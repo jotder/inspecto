@@ -38,7 +38,7 @@ class OperationalDbTest {
         assertFalse(OperationalDb.postgres());
         assertNull(OperationalDb.url(), "no shared URL — each store keeps its own per-space DuckDB file");
         assertEquals("jdbc:duckdb:/spaces/a/duckdb/jobs.db",
-                OperationalDb.urlFor("jobs.db.url", "jdbc:duckdb:/spaces/a/duckdb/jobs.db"));
+                OperationalDb.urlFor(OperationalDb.Family.JOB_RUNS, "jdbc:duckdb:/spaces/a/duckdb/jobs.db"));
     }
 
     @Test
@@ -48,12 +48,13 @@ class OperationalDbTest {
                 () -> {
                     assertTrue(OperationalDb.postgres());
                     // Named once, honoured by every family — the space's DuckDB default is not consulted.
-                    for (String family : List.of("jobs.db.url", "provenance.db.url", "status.db.url",
-                            "objects.db.url", "objects.links.db.url", "objects.notes.db.url",
-                            "objects.tags.db.url", "consignment.outputs.db.url", "file.stages.db.url",
-                            "acquire.ledger.db.url")) {
+                    // ⚠ Iterates the ROSTER rather than a hand-listed copy (2026-08-15): a family added
+                    // to Family without honouring the shared URL now fails here instead of going unnoticed.
+                    assertEquals(10, OperationalDb.Family.values().length, "the roster is ten families");
+                    for (OperationalDb.Family family : OperationalDb.Family.values()) {
                         assertEquals("jdbc:postgresql://db:5432/inspecto",
-                                OperationalDb.urlFor(family, "jdbc:duckdb:/spaces/a/duckdb/x.db"), family);
+                                OperationalDb.urlFor(family, "jdbc:duckdb:/spaces/a/duckdb/x.db"),
+                                family.name());
                     }
                 });
     }
@@ -64,7 +65,7 @@ class OperationalDbTest {
                         "inspecto.db.url", "jdbc:postgresql://db:5432/inspecto",
                         "jobs.db.url", "jdbc:duckdb:/keep/me/here.db"),
                 () -> assertEquals("jdbc:duckdb:/keep/me/here.db",
-                        OperationalDb.urlFor("jobs.db.url", "jdbc:duckdb:/spaces/a/duckdb/jobs.db")));
+                        OperationalDb.urlFor(OperationalDb.Family.JOB_RUNS, "jdbc:duckdb:/spaces/a/duckdb/jobs.db")));
     }
 
     @Test
@@ -75,10 +76,10 @@ class OperationalDbTest {
                         "inspecto.db.password", "s3cret",
                         "status.db.user", "status_reader"),
                 () -> {
-                    assertEquals("svc", OperationalDb.userFor("objects.db.user"));
-                    assertEquals("s3cret", OperationalDb.passwordFor("objects.db.password"));
-                    assertEquals("status_reader", OperationalDb.userFor("status.db.user"));
-                    assertEquals("s3cret", OperationalDb.passwordFor("status.db.password"),
+                    assertEquals("svc", OperationalDb.userFor(OperationalDb.Family.OBJECTS));
+                    assertEquals("s3cret", OperationalDb.passwordFor(OperationalDb.Family.OBJECTS));
+                    assertEquals("status_reader", OperationalDb.userFor(OperationalDb.Family.STATUS));
+                    assertEquals("s3cret", OperationalDb.passwordFor(OperationalDb.Family.STATUS),
                             "an overridden user does not drag the password with it");
                 });
     }
@@ -97,12 +98,12 @@ class OperationalDbTest {
                         "status.db.password", "${SYS:test.status.secret}",
                         "test.status.secret", "status-secret"),
                 () -> {
-                    assertEquals("resolved-secret", OperationalDb.passwordFor("objects.db.password"));
-                    assertEquals("status-secret", OperationalDb.passwordFor("status.db.password"),
+                    assertEquals("resolved-secret", OperationalDb.passwordFor(OperationalDb.Family.OBJECTS));
+                    assertEquals("status-secret", OperationalDb.passwordFor(OperationalDb.Family.STATUS),
                             "a per-family reference resolves to ITS secret, not the shared one");
                 });
         withProps(Map.of("inspecto.db.password", "plain-literal"),
-                () -> assertEquals("plain-literal", OperationalDb.passwordFor("objects.db.password")));
+                () -> assertEquals("plain-literal", OperationalDb.passwordFor(OperationalDb.Family.OBJECTS)));
     }
 
     @Test

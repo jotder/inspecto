@@ -62,7 +62,7 @@ final class ServiceStores {
         if (!"duckdb".equals(backend) && !pg && !backend.startsWith("jdbc:")) return null;
         String url = backend.startsWith("jdbc:")
                 ? backend
-                : OperationalDb.urlFor("jobs.db.url", root.jobRunDbUrl());
+                : OperationalDb.urlFor(OperationalDb.Family.JOB_RUNS, root.jobRunDbUrl());
         try {
             return DbJobRunStore.open(url);
         } catch (Exception e) {
@@ -84,7 +84,7 @@ final class ServiceStores {
         if (!"duckdb".equals(backend) && !pg && !backend.startsWith("jdbc:")) return null;
         String url = backend.startsWith("jdbc:")
                 ? backend
-                : OperationalDb.urlFor("provenance.db.url", root.provenanceDbUrl());
+                : OperationalDb.urlFor(OperationalDb.Family.PROVENANCE, root.provenanceDbUrl());
         try {
             return com.gamma.pipeline.exec.DbProvenanceStore.open(url);
         } catch (Exception e) {
@@ -121,7 +121,7 @@ final class ServiceStores {
         if (!"duckdb".equals(backend) && !pg && !backend.startsWith("jdbc:")) return null;
         String url = backend.startsWith("jdbc:")
                 ? backend
-                : OperationalDb.urlFor("consignment.outputs.db.url", root.consignmentOutputsDbUrl());
+                : OperationalDb.urlFor(OperationalDb.Family.CONSIGNMENT_OUTPUTS, root.consignmentOutputsDbUrl());
         try {
             return com.gamma.consignment.DbConsignmentOutputStore.open(url);
         } catch (Exception e) {
@@ -143,7 +143,7 @@ final class ServiceStores {
         if (!"duckdb".equals(backend) && !pg && !backend.startsWith("jdbc:")) return null;
         String url = backend.startsWith("jdbc:")
                 ? backend
-                : OperationalDb.urlFor("file.stages.db.url", root.fileStagesDbUrl());
+                : OperationalDb.urlFor(OperationalDb.Family.FILE_STAGES, root.fileStagesDbUrl());
         try {
             return com.gamma.consignment.DbFileStageStore.open(url);
         } catch (Exception e) {
@@ -187,10 +187,10 @@ final class ServiceStores {
     static com.gamma.ops.ObjectStore openObjectStore(SpaceRoot root) {
         String backend = System.getProperty("objects.backend", "memory");
         if (!"db".equalsIgnoreCase(backend)) return new com.gamma.ops.InMemoryObjectStore();
-        String url = OperationalDb.urlFor("objects.db.url", root.objectsDbUrl());
+        String url = OperationalDb.urlFor(OperationalDb.Family.OBJECTS, root.objectsDbUrl());
         try {
             com.gamma.ops.ObjectStore db = com.gamma.ops.DbObjectStore.open(url,
-                    OperationalDb.userFor("objects.db.user"), OperationalDb.passwordFor("objects.db.password"));
+                    OperationalDb.userFor(OperationalDb.Family.OBJECTS), OperationalDb.passwordFor(OperationalDb.Family.OBJECTS));
             log.info("Object backend: database ({})", url);
             return db;
         } catch (Exception e) {
@@ -210,10 +210,10 @@ final class ServiceStores {
     static com.gamma.ops.link.LinkStore openLinkStore(SpaceRoot root) {
         String backend = System.getProperty("objects.backend", "memory");
         if (!"db".equalsIgnoreCase(backend)) return new com.gamma.ops.link.InMemoryLinkStore();
-        String url = OperationalDb.urlFor("objects.links.db.url", root.linksDbUrl());
+        String url = OperationalDb.urlFor(OperationalDb.Family.LINKS, root.linksDbUrl());
         try {
             com.gamma.ops.link.LinkStore db = com.gamma.ops.link.DbLinkStore.open(url,
-                    OperationalDb.userFor("objects.db.user"), OperationalDb.passwordFor("objects.db.password"));
+                    OperationalDb.userFor(OperationalDb.Family.LINKS), OperationalDb.passwordFor(OperationalDb.Family.LINKS));
             log.info("Link backend: database ({})", url);
             return db;
         } catch (Exception e) {
@@ -232,10 +232,10 @@ final class ServiceStores {
     static com.gamma.ops.note.NoteStore openNoteStore(SpaceRoot root) {
         String backend = System.getProperty("objects.backend", "memory");
         if (!"db".equalsIgnoreCase(backend)) return new com.gamma.ops.note.InMemoryNoteStore();
-        String url = OperationalDb.urlFor("objects.notes.db.url", root.notesDbUrl());
+        String url = OperationalDb.urlFor(OperationalDb.Family.NOTES, root.notesDbUrl());
         try {
             com.gamma.ops.note.NoteStore db = com.gamma.ops.note.DbNoteStore.open(url,
-                    OperationalDb.userFor("objects.db.user"), OperationalDb.passwordFor("objects.db.password"));
+                    OperationalDb.userFor(OperationalDb.Family.NOTES), OperationalDb.passwordFor(OperationalDb.Family.NOTES));
             log.info("Note backend: database ({})", url);
             return db;
         } catch (Exception e) {
@@ -254,10 +254,10 @@ final class ServiceStores {
     static com.gamma.ops.tag.TagAssignmentStore openTagAssignmentStore(SpaceRoot root) {
         String backend = System.getProperty("objects.backend", "memory");
         if (!"db".equalsIgnoreCase(backend)) return new com.gamma.ops.tag.InMemoryTagAssignmentStore();
-        String url = OperationalDb.urlFor("objects.tags.db.url", root.tagAssignmentsDbUrl());
+        String url = OperationalDb.urlFor(OperationalDb.Family.TAGS, root.tagAssignmentsDbUrl());
         try {
             com.gamma.ops.tag.TagAssignmentStore db = com.gamma.ops.tag.DbTagAssignmentStore.open(url,
-                    OperationalDb.userFor("objects.db.user"), OperationalDb.passwordFor("objects.db.password"));
+                    OperationalDb.userFor(OperationalDb.Family.TAGS), OperationalDb.passwordFor(OperationalDb.Family.TAGS));
             log.info("Tag assignment backend: database ({})", url);
             return db;
         } catch (Exception e) {
@@ -287,10 +287,10 @@ final class ServiceStores {
     static StatusStore openStatusStore(SpaceRoot root) {
         String backend = System.getProperty("status.backend", "file");
         if (!"db".equalsIgnoreCase(backend)) return new FileStatusStore();
-        String url = OperationalDb.urlFor("status.db.url", root.statusDbUrl());
+        String url = OperationalDb.urlFor(OperationalDb.Family.STATUS, root.statusDbUrl());
         try {
             StatusStore db = DbStatusStore.open(url,
-                    OperationalDb.userFor("status.db.user"), OperationalDb.passwordFor("status.db.password"));
+                    OperationalDb.userFor(OperationalDb.Family.STATUS), OperationalDb.passwordFor(OperationalDb.Family.STATUS));
             log.info("Status backend: database ({})", url);
             return db;
         } catch (Exception e) {

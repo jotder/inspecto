@@ -475,8 +475,50 @@ acquisition ledger. Personal sets nothing at all.
   `${ENV:PGPASSWORD}`, `${KEYSTORE:alias}` (the existing `secrets.keystore.*` machinery), `${FILE:…}`,
   or a literal — the `auth.oidc.clientSecret` precedent, so the secret need not sit on the process
   command line. A literal passes through unchanged, which is what keeps existing deployments working.
-  ⚠ Open 2's **UI half stays open** — it is the bootstrap design problem (the UI is served by the
-  process that needs the database), not a build task.
+  ~~⚠ Open 2's **UI half stays open**~~ — **SHIPPED 2026-08-15, see §5.0-a.**
+
+### 5.0-a The read-and-validate surface (Open 2, 2026-08-15)
+
+**The UI reports and validates; it never writes.** Two routes, both `canConfigureAccess`:
+`GET /system/operational-db` (the effective config, per family, **with the source of each value**) and
+`POST /system/operational-db/test` (open the URL for real, run `SELECT 1`, return a **named** outcome —
+`OK` / `DRIVER_MISSING` / `AUTH_FAILED` / `UNREACHABLE`, because "the driver is missing" means *drop
+`postgresql.jar` beside `inspecto.jar`*, a different action from bad credentials). Surface:
+Settings ▸ **Operational database**.
+
+🔴 **There is deliberately no PUT, and adding one is not a follow-on.** The process serving the UI is the
+one that needs the database, so it cannot configure its own dependency and no change could take effect
+without a restart — and persisting from the UI would create a **second declaration of the same fact**
+beside `-D`, the split-brain the enrichment companion already refused (D7). Decided 2026-08-15: the
+operator applies flags through their own deployment tooling; this screen tells them what is in force.
+
+- **`OperationalDb.Family` is now the roster** — the ten families' property names live there and nowhere
+  else, so the store openers and the report cannot drift; naming a family off the list stops compiling.
+  ⛔ They had been ten **string literals** across `ServiceStores` + `SpaceBootstrap`.
+- ⚠ **Three irregularities the report models rather than flattens:** three different "is it on" spellings
+  with three different defaults (`none` / `duckdb` / `memory` / `file`); a **`*.backend` starting with
+  `jdbc:` IS the URL** and bypasses `OperationalDb` entirely (a third source beyond per-family and
+  shared); and **URL grain ≠ credential grain** — the four `objects.*` families each carry their own
+  `*.db.url` but share one `objects.db.user`/`.password`.
+- ⛔ **A family that sends no credentials reports `user: null`, never the shared one.** Five families
+  (`JOB_RUNS`, `PROVENANCE`, `CONSIGNMENT_OUTPUTS`, `FILE_STAGES`, `ACQUISITION_LEDGER`) open via
+  `open(url)` and pass **no user and no password at all**, so the report uses `reportedUser` rather than
+  `userFor` — `userFor`'s fall-back to `-Dinspecto.db.user` is right for a *credentialed* family
+  inheriting the shared value and wrong for one that sends nothing. ⚠ Caught only by probing: the first
+  cut reported `"user":"ops_user"` beside `"userProperty":null` for `JOB_RUNS`, naming a credential
+  `DbJobRunStore` never sends. A diagnostic whose entire value is being trusted must not guess.
+- ⛔ **No password leaves the server, in any form** — not the value, not a redaction, not a length. And
+  because a JDBC URL may legally embed credentials (`jdbc:postgresql://user:pw@host/db`), every URL is
+  passed through `stripUserInfo` first. ⚠ **A redaction test asserting the `password` FIELD is absent
+  proves nothing** — the guard asserts the secret appears nowhere in the whole body, and was falsified by
+  stubbing `stripUserInfo` to a no-op (1 failure, naming five families that leaked).
+- ⛔ **A supplied password is a `SecretResolver` reference, never a literal** (422) — a literal in a form
+  post is a credential in transit and in every access log. The scheme allow-list (`jdbc:postgresql:` /
+  `jdbc:duckdb:`) is the other 422: an admin-gated endpoint that opens connections must not become a
+  general-purpose port scanner.
+- ⚠ **A new gated route must also be declared in `CapabilityManifest.ENTRIES`** — `CapabilityManifestTest`
+  compares the manifest against the actual `withCapability` registration sites and fails the build on
+  drift. It caught exactly this omission on the first full reactor run.
 
 ### 5.1 Flags (all read in `ServiceStores` unless noted)
 

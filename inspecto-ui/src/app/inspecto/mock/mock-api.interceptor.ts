@@ -17,6 +17,7 @@ import { exchangeHandler } from './handlers/exchange.handler';
 import { expectationsHandler } from './handlers/expectations.handler';
 import { geoHandler } from './handlers/geo.handler';
 import { healthHandler } from './handlers/health.handler';
+import { systemHandler } from './handlers/system.handler';
 import { invHandler } from './handlers/inv.handler';
 import { jobsHandler } from './handlers/jobs.handler';
 import { navHandler } from './handlers/nav.handler';
@@ -80,6 +81,7 @@ const HANDLERS: MockHandler[] = [
     decisionRulesHandler(flags),
     bundleHandler(flags), // U-F: POST /bundle/import — after the per-kind domains it writes through
     healthHandler(flags), // /health/details only — the bare /health probe stays real (connectivity banner)
+    systemHandler(flags), // PG-1 Open 2 Stage 1: the operational-database report + JDBC test
     jobsHandler(flags),
     assistHandler(flags),
     agentHandler(flags), // AGT-6a: POST /agent/tools/{name} draft dispatch — the rest of /agent/* stays real

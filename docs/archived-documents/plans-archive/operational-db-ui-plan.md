@@ -1,6 +1,11 @@
 # Plan — PG-1 Open 2: UI configurability of the operational database
 
-**Status:** design only, **nothing built**. Written 2026-08-15 by grounding BACKLOG §6's PG-1 row, whose
+**Status: ✅ Stage 1 SHIPPED 2026-08-15** — all three §5 questions answered as recommended (Stage 1 only ·
+`-D` wins, moot · references only). **Stage 2 (persistence) is deliberately NOT built and is not owed:**
+Q1 chose read + validate as the *end state*, so §4 is a sketch retained for reasoning, not a plan of record.
+As-built: `okf/backend/engine/db-layer.md` §5.0-a.
+
+Written 2026-08-15 by grounding BACKLOG §6's PG-1 row, whose
 Open 2 reads *"Workable shape: the UI reads the current selection, validates a proposed connection (a real
 test-connection round-trip), writes it to server config, and it applies at next restart. Design-first."*
 

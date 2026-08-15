@@ -14,6 +14,7 @@ import { IconSettingsComponent } from 'app/modules/admin/icon-settings/icon-sett
 import { MapSettingsComponent } from 'app/modules/admin/map-settings/map-settings.component';
 import { ModelSettingsComponent } from 'app/modules/admin/model-settings/model-settings.component';
 import { NotificationCenterComponent } from 'app/modules/admin/notification-center/notification-center.component';
+import { OperationalDbComponent } from './operational-db.component';
 import { SpacesComponent } from 'app/modules/admin/spaces/spaces.component';
 import { TransferComponent } from 'app/modules/admin/transfer/transfer.component';
 
@@ -62,6 +63,13 @@ export class SettingsComponent {
             icon: 'heroicons_outline:bell',
             description: 'Delivery channels and notification preferences.',
             component: NotificationCenterComponent,
+        },
+        {
+            id: 'operational-db',
+            title: 'Operational database',
+            icon: 'heroicons_outline:circle-stack',
+            description: 'Where transactional stores live, and whether a connection works.',
+            component: OperationalDbComponent,
         },
         {
             id: 'spaces',

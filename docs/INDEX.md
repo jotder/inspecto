@@ -75,16 +75,16 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
-- [`superpower/operational-db-ui-plan.md`](superpower/operational-db-ui-plan.md) — **DESIGN ONLY,
-  nothing built; 3 questions open (§5).** PG-1 Open 2, the UI half of the operational-database
-  selection. ⚠ **Grounding found all four clauses of the row's "workable shape" land on something that
-  does not exist:** no route exposes the current selection, `ConnectionTester` is TCP-only (no JDBC
-  login, and it takes a profile not a URL), **no server-level config file is read at boot at all** —
-  `-D` is the entire surface — and there is no reload endpoint. Two more: `OperationalDb` is
-  package-private in `com.gamma.service` while routes live in `com.gamma.control`, and the ten families
-  have **no roster** (ten string literals across two files). Recommendation splits it: Stage 1
-  read + validate invents no config surface; persistence is a separate call, because it would create a
-  **second declaration of the same fact** — the split-brain shape this codebase has refused before.
+- ~~`superpower/operational-db-ui-plan.md`~~ — **Stage 1 SHIPPED and ARCHIVED 2026-08-15**
+  ([archive copy](archived-documents/plans-archive/operational-db-ui-plan.md), kept for the grounding).
+  PG-1 Open 2, the UI half of the operational-database selection. ⚠ **All four clauses of the row's
+  "workable shape" landed on something that did not exist** — no route exposed the selection,
+  `ConnectionTester` is TCP-only, **no server-level config file is read at boot at all**, and there is
+  no reload endpoint. Shipped as read + validate (`GET /system/operational-db`,
+  `POST /system/operational-db/test`, Settings ▸ Operational database) with **no write path**:
+  persistence would create a second declaration of the same fact beside `-D`, so Q1 chose read+validate
+  as the END STATE — ⛔ Stage 2 is not an owed follow-on. As-built:
+  [`okf/backend/engine/db-layer.md`](okf/backend/engine/db-layer.md) §5.0-a.
 
 - ~~`superpower/domain-timezone-behaviour-plan.md`~~ — **SHIPPED and ARCHIVED 2026-08-15**
   ([archive copy](archived-documents/plans-archive/domain-timezone-behaviour-plan.md), kept for the

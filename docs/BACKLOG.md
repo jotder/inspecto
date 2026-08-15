@@ -482,7 +482,8 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   server refuses — but it is the same class of divergence, and the mock is contract. ⚠ Fixing it changes
   the offline topology of every pipeline, so it needs its own slice with the node-count assertions in
   `pipeline-editable.spec.ts` updated deliberately, not absorbed into an unrelated change.
-- 🟡 **PG-1 — Postgres for Standard edition: engine done, bundle and UI open** (opened 2026-08-14).
+- ✅ **PG-1 — Postgres for Standard edition: COMPLETE** (opened 2026-08-14, closed 2026-08-15 — engine,
+  bundle *and* UI all shipped; ⛔ nothing here is owed, see Open 2 below before proposing a Save button).
   Operator's architecture, recorded so it is not re-litigated: **business data is always Parquet, read by
   DuckDB as a non-updateable query engine; operational/transactional data is DuckDB for Personal and
   PostgreSQL for Standard.** ⛔ Bottom line: **DuckDB only for Personal, DuckDB + Postgres for Standard.**
@@ -509,12 +510,15 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   at use — `${ENV:…}`, `${KEYSTORE:alias}` (so `secrets.keystore.*` is supported with no new mechanism),
   `${FILE:…}`, or a literal (pass-through, back-compat) — the `auth.oidc.clientSecret` precedent.
   As-built: `okf/backend/engine/db-layer.md` §5.0; pinned by `OperationalDbTest`.
-  **Open 2 (remaining) — UI configurability.** ⚠ **Bootstrap problem, not a build task:** the UI is
+  ~~**Open 2 — UI configurability**~~ **DECIDED + SHIPPED 2026-08-15 as read + validate.** ⚠ **Bootstrap problem, not a build task:** the UI is
   served by the process that needs the operational database, so it cannot configure the thing it depends
   on, and a live change cannot take effect without a restart. Workable shape: the UI *reads* the current
   selection, *validates* a proposed connection (a real test-connection round-trip), writes it to server
   config, and it applies at next restart. Design-first.
-  **→ DESIGNED 2026-08-15, grounded, 3 questions open in `superpower/operational-db-ui-plan.md` §5.**
+  **→ DESIGNED then SHIPPED 2026-08-15; all three §5 questions answered as recommended (Stage 1 only ·
+  `-D` wins, moot · references only). Plan archived:
+  [`plans-archive/operational-db-ui-plan.md`](archived-documents/plans-archive/operational-db-ui-plan.md).**
+  The grounding below is kept because it is *why* the shape is what it is:
   ⚠ **All four clauses of that "workable shape" land on something that does not exist:** (i) no route
   exposes the current selection (`/health/details` reports `jobRunsProjection` UP/DOWN, never the
   backend); (ii) the test-connection precedent is **not reusable** — `ConnectionTester` is a plain TCP
@@ -526,10 +530,15 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   `com.gamma.control`, and the ten families have **NO roster** (ten string literals across
   `ServiceStores` + `SpaceBootstrap`) — ⛔ a hand-copied one is the mirror bug that has already cost
   this repo twice. Also ⚠ **url grain ≠ credential grain**: the four `objects.*` families each carry
-  their own `*.db.url` but share one `objects.db.user`/`password`. **The recommendation splits the
-  work** — Stage 1 (read + validate) invents no configuration surface; persistence is a separate call,
-  since it creates a **second declaration of the same fact**, the split-brain shape the D7 enrichment
-  companion already refused.
+  their own `*.db.url` but share one `objects.db.user`/`password`. **The recommendation split the
+  work** — Stage 1 (read + validate) invents no configuration surface; persistence would create a
+  **second declaration of the same fact**, the split-brain shape the D7 enrichment companion already
+  refused. **As built:** `GET /system/operational-db` + `POST /system/operational-db/test` (both
+  `canConfigureAccess`) and Settings ▸ Operational database, with **no write path** — `OperationalDb.Family`
+  is now the real roster, and ⛔ **Stage 2 persistence is NOT an owed follow-on: read + validate is the
+  END STATE.** ⚠ The credential-grain warning above proved load-bearing: the first cut reported the shared
+  `-Dinspecto.db.user` for the five families that send no credentials at all. As-built:
+  `okf/backend/engine/db-layer.md` §5.0-a.
   **Context — `-D` is the ONLY configuration surface today.** `serve.sh`/`serve.bat` (embedded in
   `package.ps1`) translate env vars → `-D` for port, spaces root, tokens, CORS, HTTPS and OIDC only; not
   one persistence property is wired in. `space.toon`'s manifest carries only

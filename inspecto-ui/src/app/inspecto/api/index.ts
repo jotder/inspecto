@@ -17,6 +17,7 @@ export * from './optimistic';
 export * from './runs.service';
 export * from './reports.service';
 export * from './health.service';
+export * from './system.service';
 export * from './jobs.service';
 export * from './enrichment.service';
 export * from './catalog.service';

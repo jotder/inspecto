@@ -2,6 +2,9 @@ package com.gamma.service;
 
 import com.gamma.acquire.SecretResolver;
 
+import java.util.List;
+import java.util.function.Function;
+
 /**
  * The <b>operational database</b>: one selection covering every transactional/operational store the
  * service hosts (job runs, provenance, status, Objects/links/notes/tags, consignment outputs, file
@@ -46,6 +49,149 @@ final class OperationalDb {
 
     private OperationalDb() {}
 
+    /**
+     * The operational store families — <b>the roster</b>. Every family's property names live here and
+     * nowhere else, so the store openers and any diagnostic read of "what is this deployment using"
+     * cannot drift apart: naming a family that is not on this list stops compiling.
+     *
+     * <p>⛔ Introduced 2026-08-15 because they had been ten <b>string literals</b> across
+     * {@link ServiceStores} and {@link SpaceBootstrap}, which is the same shape as the mirrored ledger
+     * header and the {@code REQUEST_SCOPED_ATTRS} roster — a copy that silently goes stale.
+     *
+     * <p>⚠ Three irregularities that are REAL and must not be flattened:
+     * <ul>
+     *   <li><b>Three different "is it on" spellings.</b> The first four accept
+     *       {@code duckdb}/{@code postgres}/a raw {@code jdbc:} URL; the Objects family and status accept
+     *       {@code db}; each has its own default ({@code none}, {@code duckdb}, {@code memory},
+     *       {@code file}).</li>
+     *   <li><b>A {@code *.backend} that starts with {@code jdbc:} IS the URL</b> and bypasses this class
+     *       entirely — a third source beyond the per-family and shared properties.</li>
+     *   <li><b>URL grain ≠ credential grain.</b> The four Objects families each have their own
+     *       {@code *.db.url} but share one {@code objects.db.user}/{@code .password}.</li>
+     * </ul>
+     */
+    enum Family {
+        JOB_RUNS("Job runs", "jobs.backend", "none", Mode.URL_OR_ENGINE,
+                "jobs.db.url", null, null, SpaceRoot::jobRunDbUrl),
+        PROVENANCE("Provenance", "provenance.backend", "none", Mode.URL_OR_ENGINE,
+                "provenance.db.url", null, null, SpaceRoot::provenanceDbUrl),
+        CONSIGNMENT_OUTPUTS("Consignment outputs", "consignment.outputs.backend", "duckdb", Mode.URL_OR_ENGINE,
+                "consignment.outputs.db.url", null, null, SpaceRoot::consignmentOutputsDbUrl),
+        FILE_STAGES("File stages", "file.stages.backend", "none", Mode.URL_OR_ENGINE,
+                "file.stages.db.url", null, null, SpaceRoot::fileStagesDbUrl),
+        OBJECTS("Objects", "objects.backend", "memory", Mode.DB_FLAG,
+                "objects.db.url", "objects.db.user", "objects.db.password", SpaceRoot::objectsDbUrl),
+        LINKS("Links", "objects.backend", "memory", Mode.DB_FLAG,
+                "objects.links.db.url", "objects.db.user", "objects.db.password", SpaceRoot::linksDbUrl),
+        NOTES("Notes", "objects.backend", "memory", Mode.DB_FLAG,
+                "objects.notes.db.url", "objects.db.user", "objects.db.password", SpaceRoot::notesDbUrl),
+        TAGS("Tag assignments", "objects.backend", "memory", Mode.DB_FLAG,
+                "objects.tags.db.url", "objects.db.user", "objects.db.password", SpaceRoot::tagAssignmentsDbUrl),
+        STATUS("Status", "status.backend", "file", Mode.DB_FLAG,
+                "status.db.url", "status.db.user", "status.db.password", SpaceRoot::statusDbUrl),
+        ACQUISITION_LEDGER("Acquisition ledger", "acquire.ledger.backend", "memory", Mode.DB_FLAG,
+                "acquire.ledger.db.url", null, null, SpaceRoot::acquisitionLedgerDbUrl);
+
+        /** How a family spells "enabled" on its {@code *.backend} property — they genuinely differ. */
+        enum Mode {
+            /** {@code duckdb} | {@code postgres} | a raw {@code jdbc:…} URL (which then IS the URL). */
+            URL_OR_ENGINE,
+            /** {@code db}, against a non-DB default ({@code memory} / {@code file}). */
+            DB_FLAG
+        }
+
+        final String label;
+        final String backendProperty;
+        final String backendDefault;
+        final Mode mode;
+        final String urlProperty;
+        /** May be {@code null} — several families open with a URL and no credentials at all. */
+        final String userProperty;
+        final String passwordProperty;
+        private final Function<SpaceRoot, String> spaceDefault;
+
+        Family(String label, String backendProperty, String backendDefault, Mode mode, String urlProperty,
+               String userProperty, String passwordProperty, Function<SpaceRoot, String> spaceDefault) {
+            this.label = label;
+            this.backendProperty = backendProperty;
+            this.backendDefault = backendDefault;
+            this.mode = mode;
+            this.urlProperty = urlProperty;
+            this.userProperty = userProperty;
+            this.passwordProperty = passwordProperty;
+            this.spaceDefault = spaceDefault;
+        }
+
+        String spaceDefault(SpaceRoot root) { return spaceDefault.apply(root); }
+    }
+
+    /** Where a family's effective URL came from — the question a diagnostic read exists to answer. */
+    enum Source {
+        /** The family's own {@code *.backend} carried a raw {@code jdbc:} URL, bypassing everything else. */
+        BACKEND_PROPERTY,
+        /** The family's own {@code -D<family>.db.url}. */
+        FAMILY_PROPERTY,
+        /** The shared {@code -Dinspecto.db.url}. */
+        SHARED_PROPERTY,
+        /** No property set — the space's own embedded DuckDB file. */
+        SPACE_DEFAULT,
+        /** The family's {@code *.backend} leaves it off; no database is opened at all. */
+        DISABLED
+    }
+
+    /**
+     * One family's effective configuration. {@code url} is {@code null} exactly when
+     * {@code source == DISABLED}. ⛔ Carries no password, in any form — see {@code SystemRoutes}.
+     */
+    record Resolved(Family family, Source source, String url, String user) {
+        boolean enabled() { return source != Source.DISABLED; }
+    }
+
+    /** Every family's effective configuration, in roster order. */
+    static List<Resolved> resolveAll(SpaceRoot root) {
+        return java.util.Arrays.stream(Family.values()).map(f -> resolve(f, root)).toList();
+    }
+
+    /**
+     * A family's effective configuration — the same three-way the store openers perform, in one place so
+     * a diagnostic read cannot report a URL the store is not actually using.
+     */
+    static Resolved resolve(Family f, SpaceRoot root) {
+        String backend = System.getProperty(f.backendProperty, f.backendDefault).trim();
+        if (f.mode == Family.Mode.URL_OR_ENGINE) {
+            String lower = backend.toLowerCase();
+            if (lower.startsWith("jdbc:"))
+                return new Resolved(f, Source.BACKEND_PROPERTY, backend, reportedUser(f));
+            if (!"duckdb".equals(lower) && !"postgres".equals(lower) && !"postgresql".equals(lower))
+                return new Resolved(f, Source.DISABLED, null, null);
+        } else if (!"db".equalsIgnoreCase(backend)) {
+            return new Resolved(f, Source.DISABLED, null, null);
+        }
+        String explicit = System.getProperty(f.urlProperty);
+        if (explicit != null && !explicit.isBlank())
+            return new Resolved(f, Source.FAMILY_PROPERTY, explicit.trim(), reportedUser(f));
+        String shared = url();
+        return shared != null
+                ? new Resolved(f, Source.SHARED_PROPERTY, shared, reportedUser(f))
+                : new Resolved(f, Source.SPACE_DEFAULT, f.spaceDefault(root), reportedUser(f));
+    }
+
+    /**
+     * The user a family <b>actually connects as</b>, for the report — {@code null} when it sends no
+     * credentials at all.
+     *
+     * <p>⚠ Not {@link #userFor}, deliberately. {@code userFor} falls back to the shared
+     * {@code -Dinspecto.db.user} so a credentialed family can inherit it, but the five families with a
+     * {@code null} {@code userProperty} open via {@code open(url)} and pass <b>no user and no
+     * password</b> ({@code DbJobRunStore}, {@code DbProvenanceStore}, {@code DbConsignmentOutputStore},
+     * {@code DbFileStageStore}, {@code AcquisitionLedgers}). Reporting the shared user for them would
+     * name a credential the store never sends — the "URL grain ≠ credential grain" trap, and a
+     * diagnostic that exists to be trusted must not guess.
+     */
+    private static String reportedUser(Family f) {
+        return f.userProperty == null ? null : userFor(f);
+    }
+
     /** True when the operational stores should speak PostgreSQL rather than embedded DuckDB. */
     static boolean postgres() {
         String v = System.getProperty("inspecto.db", "duckdb").trim().toLowerCase();
@@ -74,6 +220,16 @@ final class OperationalDb {
      *
      * @throws IllegalStateException naming the property at fault and what to do about it
      */
+    /** Whether the PostgreSQL driver is on the classpath — the sidecar question, asked without throwing. */
+    static boolean driverAvailable() {
+        try {
+            Class.forName(PG_DRIVER);
+            return true;
+        } catch (ClassNotFoundException missing) {
+            return false;
+        }
+    }
+
     static void verifySelectable() {
         if (!postgres()) return;
         if (url() == null)
@@ -94,23 +250,29 @@ final class OperationalDb {
      * The URL a store should open: an explicit per-family {@code -D<family>.db.url} first (back-compat,
      * and the escape hatch for pointing one store somewhere else), then the shared operational URL,
      * then the space's own DuckDB file.
+     *
+     * <p>⚠ Takes a {@link Family}, not a property name — that is what keeps the roster load-bearing.
+     * The caller still supplies the space default because several openers reach it by a path this class
+     * should not know (a legacy root, a {@code jdbc:} backend value that already decided).
      */
-    static String urlFor(String familyUrlProperty, String spaceDefault) {
-        String explicit = System.getProperty(familyUrlProperty);
+    static String urlFor(Family family, String spaceDefault) {
+        String explicit = System.getProperty(family.urlProperty);
         if (explicit != null && !explicit.isBlank()) return explicit.trim();
         String shared = url();
         return shared != null ? shared : spaceDefault;
     }
 
     /** As {@link #urlFor}, for the credential half — a per-family value first, then the shared one. */
-    static String userFor(String familyUserProperty) {
-        String explicit = System.getProperty(familyUserProperty);
+    static String userFor(Family family) {
+        if (family.userProperty == null) return user();
+        String explicit = System.getProperty(family.userProperty);
         return explicit != null ? explicit : user();
     }
 
     /** As {@link #userFor}, for the password — a per-family value may also be a {@code ${…}} reference. */
-    static String passwordFor(String familyPasswordProperty) {
-        String explicit = System.getProperty(familyPasswordProperty);
+    static String passwordFor(Family family) {
+        if (family.passwordProperty == null) return password();
+        String explicit = System.getProperty(family.passwordProperty);
         return explicit != null ? SecretResolver.resolve(explicit) : password();
     }
 }

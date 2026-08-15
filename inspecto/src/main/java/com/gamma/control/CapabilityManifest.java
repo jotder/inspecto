@@ -129,6 +129,11 @@ final class CapabilityManifest {
             new Entry("PUT", "/config/icon-map", Roles.CAN_AUTHOR_WORKBENCH),
             // ShareRoutes
             new Entry("POST", "/dashboards/([^/]+)/share", Roles.CAN_AUTHOR_WORKBENCH),
+            // SystemRoutes — infrastructure diagnostics, so administrative rather than authoring. Both
+            // are reads (the test opens a connection and writes nothing), gated because what they report
+            // is credential-adjacent and because an endpoint that dials a URL is not for everyone.
+            new Entry("GET", "/system/operational-db", Roles.CAN_CONFIGURE_ACCESS),
+            new Entry("POST", "/system/operational-db/test", Roles.CAN_CONFIGURE_ACCESS),
             // TagRoutes
             new Entry("POST", "/tags", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/tags/([^/]+)/rename", Roles.CAN_AUTHOR_WORKBENCH),
