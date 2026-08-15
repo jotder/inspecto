@@ -133,6 +133,26 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   reported success anyway. The half-applied fix compiled and looked done. **When the surrounding syntax
   varies across call sites, grep the result and count them** before believing the edit.
 
+- **A green suite across a behaviour change means the behaviour is UNPINNED, not that it is right.** On
+  2026-08-15 the offline mock's lift was changed to emit a `transform.map` node unconditionally, altering
+  the graph topology of *every* pipeline without an authored projection — and the full UI suite passed with
+  a **zero delta**, 2433/5 before and after. Nothing anywhere asserted the node's existence, which is
+  exactly why the drift had survived since `processing.map` shipped. ⛔ When a change alters observable
+  behaviour and no test notices, **stop and add the guard** rather than banking the green run; then falsify
+  it (restore the old behaviour and watch it fail). The same shift's `record()` transaction and
+  `bind-kinds` contract were both confirmed this way. Related: the backlog row for the drift had itself
+  warned that "the node-count assertions must be updated deliberately" — **there were none**.
+
+- **A residual buried in a BACKLOG row marked ✅/SHIPPED is the likeliest thing in the file to be already
+  done.** Four were found stale in one shift (2026-08-15): a `PipelineJobRunner` gap closed *one day* after
+  it was written up, a regression test recorded as "worth adding" that already existed, a retention-docs
+  gap whose work had landed in `operations-reference.md` rather than the runbook the row named, and a
+  "8/8 stores, one missing" criterion that was really 10 stores with three missing. The cause is
+  structural: a residual records the file its author *expected* the fix to take, the fix lands elsewhere in
+  a later shift, and the row's ✅ header stops anyone re-reading the prose. ⛔ **Grep the CLAIM, not the
+  path the row names** — each of these was refuted in under two minutes by checking the behaviour. Three
+  would otherwise have been re-implemented on top of working code.
+
 - **An `HttpExchange` attribute is per-request by DEFAULT, not by guarantee — derive or clear, never
   trust a stamp.** `sun.net.httpserver.ExchangeImpl` decides *once at class-init* whether each exchange
   gets a private map:

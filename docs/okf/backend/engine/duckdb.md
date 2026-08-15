@@ -86,5 +86,18 @@ The engine embeds DuckDB natively (requires the `--enable-native-access=ALL-UNNA
       default.
 * **Reserved-word quoting.** `day` is a DuckDB keyword — alias it (`run_day`) in SQL; quote `"trigger"` too.
   Watch this whenever generating SQL with date/trigger columns. See [gotchas](../gotchas/cross-cutting.md).
+* ⚠ **The session `TimeZone` is the HOST zone, not UTC** — probed 2026-08-15 against the bundled
+  `org.duckdb:duckdb_jdbc:1.5.2.1` on a plain `jdbc:duckdb:` connection:
+  `current_setting('TimeZone')` returned the host zone (`Asia/Calcutta` on this box) and
+  `duckdb_extensions()` reported **icu installed: true, loaded: true**. The widespread "DuckDB defaults to
+  UTC" belief holds only for an **ICU-less** build, and this is not one. Consequently a SQL-side
+  `now()::TIMESTAMP` writer and a Java-side `LocalDateTime.ofInstant(…, ZoneId.systemDefault())` reader are
+  **the same wall clock** and agree — e.g. `BatchIngestStrategy:215`'s `__valid_from` and
+  `ReferenceCompactor:142`'s retention cutoff are a genuine matched pair, *not* the off-by-the-UTC-offset
+  bug they resemble. ⛔ "Fixing" that reader to UTC would **create** the skew and drop rows outside `keep`.
+  ⚠ Note the asymmetry: DuckDB follows `systemDefault()` but is **blind to `-Dops.timezone`** — nothing in
+  the repo issues `SET TimeZone` and `DuckDbUtil` has no setter — so moving such a pair onto
+  [`OperationsZone`](../control-plane/jobs.md) means changing the connection's zone as a **third** moving
+  part, not just the two Java halves.
 
 Output is written via DuckDB `COPY` — see [output & sinks](output-sinks.md).
