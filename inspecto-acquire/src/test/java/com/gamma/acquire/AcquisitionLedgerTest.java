@@ -107,4 +107,57 @@ class AcquisitionLedgerTest {
             assertEquals("e", ledger.find("S", "new.csv").orElseThrow().etag());
         }
     }
+
+    /**
+     * A replace that dies between the DELETE and the INSERT keeps the OLD fingerprint (postgres-multi-user
+     * plan, P0/F1).
+     *
+     * <p>⚠ The bug this pins is not a failed update, it is a <b>lost</b> one. Under autocommit the DELETE
+     * committed on its own, so an error in the INSERT half erased the fingerprint entirely — and a file with
+     * no ledger row is a file the next acquisition cycle treats as NEW and re-ingests, duplicating its records
+     * downstream. Failing loudly while leaving the prior fingerprint intact is the safe outcome.
+     *
+     * <p>⚠ Deliberately NOT a concurrency test: {@code synchronized} plus the single shared connection already
+     * serialise callers, so the interleaving the plan describes cannot happen until a pool lands. The crash /
+     * exception window is the half that is live today, so that is what is injected here.
+     */
+    @Test
+    void aFailedReplaceRollsBackAndKeepsThePriorFingerprint(@TempDir Path dir) throws Exception {
+        String url = "jdbc:duckdb:" + dir.resolve("atomic.db").toString().replace('\\', '/');
+        try (java.sql.Connection real = com.gamma.util.JdbcDrivers.connect(url)) {
+            DbAcquisitionLedger ledger = new DbAcquisitionLedger(real);
+            ledger.record(new LedgerEntry("S", "a.csv", "a.csv", 100, "cs1", "etag-1", "ver-1", 1000L, 5000L,
+                    LedgerEntry.PROCESSED));
+
+            // A connection whose INSERT half always fails — the crash window, made deterministic.
+            java.sql.Connection failing = (java.sql.Connection) java.lang.reflect.Proxy.newProxyInstance(
+                    java.sql.Connection.class.getClassLoader(), new Class<?>[]{java.sql.Connection.class},
+                    (proxy, method, args) -> {
+                        if ("prepareStatement".equals(method.getName()) && args != null && args.length > 0
+                                && String.valueOf(args[0]).startsWith("INSERT INTO inspecto_acquisition_ledger")) {
+                            throw new java.sql.SQLException("injected failure in the INSERT half");
+                        }
+                        try {
+                            return method.invoke(real, args);
+                        } catch (java.lang.reflect.InvocationTargetException ite) {
+                            throw ite.getCause();
+                        }
+                    });
+
+            DbAcquisitionLedger brittle = new DbAcquisitionLedger(failing);
+            assertThrows(IllegalStateException.class, () -> brittle.record(
+                    new LedgerEntry("S", "a.csv", "a.csv", 250, "cs2", "etag-2", "ver-2", 2000L, 6000L,
+                            LedgerEntry.PROCESSED)),
+                    "a half-applied replace must fail loudly, not silently");
+
+            LedgerEntry survived = ledger.find("S", "a.csv").orElseThrow(
+                    () -> new AssertionError("the fingerprint was DELETED and never re-INSERTed — "
+                            + "this file would now re-ingest as new"));
+            assertEquals(100, survived.size(), "the prior fingerprint must be intact, not the failed one");
+            assertEquals("cs1", survived.checksum());
+
+            assertTrue(real.getAutoCommit(),
+                    "autocommit must be restored — every other method on this shared connection assumes it");
+        }
+    }
 }

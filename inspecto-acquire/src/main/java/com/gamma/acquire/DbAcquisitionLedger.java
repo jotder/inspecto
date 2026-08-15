@@ -21,8 +21,10 @@ import java.util.OptionalLong;
  * note stores already own theirs.
  *
  * <p><b>Upsert semantics:</b> the {@code (source_id, relative_path)} primary key holds one row per file; a new
- * fingerprint replaces the prior one (DELETE-then-INSERT under the synchronized lock) so a re-uploaded/changed
- * file's latest state is what later cycles compare against.
+ * fingerprint replaces the prior one (DELETE-then-INSERT in one transaction, under the synchronized lock) so a
+ * re-uploaded/changed file's latest state is what later cycles compare against. The two statements are
+ * committed together — a half-applied replace would drop the fingerprint and re-ingest the file. See
+ * {@link #record}.
  */
 public final class DbAcquisitionLedger implements AcquisitionLedger, com.gamma.util.BrowsableStore {
 
@@ -67,9 +69,32 @@ public final class DbAcquisitionLedger implements AcquisitionLedger, com.gamma.u
         }
     }
 
+    /**
+     * Replace this file's fingerprint, atomically.
+     *
+     * <p>The DELETE and the INSERT are one fact — "this file's fingerprint is now X" — so they run in one
+     * transaction. Under autocommit they committed separately, and anything landing between them (a driver
+     * error, a full disk, a JVM kill) left the row deleted and never re-inserted: the fingerprint was gone,
+     * so the next acquisition cycle saw the file as NEW and re-ingested it, duplicating its records
+     * downstream. Losing a fingerprint is worse than failing to update one, which is why this rolls back.
+     *
+     * <p>⚠ This is <b>not</b> a concurrency fix. {@code synchronized} plus this store's single shared
+     * connection already serialise every caller, so no second writer can interleave today; the window this
+     * closes is the crash/exception one, which is live on DuckDB right now. (A future connection pool would
+     * remove that serialisation and make the interleaving real — see
+     * {@code docs/superpower/postgres-multi-user-plan.md} P1.)
+     *
+     * <p>⚠ Autocommit is restored in a {@code finally}: every other method on this shared connection assumes
+     * it is on.
+     */
     @Override
     public synchronized void record(LedgerEntry e) {
+        boolean priorAutoCommit = true;
+        boolean autoCommitChanged = false;
         try {
+            priorAutoCommit = conn.getAutoCommit();
+            conn.setAutoCommit(false);
+            autoCommitChanged = true;
             try (PreparedStatement del = conn.prepareStatement(
                     "DELETE FROM " + TABLE + " WHERE source_id = ? AND relative_path = ?")) {
                 del.setString(1, e.sourceId());
@@ -90,9 +115,24 @@ public final class DbAcquisitionLedger implements AcquisitionLedger, com.gamma.u
                 ins.setString(10, e.status());
                 ins.executeUpdate();
             }
+            conn.commit();
         } catch (SQLException ex) {
+            try {
+                conn.rollback();
+            } catch (SQLException rollbackFailed) {
+                // The original cause is the useful one; a failed rollback must not mask it.
+                ex.addSuppressed(rollbackFailed);
+            }
             throw new IllegalStateException(
                     "could not record ledger entry " + e.sourceId() + "/" + e.relativePath() + ": " + ex.getMessage(), ex);
+        } finally {
+            if (autoCommitChanged) {
+                try {
+                    conn.setAutoCommit(priorAutoCommit);
+                } catch (SQLException restoreFailed) {
+                    log.warn("could not restore autocommit on the ledger connection: {}", restoreFailed.getMessage());
+                }
+            }
         }
     }
 

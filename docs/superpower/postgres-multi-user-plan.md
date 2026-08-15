@@ -40,13 +40,22 @@ doc).
 These are the reason this needed a plan rather than a ticket. Each is a place where correctness
 currently rests on *there being exactly one connection*, which is precisely what a pool removes.
 
-**F1 — `DbAcquisitionLedger.record()` is atomic only by accident.** It does DELETE-then-INSERT as two
-statements inside a `synchronized` block with **no explicit transaction**. Today the monitor plus the
-single connection make that indivisible. Under a pool the two statements can land on different
-connections and interleave with another operator's, and the failure mode is the worst kind: a
-*silently* lost or duplicated acquisition fingerprint, which re-ingests or skips a file. **This must be
-wrapped in a real transaction before any pooling lands, not alongside it.** It is also worth fixing on
-its own merits — see P0.
+**F1 — ~~`DbAcquisitionLedger.record()` is atomic only by accident~~ → ✅ FIXED 2026-08-15 (P0 shipped).**
+It did DELETE-then-INSERT as two statements inside a `synchronized` block with **no explicit
+transaction**; both now run in one transaction with rollback on failure and autocommit restored in a
+`finally`.
+
+⚠ **Grounding corrected this finding's threat model.** The monitor plus the single connection genuinely
+*do* make the pair indivisible against **concurrent callers** today, so the interleaving described here
+was latent, not live. But a second non-atomicity was live all along and is independent of pooling: under
+autocommit the DELETE committed *on its own*, so a crash, JVM kill or driver error between the two
+statements erased the fingerprint permanently — and a file with no ledger row re-ingests as NEW on the
+next cycle, duplicating its records. That is the window P0 actually closed. The pooling hazard remains
+real for P1, and this fix is still its prerequisite.
+
+Pinned by `AcquisitionLedgerTest.aFailedReplaceRollsBackAndKeepsThePriorFingerprint`, which injects a
+failing INSERT through a proxy `Connection` and asserts the PRIOR fingerprint survives. ⚠ Falsified:
+with the transaction removed the test fails with *"the fingerprint was DELETED and never re-INSERTed"*.
 
 **F2 — every store exposes `Connection browseConnection()`** for the DB-browser seam
 (`BrowsableStore` → `DbBrowserRoutes`). That hands out the store's long-lived connection object. A pool
@@ -86,7 +95,7 @@ materialize-to-Parquet CQRS split) for genuinely cross-engine analytical joins.
 
 | # | Slice | Why this order |
 |---|---|---|
-| **P0** | Wrap `DbAcquisitionLedger.record()` in an explicit transaction (F1) | Independently correct, ships alone, and is a **prerequisite** — pooling on top of it would introduce a data bug, not expose one |
+| ~~**P0**~~ ✅ **SHIPPED 2026-08-15** | Wrap `DbAcquisitionLedger.record()` in an explicit transaction (F1) | Independently correct, ships alone, and is a **prerequisite** — pooling on top of it would introduce a data bug, not expose one |
 | **P1** | Pool behind `JdbcDrivers`; scheme-derived sizing (F4); stores take a connection source | The core change. Personal must be provably unchanged |
 | **P2** | Replace `browseConnection()` with a scoped accessor (F2) | Can't remove the single connection while a public method returns it |
 | **P3** | Schema-per-space URL wiring | Only meaningful once a pool exists to be shared |
@@ -98,8 +107,15 @@ Events stay on Parquet throughout — right fit, not an oversight.
 
 - Personal edition (DuckDB default) behaviour is **unchanged**, proven by the existing reactor suite
   plus an assertion that a DuckDB URL yields a pool of exactly 1.
-- `PostgresStateStoreTest` extended to **8/8** stores — `DbTagAssignmentStore` is currently the one not
-  covered against Postgres, which is a real gap regardless of this plan.
+- `PostgresStateStoreTest` extended to cover the whole store family — a real gap regardless of this plan.
+  ⚠ **This criterion was mis-sized and is corrected here (grounded 2026-08-15): it is not "8/8 with
+  `DbTagAssignmentStore` the one missing".** The test covers **7** stores today (`DbJobRunStore`,
+  `DbObjectStore`, `DbLinkStore`, `DbNoteStore`, `DbProvenanceStore`, `DbAcquisitionLedger`,
+  `DbStatusStore`), the family is **10**, and **three** are uncovered: `DbTagAssignmentStore`,
+  `DbConsignmentOutputStore` and `DbFileStageStore`. Each slots into the existing per-store
+  `open(url) → write → read back` pattern, so the work is 3× the estimate but still small per store.
+  ⚠ `DbTagAssignmentStore` is absent even from the `okf/backend/engine/db-layer.md` §2 inventory table, so
+  the doc this criterion leaned on could not have supported the "8" either.
 - A concurrency test that fails against today's single-connection stores: N concurrent writers through
   one store, asserting throughput beyond one in-flight statement and no lost update.
 - A test that `record()` is atomic under concurrent callers (F1), written **before** P1.
