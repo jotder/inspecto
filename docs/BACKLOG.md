@@ -514,6 +514,22 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   on, and a live change cannot take effect without a restart. Workable shape: the UI *reads* the current
   selection, *validates* a proposed connection (a real test-connection round-trip), writes it to server
   config, and it applies at next restart. Design-first.
+  **→ DESIGNED 2026-08-15, grounded, 3 questions open in `superpower/operational-db-ui-plan.md` §5.**
+  ⚠ **All four clauses of that "workable shape" land on something that does not exist:** (i) no route
+  exposes the current selection (`/health/details` reports `jobRunsProjection` UP/DOWN, never the
+  backend); (ii) the test-connection precedent is **not reusable** — `ConnectionTester` is a plain TCP
+  socket connect plus secret-ref resolution, no JDBC login, and it takes a `ConnectionProfile`, not a
+  URL; (iii) **there is no server config to write to** — nothing on disk configures the process,
+  `space.toon` holds only `display_name`/`description`/`created_at`, and `-D` is the entire surface;
+  (iv) "at next restart" is right and unavoidable — no reload/restart endpoint exists. Two more the row
+  misses: `OperationalDb` is **package-private in `com.gamma.service`** while routes live in
+  `com.gamma.control`, and the ten families have **NO roster** (ten string literals across
+  `ServiceStores` + `SpaceBootstrap`) — ⛔ a hand-copied one is the mirror bug that has already cost
+  this repo twice. Also ⚠ **url grain ≠ credential grain**: the four `objects.*` families each carry
+  their own `*.db.url` but share one `objects.db.user`/`password`. **The recommendation splits the
+  work** — Stage 1 (read + validate) invents no configuration surface; persistence is a separate call,
+  since it creates a **second declaration of the same fact**, the split-brain shape the D7 enrichment
+  companion already refused.
   **Context — `-D` is the ONLY configuration surface today.** `serve.sh`/`serve.bat` (embedded in
   `package.ps1`) translate env vars → `-D` for port, spaces root, tokens, CORS, HTTPS and OIDC only; not
   one persistence property is wired in. `space.toon`'s manifest carries only
