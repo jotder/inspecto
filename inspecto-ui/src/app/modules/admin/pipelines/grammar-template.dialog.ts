@@ -31,7 +31,7 @@ export interface GrammarTemplateResultData {
  * 2026-08-15 saving a reusable Grammar MOVED the block off the node and bound it via
  * `use: grammar/<id>`, so a later template edit reached back into every pipeline using it. An
  * operator carrying that expectation would edit the template and wait for a change that never comes.
- * See `docs/superpower/grammar-templates-not-bindings-plan.md`.
+ * See `docs/archived-documents/plans-archive/grammar-templates-not-bindings-plan.md`.
  */
 @Component({
     selector: 'app-grammar-template-dialog',

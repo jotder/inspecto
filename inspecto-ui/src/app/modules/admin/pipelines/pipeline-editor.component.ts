@@ -1302,7 +1302,7 @@ export class PipelineEditorComponent implements OnInit {
      *
      * ⚠ The node is deliberately NOT touched — no `use:` binding, and its inline `parsing:` block
      * stays put. A template is a copy you start from, never a live reference (the behaviour this
-     * replaced did the opposite; see `docs/superpower/grammar-templates-not-bindings-plan.md`).
+     * replaced did the opposite; see `docs/archived-documents/plans-archive/grammar-templates-not-bindings-plan.md`).
      */
     saveGrammarAsTemplate(block: Record<string, unknown>): void {
         const node = this.definitionNode();

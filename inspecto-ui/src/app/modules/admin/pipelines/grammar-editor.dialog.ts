@@ -51,7 +51,7 @@ export interface GrammarEditorDialogData {
  * authored: opening a bound node and saving MIGRATES it to an independent inline copy rather than
  * writing back to the shared component. **No pipeline-editor surface updates a `grammar` component in
  * place any more** — only the Components registry page does, which is what editing a template in the
- * library means. See `docs/superpower/grammar-templates-not-bindings-plan.md`.
+ * library means. See `docs/archived-documents/plans-archive/grammar-templates-not-bindings-plan.md`.
  *
  * <p>**Plugin Grammars are preview-only here.** A plugin parser also needs per-segment schema files,
  * which only the Onboarding Parsing stage can author; rather than write a config the engine would
@@ -235,7 +235,7 @@ export class GrammarEditorDialog {
      * ⚠ Until this date the same action MOVED the block into the component and bound the node via
      * `use: grammar/<id>`, so a later template edit reached back into every pipeline using it. It now
      * writes the component and leaves the node exactly as it was, inline block and all. See
-     * `docs/superpower/grammar-templates-not-bindings-plan.md`.
+     * `docs/archived-documents/plans-archive/grammar-templates-not-bindings-plan.md`.
      */
     private saveAsTemplate(name: string, block: Record<string, unknown>): void {
         this.write(this.components.create('grammar', { id: name, ...block }), name, () =>

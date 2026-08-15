@@ -58,7 +58,7 @@ with format tabs, because each format owns its own grammar shape and complexitie
   changed is upstream: a Grammar component is now a **Template** the UI copies from, so nothing writes a
   new binding, and opening a bound node in the editor migrates it to an inline copy. ⛔ Do not "tidy up"
   the binding read path as dead code — it is the compatibility half of a deliberate split. See
-  [`superpower/grammar-templates-not-bindings-plan.md`](../../../superpower/grammar-templates-not-bindings-plan.md).
+  [`plans-archive/grammar-templates-not-bindings-plan.md`](../../../archived-documents/plans-archive/grammar-templates-not-bindings-plan.md).
 * Grouping by **category, not type string**: `PipelineCompiler.compile` and `PipelineDryRun` ask
   `PipelineNodeTypes.isCategory(t, PARSE)`, mirroring the sink family. A new parse subtype needs no edit
   there — but it *does* need its own `LOWERABLE` and `USE_HOME` entries in `PipelineEditable`.

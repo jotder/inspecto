@@ -166,7 +166,7 @@ describe('GrammarEditorDialog', () => {
     /**
      * The inverse of what this case asserted until 2026-08-15, deliberately: saving a template writes
      * the component and leaves the node ALONE. A template is a copy source, never a binding — see
-     * `docs/superpower/grammar-templates-not-bindings-plan.md`.
+     * `docs/archived-documents/plans-archive/grammar-templates-not-bindings-plan.md`.
      */
     it('save-as-template asks for a name, writes the component, and KEEPS the block on the node', async () => {
         const node: AuthoredNode = {

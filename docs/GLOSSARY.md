@@ -310,7 +310,7 @@ Grammar inline and untouched, and later edits to the template reach nothing that
 component and bound the Step via `use: grammar/<id>`. That `use:` form stays **read-supported** in the
 engine (a hand-authored file may still carry it) but is **never authored**, and opening such a Step in the
 editor migrates it to an independent inline copy on save. See
-`superpower/grammar-templates-not-bindings-plan.md`.
+`archived-documents/plans-archive/grammar-templates-not-bindings-plan.md`.
 ⛔ not "parser config" / "parse options" in UI copy — one concept, one word. ✅ **UI DONE** (2026-08-04):
 the shared `<inspecto-grammar-editor>` (`inspecto/grammar/`) is the one authoring surface for both the
 Onboarding Parsing stage and the Pipelines `parse` node dialog, renamed `ParserConfigDialog` →

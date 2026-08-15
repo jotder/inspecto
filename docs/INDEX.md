@@ -75,8 +75,9 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
-- [`superpower/grammar-templates-not-bindings-plan.md`](superpower/grammar-templates-not-bindings-plan.md)
-  — **COMPLETE 2026-08-15 — all four slices shipped** (archive when the definition-surface plan lands). Retires the live
+- ~~`superpower/grammar-templates-not-bindings-plan.md`~~ — **SHIPPED and ARCHIVED 2026-08-15**
+  ([archive copy](archived-documents/plans-archive/grammar-templates-not-bindings-plan.md), kept for the
+  grounding and the four as-built sections). Retired the live
   `use: grammar/<id>` binding: a Grammar component becomes a **template** you copy from, never bind to.
   Grew out of the definition-surface plan's P3a residual #2 and resolves that plan's P3a-vs-P3d
   contradiction in P3d's favour. ⚠ A considered **reversal of a shipped decision** (grammar-config

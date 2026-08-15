@@ -64,7 +64,7 @@ pipeline bound to it. The `use:` form remains **read-supported** — `PipelineCo
 the `PipelineEditable` lift/lower translation and `UNKNOWN_USE_REF` are all unchanged, because a
 hand-authored file may still carry one — but nothing authors it, and **opening a bound node in the
 editor migrates it to an independent inline copy on save**. Rationale and slices:
-[`superpower/grammar-templates-not-bindings-plan.md`](../../../superpower/grammar-templates-not-bindings-plan.md).
+[`plans-archive/grammar-templates-not-bindings-plan.md`](../../../archived-documents/plans-archive/grammar-templates-not-bindings-plan.md).
 
 🔴 **A Grammar component has TWO shapes, and reading one wrong loses data silently.** It is either the
 **legacy flat** `csv_settings`-style map (`{delimiter, has_header, …}` at top level — every
