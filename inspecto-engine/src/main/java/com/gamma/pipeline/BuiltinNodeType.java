@@ -38,6 +38,14 @@ public enum BuiltinNodeType implements PipelineNodeType {
     PARSER("parser", NodeCategory.PARSE, "Parser",
             "Reads a landed file into rows; may dispatch by schema/segment (route:*) with an unmatched branch.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true),
+    // Per-format parser family (B6, decided 2026-08-13): each parse format is its own node type — no
+    // generic parser node with format tabs. Delimited first; fixed-width / ASN.1 / plugin follow, each
+    // isolated. A config whose parsing: block says `frontend: delimited` EXPLICITLY lifts to this type;
+    // a bare legacy file (delimited is the parser's implicit default) keeps the plain PARSER type until
+    // its author opts in, so nothing already deployed changes shape on a read.
+    PARSER_DELIMITED("parser.delimited", NodeCategory.PARSE, "Parser (delimited)",
+            "Reads a delimited (CSV-like) landed file into rows; the delimited grammar is its config.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true),
 
     // ── transform family (§3.4 + §15) ─────────────────────────────────────────────
     TRANSFORM_MAP("transform.map", NodeCategory.TRANSFORM, "Map",

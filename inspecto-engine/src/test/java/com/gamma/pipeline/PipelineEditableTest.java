@@ -383,7 +383,7 @@ class PipelineEditableTest {
         PipelineConfig cfg = PipelineConfig.load(toon.toString());
 
         Map<String, Object> editable = PipelineEditable.toMap(cfg, raw);
-        Map<?, ?> parser = nodeOfType(editable, "parser");
+        Map<?, ?> parser = nodeOfType(editable, "parser.delimited");
         Map<?, ?> config = (Map<?, ?>) parser.get("config");
         assertNotNull(config, "the parser node has config");
 
@@ -401,7 +401,7 @@ class PipelineEditableTest {
 
         Map<String, Object> editable = PipelineEditable.toMap(cfg, raw);
         // the operator changes the delimiter in the editor
-        Map<?, ?> parser = nodeOfType(editable, "parser");
+        Map<?, ?> parser = nodeOfType(editable, "parser.delimited");
         Map<?, ?> parsing = (Map<?, ?>) ((Map<?, ?>) parser.get("config")).get("parsing");
         @SuppressWarnings("unchecked")
         Map<String, Object> delimited = (Map<String, Object>) parsing.get("delimited");
@@ -462,7 +462,7 @@ class PipelineEditableTest {
         parsing.put("grammar", "grammar/pipe_delimited");
         PipelineConfig cfg = PipelineConfig.load(toon.toString());
 
-        Map<?, ?> parser = nodeOfType(PipelineEditable.toMap(cfg, raw), "parser");
+        Map<?, ?> parser = nodeOfType(PipelineEditable.toMap(cfg, raw), "parser.delimited");
 
         assertEquals("grammar/pipe_delimited", parser.get("use"),
                 "a bound Grammar presents as a binding, like connection/ on acquisition");
@@ -470,6 +470,95 @@ class PipelineEditableTest {
         Map<?, ?> nodeParsing = config == null ? null : (Map<?, ?>) config.get("parsing");
         assertNull(nodeParsing == null ? null : nodeParsing.get("grammar"),
                 "…and not ALSO as a free-text config key the operator could corrupt");
+    }
+
+    // ── P3a: the delimited parser subtype (B6 — per-format parser identity) ─────────
+
+    /** An explicit {@code frontend: delimited} file round-trips verbatim through the subtype. */
+    @Test
+    void explicitDelimitedFrontendRoundTripsVerbatimThroughTheSubtype(@TempDir Path dir) throws Exception {
+        Path toon = writeParsingBlockPipeline(dir);
+        Map<String, Object> raw = decode(toon);
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+
+        Map<String, Object> editable = PipelineEditable.toMap(cfg, raw);
+        nodeOfType(editable, "parser.delimited");   // the retype happened
+        Map<String, Object> lowered = PipelineEditable.lower(PipelineCodec.fromMap(editable), raw, true);
+
+        assertEquals(raw, lowered, "strict lower over the original file reproduces it verbatim");
+    }
+
+    /**
+     * Delimited is also the parser's IMPLICIT default — a legacy file that never says the word keeps the
+     * plain type, so nothing already deployed changes shape on a read before its author opts in.
+     */
+    @Test
+    void aFileWithoutAnExplicitFrontendKeepsThePlainParserType(@TempDir Path dir) throws Exception {
+        Path toon = writeRichPipeline(dir);
+        nodeOfType(PipelineEditable.toMap(PipelineConfig.load(toon.toString()), decode(toon)), "parser");
+    }
+
+    /** A delimited node authored fresh from the palette gets its frontend stamped into the file. */
+    @Test
+    void aNewDelimitedParserNodeIsStampedWithItsFrontend() {
+        Map<String, Object> lowered = PipelineEditable.lower(new PipelineGraph("x", true, List.of(
+                node("acq", "acquisition", Map.of("poll", "in")),
+                node("parse", "parser.delimited",
+                        Map.of("parsing", Map.of("delimited", Map.of("delimiter", ";")))),
+                node("sink", "sink.persistent", Map.of("database", "db"))), List.of()),
+                new LinkedHashMap<>(), true);
+
+        Map<?, ?> parsing = (Map<?, ?>) lowered.get("parsing");
+        assertEquals("delimited", parsing.get("frontend"),
+                "the file must say the word the type means, or the next lift loses the identity");
+        assertEquals(";", ((Map<?, ?>) parsing.get("delimited")).get("delimiter"));
+    }
+
+    /** A parsing.frontend that contradicts the node's own type refuses by name. */
+    @Test
+    void aContradictoryFrontendOnADelimitedParserRefuses() {
+        PipelineGraph g = new PipelineGraph("x", true, List.of(
+                node("acq", "acquisition", Map.of("poll", "in")),
+                node("parse", "parser.delimited", Map.of("parsing", Map.of("frontend", "json"))),
+                node("sink", "sink.persistent", Map.of("database", "db"))), List.of());
+        PipelineCompileException ex = assertThrows(PipelineCompileException.class,
+                () -> PipelineEditable.lower(g, new LinkedHashMap<>(), true));
+        assertEquals(PipelineEditable.PARSER_FRONTEND_MISMATCH, ex.refusals().get(0).code());
+        assertEquals("parse", ex.refusals().get(0).nodeId());
+    }
+
+    /** The flat file has ONE parse slot; a second parser-family node refuses instead of last-one-wins. */
+    @Test
+    void twoParserFamilyNodesRefuse() {
+        PipelineGraph g = new PipelineGraph("x", true, List.of(
+                node("acq", "acquisition", Map.of("poll", "in")),
+                node("p1", "parser", Map.of("schema_file", "s.toon")),
+                node("p2", "parser.delimited", Map.of("parsing", Map.of("delimited", Map.of()))),
+                node("sink", "sink.persistent", Map.of("database", "db"))), List.of());
+        PipelineCompileException ex = assertThrows(PipelineCompileException.class,
+                () -> PipelineEditable.lower(g, new LinkedHashMap<>(), true));
+        assertEquals(PipelineEditable.MULTI_PARSER, ex.refusals().get(0).code());
+        assertEquals("p2", ex.refusals().get(0).nodeId());
+    }
+
+    /** A Grammar binds to the subtype like the plain parser; a plugin ingester/ ref contradicts it. */
+    @Test
+    void delimitedParserTakesAGrammarButRefusesAnIngesterBinding() {
+        Map<String, Object> lowered = PipelineEditable.lower(new PipelineGraph("x", true, List.of(
+                node("acq", "acquisition", Map.of("poll", "in")),
+                new PipelineNode("parse", "parser.delimited", null, null, Map.of(), "grammar/pipes"),
+                node("sink", "sink.persistent", Map.of("database", "db"))), List.of()),
+                new LinkedHashMap<>(), true);
+        assertEquals("grammar/pipes", section(lowered, "parsing").get("grammar"));
+
+        PipelineCompileException ex = assertThrows(PipelineCompileException.class,
+                () -> PipelineEditable.lower(new PipelineGraph("x", true, List.of(
+                        node("acq", "acquisition", Map.of("poll", "in")),
+                        new PipelineNode("parse", "parser.delimited", null, null,
+                                Map.of(), "ingester/com.example.Custom"),
+                        node("sink", "sink.persistent", Map.of("database", "db"))), List.of()),
+                        new LinkedHashMap<>(), true));
+        assertEquals(PipelineEditable.UNSUPPORTED_BINDING, ex.refusals().get(0).code());
     }
 
     /** Two distinct databases now lower to a plural sinks: block (slice 4), not a MULTI_SINK refusal. */

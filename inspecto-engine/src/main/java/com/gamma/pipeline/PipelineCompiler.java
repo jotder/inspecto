@@ -55,7 +55,7 @@ public final class PipelineCompiler {
         for (PipelineNode n : g.nodes()) {
             String t = n.type();
             if (BuiltinNodeType.ACQUISITION.type().equals(t)) acq = n;
-            else if (BuiltinNodeType.PARSER.type().equals(t)) parser = n;
+            else if (PipelineNodeTypes.isCategory(t, NodeCategory.PARSE)) parser = n;   // any parser subtype (B6)
             else if (BuiltinNodeType.GAP.type().equals(t)) gap = n;
             else if (PipelineNodeTypes.isCategory(t, NodeCategory.SINK)) sinks.add(n);   // any sink subtype
             else if (BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type().equals(t)) dedups.add(n);

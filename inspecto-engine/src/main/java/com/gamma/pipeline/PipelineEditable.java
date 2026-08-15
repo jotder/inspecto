@@ -52,6 +52,15 @@ public final class PipelineEditable {
     public static final String MAPPING_CONFLICT = "MAPPING_CONFLICT";
     /** Two map nodes whose authored config has drifted apart — one {@code processing.map} cannot hold both. */
     public static final String MULTI_MAP_CONFIG = "MULTI_MAP_CONFIG";
+    /**
+     * Two parser-family nodes in one graph. The flat file has exactly one parse slot; before the parser
+     * became a family (B6, {@code parser.delimited}) a second node was last-one-wins, a silent discard
+     * exactly like the losses the MULTI_* codes above once refused — with two palette icons it is now
+     * an authorable state, so it refuses by name.
+     */
+    public static final String MULTI_PARSER = "MULTI_PARSER";
+    /** A {@code parser.delimited} node whose {@code parsing.frontend} names a DIFFERENT frontend. */
+    public static final String PARSER_FRONTEND_MISMATCH = "PARSER_FRONTEND_MISMATCH";
 
     /**
      * The map-node config keys an author owns — they lower to {@code processing.map} verbatim and lift
@@ -73,7 +82,8 @@ public final class PipelineEditable {
 
     /** Node types the flat config has a home for; everything else refuses with UNSUPPORTED_NODE. */
     private static final Set<String> LOWERABLE = Set.of(
-            BuiltinNodeType.ACQUISITION.type(), BuiltinNodeType.PARSER.type(), BuiltinNodeType.GAP.type(),
+            BuiltinNodeType.ACQUISITION.type(), BuiltinNodeType.PARSER.type(),
+            BuiltinNodeType.PARSER_DELIMITED.type(), BuiltinNodeType.GAP.type(),
             BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type(),
             BuiltinNodeType.TRANSFORM_DEDUP.type(),   // record-grain dedup → processing.dedup (ELT P2)
             BuiltinNodeType.TRANSFORM_ROUTE.type(),   // route: block — authoring-only until the executor lands
@@ -156,6 +166,11 @@ public final class PipelineEditable {
     /** The registry-reference prefix a Grammar-bound parser node carries on {@code use:}. */
     static final String GRAMMAR_REF_PREFIX = "grammar/";
 
+    /** The parser family: the generic parser plus the per-format subtypes (B6 — delimited first). */
+    static boolean isParserType(String t) {
+        return BuiltinNodeType.PARSER.type().equals(t) || BuiltinNodeType.PARSER_DELIMITED.type().equals(t);
+    }
+
     /**
      * Node type → the {@code use:} ref prefixes the flat config has a home for. Two kinds, three
      * prefixes: acquisition's {@code connection/} lands in the collector block, and the parser's
@@ -166,7 +181,10 @@ public final class PipelineEditable {
      */
     private static final Map<String, List<String>> USE_HOME = Map.of(
             BuiltinNodeType.ACQUISITION.type(), List.of("connection/"),
-            BuiltinNodeType.PARSER.type(), List.of(GRAMMAR_REF_PREFIX, "ingester/"));
+            BuiltinNodeType.PARSER.type(), List.of(GRAMMAR_REF_PREFIX, "ingester/"),
+            // The delimited subtype takes a Grammar but never ingester/ — a plugin ingester binding on a
+            // node whose type SAYS delimited is a contradiction, refused rather than half-honoured.
+            BuiltinNodeType.PARSER_DELIMITED.type(), List.of(GRAMMAR_REF_PREFIX));
 
     /**
      * The node types this flat config has a {@code use:} home for — the authoritative half of the
@@ -245,11 +263,20 @@ public final class PipelineEditable {
         for (PipelineNode n : g.nodes()) {
             Map<String, Object> nm = new LinkedHashMap<>();
             nm.put("id", n.id());
-            nm.put("type", n.type());
+            // The per-format parser identity (B6): a file whose parsing: block says frontend: delimited
+            // EXPLICITLY presents its parser as the delimited subtype. Explicit only — delimited is also
+            // the parser's implicit default, but retyping every bare legacy file would flip the node type
+            // of everything deployed on a read; a file that never says the word keeps the plain type.
+            String type = n.type();
+            if (BuiltinNodeType.PARSER.type().equals(type)
+                    && section(raw, "parsing").get("frontend") instanceof String f
+                    && "delimited".equalsIgnoreCase(f.trim()))
+                type = BuiltinNodeType.PARSER_DELIMITED.type();
+            nm.put("type", type);
             if (n.hasName()) nm.put("name", n.name());
             if (n.description() != null && !n.description().isBlank()) nm.put("description", n.description());
             if (n.hasUse()) nm.put("use", n.use());
-            else if (BuiltinNodeType.PARSER.type().equals(n.type())
+            else if (isParserType(n.type())
                     && section(raw, "parsing").get("grammar") instanceof String ref)
                 // A parser bound to a reusable Grammar presents that binding as use:, mirroring
                 // connection/ on acquisition. Never clobbers an existing use: — a plugin parser's
@@ -287,7 +314,7 @@ public final class PipelineEditable {
             putIfPresent(c, "poll", dirs.get("poll"));
             putIfPresent(c, "trigger", raw.get("trigger"));
             putIfPresent(c, "file_pattern", processing.get("file_pattern"));
-        } else if (BuiltinNodeType.PARSER.type().equals(t)) {
+        } else if (isParserType(t)) {
             for (String k : PARSER_OWNED) putIfPresent(c, k, processing.get(k));
             // The unified top-level parsing: block is parser-owned too, carried VERBATIM under its own
             // key rather than flattened into the legacy ones. It is not a second spelling the editor may
@@ -386,7 +413,22 @@ public final class PipelineEditable {
             if (unhomed != null)
                 refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_BINDING, n.id(), unhomed));
             if (BuiltinNodeType.ACQUISITION.type().equals(t)) acq = n;
-            else if (BuiltinNodeType.PARSER.type().equals(t)) parser = n;
+            else if (isParserType(t)) {
+                // One parse slot in the flat file. Last-one-wins predates the family, but with two
+                // palette icons a second parser is now an authorable state — refuse, don't discard.
+                if (parser != null) refusals.add(new PipelineCompileException.Refusal(MULTI_PARSER, n.id(),
+                        "the flat pipeline config has one parse slot and '" + parser.id()
+                                + "' already holds it"));
+                else parser = n;
+                // A subtype node whose own parsing: block names a DIFFERENT frontend is a contradiction
+                // the file could only resolve by silently ignoring one of the two spellings.
+                if (BuiltinNodeType.PARSER_DELIMITED.type().equals(t)
+                        && n.cfg("parsing") instanceof Map<?, ?> pb && pb.get("frontend") != null
+                        && !"delimited".equalsIgnoreCase(String.valueOf(pb.get("frontend")).trim()))
+                    refusals.add(new PipelineCompileException.Refusal(PARSER_FRONTEND_MISMATCH, n.id(),
+                            "parsing.frontend '" + pb.get("frontend")
+                                    + "' contradicts the node's own type 'parser.delimited'"));
+            }
             else if (BuiltinNodeType.GAP.type().equals(t)) gap = n;
             else if (BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type().equals(t)) marker = n;
             // The five chain kinds. Each used to claim a single slot and refuse a second (MULTI_*); they
@@ -548,6 +590,13 @@ public final class PipelineEditable {
             if (parser.use() != null && parser.use().startsWith(GRAMMAR_REF_PREFIX))
                 parsingBlock.put("grammar", parser.use());
             else if (strict) parsingBlock.remove("grammar");   // unbound in the editor ⇒ unbound on disk
+            // A delimited-subtype node authored fresh from the palette carries no frontend key yet; the
+            // file must say the word the type means, or a later read would lift it back as a plain
+            // parser and the identity would quietly evaporate. A lifted node already carries it (that is
+            // what made it this type), so the round-trip stays verbatim.
+            if (BuiltinNodeType.PARSER_DELIMITED.type().equals(parser.type())
+                    && parsingBlock.get("frontend") == null)
+                parsingBlock.put("frontend", "delimited");
             if (!parsingBlock.isEmpty()) out.put("parsing", parsingBlock);
             else out.remove("parsing");
             if (!filters.isEmpty()) {

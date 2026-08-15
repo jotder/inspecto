@@ -2,8 +2,10 @@ package com.gamma.pipeline.exec;
 
 import com.gamma.api.PublicApi;
 import com.gamma.pipeline.BuiltinNodeType;
+import com.gamma.pipeline.NodeCategory;
 import com.gamma.pipeline.PipelineGraph;
 import com.gamma.pipeline.PipelineNode;
+import com.gamma.pipeline.PipelineNodeTypes;
 import com.gamma.pipeline.PipelineStores;
 import com.gamma.util.DuckDbUtil;
 
@@ -166,7 +168,7 @@ public final class PipelineDryRun {
     private static PipelineGraph withMappingContext(PipelineGraph g) {
         Object csv = null;
         for (PipelineNode n : g.nodes())
-            if (BuiltinNodeType.PARSER.type().equals(n.type()) && n.cfg("csv") != null) csv = n.cfg("csv");
+            if (PipelineNodeTypes.isCategory(n.type(), NodeCategory.PARSE) && n.cfg("csv") != null) csv = n.cfg("csv");
         if (csv == null) return g;
 
         List<PipelineNode> nodes = new ArrayList<>();
@@ -189,7 +191,7 @@ public final class PipelineDryRun {
     /** Seed the sample at the parser node (its {@code data} output) if present, else the first entry node. */
     private static String seedNodeOf(PipelineGraph g) {
         for (PipelineNode n : g.nodes()) {
-            if (BuiltinNodeType.PARSER.type().equals(n.type())) return n.id();
+            if (PipelineNodeTypes.isCategory(n.type(), NodeCategory.PARSE)) return n.id();   // any parser subtype (B6)
         }
         if (!g.entryNodes().isEmpty()) return g.entryNodes().get(0).id();
         throw new IllegalArgumentException("flow '" + g.name() + "' has no parser or entry node to seed the sample at");
