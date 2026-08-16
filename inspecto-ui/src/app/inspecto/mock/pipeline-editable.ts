@@ -112,9 +112,15 @@ const isParserType = (t: string): boolean => t === 'parser' || t in SUBTYPE_FRON
  * parser's own `plugin.ingester`/`ingester_config`/`segments` path, just with a dedicated type once
  * the config says `frontend: plugin` explicitly, so the lift presents the same derived `ingester/<fqcn>`
  * ref it always did for the plain type — never authored, since the class comes from the config key.
+ *
+ * Plain `parser` carries the same `ingester/` ref for the legacy shape that predates both subtypes:
+ * `processing.ingester` set with no `parsing.frontend` literal at all, so the node never retypes
+ * (`subtypeForFrontend` is explicit-only) yet the lift still synthesizes the ref from the class key
+ * unconditionally, same as the ASN.1/plugin cases above.
  */
 const DERIVED_USE: Record<string, string> = {
     enrichment: 'enrichment/',
+    parser: 'ingester/',
     'parser.asn1': 'ingester/',
     'parser.plugin': 'ingester/',
 };

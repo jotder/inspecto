@@ -256,9 +256,15 @@ public final class PipelineEditable {
      * just with a dedicated type once the config says {@code frontend: plugin} explicitly, so
      * {@link PipelineLift} presents the same derived {@code ingester/<fqcn>} ref it always did for the
      * plain type — never authored, since the class comes from the config key, not a binding.
+     *
+     * <p>Plain {@code parser} carries the same {@code ingester/} ref for the legacy shape that predates
+     * both subtypes: {@code processing.ingester} set with no {@code parsing.frontend} literal at all, so
+     * the node never retypes ({@link #subtypeForFrontend} is explicit-only) yet {@link PipelineLift}
+     * still synthesizes the ref from the class key unconditionally, same as the ASN.1/plugin cases above.
      */
     private static final Map<String, String> DERIVED_USE = Map.of(
             BuiltinNodeType.ENRICHMENT.type(), "enrichment/",
+            BuiltinNodeType.PARSER.type(), "ingester/",
             BuiltinNodeType.PARSER_ASN1.type(), "ingester/",
             BuiltinNodeType.PARSER_PLUGIN.type(), "ingester/");
 

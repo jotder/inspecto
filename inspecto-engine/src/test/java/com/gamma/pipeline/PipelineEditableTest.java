@@ -1293,6 +1293,72 @@ class PipelineEditableTest {
         assertEquals(PipelineEditable.UNSUPPORTED_BINDING, ex.refusals().get(0).code());
     }
 
+    /**
+     * The legacy shape that predates both {@code parser.asn1} and {@code parser.plugin}: a bare
+     * {@code processing.ingester}/{@code segments} pair with no {@code parsing.frontend} literal at
+     * all. {@link PipelineEditable#subtypeForFrontend} is explicit-only, so the node never retypes and
+     * stays plain {@code parser} — yet {@link PipelineLift} still presents the class as a derived
+     * {@code ingester/<fqcn>} ref, exactly as it does for the two named subtypes. It must read as
+     * DERIVED (not an unhomed authored binding), or a plain pipeline holding this legacy shape would
+     * fail validate/dry-run with UNKNOWN_USE_KIND despite never having been touched.
+     */
+    @Test
+    void thePlainParsersLegacyIngesterRefIsDerivedNotAuthored(@TempDir Path dir) throws Exception {
+        Path toon = writeLegacyIngesterPipeline(dir);
+        Map<String, Object> raw = decode(toon);
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+        PipelineGraph g = PipelineCodec.fromMap(PipelineEditable.toMap(cfg, raw));
+
+        PipelineNode parser = g.nodes().stream().filter(n -> n.type().startsWith("parser"))
+                .findFirst().orElseThrow();
+        assertEquals("parser", parser.type(), "no frontend literal ⇒ no retype; it stays the plain type");
+        assertEquals("ingester/com.example.acme.LegacyIngester", parser.use(),
+                "the lift synthesizes the ref from the class key regardless of the type");
+
+        PipelineValidator.Result r = PipelineValidator.validate(g);
+        assertFalse(r.issues().stream().anyMatch(i -> i.code().equals(PipelineValidator.UNKNOWN_USE_KIND)),
+                () -> "an untouched legacy pipeline must validate, got " + r.issues());
+        assertDoesNotThrow(() -> PipelineEditable.lower(g, raw, true));
+    }
+
+    /** The pre-P3d legacy shape: {@code processing.ingester} + {@code segments}, no {@code frontend}. */
+    private static Path writeLegacyIngesterPipeline(Path dir) throws Exception {
+        Path sf = dir.resolve("legacy_record_schema.toon");
+        Files.writeString(sf, """
+                partitionKey: ID
+                raw:
+                  name: record
+                  format: CSV
+                  fields[1]{name,selector,type}:
+                    ID, id, VARCHAR
+                mapping:
+                  canonicalName: record
+                  rawName: record
+                  rules[1]{targetColumn,sourceExpression,transformType}:
+                    ID, ID, DIRECT
+                """);
+        String base = dir.toString().replace('\\', '/');
+        String toon = """
+                name: LEGACY_FEED
+                active: true
+                dirs:
+                  poll: %1$s/inbox
+                  database: %1$s/db
+                output:
+                  format: CSV
+                collector:
+                  connector: local
+                processing:
+                  threads: 1
+                  ingester: com.example.acme.LegacyIngester
+                  segments:
+                    Record: %2$s
+                """.formatted(base, sf.toString().replace('\\', '/'));
+        Path p = dir.resolve("legacy_pipeline.toon");
+        Files.writeString(p, toon);
+        return p;
+    }
+
     @SuppressWarnings("unchecked")
     private static Map<String, Object> decode(Path toon) throws Exception {
         return (Map<String, Object>) (Map<?, ?>) ConfigLoader.filesystem().decode(toon.toString());
