@@ -117,8 +117,13 @@ const isParserType = (t: string): boolean => t === 'parser' || t in SUBTYPE_FRON
  * `processing.ingester` set with no `parsing.frontend` literal at all, so the node never retypes
  * (`subtypeForFrontend` is explicit-only) yet the lift still synthesizes the ref from the class key
  * unconditionally, same as the ASN.1/plugin cases above.
+ *
+ * Exported solely so `pipeline-graph.contract.spec.ts` can pin it against `bind-kinds.contract.json`,
+ * which `BindKindHomeContractTest` writes from the Java map. All three `ingester/` entries were added
+ * in three separate sessions and each one missed the others — a missing entry here means the preview
+ * refuses a ref the product itself wrote, so the two copies must not be able to drift.
  */
-const DERIVED_USE: Record<string, string> = {
+export const DERIVED_USE: Record<string, string> = {
     enrichment: 'enrichment/',
     parser: 'ingester/',
     'parser.asn1': 'ingester/',

@@ -74,6 +74,8 @@ class BindKindHomeContractTest {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("categories", java.util.Arrays.stream(NodeCategory.values()).map(Enum::name).toList());
         out.put("bindableCategories", bindableCategories());
+        // Sorted, not Map.of's iteration order, so the artifact is stable across JVM runs.
+        out.put("derivedUse", new java.util.TreeMap<>(PipelineEditable.derivedUseByType()));
         return out;
     }
 
@@ -124,5 +126,31 @@ class BindKindHomeContractTest {
         for (BuiltinNodeType t : types(NodeCategory.PARSE))
             assertTrue(PipelineEditable.typesWithUseHome().contains(t.type()),
                     t.type() + " lost its use: home — the PARSE picker would offer refused saves");
+    }
+
+    /**
+     * The whole {@code DERIVED_USE} map, stated here as well as published, because the drift this pins is
+     * a MISSING entry and a contract file regenerated in the same commit would absorb it in silence.
+     *
+     * <p>2026-08-16: the plain {@code parser} entry was absent while {@code parser.asn1} and
+     * {@code parser.plugin} were present — the legacy {@code processing.ingester} shape with no
+     * {@code parsing.frontend} literal never retypes, so it stays plain {@code parser}, yet
+     * {@code PipelineLift.parserNode} still synthesizes the {@code ingester/<fqcn>} ref, and
+     * validate/dry-run then failed {@code UNKNOWN_USE_KIND}. All three {@code ingester/} entries were
+     * added in three separate sessions, each missing the others. Every parser type whose lift can
+     * synthesize that ref needs a row; adding a fourth means changing this list deliberately.
+     */
+    @Test
+    void everyDerivedUsePrefixIsPinned() {
+        assertEquals(
+                new java.util.TreeMap<>(Map.of(
+                        BuiltinNodeType.ENRICHMENT.type(), "enrichment/",
+                        BuiltinNodeType.PARSER.type(), "ingester/",
+                        BuiltinNodeType.PARSER_ASN1.type(), "ingester/",
+                        BuiltinNodeType.PARSER_PLUGIN.type(), "ingester/")),
+                new java.util.TreeMap<>(PipelineEditable.derivedUseByType()),
+                "DERIVED_USE changed. A node type whose lift synthesizes a use: ref MUST be listed, or "
+                        + "validate/dry-run refuses it with UNKNOWN_USE_KIND; then regenerate " + CONTRACT
+                        + " with -Dbind.kinds.write=true so the TS mock's copy is pinned to it too.");
     }
 }

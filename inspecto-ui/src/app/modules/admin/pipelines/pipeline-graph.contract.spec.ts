@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import BIND_KINDS from 'app/inspecto/mock/bind-kinds.contract.json';
 
+import { DERIVED_USE } from 'app/inspecto/mock/pipeline-editable';
+
 import { bindKindFor } from './pipeline-graph';
 
 /**
@@ -27,6 +29,17 @@ describe('bind-kind contract', () => {
     it('covers every node category the backend publishes', () => {
         expect(BIND_KINDS.categories).toEqual(['SOURCE', 'PARSE', 'TRANSFORM', 'SINK', 'CONTROL']);
         expect(BIND_KINDS.bindableCategories).toEqual(['PARSE']);
+    });
+
+    /**
+     * The mock's `DERIVED_USE` against the engine's, entry for entry. This map is the one that drifts:
+     * all three `ingester/` entries were added in three separate sessions and each missed the others,
+     * the last (plain `parser`, 2026-08-16) leaving validate/dry-run failing `UNKNOWN_USE_KIND` on the
+     * legacy `processing.ingester` shape. A missing entry makes the preview refuse a ref the product
+     * itself wrote — the AUTHOR-1(b) enrichment regression, again.
+     */
+    it('derives the same use: prefixes the engine does', () => {
+        expect(DERIVED_USE).toEqual(BIND_KINDS.derivedUse);
     });
 
     it('answers grammar for PARSE and null for every other category', () => {

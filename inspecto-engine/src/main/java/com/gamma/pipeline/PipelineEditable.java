@@ -269,6 +269,18 @@ public final class PipelineEditable {
             BuiltinNodeType.PARSER_PLUGIN.type(), "ingester/");
 
     /**
+     * The derived-{@code use:} prefixes by node type — the authoritative half of the cross-language
+     * contract ({@code BindKindHomeContractTest}), exposed for the same reason
+     * {@link #typesWithUseHome()} is. ⚠ All three {@code ingester/} entries were added in three separate
+     * sessions and each one missed the others, the last (plain {@code parser}, 2026-08-16) surfacing as a
+     * validate/dry-run {@code UNKNOWN_USE_KIND} — the map is the kind that drifts silently, so its
+     * CONTENTS are pinned, not merely its key set.
+     */
+    static Map<String, String> derivedUseByType() {
+        return DERIVED_USE;
+    }
+
+    /**
      * Whether this node's {@code use:} ref is DERIVED rather than authored ({@link #DERIVED_USE}).
      *
      * <p>Shared with {@link PipelineValidator#checkWiring}, which asks the same question for a different
