@@ -45,6 +45,11 @@ public final class PipelineProjection {
             // Save-ability, not runnability: the engine executes far more than the flat config can
             // round-trip. The palette greys these out rather than refusing at Save.
             m.put("lowerable", PipelineEditable.isLowerable(t.type()));
+            // …and whether the palette may OFFER it. A retired-but-still-lowerable type (P5-a's
+            // transform.dedup.marker) is exactly why these cannot be one flag: filtering the palette
+            // on lowerability would force the choice between offering a node nothing should create
+            // and refusing to save a graph that legitimately still carries one.
+            m.put("authorable", PipelineEditable.isAuthorable(t.type()));
             // §3.1: the node's config vocabulary, published so it has ONE definition. Before this the
             // catalog carried no attribute specs at all and the keys lived only in the client table —
             // the root cause §1 traced every config-key defect (D1–D9) back to. Absent/empty ⇒ the type

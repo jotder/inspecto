@@ -172,6 +172,50 @@ describe('PipelineEditorComponent', () => {
             c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, { id: 'legacy', type: 'adapter', config: {} }] }));
             expect(c.unsupportedNodes().map((n) => n.id)).toEqual(['legacy']);
         });
+
+        /**
+         * P5-b: a RETIRED type is a third case, and the reason `authorable` exists. It is still
+         * lowerable — an editor opened before P5-a holds a graph carrying a `transform.dedup.marker`,
+         * and that graph must still save — so it must NOT be flagged unsupported, yet the palette
+         * must never offer another. Filtering the palette on `lowerable` cannot express both.
+         */
+        it('hides a retired type from the palette while keeping it saveable', () => {
+            api.nodeTypes.mockReturnValue(
+                of([
+                    {
+                        type: 'transform.filter',
+                        category: 'TRANSFORM',
+                        label: 'Filter',
+                        description: '',
+                        accepts: ['data'],
+                        emits: ['data'],
+                        emitsNamedRoutes: false,
+                        lowerable: true,
+                        authorable: true,
+                    },
+                    {
+                        type: 'transform.dedup.marker',
+                        category: 'TRANSFORM',
+                        label: 'Dedup (marker)',
+                        description: '',
+                        accepts: ['data'],
+                        emits: ['data'],
+                        emitsNamedRoutes: false,
+                        lowerable: true,
+                        authorable: false,
+                    },
+                ]),
+            );
+            const c = make();
+            expect(c.paletteGroups().flatMap((g) => g.types.map((t) => t.type))).toEqual(['transform.filter']);
+
+            c.select('demo');
+            c.model.update((m) => ({
+                ...m!,
+                nodes: [...m!.nodes, { id: 'dedup_marker', type: 'transform.dedup.marker', config: {} }],
+            }));
+            expect(c.unsupportedNodes()).toEqual([]);
+        });
     });
 
     /**

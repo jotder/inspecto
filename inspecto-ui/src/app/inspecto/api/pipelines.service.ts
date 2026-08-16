@@ -75,6 +75,17 @@ export interface PipelineNodeType {
      */
     lowerable: boolean;
     /**
+     * Whether the palette may OFFER this type. ⚠ Not a synonym for {@link lowerable}: a retired type
+     * can still be lowerable, and P5-a produced the first one — `transform.dedup.marker` must keep
+     * lowering (an editor opened before the fold holds a graph carrying one) while nothing should
+     * ever create another. Filtering the palette on lowerability would force the choice between
+     * offering a retired node and refusing to save a graph that legitimately still has one.
+     *
+     * ⚠ Optional on purpose: an older server does not publish it, and the palette falls back to
+     * `lowerable` there — the pre-P5-a behaviour, which is right for a server with no retired types.
+     */
+    authorable?: boolean;
+    /**
      * The node's config vocabulary, published by the server (§3.1 of
      * `docs/okf/frontend/features/pipelines.md`). This is the SOURCE for the node dialog's
      * form; `node-attributes.ts` is the offline/mock fallback for when the catalog has not loaded.

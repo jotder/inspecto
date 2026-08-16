@@ -17,7 +17,7 @@ import STEP_TYPES_CONTRACT from '../step-types.contract.json';
 import { MockFlags } from '../mock-flags';
 import { error, json, match, MockHandler, MockRequest, MockResponse } from '../mock-http';
 import { MockStore } from '../mock-store';
-import { liftConfig, LOWERABLE, lowerGraph } from '../pipeline-editable';
+import { liftConfig, LOWERABLE, lowerGraph, READ_COMPAT_ONLY } from '../pipeline-editable';
 import { PIPELINE_CONFIGS_COLL, type StoredPipelineConfig } from './onboarding.handler';
 
 /**
@@ -304,10 +304,14 @@ export const NODE_TYPES: PipelineNodeType[] = (
             emits: [],
             emitsNamedRoutes: false,
         },
-    ] as Omit<PipelineNodeType, 'lowerable'>[]
+    ] as Omit<PipelineNodeType, 'lowerable' | 'authorable'>[]
 ).map((t) => ({
     ...t,
     lowerable: LOWERABLE.has(t.type),
+    // Mirrors `PipelineEditable.isAuthorable`: lowerable AND not retired. `transform.dedup.marker`
+    // is the one type where these differ — P5-a folded it onto acquisition, so it still lowers
+    // (read-compat) but the palette must never offer another.
+    authorable: LOWERABLE.has(t.type) && !READ_COMPAT_ONLY.has(t.type),
     // §3.1: the mock must publish the SAME attribute vocabulary the server does, straight from the
     // committed contract the Java side is byte-compared against — otherwise the offline preview would
     // drive its node forms from a different table than production, which is exactly the "a mock must

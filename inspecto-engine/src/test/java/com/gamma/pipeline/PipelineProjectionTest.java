@@ -34,6 +34,30 @@ class PipelineProjectionTest {
         assertEquals("SOURCE", byType(cat, "acquisition").get("category"));
     }
 
+    /**
+     * P5-a: {@code authorable} is published separately from {@code lowerable} because the two
+     * genuinely diverged. ⚠ If the palette filtered on lowerability, this type would force a choice
+     * between offering a node nothing should create and refusing to save a graph that still has one.
+     */
+    @Test
+    void theCatalogSeparatesAuthorableFromLowerable() {
+        List<Map<String, Object>> cat = PipelineProjection.catalog();
+
+        Map<String, Object> marker = byType(cat, "transform.dedup.marker");
+        assertEquals(Boolean.TRUE, marker.get("lowerable"), "still lowers — an old graph must still save");
+        assertEquals(Boolean.FALSE, marker.get("authorable"), "but the palette must never offer another");
+
+        Map<String, Object> acq = byType(cat, "acquisition");
+        assertEquals(Boolean.TRUE, acq.get("authorable"));
+        // the marker node is the ONLY type where the two answers differ
+        assertEquals(List.of("transform.dedup.marker"), cat.stream()
+                .filter(t -> !t.get("lowerable").equals(t.get("authorable")))
+                .map(t -> (String) t.get("type")).toList());
+        // …and nothing unlowerable is authorable
+        assertTrue(cat.stream().noneMatch(t -> Boolean.TRUE.equals(t.get("authorable"))
+                && Boolean.FALSE.equals(t.get("lowerable"))));
+    }
+
     @Test
     void graphProjectionIsStructuralWithTypedEdges() {
         PipelineGraph g = new PipelineGraph("DEMO", true,

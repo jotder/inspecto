@@ -126,6 +126,23 @@ public final class PipelineEditable {
     }
 
     /**
+     * Types that still LOWER but must never be OFFERED for authoring. Read-compat and save-ability are
+     * two different questions, and P5-a made them diverge for the first time: {@code
+     * transform.dedup.marker} must keep lowering (an editor opened before the fold holds a graph
+     * carrying one) while nothing should ever create another.
+     */
+    private static final Set<String> READ_COMPAT_ONLY = Set.of(BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type());
+
+    /**
+     * Whether the palette may offer this type. ⚠ Not the same as {@link #isLowerable} — filtering the
+     * palette on lowerability would force the choice between offering a retired node and refusing to
+     * save a graph that legitimately still carries one.
+     */
+    public static boolean isAuthorable(String type) {
+        return isLowerable(type) && !READ_COMPAT_ONLY.contains(type);
+    }
+
+    /**
      * Why this node's {@code use:} ref cannot be lowered, or {@code null} when it can.
      *
      * <p>⚠ The editor offers a component picker for <b>every</b> TRANSFORM and SINK node — its bind kind

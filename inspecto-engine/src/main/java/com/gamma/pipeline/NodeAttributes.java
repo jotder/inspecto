@@ -91,7 +91,12 @@ public final class NodeAttributes {
      * next save. Defaults mirror the parser's ({@code PipelineConfigParser}: {@code .processed} / 90).
      */
     public static final List<NodeAttribute> MARKER_DEDUP = List.of(
-            NodeAttribute.of("duplicate_check", "Marker dedup", "boolean", "optional")
+            // ⚠ tier `required` + required(false) — the always-visible-but-optional idiom. As `optional`
+            // the switch sat behind the form's disclosure, so the drawer's Duplicate handling group
+            // rendered as a heading over "Optional settings (1)" and NOTHING else (caught in-preview,
+            // invisible to a unit test asserting the heading). The group's whole point is that this
+            // switch is visible; the three detail keys below it stay advanced.
+            NodeAttribute.of("duplicate_check", "Marker dedup", "boolean", "required").required(false)
                     .help("Skip a file whose marker already exists beside it — the local poll path's re-processing guard."),
             NodeAttribute.of("marker_extension", "Marker extension", "string", "advanced")
                     .placeholder(".processed")

@@ -44,6 +44,14 @@ export const LOWERABLE = new Set([
 ]);
 
 /**
+ * Types that still LOWER but must never be OFFERED for authoring (mirrors
+ * `PipelineEditable.READ_COMPAT_ONLY`). Read-compat and save-ability are different questions, and
+ * P5-a made them diverge for the first time: `transform.dedup.marker` must keep lowering, because an
+ * editor opened before the fold holds a graph carrying one — while nothing should create another.
+ */
+export const READ_COMPAT_ONLY = new Set(['transform.dedup.marker']);
+
+/**
  * Acquisition-node config keys that do NOT belong to the `collector:` block — each is borrowed from
  * another section of the file and written back there by `lowerGraph` (mirrors
  * `PipelineEditable.ACQ_FOREIGN_KEYS`). ⚠ A key homed on this node without being listed here

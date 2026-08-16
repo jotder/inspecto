@@ -133,6 +133,22 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
         expect(NODE_TYPES.length).toBe(28);
     });
 
+    /**
+     * P5-a: `authorable` is NOT a synonym for `lowerable`. The marker node still lowers (an editor
+     * opened before the fold holds a graph carrying one) but the palette must never offer another —
+     * a mock publishing them as equal would let the offline palette drift from production's.
+     */
+    it('separates authorable from lowerable — only the retired marker node differs', () => {
+        const differ = NODE_TYPES.filter((t) => t.lowerable !== t.authorable).map((t) => t.type);
+        expect(differ).toEqual(['transform.dedup.marker']);
+        expect(NODE_TYPES.find((t) => t.type === 'transform.dedup.marker')).toMatchObject({
+            lowerable: true,
+            authorable: false,
+        });
+        // nothing unlowerable is authorable
+        expect(NODE_TYPES.filter((t) => t.authorable && !t.lowerable)).toEqual([]);
+    });
+
     it('only the parser family and the router emit operator-named routes', () => {
         expect(NODE_TYPES.filter((t) => t.emitsNamedRoutes).map((t) => t.type)).toEqual([
             'parser',

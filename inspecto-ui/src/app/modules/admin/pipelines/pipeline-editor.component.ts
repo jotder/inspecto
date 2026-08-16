@@ -599,11 +599,15 @@ export class PipelineEditorComponent implements OnInit {
         });
         this.api.nodeTypes().subscribe({
             next: (ts) => {
-                // The palette offers only lowerable types — a step that can never be saved to this
+                // The palette offers only AUTHORABLE types — a step that can never be saved to this
                 // pipeline format (adapter, the unspecced transform.*, sink.materialized/view, alert,
-                // event) is not offered at all. The full catalog still feeds the maps below, so a
-                // grandfathered graph carrying such a node keeps rendering + flagging (unsupported()).
-                this.paletteGroups.set(groupByCategory(ts.filter((t) => t.lowerable)));
+                // event) is not offered at all, and neither is a retired-but-still-lowerable one
+                // (transform.dedup.marker since P5-a). ⚠ Filtering on `lowerable` would put those two
+                // groups in conflict: the marker node must keep lowering so an editor opened before
+                // the fold can still save. An older server omitting the flag keeps the old behaviour.
+                // The full catalog still feeds the maps below, so a grandfathered graph carrying such
+                // a node keeps rendering + flagging (unsupported()).
+                this.paletteGroups.set(groupByCategory(ts.filter((t) => t.authorable ?? t.lowerable)));
                 this.typeCat.set(typeCategoryMap(ts));
                 this.typeLabel.set(typeLabelMap(ts));
                 this.typeEmits.set(new Map(ts.map((t) => [t.type, t.emits])));

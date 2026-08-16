@@ -98,6 +98,49 @@ describe('PipelineCollectionDefinitionComponent', () => {
         expect(fixture.debugElement.query(By.directive(CollectorConfigComponent))).not.toBeNull();
     });
 
+    /**
+     * P5-b: marker dedup is homed on this node but is NOT a `collector:` key, so it renders as its
+     * own group rather than inside the shared collector surface — which authors that block and only
+     * that block. This also closes H2: the create scaffold injects `duplicate_check` silently, and
+     * this group is the first place an operator can see or change what it wrote.
+     */
+    it('renders the dedup Guarantees as their own group, outside the collector surface', async () => {
+        const fixture = await create({
+            id: 'acq',
+            type: 'acquisition',
+            config: { duplicate_check: true, marker_extension: '.processed' },
+        });
+        const p = pane(fixture);
+        const dedupKeys = p.dedupSpecs().map((s) => s.key);
+        expect(dedupKeys).toEqual(['duplicate_check', 'marker_extension', 'retention_days', 'markers_dir']);
+        // the collector surface is handed the block's keys only — no marker key reaches it
+        const collectorKeys = p.collectorSpecs().map((s) => s.key);
+        for (const k of dedupKeys) expect(collectorKeys).not.toContain(k);
+        expect(collectorKeys).toContain('include'); // …and it still gets the whole block
+        // the group is rendered, not merely computed
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain('Duplicate handling');
+    });
+
+    it('carries both surfaces into the applied node, and the group seeds from the node', async () => {
+        const fixture = await create({
+            id: 'acq',
+            type: 'acquisition',
+            config: { include: ['*.csv'], duplicate_check: true, marker_extension: '.processed' },
+        });
+        const forms = fixture.debugElement.queryAll(By.directive(InspectoSchemaFormComponent));
+        expect(forms.length).toBe(2); // [0] = inside the collector surface, [1] = the dedup group
+        const dedupForm = forms[1].componentInstance as InspectoSchemaFormComponent;
+        expect(dedupForm.form.getRawValue()['marker_extension']).toBe('.processed');
+
+        dedupForm.form.patchValue({ retention_days: 45 });
+        pane(fixture).submit();
+
+        const config = fixture.componentInstance.applied!.config as Record<string, unknown>;
+        expect(config['duplicate_check']).toBe(true);
+        expect(config['retention_days']).toBe(45);
+        expect(config['include']).toEqual(['*.csv']); // the collector surface's values survive the merge
+    });
+
     it('applies an acquisition Connection onto use:, never into config', async () => {
         const fixture = await create({
             id: 'acq',

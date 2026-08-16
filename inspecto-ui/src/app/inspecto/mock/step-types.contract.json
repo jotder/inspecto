@@ -132,7 +132,8 @@
     "key" : "duplicate_check",
     "label" : "Marker dedup",
     "type" : "boolean",
-    "tier" : "optional",
+    "tier" : "required",
+    "required" : false,
     "help" : "Skip a file whose marker already exists beside it — the local poll path's re-processing guard."
   }, {
     "key" : "marker_extension",
