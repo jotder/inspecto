@@ -300,6 +300,96 @@ describe('PipelineEditorComponent', () => {
 
             expect(config.remove).not.toHaveBeenCalled();
         });
+
+        /**
+         * Per-segment schemas, added 2026-08-17. ⛔ The backlog's cause ("enumerating them needs the
+         * parsed block") was wrong: the paths are AUTHORED on the parse node as
+         * `parsing.<asn1|plugin>.segments`, which the editor holds in memory at delete time.
+         */
+        describe('per-segment schemas', () => {
+            function graphWithSegments(segments: Record<string, string>, key = 'asn1') {
+                return of({
+                    name: 'demo',
+                    active: false,
+                    nodes: [{ id: 'p', type: 'parser', config: { parsing: { [key]: { segments } } } }],
+                    edges: [],
+                });
+            }
+
+            it('sweeps the segment schemas the pipeline authored', async () => {
+                api.pipelineGraphRaw.mockReturnValue(
+                    graphWithSegments({
+                        CALL: 'spaces/default/config/demo_CALL.toon',
+                        SMS: 'spaces/default/config/demo_SMS.toon',
+                    }),
+                );
+                const c = make();
+                c.select('demo');
+                await c.deletePipeline();
+
+                expect(config.remove).toHaveBeenCalledWith('schema', 'demo_CALL');
+                expect(config.remove).toHaveBeenCalledWith('schema', 'demo_SMS');
+            });
+
+            it('reads a plugin node’s segments too, not just asn1', async () => {
+                api.pipelineGraphRaw.mockReturnValue(
+                    graphWithSegments({ EVT: 'spaces/default/config/demo_EVT.toon' }, 'plugin'),
+                );
+                const c = make();
+                c.select('demo');
+                await c.deletePipeline();
+
+                expect(config.remove).toHaveBeenCalledWith('schema', 'demo_EVT');
+            });
+
+            /**
+             * 🔴 The convention boundary. A path outside `<id>_` may be shared with another pipeline;
+             * deleting it would orphan that one. Leaving it costs at most an unreferenced file.
+             */
+            it('leaves a foreign schema path alone', async () => {
+                api.pipelineGraphRaw.mockReturnValue(
+                    graphWithSegments({
+                        CALL: 'spaces/default/config/demo_CALL.toon',
+                        SHARED: 'spaces/default/config/corporate_cdr.toon',
+                    }),
+                );
+                const c = make();
+                c.select('demo');
+                await c.deletePipeline();
+
+                expect(config.remove).toHaveBeenCalledWith('schema', 'demo_CALL');
+                expect(config.remove).not.toHaveBeenCalledWith('schema', 'corporate_cdr');
+            });
+
+            it('does not re-delete the flat companion when a segment names it', async () => {
+                api.pipelineGraphRaw.mockReturnValue(
+                    graphWithSegments({ ONLY: 'spaces/default/config/demo_schema.toon' }),
+                );
+                const c = make();
+                c.select('demo');
+                await c.deletePipeline();
+
+                const schemaCalls = config.remove.mock.calls.filter(
+                    (args: unknown[]) => args[0] === 'schema' && args[1] === 'demo_schema',
+                );
+                expect(schemaCalls).toHaveLength(1);
+            });
+
+            /** A failed sweep must never strand the delete — the pipeline is already gone. */
+            it('completes the delete when a segment schema removal fails', async () => {
+                api.pipelineGraphRaw.mockReturnValue(
+                    graphWithSegments({ CALL: 'spaces/default/config/demo_CALL.toon' }),
+                );
+                config.remove.mockImplementation((kind: string, name: string) =>
+                    kind === 'schema' && name === 'demo_CALL' ? throwError(() => new Error('nope')) : of({}),
+                );
+                const c = make();
+                c.select('demo');
+                await c.deletePipeline();
+
+                expect(c.selectedId()).toBeNull();
+            });
+        });
     });
 
     /**

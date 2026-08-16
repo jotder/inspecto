@@ -44,6 +44,7 @@ import { type AttributeSpec, parseUseRef, pipelineScaffold } from 'app/inspecto/
 import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
 import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { schemaNameFromPath } from 'app/inspecto/segments';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { DefinitionDrawerComponent } from 'app/inspecto/components/definition-drawer.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
@@ -1347,6 +1348,39 @@ export class PipelineEditorComponent implements OnInit {
      *       block the delete no longer has.</li>
      * </ul>
      */
+    /**
+     * The per-segment schemas (`<id>_<segmentKey>`) this pipeline OWNS, for the delete cascade.
+     *
+     * <p>⛔ The backlog's stated cause for leaving these behind — "enumerating them needs the parsed
+     * block the delete no longer has" — was wrong (grounded 2026-08-17). A segment's schema path is
+     * AUTHORED config, stored on the parse node as `parsing.<asn1|plugin>.segments` = `{key: path}`;
+     * the editor holds that graph in memory, so nothing has to be re-parsed to enumerate them.
+     *
+     * <p>🔴 **Only names inside this pipeline's own `<id>_` namespace are swept.** A hand-authored path
+     * pointing somewhere else may be shared with another pipeline, and deleting it would orphan that
+     * one — the same convention boundary the parse pane already respects when it refuses to re-derive
+     * over a foreign `schema_file`. Not sweeping a foreign schema leaves at worst an unreferenced file;
+     * sweeping one breaks a pipeline nobody asked us to touch.
+     */
+    private ownedSegmentSchemas(id: string): string[] {
+        const prefix = `${id}_`.replace(/[^A-Za-z0-9_]+/g, '_');
+        const names = new Set<string>();
+        for (const node of this.model()?.nodes ?? []) {
+            const parsing = node.config?.['parsing'];
+            if (!parsing || typeof parsing !== 'object') continue;
+            for (const key of ['asn1', 'plugin']) {
+                const block = (parsing as Record<string, unknown>)[key] as Record<string, unknown> | undefined;
+                const segments = block?.['segments'];
+                if (!segments || typeof segments !== 'object' || Array.isArray(segments)) continue;
+                for (const path of Object.values(segments as Record<string, unknown>)) {
+                    const name = schemaNameFromPath(path);
+                    if (name && name.startsWith(prefix)) names.add(name);
+                }
+            }
+        }
+        return [...names];
+    }
+
     async deletePipeline(): Promise<void> {
         const id = this.selectedId();
         if (!id) return;
@@ -1365,6 +1399,8 @@ export class PipelineEditorComponent implements OnInit {
         // W5: deleting a registered pipeline discards its canonical config (the server refuses an
         // active pipeline — deactivate first).
         const companion = (suffix: string): string => `${id}_${suffix}`.replace(/[^A-Za-z0-9_]+/g, '_');
+        // Read the per-segment schemas off the graph BEFORE the delete clears it.
+        const segmentSchemas = this.ownedSegmentSchemas(id).filter((n) => n !== companion('schema'));
         this.configApi
             .remove('pipeline', id, undefined, breaks > 0)
             .pipe(
@@ -1372,6 +1408,9 @@ export class PipelineEditorComponent implements OnInit {
                     forkJoin([
                         this.configApi.remove('schema', companion('schema')).pipe(catchError(() => of(null))),
                         this.configApi.remove('enrichment', companion('enrich')).pipe(catchError(() => of(null))),
+                        ...segmentSchemas.map((name) =>
+                            this.configApi.remove('schema', name).pipe(catchError(() => of(null))),
+                        ),
                     ]).pipe(map(() => res)),
                 ),
             )

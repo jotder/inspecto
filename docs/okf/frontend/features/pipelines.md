@@ -737,9 +737,14 @@ calls this?" of the shell's members, not by reading the plan — whose blast-rad
   configs on disk. It now reads impact, names the dependents in the confirm ("2 datasets, 1 widget"),
   sends `force` only once they have been shown, and cascades. ⚠ The impact read is **advisory**: a
   failed read must still let the delete proceed — the server re-checks and 409s on its own, so
-  refusing here would invent a refusal the backend does not have. ⚠ Per-**segment** schemas
-  (`<id>_<segmentKey>`) are still not swept; enumerating them needs the parsed block a delete no
-  longer has.
+  refusing here would invent a refusal the backend does not have. Per-**segment** schemas
+  (`<id>_<segmentKey>`) joined the cascade **2026-08-17** — ⚠ the earlier note here ("enumerating
+  them needs the parsed block a delete no longer has") was **wrong**: a segment's schema path is
+  authored config on the parse node (`parsing.<asn1|plugin>.segments` → `{key: path}`), so
+  `ownedSegmentSchemas()` reads the basenames off the in-memory graph before the delete clears it.
+  ⛔ **Scoped to the pipeline's own `<id>_` prefix** — a hand-authored path elsewhere may be shared
+  with another pipeline, and orphaning that one is worse than leaving an unreferenced file; this is
+  the same boundary the parse pane keeps when it refuses to re-derive over a foreign `schema_file`.
 - **The stream-config export had no other home.** ⛔ The editor's transfer menu is the **Metadata
   Bundle** — Studio registry artifacts addressed by **id** — while a pipeline and its satellites live
   in the **config** namespace addressed by **path**, and the two collide on the word *schema*. Deleting
