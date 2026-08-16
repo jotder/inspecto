@@ -8,13 +8,15 @@ import { DefinitionStateService } from 'app/inspecto/definition/definition-state
 
 const TOASTR = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() };
 
+/** The thread is an INPUT, not an injection — the host owns one per editor tab. */
 function create() {
     TestBed.configureTestingModule({
         imports: [InspectoSamplePanelComponent],
-        providers: [provideNoopAnimations(), DefinitionStateService, { provide: ToastrService, useValue: TOASTR }],
+        providers: [provideNoopAnimations(), { provide: ToastrService, useValue: TOASTR }],
     });
-    const state = TestBed.inject(DefinitionStateService);
+    const state = new DefinitionStateService();
     const fixture = TestBed.createComponent(InspectoSamplePanelComponent);
+    fixture.componentRef.setInput('state', state);
     fixture.detectChanges();
     return { fixture, state };
 }
@@ -50,6 +52,17 @@ describe('InspectoSamplePanelComponent', () => {
         fixture.detectChanges();
         fixture.componentInstance.clear();
         expect(state.sample()).toBeNull();
+    });
+
+    /** 🔴 The whole point of the input: two tabs must not share one sample. */
+    it('renders only the thread it was handed', () => {
+        const { fixture, state } = create();
+        const other = new DefinitionStateService();
+        other.captureSample('other-tab.csv', 'x\ny\nz\n');
+        state.captureSample('mine.csv', 'a\n');
+        fixture.detectChanges();
+        expect(fixture.nativeElement.textContent).toContain('mine.csv');
+        expect(fixture.nativeElement.textContent).not.toContain('other-tab.csv');
     });
 
     it('has no a11y violations (empty and captured states)', async () => {

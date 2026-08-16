@@ -48,6 +48,7 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { DefinitionDrawerComponent } from 'app/inspecto/components/definition-drawer.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoSplitDirective } from 'app/inspecto/components/split.directive';
+import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
 import { grammarContentAsParsingBlock } from 'app/inspecto/grammar';
 import { TransferMenuComponent } from 'app/inspecto/transfer';
 import { StreamTransferService } from 'app/inspecto/transfer/stream-transfer.service';
@@ -256,6 +257,15 @@ export class PipelineEditorComponent implements OnInit {
      */
     private readonly cachedModels = new Map<string, AuthoredPipeline>();
     private readonly dirtyIds = signal<ReadonlySet<string>>(new Set());
+    /**
+     * The sample thread, ONE PER TAB (operator-decided 2026-08-16; the wizard's D5 thread re-homed
+     * after P6-e). 🔴 It is a Map here rather than a `providers: []` entry for the reason
+     * {@link DefinitionStateService} states: providers are static per component instance and this
+     * editor is a single instance hosting every tab, so one provider would leak one sample across
+     * every open pipeline. Same shape as {@link cachedModels}, and dropped by the same
+     * {@link forgetTab}.
+     */
+    private readonly sampleThreads = new Map<string, DefinitionStateService>();
 
     /**
      * Mirror the active tab's `dirty` into the per-tab set. One effect rather than touching the dozen
@@ -283,6 +293,16 @@ export class PipelineEditorComponent implements OnInit {
      *  export, which is a different format on a different route. */
     readonly exportingConfig = signal(false);
     readonly model = signal<AuthoredPipeline | null>(null);
+
+    /**
+     * The active tab's sample thread, or null before anything is open. ⚠ Reading the Map inside a
+     * computed does not track it — deliberately: an entry is created once when its tab opens and never
+     * replaced, so `selectedId` is the only dependency that can change the answer.
+     */
+    readonly sampleThread = computed(() => {
+        const id = this.selectedId();
+        return id ? (this.sampleThreads.get(id) ?? null) : null;
+    });
 
     /** The list row for the selected pipeline — carries the `template` flag and the display name. */
     readonly selectedSummary = computed(() => {
@@ -859,6 +879,9 @@ export class PipelineEditorComponent implements OnInit {
 
     private forgetTab(id: string): void {
         this.cachedModels.delete(id);
+        // The thread is session state about a tab that no longer exists — reopening starts clean, the
+        // same way the graph is refetched rather than restored.
+        this.sampleThreads.delete(id);
         this.dirtyIds.update((s) => {
             const next = new Set(s);
             next.delete(id);
@@ -895,6 +918,8 @@ export class PipelineEditorComponent implements OnInit {
         }
         this.clearSelection();
         if (!this.openIds().includes(id)) this.openIds.update((ids) => [...ids, id]);
+        // Every path that opens a tab lands here, so this is the one place a thread is born.
+        if (!this.sampleThreads.has(id)) this.sampleThreads.set(id, new DefinitionStateService());
         // W5: the editor edits the CANONICAL *_pipeline.toon — lift it to the editable graph.
         this.api.pipelineGraphRaw(id).subscribe({
             next: (flow) => {

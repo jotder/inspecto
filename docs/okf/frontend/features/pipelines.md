@@ -538,25 +538,50 @@ The definition drawer gained the last two stages. Where their keys live is the w
 - ⛔ A single drawer over "schema + mapping + table" would span **three** node types and break the
   one-`[node]`-in/one-node-out contract every drawer holds. It was split instead (operator, 2026-08-16).
 
-### The editor has no sample thread yet — and since P6-e, nothing else does either
+### The sample thread, one per tab (P6-e follow-on, 2026-08-16)
+
+The editor now keeps a `DefinitionStateService` **per open tab** — a `Map<id, …>` beside `cachedModels`,
+born in `select()` (the one path every tab open goes through) and dropped by `forgetTab()`, so closing
+a tab and reopening it starts clean the same way the graph is refetched rather than restored.
+
+🔴 **It is a Map and not a `providers: []` entry, deliberately.** DI providers are static per component
+instance, and this editor is ONE instance hosting every tab — a provider would hand every open pipeline
+the same sample. For the same reason `InspectoSamplePanelComponent` takes the thread as an **input**
+rather than injecting it; that also keeps it pure, the D2 rule every definition pane follows.
+
+⚠ **Reading the Map inside the `sampleThread()` computed does not track it** — deliberate: an entry is
+created once when its tab opens and never replaced, so `selectedId` is the only dependency that can
+change the answer.
+
+The strip is mounted in the **parse drawer**, where the sample is consumed, and the drawer supplies the
+grammar editor's `previewFn`. ⛔ That does not move where the parse runs: the stateless
+`POST /parsers/{id}/preview` stays, because Onboarding only used `POST /config/preview/parsing` to post
+a server-held pipeline **draft**, and this editor holds a graph. ⚠ **The failure path is why it is a
+`previewFn` at all** — the grammar editor's `previewed` output fires on SUCCESS only, so a failing
+re-parse would otherwise leave the previous "parsed · N cols" chip standing over a grammar that no
+longer parses. ⚠ Only a **table** result feeds the thread; a record tree (ASN.1 / plugin) leaves it
+untouched rather than clearing it — the parsed hop means "rows a downstream step can cast".
+
+🔴 **The strip only appears for a per-format parse node** (`PARSE_NODE_FRONTENDS`), because only those
+reach the definition drawer — a generic `parser` node still opens the grammar-editor **dialog**, which
+has no thread. The offline sample `cdr_ingest` is exactly such a pipeline, which is why the preview
+drive had to add a Delimited step to see the strip at all. Not a defect: the drawer is the definition
+surface, and the dialog is the legacy path P3a deliberately left in place.
+
+### Before that: the editor had no sample thread — and after P6-e, nothing else did either
 
 Grounded 2026-08-16: that service was injected by `onboarding-shell`, `parsing-pane`, `sample-panel`
 and `schema-mapping-pane` and by nothing under `modules/admin/pipelines/`. P2-0 landed it for the
-wizard; adopting it in the editor is unbuilt work, not an existing seam. **P6-e then deleted the
-wizard**, so `DefinitionStateService` now has *no provider at all* and `InspectoSamplePanelComponent`
-(moved to `inspecto/definition/`, renamed off its `onboarding-` prefix) is unmounted — deliberately,
-for one slice, because the per-tab thread is the surface that mounts it. 🔴 **The editor must provide
-it PER TAB**: it is `@Injectable()` with no `providedIn` precisely so two pipelines cannot share one
-sample, and a single component-level provider on the multi-tab editor would leak one sample across
-every open pipeline. That ⛔ is recorded on the service itself, where someone editing it will see it.
-Two consequences of the thread still being absent:
+wizard; adopting it in the editor was unbuilt work, not an existing seam — closed by the slice above.
+Two consequences that held while the thread was absent, one of which still does:
 
 - The Load pane takes its field list from the **parser's `schema_file`** — read-only context the host
   passes in, because the host is the only thing holding the whole graph. Rules map FROM schema fields
   anyway, so no sample is needed to author them.
-- **`POST /config/preview/schema`'s mapped-row half (B1) has no consumer yet.** It needs sample rows the
-  editor cannot supply. ✅ **Decided 2026-08-16 (operator): wire the thread into the editor, per tab** —
-  so B1 gets its consumer; the work is scheduled, not open.
+- **`POST /config/preview/schema`'s mapped-row half (B1) still has no consumer.** Its blocker is gone —
+  the thread now carries parsed rows — but rendering them is the **Load drawer's** own change, not this
+  one. ⚠ And it will only ever have rows for a pipeline whose parse node is per-format, since that is
+  the only kind that feeds the thread.
 
 ### Two write-ordering guards, both falsified before being trusted
 

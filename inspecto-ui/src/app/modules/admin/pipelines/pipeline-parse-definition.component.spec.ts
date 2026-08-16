@@ -6,6 +6,8 @@ import { of, throwError } from 'rxjs';
 import { delay } from 'rxjs/operators';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthoredNode, ComponentDef, ConfigService, ParsersService, SpacesService } from 'app/inspecto/api';
+import { ToastrService } from 'ngx-toastr';
+import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
 import { GrammarEditorComponent } from 'app/inspecto/grammar';
 import { InspectoSegmentsEditorComponent } from 'app/inspecto/segments';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
@@ -25,6 +27,7 @@ import { PipelineParseDefinitionComponent } from './pipeline-parse-definition.co
             [node]="node"
             [templates]="templates"
             [pipelineName]="pipelineName"
+            [sample]="sample"
             (applied)="applied = $event"
             (dirtyChange)="dirty = $event"
             (saveAsTemplate)="template = $event"
@@ -35,6 +38,8 @@ class HostComponent {
     node: AuthoredNode = delimitedNode();
     templates: ComponentDef[] = [];
     pipelineName = '';
+    /** The tab's sample thread — null in most specs, exactly as a host that keeps none. */
+    sample: DefinitionStateService | null = null;
     applied?: AuthoredNode;
     dirty = false;
     template?: Record<string, unknown>;
@@ -183,6 +188,7 @@ async function create(
     templates: ComponentDef[] = [],
     served: unknown[] = [],
     servedDelayMs = 0,
+    sample: DefinitionStateService | null = null,
 ) {
     schemaWrites.length = 0;
     TestBed.configureTestingModule({
@@ -232,12 +238,15 @@ async function create(
                 },
             },
             { provide: SpacesService, useValue: { currentSpaceId: () => 'default' } },
+            // The sample strip (rendered only with a thread) reports an unreadable file through toastr.
+            { provide: ToastrService, useValue: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() } },
         ],
     });
     await TestBed.compileComponents();
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.node = node;
     fixture.componentInstance.templates = templates;
+    fixture.componentInstance.sample = sample;
     fixture.detectChanges();
     return fixture;
 }
@@ -256,6 +265,73 @@ function segmentsEditor(fixture: ComponentFixture<HostComponent>): InspectoSegme
 
 describe('PipelineParseDefinitionComponent', () => {
     beforeEach(() => localStorage.removeItem('inspecto.currentLens'));
+
+    /**
+     * The per-tab sample thread. The pane does not own it — it renders the strip the host hands in and
+     * mirrors Test parse into it, so the chips and every downstream step read the same result.
+     */
+    describe('sample thread', () => {
+        it('renders no strip, and leaves the editor its own sample box, without a thread', async () => {
+            const fixture = await create();
+            expect(fixture.nativeElement.querySelector('inspecto-sample-panel')).toBeNull();
+            expect(editor(fixture).sampleMode).toBe('own');
+        });
+
+        it('renders the strip and hands the editor the thread’s sample', async () => {
+            const thread = new DefinitionStateService();
+            thread.captureSample('cdr.csv', 'a|b\n1|2\n');
+            const fixture = await create(delimitedNode(), [], [], 0, thread);
+
+            expect(fixture.nativeElement.querySelector('inspecto-sample-panel')).not.toBeNull();
+            expect(fixture.nativeElement.textContent).toContain('cdr.csv');
+            expect(editor(fixture).sampleMode).toBe('host');
+            expect(editor(fixture).sampleText()).toBe('a|b\n1|2\n');
+        });
+
+        it('mirrors a table Test parse into the thread', async () => {
+            const thread = new DefinitionStateService();
+            thread.captureSample('cdr.csv', 'a|b\n1|2\n');
+            const fixture = await create(delimitedNode(), [], [], 0, thread);
+            const parsers = TestBed.inject(ParsersService) as unknown as { preview: ReturnType<typeof vi.fn> };
+            parsers.preview.mockReturnValue(
+                of({ kind: 'table', columns: ['a', 'b'], rows: [{ a: '1' }], rowCount: 1, rejectedRows: 0 }),
+            );
+            editor(fixture).test();
+
+            expect(thread.parsePreview()?.columns).toEqual(['a', 'b']);
+            expect(thread.parseError()).toBeNull();
+        });
+
+        /**
+         * ⚠ The failure path is the whole reason this is a `previewFn`: `previewed` fires on SUCCESS
+         * only, so a stale "parsed" chip would otherwise stand over a grammar that no longer parses.
+         */
+        it('records a failed Test parse, clearing the stale parsed result', async () => {
+            const thread = new DefinitionStateService();
+            thread.captureSample('cdr.csv', 'a|b\n');
+            const fixture = await create(delimitedNode(), [], [], 0, thread);
+            thread.parsePreview.set({ frontend: 'delimited', columns: ['a'], rowCount: 1, rows: [], rejectedRows: 0 });
+            const parsers = TestBed.inject(ParsersService) as unknown as { preview: ReturnType<typeof vi.fn> };
+            parsers.preview.mockReturnValue(throwError(() => new Error('nope')));
+            editor(fixture).test();
+
+            expect(thread.parsePreview()).toBeNull();
+            expect(thread.parseError()).toBeTruthy();
+        });
+
+        /** ⚠ A record tree is not "rows a downstream step can cast" — leave the thread alone. */
+        it('leaves the thread untouched for a tree preview', async () => {
+            const thread = new DefinitionStateService();
+            thread.captureSample('cdr.ber', 'x');
+            const fixture = await create(delimitedNode(), [], [], 0, thread);
+            const parsers = TestBed.inject(ParsersService) as unknown as { preview: ReturnType<typeof vi.fn> };
+            parsers.preview.mockReturnValue(of({ kind: 'tree', nodes: [] }));
+            editor(fixture).test();
+
+            expect(thread.parsePreview()).toBeNull();
+            expect(thread.parseError()).toBeNull();
+        });
+    });
 
     it('renders the shared Grammar editor with the format picker locked', async () => {
         const fixture = await create();

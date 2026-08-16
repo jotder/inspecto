@@ -573,6 +573,7 @@
                                             [node]="dn"
                                             [templates]="grammarTemplates()"
                                             [pipelineName]="selectedId() ?? ''"
+                                            [sample]="sampleThread()"
                                             (applied)="onDefinitionApplied($event)"
                                             (dirtyChange)="definitionDirty.set($event)"
                                             (saveAsTemplate)="saveGrammarAsTemplate($event)"

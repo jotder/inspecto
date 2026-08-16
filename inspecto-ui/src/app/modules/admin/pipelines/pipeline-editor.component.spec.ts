@@ -906,6 +906,41 @@ describe('PipelineEditorComponent', () => {
             expect(c.selectedId()).toBe('other');
             expect(c.definitionNode()).toBeNull();
         });
+
+        /**
+         * The sample thread is PER TAB (the reason it is a Map and not a `providers:` entry — a single
+         * provider on this one-instance-hosts-every-tab component would leak one sample everywhere).
+         */
+        describe('sample thread', () => {
+            it('gives each tab its own, and never shares a captured sample', async () => {
+                const c = make();
+                c.select('demo');
+                api.pipelineGraphRaw.mockReturnValue(of({ name: 'other', active: false, nodes: [], edges: [] }));
+                c.select('other');
+                c.sampleThread()!.captureSample('other.csv', 'x\n');
+
+                await c.activateTab('demo');
+                expect(c.sampleThread()).not.toBeNull();
+                expect(c.sampleThread()!.sample()).toBeNull();
+
+                await c.activateTab('other');
+                expect(c.sampleThread()!.sample()?.name).toBe('other.csv');
+            });
+
+            it('drops the thread with the tab — reopening starts clean', async () => {
+                const c = make();
+                c.select('demo');
+                c.sampleThread()!.captureSample('demo.csv', 'x\n');
+                await c.closeTab('demo');
+                c.select('demo');
+
+                expect(c.sampleThread()!.sample()).toBeNull();
+            });
+
+            it('is null before anything is open', () => {
+                expect(make().sampleThread()).toBeNull();
+            });
+        });
     });
 
     /**

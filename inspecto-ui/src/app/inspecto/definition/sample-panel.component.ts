@@ -1,11 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
-import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
+import { DefinitionStateService } from './definition-state.service';
 
 /** Session-held sample cap — a preview thread, not a data upload. */
 const MAX_SAMPLE_BYTES = 256 * 1024;
@@ -23,9 +23,8 @@ const RAW_PREVIEW_LINES = 40;
  * paste) and never becomes part of the config. Capture is allowed in every lens — it changes nothing
  * on the server.
  *
- * <p><b>Currently unmounted.</b> P6-e retired the onboarding wizard, its only host; it moved here
- * out of that feature (and lost its `onboarding-` prefix) because the editor's own per-tab sample
- * thread — operator-decided 2026-08-16 — is the next slice and this is the surface it mounts.
+ * <p>Its host since P6-e retired the onboarding wizard is the **pipeline editor's parse drawer**,
+ * which holds one thread PER TAB — see {@link state}.
  */
 @Component({
     selector: 'inspecto-sample-panel',
@@ -38,24 +37,24 @@ const RAW_PREVIEW_LINES = 40;
                 <mat-icon svgIcon="heroicons_outline:document-text" class="icon-size-4"></mat-icon>
                 <h2 class="m-0 text-sm font-semibold">Sample</h2>
 
-                @if (state.sample(); as s) {
+                @if (state().sample(); as s) {
                     <span class="min-w-0 max-w-48 truncate text-sm" [matTooltip]="s.name">{{ s.name }}</span>
                     <inspecto-chip variant="soft">{{ lineCount() }} lines</inspecto-chip>
-                    @if (state.parseError()) {
-                        <inspecto-chip variant="outline" matTooltip="Does not parse — see the Parsing stage">
+                    @if (state().parseError()) {
+                        <inspecto-chip variant="outline" matTooltip="Does not parse — see Test parse">
                             parse ✗
                         </inspecto-chip>
-                    } @else if (state.parsePreview(); as p) {
+                    } @else if (state().parsePreview(); as p) {
                         <inspecto-chip variant="soft" tone="primary">
                             parsed · {{ p.columns.length }} cols · {{ p.rowCount }} rows{{
                                 p.rejectedRows > 0 ? ' · ' + p.rejectedRows + ' rejected' : ''
                             }}
                         </inspecto-chip>
-                        @if (state.schemaError()) {
-                            <inspecto-chip variant="outline" matTooltip="Does not cast — see the Schema stage">
+                        @if (state().schemaError()) {
+                            <inspecto-chip variant="outline" matTooltip="Does not cast — see the output schema">
                                 cast ✗
                             </inspecto-chip>
-                        } @else if (state.schemaPreview(); as sp) {
+                        } @else if (state().schemaPreview(); as sp) {
                             <inspecto-chip variant="soft" tone="primary">
                                 cast · {{ sp.okCount }} ok{{
                                     sp.rejectedCount > 0 ? ' · ' + sp.rejectedCount + ' rejected' : ''
@@ -63,7 +62,7 @@ const RAW_PREVIEW_LINES = 40;
                             </inspecto-chip>
                         }
                     } @else {
-                        <inspecto-chip variant="outline" matTooltip="Run Test parse in the Parsing stage">
+                        <inspecto-chip variant="outline" matTooltip="Run Test parse below">
                             not parsed yet
                         </inspecto-chip>
                     }
@@ -86,7 +85,7 @@ const RAW_PREVIEW_LINES = 40;
                     </button>
                 } @else {
                     <span class="text-secondary text-sm">
-                        Capture one representative sample — it follows you through the stages, so every test shows
+                        Capture one representative sample — it follows you through the definition, so every test shows
                         <em>your</em> data.
                     </span>
                     <span class="flex-1"></span>
@@ -98,7 +97,7 @@ const RAW_PREVIEW_LINES = 40;
                 }
             </div>
 
-            @if (state.sample() && expanded()) {
+            @if (state().sample() && expanded()) {
                 <pre
                     class="bg-default m-0 max-h-96 overflow-auto rounded-b-lg border-t p-3 text-xs leading-relaxed"
                     aria-label="Raw sample preview"
@@ -132,7 +131,14 @@ const RAW_PREVIEW_LINES = 40;
     `,
 })
 export class InspectoSamplePanelComponent {
-    protected readonly state = inject(DefinitionStateService);
+    /**
+     * The thread this panel renders — an INPUT, not an injection (P6-e follow-on). Its one host is now
+     * the multi-tab pipeline editor, which keeps **one thread per tab**; DI providers are static per
+     * component instance, so an injected service could only ever be the one-per-editor instance this
+     * panel must not have. Handing the active tab's thread in keeps the panel pure, which is the same
+     * D2 rule every definition pane follows.
+     */
+    readonly state = input.required<DefinitionStateService>();
     private toastr = inject(ToastrService);
 
     readonly pasting = signal(false);
@@ -142,13 +148,13 @@ export class InspectoSamplePanelComponent {
 
     readonly lineCount = computed(
         () =>
-            this.state
+            this.state()
                 .sample()
                 ?.text.split('\n')
                 .filter((l) => l.length).length ?? 0,
     );
     readonly rawPreview = computed(() => {
-        const text = this.state.sample()?.text ?? '';
+        const text = this.state().sample()?.text ?? '';
         const lines = text.split('\n');
         const head = lines.slice(0, RAW_PREVIEW_LINES).join('\n');
         return lines.length > RAW_PREVIEW_LINES ? `${head}\n…` : head;
@@ -163,7 +169,7 @@ export class InspectoSamplePanelComponent {
         file.slice(0, MAX_SAMPLE_BYTES)
             .text()
             .then((text) => {
-                this.state.captureSample(file.name, text);
+                this.state().captureSample(file.name, text);
                 this.pasting.set(false);
                 this.expanded.set(true);
                 if (truncated) this.toastr.info(`Sample truncated to the first ${MAX_SAMPLE_BYTES / 1024} KB.`);
@@ -174,13 +180,13 @@ export class InspectoSamplePanelComponent {
     usePasted(): void {
         const text = this.pasteText.slice(0, MAX_SAMPLE_BYTES);
         if (!text.trim()) return;
-        this.state.captureSample('pasted sample', text);
+        this.state().captureSample('pasted sample', text);
         this.pasting.set(false);
         this.expanded.set(true);
         this.pasteText = '';
     }
 
     clear(): void {
-        this.state.clearSample();
+        this.state().clearSample();
     }
 }

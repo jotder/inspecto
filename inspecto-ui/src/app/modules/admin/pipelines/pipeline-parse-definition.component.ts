@@ -16,8 +16,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { forkJoin, of } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
+import { Observable, forkJoin, of, throwError } from 'rxjs';
+import { catchError, map, tap } from 'rxjs/operators';
 import {
     AuthoredNode,
     ComponentDef,
@@ -31,6 +31,8 @@ import {
     SpacesService,
     apiErrorMessage,
 } from 'app/inspecto/api';
+import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
+import { InspectoSamplePanelComponent } from 'app/inspecto/definition/sample-panel.component';
 import {
     InspectoSchemaFieldsEditorComponent,
     SchemaFieldRow,
@@ -118,10 +120,19 @@ export const PARSE_NODE_FRONTENDS: Record<string, ParsingFrontend | 'asn1' | 'pl
         MatSelectModule,
         MatTooltipModule,
         GrammarEditorComponent,
+        InspectoSamplePanelComponent,
         InspectoSegmentsEditorComponent,
         InspectoSchemaFieldsEditorComponent,
     ],
     template: `
+        <!--
+            The sample thread (§4.3), mounted where the sample is CONSUMED — choose the file, see it,
+            then pick a format and options below. One thread per editor tab; the host owns it, so
+            switching tabs never shows another pipeline's sample.
+        -->
+        @if (sample(); as thread) {
+            <div class="mb-3"><inspecto-sample-panel [state]="thread" /></div>
+        }
         <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-1">
             <mat-form-field class="w-full" subscriptSizing="dynamic">
                 <mat-label>Name</mat-label>
@@ -179,6 +190,9 @@ export const PARSE_NODE_FRONTENDS: Record<string, ParsingFrontend | 'asn1' | 'pl
                 [type]="frontend() === 'plugin' ? pickedPluginId() : frontend()"
                 [configuredIngester]="configuredIngesterFqcn()"
                 [lockType]="true"
+                [sampleMode]="sample() ? 'host' : 'own'"
+                [sample]="sample()?.sample()?.text"
+                [previewFn]="sample() ? previewFn : undefined"
                 (pluginChange)="plugin.set($event)"
                 (previewed)="onPreviewed($event)"
                 (submitted)="submit()"
@@ -289,6 +303,13 @@ export class PipelineParseDefinitionComponent {
      */
     readonly pipelineName = input('');
 
+    /**
+     * This tab's sample thread, or null when the host keeps none — in which case the grammar editor
+     * falls back to its own sample box and nothing downstream sees the sample, exactly as before.
+     * Passed in (never injected) because the thread belongs to the TAB, not to this pane.
+     */
+    readonly sample = input<DefinitionStateService | null>(null);
+
     /** The edited node, rebuilt by {@link submit} — the host applies it to the in-memory model. */
     readonly applied = output<AuthoredNode>();
     /** Whether the pane holds edits since creation / the last successful submit. */
@@ -385,6 +406,48 @@ export class PipelineParseDefinitionComponent {
      * formats, which is exactly what §4b's icon table listed "+ output schema" against.
      */
     readonly authorsSchema = computed(() => !this.authorsSegments() && !this.foreignSchema());
+
+    /**
+     * Test parse, with the result mirrored into the tab's sample thread so the strip's chips and every
+     * downstream step see it. ⛔ It does NOT change WHERE the parse runs: the stateless
+     * `POST /parsers/{id}/preview` the editor already used stays the request — Onboarding routed
+     * built-ins through `POST /config/preview/parsing` because it held a server-side pipeline DRAFT to
+     * post, and this editor holds a graph, not a config.
+     *
+     * <p>⚠ It exists at all because the grammar editor's `previewed` output fires on SUCCESS only: a
+     * failing re-parse would otherwise leave the previous "parsed · N cols" chip standing over a
+     * grammar that no longer parses. The failure path is the reason this is a `previewFn` and not two
+     * lines in {@link onPreviewed}.
+     *
+     * <p>⚠ Only a TABLE result feeds the thread. A tree (ASN.1 / plugin) leaves it untouched rather
+     * than clearing it — the thread's parsed hop means "rows a downstream step can cast", and a record
+     * tree is not that.
+     */
+    readonly previewFn = (type: string, grammar: Record<string, unknown>, text: string): Observable<ParserPreview> => {
+        const thread = this.sample();
+        if (!thread) return this.parsersApi.preview(type, grammar, text);
+        thread.parseError.set(null);
+        return this.parsersApi.preview(type, grammar, text).pipe(
+            tap((p) => {
+                if (p.kind !== 'table') return;
+                thread.parsePreview.set({
+                    frontend: type,
+                    columns: p.columns,
+                    rows: p.rows,
+                    rowCount: p.rowCount,
+                    rejectedRows: p.rejectedRows,
+                });
+                // Re-parsing invalidates any cast checked against the old rows.
+                thread.schemaPreview.set(null);
+                thread.schemaError.set(null);
+            }),
+            catchError((e) => {
+                thread.parsePreview.set(null);
+                thread.parseError.set(apiErrorMessage(e, 'The sample does not parse with these settings.'));
+                return throwError(() => e);
+            }),
+        );
+    };
 
     /** Keep both halves of the discriminated preview: the tree feeds segments, the table feeds schema. */
     onPreviewed(p: ParserPreview): void {
