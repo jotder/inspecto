@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import BIND_KINDS from 'app/inspecto/mock/bind-kinds.contract.json';
+import { DERIVED_USE } from 'app/inspecto/mock/pipeline-editable';
 
 import { bindKindFor } from './pipeline-graph';
 
@@ -33,5 +34,31 @@ describe('bind-kind contract', () => {
         expect(bindKindFor('PARSE')).toBe('grammar');
         for (const category of BIND_KINDS.categories.filter((c) => c !== 'PARSE'))
             expect(bindKindFor(category)).toBeNull();
+    });
+});
+
+/**
+ * The DERIVED_USE half of the same contract. Unlike `bindableCategories` above — which this side
+ * DERIVES from `bindKindFor` — the mock re-declares `DERIVED_USE` as its own literal map, so a missing
+ * entry is invisible until a real config trips it: the ref names no component kind, and validate 422s
+ * an untouched pipeline with `UNKNOWN_USE_KIND`.
+ *
+ * It drifted exactly that way three times. `parser.asn1`, `parser.plugin` and plain `parser` each
+ * arrived in a separate change, and the plain type — reached by the legacy `processing.ingester` key
+ * with no `parsing.frontend` literal, so it never retypes — was missed by both of the others.
+ */
+describe('derived-use contract', () => {
+    it('matches the map the engine publishes, entry for entry', () => {
+        expect(DERIVED_USE).toEqual(BIND_KINDS.derivedUse);
+    });
+
+    // Pinned so an emptied contract file cannot turn the comparison above into a vacuous pass.
+    it('still calls all three ingester-bearing parser types derived', () => {
+        expect(BIND_KINDS.derivedUse).toEqual({
+            enrichment: 'enrichment/',
+            parser: 'ingester/',
+            'parser.asn1': 'ingester/',
+            'parser.plugin': 'ingester/',
+        });
     });
 });

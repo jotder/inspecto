@@ -118,7 +118,7 @@ const isParserType = (t: string): boolean => t === 'parser' || t in SUBTYPE_FRON
  * (`subtypeForFrontend` is explicit-only) yet the lift still synthesizes the ref from the class key
  * unconditionally, same as the ASN.1/plugin cases above.
  */
-const DERIVED_USE: Record<string, string> = {
+export const DERIVED_USE: Record<string, string> = {
     enrichment: 'enrichment/',
     parser: 'ingester/',
     'parser.asn1': 'ingester/',

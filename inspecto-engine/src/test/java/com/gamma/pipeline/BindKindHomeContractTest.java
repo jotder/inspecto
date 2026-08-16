@@ -37,6 +37,12 @@ import static org.junit.jupiter.api.Assertions.*;
  * <p>Only builtins are pinned: plugin-contributed types vary by classpath, and a plugin type in a
  * bindable category would silently widen the set. Regenerate deliberately with
  * {@code -Dbind.kinds.write=true}, then check the TS suite still passes.
+ *
+ * <p>The artifact carries a second map, {@link PipelineEditable#derivedUseByType()}, pinned <b>verbatim</b>
+ * rather than derived. The distinction matters: the mock re-declares {@code DERIVED_USE} as its own
+ * literal, so a missing entry there is invisible until a real config trips it — and it drifted that way
+ * three times before plain {@code parser} was found missing, which made a legacy
+ * {@code processing.ingester} pipeline fail validate with {@code UNKNOWN_USE_KIND}.
  */
 class BindKindHomeContractTest {
 
@@ -74,6 +80,9 @@ class BindKindHomeContractTest {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("categories", java.util.Arrays.stream(NodeCategory.values()).map(Enum::name).toList());
         out.put("bindableCategories", bindableCategories());
+        // Sorted, not insertion-ordered: DERIVED_USE is a Map.of(), whose iteration order is not stable
+        // across JVMs — publishing it raw would rewrite this artifact on unrelated runs.
+        out.put("derivedUse", new java.util.TreeMap<>(PipelineEditable.derivedUseByType()));
         return out;
     }
 
@@ -124,5 +133,33 @@ class BindKindHomeContractTest {
         for (BuiltinNodeType t : types(NodeCategory.PARSE))
             assertTrue(PipelineEditable.typesWithUseHome().contains(t.type()),
                     t.type() + " lost its use: home — the PARSE picker would offer refused saves");
+    }
+
+    /**
+     * The {@code ingester/} rule stated once, rather than left to three independently-authored map
+     * entries. {@link PipelineLift#parserNode} synthesizes {@code ingester/<fqcn>} from the ingester
+     * CLASS key on any parser node that has one, and the retype to a subtype is explicit-only — so
+     * every parse type that can reach that key must call the ref DERIVED. Getting this wrong is not a
+     * cosmetic drift: the ref names no {@code ComponentRegistry} kind, so validate 422s an untouched
+     * pipeline with {@code UNKNOWN_USE_KIND}. The three types below arrived in three separate changes
+     * and the plain one was missed by both of the others.
+     */
+    @Test
+    void everyParseTypeThatCanReachAnIngesterClassCallsItsRefDerived() {
+        List<BuiltinNodeType> reachesIngesterClass = List.of(
+                // the legacy `processing.ingester` key, on a node with no `parsing.frontend` literal
+                BuiltinNodeType.PARSER,
+                // `frontend: asn1` — the config parser synthesizes the Asn1RecordIngester binding
+                BuiltinNodeType.PARSER_ASN1,
+                // `frontend: plugin` — the same triple under `parsing.plugin`
+                BuiltinNodeType.PARSER_PLUGIN);
+
+        for (BuiltinNodeType t : types(NodeCategory.PARSE))
+            assertEquals(reachesIngesterClass.contains(t) ? "ingester/" : null,
+                    PipelineEditable.derivedUseByType().get(t.type()),
+                    t.type() + ": a parse type that can reach an ingester CLASS key must call the lift's "
+                            + "synthesized ref DERIVED (the ref names no ComponentRegistry kind, so "
+                            + "validate 422s an untouched pipeline with UNKNOWN_USE_KIND); one that "
+                            + "cannot must not, or a genuinely unhomed binding would be waved through");
     }
 }
