@@ -27,8 +27,9 @@ export const LOWERABLE = new Set([
     'parser.delimited', // the first per-format parser subtype (B6/P3a — mirrors the engine)
     'parser.fixedwidth', // the second (P3b) — spans both record modes, drawer serves text only
     'parser.asn1', // the third (P3c) — first-class `frontend: asn1`, grammar carried inline
-    'parser.json', // P3d — the two remaining built-in frontends, never implicit, so both retype
+    'parser.json', // P3d slice C — the two remaining built-in frontends, never implicit, so both retype
     'parser.text_regex',
+    'parser.plugin', // P3d slice D — the custom-plugin subtype, wired through the existing plugin: block
     'gap',
     'transform.dedup.marker',
     'transform.filter',
@@ -58,6 +59,9 @@ const USE_HOME: Record<string, string[]> = {
     'parser.asn1': ['grammar/'],
     'parser.json': ['grammar/'],
     'parser.text_regex': ['grammar/'],
+    // The one exception: parser.plugin IS the plain parser's plugin path, so it takes ingester/ too —
+    // see DERIVED_USE below for why that ref is accepted but never authored.
+    'parser.plugin': ['grammar/', 'ingester/'],
 };
 
 /**
@@ -71,15 +75,17 @@ const SUBTYPE_FRONTENDS: Record<string, string[]> = {
     'parser.asn1': ['asn1'],
     'parser.json': ['json'],
     'parser.text_regex': ['text_regex'],
+    'parser.plugin': ['plugin'],
 };
 
 /** Display label per subtype — mirrors each `BuiltinNodeType`'s own label. */
 const PARSER_SUBTYPE_LABELS: Record<string, string> = {
-    'parser.delimited': 'Parser (delimited)',
-    'parser.fixedwidth': 'Parser (fixed width)',
-    'parser.asn1': 'Parser (ASN.1)',
-    'parser.json': 'Parser (JSON)',
-    'parser.text_regex': 'Parser (text/regex)',
+    'parser.delimited': 'Delimited',
+    'parser.fixedwidth': 'Fixed-Width',
+    'parser.asn1': 'ASN.1',
+    'parser.json': 'JSON',
+    'parser.text_regex': 'Regex',
+    'parser.plugin': 'Custom',
 };
 
 /** The node subtype a `parsing.frontend` value names, or `null` for none/unknown. */
@@ -101,10 +107,16 @@ const isParserType = (t: string): boolean => t === 'parser' || t in SUBTYPE_FRON
  * authors an ingester — the config parser synthesizes the `Asn1RecordIngester` binding at load and
  * refuses an explicit `plugin:` block beside it — so the class the lift reads back and presents as
  * `use:` is the read side's own doing, and refusing it would make every ASN.1 pipeline unsaveable.
+ *
+ * `parser.plugin` (P3d slice D) carries the identical reasoning one level down: it is the plain
+ * parser's own `plugin.ingester`/`ingester_config`/`segments` path, just with a dedicated type once
+ * the config says `frontend: plugin` explicitly, so the lift presents the same derived `ingester/<fqcn>`
+ * ref it always did for the plain type — never authored, since the class comes from the config key.
  */
 const DERIVED_USE: Record<string, string> = {
     enrichment: 'enrichment/',
     'parser.asn1': 'ingester/',
+    'parser.plugin': 'ingester/',
 };
 
 /**

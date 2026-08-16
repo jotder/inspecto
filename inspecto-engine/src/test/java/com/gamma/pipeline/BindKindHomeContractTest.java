@@ -106,19 +106,20 @@ class BindKindHomeContractTest {
                         t.type() + " gained a use: home — the UI picker rule must be revisited, not just this test");
     }
 
-    /** PARSE is bindable only while EVERY type in it is homed. The tripwire has fired four times,
+    /** PARSE is bindable only while EVERY type in it is homed. The tripwire has fired five times,
      *  correctly: {@code parser.delimited} (P3a), {@code parser.fixedwidth} (P3b), {@code parser.asn1}
-     *  (P3c) and the {@code parser.json}/{@code parser.text_regex} pair (P3d) each arrived WITH a
-     *  {@code grammar/} home, so the category stays bindable and this pins the whole family. A parse
-     *  type added without a home must flip {@code bindKindFor('PARSE')} to null, and this test is
-     *  where that shows up first. */
+     *  (P3c), the {@code parser.json}/{@code parser.text_regex} pair (P3d slice C) and
+     *  {@code parser.plugin} (P3d slice D) each arrived WITH a home, so the category stays bindable and
+     *  this pins the whole family. A parse type added without a home must flip
+     *  {@code bindKindFor('PARSE')} to null, and this test is where that shows up first. */
     @Test
     void parseIsBindableAndEveryParseTypeIsHomed() {
         assertTrue(bindableCategories().contains(NodeCategory.PARSE.name()));
         assertEquals(
                 List.of(BuiltinNodeType.PARSER, BuiltinNodeType.PARSER_DELIMITED,
                         BuiltinNodeType.PARSER_FIXEDWIDTH, BuiltinNodeType.PARSER_ASN1,
-                        BuiltinNodeType.PARSER_JSON, BuiltinNodeType.PARSER_TEXT_REGEX),
+                        BuiltinNodeType.PARSER_JSON, BuiltinNodeType.PARSER_TEXT_REGEX,
+                        BuiltinNodeType.PARSER_PLUGIN),
                 types(NodeCategory.PARSE));
         for (BuiltinNodeType t : types(NodeCategory.PARSE))
             assertTrue(PipelineEditable.typesWithUseHome().contains(t.type()),

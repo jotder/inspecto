@@ -24,6 +24,7 @@ import {
     ConfigService,
     ParserDef,
     ParserTreeNode,
+    ParsersService,
     SpacesService,
     apiErrorMessage,
 } from 'app/inspecto/api';
@@ -53,16 +54,21 @@ import {
  * `asn1` (P3c) is not a built-in `ParsingFrontend` — the editor hosts it as the served parser it is,
  * schema-driven off `GET /parsers` — but the node type locks it exactly like the built-ins.
  *
- * `json` / `text_regex` (P3d) close the gap between the plan's six-format icon table and the four node
- * types B6 named: they are ordinary built-ins the shared editor already rendered, so they needed only
- * their entry here plus the node type behind it.
+ * `json` / `text_regex` (P3d slice C) close the gap between the plan's six-format icon table and the
+ * four node types B6 named: they are ordinary built-ins the shared editor already rendered, so they
+ * needed only their entry here plus the node type behind it.
+ *
+ * `plugin` (P3d slice D) is the generic custom-plugin path: unlike `asn1`, its node type does not name
+ * ONE served parser — the pane offers a picker over whichever ingestable plugins the catalog serves,
+ * excluding ones already homed by their own entry above (today, just `asn1`).
  */
-export const PARSE_NODE_FRONTENDS: Record<string, ParsingFrontend | 'asn1'> = {
+export const PARSE_NODE_FRONTENDS: Record<string, ParsingFrontend | 'asn1' | 'plugin'> = {
     'parser.delimited': 'delimited',
     'parser.fixedwidth': 'fixedwidth',
     'parser.asn1': 'asn1',
     'parser.json': 'json',
     'parser.text_regex': 'text_regex',
+    'parser.plugin': 'plugin',
 };
 
 /**
@@ -138,9 +144,30 @@ export const PARSE_NODE_FRONTENDS: Record<string, ParsingFrontend | 'asn1'> = {
                     Save as template&hellip;
                 </button>
             </div>
+            <!--
+                The generic plugin's own picker (P3d slice D). Unlike every other subtype, this node's
+                TYPE does not name one served parser — it spans whichever ingestable, non-dedicated
+                plugin the catalog serves, so the pane offers its own selector rather than unlocking the
+                shared editor's built-in toggle (which would also expose the four built-in formats and
+                every preview-only plugin).
+            -->
+            @if (frontend() === 'plugin') {
+                <mat-form-field class="mb-2 w-full" subscriptSizing="dynamic">
+                    <mat-label>Parser plugin</mat-label>
+                    <mat-select [value]="plugin()?.id ?? null" (selectionChange)="pickPlugin($event.value)">
+                        @for (p of pluginChoices(); track p.id) {
+                            <mat-option [value]="p.id">{{ p.label }}</mat-option>
+                        }
+                    </mat-select>
+                    @if (!pluginChoices().length) {
+                        <mat-hint>No ingestable plugin is deployed on this server.</mat-hint>
+                    }
+                </mat-form-field>
+            }
             <inspecto-grammar-editor
                 [initial]="seedBlock()"
-                [type]="frontend()"
+                [type]="frontend() === 'plugin' ? pickedPluginId() : frontend()"
+                [configuredIngester]="configuredIngesterFqcn()"
                 [lockType]="true"
                 (pluginChange)="plugin.set($event)"
                 (previewed)="previewTree.set($event.kind === 'tree' ? $event.nodes : null)"
@@ -171,6 +198,7 @@ export class PipelineParseDefinitionComponent {
     private fb = inject(FormBuilder);
     private configApi = inject(ConfigService);
     private spaces = inject(SpacesService);
+    private parsersApi = inject(ParsersService);
 
     /** The per-format parse node being defined (identity fixed; config/name/description editable). */
     readonly node = input.required<AuthoredNode>();
@@ -179,7 +207,9 @@ export class PipelineParseDefinitionComponent {
      * The format this node's type means — the editor is locked to it and only templates naming it are
      * offered. Derived from the node type rather than passed in, so the host cannot desync the two.
      */
-    readonly frontend = computed<ParsingFrontend | 'asn1'>(() => PARSE_NODE_FRONTENDS[this.node().type] ?? 'delimited');
+    readonly frontend = computed<ParsingFrontend | 'asn1' | 'plugin'>(
+        () => PARSE_NODE_FRONTENDS[this.node().type] ?? 'delimited',
+    );
     /**
      * Stored Grammar components offered as starting points. Passed IN rather than fetched: the pane
      * stays pure (P2 — `[node]` in, outputs out, no injected state) and the host already lists them.
@@ -208,7 +238,7 @@ export class PipelineParseDefinitionComponent {
     @ViewChild(GrammarEditorComponent) private editor?: GrammarEditorComponent;
     @ViewChild(InspectoSegmentsEditorComponent) private segmentsEditor?: InspectoSegmentsEditorComponent;
 
-    // ── segments (asn1) ──────────────────────────────────────────────────────────
+    // ── segments (asn1 / plugin) ─────────────────────────────────────────────────
 
     /**
      * The served parser the editor resolved, mirrored from `(pluginChange)`.
@@ -218,6 +248,44 @@ export class PipelineParseDefinitionComponent {
      * read would decide "no segments editor" before the catalog ever arrived.
      */
     readonly plugin = signal<ParserDef | null>(null);
+
+    // ── the plugin picker (P3d slice D) ──────────────────────────────────────────
+
+    /**
+     * The full served catalog, fetched independently of the shared editor's own copy — a stateless
+     * read, the same tier as the segment-schema reads this pane already makes via `ConfigService`, not
+     * the per-pane STATE service P2 forbids. Fetched separately (rather than reached through a
+     * `@ViewChild` into the editor's own signal) so the picker's first paint does not depend on the
+     * editor's view-init timing.
+     */
+    private readonly servedPlugins = signal<ParserDef[] | null>(null);
+
+    /**
+     * Ingestable plugins this generic node may pick, excluding every id already homed by its own
+     * dedicated entry in {@link PARSE_NODE_FRONTENDS} (today, just `asn1`) — offering one of those here
+     * would create a second authoring path to the same subtype.
+     */
+    readonly pluginChoices = computed<ParserDef[]>(() => {
+        if (this.frontend() !== 'plugin') return [];
+        const dedicated = new Set<string>(Object.values(PARSE_NODE_FRONTENDS));
+        return (this.servedPlugins() ?? []).filter((p) => p.ingestable && p.ingesterClass && !dedicated.has(p.id));
+    });
+
+    /** The operator's manual pick, feeding the shared editor's `[type]`. Rehydration on load goes
+     *  through `[configuredIngester]` instead, so the two paths never race each other. */
+    readonly pickedPluginId = signal<string | null>(null);
+
+    /** The FQCN already authored on this node's `parsing.plugin.ingester`, if any — rehydrates the
+     *  editor's selection on load without marking it dirty (mirrors the editor's own contract). */
+    readonly configuredIngesterFqcn = computed(() => {
+        if (this.frontend() !== 'plugin') return '';
+        const p = this.parsingBlock()['plugin'] as Record<string, unknown> | undefined;
+        return typeof p?.['ingester'] === 'string' ? (p['ingester'] as string) : '';
+    });
+
+    pickPlugin(id: string): void {
+        this.pickedPluginId.set(id);
+    }
 
     /** The decoded record forest from the last Test parse — what "Derive from preview" proposes from. */
     readonly previewTree = signal<ParserTreeNode[] | null>(null);
@@ -229,13 +297,14 @@ export class PipelineParseDefinitionComponent {
     readonly writing = signal(false);
 
     /**
-     * Whether this node authors segments: an ASN.1 node whose served parser has resolved and can
-     * actually load to Tables. A preview-only parser has no ingester to feed, so segments would be an
-     * elaborate way to author nothing.
+     * Whether this node authors segments: an ASN.1 or generic-plugin node whose served parser has
+     * resolved and can actually load to Tables. A preview-only parser has no ingester to feed, so
+     * segments would be an elaborate way to author nothing.
      */
     readonly authorsSegments = computed(() => {
+        const f = this.frontend();
         const p = this.plugin();
-        return this.frontend() === 'asn1' && !!p?.ingestable && !!p.ingesterClass;
+        return (f === 'asn1' || f === 'plugin') && !!p?.ingestable && !!p.ingesterClass;
     });
 
     readonly form = this.fb.group({
@@ -273,6 +342,14 @@ export class PipelineParseDefinitionComponent {
     private templateDirty = false;
 
     constructor() {
+        // A stateless catalog fetch, same as the shared editor's own — used only to build the picker's
+        // choice list, never to decide what gets applied (that stays `this.plugin()`, mirrored from the
+        // editor's own resolution).
+        this.parsersApi.list().subscribe({
+            next: (list) => this.servedPlugins.set(list),
+            error: () => this.servedPlugins.set([]),
+        });
+
         // Seed from the node input. The host recreates this component per node (and on Discard), so
         // this runs once per instance — but an input swap without recreation re-seeds correctly too
         // (the [initial] binding re-seeds the editor, which is what marks it pristine again).
@@ -285,15 +362,20 @@ export class PipelineParseDefinitionComponent {
             this.pickedTemplate.set(null);
             this.templateBlock.set(null);
             this.templateDirty = false;
+            // A manual plugin pick is the same kind of stale state — the FQCN carried on THIS node
+            // rehydrates instead, through [configuredIngester].
+            this.pickedPluginId.set(null);
             this.initialSegments.set([]);
             this.emitDirty();
             this.loadSavedSegments();
         });
     }
 
-    /** `segment key → schema-toon path`, as stored in the node's `parsing.asn1.segments`. */
+    /** `segment key → schema-toon path`, as stored in the node's `parsing.<asn1|plugin>.segments`. */
     private savedSegmentPaths(): Record<string, unknown> {
-        const a = this.parsingBlock()['asn1'] as Record<string, unknown> | undefined;
+        const f = this.frontend();
+        const key = f === 'plugin' ? 'plugin' : 'asn1';
+        const a = this.parsingBlock()[key] as Record<string, unknown> | undefined;
         const segs = a?.['segments'];
         return segs && typeof segs === 'object' && !Array.isArray(segs) ? (segs as Record<string, unknown>) : {};
     }
@@ -382,12 +464,14 @@ export class PipelineParseDefinitionComponent {
      * so a dirty pane must stay dirty.
      */
     requestSaveAsTemplate(): void {
-        if (!this.editor?.validate() || this.asn1Unavailable()) return;
+        if (!this.editor?.validate() || this.asn1Unavailable() || this.pluginUnavailable()) return;
         const block = this.parsingValue();
         // A template is a Grammar copy; segments are deployment-specific schema paths, not grammar.
-        if (block['asn1'] && typeof block['asn1'] === 'object') {
-            const { segments: _deployment, ...grammarOnly } = block['asn1'] as Record<string, unknown>;
-            block['asn1'] = grammarOnly;
+        for (const key of ['asn1', 'plugin'] as const) {
+            if (block[key] && typeof block[key] === 'object') {
+                const { segments: _deployment, ...grammarOnly } = block[key] as Record<string, unknown>;
+                block[key] = grammarOnly;
+            }
         }
         this.saveAsTemplate.emit(block);
     }
@@ -407,10 +491,28 @@ export class PipelineParseDefinitionComponent {
     }
 
     /**
+     * The generic-plugin twin of {@link asn1Unavailable}: this node has no single served identity, so
+     * "unavailable" covers both nothing picked yet and a served-but-not-ingestable pick (the catalog can
+     * change between opens). Either way, Applying would write a hollow `plugin:` block over a deployed
+     * one and must refuse rather than look like a successful save.
+     */
+    private pluginUnavailable(): boolean {
+        if (this.frontend() !== 'plugin') return false;
+        const p = this.plugin();
+        if (p?.ingestable && p.ingesterClass) return false;
+        this.editor?.error.set(
+            this.pluginChoices().length
+                ? 'Pick a parser plugin before applying.'
+                : 'No ingestable parser plugin is deployed on this server, so this node cannot be edited here.',
+        );
+        return true;
+    }
+
+    /**
      * The `parsing:` block to persist. A built-in comes from the editor's own {@link
      * GrammarEditorComponent#value} (authored keys + cleared sibling roots + the frontend word). asn1
-     * is a SERVED parser, not a built-in — `value()` would stamp the editor's internal frontend
-     * (delimited) — so its block is assembled here from the schema-form's `asn1.*` keys plus the
+     * and plugin are SERVED parsers, not built-ins — `value()` would stamp the editor's internal
+     * frontend (delimited) — so their blocks are assembled here from the schema-form's keys plus the
      * frontend word the node type means.
      *
      * <p>`segments` come from {@link segmentPaths} when this node authors them; otherwise the node's
@@ -419,6 +521,17 @@ export class PipelineParseDefinitionComponent {
      */
     private parsingValue(segments?: Record<string, string>): Record<string, unknown> {
         const f = this.frontend();
+        if (f === 'plugin') {
+            const p = this.plugin();
+            const g = this.editor!.grammar();
+            const prior = this.parsingBlock()['plugin'] as Record<string, unknown> | undefined;
+            const block: Record<string, unknown> = { ingester: p?.ingesterClass ?? prior?.['ingester'] };
+            if (g['ingester_config'] !== undefined) block['ingester_config'] = g['ingester_config'];
+            else if (prior?.['ingester_config'] !== undefined) block['ingester_config'] = prior['ingester_config'];
+            if (segments) block['segments'] = segments;
+            else if (prior?.['segments'] !== undefined) block['segments'] = prior['segments'];
+            return { frontend: 'plugin', plugin: block };
+        }
         if (f !== 'asn1') return { ...this.editor!.value(), frontend: f };
         const a = { ...((this.editor!.grammar()['asn1'] as Record<string, unknown> | undefined) ?? {}) };
         const prior = this.parsingBlock()['asn1'] as Record<string, unknown> | undefined;
@@ -440,7 +553,7 @@ export class PipelineParseDefinitionComponent {
      * editor is marked pristine because Apply consumed the edits.
      */
     submit(): void {
-        if (!this.editor?.validate() || this.asn1Unavailable()) return;
+        if (!this.editor?.validate() || this.asn1Unavailable() || this.pluginUnavailable()) return;
         if (!this.authorsSegments()) return this.applyWith(this.parsingValue());
 
         // Segments: write one schema toon per segment FIRST, then emit a block referencing them. Two

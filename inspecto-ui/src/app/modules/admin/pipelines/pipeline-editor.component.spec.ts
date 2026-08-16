@@ -257,6 +257,12 @@ describe('PipelineEditorComponent', () => {
         it.each([
             ['parser.json', { frontend: 'json', json: { format: 'newline' } }],
             ['parser.text_regex', { frontend: 'text_regex', text_regex: { pattern: '(?<ID>\\w+)' } }],
+            // P3d slice D: the generic plugin subtype routes the same way — no dedicated case needed,
+            // which is exactly the point of the collapsed template.
+            [
+                'parser.plugin',
+                { frontend: 'plugin', plugin: { ingester: 'com.example.acme.AcmeFeedIngester' } },
+            ],
         ])('routes an inline %s node to the drawer, not the grammar dialog', (type, parsing) => {
             const c = make();
             c.select('demo');

@@ -86,6 +86,7 @@ public final class PipelineEditable {
             BuiltinNodeType.PARSER_DELIMITED.type(), BuiltinNodeType.PARSER_FIXEDWIDTH.type(),
             BuiltinNodeType.PARSER_ASN1.type(),
             BuiltinNodeType.PARSER_JSON.type(), BuiltinNodeType.PARSER_TEXT_REGEX.type(),
+            BuiltinNodeType.PARSER_PLUGIN.type(),
             BuiltinNodeType.GAP.type(),
             BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type(),
             BuiltinNodeType.TRANSFORM_DEDUP.type(),   // record-grain dedup → processing.dedup (ELT P2)
@@ -185,7 +186,8 @@ public final class PipelineEditable {
             BuiltinNodeType.PARSER_FIXEDWIDTH.type(), List.of("fixedwidth", "fixed_width"),
             BuiltinNodeType.PARSER_ASN1.type(), List.of("asn1"),
             BuiltinNodeType.PARSER_JSON.type(), List.of("json"),
-            BuiltinNodeType.PARSER_TEXT_REGEX.type(), List.of("text_regex"));
+            BuiltinNodeType.PARSER_TEXT_REGEX.type(), List.of("text_regex"),
+            BuiltinNodeType.PARSER_PLUGIN.type(), List.of("plugin"));
 
     /** The node subtype a {@code parsing.frontend} value names, or {@code null} for none/unknown. */
     private static String subtypeForFrontend(String frontend) {
@@ -206,15 +208,18 @@ public final class PipelineEditable {
     private static final Map<String, List<String>> USE_HOME = Map.of(
             BuiltinNodeType.ACQUISITION.type(), List.of("connection/"),
             BuiltinNodeType.PARSER.type(), List.of(GRAMMAR_REF_PREFIX, "ingester/"),
-            // A per-format subtype takes a Grammar but never ingester/ — a plugin ingester binding on a
-            // node whose type SAYS its format is a contradiction, refused rather than half-honoured.
-            // (Binary fixed-width reaches FixedWidthRecordIngester through the plain
+            // A built-in per-format subtype takes a Grammar but never ingester/ — a plugin ingester
+            // binding on a node whose type SAYS its built-in format is a contradiction, refused rather
+            // than half-honoured. (Binary fixed-width reaches FixedWidthRecordIngester through the plain
             // processing.ingester CLASS key, not a use: binding, so it needs no home here.)
             BuiltinNodeType.PARSER_DELIMITED.type(), List.of(GRAMMAR_REF_PREFIX),
             BuiltinNodeType.PARSER_FIXEDWIDTH.type(), List.of(GRAMMAR_REF_PREFIX),
             BuiltinNodeType.PARSER_ASN1.type(), List.of(GRAMMAR_REF_PREFIX),
             BuiltinNodeType.PARSER_JSON.type(), List.of(GRAMMAR_REF_PREFIX),
-            BuiltinNodeType.PARSER_TEXT_REGEX.type(), List.of(GRAMMAR_REF_PREFIX));
+            BuiltinNodeType.PARSER_TEXT_REGEX.type(), List.of(GRAMMAR_REF_PREFIX),
+            // The plugin subtype is the one exception: it IS the plain parser's plugin path, so it takes
+            // ingester/ too — see DERIVED_USE below for why that ref is accepted but never authored.
+            BuiltinNodeType.PARSER_PLUGIN.type(), List.of(GRAMMAR_REF_PREFIX, "ingester/"));
 
     /**
      * The node types this flat config has a {@code use:} home for — the authoritative half of the
@@ -245,10 +250,17 @@ public final class PipelineEditable {
      * beside it is refused outright — so the class {@link PipelineLift} reads back and presents as
      * {@code use:} is the read side's own doing. Refusing it would make every ASN.1 pipeline unsaveable,
      * which is precisely the enrichment regression above, arrived at by a different route.
+     *
+     * <p>{@code parser.plugin} (P3d slice D) carries the identical reasoning one level down: it is the
+     * plain parser's own {@code parsing.plugin.ingester}/{@code ingester_config}/{@code segments} path,
+     * just with a dedicated type once the config says {@code frontend: plugin} explicitly, so
+     * {@link PipelineLift} presents the same derived {@code ingester/<fqcn>} ref it always did for the
+     * plain type — never authored, since the class comes from the config key, not a binding.
      */
     private static final Map<String, String> DERIVED_USE = Map.of(
             BuiltinNodeType.ENRICHMENT.type(), "enrichment/",
-            BuiltinNodeType.PARSER_ASN1.type(), "ingester/");
+            BuiltinNodeType.PARSER_ASN1.type(), "ingester/",
+            BuiltinNodeType.PARSER_PLUGIN.type(), "ingester/");
 
     /**
      * Whether this node's {@code use:} ref is DERIVED rather than authored ({@link #DERIVED_USE}).

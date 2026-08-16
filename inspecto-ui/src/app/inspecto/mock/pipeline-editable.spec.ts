@@ -384,6 +384,86 @@ describe('mock pipeline-editable — the ASN.1 parser subtype (parser.asn1)', ()
 });
 
 /**
+ * Parity guard for the generic custom-plugin subtype (P3d slice D). Mirrors `PipelineEditableTest`'s
+ * slice-D block: `frontend: plugin` wires the SAME ingester/ingester_config/segments triple the
+ * framework already carried before this node type existed, and — unlike every other subtype — this
+ * one's `use:` DOES take `ingester/`, because the lift presents the config's own FQCN back as a
+ * derived ref, exactly as it always did for the plain `parser` type.
+ */
+describe('mock pipeline-editable — the generic custom-plugin subtype (parser.plugin)', () => {
+    const pluginConfig = () => ({
+        name: 'PLUGIN_FEED',
+        active: true,
+        dirs: { poll: '/in', database: '/db' },
+        output: { format: 'CSV' },
+        collector: { connector: 'local' },
+        parsing: {
+            frontend: 'plugin',
+            plugin: {
+                ingester: 'com.example.acme.AcmeFeedIngester',
+                ingester_config: { mode: 'strict' },
+                segments: { Record: 'config/record_schema.toon' },
+            },
+        },
+        processing: {},
+    });
+
+    it('lifts frontend: plugin to the subtype and round-trips the block — segments included — verbatim', () => {
+        const existing = pluginConfig();
+        const g = liftConfig(existing);
+
+        expect(g.nodes.find((n) => n.type === 'parser.plugin')).toBeDefined();
+        const res = lowerGraph(g, existing, true);
+        expect((res as { config: Record<string, unknown> }).config).toEqual(pluginConfig());
+    });
+
+    it('stamps frontend: plugin onto a palette-fresh node', () => {
+        const existing = pluginConfig();
+        const g = liftConfig(existing);
+        const parser = g.nodes.find((n) => n.type === 'parser.plugin')!;
+        parser.config = { parsing: { plugin: { ingester: 'com.example.acme.AcmeFeedIngester' } } };
+
+        const res = lowerGraph(g, existing, true);
+
+        const parsing = (res as { config: Record<string, unknown> }).config['parsing'] as Record<string, unknown>;
+        expect(parsing['frontend']).toBe('plugin');
+    });
+
+    it('refuses a foreign frontend on a plugin node', () => {
+        const existing = pluginConfig();
+        const g = liftConfig(existing);
+        const parser = g.nodes.find((n) => n.type === 'parser.plugin')!;
+        parser.config = { parsing: { frontend: 'delimited' } };
+
+        const res = lowerGraph(g, existing, true);
+
+        expect('refusals' in res).toBe(true);
+        const refusals = (res as { refusals: { code: string; nodeId?: string }[] }).refusals;
+        expect(refusals[0].code).toBe('PARSER_FRONTEND_MISMATCH');
+        expect(refusals[0].nodeId).toBe(parser.id);
+    });
+
+    /** Unlike every built-in subtype, this one DOES accept a derived ingester/ ref — but only that
+     *  exact prefix; an unrelated binding on the same node still refuses. */
+    it('accepts the derived ingester/ ref (and a grammar/ binding) but refuses an unrelated one', () => {
+        const existing = pluginConfig();
+        const g = liftConfig(existing);
+        const parser = g.nodes.find((n) => n.type === 'parser.plugin')!;
+
+        parser.use = 'grammar/vendor_feed';
+        expect('refusals' in lowerGraph(g, existing, true)).toBe(false);
+
+        parser.use = 'ingester/com.example.acme.AcmeFeedIngester';
+        expect('refusals' in lowerGraph(g, existing, true)).toBe(false);
+
+        parser.use = 'transform/nope';
+        const res = lowerGraph(g, existing, true);
+        expect('refusals' in res).toBe(true);
+        expect((res as { refusals: { code: string }[] }).refusals[0].code).toBe('UNSUPPORTED_BINDING');
+    });
+});
+
+/**
  * Parity guard for the last two built-in frontends to get their own node type (P3d). Mirrors
  * `PipelineEditableTest`'s P3d block. Neither is implicit — delimited alone is the parser's default —
  * so every such file retypes, and each answers to exactly one spelling.

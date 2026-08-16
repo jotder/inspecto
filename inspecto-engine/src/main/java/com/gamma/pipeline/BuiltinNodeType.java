@@ -43,7 +43,7 @@ public enum BuiltinNodeType implements PipelineNodeType {
     // isolated. A config whose parsing: block says `frontend: delimited` EXPLICITLY lifts to this type;
     // a bare legacy file (delimited is the parser's implicit default) keeps the plain PARSER type until
     // its author opts in, so nothing already deployed changes shape on a read.
-    PARSER_DELIMITED("parser.delimited", NodeCategory.PARSE, "Parser (delimited)",
+    PARSER_DELIMITED("parser.delimited", NodeCategory.PARSE, "Delimited",
             "Reads a delimited (CSV-like) landed file into rows; the delimited grammar is its config.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true),
     // Fixed width (P3b). Unlike delimited, this frontend is NEVER implicit — a config is fixed-width
@@ -53,14 +53,14 @@ public enum BuiltinNodeType implements PipelineNodeType {
     // Covers BOTH record modes: `record: line` (native read_csv+substring) and `record: bytes`
     // (binary, layout from processing.ingester_config via FixedWidthRecordIngester). The drawer
     // serves only the text mode — binary keeps the dialog — but the node TYPE spans the format.
-    PARSER_FIXEDWIDTH("parser.fixedwidth", NodeCategory.PARSE, "Parser (fixed width)",
+    PARSER_FIXEDWIDTH("parser.fixedwidth", NodeCategory.PARSE, "Fixed-Width",
             "Reads a fixed-width landed file into rows; positional slices carved from each record.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true),
     // ASN.1 (P3c). One spelling, never implicit. `frontend: asn1` is first-class in the parser
     // (PipelineConfigParser#asn1PluginBlock synthesizes the Asn1RecordIngester binding), and the
     // grammar rides INLINE in the asn1: block — X.680 text, root_type, strictness, header lengths,
     // segments — so lift/lower carries the block verbatim and reads nothing inside it.
-    PARSER_ASN1("parser.asn1", NodeCategory.PARSE, "Parser (ASN.1)",
+    PARSER_ASN1("parser.asn1", NodeCategory.PARSE, "ASN.1",
             "Decodes BER/DER records against an X.680 grammar and flattens them onto segment schemas.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true),
     // JSON and text/regex (P3d). The plan's icon table always listed six formats while B6 named only
@@ -68,11 +68,21 @@ public enum BuiltinNodeType implements PipelineNodeType {
     // grammar dialog. Like fixed width and ASN.1 they are never implicit — a config is JSON or
     // text/regex only by saying so — so every such file retypes, and the "explicit only, don't reshape
     // what's deployed" caveat is delimited's alone.
-    PARSER_JSON("parser.json", NodeCategory.PARSE, "Parser (JSON)",
+    PARSER_JSON("parser.json", NodeCategory.PARSE, "JSON",
             "Reads an NDJSON or JSON-array landed file into rows; top-level keys become the columns.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true),
-    PARSER_TEXT_REGEX("parser.text_regex", NodeCategory.PARSE, "Parser (text/regex)",
+    PARSER_TEXT_REGEX("parser.text_regex", NodeCategory.PARSE, "Regex",
             "Reads matching lines into rows via named capture groups; non-matching lines are dropped.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true),
+    // The custom-plugin subtype (P3d slice D): a deployed ParserPlugin the four built-ins and ASN.1
+    // don't cover, wired through the existing `parsing.plugin` machinery (ingester/ingester_config/
+    // segments) that framework already had before this family existed. Never implicit, like every
+    // subtype but delimited. Unlike the others its `use:` home ALSO takes `ingester/`: PipelineLift
+    // presents the plugin's FQCN as a derived `use:` ref the same way it does for the plain `parser`
+    // type, and this subtype must accept — never author — that ref, or every plugin pipeline retyped
+    // to it becomes unsaveable the moment it is opened (the P3c ASN.1 lesson, same cause).
+    PARSER_PLUGIN("parser.plugin", NodeCategory.PARSE, "Custom",
+            "Decodes records through a deployed custom ParserPlugin, loaded via its StreamingFileIngester.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true),
 
     // ── transform family (§3.4 + §15) ─────────────────────────────────────────────

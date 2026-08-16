@@ -113,6 +113,40 @@ function textRegexNode(): AuthoredNode {
     };
 }
 
+/** The P3d slice D twin: the generic plugin node has no single served identity, so its config names
+ *  the deployed FQCN directly rather than a fixed frontend id. */
+function pluginNode(): AuthoredNode {
+    return {
+        id: 'parse',
+        type: 'parser.plugin',
+        name: 'Parser (plugin)',
+        config: {
+            schema_file: 'cdr_schema.toon',
+            parsing: {
+                frontend: 'plugin',
+                plugin: {
+                    ingester: 'com.example.acme.AcmeFeedIngester',
+                    ingester_config: { mode: 'strict' },
+                    segments: { Record: 'config/record_schema.toon' },
+                },
+            },
+        },
+    };
+}
+
+/** A served ingestable plugin — deliberately NOT `asn1` (which has its own dedicated node type and
+ *  must never appear in this node's picker). */
+const ACME_DEF = {
+    id: 'acme_feed',
+    label: 'Acme Feed — vendor binary format',
+    hierarchical: true,
+    ingestable: true,
+    ingesterClass: 'com.example.acme.AcmeFeedIngester',
+    grammarSchema: [
+        { path: 'ingester_config.mode', label: 'Mode', type: 'STRING', description: 'Decode strictness.' },
+    ],
+};
+
 /** The served definition the editor renders asn1 from — the shape parsers.handler.ts transcribes. */
 const ASN1_DEF = {
     id: 'asn1',
@@ -432,6 +466,82 @@ describe('PipelineParseDefinitionComponent', () => {
             const a = template['asn1'] as Record<string, unknown>;
             expect(a['grammar']).toContain('DEFINITIONS');
             expect(a['segments']).toBeUndefined();
+        });
+    });
+
+    /**
+     * The generic custom-plugin subtype (P3d slice D). Unlike every other subtype this node's format is
+     * NOT one served identity — the pane offers its own picker over whichever ingestable plugins the
+     * catalog serves, excluding ones already homed by their own dedicated entry (asn1).
+     * ⚠ One `create()` per test.
+     */
+    describe('the generic custom-plugin subtype (parser.plugin)', () => {
+        it('offers only ingestable plugins, excluding ones with their own dedicated type', async () => {
+            const fixture = await create(pluginNode(), [], [ACME_DEF, ASN1_DEF]);
+            const p = pane(fixture);
+            expect(p.pluginChoices().map((x) => x.id)).toEqual(['acme_feed']);
+        });
+
+        it('rehydrates the saved ingester on load without marking the pane dirty', async () => {
+            const fixture = await create(pluginNode(), [], [ACME_DEF], 5);
+            await new Promise((r) => setTimeout(r, 10));
+            fixture.detectChanges();
+
+            expect(pane(fixture).plugin()?.id).toBe('acme_feed');
+            expect(fixture.componentInstance.dirty).toBe(false);
+        });
+
+        it('offers the segments editor for an ingestable plugin, and authors them on Apply', async () => {
+            const fixture = await create(pluginNode(), [], [ACME_DEF]);
+            expect(pane(fixture).authorsSegments()).toBe(true);
+        });
+
+        /**
+         * This node is ingestable (authorsSegments() is true), so submit() takes the segment-write
+         * path — same two-hop contract as ASN.1: schemas are written first, then the block naming them
+         * is emitted, only after which the ingester + ingester_config from the schema form land in it.
+         */
+        it('Apply writes segment schemas then assembles ingester + ingester_config from the served schema', async () => {
+            const fixture = await create(pluginNode(), [], [ACME_DEF]);
+            editor(fixture).schemaForm!.form.patchValue({ ingester_config__mode: 'lenient' });
+            fixture.detectChanges();
+            const segments = segmentsEditor(fixture);
+            vi.spyOn(segments, 'validate').mockReturnValue(true);
+
+            pane(fixture).submit();
+
+            const applied = fixture.componentInstance.applied!;
+            const parsing = applied.config!['parsing'] as Record<string, unknown>;
+            expect(parsing['frontend']).toBe('plugin');
+            const plugin = parsing['plugin'] as Record<string, unknown>;
+            expect(plugin['ingester']).toBe('com.example.acme.AcmeFeedIngester');
+            expect(plugin['ingester_config']).toEqual({ mode: 'lenient' });
+            expect(plugin['segments']).toBeDefined();
+        });
+
+        /**
+         * ⚠ This node has no single served identity, so "unavailable" covers nothing-picked-yet too —
+         * not just a jar that failed to deploy. Applying must refuse rather than write a hollow block.
+         */
+        it('refuses to Apply when no plugin has been picked or rehydrated', async () => {
+            const fixture = await create(pluginNode(), [], []);
+
+            pane(fixture).submit();
+
+            expect(fixture.componentInstance.applied).toBeUndefined();
+            expect(editor(fixture).error()).toContain('No ingestable parser plugin');
+        });
+
+        it('Save as template strips segments but keeps the ingester class', async () => {
+            const fixture = await create(pluginNode(), [], [ACME_DEF]);
+            pane(fixture).requestSaveAsTemplate();
+            fixture.detectChanges();
+
+            const template = fixture.componentInstance.template!;
+            expect(template['frontend']).toBe('plugin');
+            const p = template['plugin'] as Record<string, unknown>;
+            expect(p['ingester']).toBe('com.example.acme.AcmeFeedIngester');
+            expect(p['segments']).toBeUndefined();
         });
     });
 

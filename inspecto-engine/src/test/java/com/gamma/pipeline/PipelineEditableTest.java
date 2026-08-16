@@ -1167,6 +1167,132 @@ class PipelineEditableTest {
         return p;
     }
 
+    /**
+     * The generic-plugin twin of {@link #writeAsn1Pipeline}: {@code frontend: plugin} wires the SAME
+     * ingester/ingester_config/segments triple that framework already carried before this node-type
+     * family existed — only {@code frontend: plugin} needs to be said explicitly for it to retype.
+     * The ingester class need not exist on the classpath: config load stores the FQCN string and
+     * validates the referenced segment schemas, never the class itself.
+     */
+    private static Path writePluginPipeline(Path dir) throws Exception {
+        Path sf = dir.resolve("plugin_record_schema.toon");
+        Files.writeString(sf, """
+                partitionKey: ID
+                raw:
+                  name: record
+                  format: CSV
+                  fields[1]{name,selector,type}:
+                    ID, id, VARCHAR
+                mapping:
+                  canonicalName: record
+                  rawName: record
+                  rules[1]{targetColumn,sourceExpression,transformType}:
+                    ID, ID, DIRECT
+                """);
+        String base = dir.toString().replace('\\', '/');
+        String toon = """
+                name: PLUGIN_FEED
+                active: true
+                dirs:
+                  poll: %1$s/inbox
+                  database: %1$s/db
+                output:
+                  format: CSV
+                collector:
+                  connector: local
+                parsing:
+                  frontend: plugin
+                  plugin:
+                    ingester: com.example.acme.AcmeFeedIngester
+                    ingester_config:
+                      mode: strict
+                    segments:
+                      Record: %2$s
+                processing:
+                  threads: 1
+                """.formatted(base, sf.toString().replace('\\', '/'));
+        Path p = dir.resolve("plugin_pipeline.toon");
+        Files.writeString(p, toon);
+        return p;
+    }
+
+    // ── P3d slice D: the custom-plugin parser subtype ────────────────────────────────
+
+    /**
+     * An explicit {@code frontend: plugin} file round-trips verbatim through the subtype — the whole
+     * {@code plugin:} block (ingester FQCN, ingester_config, segments) is carried, not read, exactly
+     * the mechanism the plain {@code parser} type already used for this frontend.
+     */
+    @Test
+    void explicitPluginFrontendRoundTripsVerbatimThroughTheSubtype(@TempDir Path dir) throws Exception {
+        Path toon = writePluginPipeline(dir);
+        Map<String, Object> raw = decode(toon);
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+
+        Map<String, Object> editable = PipelineEditable.toMap(cfg, raw);
+        nodeOfType(editable, "parser.plugin");   // the retype happened
+        Map<String, Object> lowered = PipelineEditable.lower(PipelineCodec.fromMap(editable), raw, true);
+
+        assertEquals(raw, lowered, "strict lower over the original file reproduces it verbatim");
+    }
+
+    /** A plugin node authored fresh from the palette gets {@code frontend: plugin} stamped in. */
+    @Test
+    void aNewPluginParserNodeIsStampedWithItsFrontend() {
+        Map<String, Object> lowered = PipelineEditable.lower(new PipelineGraph("x", true, List.of(
+                node("acq", "acquisition", Map.of("poll", "in")),
+                node("parse", "parser.plugin", Map.of("parsing", Map.of(
+                        "plugin", Map.of("ingester", "com.example.acme.AcmeFeedIngester")))),
+                node("sink", "sink.persistent", Map.of("database", "db"))), List.of()),
+                new LinkedHashMap<>(), true);
+
+        Map<?, ?> parsing = (Map<?, ?>) lowered.get("parsing");
+        assertEquals("plugin", parsing.get("frontend"),
+                "the file must say the word the type means, or the next lift loses the identity");
+    }
+
+    /** {@code plugin} has one spelling; anything else on the node is a genuine contradiction. */
+    @Test
+    void aForeignFrontendOnAPluginNodeRefuses() {
+        PipelineCompileException ex = assertThrows(PipelineCompileException.class,
+                () -> PipelineEditable.lower(new PipelineGraph("x", true, List.of(
+                        node("acq", "acquisition", Map.of("poll", "in")),
+                        node("parse", "parser.plugin", Map.of("parsing", Map.of("frontend", "delimited"))),
+                        node("sink", "sink.persistent", Map.of("database", "db"))), List.of()),
+                        new LinkedHashMap<>(), true));
+        assertEquals(PipelineEditable.PARSER_FRONTEND_MISMATCH, ex.refusals().get(0).code());
+        assertEquals("parse", ex.refusals().get(0).nodeId());
+    }
+
+    /**
+     * Unlike the built-in subtypes, {@code parser.plugin} DOES take an {@code ingester/} ref — but only
+     * because {@link PipelineLift} presents the config's own {@code plugin.ingester} FQCN back as a
+     * derived {@code use:}, exactly as it always did for the plain {@code parser} type. It must be
+     * accepted (never refused as unhomed) and never actually lowered from — the class comes from the
+     * config key, not the binding — while an unrelated ref on the same node still refuses.
+     */
+    @Test
+    void acceptsTheDerivedIngesterRefButRefusesAnUnrelatedBinding(@TempDir Path dir) throws Exception {
+        Path toon = writePluginPipeline(dir);
+        Map<String, Object> raw = decode(toon);
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+        Map<String, Object> editable = PipelineEditable.toMap(cfg, raw);
+        PipelineGraph g = PipelineCodec.fromMap(editable);
+        PipelineNode parser = g.nodes().stream().filter(n -> "parser.plugin".equals(n.type()))
+                .findFirst().orElseThrow();
+        assertEquals("ingester/com.example.acme.AcmeFeedIngester", parser.use(),
+                "the lift presents the config's own ingester FQCN as a derived use:");
+        assertDoesNotThrow(() -> PipelineEditable.lower(g, raw, true));
+
+        PipelineNode bad = new PipelineNode(parser.id(), parser.type(), parser.name(),
+                parser.description(), parser.config(), "transform/nope");
+        PipelineGraph g2 = new PipelineGraph(g.name(), g.active(),
+                g.nodes().stream().map(n -> n.id().equals(bad.id()) ? bad : n).toList(), g.edges());
+        PipelineCompileException ex = assertThrows(PipelineCompileException.class,
+                () -> PipelineEditable.lower(g2, raw, true));
+        assertEquals(PipelineEditable.UNSUPPORTED_BINDING, ex.refusals().get(0).code());
+    }
+
     @SuppressWarnings("unchecked")
     private static Map<String, Object> decode(Path toon) throws Exception {
         return (Map<String, Object>) (Map<?, ?>) ConfigLoader.filesystem().decode(toon.toString());

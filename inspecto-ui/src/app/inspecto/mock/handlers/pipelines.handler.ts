@@ -78,7 +78,7 @@ export const NODE_TYPES: PipelineNodeType[] = (
         {
             type: 'parser.delimited',
             category: 'PARSE',
-            label: 'Parser (delimited)',
+            label: 'Delimited',
             description: 'Reads a delimited (CSV-like) landed file into rows; the delimited grammar is its config.',
             accepts: ['data'],
             emits: ['data', 'unmatched'],
@@ -87,7 +87,7 @@ export const NODE_TYPES: PipelineNodeType[] = (
         {
             type: 'parser.fixedwidth',
             category: 'PARSE',
-            label: 'Parser (fixed width)',
+            label: 'Fixed-Width',
             description: 'Reads a fixed-width landed file into rows; positional slices carved from each record.',
             accepts: ['data'],
             emits: ['data', 'unmatched'],
@@ -96,7 +96,7 @@ export const NODE_TYPES: PipelineNodeType[] = (
         {
             type: 'parser.asn1',
             category: 'PARSE',
-            label: 'Parser (ASN.1)',
+            label: 'ASN.1',
             description: 'Decodes BER/DER records against an X.680 grammar and flattens them onto segment schemas.',
             accepts: ['data'],
             emits: ['data', 'unmatched'],
@@ -105,7 +105,7 @@ export const NODE_TYPES: PipelineNodeType[] = (
         {
             type: 'parser.json',
             category: 'PARSE',
-            label: 'Parser (JSON)',
+            label: 'JSON',
             description: 'Reads an NDJSON or JSON-array landed file into rows; top-level keys become the columns.',
             accepts: ['data'],
             emits: ['data', 'unmatched'],
@@ -116,6 +116,15 @@ export const NODE_TYPES: PipelineNodeType[] = (
             category: 'PARSE',
             label: 'Parser (text/regex)',
             description: 'Reads matching lines into rows via named capture groups; non-matching lines are dropped.',
+            accepts: ['data'],
+            emits: ['data', 'unmatched'],
+            emitsNamedRoutes: true,
+        },
+        {
+            type: 'parser.plugin',
+            category: 'PARSE',
+            label: 'Parser (plugin)',
+            description: 'Decodes records through a deployed custom ParserPlugin, loaded via its StreamingFileIngester.',
             accepts: ['data'],
             emits: ['data', 'unmatched'],
             emitsNamedRoutes: true,
