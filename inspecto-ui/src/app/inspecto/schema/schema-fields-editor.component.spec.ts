@@ -2,7 +2,11 @@ import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, expect, it } from 'vitest';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
-import { InspectoSchemaFieldsEditorComponent, SchemaFieldRow } from './schema-fields-editor.component';
+import {
+    InspectoSchemaFieldsEditorComponent,
+    SchemaFieldRow,
+    narrowToSchemaType,
+} from './schema-fields-editor.component';
 
 /** n included VARCHAR rows named col_0 … col_n-1, selector = the name (a json/text_regex sample). */
 function rows(n: number): SchemaFieldRow[] {
@@ -145,6 +149,34 @@ describe('InspectoSchemaFieldsEditorComponent', () => {
         fixture.detectChanges();
         expect(c.totalCount()).toBe(2);
         expect(c.form.dirty).toBe(false);
+    });
+
+    /**
+     * D4 (P4-3): the client inference fork is gone and types come from the server, whose vocabulary is
+     * WIDER than this grid's. Narrowing is what makes that retirement safe.
+     */
+    describe('narrowToSchemaType', () => {
+        it('keeps the four types the grid offers', () => {
+            expect(narrowToSchemaType('VARCHAR')).toBe('VARCHAR');
+            expect(narrowToSchemaType('DOUBLE')).toBe('DOUBLE');
+            expect(narrowToSchemaType('DATE')).toBe('DATE');
+            expect(narrowToSchemaType('TIMESTAMP')).toBe('TIMESTAMP');
+        });
+
+        it('narrows BIGINT to DOUBLE — the engine has no integer cast, only a DOUBLE one', () => {
+            expect(narrowToSchemaType('BIGINT')).toBe('DOUBLE');
+        });
+
+        it('falls back to VARCHAR for anything else, BOOLEAN included', () => {
+            expect(narrowToSchemaType('BOOLEAN')).toBe('VARCHAR');
+            expect(narrowToSchemaType('DECIMAL(10,2)')).toBe('VARCHAR');
+            expect(narrowToSchemaType('')).toBe('VARCHAR');
+        });
+
+        it('is case- and whitespace-insensitive, as server payloads are not guaranteed tidy', () => {
+            expect(narrowToSchemaType('  bigint ')).toBe('DOUBLE');
+            expect(narrowToSchemaType('timestamp')).toBe('TIMESTAMP');
+        });
     });
 
     it('has no a11y violations', async () => {

@@ -6,8 +6,6 @@ import { ParsingFrontend } from './parsing-attributes';
  *
  * - {@link sniffFrontend} guesses the parsing frontend from the raw text (a SUGGESTION chip the
  *   builder applies with one click — never auto-applied).
- * - {@link suggestTypes} proposes a column type per parsed-preview column, restricted to the four
- *   honestly-castable types the Schema stage offers; the real TRY_CAST validate stays the verdict.
  * - {@link jsonSampleToTree} renders the sample's own JSON records as a {@link ParserTreeNode}
  *   forest, making visible which keys are top-level (columns) and which are nested (the engine
  *   stringifies those into one column — flattening is not yet supported, BACKLOG §"flatten DSL").
@@ -82,43 +80,6 @@ export function sniffFrontend(text: string): FrontendSuggestion | null {
         };
     }
     return null;
-}
-
-/** The four honestly-castable schema types (exactly what `TransformCompiler.direct()` casts). */
-export type SuggestedType = 'VARCHAR' | 'DOUBLE' | 'DATE' | 'TIMESTAMP';
-
-const MAX_TYPE_SAMPLE_ROWS = 200;
-const NUMBER_RE = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?/;
-
-/**
- * Per-column type suggestions over the parsed preview rows: a type is suggested only when EVERY
- * non-blank sampled value matches it (conservative — blanks/NULLs don't vote, an empty column
- * stays VARCHAR).
- */
-export function suggestTypes(columns: string[], rows: Record<string, unknown>[]): Record<string, SuggestedType> {
-    const sample = rows.slice(0, MAX_TYPE_SAMPLE_ROWS);
-    const out: Record<string, SuggestedType> = {};
-    for (const col of columns) {
-        const values = sample
-            .map((r) => r[col])
-            .filter((v) => v !== null && v !== undefined)
-            .map((v) => String(v).trim())
-            .filter((v) => v.length > 0);
-        if (values.length === 0) {
-            out[col] = 'VARCHAR';
-        } else if (values.every((v) => NUMBER_RE.test(v))) {
-            out[col] = 'DOUBLE';
-        } else if (values.every((v) => DATE_RE.test(v))) {
-            out[col] = 'DATE';
-        } else if (values.every((v) => TIMESTAMP_RE.test(v))) {
-            out[col] = 'TIMESTAMP';
-        } else {
-            out[col] = 'VARCHAR';
-        }
-    }
-    return out;
 }
 
 const MAX_TREE_RECORDS = 50;

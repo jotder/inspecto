@@ -22,11 +22,11 @@ import { ConfigService, LensService, SpacesService, apiErrorMessage } from 'app/
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
-import { suggestTypes } from 'app/inspecto/grammar';
 import {
     InspectoSchemaFieldsEditorComponent,
     SchemaFieldRow,
     deriveSelector,
+    narrowToSchemaType,
     sanitizeIdentifier,
 } from 'app/inspecto/schema';
 import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
@@ -184,21 +184,42 @@ export class OnboardingSchemaMappingPaneComponent implements OnInit {
         }
     }
 
+    /**
+     * Seed the grid from the parsed sample, taking the per-column TYPES from the server's inference
+     * (`POST /config/suggest/schema`) — D4: one implementation, the same TRY_CAST voting that runs when
+     * anything else asks. A SUGGESTION the builder can override; "Validate types" (real TRY_CAST) stays
+     * the verdict.
+     *
+     * <p>⚠ Only the type is taken. The SELECTOR stays client-derived: it is frontend-dependent (position
+     * for delimited/fixedwidth, key for json/text_regex) and the server, which sees only rows, has no
+     * way to know which. Server types are narrowed to the four this grid offers.
+     */
     private deriveFromSample(): void {
         const preview = this.definition.parsePreview();
         if (!preview) return;
-        // Autodetected per-column types over the parsed sample — a SUGGESTION the builder can
-        // override; "Validate types" (real TRY_CAST) stays the verdict.
-        const suggested = suggestTypes(preview.columns, preview.rows);
-        this.fieldSeed.set(
-            preview.columns.map((col, i) => ({
-                include: true,
-                name: sanitizeIdentifier(col, i),
-                selector: deriveSelector(preview.frontend, i, col),
-                type: suggested[col] ?? 'VARCHAR',
-            })),
-        );
-        this.typesSuggested.set(Object.values(suggested).some((t) => t !== 'VARCHAR'));
+        const seed = (types: Map<string, string>) => {
+            this.fieldSeed.set(
+                preview.columns.map((col, i) => ({
+                    include: true,
+                    name: sanitizeIdentifier(col, i),
+                    selector: deriveSelector(preview.frontend, i, col),
+                    type: types.get(col) ?? 'VARCHAR',
+                })),
+            );
+            this.typesSuggested.set([...types.values()].some((t) => t !== 'VARCHAR'));
+        };
+        this.loading.set(true);
+        this.configApi.suggestSchema(preview.rows).subscribe({
+            next: (s) => {
+                this.loading.set(false);
+                seed(new Map(s.fields.map((f) => [f.name, narrowToSchemaType(f.type)])));
+            },
+            // Inference is advisory: without it every column is text, which the builder can still fix.
+            error: () => {
+                this.loading.set(false);
+                seed(new Map());
+            },
+        });
     }
 
     private hydrateFromSchema(config: Record<string, unknown>): void {

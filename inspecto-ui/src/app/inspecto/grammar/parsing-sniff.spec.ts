@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { jsonSampleToTree, sniffFrontend, suggestTypes } from './parsing-sniff';
+import { jsonSampleToTree, sniffFrontend } from './parsing-sniff';
 
 describe('sniffFrontend', () => {
     it('recognises a JSON array document', () => {
@@ -38,31 +38,6 @@ describe('sniffFrontend', () => {
 
     it('does not call malformed JSON lines NDJSON', () => {
         expect(sniffFrontend('{"a": 1}\n{oops\n')).toBeNull();
-    });
-});
-
-describe('suggestTypes', () => {
-    it('suggests DOUBLE, DATE, TIMESTAMP and VARCHAR conservatively', () => {
-        const rows = [
-            { n: '1.5', d: '2026-07-29', t: '2026-07-29 10:00:00', s: 'abc', m: '1' },
-            { n: '-2e3', d: '2026-07-30', t: '2026-07-30T11:30', s: '42', m: 'x' },
-        ];
-        expect(suggestTypes(['n', 'd', 't', 's', 'm'], rows)).toEqual({
-            n: 'DOUBLE',
-            d: 'DATE',
-            t: 'TIMESTAMP',
-            s: 'VARCHAR', // mixed values
-            m: 'VARCHAR', // one numeric + one not ⇒ no vote
-        });
-    });
-
-    it('blanks and NULLs do not vote; an all-blank column stays VARCHAR', () => {
-        const rows = [
-            { a: '7', b: null },
-            { a: '', b: '' },
-            { a: '9', b: null },
-        ];
-        expect(suggestTypes(['a', 'b'], rows)).toEqual({ a: 'DOUBLE', b: 'VARCHAR' });
     });
 });
 

@@ -23,6 +23,25 @@ export const TYPE_META: Record<string, { icon: string; hint: string }> = {
 
 const IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
+/**
+ * A server-inferred type (`SchemaSuggest`) narrowed to the four this grid offers.
+ *
+ * <p>The server votes over a WIDER vocabulary than the grid does — it can return `BIGINT` and
+ * `BOOLEAN`, which {@link SCHEMA_TYPES} deliberately omits because `TransformCompiler.direct()` casts
+ * only TIMESTAMP / DATE / DOUBLE and passes everything else through untouched. Offering `BIGINT` would
+ * imply an integer coercion the engine never performs, so it narrows to `DOUBLE` (the honest numeric
+ * cast) and `BOOLEAN` to `VARCHAR` (stored as text).
+ *
+ * <p>This is the seam D4's "retire the client `suggestTypes()`" actually needed: the client fork's
+ * whole vocabulary WAS these four, so deleting it without narrowing would have put unselectable types
+ * into the grid.
+ */
+export function narrowToSchemaType(serverType: string): string {
+    const t = (serverType ?? '').trim().toUpperCase();
+    if (t === 'BIGINT') return 'DOUBLE';
+    return (SCHEMA_TYPES as readonly string[]).includes(t) ? t : 'VARCHAR';
+}
+
 /** One editable row of a schema's `raw.fields[]`. */
 export interface SchemaFieldRow {
     include: boolean;

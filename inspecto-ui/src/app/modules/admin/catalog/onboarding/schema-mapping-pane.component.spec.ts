@@ -61,6 +61,23 @@ async function create(
                     write: vi.fn((type: string) => of(WRITE_OK(type))), // companion schema file
                     read: vi.fn(() => throwError(() => ({ status: 404 }))),
                     previewSchema: vi.fn(() => of(SCHEMA_PREVIEW)),
+                    // D4: types now come from the SERVER's inference. This stub mirrors
+                    // `SchemaSuggest`'s vote closely enough to exercise the narrowing — it returns
+                    // BIGINT for all-integer columns, which the grid narrows to DOUBLE because
+                    // TransformCompiler.direct() has no integer cast.
+                    suggestSchema: vi.fn((rows: Record<string, unknown>[]) => {
+                        const columns = [...new Set(rows.flatMap((r) => Object.keys(r)))];
+                        return of({
+                            fields: columns.map((name) => {
+                                const values = rows
+                                    .map((r) => String(r[name] ?? '').trim())
+                                    .filter((v) => v !== '');
+                                const allInt = values.length > 0 && values.every((v) => /^[+-]?\d+$/.test(v));
+                                return { name, selector: name, type: allInt ? 'BIGINT' : 'VARCHAR' };
+                            }),
+                            mapping: { rules: [] },
+                        });
+                    }),
                     ...api,
                 },
             },
