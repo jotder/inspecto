@@ -232,6 +232,19 @@
         }
     </div>
 
+    <!-- Guided mode (definition-surface P6-d): the wizard's stage rail as a compact chip strip. Its own
+         row rather than crammed into the toolbar, which is already a dense icon bar. Chips only — no
+         "next step" affordance and no wizard lifecycle state (plan §11-2). -->
+    @if (guided() && model()) {
+        <div
+            class="flex shrink-0 items-center gap-2 border-b px-3 py-1.5"
+            style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
+        >
+            <inspecto-pipeline-checklist [chips]="checklist()" (open)="openStage($event)" />
+            <span class="text-secondary ml-auto text-xs">{{ lifecycle() }}</span>
+        </div>
+    }
+
     @if (unavailable()) {
         <div
             role="alert"

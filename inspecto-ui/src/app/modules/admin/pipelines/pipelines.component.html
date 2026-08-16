@@ -147,7 +147,7 @@
          the viewport minus the classic layout's chrome (64px header + 56px footer); the canvas then
          shrinks for the bottom dock instead of pushing the page taller. -->
     <div class="flex min-h-0 min-w-0 flex-auto flex-col overflow-hidden" style="height: calc(100dvh - 120px)">
-        <app-pipeline-editor [readOnly]="mode() === 'view'">
+        <app-pipeline-editor [readOnly]="mode() === 'view'" [guided]="guided()">
             <span toolbarEnd class="flex shrink-0 items-center gap-2">
                 <inspecto-ai-explain screen="Pipelines" [terms]="['Pipeline', 'Step', 'Trigger']" />
                 <ng-container *ngTemplateOutlet="modeToggle"></ng-container>

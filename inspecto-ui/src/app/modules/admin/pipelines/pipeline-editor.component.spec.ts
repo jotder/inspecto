@@ -167,8 +167,10 @@ describe('PipelineEditorComponent', () => {
     });
 
     /** Build the component, run ngOnInit, and inject a canvas double (no live G6). */
-    function make(): PipelineEditorComponent {
-        const c = TestBed.createComponent(PipelineEditorComponent).componentInstance;
+    function make(inputs: { guided?: boolean } = {}): PipelineEditorComponent {
+        const fixture = TestBed.createComponent(PipelineEditorComponent);
+        if (inputs.guided !== undefined) fixture.componentRef.setInput('guided', inputs.guided);
+        const c = fixture.componentInstance;
         c.ngOnInit();
         (c as unknown as { canvas: unknown }).canvas = canvasMock();
         return c;
@@ -227,6 +229,59 @@ describe('PipelineEditorComponent', () => {
 
             expect(components.create).not.toHaveBeenCalled();
             expect(toast.warning).toHaveBeenCalled();
+        });
+
+        /**
+         * P6-d: the readiness gate P6-b left behind. ⛔ Guided only — `validatePipeline` does not
+         * require a parse node, so a hand-built collect→sink graph is legitimate and must still
+         * activate; the wizard's five stages are the Stream contract, not the editor's.
+         */
+        it('refuses a guided go-live and NAMES the stages that are not ready', async () => {
+            api.nodeTypes.mockReturnValue(
+                of([
+                    {
+                        type: 'acquisition',
+                        category: 'SOURCE',
+                        label: 'Collect',
+                        description: '',
+                        accepts: [],
+                        emits: ['data'],
+                        emitsNamedRoutes: false,
+                        lowerable: true,
+                    },
+                ]),
+            );
+            const c = make({ guided: true });
+            c.select('demo');
+            await c.activate();
+
+            expect(api.savePipelineGraph).not.toHaveBeenCalled();
+            expect(confirmOf().confirm).not.toHaveBeenCalled();
+            const msg = String(toast.error.mock.calls[0][0]);
+            expect(msg).toContain('Parse'); // the fixture has neither a parser
+            expect(msg).toContain('Publish'); // nor a sink
+            expect(msg).not.toContain('Collect'); // but its collector IS configured
+        });
+
+        /**
+         * ⚠ Every stage resolves through the served node-type catalog, so an unresolved catalog reads
+         * as five empty stages. Gating on it would refuse a perfectly ready pipeline and name every
+         * stage as missing — the same "don't cry wolf" posture `unsupportedNodes` takes.
+         */
+        it('does not gate a guided go-live while the node-type catalog is unresolved', async () => {
+            api.nodeTypes.mockReturnValue(throwError(() => new Error('no catalog')));
+            const c = make({ guided: true });
+            c.select('demo');
+            await c.activate();
+
+            expect(api.savePipelineGraph).toHaveBeenCalled();
+        });
+
+        it('leaves an UNGUIDED pipeline on the old validator gate alone', async () => {
+            const c = make();
+            c.select('demo'); // the fixture has no parse or sink node at all
+            await c.activate();
+            expect(api.savePipelineGraph).toHaveBeenCalled();
         });
 
         it('deactivation confirms but leaves the Dataset registered', async () => {
@@ -584,6 +639,85 @@ describe('PipelineEditorComponent', () => {
                 dialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
                 c.openNodeConfig(c.model()!.nodes[1]); // transform.filter
                 expect(dialog.open.mock.calls[0][1].data.enrichmentHost).toBeUndefined();
+            });
+        });
+
+        /** P6-d: the checklist is a view over the SAME graph, and a chip opens its stage's node. */
+        describe('guided checklist', () => {
+            /**
+             * ⚠ Every stage resolves through the SERVED node-type catalog, so the default fixture
+             * (which publishes only `transform.filter`) reads as five empty stages. That is the real
+             * behaviour, not a test artifact — it is why the go-live gate waits for the catalog.
+             */
+            function guided(): PipelineEditorComponent {
+                api.nodeTypes.mockReturnValue(
+                    of([
+                        {
+                            type: 'acquisition',
+                            category: 'SOURCE',
+                            label: 'Collect',
+                            description: '',
+                            accepts: [],
+                            emits: ['data'],
+                            emitsNamedRoutes: false,
+                            lowerable: true,
+                        },
+                        {
+                            type: 'transform.filter',
+                            category: 'TRANSFORM',
+                            label: 'Filter',
+                            description: '',
+                            accepts: ['data'],
+                            emits: ['data'],
+                            emitsNamedRoutes: false,
+                            lowerable: true,
+                        },
+                    ]),
+                );
+                return make({ guided: true });
+            }
+
+            it('reads the open graph, live — no Validate needed first', () => {
+                const c = guided();
+                c.select('demo');
+                const chips = c.checklist();
+                expect(chips.map((s) => s.id)).toEqual(['collect', 'parse', 'schema', 'enrich', 'publish']);
+                expect(chips[0].status).toBe('configured'); // the fixture's acquisition node
+                expect(chips[4].status).toBe('empty'); // it has no sink
+                expect(c.findings()).toEqual([]); // and the dock was never opened
+                expect(c.lifecycle()).toBe('Draft');
+            });
+
+            it('a chip opens its stage`s node through the ONE open path', () => {
+                const c = guided();
+                c.select('demo');
+                const open = vi.spyOn(c, 'openNodeConfig').mockImplementation(() => {});
+                c.openStage(c.checklist()[0]); // Collect → the acquisition node
+                expect(open).toHaveBeenCalledWith(expect.objectContaining({ id: 'src' }));
+            });
+
+            /**
+             * Found in the preview, invisible to every unit test above: `openNodeConfig` is gated on
+             * `canAuthor()`, so in View mode the whole strip did nothing at all. Selecting is not
+             * gated, so the chip still reveals its Step and only the editing half is withheld.
+             */
+            it('still reveals the Step when authoring is withheld (View mode / Business lens)', () => {
+                const c = guided();
+                c.readOnly = true;
+                c.select('demo');
+                const open = vi.spyOn(c, 'openNodeConfig');
+                c.openStage(c.checklist()[0]);
+                expect(c.selectedNode()?.id).toBe('src');
+                expect(open).toHaveBeenCalled(); // called, and internally a no-op — not skipped here
+                expect(c.definitionNode()).toBeNull(); // nothing opened for editing
+            });
+
+            it('an empty chip opens nothing', () => {
+                const c = guided();
+                c.select('demo');
+                const open = vi.spyOn(c, 'openNodeConfig').mockImplementation(() => {});
+                c.openStage(c.checklist()[4]); // Publish — no sink node exists
+                expect(open).not.toHaveBeenCalled();
             });
         });
 

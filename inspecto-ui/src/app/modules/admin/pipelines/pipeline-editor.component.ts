@@ -8,6 +8,7 @@ import {
     computed,
     effect,
     inject,
+    input,
     signal,
 } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -110,6 +111,8 @@ import {
     uniqueNodeId,
     validatePipeline,
 } from './pipeline-graph';
+import { PipelineChecklistComponent } from './pipeline-checklist.component';
+import { incompleteStages, pipelineLifecycle, StageChip, stageChecklist } from './pipeline-stages';
 
 /** The `use:` prefix a Grammar component is referenced by — also how its ref is keyed in `validRefs`. */
 const GRAMMAR_REF_PREFIX = 'grammar/';
@@ -145,6 +148,7 @@ const GRAMMAR_REF_PREFIX = 'grammar/';
         PipelineLoadDefinitionComponent,
         PipelineDryRunPanelComponent,
         PipelineEditorGraphComponent,
+        PipelineChecklistComponent,
         PipelineInspectorComponent,
         PipelinePaletteComponent,
         PipelineGuaranteesPanelComponent,
@@ -182,6 +186,13 @@ export class PipelineEditorComponent implements OnInit {
      * are consulted through {@link canAuthor}, and neither alone is trusted.
      */
     @Input() readOnly = false;
+
+    /**
+     * Guided mode (P6-d): show the stage checklist strip. Host-supplied because "this pipeline came
+     * from Onboard" is a routing fact, not a property of the graph — P6-a's redirect is what will set
+     * it. Off by default, so the plain editor is unchanged for everyone who did not come that way.
+     */
+    readonly guided = input(false);
 
     readonly flows = signal<PipelineSummary[]>([]);
 
@@ -555,6 +566,38 @@ export class PipelineEditorComponent implements OnInit {
 
     /** Bound reference to {@link statusOf} for the step-cards `@Input` (a plain method reference would lose `this`). */
     readonly boundStatusOf = (n: AuthoredNode): NodeStatus => this.statusOf(n);
+
+    // ── guided mode (definition-surface P6-d): the wizard's stage rail as toolbar chips ──
+
+    /**
+     * The guided checklist over the CURRENT graph. Deliberately live rather than a snapshot of
+     * {@link findings}: the dock shows the last Validate the operator asked for, while a chip is a
+     * status light and would be lying the moment a node changed. Same pure validator either way, so
+     * the two can never disagree about a given graph.
+     */
+    readonly checklist = computed<StageChip[]>(() => {
+        const m = this.model();
+        const findings = m ? validatePipeline(m, this.typeCat(), this.validRefs(), this.testedStatus()) : [];
+        return stageChecklist(m, this.typeCat(), (n) => this.statusOf(n), findings);
+    });
+
+    /** Draft → Ready → Live, shown beside the chips. */
+    readonly lifecycle = computed(() => pipelineLifecycle(this.checklist(), this.isActive()));
+
+    /**
+     * A chip click reveals that stage's Step, then opens the surface that owns it (drawer or dialog).
+     *
+     * ⚠ Selecting FIRST is not decoration: {@link openNodeConfig} is gated on {@link canAuthor}, so in
+     * View mode (or the Business lens) it is a no-op — and a chip that does literally nothing is the
+     * "affordance that can only fail" this editor avoids elsewhere. Selecting always works, so the
+     * chip reveals the Step in the inspector either way and only the editing half is withheld.
+     */
+    openStage(chip: StageChip): void {
+        const node = this.model()?.nodes.find((n) => n.id === chip.nodeId);
+        if (!node) return;
+        this.onNodeSelected(node.id);
+        this.openNodeConfig(node);
+    }
 
     /** Push every node's current status to the canvas (after the registry refs or test outcomes change). */
     private refreshAllStatuses(): void {
@@ -1648,6 +1691,21 @@ export class PipelineEditorComponent implements OnInit {
         const m = this.model();
         const id = this.selectedId();
         if (!m || !id) return;
+        // The readiness gate P6-b left behind (P6-d): a MISSING stage produces no per-node error, so
+        // the validator alone would let a guided pipeline with no parser at all go live. Named, never
+        // silent. ⛔ GUIDED ONLY — the wizard's five stages are the Stream contract, not the editor's:
+        // `validatePipeline` deliberately does not require a parse node, and a hand-built graph that
+        // collects and sinks is legitimate. Applying this to every pipeline would refuse those.
+        // ⚠ And only once the node-type catalog is in: every stage is derived through `typeCat`, so an
+        // unresolved catalog reads as five empty stages — the gate would refuse a perfectly ready
+        // pipeline and name every stage as missing. Same "don't cry wolf" posture as `unsupportedNodes`.
+        const gated = this.guided() && this.typeCat().size > 0;
+        const incomplete = gated ? incompleteStages(this.checklist()) : [];
+        if (incomplete.length) {
+            this.validate();
+            this.toast.error(`Not ready to go live — ${incomplete.join(', ')} still needs work.`);
+            return;
+        }
         if (this.validate().some((f) => f.severity === 'error')) {
             this.toast.error('Fix the errors below before activating.');
             return;

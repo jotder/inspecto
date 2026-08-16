@@ -2,6 +2,7 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { of } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { describe, expect, it, vi } from 'vitest';
@@ -78,6 +79,8 @@ function build() {
             { provide: ToastrService, useValue: { success: vi.fn(), warning: vi.fn(), error: vi.fn() } },
             { provide: MatDialog, useValue: { open: vi.fn() } },
             { provide: LensService, useValue: { canAuthorWorkbench: signal(true) } },
+            // P6-d: guided mode rides the URL (`?guided=1`), so the host reads the query params.
+            { provide: ActivatedRoute, useValue: { queryParamMap: of(convertToParamMap({})) } },
             {
                 provide: BundleTransferService,
                 useValue: {

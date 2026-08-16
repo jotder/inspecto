@@ -1,5 +1,8 @@
 import { ChangeDetectionStrategy, Component, ViewEncapsulation, computed, inject, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { NgTemplateOutlet } from '@angular/common';
+import { ActivatedRoute } from '@angular/router';
+import { map } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -66,8 +69,18 @@ export type PipelinesViewMode = 'view' | 'editor' | 'topology';
 export class PipelinesComponent {
     private api = inject(PipelinesService);
     private iconMapApi = inject(IconMapService);
+    private route = inject(ActivatedRoute);
 
     readonly mode = signal<PipelinesViewMode>('view');
+
+    /**
+     * `?guided=1` puts the editor in guided mode (the checklist strip, P6-d). It is a routing fact —
+     * "the operator arrived from Onboard" — which is why it rides the URL rather than being derived
+     * from the pipeline: P6-a's redirect out of `/catalog/onboard` is what will set it.
+     */
+    readonly guided = toSignal(this.route.queryParamMap.pipe(map((p) => p.get('guided') === '1')), {
+        initialValue: false,
+    });
 
     // ── topology (T24): one or many pipelines joined at their shared stores ──
     readonly iconMap = signal<IconMap>({});
