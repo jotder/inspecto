@@ -513,7 +513,14 @@ src/app/
   registered in `app-commands.ts` (side-effect import — never import a feature into the layout). The
   target pane implements the `?create=1` handshake: strip the param (`replaceUrl`) and open the create
   dialog **in the navigation promise's `.then()`** — MatDialog closes open dialogs on navigation
-  (reference: object-mail / jobs `ngOnInit`). **`?`** (outside a text field) opens the shared
+  (reference: object-mail / jobs `ngOnInit`). ⚠ **A handshake that REPLACES a route is the opposite
+  case and must NOT be stripped** — `/pipelines?guided=1&open=<id>&stage=<chip>` (P6-a, 2026-08-16) is
+  where the retired onboarding wizard redirects, so it has to survive a reload and a bookmark. Build
+  such a target in ONE exported function both the route's `redirectTo` and the calling buttons use, in
+  its own module (a routes file usually imports its component, so the component importing back is a
+  cycle) — reference `catalog/onboard-redirect.ts`. ⚠ And when the param drives a LOAD rather than a
+  setting, consume it once per value: the receiving effect must not re-run on unrelated signals, or it
+  refetches and discards in-flight edits. **`?`** (outside a text field) opens the shared
   `ShortcutsHelpDialog` (`inspecto/shortcuts-help.dialog.ts`) — add new global bindings to its
   `SHORTCUTS` list.
 
