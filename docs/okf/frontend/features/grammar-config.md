@@ -20,8 +20,8 @@ Two screens author how raw bytes become rows — a **Grammar** (`docs/GLOSSARY.m
 
 Definition-surface P3a moved the common case out of the popup: a **`parser.delimited`** node defines in the
 right-dock drawer (`<app-pipeline-parse-definition>`), over this same shared editor; P3b added
-**`parser.fixedwidth`**, P3c **`parser.asn1`**, and P3d **`parser.json`** + **`parser.text_regex`** to the
-same pane. Since the templates-not-bindings change that includes
+**`parser.fixedwidth`**, P3c **`parser.asn1`**, and P3d **`parser.json`** + **`parser.text_regex`** +
+**`parser.plugin`** to the same pane. Since the templates-not-bindings change that includes
 **grammar-bound** nodes, which the host materialises into an inline copy on open (`definitionDraft`) and
 which migrate for real when the operator Applies.
 
@@ -38,9 +38,10 @@ A parse type **absent** from that map keeps the dialog.
 drift from the map that actually decides it. Adding a format is now a `PARSE_NODE_FRONTENDS` entry and
 nothing else on the template side.
 
-`GrammarEditorDialog` is left with three jobs: the **plain `parser` type** (no drawer pane yet — P3d's
-remaining `parser.plugin` slice adds one), a **dangling** `use: grammar/<id>` whose component does not
-exist, and **binary fixed width**. ⚠ "P3d retires the dialog entirely" was always false and stays false:
+`GrammarEditorDialog` is left with two jobs: a **dangling** `use: grammar/<id>` whose component does not
+exist, and **binary fixed width**. The plain `parser` type still has no drawer pane either — the plugin
+subtype covers only nodes with an *authored* `parsing.plugin` block, not the unbound generic type.
+⚠ "P3d retires the dialog entirely" was always false and stays false:
 the dangling and binary cases are deliberate keeps. The dangling case is deliberate: with nothing to resolve there is no faithful copy
 to migrate to, and seeding the drawer with defaults would replace the operator's broken reference with a
 silently invented Grammar. The binary case (`record: bytes`, detected by `isBinaryFixedWidth`) lifts to
@@ -78,6 +79,32 @@ whole UI half was two `PARSE_NODE_FRONTENDS` entries. Everything else was the en
   authoring mistake and must refuse rather than be dropped.
 * `isParserType` is now `PARSER` ∪ `SUBTYPE_FRONTENDS.keySet()` in both languages, rather than a chain of
   `equals` growing one arm per format.
+
+## The generic custom-plugin subtype — `parser.plugin` (P3d slice D, 2026-08-16)
+
+The last per-format slice, closing out P3d. Unlike JSON/text-regex, `parser.plugin` is not a built-in
+`ParsingFrontend` — it hosts *any* served plugin whose `ingestable && ingesterClass` are both set and
+that isn't already claimed by a dedicated subtype (today: everything except `asn1`), via a `<mat-select>`
+the pane owns directly.
+
+* **The pane fetches its own catalog** (`inject(ParsersService).list()`), rather than reaching through
+  `@ViewChild` into the shared editor's internal `served()` signal — the same async-ordering trap P3c's
+  ASN.1 slice hit twice (catalog resolving after `[type]` was set, `specs` rebuilding from defaults on a
+  late-arriving spec list). A second independent fetch costs one extra network call and buys immunity
+  from that whole bug class.
+* **`USE_HOME` gets `grammar/` + `ingester/`, mirroring the plain `parser` type** — a plugin's ingester is
+  authored in `parsing.plugin.ingester`, not synthesized, so this looks like it shouldn't need
+  `DERIVED_USE` the way ASN.1 did. It still does: `PipelineLift.parserNode()` computes
+  `use = "ingester/" + fqcn` unconditionally whenever `s.ingesterClass() != null`, regardless of subtype,
+  so the LIFT presents that ref on *every* plugin-backed node before it is retyped — `DERIVED_USE` maps
+  `parser.plugin → ingester/` for the same reason P3c needed it for ASN.1.
+* **Cannot be proven end-to-end offline.** The mock catalog is a verbatim transcription of the real
+  server's `Parsers.catalog()`, and the real server has no second ingestable plugin besides `asn1` — so
+  only the node type, drawer routing, and the empty-catalog refusal message are preview-verifiable here;
+  the actual pick → apply → save flow needs a real deployed third-party plugin.
+* **Found, not fixed**: the plain `parser` type's `ingester/` use-home has no `DERIVED_USE` counterpart,
+  so a legacy `processing.ingester`-configured pipeline that was never retyped to `parser.plugin` would
+  hit `UNKNOWN_USE_KIND` on validate. Pre-existing, unrelated to this slice, flagged as a follow-up.
 
 ## A SERVED format in the pane — ASN.1 (P3c, 2026-08-16)
 
