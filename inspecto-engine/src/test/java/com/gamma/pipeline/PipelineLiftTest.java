@@ -36,20 +36,25 @@ class PipelineLiftTest {
 
         // node types
         assertType(g, "acq", "acquisition");
-        assertType(g, "dedup_marker", "transform.dedup.marker");   // duplicate_check enabled (G2 marker subsystem)
         assertType(g, "parse", "parser");
         assertType(g, "map", "transform.map");
         assertType(g, "sink", "sink.persistent");
 
-        // fingerprint dedup is never a node (2026-08-04 fold — it rides acquisition, where it runs);
-        // single schema ⇒ no gap / no quarantine
+        // NEITHER file-grain dedup is a node: fingerprint folded onto acquisition 2026-08-04, marker
+        // followed in P5-a — both are decided in the poll cycle, before anything is parsed.
+        // Single schema ⇒ no gap / no quarantine either.
         assertTrue(g.node("dedup_fingerprint").isEmpty());
+        assertTrue(g.node("dedup_marker").isEmpty());
         assertTrue(g.node("gap").isEmpty());
         assertTrue(g.node("quarantine").isEmpty());
 
-        // the data chain acq → dedup_marker → parse → map → sink
-        assertEquals(List.of("dedup_marker"), ids2(g.dataEdgesFrom("acq")));
-        assertEquals(List.of("parse"), ids2(g.dataEdgesFrom("dedup_marker")));
+        // …and its keys ride acquisition instead (duplicate_check enabled, path mode)
+        PipelineNode acq = g.node("acq").orElseThrow();
+        assertEquals(true, acq.cfg("duplicate_check"));
+        assertNotNull(acq.cfg("retention_days"));
+
+        // the data chain acq → parse → map → sink
+        assertEquals(List.of("parse"), ids2(g.dataEdgesFrom("acq")));
         assertEquals(List.of("map"), ids2(g.dataEdgesFrom("parse")));
         assertEquals(List.of("sink"), ids2(g.dataEdgesFrom("map")));
 
@@ -137,8 +142,11 @@ class PipelineLiftTest {
         PipelineGraph g = PipelineLift.lift(cfg);
 
         assertEquals(List.of("acq"), ids(g.entryNodes()));
-        // duplicate_check off ⇒ acq feeds the parser dispatcher directly
         assertEquals(List.of("parse"), ids2(g.dataEdgesFrom("acq")));
+        // duplicate_check off ⇒ the acquisition node carries no marker keys at all (P5-a). The toggle
+        // is absent, not false: an absent toggle is what lets a legacy marker node still be read.
+        for (String k : List.of("duplicate_check", "marker_extension", "retention_days", "markers_dir"))
+            assertNull(g.node("acq").orElseThrow().cfg(k), k + " must not ride a dedup-off acquisition node");
         assertNotNull(g.node("parse").orElseThrow().cfg("selector"));   // selector carried (G3)
 
         // one route branch per schema, each to its own map → sink, plus unmatched → quarantine

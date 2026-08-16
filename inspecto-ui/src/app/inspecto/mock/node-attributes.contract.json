@@ -122,6 +122,33 @@
     "type" : "string",
     "tier" : "advanced",
     "help" : "Target directory when \"After success\" is Move."
+  }, {
+    "key" : "duplicate_check",
+    "label" : "Marker dedup",
+    "type" : "boolean",
+    "tier" : "optional",
+    "help" : "Skip a file whose marker already exists beside it — the local poll path's re-processing guard."
+  }, {
+    "key" : "marker_extension",
+    "label" : "Marker extension",
+    "type" : "string",
+    "tier" : "advanced",
+    "help" : "Suffix of the per-file marker written beside a processed input; a file whose marker exists is skipped.",
+    "placeholder" : ".processed"
+  }, {
+    "key" : "retention_days",
+    "label" : "Marker retention (days)",
+    "type" : "number",
+    "tier" : "advanced",
+    "min" : 1.0,
+    "help" : "Stale markers older than this are cleaned up (MarkerManager); blank = the engine default of 90.",
+    "placeholder" : "90"
+  }, {
+    "key" : "markers_dir",
+    "label" : "Markers directory",
+    "type" : "string",
+    "tier" : "advanced",
+    "help" : "Where marker files land (dirs.markers); blank = the space convention."
   } ],
   "transform.filter" : [ {
     "key" : "where",
@@ -194,28 +221,6 @@
     "tier" : "optional",
     "help" : "Which duplicate wins — SQL ordering over the typed columns; blank = input order.",
     "placeholder" : "event_ts DESC"
-  } ],
-  "transform.dedup.marker" : [ {
-    "key" : "marker_extension",
-    "label" : "Marker extension",
-    "type" : "string",
-    "tier" : "optional",
-    "help" : "Suffix of the per-file marker written beside a processed input; a file whose marker exists is skipped.",
-    "placeholder" : ".processed"
-  }, {
-    "key" : "retention_days",
-    "label" : "Marker retention (days)",
-    "type" : "number",
-    "tier" : "optional",
-    "min" : 1.0,
-    "help" : "Stale markers older than this are cleaned up (MarkerManager); blank = the engine default of 90.",
-    "placeholder" : "90"
-  }, {
-    "key" : "markers_dir",
-    "label" : "Markers directory",
-    "type" : "string",
-    "tier" : "advanced",
-    "help" : "Where marker files land (dirs.markers); blank = the space convention."
   } ],
   "transform.summarize" : [ {
     "key" : "group_by",

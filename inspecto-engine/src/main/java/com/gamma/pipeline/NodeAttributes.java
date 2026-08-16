@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 /**
  * The per-node-type config attribute tables, published on {@code GET /pipelines/node-types}. This is the
@@ -71,6 +72,40 @@ public final class NodeAttributes {
                     .help("Wait for a file to stop growing before collecting it."),
             NodeAttribute.of("post_action__archive_path", "Archive path", "string", "advanced")
                     .help("Target directory when \"After success\" is Move."));
+
+    /**
+     * Marker dedup (file-grain, → {@code processing.duplicate_check} + {@code dirs.markers}) — the
+     * marker-file duplicate Guarantee the LOCAL poll path applies. It had its own
+     * {@code transform.dedup.marker} node until P5-a (2026-08-16) folded it onto acquisition, where
+     * the fingerprint policy ({@code duplicate__*}) already lived: both are decided in the poll cycle,
+     * before anything is parsed.
+     *
+     * <p>⚠ <b>Kept separate from {@link #COLLECTOR} on purpose.</b> That list IS the {@code collector:}
+     * block and is rendered whole by Onboarding's Collection stage too; these four keys live in
+     * {@code processing:}/{@code dirs:} and are only <em>borrowed</em> by the acquisition NODE
+     * ({@code PipelineEditable.ACQ_FOREIGN_KEYS}), so folding them in would give that stage four
+     * fields it would write to a block nothing reads them in.
+     *
+     * <p>⚠ {@code duplicate_check} is the authored on/off and must stay explicit: if the presence of a
+     * detail key were the switch, clearing "retention" in the form would silently disable dedup on the
+     * next save. Defaults mirror the parser's ({@code PipelineConfigParser}: {@code .processed} / 90).
+     */
+    public static final List<NodeAttribute> MARKER_DEDUP = List.of(
+            NodeAttribute.of("duplicate_check", "Marker dedup", "boolean", "optional")
+                    .help("Skip a file whose marker already exists beside it — the local poll path's re-processing guard."),
+            NodeAttribute.of("marker_extension", "Marker extension", "string", "advanced")
+                    .placeholder(".processed")
+                    .help("Suffix of the per-file marker written beside a processed input; a file whose marker exists is skipped."),
+            NodeAttribute.of("retention_days", "Marker retention (days)", "number", "advanced").min(1)
+                    .placeholder("90")
+                    .help("Stale markers older than this are cleaned up (MarkerManager); blank = the engine default of 90."),
+            NodeAttribute.of("markers_dir", "Markers directory", "string", "advanced")
+                    .help("Where marker files land (dirs.markers); blank = the space convention."));
+
+    /** The {@code acquisition} node's published spec: the {@code collector:} block it authors, plus
+     *  the marker-dedup keys it borrows from {@code processing:}/{@code dirs:}. */
+    public static final List<NodeAttribute> ACQUISITION =
+            Stream.concat(COLLECTOR.stream(), MARKER_DEDUP.stream()).toList();
 
     /**
      * The {@code output:} block, shared by all three sink kinds and Onboarding's Dataset & Go-live stage —
@@ -172,25 +207,6 @@ public final class NodeAttributes {
                     .help("Which duplicate wins — SQL ordering over the typed columns; blank = input order."));
 
     /**
-     * {@code transform.dedup.marker} (file-grain, → {@code processing.duplicate_check} +
-     * {@code dirs.markers}) — the marker-file duplicate Guarantee the LOCAL poll path applies. All
-     * three keys are proven by the lift/lower round-trip ({@code PipelineLift.dedupMarkerNode} emits
-     * them; {@code PipelineEditable.lower} and {@code PipelineCompiler} read them back). Unspecced
-     * until 2026-08-14, so the only way to edit a stream's dedup retention was the free-form
-     * key/value editor. Defaults mirror the parser's ({@code PipelineConfigParser}: {@code .processed}
-     * / 90) — the UI scaffold no longer writes its own.
-     */
-    public static final List<NodeAttribute> TRANSFORM_DEDUP_MARKER = List.of(
-            NodeAttribute.of("marker_extension", "Marker extension", "string", "optional")
-                    .placeholder(".processed")
-                    .help("Suffix of the per-file marker written beside a processed input; a file whose marker exists is skipped."),
-            NodeAttribute.of("retention_days", "Marker retention (days)", "number", "optional").min(1)
-                    .placeholder("90")
-                    .help("Stale markers older than this are cleaned up (MarkerManager); blank = the engine default of 90."),
-            NodeAttribute.of("markers_dir", "Markers directory", "string", "advanced")
-                    .help("Where marker files land (dirs.markers); blank = the space convention."));
-
-    /**
      * {@code transform.summarize} (→ {@code processing.summarize}) — the group-by rollup, authoring-only
      * until the branch-aware executor arms it. Keys proven by {@code NodeConfigNameContractTest}.
      */
@@ -215,17 +231,18 @@ public final class NodeAttributes {
     private static final Map<String, List<NodeAttribute>> BY_TYPE = byType();
 
     private static Map<String, List<NodeAttribute>> byType() {
-        for (List<NodeAttribute> table : List.of(COLLECTOR, OUTPUT, SINK_PERSISTENT, TRANSFORM_FILTER,
-                TRANSFORM_ROUTE, TRANSFORM_DEDUP, TRANSFORM_DEDUP_MARKER, TRANSFORM_SUMMARIZE, TRANSFORM_JOIN))
+        for (List<NodeAttribute> table : List.of(COLLECTOR, MARKER_DEDUP, OUTPUT, SINK_PERSISTENT,
+                TRANSFORM_FILTER, TRANSFORM_ROUTE, TRANSFORM_DEDUP, TRANSFORM_SUMMARIZE, TRANSFORM_JOIN))
             for (NodeAttribute a : table) a.validate();   // whole-spec checks, once the builders are done
         Map<String, List<NodeAttribute>> m = new LinkedHashMap<>();
         // The acquisition node authors the WHOLE collector block, duplicate__* included — fingerprint
-        // dedup executes in the poll cycle, and its former graph node was removed 2026-08-04.
-        m.put(BuiltinNodeType.ACQUISITION.type(), COLLECTOR);
+        // dedup executes in the poll cycle, and its former graph node was removed 2026-08-04. Marker
+        // dedup joined it in P5-a (2026-08-16), so transform.dedup.marker is unspecced again: it is
+        // read-compat only, never authored, and a spec would invite editing a node nothing emits.
+        m.put(BuiltinNodeType.ACQUISITION.type(), ACQUISITION);
         m.put(BuiltinNodeType.TRANSFORM_FILTER.type(), TRANSFORM_FILTER);
         m.put(BuiltinNodeType.TRANSFORM_ROUTE.type(), TRANSFORM_ROUTE);
         m.put(BuiltinNodeType.TRANSFORM_DEDUP.type(), TRANSFORM_DEDUP);
-        m.put(BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type(), TRANSFORM_DEDUP_MARKER);
         m.put(BuiltinNodeType.TRANSFORM_SUMMARIZE.type(), TRANSFORM_SUMMARIZE);
         m.put(BuiltinNodeType.TRANSFORM_JOIN.type(), TRANSFORM_JOIN);
         m.put(BuiltinNodeType.SINK_PERSISTENT.type(), SINK_PERSISTENT);

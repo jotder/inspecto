@@ -78,7 +78,15 @@ export class PipelineGuaranteesPanelComponent {
         if (!m) return [];
         const acq = m.nodes.find((n) => n.type === 'acquisition');
         const gap = m.nodes.find((n) => n.type === 'gap');
-        const marker = m.nodes.find((n) => n.type === 'transform.dedup.marker');
+        // Marker dedup rides the acquisition node since P5-a; a graph lifted before that still carries
+        // its own node, so both are read (mirrors `PipelineLift.markerHome`) — the card must not go
+        // dark for either shape, and its owner is whichever node actually holds the keys.
+        const legacyMarker = m.nodes.find((n) => n.type === 'transform.dedup.marker');
+        const marker = acq?.config?.['duplicate_check'] != null
+            ? acq.config['duplicate_check'] === true
+                ? acq
+                : undefined
+            : legacyMarker;
         const quarantine = m.nodes.find(
             (n) => n.type === 'sink.persistent' && n.config?.['dir'] != null && n.config?.['database'] == null,
         );

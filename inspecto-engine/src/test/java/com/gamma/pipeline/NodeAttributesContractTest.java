@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -67,16 +68,31 @@ class NodeAttributesContractTest {
      * {@code transform.dedup.fingerprint} node; that node was removed because file dedup executes in
      * the {@code CollectorProcessor} poll cycle ({@code ledgerFilter}) — it never was a transform, so
      * the split told the operator the check happens somewhere it does not.
+     *
+     * <p>P5-a folded MARKER dedup onto the same node for the same reason, so the published list is now
+     * {@code COLLECTOR + MARKER_DEDUP}. ⚠ The two lists stay separate deliberately: {@code COLLECTOR}
+     * IS the {@code collector:} block and Onboarding's Collection stage renders it whole, while the
+     * marker keys live in {@code processing:}/{@code dirs:} and are only borrowed by this node.
      */
     @Test
-    void acquisitionPublishesTheWholeCollectorBlockIncludingDedup() {
+    void acquisitionPublishesTheWholeCollectorBlockIncludingBothFileDedups() {
         List<String> acq = NodeAttributes.forType("acquisition").stream().map(NodeAttribute::key).toList();
-        assertTrue(acq.contains("duplicate__mode"));
+        assertTrue(acq.contains("duplicate__mode"));        // fingerprint policy (2026-08-04 fold)
         assertTrue(acq.contains("duplicate__on_change"));
-        assertEquals(NodeAttributes.COLLECTOR.stream().map(NodeAttribute::key).toList(), acq);
+        assertTrue(acq.contains("duplicate_check"));        // marker dedup (P5-a fold)
+        assertTrue(acq.contains("markers_dir"));
+        assertEquals(
+                Stream.concat(NodeAttributes.COLLECTOR.stream(), NodeAttributes.MARKER_DEDUP.stream())
+                        .map(NodeAttribute::key).toList(),
+                acq);
+        // …and the marker keys are NOT in the collector-block table itself — folding them in would give
+        // Onboarding's Collection stage four fields it would write to a block nothing reads them in.
+        assertTrue(NodeAttributes.COLLECTOR.stream().map(NodeAttribute::key)
+                .noneMatch(k -> k.equals("duplicate_check") || k.equals("markers_dir")));
 
-        // The removed node publishes nothing — a graph still carrying one is refused at save.
+        // Neither removed node publishes anything — transform.dedup.marker is read-compat only now.
         assertTrue(NodeAttributes.forType("transform.dedup.fingerprint").isEmpty());
+        assertTrue(NodeAttributes.forType("transform.dedup.marker").isEmpty());
     }
 
     /** The catalog every client reads must actually carry the specs — the whole point of §3.1. */

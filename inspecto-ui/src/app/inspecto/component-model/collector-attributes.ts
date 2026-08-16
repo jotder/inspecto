@@ -122,6 +122,54 @@ export const COLLECTOR_ATTRIBUTES: AttributeSpec[] = [
 ];
 
 /**
+ * Marker dedup (file-grain, → `processing.duplicate_check` + `dirs.markers`) — the marker-file
+ * duplicate Guarantee the LOCAL poll path applies. It had its own `transform.dedup.marker` node until
+ * P5-a (2026-08-16) folded it onto acquisition, beside the fingerprint policy (`duplicate__*`).
+ * Mirrors `NodeAttributes.MARKER_DEDUP`.
+ *
+ * <p>⚠ **Deliberately NOT part of {@link COLLECTOR_ATTRIBUTES}.** That table IS the `collector:` block
+ * and Onboarding's Collection stage renders it whole; these four keys live in `processing:`/`dirs:`
+ * and are only borrowed by the Pipelines editor's `acquisition` NODE, so folding them in would give
+ * that stage four fields it would write to a block nothing reads them in.
+ *
+ * <p>⚠ `duplicate_check` is the authored on/off and must stay explicit — if the presence of a detail
+ * key were the switch, clearing "retention" would silently disable dedup on the next save.
+ */
+export const MARKER_DEDUP_ATTRIBUTES: AttributeSpec[] = [
+    {
+        key: 'duplicate_check',
+        label: 'Marker dedup',
+        type: 'boolean',
+        tier: 'optional',
+        help: "Skip a file whose marker already exists beside it — the local poll path's re-processing guard.",
+    },
+    {
+        key: 'marker_extension',
+        label: 'Marker extension',
+        type: 'string',
+        tier: 'advanced',
+        placeholder: '.processed',
+        help: 'Suffix of the per-file marker written beside a processed input; a file whose marker exists is skipped.',
+    },
+    {
+        key: 'retention_days',
+        label: 'Marker retention (days)',
+        type: 'number',
+        tier: 'advanced',
+        min: 1,
+        placeholder: '90',
+        help: 'Stale markers older than this are cleaned up (MarkerManager); blank = the engine default of 90.',
+    },
+    {
+        key: 'markers_dir',
+        label: 'Markers directory',
+        type: 'string',
+        tier: 'advanced',
+        help: 'Where marker files land (dirs.markers); blank = the space convention.',
+    },
+];
+
+/**
  * ⚠ **There is no dedup subset any more** (collector-config unification, 2026-08-04). D9 had split
  * `duplicate__*` onto a `transform.dedup.fingerprint` node; that node was REMOVED because file
  * duplicate detection executes inside the `CollectorProcessor` poll cycle (`ledgerFilter` reads

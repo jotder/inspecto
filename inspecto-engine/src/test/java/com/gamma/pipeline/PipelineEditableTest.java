@@ -53,6 +53,78 @@ class PipelineEditableTest {
                 "single-schema quarantine dir has no owning node and must be preserved");
     }
 
+    // ── P5-a: marker dedup moved from its own node onto acquisition ─────────────────────
+    // The keys live in processing.duplicate_check + dirs.markers and are only BORROWED by the
+    // acquisition node, so the two hazards worth pinning are (a) leaking them into collector:,
+    // where nothing reads them, and (b) losing an editor's dedup because its graph predates the move.
+
+    /** The lifted acquisition node carries the marker keys, and lowering puts them back where the engine reads them. */
+    @Test
+    void markerDedupRidesAcquisitionAndLowersToItsOwnBlock(@TempDir Path dir) throws Exception {
+        Path toon = writeRichPipeline(dir);
+        Map<String, Object> raw = decode(toon);
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+
+        Map<String, Object> editable = PipelineEditable.toMap(cfg, raw);
+        PipelineGraph g = PipelineCodec.fromMap(editable);
+        assertTrue(g.node("dedup_marker").isEmpty(), "the marker node is no longer emitted");
+        PipelineNode acq = g.node("acq").orElseThrow();
+        assertEquals(true, acq.cfg("duplicate_check"));
+        assertEquals(".processed", acq.cfg("marker_extension"));
+        // ⚠ numeric compare: this path carries the file's decoded value (a Long), while the typed
+        // PipelineLift path carries the record's int — assertEquals on the boxes would fail on one
+        assertEquals(30, ((Number) acq.cfg("retention_days")).intValue());
+        assertEquals(dir.toString().replace('\\', '/') + "/markers", acq.cfg("markers_dir"));
+
+        Map<String, Object> lowered = PipelineEditable.lower(g, raw, true);
+        Map<?, ?> dc = (Map<?, ?>) ((Map<?, ?>) lowered.get("processing")).get("duplicate_check");
+        assertEquals(true, dc.get("enabled"));
+        assertEquals(30, ((Number) dc.get("retention_days")).intValue());
+        assertEquals(dir.toString().replace('\\', '/') + "/markers",
+                ((Map<?, ?>) lowered.get("dirs")).get("markers"));
+        // ⚠ the leak guard: acquisition-node keys are dumped wholesale into collector:, so a borrowed
+        // key missing from ACQ_FOREIGN_KEYS would land in a block the engine never reads it from
+        Map<?, ?> collector = (Map<?, ?>) lowered.get("collector");
+        for (String k : List.of("duplicate_check", "marker_extension", "retention_days", "markers_dir"))
+            assertFalse(collector.containsKey(k), k + " must not leak into the collector: block");
+    }
+
+    /**
+     * Read-compat: an editor opened before P5-a holds a lifted graph that still carries a standalone
+     * marker node. Lower must keep accepting it — ignoring it would delete that operator's dedup on
+     * their next save. (The lift never emits one again; only LOWER is compatible.)
+     */
+    @Test
+    void aLegacyMarkerNodeStillLowers() {
+        Map<String, Object> lowered = PipelineEditable.lower(new PipelineGraph("x", true, List.of(
+                node("acq", "acquisition", Map.of("poll", "in")),
+                node("dedup_marker", "transform.dedup.marker", Map.of("retention_days", 7)),
+                node("parse", "parser", Map.of("schema_file", "s.toon")),
+                node("sink", "sink.persistent", Map.of("database", "db"))), List.of()),
+                new LinkedHashMap<>(), true);
+
+        Map<?, ?> dc = (Map<?, ?>) ((Map<?, ?>) lowered.get("processing")).get("duplicate_check");
+        assertEquals(true, dc.get("enabled"));
+        assertEquals(7, dc.get("retention_days"));
+    }
+
+    /**
+     * ⚠ The acquisition toggle is authoritative when PRESENT, in BOTH directions: a graph that turns
+     * dedup off while a stale marker node is still on the canvas must not fall through to it and
+     * silently re-enable what the operator just switched off.
+     */
+    @Test
+    void anExplicitlyDisabledToggleBeatsAStaleMarkerNode() {
+        Map<String, Object> lowered = PipelineEditable.lower(new PipelineGraph("x", true, List.of(
+                node("acq", "acquisition", Map.of("poll", "in", "duplicate_check", false)),
+                node("dedup_marker", "transform.dedup.marker", Map.of("retention_days", 7)),
+                node("parse", "parser", Map.of("schema_file", "s.toon")),
+                node("sink", "sink.persistent", Map.of("database", "db"))), List.of()),
+                new LinkedHashMap<>(), true);
+
+        assertNull(((Map<?, ?>) lowered.get("processing")).get("duplicate_check"));
+    }
+
     @Test
     void unsupportedNodeRefusesWithNamedCode() {
         PipelineGraph g = new PipelineGraph("x", true, List.of(

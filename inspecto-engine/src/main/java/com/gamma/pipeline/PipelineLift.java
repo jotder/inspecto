@@ -43,6 +43,7 @@ public final class PipelineLift {
 
     // ── stable node ids ──────────────────────────────────────────────────────────
     static final String ACQ               = "acq";
+    /** No longer emitted (P5-a moved the keys onto {@link #ACQ}); still the id a legacy graph carries. */
     static final String DEDUP_MARKER      = "dedup_marker";
     static final String PARSE             = "parse";
     static final String QUARANTINE        = "quarantine";
@@ -62,20 +63,13 @@ public final class PipelineLift {
             edges.add(new PipelineEdge(ACQ, PipelineRel.GAP, GAP));
         }
 
-        // 2. dedup prefix (marker subsystem only — fingerprint dedup rides the acquisition node,
-        //    where it actually executes), feeding the parser
-        String upstream = ACQ;
-        if (cfg.processing().duplicateCheckEnabled()) {
-            nodes.add(dedupMarkerNode(cfg));
-            edges.add(PipelineEdge.data(upstream, DEDUP_MARKER));
-            upstream = DEDUP_MARKER;
-        }
-
-        // 3. parser, fed by the dedup prefix (or directly by acq)
+        // 2. parser, fed directly by acq. Marker dedup used to sit between them as its own node; it
+        //    now rides the acquisition node like the fingerprint policy already did (P5-a), because
+        //    both are file-grain Guarantees the poll cycle applies before anything is parsed.
         nodes.add(parserNode(cfg));
-        edges.add(PipelineEdge.data(upstream, PARSE));
+        edges.add(PipelineEdge.data(ACQ, PARSE));
 
-        // 4. branch on schema resolution (exactly one of the three is set)
+        // 3. branch on schema resolution (exactly one of the three is set)
         PipelineConfig.Schemas s = cfg.schemas();
         // either filtering moment surfaces as one Filter node (pre-parse lists and/or post-parse `where`)
         boolean rowFilters = cfg.csv().hasRowFilters() || cfg.csv().hasRowPredicate();
@@ -209,18 +203,35 @@ public final class PipelineLift {
         c.put("circuit_breaker", src.circuitBreaker());
         c.put("post_action", src.postAction());   // success-side finalizer (G8)
         if (cfg.triggerConfig() != null) c.put("trigger", cfg.triggerConfig());   // T13: entry-node trigger (§3.6)
+        // Marker dedup (P5-a): the file-grain marker Guarantee, homed here beside the fingerprint
+        // policy it is a sibling of. `duplicate_check` is the AUTHORED on/off — presence of the
+        // detail keys must never be the switch, or clearing a retention field would silently
+        // disable dedup on the next save.
+        if (cfg.processing().duplicateCheckEnabled()) {
+            c.put("duplicate_check", true);
+            put(c, "marker_extension", cfg.processing().markerExtension());
+            c.put("retention_days", cfg.processing().retentionDays());
+            put(c, "markers_dir", cfg.dirs().markers());
+        }
         String use = src.hasConnection() ? "connection/" + src.connection() : null;
         return new PipelineNode(ACQ, BuiltinNodeType.ACQUISITION.type(),
                 null, "Collector: " + src.connector(), c, use);
     }
 
-    private static PipelineNode dedupMarkerNode(PipelineConfig cfg) {
-        Map<String, Object> c = new LinkedHashMap<>();
-        put(c, "marker_extension", cfg.processing().markerExtension());
-        c.put("retention_days", cfg.processing().retentionDays());
-        put(c, "markers_dir", cfg.dirs().markers());
-        return new PipelineNode(DEDUP_MARKER, BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type(),
-                null, null, c, null);
+    /**
+     * <b>Which node carries marker dedup (P5-a).</b> The acquisition node authors it; a standalone
+     * {@code transform.dedup.marker} node is still READ — never emitted — because an editor opened
+     * before P5-a holds a lifted graph carrying one, and ignoring it would delete that operator's
+     * dedup on their next save. ⚠ The acquisition toggle is authoritative whenever PRESENT, in both
+     * directions: an explicit {@code false} must not fall through to a stale node and re-enable it.
+     *
+     * @return the node whose {@code marker_extension}/{@code retention_days}/{@code markers_dir} apply,
+     *         or {@code null} when marker dedup is off.
+     */
+    static PipelineNode markerHome(PipelineNode acq, PipelineNode legacyMarker) {
+        Object toggle = acq == null ? null : acq.cfg("duplicate_check");
+        if (toggle == null) return legacyMarker;
+        return Boolean.parseBoolean(String.valueOf(toggle)) ? acq : null;
     }
 
     private static PipelineNode parserNode(PipelineConfig cfg) {

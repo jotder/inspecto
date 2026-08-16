@@ -907,3 +907,85 @@ describe('mock pipeline-editable — the authored map projection (processing.map
         expect((config['processing'] as Record<string, unknown>)['map']).toEqual({ columns });
     });
 });
+
+/**
+ * Parity guard for P5-a: marker dedup moved off its own `transform.dedup.marker` node onto the
+ * acquisition node, where the fingerprint policy already lived. Mirrors `PipelineEditableTest`'s
+ * three cases — a mock that kept emitting the node would put the offline editor one node AHEAD of
+ * the server, which is the node-count drift MOCK-1 exists to catch, in reverse.
+ */
+describe('mock pipeline-editable — marker dedup rides acquisition (P5-a)', () => {
+    const markerConfig = () => ({
+        name: 'MD',
+        active: true,
+        dirs: { poll: '/in', database: '/db', markers: '/markers' },
+        output: { format: 'CSV' },
+        collector: { connector: 'local' },
+        processing: {
+            schema_file: 's.toon',
+            duplicate_check: { enabled: true, marker_extension: '.done', retention_days: 30 },
+        },
+    });
+
+    it('lifts the keys onto acq (no marker node) and lowers them back to their own blocks', () => {
+        const g = liftConfig(markerConfig());
+        expect(g.nodes.find((n) => n.type === 'transform.dedup.marker')).toBeUndefined();
+        const acq = g.nodes.find((n) => n.type === 'acquisition')!;
+        expect(acq.config).toMatchObject({
+            duplicate_check: true,
+            marker_extension: '.done',
+            retention_days: 30,
+            markers_dir: '/markers',
+        });
+        // the parser is fed directly, with no dedup node in between
+        expect(g.edges.find((e) => e.to === 'parse')?.from).toBe('acq');
+
+        const res = lowerGraph(g, markerConfig(), true);
+        const config = (res as { config: Record<string, unknown> }).config;
+        expect((config['processing'] as Record<string, unknown>)['duplicate_check']).toEqual({
+            enabled: true,
+            marker_extension: '.done',
+            retention_days: 30,
+        });
+        expect((config['dirs'] as Record<string, unknown>)['markers']).toBe('/markers');
+        // ⚠ the leak guard: acq's config is dumped wholesale into collector:, so a borrowed key
+        // missing from ACQ_FOREIGN_KEYS would land in a block nothing reads it from
+        const collector = config['collector'] as Record<string, unknown>;
+        for (const k of ['duplicate_check', 'marker_extension', 'retention_days', 'markers_dir'])
+            expect(collector[k], `${k} must not leak into collector:`).toBeUndefined();
+    });
+
+    it('still lowers a legacy standalone marker node — read-compat, never re-emitted', () => {
+        const g = liftConfig(markerConfig());
+        const acq = g.nodes.find((n) => n.type === 'acquisition')!;
+        for (const k of ['duplicate_check', 'marker_extension', 'retention_days', 'markers_dir'])
+            delete acq.config![k];
+        g.nodes.push({
+            id: 'dedup_marker',
+            type: 'transform.dedup.marker',
+            config: { retention_days: 7 },
+        });
+
+        const res = lowerGraph(g, markerConfig(), true);
+        const processing = (res as { config: Record<string, unknown> }).config['processing'] as Record<
+            string,
+            unknown
+        >;
+        expect(processing['duplicate_check']).toEqual({ enabled: true, retention_days: 7 });
+    });
+
+    it('lets an explicit duplicate_check:false beat a stale marker node', () => {
+        const g = liftConfig(markerConfig());
+        g.nodes.find((n) => n.type === 'acquisition')!.config!['duplicate_check'] = false;
+        g.nodes.push({
+            id: 'dedup_marker',
+            type: 'transform.dedup.marker',
+            config: { retention_days: 7 },
+        });
+
+        const res = lowerGraph(g, markerConfig(), true);
+        const config = (res as { config: Record<string, unknown> }).config;
+        expect((config['processing'] as Record<string, unknown>)['duplicate_check']).toBeUndefined();
+        expect((config['dirs'] as Record<string, unknown>)['markers']).toBeUndefined();
+    });
+});

@@ -88,6 +88,7 @@ public final class PipelineEditable {
             BuiltinNodeType.PARSER_JSON.type(), BuiltinNodeType.PARSER_TEXT_REGEX.type(),
             BuiltinNodeType.PARSER_PLUGIN.type(),
             BuiltinNodeType.GAP.type(),
+            // read-compat only since P5-a: never emitted, still accepted (see PipelineLift.markerHome)
             BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type(),
             BuiltinNodeType.TRANSFORM_DEDUP.type(),   // record-grain dedup → processing.dedup (ELT P2)
             BuiltinNodeType.TRANSFORM_ROUTE.type(),   // route: block — authoring-only until the executor lands
@@ -158,6 +159,16 @@ public final class PipelineEditable {
      * acquisition — they execute in the poll cycle, so acquisition is where they are authored.
      */
     private static final Set<String> NOT_ACQ_OWNED = Set.of("gap_detection");
+
+    /**
+     * Acquisition-node config keys that do <b>not</b> belong to the {@code collector:} block — each is
+     * borrowed from another section of the file and written back there by {@code lower}. ⚠ A key homed
+     * on this node without being listed here silently leaks into {@code collector:}, where nothing
+     * reads it. The marker-dedup four joined 2026-08-04's fingerprint fold in P5-a.
+     */
+    private static final Set<String> ACQ_FOREIGN_KEYS = Set.of(
+            "poll", "trigger", "file_pattern",
+            "duplicate_check", "marker_extension", "retention_days", "markers_dir");
 
     /**
      * Parser-owned <b>processing</b> keys (schema resolution + the parse frontend). The parser also
@@ -385,6 +396,16 @@ public final class PipelineEditable {
             putIfPresent(c, "poll", dirs.get("poll"));
             putIfPresent(c, "trigger", raw.get("trigger"));
             putIfPresent(c, "file_pattern", processing.get("file_pattern"));
+            // Marker dedup, homed here since P5-a — same borrow-from-another-block shape as the three
+            // keys above. `duplicate_check` carries only the enabled flag; the file keeps the nested map.
+            // (the enabled test is PipelineConfigParser:241's, verbatim — the file may spell it either way)
+            if (processing.get("duplicate_check") instanceof Map<?, ?> dc
+                    && Boolean.parseBoolean(String.valueOf(dc.get("enabled")))) {
+                c.put("duplicate_check", true);
+                putIfPresent(c, "marker_extension", dc.get("marker_extension"));
+                putIfPresent(c, "retention_days", dc.get("retention_days"));
+                putIfPresent(c, "markers_dir", dirs.get("markers"));
+            }
         } else if (isParserType(t)) {
             for (String k : PARSER_OWNED) putIfPresent(c, k, processing.get(k));
             // The unified top-level parsing: block is parser-owned too, carried VERBATIM under its own
@@ -406,12 +427,6 @@ public final class PipelineEditable {
             if (collector.get("gap_detection") instanceof Map<?, ?> gd)
                 for (Map.Entry<?, ?> e : gd.entrySet())
                     if (!"enabled".equals(e.getKey())) c.put(String.valueOf(e.getKey()), e.getValue());
-        } else if (BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type().equals(t)) {
-            if (processing.get("duplicate_check") instanceof Map<?, ?> dc) {
-                putIfPresent(c, "marker_extension", dc.get("marker_extension"));
-                putIfPresent(c, "retention_days", dc.get("retention_days"));
-            }
-            putIfPresent(c, "markers_dir", dirs.get("markers"));
         } else if (BuiltinNodeType.SINK_PERSISTENT.type().equals(t)) {
             if (isQuarantine(n)) {
                 putIfPresent(c, "dir", dirs.get("quarantine"));
@@ -579,7 +594,7 @@ public final class PipelineEditable {
         if (acq != null) {
             collector.keySet().removeIf(k -> !NOT_ACQ_OWNED.contains(k));
             for (Map.Entry<String, Object> e : acq.config().entrySet())
-                if (!Set.of("poll", "trigger", "file_pattern").contains(e.getKey()))
+                if (!ACQ_FOREIGN_KEYS.contains(e.getKey()))
                     collector.put(e.getKey(), e.getValue());
             collector.remove("connection");
             if (acq.use() != null && acq.use().startsWith("connection/"))
@@ -636,13 +651,16 @@ public final class PipelineEditable {
             processing.remove("map");
         }
 
-        if (marker != null) {
+        // Marker dedup → processing.duplicate_check + dirs.markers, homed on acquisition since P5-a
+        // (see PipelineLift.markerHome for why a legacy marker node is still read).
+        PipelineNode markerHome = PipelineLift.markerHome(acq, marker);
+        if (markerHome != null) {
             Map<String, Object> dc = new LinkedHashMap<>();
             dc.put("enabled", true);
-            putIfPresent(dc, "marker_extension", marker.cfg("marker_extension"));
-            putIfPresent(dc, "retention_days", marker.cfg("retention_days"));
+            putIfPresent(dc, "marker_extension", markerHome.cfg("marker_extension"));
+            putIfPresent(dc, "retention_days", markerHome.cfg("retention_days"));
             processing.put("duplicate_check", dc);
-            replaceOrRemove(dirs, "markers", marker.cfg("markers_dir"));
+            replaceOrRemove(dirs, "markers", markerHome.cfg("markers_dir"));
         } else if (strict) {
             processing.remove("duplicate_check");
             dirs.remove("markers");

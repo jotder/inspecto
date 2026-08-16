@@ -48,8 +48,10 @@ class PipelineCompilerTest {
         assertEquals(cfg.output().format(), sink.cfg("format"));
         assertEquals(cfg.dirs().database(), sink.cfg("database"));
 
-        // dedup: path mode + duplicate_check on ⇒ exactly the marker subsystem, no fingerprint
-        assertEquals(List.of("transform.dedup.marker"), c.dedups().stream().map(PipelineNode::type).toList());
+        // dedup: duplicate_check on, but NEITHER file-grain dedup is a node any more — marker rides
+        // acquisition since P5-a, as fingerprint has since 2026-08-04
+        assertEquals(List.of(), c.dedups().stream().map(PipelineNode::type).toList());
+        assertEquals(true, acq.cfg("duplicate_check"));
         assertTrue(c.gap().isEmpty());
     }
 

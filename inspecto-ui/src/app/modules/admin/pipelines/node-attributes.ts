@@ -1,4 +1,9 @@
-import { type AttributeSpec, COLLECTOR_ATTRIBUTES, OUTPUT_ATTRIBUTES } from 'app/inspecto/component-model';
+import {
+    type AttributeSpec,
+    COLLECTOR_ATTRIBUTES,
+    MARKER_DEDUP_ATTRIBUTES,
+    OUTPUT_ATTRIBUTES,
+} from 'app/inspecto/component-model';
 
 /**
  * Per-node-type config attribute schemas for the generic {@link NodeConfigDialog} — the non-parser
@@ -78,7 +83,10 @@ import { type AttributeSpec, COLLECTOR_ATTRIBUTES, OUTPUT_ATTRIBUTES } from 'app
 // `SINK_ATTRIBUTES` fork exactly as U-D collapsed the collector one. All three sink kinds write
 // the same block — the kind is the materialisation behaviour, not a different config shape.
 const NODE_ATTRIBUTES: Record<string, AttributeSpec[]> = {
-    acquisition: COLLECTOR_ATTRIBUTES,
+    // The acquisition NODE's spec = the `collector:` block it authors + the marker-dedup keys it
+    // borrows from `processing:`/`dirs:` (P5-a). Onboarding's Collection stage keeps the block table
+    // alone — see MARKER_DEDUP_ATTRIBUTES for why the two are not merged.
+    acquisition: [...COLLECTOR_ATTRIBUTES, ...MARKER_DEDUP_ATTRIBUTES],
     // The persistent sink adds its destination to the shared output block: `database` is the one key
     // `PipelineEditable.lower` HARD-requires on the primary sink (`NO_PERSISTENT_SINK` refuses the save
     // without it), so it must be askable up front — but `required: false`, because a quarantine sink is
@@ -216,35 +224,9 @@ const NODE_ATTRIBUTES: Record<string, AttributeSpec[]> = {
             placeholder: 'event_ts DESC',
         },
     ],
-    // File-grain marker dedup (→ processing.duplicate_check + dirs.markers) — the marker-file
-    // duplicate Guarantee the LOCAL poll path applies. All three keys are lift/lower-proven;
-    // unspecced (free-form editor only) until 2026-08-14. Defaults mirror the parser's (.processed / 90).
-    'transform.dedup.marker': [
-        {
-            key: 'marker_extension',
-            label: 'Marker extension',
-            type: 'string',
-            tier: 'optional',
-            help: 'Suffix of the per-file marker written beside a processed input; a file whose marker exists is skipped.',
-            placeholder: '.processed',
-        },
-        {
-            key: 'retention_days',
-            label: 'Marker retention (days)',
-            type: 'number',
-            tier: 'optional',
-            min: 1,
-            help: 'Stale markers older than this are cleaned up (MarkerManager); blank = the engine default of 90.',
-            placeholder: '90',
-        },
-        {
-            key: 'markers_dir',
-            label: 'Markers directory',
-            type: 'string',
-            tier: 'advanced',
-            help: 'Where marker files land (dirs.markers); blank = the space convention.',
-        },
-    ],
+    // `transform.dedup.marker` is deliberately ABSENT: P5-a moved marker dedup onto the acquisition
+    // node (MARKER_DEDUP_ATTRIBUTES above), and nothing emits the node any more — it is read-compat
+    // only, so a spec here would invite editing a node the lift never produces.
     // Group-by rollup (→ processing.summarize) — authoring-only until the branch-aware executor arms it.
     'transform.summarize': [
         {

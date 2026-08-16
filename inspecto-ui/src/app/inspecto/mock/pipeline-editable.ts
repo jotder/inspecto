@@ -31,6 +31,7 @@ export const LOWERABLE = new Set([
     'parser.text_regex',
     'parser.plugin', // P3d slice D — the custom-plugin subtype, wired through the existing plugin: block
     'gap',
+    // read-compat only since P5-a: never emitted by the lift, still accepted by lower
     'transform.dedup.marker',
     'transform.filter',
     'transform.map',
@@ -41,6 +42,22 @@ export const LOWERABLE = new Set([
     'transform.summarize', // group-by rollup → processing.summarize (ELT P3), authoring-only
     'transform.join', // reference join → processing.join (ELT P3 S2), authoring-only
 ]);
+
+/**
+ * Acquisition-node config keys that do NOT belong to the `collector:` block — each is borrowed from
+ * another section of the file and written back there by `lowerGraph` (mirrors
+ * `PipelineEditable.ACQ_FOREIGN_KEYS`). ⚠ A key homed on this node without being listed here
+ * silently leaks into `collector:`, where nothing reads it.
+ */
+const ACQ_FOREIGN_KEYS = [
+    'poll',
+    'trigger',
+    'file_pattern',
+    'duplicate_check',
+    'marker_extension',
+    'retention_days',
+    'markers_dir',
+];
 
 /**
  * Node type → the `use:` ref prefixes the flat config has a home for (mirrors
@@ -224,6 +241,16 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
     if (dirs['poll'] != null) acqCfg['poll'] = dirs['poll'];
     if (config['trigger'] != null) acqCfg['trigger'] = config['trigger'];
     if (processing['file_pattern'] != null) acqCfg['file_pattern'] = processing['file_pattern'];
+    // Marker dedup rides acquisition since P5-a (it was its own transform.dedup.marker node until
+    // 2026-08-16), beside the fingerprint policy it is a sibling of. `duplicate_check` is the
+    // AUTHORED on/off — presence of a detail key must never be the switch.
+    const dupCheck = asMap(processing['duplicate_check']);
+    if (dupCheck['enabled'] === true) {
+        acqCfg['duplicate_check'] = true;
+        if (dupCheck['marker_extension'] != null) acqCfg['marker_extension'] = dupCheck['marker_extension'];
+        if (dupCheck['retention_days'] != null) acqCfg['retention_days'] = dupCheck['retention_days'];
+        if (dirs['markers'] != null) acqCfg['markers_dir'] = dirs['markers'];
+    }
     const acqUse = collector['connection'] ? `connection/${String(collector['connection'])}` : undefined;
     nodes.push({ id: 'acq', type: 'acquisition', name: 'Collect', use: acqUse, config: acqCfg });
 
@@ -236,20 +263,7 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
         edges.push({ from: 'acq', rel: 'gap', to: 'gap' });
     }
 
-    // dedup prefix
-    let upstream = 'acq';
-    const dupCheck = asMap(processing['duplicate_check']);
-    if (dupCheck['enabled'] === true) {
-        const c: Cfg = {};
-        if (dupCheck['marker_extension'] != null) c['marker_extension'] = dupCheck['marker_extension'];
-        if (dupCheck['retention_days'] != null) c['retention_days'] = dupCheck['retention_days'];
-        if (dirs['markers'] != null) c['markers_dir'] = dirs['markers'];
-        nodes.push({ id: 'dedup_marker', type: 'transform.dedup.marker', name: 'Dedup (marker)', config: c });
-        edges.push({ from: upstream, rel: 'data', to: 'dedup_marker' });
-        upstream = 'dedup_marker';
-    }
-
-    // parser
+    // parser — fed directly by acq since P5-a folded the marker node into acquisition
     const parserCfg: Cfg = {};
     for (const k of ['csv_settings', 'schema_file', 'schemas', 'segments', 'ingester', 'ingester_config']) {
         if (processing[k] != null) parserCfg[k] = processing[k];
@@ -286,7 +300,7 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
         use: parserUse,
         config: parserCfg,
     });
-    edges.push({ from: upstream, rel: 'data', to: 'parse' });
+    edges.push({ from: 'acq', rel: 'data', to: 'parse' });
     let sinkUpstream = 'parse';
     if (Object.keys(filterCfg).length) {
         nodes.push({ id: 'filter', type: 'transform.filter', name: 'Row filter', config: filterCfg });
@@ -586,7 +600,7 @@ export function lowerGraph(
     if (acq) {
         for (const k of Object.keys(collector)) if (k !== 'gap_detection') delete collector[k];
         for (const [k, v] of Object.entries(acq.config ?? {}))
-            if (!['poll', 'trigger', 'file_pattern'].includes(k)) collector[k] = v;
+            if (!ACQ_FOREIGN_KEYS.includes(k)) collector[k] = v;
         delete collector['connection'];
         if (acq.use?.startsWith('connection/')) collector['connection'] = acq.use.slice('connection/'.length);
         setOrDel(dirs, 'poll', acq.config?.['poll']);
@@ -595,12 +609,22 @@ export function lowerGraph(
     }
     overlay(collector, 'gap_detection', gap ? { enabled: true, ...(gap.config ?? {}) } : undefined, strict);
 
-    if (marker) {
+    // Marker dedup → processing.duplicate_check + dirs.markers, homed on acquisition since P5-a
+    // (mirrors PipelineLift.markerHome — a legacy graph's own marker node is still READ, never
+    // emitted, and an explicit `duplicate_check: false` must not fall through and re-enable it).
+    const markerHome =
+        acq?.config?.['duplicate_check'] != null
+            ? acq.config['duplicate_check'] === true
+                ? acq
+                : undefined
+            : marker;
+    if (markerHome) {
         const dc: Cfg = { enabled: true };
-        if (marker.config?.['marker_extension'] != null) dc['marker_extension'] = marker.config['marker_extension'];
-        if (marker.config?.['retention_days'] != null) dc['retention_days'] = marker.config['retention_days'];
+        const mc = markerHome.config ?? {};
+        if (mc['marker_extension'] != null) dc['marker_extension'] = mc['marker_extension'];
+        if (mc['retention_days'] != null) dc['retention_days'] = mc['retention_days'];
         processing['duplicate_check'] = dc;
-        setOrDel(dirs, 'markers', marker.config?.['markers_dir']);
+        setOrDel(dirs, 'markers', mc['markers_dir']);
     } else if (strict) {
         delete processing['duplicate_check'];
         delete dirs['markers'];

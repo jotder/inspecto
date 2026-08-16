@@ -97,6 +97,10 @@ public final class PipelineCompiler {
         // inverse in the raw map shape fromMap re-parses. Absent ⇒ the parser's implicit LOCAL default, so
         // a plain local pipeline still emits a block that re-parses to the identical Collector record. ──
         Map<String, Object> collector = collectorBlock(g, acq, c);
+        // Marker dedup rides acquisition since P5-a; a legacy graph's own node is still read.
+        PipelineNode marker = PipelineLift.markerHome(acq, c.dedups().stream()
+                .filter(d -> BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type().equals(d.type()))
+                .findFirst().orElse(null));
         if (!collector.isEmpty()) raw.put("collector", collector);
 
         // ── dirs (data-relevant only; status_dir/errors/log_dir intentionally omitted) ──
@@ -105,8 +109,7 @@ public final class PipelineCompiler {
         putIfPresent(dirs, "database", sink.cfg("database"));
         putIfPresent(dirs, "backup", sink.cfg("backup"));
         putIfPresent(dirs, "temp", sink.cfg("temp"));
-        c.dedups().stream().filter(d -> BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type().equals(d.type())).findFirst()
-                .ifPresent(d -> putIfPresent(dirs, "markers", d.cfg("markers_dir")));
+        if (marker != null) putIfPresent(dirs, "markers", marker.cfg("markers_dir"));
         c.sinks().stream().filter(s -> s.cfg("dir") != null).findFirst()
                 .ifPresent(qs -> putIfPresent(dirs, "quarantine", qs.cfg("dir")));
         raw.put("dirs", dirs);
@@ -123,14 +126,13 @@ public final class PipelineCompiler {
         putIfPresent(proc, "threads", sink.cfg("threads"));
         putIfPresent(proc, "duckdb_threads", sink.cfg("duckdb_threads"));
         putIfPresent(proc, "file_pattern", acq.cfg("file_pattern"));   // present once the lift carries it; else default glob
-        c.dedups().stream().filter(d -> BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type().equals(d.type())).findFirst()
-                .ifPresent(d -> {
-                    Map<String, Object> dc = new LinkedHashMap<>();
-                    dc.put("enabled", true);
-                    putIfPresent(dc, "marker_extension", d.cfg("marker_extension"));
-                    putIfPresent(dc, "retention_days", d.cfg("retention_days"));
-                    proc.put("duplicate_check", dc);
-                });
+        if (marker != null) {
+            Map<String, Object> dc = new LinkedHashMap<>();
+            dc.put("enabled", true);
+            putIfPresent(dc, "marker_extension", marker.cfg("marker_extension"));
+            putIfPresent(dc, "retention_days", marker.cfg("retention_days"));
+            proc.put("duplicate_check", dc);
+        }
         if (parser.cfg("csv") instanceof PipelineConfig.CsvSettings csv) proc.put("csv_settings", csvSettingsToMap(csv));
 
         Files.createDirectories(schemaDir);

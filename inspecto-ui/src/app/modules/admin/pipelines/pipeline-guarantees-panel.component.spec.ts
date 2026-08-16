@@ -58,6 +58,46 @@ describe('PipelineGuaranteesPanelComponent', () => {
         expect(edited.map((n) => n.id)).toEqual(['acq']);
     });
 
+    /**
+     * P5-a moved marker dedup onto the acquisition node, so the card reads it from there — and its
+     * Edit row must now hand back `acq`, since that is the node holding the keys.
+     * (⚠ one `create()` per test: TestBed cannot be reconfigured once instantiated.)
+     */
+    it('reads the Markers guarantee from the acquisition node, and edits it there', () => {
+        const withAcq: AuthoredPipeline = {
+            ...MODEL,
+            nodes: MODEL.nodes.map((n) =>
+                n.id === 'acq'
+                    ? { ...n, config: { ...n.config, duplicate_check: true, markers_dir: '/markers' } }
+                    : n,
+            ),
+        };
+        const { fixture, c } = create({ model: withAcq, editable: true });
+        expect((fixture.nativeElement as HTMLElement).textContent ?? '').toContain('/markers');
+        const owners: AuthoredNode[] = [];
+        c.edit.subscribe((n) => owners.push(n));
+        Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button'))
+            .find((b) => b.getAttribute('aria-label') === 'Edit Markers')!
+            .click();
+        expect(owners.map((n) => n.id)).toEqual(['acq']);
+    });
+
+    /**
+     * …and a graph lifted BEFORE P5-a still carries a standalone `transform.dedup.marker` node. The
+     * card going dark for that shape would tell the operator a configured Guarantee is off.
+     */
+    it('still reads the Markers guarantee from a legacy marker node', () => {
+        const legacy: AuthoredPipeline = {
+            ...MODEL,
+            nodes: [
+                ...MODEL.nodes,
+                { id: 'dedup_marker', type: 'transform.dedup.marker', config: { markers_dir: '/old' } },
+            ],
+        };
+        const { fixture } = create({ model: legacy });
+        expect((fixture.nativeElement as HTMLElement).textContent ?? '').toContain('/old');
+    });
+
     it('shows no Edit buttons when not editable, and renders empty rows for a null model', () => {
         const { fixture } = create({ model: MODEL, editable: false });
         expect((fixture.nativeElement as HTMLElement).querySelectorAll('button')).toHaveLength(0);

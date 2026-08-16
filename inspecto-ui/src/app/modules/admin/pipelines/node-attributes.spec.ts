@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { byTier, COLLECTOR_ATTRIBUTES, isRequired, OUTPUT_ATTRIBUTES } from 'app/inspecto/component-model';
+import {
+    byTier,
+    COLLECTOR_ATTRIBUTES,
+    isRequired,
+    MARKER_DEDUP_ATTRIBUTES,
+    OUTPUT_ATTRIBUTES,
+} from 'app/inspecto/component-model';
 import NODE_ATTRIBUTE_CONTRACT from 'app/inspecto/mock/node-attributes.contract.json';
 import { nodeAttributesFor, speccedNodeTypes } from './node-attributes';
 
@@ -87,10 +93,18 @@ describe('node-attributes', () => {
 
     /**
      * U-D's whole point: one table per concern, so the acquisition node cannot drift from Onboarding —
-     * asserted by table identity, so a forked copy fails even if the keys look the same.
+     * asserted by ELEMENT identity, so a forked copy fails even if the keys look the same. (Whole-array
+     * identity stopped being possible in P5-a, when the node's spec became the shared block table PLUS
+     * the marker-dedup keys it borrows from `processing:`/`dirs:`.)
      */
-    it('authors the collector block from the SAME shared table Onboarding uses', () => {
-        expect(nodeAttributesFor('acquisition')).toBe(COLLECTOR_ATTRIBUTES);
+    it('authors the collector block from the SAME shared table Onboarding uses, plus the marker keys', () => {
+        const acq = nodeAttributesFor('acquisition')!;
+        const shared = [...COLLECTOR_ATTRIBUTES, ...MARKER_DEDUP_ATTRIBUTES];
+        expect(acq).toHaveLength(shared.length);
+        shared.forEach((spec, i) => expect(acq[i]).toBe(spec));
+        // ⚠ and the marker keys stay OUT of the block table itself — Onboarding's Collection stage
+        // renders that one whole, and these four are not `collector:` keys.
+        expect(COLLECTOR_ATTRIBUTES.map((s) => s.key)).not.toContain('duplicate_check');
     });
 
     /**
