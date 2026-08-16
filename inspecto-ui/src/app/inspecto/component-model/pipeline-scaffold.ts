@@ -8,13 +8,36 @@
  * correction) — it used to hardcode 30, silently overriding `PipelineConfigParser`'s own default of
  * 90 with no operator decision behind the difference; omitting the key lets that default govern.
  */
+/**
+ * The identity `PipelineConfigParser` derives from a name when no explicit `id:` is present
+ * (`PipelineConfigParser.java:81` — lower-case, spaces underscored). Mirrored here so a stamped id is
+ * byte-identical to the derived one; if that derivation ever changes, this must change with it.
+ */
+export function derivedPipelineId(name: string): string {
+    return name.trim().toLowerCase().replaceAll(' ', '_');
+}
+
+/** The `id:` FieldSpec's pattern (`ConfigSpecs.pipeline()`) — enforced only on an EXPLICIT id. */
+const PIPELINE_ID_PATTERN = /^[a-z0-9][a-z0-9_]*$/;
+
 export function pipelineScaffold(
     name: string,
     opts: { poll?: string; database?: string; description?: string; reference?: boolean } = {},
 ): Record<string, unknown> {
     const home = (opts.database || `data/${name}/database`).replace(/\/database$/, '');
+    const id = derivedPipelineId(name);
     const config: Record<string, unknown> = {
         name,
+        // Stamp identity at CREATION so `name` is a display label from day one: a later relabel is then
+        // a one-field edit with zero migration, instead of `PipelineRoutes.relabel` having to stamp the
+        // derived id first. The value is exactly what the parser would have derived, so this changes
+        // nothing about how the pipeline is keyed — it only stops the id moving when the name does.
+        //
+        // ⚠ Omitted when the slug would not satisfy the spec's `id` pattern. That pattern is enforced
+        // ONLY on an explicit id, so writing one for e.g. "my-pipe" would newly REJECT a name the
+        // create form accepts today. Such a pipeline keeps deriving (and stays un-renameable) until
+        // someone decides whether the derivation or the pattern is wrong — see BACKLOG.
+        ...(PIPELINE_ID_PATTERN.test(id) ? { id } : {}),
         active: false,
         dirs: {
             poll: opts.poll || `data/inbox/${name}`,
