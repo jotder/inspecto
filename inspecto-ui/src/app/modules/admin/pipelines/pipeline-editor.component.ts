@@ -25,6 +25,7 @@ import {
     ComponentDef,
     ComponentsService,
     ConfigService,
+    DatasetRegistrationService,
     PipelineRefusal,
     PipelineRunResult,
     PipelinesService,
@@ -34,6 +35,7 @@ import {
     IconMapService,
     LensService,
     apiErrorMessage,
+    datasetManualHint,
 } from 'app/inspecto/api';
 import { type AttributeSpec, parseUseRef, pipelineScaffold } from 'app/inspecto/component-model';
 import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
@@ -163,6 +165,7 @@ export class PipelineEditorComponent implements OnInit {
     private api = inject(PipelinesService);
     private configApi = inject(ConfigService);
     private components = inject(ComponentsService);
+    private datasets = inject(DatasetRegistrationService);
     private iconMapApi = inject(IconMapService);
     private fb = inject(FormBuilder);
     private toast = inject(ToastrService);
@@ -1609,7 +1612,12 @@ export class PipelineEditorComponent implements OnInit {
         if (nodeId) this.onNodeSelected(nodeId);
     }
 
-    activate(): void {
+    /**
+     * Go live (P6-b: the wizard's Publish stage as a toolbar action). Three things the bare `active`
+     * flag write did not do, all of them the wizard's: the validate gate stays, a confirm names the
+     * consequence, and going live registers the Dataset over the landed store.
+     */
+    async activate(): Promise<void> {
         const m = this.model();
         const id = this.selectedId();
         if (!m || !id) return;
@@ -1617,17 +1625,27 @@ export class PipelineEditorComponent implements OnInit {
             this.toast.error('Fix the errors below before activating.');
             return;
         }
-        this.setActive(id, { ...m, active: true }, `Activated '${id}'`);
+        const ok = await this.confirm.confirm(
+            `Activate '${id}'? The collector starts picking up files on its next poll cycle.`,
+            'Activate',
+        );
+        if (!ok) return;
+        this.setActive(id, { ...m, active: true }, `Activated '${id}'`, true);
     }
 
-    deactivate(): void {
+    async deactivate(): Promise<void> {
         const m = this.model();
         const id = this.selectedId();
         if (!m || !id) return;
-        this.setActive(id, { ...m, active: false }, `Deactivated '${id}'`);
+        const ok = await this.confirm.confirm(
+            `Take '${id}' offline? Collection stops after the current cycle; the Dataset stays registered.`,
+            'Take offline',
+        );
+        if (!ok) return;
+        this.setActive(id, { ...m, active: false }, `Deactivated '${id}'`, false);
     }
 
-    private setActive(id: string, updated: AuthoredPipeline, ok: string): void {
+    private setActive(id: string, updated: AuthoredPipeline, ok: string, goingLive: boolean): void {
         this.activating.set(true);
         this.api.savePipelineGraph(id, updated).subscribe({
             next: () => {
@@ -1635,11 +1653,43 @@ export class PipelineEditorComponent implements OnInit {
                 this.model.set(updated);
                 this.dirty.set(false);
                 this.toast.success(ok);
+                if (goingLive) this.ensureDataset(id, updated.name || id);
             },
             error: (err) => {
                 this.activating.set(false);
                 if (!this.showRefusals(err)) this.onWriteError(err, 'Update failed');
             },
+        });
+    }
+
+    /**
+     * The Stream→Dataset hop the wizard's go-live has always performed, via the shared
+     * {@link DatasetRegistrationService}. ⚠ Streams only — a Reference's store is consumed by name in
+     * enrichments, not queried as a raw Dataset — and 🔴 the stream/reference answer comes from the
+     * D8 `settings` endpoint, NOT from `PipelineSummary.produces`: that field is the list of STORES
+     * the pipeline produces, a different concept wearing the same word. Never blocks or reverses the
+     * activation, which has already succeeded by the time this runs.
+     */
+    private ensureDataset(id: string, display: string): void {
+        const store = id.toLowerCase().replace(/ /g, '_');
+        this.api.settings(id).subscribe({
+            next: (settings) => {
+                if (settings.produces === 'reference') return;
+                this.datasets.ensure(store, display).subscribe((res) => {
+                    if (res.status === 'created')
+                        this.toast.success(`Dataset "${store}" registered — queryable under Catalog ▸ Datasets`);
+                    else if (res.status === 'failed')
+                        this.toast.warning(
+                            `The pipeline is live, but its Dataset could not be registered — ${datasetManualHint(store)}`,
+                        );
+                });
+            },
+            // Unknown kind ⇒ do NOT guess. Registering a Dataset over a Reference's store would put a
+            // row set in the Catalog that nothing should query there.
+            error: () =>
+                this.toast.warning(
+                    `The pipeline is live, but its kind could not be read, so no Dataset was registered — ${datasetManualHint(store)}`,
+                ),
         });
     }
 

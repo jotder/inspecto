@@ -45,6 +45,7 @@ describe('PipelineEditorComponent', () => {
         rename: ReturnType<typeof vi.fn>;
         document: ReturnType<typeof vi.fn>;
         documentFingerprint: ReturnType<typeof vi.fn>;
+        settings: ReturnType<typeof vi.fn>;
     };
     let config: {
         write: ReturnType<typeof vi.fn>;
@@ -53,7 +54,12 @@ describe('PipelineEditorComponent', () => {
     };
     let dialog: { open: ReturnType<typeof vi.fn> };
     let components: { list: ReturnType<typeof vi.fn>; create: ReturnType<typeof vi.fn> };
-    let toast: { success: ReturnType<typeof vi.fn>; error: ReturnType<typeof vi.fn>; info: ReturnType<typeof vi.fn> };
+    let toast: {
+        success: ReturnType<typeof vi.fn>;
+        error: ReturnType<typeof vi.fn>;
+        info: ReturnType<typeof vi.fn>;
+        warning: ReturnType<typeof vi.fn>;
+    };
 
     beforeEach(() => {
         // LensService persists to localStorage; clear it so a lens set by one test/file can't leak into another.
@@ -122,6 +128,9 @@ describe('PipelineEditorComponent', () => {
             ),
             document: vi.fn().mockReturnValue(of({ body: new Blob(['# Pipeline: demo']) })),
             documentFingerprint: vi.fn().mockReturnValue('0123456789abcdef0123'),
+            // P6-b: go-live reads stream-vs-reference from the D8 settings endpoint — NOT from
+            // PipelineSummary.produces, which is the list of stores the pipeline produces.
+            settings: vi.fn().mockReturnValue(of({ produces: 'stream', reference: null })),
         };
         config = {
             write: vi.fn().mockReturnValue(of({ written: true, path: 'x_pipeline.toon', name: 'x' })),
@@ -130,7 +139,7 @@ describe('PipelineEditorComponent', () => {
         };
         dialog = { open: vi.fn() };
         components = { list: vi.fn().mockReturnValue(of([])), create: vi.fn() };
-        toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
+        toast = { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() };
         TestBed.configureTestingModule({
             imports: [PipelineEditorComponent],
             providers: [
@@ -139,7 +148,14 @@ describe('PipelineEditorComponent', () => {
                 { provide: ConfigService, useValue: config },
                 { provide: ComponentsService, useValue: components },
                 { provide: ToastrService, useValue: toast },
-                { provide: InspectoConfirmService, useValue: { confirmDestructive: vi.fn().mockResolvedValue(true) } },
+                {
+                    provide: InspectoConfirmService,
+                    // P6-b: activate/deactivate now confirm through the NEUTRAL confirm(), not confirmDestructive.
+                    useValue: {
+                        confirm: vi.fn().mockResolvedValue(true),
+                        confirmDestructive: vi.fn().mockResolvedValue(true),
+                    },
+                },
                 { provide: MatDialog, useValue: dialog },
             ],
         });
@@ -160,6 +176,69 @@ describe('PipelineEditorComponent', () => {
     function canvasOf(c: PipelineEditorComponent) {
         return (c as unknown as { canvas: ReturnType<typeof canvasMock> }).canvas;
     }
+
+    /**
+     * P6-b — publish as a toolbar action. The editor could already flip `active`, but the wizard's
+     * go-live did three more things, and the Dataset hop is the one whose absence is SILENT: without
+     * it a stream goes live and its landed data is simply never queryable in the Catalog.
+     */
+    describe('go-live (P6-b)', () => {
+        function confirmOf() {
+            return TestBed.inject(InspectoConfirmService) as unknown as { confirm: ReturnType<typeof vi.fn> };
+        }
+
+        it('confirms, then registers the Dataset over the landed store', async () => {
+            const c = make();
+            c.select('demo');
+            await c.activate();
+
+            expect(confirmOf().confirm).toHaveBeenCalled();
+            expect(api.savePipelineGraph).toHaveBeenCalledWith('demo', expect.objectContaining({ active: true }));
+            expect(components.create).toHaveBeenCalledWith('dataset', expect.objectContaining({ physicalRef: 'demo' }));
+        });
+
+        it('does not activate when the confirm is declined', async () => {
+            const c = make();
+            c.select('demo');
+            confirmOf().confirm.mockResolvedValueOnce(false);
+            await c.activate();
+
+            expect(api.savePipelineGraph).not.toHaveBeenCalled();
+            expect(components.create).not.toHaveBeenCalled();
+        });
+
+        /** ⚠ A Reference's store is consumed by name in enrichments, not queried as a raw Dataset. */
+        it('registers nothing for a reference pipeline', async () => {
+            api.settings.mockReturnValue(of({ produces: 'reference', reference: null }));
+            const c = make();
+            c.select('demo');
+            await c.activate();
+
+            expect(api.savePipelineGraph).toHaveBeenCalled(); // it still goes live
+            expect(components.create).not.toHaveBeenCalled();
+        });
+
+        /** ⛔ Unknown kind ⇒ do not guess: registering over a Reference's store pollutes the Catalog. */
+        it('warns and registers nothing when the kind cannot be read', async () => {
+            api.settings.mockReturnValue(throwError(() => new Error('boom')));
+            const c = make();
+            c.select('demo');
+            await c.activate();
+
+            expect(components.create).not.toHaveBeenCalled();
+            expect(toast.warning).toHaveBeenCalled();
+        });
+
+        it('deactivation confirms but leaves the Dataset registered', async () => {
+            const c = make();
+            c.select('demo');
+            await c.deactivate();
+
+            expect(confirmOf().confirm).toHaveBeenCalled();
+            expect(api.savePipelineGraph).toHaveBeenCalledWith('demo', expect.objectContaining({ active: false }));
+            expect(components.create).not.toHaveBeenCalled();
+        });
+    });
 
     describe('palette catalog', () => {
         it('offers only lowerable types, while the type maps keep the full catalog', () => {
@@ -1079,7 +1158,14 @@ describe('PipelineEditorComponent recipe view (UI plan §1, S1)', () => {
                 { provide: ConfigService, useValue: { write: vi.fn(), registerPipeline: vi.fn(), remove: vi.fn() } },
                 { provide: ComponentsService, useValue: { list: vi.fn().mockReturnValue(of([])) } },
                 { provide: ToastrService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } },
-                { provide: InspectoConfirmService, useValue: { confirmDestructive: vi.fn().mockResolvedValue(true) } },
+                {
+                    provide: InspectoConfirmService,
+                    // P6-b: activate/deactivate now confirm through the NEUTRAL confirm(), not confirmDestructive.
+                    useValue: {
+                        confirm: vi.fn().mockResolvedValue(true),
+                        confirmDestructive: vi.fn().mockResolvedValue(true),
+                    },
+                },
                 { provide: MatDialog, useValue: { open: vi.fn() } },
             ],
         });

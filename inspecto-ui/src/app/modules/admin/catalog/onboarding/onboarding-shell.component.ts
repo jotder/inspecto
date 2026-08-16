@@ -7,7 +7,15 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { firstValueFrom } from 'rxjs';
-import { ComponentsService, ConfigImpact, ConfigService, LensService, apiErrorMessage } from 'app/inspecto/api';
+import {
+    ComponentsService,
+    ConfigImpact,
+    ConfigService,
+    DatasetRegistrationService,
+    LensService,
+    apiErrorMessage,
+    datasetManualHint,
+} from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
@@ -77,6 +85,7 @@ export class OnboardingShellComponent {
     private confirm = inject(InspectoConfirmService);
     private configApi = inject(ConfigService);
     private components = inject(ComponentsService);
+    private datasets = inject(DatasetRegistrationService);
     private toastr = inject(ToastrService);
     private destroyRef = inject(DestroyRef);
     private transfer = inject(StreamTransferService);
@@ -176,45 +185,25 @@ export class OnboardingShellComponent {
     }
 
     /** Going live also registers the Dataset over the stream's store (physicalRef = the normalized
-     *  pipeline name), so the Stream→Dataset hop is no longer manual. Idempotent — a dataset
-     *  already pointing at the store wins, whatever its id. Any failure downgrades to a warning:
-     *  activation has already succeeded, and the Dataset can always be authored by hand. Streams
-     *  only — a Reference's store is consumed by name in enrichments (and its upsert/SCD2 layouts
-     *  carry system columns), not queried as a raw Dataset. */
+     *  pipeline name), so the Stream→Dataset hop is no longer manual — the hop itself now lives in
+     *  the shared {@link DatasetRegistrationService} (P6-b), because the Pipelines editor's toolbar
+     *  activation performs the identical one and this shell is deleted in P6-e. Streams only: a
+     *  Reference's store is consumed by name in enrichments (and its upsert/SCD2 layouts carry
+     *  system columns), not queried as a raw Dataset — that call stays HERE, since each host reads
+     *  stream-vs-reference from a different place. */
     private ensureDataset(): void {
         if (this.state.kind() !== 'stream') return;
         const store = this.state.normalizedName();
         // The display label lives in the config (identity/display split); the route-set signal is
         // the fallback — the same precedence normalizedName() itself uses.
         const display = String((this.state.config() ?? {})['name'] ?? this.state.name());
-        const manualHint = `create it under Catalog ▸ Datasets with physical reference "${store}".`;
-        this.components.list('dataset').subscribe({
-            next: (defs) => {
-                if (defs.some((d) => d.content['physicalRef'] === store)) return; // already registered
-                this.components
-                    .create('dataset', {
-                        id: store,
-                        name: display,
-                        kind: 'physical',
-                        // The store IS the source. Leaving this blank used to fall through to a
-                        // sample-source default that names nothing, so the dataset silently read
-                        // zero rows everywhere; naming the store is honest whether or not a preview
-                        // for it exists yet (BACKLOG §4 split S2, slice B).
-                        sourceName: store,
-                        physicalRef: store,
-                        description: `Landed data of stream "${display}" — registered at go-live.`,
-                    })
-                    .subscribe({
-                        next: () =>
-                            this.toastr.success(`Dataset "${store}" registered — queryable under Catalog ▸ Datasets`),
-                        error: () =>
-                            this.toastr.warning(
-                                `The stream is live, but its Dataset could not be registered — ${manualHint}`,
-                            ),
-                    });
-            },
-            error: () =>
-                this.toastr.warning(`The stream is live, but the Dataset registry could not be read — ${manualHint}`),
+        this.datasets.ensure(store, display).subscribe((res) => {
+            if (res.status === 'created')
+                this.toastr.success(`Dataset "${store}" registered — queryable under Catalog ▸ Datasets`);
+            else if (res.status === 'failed')
+                this.toastr.warning(
+                    `The stream is live, but its Dataset could not be registered — ${datasetManualHint(store)}`,
+                );
         });
     }
 
