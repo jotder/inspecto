@@ -23,11 +23,19 @@ import {
     ComponentDef,
     ConfigService,
     ParserDef,
+    ParserPreview,
+    ParserTablePreview,
     ParserTreeNode,
     ParsersService,
     SpacesService,
     apiErrorMessage,
 } from 'app/inspecto/api';
+import {
+    InspectoSchemaFieldsEditorComponent,
+    SchemaFieldRow,
+    deriveSelector,
+    sanitizeIdentifier,
+} from 'app/inspecto/schema';
 import {
     GrammarEditorComponent,
     ParsingFrontend,
@@ -110,6 +118,7 @@ export const PARSE_NODE_FRONTENDS: Record<string, ParsingFrontend | 'asn1' | 'pl
         MatTooltipModule,
         GrammarEditorComponent,
         InspectoSegmentsEditorComponent,
+        InspectoSchemaFieldsEditorComponent,
     ],
     template: `
         <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-1">
@@ -170,7 +179,7 @@ export const PARSE_NODE_FRONTENDS: Record<string, ParsingFrontend | 'asn1' | 'pl
                 [configuredIngester]="configuredIngesterFqcn()"
                 [lockType]="true"
                 (pluginChange)="plugin.set($event)"
-                (previewed)="previewTree.set($event.kind === 'tree' ? $event.nodes : null)"
+                (previewed)="onPreviewed($event)"
                 (submitted)="submit()"
             >
                 <!--
@@ -188,6 +197,32 @@ export const PARSE_NODE_FRONTENDS: Record<string, ParsingFrontend | 'asn1' | 'pl
                             }
                         </div>
                         <inspecto-segments-editor [tree]="previewTree()" [initial]="initialSegments()" />
+                    }
+                    <!--
+                        Output schema (P4-2a-ii). §4b's icon table always listed "+ output schema" for
+                        the flat formats; schema_file is the PARSER node's key, so this is its home.
+                        Same two-hop write as segments: the toon lands before the node names it.
+                    -->
+                    @if (authorsSchema()) {
+                        <div class="mb-1 mt-3 flex items-center gap-2">
+                            <span class="text-xs font-semibold uppercase opacity-70">Output schema</span>
+                            @if (schemaLoading()) {
+                                <span class="text-secondary text-xs">Loading the saved schema…</span>
+                            }
+                        </div>
+                        @if (schemaSeed().length) {
+                            <inspecto-schema-fields-editor [rows]="schemaSeed()" />
+                        } @else {
+                            <p class="text-secondary m-0 text-sm">
+                                Test the parse above — the output schema is derived from the columns it
+                                produces, never hand-typed.
+                            </p>
+                        }
+                    } @else if (foreignSchema()) {
+                        <p class="text-secondary m-0 mt-3 text-sm">
+                            This parser's schema file ({{ existingSchemaFile() }}) doesn't match the editor's naming
+                            convention — author it in the pipeline TOON directly. Applying here leaves it untouched.
+                        </p>
                     }
                 </div>
             </inspecto-grammar-editor>
@@ -237,6 +272,7 @@ export class PipelineParseDefinitionComponent {
 
     @ViewChild(GrammarEditorComponent) private editor?: GrammarEditorComponent;
     @ViewChild(InspectoSegmentsEditorComponent) private segmentsEditor?: InspectoSegmentsEditorComponent;
+    @ViewChild(InspectoSchemaFieldsEditorComponent) private schemaGrid?: InspectoSchemaFieldsEditorComponent;
 
     // ── segments (asn1 / plugin) ─────────────────────────────────────────────────
 
@@ -289,6 +325,51 @@ export class PipelineParseDefinitionComponent {
 
     /** The decoded record forest from the last Test parse — what "Derive from preview" proposes from. */
     readonly previewTree = signal<ParserTreeNode[] | null>(null);
+
+    // ── Output schema (P4-2a-ii) ─────────────────────────────────────────────────
+    /** The last FLAT parse preview — the columns an output schema is derived from. */
+    readonly previewTable = signal<ParserTablePreview | null>(null);
+    /** Rows for the shared grid; a stable reference, since it rebuilds on identity change. */
+    readonly schemaSeed = signal<SchemaFieldRow[]>([]);
+    readonly schemaLoading = signal(false);
+    /** A saved schema was read back, so a fresh parse must NOT re-derive over the operator's edits. */
+    private readonly schemaHydrated = signal(false);
+
+    readonly existingSchemaFile = computed(() => String(this.node().config?.['schema_file'] ?? '').trim());
+    private schemaName(): string {
+        return `${this.pipelineName() || this.node().id}_schema`.replace(/[^A-Za-z0-9_]+/g, '_');
+    }
+    private schemaConventionPath(): string {
+        return `${this.base()}/config/${this.schemaName()}.toon`;
+    }
+    /** A `schema_file` this editor did not write — hand-authored in the TOON; never touched here. */
+    readonly foreignSchema = computed(
+        () => this.existingSchemaFile() !== '' && this.existingSchemaFile() !== this.schemaConventionPath(),
+    );
+    /**
+     * Whether this node authors an output schema. Segment-authoring nodes (ASN.1 / plugin) carry their
+     * schemas per segment instead, and a foreign `schema_file` is left alone — so this is the flat
+     * formats, which is exactly what §4b's icon table listed "+ output schema" against.
+     */
+    readonly authorsSchema = computed(() => !this.authorsSegments() && !this.foreignSchema());
+
+    /** Keep both halves of the discriminated preview: the tree feeds segments, the table feeds schema. */
+    onPreviewed(p: ParserPreview): void {
+        this.previewTree.set(p.kind === 'tree' ? p.nodes : null);
+        if (p.kind !== 'table') return;
+        this.previewTable.set(p);
+        // ⛔ Never re-derive over a schema read back from disk: the operator's saved names, types and
+        // include flags are the truth, and a fresh sample would silently replace them on Apply.
+        if (this.schemaHydrated()) return;
+        this.schemaSeed.set(
+            p.columns.map((col, i) => ({
+                include: true,
+                name: sanitizeIdentifier(col, i),
+                selector: deriveSelector(this.frontend(), i, col),
+                type: 'VARCHAR',
+            })),
+        );
+    }
 
     /** Segment drafts re-hydrated from the node's saved `asn1.segments`, keys AND columns. */
     readonly initialSegments = signal<SegmentDraft[]>([]);
@@ -366,8 +447,42 @@ export class PipelineParseDefinitionComponent {
             // rehydrates instead, through [configuredIngester].
             this.pickedPluginId.set(null);
             this.initialSegments.set([]);
+            this.schemaSeed.set([]);
+            this.schemaHydrated.set(false);
+            this.previewTable.set(null);
             this.emitDirty();
             this.loadSavedSegments();
+            this.loadSavedSchema();
+        });
+    }
+
+    /**
+     * Read this node's saved output schema back, so re-opening a defined parser edits the schema that
+     * exists rather than proposing a new one. Only for our own convention path — a hand-authored
+     * `schema_file` is reported and left alone (the Onboarding stage's rule, ported).
+     */
+    private loadSavedSchema(): void {
+        if (!this.authorsSchema() || !this.existingSchemaFile()) return;
+        this.schemaLoading.set(true);
+        this.configApi.read('schema', this.schemaName()).subscribe({
+            next: (r) => {
+                this.schemaLoading.set(false);
+                const raw = (r.config?.['raw'] ?? {}) as Record<string, unknown>;
+                const fields = Array.isArray(raw['fields']) ? (raw['fields'] as Record<string, unknown>[]) : [];
+                if (!fields.length) return;
+                this.schemaSeed.set(
+                    fields.map((f) => ({
+                        include: true,
+                        name: String(f['name'] ?? ''),
+                        selector: String(f['selector'] ?? ''),
+                        type: String(f['type'] ?? 'VARCHAR'),
+                    })),
+                );
+                this.schemaHydrated.set(true);
+            },
+            // A 404 is ordinary: the node names a schema whose file was never written. Deriving from
+            // the next parse is exactly right there, so leave the seed alone and stay un-hydrated.
+            error: () => this.schemaLoading.set(false),
         });
     }
 
@@ -452,7 +567,8 @@ export class PipelineParseDefinitionComponent {
             this.form.dirty ||
             this.templateDirty ||
             (this.editor?.isDirty() ?? false) ||
-            (this.segmentsEditor?.isDirty() ?? false);
+            (this.segmentsEditor?.isDirty() ?? false) ||
+            (this.schemaGrid?.form.dirty ?? false);
         if (dirty === this.lastDirty) return;
         this.lastDirty = dirty;
         this.dirtyChange.emit(dirty);
@@ -554,7 +670,7 @@ export class PipelineParseDefinitionComponent {
      */
     submit(): void {
         if (!this.editor?.validate() || this.asn1Unavailable() || this.pluginUnavailable()) return;
-        if (!this.authorsSegments()) return this.applyWith(this.parsingValue());
+        if (!this.authorsSegments()) return this.submitWithSchema();
 
         // Segments: write one schema toon per segment FIRST, then emit a block referencing them. Two
         // hops in this order because the config must never name a schema file that does not exist yet
@@ -585,8 +701,47 @@ export class PipelineParseDefinitionComponent {
         });
     }
 
+    /**
+     * The flat-format path: write the output schema toon FIRST, then emit a node naming it — the same
+     * two-hop ordering segments use, for the same reason (the config must never name a file that does
+     * not exist yet). A node with no schema grid in play applies straight through, so a parser can
+     * still be defined before its schema is.
+     */
+    private submitWithSchema(): void {
+        const grid = this.schemaGrid;
+        if (!this.authorsSchema() || !grid || !this.schemaSeed().length) return this.applyWith(this.parsingValue());
+        if (!grid.validate()) {
+            this.editor?.error.set(grid.problem() ?? 'Fix the output schema before applying.');
+            return;
+        }
+        const fields = grid.value();
+        const name = this.schemaName();
+        const draft = {
+            raw: { name, format: 'CSV', fields: fields.map((f) => ({ name: f.name, selector: f.selector, type: f.type })) },
+            mapping: {
+                canonicalName: name,
+                rawName: name,
+                rules: fields.map((f) => ({ targetColumn: f.name, sourceExpression: f.name })),
+            },
+        };
+        this.writing.set(true);
+        this.configApi.write('schema', draft, { overwrite: true }).subscribe({
+            next: () => {
+                this.writing.set(false);
+                grid.markPristine();
+                this.applyWith(this.parsingValue(), this.schemaConventionPath());
+            },
+            error: (e) => {
+                this.writing.set(false);
+                // Nothing is applied: a node naming a schema that failed to write is the state this
+                // ordering exists to prevent, and the pane stays dirty so the edits survive.
+                this.editor?.error.set(apiErrorMessage(e, 'Could not save the output schema.'));
+            },
+        });
+    }
+
     /** Rebuild the node around the finished block, emit it, and consume the pane's edits. */
-    private applyWith(block: Record<string, unknown>): void {
+    private applyWith(block: Record<string, unknown>, schemaFile?: string): void {
         const v = this.form.getRawValue();
         // `use` is dropped, never carried: this pane's whole contract is that the node owns its
         // Grammar inline. A node opened here BOUND to a `grammar/<id>` component is materialised into
@@ -596,7 +751,7 @@ export class PipelineParseDefinitionComponent {
             ...n,
             name: (v.name ?? '').trim() || n.name,
             description: (v.description ?? '').trim() || undefined,
-            config: { ...(n.config ?? {}), parsing: block },
+            config: { ...(n.config ?? {}), parsing: block, ...(schemaFile ? { schema_file: schemaFile } : {}) },
         };
         this.form.markAsPristine();
         this.editor?.markPristine();

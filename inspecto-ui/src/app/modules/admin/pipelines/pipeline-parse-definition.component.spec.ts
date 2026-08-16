@@ -668,6 +668,103 @@ describe('PipelineParseDefinitionComponent', () => {
         });
     });
 
+    /**
+     * P4-2a-ii — the flat formats author their output schema here, because `schema_file` is the PARSER
+     * node's key (not `transform.map`'s), which is what §4b's icon table meant by "+ output schema".
+     */
+    describe('output schema', () => {
+        /** A delimited node with NO schema yet — the fresh-drop case. */
+        function unschemadNode(): AuthoredNode {
+            const n = delimitedNode();
+            delete (n.config as Record<string, unknown>)['schema_file'];
+            return n;
+        }
+
+        const TABLE_PREVIEW = {
+            kind: 'table' as const,
+            columns: ['a number', 'DURATION'],
+            rows: [{ 'a number': '55', DURATION: '30' }],
+            rowCount: 1,
+            rejectedRows: 0,
+        };
+
+        it('derives fields from a flat preview, writes the toon, THEN names it on the node', async () => {
+            const fixture = await create(unschemadNode());
+            pane(fixture).onPreviewed(TABLE_PREVIEW);
+            fixture.detectChanges();
+
+            // Derived, not hand-typed: the column name is sanitised into an identifier.
+            expect(pane(fixture).schemaSeed().map((r) => r.name)).toEqual(['A_NUMBER', 'DURATION']);
+            // Delimited addresses parsed columns by POSITION, so selectors are indices.
+            expect(pane(fixture).schemaSeed().map((r) => r.selector)).toEqual(['0', '1']);
+
+            pane(fixture).submit();
+            fixture.detectChanges();
+
+            // hop 1: the schema toon
+            expect(schemaWrites).toHaveLength(1);
+            expect(schemaWrites[0].type).toBe('schema');
+            expect((schemaWrites[0].config['raw'] as Record<string, unknown>)['name']).toBe('parse_schema');
+            // hop 2: the node naming what was just written
+            expect(fixture.componentInstance.applied!.config!['schema_file']).toBe(
+                'spaces/default/config/parse_schema.toon',
+            );
+        });
+
+        it('applies nothing when the schema write fails, so no node names a missing file', async () => {
+            schemaWriteFails = true;
+            try {
+                const fixture = await create(unschemadNode());
+                pane(fixture).onPreviewed(TABLE_PREVIEW);
+                fixture.detectChanges();
+                pane(fixture).submit();
+                fixture.detectChanges();
+                expect(schemaWrites).toHaveLength(1);
+                expect(fixture.componentInstance.applied).toBeUndefined();
+            } finally {
+                schemaWriteFails = false;
+            }
+        });
+
+        /** ⛔ The clobber guard: a saved schema is the truth, and a fresh parse must not replace it. */
+        it('does not re-derive over a schema read back from disk', async () => {
+            const n = unschemadNode();
+            (n.config as Record<string, unknown>)['schema_file'] = 'spaces/default/config/parse_schema.toon';
+            const fixture = await create(n);
+            fixture.detectChanges();
+            // The harness's read() returns a one-field saved schema.
+            expect(pane(fixture).schemaSeed().map((r) => r.name)).toEqual(['IMSI']);
+
+            pane(fixture).onPreviewed(TABLE_PREVIEW);
+            fixture.detectChanges();
+            expect(pane(fixture).schemaSeed().map((r) => r.name)).toEqual(['IMSI']);
+        });
+
+        it('leaves a hand-authored schema_file alone — no editor, no write', async () => {
+            const fixture = await create(delimitedNode()); // schema_file: 'cdr_schema.toon' (foreign)
+            expect(pane(fixture).foreignSchema()).toBe(true);
+            expect(pane(fixture).authorsSchema()).toBe(false);
+
+            pane(fixture).onPreviewed(TABLE_PREVIEW);
+            fixture.detectChanges();
+            pane(fixture).submit();
+            fixture.detectChanges();
+
+            expect(schemaWrites).toHaveLength(0);
+            expect(fixture.componentInstance.applied!.config!['schema_file']).toBe('cdr_schema.toon');
+        });
+
+        it('applies straight through when no parse has run — a parser may be defined before its schema', async () => {
+            const fixture = await create(unschemadNode());
+            pane(fixture).submit();
+            fixture.detectChanges();
+
+            expect(schemaWrites).toHaveLength(0);
+            expect(fixture.componentInstance.applied).toBeDefined();
+            expect(fixture.componentInstance.applied!.config!['schema_file']).toBeUndefined();
+        });
+    });
+
     it('has no a11y violations', async () => {
         const fixture = await create();
         await expectNoA11yViolations(fixture.nativeElement);
