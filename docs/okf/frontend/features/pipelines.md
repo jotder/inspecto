@@ -187,6 +187,31 @@ rather than guessed. Types without a schema fall back to the free-form key/value
 config", collapsed when a schema exists) — the conversion is non-lossy by design. Declared defaults **persist on save** even when untouched
 (product-confirmed 2026-07-02: configs stay explicit/self-documenting).
 
+### Guided mode: the checklist chips and the readiness gate (P6-d, 2026-08-16)
+
+The wizard's stage rail becomes a chip strip in the editor — Collect → Parse → Schema → Enrich →
+Publish, each with a status word and its finding count, each click opening that stage's node. Guided
+mode rides `?guided=1` (the routing fact "the operator arrived from Onboard"); off by default.
+
+- ⛔ **The stage model is derived from the graph, not ported from the wizard.**
+  `OnboardingStateService.stageStatus` reads *blocks* of a server-held draft; the editor holds an
+  `AuthoredPipeline`. `pipeline-stages.ts` answers the same question from the nodes and reuses the
+  existing `NodeStatus` model — a second opinion about readiness is how a chip and the canvas card
+  under it come to disagree.
+- 🔴 **A `transform.map` node is on every lifted graph** whether or not anything authored it, and a
+  derived one is `unconfigured`. The Schema stage therefore keys on **authored evidence** — the parse
+  node's schema artifact, or a map node carrying config — never on that node's presence or status.
+- ⛔ **The go-live readiness gate is guided-only.** `validatePipeline` does not require a parse node,
+  so a hand-built collect→sink graph is legitimate; the wizard's five stages are the *Stream* contract,
+  not the editor's. ⚠ It also waits for the served node-type catalog: every stage resolves through
+  `typeCat`, so an unresolved catalog reads as five empty stages and would refuse a ready pipeline.
+- 🔴 **A chip selects its Step before opening it.** `openNodeConfig` is gated on `canAuthor()`, so in
+  View mode or the Business lens the strip was otherwise a silent no-op. Selecting is not gated, so the
+  chip works in every mode and only the editing half is withheld.
+- `rejects` (ran, but dropped rows) does **not** promote a stage to ✓ — the warning surfaces as the
+  chip's finding count. The Schema stage tops out at `configured`: the editor has no preview thread
+  yet, and claiming a validation it never ran would be a lie.
+
 ### Derived, not asked: the enrichment wiring seed (P6-c, 2026-08-16)
 
 Onboarding's Enrichment stage renders **no** wiring form at all — it derives input/output/triggers from
