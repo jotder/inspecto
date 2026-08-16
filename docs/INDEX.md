@@ -75,16 +75,19 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
-- [`superpower/definition-surface-unification-plan.md`](superpower/definition-surface-unification-plan.md)
-  — **ACTIVE, the current thread.** Collapses the onboarding wizard and the pipeline-editor dialogs onto
-  one host: the `/pipelines` editor with a right-dock definition drawer. **P0–P3d all shipped**
-  (drawer shell, five pure panes, then the whole per-format parser family — `parser.delimited`
-  2026-08-15, `parser.fixedwidth`/`asn1`/`json`/`text_regex`/`plugin` all 2026-08-16, P3d closed). **Open:
-  P4 schema sync, P5 dedup fold, P6 host collapse, P7 close-out.** Decisions D1–D3 + B6 are pinned in the
-  doc — don't re-ask. ⚠ `grammar-editor.dialog` is NOT retired: it still serves a **dangling**
-  `use: grammar/<id>` and **binary fixed-width**, both deliberate keeps. As-built lives in
-  [`okf/backend/pipeline-graph/design.md`](okf/backend/pipeline-graph/design.md) and
-  [`okf/frontend/features/grammar-config.md`](okf/frontend/features/grammar-config.md).
+- ~~`superpower/definition-surface-unification-plan.md`~~ — **SHIPPED END-TO-END and ARCHIVED 2026-08-16**
+  ([archive copy](archived-documents/plans-archive/definition-surface-unification-plan.md), kept for the
+  grounding and the per-slice as-built). Collapsed the onboarding wizard and the pipeline-editor dialogs
+  onto one host: the `/pipelines` editor with a right-dock definition drawer. **All of P0–P7**: the drawer
+  shell and five pure panes, the whole per-format parser family (P3a–P3d), schema/mapping (P4), the marker
+  dedup fold (P5), and the host collapse (P6-a…P6-e) — **the wizard shell is deleted and its route is a
+  redirect**. ⚠ `grammar-editor.dialog` is NOT retired: it still serves a **dangling** `use: grammar/<id>`,
+  **binary fixed-width**, and any **generic `parser` node** — all deliberate keeps, and the last of them is
+  why the sample thread does not reach every pipeline. As-built lives in
+  [`okf/frontend/features/pipelines.md`](okf/frontend/features/pipelines.md) (the editor, incl. the per-tab
+  sample thread), [`okf/frontend/features/onboarding.md`](okf/frontend/features/onboarding.md) (what
+  onboarding still means), [`okf/backend/pipeline-graph/design.md`](okf/backend/pipeline-graph/design.md)
+  and [`okf/frontend/features/grammar-config.md`](okf/frontend/features/grammar-config.md).
 
 - ~~`superpower/grammar-templates-not-bindings-plan.md`~~ — **SHIPPED and ARCHIVED 2026-08-15**
   ([archive copy](archived-documents/plans-archive/grammar-templates-not-bindings-plan.md), kept for the

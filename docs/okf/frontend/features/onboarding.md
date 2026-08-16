@@ -1,7 +1,7 @@
 ---
 type: Feature
 title: Stream & Reference Onboarding
-description: Guided, resumable authoring of a data origin — a stage rail over the server-held Stage-1 pipeline draft.
+description: Creating a data origin — the entry point, the draft-is-server-state rule, and the config bundle. The authoring itself is the pipeline editor.
 resource: inspecto-ui/src/app/modules/admin/catalog/onboarding/onboarding-create.dialog.ts
 tags: [feature, onboarding, catalog, acquisition, pipeline]
 timestamp: 2026-07-16T00:00:00Z
@@ -9,18 +9,22 @@ timestamp: 2026-07-16T00:00:00Z
 
 # Stream & Reference Onboarding
 
-> 🔴 **The stage-rail shell was DELETED 2026-08-16 (definition-surface unification P6-e).** Onboarding
-> is now the **guided pipeline editor** — see [pipelines](pipelines.md). What survives here is the
-> **create dialog** (`onboarding-create.dialog.ts`, still the entry point and still the only Import
-> surface) and the *concepts*: the stage model, readiness, the draft-IS-server-state rule. The route
-> `/catalog/onboard/:name(/:stage)` is a redirect (P6-a); the stage rail is the editor's checklist
-> chips (P6-d); go-live, the Dataset hop, the enrichment/segment writes, the impact-aware delete and
-> the stream-config export all live on the editor (P6-b/c/e). Everything below the banner still
-> describes **behaviour that is live**, just under a different host, unless a line says otherwise.
-> *(P7 folds the remainder into `pipelines.md` and archives this file.)*
+> 🔴 **The stage-rail shell was DELETED 2026-08-16 (definition-surface unification P6-e, plan
+> archived).** Onboarding a data origin now means: this **create dialog**, then the **guided pipeline
+> editor** — [pipelines](pipelines.md). The route `/catalog/onboard/:name(/:stage)` is a redirect
+> (P6-a); the stage rail is the editor's checklist chips (P6-d); go-live + the Dataset hop (P6-b), the
+> enrichment seed (P6-c), the impact-aware delete and the stream-config export (P6-e) are editor
+> surfaces.
+>
+> **This file is still current for what it now covers**: the entry point and create dialog, the
+> draft-IS-server-state rule, the config export/import bundle, and the *concepts* the editor
+> inherited (the stage model, readiness, lifecycle). Each section below names its live host. Rules
+> about a shared component live with that component — [collector-config](collector-config.md),
+> [grammar-config](grammar-config.md) — and the editor's own as-built is in
+> [pipelines](pipelines.md).
 
-Route `/catalog/onboard/:name(/:stage)` (one matcher route — the shell survives stage navigation),
-entered from the Catalog Streams/References tabs' **Onboard Stream / Onboard Reference** header CTA
+Route `/catalog/onboard/:name(/:stage)` — since P6-a a **matcher route that redirects** into the guided
+editor, kept so old per-stage bookmarks resolve rather than 404. Onboarding is entered from the Catalog Streams/References tabs' **Onboard Stream / Onboard Reference** header CTA
 (lens-gated `canAuthorWorkbench`) or from the nav item **Platform ▸ Catalog ▸ Onboard Stream**, which
 links to `/catalog?onboard=stream` — `CatalogComponent.ngOnInit` selects that tab and raises the same
 create dialog *after* the rows load, so the name control can reject a duplicate inline instead of
@@ -30,7 +34,13 @@ writes a minimal `active: false` pipeline draft + registers it — **the server-
 draft** (shift-handover safe; no wizard state is ever stored). Vocabulary: [GLOSSARY](../../../GLOSSARY.md)
 §2 *Onboard*; ⛔ never "wizard" in copy.
 
-## The stage rail (kind-aware, jumpable — not a locked stepper)
+## The stage model (now the editor's checklist chips)
+
+⚠ **Host: the pipeline editor's guided mode** (`pipeline-stages.ts`, P6-d). The stage *model* below is
+the durable part and survived the shell; ⛔ the readiness computation did NOT port — the wizard asked
+"is this stage configured?" of a server-held config draft, while the editor answers it from the
+**nodes**. See [pipelines](pipelines.md) for why keying on a `transform.map` node's presence shows
+every pipeline as blocked.
 
 - **Stream:** Collection → Parsing → Schema & Mapping → Enrichment *(optional)* → Dataset & Go-live.
 - **Reference** (`produces: reference` written at create): Collection → Parsing → **Keys & Load**
@@ -40,10 +50,12 @@ draft** (shift-handover safe; no wizard state is ever stored). Vocabulary: [GLOS
 Per-stage readiness chips are **computed from the config blocks on every read** (Not configured /
 Configured / Validated — Validated is session-only, from a passed sample test); lifecycle badge =
 Draft → Ready (all required stages configured) → Live (`active: true`). Resume lands on the first
-incomplete stage. Discard = `DELETE /config/pipeline/{name}` (refused while active).
+incomplete stage. Discard = `DELETE /config/pipeline/{name}` (refused while active) — since P6-e it is
+the editor's **Delete pipeline**, which reads the impact first, sends `force` only once dependents have
+been shown, and cascades the `<id>_schema` / `<id>_enrich` companions.
 
-**Take offline (2026-08-14) is the inverse of go-live and the same flag** — `saveBlock({active:
-false})` from the publish pane, no dedicated route (the write surfaces already accepted a false
+**Take offline (2026-08-14) is the inverse of go-live and the same flag** — an `active: false` write
+(the publish pane's `saveBlock` then, the editor's toolbar Deactivate now), no dedicated route (the write surfaces already accepted a false
 value; this was UI-only work). It exists because `active` had **no** UI write of `false` anywhere in
 this flow, while both Discard and `DELETE /config/pipeline` refuse an active pipeline — so **a Live
 stream could not be removed from the Catalog at all**. Taking it offline deliberately **keeps** the
@@ -53,25 +65,18 @@ collector does not unwrite.
 ⚠ **A Live pipeline has no separate publish step — every stage save takes effect.** `/config/patch`
 has no active-pipeline gate (unlike delete and rename, which 409), and `ConfigRegistry` is
 mtime-keyed, so an edit to a live config is picked up on the next poll cycle with no operator action.
-The shell used to claim the opposite ("It runs only when you go live"); it now swaps that copy while
-live and raises a warning banner pointing at Take offline. *(Enrichments are the exception — no mtime
+The wizard used to claim the opposite ("It runs only when you go live") and was corrected to swap that
+copy while live; the editor never made the claim. *(Enrichments are the exception — no mtime
 hot-reload, they need explicit re-registration.)*
 
-**Go-live also registers the Dataset** (2026-07-30, shipped as S1 of the since-superseded
-onboarding↔pipeline *split* plan; the behaviour **stays** under the current
-`superpower/onboarding-pipeline-unification.md` — it is no longer "the handoff artifact between two
-planes", but Datasets remain the query surface and this is independently useful): after the
-`active: true` save succeeds, the publish
-pane writes a `dataset` component (`id` = the normalized pipeline name, `kind: physical`,
-`physicalRef` = the store) via the shared `ComponentsService` — deliberately **not** studio's
-`DatasetsService` (cross-feature import ban). Idempotent by **physicalRef, not id** (any existing
-dataset pointing at the store wins); every failure downgrades to a toastr *warning* carrying the
-manual recipe, because activation has already succeeded. **Streams only** — a Reference's store is
-consumed by name in enrichments, and its upsert/SCD2 layouts carry system columns. ⚠ The registered
-dataset deliberately carries **no `sourceName`** (the editor's source select offers only
-`SAMPLE_SOURCE_NAMES`, so any value would be a lie; `physicalRef` is the binding that matters) — the
-list card therefore reads `source: data` from `fromContent`'s default until split S2 wires that picker
-to the Catalog's real stores. Do not "fix" it by inventing a sample-source value.
+**Go-live also registers the Dataset** (2026-07-30) so landed data is queryable without anyone
+authoring one. ⚠ **Host: the editor's toolbar activation**, through the shared
+`DatasetRegistrationService` — the hop was EXTRACTED there in P6-b, not copied, and the as-built
+(idempotent by `physicalRef` not id; `sourceName` = the store; never reverses an activation that
+already succeeded; Streams only) lives in [pipelines](pipelines.md). ⛔ Two claims that used to sit
+here are superseded and must not be restored: that the *publish pane* writes it, and that the dataset
+carries **no** `sourceName` — blank falls through to a default naming nothing, so the dataset reads
+zero rows everywhere.
 
 ## Stream configuration export / import (2026-07-31)
 
@@ -116,17 +121,20 @@ from the file and the toggle is locked — a Reference imported as a Stream woul
 semantics. Every rewrite is stated in the dialog BEFORE the write. No new mock handler is needed: both
 sides replay existing `ConfigService` reads/writes.
 
-## Sample-as-thread (a strip at the top of the PARSING stage)
+## Sample-as-thread (now a strip in the editor's parse drawer, one per tab)
+
+⚠ **Host: the pipeline editor's parse definition drawer**, which keeps one thread PER TAB (P6-e
+follow-on) — see [pipelines](pipelines.md) for the per-tab rule and the `previewFn` failure path. What
+follows is the thread's own contract, unchanged.
 
 One captured sample (file ≤256KB or paste, session-held) threads through the stages: raw → parsed
 (`POST /config/preview/parsing`, real DuckDB) → cast-checked (`POST /config/preview/schema`,
 TRY_CAST). A new sample or re-parse invalidates the downstream hops. Since the 2026-07-29 reflow
 the panel is a **collapsible full-width strip mounted by the Parsing pane itself** — the stage that
 consumes it (choose the file → view it → pick a type and options below) — replacing the old
-right-hand aside. ⚠ It is deliberately **not** in the shell: on Collection/Publish it was dead
-weight, and the state is session-held in `OnboardingStateService`, so downstream stages still read
-the thread without rendering the panel (`onboarding-shell.component.spec` pins that the shell does
-not render it; the parsing pane pins that it precedes the file-type picker). The header row carries the thread
+right-hand aside. ⚠ It is deliberately mounted **only where the sample is consumed** — on a host
+chrome it is dead weight — and the state is session-held in `DefinitionStateService`, so downstream
+steps still read the thread without rendering the panel. The header row carries the thread
 chips (lines / parsed / cast) and capture actions, the body shows up to 40 raw lines, and it is now
 visible on small screens too. The schema pane DERIVES its fields from the parsed columns
 (frontend-aware selectors: positional for delimited/fixedwidth, verbatim key for json/text_regex)
@@ -152,7 +160,11 @@ aborts the trigger view; visual proof is a preview job. There is deliberately **
 "format" column** — a schema field is `{name, selector, type}`; date/timestamp format masks are
 pipeline-level `csv_settings`, and a per-field column would imply rigor the engine does not apply.
 
-## Parsing stage flow (choose file → view → type → options → test → table/tree)
+## Parse flow (choose file → view → type → options → test → table/tree)
+
+⚠ **Host: the shared `<inspecto-grammar-editor>`**, mounted by the editor's parse drawer (per-format
+nodes) or the grammar-editor dialog (a generic `parser` node). The rules below are the shared
+component's, which is why they outlived the stage that used to host them.
 
 The stage is a thin host over the shared `<inspecto-grammar-editor>` (2026-08-04) — see
 [Grammar configuration](grammar-config.md) for the store contract and what is shared with the
@@ -244,7 +256,11 @@ Three details that are load-bearing:
 - The late read is **dropped if the operator has already edited** — the editor's `initial` setter
   rebuilds the whole `FormArray`, so applying it over their work would silently discard it.
 
-## Enrichment stage (Streams, optional)
+## Enrichment companion (Streams, optional)
+
+⚠ **Host: the editor's `enrichment` node dialog.** ⛔ The wiring convention below was EXTRACTED to
+shared `inspecto/enrichment/enrichment-wiring.ts` (P6-c) precisely so it would outlive the pane; the
+dialog still ASKS through `ENRICHMENT_WIRING_ATTRIBUTES` but seeds those fields from it.
 
 Opt-in pane authoring the companion `EnrichmentConfig` (`<pipeline>_enrich`): reference bindings
 (**by-name first** — the picker offers only pipeline-produced Reference Datasets, minus self — with
@@ -255,7 +271,9 @@ space's `enriched/` convention. **Every save re-registers** (`POST /enrichment`)
 enrichments do not hot-reload by mtime; a register failure downgrades to a warning (the file is
 saved; it loads on restart).
 
-## Collection stage: Connection-first — `connector` is never asked
+## Collect: Connection-first — `connector` is never asked
+
+⚠ **Host: the shared `<inspecto-collector-config>`**, mounted by the editor's collection drawer.
 
 Since the 2026-07-29 reflow there is **no Connector select at all**. The stage asks one question —
 **Collect from: Local inbox | Connection** — and `collector.connector` is derived and injected at
@@ -277,14 +295,19 @@ control drops out of the schema form's value and the key would vanish from the w
 
 ## Seams & gotchas
 
-Backend seams: [onboarding-authoring](../../backend/control-plane/onboarding-authoring.md). Every
-stage saves its block through **`POST /config/patch`** (2026-08-04), which deep-merges server-side
-instead of replacing the file after a client-side merge — that replace was a stale-read clobber, and
-one route fixed it for every stage. ⚠ A cleared key must travel as `null`, not `undefined`
-(`nullifyDeletes`), or JSON drops it and the merge keeps the old value. The
+Backend seams: [onboarding-authoring](../../backend/control-plane/onboarding-authoring.md).
+
+⚠ **`POST /config/patch` no longer has a UI caller.** The wizard saved every stage's block through it
+(2026-08-04): it deep-merges server-side instead of replacing the file after a client-side merge, which
+had been a stale-read clobber, and one route fixed it for every stage. The editor does not need it — it
+holds a graph and saves it whole (`PUT`), so that window is not one it has. ⛔ The route and
+`ConfigService.patch` stay: the contract is server-side API, the mock handler pins it, and any future
+block-at-a-time surface wants it rather than a second client-side merge. Its rule, if it is used again:
+a cleared key must travel as `null`, not `undefined` (`nullifyDeletes`), or JSON drops it and the merge
+keeps the old value. The
 create dialog silently derives the full dir convention (`status_dir` et al — without it the Runs
 history stays empty) and `processing.duplicate_check` (the collector-level `duplicate:` block is a
 no-op on the legacy local poll path — without markers the same file re-ingests every cycle).
 Catalog list rows show Draft/Live from `attrs.active` (References included, via the produced-origin
-graph attrs); "Ready" is visible in the shell header only. Offline via the `onboarding.handler`
+graph attrs); readiness itself is the editor's guided checklist. Offline via the `onboarding.handler`
 mock (config write/read/delete, both previews, register pair).
