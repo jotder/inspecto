@@ -29,6 +29,7 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { EnrichmentEditorComponent } from 'app/inspecto/enrichment/enrichment-editor.component';
+import { EnrichmentWiring, enrichmentWiringDefaults } from 'app/inspecto/enrichment/enrichment-wiring';
 
 /**
  * Enrichment stage (optional, Streams) — authors the companion `EnrichmentConfig`
@@ -175,27 +176,28 @@ export class OnboardingEnrichmentPaneComponent implements OnInit {
         return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
     }
 
+    /** The derived wiring, from the shared convention both hosts author against (P6-c). */
+    private derived(): EnrichmentWiring {
+        return enrichmentWiringDefaults({
+            enrichName: this.enrichName(),
+            pipelineId: this.pipelineId(),
+            base: this.base(),
+            inputDatabase: String(this.blockOf('dirs')['database'] ?? ''),
+            inputFormat: String(this.blockOf('output')['format'] ?? ''),
+        });
+    }
+
     /** Input = this pipeline's Stage-1 output (kept verbatim on resume — the file is the truth). */
     inputBlock(): Record<string, unknown> {
         const existing = this.enrichment();
         if (existing?.['input']) return existing['input'] as Record<string, unknown>;
-        const dirs = this.blockOf('dirs');
-        const output = this.blockOf('output');
-        return {
-            database: String(dirs['database'] ?? ''),
-            format: String(output['format'] ?? 'PARQUET').toUpperCase(),
-            partitions: ['year', 'month', 'day'],
-        };
+        return this.derived().input;
     }
 
     outputBlock(): Record<string, unknown> {
         const existing = this.enrichment();
         if (existing?.['output']) return existing['output'] as Record<string, unknown>;
-        return {
-            database: `${this.base()}/data/enriched/${this.enrichName()}`,
-            format: 'PARQUET',
-            partitions: ['year', 'month', 'day'],
-        };
+        return this.derived().output;
     }
 
     /** The full enrichment draft from the current form, or null on a blocking validation problem. */
@@ -207,7 +209,7 @@ export class OnboardingEnrichmentPaneComponent implements OnInit {
             input: this.inputBlock(),
             output: this.outputBlock(),
             transform: parts.transform,
-            triggers: { on_pipeline: this.pipelineId() },
+            triggers: this.derived().triggers,
         };
         if (Object.keys(parts.references).length > 0) draft['references'] = parts.references;
         return draft;

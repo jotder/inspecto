@@ -27,6 +27,7 @@ import {
     ComponentType,
     ConfigService,
     LensService,
+    SpacesService,
 } from 'app/inspecto/api';
 import { CollectorConfigComponent } from 'app/inspecto/collector/collector-config.component';
 import { AttributeSpec, KEY_SEP, flattenBlock, nestKeys } from 'app/inspecto/component-model';
@@ -37,6 +38,7 @@ import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form
 import { pipelineOptionLoader, referenceOptionLoader } from 'app/inspecto/components/entity-option-loaders';
 import { EnrichmentEditorComponent } from 'app/inspecto/enrichment/enrichment-editor.component';
 import { ENRICHMENT_WIRING_ATTRIBUTES } from 'app/inspecto/enrichment/enrichment-attributes';
+import { enrichmentWiringDefaults } from 'app/inspecto/enrichment/enrichment-wiring';
 import { ComponentFormDialog, ComponentFormResult } from 'app/modules/admin/components/component-form.dialog';
 import { groupByValidator, measuresValidator } from './measure-grammar';
 import { nodeAttributesFor } from './node-attributes';
@@ -64,6 +66,25 @@ export interface NodeConfigData {
      * the server deliberately unspecced would keep drawing a stale client form.
      */
     attributes?: AttributeSpec[];
+    /**
+     * What the HOST pipeline can tell an `enrichment` node about itself (definition-surface P6-c), so
+     * the wiring form seeds derived values instead of asking the author to retype them. Only the
+     * pipeline-derived facts travel — the conventions built on top of them live in
+     * `enrichmentWiringDefaults`, shared with the Onboarding stage.
+     *
+     * `undefined` ⇒ this host has no pipeline context (or the node is not an enrichment): the form
+     * opens blank, exactly as it did before.
+     */
+    enrichmentHost?: EnrichmentHostPipeline;
+}
+
+/** The host pipeline's identity plus where its Stage-1 output lands. */
+export interface EnrichmentHostPipeline {
+    /** The engine's normalized pipeline id — what `BatchEvent.pipeline()` carries. */
+    pipelineId: string;
+    /** Its output store, when exactly ONE destination could be resolved (see the editor's derivation). */
+    inputDatabase?: string;
+    inputFormat?: string;
 }
 
 /** Dialog close payload: the edited node (absent ⇒ the user cancelled). */
@@ -310,6 +331,7 @@ export class NodeConfigDialog {
     private configApi = inject(ConfigService);
     private catalog = inject(CatalogService);
     private lens = inject(LensService);
+    private spaces = inject(SpacesService);
     private toastr = inject(ToastrService);
     private dialog = inject(MatDialog);
     private ref = inject(MatDialogRef<NodeConfigDialog, NodeConfigResult>);
@@ -341,7 +363,13 @@ export class NodeConfigDialog {
     });
     readonly wiringInitial = computed<Record<string, unknown>>(() => {
         const s = this.enrichSource();
-        if (!s || s === 'loading') return {};
+        if (s === 'loading') return {};
+        // Authoring fresh (no binding, or a binding that could not be read): derive what the host
+        // pipeline already knows instead of presenting empty required fields — the same conventions
+        // the Onboarding stage derives silently (P6-c). Read once: `enrichName` is a form control, so
+        // this deliberately does NOT re-derive as the author renames — a seed that moved under an
+        // edited form would clobber it.
+        if (!s) return this.freshWiring();
         const input = (s['input'] as Record<string, unknown>) ?? {};
         const output = (s['output'] as Record<string, unknown>) ?? {};
         const flat = flattenBlock({
@@ -359,6 +387,24 @@ export class NodeConfigDialog {
         );
         return flat;
     });
+
+    /** The derived seed for a fresh companion — empty when this host supplied no pipeline context. */
+    private freshWiring(): Record<string, unknown> {
+        const host = this.data.enrichmentHost;
+        if (!host) return {};
+        const w = enrichmentWiringDefaults({
+            enrichName: this.enrichName.value.trim() || this.data.node.id,
+            pipelineId: host.pipelineId,
+            base: this.spaces.currentSpaceId() ? `spaces/${this.spaces.currentSpaceId()}` : '.',
+            inputDatabase: host.inputDatabase,
+            inputFormat: host.inputFormat,
+        });
+        const flat = flattenBlock({ input: w.input, output: w.output, triggers: w.triggers });
+        // Same as above: the two partition chips hold real arrays, not `flattenBlock`'s comma string.
+        flat[`input${KEY_SEP}partitions`] = w.input['partitions'];
+        flat[`output${KEY_SEP}partitions`] = w.output['partitions'];
+        return flat;
+    }
     /** Produced Reference Datasets bindable by name (same source the Onboarding stage uses). */
     readonly refOptions = signal<{ id: string; label: string }[]>([]);
     readonly enrichName = this.fb.control('', { nonNullable: true });
@@ -658,10 +704,7 @@ export class NodeConfigDialog {
         const input = block('input');
         input['partitions'] = authoredList(formValue[`input${KEY_SEP}partitions`]);
         const output = block('output');
-        output['partitions'] = remarryPartitionSources(
-            authoredList(formValue[`output${KEY_SEP}partitions`]),
-            existing,
-        );
+        output['partitions'] = remarryPartitionSources(authoredList(formValue[`output${KEY_SEP}partitions`]), existing);
         const draft: Record<string, unknown> = {
             name,
             input,

@@ -54,7 +54,7 @@ import { PipelineInspectorComponent } from './pipeline-inspector.component';
 import { PipelinePaletteComponent } from './pipeline-palette.component';
 import { PipelineGuaranteesPanelComponent } from './pipeline-guarantees-panel.component';
 import { PipelineStepCardsComponent } from './pipeline-step-cards.component';
-import { NodeConfigDialog, NodeConfigResult } from './node-config.dialog';
+import { EnrichmentHostPipeline, NodeConfigDialog, NodeConfigResult } from './node-config.dialog';
 import { PipelineCollectionDefinitionComponent } from './pipeline-collection-definition.component';
 import { PARSE_NODE_FRONTENDS, PipelineParseDefinitionComponent } from './pipeline-parse-definition.component';
 import { PipelineLoadDefinitionComponent } from './pipeline-load-definition.component';
@@ -1230,11 +1230,36 @@ export class PipelineEditorComponent implements OnInit {
                           categoryLabel: categoryLabel(category),
                           bindKind: bindKindFor(category),
                           attributes: this.typeAttributes().get(node.type),
+                          enrichmentHost: node.type === 'enrichment' ? this.enrichmentHost() : undefined,
                       },
                   });
         ref.afterClosed().subscribe((res?: NodeConfigResult) => {
             if (res?.node) this.applyNodePatch(res.node);
         });
+    }
+
+    /**
+     * What this pipeline can tell a fresh `enrichment` node about itself, so its wiring form seeds
+     * derived values instead of empty required fields (definition-surface P6-c — the Onboarding stage
+     * derives the same facts from its draft's `dirs`/`output` blocks; here they live on the sink node).
+     *
+     * ⚠ The Stage-1 output travels only when exactly ONE destination declares a `database`: a
+     * multi-destination pipeline has no single "the output", and seeding one of them would quietly
+     * point the transform at a store the author never chose. Quarantine is SINK-category too and
+     * carries only `dir`, which is why the filter keys on the config, not the category alone.
+     */
+    private enrichmentHost(): EnrichmentHostPipeline | undefined {
+        const id = this.selectedId();
+        if (!id) return undefined;
+        const stores = (this.model()?.nodes ?? []).filter(
+            (n) => this.typeCategory(n.type) === 'SINK' && typeof n.config?.['database'] === 'string',
+        );
+        const only = stores.length === 1 ? stores[0].config! : null;
+        return {
+            pipelineId: id,
+            inputDatabase: only ? String(only['database']) : undefined,
+            inputFormat: only && typeof only['format'] === 'string' ? only['format'] : undefined,
+        };
     }
 
     // ── definition drawer lifecycle (definition-surface P1) ────────────────────────────────────────
@@ -1269,7 +1294,11 @@ export class PipelineEditorComponent implements OnInit {
     private isBinaryFixedWidth(node: AuthoredNode): boolean {
         const parsing = node.config?.['parsing'] as Record<string, unknown> | undefined;
         const fw = parsing?.['fixedwidth'] as Record<string, unknown> | undefined;
-        return String(fw?.['record'] ?? '').trim().toLowerCase() === 'bytes';
+        return (
+            String(fw?.['record'] ?? '')
+                .trim()
+                .toLowerCase() === 'bytes'
+        );
     }
 
     /** The `grammar/<id>` this node binds, or `null` when its Grammar is already inline. */
@@ -1318,9 +1347,7 @@ export class PipelineEditorComponent implements OnInit {
      * `{columns, rules}` — so the host, which holds the whole graph, is the one place that can supply it.
      */
     readonly parserSchemaFile = computed(() => {
-        const parser = (this.model()?.nodes ?? []).find(
-            (n) => n.type === 'parser' || n.type in PARSE_NODE_FRONTENDS,
-        );
+        const parser = (this.model()?.nodes ?? []).find((n) => n.type === 'parser' || n.type in PARSE_NODE_FRONTENDS);
         return String(parser?.config?.['schema_file'] ?? '').trim();
     });
 

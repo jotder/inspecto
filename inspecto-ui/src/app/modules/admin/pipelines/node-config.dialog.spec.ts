@@ -14,6 +14,7 @@ import {
     ConnectionsService,
     LensService,
     MetadataNode,
+    SpacesService,
 } from 'app/inspecto/api';
 import { CollectorConfigComponent } from 'app/inspecto/collector/collector-config.component';
 import type { AttributeSpec } from 'app/inspecto/component-model';
@@ -90,6 +91,8 @@ async function create(data: Partial<NodeConfigData> = {}, api: Partial<ConfigSer
                 },
             },
             { provide: LensService, useValue: { canAuthorWorkbench: () => true } },
+            // The derived `output.database` convention is space-relative (P6-c).
+            { provide: SpacesService, useValue: { currentSpaceId: () => 'demo' } },
             { provide: ToastrService, useValue: TOASTR },
         ],
     });
@@ -537,6 +540,55 @@ describe('NodeConfigDialog', () => {
         expect(c.freeFormOpen()).toBe(false); // the editor is the primary surface, not the key/value grid
     });
 
+    it('seeds a FRESH companion from the host pipeline instead of asking (P6-c)', async () => {
+        const fixture = await create({
+            node: { id: 'enrich1', type: 'enrichment' },
+            typeLabel: 'enrichment',
+            categoryLabel: 'Transform',
+            bindKind: null,
+            enrichmentHost: {
+                pipelineId: 'orders',
+                inputDatabase: 'spaces/demo/data/orders/database',
+                inputFormat: 'PARQUET',
+            },
+        });
+        const wiring = fixture.debugElement.query(By.directive(InspectoSchemaFormComponent))
+            .componentInstance as InspectoSchemaFormComponent;
+        expect(wiring.form.get('input__database')?.value).toBe('spaces/demo/data/orders/database');
+        expect(wiring.form.get('output__database')?.value).toBe('spaces/demo/data/enriched/enrich1');
+        expect(wiring.form.get('triggers__on_pipeline')?.value).toBe('orders');
+        expect(wiring.form.get('input__partitions')?.value).toEqual(['year', 'month', 'day']);
+    });
+
+    it('a host with no resolvable output store seeds everything EXCEPT the input store', async () => {
+        // Multi-destination (or store-less) pipeline: the editor sends no `inputDatabase` rather than
+        // pointing the transform at a store the author never chose.
+        const fixture = await create({
+            node: { id: 'enrich1', type: 'enrichment' },
+            typeLabel: 'enrichment',
+            categoryLabel: 'Transform',
+            bindKind: null,
+            enrichmentHost: { pipelineId: 'orders' },
+        });
+        const wiring = fixture.debugElement.query(By.directive(InspectoSchemaFormComponent))
+            .componentInstance as InspectoSchemaFormComponent;
+        expect(wiring.form.get('input__database')?.value).toBe('');
+        expect(wiring.form.get('triggers__on_pipeline')?.value).toBe('orders');
+    });
+
+    it('a host that supplies no pipeline context still opens the wiring form blank', async () => {
+        const fixture = await create({
+            node: { id: 'enrich1', type: 'enrichment' },
+            typeLabel: 'enrichment',
+            categoryLabel: 'Transform',
+            bindKind: null,
+        });
+        const wiring = fixture.debugElement.query(By.directive(InspectoSchemaFormComponent))
+            .componentInstance as InspectoSchemaFormComponent;
+        expect(wiring.form.get('input__database')?.value).toBeFalsy();
+        expect(wiring.form.get('triggers__on_pipeline')?.value).toBeFalsy();
+    });
+
     it('save writes the companion, registers it, and closes bound by reference — config stays unmirrored', async () => {
         let closed: { node: AuthoredNode } | undefined;
         const write = vi.fn((type: string, cfg: Record<string, unknown>) =>
@@ -636,6 +688,41 @@ describe('NodeConfigDialog', () => {
         expect(closed?.node.use).toBe('enrichment/orders_enrich');
     });
 
+    it('a BOUND companion wins over the host-derived seed — the file is the truth', async () => {
+        const read = vi.fn(() =>
+            of({
+                type: 'enrichment',
+                name: 'orders_enrich',
+                path: 'orders_enrich.toon',
+                config: {
+                    name: 'orders_enrich',
+                    input: { database: 'in/db', format: 'CSV', partitions: ['dt'] },
+                    output: { database: 'out/db', partitions: [] },
+                    transform: 'SELECT 1 FROM input',
+                    triggers: { on_pipeline: 'other_pipeline' },
+                },
+            }),
+        );
+        const fixture = await create(
+            {
+                node: { id: 'enrich1', type: 'enrichment', use: 'enrichment/orders_enrich' },
+                typeLabel: 'enrichment',
+                categoryLabel: 'Transform',
+                bindKind: null,
+                enrichmentHost: { pipelineId: 'orders', inputDatabase: 'derived/db', inputFormat: 'PARQUET' },
+            },
+            { read },
+        );
+        fixture.detectChanges(); // the async read landed
+        const wiring = fixture.debugElement.query(By.directive(InspectoSchemaFormComponent))
+            .componentInstance as InspectoSchemaFormComponent;
+        expect(wiring.form.get('input__database')?.value).toBe('in/db');
+        expect(wiring.form.get('input__partitions')?.value).toEqual(['dt']);
+        // Even a trigger naming a DIFFERENT pipeline stands: this dialog edits the companion, and
+        // re-pointing it at its host would be an unasked-for change to a deployed enrichment.
+        expect(wiring.form.get('triggers__on_pipeline')?.value).toBe('other_pipeline');
+    });
+
     // `EnrichmentConfig.fromMap` THROWS `Missing or invalid list` when either partitions key is absent,
     // so before they were specced a fresh enrichment authored here wrote a config that could never load
     // — it saved, then failed to register. An empty list is the legal "unpartitioned" value.
@@ -652,7 +739,12 @@ describe('NodeConfigDialog', () => {
             }),
         );
         const fixture = await create(
-            { node: { id: 'enrich1', type: 'enrichment' }, typeLabel: 'enrichment', categoryLabel: 'Transform', bindKind: null },
+            {
+                node: { id: 'enrich1', type: 'enrichment' },
+                typeLabel: 'enrichment',
+                categoryLabel: 'Transform',
+                bindKind: null,
+            },
             { write },
         );
         const c = fixture.componentInstance;

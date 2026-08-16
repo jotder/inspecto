@@ -382,10 +382,7 @@ describe('PipelineEditorComponent', () => {
             ['parser.text_regex', { frontend: 'text_regex', text_regex: { pattern: '(?<ID>\\w+)' } }],
             // P3d slice D: the generic plugin subtype routes the same way — no dedicated case needed,
             // which is exactly the point of the collapsed template.
-            [
-                'parser.plugin',
-                { frontend: 'plugin', plugin: { ingester: 'com.example.acme.AcmeFeedIngester' } },
-            ],
+            ['parser.plugin', { frontend: 'plugin', plugin: { ingester: 'com.example.acme.AcmeFeedIngester' } }],
         ])('routes an inline %s node to the drawer, not the grammar dialog', (type, parsing) => {
             const c = make();
             c.select('demo');
@@ -462,7 +459,12 @@ describe('PipelineEditorComponent', () => {
             const c = make();
             c.select('demo');
             c.grammarTemplates.set([
-                { name: 'pipes', ref: 'grammar/pipes', type: 'grammar', content: { delimiter: '|', has_header: false } },
+                {
+                    name: 'pipes',
+                    ref: 'grammar/pipes',
+                    type: 'grammar',
+                    content: { delimiter: '|', has_header: false },
+                },
             ] as never);
             const node = { id: 'parse', type: 'parser.delimited', use: 'grammar/pipes', config: {} };
             c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, node] }));
@@ -471,10 +473,16 @@ describe('PipelineEditorComponent', () => {
 
             expect(dialog.open).not.toHaveBeenCalled();
             // The drawer shows an inline copy; the MODEL is untouched until Apply.
-            expect(c.definitionNode()!.config!['parsing']).toEqual({ delimited: { delimiter: '|', has_header: false } });
+            expect(c.definitionNode()!.config!['parsing']).toEqual({
+                delimited: { delimiter: '|', has_header: false },
+            });
             expect(c.model()!.nodes.find((n) => n.id === 'parse')!.use).toBe('grammar/pipes');
 
-            c.onDefinitionApplied({ id: 'parse', type: 'parser.delimited', config: { parsing: { frontend: 'delimited' } } });
+            c.onDefinitionApplied({
+                id: 'parse',
+                type: 'parser.delimited',
+                config: { parsing: { frontend: 'delimited' } },
+            });
             expect(c.model()!.nodes.find((n) => n.id === 'parse')!.use).toBeUndefined();
         });
 
@@ -506,6 +514,77 @@ describe('PipelineEditorComponent', () => {
             c.openNodeConfig(plain);
             expect(dialog.open).toHaveBeenCalledTimes(1);
             expect(c.definitionNode()).toBeNull();
+        });
+
+        /**
+         * P6-c: an enrichment node opened from the editor carries what the host pipeline knows about
+         * itself, so its wiring form seeds derived values instead of empty required fields.
+         */
+        describe('enrichment host context', () => {
+            const TYPES = [
+                {
+                    type: 'enrichment',
+                    category: 'TRANSFORM',
+                    label: 'Enrichment',
+                    description: '',
+                    accepts: ['data'],
+                    emits: ['data'],
+                    emitsNamedRoutes: false,
+                    lowerable: true,
+                },
+                {
+                    type: 'sink.persistent',
+                    category: 'SINK',
+                    label: 'Store',
+                    description: '',
+                    accepts: ['data'],
+                    emits: [],
+                    emitsNamedRoutes: false,
+                    lowerable: true,
+                },
+            ];
+            const enrich = { id: 'enr', type: 'enrichment', config: {} };
+
+            function open(sinks: { id: string; type: string; config: Record<string, unknown> }[]) {
+                api.nodeTypes.mockReturnValue(of(TYPES));
+                const c = make();
+                c.select('demo');
+                dialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
+                c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, enrich, ...sinks] }));
+                c.openNodeConfig(enrich);
+                return dialog.open.mock.calls[0][1].data.enrichmentHost;
+            }
+
+            it('sends the pipeline id and its single output store', () => {
+                expect(
+                    open([{ id: 'out', type: 'sink.persistent', config: { database: 'd/db', format: 'PARQUET' } }]),
+                ).toEqual({ pipelineId: 'demo', inputDatabase: 'd/db', inputFormat: 'PARQUET' });
+            });
+
+            it('sends NO store when the pipeline has two — there is no single "the output"', () => {
+                const host = open([
+                    { id: 'a', type: 'sink.persistent', config: { database: 'a/db' } },
+                    { id: 'b', type: 'sink.persistent', config: { database: 'b/db' } },
+                ]);
+                expect(host).toEqual({ pipelineId: 'demo', inputDatabase: undefined, inputFormat: undefined });
+            });
+
+            it('ignores a SINK-category node carrying no database (quarantine)', () => {
+                const host = open([
+                    { id: 'out', type: 'sink.persistent', config: { database: 'd/db' } },
+                    { id: 'quarantine', type: 'sink.persistent', config: { dir: 'q/' } },
+                ]);
+                expect(host.inputDatabase).toBe('d/db');
+            });
+
+            it('is not attached to a non-enrichment node', () => {
+                api.nodeTypes.mockReturnValue(of(TYPES));
+                const c = make();
+                c.select('demo');
+                dialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
+                c.openNodeConfig(c.model()!.nodes[1]); // transform.filter
+                expect(dialog.open.mock.calls[0][1].data.enrichmentHost).toBeUndefined();
+            });
         });
 
         it('switching tabs guards unapplied drawer edits and closes the drawer', async () => {
