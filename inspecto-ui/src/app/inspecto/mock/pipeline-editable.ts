@@ -26,6 +26,7 @@ export const LOWERABLE = new Set([
     'parser',
     'parser.delimited', // the first per-format parser subtype (B6/P3a — mirrors the engine)
     'parser.fixedwidth', // the second (P3b) — spans both record modes, drawer serves text only
+    'parser.asn1', // the third (P3c) — first-class `frontend: asn1`, grammar carried inline
     'gap',
     'transform.dedup.marker',
     'transform.filter',
@@ -52,6 +53,7 @@ const USE_HOME: Record<string, string[]> = {
     // use: binding, so it needs no home here.)
     'parser.delimited': ['grammar/'],
     'parser.fixedwidth': ['grammar/'],
+    'parser.asn1': ['grammar/'],
 };
 
 /**
@@ -62,12 +64,14 @@ const USE_HOME: Record<string, string[]> = {
 const SUBTYPE_FRONTENDS: Record<string, string[]> = {
     'parser.delimited': ['delimited'],
     'parser.fixedwidth': ['fixedwidth', 'fixed_width'],
+    'parser.asn1': ['asn1'],
 };
 
 /** Display label per subtype — mirrors each `BuiltinNodeType`'s own label. */
 const PARSER_SUBTYPE_LABELS: Record<string, string> = {
     'parser.delimited': 'Parser (delimited)',
     'parser.fixedwidth': 'Parser (fixed width)',
+    'parser.asn1': 'Parser (ASN.1)',
 };
 
 /** The node subtype a `parsing.frontend` value names, or `null` for none/unknown. */
@@ -78,16 +82,22 @@ const subtypeForFrontend = (frontend: string): string | null => {
 
 /** The parser family: the generic parser plus the per-format subtypes (B6 — delimited, fixed width). */
 const isParserType = (t: string): boolean =>
-    t === 'parser' || t === 'parser.delimited' || t === 'parser.fixedwidth';
+    t === 'parser' || t === 'parser.delimited' || t === 'parser.fixedwidth' || t === 'parser.asn1';
 
 /**
  * Node type → the `use:` prefix that is DERIVED, not authored, and is dropped in silence on purpose
  * (mirrors `PipelineEditable.DERIVED_USE`). An enrichment node's ref is written by the editor itself
  * when it saves the companion `*_enrich.toon`, which is the truth; refusing it made every pipeline
  * holding an enrichment node unsaveable for a day.
+ *
+ * An ASN.1 node's `ingester/` ref is derived from the other end: a `frontend: asn1` file never
+ * authors an ingester — the config parser synthesizes the `Asn1RecordIngester` binding at load and
+ * refuses an explicit `plugin:` block beside it — so the class the lift reads back and presents as
+ * `use:` is the read side's own doing, and refusing it would make every ASN.1 pipeline unsaveable.
  */
 const DERIVED_USE: Record<string, string> = {
     enrichment: 'enrichment/',
+    'parser.asn1': 'ingester/',
 };
 
 /**

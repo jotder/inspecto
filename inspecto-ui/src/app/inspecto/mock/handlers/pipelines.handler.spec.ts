@@ -37,6 +37,7 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
         'parser',
         'parser.delimited', // B6/P3a: the first per-format parser subtype (engine `6bc685cf`)
         'parser.fixedwidth', // P3b: the second — spans both record modes; the drawer serves text only
+        'parser.asn1', // P3c: the third — first-class `frontend: asn1`, grammar carried inline
         'transform.map',
         'transform.filter',
         'transform.select',
@@ -71,7 +72,8 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
             'sink.file',
             'sink.database',
             'parser.dsv',
-            'parser.asn1',
+            // ⚠ `parser.asn1` left this list in P3c: it was an invented editor type, and is now a real
+            // BuiltinNodeType with a `frontend: asn1` home in the engine. A fiction became a fact.
             'transform.record',
             'transform.aggregate',
             'transform.alert',
@@ -98,7 +100,7 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
         expect(dedups).toEqual(['transform.dedup.marker', 'transform.dedup']);
     });
 
-    it('marks exactly the 14 types the server can lower — a laxer mock is the whole failure mode', () => {
+    it('marks exactly the 15 types the server can lower — a laxer mock is the whole failure mode', () => {
         // Must equal PipelineEditable.LOWERABLE. If the server's set changes, this test is the
         // tripwire: a mock that offers more than the backend accepts sends the user into a 422.
         expect(
@@ -110,6 +112,7 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
             'enrichment',
             'gap',
             'parser',
+            'parser.asn1',
             'parser.delimited',
             'parser.fixedwidth',
             'sink.persistent',
@@ -121,7 +124,7 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
             'transform.route',
             'transform.summarize',
         ]);
-        expect(NODE_TYPES.length).toBe(24);
+        expect(NODE_TYPES.length).toBe(25);
     });
 
     it('only the parser family and the router emit operator-named routes', () => {
@@ -129,6 +132,7 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
             'parser',
             'parser.delimited',
             'parser.fixedwidth',
+            'parser.asn1',
             'transform.route',
         ]);
     });

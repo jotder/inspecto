@@ -549,6 +549,15 @@
                                                 (saveAsTemplate)="saveGrammarAsTemplate($event)"
                                             />
                                         }
+                                        @case ('parser.asn1') {
+                                            <app-pipeline-parse-definition
+                                                [node]="dn"
+                                                [templates]="grammarTemplates()"
+                                                (applied)="onDefinitionApplied($event)"
+                                                (dirtyChange)="definitionDirty.set($event)"
+                                                (saveAsTemplate)="saveGrammarAsTemplate($event)"
+                                            />
+                                        }
                                     }
                                 </inspecto-definition-drawer>
                             }

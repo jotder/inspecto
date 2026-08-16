@@ -482,6 +482,16 @@ final class PipelineConfigParser {
                         ? (Map<String, Object>) pm
                         : (blockShaped && grammarBlock.get("plugin") instanceof Map<?, ?> gm)
                                 ? (Map<String, Object>) gm : null;
+        // `frontend: asn1` (first-class, definition-surface P3c) is sugar for the plugin wiring:
+        // the asn1: block synthesizes the Asn1RecordIngester binding below, so everything downstream
+        // (segments loading, schemas, execution) is the one plugin path. An explicit plugin block
+        // alongside is a contradiction — which of the two would win is undefined, so refuse.
+        if (frontend.equals("asn1")) {
+            if (pluginBlock != null || proc.get("ingester") != null)
+                throw new IllegalArgumentException("frontend 'asn1' synthesizes its own plugin ingester — "
+                        + "remove parsing.plugin / processing.ingester, or use frontend 'plugin'");
+            pluginBlock = asn1PluginBlock(csv);
+        }
         b.ingesterClass = pluginBlock != null && pluginBlock.get("ingester") != null
                 ? (String) pluginBlock.get("ingester") : (String) proc.get("ingester");
         Object icfg = pluginBlock != null && pluginBlock.get("ingester_config") != null
@@ -1151,7 +1161,7 @@ final class PipelineConfigParser {
 
     /** The recognised {@code parsing.frontend} values (docs/parsing-options-reference.md §5). */
     private static final Set<String> FRONTENDS =
-            Set.of("delimited", "fixedwidth", "fixed_width", "json", "text_regex", "plugin");
+            Set.of("delimited", "fixedwidth", "fixed_width", "json", "text_regex", "asn1", "plugin");
 
     /**
      * Overlay the unified {@code parsing:} block onto the legacy grammar/{@code csv_settings} map
@@ -1169,11 +1179,48 @@ final class PipelineConfigParser {
         if (parsing.get("delimited") instanceof Map<?, ?> del)
             merged.putAll((Map<String, Object>) del);
         for (String key : new String[]{"frontend", "encoding", "compression",
-                                       "fixedwidth", "json", "text_regex"}) {
+                                       "fixedwidth", "json", "text_regex", "asn1"}) {
             Object v = parsing.get(key);
             if (v != null) merged.put(key, v);
         }
         return merged;
+    }
+
+    /**
+     * Translate the {@code asn1:} block into the plugin wiring {@code frontend: asn1} means
+     * (definition-surface P3c). The grammar is <b>inline X.680 module text</b> — the shape the
+     * drawer's textarea and {@code POST /parsers/asn1/preview} author — carried to the ingester as
+     * {@code ingester_config.grammar_text}, never as the path-jailed {@code grammar} key. Hard-fails
+     * (draft rejected before any run) on a missing block, empty grammar/root_type, or missing
+     * segments — the tailored messages here, not the generic plugin ones.
+     */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> asn1PluginBlock(Map<String, Object> csv) {
+        if (!(csv.get("asn1") instanceof Map<?, ?> aMap))
+            throw new IllegalArgumentException(
+                    "frontend 'asn1' requires an 'asn1:' block with grammar, root_type and segments");
+        Map<String, Object> a = (Map<String, Object>) aMap;
+        String grammar  = a.get("grammar")   == null ? "" : String.valueOf(a.get("grammar")).trim();
+        String rootType = a.get("root_type") == null ? "" : String.valueOf(a.get("root_type")).trim();
+        if (grammar.isEmpty())
+            throw new IllegalArgumentException(
+                    "asn1.grammar (inline X.680 module text) is required to ingest — "
+                    + "an empty grammar is preview-only TLV inspection");
+        if (rootType.isEmpty())
+            throw new IllegalArgumentException("asn1.root_type is required for frontend 'asn1'");
+        if (!(a.get("segments") instanceof Map<?, ?> segs) || segs.isEmpty())
+            throw new IllegalArgumentException(
+                    "asn1.segments must be a non-empty map of {recordName: schemaPath} for frontend 'asn1'");
+        Map<String, Object> ic = new LinkedHashMap<>();
+        ic.put("grammar_text", grammar);
+        ic.put("root_type", rootType);
+        for (String k : new String[]{"strictness", "file_header_length", "record_header_length"})
+            if (a.get(k) != null) ic.put(k, a.get(k));
+        Map<String, Object> plugin = new LinkedHashMap<>();
+        plugin.put("ingester", "com.gamma.ingester.Asn1RecordIngester");
+        plugin.put("ingester_config", ic);
+        plugin.put("segments", a.get("segments"));
+        return plugin;
     }
 
     /** Resolve + validate the {@code frontend} selector; unknown values are rejected with the list. */
@@ -1181,7 +1228,7 @@ final class PipelineConfigParser {
         String f = String.valueOf(csv.getOrDefault("frontend", "delimited")).trim().toLowerCase();
         if (!FRONTENDS.contains(f))
             throw new IllegalArgumentException("Unknown parsing.frontend '" + f
-                    + "' — expected one of: delimited, fixedwidth, json, text_regex, plugin");
+                    + "' — expected one of: delimited, fixedwidth, json, text_regex, asn1, plugin");
         return f;
     }
 

@@ -343,6 +343,14 @@ export class InspectoSchemaFormComponent {
             });
         }
         this.applyExtraValidators();
+        // …and re-apply the host's seeded VALUES, for the same reason the validators above are
+        // re-applied: this setter rebuilds every control from defaults, and Angular does not re-run
+        // the `initial` setter unless that binding's reference also changed. A host whose spec set
+        // resolves ASYNCHRONOUSLY (the Grammar editor's served-parser form, which swaps specs when
+        // `GET /parsers` lands) therefore seeded before the swap and would silently show defaults —
+        // then write them back on save. Keys absent from the new spec set are ignored by patchValue,
+        // so a deliberate format switch still lands on the new format's defaults.
+        if (this.lastInitial) this.form.patchValue(this.lastInitial, { emitEvent: false });
         this.syncVisibility(this.form.getRawValue());
     }
 
@@ -374,9 +382,13 @@ export class InspectoSchemaFormComponent {
 
     /** Existing values to edit (patched over the declared defaults). */
     @Input() set initial(value: Record<string, unknown> | null | undefined) {
+        this.lastInitial = value ?? null;
         if (value) this.form.patchValue(value, { emitEvent: false });
         this.syncVisibility(this.form.getRawValue());
     }
+
+    /** The last seed, replayed after a {@link specs} rebuild — see the note in that setter. */
+    private lastInitial: Record<string, unknown> | null = null;
 
     /** Suggestion sources for `type: 'autocomplete'` attributes, keyed by attribute key. */
     @Input() optionLoaders: Record<string, AttributeOptionLoader> | undefined;

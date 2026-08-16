@@ -146,6 +146,34 @@ class Asn1RecordIngesterTest {
         assertTrue(e.getMessage().contains("root_type"), e.getMessage());
     }
 
+    /** `grammar_text` carries the module inline — what `frontend: asn1` synthesizes; no file, no jail. */
+    @Test
+    void inlineGrammarTextIngestsWithoutAGrammarFile(@TempDir Path dir) throws Exception {
+        // One line: X.680 is whitespace-insensitive, and a single quoted scalar sidesteps any
+        // question of TOON multi-line string support.
+        String oneLine = GRAMMAR.replace('\n', ' ').trim();
+        PipelineConfig cfg = PipelineConfig.load(writePipeline(dir, MO_CALL_SCHEMA,
+                "grammar_text: \"" + oneLine + "\"\n    root_type: CallEventRecord").toString());
+        File dat = write(dir, "cdr.ber", hex(MO_CALL_HEX));
+
+        CapturingSink sink = new CapturingSink();
+        new Asn1RecordIngester().ingest(dat, sink, 0, cfg);
+
+        assertEquals(1, sink.emitted.size());
+        assertArrayEquals(new Object[]{"42", "7", "9999", "moCallRecord"}, sink.emitted.get(0));
+    }
+
+    /** A bad inline module is a config error naming grammar_text, not a decode failure. */
+    @Test
+    void anInvalidInlineGrammarIsAConfigError(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = PipelineConfig.load(writePipeline(dir, MO_CALL_SCHEMA,
+                "grammar_text: \"this is not X.680\"\n    root_type: CallEventRecord").toString());
+        File dat = write(dir, "cdr.ber", hex(MO_CALL_HEX));
+        Exception e = assertThrows(IllegalArgumentException.class,
+                () -> new Asn1RecordIngester().ingest(dat, new CapturingSink(), 0, cfg));
+        assertTrue(e.getMessage().contains("grammar_text"), e.getMessage());
+    }
+
     @Test
     void anUnreadableGrammarPathIsAConfigError(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = PipelineConfig.load(writePipeline(dir, MO_CALL_SCHEMA,

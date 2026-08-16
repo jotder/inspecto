@@ -93,6 +93,15 @@ export const NODE_TYPES: PipelineNodeType[] = (
             emits: ['data', 'unmatched'],
             emitsNamedRoutes: true,
         },
+        {
+            type: 'parser.asn1',
+            category: 'PARSE',
+            label: 'Parser (ASN.1)',
+            description: 'Decodes BER/DER records against an X.680 grammar and flattens them onto segment schemas.',
+            accepts: ['data'],
+            emits: ['data', 'unmatched'],
+            emitsNamedRoutes: true,
+        },
         // transform family
         {
             type: 'transform.map',

@@ -56,6 +56,13 @@ public enum BuiltinNodeType implements PipelineNodeType {
     PARSER_FIXEDWIDTH("parser.fixedwidth", NodeCategory.PARSE, "Parser (fixed width)",
             "Reads a fixed-width landed file into rows; positional slices carved from each record.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true),
+    // ASN.1 (P3c). One spelling, never implicit. `frontend: asn1` is first-class in the parser
+    // (PipelineConfigParser#asn1PluginBlock synthesizes the Asn1RecordIngester binding), and the
+    // grammar rides INLINE in the asn1: block — X.680 text, root_type, strictness, header lengths,
+    // segments — so lift/lower carries the block verbatim and reads nothing inside it.
+    PARSER_ASN1("parser.asn1", NodeCategory.PARSE, "Parser (ASN.1)",
+            "Decodes BER/DER records against an X.680 grammar and flattens them onto segment schemas.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true),
 
     // ── transform family (§3.4 + §15) ─────────────────────────────────────────────
     TRANSFORM_MAP("transform.map", NodeCategory.TRANSFORM, "Map",

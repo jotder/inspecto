@@ -84,6 +84,7 @@ public final class PipelineEditable {
     private static final Set<String> LOWERABLE = Set.of(
             BuiltinNodeType.ACQUISITION.type(), BuiltinNodeType.PARSER.type(),
             BuiltinNodeType.PARSER_DELIMITED.type(), BuiltinNodeType.PARSER_FIXEDWIDTH.type(),
+            BuiltinNodeType.PARSER_ASN1.type(),
             BuiltinNodeType.GAP.type(),
             BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type(),
             BuiltinNodeType.TRANSFORM_DEDUP.type(),   // record-grain dedup → processing.dedup (ELT P2)
@@ -171,7 +172,8 @@ public final class PipelineEditable {
     static boolean isParserType(String t) {
         return BuiltinNodeType.PARSER.type().equals(t)
                 || BuiltinNodeType.PARSER_DELIMITED.type().equals(t)
-                || BuiltinNodeType.PARSER_FIXEDWIDTH.type().equals(t);
+                || BuiltinNodeType.PARSER_FIXEDWIDTH.type().equals(t)
+                || BuiltinNodeType.PARSER_ASN1.type().equals(t);
     }
 
     /**
@@ -182,7 +184,8 @@ public final class PipelineEditable {
      */
     private static final Map<String, List<String>> SUBTYPE_FRONTENDS = Map.of(
             BuiltinNodeType.PARSER_DELIMITED.type(), List.of("delimited"),
-            BuiltinNodeType.PARSER_FIXEDWIDTH.type(), List.of("fixedwidth", "fixed_width"));
+            BuiltinNodeType.PARSER_FIXEDWIDTH.type(), List.of("fixedwidth", "fixed_width"),
+            BuiltinNodeType.PARSER_ASN1.type(), List.of("asn1"));
 
     /** The node subtype a {@code parsing.frontend} value names, or {@code null} for none/unknown. */
     private static String subtypeForFrontend(String frontend) {
@@ -208,7 +211,8 @@ public final class PipelineEditable {
             // (Binary fixed-width reaches FixedWidthRecordIngester through the plain
             // processing.ingester CLASS key, not a use: binding, so it needs no home here.)
             BuiltinNodeType.PARSER_DELIMITED.type(), List.of(GRAMMAR_REF_PREFIX),
-            BuiltinNodeType.PARSER_FIXEDWIDTH.type(), List.of(GRAMMAR_REF_PREFIX));
+            BuiltinNodeType.PARSER_FIXEDWIDTH.type(), List.of(GRAMMAR_REF_PREFIX),
+            BuiltinNodeType.PARSER_ASN1.type(), List.of(GRAMMAR_REF_PREFIX));
 
     /**
      * The node types this flat config has a {@code use:} home for — the authoritative half of the
@@ -232,9 +236,17 @@ public final class PipelineEditable {
      * doc). ⚠ It was swept up by AUTHOR-1(b) on 2026-08-14 and refused for a day: since the editor puts
      * the ref on the node unconditionally, that made <b>every</b> pipeline holding an enrichment node
      * unsaveable. A binding the product writes is never an authoring mistake.
+     *
+     * <p>An ASN.1 node's {@code ingester/} ref is derived for the same reason from the other end: a
+     * {@code frontend: asn1} file never authors an ingester — {@code PipelineConfigParser#asn1PluginBlock}
+     * synthesizes the {@code Asn1RecordIngester} binding at load, and an explicit {@code plugin:} block
+     * beside it is refused outright — so the class {@link PipelineLift} reads back and presents as
+     * {@code use:} is the read side's own doing. Refusing it would make every ASN.1 pipeline unsaveable,
+     * which is precisely the enrichment regression above, arrived at by a different route.
      */
     private static final Map<String, String> DERIVED_USE = Map.of(
-            BuiltinNodeType.ENRICHMENT.type(), "enrichment/");
+            BuiltinNodeType.ENRICHMENT.type(), "enrichment/",
+            BuiltinNodeType.PARSER_ASN1.type(), "ingester/");
 
     /**
      * Whether this node's {@code use:} ref is DERIVED rather than authored ({@link #DERIVED_USE}).

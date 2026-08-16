@@ -32,14 +32,18 @@ import {
  * ⛔ A parse type absent here keeps the dialog. `parser` (the generic reader) has no single format to
  * lock, and binary fixed-width — which lifts to `parser.fixedwidth` all the same — carries its layout
  * in `processing.ingester_config`, which this pane cannot author (P3b operator decision).
+ *
+ * `asn1` (P3c) is not a built-in `ParsingFrontend` — the editor hosts it as the served parser it is,
+ * schema-driven off `GET /parsers` — but the node type locks it exactly like the built-ins.
  */
-export const PARSE_NODE_FRONTENDS: Record<string, ParsingFrontend> = {
+export const PARSE_NODE_FRONTENDS: Record<string, ParsingFrontend | 'asn1'> = {
     'parser.delimited': 'delimited',
     'parser.fixedwidth': 'fixedwidth',
+    'parser.asn1': 'asn1',
 };
 
 /**
- * The **Parse definition pane** (definition-surface P3a; fixed width added by P3b) — the per-format
+ * The **Parse definition pane** (definition-surface P3a; fixed width P3b, ASN.1 P3c) — the per-format
  * path of the parse node, re-hosted inside `<inspecto-definition-drawer>` instead of
  * `grammar-editor.dialog`. Renders name/description plus the shared `<inspecto-grammar-editor>`
  * locked to the node's own format: a per-format node's format IS its type (B6), so the picker would
@@ -123,7 +127,7 @@ export class PipelineParseDefinitionComponent {
      * The format this node's type means — the editor is locked to it and only templates naming it are
      * offered. Derived from the node type rather than passed in, so the host cannot desync the two.
      */
-    readonly frontend = computed<ParsingFrontend>(() => PARSE_NODE_FRONTENDS[this.node().type] ?? 'delimited');
+    readonly frontend = computed<ParsingFrontend | 'asn1'>(() => PARSE_NODE_FRONTENDS[this.node().type] ?? 'delimited');
     /**
      * Stored Grammar components offered as starting points. Passed IN rather than fetched: the pane
      * stays pure (P2 — `[node]` in, outputs out, no injected state) and the host already lists them.
@@ -236,8 +240,47 @@ export class PipelineParseDefinitionComponent {
      * so a dirty pane must stay dirty.
      */
     requestSaveAsTemplate(): void {
-        if (!this.editor?.validate()) return;
-        this.saveAsTemplate.emit({ ...this.editor.value(), frontend: this.frontend() });
+        if (!this.editor?.validate() || this.asn1Unavailable()) return;
+        const block = this.parsingValue();
+        // A template is a Grammar copy; segments are deployment-specific schema paths, not grammar.
+        if (block['asn1'] && typeof block['asn1'] === 'object') {
+            const { segments: _deployment, ...grammarOnly } = block['asn1'] as Record<string, unknown>;
+            block['asn1'] = grammarOnly;
+        }
+        this.saveAsTemplate.emit(block);
+    }
+
+    /**
+     * The `parsing:` block to persist. A built-in comes from the editor's own {@link
+     * GrammarEditorComponent#value} (authored keys + cleared sibling roots + the frontend word). asn1
+     * is a SERVED parser, not a built-in — `value()` would stamp the editor's internal frontend
+     * (delimited) — so its block is assembled here: the schema-form's `asn1.*` keys, the frontend the
+     * node type means, and the node's own `segments` carried VERBATIM. The drawer does not author
+     * segments (Onboarding owns that transaction — writing schema toons is a host write this pure
+     * pane cannot make), and a submit that dropped them would silently turn an ingest-capable config
+     * preview-only.
+     */
+    /**
+     * The asn1 form is SERVED — its fields exist only if `GET /parsers` returned the plugin. When it
+     * did not (jar not deployed, catalog fetch failed), the schema form holds no `asn1.*` keys at
+     * all, so building the block from it would write an EMPTY grammar over a deployed one and answer
+     * "applied". Refuse instead, and say why: an unauthorable pane must not look like a successful save.
+     */
+    private asn1Unavailable(): boolean {
+        if (this.frontend() !== 'asn1' || this.editor?.pluginDef()) return false;
+        this.editor?.error.set(
+            'The ASN.1 parser is not available from this server, so its grammar cannot be edited here.',
+        );
+        return true;
+    }
+
+    private parsingValue(): Record<string, unknown> {
+        const f = this.frontend();
+        if (f !== 'asn1') return { ...this.editor!.value(), frontend: f };
+        const a = { ...((this.editor!.grammar()['asn1'] as Record<string, unknown> | undefined) ?? {}) };
+        const prior = this.parsingBlock()['asn1'] as Record<string, unknown> | undefined;
+        if (prior?.['segments'] !== undefined) a['segments'] = prior['segments'];
+        return { frontend: 'asn1', asn1: a };
     }
 
     /**
@@ -246,8 +289,8 @@ export class PipelineParseDefinitionComponent {
      * editor is marked pristine because Apply consumed the edits.
      */
     submit(): void {
-        if (!this.editor?.validate()) return;
-        const block = { ...this.editor.value(), frontend: this.frontend() };
+        if (!this.editor?.validate() || this.asn1Unavailable()) return;
+        const block = this.parsingValue();
         const v = this.form.getRawValue();
         // `use` is dropped, never carried: this pane's whole contract is that the node owns its
         // Grammar inline. A node opened here BOUND to a `grammar/<id>` component is materialised into

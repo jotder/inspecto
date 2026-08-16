@@ -125,6 +125,74 @@ class UnifiedParsingBlockTest {
         assertTrue(e.getMessage().contains("plugin"), e.getMessage());
     }
 
+    // ── frontend: asn1 (first-class, definition-surface P3c) ───────────────────
+
+    /** `frontend: asn1` is sugar for the plugin wiring: the asn1: block synthesizes the
+     *  Asn1RecordIngester binding, with the grammar carried INLINE as grammar_text. */
+    @Test
+    void asn1FrontendSynthesizesThePluginWiring(@TempDir Path dir) throws Exception {
+        Path seg = dir.resolve("seg_mo.toon");
+        Files.writeString(seg, SCHEMA, StandardCharsets.UTF_8);
+        PipelineConfig cfg = load(dir, "a1ok", "", """
+                parsing:
+                  frontend: asn1
+                  asn1:
+                    grammar: "CDR DEFINITIONS ::= BEGIN Record ::= SEQUENCE { id [0] IA5String } END"
+                    root_type: Record
+                    strictness: DER
+                    file_header_length: 50
+                    segments:
+                      Record: %s
+                """.formatted(seg.toString().replace('\\', '/')));
+        assertEquals("com.gamma.ingester.Asn1RecordIngester", cfg.schemas().ingesterClass());
+        assertEquals(java.util.Set.of("Record"), cfg.schemas().segments().keySet());
+        assertTrue(String.valueOf(cfg.schemas().ingesterConfig().get("grammar_text")).contains("DEFINITIONS"),
+                "the grammar travels inline as grammar_text, never as the path-jailed grammar key");
+        assertNull(cfg.schemas().ingesterConfig().get("grammar"));
+        assertEquals("Record", cfg.schemas().ingesterConfig().get("root_type"));
+        assertEquals("DER", cfg.schemas().ingesterConfig().get("strictness"));
+        assertEquals("50", String.valueOf(cfg.schemas().ingesterConfig().get("file_header_length")));
+    }
+
+    /** An empty grammar is preview-only TLV inspection — an ingest config must carry the module. */
+    @Test
+    void asn1FrontendWithoutGrammarTextFailsLoad(@TempDir Path dir) {
+        Exception e = assertThrows(IllegalArgumentException.class, () -> load(dir, "a1ng", "", """
+                parsing:
+                  frontend: asn1
+                  asn1:
+                    root_type: Record
+                """));
+        assertTrue(e.getMessage().contains("asn1.grammar"), e.getMessage());
+    }
+
+    @Test
+    void asn1FrontendWithoutSegmentsFailsLoad(@TempDir Path dir) {
+        Exception e = assertThrows(IllegalArgumentException.class, () -> load(dir, "a1ns", "", """
+                parsing:
+                  frontend: asn1
+                  asn1:
+                    grammar: "X DEFINITIONS ::= BEGIN Y ::= IA5String END"
+                    root_type: Y
+                """));
+        assertTrue(e.getMessage().contains("asn1.segments"), e.getMessage());
+    }
+
+    /** Which of the two ingester bindings would win is undefined — carrying both is refused. */
+    @Test
+    void asn1FrontendAlongsideAnExplicitPluginBlockIsRefused(@TempDir Path dir) {
+        Exception e = assertThrows(IllegalArgumentException.class, () -> load(dir, "a1px", "", """
+                parsing:
+                  frontend: asn1
+                  asn1:
+                    grammar: "X DEFINITIONS ::= BEGIN Y ::= IA5String END"
+                    root_type: Y
+                  plugin:
+                    ingester: com.gamma.ingester.FixedWidthRecordIngester
+                """));
+        assertTrue(e.getMessage().contains("synthesizes its own plugin ingester"), e.getMessage());
+    }
+
     @Test
     void unknownFrontendInCsvSettingsAlsoRejected(@TempDir Path dir) {
         Exception e = assertThrows(IllegalArgumentException.class,
@@ -161,7 +229,8 @@ class UnifiedParsingBlockTest {
                 "processing:\n" +
                 "  threads: 1\n" +
                 "  file_pattern: \"glob:**/*.csv\"\n" +
-                ("plg".equals(tag) || "nip".equals(tag) ? "" : "  schema_file: " + fwd(schema) + "\n") +
+                ("plg".equals(tag) || "nip".equals(tag) || tag.startsWith("a1")
+                        ? "" : "  schema_file: " + fwd(schema) + "\n") +
                 procExtra +
                 topExtra;
         Path p = dir.resolve("pipe_" + tag + ".toon");

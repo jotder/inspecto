@@ -116,9 +116,19 @@ export class GrammarEditorComponent {
     }
     @Input() sampleMode: SampleMode = 'own';
 
-    /** Pre-select a type (a built-in frontend id or a served parser id). */
+    /**
+     * Pre-select a type (a built-in frontend id or a served parser id).
+     *
+     * ⚠ A SETTER that re-attempts, for the same reason {@link configuredIngester} does: the catalog
+     * fetch is kicked off in the constructor, so with an already-resolved source it completes BEFORE
+     * Angular sets this input and `applyPendingType` runs against an empty pending slot. Both orders
+     * must resolve, or a served-parser type (asn1) silently presents as the default built-in.
+     */
     @Input() set type(v: string | null | undefined) {
-        if (v) this.pendingType.set(v);
+        if (!v) return;
+        this.pendingType.set(v);
+        const list = this.served();
+        if (list) this.applyPendingType(list);
     }
 
     /**

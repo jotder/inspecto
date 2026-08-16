@@ -653,6 +653,53 @@ class PipelineEditableTest {
         assertEquals("parse", ex.refusals().get(0).nodeId());
     }
 
+    // ── P3c: the ASN.1 parser subtype ────────────────────────────────────────────────
+
+    /**
+     * An explicit {@code frontend: asn1} file round-trips verbatim through the subtype — the whole
+     * {@code asn1:} block (inline grammar, root_type, strictness, segments) is carried, not read.
+     */
+    @Test
+    void explicitAsn1FrontendRoundTripsVerbatimThroughTheSubtype(@TempDir Path dir) throws Exception {
+        Path toon = writeAsn1Pipeline(dir);
+        Map<String, Object> raw = decode(toon);
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+
+        Map<String, Object> editable = PipelineEditable.toMap(cfg, raw);
+        nodeOfType(editable, "parser.asn1");   // the retype happened
+        Map<String, Object> lowered = PipelineEditable.lower(PipelineCodec.fromMap(editable), raw, true);
+
+        assertEquals(raw, lowered, "strict lower over the original file reproduces it verbatim");
+    }
+
+    /** An ASN.1 node authored fresh from the palette gets {@code frontend: asn1} stamped in. */
+    @Test
+    void aNewAsn1ParserNodeIsStampedWithItsCanonicalFrontend() {
+        Map<String, Object> lowered = PipelineEditable.lower(new PipelineGraph("x", true, List.of(
+                node("acq", "acquisition", Map.of("poll", "in")),
+                node("parse", "parser.asn1", Map.of("parsing", Map.of(
+                        "asn1", Map.of("root_type", "Record")))),
+                node("sink", "sink.persistent", Map.of("database", "db"))), List.of()),
+                new LinkedHashMap<>(), true);
+
+        Map<?, ?> parsing = (Map<?, ?>) lowered.get("parsing");
+        assertEquals("asn1", parsing.get("frontend"),
+                "the file must say the word the type means, or the next lift loses the identity");
+    }
+
+    /** {@code asn1} has one spelling; anything else on the node is a genuine contradiction. */
+    @Test
+    void aForeignFrontendOnAnAsn1NodeRefuses() {
+        PipelineCompileException ex = assertThrows(PipelineCompileException.class,
+                () -> PipelineEditable.lower(new PipelineGraph("x", true, List.of(
+                        node("acq", "acquisition", Map.of("poll", "in")),
+                        node("parse", "parser.asn1", Map.of("parsing", Map.of("frontend", "delimited"))),
+                        node("sink", "sink.persistent", Map.of("database", "db"))), List.of()),
+                        new LinkedHashMap<>(), true));
+        assertEquals(PipelineEditable.PARSER_FRONTEND_MISMATCH, ex.refusals().get(0).code());
+        assertEquals("parse", ex.refusals().get(0).nodeId());
+    }
+
     /** Two distinct databases now lower to a plural sinks: block (slice 4), not a MULTI_SINK refusal. */
     @Test
     void twoDistinctDatabasesLowerToASinksList() {
@@ -968,6 +1015,53 @@ class PipelineEditableTest {
                   schema_file: %2$s
                 """.formatted(base, sf.toString().replace('\\', '/'), frontend, extraFw);
         Path p = dir.resolve("fixed_width_pipeline.toon");
+        Files.writeString(p, toon);
+        return p;
+    }
+
+    /**
+     * The ASN.1 twin of {@link #writeFixedWidthPipeline}. The grammar is INLINE X.680 text on one
+     * line (whitespace-insensitive, and a single quoted scalar sidesteps TOON multi-line questions);
+     * the segment schema file must exist because the load resolves {@code asn1.segments} eagerly.
+     */
+    private static Path writeAsn1Pipeline(Path dir) throws Exception {
+        Path sf = dir.resolve("record_schema.toon");
+        Files.writeString(sf, """
+                partitionKey: ID
+                raw:
+                  name: record
+                  format: CSV
+                  fields[1]{name,selector,type}:
+                    ID, id, VARCHAR
+                mapping:
+                  canonicalName: record
+                  rawName: record
+                  rules[1]{targetColumn,sourceExpression,transformType}:
+                    ID, ID, DIRECT
+                """);
+        String base = dir.toString().replace('\\', '/');
+        String toon = """
+                name: ASN1_CDR
+                active: true
+                dirs:
+                  poll: %1$s/inbox
+                  database: %1$s/db
+                output:
+                  format: CSV
+                collector:
+                  connector: local
+                parsing:
+                  frontend: asn1
+                  asn1:
+                    grammar: "CDR DEFINITIONS ::= BEGIN Record ::= SEQUENCE { id [0] IA5String } END"
+                    root_type: Record
+                    strictness: BER
+                    segments:
+                      Record: %2$s
+                processing:
+                  threads: 1
+                """.formatted(base, sf.toString().replace('\\', '/'));
+        Path p = dir.resolve("asn1_pipeline.toon");
         Files.writeString(p, toon);
         return p;
     }

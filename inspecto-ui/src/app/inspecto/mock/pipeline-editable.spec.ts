@@ -300,6 +300,90 @@ describe('mock pipeline-editable — the fixed-width parser subtype (parser.fixe
 });
 
 /**
+ * Parity guard for the ASN.1 parser subtype (P3c). One spelling only, never implicit, and the
+ * grammar rides INLINE in the asn1: block (grammar text, root_type, strictness, headers, segments) —
+ * so lift/lower is pure carry: nothing here reads inside the block.
+ */
+describe('mock pipeline-editable — the ASN.1 parser subtype (parser.asn1)', () => {
+    const asn1Config = () => ({
+        name: 'A1',
+        active: true,
+        dirs: { poll: '/in', database: '/db' },
+        output: { format: 'CSV' },
+        collector: { connector: 'local' },
+        parsing: {
+            frontend: 'asn1',
+            asn1: {
+                grammar: 'CDR DEFINITIONS ::= BEGIN Record ::= SEQUENCE { id [0] IA5String } END',
+                root_type: 'Record',
+                strictness: 'BER',
+                segments: { Record: 'config/record_schema.toon' },
+            },
+        },
+        processing: {},
+    });
+
+    it('lifts frontend: asn1 to the subtype and round-trips the block — segments included — verbatim', () => {
+        const existing = asn1Config();
+        const g = liftConfig(existing);
+
+        expect(g.nodes.find((n) => n.type === 'parser.asn1')).toBeDefined();
+        const res = lowerGraph(g, existing, true);
+        expect((res as { config: Record<string, unknown> }).config).toEqual(asn1Config());
+    });
+
+    it('stamps frontend: asn1 onto a palette-fresh node', () => {
+        const existing = asn1Config();
+        const g = liftConfig(existing);
+        const parser = g.nodes.find((n) => n.type === 'parser.asn1')!;
+        parser.config = { parsing: { asn1: { root_type: 'Record' } } };
+
+        const res = lowerGraph(g, existing, true);
+
+        const parsing = (res as { config: Record<string, unknown> }).config['parsing'] as Record<string, unknown>;
+        expect(parsing['frontend']).toBe('asn1');
+    });
+
+    it('refuses a foreign frontend on an asn1 node', () => {
+        const existing = asn1Config();
+        const g = liftConfig(existing);
+        const parser = g.nodes.find((n) => n.type === 'parser.asn1')!;
+        parser.config = { parsing: { frontend: 'delimited' } };
+
+        const res = lowerGraph(g, existing, true);
+
+        expect('refusals' in res).toBe(true);
+        const refusals = (res as { refusals: { code: string; nodeId?: string }[] }).refusals;
+        expect(refusals[0].code).toBe('PARSER_FRONTEND_MISMATCH');
+        expect(refusals[0].nodeId).toBe(parser.id);
+    });
+
+    /**
+     * ⚠ The gap the round-trip test caught: `frontend: asn1` makes the config parser synthesize an
+     * `Asn1RecordIngester` binding, so the LIFT reads a class back and presents `use: ingester/<fqcn>`
+     * on a node whose only authored home is `grammar/`. Refusing it would make every ASN.1 pipeline
+     * unsaveable — the enrichment regression by another route — so it is DERIVED and dropped silently.
+     * An unrelated homeless ref on the same node still refuses.
+     */
+    it('drops the synthesized ingester/ ref as derived, and takes a grammar/ binding', () => {
+        const existing = asn1Config();
+        const g = liftConfig(existing);
+        const parser = g.nodes.find((n) => n.type === 'parser.asn1')!;
+
+        parser.use = 'grammar/vendor_cdr';
+        expect('refusals' in lowerGraph(g, existing, true)).toBe(false);
+
+        parser.use = 'ingester/com.gamma.ingester.Asn1RecordIngester';
+        expect('refusals' in lowerGraph(g, existing, true)).toBe(false);
+
+        parser.use = 'transform/nope';
+        const res = lowerGraph(g, existing, true);
+        expect('refusals' in res).toBe(true);
+        expect((res as { refusals: { code: string }[] }).refusals[0].code).toBe('UNSUPPORTED_BINDING');
+    });
+});
+
+/**
  * Parity guard for the processing-key transform nodes the server lowers (PipelineEditable.LOWERABLE):
  * transform.dedup → processing.dedup {keys, order_by}, transform.join → processing.join
  * {reference, on}, transform.summarize → processing.summarize {group_by, measures}. The mock used to
