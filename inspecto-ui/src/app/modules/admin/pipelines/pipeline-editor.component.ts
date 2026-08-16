@@ -55,6 +55,7 @@ import { PipelineStepCardsComponent } from './pipeline-step-cards.component';
 import { NodeConfigDialog, NodeConfigResult } from './node-config.dialog';
 import { PipelineCollectionDefinitionComponent } from './pipeline-collection-definition.component';
 import { PARSE_NODE_FRONTENDS, PipelineParseDefinitionComponent } from './pipeline-parse-definition.component';
+import { PipelineLoadDefinitionComponent } from './pipeline-load-definition.component';
 import { GrammarEditorDialog } from './grammar-editor.dialog';
 import { PipelineOpenDialog } from './pipeline-open.dialog';
 import { PipelineChangeIdDialog, PipelineChangeIdResultData } from './pipeline-change-id.dialog';
@@ -139,6 +140,7 @@ const GRAMMAR_REF_PREFIX = 'grammar/';
         DefinitionDrawerComponent,
         PipelineCollectionDefinitionComponent,
         PipelineParseDefinitionComponent,
+        PipelineLoadDefinitionComponent,
         PipelineDryRunPanelComponent,
         PipelineEditorGraphComponent,
         PipelineInspectorComponent,
@@ -312,6 +314,7 @@ export class PipelineEditorComponent implements OnInit {
     readonly definitionDirty = signal(false);
     @ViewChild(PipelineCollectionDefinitionComponent) private definitionPane?: PipelineCollectionDefinitionComponent;
     @ViewChild(PipelineParseDefinitionComponent) private parseDefinitionPane?: PipelineParseDefinitionComponent;
+    @ViewChild(PipelineLoadDefinitionComponent) private loadDefinitionPane?: PipelineLoadDefinitionComponent;
 
     /** Served specs for the drawer's node type (`undefined` until the catalog resolves — the pane falls back). */
     definitionAttributes(): AttributeSpec[] | undefined {
@@ -1196,7 +1199,7 @@ export class PipelineEditorComponent implements OnInit {
         // slice lands (P3b–P3d, P4). A grammar-BOUND parser node stays on the dialog even when it is
         // delimited: updating a reusable Grammar component is its own write route, which the dialog
         // owns — the drawer's Apply is an in-memory patch only (D2).
-        if (node.type === 'acquisition' || this.isDrawerParse(node)) {
+        if (node.type === 'acquisition' || this.isDrawerParse(node) || node.type === 'transform.map') {
             void this.openDefinition(node);
             return;
         }
@@ -1301,9 +1304,22 @@ export class PipelineEditorComponent implements OnInit {
         this.inspectorOpen.set(true);
     }
 
+    /**
+     * The parser node's `schema_file` — read-only context for the Load pane, whose mapping rules map FROM
+     * that schema's fields. The key lives on the PARSER node (`PipelineLift` puts it there with
+     * `csv_settings`/`schemas`/`segments`), never on `transform.map`, whose only authored keys are
+     * `{columns, rules}` — so the host, which holds the whole graph, is the one place that can supply it.
+     */
+    readonly parserSchemaFile = computed(() => {
+        const parser = (this.model()?.nodes ?? []).find(
+            (n) => n.type === 'parser' || n.type in PARSE_NODE_FRONTENDS,
+        );
+        return String(parser?.config?.['schema_file'] ?? '').trim();
+    });
+
     /** Drawer Apply: ask the pane to rebuild the node (it emits `applied` → {@link onDefinitionApplied}). */
     applyDefinition(): void {
-        (this.definitionPane ?? this.parseDefinitionPane)?.submit();
+        (this.definitionPane ?? this.parseDefinitionPane ?? this.loadDefinitionPane)?.submit();
     }
 
     /** The pane's rebuilt node — an in-memory patch (D2), persisted only by the toolbar Save. */

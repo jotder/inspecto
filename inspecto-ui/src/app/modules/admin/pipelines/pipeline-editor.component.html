@@ -524,11 +524,26 @@
                                             (applied)="onDefinitionApplied($event)"
                                             (dirtyChange)="definitionDirty.set($event)"
                                         />
+                                    } @else if (dn.type === 'transform.map') {
+                                        <!--
+                                            Load (P4-2b). A distinct node KIND, not a parse subtype, so
+                                            this arm is not the enumeration the note below forbids. The
+                                            parser's schema_file comes in as read-only context: the
+                                            rules map FROM that schema's fields, and the key lives on
+                                            the parser node, which only the host can reach.
+                                        -->
+                                        <app-pipeline-load-definition
+                                            [node]="dn"
+                                            [schemaFile]="parserSchemaFile()"
+                                            (applied)="onDefinitionApplied($event)"
+                                            (dirtyChange)="definitionDirty.set($event)"
+                                        />
                                     } @else {
                                         <!--
                                             Every other node reaching the drawer is a per-format parse
-                                            node — `openDefinition` opens it for `acquisition` or
-                                            `isDrawerParse` and nothing else. ONE pane serves them all:
+                                            node — `openDefinition` opens it for `acquisition`,
+                                            `isDrawerParse` or `transform.map` and nothing else. ONE
+                                            pane serves every parse format:
                                             it reads its own format off the node type
                                             (PARSE_NODE_FRONTENDS), so a new format needs no template
                                             change at all. ⛔ Do not re-enumerate the subtypes here —
