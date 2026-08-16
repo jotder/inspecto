@@ -538,3 +538,71 @@ editor: seed `[rows]`, call `validate()` then `value()`, host owns every write, 
 change, so hosts hold the seed in a signal; and the onboarding pane reaches it through a **signal**
 `viewChild` because `includedNames` is `computed()` off it and a plain `@ViewChild` would never re-run
 that computed when the grid appears.
+
+## Marker dedup lives on the acquisition node (P5, 2026-08-16)
+
+File-grain duplicate detection is decided in the poll cycle, before anything is parsed. Fingerprint
+policy (`collector.duplicate.*`) had ridden the acquisition node since 2026-08-04; **marker dedup
+joined it in P5**, and `transform.dedup.marker` stopped being emitted. Config keys are unchanged
+(`processing.duplicate_check` + `dirs.markers`).
+
+### The toggle is authored, and authoritative in both directions
+
+`duplicate_check` is an explicit boolean on the node, not "presence of a detail key". The lift always
+emits `retention_days` when dedup is on, so presence *looks* like a usable switch — but then clearing
+the retention field in the form would silently disable dedup on the next save. And when the toggle is
+**present** it wins both ways: an explicit `false` must not fall through to a legacy marker node and
+re-enable what the operator just switched off. One statement of the rule, `PipelineLift.markerHome`,
+is called by all three readers (`PipelineEditable.lower`, `PipelineCompiler`, the guarantees panel's
+mirror) — it was a copy in three places for exactly one commit before that hurt.
+
+### Read-compat is a LOWER-only property
+
+`transform.dedup.marker` stays in `LOWERABLE` and is still accepted; it is simply never emitted again.
+An editor opened before the fold holds a lifted graph carrying one, and refusing it would delete that
+operator's dedup on their next save. ⚠ Its `editableConfig` branch **was** deleted — nothing lifts it
+any more, so that branch was dead the moment the lift changed.
+
+### `authorable` ≠ `lowerable` (the palette's flag)
+
+The palette used to filter on `lowerable`, which the retired node must keep. That single flag cannot
+express "still saveable, never offerable", so the node-type catalog publishes **`authorable`**
+(`PipelineEditable.isAuthorable` = lowerable ∧ not `READ_COMPAT_ONLY`). It is **optional** on the
+client type: an older server omits it and the palette falls back to `lowerable`, which is right for a
+server with no retired types. A graph carrying the retired node still renders and is *not* flagged
+unsupported — pinned as the third case in the editor spec.
+
+### The marker keys are NOT part of `COLLECTOR_ATTRIBUTES`
+
+They live in `processing:`/`dirs:` and are only *borrowed* by the acquisition node, so they are their
+own `MARKER_DEDUP` list and the node publishes `COLLECTOR + MARKER_DEDUP`. Folding them into the block
+table would give Onboarding's Collection stage — which renders that table whole — four fields it would
+write to a block nothing reads them in. This is the per-*block*-not-per-*node* rule above, in the one
+case where a node's spec is legitimately wider than its block.
+
+⚠ **`lower` dumps the acquisition node's config wholesale into `collector:`**, minus an exclusion set.
+A borrowed key missing from `ACQ_FOREIGN_KEYS` therefore lands in a block nothing reads it from —
+silently. The set is mirrored in the mock and the leak is asserted in both languages.
+
+⚠ The Collection drawer renders the group with `tier: 'required'` + `required: false` (always visible,
+never mandatory). As `optional` the switch sat behind the schema form's disclosure and the group
+rendered as a heading over "Optional settings (1)" **and nothing else** — a unit test asserting the
+heading text passed the whole time; only driving the preview showed it.
+
+## Go-live registers the Dataset, from either surface (P6-b, 2026-08-16)
+
+Activating a *stream* registers a Dataset over the store it lands, so landed data is queryable without
+anyone authoring one. The hop is `DatasetRegistrationService` (`inspecto/api`), shared by the
+onboarding shell and the Pipelines editor's toolbar action — **idempotent by `physicalRef`** whatever
+the dataset's id, `sourceName` = the store (blank falls through to a default naming nothing, so the
+dataset reads zero rows everywhere), and it **never reverses an activation that already succeeded**:
+every failure resolves to a `failed` result the host reports as a warning.
+
+🔴 **`produces` names two different things.** `PipelineSummary.produces` is the list of STORES a
+pipeline produces; stream-vs-reference is the config-level `produces` behind the **D8 `settings`**
+endpoint. Deciding the Dataset hop off the summary field is silently wrong. ⚠ When that read *fails*,
+register nothing and warn — a Dataset over a Reference's store puts rows in the Catalog that nothing
+should query there.
+
+⚠ `InspectoConfirmService.confirm(message, title)` takes a **title string**; only `confirmDestructive`
+takes an options object.
