@@ -7,7 +7,28 @@
 ## The identity model
 
 `ConfigSpecs.pipeline()` splits `name` (display) from `id` (stable identity, `[a-z0-9][a-z0-9_]*`,
-immutable once set). `id` is **absent from every config written before 2026-08-02** — identity is
+immutable once set). **Since 2026-08-17 a newly created pipeline carries `id:` from birth** — the UI's
+`pipelineScaffold()` stamps it, and that function is the single payload builder behind *both* create
+surfaces (the Pipelines editor's inline "New pipeline" and the Catalog `onboarding-create.dialog`), so
+neither can drift from the other. The stamped value is **byte-identical to the derivation below**
+(`derivedPipelineId()` mirrors `PipelineConfigParser.java:81`), so nothing is keyed differently and this
+is not a migration; it only stops the id following the name, which makes `label` below a pure one-field
+edit rather than a stamp-then-edit.
+
+⛔ **The id is deliberately NOT opaque/minted.** It names the config file, `<id>_commits.log`, the ledger
+`source_id` and the Catalog Stream — a random id makes an operator's config directory unreadable. If a
+fully-decoupled identity is ever wanted, that is a product decision with an on-disk cost, not a cleanup.
+
+🔴 **Three rules derive an identity-ish string from `name`, and they do not agree.** The `id` **pattern**
+(`[a-z0-9][a-z0-9_]*`) is enforced only on an **explicit** id; the **derivation** lower-cases and
+underscores spaces and nothing else; the **filename** comes from a third path (`ConfigRoutes`'
+`identityField("pipeline")` → `name`). So a name like `my-pipe` or `has.dot` derives an id its own spec
+would reject — and stamping it would newly refuse a name the create form accepts today. `pipelineScaffold`
+therefore **omits** `id` in exactly that case, leaving such a pipeline on the derivation (and
+un-renameable). Whether the derivation or the pattern is wrong is an open decision; ⛔ do not resolve it by
+widening the pattern without reconciling the filename rule too.
+
+`id` is **absent from every config written before 2026-08-02** — identity is
 *derived* from `name` (`lowercase, spaces→underscores`) and baked into ~140 call sites: the config
 filename, `<id>_commits.log`, the run-timestamped audit CSVs, the acquisition ledger's `source_id`, the
 DuckDB status mirror's `pipeline` column, and the Catalog Stream. That embedding is why a rename is a
@@ -21,7 +42,8 @@ migration, not an edit, and why the feature ships in three tiers of cost:
 
 ## `label` — display-name-only rename
 
-Stamps `id` with today's derived value (idempotent — a no-op if already set), then writes the new `name`.
+Stamps `id` with today's derived value (idempotent — a no-op if already set, which is now the normal case
+for anything created after 2026-08-17), then writes the new `name`.
 The file keeps its `<id>_pipeline.toon` name; dirs, audit trail, ledger keys and Stream are untouched, so
 no dependent config needs rewriting. This is the route for "I don't need `id` to change" — most renames.
 
