@@ -1210,7 +1210,8 @@ export class PipelineEditorComponent implements OnInit {
                     this.transfer.download(bundle);
                     // A satellite that could not be read is named, not swallowed — the file downloaded,
                     // but it is incomplete and re-importing it would silently lose that piece.
-                    if (missing.length) this.toast.warning(`Exported without ${missing.join(', ')} — could not be read.`);
+                    if (missing.length)
+                        this.toast.warning(`Exported without ${missing.join(', ')} — could not be read.`);
                     else this.toast.success(`Exported "${id}" configuration`);
                 },
                 error: (err) => {
@@ -1560,6 +1561,21 @@ export class PipelineEditorComponent implements OnInit {
         const parser = (this.model()?.nodes ?? []).find((n) => n.type === 'parser' || n.type in PARSE_NODE_FRONTENDS);
         return String(parser?.config?.['schema_file'] ?? '').trim();
     });
+
+    /**
+     * The definition drawer's header identity for a node — the GLOSSARY's definition stages
+     * (**Collector · Parse · Load**), which is exactly the set `openDefinition` admits.
+     *
+     * <p>⚠ It is a THREE-way choice. The template used to inline a two-way
+     * `acquisition ? 'Collector' : 'Parser'` ternary, which labelled the Load drawer **"PARSER"** and
+     * gave it the parse icon — invisible to every unit test, found by driving the preview. Any new node
+     * kind that reaches this drawer must be added here, not re-inlined at the binding.
+     */
+    definitionKind(node: AuthoredNode): { label: string; icon: string } {
+        if (node.type === 'acquisition') return { label: 'Collector', icon: 'heroicons_outline:inbox-arrow-down' };
+        if (node.type === 'transform.map') return { label: 'Load', icon: 'heroicons_outline:arrows-right-left' };
+        return { label: 'Parse', icon: 'heroicons_outline:document-text' };
+    }
 
     /** Drawer Apply: ask the pane to rebuild the node (it emits `applied` → {@link onDefinitionApplied}). */
     applyDefinition(): void {

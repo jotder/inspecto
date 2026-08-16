@@ -521,16 +521,17 @@
                                  here in the dock, not in a popup. Apply is an in-memory patch (D2);
                                  Discard recreates the pane from the model (the @for tracks the epoch,
                                  so bumping it is the recreation). -->
+                            <!-- THREE kinds reach this drawer, so the header identity is a three-way
+                                 choice made in the component (`definitionKind`): the two-way
+                                 acquisition/else ternary that used to be inlined here labelled the Load
+                                 drawer "PARSER". The names are the GLOSSARY's definition stages —
+                                 Collector · Parse · Load. -->
                             @for (epoch of [definitionEpoch()]; track epoch) {
                                 <inspecto-definition-drawer
                                     class="block h-full"
                                     [title]="dn.name || dn.id"
-                                    [kindLabel]="dn.type === 'acquisition' ? 'Collector' : 'Parser'"
-                                    [icon]="
-                                        dn.type === 'acquisition'
-                                            ? 'heroicons_outline:inbox-arrow-down'
-                                            : 'heroicons_outline:document-text'
-                                    "
+                                    [kindLabel]="definitionKind(dn).label"
+                                    [icon]="definitionKind(dn).icon"
                                     [dirty]="definitionDirty()"
                                     (apply)="applyDefinition()"
                                     (discard)="discardDefinition()"

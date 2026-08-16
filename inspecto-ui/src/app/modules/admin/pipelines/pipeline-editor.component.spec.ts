@@ -203,7 +203,10 @@ describe('PipelineEditorComponent', () => {
             c.exportConfig();
 
             expect(config.read).toHaveBeenCalledWith('pipeline', 'demo');
-            expect(transfer.buildExport).toHaveBeenCalledWith('demo', 'reference', { name: 'demo', produces: 'reference' });
+            expect(transfer.buildExport).toHaveBeenCalledWith('demo', 'reference', {
+                name: 'demo',
+                produces: 'reference',
+            });
             expect(transfer.download).toHaveBeenCalled();
         });
 
@@ -939,6 +942,28 @@ describe('PipelineEditorComponent', () => {
 
             it('is null before anything is open', () => {
                 expect(make().sampleThread()).toBeNull();
+            });
+        });
+
+        /**
+         * The drawer header names the GLOSSARY's definition stage. ⚠ Three kinds reach the drawer, and
+         * the binding used to be a two-way `acquisition ? 'Collector' : 'Parser'` ternary — so the Load
+         * drawer announced itself as "PARSER" with the parse icon. Found by driving the preview.
+         */
+        describe('definition drawer header', () => {
+            it('names each of the three kinds that reach the drawer', () => {
+                const c = make();
+                expect(c.definitionKind({ id: 'a', type: 'acquisition' }).label).toBe('Collector');
+                expect(c.definitionKind({ id: 'm', type: 'transform.map' }).label).toBe('Load');
+                expect(c.definitionKind({ id: 'p', type: 'parser.delimited' }).label).toBe('Parse');
+                expect(c.definitionKind({ id: 'p2', type: 'parser' }).label).toBe('Parse');
+            });
+
+            it('gives the Load drawer its own icon, not the parse one', () => {
+                const c = make();
+                const load = c.definitionKind({ id: 'm', type: 'transform.map' }).icon;
+                expect(load).not.toBe(c.definitionKind({ id: 'p', type: 'parser' }).icon);
+                expect(load).not.toBe(c.definitionKind({ id: 'a', type: 'acquisition' }).icon);
             });
         });
     });
