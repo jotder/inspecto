@@ -40,7 +40,7 @@ export function grammarContentAsParsingBlock(content: Record<string, unknown>): 
     if (block['frontend'] === undefined && typeof legacyType === 'string') block['frontend'] = legacyType;
 
     // Already nested ⇒ nothing to lift. Only a flat component needs the csv settings rehomed.
-    if (PARSING_ROOTS.some((r) => block[r] !== null && typeof block[r] === 'object')) return block;
+    if (isNestedGrammarContent(block)) return block;
 
     const delimited: Record<string, unknown> = {};
     for (const k of CSV_SETTINGS_KEYS) {
@@ -52,8 +52,12 @@ export function grammarContentAsParsingBlock(content: Record<string, unknown>): 
     return block;
 }
 
-/** Sub-block roots that are a parser other than DSV — a `delimited:` reading of one is a fiction. */
-const NON_DELIMITED_ROOTS = ['fixedwidth', 'json', 'text_regex', 'plugin'];
+/**
+ * Sub-block roots that are a parser other than DSV — a `delimited:` reading of one is a fiction.
+ * ⚠ DERIVED from `PARSING_ROOTS`, never restated: a new root added to one list but not the other would
+ * silently read as delimited again, which is the exact failure this module exists to prevent.
+ */
+const NON_DELIMITED_ROOTS = PARSING_ROOTS.filter((r) => r !== 'delimited');
 
 /**
  * What this Grammar is, when it is **not** plain delimited — a root sub-block name (`plugin`,
@@ -64,12 +68,34 @@ const NON_DELIMITED_ROOTS = ['fixedwidth', 'json', 'text_regex', 'plugin'];
  * a form that then SAVES that reading replaces the stored parser (`PUT /components` is a replace).
  */
 export function nonDelimitedGrammar(content: Record<string, unknown>): string | null {
-    const block = grammarContentAsParsingBlock(content);
+    return nonDelimitedGrammarBlock(grammarContentAsParsingBlock(content));
+}
+
+/**
+ * As {@link nonDelimitedGrammar}, for a caller that has ALREADY normalised. Prefer this whenever the
+ * block is needed too — normalising twice for one answer costs two spreads and a key sweep per call,
+ * and the summary/seed paths run per row per change detection.
+ *
+ * Reading `frontend` off the block rather than the raw content is not a shortcut: the lift folds a
+ * legacy `parser_type` into `frontend`, so the block already carries whichever the component declared.
+ */
+export function nonDelimitedGrammarBlock(block: Record<string, unknown>): string | null {
     const root = NON_DELIMITED_ROOTS.find((r) => block[r] !== null && typeof block[r] === 'object');
     if (root) return root;
     if (block['segments'] !== undefined) return 'segments';
-    if (grammarSeedsFrontend(content, 'delimited')) return null;
-    return String(content['frontend'] ?? content['parser_type']);
+    if (grammarSeedsFrontend(block, 'delimited')) return null;
+    return String(block['frontend']);
+}
+
+/**
+ * The inverse of {@link grammarContentAsParsingBlock} — a block written back in the shape it was
+ * stored in. Lives here, beside the lift, so the encode/decode pair cannot drift apart: an edit is not
+ * a migration, so a legacy flat component stays flat and a nested one stays nested.
+ */
+export function grammarBlockAsContent(block: Record<string, unknown>, nested: boolean): Record<string, unknown> {
+    if (nested) return { ...block };
+    const { delimited, ...flat } = block;
+    return { ...flat, ...(delimited as Record<string, unknown> | undefined) };
 }
 
 /** Every spelling that names each per-format frontend a node type can be locked to. */

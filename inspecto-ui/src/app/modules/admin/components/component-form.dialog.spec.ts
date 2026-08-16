@@ -15,7 +15,8 @@ const SAVED: ComponentDef = {
     content: { delimiter: ',', has_header: true },
 };
 
-function create(kind: ComponentDef['type'] = 'grammar') {
+/** Build the dialog. Pass `def` for edit mode — the id locks and the stored content seeds the form. */
+function create(kind: ComponentDef['type'] = 'grammar', def?: ComponentDef) {
     const ref = { close: vi.fn() };
     const api = {
         create: vi.fn(() => of(SAVED)),
@@ -30,7 +31,7 @@ function create(kind: ComponentDef['type'] = 'grammar') {
         imports: [ComponentFormDialog],
         providers: [
             provideNoopAnimations(),
-            { provide: MAT_DIALOG_DATA, useValue: { kind } },
+            { provide: MAT_DIALOG_DATA, useValue: { kind, def } },
             { provide: MatDialogRef, useValue: ref },
             { provide: ComponentsService, useValue: api },
             { provide: ToastrService, useValue: { success: () => undefined, error: () => undefined } },
@@ -185,25 +186,8 @@ describe('ComponentFormDialog', () => {
     // `PUT /components` REPLACES content (the server carries over just owner/shares), so reading the
     // wrong shape here does not merely mis-display — it destroys the stored parser on Save.
     describe('grammar content shapes (A9)', () => {
-        function grammarDialog(content: Record<string, unknown>) {
-            const ref = { close: vi.fn() };
-            const api = { create: vi.fn(() => of(SAVED)), update: vi.fn(() => of(SAVED)) };
-            const def: ComponentDef = { type: 'grammar', name: 'vendor-x', ref: 'grammar:vendor-x', content };
-            TestBed.resetTestingModule();
-            TestBed.configureTestingModule({
-                imports: [ComponentFormDialog],
-                providers: [
-                    provideNoopAnimations(),
-                    { provide: MAT_DIALOG_DATA, useValue: { kind: 'grammar', def } },
-                    { provide: MatDialogRef, useValue: ref },
-                    { provide: ComponentsService, useValue: api },
-                    { provide: ToastrService, useValue: { success: () => undefined, error: () => undefined } },
-                ],
-            });
-            const fixture = TestBed.createComponent(ComponentFormDialog);
-            fixture.detectChanges();
-            return { fixture, c: fixture.componentInstance, api };
-        }
+        const grammarDialog = (content: Record<string, unknown>) =>
+            create('grammar', { type: 'grammar', name: 'vendor-x', ref: 'grammar:vendor-x', content });
 
         it('seeds from a nested delimited block instead of showing DSV defaults', () => {
             const { c } = grammarDialog({ frontend: 'delimited', delimited: { delimiter: '|', has_header: true } });
@@ -248,7 +232,7 @@ describe('ComponentFormDialog', () => {
                 frontend: 'plugin',
                 plugin: { ingesterClass: 'com.gamma.Asn1RecordIngester', segments: { cdr: 'x_cdr.toon' } },
             });
-            expect(c.grammarUnauthorable()).toBe('plugin');
+            expect(c.grammarUnauthorable).toBe('plugin');
             c.submit();
             expect(api.update).not.toHaveBeenCalled();
 
@@ -259,14 +243,14 @@ describe('ComponentFormDialog', () => {
         });
 
         it('refuses a Grammar whose frontend is not delimited', () => {
-            expect(grammarDialog({ frontend: 'fixedwidth' }).c.grammarUnauthorable()).toBe('fixedwidth');
-            expect(grammarDialog({ fixedwidth: { columns: [] } }).c.grammarUnauthorable()).toBe('fixedwidth');
-            expect(grammarDialog({ parser_type: 'asn1' }).c.grammarUnauthorable()).toBe('asn1');
+            expect(grammarDialog({ frontend: 'fixedwidth' }).c.grammarUnauthorable).toBe('fixedwidth');
+            expect(grammarDialog({ fixedwidth: { columns: [] } }).c.grammarUnauthorable).toBe('fixedwidth');
+            expect(grammarDialog({ parser_type: 'asn1' }).c.grammarUnauthorable).toBe('asn1');
         });
 
         it('still treats an undeclared legacy component as authorable delimited', () => {
-            expect(grammarDialog({ delimiter: ',', has_header: true }).c.grammarUnauthorable()).toBeNull();
-            expect(create('grammar').c.grammarUnauthorable()).toBeNull();
+            expect(grammarDialog({ delimiter: ',', has_header: true }).c.grammarUnauthorable).toBeNull();
+            expect(create('grammar').c.grammarUnauthorable).toBeNull();
         });
     });
 });

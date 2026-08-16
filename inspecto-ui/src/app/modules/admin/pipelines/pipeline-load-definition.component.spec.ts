@@ -205,9 +205,9 @@ describe('PipelineLoadDefinitionComponent', () => {
 
             // Incomplete is refused up front — the compiler reads parts[1] unconditionally.
             expect(p.ruleProblem(row)).toContain('date column');
-            p.setConcatPart(row, 0, 'TRADE_DATE');
+            p.setSourcePart(row, 0, 'TRADE_DATE');
             expect(p.ruleProblem(row)).not.toBeNull();
-            p.setConcatPart(row, 1, 'TRADE_TIME');
+            p.setSourcePart(row, 1, 'TRADE_TIME');
             expect(p.ruleProblem(row)).toBeNull();
             expect(p.sourcePart(row, 0)).toBe('TRADE_DATE');
 
@@ -234,14 +234,14 @@ describe('PipelineLoadDefinitionComponent', () => {
             const p = pane(fixture);
             const row = p.ruleRows.at(0);
 
-            p.setFilenamePart(row, 0, 'FILE_NAME');
+            p.setSourcePart(row, 0, 'FILE_NAME');
             // ⚠ NOT `FILE_NAME||` — an empty third position would compile to TRY_STRPTIME(…, '').
             expect(row.getRawValue().sourceExpression).toBe('FILE_NAME');
             expect(p.ruleProblem(row)).toBeNull();
 
-            p.setFilenamePart(row, 2, '%Y%m%d');
+            p.setSourcePart(row, 2, '%Y%m%d');
             expect(row.getRawValue().sourceExpression).toBe('FILE_NAME||%Y%m%d');
-            p.setFilenamePart(row, 1, 'data_');
+            p.setSourcePart(row, 1, 'data_');
             expect(row.getRawValue().sourceExpression).toBe('FILE_NAME|data_|%Y%m%d');
             expect(p.sourcePart(row, 1)).toBe('data_');
 
@@ -260,7 +260,6 @@ describe('PipelineLoadDefinitionComponent', () => {
             );
             const p = pane(fixture);
             expect(p.ruleProblem(p.ruleRows.at(0))).toContain('EVENT_DATE');
-            expect(p.anyRuleProblem()).toBe(true);
 
             // Blocked before the round trip — the engine enforces this in three places and would 422.
             p.submit();

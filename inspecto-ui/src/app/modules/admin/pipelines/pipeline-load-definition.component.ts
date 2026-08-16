@@ -9,6 +9,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { AuthoredNode, ConfigService, apiErrorMessage } from 'app/inspecto/api';
 import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
+import { FILENAME_DATE_TARGET, TRANSFORM_TYPES } from 'app/inspecto/mapping';
 import { schemaNameFromPath } from 'app/inspecto/segments';
 
 /**
@@ -24,14 +25,19 @@ import { schemaNameFromPath } from 'app/inspecto/segments';
  * A rule carrying a type this pane does not offer is still preserved and shown, never silently
  * rewritten: not offering a type is a UI limit and must not become a data loss.
  */
-const OFFERED_TRANSFORMS = ['DIRECT', 'EXPR', 'CONCAT_DT', 'FILENAME_DATE'] as const;
+const OFFERED_TRANSFORMS = TRANSFORM_TYPES;
+
+/** One shared array so `transformsFor` can hand back a stable reference on the common path. */
+const OFFERED_LIST: string[] = [...OFFERED_TRANSFORMS];
 
 /**
- * `FILENAME_DATE` may only write this column — enforced in THREE places server-side
- * (`TransformCompiler`, `MappingRules`, and the offline mock's validator), so authoring anything else
- * is a guaranteed 422. Mirrored here to refuse it before the round trip.
+ * How many `|` positions each structured type must always emit. `CONCAT_DT` keeps both even when one
+ * is blank — the compiler reads `parts[1]` unconditionally — while `FILENAME_DATE` keeps only the
+ * column, so an unset prefix/format stays *missing* and the compiler's own defaults govern.
  */
-const FILENAME_DATE_TARGET = 'EVENT_DATE';
+const MIN_SOURCE_POSITIONS: Record<string, number> = { CONCAT_DT: 2, FILENAME_DATE: 1 };
+
+const FILENAME_DATE_TYPE = 'FILENAME_DATE';
 
 const IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -156,7 +162,7 @@ interface RuleRow {
                                                 <mat-label>Date column</mat-label>
                                                 <mat-select
                                                     [value]="sourcePart(g, 0)"
-                                                    (valueChange)="setConcatPart(g, 0, $event)"
+                                                    (valueChange)="setSourcePart(g, 0, $event)"
                                                     aria-label="Date column"
                                                 >
                                                     @for (f of fields(); track f) {
@@ -168,7 +174,7 @@ interface RuleRow {
                                                 <mat-label>Time column</mat-label>
                                                 <mat-select
                                                     [value]="sourcePart(g, 1)"
-                                                    (valueChange)="setConcatPart(g, 1, $event)"
+                                                    (valueChange)="setSourcePart(g, 1, $event)"
                                                     aria-label="Time column"
                                                 >
                                                     @for (f of fields(); track f) {
@@ -184,7 +190,7 @@ interface RuleRow {
                                                 <mat-label>File name column</mat-label>
                                                 <mat-select
                                                     [value]="sourcePart(g, 0)"
-                                                    (valueChange)="setFilenamePart(g, 0, $event)"
+                                                    (valueChange)="setSourcePart(g, 0, $event)"
                                                     aria-label="File name column"
                                                 >
                                                     @for (f of fields(); track f) {
@@ -197,7 +203,7 @@ interface RuleRow {
                                                 <input
                                                     matInput
                                                     [value]="sourcePart(g, 1)"
-                                                    (input)="setFilenamePart(g, 1, $any($event.target).value)"
+                                                    (input)="setSourcePart(g, 1, $any($event.target).value)"
                                                     aria-label="File name prefix"
                                                     matTooltip="Literal text before the 8-digit date, e.g. cbs_cdr_vou_ — spliced into the extract pattern."
                                                 />
@@ -207,7 +213,7 @@ interface RuleRow {
                                                 <input
                                                     matInput
                                                     [value]="sourcePart(g, 2)"
-                                                    (input)="setFilenamePart(g, 2, $any($event.target).value)"
+                                                    (input)="setSourcePart(g, 2, $any($event.target).value)"
                                                     placeholder="%Y%m%d"
                                                     aria-label="Date format"
                                                 />
@@ -385,11 +391,15 @@ export class PipelineLoadDefinitionComponent {
         this.ruleRows.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.invalidateMapping());
     }
 
-    /** The type options for a row: the offered set, plus whatever it already carries (never dropped). */
+    /**
+     * The type options for a row: the offered set, plus whatever it already carries (never dropped).
+     * Returns the SAME array reference on the common path — this is a template call, so allocating a
+     * fresh copy per row per change-detection cycle would also churn `@for`'s identity.
+     */
     transformsFor(g: FormGroup): string[] {
         const current = String(g.get('transformType')?.value ?? '');
-        const offered: string[] = [...OFFERED_TRANSFORMS];
-        return offered.includes(current) || !current ? offered : [...offered, current];
+        if (!current || OFFERED_LIST.includes(current)) return OFFERED_LIST;
+        return [...OFFERED_LIST, current];
     }
 
     private sourceParts(g: FormGroup): string[] {
@@ -402,50 +412,41 @@ export class PipelineLoadDefinitionComponent {
     }
 
     /**
-     * `CONCAT_DT`'s source is `<dateColumn>|<timeColumn>` — **always both positions**. The compiler
-     * reads `parts[1]` unconditionally, so a missing `|` is an `ArrayIndexOutOfBounds` at run time;
-     * that is exactly why `MappingRules` refuses it up front, and why this never emits a bare column.
+     * Write one `|` position of a structured source, keeping the type's minimum arity.
+     *
+     * `CONCAT_DT` keeps **both** positions even when one is blank: the compiler reads `parts[1]`
+     * unconditionally, so a bare column is an `ArrayIndexOutOfBounds` at run time — which is why
+     * `MappingRules` refuses it up front. ⚠ `FILENAME_DATE`, by contrast, drops trailing blanks rather
+     * than emitting them: the compiler defaults a *missing* position (`""` prefix, `%Y%m%d` format),
+     * but an empty one interpolates into the SQL — `col||` would silently give `TRY_STRPTIME(…, '')`.
      */
-    setConcatPart(g: FormGroup, index: 0 | 1, value: string): void {
+    setSourcePart(g: FormGroup, index: number, value: string): void {
+        const type = String(g.get('transformType')?.value ?? '');
+        const min = MIN_SOURCE_POSITIONS[type] ?? 1;
         const parts = this.sourceParts(g);
+        while (parts.length <= index) parts.push('');
         parts[index] = value;
-        g.patchValue({ sourceExpression: `${parts[0] ?? ''}|${parts[1] ?? ''}` });
-    }
-
-    /**
-     * `FILENAME_DATE`'s source is `<column>|<prefix>|<strptime>`, where prefix and format are optional.
-     * ⚠ Trailing blanks are DROPPED rather than emitted: the compiler defaults a *missing* position
-     * (`""` prefix, `%Y%m%d` format), but an empty third position would interpolate an empty format
-     * string into the SQL. Writing `col||` would silently produce a `TRY_STRPTIME(…, '')`.
-     */
-    setFilenamePart(g: FormGroup, index: 0 | 1 | 2, value: string): void {
-        const parts = this.sourceParts(g);
-        while (parts.length < 3) parts.push('');
-        parts[index] = value;
-        while (parts.length > 1 && !parts[parts.length - 1].trim()) parts.pop();
+        while (parts.length > min && !parts[parts.length - 1].trim()) parts.pop();
+        while (parts.length < min) parts.push('');
         g.patchValue({ sourceExpression: parts.join('|') });
     }
 
     /** The refusal the engine would raise for this row, or `null`. Mirrors `MappingRules`. */
     ruleProblem(g: FormGroup): string | null {
+        // Read the type FIRST: this runs per row per change detection, and the overwhelming majority
+        // of rows are DIRECT — they must not pay for a split whose result is never read.
         const type = String(g.get('transformType')?.value ?? '');
-        const parts = this.sourceParts(g);
-        if (type === 'CONCAT_DT' && (!parts[0]?.trim() || !parts[1]?.trim())) {
-            return 'Needs a date column and a time column.';
-        }
-        if (type === 'FILENAME_DATE') {
-            const target = String(g.get('targetColumn')?.value ?? '')
-                .trim()
-                .toUpperCase();
-            if (target !== FILENAME_DATE_TARGET) return `Can only write ${FILENAME_DATE_TARGET}.`;
-            if (!parts[0]?.trim()) return 'Needs the column holding the file name.';
-        }
-        return null;
-    }
+        if (type !== 'CONCAT_DT' && type !== FILENAME_DATE_TYPE) return null;
 
-    /** Whether any row would be refused — used to block a save that is a guaranteed 422. */
-    anyRuleProblem(): boolean {
-        return this.ruleRows.controls.some((g) => this.ruleProblem(g as FormGroup) !== null);
+        const parts = this.sourceParts(g);
+        if (type === 'CONCAT_DT') {
+            return !parts[0]?.trim() || !parts[1]?.trim() ? 'Needs a date column and a time column.' : null;
+        }
+        const target = String(g.get('targetColumn')?.value ?? '')
+            .trim()
+            .toUpperCase();
+        if (target !== FILENAME_DATE_TARGET) return `Can only write ${FILENAME_DATE_TARGET}.`;
+        return !parts[0]?.trim() ? 'Needs the column holding the file name.' : null;
     }
 
     /**

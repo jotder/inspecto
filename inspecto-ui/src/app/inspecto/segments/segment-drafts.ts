@@ -123,6 +123,44 @@ export function schemaNameFromPath(path: unknown): string {
 }
 
 /**
+ * The `<pipeline>_<suffix>` schema name convention, sanitised to a legal identifier. Pass an empty
+ * suffix for the bare `<pipeline>_` prefix that identifies the schemas a pipeline OWNS.
+ *
+ * ⚠ One spelling on purpose: a delete cascade decides what it may remove by testing this prefix
+ * against names a writer produced, so the two must stay byte-identical. They were separate regexes
+ * until 2026-08-17.
+ */
+export function companionSchemaName(pipeline: string, suffix: string): string {
+    return `${pipeline}_${suffix}`.replace(/[^A-Za-z0-9_]+/g, '_');
+}
+
+/**
+ * The `{segmentKey: schemaPath}` map a node's authored `parsing:` block declares, across every
+ * hierarchical frontend that can carry one — `{}` when the node has none.
+ *
+ * <p>The shape lives here rather than at each reader because three surfaces walk it (the Parse
+ * drawer's re-hydration, the delete cascade, and stream transfer), and the delete cascade is the one
+ * where missing a frontend silently orphans schema files.
+ */
+export function segmentPathsOf(config: Record<string, unknown> | undefined): Record<string, string> {
+    const parsing = config?.['parsing'];
+    if (!parsing || typeof parsing !== 'object') return {};
+    const out: Record<string, string> = {};
+    for (const key of SEGMENTED_FRONTENDS) {
+        const block = (parsing as Record<string, unknown>)[key] as Record<string, unknown> | undefined;
+        const segments = block?.['segments'];
+        if (!segments || typeof segments !== 'object' || Array.isArray(segments)) continue;
+        for (const [segKey, path] of Object.entries(segments as Record<string, unknown>)) {
+            if (typeof path === 'string') out[segKey] = path;
+        }
+    }
+    return out;
+}
+
+/** The `parsing:` sub-blocks that can declare `segments:` — add a new hierarchical frontend here. */
+const SEGMENTED_FRONTENDS = ['asn1', 'plugin'];
+
+/**
  * Rebuild a segment draft from the schema toon it was written to — the inverse of
  * {@link schemaDraftFor}, reading back the `raw.fields[]` it wrote.
  *

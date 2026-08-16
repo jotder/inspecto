@@ -12,11 +12,11 @@
         </mat-form-field>
 
         <!-- ── grammar ─────────────────────────────────────────────────────────── -->
-        @if (kind === 'grammar') { @if (grammarUnauthorable(); as reason) {
-        <p class="text-warn text-sm" role="alert">
+        @if (kind === 'grammar') { @if (grammarUnauthorable; as reason) {
+        <inspecto-alert variant="warning" title="Not editable here">
             This is a <code>{{ reason }}</code> Grammar, which this form cannot author — it only edits delimited (DSV)
             settings, and saving would replace the stored parser. Edit it from the pipeline's Parse step.
-        </p>
+        </inspecto-alert>
         } @else {
         <div class="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
             <mat-form-field subscriptSizing="dynamic">
@@ -217,7 +217,7 @@
             type="submit"
             mat-flat-button
             color="primary"
-            [disabled]="form.invalid || saving || !!grammarUnauthorable()"
+            [disabled]="form.invalid || saving || !!grammarUnauthorable"
         >
             {{ isEdit ? 'Save' : 'Create' }}
         </button>

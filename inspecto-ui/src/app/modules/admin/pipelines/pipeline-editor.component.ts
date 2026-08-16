@@ -40,11 +40,11 @@ import {
     apiErrorMessage,
     datasetManualHint,
 } from 'app/inspecto/api';
-import { type AttributeSpec, parseUseRef, pipelineScaffold } from 'app/inspecto/component-model';
+import { type AttributeSpec, derivedPipelineId, parseUseRef, pipelineScaffold } from 'app/inspecto/component-model';
 import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
 import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
-import { schemaNameFromPath } from 'app/inspecto/segments';
+import { companionSchemaName, schemaNameFromPath, segmentPathsOf } from 'app/inspecto/segments';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { DefinitionDrawerComponent } from 'app/inspecto/components/definition-drawer.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
@@ -1363,19 +1363,12 @@ export class PipelineEditorComponent implements OnInit {
      * sweeping one breaks a pipeline nobody asked us to touch.
      */
     private ownedSegmentSchemas(id: string): string[] {
-        const prefix = `${id}_`.replace(/[^A-Za-z0-9_]+/g, '_');
+        const prefix = companionSchemaName(id, '');
         const names = new Set<string>();
         for (const node of this.model()?.nodes ?? []) {
-            const parsing = node.config?.['parsing'];
-            if (!parsing || typeof parsing !== 'object') continue;
-            for (const key of ['asn1', 'plugin']) {
-                const block = (parsing as Record<string, unknown>)[key] as Record<string, unknown> | undefined;
-                const segments = block?.['segments'];
-                if (!segments || typeof segments !== 'object' || Array.isArray(segments)) continue;
-                for (const path of Object.values(segments as Record<string, unknown>)) {
-                    const name = schemaNameFromPath(path);
-                    if (name && name.startsWith(prefix)) names.add(name);
-                }
+            for (const path of Object.values(segmentPathsOf(node.config))) {
+                const name = schemaNameFromPath(path);
+                if (name && name.startsWith(prefix)) names.add(name);
             }
         }
         return [...names];
@@ -1398,7 +1391,7 @@ export class PipelineEditorComponent implements OnInit {
         if (!ok) return;
         // W5: deleting a registered pipeline discards its canonical config (the server refuses an
         // active pipeline — deactivate first).
-        const companion = (suffix: string): string => `${id}_${suffix}`.replace(/[^A-Za-z0-9_]+/g, '_');
+        const companion = (suffix: string): string => companionSchemaName(id, suffix);
         // Read the per-segment schemas off the graph BEFORE the delete clears it.
         const segmentSchemas = this.ownedSegmentSchemas(id).filter((n) => n !== companion('schema'));
         this.configApi
@@ -1978,7 +1971,7 @@ export class PipelineEditorComponent implements OnInit {
      * activation, which has already succeeded by the time this runs.
      */
     private ensureDataset(id: string, display: string): void {
-        const store = id.toLowerCase().replace(/ /g, '_');
+        const store = derivedPipelineId(id);
         this.api.settings(id).subscribe({
             next: (settings) => {
                 if (settings.produces === 'reference') return;

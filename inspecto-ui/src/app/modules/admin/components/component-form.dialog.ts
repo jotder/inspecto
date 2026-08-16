@@ -30,7 +30,14 @@ import {
     SinkPreview,
 } from 'app/inspecto/api';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
-import { grammarContentAsParsingBlock, isNestedGrammarContent, nonDelimitedGrammar } from 'app/inspecto/grammar';
+import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import {
+    grammarBlockAsContent,
+    grammarContentAsParsingBlock,
+    isNestedGrammarContent,
+    nonDelimitedGrammarBlock,
+} from 'app/inspecto/grammar';
+import { isRecord } from 'app/inspecto/a2ui/a2ui-artifact';
 
 /** Dialog data: `def` set ⇒ edit mode (id locked, Test available); absent ⇒ create. */
 interface ComponentFormData {
@@ -91,6 +98,7 @@ const SINK_FORMATS = ['parquet', 'csv', 'json', 'avro'];
         MatSelectModule,
         MatSlideToggleModule,
         StatusBadgeComponent,
+        InspectoAlertComponent,
     ],
     changeDetection: ChangeDetectionStrategy.Eager,
     templateUrl: './component-form.dialog.html',
@@ -133,8 +141,12 @@ export class ComponentFormDialog {
     /** Whether to write the settings back under `delimited:` — a stored shape must not change on save. */
     private grammarNested = false;
 
-    /** Set when the stored grammar is one this DSV form cannot express; names it, and blocks Save. */
-    readonly grammarUnauthorable = signal<string | null>(null);
+    /**
+     * Set when the stored grammar is one this DSV form cannot express; names it, and blocks Save.
+     * Decided once in the constructor from the component being opened — it cannot change while the
+     * dialog is open, so it is a plain field rather than a signal advertising mutability it lacks.
+     */
+    grammarUnauthorable: string | null = null;
 
     readonly title = computed(() => `${this.isEdit ? 'Edit' : 'New'} ${this.kind}`);
     readonly partitionSeparatorKeys = [ENTER, COMMA];
@@ -170,11 +182,14 @@ export class ComponentFormDialog {
             // keeps its csv settings under `delimited:`, and reading top-level keys would show DEFAULTS
             // for a stored `|` — the exact trap grammar-block.ts's "Load-bearing" note describes.
             const content = c as Record<string, unknown>;
+            // Normalise ONCE — the block answers all three questions below.
             this.grammarBlock = grammarContentAsParsingBlock(content);
+            // ⚠ Nested-ness is read off the RAW content, not the block: the lift adds a `delimited:` key
+            // to flat content, so the block always looks nested by the time we hold it.
             this.grammarNested = isNestedGrammarContent(content);
             // This form has six delimited inputs and nothing else, so a non-DSV Grammar must be REFUSED
             // rather than opened showing defaults — the Parse drawer makes the same call for plugins.
-            this.grammarUnauthorable.set(nonDelimitedGrammar(content));
+            this.grammarUnauthorable = nonDelimitedGrammarBlock(this.grammarBlock);
             const d = obj(this.grammarBlock['delimited']);
             this.form.patchValue({
                 delimiter: str(d['delimiter'], ','),
@@ -247,10 +262,9 @@ export class ComponentFormDialog {
                 setOrDelete(delimited, 'escape', v.escape || undefined);
                 setOrDelete(block, 'encoding', v.encoding || undefined);
 
-                // Write back in the shape it was stored in — an edit here is not a migration.
-                if (this.grammarNested) return { ...block, delimited };
-                delete block['delimited'];
-                return { ...block, ...delimited };
+                // Write back in the shape it was stored in — an edit here is not a migration. The rule
+                // lives beside the lift in grammar-block.ts so encode and decode cannot drift apart.
+                return grammarBlockAsContent({ ...block, delimited }, this.grammarNested);
             }
             case 'transform': {
                 // form.invalid already blocks submit() when config isn't valid JSON (jsonValidator).
@@ -272,7 +286,7 @@ export class ComponentFormDialog {
     }
 
     submit(): void {
-        if (this.grammarUnauthorable()) return;
+        if (this.grammarUnauthorable) return;
         if (this.form.invalid) {
             this.form.markAllAsTouched();
             return;
@@ -372,9 +386,9 @@ function setOrDelete(target: Record<string, unknown>, key: string, value: unknow
     if (value === undefined) delete target[key];
     else target[key] = value;
 }
-/** A `.toon` sub-block read as a map — `{}` for anything that is not one. */
+/** A `.toon` sub-block read as a mutable copy — `{}` for anything that is not a map. */
 function obj(v: unknown): Record<string, unknown> {
-    return v !== null && typeof v === 'object' && !Array.isArray(v) ? { ...(v as Record<string, unknown>) } : {};
+    return isRecord(v) ? { ...v } : {};
 }
 /** The chip label for a `partitions:` entry — a bare column name, or the `column` of a `{column, source}` map. */
 function partitionLabel(p: unknown): string {

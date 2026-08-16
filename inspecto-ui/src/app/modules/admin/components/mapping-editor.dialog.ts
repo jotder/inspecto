@@ -18,6 +18,7 @@ import {
     PipelinesService,
 } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { TRANSFORM_TYPES } from 'app/inspecto/mapping';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-resize.directive';
 import { DataTableComponent } from 'app/inspecto/data-table';
@@ -111,8 +112,7 @@ export function previewGraph(id: string, rules: Record<string, string>[]): Autho
 const COLUMNS: EditableGridColumn[] = [
     { key: 'targetColumn', label: 'Target column' },
     { key: 'sourceExpression', label: 'Source expression' },
-    // TransformCompiler's vocabulary: DIRECT (or blank), EXPR, CONCAT_DT, FILENAME_DATE.
-    { key: 'transformType', label: 'Transform type', options: ['DIRECT', 'EXPR', 'CONCAT_DT', 'FILENAME_DATE'] },
+    { key: 'transformType', label: 'Transform type', options: [...TRANSFORM_TYPES] },
 ];
 
 /**
