@@ -102,6 +102,24 @@ export const NODE_TYPES: PipelineNodeType[] = (
             emits: ['data', 'unmatched'],
             emitsNamedRoutes: true,
         },
+        {
+            type: 'parser.json',
+            category: 'PARSE',
+            label: 'Parser (JSON)',
+            description: 'Reads an NDJSON or JSON-array landed file into rows; top-level keys become the columns.',
+            accepts: ['data'],
+            emits: ['data', 'unmatched'],
+            emitsNamedRoutes: true,
+        },
+        {
+            type: 'parser.text_regex',
+            category: 'PARSE',
+            label: 'Parser (text/regex)',
+            description: 'Reads matching lines into rows via named capture groups; non-matching lines are dropped.',
+            accepts: ['data'],
+            emits: ['data', 'unmatched'],
+            emitsNamedRoutes: true,
+        },
         // transform family
         {
             type: 'transform.map',

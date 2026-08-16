@@ -38,6 +38,8 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
         'parser.delimited', // B6/P3a: the first per-format parser subtype (engine `6bc685cf`)
         'parser.fixedwidth', // P3b: the second — spans both record modes; the drawer serves text only
         'parser.asn1', // P3c: the third — first-class `frontend: asn1`, grammar carried inline
+        'parser.json', // P3d: the last two built-in frontends; neither is implicit, so both retype
+        'parser.text_regex',
         'transform.map',
         'transform.filter',
         'transform.select',
@@ -100,7 +102,7 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
         expect(dedups).toEqual(['transform.dedup.marker', 'transform.dedup']);
     });
 
-    it('marks exactly the 15 types the server can lower — a laxer mock is the whole failure mode', () => {
+    it('marks exactly the 17 types the server can lower — a laxer mock is the whole failure mode', () => {
         // Must equal PipelineEditable.LOWERABLE. If the server's set changes, this test is the
         // tripwire: a mock that offers more than the backend accepts sends the user into a 422.
         expect(
@@ -115,6 +117,8 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
             'parser.asn1',
             'parser.delimited',
             'parser.fixedwidth',
+            'parser.json',
+            'parser.text_regex',
             'sink.persistent',
             'transform.dedup',
             'transform.dedup.marker',
@@ -124,7 +128,7 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
             'transform.route',
             'transform.summarize',
         ]);
-        expect(NODE_TYPES.length).toBe(25);
+        expect(NODE_TYPES.length).toBe(27);
     });
 
     it('only the parser family and the router emit operator-named routes', () => {
@@ -133,6 +137,8 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
             'parser.delimited',
             'parser.fixedwidth',
             'parser.asn1',
+            'parser.json',
+            'parser.text_regex',
             'transform.route',
         ]);
     });

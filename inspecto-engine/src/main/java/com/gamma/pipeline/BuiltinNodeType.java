@@ -63,6 +63,17 @@ public enum BuiltinNodeType implements PipelineNodeType {
     PARSER_ASN1("parser.asn1", NodeCategory.PARSE, "Parser (ASN.1)",
             "Decodes BER/DER records against an X.680 grammar and flattens them onto segment schemas.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true),
+    // JSON and text/regex (P3d). The plan's icon table always listed six formats while B6 named only
+    // four types, so until now these two lifted to the plain PARSER and could only be defined in the
+    // grammar dialog. Like fixed width and ASN.1 they are never implicit — a config is JSON or
+    // text/regex only by saying so — so every such file retypes, and the "explicit only, don't reshape
+    // what's deployed" caveat is delimited's alone.
+    PARSER_JSON("parser.json", NodeCategory.PARSE, "Parser (JSON)",
+            "Reads an NDJSON or JSON-array landed file into rows; top-level keys become the columns.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true),
+    PARSER_TEXT_REGEX("parser.text_regex", NodeCategory.PARSE, "Parser (text/regex)",
+            "Reads matching lines into rows via named capture groups; non-matching lines are dropped.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true),
 
     // ── transform family (§3.4 + §15) ─────────────────────────────────────────────
     TRANSFORM_MAP("transform.map", NodeCategory.TRANSFORM, "Map",

@@ -700,6 +700,62 @@ class PipelineEditableTest {
         assertEquals("parse", ex.refusals().get(0).nodeId());
     }
 
+    // ── P3d: the JSON and text/regex parser subtypes ─────────────────────────────────
+
+    /**
+     * Both remaining built-in frontends round-trip verbatim through their own subtype. Neither is
+     * implicit — a config is JSON or text/regex only by saying so — so unlike delimited every such
+     * file retypes, and there is no "keeps the plain type until its author opts in" caveat.
+     */
+    @Test
+    void theRemainingBuiltinFrontendsRoundTripVerbatimThroughTheirSubtypes(@TempDir Path dir) throws Exception {
+        for (String[] c : new String[][]{
+                {"json", "parser.json", "  json:\n    format: newline\n"},
+                {"text_regex", "parser.text_regex", "  text_regex:\n    pattern: \"(?<ID>\\\\w+) (?<EVENT_DATE>.+)\"\n"}}) {
+            Path toon = writeSimpleFrontendPipeline(dir, c[0], c[2]);
+            Map<String, Object> raw = decode(toon);
+            PipelineConfig cfg = PipelineConfig.load(toon.toString());
+
+            Map<String, Object> editable = PipelineEditable.toMap(cfg, raw);
+            nodeOfType(editable, c[1]);   // the retype happened
+            Map<String, Object> lowered = PipelineEditable.lower(PipelineCodec.fromMap(editable), raw, true);
+
+            assertEquals(raw, lowered, c[0] + ": strict lower over the original file reproduces it verbatim");
+        }
+    }
+
+    /** A JSON / text-regex node authored fresh from the palette gets its frontend word stamped in. */
+    @Test
+    void aNewJsonOrTextRegexParserNodeIsStampedWithItsFrontend() {
+        for (String frontend : List.of("json", "text_regex")) {
+            Map<String, Object> lowered = PipelineEditable.lower(new PipelineGraph("x", true, List.of(
+                    node("acq", "acquisition", Map.of("poll", "in")),
+                    node("parse", "parser." + frontend, Map.of("parsing", Map.of())),
+                    node("sink", "sink.persistent", Map.of("database", "db"))), List.of()),
+                    new LinkedHashMap<>(), true);
+
+            Map<?, ?> parsing = (Map<?, ?>) lowered.get("parsing");
+            assertEquals(frontend, parsing.get("frontend"),
+                    "the file must say the word the type means, or the next lift loses the identity");
+        }
+    }
+
+    /** Each has ONE spelling; anything else on the node is a genuine contradiction. */
+    @Test
+    void aForeignFrontendOnAJsonOrTextRegexNodeRefuses() {
+        for (String frontend : List.of("json", "text_regex")) {
+            PipelineCompileException ex = assertThrows(PipelineCompileException.class,
+                    () -> PipelineEditable.lower(new PipelineGraph("x", true, List.of(
+                            node("acq", "acquisition", Map.of("poll", "in")),
+                            node("parse", "parser." + frontend,
+                                    Map.of("parsing", Map.of("frontend", "delimited"))),
+                            node("sink", "sink.persistent", Map.of("database", "db"))), List.of()),
+                            new LinkedHashMap<>(), true));
+            assertEquals(PipelineEditable.PARSER_FRONTEND_MISMATCH, ex.refusals().get(0).code());
+            assertEquals("parse", ex.refusals().get(0).nodeId());
+        }
+    }
+
     /** Two distinct databases now lower to a plural sinks: block (slice 4), not a MULTI_SINK refusal. */
     @Test
     void twoDistinctDatabasesLowerToASinksList() {
@@ -1015,6 +1071,51 @@ class PipelineEditableTest {
                   schema_file: %2$s
                 """.formatted(base, sf.toString().replace('\\', '/'), frontend, extraFw);
         Path p = dir.resolve("fixed_width_pipeline.toon");
+        Files.writeString(p, toon);
+        return p;
+    }
+
+    /**
+     * The JSON / text-regex twin of {@link #writeFixedWidthPipeline}: a frontend whose whole grammar is
+     * one nested sub-block, passed in already indented to {@code parsing:}. Selectors are column NAMES
+     * here (not the positional indices the delimited/fixed-width fixtures use) because both frontends
+     * hand the reader named columns.
+     */
+    private static Path writeSimpleFrontendPipeline(Path dir, String frontend, String block) throws Exception {
+        Path sf = dir.resolve(frontend + "_schema.toon");
+        Files.writeString(sf, """
+                partitionKey: EVENT_DATE
+                raw:
+                  name: %1$s_data
+                  format: CSV
+                  fields[2]{name,selector,type}:
+                    ID, ID, VARCHAR
+                    EVENT_DATE, EVENT_DATE, DATE
+                mapping:
+                  canonicalName: %1$s_data
+                  rawName: %1$s_data
+                  rules[2]{targetColumn,sourceExpression,transformType}:
+                    ID, ID, DIRECT
+                    EVENT_DATE, EVENT_DATE, DIRECT
+                """.formatted(frontend));
+        String base = dir.toString().replace('\\', '/');
+        String toon = """
+                name: %5$s
+                active: true
+                dirs:
+                  poll: %1$s/inbox
+                  database: %1$s/db
+                output:
+                  format: CSV
+                collector:
+                  connector: local
+                parsing:
+                  frontend: %3$s
+                %4$sprocessing:
+                  schema_file: %2$s
+                """.formatted(base, sf.toString().replace('\\', '/'), frontend, block,
+                        frontend.toUpperCase(java.util.Locale.ROOT));
+        Path p = dir.resolve(frontend + "_pipeline.toon");
         Files.writeString(p, toon);
         return p;
     }

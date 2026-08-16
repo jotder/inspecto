@@ -384,6 +384,79 @@ describe('mock pipeline-editable — the ASN.1 parser subtype (parser.asn1)', ()
 });
 
 /**
+ * Parity guard for the last two built-in frontends to get their own node type (P3d). Mirrors
+ * `PipelineEditableTest`'s P3d block. Neither is implicit — delimited alone is the parser's default —
+ * so every such file retypes, and each answers to exactly one spelling.
+ */
+describe('mock pipeline-editable — the JSON and text/regex parser subtypes', () => {
+    const cases = [
+        { type: 'parser.json', frontend: 'json', grammar: { format: 'newline' } },
+        { type: 'parser.text_regex', frontend: 'text_regex', grammar: { pattern: '(?<ID>\\w+) (?<TS>.+)' } },
+    ];
+    const configFor = (c: (typeof cases)[number]) => ({
+        name: 'BF',
+        active: true,
+        dirs: { poll: '/in', database: '/db' },
+        output: { format: 'CSV' },
+        collector: { connector: 'local' },
+        parsing: { frontend: c.frontend, [c.frontend]: { ...c.grammar } },
+        processing: { schema_file: 'bf_schema.toon' },
+    });
+
+    for (const c of cases) {
+        it(`lifts frontend: ${c.frontend} to ${c.type} and round-trips verbatim`, () => {
+            const existing = configFor(c);
+            const g = liftConfig(existing);
+
+            expect(g.nodes.find((n) => n.type === c.type)).toBeDefined();
+            const res = lowerGraph(g, existing, true);
+            expect((res as { config: Record<string, unknown> }).config).toEqual(configFor(c));
+        });
+
+        it(`stamps frontend: ${c.frontend} onto a palette-fresh ${c.type} node`, () => {
+            const existing = configFor(c);
+            const g = liftConfig(existing);
+            g.nodes.find((n) => n.type === c.type)!.config = { parsing: { [c.frontend]: { ...c.grammar } } };
+
+            const res = lowerGraph(g, existing, true);
+
+            const parsing = (res as { config: Record<string, unknown> }).config['parsing'] as Record<string, unknown>;
+            expect(parsing['frontend']).toBe(c.frontend);
+        });
+
+        it(`refuses a foreign frontend on a ${c.type} node`, () => {
+            const existing = configFor(c);
+            const g = liftConfig(existing);
+            const parser = g.nodes.find((n) => n.type === c.type)!;
+            parser.config = { parsing: { frontend: 'fixedwidth' } };
+
+            const res = lowerGraph(g, existing, true);
+
+            expect('refusals' in res).toBe(true);
+            const refusals = (res as { refusals: { code: string; nodeId?: string }[] }).refusals;
+            expect(refusals[0].code).toBe('PARSER_FRONTEND_MISMATCH');
+            expect(refusals[0].nodeId).toBe(parser.id);
+        });
+
+        it(`homes a grammar/ binding on ${c.type} but refuses an ingester/ one`, () => {
+            const existing = configFor(c);
+            const g = liftConfig(existing);
+            const parser = g.nodes.find((n) => n.type === c.type)!;
+
+            parser.use = 'grammar/vendor_feed';
+            expect('refusals' in lowerGraph(g, existing, true)).toBe(false);
+
+            // Unlike asn1, nothing synthesizes an ingester for a plain built-in, so a class binding
+            // here is an authoring mistake and must say so rather than be dropped.
+            parser.use = 'ingester/com.gamma.ingester.Asn1RecordIngester';
+            const res = lowerGraph(g, existing, true);
+            expect('refusals' in res).toBe(true);
+            expect((res as { refusals: { code: string }[] }).refusals[0].code).toBe('UNSUPPORTED_BINDING');
+        });
+    }
+});
+
+/**
  * Parity guard for the processing-key transform nodes the server lowers (PipelineEditable.LOWERABLE):
  * transform.dedup → processing.dedup {keys, order_by}, transform.join → processing.join
  * {reference, on}, transform.summarize → processing.summarize {group_by, measures}. The mock used to

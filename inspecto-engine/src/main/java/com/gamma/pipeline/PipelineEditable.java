@@ -85,6 +85,7 @@ public final class PipelineEditable {
             BuiltinNodeType.ACQUISITION.type(), BuiltinNodeType.PARSER.type(),
             BuiltinNodeType.PARSER_DELIMITED.type(), BuiltinNodeType.PARSER_FIXEDWIDTH.type(),
             BuiltinNodeType.PARSER_ASN1.type(),
+            BuiltinNodeType.PARSER_JSON.type(), BuiltinNodeType.PARSER_TEXT_REGEX.type(),
             BuiltinNodeType.GAP.type(),
             BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type(),
             BuiltinNodeType.TRANSFORM_DEDUP.type(),   // record-grain dedup → processing.dedup (ELT P2)
@@ -168,12 +169,9 @@ public final class PipelineEditable {
     /** The registry-reference prefix a Grammar-bound parser node carries on {@code use:}. */
     static final String GRAMMAR_REF_PREFIX = "grammar/";
 
-    /** The parser family: the generic parser plus the per-format subtypes (B6 — delimited, fixed width). */
+    /** The parser family: the generic parser plus every per-format subtype (B6). */
     static boolean isParserType(String t) {
-        return BuiltinNodeType.PARSER.type().equals(t)
-                || BuiltinNodeType.PARSER_DELIMITED.type().equals(t)
-                || BuiltinNodeType.PARSER_FIXEDWIDTH.type().equals(t)
-                || BuiltinNodeType.PARSER_ASN1.type().equals(t);
+        return BuiltinNodeType.PARSER.type().equals(t) || SUBTYPE_FRONTENDS.containsKey(t);
     }
 
     /**
@@ -185,7 +183,9 @@ public final class PipelineEditable {
     private static final Map<String, List<String>> SUBTYPE_FRONTENDS = Map.of(
             BuiltinNodeType.PARSER_DELIMITED.type(), List.of("delimited"),
             BuiltinNodeType.PARSER_FIXEDWIDTH.type(), List.of("fixedwidth", "fixed_width"),
-            BuiltinNodeType.PARSER_ASN1.type(), List.of("asn1"));
+            BuiltinNodeType.PARSER_ASN1.type(), List.of("asn1"),
+            BuiltinNodeType.PARSER_JSON.type(), List.of("json"),
+            BuiltinNodeType.PARSER_TEXT_REGEX.type(), List.of("text_regex"));
 
     /** The node subtype a {@code parsing.frontend} value names, or {@code null} for none/unknown. */
     private static String subtypeForFrontend(String frontend) {
@@ -212,7 +212,9 @@ public final class PipelineEditable {
             // processing.ingester CLASS key, not a use: binding, so it needs no home here.)
             BuiltinNodeType.PARSER_DELIMITED.type(), List.of(GRAMMAR_REF_PREFIX),
             BuiltinNodeType.PARSER_FIXEDWIDTH.type(), List.of(GRAMMAR_REF_PREFIX),
-            BuiltinNodeType.PARSER_ASN1.type(), List.of(GRAMMAR_REF_PREFIX));
+            BuiltinNodeType.PARSER_ASN1.type(), List.of(GRAMMAR_REF_PREFIX),
+            BuiltinNodeType.PARSER_JSON.type(), List.of(GRAMMAR_REF_PREFIX),
+            BuiltinNodeType.PARSER_TEXT_REGEX.type(), List.of(GRAMMAR_REF_PREFIX));
 
     /**
      * The node types this flat config has a {@code use:} home for — the authoritative half of the

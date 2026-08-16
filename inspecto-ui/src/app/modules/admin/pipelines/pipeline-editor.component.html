@@ -517,50 +517,32 @@
                                     (discard)="discardDefinition()"
                                     (closed)="closeDefinition()"
                                 >
-                                    @switch (dn.type) {
-                                        @case ('acquisition') {
-                                            <app-pipeline-collection-definition
-                                                [node]="dn"
-                                                [attributes]="definitionAttributes()"
-                                                (applied)="onDefinitionApplied($event)"
-                                                (dirtyChange)="definitionDirty.set($event)"
-                                            />
-                                        }
+                                    @if (dn.type === 'acquisition') {
+                                        <app-pipeline-collection-definition
+                                            [node]="dn"
+                                            [attributes]="definitionAttributes()"
+                                            (applied)="onDefinitionApplied($event)"
+                                            (dirtyChange)="definitionDirty.set($event)"
+                                        />
+                                    } @else {
                                         <!--
-                                            One pane per per-format parse subtype — it reads its own
-                                            format off the node type (PARSE_NODE_FRONTENDS), so a new
-                                            format needs only a @case here, not a second component.
+                                            Every other node reaching the drawer is a per-format parse
+                                            node — `openDefinition` opens it for `acquisition` or
+                                            `isDrawerParse` and nothing else. ONE pane serves them all:
+                                            it reads its own format off the node type
+                                            (PARSE_NODE_FRONTENDS), so a new format needs no template
+                                            change at all. ⛔ Do not re-enumerate the subtypes here —
+                                            an arm per type is a second copy of the routing rule, free
+                                            to drift from the list that actually decides it.
                                         -->
-                                        @case ('parser.delimited') {
-                                            <app-pipeline-parse-definition
-                                                [node]="dn"
-                                                [templates]="grammarTemplates()"
-                                                [pipelineName]="selectedId() ?? ''"
-                                                (applied)="onDefinitionApplied($event)"
-                                                (dirtyChange)="definitionDirty.set($event)"
-                                                (saveAsTemplate)="saveGrammarAsTemplate($event)"
-                                            />
-                                        }
-                                        @case ('parser.fixedwidth') {
-                                            <app-pipeline-parse-definition
-                                                [node]="dn"
-                                                [templates]="grammarTemplates()"
-                                                [pipelineName]="selectedId() ?? ''"
-                                                (applied)="onDefinitionApplied($event)"
-                                                (dirtyChange)="definitionDirty.set($event)"
-                                                (saveAsTemplate)="saveGrammarAsTemplate($event)"
-                                            />
-                                        }
-                                        @case ('parser.asn1') {
-                                            <app-pipeline-parse-definition
-                                                [node]="dn"
-                                                [templates]="grammarTemplates()"
-                                                [pipelineName]="selectedId() ?? ''"
-                                                (applied)="onDefinitionApplied($event)"
-                                                (dirtyChange)="definitionDirty.set($event)"
-                                                (saveAsTemplate)="saveGrammarAsTemplate($event)"
-                                            />
-                                        }
+                                        <app-pipeline-parse-definition
+                                            [node]="dn"
+                                            [templates]="grammarTemplates()"
+                                            [pipelineName]="selectedId() ?? ''"
+                                            (applied)="onDefinitionApplied($event)"
+                                            (dirtyChange)="definitionDirty.set($event)"
+                                            (saveAsTemplate)="saveGrammarAsTemplate($event)"
+                                        />
                                     }
                                 </inspecto-definition-drawer>
                             }

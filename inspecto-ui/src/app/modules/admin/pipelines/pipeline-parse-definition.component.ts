@@ -52,11 +52,17 @@ import {
  *
  * `asn1` (P3c) is not a built-in `ParsingFrontend` — the editor hosts it as the served parser it is,
  * schema-driven off `GET /parsers` — but the node type locks it exactly like the built-ins.
+ *
+ * `json` / `text_regex` (P3d) close the gap between the plan's six-format icon table and the four node
+ * types B6 named: they are ordinary built-ins the shared editor already rendered, so they needed only
+ * their entry here plus the node type behind it.
  */
 export const PARSE_NODE_FRONTENDS: Record<string, ParsingFrontend | 'asn1'> = {
     'parser.delimited': 'delimited',
     'parser.fixedwidth': 'fixedwidth',
     'parser.asn1': 'asn1',
+    'parser.json': 'json',
+    'parser.text_regex': 'text_regex',
 };
 
 /**

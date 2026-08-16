@@ -88,6 +88,31 @@ function asn1Node(): AuthoredNode {
     };
 }
 
+/** The P3d twins: ordinary built-ins the shared editor already rendered — only the node type is new. */
+function jsonNode(): AuthoredNode {
+    return {
+        id: 'parse',
+        type: 'parser.json',
+        name: 'Parser (JSON)',
+        config: {
+            schema_file: 'cdr_schema.toon',
+            parsing: { frontend: 'json', json: { format: 'array', records_path: 'payload.records' } },
+        },
+    };
+}
+
+function textRegexNode(): AuthoredNode {
+    return {
+        id: 'parse',
+        type: 'parser.text_regex',
+        name: 'Parser (text/regex)',
+        config: {
+            schema_file: 'cdr_schema.toon',
+            parsing: { frontend: 'text_regex', text_regex: { pattern: '(?<ID>\\w+) (?<TS>.+)' } },
+        },
+    };
+}
+
 /** The served definition the editor renders asn1 from — the shape parsers.handler.ts transcribes. */
 const ASN1_DEF = {
     id: 'asn1',
@@ -407,6 +432,45 @@ describe('PipelineParseDefinitionComponent', () => {
             const a = template['asn1'] as Record<string, unknown>;
             expect(a['grammar']).toContain('DEFINITIONS');
             expect(a['segments']).toBeUndefined();
+        });
+    });
+
+    /**
+     * The JSON and text/regex subtypes (P3d). Nothing about the pane changed for them — the point of
+     * these tests is exactly that: an entry in `PARSE_NODE_FRONTENDS` plus the node type behind it is
+     * the whole slice, and the seed / lock / Apply path is the shared one.
+     * ⚠ One `create()` per test — `TestBed.configureTestingModule` throws once instantiated.
+     */
+    describe('the JSON and text/regex subtypes', () => {
+        it('locks the editor to json and seeds the stored block', async () => {
+            const fixture = await create(jsonNode());
+            expect(pane(fixture).frontend()).toBe('json');
+            expect(editor(fixture).value()['json']).toEqual({ format: 'array', records_path: 'payload.records' });
+        });
+
+        it('locks the editor to text_regex and seeds the stored pattern', async () => {
+            const fixture = await create(textRegexNode());
+            expect(pane(fixture).frontend()).toBe('text_regex');
+            expect(editor(fixture).value()['text_regex']).toEqual({ pattern: '(?<ID>\\w+) (?<TS>.+)' });
+        });
+
+        it('Apply stamps the frontend and keeps the rest of the node config', async () => {
+            const fixture = await create(jsonNode());
+            editor(fixture).schemaForm!.form.patchValue({ json__format: 'auto' });
+            fixture.detectChanges();
+
+            pane(fixture).submit();
+
+            const parsing = fixture.componentInstance.applied!.config!['parsing'] as Record<string, unknown>;
+            expect(parsing['frontend']).toBe('json');
+            expect((parsing['json'] as Record<string, unknown>)['format']).toBe('auto');
+            expect(fixture.componentInstance.applied!.config!['schema_file']).toBe('cdr_schema.toon');
+        });
+
+        /** Segments are the ASN.1 load path; a built-in frontend has none to author. */
+        it('offers no segments editor on a text/regex node', async () => {
+            const fixture = await create(textRegexNode(), [], [ASN1_DEF]);
+            expect(pane(fixture).authorsSegments()).toBe(false);
         });
     });
 

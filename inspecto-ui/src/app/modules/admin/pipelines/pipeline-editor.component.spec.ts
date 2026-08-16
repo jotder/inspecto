@@ -249,6 +249,25 @@ describe('PipelineEditorComponent', () => {
         });
 
         /**
+         * P3d: the two remaining built-in frontends route the same way. Pinned per type rather than
+         * per format because the template no longer enumerates the subtypes at all — `isDrawerParse`
+         * over `PARSE_NODE_FRONTENDS` is the whole rule, and this is what proves a new entry reaches
+         * the pane without a template change.
+         */
+        it.each([
+            ['parser.json', { frontend: 'json', json: { format: 'newline' } }],
+            ['parser.text_regex', { frontend: 'text_regex', text_regex: { pattern: '(?<ID>\\w+)' } }],
+        ])('routes an inline %s node to the drawer, not the grammar dialog', (type, parsing) => {
+            const c = make();
+            c.select('demo');
+            const node = { id: 'parse', type, config: { parsing } };
+            c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, node] }));
+            c.openNodeConfig(node);
+            expect(dialog.open).not.toHaveBeenCalled();
+            expect(c.definitionNode()?.id).toBe('parse');
+        });
+
+        /**
          * P3b operator decision: a BINARY fixed-width node lifts to `parser.fixedwidth` like any other,
          * but its geometry lives in `processing.ingester_config` and is executed by
          * `FixedWidthRecordIngester` — the pane's `fixedwidth.fields[]` slice table would govern

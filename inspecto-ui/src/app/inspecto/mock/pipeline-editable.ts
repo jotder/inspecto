@@ -27,6 +27,8 @@ export const LOWERABLE = new Set([
     'parser.delimited', // the first per-format parser subtype (B6/P3a — mirrors the engine)
     'parser.fixedwidth', // the second (P3b) — spans both record modes, drawer serves text only
     'parser.asn1', // the third (P3c) — first-class `frontend: asn1`, grammar carried inline
+    'parser.json', // P3d — the two remaining built-in frontends, never implicit, so both retype
+    'parser.text_regex',
     'gap',
     'transform.dedup.marker',
     'transform.filter',
@@ -54,6 +56,8 @@ const USE_HOME: Record<string, string[]> = {
     'parser.delimited': ['grammar/'],
     'parser.fixedwidth': ['grammar/'],
     'parser.asn1': ['grammar/'],
+    'parser.json': ['grammar/'],
+    'parser.text_regex': ['grammar/'],
 };
 
 /**
@@ -65,6 +69,8 @@ const SUBTYPE_FRONTENDS: Record<string, string[]> = {
     'parser.delimited': ['delimited'],
     'parser.fixedwidth': ['fixedwidth', 'fixed_width'],
     'parser.asn1': ['asn1'],
+    'parser.json': ['json'],
+    'parser.text_regex': ['text_regex'],
 };
 
 /** Display label per subtype — mirrors each `BuiltinNodeType`'s own label. */
@@ -72,6 +78,8 @@ const PARSER_SUBTYPE_LABELS: Record<string, string> = {
     'parser.delimited': 'Parser (delimited)',
     'parser.fixedwidth': 'Parser (fixed width)',
     'parser.asn1': 'Parser (ASN.1)',
+    'parser.json': 'Parser (JSON)',
+    'parser.text_regex': 'Parser (text/regex)',
 };
 
 /** The node subtype a `parsing.frontend` value names, or `null` for none/unknown. */
@@ -80,9 +88,8 @@ const subtypeForFrontend = (frontend: string): string | null => {
     return Object.entries(SUBTYPE_FRONTENDS).find(([, v]) => v.includes(f))?.[0] ?? null;
 };
 
-/** The parser family: the generic parser plus the per-format subtypes (B6 — delimited, fixed width). */
-const isParserType = (t: string): boolean =>
-    t === 'parser' || t === 'parser.delimited' || t === 'parser.fixedwidth' || t === 'parser.asn1';
+/** The parser family: the generic parser plus every per-format subtype (B6). */
+const isParserType = (t: string): boolean => t === 'parser' || t in SUBTYPE_FRONTENDS;
 
 /**
  * Node type → the `use:` prefix that is DERIVED, not authored, and is dropped in silence on purpose
