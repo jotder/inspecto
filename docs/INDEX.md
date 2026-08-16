@@ -77,12 +77,12 @@ former root reference docs** (each index lists them):
 
 - [`superpower/definition-surface-unification-plan.md`](superpower/definition-surface-unification-plan.md)
   — **ACTIVE, the current thread.** Collapses the onboarding wizard and the pipeline-editor dialogs onto
-  one host: the `/pipelines` editor with a right-dock definition drawer. **P0–P2 and P3a/P3b shipped**
-  (drawer shell, five pure panes, then the per-format parser family — `parser.delimited` 2026-08-15,
-  `parser.fixedwidth` 2026-08-16). **Open: P3c (ASN.1), P3d (Custom), P4 schema sync, P5 dedup fold,
-  P6 host collapse, P7 close-out.** Decisions D1–D3 + B6 are pinned in the doc — don't re-ask. ⚠ P3d's
-  "retires `grammar-editor.dialog` entirely" is short by one case since P3b: the dialog also serves
-  **binary fixed-width**. As-built lives in
+  one host: the `/pipelines` editor with a right-dock definition drawer. **P0–P3d all shipped**
+  (drawer shell, five pure panes, then the whole per-format parser family — `parser.delimited`
+  2026-08-15, `parser.fixedwidth`/`asn1`/`json`/`text_regex`/`plugin` all 2026-08-16, P3d closed). **Open:
+  P4 schema sync, P5 dedup fold, P6 host collapse, P7 close-out.** Decisions D1–D3 + B6 are pinned in the
+  doc — don't re-ask. ⚠ `grammar-editor.dialog` is NOT retired: it still serves a **dangling**
+  `use: grammar/<id>` and **binary fixed-width**, both deliberate keeps. As-built lives in
   [`okf/backend/pipeline-graph/design.md`](okf/backend/pipeline-graph/design.md) and
   [`okf/frontend/features/grammar-config.md`](okf/frontend/features/grammar-config.md).
 
