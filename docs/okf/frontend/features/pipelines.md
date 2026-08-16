@@ -538,18 +538,25 @@ The definition drawer gained the last two stages. Where their keys live is the w
 - ⛔ A single drawer over "schema + mapping + table" would span **three** node types and break the
   one-`[node]`-in/one-node-out contract every drawer holds. It was split instead (operator, 2026-08-16).
 
-### The editor has no sample thread — `DefinitionStateService` is onboarding-only
+### The editor has no sample thread yet — and since P6-e, nothing else does either
 
-Grounded 2026-08-16: that service is injected by `onboarding-shell`, `parsing-pane`, `sample-panel` and
-`schema-mapping-pane` and by nothing under `modules/admin/pipelines/`. P2-0 landed it for the wizard;
-adopting it in the editor is unbuilt work, not an existing seam. Two consequences:
+Grounded 2026-08-16: that service was injected by `onboarding-shell`, `parsing-pane`, `sample-panel`
+and `schema-mapping-pane` and by nothing under `modules/admin/pipelines/`. P2-0 landed it for the
+wizard; adopting it in the editor is unbuilt work, not an existing seam. **P6-e then deleted the
+wizard**, so `DefinitionStateService` now has *no provider at all* and `InspectoSamplePanelComponent`
+(moved to `inspecto/definition/`, renamed off its `onboarding-` prefix) is unmounted — deliberately,
+for one slice, because the per-tab thread is the surface that mounts it. 🔴 **The editor must provide
+it PER TAB**: it is `@Injectable()` with no `providedIn` precisely so two pipelines cannot share one
+sample, and a single component-level provider on the multi-tab editor would leak one sample across
+every open pipeline. That ⛔ is recorded on the service itself, where someone editing it will see it.
+Two consequences of the thread still being absent:
 
 - The Load pane takes its field list from the **parser's `schema_file`** — read-only context the host
   passes in, because the host is the only thing holding the whole graph. Rules map FROM schema fields
   anyway, so no sample is needed to author them.
 - **`POST /config/preview/schema`'s mapped-row half (B1) has no consumer yet.** It needs sample rows the
-  editor cannot supply. Either wire the thread (P6, where wizard and editor state merge anyway) or leave
-  the preview server-side — an open call, recorded in BACKLOG.
+  editor cannot supply. ✅ **Decided 2026-08-16 (operator): wire the thread into the editor, per tab** —
+  so B1 gets its consumer; the work is scheduled, not open.
 
 ### Two write-ordering guards, both falsified before being trusted
 
@@ -669,3 +676,39 @@ should query there.
 
 ⚠ `InspectoConfirmService.confirm(message, title)` takes a **title string**; only `confirmDestructive`
 takes an options object.
+
+## The wizard shell is gone — what had to move with it (P6-e, 2026-08-16)
+
+The onboarding stage-rail shell, its `OnboardingStateService`, all five stage panes, the placeholder
+pane and `stage-attributes` were deleted (22 files, ~2.3k lines). The editor had been running the same
+shared components for several phases, so the panes were thin hosts by then; what was NOT covered was
+the shell's own **persistence and toolbar**. `onboarding-create.dialog` survives — it is still the
+Catalog's entry point and still the only **Import** surface.
+
+🔴 **Two shipped capabilities would have been lost silently.** Both were found by asking "who else
+calls this?" of the shell's members, not by reading the plan — whose blast-radius note named neither:
+
+- **`deletePipeline()` was a bare `remove()`.** No impact read, no `force`, and **no companion
+  cascade** — so every delete this editor had ever done left orphan `<id>_schema` / `<id>_enrich`
+  configs on disk. It now reads impact, names the dependents in the confirm ("2 datasets, 1 widget"),
+  sends `force` only once they have been shown, and cascades. ⚠ The impact read is **advisory**: a
+  failed read must still let the delete proceed — the server re-checks and 409s on its own, so
+  refusing here would invent a refusal the backend does not have. ⚠ Per-**segment** schemas
+  (`<id>_<segmentKey>`) are still not swept; enumerating them needs the parsed block a delete no
+  longer has.
+- **The stream-config export had no other home.** ⛔ The editor's transfer menu is the **Metadata
+  Bundle** — Studio registry artifacts addressed by **id** — while a pipeline and its satellites live
+  in the **config** namespace addressed by **path**, and the two collide on the word *schema*. Deleting
+  the shell left `StreamTransferService.buildExport` with **zero callers** while the create dialog
+  still reads a bundle: an import-only format. `exportConfig()` now sits in the editor's menu.
+
+⚠ **`exportConfig` reads the SERVER-held config back** (`GET /config/pipeline/<id>`) rather than
+lowering the open graph, and refuses while the tab is dirty. An export that carries the last saved
+state while the screen shows something else is worse than no export. Stream-vs-reference comes from
+**that config's own `produces`** — ⛔ not `PipelineSummary.produces`, which is the list of stores.
+
+⚠ **Two deliberate narrowings, recorded so they are not mistaken for bugs.** *View as graph* was not
+carried over (it needs the kind, hence an extra settings hop, and the Catalog's lineage tab is
+directly reachable). And Export configuration lives inside the `canAuthor()` menu, so unlike the
+shell's every-lens export it is hidden from the Business lens — consistent with its neighbour *Export
+document*, but narrower than what it replaced.

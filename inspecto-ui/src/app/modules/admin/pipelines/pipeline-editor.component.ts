@@ -20,8 +20,10 @@ import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
+import { catchError, firstValueFrom, forkJoin, map, of, switchMap } from 'rxjs';
 import {
     AuthoredPipeline,
+    ConfigImpact,
     AuthoredNode,
     ComponentDef,
     ComponentsService,
@@ -48,6 +50,7 @@ import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state
 import { InspectoSplitDirective } from 'app/inspecto/components/split.directive';
 import { grammarContentAsParsingBlock } from 'app/inspecto/grammar';
 import { TransferMenuComponent } from 'app/inspecto/transfer';
+import { StreamTransferService } from 'app/inspecto/transfer/stream-transfer.service';
 import { G6GraphData } from 'app/modules/admin/catalog/catalog-graph';
 import { PipelineDryRunPanelComponent } from './pipeline-dry-run-panel.component';
 import { PipelineEditorGraphComponent } from './pipeline-editor-graph.component';
@@ -118,6 +121,17 @@ import { incompleteStages, pipelineLifecycle, PipelineStageId, StageChip, stageC
 const GRAMMAR_REF_PREFIX = 'grammar/';
 
 /**
+ * "2 datasets, 1 widget" — the impact report as a phrase for a confirm dialog. Names kinds and
+ * counts rather than listing every id: the dialog has to be readable, and the operator only needs
+ * to know the shape of what breaks before deciding. (From the onboarding shell, P6-e.)
+ */
+function describeDependents(impact: ConfigImpact): string {
+    return Object.entries(impact.dependents)
+        .map(([kind, items]) => `${items.length} ${kind}${items.length === 1 ? '' : 's'}`)
+        .join(', ');
+}
+
+/**
  * Pipeline editor (T32, build-side NiFi UX) — author/edit a pipeline on an interactive G6 canvas; Save
  * lowers the graph to the canonical flat `*_pipeline.toon` (no UI surface writes `*_flow.toon`):
  * drag node types from the palette, click two nodes to connect, edit node config in the inspector, dry-run a
@@ -168,6 +182,7 @@ const GRAMMAR_REF_PREFIX = 'grammar/';
 export class PipelineEditorComponent implements OnInit {
     private api = inject(PipelinesService);
     private configApi = inject(ConfigService);
+    private transfer = inject(StreamTransferService);
     private components = inject(ComponentsService);
     private datasets = inject(DatasetRegistrationService);
     private iconMapApi = inject(IconMapService);
@@ -264,6 +279,9 @@ export class PipelineEditorComponent implements OnInit {
     readonly selectedId = signal<string | null>(null);
     /** In-flight guard for the Pipeline Document export — the generator re-reads config on every call. */
     readonly exportingDocument = signal(false);
+    /** A stream-config export is in flight ({@link exportConfig}) — a separate flag from the document
+     *  export, which is a different format on a different route. */
+    readonly exportingConfig = signal(false);
     readonly model = signal<AuthoredPipeline | null>(null);
 
     /** The list row for the selected pipeline — carries the `template` flag and the display name. */
@@ -1124,6 +1142,59 @@ export class PipelineEditorComponent implements OnInit {
         });
     }
 
+    /**
+     * Export this pipeline's whole configuration as a portable `inspecto-stream-config` bundle — the
+     * pipeline body plus its schema, any per-segment plugin schemas and the `<id>_enrich` companion.
+     * The onboarding shell's toolbar export, re-homed in P6-e: ⛔ deleting the shell without it would
+     * have left the format **import-only**, since the create dialog still reads a bundle and nothing
+     * would produce one.
+     *
+     * <p>⛔ Not the Metadata Bundle the transfer menu offers, and the two must not be merged: that one
+     * carries Studio registry artifacts addressed by **id**, while a pipeline and its satellites live
+     * in the **config** namespace addressed by **path** — and they collide on the word *schema*.
+     *
+     * <p>⚠ What travels is the **server-held** config, read back here rather than lowered from the
+     * open graph. So a tab with unapplied edits refuses: an export that silently carries the last
+     * saved state while showing something else is worse than no export. Read-only, so every lens gets
+     * it — a Business-lens operator handing a config to support is the point.
+     */
+    exportConfig(): void {
+        const id = this.selectedId();
+        if (!id || this.exportingConfig()) return;
+        if (this.dirty()) {
+            this.toast.warning('Apply this pipeline before exporting — an export carries the saved configuration.');
+            return;
+        }
+        this.exportingConfig.set(true);
+        this.configApi
+            .read('pipeline', id)
+            .pipe(
+                // Stream-vs-reference off the CONFIG's own `produces` — the same read the shell used.
+                // ⛔ Not PipelineSummary.produces, which is the list of stores the pipeline produces.
+                switchMap((r) =>
+                    this.transfer.buildExport(
+                        id,
+                        String(r.config['produces'] ?? '') === 'reference' ? 'reference' : 'stream',
+                        r.config,
+                    ),
+                ),
+            )
+            .subscribe({
+                next: ({ bundle, missing }) => {
+                    this.exportingConfig.set(false);
+                    this.transfer.download(bundle);
+                    // A satellite that could not be read is named, not swallowed — the file downloaded,
+                    // but it is incomplete and re-importing it would silently lose that piece.
+                    if (missing.length) this.toast.warning(`Exported without ${missing.join(', ')} — could not be read.`);
+                    else this.toast.success(`Exported "${id}" configuration`);
+                },
+                error: (err) => {
+                    this.exportingConfig.set(false);
+                    this.toast.error(apiErrorMessage(err, 'Could not export the configuration.'));
+                },
+            });
+    }
+
     /** Trigger a browser download for a fetched blob (object URL, revoked after the click). */
     private downloadBlob(blob: Blob, filename: string): void {
         const url = URL.createObjectURL(blob);
@@ -1233,27 +1304,62 @@ export class PipelineEditorComponent implements OnInit {
         });
     }
 
+    /**
+     * Delete the authored pipeline, after telling the operator what it would break — the wizard's
+     * "Discard draft" re-homed here in P6-e, since this editor is now the only surface that deletes
+     * a guided pipeline. Three parts the bare `remove()` did not have:
+     *
+     * <ul>
+     *   <li>the <b>impact read</b> — advisory only, so a failed read still lets the delete proceed
+     *       and be refused by the server, which re-checks on its own;</li>
+     *   <li><b>force</b>, sent only when dependents were shown: the operator has seen the list and
+     *       chosen anyway (it does NOT bypass the separate active-pipeline refusal);</li>
+     *   <li>the <b>companion cascade</b>, so a deleted pipeline leaves no orphan `<id>_schema` /
+     *       `<id>_enrich` behind. Best-effort by design: the pipeline is already gone, and a 404 just
+     *       means that companion was never authored. ⚠ Per-SEGMENT schemas (`<id>_<segmentKey>`) are
+     *       not swept — the wizard never swept them either, and enumerating them needs the parsed
+     *       block the delete no longer has.</li>
+     * </ul>
+     */
     async deletePipeline(): Promise<void> {
         const id = this.selectedId();
         if (!id) return;
-        const ok = await this.confirm.confirmDestructive(`Permanently delete the authored pipeline '${id}'?`, {
-            title: 'Delete pipeline',
-            confirmText: 'Delete',
-        });
+        const impact = await firstValueFrom(this.configApi.impact(id).pipe(catchError(() => of(null))));
+        const breaks = impact?.total ?? 0;
+        const ok = await this.confirm.confirmDestructive(
+            breaks === 0
+                ? `Permanently delete the authored pipeline '${id}'?`
+                : `'${id}' is still referenced by ${breaks} config${breaks === 1 ? '' : 's'}: ` +
+                      `${describeDependents(impact!)}. Deleting it leaves ` +
+                      `${breaks === 1 ? 'that reference' : 'those references'} pointing at nothing. ` +
+                      `Delete anyway? This cannot be undone.`,
+            { title: 'Delete pipeline', confirmText: 'Delete' },
+        );
         if (!ok) return;
         // W5: deleting a registered pipeline discards its canonical config (the server refuses an
         // active pipeline — deactivate first).
-        this.configApi.remove('pipeline', id).subscribe({
-            next: () => {
-                this.flows.update((fs) => fs.filter((f) => f.name !== id));
-                this.model.set(null);
-                this.selectedId.set(null);
-                this.clearSelection();
-                const next = this.flows()[0];
-                if (next) this.select(next.name);
-            },
-            error: (err) => this.onWriteError(err, 'Delete failed'),
-        });
+        const companion = (suffix: string): string => `${id}_${suffix}`.replace(/[^A-Za-z0-9_]+/g, '_');
+        this.configApi
+            .remove('pipeline', id, undefined, breaks > 0)
+            .pipe(
+                switchMap((res) =>
+                    forkJoin([
+                        this.configApi.remove('schema', companion('schema')).pipe(catchError(() => of(null))),
+                        this.configApi.remove('enrichment', companion('enrich')).pipe(catchError(() => of(null))),
+                    ]).pipe(map(() => res)),
+                ),
+            )
+            .subscribe({
+                next: () => {
+                    this.flows.update((fs) => fs.filter((f) => f.name !== id));
+                    this.model.set(null);
+                    this.selectedId.set(null);
+                    this.clearSelection();
+                    const next = this.flows()[0];
+                    if (next) this.select(next.name);
+                },
+                error: (err) => this.onWriteError(err, 'Delete failed'),
+            });
     }
 
     // ── canvas events ──

@@ -3,23 +3,23 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
-import { OnboardingSamplePanelComponent } from './sample-panel.component';
+import { InspectoSamplePanelComponent } from './sample-panel.component';
 import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
 
 const TOASTR = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() };
 
 function create() {
     TestBed.configureTestingModule({
-        imports: [OnboardingSamplePanelComponent],
+        imports: [InspectoSamplePanelComponent],
         providers: [provideNoopAnimations(), DefinitionStateService, { provide: ToastrService, useValue: TOASTR }],
     });
     const state = TestBed.inject(DefinitionStateService);
-    const fixture = TestBed.createComponent(OnboardingSamplePanelComponent);
+    const fixture = TestBed.createComponent(InspectoSamplePanelComponent);
     fixture.detectChanges();
     return { fixture, state };
 }
 
-describe('OnboardingSamplePanelComponent', () => {
+describe('InspectoSamplePanelComponent', () => {
     it('captures pasted text as the session sample and resets the parse thread', () => {
         const { fixture, state } = create();
         state.parsePreview.set({ frontend: 'delimited', columns: [], rowCount: 0, rows: [], rejectedRows: 0 });

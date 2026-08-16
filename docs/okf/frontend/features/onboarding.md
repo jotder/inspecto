@@ -2,12 +2,22 @@
 type: Feature
 title: Stream & Reference Onboarding
 description: Guided, resumable authoring of a data origin — a stage rail over the server-held Stage-1 pipeline draft.
-resource: inspecto-ui/src/app/modules/admin/catalog/onboarding/onboarding-shell.component.ts
+resource: inspecto-ui/src/app/modules/admin/catalog/onboarding/onboarding-create.dialog.ts
 tags: [feature, onboarding, catalog, acquisition, pipeline]
 timestamp: 2026-07-16T00:00:00Z
 ---
 
 # Stream & Reference Onboarding
+
+> 🔴 **The stage-rail shell was DELETED 2026-08-16 (definition-surface unification P6-e).** Onboarding
+> is now the **guided pipeline editor** — see [pipelines](pipelines.md). What survives here is the
+> **create dialog** (`onboarding-create.dialog.ts`, still the entry point and still the only Import
+> surface) and the *concepts*: the stage model, readiness, the draft-IS-server-state rule. The route
+> `/catalog/onboard/:name(/:stage)` is a redirect (P6-a); the stage rail is the editor's checklist
+> chips (P6-d); go-live, the Dataset hop, the enrichment/segment writes, the impact-aware delete and
+> the stream-config export all live on the editor (P6-b/c/e). Everything below the banner still
+> describes **behaviour that is live**, just under a different host, unless a line says otherwise.
+> *(P7 folds the remainder into `pipelines.md` and archives this file.)*
 
 Route `/catalog/onboard/:name(/:stage)` (one matcher route — the shell survives stage navigation),
 entered from the Catalog Streams/References tabs' **Onboard Stream / Onboard Reference** header CTA
@@ -65,8 +75,10 @@ to the Catalog's real stores. Do not "fix" it by inventing a sample-source value
 
 ## Stream configuration export / import (2026-07-31)
 
-**Export** is a toolbar button on the onboarding shell (next to *View as graph*); **Import** is on the
-New Stream dialog, which becomes "Create from import". Format `inspecto-stream-config` v1, pure logic
+**Export** is a toolbar-menu item — on the onboarding shell until P6-e, **on the pipeline editor**
+since (⛔ deleting the shell without re-homing it would have left the format import-only: the create
+dialog still reads a bundle, so nothing could produce one); **Import** is on the New Stream dialog,
+which becomes "Create from import". Format `inspecto-stream-config` v1, pure logic
 in `inspecto/transfer/stream-bundle.ts` (+ `stream-transfer.service.ts` for the I/O).
 
 ⚠ **Deliberately NOT a `BundleKind`** of the Metadata Bundle (`inspecto/transfer/bundle.ts`). That

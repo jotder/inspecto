@@ -6,6 +6,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { PipelineEditorComponent } from './pipeline-editor.component';
 import { AuthoredPipeline, ComponentsService, ConfigService, LensService, PipelinesService } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { StreamTransferService } from 'app/inspecto/transfer/stream-transfer.service';
 import { ToastrService } from 'ngx-toastr';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 
@@ -51,7 +52,10 @@ describe('PipelineEditorComponent', () => {
         write: ReturnType<typeof vi.fn>;
         registerPipeline: ReturnType<typeof vi.fn>;
         remove: ReturnType<typeof vi.fn>;
+        impact: ReturnType<typeof vi.fn>;
+        read: ReturnType<typeof vi.fn>;
     };
+    let transfer: { buildExport: ReturnType<typeof vi.fn>; download: ReturnType<typeof vi.fn> };
     let dialog: { open: ReturnType<typeof vi.fn> };
     let components: { list: ReturnType<typeof vi.fn>; create: ReturnType<typeof vi.fn> };
     let toast: {
@@ -136,6 +140,12 @@ describe('PipelineEditorComponent', () => {
             write: vi.fn().mockReturnValue(of({ written: true, path: 'x_pipeline.toon', name: 'x' })),
             registerPipeline: vi.fn().mockReturnValue(of({ registered: true })),
             remove: vi.fn().mockReturnValue(of({ deleted: true })),
+            impact: vi.fn().mockReturnValue(of({ pipeline: 'demo', total: 0, truncated: false, dependents: {} })),
+            read: vi.fn().mockReturnValue(of({ config: { name: 'demo' }, path: 'demo_pipeline.toon' })),
+        };
+        transfer = {
+            buildExport: vi.fn().mockReturnValue(of({ bundle: { kind: 'inspecto-stream-config' }, missing: [] })),
+            download: vi.fn(),
         };
         dialog = { open: vi.fn() };
         components = { list: vi.fn().mockReturnValue(of([])), create: vi.fn() };
@@ -146,6 +156,7 @@ describe('PipelineEditorComponent', () => {
                 provideNoopAnimations(),
                 { provide: PipelinesService, useValue: api },
                 { provide: ConfigService, useValue: config },
+                { provide: StreamTransferService, useValue: transfer },
                 { provide: ComponentsService, useValue: components },
                 { provide: ToastrService, useValue: toast },
                 {
@@ -178,6 +189,115 @@ describe('PipelineEditorComponent', () => {
     function canvasOf(c: PipelineEditorComponent) {
         return (c as unknown as { canvas: ReturnType<typeof canvasMock> }).canvas;
     }
+
+    /**
+     * P6-e — the stream-config export re-homed. ⛔ Deleting the shell without this would have left the
+     * `inspecto-stream-config` format IMPORT-only: the create dialog still reads a bundle, and
+     * `StreamTransferService.buildExport` would have had no caller at all.
+     */
+    describe('export configuration (P6-e)', () => {
+        it('exports the SERVER-held config, with the kind off its own `produces`', () => {
+            config.read.mockReturnValue(of({ config: { name: 'demo', produces: 'reference' } }));
+            const c = make();
+            c.select('demo');
+            c.exportConfig();
+
+            expect(config.read).toHaveBeenCalledWith('pipeline', 'demo');
+            expect(transfer.buildExport).toHaveBeenCalledWith('demo', 'reference', { name: 'demo', produces: 'reference' });
+            expect(transfer.download).toHaveBeenCalled();
+        });
+
+        it('defaults to a stream when `produces` says nothing', () => {
+            const c = make();
+            c.select('demo');
+            c.exportConfig();
+
+            expect(transfer.buildExport).toHaveBeenCalledWith('demo', 'stream', expect.anything());
+        });
+
+        /** ⚠ The export carries the SAVED config — shipping it while the tab shows unapplied edits
+         *  produces a file that quietly disagrees with the screen. */
+        it('refuses while the tab is dirty', () => {
+            const c = make();
+            c.select('demo');
+            c.dirty.set(true);
+            c.exportConfig();
+
+            expect(config.read).not.toHaveBeenCalled();
+            expect(toast.warning).toHaveBeenCalled();
+        });
+
+        /** A satellite that could not be read is NAMED — the file downloaded, but re-importing it
+         *  would silently lose that piece. */
+        it('names an unreadable satellite instead of swallowing it', () => {
+            transfer.buildExport.mockReturnValue(of({ bundle: {}, missing: ['demo_schema'] }));
+            const c = make();
+            c.select('demo');
+            c.exportConfig();
+
+            expect(transfer.download).toHaveBeenCalled();
+            expect(toast.warning).toHaveBeenCalledWith(expect.stringContaining('demo_schema'));
+        });
+    });
+
+    /**
+     * P6-e — the wizard's "Discard draft" re-homed. The editor is now the only surface that deletes a
+     * guided pipeline, so its bare `remove()` had to grow the three things the wizard did.
+     */
+    describe('delete (P6-e)', () => {
+        function confirmOf() {
+            return TestBed.inject(InspectoConfirmService) as unknown as {
+                confirmDestructive: ReturnType<typeof vi.fn>;
+            };
+        }
+
+        it('cascades the companion configs so no orphan schema/enrichment lingers', async () => {
+            const c = make();
+            c.select('demo');
+            await c.deletePipeline();
+
+            expect(config.remove).toHaveBeenCalledWith('pipeline', 'demo', undefined, false);
+            expect(config.remove).toHaveBeenCalledWith('schema', 'demo_schema');
+            expect(config.remove).toHaveBeenCalledWith('enrichment', 'demo_enrich');
+        });
+
+        it('names the dependents and sends force once the operator has seen them', async () => {
+            config.impact.mockReturnValue(
+                of({
+                    pipeline: 'demo',
+                    total: 3,
+                    truncated: false,
+                    dependents: { dataset: [{ id: 'a' }, { id: 'b' }], widget: [{ id: 'c' }] },
+                }),
+            );
+            const c = make();
+            c.select('demo');
+            await c.deletePipeline();
+
+            expect(confirmOf().confirmDestructive.mock.calls[0][0]).toContain('2 datasets, 1 widget');
+            expect(config.remove).toHaveBeenCalledWith('pipeline', 'demo', undefined, true);
+        });
+
+        /** The impact read is ADVISORY — the server re-checks and refuses on its own, so a failed
+         *  read must not become a delete the operator cannot perform. */
+        it('still deletes when the impact read fails', async () => {
+            config.impact.mockReturnValue(throwError(() => new Error('boom')));
+            const c = make();
+            c.select('demo');
+            await c.deletePipeline();
+
+            expect(config.remove).toHaveBeenCalledWith('pipeline', 'demo', undefined, false);
+        });
+
+        it('deletes nothing when the confirm is declined', async () => {
+            confirmOf().confirmDestructive.mockResolvedValueOnce(false);
+            const c = make();
+            c.select('demo');
+            await c.deletePipeline();
+
+            expect(config.remove).not.toHaveBeenCalled();
+        });
+    });
 
     /**
      * P6-b — publish as a toolbar action. The editor could already flip `active`, but the wizard's

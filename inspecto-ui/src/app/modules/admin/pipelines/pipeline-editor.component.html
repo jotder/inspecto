@@ -78,6 +78,12 @@
                         <mat-icon svgIcon="heroicons_outline:document-text"></mat-icon>
                         <span>Export document</span>
                     </button>
+                    <!-- P6-e: the portable `inspecto-stream-config` bundle (config + satellites), re-homed
+                         from the retired onboarding shell. ⛔ NOT the transfer menu's Metadata Bundle. -->
+                    <button mat-menu-item (click)="exportConfig()" [disabled]="exportingConfig()">
+                        <mat-icon svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
+                        <span>Export configuration</span>
+                    </button>
                     <button mat-menu-item (click)="deletePipeline()">
                         <mat-icon svgIcon="heroicons_outline:trash"></mat-icon>
                         <span>Delete pipeline</span>

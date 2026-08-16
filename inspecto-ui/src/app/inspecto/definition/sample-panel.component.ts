@@ -12,19 +12,23 @@ const MAX_SAMPLE_BYTES = 256 * 1024;
 const RAW_PREVIEW_LINES = 40;
 
 /**
- * The sample-as-thread strip (design §4.3): ONE captured sample follows the builder through the
- * stages — raw here, parsed once the Parsing stage tests it, cast/mapped in later phases. It is
- * mounted **at the top of the Parsing stage only** (the stage that consumes it: choose the file,
- * see it, then pick a type and options below) — not in the shell, where it would be dead weight on
- * Collection/Publish. The state it reads is session-held in the shared {@link DefinitionStateService}
- * (host-provided — the one sample thread every definition surface shares, D5), so the
- * downstream stages still see the thread without rendering this panel. The header chips summarize
- * the thread (raw → parsed → cast) and the raw preview collapses when the builder is done reading
- * it. The sample is re-capturable (upload or paste) and never becomes part of the config. Capture
- * is allowed in every lens — it changes nothing on the server.
+ * The sample-as-thread strip (design §4.3): ONE captured sample follows the builder through a
+ * definition surface — raw here, parsed once the parse step tests it, cast/mapped downstream. It is
+ * mounted **where the sample is consumed** (the parse surface: choose the file, see it, then pick a
+ * type and options below), never on a host chrome where it would be dead weight. The state it reads
+ * is session-held in the shared {@link DefinitionStateService} (host-provided — the one sample
+ * thread every definition surface shares, D5), so the downstream steps still see the thread without
+ * rendering this panel. The header chips summarize the thread (raw → parsed → cast) and the raw
+ * preview collapses when the builder is done reading it. The sample is re-capturable (upload or
+ * paste) and never becomes part of the config. Capture is allowed in every lens — it changes nothing
+ * on the server.
+ *
+ * <p><b>Currently unmounted.</b> P6-e retired the onboarding wizard, its only host; it moved here
+ * out of that feature (and lost its `onboarding-` prefix) because the editor's own per-tab sample
+ * thread — operator-decided 2026-08-16 — is the next slice and this is the surface it mounts.
  */
 @Component({
-    selector: 'app-onboarding-sample-panel',
+    selector: 'inspecto-sample-panel',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [FormsModule, MatButtonModule, MatIconModule, MatTooltipModule, ChipComponent],
@@ -127,7 +131,7 @@ const RAW_PREVIEW_LINES = 40;
         </section>
     `,
 })
-export class OnboardingSamplePanelComponent {
+export class InspectoSamplePanelComponent {
     protected readonly state = inject(DefinitionStateService);
     private toastr = inject(ToastrService);
 
