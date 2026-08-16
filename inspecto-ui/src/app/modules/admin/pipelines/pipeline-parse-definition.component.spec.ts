@@ -206,6 +206,18 @@ async function create(
                     // The node's saved `asn1.segments` re-hydrate from the schema toons they point at —
                     // keys AND columns. Returning a real one exercises that path; a 404 would leave a
                     // keys-only draft, which validation correctly refuses (that is its own test).
+                    // B3: the drift diff the 2a-iii indicator consumes.
+                    suggestSchema: () =>
+                        of({
+                            fields: [],
+                            mapping: { rules: [] },
+                            drift: {
+                                drifted: true,
+                                added: [{ name: 'DURATION', type: 'VARCHAR' }],
+                                missing: [],
+                                typeChanged: [{ name: 'IMSI', declared: 'VARCHAR', suggested: 'BIGINT' }],
+                            },
+                        }),
                     read: () =>
                         savedSchemaMissing
                             ? throwError(() => ({ status: 404 }))
@@ -752,6 +764,44 @@ describe('PipelineParseDefinitionComponent', () => {
 
             expect(schemaWrites).toHaveLength(0);
             expect(fixture.componentInstance.applied!.config!['schema_file']).toBe('cdr_schema.toon');
+        });
+
+        /**
+         * 2a-iii: a hydrated schema does not re-derive — it asks what changed (B3). The indicator is the
+         * consumer of the drift diff, and "add new" is the only half of a re-sync that cannot clobber.
+         */
+        describe('drift', () => {
+            function schemadNode(): AuthoredNode {
+                const n = unschemadNode();
+                (n.config as Record<string, unknown>)['schema_file'] = 'spaces/default/config/parse_schema.toon';
+                return n;
+            }
+
+            it('asks for drift instead of re-deriving, and reports what changed', async () => {
+                const fixture = await create(schemadNode());
+                fixture.detectChanges();
+                pane(fixture).onPreviewed(TABLE_PREVIEW);
+                fixture.detectChanges();
+
+                // The harness's suggestSchema returns a drift block naming one added column.
+                expect(pane(fixture).schemaDrift()?.drifted).toBe(true);
+                expect(fixture.nativeElement.textContent).toContain('no longer matches the saved schema');
+                // The saved schema is untouched by merely observing drift.
+                expect(pane(fixture).schemaSeed().map((r) => r.name)).toEqual(['IMSI']);
+            });
+
+            it('adds the new columns on request, keeping every existing row including excluded ones', async () => {
+                const fixture = await create(schemadNode());
+                fixture.detectChanges();
+                pane(fixture).onPreviewed(TABLE_PREVIEW);
+                fixture.detectChanges();
+
+                pane(fixture).addDriftedFields();
+                fixture.detectChanges();
+
+                expect(pane(fixture).schemaSeed().map((r) => r.name)).toEqual(['IMSI', 'DURATION']);
+                expect(pane(fixture).schemaDrift()).toBeNull();
+            });
         });
 
         it('applies straight through when no parse has run — a parser may be defined before its schema', async () => {

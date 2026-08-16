@@ -26,6 +26,7 @@ import {
     ParserPreview,
     ParserTablePreview,
     ParserTreeNode,
+    SchemaDrift,
     ParsersService,
     SpacesService,
     apiErrorMessage,
@@ -210,6 +211,36 @@ export const PARSE_NODE_FRONTENDS: Record<string, ParsingFrontend | 'asn1' | 'pl
                                 <span class="text-secondary text-xs">Loading the saved schema…</span>
                             }
                         </div>
+                        @if (schemaDrift(); as d) {
+                            @if (d.drifted) {
+                                <div
+                                    class="mb-2 flex flex-wrap items-center gap-2 text-sm"
+                                    role="status"
+                                    aria-live="polite"
+                                >
+                                    <span class="text-secondary">
+                                        This sample no longer matches the saved schema:
+                                        {{ d.added.length }} new, {{ d.missing.length }} missing,
+                                        {{ d.typeChanged.length }} changed type.
+                                    </span>
+                                    @if (d.added.length) {
+                                        <button mat-stroked-button type="button" (click)="addDriftedFields()">
+                                            Add {{ d.added.length }} new
+                                        </button>
+                                    }
+                                </div>
+                                @if (d.typeChanged.length) {
+                                    <p class="text-secondary m-0 mb-2 text-xs">
+                                        Type changes are reported, not applied — a saved type may be a
+                                        deliberate override. Change them yourself if the sample is right:
+                                        @for (t of d.typeChanged; track t.name) {
+                                            <span class="font-mono">{{ t.name }}</span> ({{ t.declared }} →
+                                            {{ t.suggested }})@if (!$last) {<span>, </span>}
+                                        }
+                                    </p>
+                                }
+                            }
+                        }
                         @if (schemaSeed().length) {
                             <inspecto-schema-fields-editor [rows]="schemaSeed()" />
                         } @else {
@@ -334,6 +365,8 @@ export class PipelineParseDefinitionComponent {
     readonly schemaLoading = signal(false);
     /** A saved schema was read back, so a fresh parse must NOT re-derive over the operator's edits. */
     private readonly schemaHydrated = signal(false);
+    /** How the saved schema differs from what THIS sample suggests (B3) — null until a parse runs. */
+    readonly schemaDrift = signal<SchemaDrift | null>(null);
 
     readonly existingSchemaFile = computed(() => String(this.node().config?.['schema_file'] ?? '').trim());
     private schemaName(): string {
@@ -360,7 +393,8 @@ export class PipelineParseDefinitionComponent {
         this.previewTable.set(p);
         // ⛔ Never re-derive over a schema read back from disk: the operator's saved names, types and
         // include flags are the truth, and a fresh sample would silently replace them on Apply.
-        if (this.schemaHydrated()) return;
+        // Instead, ASK what changed — that is exactly the drift question (B3).
+        if (this.schemaHydrated()) return this.checkDrift(p.rows);
         this.schemaSeed.set(
             p.columns.map((col, i) => ({
                 include: true,
@@ -449,11 +483,61 @@ export class PipelineParseDefinitionComponent {
             this.initialSegments.set([]);
             this.schemaSeed.set([]);
             this.schemaHydrated.set(false);
+            this.schemaDrift.set(null);
             this.previewTable.set(null);
             this.emitDirty();
             this.loadSavedSegments();
             this.loadSavedSchema();
         });
+    }
+
+    /** The rows the grid currently holds — ALL of them, excluded ones included, so a merge never drops. */
+    private currentSchemaRows(): SchemaFieldRow[] {
+        const grid = this.schemaGrid;
+        if (!grid) return this.schemaSeed();
+        return grid.fieldRows.controls.map((g) => g.getRawValue() as SchemaFieldRow);
+    }
+
+    /**
+     * Ask the server how the saved schema differs from what this sample now votes for (B3). Only for a
+     * HYDRATED schema: a freshly-derived one was built from this very sample, so it cannot have drifted.
+     */
+    private checkDrift(rows: Record<string, unknown>[]): void {
+        const fields = this.currentSchemaRows().map((r) => ({ name: r.name, selector: r.selector, type: r.type }));
+        if (!fields.length) return;
+        this.configApi.suggestSchema(rows, { raw: { fields } }).subscribe({
+            next: (s) => this.schemaDrift.set(s.drift ?? null),
+            // Drift is advisory: failing to compute it must not disturb an otherwise working pane.
+            error: () => this.schemaDrift.set(null),
+        });
+    }
+
+    /**
+     * Append the columns the sample has and the schema does not. ⚠ This is the ONLY half of §5.2's
+     * "re-sync" that can be done without clobbering: a type change is NOT auto-applied because nothing
+     * distinguishes a deliberate operator override from a stale derivation, and a missing field is not
+     * auto-removed because the sample may simply be a narrow one. Both stay reported for a human call.
+     */
+    addDriftedFields(): void {
+        const added = this.schemaDrift()?.added ?? [];
+        if (!added.length) return;
+        const current = this.currentSchemaRows();
+        const columns = this.previewTable()?.columns ?? [];
+        this.schemaSeed.set([
+            ...current,
+            ...added.map((f) => {
+                // The selector must address the column the way this frontend does — by POSITION for
+                // delimited/fixedwidth — so it is derived from the sample's own column order.
+                const i = columns.indexOf(f.name);
+                return {
+                    include: true,
+                    name: sanitizeIdentifier(f.name, i < 0 ? current.length : i),
+                    selector: deriveSelector(this.frontend(), i < 0 ? current.length : i, f.name),
+                    type: f.type,
+                };
+            }),
+        ]);
+        this.schemaDrift.set(null);
     }
 
     /**
