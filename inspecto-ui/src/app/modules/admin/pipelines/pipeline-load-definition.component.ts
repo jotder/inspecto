@@ -12,13 +12,26 @@ import { DefinitionStateService } from 'app/inspecto/definition/definition-state
 import { schemaNameFromPath } from 'app/inspecto/segments';
 
 /**
- * The transform types this pane AUTHORS. `TransformCompiler` recognises four
- * ({@code DIRECT, EXPR, CONCAT_DT, FILENAME_DATE}), but the latter two carry specialised source
- * semantics this grid has no affordance for — so they are not offered. A rule already carrying one is
- * preserved and shown, never silently rewritten to DIRECT: not offering a type is a UI limit, and must
- * not become a data loss.
+ * The transform types this pane AUTHORS — all four `TransformCompiler` recognises
+ * (`TransformCompiler.TRANSFORM_TYPES`). `CONCAT_DT` and `FILENAME_DATE` were withheld until
+ * 2026-08-17 because they carry specialised source semantics; they are now authored structurally.
+ *
+ * ⚠ **There is no per-rule `format` or `pattern` field to put them in.** A rule is exactly
+ * `{targetColumn, sourceExpression, transformType}` — `MappingCsv` drops every other key — so both
+ * types pack their parameters into `sourceExpression` as `|`-delimited positions. This pane composes
+ * and decomposes that string; it never invents a fourth key.
+ *
+ * A rule carrying a type this pane does not offer is still preserved and shown, never silently
+ * rewritten: not offering a type is a UI limit and must not become a data loss.
  */
-const OFFERED_TRANSFORMS = ['DIRECT', 'EXPR'] as const;
+const OFFERED_TRANSFORMS = ['DIRECT', 'EXPR', 'CONCAT_DT', 'FILENAME_DATE'] as const;
+
+/**
+ * `FILENAME_DATE` may only write this column — enforced in THREE places server-side
+ * (`TransformCompiler`, `MappingRules`, and the offline mock's validator), so authoring anything else
+ * is a guaranteed 422. Mirrored here to refuse it before the round trip.
+ */
+const FILENAME_DATE_TARGET = 'EVENT_DATE';
 
 const IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -136,6 +149,70 @@ interface RuleRow {
                                                 }
                                             </mat-select>
                                         </mat-form-field>
+                                    } @else if (g.get('transformType')?.value === 'CONCAT_DT') {
+                                        <!-- Source is date|time: two raw column names, joined by the compiler. -->
+                                        <div class="flex items-center gap-2">
+                                            <mat-form-field class="w-full" subscriptSizing="dynamic">
+                                                <mat-label>Date column</mat-label>
+                                                <mat-select
+                                                    [value]="sourcePart(g, 0)"
+                                                    (valueChange)="setConcatPart(g, 0, $event)"
+                                                    aria-label="Date column"
+                                                >
+                                                    @for (f of fields(); track f) {
+                                                        <mat-option [value]="f">{{ f }}</mat-option>
+                                                    }
+                                                </mat-select>
+                                            </mat-form-field>
+                                            <mat-form-field class="w-full" subscriptSizing="dynamic">
+                                                <mat-label>Time column</mat-label>
+                                                <mat-select
+                                                    [value]="sourcePart(g, 1)"
+                                                    (valueChange)="setConcatPart(g, 1, $event)"
+                                                    aria-label="Time column"
+                                                >
+                                                    @for (f of fields(); track f) {
+                                                        <mat-option [value]="f">{{ f }}</mat-option>
+                                                    }
+                                                </mat-select>
+                                            </mat-form-field>
+                                        </div>
+                                    } @else if (g.get('transformType')?.value === 'FILENAME_DATE') {
+                                        <!-- Source is column|prefix|strptime; the 8-digit group is fixed. -->
+                                        <div class="flex items-center gap-2">
+                                            <mat-form-field class="w-full" subscriptSizing="dynamic">
+                                                <mat-label>File name column</mat-label>
+                                                <mat-select
+                                                    [value]="sourcePart(g, 0)"
+                                                    (valueChange)="setFilenamePart(g, 0, $event)"
+                                                    aria-label="File name column"
+                                                >
+                                                    @for (f of fields(); track f) {
+                                                        <mat-option [value]="f">{{ f }}</mat-option>
+                                                    }
+                                                </mat-select>
+                                            </mat-form-field>
+                                            <mat-form-field class="w-full" subscriptSizing="dynamic">
+                                                <mat-label>Prefix</mat-label>
+                                                <input
+                                                    matInput
+                                                    [value]="sourcePart(g, 1)"
+                                                    (input)="setFilenamePart(g, 1, $any($event.target).value)"
+                                                    aria-label="File name prefix"
+                                                    matTooltip="Literal text before the 8-digit date, e.g. cbs_cdr_vou_ — spliced into the extract pattern."
+                                                />
+                                            </mat-form-field>
+                                            <mat-form-field class="w-full" subscriptSizing="dynamic">
+                                                <mat-label>Format</mat-label>
+                                                <input
+                                                    matInput
+                                                    [value]="sourcePart(g, 2)"
+                                                    (input)="setFilenamePart(g, 2, $any($event.target).value)"
+                                                    placeholder="%Y%m%d"
+                                                    aria-label="Date format"
+                                                />
+                                            </mat-form-field>
+                                        </div>
                                     } @else {
                                         <mat-form-field class="w-full" subscriptSizing="dynamic">
                                             <input
@@ -145,6 +222,9 @@ interface RuleRow {
                                                 matTooltip="A per-row DuckDB scalar expression, emitted verbatim — you own any explicit cast, e.g. TRY_CAST(amt AS DOUBLE) / 100."
                                             />
                                         </mat-form-field>
+                                    }
+                                    @if (ruleProblem(g); as problem) {
+                                        <p class="text-warn m-0 text-xs" role="alert">{{ problem }}</p>
                                     }
                                 </td>
                             </tr>
@@ -305,11 +385,67 @@ export class PipelineLoadDefinitionComponent {
         this.ruleRows.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.invalidateMapping());
     }
 
-    /** The type options for a row: the two offered, plus whatever it already carries (never dropped). */
+    /** The type options for a row: the offered set, plus whatever it already carries (never dropped). */
     transformsFor(g: FormGroup): string[] {
         const current = String(g.get('transformType')?.value ?? '');
         const offered: string[] = [...OFFERED_TRANSFORMS];
         return offered.includes(current) || !current ? offered : [...offered, current];
+    }
+
+    private sourceParts(g: FormGroup): string[] {
+        return String(g.get('sourceExpression')?.value ?? '').split('|');
+    }
+
+    /** One `|`-delimited position of a structured `sourceExpression`, for a template binding. */
+    sourcePart(g: FormGroup, index: number): string {
+        return this.sourceParts(g)[index] ?? '';
+    }
+
+    /**
+     * `CONCAT_DT`'s source is `<dateColumn>|<timeColumn>` — **always both positions**. The compiler
+     * reads `parts[1]` unconditionally, so a missing `|` is an `ArrayIndexOutOfBounds` at run time;
+     * that is exactly why `MappingRules` refuses it up front, and why this never emits a bare column.
+     */
+    setConcatPart(g: FormGroup, index: 0 | 1, value: string): void {
+        const parts = this.sourceParts(g);
+        parts[index] = value;
+        g.patchValue({ sourceExpression: `${parts[0] ?? ''}|${parts[1] ?? ''}` });
+    }
+
+    /**
+     * `FILENAME_DATE`'s source is `<column>|<prefix>|<strptime>`, where prefix and format are optional.
+     * ⚠ Trailing blanks are DROPPED rather than emitted: the compiler defaults a *missing* position
+     * (`""` prefix, `%Y%m%d` format), but an empty third position would interpolate an empty format
+     * string into the SQL. Writing `col||` would silently produce a `TRY_STRPTIME(…, '')`.
+     */
+    setFilenamePart(g: FormGroup, index: 0 | 1 | 2, value: string): void {
+        const parts = this.sourceParts(g);
+        while (parts.length < 3) parts.push('');
+        parts[index] = value;
+        while (parts.length > 1 && !parts[parts.length - 1].trim()) parts.pop();
+        g.patchValue({ sourceExpression: parts.join('|') });
+    }
+
+    /** The refusal the engine would raise for this row, or `null`. Mirrors `MappingRules`. */
+    ruleProblem(g: FormGroup): string | null {
+        const type = String(g.get('transformType')?.value ?? '');
+        const parts = this.sourceParts(g);
+        if (type === 'CONCAT_DT' && (!parts[0]?.trim() || !parts[1]?.trim())) {
+            return 'Needs a date column and a time column.';
+        }
+        if (type === 'FILENAME_DATE') {
+            const target = String(g.get('targetColumn')?.value ?? '')
+                .trim()
+                .toUpperCase();
+            if (target !== FILENAME_DATE_TARGET) return `Can only write ${FILENAME_DATE_TARGET}.`;
+            if (!parts[0]?.trim()) return 'Needs the column holding the file name.';
+        }
+        return null;
+    }
+
+    /** Whether any row would be refused — used to block a save that is a guaranteed 422. */
+    anyRuleProblem(): boolean {
+        return this.ruleRows.controls.some((g) => this.ruleProblem(g as FormGroup) !== null);
     }
 
     /**
@@ -434,6 +570,15 @@ export class PipelineLoadDefinitionComponent {
             this.ruleRows.controls.forEach((g) => g.markAllAsTouched());
             this.error.set('Every rule needs a valid target column and a source.');
             return;
+        }
+        // Mirror the engine's own per-type refusals rather than posting a guaranteed 422.
+        for (const g of this.ruleRows.controls) {
+            const problem = this.ruleProblem(g as FormGroup);
+            if (problem) {
+                const t = String(g.get('targetColumn')?.value ?? '').trim() || '(unnamed)';
+                this.error.set(`${String(g.get('transformType')?.value)} rule "${t}": ${problem}`);
+                return;
+            }
         }
         const seen = new Set<string>();
         for (const g of this.ruleRows.controls) {

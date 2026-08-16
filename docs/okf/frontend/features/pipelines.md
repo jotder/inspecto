@@ -607,9 +607,31 @@ already parsed, and renders `mappedColumns` / `mappedRows` (first 20) under the 
 - **A saved schema is re-read on open and a fresh parse must not re-derive over it.** The operator's
   names, types and include flags are the truth; deriving from a new sample would replace them on Apply.
   A hand-authored `schema_file` outside the naming convention is reported and never touched.
-- **A transform type the UI does not offer is preserved, not rewritten.** The Load pane offers `DIRECT`
-  and `EXPR` only (`CONCAT_DT`/`FILENAME_DATE` carry source semantics the grid has no affordance for);
-  a rule already carrying one keeps it. *Not offering* must never become *destroying*.
+- **A transform type the UI does not offer is preserved, not rewritten.** *Not offering* must never
+  become *destroying*. ⚠ **Updated 2026-08-17:** the Load pane now authors **all four** types
+  `TransformCompiler` recognises, so what this guard protects is a value the pane has never heard of
+  (a hand-authored `LOOKUP`, say) — it is kept and shown alongside the four.
+
+  **How the two specialised types are authored, given there is nowhere to put their parameters.** A rule
+  is exactly `{targetColumn, sourceExpression, transformType}` — `MappingCsv` drops every other key — so
+  both pack their parameters into `sourceExpression` as `|`-delimited positions, and the pane composes
+  and decomposes that string rather than inventing a fourth key:
+  - `CONCAT_DT` → `<dateColumn>|<timeColumn>`, **always both**. The compiler reads `parts[1]`
+    unconditionally, so a bare column is an `ArrayIndexOutOfBounds` at run time — which is why
+    `MappingRules` refuses it up front and why the pane never emits one. The timestamp format is *not*
+    per-rule; it comes from the pipeline's `timestamp_formats`.
+  - `FILENAME_DATE` → `<column>|<prefix>|<strptime>`, the last two optional. ⚠ **Trailing blanks are
+    dropped, not emitted**: the compiler defaults a *missing* position (`""`, `%Y%m%d`), but an empty
+    third position interpolates an empty format into the SQL — writing `col||` silently produces
+    `TRY_STRPTIME(…, '')`. The 8-digit group in the extract pattern is hardcoded; the prefix is the only
+    variable part. 🔴 It may only write **`EVENT_DATE`** — enforced in three places server-side
+    (`TransformCompiler`, `MappingRules`, the mock validator), so the pane refuses anything else rather
+    than posting a guaranteed 422.
+
+  ⚠ **Offline, Test mapping renders these as blank cells.** The mock has no SQL engine, so its
+  `mappedValue` returns null for everything but `DIRECT` — the offline preview proves the projection
+  plumbing, never an expression's value. Its *validator* is a faithful mirror, so authoring is checked
+  correctly even though the output is empty.
 
 Both were verified by deleting the guard and watching exactly its own test fail — the only way to know a
 first-try-green test is testing anything.

@@ -172,23 +172,102 @@ describe('PipelineLoadDefinitionComponent', () => {
     });
 
     /**
-     * ⛔ Not offering CONCAT_DT/FILENAME_DATE is a UI limit; it must never become data loss. A rule
-     * already carrying one keeps it, and the select shows it alongside the two offered types.
+     * ⛔ Not offering a type is a UI limit; it must never become data loss. All four types the compiler
+     * recognises are authored since 2026-08-17, so the case this guards is now a hand-authored value
+     * the pane has never heard of — it keeps it, and the select shows it alongside the offered four.
      */
     it('preserves a transform type it does not offer', async () => {
         const fixture = await create(
             mapNode({
-                rules: [{ targetColumn: 'day', sourceExpression: 'FILENAME', transformType: 'FILENAME_DATE' }],
+                rules: [{ targetColumn: 'day', sourceExpression: 'FILENAME', transformType: 'LOOKUP' }],
             }),
         );
         const p = pane(fixture);
-        expect(p.transformsFor(p.ruleRows.at(0))).toEqual(['DIRECT', 'EXPR', 'FILENAME_DATE']);
+        expect(p.transformsFor(p.ruleRows.at(0))).toEqual(['DIRECT', 'EXPR', 'CONCAT_DT', 'FILENAME_DATE', 'LOOKUP']);
 
         p.submit();
         fixture.detectChanges();
         expect(
             (fixture.componentInstance.applied!.config!['rules'] as Record<string, unknown>[])[0]['transformType'],
-        ).toBe('FILENAME_DATE');
+        ).toBe('LOOKUP');
+    });
+
+    // A4: both specialised types pack their parameters into `sourceExpression` as `|`-delimited
+    // positions, because a rule is exactly {targetColumn, sourceExpression, transformType} and
+    // `MappingCsv` drops any other key. The pane composes that string; it never invents a field.
+    describe('structured transform types (A4)', () => {
+        it('composes CONCAT_DT from a date and a time column', async () => {
+            const fixture = await create(
+                mapNode({ rules: [{ targetColumn: 'TRADE_TS', sourceExpression: '', transformType: 'CONCAT_DT' }] }),
+            );
+            const p = pane(fixture);
+            const row = p.ruleRows.at(0);
+
+            // Incomplete is refused up front — the compiler reads parts[1] unconditionally.
+            expect(p.ruleProblem(row)).toContain('date column');
+            p.setConcatPart(row, 0, 'TRADE_DATE');
+            expect(p.ruleProblem(row)).not.toBeNull();
+            p.setConcatPart(row, 1, 'TRADE_TIME');
+            expect(p.ruleProblem(row)).toBeNull();
+            expect(p.sourcePart(row, 0)).toBe('TRADE_DATE');
+
+            // The structured editor must actually RENDER — a behaviour-only assertion would pass
+            // against a broken @if branch showing the EXPR free-text box instead.
+            const labels = [...fixture.nativeElement.querySelectorAll('mat-label')].map((l) =>
+                (l.textContent ?? '').trim(),
+            );
+            expect(labels).toContain('Date column');
+            expect(labels).toContain('Time column');
+
+            p.submit();
+            fixture.detectChanges();
+            const rules = fixture.componentInstance.applied!.config!['rules'] as Record<string, unknown>[];
+            expect(rules[0]['sourceExpression']).toBe('TRADE_DATE|TRADE_TIME');
+        });
+
+        it('composes FILENAME_DATE and drops trailing blank positions', async () => {
+            const fixture = await create(
+                mapNode({
+                    rules: [{ targetColumn: 'EVENT_DATE', sourceExpression: '', transformType: 'FILENAME_DATE' }],
+                }),
+            );
+            const p = pane(fixture);
+            const row = p.ruleRows.at(0);
+
+            p.setFilenamePart(row, 0, 'FILE_NAME');
+            // ⚠ NOT `FILE_NAME||` — an empty third position would compile to TRY_STRPTIME(…, '').
+            expect(row.getRawValue().sourceExpression).toBe('FILE_NAME');
+            expect(p.ruleProblem(row)).toBeNull();
+
+            p.setFilenamePart(row, 2, '%Y%m%d');
+            expect(row.getRawValue().sourceExpression).toBe('FILE_NAME||%Y%m%d');
+            p.setFilenamePart(row, 1, 'data_');
+            expect(row.getRawValue().sourceExpression).toBe('FILE_NAME|data_|%Y%m%d');
+            expect(p.sourcePart(row, 1)).toBe('data_');
+
+            fixture.detectChanges();
+            const labels = [...fixture.nativeElement.querySelectorAll('mat-label')].map((l) =>
+                (l.textContent ?? '').trim(),
+            );
+            expect(labels).toEqual(expect.arrayContaining(['File name column', 'Prefix', 'Format']));
+        });
+
+        it('refuses a FILENAME_DATE rule that does not write EVENT_DATE', async () => {
+            const fixture = await create(
+                mapNode({
+                    rules: [{ targetColumn: 'day', sourceExpression: 'FILE_NAME', transformType: 'FILENAME_DATE' }],
+                }),
+            );
+            const p = pane(fixture);
+            expect(p.ruleProblem(p.ruleRows.at(0))).toContain('EVENT_DATE');
+            expect(p.anyRuleProblem()).toBe(true);
+
+            // Blocked before the round trip — the engine enforces this in three places and would 422.
+            p.submit();
+            fixture.detectChanges();
+            expect(fixture.componentInstance.applied).toBeUndefined();
+            expect(String(p.error())).toContain('EVENT_DATE');
+        });
     });
 
     it('still edits the node rules when the schema cannot be read, reporting the lost picker', async () => {
