@@ -578,10 +578,29 @@ Two consequences that held while the thread was absent, one of which still does:
 - The Load pane takes its field list from the **parser's `schema_file`** — read-only context the host
   passes in, because the host is the only thing holding the whole graph. Rules map FROM schema fields
   anyway, so no sample is needed to author them.
-- **`POST /config/preview/schema`'s mapped-row half (B1) still has no consumer.** Its blocker is gone —
-  the thread now carries parsed rows — but rendering them is the **Load drawer's** own change, not this
-  one. ⚠ And it will only ever have rows for a pipeline whose parse node is per-format, since that is
-  the only kind that feeds the thread.
+- ~~**`POST /config/preview/schema`'s mapped-row half (B1) still has no consumer.**~~ Consumed since
+  2026-08-16 — see below.
+
+### The Load drawer tests a mapping against the thread (B1)
+
+*Test mapping* posts `{raw: <the parser schema's raw>, mapping: {rules}}` over the rows the parse drawer
+already parsed, and renders `mappedColumns` / `mappedRows` (first 20) under the rule grid.
+
+- **It posts the rules being EDITED, not the node's** — the point is to try an edit before applying it.
+- **The result is the thread's cast hop**, written back into `DefinitionStateService`: after a mapping
+  test the parse drawer's own strip reads `parsed · N cols → cast · N ok`. A re-parse clears it, exactly
+  as it clears any other downstream result.
+- **An edited rule clears the grid.** A result may never outlive the config it came from; that is cheaper
+  and more honest than a "stale" badge. ⚠ The clear runs from `valueChanges`, which `seedRules` emits from
+  inside the node effect — probed, and those reads do NOT become dependencies of that effect, so no
+  `untracked` is needed (the speculative guard was removed after the probe showed it never fires).
+- 🔴 **Reachable only where the parse node is per-format** — a generic `parser` opens the grammar dialog,
+  which has no thread.
+- ⚠ Two things only the preview could show. The offline mock resolved a `DIRECT` source by **exact key**,
+  so an identity rule seeded from a schema (field names upper-cased) rendered *"3 rows mapped"* over a grid
+  of blank cells; it now folds case, matching how DuckDB binds an unquoted identifier. And the drawer's
+  header labels a `transform.map` node **"PARSER"** — `kindLabel` is an acquisition/else ternary in the
+  editor template; cosmetic, still open in BACKLOG.
 
 ### Two write-ordering guards, both falsified before being trusted
 

@@ -650,12 +650,20 @@ interface MappingRuleMock {
  * owns any explicit cast, so `QUANTITY * 2` over a VARCHAR column refuses), whereas the mock has no
  * binder and yields a null cell. Offline authoring therefore cannot tell a valid expression from an
  * unbindable one; a pane must present these cells as *not evaluated*, never as a computed value.
+ *
+ * <p>⚠ The source lookup falls back to a CASE-INSENSITIVE match, because DuckDB resolves an unquoted
+ * identifier that way: an identity rule seeded from a schema (whose field names are upper-cased) maps a
+ * parsed column named `Column0` through `COLUMN0` on the server. Found in the preview 2026-08-16 — the
+ * exact-match-only version rendered "3 rows mapped" over a grid of blank cells, which reads as a broken
+ * feature rather than as the mock being stricter than the engine it mirrors.
  */
 function mappedValue(rule: MappingRuleMock, row: Record<string, unknown>): unknown {
     const type = (rule.transformType ?? '').trim().toUpperCase();
     if (type !== '' && type !== 'DIRECT') return null;
     const source = rule.sourceExpression ?? '';
-    return source in row ? row[source] : null;
+    if (source in row) return row[source];
+    const folded = Object.keys(row).find((k) => k.toLowerCase() === source.toLowerCase());
+    return folded === undefined ? null : row[folded];
 }
 
 /**

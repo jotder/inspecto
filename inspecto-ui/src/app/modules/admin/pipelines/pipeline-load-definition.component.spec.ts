@@ -1,14 +1,19 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { AuthoredNode, ConfigService } from 'app/inspecto/api';
+import { AuthoredNode, ConfigService, SchemaPreview } from 'app/inspecto/api';
+import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { PipelineLoadDefinitionComponent } from './pipeline-load-definition.component';
 
 let schemaMissing = false;
+/** What the stubbed `POST /config/preview/schema` answers, and what it was asked. */
+let previewAnswer: SchemaPreview | HttpErrorResponse = { columns: [], okCount: 0, rejectedCount: 0, rejectedRows: [] };
+let previewCalls: { config: Record<string, unknown>; rows: Record<string, unknown>[] }[] = [];
 
 /** Host so the required signal `node` input binds naturally and outputs are captured. */
 @Component({
@@ -19,6 +24,7 @@ let schemaMissing = false;
         <app-pipeline-load-definition
             [node]="node"
             [schemaFile]="schemaFile"
+            [sample]="sample"
             (applied)="applied = $event"
             (dirtyChange)="dirty = $event"
         />
@@ -27,6 +33,7 @@ let schemaMissing = false;
 class HostComponent {
     node: AuthoredNode = mapNode();
     schemaFile = 'spaces/default/config/cdr_schema.toon';
+    sample: DefinitionStateService | null = null;
     applied?: AuthoredNode;
     dirty = false;
 }
@@ -35,7 +42,11 @@ function mapNode(config: Record<string, unknown> = {}): AuthoredNode {
     return { id: 'map', type: 'transform.map', name: 'Map', config };
 }
 
-async function create(node: AuthoredNode = mapNode(), schemaFile = 'spaces/default/config/cdr_schema.toon') {
+async function create(
+    node: AuthoredNode = mapNode(),
+    schemaFile = 'spaces/default/config/cdr_schema.toon',
+    sample: DefinitionStateService | null = null,
+) {
     TestBed.configureTestingModule({
         imports: [HostComponent],
         providers: [
@@ -56,6 +67,12 @@ async function create(node: AuthoredNode = mapNode(), schemaFile = 'spaces/defau
                                       },
                                   },
                               }),
+                    previewSchema: (config: Record<string, unknown>, rows: Record<string, unknown>[]) => {
+                        previewCalls.push({ config, rows });
+                        return previewAnswer instanceof HttpErrorResponse
+                            ? throwError(() => previewAnswer)
+                            : of(previewAnswer);
+                    },
                 },
             },
         ],
@@ -64,8 +81,23 @@ async function create(node: AuthoredNode = mapNode(), schemaFile = 'spaces/defau
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.node = node;
     fixture.componentInstance.schemaFile = schemaFile;
+    fixture.componentInstance.sample = sample;
     fixture.detectChanges();
     return fixture;
+}
+
+/** A thread already carrying a parsed sample — the state the Parse drawer leaves behind. */
+function threadWithParsedRows(rows: Record<string, unknown>[] = [{ A_NUMBER: '999', DURATION: '12' }]) {
+    const state = new DefinitionStateService();
+    state.captureSample('cdr.csv', '999,12');
+    state.parsePreview.set({
+        frontend: 'delimited',
+        columns: ['A_NUMBER', 'DURATION'],
+        rowCount: rows.length,
+        rows,
+        rejectedRows: 0,
+    });
+    return state;
 }
 
 function pane(fixture: ComponentFixture<HostComponent>): PipelineLoadDefinitionComponent {
@@ -154,8 +186,9 @@ describe('PipelineLoadDefinitionComponent', () => {
 
         p.submit();
         fixture.detectChanges();
-        expect((fixture.componentInstance.applied!.config!['rules'] as Record<string, unknown>[])[0]['transformType'])
-            .toBe('FILENAME_DATE');
+        expect(
+            (fixture.componentInstance.applied!.config!['rules'] as Record<string, unknown>[])[0]['transformType'],
+        ).toBe('FILENAME_DATE');
     });
 
     it('still edits the node rules when the schema cannot be read, reporting the lost picker', async () => {
@@ -178,6 +211,123 @@ describe('PipelineLoadDefinitionComponent', () => {
 
     it('has no a11y violations', async () => {
         const fixture = await create();
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+});
+
+/**
+ * B1 — the mapped-output half. `POST /config/preview/schema` returns `mappedColumns`/`mappedRows` when
+ * the posted draft carries `mapping.rules`; this pane is its consumer, running the rules being EDITED
+ * over the rows the tab's sample thread already parsed.
+ */
+describe('PipelineLoadDefinitionComponent — mapped output (B1)', () => {
+    const mappedOk: SchemaPreview = {
+        columns: ['A_NUMBER', 'DURATION'],
+        okCount: 1,
+        rejectedCount: 0,
+        rejectedRows: [],
+        mappedColumns: ['msisdn', 'secs'],
+        mappedCount: 1,
+        mappedRows: [{ msisdn: '999', secs: 12 }],
+    };
+
+    beforeEach(() => {
+        schemaMissing = false;
+        previewCalls = [];
+        previewAnswer = mappedOk;
+    });
+
+    it('says what to capture first when the thread has no parsed rows', async () => {
+        const fixture = await create(mapNode(), 'spaces/default/config/cdr_schema.toon', new DefinitionStateService());
+        expect(pane(fixture).canTest()).toBe(false);
+        expect(fixture.nativeElement.textContent).toContain('Capture a sample on the parse step');
+    });
+
+    it('posts the FORM rules plus the schema raw over the parsed rows, and renders the mapped grid', async () => {
+        const thread = threadWithParsedRows();
+        const fixture = await create(mapNode(), 'spaces/default/config/cdr_schema.toon', thread);
+        const p = pane(fixture);
+        p.ruleRows.at(0).get('targetColumn')?.setValue('msisdn');
+        p.testMapping();
+        fixture.detectChanges();
+
+        expect(previewCalls).toHaveLength(1);
+        const posted = previewCalls[0];
+        expect(posted.rows).toEqual([{ A_NUMBER: '999', DURATION: '12' }]);
+        expect((posted.config['raw'] as Record<string, unknown>)['fields']).toHaveLength(2);
+        const rules = (posted.config['mapping'] as { rules: Record<string, unknown>[] }).rules;
+        // The edit is what gets tested — not the node's stored rules.
+        expect(rules[0]['targetColumn']).toBe('msisdn');
+
+        const text = fixture.nativeElement.textContent;
+        expect(text).toContain('msisdn');
+        expect(text).toContain('999');
+        expect(text).toContain('1 rows mapped from 1 parsed');
+    });
+
+    /** The mapped hop IS the thread's cast hop — the Parse drawer's strip must show the same result. */
+    it('mirrors the result into the thread', async () => {
+        const thread = threadWithParsedRows();
+        const fixture = await create(mapNode(), 'spaces/default/config/cdr_schema.toon', thread);
+        pane(fixture).testMapping();
+        expect(thread.schemaPreview()?.mappedCount).toBe(1);
+        expect(thread.schemaError()).toBeNull();
+    });
+
+    it('clears the mapped grid before reporting a refusal — a stale grid must not outlive the rules', async () => {
+        const thread = threadWithParsedRows();
+        const fixture = await create(mapNode(), 'spaces/default/config/cdr_schema.toon', thread);
+        pane(fixture).testMapping();
+        previewAnswer = new HttpErrorResponse({ status: 422, error: { error: 'Binder Error: no such column' } });
+        pane(fixture).testMapping();
+        fixture.detectChanges();
+
+        expect(thread.schemaPreview()).toBeNull();
+        expect(pane(fixture).mapped()).toBeNull();
+        expect(String(pane(fixture).mapError())).toContain('Binder Error');
+        expect(fixture.nativeElement.textContent).toContain('Binder Error');
+    });
+
+    it('invalidates the mapped grid as soon as a rule is edited', async () => {
+        const thread = threadWithParsedRows();
+        const fixture = await create(mapNode(), 'spaces/default/config/cdr_schema.toon', thread);
+        const p = pane(fixture);
+        p.testMapping();
+        expect(p.mapped()).not.toBeNull();
+
+        p.ruleRows.at(0).get('sourceExpression')?.setValue('DURATION');
+        fixture.detectChanges();
+        expect(p.mapped()).toBeNull();
+        expect(fixture.nativeElement.textContent).not.toContain('999');
+    });
+
+    /** ⚠ The result must survive its own arrival: writing it must not re-trigger the node effect. */
+    it('keeps the result after the change-detection pass that renders it', async () => {
+        const thread = threadWithParsedRows();
+        const fixture = await create(mapNode(), 'spaces/default/config/cdr_schema.toon', thread);
+        const p = pane(fixture);
+        p.ruleRows.at(0).get('targetColumn')?.setValue('msisdn');
+        p.testMapping();
+        fixture.detectChanges();
+        fixture.detectChanges();
+        expect(p.mapped()?.mappedCount).toBe(1);
+        // A re-run of the node effect would also have reseeded the grid over the edit.
+        expect(p.ruleRows.at(0).get('targetColumn')?.value).toBe('msisdn');
+    });
+
+    it('still edits, and simply cannot test, when the host keeps no thread', async () => {
+        const fixture = await create();
+        const p = pane(fixture);
+        expect(p.canTest()).toBe(false);
+        p.testMapping();
+        expect(previewCalls).toHaveLength(0);
+        expect(p.ruleRows.length).toBe(2);
+    });
+
+    it('has no a11y violations with the mapped grid rendered', async () => {
+        const fixture = await create(mapNode(), 'spaces/default/config/cdr_schema.toon', threadWithParsedRows());
+        pane(fixture).testMapping();
+        fixture.detectChanges();
         await expectNoA11yViolations(fixture.nativeElement);
     });
 });

@@ -549,11 +549,14 @@
                                             this arm is not the enumeration the note below forbids. The
                                             parser's schema_file comes in as read-only context: the
                                             rules map FROM that schema's fields, and the key lives on
-                                            the parser node, which only the host can reach.
+                                            the parser node, which only the host can reach. The tab's
+                                            sample thread comes in the same way (B1) — it is what
+                                            "Test mapping" runs the rules over.
                                         -->
                                         <app-pipeline-load-definition
                                             [node]="dn"
                                             [schemaFile]="parserSchemaFile()"
+                                            [sample]="sampleThread()"
                                             (applied)="onDefinitionApplied($event)"
                                             (dirtyChange)="definitionDirty.set($event)"
                                         />

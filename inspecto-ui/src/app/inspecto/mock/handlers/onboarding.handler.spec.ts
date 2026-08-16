@@ -290,6 +290,20 @@ describe('onboardingHandler POST /config/preview/schema — the mapped half (B1)
         expect(body['mappedRows']).toEqual([{ account: '1', memo: 'a' }]);
     });
 
+    /**
+     * DuckDB resolves an unquoted identifier case-insensitively, so a rule seeded from a schema (field
+     * names upper-cased) must still find the parsed column it names. Found in the preview: the
+     * exact-match-only version answered "3 rows mapped" with every cell blank.
+     */
+    it('resolves a DIRECT source case-insensitively, as an unquoted identifier binds', () => {
+        const config = {
+            raw: { fields: [{ name: 'Column0', type: 'VARCHAR' }] },
+            mapping: { rules: [{ targetColumn: 'msisdn', sourceExpression: 'COLUMN0', transformType: 'DIRECT' }] },
+        };
+        const body = preview(config, [{ Column0: '9198765' }])?.body as Record<string, unknown>;
+        expect(body['mappedRows']).toEqual([{ msisdn: '9198765' }]);
+    });
+
     it('yields null for an EXPR rule — the mock has no SQL engine, and must not invent a value', () => {
         const config = {
             ...FIELDS,
