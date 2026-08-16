@@ -43,6 +43,15 @@ slice table would govern nothing — operator decision 2026-08-16.
 bound Grammar is a write route the drawer lacks — is **superseded**. The resolution was to remove the
 binding, not to build the write route.
 
+## Shared surfaces the Parse pane composes
+
+`<inspecto-segments-editor>` (`inspecto/segments/`) maps a hierarchical parser's decoded record tree onto flat
+segment schemas. It lives in `inspecto/` rather than the Onboarding feature because **a feature may not import
+another feature** and both hosts now need it — the `connection-form.dialog` relocation precedent. Like the
+grammar editor it has **no write path**: the two hosts write different blocks (Onboarding's
+`parsing.plugin.segments`, the Parse drawer's `parsing.asn1.segments`), which is exactly why the write stays
+host-side.
+
 ## A SERVED format in the pane — ASN.1 (P3c, 2026-08-16)
 
 `asn1` is the first subtype that is **not a built-in `ParsingFrontend`**: the editor hosts it as the served
@@ -52,10 +61,19 @@ like the built-ins. Three consequences, each of which cost a test:
 * **The pane assembles the block itself.** `GrammarEditorComponent.value()` is the built-ins' shape — it would
   stamp the editor's *internal* frontend (`delimited`) — so the pane's `parsingValue()` builds
   `{frontend: 'asn1', asn1: …}` from `grammar()` instead. ⛔ Don't "simplify" it back to `value()`.
-* **`asn1.segments` is carried VERBATIM, never authored here.** Writing segments means writing schema toons —
-  a host transaction Onboarding owns and a pure pane cannot make. Dropping them on Apply would silently turn
-  an ingest-capable config preview-only, so the carry-through is pinned. A **template** strips them: a
-  template is a Grammar copy, and segment paths are deployment, not grammar.
+* **`asn1.segments` is AUTHORED here** (P3d re-scope, 2026-08-16 — it was carried verbatim for one day).
+  The pane projects the shared `<inspecto-segments-editor>` via `[grammarExtras]` and writes one schema
+  toon per segment **before** emitting a block that references them — a config must never name a file that
+  does not exist yet, so a failed write applies **nothing** and the pane stays dirty. This is the pane's
+  ONE write and it is not a P2 exception: P2's rule is that a stage's own companion artifact stays a pane
+  write, and it names segment schemas explicitly (the reusable `grammar` component is a THIRD entity,
+  which is why *that* one is still emitted to the host). ⚠ Apply therefore hits the server while the node
+  change is still only in-memory — discarding afterwards can orphan schema toons, exactly as Onboarding's
+  `savePlugin` can. A **template** strips segments: a template is a Grammar copy, and segment paths are
+  deployment, not grammar.
+* **A keys-only segment refuses to Apply.** Saved segments re-hydrate from the toons they point at (keys
+  AND columns); when a read 404s that segment arrives column-less, and a segment with no columns cannot
+  describe a Table — so Apply refuses rather than writing an empty schema over it.
 * **A served form cannot author what the catalog did not serve.** With the plugin absent the schema form holds
   no `asn1.*` keys at all, so Apply would write an EMPTY grammar over a deployed one and report success. The
   pane refuses instead (`asn1Unavailable`). The editor's own "jar not deployed" banner does **not** cover this:

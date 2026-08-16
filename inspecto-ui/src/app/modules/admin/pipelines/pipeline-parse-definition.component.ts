@@ -16,13 +16,30 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { AuthoredNode, ComponentDef } from 'app/inspecto/api';
+import { forkJoin, of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
+import {
+    AuthoredNode,
+    ComponentDef,
+    ConfigService,
+    ParserDef,
+    ParserTreeNode,
+    SpacesService,
+    apiErrorMessage,
+} from 'app/inspecto/api';
 import {
     GrammarEditorComponent,
     ParsingFrontend,
     grammarContentAsParsingBlock,
     grammarSeedsFrontend,
 } from 'app/inspecto/grammar';
+import {
+    InspectoSegmentsEditorComponent,
+    SegmentDraft,
+    schemaDraftFor,
+    schemaNameFromPath,
+    segmentDraftFrom,
+} from 'app/inspecto/segments';
 
 /**
  * The per-format parse node types the drawer serves → the frontend each one means. This is the ONE
@@ -54,8 +71,14 @@ export const PARSE_NODE_FRONTENDS: Record<string, ParsingFrontend | 'asn1'> = {
  * tabs appear and each format stays its own palette entry. A second copy of this file would only
  * drift.
  *
- * <p>**Pure** (D2): {@link submit} rebuilds the node with the Grammar in its inline `parsing:` home
- * and emits it — the host patches its in-memory model and the toolbar Save persists. Grammar-BOUND
+ * <p>**Pure** (D2), with ONE write of its own: {@link submit} rebuilds the node with the Grammar in
+ * its inline `parsing:` home and emits it — the host patches its in-memory model and the toolbar Save
+ * persists. The exception is an ASN.1 node's **segment schemas**, which this pane writes itself before
+ * emitting a block that references them: P2's rule is that a stage's OWN companion artifact stays a
+ * pane write (the reusable `grammar` component is a THIRD entity, which is why THAT one is emitted to
+ * the host instead). ⚠ Applying therefore hits the server even though the node change is still only
+ * in-memory — the same ordering, and the same orphan-on-discard tradeoff, as Onboarding's `savePlugin`.
+ * Grammar-BOUND
  * nodes (`use: grammar/<id>`) do not reach this pane: updating a reusable component is its own write
  * route, which the dialog still owns — the host routes those to `grammar-editor.dialog`.
  *
@@ -74,6 +97,7 @@ export const PARSE_NODE_FRONTENDS: Record<string, ParsingFrontend | 'asn1'> = {
         MatSelectModule,
         MatTooltipModule,
         GrammarEditorComponent,
+        InspectoSegmentsEditorComponent,
     ],
     template: `
         <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-1">
@@ -112,13 +136,35 @@ export const PARSE_NODE_FRONTENDS: Record<string, ParsingFrontend | 'asn1'> = {
                 [initial]="seedBlock()"
                 [type]="frontend()"
                 [lockType]="true"
+                (pluginChange)="plugin.set($event)"
+                (previewed)="previewTree.set($event.kind === 'tree' ? $event.nodes : null)"
                 (submitted)="submit()"
-            />
+            >
+                <!--
+                    Segments need one schema .toon written per segment BEFORE the block that
+                    references them, so the editor stays write-free and this is projected in — the
+                    same contract the Onboarding Parsing stage uses. Shown only once the served parser
+                    has resolved: without it there is no record tree to derive from.
+                -->
+                <div grammarExtras>
+                    @if (authorsSegments()) {
+                        <div class="mb-1 mt-3 flex items-center gap-2">
+                            <span class="text-xs font-semibold uppercase opacity-70">Segments</span>
+                            @if (segmentsLoading()) {
+                                <span class="text-secondary text-xs">Loading the saved segment columns…</span>
+                            }
+                        </div>
+                        <inspecto-segments-editor [tree]="previewTree()" [initial]="initialSegments()" />
+                    }
+                </div>
+            </inspecto-grammar-editor>
         </form>
     `,
 })
 export class PipelineParseDefinitionComponent {
     private fb = inject(FormBuilder);
+    private configApi = inject(ConfigService);
+    private spaces = inject(SpacesService);
 
     /** The per-format parse node being defined (identity fixed; config/name/description editable). */
     readonly node = input.required<AuthoredNode>();
@@ -134,6 +180,13 @@ export class PipelineParseDefinitionComponent {
      */
     readonly templates = input<ComponentDef[]>([]);
 
+    /**
+     * The pipeline this node belongs to — only used to name the segment schema toons, by the SAME
+     * `<pipeline>_<segmentKey>` convention the Onboarding Parsing stage uses, so a stream onboarded
+     * there and then edited here rewrites its own schemas instead of growing a second set.
+     */
+    readonly pipelineName = input('');
+
     /** The edited node, rebuilt by {@link submit} — the host applies it to the in-memory model. */
     readonly applied = output<AuthoredNode>();
     /** Whether the pane holds edits since creation / the last successful submit. */
@@ -147,6 +200,37 @@ export class PipelineParseDefinitionComponent {
     readonly saveAsTemplate = output<Record<string, unknown>>();
 
     @ViewChild(GrammarEditorComponent) private editor?: GrammarEditorComponent;
+    @ViewChild(InspectoSegmentsEditorComponent) private segmentsEditor?: InspectoSegmentsEditorComponent;
+
+    // ── segments (asn1) ──────────────────────────────────────────────────────────
+
+    /**
+     * The served parser the editor resolved, mirrored from `(pluginChange)`.
+     *
+     * ⚠ Mirrored, NOT read through the `@ViewChild` in the template: content projected INTO the editor
+     * evaluates in THIS component's context and the query is unresolved on first render, so a template
+     * read would decide "no segments editor" before the catalog ever arrived.
+     */
+    readonly plugin = signal<ParserDef | null>(null);
+
+    /** The decoded record forest from the last Test parse — what "Derive from preview" proposes from. */
+    readonly previewTree = signal<ParserTreeNode[] | null>(null);
+
+    /** Segment drafts re-hydrated from the node's saved `asn1.segments`, keys AND columns. */
+    readonly initialSegments = signal<SegmentDraft[]>([]);
+    readonly segmentsLoading = signal(false);
+    /** A segment-schema write is in flight — Apply is a server round-trip for an ASN.1 node. */
+    readonly writing = signal(false);
+
+    /**
+     * Whether this node authors segments: an ASN.1 node whose served parser has resolved and can
+     * actually load to Tables. A preview-only parser has no ingester to feed, so segments would be an
+     * elaborate way to author nothing.
+     */
+    readonly authorsSegments = computed(() => {
+        const p = this.plugin();
+        return this.frontend() === 'asn1' && !!p?.ingestable && !!p.ingesterClass;
+    });
 
     readonly form = this.fb.group({
         name: this.fb.control(''),
@@ -195,8 +279,56 @@ export class PipelineParseDefinitionComponent {
             this.pickedTemplate.set(null);
             this.templateBlock.set(null);
             this.templateDirty = false;
+            this.initialSegments.set([]);
             this.emitDirty();
+            this.loadSavedSegments();
         });
+    }
+
+    /** `segment key → schema-toon path`, as stored in the node's `parsing.asn1.segments`. */
+    private savedSegmentPaths(): Record<string, unknown> {
+        const a = this.parsingBlock()['asn1'] as Record<string, unknown> | undefined;
+        const segs = a?.['segments'];
+        return segs && typeof segs === 'object' && !Array.isArray(segs) ? (segs as Record<string, unknown>) : {};
+    }
+
+    /**
+     * Read each saved segment's schema toon back, so re-editing an existing pipeline does not force a
+     * destructive re-derive. Per-segment and non-fatal: a failed read leaves that segment keys-only.
+     * A 404 is expected and silent — a config may legitimately reference a schema never written.
+     */
+    private loadSavedSegments(): void {
+        const paths = this.savedSegmentPaths();
+        const keys = Object.keys(paths);
+        if (keys.length === 0) return;
+        const reads = keys.map((key) => {
+            const name = schemaNameFromPath(paths[key]);
+            if (!name) return of<SegmentDraft>({ key, columns: [] });
+            return this.configApi.read('schema', name).pipe(
+                map((r) => segmentDraftFrom(key, r.config)),
+                catchError(() => of<SegmentDraft>({ key, columns: [] })),
+            );
+        });
+        this.segmentsLoading.set(true);
+        forkJoin(reads).subscribe((drafts) => {
+            this.segmentsLoading.set(false);
+            // The editor's `initial` setter REBUILDS the FormArray, so a late read landing over edits
+            // the operator already made would silently discard them.
+            if (this.segmentsEditor?.isDirty()) return;
+            this.initialSegments.set(drafts);
+        });
+    }
+
+    private base(): string {
+        return this.spaces.currentSpaceId() ? `spaces/${this.spaces.currentSpaceId()}` : '.';
+    }
+    /** One schema toon per segment, named by the Onboarding Parsing stage's convention. */
+    private schemaNameFor(segmentKey: string): string {
+        const pipeline = this.pipelineName() || this.node().id;
+        return `${pipeline}_${segmentKey}`.replace(/[^A-Za-z0-9_]+/g, '_');
+    }
+    private schemaPathFor(segmentKey: string): string {
+        return `${this.base()}/config/${this.schemaNameFor(segmentKey)}.toon`;
     }
 
     /**
@@ -228,7 +360,11 @@ export class PipelineParseDefinitionComponent {
     }
 
     private emitDirty(): void {
-        const dirty = this.form.dirty || this.templateDirty || (this.editor?.isDirty() ?? false);
+        const dirty =
+            this.form.dirty ||
+            this.templateDirty ||
+            (this.editor?.isDirty() ?? false) ||
+            (this.segmentsEditor?.isDirty() ?? false);
         if (dirty === this.lastDirty) return;
         this.lastDirty = dirty;
         this.dirtyChange.emit(dirty);
@@ -251,16 +387,6 @@ export class PipelineParseDefinitionComponent {
     }
 
     /**
-     * The `parsing:` block to persist. A built-in comes from the editor's own {@link
-     * GrammarEditorComponent#value} (authored keys + cleared sibling roots + the frontend word). asn1
-     * is a SERVED parser, not a built-in — `value()` would stamp the editor's internal frontend
-     * (delimited) — so its block is assembled here: the schema-form's `asn1.*` keys, the frontend the
-     * node type means, and the node's own `segments` carried VERBATIM. The drawer does not author
-     * segments (Onboarding owns that transaction — writing schema toons is a host write this pure
-     * pane cannot make), and a submit that dropped them would silently turn an ingest-capable config
-     * preview-only.
-     */
-    /**
      * The asn1 form is SERVED — its fields exist only if `GET /parsers` returned the plugin. When it
      * did not (jar not deployed, catalog fetch failed), the schema form holds no `asn1.*` keys at
      * all, so building the block from it would write an EMPTY grammar over a deployed one and answer
@@ -274,13 +400,32 @@ export class PipelineParseDefinitionComponent {
         return true;
     }
 
-    private parsingValue(): Record<string, unknown> {
+    /**
+     * The `parsing:` block to persist. A built-in comes from the editor's own {@link
+     * GrammarEditorComponent#value} (authored keys + cleared sibling roots + the frontend word). asn1
+     * is a SERVED parser, not a built-in — `value()` would stamp the editor's internal frontend
+     * (delimited) — so its block is assembled here from the schema-form's `asn1.*` keys plus the
+     * frontend word the node type means.
+     *
+     * <p>`segments` come from {@link segmentPaths} when this node authors them; otherwise the node's
+     * own are carried VERBATIM — a submit that dropped them would silently turn an ingest-capable
+     * config preview-only.
+     */
+    private parsingValue(segments?: Record<string, string>): Record<string, unknown> {
         const f = this.frontend();
         if (f !== 'asn1') return { ...this.editor!.value(), frontend: f };
         const a = { ...((this.editor!.grammar()['asn1'] as Record<string, unknown> | undefined) ?? {}) };
         const prior = this.parsingBlock()['asn1'] as Record<string, unknown> | undefined;
-        if (prior?.['segments'] !== undefined) a['segments'] = prior['segments'];
+        if (segments) a['segments'] = segments;
+        else if (prior?.['segments'] !== undefined) a['segments'] = prior['segments'];
         return { frontend: 'asn1', asn1: a };
+    }
+
+    /** `segment key → schema-toon path` for the drafts currently in the editor. */
+    private segmentPaths(drafts: SegmentDraft[]): Record<string, string> {
+        const paths: Record<string, string> = {};
+        for (const d of drafts) paths[d.key] = this.schemaPathFor(d.key);
+        return paths;
     }
 
     /**
@@ -290,7 +435,39 @@ export class PipelineParseDefinitionComponent {
      */
     submit(): void {
         if (!this.editor?.validate() || this.asn1Unavailable()) return;
-        const block = this.parsingValue();
+        if (!this.authorsSegments()) return this.applyWith(this.parsingValue());
+
+        // Segments: write one schema toon per segment FIRST, then emit a block referencing them. Two
+        // hops in this order because the config must never name a schema file that does not exist yet
+        // — the Schema stage's rule, and Onboarding's `savePlugin` does exactly the same.
+        const segments = this.segmentsEditor;
+        if (!segments || !segments.validate()) {
+            this.editor.error.set(segments?.problem() ?? 'Add at least one segment.');
+            return;
+        }
+        const drafts = segments.value();
+        this.writing.set(true);
+        forkJoin(
+            drafts.map((d) =>
+                this.configApi.write('schema', schemaDraftFor(d, this.schemaNameFor(d.key)), { overwrite: true }),
+            ),
+        ).subscribe({
+            next: () => {
+                this.writing.set(false);
+                segments.markPristine();
+                this.applyWith(this.parsingValue(this.segmentPaths(drafts)));
+            },
+            error: (e) => {
+                this.writing.set(false);
+                // Nothing is applied: a node pointing at schemas that failed to write is the state
+                // this ordering exists to prevent, and the pane stays dirty so the edits survive.
+                this.editor?.error.set(apiErrorMessage(e, 'Could not save the segment schemas.'));
+            },
+        });
+    }
+
+    /** Rebuild the node around the finished block, emit it, and consume the pane's edits. */
+    private applyWith(block: Record<string, unknown>): void {
         const v = this.form.getRawValue();
         // `use` is dropped, never carried: this pane's whole contract is that the node owns its
         // Grammar inline. A node opened here BOUND to a `grammar/<id>` component is materialised into
@@ -303,7 +480,7 @@ export class PipelineParseDefinitionComponent {
             config: { ...(n.config ?? {}), parsing: block },
         };
         this.form.markAsPristine();
-        this.editor.markPristine();
+        this.editor?.markPristine();
         this.templateDirty = false; // Apply consumed the pick, same as any other edit
         this.emitDirty();
         this.applied.emit(node);

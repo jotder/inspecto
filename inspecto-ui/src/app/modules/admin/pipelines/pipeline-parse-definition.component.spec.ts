@@ -2,11 +2,12 @@ import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { delay } from 'rxjs/operators';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AuthoredNode, ComponentDef, ParsersService } from 'app/inspecto/api';
+import { AuthoredNode, ComponentDef, ConfigService, ParsersService, SpacesService } from 'app/inspecto/api';
 import { GrammarEditorComponent } from 'app/inspecto/grammar';
+import { InspectoSegmentsEditorComponent } from 'app/inspecto/segments';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { PipelineParseDefinitionComponent } from './pipeline-parse-definition.component';
 
@@ -23,6 +24,7 @@ import { PipelineParseDefinitionComponent } from './pipeline-parse-definition.co
         <app-pipeline-parse-definition
             [node]="node"
             [templates]="templates"
+            [pipelineName]="pipelineName"
             (applied)="applied = $event"
             (dirtyChange)="dirty = $event"
             (saveAsTemplate)="template = $event"
@@ -32,6 +34,7 @@ import { PipelineParseDefinitionComponent } from './pipeline-parse-definition.co
 class HostComponent {
     node: AuthoredNode = delimitedNode();
     templates: ComponentDef[] = [];
+    pipelineName = '';
     applied?: AuthoredNode;
     dirty = false;
     template?: Record<string, unknown>;
@@ -106,6 +109,11 @@ const ASN1_DEF = {
     ],
 };
 
+/** Segment-schema writes the pane made, in order — the two-hop contract is what these assert. */
+const schemaWrites: { type: string; config: Record<string, unknown> }[] = [];
+let schemaWriteFails = false;
+let savedSchemaMissing = false;
+
 /**
  * `servedDelayMs` reproduces PRODUCTION ordering: `GET /parsers` is an HTTP hop, so the catalog lands
  * after the inputs are bound and after the editor is seeded. A synchronous `of()` hides a whole class
@@ -117,6 +125,7 @@ async function create(
     served: unknown[] = [],
     servedDelayMs = 0,
 ) {
+    schemaWrites.length = 0;
     TestBed.configureTestingModule({
         imports: [HostComponent],
         providers: [
@@ -128,6 +137,30 @@ async function create(
                     preview: vi.fn(() => of({ kind: 'table', rows: [] })),
                 },
             },
+            {
+                provide: ConfigService,
+                useValue: {
+                    write: (type: string, config: Record<string, unknown>) => {
+                        schemaWrites.push({ type, config });
+                        return schemaWriteFails ? throwError(() => new Error('disk full')) : of({ written: true });
+                    },
+                    // The node's saved `asn1.segments` re-hydrate from the schema toons they point at —
+                    // keys AND columns. Returning a real one exercises that path; a 404 would leave a
+                    // keys-only draft, which validation correctly refuses (that is its own test).
+                    read: () =>
+                        savedSchemaMissing
+                            ? throwError(() => ({ status: 404 }))
+                            : of({
+                                  config: {
+                                      raw: {
+                                          name: 'record',
+                                          fields: [{ name: 'IMSI', selector: 'imsi', type: 'VARCHAR' }],
+                                      },
+                                  },
+                              }),
+                },
+            },
+            { provide: SpacesService, useValue: { currentSpaceId: () => 'default' } },
         ],
     });
     await TestBed.compileComponents();
@@ -144,6 +177,10 @@ function pane(fixture: ComponentFixture<HostComponent>): PipelineParseDefinition
 
 function editor(fixture: ComponentFixture<HostComponent>): GrammarEditorComponent {
     return fixture.debugElement.query(By.directive(GrammarEditorComponent)).componentInstance;
+}
+
+function segmentsEditor(fixture: ComponentFixture<HostComponent>): InspectoSegmentsEditorComponent {
+    return fixture.debugElement.query(By.directive(InspectoSegmentsEditorComponent)).componentInstance;
 }
 
 describe('PipelineParseDefinitionComponent', () => {
@@ -251,22 +288,83 @@ describe('PipelineParseDefinitionComponent', () => {
             expect(editor(fixture).lockType).toBe(true);
         });
 
-        it('Apply stamps frontend: asn1 and carries the node’s segments VERBATIM', async () => {
+        /**
+         * The two-hop contract: schema toons are written BEFORE the block that references them, so a
+         * config never names a file that does not exist. Segments are authored here now (P3d re-scope)
+         * rather than carried verbatim, and the emitted paths are the ones just written.
+         */
+        it('re-hydrates the saved segment’s COLUMNS, not just its key', async () => {
             const fixture = await create(asn1Node(), [], [ASN1_DEF]);
+            expect(pane(fixture).initialSegments()).toEqual([
+                { key: 'Record', columns: [{ name: 'IMSI', selector: 'imsi', type: 'VARCHAR' }] },
+            ]);
+        });
+
+        it('Apply writes one schema toon per segment, THEN emits a block referencing them', async () => {
+            const fixture = await create(asn1Node(), [], [ASN1_DEF]);
+            fixture.componentInstance.pipelineName = 'asn1_cdr';
+            fixture.detectChanges();
             editor(fixture).schemaForm!.form.patchValue({ asn1__root_type: 'CallEventRecord' });
             fixture.detectChanges();
 
             pane(fixture).submit();
 
-            const applied = fixture.componentInstance.applied!;
-            const parsing = applied.config!['parsing'] as Record<string, unknown>;
+            // hop 1: the schema toon, named by the Onboarding convention
+            expect(schemaWrites).toHaveLength(1);
+            expect(schemaWrites[0].type).toBe('schema');
+            expect((schemaWrites[0].config['raw'] as Record<string, unknown>)['name']).toBe('asn1_cdr_Record');
+            // hop 2: the block, pointing at what was just written
+            const parsing = fixture.componentInstance.applied!.config!['parsing'] as Record<string, unknown>;
             expect(parsing['frontend']).toBe('asn1');
             const a = parsing['asn1'] as Record<string, unknown>;
             expect(a['root_type']).toBe('CallEventRecord');
             expect(a['grammar']).toContain('DEFINITIONS');
-            // The drawer does not author segments (Onboarding owns that transaction) — dropping them
-            // on Apply would silently turn an ingest-capable config preview-only.
-            expect(a['segments']).toEqual({ Record: 'config/record_schema.toon' });
+            expect(a['segments']).toEqual({ Record: 'spaces/default/config/asn1_cdr_Record.toon' });
+        });
+
+        /** A node pointing at schemas that failed to write is the state the ordering exists to prevent. */
+        it('applies NOTHING when the segment-schema write fails', async () => {
+            schemaWriteFails = true;
+            try {
+                const fixture = await create(asn1Node(), [], [ASN1_DEF]);
+                pane(fixture).submit();
+
+                expect(fixture.componentInstance.applied).toBeUndefined();
+                expect(editor(fixture).error()).toContain('Could not save the segment schemas');
+            } finally {
+                schemaWriteFails = false;
+            }
+        });
+
+        /**
+         * A segment whose schema toon could not be read back is keys-only, and a segment with no
+         * columns cannot describe a Table — so Apply refuses rather than writing an empty schema.
+         */
+        it('refuses to Apply a keys-only segment whose saved schema is missing', async () => {
+            savedSchemaMissing = true;
+            try {
+                const fixture = await create(asn1Node(), [], [ASN1_DEF]);
+                pane(fixture).submit();
+
+                expect(schemaWrites).toHaveLength(0);
+                expect(fixture.componentInstance.applied).toBeUndefined();
+                expect(editor(fixture).error()).toContain('needs at least one column');
+            } finally {
+                savedSchemaMissing = false;
+            }
+        });
+
+        /** Segments are only meaningful for a parser that can actually load — and only for asn1 here. */
+        it('offers the segments editor for an ingestable ASN.1 node, never for a built-in format', async () => {
+            const fixture = await create(asn1Node(), [], [ASN1_DEF]);
+            expect(pane(fixture).authorsSegments()).toBe(true);
+            expect(fixture.nativeElement.querySelector('inspecto-segments-editor')).not.toBeNull();
+        });
+
+        it('does not offer segments on a delimited node', async () => {
+            const fixture = await create(delimitedNode(), [], [ASN1_DEF]);
+            expect(pane(fixture).authorsSegments()).toBe(false);
+            expect(fixture.nativeElement.querySelector('inspecto-segments-editor')).toBeNull();
         });
 
         /**
