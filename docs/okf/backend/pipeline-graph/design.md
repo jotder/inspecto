@@ -36,7 +36,8 @@ moved from `docs/flow-graph-design.md`, 2026-07-16).
 ## The parser family — per-format node types (2026-08-15, `6bc685cf`)
 
 Parse is a **family**, the way sink already was: the generic `parser` plus one type per format —
-`parser.delimited` (P3a) and `parser.fixedwidth` (P3b) so far, with ASN.1 / plugin to follow. Decided as
+`parser.delimited` (P3a), `parser.fixedwidth` (P3b) and `parser.asn1` (P3c) so far, with the custom
+plugin type (P3d) to follow. Decided as
 B6 — no generic parse node with format tabs, because each format owns its own grammar shape and
 complexities.
 
@@ -55,6 +56,13 @@ complexities.
 * **Lower stamps the CANONICAL frontend** (the first entry in the subtype's list) onto a palette-fresh
   node — the file must say the word its type means, or the next lift silently loses the identity. A
   lifted node already carries one, so the round-trip stays byte-verbatim.
+* **A frontend the parser SYNTHESIZES a binding for makes that binding DERIVED** (P3c). `frontend: asn1`
+  is sugar: `PipelineConfigParser#asn1PluginBlock` builds the `Asn1RecordIngester` wiring at load, so the
+  lift reads a class back and presents `use: ingester/<fqcn>` on a node whose only *authored* home is
+  `grammar/`. Refusing that ref would make every ASN.1 pipeline unsaveable — the AUTHOR-1(b) enrichment
+  regression reached from the opposite direction — so `DERIVED_USE` maps `parser.asn1 → ingester/` and it
+  is dropped in silence. ⚠ The rule generalises: **whenever a load-time synthesis invents something the
+  lift can present, check what the save path will then think the author wrote.**
 * ⚠ **A record mode is not a node type.** Binary fixed width (`record: bytes`) lifts to
   `parser.fixedwidth` like any other — the type spans the format — but its field geometry lives in
   `processing.ingester_config` and is executed by `FixedWidthRecordIngester`, **not** by the

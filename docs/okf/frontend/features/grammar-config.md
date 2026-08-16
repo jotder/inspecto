@@ -20,7 +20,7 @@ Two screens author how raw bytes become rows — a **Grammar** (`docs/GLOSSARY.m
 
 Definition-surface P3a moved the common case out of the popup: a **`parser.delimited`** node defines in the
 right-dock drawer (`<app-pipeline-parse-definition>`), over this same shared editor; P3b added
-**`parser.fixedwidth`** to the same pane. Since the templates-not-bindings change that includes
+**`parser.fixedwidth`** and P3c **`parser.asn1`** to the same pane. Since the templates-not-bindings change that includes
 **grammar-bound** nodes, which the host materialises into an inline copy on open (`definitionDraft`) and
 which migrate for real when the operator Applies.
 
@@ -42,6 +42,42 @@ slice table would govern nothing — operator decision 2026-08-16.
 ⚠ The earlier framing of this split — that bound nodes stay on the dialog *permanently* because updating a
 bound Grammar is a write route the drawer lacks — is **superseded**. The resolution was to remove the
 binding, not to build the write route.
+
+## A SERVED format in the pane — ASN.1 (P3c, 2026-08-16)
+
+`asn1` is the first subtype that is **not a built-in `ParsingFrontend`**: the editor hosts it as the served
+parser it already was (form built from `GET /parsers`' `grammarSchema`), while the node type locks it exactly
+like the built-ins. Three consequences, each of which cost a test:
+
+* **The pane assembles the block itself.** `GrammarEditorComponent.value()` is the built-ins' shape — it would
+  stamp the editor's *internal* frontend (`delimited`) — so the pane's `parsingValue()` builds
+  `{frontend: 'asn1', asn1: …}` from `grammar()` instead. ⛔ Don't "simplify" it back to `value()`.
+* **`asn1.segments` is carried VERBATIM, never authored here.** Writing segments means writing schema toons —
+  a host transaction Onboarding owns and a pure pane cannot make. Dropping them on Apply would silently turn
+  an ingest-capable config preview-only, so the carry-through is pinned. A **template** strips them: a
+  template is a Grammar copy, and segment paths are deployment, not grammar.
+* **A served form cannot author what the catalog did not serve.** With the plugin absent the schema form holds
+  no `asn1.*` keys at all, so Apply would write an EMPTY grammar over a deployed one and report success. The
+  pane refuses instead (`asn1Unavailable`). The editor's own "jar not deployed" banner does **not** cover this:
+  it keys on the `configuredIngester` FQCN input, which the drawer never passes.
+
+⚠ **The shared editor's catalog fetch runs in its CONSTRUCTOR**, so with a synchronously-resolved source it
+completes *before* Angular sets the inputs. `configuredIngester` already re-attempted for that reason; `type`
+did not, and a served type silently presented as the default built-in. Both setters now re-attempt against an
+already-arrived catalog — production HTTP is async, so only the served formats and tests ever saw it.
+
+### 🔴 A spec swap used to discard the seeded values (fixed 2026-08-16)
+
+`InspectoSchemaFormComponent.specs` **rebuilds every control from defaults** when reassigned, and Angular does
+not re-run the sibling `initial` setter unless *that* binding's reference also changed. So any host whose spec
+set resolves **asynchronously** seeded first and had its values thrown away second. For ASN.1 that meant a
+deployed config opened with an **empty grammar**, and Apply would then write the emptied block back. The setter
+now replays the last seed, exactly as it already replayed `extraValidators` for the same reason.
+
+⚠ **This was invisible to every unit test** and was found only by driving the offline preview: with a
+synchronous `of(catalog)` the plugin resolves *before* the specs bind, so the values survive and the suite is
+green. The regression spec therefore uses an rxjs `delay` to reproduce production ordering — **when a component
+reacts to a fetch, a test that resolves it synchronously is testing a different component.**
 
 - **`[lockType]`** hides the format picker: for a per-format node the format *is* the node's type
   ([per-format node types](../../backend/pipeline-graph/design.md)), so offering a switch could only author

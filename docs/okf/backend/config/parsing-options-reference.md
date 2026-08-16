@@ -174,7 +174,7 @@ parses exactly as before. An unknown `parsing.frontend` is rejected at load.
 
 ```yaml
 parsing:
-  frontend: delimited        # delimited | fixedwidth | json | text_regex | xml | plugin
+  frontend: delimited        # delimited | fixedwidth | json | text_regex | asn1 | plugin
   # ── shared options ──────────────────────────────────────────────────────────
   encoding: utf-8            # utf-8 | utf-16 | latin-1
   compression: auto          # auto | gzip | zstd | none
@@ -219,6 +219,21 @@ parsing:
     pattern: "^(?P<key>[A-Z_]+): (?P<value>.*)$"
     # OR a positional capture → field map via mapping.rules[] EXPR over regexp_extract
 
+  # ── frontend: asn1 (first-class BER/DER, definition-surface P3c) ─────────────
+  # Sugar for the plugin wiring below: at load PipelineConfigParser#asn1PluginBlock synthesizes
+  # the Asn1RecordIngester binding, so everything downstream is the one plugin path. The grammar
+  # is INLINE X.680 text (what the drawer's textarea and POST /parsers/asn1/preview author),
+  # carried to the ingester as ingester_config.grammar_text — never the path-jailed grammar key.
+  # An explicit plugin: block alongside is refused (which binding wins would be undefined).
+  asn1:
+    grammar: "CDR DEFINITIONS ::= BEGIN ... END"   # inline X.680 module text (required)
+    root_type: CallEventRecord                     # required
+    strictness: BER            # BER (default) | DER | CER
+    file_header_length: 0      # bytes skipped once at file start (e.g. 50, Huawei framing)
+    record_header_length: 0    # bytes preceding each record's TLV (e.g. 4)
+    segments:                  # {recordName: schemaPath}, required to ingest
+      moCallRecord: config/cdr/mo_call_schema.toon
+
   # ── frontend: plugin (binary / grammar-driven) ───────────────────────────────
   plugin:
     ingester: com.acme.etl.Asn1CdrIngester     # StreamingFileIngester FQCN
@@ -231,11 +246,12 @@ parsing:
       record_tag: "0xA1"
 ```
 
-**Mapping to reality:** all five frontends are **implemented**: `delimited` (= today's
+**Mapping to reality:** all six frontends are **implemented**: `delimited` (= today's
 `csv_settings`), `plugin` (= `processing.ingester`/`segments`), `fixedwidth` (native
 `read_csv`+`substring`; binary via the shipped `com.gamma.ingester.FixedWidthRecordIngester`
 plugin — §6.3), `json` (`read_ndjson`/`read_json`, selectors = top-level JSON keys — §6.4), and
-`text_regex` (`read_csv` 1-col + `regexp_extract` named groups, selectors = group names — §6.5).
+`text_regex` (`read_csv` 1-col + `regexp_extract` named groups, selectors = group names — §6.5),
+and `asn1` (synthesized `Asn1RecordIngester` binding, grammar inline — P3c).
 Not yet implemented within them: `text_regex.record_split`
 `"\n\n"` (blank-line block records, e.g. LDIF entries), and the §8 step-1 extra delimited knobs
 (`quote`/`escape`/`comment`/`skip_junk` renames). Each unsupported knob is rejected at load with a
