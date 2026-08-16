@@ -1,6 +1,7 @@
 package com.gamma.pipeline.exec;
 
 import com.gamma.api.PublicApi;
+import com.gamma.etl.DataTransformer;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.pipeline.PipelineNode;
 import com.gamma.util.DuckDbUtil;
@@ -331,6 +332,13 @@ public final class ComponentPreview {
      * field to its type and split rows into {@code data} (every typed field casts, or is null/blank) and
      * {@code rejected} (some non-blank value fails its cast) — the same data-vs-reject split production applies
      * (doc §7.2). Throws {@link IllegalArgumentException} for an empty sample or a schema with no typed fields.
+     *
+     * <p>When {@code content} also carries {@code mapping.rules}, a third {@code mapped} relation is produced:
+     * the rules compiled over the {@code data} rows through {@link DataTransformer#dataColumns} — the very
+     * projection the graph executor's {@code transform.map} runs ({@link RowShaper#mappedColumns}) — so the
+     * Load drawer's "mapped output" table shows target columns, not the passing input. This is what makes an
+     * {@code EXPR} rule reviewable at all: its effect exists only once compiled. Absent or empty rules leave
+     * the result exactly as it was, so the cast-only callers are unaffected.
      */
     public static Result schema(Map<String, Object> content, List<Map<String, Object>> sampleRows)
             throws SQLException, java.io.IOException {
@@ -364,15 +372,74 @@ public final class ComponentPreview {
                 st.execute("CREATE TABLE " + ScratchTables.q(rejected) + " AS SELECT * FROM " + ScratchTables.q(INPUT)
                         + " WHERE NOT COALESCE((" + allOk + "), FALSE)");
             }
-            List<RelationPreview> out = List.of(
-                    new RelationPreview("data", ScratchTables.count(conn, data),
-                            ScratchTables.readRows(conn, data, MAX_ROWS)),
-                    new RelationPreview("rejected", ScratchTables.count(conn, rejected),
-                            ScratchTables.readRows(conn, rejected, MAX_ROWS)));
-            return new Result(columns, out);
+            List<RelationPreview> out = new ArrayList<>();
+            out.add(new RelationPreview("data", ScratchTables.count(conn, data),
+                    ScratchTables.readRows(conn, data, MAX_ROWS)));
+            out.add(new RelationPreview("rejected", ScratchTables.count(conn, rejected),
+                    ScratchTables.readRows(conn, rejected, MAX_ROWS)));
+
+            List<Map<String, Object>> projection = mappedProjection(content, data);
+            if (projection != null) {
+                String mapped = "preview_schema__mapped";
+                StringBuilder sel = new StringBuilder();
+                for (Map<String, Object> col : projection) {
+                    if (!sel.isEmpty()) sel.append(", ");
+                    sel.append(col.get("expr")).append(" AS ")
+                       .append(ScratchTables.q(String.valueOf(col.get("name"))));
+                }
+                try (java.sql.Statement st = conn.createStatement()) {
+                    st.execute("CREATE TABLE " + ScratchTables.q(mapped) + " AS SELECT " + sel
+                            + " FROM " + ScratchTables.q(data));
+                }
+                out.add(new RelationPreview("mapped", ScratchTables.count(conn, mapped),
+                        ScratchTables.readRows(conn, mapped, MAX_ROWS)));
+            }
+            return new Result(columns, List.copyOf(out));
         } finally {
             DuckDbUtil.deleteTempDb(db);
         }
+    }
+
+    /**
+     * The compiled {@code {name, expr}} projection for this schema draft's mapping rules over
+     * {@code sourceTable}, or {@code null} when the draft declares none — in which case the preview stays
+     * the cast-only split it has always been.
+     *
+     * <p>Guards the exact shape {@link DataTransformer#dataColumns} requires ({@code raw.fields} +
+     * {@code mapping.rules}, both lists) rather than the looser set {@link #schemaFields} accepts: that
+     * helper also reads a top-level {@code fields}/{@code columns}, and handing such a draft to
+     * {@code dataColumns} would fail on a cast rather than simply skip the mapped relation.
+     */
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> mappedProjection(Map<String, Object> content, String sourceTable) {
+        if (!(content.get("raw") instanceof Map<?, ?> raw) || !(raw.get("fields") instanceof List<?> fields)
+                || fields.isEmpty()) return null;
+        if (!(content.get("mapping") instanceof Map<?, ?> mapping)
+                || !(mapping.get("rules") instanceof List<?> rules) || rules.isEmpty()) return null;
+        List<Map<String, Object>> cols =
+                DataTransformer.dataColumns(content, csvSettingsOf(content), sourceTable);
+        return cols.isEmpty() ? null : cols;
+    }
+
+    /**
+     * The {@code csv} settings to compile a draft's rules with — only the two format lists are read
+     * ({@code DIRECT} on a DATE/TIMESTAMP field parses through them). A draft posted to the preview route
+     * carries its {@code csv} block as a plain map, if at all; absent, the empty lists compile a typed
+     * column to a plain {@code TRY_CAST}. Mirrors {@link RowShaper}'s own resolution for the same reason.
+     */
+    private static PipelineConfig.CsvSettings csvSettingsOf(Map<String, Object> content) {
+        if (!(content.get("csv") instanceof Map<?, ?> m))
+            return PipelineConfig.CsvSettings.ofFormats(List.of(), List.of());
+        return PipelineConfig.CsvSettings.ofFormats(
+                formatList(m.get("dateFormats")), formatList(m.get("tsFormats")));
+    }
+
+    /** One decoded format list — empty for anything that is not a list, so a malformed block degrades. */
+    private static List<String> formatList(Object value) {
+        if (!(value instanceof List<?> list)) return List.of();
+        List<String> out = new ArrayList<>();
+        for (Object o : list) if (o != null) out.add(o.toString());
+        return List.copyOf(out);
     }
 
     // ── sink (scratch-validate config against the sample — no write) ────────────────

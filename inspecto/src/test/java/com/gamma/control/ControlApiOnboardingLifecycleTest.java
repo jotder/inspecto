@@ -195,6 +195,61 @@ class ControlApiOnboardingLifecycleTest {
             assertEquals(1, out.get("okCount").asInt());
             assertEquals(1, out.get("rejectedCount").asInt());
             assertEquals("1002", out.get("rejectedRows").get(0).get("ORDER_ID").asText());
+            assertNull(out.get("mappedRows"),
+                    "no mapping rules posted → the response keeps its pre-B1 shape");
+        }
+    }
+
+    /**
+     * B1 (definition-surface unification P4): a draft carrying {@code mapping.rules} also gets the compiled
+     * mapped output — TARGET columns over the rows that passed the cast — which is what the Load drawer's
+     * "mapped output" table renders. An {@code EXPR} rule is the case that cannot be shown any other way.
+     */
+    @Test
+    void schemaPreviewReturnsMappedRowsWhenTheDraftDeclaresMappingRules(@TempDir Path cfg) throws Exception {
+        try (Ctx c = open(cfg, null)) {
+            String body = """
+                    {"config":{"raw":{"fields":[
+                       {"name":"ORDER_ID","type":"VARCHAR"},
+                       {"name":"QUANTITY","type":"DOUBLE"}]},
+                      "mapping":{"rules":[
+                       {"targetColumn":"order_ref","sourceExpression":"ORDER_ID","transformType":"DIRECT"},
+                       {"targetColumn":"qty_x2","sourceExpression":"TRY_CAST(QUANTITY AS DOUBLE) * 2","transformType":"EXPR"}]}},
+                     "sampleRows":[
+                       {"ORDER_ID":"1001","QUANTITY":"3"},
+                       {"ORDER_ID":"1002","QUANTITY":"abc"}]}""";
+            HttpResponse<String> r = post(c.port, "/config/preview/schema", body);
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode out = V1Body.of(r.body());
+
+            assertEquals(1, out.get("okCount").asInt());
+            assertEquals(1, out.get("mappedCount").asInt(), "only the cast-passing row maps");
+            assertEquals("order_ref", out.get("mappedColumns").get(0).asText());
+            assertEquals("qty_x2", out.get("mappedColumns").get(1).asText());
+            JsonNode mapped = out.get("mappedRows").get(0);
+            assertEquals("1001", mapped.get("order_ref").asText());
+            assertEquals(6.0, mapped.get("qty_x2").asDouble(), 1e-9, "the EXPR rule actually ran");
+        }
+    }
+
+    /**
+     * The scratch source is VARCHAR — exactly as the ingested table production maps over is, which is why
+     * {@code TransformCompiler.direct} casts at all. An {@code EXPR} is emitted <b>verbatim</b> and "the
+     * author owns validity and any explicit cast", so an uncast arithmetic expression is an authoring error
+     * that fails the DuckDB binder here in precisely the way it would at run time. Surfacing that as a 422
+     * while the rule is being written IS the point of B1; it must not be silently swallowed to a null cell.
+     */
+    @Test
+    void schemaPreviewRefusesAnUncastExprTheSameWayProductionWould(@TempDir Path cfg) throws Exception {
+        try (Ctx c = open(cfg, null)) {
+            String body = """
+                    {"config":{"raw":{"fields":[{"name":"QUANTITY","type":"DOUBLE"}]},
+                      "mapping":{"rules":[
+                       {"targetColumn":"qty_x2","sourceExpression":"QUANTITY * 2","transformType":"EXPR"}]}},
+                     "sampleRows":[{"QUANTITY":"3"}]}""";
+            HttpResponse<String> r = post(c.port, "/config/preview/schema", body);
+            assertEquals(422, r.statusCode(), "an unbindable expression is the author's error, said up front");
+            assertTrue(r.body().contains("Binder Error"), r.body());
         }
     }
 

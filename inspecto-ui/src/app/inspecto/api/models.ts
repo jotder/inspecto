@@ -401,12 +401,18 @@ export interface ParsingPreview {
     rejectedRows: number;
 }
 
-/** Result of POST /config/preview/schema — TRY_CAST already-parsed rows against typed fields. */
+/** Result of POST /config/preview/schema — TRY_CAST already-parsed rows against typed fields.
+ *  The `mapped*` half (B1) is present ONLY when the posted draft carried `mapping.rules`: it is those
+ *  rules compiled over the rows that passed the cast, in TARGET columns — the Load drawer's "mapped
+ *  output". A draft without rules gets the pre-B1 shape, which is what the onboarding pane still posts. */
 export interface SchemaPreview {
     columns: string[];
     okCount: number;
     rejectedCount: number;
     rejectedRows: Record<string, unknown>[];
+    mappedColumns?: string[];
+    mappedCount?: number;
+    mappedRows?: Record<string, unknown>[];
 }
 
 /** Result of POST /config/suggest/schema — a DRAFT `raw.fields` + identity mapping inferred from

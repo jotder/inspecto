@@ -572,6 +572,9 @@ interface SchemaPreviewMock {
     okCount: number;
     rejectedCount: number;
     rejectedRows: Record<string, unknown>[];
+    mappedColumns?: string[];
+    mappedCount?: number;
+    mappedRows?: Record<string, unknown>[];
 }
 
 /** Mirrors `ComponentPreview.schema()`'s cast set: only DOUBLE/DATE/TIMESTAMP actually reject a
@@ -603,7 +606,52 @@ function previewSchema(config: Record<string, unknown>, sampleRows: Record<strin
         const allCast = fields.every((f) => !f.name || !(f.name in row) || castOk(row[f.name], f.type));
         (allCast ? ok : rejected).push(row);
     }
-    return { columns, okCount: ok.length, rejectedCount: rejected.length, rejectedRows: rejected.slice(0, 200) };
+    const out: SchemaPreviewMock = {
+        columns,
+        okCount: ok.length,
+        rejectedCount: rejected.length,
+        rejectedRows: rejected.slice(0, 200),
+    };
+
+    // B1: the mapped half, present only when the draft declares rules — same condition as the server.
+    const mapping = (config['mapping'] ?? {}) as Record<string, unknown>;
+    const rules = (Array.isArray(mapping['rules']) ? mapping['rules'] : []) as MappingRuleMock[];
+    if (fields.length && rules.length) {
+        out.mappedColumns = rules.map((r) => r.targetColumn ?? '');
+        out.mappedRows = ok.slice(0, 200).map((row) => {
+            const mappedRow: Record<string, unknown> = {};
+            for (const r of rules) mappedRow[r.targetColumn ?? ''] = mappedValue(r, row);
+            return mappedRow;
+        });
+        out.mappedCount = ok.length;
+    }
+    return out;
+}
+
+interface MappingRuleMock {
+    targetColumn?: string;
+    sourceExpression?: string;
+    transformType?: string;
+}
+
+/**
+ * One mapped cell. ⚠ **The offline mock cannot evaluate a DuckDB expression** — it has no SQL engine —
+ * so only `DIRECT` (blank/omitted included, matching `TransformCompiler`'s own default) resolves, by
+ * reading the source column. `EXPR`, `CONCAT_DT` and `FILENAME_DATE` yield `null`: the offline preview
+ * therefore proves the mapped table's *plumbing* (columns, row count, rename projection) but NOT an
+ * expression's result, which needs the real server.
+ *
+ * ⚠ One narrow direction where this IS leniency, and cannot be fixed here: the server compiles the rule
+ * and a malformed expression fails DuckDB's binder as a 422 (an `EXPR` is emitted verbatim — the author
+ * owns any explicit cast, so `QUANTITY * 2` over a VARCHAR column refuses), whereas the mock has no
+ * binder and yields a null cell. Offline authoring therefore cannot tell a valid expression from an
+ * unbindable one; a pane must present these cells as *not evaluated*, never as a computed value.
+ */
+function mappedValue(rule: MappingRuleMock, row: Record<string, unknown>): unknown {
+    const type = (rule.transformType ?? '').trim().toUpperCase();
+    if (type !== '' && type !== 'DIRECT') return null;
+    const source = rule.sourceExpression ?? '';
+    return source in row ? row[source] : null;
 }
 
 /**

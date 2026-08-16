@@ -257,6 +257,50 @@ describe('onboardingHandler schema gate ↔ component-registry bridge', () => {
     });
 });
 
+describe('onboardingHandler POST /config/preview/schema — the mapped half (B1)', () => {
+    const preview = (config: unknown, sampleRows: unknown) =>
+        handler(req('POST', '/api/config/preview/schema', { config, sampleRows }), new MockStore());
+
+    const FIELDS = { raw: { fields: [{ name: 'ID', type: 'DOUBLE' }, { name: 'NOTE', type: 'VARCHAR' }] } };
+    const ROWS = [
+        { ID: '1', NOTE: 'a' },
+        { ID: 'nope', NOTE: 'b' }, // fails the DOUBLE cast → rejected, so never mapped
+    ];
+
+    it('omits the mapped half entirely when the draft declares no rules (pre-B1 shape)', () => {
+        const body = preview(FIELDS, ROWS)?.body as Record<string, unknown>;
+        expect(body['okCount']).toBe(1);
+        expect(body['mappedRows']).toBeUndefined();
+        expect(body['mappedColumns']).toBeUndefined();
+    });
+
+    it('projects DIRECT rules into target columns over the cast-passing rows only', () => {
+        const config = {
+            ...FIELDS,
+            mapping: {
+                rules: [
+                    { targetColumn: 'account', sourceExpression: 'ID', transformType: 'DIRECT' },
+                    { targetColumn: 'memo', sourceExpression: 'NOTE' }, // omitted type == DIRECT
+                ],
+            },
+        };
+        const body = preview(config, ROWS)?.body as Record<string, unknown>;
+        expect(body['mappedColumns']).toEqual(['account', 'memo']);
+        expect(body['mappedCount']).toBe(1);
+        expect(body['mappedRows']).toEqual([{ account: '1', memo: 'a' }]);
+    });
+
+    it('yields null for an EXPR rule — the mock has no SQL engine, and must not invent a value', () => {
+        const config = {
+            ...FIELDS,
+            mapping: { rules: [{ targetColumn: 'shout', sourceExpression: 'UPPER(NOTE)', transformType: 'EXPR' }] },
+        };
+        const body = preview(config, ROWS)?.body as Record<string, unknown>;
+        expect(body['mappedColumns']).toEqual(['shout']);
+        expect(body['mappedRows']).toEqual([{ shout: null }]);
+    });
+});
+
 describe('onboardingHandler POST /config/suggest/schema', () => {
     const suggest = (sampleRows: unknown) =>
         handler(req('POST', '/api/config/suggest/schema', { sampleRows }), new MockStore());

@@ -597,6 +597,12 @@ final class ConfigRoutes implements RouteModule {
      * component's own preview runs — so the Schema & Mapping stage's "Validate types" sees exactly
      * what that engine path would do. Config/cast problems are the caller's (422), never a server
      * error.
+     *
+     * <p><b>B1 (definition-surface unification P4):</b> when the posted draft also carries
+     * {@code mapping.rules}, the response gains {@code mappedColumns} / {@code mappedCount} /
+     * {@code mappedRows} — the rules compiled over the rows that passed the cast, i.e. the Load drawer's
+     * "mapped output" in TARGET columns. Additive: a draft without rules gets byte-identical output to
+     * before, which is what the onboarding pane still posts.
      */
     private Object previewSchema(Map<String, Object> body) {
         Object cfgObj = body.get("config");
@@ -609,24 +615,43 @@ final class ConfigRoutes implements RouteModule {
             ComponentPreview.Result r = ComponentPreview.schema(content, sampleRows);
             int okCount = 0, rejectedCount = 0;
             List<Map<String, Object>> rejectedRows = List.of();
+            ComponentPreview.RelationPreview mapped = null;
             for (ComponentPreview.RelationPreview rel : r.relations()) {
                 if ("data".equals(rel.rel())) okCount = rel.rowCount();
                 else if ("rejected".equals(rel.rel())) {
                     rejectedCount = rel.rowCount();
                     rejectedRows = rel.rows();
-                }
+                } else if ("mapped".equals(rel.rel())) mapped = rel;
             }
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("columns", r.inputColumns());
             out.put("okCount", okCount);
             out.put("rejectedCount", rejectedCount);
             out.put("rejectedRows", rejectedRows);
+            // B1: present only when the draft declared mapping rules. The column list comes from the rules
+            // themselves, not from the returned rows, so an empty mapped set still renders its grid header.
+            if (mapped != null) {
+                out.put("mappedColumns", targetColumns(content));
+                out.put("mappedCount", mapped.rowCount());
+                out.put("mappedRows", mapped.rows());
+            }
             return out;
         } catch (IllegalArgumentException badSchema) {
             throw new ApiException(422, badSchema.getMessage());
         } catch (Exception castFail) {
             throw new ApiException(422, "schema preview failed: " + castFail.getMessage());
         }
+    }
+
+    /** The mapped relation's column names, in rule order — the draft's own {@code mapping.rules} targets. */
+    private static List<String> targetColumns(Map<String, Object> content) {
+        if (!(content.get("mapping") instanceof Map<?, ?> mapping)
+                || !(mapping.get("rules") instanceof List<?> rules)) return List.of();
+        List<String> out = new ArrayList<>();
+        for (Object r : rules)
+            if (r instanceof Map<?, ?> rule && rule.get("targetColumn") != null)
+                out.add(rule.get("targetColumn").toString());
+        return List.copyOf(out);
     }
 
     /**

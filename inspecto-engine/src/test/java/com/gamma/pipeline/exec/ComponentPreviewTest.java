@@ -104,6 +104,79 @@ class ComponentPreviewTest {
         assertEquals("1", rel(r, "data").rows().get(0).get("id").toString());
     }
 
+    // ── schema: the mapped relation (B1, definition-surface unification P4) ──────
+
+    /** A draft in the shape {@code DataTransformer.dataColumns} needs: {@code raw.fields} + {@code mapping.rules}. */
+    private static Map<String, Object> draft(List<Map<String, Object>> fields, List<Map<String, Object>> rules) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("raw", Map.of("fields", fields));
+        m.put("mapping", Map.of("rules", rules));
+        return m;
+    }
+
+    @Test
+    void schemaPreviewCompilesMappingRulesIntoAMappedRelation() throws Exception {
+        Map<String, Object> schema = draft(
+                List.of(Map.of("name", "id", "type", "integer"),
+                        Map.of("name", "amt", "type", "double")),
+                List.of(Map.of("targetColumn", "account", "sourceExpression", "id",
+                               "transformType", "DIRECT"),
+                        Map.of("targetColumn", "amount", "sourceExpression", "amt",
+                               "transformType", "DIRECT")));
+        List<Map<String, Object>> sample = List.of(
+                two("id", "1", "amt", "150"),
+                two("id", "x", "amt", "50"));    // rejected by the cast, so never reaches the mapping
+
+        ComponentPreview.Result r = ComponentPreview.schema(schema, sample);
+        ComponentPreview.RelationPreview mapped = rel(r, "mapped");
+        assertEquals(1, mapped.rowCount(), "only the cast-passing row is mapped");
+        // The projection renames: target columns, not the input's.
+        assertEquals(List.of("account", "amount"), List.copyOf(mapped.rows().get(0).keySet()));
+        assertEquals("1", mapped.rows().get(0).get("account").toString());
+    }
+
+    /** The reason B1 exists at all: an EXPR rule's effect is invisible until the rule is compiled. */
+    @Test
+    void schemaPreviewAppliesAnExprRuleVerbatim() throws Exception {
+        Map<String, Object> schema = draft(
+                List.of(Map.of("name", "code", "type", "VARCHAR")),
+                List.of(Map.of("targetColumn", "shout", "sourceExpression", "UPPER(code)",
+                               "transformType", "EXPR")));
+        ComponentPreview.Result r = ComponentPreview.schema(
+                schema, List.of(Map.of("code", "ab"), Map.of("code", "cd")));
+
+        ComponentPreview.RelationPreview mapped = rel(r, "mapped");
+        assertEquals(2, mapped.rowCount());
+        assertEquals("AB", mapped.rows().get(0).get("shout").toString());
+    }
+
+    /** Additive: the cast-only callers (the onboarding pane posts no rules) are untouched. */
+    @Test
+    void schemaPreviewWithoutMappingRulesProducesNoMappedRelation() throws Exception {
+        Map<String, Object> schema = Map.of("raw", Map.of("fields",
+                List.of(Map.of("name", "id", "type", "integer"))));
+        ComponentPreview.Result r = ComponentPreview.schema(schema, List.of(Map.of("id", "1")));
+
+        assertEquals(List.of("data", "rejected"),
+                r.relations().stream().map(ComponentPreview.RelationPreview::rel).toList());
+    }
+
+    /**
+     * A draft using the looser top-level {@code fields} that {@link ComponentPreview#schema} accepts is not
+     * the shape {@code dataColumns} reads — it must skip the mapped relation, not fail the whole preview.
+     */
+    @Test
+    void schemaPreviewSkipsMappingForADraftWithoutRawFields() throws Exception {
+        Map<String, Object> schema = new LinkedHashMap<>();
+        schema.put("fields", List.of(Map.of("name", "id", "type", "integer")));
+        schema.put("mapping", Map.of("rules", List.of(
+                Map.of("targetColumn", "account", "sourceExpression", "id", "transformType", "DIRECT"))));
+
+        ComponentPreview.Result r = ComponentPreview.schema(schema, List.of(Map.of("id", "1")));
+        assertEquals(1, rel(r, "data").rowCount());
+        assertTrue(r.relations().stream().noneMatch(p -> p.rel().equals("mapped")));
+    }
+
     // ── sink ─────────────────────────────────────────────────────────────────────
 
     @Test
