@@ -187,6 +187,22 @@ rather than guessed. Types without a schema fall back to the free-form key/value
 config", collapsed when a schema exists) — the conversion is non-lossy by design. Declared defaults **persist on save** even when untouched
 (product-confirmed 2026-07-02: configs stay explicit/self-documenting).
 
+### The onboarding deep link (P6-a, 2026-08-16)
+
+`/catalog/onboard/:name/:stage` is a **redirect** into the guided editor —
+`/pipelines?guided=1&open=<name>&stage=<chip>`. `onboard-redirect.ts` is the one statement of that
+target, used by the route *and* by the Catalog's two navigation sites, so a bookmark and a button
+cannot drift; it is its own file because `catalog.routes` imports `CatalogComponent`.
+
+- **The matcher stays.** Only `loadComponent`/`canDeactivate` were removed, so old per-stage bookmarks
+  resolve instead of 404-ing.
+- ⚠ **`select()` is a load, not an idempotent setter.** The effect that consumes `?open=` fires once
+  per id — re-running it refetches the graph and silently discards that tab's unsaved edits.
+- ⚠ **`?open=` also switches the pane to Edit.** The wizard was never a read-only surface, and landing
+  in View makes every checklist chip a no-op.
+- `schema` and `keys` both map to the Schema chip — a Reference's "Keys & Load" stage authors the same
+  artifact. An unknown stage carries no focus rather than inventing one.
+
 ### Guided mode: the checklist chips and the readiness gate (P6-d, 2026-08-16)
 
 The wizard's stage rail becomes a chip strip in the editor — Collect → Parse → Schema → Enrich →
