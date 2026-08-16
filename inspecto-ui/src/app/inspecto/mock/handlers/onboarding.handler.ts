@@ -330,12 +330,16 @@ export function onboardingHandler(flags: MockFlags): MockHandler {
         }
 
         if (method === 'POST' && SUGGEST_SCHEMA.test(url)) {
-            const body = (req.body ?? {}) as { sampleRows?: Record<string, unknown>[] };
+            const body = (req.body ?? {}) as {
+                sampleRows?: Record<string, unknown>[];
+                config?: Record<string, unknown>;
+            };
             if (!body.sampleRows?.length) {
                 return error(400, "body must include non-empty 'sampleRows'");
             }
             try {
-                return json(suggestSchema(body.sampleRows));
+                // B3: `config` is the draft the caller holds; absent, there is nothing to have drifted from.
+                return json(suggestSchema(body.sampleRows, body.config));
             } catch (e) {
                 return error(422, e instanceof Error ? e.message : 'schema suggestion failed');
             }
@@ -662,9 +666,13 @@ function mappedValue(rule: MappingRuleMock, row: Record<string, unknown>): unkno
  * VARCHAR. Blanks abstain; an all-blank column is VARCHAR. Same response shape as the real route:
  * a DRAFT fields list (selector = the column key) + identity mapping rules.
  */
-function suggestSchema(sampleRows: Record<string, unknown>[]): {
+function suggestSchema(
+    sampleRows: Record<string, unknown>[],
+    draft?: Record<string, unknown>,
+): {
     fields: Record<string, string>[];
     mapping: { rules: Record<string, string>[] };
+    drift?: SchemaDriftMock;
 } {
     const columns: string[] = [];
     for (const r of sampleRows) for (const k of Object.keys(r)) if (!columns.includes(k)) columns.push(k);
@@ -690,7 +698,11 @@ function suggestSchema(sampleRows: Record<string, unknown>[]): {
     };
 
     const fields = columns.map((c) => ({ name: c, selector: c, type: infer(c) }));
-    return {
+    const out: {
+        fields: Record<string, string>[];
+        mapping: { rules: Record<string, string>[] };
+        drift?: SchemaDriftMock;
+    } = {
         fields,
         mapping: {
             rules: fields.map((f) => ({
@@ -699,6 +711,67 @@ function suggestSchema(sampleRows: Record<string, unknown>[]): {
                 transformType: 'DIRECT',
             })),
         },
+    };
+    if (draft) out.drift = schemaDrift(draft, fields);
+    return out;
+}
+
+interface SchemaDriftMock {
+    drifted: boolean;
+    added: { name: string; type: string }[];
+    missing: { name: string; type: string }[];
+    typeChanged: { name: string; declared: string; suggested: string }[];
+}
+
+/**
+ * Mirrors `SchemaSuggest.drift` (B3). The join key is the draft field's **selector** (its name when
+ * blank) — the selector points into the parsed sample, while `name` is an output column the author is
+ * free to rename deliberately, so keying on name would report every intentional rename as drift.
+ *
+ * ⛔ There is no `renamed` category here either: a renamed SOURCE column is indistinguishable from one
+ * removed and another added, and surfaces as a `missing` + `added` pair. Presenting that pair as a
+ * likely rename is a UI affordance over the two facts, never a claim the server (or this mock) makes.
+ */
+function schemaDrift(
+    draft: Record<string, unknown>,
+    inferred: { name: string; type: string }[],
+): SchemaDriftMock {
+    const raw = (draft['raw'] ?? {}) as Record<string, unknown>;
+    const draftFields = (Array.isArray(raw['fields']) ? raw['fields'] : []) as {
+        name?: string;
+        selector?: string;
+        type?: string;
+    }[];
+    const bySampleColumn = new Map(inferred.map((f) => [f.name, f]));
+
+    const missing: { name: string; type: string }[] = [];
+    const typeChanged: { name: string; declared: string; suggested: string }[] = [];
+    const claimed = new Set<string>();
+
+    for (const df of draftFields) {
+        const name = (df.name ?? '').trim();
+        if (!name) continue;
+        const selector = (df.selector ?? '').trim();
+        const key = selector || name;
+        const declared = (df.type ?? '').trim();
+
+        const match = bySampleColumn.get(key);
+        if (!match) {
+            missing.push({ name, type: declared });
+            continue;
+        }
+        claimed.add(key);
+        // A field with no declared type has nothing to have changed FROM.
+        if (declared && declared.toUpperCase() !== match.type.toUpperCase())
+            typeChanged.push({ name, declared, suggested: match.type });
+    }
+
+    const added = inferred.filter((f) => !claimed.has(f.name)).map((f) => ({ name: f.name, type: f.type }));
+    return {
+        drifted: added.length > 0 || missing.length > 0 || typeChanged.length > 0,
+        added,
+        missing,
+        typeChanged,
     };
 }
 

@@ -663,16 +663,26 @@ final class ConfigRoutes implements RouteModule {
      * auto-applied (the {@code ParserPlugin.suggest} posture), and real ingest keeps
      * {@code auto_detect=false}. Body {@code {sampleRows:[{...}]}} — the parsing preview's output
      * shape, so the two routes chain: parse the sample, then suggest from what parsed.
+     *
+     * <p><b>B3 (definition-surface unification P4):</b> when the body also carries {@code config} — the
+     * draft the caller is currently holding — the response gains a {@code drift} block
+     * ({@code drifted}, {@code added}, {@code missing}, {@code typeChanged}) diffing that draft against
+     * this sample's vote, which backs §5.2's drift indicator and its merge-don't-clobber re-sync. Purely
+     * additive: without {@code config} the response is exactly the pre-B3 full suggestion. Note the diff
+     * is informational — unlike {@link com.gamma.config.safety.SchemaCompatibility} it gates nothing and
+     * never emits an ERROR.
      */
+    @SuppressWarnings("unchecked")
     private Object suggestSchema(Map<String, Object> body) {
         List<Map<String, Object>> sampleRows = ApiContext.sampleRows(body);
         if (sampleRows.isEmpty())
             throw new ApiException(400, "body must include non-empty 'sampleRows'");
         try {
+            List<com.gamma.pipeline.exec.SchemaSuggest.Field> inferred =
+                    com.gamma.pipeline.exec.SchemaSuggest.infer(sampleRows);
             List<Map<String, Object>> fields = new ArrayList<>();
             List<Map<String, Object>> rules = new ArrayList<>();
-            for (com.gamma.pipeline.exec.SchemaSuggest.Field f
-                    : com.gamma.pipeline.exec.SchemaSuggest.infer(sampleRows)) {
+            for (com.gamma.pipeline.exec.SchemaSuggest.Field f : inferred) {
                 Map<String, Object> field = new LinkedHashMap<>();
                 field.put("name", f.name());
                 field.put("selector", f.name());
@@ -687,12 +697,37 @@ final class ConfigRoutes implements RouteModule {
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("fields", fields);
             out.put("mapping", Map.of("rules", rules));
+            // B3: only when the caller posted the draft it is holding. Without one there is nothing to have
+            // drifted FROM, and the response stays the pre-B3 full suggestion.
+            if (body.get("config") instanceof Map<?, ?> draft)
+                out.put("drift", driftBody(com.gamma.pipeline.exec.SchemaSuggest.drift(
+                        (Map<String, Object>) draft, inferred)));
             return out;
         } catch (IllegalArgumentException badSample) {
             throw new ApiException(422, badSample.getMessage());
         } catch (Exception inferFail) {
             throw new ApiException(422, "schema suggestion failed: " + inferFail.getMessage());
         }
+    }
+
+    /** The drift diff as response JSON; {@code drifted} lets a client light its indicator without counting. */
+    private static Map<String, Object> driftBody(com.gamma.pipeline.exec.SchemaSuggest.Drift d) {
+        List<Map<String, Object>> added = new ArrayList<>();
+        for (com.gamma.pipeline.exec.SchemaSuggest.Field f : d.added())
+            added.add(Map.of("name", f.name(), "type", f.type()));
+        List<Map<String, Object>> missing = new ArrayList<>();
+        for (com.gamma.pipeline.exec.SchemaSuggest.Field f : d.missing())
+            missing.add(Map.of("name", f.name(), "type", f.type()));
+        List<Map<String, Object>> typeChanged = new ArrayList<>();
+        for (com.gamma.pipeline.exec.SchemaSuggest.TypeChange t : d.typeChanged())
+            typeChanged.add(Map.of("name", t.name(), "declared", t.declared(), "suggested", t.suggested()));
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("drifted", !d.isEmpty());
+        out.put("added", added);
+        out.put("missing", missing);
+        out.put("typeChanged", typeChanged);
+        return out;
     }
 
     /** The parsing frontend a config resolves to (the same precedence the ingester applies). */

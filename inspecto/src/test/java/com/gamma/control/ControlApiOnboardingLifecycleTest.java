@@ -279,6 +279,59 @@ class ControlApiOnboardingLifecycleTest {
 
             assertEquals(400, post(c.port, "/config/suggest/schema", "{}").statusCode(),
                     "no sampleRows is the caller's error, said up front");
+            assertNull(V1Body.of(r.body()).get("drift"),
+                    "no draft posted → nothing to have drifted from, and the pre-B3 shape stands");
+        }
+    }
+
+    /**
+     * B3 (definition-surface unification P4): posting the draft the caller holds alongside the sample adds
+     * a {@code drift} diff — the backing for §5.2's drift indicator and its merge-don't-clobber re-sync.
+     * Informational only: it gates nothing, unlike the BACKWARD compatibility save-gate.
+     */
+    @Test
+    void schemaSuggestDiffsThePostedDraftAgainstTheCurrentSample(@TempDir Path cfg) throws Exception {
+        try (Ctx c = open(cfg, null)) {
+            // Draft: QUANTITY declared BIGINT, plus a field whose source column is gone.
+            // Sample now votes QUANTITY=DOUBLE and carries a column the draft never had.
+            String body = """
+                    {"config":{"raw":{"fields":[
+                       {"name":"qty","selector":"QUANTITY","type":"BIGINT"},
+                       {"name":"legacy","selector":"OLD_COL","type":"VARCHAR"}]}},
+                     "sampleRows":[
+                       {"QUANTITY":"1.5","NOTE":"hi"},
+                       {"QUANTITY":"2.5","NOTE":"there"}]}""";
+            HttpResponse<String> r = post(c.port, "/config/suggest/schema", body);
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode drift = V1Body.of(r.body()).get("drift");
+
+            assertTrue(drift.get("drifted").asBoolean());
+            assertEquals("NOTE", drift.get("added").get(0).get("name").asText());
+            assertEquals("legacy", drift.get("missing").get(0).get("name").asText(),
+                    "missing is keyed by the draft's own field name");
+            assertEquals("qty", drift.get("typeChanged").get(0).get("name").asText());
+            assertEquals("BIGINT", drift.get("typeChanged").get(0).get("declared").asText());
+            assertEquals("DOUBLE", drift.get("typeChanged").get(0).get("suggested").asText());
+        }
+    }
+
+    /** A draft still matching its sample reports no drift — the indicator must stay dark. */
+    @Test
+    void schemaSuggestReportsNoDriftForAnUpToDateDraft(@TempDir Path cfg) throws Exception {
+        try (Ctx c = open(cfg, null)) {
+            String body = """
+                    {"config":{"raw":{"fields":[
+                       {"name":"account","selector":"ORDER_ID","type":"BIGINT"}]}},
+                     "sampleRows":[{"ORDER_ID":"1001"},{"ORDER_ID":"1002"}]}""";
+            HttpResponse<String> r = post(c.port, "/config/suggest/schema", body);
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode drift = V1Body.of(r.body()).get("drift");
+
+            assertFalse(drift.get("drifted").asBoolean(),
+                    "renaming the OUTPUT column is deliberate, not drift — the join key is the selector");
+            assertEquals(0, drift.get("added").size());
+            assertEquals(0, drift.get("missing").size());
+            assertEquals(0, drift.get("typeChanged").size());
         }
     }
 

@@ -125,9 +125,16 @@ export class ConfigService {
         return this.http.post<SchemaPreview>(apiUrl('/config/preview/schema'), { config, sampleRows });
     }
     /** Infer a DRAFT schema (typed fields + identity mapping) from already-parsed sample rows —
-     *  stateless, scratch-only; the result seeds a human edit and is never auto-applied. */
-    suggestSchema(sampleRows: Record<string, unknown>[]): Observable<SchemaSuggestion> {
-        return this.http.post<SchemaSuggestion>(apiUrl('/config/suggest/schema'), { sampleRows });
+     *  stateless, scratch-only; the result seeds a human edit and is never auto-applied.
+     *  Pass `config` (the draft currently held) to also get the B3 `drift` diff back. */
+    suggestSchema(
+        sampleRows: Record<string, unknown>[],
+        config?: Record<string, unknown>,
+    ): Observable<SchemaSuggestion> {
+        return this.http.post<SchemaSuggestion>(
+            apiUrl('/config/suggest/schema'),
+            config ? { sampleRows, config } : { sampleRows },
+        );
     }
     /** Run a draft enrichment's transform over an in-memory `input` sample — stateless, scratch-only. */
     previewEnrichment(

@@ -310,6 +310,64 @@ describe('onboardingHandler POST /config/suggest/schema', () => {
         expect(suggest([])?.status).toBe(400);
     });
 
+    describe('drift (B3)', () => {
+        const withDraft = (draft: unknown, sampleRows: unknown) =>
+            handler(req('POST', '/api/config/suggest/schema', { config: draft, sampleRows }), new MockStore());
+
+        const SAMPLE = [{ QUANTITY: '1.5', NOTE: 'hi' }, { QUANTITY: '2.5', NOTE: 'there' }];
+
+        it('omits drift entirely when no draft is posted — nothing to have drifted from', () => {
+            const body = suggest(SAMPLE)?.body as Record<string, unknown>;
+            expect(body['fields']).toBeDefined();
+            expect(body['drift']).toBeUndefined();
+        });
+
+        it('reports added, missing and typeChanged against the posted draft', () => {
+            const draft = {
+                raw: {
+                    fields: [
+                        { name: 'qty', selector: 'QUANTITY', type: 'BIGINT' },
+                        { name: 'legacy', selector: 'OLD_COL', type: 'VARCHAR' },
+                    ],
+                },
+            };
+            const drift = (withDraft(draft, SAMPLE)?.body as Record<string, unknown>)['drift'] as Record<
+                string,
+                unknown
+            >;
+            expect(drift['drifted']).toBe(true);
+            expect(drift['added']).toEqual([{ name: 'NOTE', type: 'VARCHAR' }]);
+            expect(drift['missing']).toEqual([{ name: 'legacy', type: 'VARCHAR' }]);
+            expect(drift['typeChanged']).toEqual([{ name: 'qty', declared: 'BIGINT', suggested: 'DOUBLE' }]);
+        });
+
+        it('does not treat a deliberate OUTPUT rename as drift — the join key is the selector', () => {
+            const draft = { raw: { fields: [{ name: 'quantity_sold', selector: 'QUANTITY', type: 'DOUBLE' }] } };
+            const drift = (withDraft(draft, [{ QUANTITY: '1.5' }])?.body as Record<string, unknown>)[
+                'drift'
+            ] as Record<string, unknown>;
+            expect(drift['drifted']).toBe(false);
+        });
+
+        it('surfaces a renamed SOURCE column as the missing+added pair, claiming no rename', () => {
+            const draft = { raw: { fields: [{ name: 'ts', selector: 'EVENT_TS', type: 'VARCHAR' }] } };
+            const drift = (withDraft(draft, [{ EVENT_TIME: 'x' }])?.body as Record<string, unknown>)[
+                'drift'
+            ] as Record<string, unknown>;
+            expect(drift['missing']).toEqual([{ name: 'ts', type: 'VARCHAR' }]);
+            expect(drift['added']).toEqual([{ name: 'EVENT_TIME', type: 'VARCHAR' }]);
+        });
+
+        it('a field with no declared type has nothing to have changed from', () => {
+            const draft = { raw: { fields: [{ name: 'qty', selector: 'QUANTITY', type: '' }] } };
+            const drift = (withDraft(draft, [{ QUANTITY: '1.5' }])?.body as Record<string, unknown>)[
+                'drift'
+            ] as Record<string, unknown>;
+            expect(drift['typeChanged']).toEqual([]);
+            expect(drift['drifted']).toBe(false);
+        });
+    });
+
     it('422s column-less sample rows (server: SchemaSuggest.infer refuses)', () => {
         expect(suggest([{}])?.status).toBe(422);
     });

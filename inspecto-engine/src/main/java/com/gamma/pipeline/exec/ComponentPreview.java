@@ -508,9 +508,11 @@ public final class ComponentPreview {
         }
     }
 
-    /** The typed field list of a schema component: {@code raw.fields} (parse schema) or {@code fields}/{@code columns}. */
+    /** The typed field list of a schema component: {@code raw.fields} (parse schema) or {@code fields}/{@code columns}.
+     *  Package-private rather than private so {@link SchemaSuggest#drift} reads a draft's fields through this
+     *  same accessor — a third reader of {@code raw.fields} is a third thing to drift. */
     @SuppressWarnings("unchecked")
-    private static List<Map<String, Object>> schemaFields(Map<String, Object> content) {
+    static List<Map<String, Object>> schemaFields(Map<String, Object> content) {
         if (content.get("raw") instanceof Map<?, ?> raw && raw.get("fields") instanceof List<?> rf)
             return castFields(rf);
         if (content.get("fields") instanceof List<?> f)   return castFields(f);

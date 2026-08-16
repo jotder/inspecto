@@ -416,10 +416,24 @@ export interface SchemaPreview {
 }
 
 /** Result of POST /config/suggest/schema — a DRAFT `raw.fields` + identity mapping inferred from
- *  already-parsed sample rows (TRY_CAST voting); seeds a human edit, never auto-applied. */
+ *  already-parsed sample rows (TRY_CAST voting); seeds a human edit, never auto-applied.
+ *  `drift` (B3) is present only when the caller posted the draft it holds. */
 export interface SchemaSuggestion {
     fields: { name: string; selector: string; type: string }[];
     mapping: { rules: { targetColumn: string; sourceExpression: string; transformType: string }[] };
+    drift?: SchemaDrift;
+}
+
+/** How a schema draft has drifted from what the current sample suggests (B3) — backs the drift
+ *  indicator and the merge-don't-clobber re-sync. Entries are keyed by the DRAFT's field `name`.
+ *  ⛔ There is no `renamed` category: a renamed source column is indistinguishable from a remove+add
+ *  and surfaces as a `missing` + `added` pair. Treating that pair as a likely rename is a UI
+ *  affordance over the two facts — never a claim the server makes. */
+export interface SchemaDrift {
+    drifted: boolean;
+    added: { name: string; type: string }[];
+    missing: { name: string; type: string }[];
+    typeChanged: { name: string; declared: string; suggested: string }[];
 }
 
 /** Result of POST /enrichment/preview — a draft transform run over an in-memory `input` sample. */
