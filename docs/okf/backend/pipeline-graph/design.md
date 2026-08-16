@@ -36,16 +36,18 @@ moved from `docs/flow-graph-design.md`, 2026-07-16).
 ## The parser family — per-format node types (2026-08-15, `6bc685cf`)
 
 Parse is a **family**, the way sink already was: the generic `parser` plus one type per format —
-`parser.delimited` (P3a), `parser.fixedwidth` (P3b) and `parser.asn1` (P3c) so far, with the custom
-plugin type (P3d) to follow. Decided as
+`parser.delimited` (P3a), `parser.fixedwidth` (P3b), `parser.asn1` (P3c) and the `parser.json` /
+`parser.text_regex` pair (P3d), with the custom plugin type still to follow. Decided as
 B6 — no generic parse node with format tabs, because each format owns its own grammar shape and
-complexities.
+complexities. `isParserType` is `PARSER` ∪ `SUBTYPE_FRONTENDS.keySet()`, so a subtype joins the family by
+declaring its spellings and nothing else.
 
 * **The lift retypes only on an EXPLICIT `parsing.frontend`.** Delimited is also the parser's *implicit*
   default (`PipelineConfigParser` defaults the key), so retyping every bare legacy file would change the
   node type of everything already deployed on a mere read. A file that never says the word keeps the plain
-  `parser` type until its author opts in. ⚠ This caveat is **delimited's alone** — fixed width is never
-  implicit, so every fixed-width config already declares itself and all of them retype.
+  `parser` type until its author opts in. ⚠ This caveat is **delimited's alone** — every other frontend
+  (fixed width, ASN.1, JSON, text/regex) is never implicit, so those configs already declare themselves and
+  all of them retype.
 * **A subtype answers to every spelling of its frontend, and the set is the source of truth.**
   `SUBTYPE_FRONTENDS` maps each subtype to its spellings and `subtypeForFrontend` inverts it; both the
   lift's retype and the lower's mismatch check go through it, so the comparison is by **subtype, not by
@@ -62,7 +64,10 @@ complexities.
   `grammar/`. Refusing that ref would make every ASN.1 pipeline unsaveable — the AUTHOR-1(b) enrichment
   regression reached from the opposite direction — so `DERIVED_USE` maps `parser.asn1 → ingester/` and it
   is dropped in silence. ⚠ The rule generalises: **whenever a load-time synthesis invents something the
-  lift can present, check what the save path will then think the author wrote.**
+  lift can present, check what the save path will then think the author wrote.** ⛔ It does **not**
+  generalise to the other subtypes: nothing synthesizes an ingester for a plain built-in, so an
+  `ingester/` ref on `parser.json` / `parser.text_regex` / `parser.delimited` / `parser.fixedwidth` is an
+  authoring mistake and refuses with `UNSUPPORTED_BINDING`.
 * ⚠ **A record mode is not a node type.** Binary fixed width (`record: bytes`) lifts to
   `parser.fixedwidth` like any other — the type spans the format — but its field geometry lives in
   `processing.ingester_config` and is executed by `FixedWidthRecordIngester`, **not** by the

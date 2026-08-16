@@ -20,7 +20,8 @@ Two screens author how raw bytes become rows — a **Grammar** (`docs/GLOSSARY.m
 
 Definition-surface P3a moved the common case out of the popup: a **`parser.delimited`** node defines in the
 right-dock drawer (`<app-pipeline-parse-definition>`), over this same shared editor; P3b added
-**`parser.fixedwidth`** and P3c **`parser.asn1`** to the same pane. Since the templates-not-bindings change that includes
+**`parser.fixedwidth`**, P3c **`parser.asn1`**, and P3d **`parser.json`** + **`parser.text_regex`** to the
+same pane. Since the templates-not-bindings change that includes
 **grammar-bound** nodes, which the host materialises into an inline copy on open (`definitionDraft`) and
 which migrate for real when the operator Applies.
 
@@ -31,9 +32,16 @@ generic parser **node type** with format tabs — not component reuse; the type 
 no tabs appear and each format keeps its own palette entry. A second copy of the pane would only drift.
 A parse type **absent** from that map keeps the dialog.
 
-`GrammarEditorDialog` is left with three jobs: the **plain `parser` type** (no drawer pane yet — P3d adds
-one and retires the dialog), a **dangling** `use: grammar/<id>` whose component does not exist, and
-**binary fixed width**. The dangling case is deliberate: with nothing to resolve there is no faithful copy
+⛔ **The drawer template does not enumerate the subtypes.** It is `@if (dn.type === 'acquisition') … @else
+<app-pipeline-parse-definition>`, because `openDefinition` only ever opens for `acquisition` or
+`isDrawerParse`. It used to carry one `@case` per subtype — a second copy of the routing rule, free to
+drift from the map that actually decides it. Adding a format is now a `PARSE_NODE_FRONTENDS` entry and
+nothing else on the template side.
+
+`GrammarEditorDialog` is left with three jobs: the **plain `parser` type** (no drawer pane yet — P3d's
+remaining `parser.plugin` slice adds one), a **dangling** `use: grammar/<id>` whose component does not
+exist, and **binary fixed width**. ⚠ "P3d retires the dialog entirely" was always false and stays false:
+the dangling and binary cases are deliberate keeps. The dangling case is deliberate: with nothing to resolve there is no faithful copy
 to migrate to, and seeding the drawer with defaults would replace the operator's broken reference with a
 silently invented Grammar. The binary case (`record: bytes`, detected by `isBinaryFixedWidth`) lifts to
 `parser.fixedwidth` like any other but carries its geometry in `processing.ingester_config`, so the pane's
@@ -51,6 +59,25 @@ another feature** and both hosts now need it — the `connection-form.dialog` re
 grammar editor it has **no write path**: the two hosts write different blocks (Onboarding's
 `parsing.plugin.segments`, the Parse drawer's `parsing.asn1.segments`), which is exactly why the write stays
 host-side.
+
+## The last two built-ins — JSON and text/regex (P3d, 2026-08-16)
+
+The plan's icon table always listed **six** formats while B6 named only four node types, so `json` and
+`text_regex` had no type of their own and fell back to the plain `parser` plus the dialog. They now have
+one each. The slice is deliberately unremarkable: both are ordinary `ParsingFrontend` members the shared
+editor already rendered, `normalizeFrontend` already read and `clearMissingRoots` already cleared, so the
+whole UI half was two `PARSE_NODE_FRONTENDS` entries. Everything else was the engine's five touchpoints
+(`BuiltinNodeType`, `LOWERABLE`, `isParserType`, `SUBTYPE_FRONTENDS`, `USE_HOME`) plus the mock mirrors.
+
+* Neither is implicit — **delimited alone is the parser's default** — so every such file retypes on a lift,
+  and P3a's delicate "explicit only, don't reshape what's deployed" caveat costs nothing here (the same
+  reasoning P3b recorded for fixed width).
+* Each answers to **one** spelling, so unlike fixed width there is no alias to preserve.
+* Each homes `grammar/` and nothing else. ⛔ **Not `ingester/`**: only `parser.asn1` gets that, and only
+  because the config parser *synthesizes* the binding at load. On a plain built-in an `ingester/` ref is an
+  authoring mistake and must refuse rather than be dropped.
+* `isParserType` is now `PARSER` ∪ `SUBTYPE_FRONTENDS.keySet()` in both languages, rather than a chain of
+  `equals` growing one arm per format.
 
 ## A SERVED format in the pane — ASN.1 (P3c, 2026-08-16)
 
