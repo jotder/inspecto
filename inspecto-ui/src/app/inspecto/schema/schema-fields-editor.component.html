@@ -1,0 +1,150 @@
+<!-- Field-table toolbar: find / filter / counts. The form stays the source of truth;
+     these only choose which rows render (500+ column feeds stay usable). -->
+<div class="flex flex-wrap items-center gap-3">
+    <mat-form-field class="w-64" subscriptSizing="dynamic">
+        <mat-icon matPrefix class="icon-size-4" svgIcon="heroicons_outline:magnifying-glass"></mat-icon>
+        <input
+            matInput
+            type="text"
+            placeholder="Search name or source"
+            aria-label="Search fields"
+            [value]="search()"
+            (input)="setSearch($any($event.target).value)"
+        />
+    </mat-form-field>
+    <mat-form-field class="w-44" subscriptSizing="dynamic">
+        <mat-select [value]="typeFilter()" (selectionChange)="setTypeFilter($event.value)" aria-label="Filter by type">
+            <mat-option value="all">All types</mat-option>
+            @for (t of types; track t) {
+                <mat-option [value]="t">
+                    <span class="inline-flex items-center gap-2">
+                        <mat-icon class="icon-size-4" [svgIcon]="typeMeta[t].icon"></mat-icon>
+                        <span>{{ t }}</span>
+                    </span>
+                </mat-option>
+            }
+        </mat-select>
+    </mat-form-field>
+    <span class="text-secondary text-sm">
+        {{ filteredEntries().length }} of {{ totalCount() }} columns · {{ includedNames().length }} included
+    </span>
+</div>
+
+<div>
+    <table class="w-full border-collapse">
+        <thead>
+            <tr class="text-secondary text-left text-xs font-semibold uppercase tracking-wider">
+                <th scope="col" class="w-12 pb-1">
+                    <mat-checkbox
+                        [checked]="visibleIncludeState() === 'all'"
+                        [indeterminate]="visibleIncludeState() === 'some'"
+                        (change)="toggleAllVisible($event.checked)"
+                        aria-label="Include all fields matching the current search and filter"
+                    ></mat-checkbox>
+                </th>
+                <th scope="col" class="pb-1" [attr.aria-sort]="ariaSort('name')">
+                    <button type="button" class="inline-flex items-center gap-1 uppercase" (click)="sortBy('name')">
+                        Name
+                        @if (sortKey() === 'name') {
+                            <mat-icon
+                                class="icon-size-3"
+                                [svgIcon]="
+                                    sortDir() === 1 ? 'heroicons_outline:chevron-up' : 'heroicons_outline:chevron-down'
+                                "
+                            ></mat-icon>
+                        }
+                    </button>
+                </th>
+                <th scope="col" class="w-24 pb-1" [attr.aria-sort]="ariaSort('selector')">
+                    <button type="button" class="inline-flex items-center gap-1 uppercase" (click)="sortBy('selector')">
+                        Source
+                        @if (sortKey() === 'selector') {
+                            <mat-icon
+                                class="icon-size-3"
+                                [svgIcon]="
+                                    sortDir() === 1 ? 'heroicons_outline:chevron-up' : 'heroicons_outline:chevron-down'
+                                "
+                            ></mat-icon>
+                        }
+                    </button>
+                </th>
+                <th scope="col" class="w-48 pb-1" [attr.aria-sort]="ariaSort('type')">
+                    <button type="button" class="inline-flex items-center gap-1 uppercase" (click)="sortBy('type')">
+                        Type
+                        @if (sortKey() === 'type') {
+                            <mat-icon
+                                class="icon-size-3"
+                                [svgIcon]="
+                                    sortDir() === 1 ? 'heroicons_outline:chevron-up' : 'heroicons_outline:chevron-down'
+                                "
+                            ></mat-icon>
+                        }
+                    </button>
+                </th>
+            </tr>
+        </thead>
+        <tbody>
+            @for (e of pagedEntries(); track e.index) {
+                <tr [formGroup]="e.group" class="border-t align-middle">
+                    <td class="py-1">
+                        <mat-checkbox
+                            formControlName="include"
+                            [aria-label]="'Include ' + (e.group.get('name')?.value || 'field ' + (e.index + 1))"
+                        ></mat-checkbox>
+                    </td>
+                    <td class="py-1 pr-2">
+                        <mat-form-field class="w-full" subscriptSizing="dynamic">
+                            <input matInput formControlName="name" aria-label="Field name" />
+                            @if (e.group.get('name')?.hasError('pattern') && e.group.get('name')?.touched) {
+                                <mat-error>Letters, digits, _ — start with a letter or _.</mat-error>
+                            }
+                        </mat-form-field>
+                    </td>
+                    <td class="w-24 py-1 pr-2">
+                        <span
+                            class="text-secondary block max-w-24 truncate text-xs"
+                            [matTooltip]="'Parsed source: ' + $safeNavigationMigration(e.group.get('selector')?.value)"
+                            >{{ e.group.get('selector')?.value }}</span
+                        >
+                    </td>
+                    <td class="w-48 py-1">
+                        <mat-form-field class="w-full" subscriptSizing="dynamic">
+                            <mat-select formControlName="type" aria-label="Field type">
+                                <mat-select-trigger>
+                                    <span class="inline-flex items-center gap-1.5">
+                                        <mat-icon
+                                            class="icon-size-4"
+                                            [svgIcon]="typeIcon($safeNavigationMigration(e.group.get('type')?.value))"
+                                        ></mat-icon>
+                                        {{ e.group.get('type')?.value }}
+                                    </span>
+                                </mat-select-trigger>
+                                @for (t of types; track t) {
+                                    <mat-option [value]="t">
+                                        <span class="inline-flex items-center gap-2">
+                                            <mat-icon class="icon-size-4" [svgIcon]="typeMeta[t].icon"></mat-icon>
+                                            <span>{{ t }}</span>
+                                            <span class="text-secondary text-xs">{{ typeMeta[t].hint }}</span>
+                                        </span>
+                                    </mat-option>
+                                }
+                            </mat-select>
+                        </mat-form-field>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    @if (filteredEntries().length === 0) {
+        <p class="text-secondary m-0 py-2 text-sm">No fields match — clear the search or type filter.</p>
+    }
+    <mat-paginator
+        [length]="filteredEntries().length"
+        [pageIndex]="pageIndex()"
+        [pageSize]="pageSize()"
+        [pageSizeOptions]="[25, 50, 100]"
+        [showFirstLastButtons]="true"
+        (page)="onPage($event)"
+        aria-label="Field table pages"
+    />
+</div>
