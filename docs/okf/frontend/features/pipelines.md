@@ -458,3 +458,83 @@ A plain reactive form, not `<inspecto-schema-form>`: `reference.key` is server-s
 and `fieldSpecsToAttributes`'s `TYPE_MAP` (see "Node config specs are SERVED" above) still deliberately
 skips served `LIST` — unchanged by this work, so a hand-built form was the smaller, honest choice over
 half-wiring generic list rendering for one field.
+
+## The Load stage: schema on the parser, mapping on the map node (P4, 2026-08-16)
+
+The definition drawer gained the last two stages. Where their keys live is the whole design, and it is
+**not** where the plan assumed:
+
+- **`processing.schema_file` is the PARSER node's key.** `PipelineLift` puts it there with
+  `csv_settings`/`schemas`/`segments`/`ingester*`, and `PARSER_NO_SCHEMA` checks it there. So the
+  **Parse drawer** authors the output schema for the flat formats — which is what §4b's icon table
+  always meant by "+ output schema".
+- **`transform.map` authors exactly `{columns, rules}`** (`MAP_AUTHORED`, pinned in
+  `PipelineEditable.java` and mirrored in the mock). `schema` and `csv` on a map node are
+  `MAP_DERIVED` — resolved by the engine, dropped by `lower`. So the **Load drawer** authors the
+  mapping and nothing else.
+- ⛔ A single drawer over "schema + mapping + table" would span **three** node types and break the
+  one-`[node]`-in/one-node-out contract every drawer holds. It was split instead (operator, 2026-08-16).
+
+### The editor has no sample thread — `DefinitionStateService` is onboarding-only
+
+Grounded 2026-08-16: that service is injected by `onboarding-shell`, `parsing-pane`, `sample-panel` and
+`schema-mapping-pane` and by nothing under `modules/admin/pipelines/`. P2-0 landed it for the wizard;
+adopting it in the editor is unbuilt work, not an existing seam. Two consequences:
+
+- The Load pane takes its field list from the **parser's `schema_file`** — read-only context the host
+  passes in, because the host is the only thing holding the whole graph. Rules map FROM schema fields
+  anyway, so no sample is needed to author them.
+- **`POST /config/preview/schema`'s mapped-row half (B1) has no consumer yet.** It needs sample rows the
+  editor cannot supply. Either wire the thread (P6, where wizard and editor state merge anyway) or leave
+  the preview server-side — an open call, recorded in BACKLOG.
+
+### Two write-ordering guards, both falsified before being trusted
+
+- **A saved schema is re-read on open and a fresh parse must not re-derive over it.** The operator's
+  names, types and include flags are the truth; deriving from a new sample would replace them on Apply.
+  A hand-authored `schema_file` outside the naming convention is reported and never touched.
+- **A transform type the UI does not offer is preserved, not rewritten.** The Load pane offers `DIRECT`
+  and `EXPR` only (`CONCAT_DT`/`FILENAME_DATE` carry source semantics the grid has no affordance for);
+  a rule already carrying one keeps it. *Not offering* must never become *destroying*.
+
+Both were verified by deleting the guard and watching exactly its own test fail — the only way to know a
+first-try-green test is testing anything.
+
+### Drift is reported, not applied — and only one third of a "re-sync" is safe
+
+`POST /config/suggest/schema` takes the draft alongside the sample and returns a field-level diff (B3).
+The Parse drawer renders it. Of §5.2's "re-sync merges, never clobbers", **only adding new columns is
+automatable**: a type change cannot be auto-applied (nothing distinguishes a deliberate override from a
+stale derivation) and a missing field cannot be auto-removed (the sample may simply be narrow). Both are
+reported with their old→new types for a human call. The merge reads **all** grid rows, excluded ones
+included, so appending never silently drops an unticked row.
+
+⛔ **There is no `renamed` drift category and there cannot be one.** From a draft plus a fresh sample, a
+renamed source column is indistinguishable from a remove+add — the same fact `SchemaCompatibility`
+states for the save gate. It surfaces as a `missing`+`added` pair; calling that pair a rename is a UI
+affordance over two facts, never a server claim. The diff joins on the **selector**, not the name:
+`name` is an output column an author renames deliberately, so keying on it would light the indicator on
+every intentional rename.
+
+### Retiring the client type inference was not a pure deletion (D4)
+
+`suggestTypes()` is gone; types come from `SchemaSuggest` via the server. But **the server's vocabulary
+is wider than the grid's** — it votes `BIGINT`/`BOOLEAN`, while the grid offers only the four types
+`TransformCompiler.direct()` actually casts. `narrowToSchemaType()` maps `BIGINT → DOUBLE` (there is no
+integer cast) and anything unknown to `VARCHAR`; without it the retirement would have put unselectable
+types into the grid. Only the **type** comes from the server — the **selector** stays client-derived,
+being frontend-dependent (position for delimited/fixedwidth, key for json/text_regex) in a way the
+server, which sees only rows, cannot know.
+
+There was never a *second* client fork: `schema-editor.dialog`'s "Suggest from sample" already called
+the server. It is a second entry point to one implementation.
+
+### The shared `raw.fields[]` grid lives in `inspecto/schema/`
+
+Extracted from the onboarding pane so the Parse drawer could author a schema too — a feature may not
+import a feature, the rule that moved the segments editor in P3d. Host contract mirrors the segments
+editor: seed `[rows]`, call `validate()` then `value()`, host owns every write, problems surface through
+`problem()` so a shared grid never decides how a host reports an error. `[rows]` rebuilds on **reference**
+change, so hosts hold the seed in a signal; and the onboarding pane reaches it through a **signal**
+`viewChild` because `includedNames` is `computed()` off it and a plain `@ViewChild` would never re-run
+that computed when the grid appears.
