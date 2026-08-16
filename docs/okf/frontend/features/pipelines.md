@@ -187,6 +187,28 @@ rather than guessed. Types without a schema fall back to the free-form key/value
 config", collapsed when a schema exists) — the conversion is non-lossy by design. Declared defaults **persist on save** even when untouched
 (product-confirmed 2026-07-02: configs stay explicit/self-documenting).
 
+### Derived, not asked: the enrichment wiring seed (P6-c, 2026-08-16)
+
+Onboarding's Enrichment stage renders **no** wiring form at all — it derives input/output/triggers from
+the draft. The editor's node dialog has to ask (it has no wizard draft), but a **fresh** companion's
+fields now arrive filled from what the host pipeline knows, so the two surfaces ask the same amount.
+
+- **The convention is one function, shared:** `enrichmentWiringDefaults`
+  (`inspecto/enrichment/enrichment-wiring.ts`) owns *input = the Stage-1 output · output =
+  `<base>/data/enriched/<name>` · trigger = `on_pipeline`*. ⛔ It lives in shared `inspecto/`, not the
+  onboarding feature, because the wizard shell that owned it is being retired (P6-e) — both hosts derive
+  through it, and only pipeline-DERIVED facts travel in `NodeConfigData.enrichmentHost`.
+- 🔴 **The Stage-1 store travels only when exactly ONE sink declares a `database`.** A multi-destination
+  pipeline has no single "the output"; seeding one would point the transform at a store the author never
+  chose, and an invented store path reads zero rows everywhere while looking like it worked. The required
+  field stays blank instead. ⚠ **Quarantine is SINK-category too and carries only `dir`**, so the
+  derivation filters on the config, not the category — otherwise it counts as a second destination and
+  suppresses the seed on every pipeline that has quarantine.
+- ⚠ **A seed is one-shot.** It is read once and deliberately not re-derived as the author renames the
+  companion — a seed moving under an edited form clobbers it. A **bound** companion's file always wins,
+  including a `triggers.on_pipeline` naming a different pipeline: this dialog edits the companion, and
+  silently re-pointing a deployed enrichment at its host is not an edit anyone asked for.
+
 ### The enrichment wiring form's partition lists (2026-08-13)
 
 The `enrichment` node authors a **companion** `*_enrich.toon` rather than `node.config`, through

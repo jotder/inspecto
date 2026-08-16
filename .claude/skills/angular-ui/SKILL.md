@@ -123,7 +123,13 @@ src/app/
   `use: enrichment/<name>` — never mirror the config into `node.config` (split-brain). `partitions`
   lists are still unspecced and must travel verbatim through a save (speccing them is now an unblocked
   follow-up — `AttributeSpec` gained a `list` type in D7, 2026-08-03); a `transform_file` config is
-  refused, not overwritten.
+  refused, not overwritten. ⚠ **The derived half is `enrichmentWiringDefaults`**
+  (`inspecto/enrichment/enrichment-wiring.ts`, P6-c 2026-08-16) — input = the pipeline's Stage-1 output,
+  output = `<base>/data/enriched/<name>`, trigger = `on_pipeline`. Both hosts derive through it (the
+  Onboarding stage silently, the node dialog as the seed of its asked form); never re-state the
+  convention in a host. A host passes only facts it resolved itself, and passes **nothing** when the
+  fact is ambiguous — a blank required field is honest, an invented store path reads zero rows and looks
+  like it worked. A seed is **one-shot**: re-deriving it while the author edits clobbers the form.
 - **Asking where files come from → `<inspecto-collector-config>`** (`inspecto/collector/`, 2026-08-04).
   ONE shared surface for the `collector:` block: the local-inbox/Connection toggle, the schema form over
   the shared `COLLECTOR_ATTRIBUTES`, Test connection, create-a-Connection in place, and the derived
