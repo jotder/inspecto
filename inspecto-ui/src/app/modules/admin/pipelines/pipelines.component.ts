@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, ViewEncapsulation, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ViewEncapsulation, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NgTemplateOutlet } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
@@ -16,6 +16,7 @@ import { TransferMenuComponent } from 'app/inspecto/transfer';
 import { GraphViewComponent } from 'app/modules/admin/catalog/graph-view.component';
 import { G6GraphData } from 'app/modules/admin/catalog/catalog-graph';
 import { PipelineEditorComponent } from './pipeline-editor.component';
+import { PipelineStageId } from './pipeline-stages';
 import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
 import {
     CATEGORY_ORDER,
@@ -80,6 +81,22 @@ export class PipelinesComponent {
      */
     readonly guided = toSignal(this.route.queryParamMap.pipe(map((p) => p.get('guided') === '1')), {
         initialValue: false,
+    });
+
+    /**
+     * `?open=<pipeline>&stage=<chip>` — the deep link the retired `/catalog/onboard/:name/:stage`
+     * route redirects into (P6-a). Deliberately NOT stripped after use, unlike the `?create=1`
+     * handshake: this URL is the wizard's replacement, so it has to survive a reload and a bookmark.
+     */
+    readonly openId = toSignal(this.route.queryParamMap.pipe(map((p) => p.get('open') ?? '')), { initialValue: '' });
+    readonly focusStage = toSignal(
+        this.route.queryParamMap.pipe(map((p) => (p.get('stage') ?? '') as PipelineStageId | '')),
+        { initialValue: '' as PipelineStageId | '' },
+    );
+
+    /** Arriving with a pipeline to open means arriving to AUTHOR it — the wizard was never read-only. */
+    private readonly editOnDeepLink = effect(() => {
+        if (this.openId()) this.mode.set('editor');
     });
 
     // ── topology (T24): one or many pipelines joined at their shared stores ──

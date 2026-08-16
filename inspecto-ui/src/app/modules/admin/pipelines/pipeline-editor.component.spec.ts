@@ -642,6 +642,49 @@ describe('PipelineEditorComponent', () => {
             });
         });
 
+        /**
+         * P6-a: the retired `/catalog/onboard/:name/:stage` route redirects here, so the editor has to
+         * open a named pipeline — and land on a named stage — straight off the URL.
+         */
+        describe('deep link (P6-a)', () => {
+            it('opens the named pipeline as a tab on arrival', () => {
+                const fixture = TestBed.createComponent(PipelineEditorComponent);
+                fixture.componentRef.setInput('openId', 'demo');
+                const c = fixture.componentInstance;
+                c.ngOnInit();
+                (c as unknown as { canvas: unknown }).canvas = canvasMock();
+                fixture.detectChanges(); // flush the effect
+
+                expect(c.selectedId()).toBe('demo');
+                expect(c.openIds()).toContain('demo');
+            });
+
+            /**
+             * ⚠ `select()` is a LOAD, not an idempotent setter: re-running it would refetch the graph
+             * and throw away the tab's unsaved edits. The effect must consume each id exactly once.
+             */
+            it('does not re-open — and so cannot discard edits — when an unrelated signal changes', () => {
+                const fixture = TestBed.createComponent(PipelineEditorComponent);
+                fixture.componentRef.setInput('openId', 'demo');
+                const c = fixture.componentInstance;
+                c.ngOnInit();
+                (c as unknown as { canvas: unknown }).canvas = canvasMock();
+                fixture.detectChanges();
+                api.pipelineGraphRaw.mockClear();
+
+                c.dirty.set(true);
+                fixture.detectChanges();
+                expect(api.pipelineGraphRaw).not.toHaveBeenCalled();
+                expect(c.dirty()).toBe(true);
+            });
+
+            it('opens nothing without the param', () => {
+                const c = make();
+                expect(c.selectedId()).toBeNull();
+                expect(c.openIds()).toEqual([]);
+            });
+        });
+
         /** P6-d: the checklist is a view over the SAME graph, and a chip opens its stage's node. */
         describe('guided checklist', () => {
             /**

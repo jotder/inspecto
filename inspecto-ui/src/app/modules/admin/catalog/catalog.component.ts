@@ -32,6 +32,7 @@ import { GraphViewComponent } from './graph-view.component';
 import { NodeDetailDialog } from './node-detail.dialog';
 import { SharingComponent } from './sharing.component';
 import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
+import { onboardRedirect } from './onboard-redirect';
 
 type CatTab = 'tables' | 'streams' | 'references' | 'kpis' | 'graph' | 'usage' | 'shared-with-me' | 'shared-by-me';
 
@@ -183,7 +184,9 @@ export class CatalogComponent implements OnInit {
             icon: 'heroicons_outline:pencil-square',
             hint: (row) => (row.attrs?.['active'] === false ? 'Resume onboarding' : 'Open onboarding'),
             visible: (row) => this.lens.canAuthorWorkbench() && !!row.attrs?.['pipeline'],
-            onClick: (row) => this.router.navigate(['/catalog', 'onboard', String(row.attrs?.['pipeline'])]),
+            // P6-a: onboarding IS the guided editor now — go straight there rather than through the
+            // route's own redirect, so the operator sees one navigation instead of two.
+            onClick: (row) => this.router.navigateByUrl(onboardRedirect(this.router, String(row.attrs?.['pipeline']))),
         },
         {
             icon: 'heroicons_outline:clock',
@@ -363,7 +366,7 @@ export class CatalogComponent implements OnInit {
             })
             .afterClosed()
             .subscribe((res) => {
-                if (res?.name) this.router.navigate(['/catalog', 'onboard', res.name]);
+                if (res?.name) this.router.navigateByUrl(onboardRedirect(this.router, res.name));
             });
     }
 }

@@ -112,7 +112,7 @@ import {
     validatePipeline,
 } from './pipeline-graph';
 import { PipelineChecklistComponent } from './pipeline-checklist.component';
-import { incompleteStages, pipelineLifecycle, StageChip, stageChecklist } from './pipeline-stages';
+import { incompleteStages, pipelineLifecycle, PipelineStageId, StageChip, stageChecklist } from './pipeline-stages';
 
 /** The `use:` prefix a Grammar component is referenced by — also how its ref is keyed in `validRefs`. */
 const GRAMMAR_REF_PREFIX = 'grammar/';
@@ -193,6 +193,42 @@ export class PipelineEditorComponent implements OnInit {
      * it. Off by default, so the plain editor is unchanged for everyone who did not come that way.
      */
     readonly guided = input(false);
+
+    /**
+     * Open this pipeline as a tab on arrival (P6-a): the deep-link handshake the retired
+     * `/catalog/onboard/:name` route redirects into. Empty ⇒ nothing is opened, exactly as before.
+     */
+    readonly openId = input('');
+
+    /** Which checklist chip to land on, carried from the retired route's `:stage` segment. */
+    readonly focusStage = input<PipelineStageId | ''>('');
+
+    /**
+     * Consume {@link openId} once per id — `select()` is a load, not an idempotent setter, so an
+     * effect that re-ran on any unrelated signal would refetch the graph and discard the tab's edits.
+     */
+    private readonly openFromUrl = effect(() => {
+        const id = this.openId();
+        if (!id || id === this.openedFromUrl) return;
+        this.openedFromUrl = id;
+        this.select(id);
+    });
+    private openedFromUrl = '';
+
+    /**
+     * Land on the stage the deep link named, once its graph is in. Waits for the model because the
+     * chip's node does not exist until then; fires once, so it never fights the operator's own
+     * navigation afterwards.
+     */
+    private readonly focusFromUrl = effect(() => {
+        const stage = this.focusStage();
+        const loaded = this.model() && this.selectedId() === this.openId();
+        if (!stage || !loaded || this.focusedFromUrl) return;
+        this.focusedFromUrl = true;
+        const chip = this.checklist().find((c) => c.id === stage);
+        if (chip) this.openStage(chip);
+    });
+    private focusedFromUrl = false;
 
     readonly flows = signal<PipelineSummary[]>([]);
 
