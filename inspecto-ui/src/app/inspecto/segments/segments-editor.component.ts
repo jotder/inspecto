@@ -28,10 +28,15 @@ import {
  * in the host, the `fixedwidth.fields[]` / schema-stage `fieldRows` precedent.
  *
  * <p>Editing only — the host owns persistence, because saving a segment means writing its schema
- * toon *and* patching the pipeline's `parsing.plugin` block, which is the host's transaction.
+ * toon *and* patching the block that references them, which is the host's transaction. The two hosts
+ * write different blocks (Onboarding's `parsing.plugin.segments`, the Pipelines Parse drawer's
+ * `parsing.asn1.segments`), which is exactly why the write stays out of here.
+ *
+ * <p>⚠ **Shared, not onboarding-owned** (relocated 2026-08-16): a feature may not import another
+ * feature, so this lives in `inspecto/` — the `connection-form.dialog` precedent.
  */
 @Component({
-    selector: 'app-onboarding-segments-editor',
+    selector: 'inspecto-segments-editor',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
@@ -46,7 +51,7 @@ import {
     ],
     templateUrl: './segments-editor.component.html',
 })
-export class OnboardingSegmentsEditorComponent {
+export class InspectoSegmentsEditorComponent {
     private fb = inject(FormBuilder);
 
     /** The plugin preview's record forest — the source "Derive from preview" reads. */

@@ -3,7 +3,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { ParserTreeNode } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
-import { OnboardingSegmentsEditorComponent } from './segments-editor.component';
+import { InspectoSegmentsEditorComponent } from './segments-editor.component';
 
 const leaf = (label: string): ParserTreeNode => ({ label, value: 'v' });
 const node = (label: string, children: ParserTreeNode[]): ParserTreeNode => ({ label, children });
@@ -13,16 +13,16 @@ const TREE: ParserTreeNode[] = [
     node('smsRecord', [leaf('imsi')]),
 ];
 
-describe('OnboardingSegmentsEditorComponent', () => {
-    let fixture: ComponentFixture<OnboardingSegmentsEditorComponent>;
-    let component: OnboardingSegmentsEditorComponent;
+describe('InspectoSegmentsEditorComponent', () => {
+    let fixture: ComponentFixture<InspectoSegmentsEditorComponent>;
+    let component: InspectoSegmentsEditorComponent;
 
     beforeEach(async () => {
         await TestBed.configureTestingModule({
-            imports: [OnboardingSegmentsEditorComponent],
+            imports: [InspectoSegmentsEditorComponent],
             providers: [provideNoopAnimations()],
         }).compileComponents();
-        fixture = TestBed.createComponent(OnboardingSegmentsEditorComponent);
+        fixture = TestBed.createComponent(InspectoSegmentsEditorComponent);
         component = fixture.componentInstance;
         fixture.componentRef.setInput('tree', TREE);
         fixture.detectChanges();

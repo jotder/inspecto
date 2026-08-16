@@ -29,8 +29,13 @@ import { GrammarEditorComponent, PARSING_FRONTENDS } from 'app/inspecto/grammar'
 import { mergeBlock } from 'app/inspecto/component-model';
 import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
 import { OnboardingSamplePanelComponent } from './sample-panel.component';
-import { OnboardingSegmentsEditorComponent } from './segments-editor.component';
-import { SegmentDraft, schemaDraftFor, schemaNameFromPath, segmentDraftFrom } from './segment-drafts';
+import {
+    InspectoSegmentsEditorComponent,
+    SegmentDraft,
+    schemaDraftFor,
+    schemaNameFromPath,
+    segmentDraftFrom,
+} from 'app/inspecto/segments';
 
 /**
  * Parsing stage — a thin HOST over the shared `<inspecto-grammar-editor>` (2026-08-04). The format
@@ -66,7 +71,7 @@ import { SegmentDraft, schemaDraftFor, schemaNameFromPath, segmentDraftFrom } fr
         MatProgressSpinnerModule,
         GrammarEditorComponent,
         OnboardingSamplePanelComponent,
-        OnboardingSegmentsEditorComponent,
+        InspectoSegmentsEditorComponent,
     ],
     templateUrl: './parsing-pane.component.html',
 })
@@ -89,7 +94,7 @@ export class OnboardingParsingPaneComponent implements OnInit {
     readonly dirtyChange = output<boolean>();
 
     @ViewChild(GrammarEditorComponent) grammar?: GrammarEditorComponent;
-    @ViewChild(OnboardingSegmentsEditorComponent) segmentsEditor?: OnboardingSegmentsEditorComponent;
+    @ViewChild(InspectoSegmentsEditorComponent) segmentsEditor?: InspectoSegmentsEditorComponent;
 
     private blockOf(name: string): Record<string, unknown> {
         const v = (this.config() ?? {})[name];
