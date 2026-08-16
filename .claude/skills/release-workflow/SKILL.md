@@ -16,12 +16,16 @@ checklist. Enforced by three layers: a Claude Code hook (agent reminder), `.gith
 (local block), and CI `.github/workflows/branch-policy.yml` (un-bypassable backstop).
 **One-time per clone:** `git config core.hooksPath .githooks`.
 
-## CURRENT STATE (2026-08-11) — apply this before the checklist below
+## CURRENT STATE (2026-08-17) — apply this before the checklist below
 
-**Nothing is in production after `3.x`.** Work goes along `master`; `4.x` is cut as a release later,
-then work continues toward 5. So **`master` is the only line anyone works on**, the **merge-forward set
-is always empty** (there is no older *supported* line for a `fix:` to land on), and **`4.x` receives
-nothing — no back-merge, let it drift.**
+**Nothing is in production after `3.x`.** Work goes along `master`; the next major is cut as a release
+branch later. So **`master` is the only line anyone works on** and the **merge-forward set is always
+empty** (there is no older *supported* line for a `fix:` to land on).
+
+⛔ **`4.x` NO LONGER EXISTS — deleted 2026-08-17 (operator call).** It never became a maintenance line
+and held nothing `master` lacked. Do not try to check it out, back-merge to it, or treat any `4.x` in
+the examples below as a live branch. The `v4.0.0` / `v4.0.0-RC1` **tags survive** and are ancestors of
+`master`.
 
 Practically, checklist step 4 below resolves to: *"propagation set: empty — `master` only"*. State it
 and proceed; do not go looking for an older branch and do not ask the operator to re-confirm it for
@@ -33,7 +37,8 @@ wrong, it is **not yet in force**. See `docs/BRANCHING.md` §0-A.
 
 ## The two axes — never confuse them
 
-- **Versions = git branches.** Active: `master` (newest mainline) + the current `N.x` (today **`4.x`**).
+- **Versions = git branches.** Active: `master` (newest mainline) — **today the only one**; there is no
+  current `N.x` (see CURRENT STATE).
   **Retired/EOL (FROZEN — no commits/pushes/tags, never a propagation target): `1.x`, `2.x`, `3.x`.`**
 - **Editions (Personal / Standard / Enterprise) = build flavors** (Maven profiles + `ServiceLoader`
   modules + `-D` flags). **Editions are NEVER branches.**

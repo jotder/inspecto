@@ -20,8 +20,9 @@
 **Inspecto** (formerly *UCC File Processor*; repo `inspecto`, checked out here as
 `C:/sandbox/inspecto-clean`). Java (core bytecode
 `release=24`; agent modules need a **JDK 25+ runtime**; built & bundled on **JDK 26**) / Maven
-multi-module · embedded **DuckDB** · **TOON** config · OpenCSV. Mainline = `master`; current release line
-= `4.x`. Editions = build flavors (see below), **never branches**.
+multi-module · embedded **DuckDB** · **TOON** config · OpenCSV. Mainline = `master` — the ONLY
+line (`4.x` was deleted 2026-08-17; the next major's branch is cut when it ships, `BRANCHING.md` §0-A).
+Editions = build flavors (see below), **never branches**.
 
 Module dirs were renamed 2026-06-12; the **artifactIds caught up on 2026-08-10** (`a1da65f5`), so dir ==
 artifactId everywhere — with one deliberate exception: `inspecto/` is `inspecto-processor`, because a bare
@@ -310,8 +311,9 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   CI and `spaces/**` runtime state is never scanned; its `CONFIG_ALLOW` doubles as the Flow→Pipeline Tier-3
   debt register and fails when an entry goes stale) and `tools/check-secrets.mjs` (a
   secret-ish key assigned a ≥16-char literal — SEC-INCIDENT-1). Both take a per-line `vocab-allow` /
-  `secret-allow` comment as the escape hatch. ⚠ **`check-secrets.mjs` is deliberately master-only** — `4.x`
-  still carries the live OAuth secrets, so merging it forward pins `4.x` CI red (BACKLOG §5). A third guard,
+  `secret-allow` comment as the escape hatch. ⚠ **`check-secrets.mjs` was "master-only" while `4.x` still carried the
+  live OAuth secrets** (merging it forward would have pinned that branch's CI red, BACKLOG §5); P1 fixed
+  the code there and the branch itself was deleted 2026-08-17, so the caveat is now history. A third guard,
   `npm run lint:tokens`, runs in the separate path-filtered `ui.yml` (§6).
 - **`BatchEvent.pipeline()` is the LOWERCASED pipeline name** (`cfg.identity().pipelineName()`). Any name
   matching against it (triggers, `runPipeline`, `pathFor`) must use the lowercased id — tests call

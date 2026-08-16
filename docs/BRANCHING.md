@@ -8,22 +8,22 @@
 
 ---
 
-## 0-A. CURRENT STATE (2026-08-11) — read this before applying §3
+## 0-A. CURRENT STATE (2026-08-17) — read this before applying §3
 
-**Nothing is in production after `3.x`.** Work goes along `master`; at some point `4.x` is cut as a
-release; then work continues toward 5. So today:
+**Nothing is in production after `3.x`.** Work goes along `master`; at some point the next major is
+cut as a release branch; then work continues past it. So today:
 
 | | |
 |---|---|
 | **The only line anyone works on** | **`master`** |
-| **`4.x`** | a **future release cut**, not a maintenance line with users on it — **ignore it** |
+| **`4.x`** | **DELETED 2026-08-17 (operator call) — the branch no longer exists.** It had never been a maintenance line with users on it, and it carried nothing master lacked: 5 of its 6 unique commits were merges *from* master and the sixth (`8a3d43be`, the committed-secret guard fix) was a cherry-pick already on master. The **`v4.0.0` and `v4.0.0-RC1` tags were deleted with it** (operator call, same day) — 4.0.0 never reached production, so the line leaves no release record behind. ⚠ **Both tagged commits remain ancestors of `master` and are NOT lost**: `v4.0.0` = `aa90a55a` ("release: UCC 4.0.0 — agent-kernel migration (U0+U1)", 2026-06-05), `v4.0.0-RC1` = `0f509598` (2026-07-21). Re-create either with `git tag <name> <sha>` if a release record is ever wanted. When the next major is cut, create its branch from `master` and §1/§3 come into force then. |
 | **The merge-forward set (§3)** | **always empty** — there is no older *supported* line to land a `fix:` on |
-| **Back-merges into `4.x`** | **not owed**; let it drift |
 
 ⚠ **§1's "Active" list and §3's propagation rule below describe the model for when a release exists
 and has users.** They are not wrong as policy — they are simply **not yet in force**, because the
-precondition (a shipped major with people running it) is not met. Apply §3 from the day `4.x` is cut
-and starts receiving fixes; until then a `fix:` lands on `master` like everything else.
+precondition (a shipped major with people running it) is not met. Apply §3 from the day the next
+major's branch is cut and starts receiving fixes; until then a `fix:` lands on `master` like
+everything else.
 
 ⚠ **Do not "fix" this by deleting §1/§3.** The machinery becomes correct the moment a release exists,
 and rewriting it now would mean re-deriving it later.
@@ -33,9 +33,10 @@ not block — and has been left that way deliberately rather than silenced, so t
 when it applies. Treat its output as a prompt to state the propagation set (today: empty), not as an
 instruction to go find an older branch.
 
-*(History: this was briefly run as "`4.x` is kept a byte-identical mirror of `master`" earlier the same
-day, producing the back-merges `bb6e6618`…`b6d658ca`. Those are harmless and stay; the mirroring rule
-does not. The stable fact is the first line of this section — nothing is in production after 3.x.)*
+*(History: this was briefly run as "`4.x` is kept a byte-identical mirror of `master`" on 2026-08-11,
+producing the back-merges `bb6e6618`…`b6d658ca`. Those commits died with the branch on 2026-08-17 and
+nothing was lost by it — see the table. The stable fact through all of it is the first line of this
+section: nothing is in production after 3.x.)*
 
 ---
 
@@ -43,7 +44,7 @@ does not. The stable fact is the first line of this section — nothing is in pr
 
 | Axis | Mechanism | Example |
 |---|---|---|
-| **Versions / releases** | **git branches** | `master`, `4.x` |
+| **Versions / releases** | **git branches** | `master` (today the only one — §0-A) |
 | **Editions** (Personal / Standard / Enterprise) | **build flavors** — Maven profiles + `ServiceLoader` modules + `-D` flags | `mvn -Pedition-standard package` |
 
 **Editions are NEVER branches.** There is no `personal` or `standard` branch. An edition is *which
@@ -57,9 +58,9 @@ modules get assembled* from the same commit. See the editions plan for the assem
 - **`master`** — the mainline / newest supported line. All new features land here; it is the forward
   end of every merge chain. HEAD of the current development version. ⚠ **Today it is the *only* line
   worked on — see §0-A.**
-- **`<N>.x`** — the maintenance branch for the **current** major (today: **`4.x`**). Receives `fix:`
-  backports for the shipped major; tagged `vN.y.z` on release. ⚠ **Not yet in that role** — `4.x` has
-  no production users, so it receives nothing today (§0-A).
+- **`<N>.x`** — the maintenance branch for the **current** major. Receives `fix:` backports for the
+  shipped major; tagged `vN.y.z` on release. ⚠ **No such branch exists today** — `4.x` was deleted
+  2026-08-17 because it never entered that role (§0-A).
 
 ### Retired (FROZEN — end-of-life, NO commits/pushes/tags, NEVER a propagation target)
 - **`1.x`, `2.x`, `3.x`** — read-only history only. The release guard hard-blocks any
@@ -96,7 +97,10 @@ Scope is encouraged (`fix(etl):`, `feat(ui):`, `fix(security):`).
 
 ⚠ **Not in force yet — see §0-A.** With nothing in production after `3.x` there is no older *supported*
 branch, so "the oldest affected branch" resolves to `master` for every change and the merge-forward set
-is empty. The rule below applies from the day `4.x` is cut and has users.
+is empty. The rule below applies from the day the next major's branch is cut and has users. ⚠ **`4.x`
+below is a PLACEHOLDER for that future cut, not a branch you can check out** — it was deleted
+2026-08-17 (§0-A). The machinery is kept verbatim because it becomes correct the moment a release
+exists; only the name will differ.
 
 ```
         fix lands here

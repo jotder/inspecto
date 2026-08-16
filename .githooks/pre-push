@@ -35,7 +35,7 @@ done
 [ "$status" -ne 0 ] && exit 1
 
 echo "pre-push: nothing is in production after 3.x — master is the only line worked on, so the" >&2
-echo "          merge-forward set is EMPTY and 4.x receives nothing (BRANCHING.md §0-A)." >&2
-echo "          When 4.x is cut and has users, MERGE-FORWARD (oldest supported -> master) applies again." >&2
+echo "          merge-forward set is EMPTY (BRANCHING.md §0-A; 4.x was deleted 2026-08-17)." >&2
+echo "          When the next major is cut and has users, MERGE-FORWARD (oldest supported -> master) applies again." >&2
 echo "          Editions are build flavors, not branches." >&2
 exit 0

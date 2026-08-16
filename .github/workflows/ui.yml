@@ -7,10 +7,10 @@ name: UI
 
 on:
   push:
-    branches: [master, main, 3.x, 4.x]
+    branches: [master, main, 3.x]
     paths: ['inspecto-ui/**', '.github/workflows/ui.yml']
   pull_request:
-    branches: [master, main, 3.x, 4.x]
+    branches: [master, main, 3.x]
     paths: ['inspecto-ui/**', '.github/workflows/ui.yml']
 
 permissions:

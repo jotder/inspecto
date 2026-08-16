@@ -6,10 +6,10 @@ name: CI
 
 on:
   push:
-    branches: [master, main, 3.x, 4.x]
+    branches: [master, main, 3.x]
     tags: ['v*']
   pull_request:
-    branches: [master, main, 3.x, 4.x]
+    branches: [master, main, 3.x]
 
 # Default GITHUB_TOKEN perms, narrowed to just reading this repo — eoiagent is built from source
 # below, so no GitHub Packages auth is needed here.
@@ -33,8 +33,7 @@ jobs:
       # Committed-secret guard (SEC-INCIDENT-1, docs/BACKLOG.md §5): a secret-ish key assigned a long
       # literal fails the build. Five OAuth client secrets reached a public remote this way; history
       # keeps leaked values forever, so blocking REINTRODUCTION is the only durable control. Pure Node,
-      # ~1s. Runs on `4.x` too since 2026-07-25 — PKCE P0+P1 removed `appClientSecret` from that
-      # branch, so the guard is green there. Keep both copies of the script identical.
+      # ~1s. (It also ran on `4.x` from 2026-07-25 until that branch was deleted 2026-08-17.)
       - name: Guard — no committed secrets
         run: node tools/check-secrets.mjs
 

@@ -347,6 +347,15 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 > in `environment.gamma.ts`. **Keep the two copies of the script identical** — a divergence means one
 > branch is guarded by weaker rules than the other.
 >
+> ⚠ **2026-08-17 — the `4.x` BRANCH WAS DELETED (operator call).** Everything below that names `4.x` is
+> the incident record as written and stays for provenance, but two things changed operationally: the
+> branch is no longer checkoutable (its tip was `b6d658ca`; `v4.0.0` / `v4.0.0-RC1` remain as tags and
+> are ancestors of `master`), and **P2 as phrased — "deploy the `4.x` bundle, then rotate" — no longer
+> has a branch to build from.** Whether a deploy is still owed at all depends on whether any SPA built
+> from that line is actually running; if none is, P2 collapses to *rotate at the issuer* and the
+> remaining work is the non-code half (GitHub Support purge of `refs/pull/*`, refresh-grant
+> verification, bundle deletion). **Needs an operator call before anyone acts on P2.**
+>
 > **✅ `4.x` IS NOW FIXED CODE-SIDE (2026-07-25) — ROTATION IS UNBLOCKED.** P0 (`481a68d5`) removed the
 > dead confidential-client code holding the inline IAM literal; **P1 (`89cb3cce`) put the live path on
 > PKCE and removed `appClientSecret` from `4.x` entirely** — `app.properties.ts` and all four
