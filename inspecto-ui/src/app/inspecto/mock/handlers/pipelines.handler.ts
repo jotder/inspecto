@@ -114,7 +114,7 @@ export const NODE_TYPES: PipelineNodeType[] = (
         {
             type: 'parser.text_regex',
             category: 'PARSE',
-            label: 'Parser (text/regex)',
+            label: 'Regex',
             description: 'Reads matching lines into rows via named capture groups; non-matching lines are dropped.',
             accepts: ['data'],
             emits: ['data', 'unmatched'],
@@ -123,7 +123,7 @@ export const NODE_TYPES: PipelineNodeType[] = (
         {
             type: 'parser.plugin',
             category: 'PARSE',
-            label: 'Parser (plugin)',
+            label: 'Custom',
             description: 'Decodes records through a deployed custom ParserPlugin, loaded via its StreamingFileIngester.',
             accepts: ['data'],
             emits: ['data', 'unmatched'],
