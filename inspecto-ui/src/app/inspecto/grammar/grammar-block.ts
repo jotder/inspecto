@@ -21,6 +21,16 @@ const CSV_SETTINGS_KEYS = ['delimiter', 'has_header', 'skip_header_lines', 'null
 const PARSING_ROOTS = ['delimited', 'fixedwidth', 'json', 'text_regex', 'plugin'];
 
 /**
+ * Whether the stored content is ALREADY the nested `parsing:` shape — i.e. whether a writer must put
+ * the csv settings back under `delimited:` rather than at top level. Deliberately the same test as the
+ * lift below (a sub-block root present as an object), so read and write agree on one rule; a bare
+ * `frontend` key does not make content nested, because nothing has been rehomed.
+ */
+export function isNestedGrammarContent(content: Record<string, unknown>): boolean {
+    return PARSING_ROOTS.some((r) => content?.[r] !== null && typeof content?.[r] === 'object');
+}
+
+/**
  * Normalise a Grammar component's stored content into a `parsing:`-shaped block the editor can seed
  * from. Legacy `parser_type` becomes `frontend` (no engine code ever read `parser_type`), and legacy
  * top-level csv settings move under `delimited:`. Already-nested content passes through untouched.
@@ -40,6 +50,26 @@ export function grammarContentAsParsingBlock(content: Record<string, unknown>): 
     }
     if (Object.keys(delimited).length > 0) block['delimited'] = delimited;
     return block;
+}
+
+/** Sub-block roots that are a parser other than DSV — a `delimited:` reading of one is a fiction. */
+const NON_DELIMITED_ROOTS = ['fixedwidth', 'json', 'text_regex', 'plugin'];
+
+/**
+ * What this Grammar is, when it is **not** plain delimited — a root sub-block name (`plugin`,
+ * `fixedwidth`, …) or the declared frontend; `null` for a genuine DSV component.
+ *
+ * ⚠ Every DSV-only surface needs this: reading a top-level `delimiter` off an `asn1`/`json`/`xlsx`
+ * component yields the DEFAULT `,` and reports it as comma-delimited, which is not a display quirk —
+ * a form that then SAVES that reading replaces the stored parser (`PUT /components` is a replace).
+ */
+export function nonDelimitedGrammar(content: Record<string, unknown>): string | null {
+    const block = grammarContentAsParsingBlock(content);
+    const root = NON_DELIMITED_ROOTS.find((r) => block[r] !== null && typeof block[r] === 'object');
+    if (root) return root;
+    if (block['segments'] !== undefined) return 'segments';
+    if (grammarSeedsFrontend(content, 'delimited')) return null;
+    return String(content['frontend'] ?? content['parser_type']);
 }
 
 /** Every spelling that names each per-format frontend a node type can be locked to. */

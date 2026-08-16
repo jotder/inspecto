@@ -11,6 +11,7 @@ import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ComponentHistoryDialog } from 'app/inspecto/components/component-history.dialog';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
+import { grammarContentAsParsingBlock, nonDelimitedGrammar } from 'app/inspecto/grammar';
 import { ComponentFormDialog, ComponentFormResult } from './component-form.dialog';
 import { MappingEditorDialog } from './mapping-editor.dialog';
 import { SchemaEditorDialog } from './schema-editor.dialog';
@@ -73,8 +74,16 @@ export class ComponentsComponent implements OnInit {
     summary(def: ComponentDef): string {
         const c = def.content ?? {};
         switch (def.type) {
-            case 'grammar':
-                return `delimiter ${disp(c['delimiter'], ',')}${c['has_header'] ? ', header' : ''}`;
+            case 'grammar': {
+                // Not every Grammar is DSV. A top-level `delimiter` read reports the DEFAULT `,` for an
+                // asn1/json/xlsx component that has no delimiter at all — seven of the nine seeded
+                // grammars said "delimiter ," before this. Name the parser instead, and read the csv
+                // settings through the normaliser so a nested `delimited:` block is not missed either.
+                const kind = nonDelimitedGrammar(c);
+                if (kind) return kind;
+                const d = (grammarContentAsParsingBlock(c)['delimited'] ?? {}) as Record<string, unknown>;
+                return `delimiter ${disp(d['delimiter'], ',')}${d['has_header'] ? ', header' : ''}`;
+            }
             case 'schema': {
                 const fields = ((c['raw'] as Record<string, unknown>)?.['fields'] as unknown[]) ?? [];
                 return `${fields.length} field${fields.length === 1 ? '' : 's'}`;

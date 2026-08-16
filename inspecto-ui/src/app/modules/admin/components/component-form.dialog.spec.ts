@@ -25,6 +25,7 @@ function create(kind: ComponentDef['type'] = 'grammar') {
     // retired (W1) so nothing renders it now, but the stubs stay: cheaper than proving absence, and this
     // spec is about the dialog — the surface has its own specs.
     localStorage.removeItem('inspecto.currentLens');
+    TestBed.resetTestingModule(); // some cases build a second dialog to compare two stored shapes
     TestBed.configureTestingModule({
         imports: [ComponentFormDialog],
         providers: [
@@ -177,5 +178,95 @@ describe('ComponentFormDialog', () => {
     // because every use would answer "no structural spec for kind".
     it('offers no AI drafting on a kind component_draft cannot validate', () => {
         expect(create('grammar').fixture.nativeElement.querySelector('inspecto-ai-assist')).toBeNull();
+    });
+
+    // A Grammar component has TWO stored shapes (grammar-block.ts): the legacy flat csv map, and the
+    // nested `parsing:` block a Parse drawer writes. This form authors delimited settings only, and
+    // `PUT /components` REPLACES content (the server carries over just owner/shares), so reading the
+    // wrong shape here does not merely mis-display — it destroys the stored parser on Save.
+    describe('grammar content shapes (A9)', () => {
+        function grammarDialog(content: Record<string, unknown>) {
+            const ref = { close: vi.fn() };
+            const api = { create: vi.fn(() => of(SAVED)), update: vi.fn(() => of(SAVED)) };
+            const def: ComponentDef = { type: 'grammar', name: 'vendor-x', ref: 'grammar:vendor-x', content };
+            TestBed.resetTestingModule();
+            TestBed.configureTestingModule({
+                imports: [ComponentFormDialog],
+                providers: [
+                    provideNoopAnimations(),
+                    { provide: MAT_DIALOG_DATA, useValue: { kind: 'grammar', def } },
+                    { provide: MatDialogRef, useValue: ref },
+                    { provide: ComponentsService, useValue: api },
+                    { provide: ToastrService, useValue: { success: () => undefined, error: () => undefined } },
+                ],
+            });
+            const fixture = TestBed.createComponent(ComponentFormDialog);
+            fixture.detectChanges();
+            return { fixture, c: fixture.componentInstance, api };
+        }
+
+        it('seeds from a nested delimited block instead of showing DSV defaults', () => {
+            const { c } = grammarDialog({ frontend: 'delimited', delimited: { delimiter: '|', has_header: true } });
+            expect(c.form.getRawValue().delimiter).toBe('|');
+            expect(c.form.getRawValue().hasHeader).toBe(true);
+        });
+
+        it('saves a nested component back nested, keeping the keys it cannot author', () => {
+            const { c, api } = grammarDialog({
+                frontend: 'delimited',
+                delimited: { delimiter: '|', has_header: true, null_strings: ['\\N'] },
+            });
+            c.form.patchValue({ delimiter: ';' });
+            c.submit();
+            expect(api.update).toHaveBeenCalledWith('grammar', 'vendor-x', {
+                frontend: 'delimited',
+                delimited: { delimiter: ';', has_header: true, null_strings: ['\\N'] },
+            });
+        });
+
+        it('saves a legacy flat component back flat — an edit here is not a migration', () => {
+            const { c, api } = grammarDialog({ delimiter: '|', has_header: true, null_strings: ['\\N'] });
+            c.form.patchValue({ delimiter: ';' });
+            c.submit();
+            expect(api.update).toHaveBeenCalledWith('grammar', 'vendor-x', {
+                delimiter: ';',
+                has_header: true,
+                null_strings: ['\\N'],
+            });
+        });
+
+        it('removes an optional key the operator cleared', () => {
+            const { c, api } = grammarDialog({ delimiter: ',', has_header: false, quote: '"' });
+            expect(c.form.getRawValue().quote).toBe('"');
+            c.form.patchValue({ quote: '' });
+            c.submit();
+            expect(api.update).toHaveBeenCalledWith('grammar', 'vendor-x', { delimiter: ',', has_header: false });
+        });
+
+        it('refuses a plugin Grammar rather than replacing it with DSV settings', () => {
+            const { c, api, fixture } = grammarDialog({
+                frontend: 'plugin',
+                plugin: { ingesterClass: 'com.gamma.Asn1RecordIngester', segments: { cdr: 'x_cdr.toon' } },
+            });
+            expect(c.grammarUnauthorable()).toBe('plugin');
+            c.submit();
+            expect(api.update).not.toHaveBeenCalled();
+
+            const text = fixture.nativeElement.textContent as string;
+            expect(text).toContain('cannot author');
+            const save = fixture.nativeElement.querySelector('button[type="submit"]') as HTMLButtonElement;
+            expect(save.disabled).toBe(true);
+        });
+
+        it('refuses a Grammar whose frontend is not delimited', () => {
+            expect(grammarDialog({ frontend: 'fixedwidth' }).c.grammarUnauthorable()).toBe('fixedwidth');
+            expect(grammarDialog({ fixedwidth: { columns: [] } }).c.grammarUnauthorable()).toBe('fixedwidth');
+            expect(grammarDialog({ parser_type: 'asn1' }).c.grammarUnauthorable()).toBe('asn1');
+        });
+
+        it('still treats an undeclared legacy component as authorable delimited', () => {
+            expect(grammarDialog({ delimiter: ',', has_header: true }).c.grammarUnauthorable()).toBeNull();
+            expect(create('grammar').c.grammarUnauthorable()).toBeNull();
+        });
     });
 });

@@ -186,7 +186,8 @@ editor migrates it to an independent inline copy on save**. Rationale and slices
 
 🔴 **A Grammar component has TWO shapes, and reading one wrong loses data silently.** It is either the
 **legacy flat** `csv_settings`-style map (`{delimiter, has_header, …}` at top level — every
-pre-2026-08-04 component, and everything the Components registry form still writes) or an
+pre-2026-08-04 component, and what the Components registry form writes for a component already stored
+that way) or an
 **extracted `parsing:` block** (`{frontend, delimited: {…}}`). The editor seeds its property sheet by
 flattening the block to `delimited__*` keys, so feeding it a flat component matches **no spec key** and
 the form falls back to its **declared defaults** — a component storing `delimiter: "|"` displayed, and
@@ -202,6 +203,30 @@ Undeclared means the legacy flat shape, and delimited is the engine's implicit d
 component to a fixed-width node would seed a slice table from a `{delimiter: '|'}` map, inventing a
 Grammar nobody wrote. Each frontend's accepted spellings live in `FRONTEND_ALIASES` (delimited also
 answers to `csv`/`dsv`; fixed width to `fixedwidth`/`fixed_width`).
+
+🔴 **The same misread was live on the Components registry page until 2026-08-17, and there it DESTROYED
+the component.** `component-form.dialog.ts` seeded from raw top-level keys and its `buildContent()`
+returned a fresh six-key literal that never spread the stored content; `PUT /components` is a **replace**
+(`ComponentAccess.onUpdate` starts from the incoming map and carries over only `owner`/`shares`), so
+opening an `asn1`/`json`/`xlsx`/plugin Grammar and pressing Save wrote `{delimiter: ',', has_header:
+false}` over it. Three rules came out of the fix, and they generalise to any partial editor of a
+`.toon`-backed component:
+
+1. **Seed through the normaliser, never off raw content** — same rule as the drawer, now enforced on both
+   surfaces.
+2. **Write back in the shape it was stored in.** An edit is not a migration: nested stays nested, flat
+   stays flat, keys the form does not own are re-emitted, and a *cleared* field removes its key rather
+   than leaving a stale one. A form that owns six keys must not emit a six-key document.
+3. **Refuse what you cannot express.** A non-DSV Grammar now shows a banner naming the parser and
+   disables Save, pointing at the pipeline's Parse step — the same call `grammar-editor.dialog.ts`
+   already made with `pluginBlocked`, rather than half-authoring a config the engine would reject.
+
+⚠ **The list had the bug too, and only the running preview showed it**: the registry's `summary()` read a
+top-level `delimiter`, so **seven of the nine seeded grammars advertised "delimiter ,"** when none of them
+has a delimiter. Both surfaces now call **`nonDelimitedGrammar(content)`** (`grammar-block.ts`), which
+returns the parser's name (`plugin`, `fixedwidth`, the declared frontend, …) or `null` for genuine DSV.
+Put a new shape-question there rather than re-deriving it — that file states its own charter as the one
+place that knows a Grammar has two shapes, and every duplicate of that knowledge so far has been a bug.
 
 A Grammar component can itself be either shape now: the legacy **flat** `csv_settings`-style map
 (`{delimiter, has_header, ...}` at top level — how every pre-2026-08-04 component was written), or an

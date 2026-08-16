@@ -30,6 +30,7 @@ import {
     SinkPreview,
 } from 'app/inspecto/api';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
+import { grammarContentAsParsingBlock, isNestedGrammarContent, nonDelimitedGrammar } from 'app/inspecto/grammar';
 
 /** Dialog data: `def` set ⇒ edit mode (id locked, Test available); absent ⇒ create. */
 interface ComponentFormData {
@@ -121,6 +122,20 @@ export class ComponentFormDialog {
     /** Original `partitions:` entries by chip label — a `{column, source}` map survives an untouched save. */
     private readonly sinkPartitionEntries = new Map<string, unknown>();
 
+    /**
+     * The stored grammar content read as a `parsing:` block. Kept whole so a save re-emits the keys
+     * this form cannot author (`frontend`, `null_strings`, …) instead of replacing the component with
+     * its six DSV fields — `PUT /components` is a REPLACE, and the server's "merge" carries over only
+     * `owner`/`shares` (`ComponentAccess.onUpdate`), so anything dropped here is gone from the file.
+     */
+    private grammarBlock: Record<string, unknown> = {};
+
+    /** Whether to write the settings back under `delimited:` — a stored shape must not change on save. */
+    private grammarNested = false;
+
+    /** Set when the stored grammar is one this DSV form cannot express; names it, and blocks Save. */
+    readonly grammarUnauthorable = signal<string | null>(null);
+
     readonly title = computed(() => `${this.isEdit ? 'Edit' : 'New'} ${this.kind}`);
     readonly partitionSeparatorKeys = [ENTER, COMMA];
 
@@ -151,13 +166,23 @@ export class ComponentFormDialog {
         if (this.data.def) this.form.patchValue({ id: this.data.def.name });
 
         if (this.kind === 'grammar') {
+            // Seed through the normaliser, never off raw content: a component written by a Parse drawer
+            // keeps its csv settings under `delimited:`, and reading top-level keys would show DEFAULTS
+            // for a stored `|` — the exact trap grammar-block.ts's "Load-bearing" note describes.
+            const content = c as Record<string, unknown>;
+            this.grammarBlock = grammarContentAsParsingBlock(content);
+            this.grammarNested = isNestedGrammarContent(content);
+            // This form has six delimited inputs and nothing else, so a non-DSV Grammar must be REFUSED
+            // rather than opened showing defaults — the Parse drawer makes the same call for plugins.
+            this.grammarUnauthorable.set(nonDelimitedGrammar(content));
+            const d = obj(this.grammarBlock['delimited']);
             this.form.patchValue({
-                delimiter: str(c['delimiter'], ','),
-                hasHeader: c['has_header'] === true || c['has_header'] === 'true',
-                skipHeaderLines: num(c['skip_header_lines'], 0),
-                quote: str(c['quote'], ''),
-                escape: str(c['escape'], ''),
-                encoding: str(c['encoding'], ''),
+                delimiter: str(d['delimiter'], ','),
+                hasHeader: d['has_header'] === true || d['has_header'] === 'true',
+                skipHeaderLines: num(d['skip_header_lines'], 0),
+                quote: str(d['quote'], ''),
+                escape: str(d['escape'], ''),
+                encoding: str(this.grammarBlock['encoding'], ''),
             });
         } else if (this.kind === 'transform') {
             const { type, ...rest } = c as { type?: string };
@@ -210,15 +235,22 @@ export class ComponentFormDialog {
         const v = this.form.getRawValue();
         switch (this.kind) {
             case 'grammar': {
-                const out: Record<string, unknown> = {
-                    delimiter: v.delimiter || ',',
-                    has_header: !!v.hasHeader,
-                };
-                if (Number(v.skipHeaderLines) > 0) out['skip_header_lines'] = Number(v.skipHeaderLines);
-                if (v.quote) out['quote'] = v.quote;
-                if (v.escape) out['escape'] = v.escape;
-                if (v.encoding) out['encoding'] = v.encoding;
-                return out;
+                // Start from the STORED block, not an empty literal: the six inputs below are the only
+                // keys this form owns, and a PUT replaces the file wholesale.
+                const block = { ...this.grammarBlock };
+                const delimited = obj(block['delimited']);
+                delimited['delimiter'] = v.delimiter || ',';
+                delimited['has_header'] = !!v.hasHeader;
+                const skip = Number(v.skipHeaderLines);
+                setOrDelete(delimited, 'skip_header_lines', skip > 0 ? skip : undefined);
+                setOrDelete(delimited, 'quote', v.quote || undefined);
+                setOrDelete(delimited, 'escape', v.escape || undefined);
+                setOrDelete(block, 'encoding', v.encoding || undefined);
+
+                // Write back in the shape it was stored in — an edit here is not a migration.
+                if (this.grammarNested) return { ...block, delimited };
+                delete block['delimited'];
+                return { ...block, ...delimited };
             }
             case 'transform': {
                 // form.invalid already blocks submit() when config isn't valid JSON (jsonValidator).
@@ -240,6 +272,7 @@ export class ComponentFormDialog {
     }
 
     submit(): void {
+        if (this.grammarUnauthorable()) return;
         if (this.form.invalid) {
             this.form.markAllAsTouched();
             return;
@@ -333,6 +366,15 @@ function str(v: unknown, dflt: string): string {
 function num(v: unknown, dflt: number): number {
     const n = Number(v);
     return Number.isFinite(n) ? n : dflt;
+}
+/** An optional key: write it, or REMOVE it when the operator clears the field. */
+function setOrDelete(target: Record<string, unknown>, key: string, value: unknown): void {
+    if (value === undefined) delete target[key];
+    else target[key] = value;
+}
+/** A `.toon` sub-block read as a map — `{}` for anything that is not one. */
+function obj(v: unknown): Record<string, unknown> {
+    return v !== null && typeof v === 'object' && !Array.isArray(v) ? { ...(v as Record<string, unknown>) } : {};
 }
 /** The chip label for a `partitions:` entry — a bare column name, or the `column` of a `{column, source}` map. */
 function partitionLabel(p: unknown): string {

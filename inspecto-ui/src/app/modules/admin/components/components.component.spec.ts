@@ -51,6 +51,19 @@ describe('ComponentsComponent', () => {
         ).toContain('sink.view');
     });
 
+    // Not every Grammar is DSV. Reading a top-level `delimiter` gave the DEFAULT `,` for the seeded
+    // asn1/json/xlsx components, so the list asserted a delimiter none of them has.
+    it('names a non-delimited Grammar instead of inventing a delimiter', () => {
+        const c = create({}).componentInstance;
+        const grammar = (content: Record<string, unknown>) =>
+            c.summary({ type: 'grammar' as const, name: 'g', ref: 'grammar/g', content });
+        expect(grammar({ parser_type: 'asn1', encoding_rules: 'BER' })).toBe('asn1');
+        expect(grammar({ plugin: { ingesterClass: 'com.gamma.X' } })).toBe('plugin');
+        expect(grammar({ delimiter: '|', has_header: true })).toBe('delimiter |, header');
+        // …and a nested block reads through the normaliser rather than missing the settings entirely.
+        expect(grammar({ frontend: 'delimited', delimited: { delimiter: ';' } })).toBe('delimiter ;');
+    });
+
     it('renders an accessible empty state when there are no components', async () => {
         const fixture = create({});
         await expectNoA11yViolations(fixture.nativeElement);
