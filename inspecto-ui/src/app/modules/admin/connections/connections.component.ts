@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewEncapsulation, inject, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -37,7 +37,7 @@ import { ConnectionFormDialog, ConnectionFormResult } from 'app/inspecto/connect
         StatusBadgeComponent,
     ],
     templateUrl: './connections.component.html',
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,
 })
 export class ConnectionsComponent implements OnInit {
@@ -48,29 +48,29 @@ export class ConnectionsComponent implements OnInit {
     /** Business lens = read-only across the Workbench (Wave-1 interview decision) — hides authoring. */
     protected lens = inject(LensService);
 
-    connections: ConnectionProfile[] = [];
-    loading = false;
+    readonly connections = signal<ConnectionProfile[]>([]);
+    readonly loading = signal(false);
     testing: Record<string, boolean> = {};
     results: Record<string, ConnectionTestResult> = {};
     /** Flipped true once a mutate (create/update/delete) returns 503 — hides the mutate actions. */
-    writesDisabled = false;
+    readonly writesDisabled = signal(false);
     /** Free-text filter over id / connector / host / database / base path / username / options. */
-    filterText = '';
+    readonly filterText = signal('');
 
     ngOnInit(): void {
         this.load();
     }
 
     load(): void {
-        this.loading = true;
+        this.loading.set(true);
         this.api.list().subscribe({
             next: (c) => {
-                this.connections = c;
-                this.loading = false;
+                this.connections.set(c);
+                this.loading.set(false);
             },
             error: () => {
-                this.connections = [];
-                this.loading = false;
+                this.connections.set([]);
+                this.loading.set(false);
                 this.toastr.warning('Could not load connections — is ControlApi running?');
             },
         });
@@ -114,14 +114,14 @@ export class ConnectionsComponent implements OnInit {
     }
 
     onFilter(ev: Event): void {
-        this.filterText = (ev.target as HTMLInputElement).value;
+        this.filterText.set((ev.target as HTMLInputElement).value);
     }
 
     /** Connections matching the current filter (all when the filter is blank). */
     get visibleConnections(): ConnectionProfile[] {
-        const q = this.filterText.trim().toLowerCase();
-        if (!q) return this.connections;
-        return this.connections.filter((c) => this.matchesFilter(c, q));
+        const q = this.filterText().trim().toLowerCase();
+        if (!q) return this.connections();
+        return this.connections().filter((c) => this.matchesFilter(c, q));
     }
 
     private matchesFilter(c: ConnectionProfile, q: string): boolean {
@@ -147,7 +147,7 @@ export class ConnectionsComponent implements OnInit {
     create(): void {
         this.dialog
             .open(ConnectionFormDialog, {
-                data: { existingIds: this.connections.map((c) => c.id) },
+                data: { existingIds: this.connections().map((c) => c.id) },
                 width: '720px',
                 maxHeight: '85vh',
             })
@@ -167,7 +167,7 @@ export class ConnectionsComponent implements OnInit {
     }
 
     private afterForm(r?: ConnectionFormResult): void {
-        if (r?.writesDisabled) this.writesDisabled = true;
+        if (r?.writesDisabled) this.writesDisabled.set(true);
         if (r?.saved) this.load();
     }
 
@@ -185,7 +185,7 @@ export class ConnectionsComponent implements OnInit {
                 this.load();
             },
             error: (e) => {
-                if (e?.status === 503) this.writesDisabled = true;
+                if (e?.status === 503) this.writesDisabled.set(true);
                 const msg =
                     e?.status === 503
                         ? 'Writes are disabled (no write root configured).'

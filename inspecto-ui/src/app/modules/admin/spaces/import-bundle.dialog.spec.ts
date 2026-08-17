@@ -46,7 +46,7 @@ describe('ImportBundleDialog', () => {
     it('blocks import until conflicts are acknowledged via overwrite', () => {
         const c = create({ spaceId: 'alpha' }).componentInstance;
         c.file = new File([], 'b.zip');
-        c.preview = PREVIEW; // valid but with a conflict
+        c.preview.set(PREVIEW); // valid but with a conflict
         expect(c.canImport()).toBe(false);
         c.overwrite.setValue(true);
         expect(c.canImport()).toBe(true);
@@ -55,7 +55,7 @@ describe('ImportBundleDialog', () => {
     it('blocks import when the preview is invalid', () => {
         const c = create({ spaceId: 'alpha' }).componentInstance;
         c.file = new File([], 'b.zip');
-        c.preview = { ...PREVIEW, conflicts: [], valid: false };
+        c.preview.set({ ...PREVIEW, conflicts: [], valid: false });
         expect(c.canImport()).toBe(false);
     });
 

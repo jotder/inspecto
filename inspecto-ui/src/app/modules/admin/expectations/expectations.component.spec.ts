@@ -64,7 +64,7 @@ async function create(
 describe('ExpectationsComponent', () => {
     it('lists expectations with no a11y violations', async () => {
         const { fixture } = await create();
-        expect(fixture.componentInstance.rows).toEqual([ROW]);
+        expect(fixture.componentInstance.rows()).toEqual([ROW]);
         await expectNoA11yViolations(fixture.nativeElement);
     });
 
@@ -86,7 +86,7 @@ describe('ExpectationsComponent', () => {
         const { fixture, toastr } = await create({ api: { evaluate: vi.fn(() => of(failed)) } });
         fixture.componentInstance.evaluate(ROW);
         expect(toastr.warning).toHaveBeenCalledWith(expect.stringContaining('an Incident was raised'));
-        expect(fixture.componentInstance.rows[0].lastResult?.status).toBe('FAILED');
+        expect(fixture.componentInstance.rows()[0].lastResult?.status).toBe('FAILED');
     });
 
     it('the sweep reports the failure count', async () => {

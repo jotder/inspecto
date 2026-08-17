@@ -9,13 +9,13 @@
             </div>
         </div>
         <div class="flex flex-wrap items-center gap-3">
-            @if (loading) {
+            @if (loading()) {
                 <mat-spinner diameter="24"></mat-spinner>
             }
-            <button mat-icon-button (click)="load()" [disabled]="loading" aria-label="Refresh">
+            <button mat-icon-button (click)="load()" [disabled]="loading()" aria-label="Refresh">
                 <mat-icon [svgIcon]="'heroicons_outline:arrow-path'"></mat-icon>
             </button>
-            @if (!writesDisabled && lens.canOnboardConnections()) {
+            @if (!writesDisabled() && lens.canOnboardConnections()) {
                 <button mat-flat-button color="primary" (click)="create()">
                     <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
                     <span class="ml-2">New connection</span>
@@ -32,19 +32,19 @@
         <input
             type="text"
             class="bg-card w-full rounded border border-gray-300 py-1.5 pl-8 pr-2 text-sm dark:border-gray-600"
-            placeholder="Filter connections…"
-            aria-label="Filter connections"
+            placeholder="Filter connections()…"
+            aria-label="Filter connections()"
             (input)="onFilter($event)"
         />
     </div>
 
-    @if (writesDisabled) {
+    @if (writesDisabled()) {
         <inspecto-alert class="mt-4 block" variant="warning" icon="heroicons_outline:lock-closed">
             Connection editing is disabled on this server (no write root configured). Listing and Test remain available.
         </inspecto-alert>
     }
 
-    @if (!loading && connections.length === 0) {
+    @if (!loading() && connections().length === 0) {
         <div class="text-secondary mt-8">
             No connection profiles loaded. Author a <code>*_connection.toon</code> next to your pipeline configs — a
             <code>connection</code> block with <code>id</code>, <code>connector</code>, <code>host</code>,
@@ -86,7 +86,7 @@
                         >
                             <mat-icon class="icon-size-5" svgIcon="heroicons_outline:beaker"></mat-icon>
                         </button>
-                        @if (!writesDisabled && lens.canOnboardConnections()) {
+                        @if (!writesDisabled() && lens.canOnboardConnections()) {
                             <button mat-icon-button (click)="edit(c)" matTooltip="Edit" aria-label="Edit">
                                 <mat-icon class="icon-size-5" svgIcon="heroicons_outline:pencil-square"></mat-icon>
                             </button>
@@ -143,7 +143,7 @@
         }
     </div>
 
-    @if (connections.length && visibleConnections.length === 0) {
-        <div class="text-secondary mt-8">No connections match “{{ filterText }}”.</div>
+    @if (connections().length && visibleConnections.length === 0) {
+        <div class="text-secondary mt-8">No connections match “{{ filterText() }}”.</div>
     }
 </div>

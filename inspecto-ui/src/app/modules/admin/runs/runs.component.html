@@ -16,7 +16,7 @@
                     <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
                 </button>
                 @if (lens.canOperateRuns()) {
-                    <button mat-flat-button color="primary" [disabled]="loading" (click)="runAll()">
+                    <button mat-flat-button color="primary" [disabled]="loading()" (click)="runAll()">
                         <mat-icon svgIcon="heroicons_outline:play"></mat-icon>
                         <span class="ml-2">Run all</span>
                     </button>
@@ -30,13 +30,13 @@
                 tier="standard"
                 sourceName="pipelines"
                 exportName="pipelines"
-                stateKey="runs"
-                [rows]="runs"
+                stateKey="runs()"
+                [rows]="runs()"
                 [columns]="columnDefs"
                 [rowActions]="rowActions"
-                [loading]="loading"
+                [loading]="loading()"
                 [autoHeight]="true"
-                noRowsTitle="No ingest runs configured"
+                noRowsTitle="No ingest runs() configured"
                 noRowsHint="Runs are defined by *_pipeline.toon configs on the server."
             />
         </div>
@@ -45,7 +45,7 @@
     <!-- Right: run detail as a resizable side panel (R5, the object-mail pattern) -->
     @if (detailName(); as name) {
         <div
-            inspectoSplit="runs.detail"
+            inspectoSplit="runs().detail"
             #detailSplit="inspectoSplit"
             pane="right"
             [min]="380"

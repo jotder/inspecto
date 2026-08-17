@@ -56,7 +56,7 @@ describe('RunsComponent', () => {
 
     it('loads runs on init', () => {
         const c = create().componentInstance;
-        expect(c.runs).toEqual([RUN]);
+        expect(c.runs()).toEqual([RUN]);
     });
 
     it('shows Run all and all row actions in the default (Builder) lens', () => {
@@ -103,7 +103,7 @@ describe('RunsComponent', () => {
         fixture.detectChanges();
         expect(c.detailName()).toBe('cdr_ingest');
         expect(el.querySelector('app-run-detail')).toBeTruthy();
-        expect(c.runs).toEqual([RUN]); // the list survives the detail opening
+        expect(c.runs()).toEqual([RUN]); // the list survives the detail opening
 
         params.next(convertToParamMap({})); // back to /runs
         fixture.detectChanges();

@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, ViewEncapsulation, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -28,7 +28,7 @@ interface MetricCard {
     standalone: true,
     imports: [MatButtonModule, MatIconModule, MatTooltipModule, DataTableComponent],
     templateUrl: './processing-status.component.html',
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,
 })
 export class ProcessingStatusComponent implements OnInit {
@@ -36,9 +36,9 @@ export class ProcessingStatusComponent implements OnInit {
     private router = inject(Router);
     private dialog = inject(MatDialog);
 
-    loading = false;
-    report: StatusReport | null = null;
-    cards: MetricCard[] = [];
+    readonly loading = signal(false);
+    readonly report = signal<StatusReport | null>(null);
+    readonly cards = signal<MetricCard[]>([]);
 
     readonly columnDefs: ColDef<RunStatus>[] = [
         { field: 'pipeline', headerName: 'Pipeline', flex: 1 },
@@ -97,11 +97,11 @@ export class ProcessingStatusComponent implements OnInit {
     }
 
     load(): void {
-        this.loading = true;
+        this.loading.set(true);
         this.api.status().subscribe({
             next: (r) => {
-                this.report = r;
-                this.cards = [
+                this.report.set(r);
+                this.cards.set([
                     { label: 'Pipelines', value: String(r.pipelineCount) },
                     { label: 'Paused', value: String(r.pausedCount) },
                     {
@@ -109,13 +109,13 @@ export class ProcessingStatusComponent implements OnInit {
                         value: r.totalCommittedBatches.toLocaleString(),
                     },
                     { label: 'Quarantine files', value: String(r.totalQuarantineFiles) },
-                ];
-                this.loading = false;
+                ]);
+                this.loading.set(false);
             },
             error: () => {
-                this.report = null;
-                this.cards = [];
-                this.loading = false;
+                this.report.set(null);
+                this.cards.set([]);
+                this.loading.set(false);
             },
         });
     }

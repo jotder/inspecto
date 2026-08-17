@@ -1,16 +1,17 @@
 import {
     AfterViewInit,
+    ChangeDetectionStrategy,
     Component,
     DestroyRef,
     ElementRef,
     EventEmitter,
+    inject,
     Input,
     OnChanges,
     OnDestroy,
     Output,
+    signal,
     ViewChild,
-    inject,
-    ChangeDetectionStrategy,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { GammaConfigService } from '@gamma/services/config';
@@ -191,7 +192,7 @@ const esc = (s: unknown): string => String(s ?? '').replace(/[&<>"']/g, (c) => `
     template: '<div #host class="h-full w-full"></div>',
     // Default: viewport-dynamic height for scrolling pages. `fill` mode instead grows into the
     // remaining space of a flex-column studio (Link Analysis); autoFit:'view' scales the graph.
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     host: {
         '[class]': `fill ? 'block w-full min-h-0 flex-auto' : 'block w-full min-h-96 h-[62vh]'`,
     },

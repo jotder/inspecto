@@ -55,7 +55,7 @@ import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component'
         RunDetailComponent,
     ],
     templateUrl: './runs.component.html',
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,
 })
 export class RunsComponent implements OnInit {
@@ -69,8 +69,8 @@ export class RunsComponent implements OnInit {
     /** Business lens = read-only observe on Runs (plan §1) — hides trigger/pause/reprocess. */
     protected lens = inject(LensService);
 
-    runs: RunView[] = [];
-    loading = false;
+    readonly runs = signal<RunView[]>([]);
+    readonly loading = signal(false);
     autoRefresh = true;
     private dialogOpen = false;
 
@@ -129,14 +129,14 @@ export class RunsComponent implements OnInit {
     }
 
     load(): void {
-        this.loading = true;
+        this.loading.set(true);
         this.api.list().subscribe({
             next: (p) => {
-                this.runs = p;
-                this.loading = false;
+                this.runs.set(p);
+                this.loading.set(false);
             },
             error: (e) => {
-                this.loading = false;
+                this.loading.set(false);
                 this.toastr.error(apiErrorMessage(e, 'Failed to load runs'));
             },
         });
@@ -158,7 +158,7 @@ export class RunsComponent implements OnInit {
     async runAll(): Promise<void> {
         if (!this.lens.canOperateRuns()) return; // Business lens: read-only observe
         if (!(await this.confirm.confirm('Trigger all runs now?', 'Run all'))) return;
-        this.loading = true;
+        this.loading.set(true);
         this.api.runAll().subscribe({
             next: (res) => {
                 const total = Object.values(res).reduce((s, r) => s + (r.total || 0), 0);
@@ -168,7 +168,7 @@ export class RunsComponent implements OnInit {
                 this.load();
             },
             error: (e) => {
-                this.loading = false;
+                this.loading.set(false);
                 this.toastr.error(apiErrorMessage(e, 'Run all failed'));
             },
         });
@@ -182,7 +182,7 @@ export class RunsComponent implements OnInit {
         // Optimistic: flip the local paused state now (snappy toggle, no refetch); the call selection
         // is based on the pre-flip value, and we roll back + toast only on failure.
         const call = wasPaused ? this.api.resume(p.name) : this.api.pause(p.name);
-        const render = () => (this.runs = [...this.runs]); // new ref so the grid re-renders
+        const render = () => this.runs.set([...this.runs()]); // new ref so the grid re-renders
         optimisticMutate({
             apply: () => {
                 p.paused = !wasPaused;

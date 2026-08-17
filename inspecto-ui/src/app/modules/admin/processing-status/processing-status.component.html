@@ -18,9 +18,9 @@
 
     <!-- Main -->
     <div class="flex flex-auto flex-col p-6 sm:p-10">
-        @if (cards.length) {
+        @if (cards().length) {
             <div class="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-                @for (c of cards; track c.label) {
+                @for (c of cards(); track c.label) {
                     <div class="bg-card flex flex-col rounded-2xl p-4 shadow">
                         <div class="text-secondary text-sm">{{ c.label }}</div>
                         <div class="mt-1 text-2xl font-extrabold tracking-tight">{{ c.value }}</div>
@@ -34,11 +34,11 @@
             tier="standard"
             sourceName="processing-status"
             exportName="processing-status"
-            [rows]="report?.pipelines ?? []"
+            [rows]="report()?.pipelines ?? []"
             [columns]="columnDefs"
             [rowActions]="rowActions"
             [pinActions]="true"
-            [loading]="loading"
+            [loading]="loading()"
             noRowsTitle="No pipelines found"
             noRowsHint="No pipeline status is available yet."
         />

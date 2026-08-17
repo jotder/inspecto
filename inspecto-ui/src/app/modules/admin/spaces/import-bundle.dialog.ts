@@ -1,4 +1,4 @@
-import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { AbstractControl, FormControl, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -48,7 +48,7 @@ export interface ImportBundleData {
         MatProgressSpinnerModule,
         StatusBadgeComponent,
     ],
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>
             {{ isImport ? 'Import bundle into "' + data.spaceId + '"' : 'Create space from bundle' }}
@@ -85,7 +85,7 @@ export interface ImportBundleData {
                 />
             </div>
 
-            @if (previewing) {
+            @if (previewing()) {
                 <div class="flex items-center gap-2">
                     <mat-spinner diameter="20"></mat-spinner>
                     <span>Analysing bundle…</span>
@@ -93,7 +93,7 @@ export interface ImportBundleData {
             }
 
             <!-- Preview (import-into-existing only) -->
-            @if (preview; as p) {
+            @if (preview(); as p) {
                 <div class="space-y-3 rounded-lg border p-3">
                     <div class="flex flex-wrap items-center gap-2">
                         <inspecto-status-badge
@@ -158,7 +158,7 @@ export interface ImportBundleData {
             }
         </mat-dialog-content>
         <mat-dialog-actions align="end">
-            <button type="button" mat-button mat-dialog-close [disabled]="busy">Cancel</button>
+            <button type="button" mat-button mat-dialog-close [disabled]="busy()">Cancel</button>
             @if (isImport) {
                 <button type="button" mat-flat-button color="primary" [disabled]="!canImport()" (click)="doImport()">
                     Import
@@ -168,7 +168,7 @@ export interface ImportBundleData {
                     type="button"
                     mat-flat-button
                     color="primary"
-                    [disabled]="!file || newId.invalid || busy"
+                    [disabled]="!file || newId.invalid || busy()"
                     (click)="doCreate()"
                 >
                     Create
@@ -195,28 +195,28 @@ export class ImportBundleDialog {
     readonly overwrite = new FormControl(false, { nonNullable: true });
 
     file: File | null = null;
-    preview: ImportPreview | null = null;
-    previewing = false;
-    busy = false;
+    readonly preview = signal<ImportPreview | null>(null);
+    readonly previewing = signal(false);
+    readonly busy = signal(false);
 
     onFile(e: Event): void {
         const input = e.target as HTMLInputElement;
         this.file = input.files?.[0] ?? null;
-        this.preview = null;
+        this.preview.set(null);
         this.overwrite.setValue(false);
         if (this.file && this.isImport) this.runPreview();
     }
 
     private runPreview(): void {
-        this.previewing = true;
+        this.previewing.set(true);
         this.api.importPreview(this.data.spaceId!, this.file!).subscribe({
             next: (p) => {
-                this.previewing = false;
-                this.preview = p;
+                this.previewing.set(false);
+                this.preview.set(p);
                 if (!p.valid) this.toastr.warning('Bundle has validation errors — see findings.');
             },
             error: (err) => {
-                this.previewing = false;
+                this.previewing.set(false);
                 this.toastr.error(apiErrorMessage(err, 'Could not analyse the bundle.'));
             },
         });
@@ -224,23 +224,23 @@ export class ImportBundleDialog {
 
     /** Import is allowed once a valid preview exists, and conflicts (if any) are acknowledged. */
     canImport(): boolean {
-        if (this.busy || !this.file || !this.preview) return false;
-        if (!this.preview.valid) return false;
-        if (this.preview.conflicts.length && !this.overwrite.value) return false;
+        if (this.busy() || !this.file || !this.preview()) return false;
+        if (!this.preview().valid) return false;
+        if (this.preview().conflicts.length && !this.overwrite.value) return false;
         return true;
     }
 
     doImport(): void {
         if (!this.canImport()) return;
-        this.busy = true;
+        this.busy.set(true);
         this.api.importBundle(this.data.spaceId!, this.file!, this.overwrite.value).subscribe({
             next: (r) => {
-                this.busy = false;
+                this.busy.set(false);
                 this.toastr.success(`Imported ${r.imported.length} data source(s) into "${this.data.spaceId}"`);
                 this.ref.close(true);
             },
             error: (err) => {
-                this.busy = false;
+                this.busy.set(false);
                 const msg =
                     err?.status === 409
                         ? `Conflicts: ${(err.error?.conflicts ?? []).join(', ')} — enable overwrite.`
@@ -255,15 +255,15 @@ export class ImportBundleDialog {
             this.newId.markAsTouched();
             return;
         }
-        this.busy = true;
+        this.busy.set(true);
         this.api.createFromBundle(this.newId.value, this.file).subscribe({
             next: (space) => {
-                this.busy = false;
+                this.busy.set(false);
                 this.toastr.success(`Space "${space.id}" created from bundle`);
                 this.ref.close(true);
             },
             error: (err) => {
-                this.busy = false;
+                this.busy.set(false);
                 const msg =
                     err?.status === 409
                         ? `A space "${this.newId.value}" already exists.`

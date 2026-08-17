@@ -60,8 +60,8 @@ describe('ProcessingStatusComponent', () => {
         const fixture = create();
         fixture.detectChanges();
         const c = fixture.componentInstance;
-        expect(c.report?.pipelines).toHaveLength(2);
-        expect(c.cards.map((x) => x.value)).toEqual(['2', '1', '351', '2']);
+        expect(c.report()?.pipelines).toHaveLength(2);
+        expect(c.cards().map((x) => x.value)).toEqual(['2', '1', '351', '2']);
     });
 
     it('asks "what happened" for the row\'s own pipeline, over the windowed path', () => {

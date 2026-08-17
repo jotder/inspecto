@@ -102,7 +102,7 @@ const SINK_FORMATS = ['parquet', 'csv', 'json', 'avro'];
         StatusBadgeComponent,
         InspectoAlertComponent,
     ],
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     templateUrl: './component-form.dialog.html',
 })
 export class ComponentFormDialog {
@@ -122,7 +122,7 @@ export class ComponentFormDialog {
     readonly sinkKinds = SINK_KINDS;
     readonly sinkFormats = SINK_FORMATS;
 
-    saving = false;
+    readonly saving = signal(false);
     readonly testing = signal(false);
     readonly grammarResult = signal<GrammarPreview | null>(null);
     readonly relationsResult = signal<RelationsPreview | null>(null);
@@ -310,18 +310,18 @@ export class ComponentFormDialog {
         const content = this.buildContent();
         if (!content) return;
         const id = this.form.getRawValue().id as string;
-        this.saving = true;
+        this.saving.set(true);
         const req$ = this.isEdit
             ? this.api.update(this.kind, id, content)
             : this.api.create(this.kind, { id, ...content });
         req$.subscribe({
             next: (saved) => {
-                this.saving = false;
+                this.saving.set(false);
                 this.toastr.success(`${this.kind} "${id}" ${this.isEdit ? 'updated' : 'created'}`);
                 this.ref.close({ saved });
             },
             error: (e) => {
-                this.saving = false;
+                this.saving.set(false);
                 const msg =
                     e?.status === 503
                         ? 'Writes are disabled (no write root configured).'

@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, ViewEncapsulation, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -44,7 +44,7 @@ const KIND_LABELS: Record<string, string> = {
         InspectoEmptyStateComponent,
     ],
     templateUrl: './expectations.component.html',
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,
 })
 export class ExpectationsComponent implements OnInit {
@@ -54,9 +54,9 @@ export class ExpectationsComponent implements OnInit {
     private toastr = inject(ToastrService);
     protected lens = inject(LensService);
 
-    rows: Expectation[] = [];
-    loading = false;
-    sweeping = false;
+    readonly rows = signal<Expectation[]>([]);
+    readonly loading = signal(false);
+    readonly sweeping = signal(false);
 
     readonly columnDefs: ColDef<Expectation>[] = [
         { field: 'name', headerName: 'Expectation', flex: 1, minWidth: 180 },
@@ -152,14 +152,14 @@ export class ExpectationsComponent implements OnInit {
     }
 
     load(): void {
-        this.loading = true;
+        this.loading.set(true);
         this.api.list().subscribe({
             next: (rows) => {
-                this.rows = rows;
-                this.loading = false;
+                this.rows.set(rows);
+                this.loading.set(false);
             },
             error: (e) => {
-                this.loading = false;
+                this.loading.set(false);
                 this.toastr.warning(apiErrorMessage(e, 'Could not load expectations.'));
             },
         });
@@ -167,7 +167,7 @@ export class ExpectationsComponent implements OnInit {
 
     newExpectation(): void {
         const data: ExpectationFormData = {
-            existingNames: this.rows.map((r) => r.name),
+            existingNames: this.rows().map((r) => r.name),
         };
         this.dialog
             .open(ExpectationFormDialog, { data, width: '640px', maxHeight: '88vh' })
@@ -212,17 +212,17 @@ export class ExpectationsComponent implements OnInit {
 
     /** Sweep every enabled check (like the Alerts manual sweep). */
     evaluateAll(): void {
-        this.sweeping = true;
+        this.sweeping.set(true);
         this.api.evaluateAll().subscribe({
             next: (rows) => {
-                this.rows = rows;
-                this.sweeping = false;
+                this.rows.set(rows);
+                this.sweeping.set(false);
                 const failed = rows.filter((r) => r.lastResult?.status === 'FAILED').length;
                 if (failed) this.toastr.warning(`${failed} expectation(s) FAILED — Incidents were raised.`);
                 else this.toastr.success('All enabled expectations passed.');
             },
             error: (err) => {
-                this.sweeping = false;
+                this.sweeping.set(false);
                 this.toastr.error(apiErrorMessage(err, 'Could not run the sweep.'));
             },
         });
@@ -233,7 +233,7 @@ export class ExpectationsComponent implements OnInit {
         this.api.remove(e.name).subscribe({
             next: () => {
                 this.toastr.success(`Expectation "${e.name}" deleted`);
-                this.rows = this.rows.filter((r) => r.name !== e.name);
+                this.rows.set(this.rows().filter((r) => r.name !== e.name));
             },
             error: (err) => this.toastr.error(apiErrorMessage(err, `Could not delete "${e.name}".`)),
         });
@@ -241,6 +241,6 @@ export class ExpectationsComponent implements OnInit {
 
     /** Replace one row (reassign the array so the grid re-renders). */
     private patch(next: Expectation): void {
-        this.rows = this.rows.map((r) => (r.name === next.name ? next : r));
+        this.rows.set(this.rows().map((r) => (r.name === next.name ? next : r)));
     }
 }

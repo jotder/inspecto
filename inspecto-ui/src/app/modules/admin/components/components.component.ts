@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewEncapsulation, inject, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -33,7 +33,7 @@ import { SchemaEditorDialog } from './schema-editor.dialog';
         InspectoAlertComponent,
     ],
     templateUrl: './components.component.html',
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,
 })
 export class ComponentsComponent implements OnInit {
@@ -43,32 +43,32 @@ export class ComponentsComponent implements OnInit {
     private confirm = inject(InspectoConfirmService);
 
     readonly types = COMPONENT_TYPES;
-    byType: Record<string, ComponentDef[]> = {};
-    loading = false;
+    readonly byType = signal<Record<string, ComponentDef[]>>({});
+    readonly loading = signal(false);
     /** Flipped true once a mutate (create/update/delete) returns 503 — hides the mutate actions. */
-    writesDisabled = false;
+    readonly writesDisabled = signal(false);
 
     ngOnInit(): void {
         this.load();
     }
 
     load(): void {
-        this.loading = true;
+        this.loading.set(true);
         forkJoin(Object.fromEntries(this.types.map((t) => [t, this.api.list(t)]))).subscribe({
             next: (res) => {
-                this.byType = res as Record<string, ComponentDef[]>;
-                this.loading = false;
+                this.byType.set(res as Record<string, ComponentDef[]>);
+                this.loading.set(false);
             },
             error: () => {
-                this.byType = {};
-                this.loading = false;
+                this.byType.set({});
+                this.loading.set(false);
                 this.toastr.warning('Could not load components — is ControlApi running?');
             },
         });
     }
 
     countFor(type: ComponentType): number {
-        return this.byType[type]?.length ?? 0;
+        return this.byType()[type]?.length ?? 0;
     }
 
     summary(def: ComponentDef): string {
@@ -128,7 +128,7 @@ export class ComponentsComponent implements OnInit {
                         maxHeight: '88vh',
                     });
         opened.afterClosed().subscribe((r?: ComponentFormResult) => {
-            if (r?.writesDisabled) this.writesDisabled = true;
+            if (r?.writesDisabled) this.writesDisabled.set(true);
             if (r?.saved) this.load();
         });
     }
@@ -159,7 +159,7 @@ export class ComponentsComponent implements OnInit {
                 this.load();
             },
             error: (e) => {
-                if (e?.status === 503) this.writesDisabled = true;
+                if (e?.status === 503) this.writesDisabled.set(true);
                 const msg =
                     e?.status === 503
                         ? 'Writes are disabled (no write root configured).'

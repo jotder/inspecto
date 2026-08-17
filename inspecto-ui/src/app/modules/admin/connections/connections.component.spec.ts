@@ -38,14 +38,14 @@ describe('ConnectionsComponent', () => {
 
     it('loads connections on init', () => {
         const c = create().componentInstance;
-        expect(c.connections).toEqual([CONN]);
+        expect(c.connections()).toEqual([CONN]);
     });
 
     it('filters by id/connector/host', () => {
         const c = create().componentInstance;
-        c.filterText = 'edge';
+        c.filterText.set('edge');
         expect(c.visibleConnections).toEqual([CONN]);
-        c.filterText = 'nope';
+        c.filterText.set('nope');
         expect(c.visibleConnections).toEqual([]);
     });
 

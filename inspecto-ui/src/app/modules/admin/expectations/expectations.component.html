@@ -15,13 +15,13 @@
                 screen="Expectations"
                 [terms]="['Expectation', 'Incident', 'Alert Rule', 'Decision Rule']"
             />
-            @if (loading || sweeping) {
+            @if (loading() || sweeping()) {
                 <mat-spinner diameter="24"></mat-spinner>
             }
-            <button mat-icon-button (click)="load()" [disabled]="loading" aria-label="Refresh">
+            <button mat-icon-button (click)="load()" [disabled]="loading()" aria-label="Refresh">
                 <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
             </button>
-            <button mat-stroked-button (click)="evaluateAll()" [disabled]="sweeping || !rows.length">
+            <button mat-stroked-button (click)="evaluateAll()" [disabled]="sweeping() || !rows().length">
                 <mat-icon svgIcon="heroicons_outline:play"></mat-icon>
                 <span class="ml-2">Run all checks</span>
             </button>
@@ -36,7 +36,7 @@
 
     <!-- Main -->
     <div class="flex flex-auto flex-col p-6 sm:p-10">
-        @if (!loading && rows.length === 0) {
+        @if (!loading() && rows().length === 0) {
             <inspecto-empty-state
                 icon="heroicons_outline:check-badge"
                 title="No expectations yet"
@@ -50,10 +50,10 @@
                 tier="standard"
                 sourceName="expectations"
                 exportName="expectations"
-                [rows]="rows"
+                [rows]="rows()"
                 [columns]="columnDefs"
                 [rowActions]="rowActions"
-                [loading]="loading"
+                [loading]="loading()"
                 [autoHeight]="true"
             />
         }
