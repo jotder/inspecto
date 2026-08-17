@@ -14,6 +14,7 @@ import type { IconMap } from '../../api/icon-map.service';
 import type { AttributeSpec } from '../../component-model/attribute-spec';
 import NODE_ATTRIBUTE_CONTRACT from '../node-attributes.contract.json';
 import STEP_TYPES_CONTRACT from '../step-types.contract.json';
+import { derivedPipelineId } from '../../component-model/pipeline-scaffold';
 import { MockFlags } from '../mock-flags';
 import { error, json, match, MockHandler, MockRequest, MockResponse } from '../mock-http';
 import { MockStore } from '../mock-store';
@@ -531,11 +532,6 @@ function configSummary(r: StoredPipelineConfig): PipelineSummary {
     return s;
 }
 
-/** The server's identity rule: lowercase, spaces → underscores (`PipelineConfigParser`). */
-function derivedId(name: string): string {
-    return name.trim().toLowerCase().replace(/ /g, '_');
-}
-
 /**
  * `POST /pipelines/{name}/save-as-template` — mirrors `PipelineRoutes.saveAsTemplate`.
  *
@@ -625,7 +621,7 @@ function relabel(store: MockStore, space: string, name: string, body: { name?: s
 
     const declared = rec.config['id'];
     const stampedId = !(typeof declared === 'string' && declared.trim());
-    const id = stampedId ? derivedId(String(rec.config['name'] ?? name)) : String(declared).trim();
+    const id = stampedId ? derivedPipelineId(String(rec.config['name'] ?? name)) : String(declared).trim();
     // The record key and file name are the IDENTITY — a relabel must not move either.
     store.put(space, PIPELINE_CONFIGS_COLL, name, {
         ...rec,

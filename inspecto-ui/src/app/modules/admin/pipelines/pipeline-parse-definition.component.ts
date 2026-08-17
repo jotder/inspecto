@@ -51,6 +51,7 @@ import {
     schemaDraftFor,
     schemaNameFromPath,
     segmentDraftFrom,
+    segmentPathsOf,
 } from 'app/inspecto/segments';
 
 /**
@@ -633,13 +634,13 @@ export class PipelineParseDefinitionComponent {
         });
     }
 
-    /** `segment key → schema-toon path`, as stored in the node's `parsing.<asn1|plugin>.segments`. */
-    private savedSegmentPaths(): Record<string, unknown> {
-        const f = this.frontend();
-        const key = f === 'plugin' ? 'plugin' : 'asn1';
-        const a = this.parsingBlock()[key] as Record<string, unknown> | undefined;
-        const segs = a?.['segments'];
-        return segs && typeof segs === 'object' && !Array.isArray(segs) ? (segs as Record<string, unknown>) : {};
+    /**
+     * `segment key → schema-toon path`, as stored in the node's `parsing.<asn1|plugin>.segments`.
+     * Read through the shared {@link segmentPathsOf} so this walk and the delete cascade's cannot
+     * drift — a frontend one of them knows and the other doesn't is how schema files get orphaned.
+     */
+    private savedSegmentPaths(): Record<string, string> {
+        return segmentPathsOf({ parsing: this.parsingBlock() });
     }
 
     /**

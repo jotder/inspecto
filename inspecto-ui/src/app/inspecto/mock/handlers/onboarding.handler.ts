@@ -1,5 +1,6 @@
 import type { ComponentDef } from '../../api/components.service';
 import type { ConfigDependent } from '../../api/models';
+import { derivedPipelineId } from '../../component-model/pipeline-scaffold';
 import { MockFlags } from '../mock-flags';
 import { error, json, match, MockHandler, MockRequest } from '../mock-http';
 import { MockStore } from '../mock-store';
@@ -127,7 +128,7 @@ function pipelineIdOf(config: Record<string, unknown>, fallback: string): string
     const explicit = String(config['id'] ?? '').trim();
     if (explicit) return explicit;
     const name = String(config['name'] ?? '').trim();
-    return name ? name.toLowerCase().replace(/ /g, '_') : fallback;
+    return name ? derivedPipelineId(name) : fallback;
 }
 
 function collFor(type: string): string {
