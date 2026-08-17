@@ -22,6 +22,16 @@
       "port": 4205
     },
     {
+      "name": "inspecto-bundle",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "cd inspecto-deploy && set PORT=%PORT% && set CONTROL_TOKEN=devtoken && call .\\serve.bat"
+      ],
+      "autoPort": true,
+      "port": 8090
+    },
+    {
       "name": "inspecto-backend",
       "runtimeExecutable": "cmd",
       "runtimeArgs": [

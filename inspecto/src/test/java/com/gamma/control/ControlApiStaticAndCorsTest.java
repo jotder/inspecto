@@ -64,6 +64,12 @@ class ControlApiStaticAndCorsTest {
         return client.send(b.build(), BodyHandlers.ofString());
     }
 
+    private HttpResponse<String> sendIfNoneMatch(int port, String path, String etag) throws Exception {
+        HttpRequest r = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
+                .header("If-None-Match", etag).GET().build();
+        return client.send(r, BodyHandlers.ofString());
+    }
+
     private static String acao(HttpResponse<?> r) {
         return r.headers().firstValue("Access-Control-Allow-Origin").orElse(null);
     }
@@ -164,6 +170,51 @@ class ControlApiStaticAndCorsTest {
             assertEquals(200, send(c.port, "GET", "/").statusCode(), "SPA shell loads");
             assertEquals(200, send(c.port, "GET", "/runs").statusCode(),
                     "CONTROL route is reachable");
+        }
+    }
+
+    /**
+     * The stale-chunk guard. A UI file used to be served with NO cache directive and NO validator,
+     * which is not "do not cache" — a browser then falls back to heuristic freshness and may reuse a
+     * chunk without asking. Serving an upgraded UI from the same host:port that way mixes the new
+     * index.html with stale chunks, and since Angular reuses short chunk names across builds the
+     * stale file can hold a different module than the new graph imports from it, so bootstrap dies on
+     * an undefined helper. Pinned because the symptom (a "corrupt bundle") points nowhere near
+     * the cause.
+     */
+    @Test
+    void uiFilesCarryANoCacheDirectiveAndAValidator(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(spaDir(dir).toString(), null)) {
+            for (String path : List.of("/", "/assets/app.js")) {
+                HttpResponse<String> r = send(c.port, "GET", path);
+                assertEquals("no-cache", r.headers().firstValue("Cache-Control").orElse(null),
+                        path + " must tell the browser to revalidate before reuse");
+                assertTrue(r.headers().firstValue("ETag").isPresent(),
+                        path + " needs a validator, or no-cache costs a full refetch every load");
+            }
+        }
+    }
+
+    @Test
+    void unchangedUiFileRevalidatesToABodilessNotModified(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(spaDir(dir).toString(), null)) {
+            String etag = send(c.port, "GET", "/assets/app.js").headers().firstValue("ETag").orElseThrow();
+            HttpResponse<String> again = sendIfNoneMatch(c.port, "/assets/app.js", etag);
+            assertEquals(304, again.statusCode(), "an unchanged file revalidates cheaply");
+            assertEquals("", again.body(), "a 304 carries no body");
+        }
+    }
+
+    @Test
+    void redeployedUiFileGetsANewEtagAndTheNewBytes(@TempDir Path dir) throws Exception {
+        Path ui = spaDir(dir);
+        try (Ctx c = open(ui.toString(), null)) {
+            String stale = send(c.port, "GET", "/assets/app.js").headers().firstValue("ETag").orElseThrow();
+            Files.writeString(ui.resolve("assets").resolve("app.js"), "console.log('inspecto v2 rebuilt');");
+            HttpResponse<String> fresh = sendIfNoneMatch(c.port, "/assets/app.js", stale);
+            assertEquals(200, fresh.statusCode(), "a replaced file must NOT revalidate as unchanged");
+            assertTrue(fresh.body().contains("v2 rebuilt"), "the new bytes are served");
+            assertNotEquals(stale, fresh.headers().firstValue("ETag").orElse(null));
         }
     }
 

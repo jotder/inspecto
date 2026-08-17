@@ -21,6 +21,7 @@ import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -757,7 +758,34 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         return false;
     }
 
+    /**
+     * Write a UI file, with a cache directive and a validator.
+     *
+     * ⚠ {@code no-cache} is deliberate for EVERY file, content-hashed chunk names included. This
+     * handler previously sent no cache headers and no validator at all, which does NOT mean "do not
+     * cache" — with neither a directive nor a validator a browser falls back to HEURISTIC freshness
+     * and may reuse a response without revalidating. Serving an upgraded UI from the same host:port
+     * then combines the new {@code index.html} with stale chunks, and because Angular reuses its short
+     * chunk names across builds a stale {@code chunk-<hash>.js} can hold a DIFFERENT module than the
+     * one the new graph imports from it — the import resolves to undefined and bootstrap dies on a
+     * missing helper ("w$1 is not a function"). The failure looks like a corrupt bundle, so it costs
+     * far more to diagnose than the revalidation costs to avoid.
+     *
+     * {@code no-cache} means "revalidate before reuse", not "do not store": the ETag makes that
+     * revalidation cheap, answering an unchanged file with a bodiless 304 instead of the bytes.
+     * Size+mtime is a sufficient validator here — these files are build output, replaced wholesale by
+     * a deploy, never edited in place within a millisecond of the same length.
+     */
     private void writeFile(HttpExchange ex, Path file) throws IOException {
+        BasicFileAttributes attrs = Files.readAttributes(file, BasicFileAttributes.class);
+        String etag = '"' + Long.toHexString(attrs.lastModifiedTime().toMillis())
+                    + '-' + Long.toHexString(attrs.size()) + '"';
+        ex.getResponseHeaders().set("Cache-Control", "no-cache");
+        ex.getResponseHeaders().set("ETag", etag);
+        if (etag.equals(ex.getRequestHeaders().getFirst("If-None-Match"))) {
+            ex.sendResponseHeaders(304, -1);   // -1 ⇒ no body, as 304 requires
+            return;
+        }
         byte[] bytes = Files.readAllBytes(file);
         ex.getResponseHeaders().set("Content-Type", contentType(file.getFileName().toString()));
         ex.sendResponseHeaders(200, bytes.length);
