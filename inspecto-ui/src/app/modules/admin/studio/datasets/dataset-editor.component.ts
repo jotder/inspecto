@@ -29,21 +29,9 @@ import {
     inferRoles,
 } from './dataset-types';
 import { DatasetsService } from './datasets.service';
+import { uniqueNameValidator } from 'app/inspecto/investigation/unique-name';
 
 const KINDS: DatasetKind[] = ['virtual', 'physical', 'materialized'];
-
-/** Rejects a value (case-insensitive, trimmed) already present in `taken` → `{ duplicate: true }`. */
-function uniqueNameValidator(taken: string[]): ValidatorFn {
-    const set = new Set(taken.map((t) => t.trim().toLowerCase()));
-    return (c: AbstractControl) =>
-        set.has(
-            String(c.value ?? '')
-                .trim()
-                .toLowerCase(),
-        )
-            ? { duplicate: true }
-            : null;
-}
 
 /**
  * Dataset editor — create or edit a Studio {@link Dataset}. A **virtual** dataset embeds the Query Core
@@ -162,7 +150,7 @@ export class DatasetEditorComponent implements OnInit {
                 .list()
                 .pipe(takeUntilDestroyed(this.destroyRef))
                 .subscribe((all) => {
-                    this.form.controls.name.addValidators(uniqueNameValidator(all.map((d) => d.id)));
+                    this.form.controls.name.addValidators(uniqueNameValidator(() => all.map((d) => d.id)));
                     this.form.controls.name.updateValueAndValidity({ emitEvent: false });
                 });
         }

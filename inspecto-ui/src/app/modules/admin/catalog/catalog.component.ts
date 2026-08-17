@@ -33,6 +33,8 @@ import { NodeDetailDialog } from './node-detail.dialog';
 import { SharingComponent } from './sharing.component';
 import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
 import { onboardRedirect } from './onboard-redirect';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 
 type CatTab = 'tables' | 'streams' | 'references' | 'kpis' | 'graph' | 'usage' | 'shared-with-me' | 'shared-by-me';
 
@@ -355,9 +357,20 @@ export class CatalogComponent implements OnInit {
     /** Header CTA (Streams/References tabs, authoring lenses): open the guided onboarding. */
     onboard(kind: 'stream' | 'reference'): void {
         if (!this.lens.canAuthorWorkbench()) return;
-        const existingNames = [...this.streams, ...this.references]
-            .map((n) => String(n.attrs?.['pipeline'] ?? ''))
-            .filter(Boolean);
+        // ⚠ Resolve BOTH lists first. `loadTab()` fetches only the ACTIVE tab, so on the default Streams
+        // tab `references` was still empty — the inline duplicate guard then covered half the namespace,
+        // and typing the name of an existing REFERENCE pipeline passed it. The collision only surfaced
+        // as the 409 after the write, which is precisely the late failure this dialog's inline guard
+        // exists to prevent. Both fall back to what is already cached, so a failed list degrades to the
+        // old behaviour rather than blocking the CTA.
+        forkJoin({
+            streams: this.api.streams().pipe(catchError(() => of(this.streams))),
+            references: this.api.references().pipe(catchError(() => of(this.references))),
+        }).subscribe(({ streams, references }) => this.openOnboarding(kind, [...streams, ...references]));
+    }
+
+    private openOnboarding(kind: 'stream' | 'reference', known: MetadataNode[]): void {
+        const existingNames = known.map((n) => String(n.attrs?.['pipeline'] ?? '')).filter(Boolean);
         this.dialog
             .open<OnboardingCreateDialog, unknown, OnboardingCreateResult>(OnboardingCreateDialog, {
                 data: { kind, existingNames },

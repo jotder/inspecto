@@ -116,6 +116,8 @@ export class GrammarEditorDialog {
     readonly step = signal<'config' | 'name'>('config');
     /** The block captured before the name step unmounts the editor (its form dies with the `@if`). */
     private pendingBlock: Record<string, unknown> | null = null;
+    /** The `use: grammar/<id>` this node names but which the registry does not return — see the ctor. */
+    readonly missingBinding = signal<string | null>(null);
 
     readonly nameForm = this.fb.group({
         name: [
@@ -129,8 +131,19 @@ export class GrammarEditorDialog {
         ],
     });
 
-    /** Esc / backdrop / Cancel all confirm before discarding a dirty Grammar. */
-    readonly requestClose = guardDirtyClose(this.ref, () => this.editor?.isDirty() ?? false, this.confirm);
+    /**
+     * Esc / backdrop / Cancel all confirm before discarding a dirty Grammar.
+     *
+     * ⚠ `pendingBlock` is part of the test. On the name step the `@if (step() === 'config')` block that
+     * hosts the editor is torn down, so `this.editor` is undefined and the guard reported CLEAN — Cancel
+     * or Esc there binned the whole authored Grammar, silently, at the one moment the operator had the
+     * most work in flight. The captured block lives only in memory, so it is the dirtiness there.
+     */
+    readonly requestClose = guardDirtyClose(
+        this.ref,
+        () => (this.editor?.isDirty() ?? false) || this.pendingBlock !== null,
+        this.confirm,
+    );
 
     constructor() {
         const ref = parseUseRef(this.data.node.use);
@@ -141,10 +154,33 @@ export class GrammarEditorDialog {
         this.components.list('grammar').subscribe({
             next: (list) => {
                 this.grammars.set(list);
-                const bound = boundId ? list.find((g) => g.name === boundId) : null;
-                if (bound) this.seedFrom(grammarBlock(bound.content ?? {}));
+                // ⚠ Read the LIVE binding, not the constructor's `boundId` const. While this request was
+                // in flight the operator may have picked "This Step's own Grammar", which seeds from the
+                // node and clears the binding — the stale const then re-seeded the editor with the old
+                // template's block while the dropdown, hint and Save-as-template button all still said
+                // the block was the Step's own.
+                const live = this.boundGrammarId();
+                if (!live) return;
+                const bound = list.find((g) => g.name === live);
+                if (bound) {
+                    this.seedFrom(grammarBlock(bound.content ?? {}));
+                    return;
+                }
+                // The bound Grammar is GONE (deleted/renamed). Seeding nothing left the editor showing
+                // delimited defaults, and `closeInline` strips `use:` — so Save silently replaced the
+                // authored binding AND its grammar with a default block. Fall back to the node's own
+                // parsing block and say so.
+                this.missingBinding.set(live);
+                this.seedFrom(nodeParsingBlock(this.data.node));
             },
-            error: () => this.grammars.set([]),
+            // Same hole via the error arm: swallowed, the editor stayed unseeded and Save overwrote.
+            error: () => {
+                this.grammars.set([]);
+                if (this.boundGrammarId()) {
+                    this.missingBinding.set(this.boundGrammarId());
+                    this.seedFrom(nodeParsingBlock(this.data.node));
+                }
+            },
         });
     }
 
@@ -238,9 +274,7 @@ export class GrammarEditorDialog {
      * `docs/archived-documents/plans-archive/grammar-templates-not-bindings-plan.md`.
      */
     private saveAsTemplate(name: string, block: Record<string, unknown>): void {
-        this.write(this.components.create('grammar', { id: name, ...block }), name, () =>
-            this.closeInline(block),
-        );
+        this.write(this.components.create('grammar', { id: name, ...block }), name, () => this.closeInline(block));
     }
 
     private write(req$: Observable<unknown>, name: string, onDone: () => void): void {

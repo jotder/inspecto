@@ -50,21 +50,9 @@ import { ShareDashboardDialog } from './share-dashboard.dialog';
 import { DashboardTileComponent } from './dashboard-tile.component';
 import { DashboardFilterBarComponent } from './dashboard-filter-bar.component';
 import { DashboardDrillDrawerComponent } from './dashboard-drill-drawer.component';
+import { uniqueNameValidator } from 'app/inspecto/investigation/unique-name';
 import '../widgets/widget.kind'; // register widget kind + viz plugins (tiles call getViz)
 import './dashboard.kind'; // register the dashboard kind
-
-/** Rejects a value (case-insensitive, trimmed) already present in `taken` → `{ duplicate: true }`. */
-function uniqueNameValidator(taken: string[]): ValidatorFn {
-    const set = new Set(taken.map((t) => t.trim().toLowerCase()));
-    return (c: AbstractControl) =>
-        set.has(
-            String(c.value ?? '')
-                .trim()
-                .toLowerCase(),
-        )
-            ? { duplicate: true }
-            : null;
-}
 
 /**
  * Dashboard editor — compose saved widgets into a grid. Add widget tiles, drag to reorder (CDK), toggle each
@@ -257,7 +245,7 @@ export class DashboardEditorComponent implements OnInit {
         } else {
             // Product-wide rule: block a duplicate id inline on create rather than relying on the server 409.
             this.dashboardsApi.list().subscribe((all) => {
-                this.form.controls.name.addValidators(uniqueNameValidator(all.map((d) => d.id)));
+                this.form.controls.name.addValidators(uniqueNameValidator(() => all.map((d) => d.id)));
                 this.form.controls.name.updateValueAndValidity({ emitEvent: false });
             });
         }

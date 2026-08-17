@@ -435,6 +435,13 @@ export class PipelineLoadDefinitionComponent {
         while (parts.length > min && !parts[parts.length - 1].trim()) parts.pop();
         while (parts.length < min) parts.push('');
         g.patchValue({ sourceExpression: parts.join('|') });
+        // ⚠ `patchValue` does NOT mark the form dirty, and the five CONCAT_DT / FILENAME_DATE controls
+        // bind [value]/(valueChange) rather than formControlName — so nothing else armed the flag either.
+        // Unlike the Parse and Collection panes this component has no `onInteraction` host listener, so
+        // editing only a Date/Time/File-name column, Prefix or Format left Apply greyed out until the
+        // operator happened to poke an unrelated field.
+        g.markAsDirty();
+        this.emitDirty();
     }
 
     /** The refusal the engine would raise for this row, or `null`. Mirrors `MappingRules`. */

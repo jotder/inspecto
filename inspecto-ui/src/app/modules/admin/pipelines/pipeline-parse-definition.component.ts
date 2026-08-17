@@ -1,14 +1,15 @@
 import {
     ChangeDetectionStrategy,
     Component,
-    HostListener,
-    ViewChild,
     computed,
     effect,
+    HostListener,
     inject,
     input,
     output,
     signal,
+    untracked,
+    ViewChild,
 } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -257,11 +258,14 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                                 </div>
                                 @if (d.typeChanged.length) {
                                     <p class="text-secondary m-0 mb-2 text-xs">
-                                        Type changes are reported, not applied — a saved type may be a
-                                        deliberate override. Change them yourself if the sample is right:
+                                        Type changes are reported, not applied — a saved type may be a deliberate
+                                        override. Change them yourself if the sample is right:
                                         @for (t of d.typeChanged; track t.name) {
                                             <span class="font-mono">{{ t.name }}</span> ({{ t.declared }} →
-                                            {{ t.suggested }})@if (!$last) {<span>, </span>}
+                                            {{ t.suggested }})
+                                            @if (!$last) {
+                                                <span>, </span>
+                                            }
                                         }
                                     </p>
                                 }
@@ -270,8 +274,8 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                         @if (schemaSeed().length) {
                             @if (schemaStale()) {
                                 <p class="text-warn m-0 mb-2 text-sm" role="status" aria-live="polite">
-                                    These columns came from an earlier test — the settings above no longer parse
-                                    the sample. Fix them and test again, or Apply keeps the columns shown.
+                                    These columns came from an earlier test — the settings above no longer parse the
+                                    sample. Fix them and test again, or Apply keeps the columns shown.
                                 </p>
                             }
                             <inspecto-schema-fields-editor [rows]="schemaSeed()" />
@@ -286,10 +290,10 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                             @if (schemaReplaceNeeded()) {
                                 <inspecto-alert class="mt-3 block" variant="warning">
                                     <p class="m-0 text-sm">
-                                        The saved output schema has columns this parse no longer produces, so it was
-                                        not overwritten. Replacing it is the right move when you have changed what
-                                        this pipeline reads — anything downstream that expects the old columns will
-                                        need updating.
+                                        The saved output schema has columns this parse no longer produces, so it was not
+                                        overwritten. Replacing it is the right move when you have changed what this
+                                        pipeline reads — anything downstream that expects the old columns will need
+                                        updating.
                                     </p>
                                     <button
                                         mat-stroked-button
@@ -304,8 +308,8 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                             }
                         } @else {
                             <p class="text-secondary m-0 text-sm">
-                                Test the parse above — the output schema is derived from the columns it
-                                produces, never hand-typed.
+                                Test the parse above — the output schema is derived from the columns it produces, never
+                                hand-typed.
                             </p>
                         }
                     } @else if (foreignSchema()) {
@@ -615,6 +619,20 @@ export class PipelineParseDefinitionComponent {
         // (the [initial] binding re-seeds the editor, which is what marks it pristine again).
         effect(() => {
             const n = this.node();
+            // ⚠ untracked: an effect tracks every signal read synchronously in its body, INCLUDING through
+            // the methods it calls — and `loadSavedSchema()` reaches `plugin()` via
+            // authorsSchema→authorsSegments. So the seed re-ran when the served parser catalog landed (or
+            // when the child editor emitted its plugin pick), reverting typed Name/Description, discarding
+            // the chosen Grammar template, clearing derived schema rows and segment drafts, and then
+            // calling markAsPristine + emitDirty — Apply greyed out over work just done. The node input is
+            // the ONLY thing that should re-seed this pane.
+            untracked(() => this.seedFromNode(n));
+        });
+    }
+
+    /** The one-shot seed body — see the effect above for why it must not be tracked. */
+    private seedFromNode(n: AuthoredNode): void {
+        {
             this.form.patchValue({ name: n.name ?? '', description: n.description ?? '' });
             this.form.markAsPristine();
             // A different node (or a Discard-driven re-seed) makes any template pick stale — the
@@ -633,7 +651,7 @@ export class PipelineParseDefinitionComponent {
             this.emitDirty();
             this.loadSavedSegments();
             this.loadSavedSchema();
-        });
+        }
     }
 
     /** The rows the grid currently holds — ALL of them, excluded ones included, so a merge never drops. */
@@ -683,6 +701,13 @@ export class PipelineParseDefinitionComponent {
             }),
         ]);
         this.schemaDrift.set(null);
+        // ⚠ Adding derived columns IS unapplied work, and nothing else here says so: the drift path
+        // returns before `parsedSinceApply` is set, and the shared grid rebuilds itself PRISTINE on the
+        // new `schemaSeed` reference — so every term of the dirty expression was false and Apply stayed
+        // greyed out over columns the product had just derived. The operator had to hand-edit and blur
+        // a cell to keep them.
+        this.parsedSinceApply = true;
+        this.emitDirty();
     }
 
     /**
@@ -943,7 +968,11 @@ export class PipelineParseDefinitionComponent {
         const fields = grid.value();
         const name = this.schemaName();
         const draft = {
-            raw: { name, format: 'CSV', fields: fields.map((f) => ({ name: f.name, selector: f.selector, type: f.type })) },
+            raw: {
+                name,
+                format: 'CSV',
+                fields: fields.map((f) => ({ name: f.name, selector: f.selector, type: f.type })),
+            },
             mapping: {
                 canonicalName: name,
                 rawName: name,

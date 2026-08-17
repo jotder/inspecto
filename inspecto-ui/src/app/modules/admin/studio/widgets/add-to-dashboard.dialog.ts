@@ -8,6 +8,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { Dashboard } from '../dashboards/dashboard-types';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
+import { uniqueNameValidator } from 'app/inspecto/investigation/unique-name';
 
 export interface AddToDashboardData {
     widgetId: string;
@@ -19,19 +20,6 @@ export interface AddToDashboardData {
 export interface AddToDashboardResult {
     existingId?: string;
     newName?: string;
-}
-
-/** Rejects a value (case-insensitive, trimmed) already present in `taken` → `{ duplicate: true }`. */
-function uniqueNameValidator(taken: string[]): ValidatorFn {
-    const set = new Set(taken.map((t) => t.trim().toLowerCase()));
-    return (c: AbstractControl) =>
-        set.has(
-            String(c.value ?? '')
-                .trim()
-                .toLowerCase(),
-        )
-            ? { duplicate: true }
-            : null;
 }
 
 /** Sentinel target = "create a new dashboard" (the default — the name field appears). A string, not
@@ -109,7 +97,7 @@ export class AddToDashboardDialog {
             [
                 Validators.required,
                 Validators.pattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/),
-                uniqueNameValidator(this.data.dashboards.map((d) => d.id)),
+                uniqueNameValidator(() => this.data.dashboards.map((d) => d.id)),
             ],
         ],
     });

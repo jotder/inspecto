@@ -6,6 +6,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
+import { uniqueNameValidator } from 'app/inspecto/investigation/unique-name';
 
 export interface WidgetSaveData {
     suggestedId: string;
@@ -14,19 +15,6 @@ export interface WidgetSaveData {
     description?: string;
     /** Ids already in use — on create the id control rejects a duplicate inline (product-wide rule). */
     existingNames?: string[];
-}
-
-/** Rejects a value (case-insensitive, trimmed) already present in `taken` → `{ duplicate: true }`. */
-function uniqueNameValidator(taken: string[]): ValidatorFn {
-    const set = new Set(taken.map((t) => t.trim().toLowerCase()));
-    return (c: AbstractControl) =>
-        set.has(
-            String(c.value ?? '')
-                .trim()
-                .toLowerCase(),
-        )
-            ? { duplicate: true }
-            : null;
 }
 
 export interface WidgetSaveResult {
@@ -95,7 +83,7 @@ export class WidgetSaveDialog {
             [
                 Validators.required,
                 Validators.pattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/),
-                ...(this.data.lockId ? [] : [uniqueNameValidator(this.data.existingNames ?? [])]),
+                ...(this.data.lockId ? [] : [uniqueNameValidator(() => this.data.existingNames ?? [])]),
             ],
         ],
         description: [this.data.description ?? ''],

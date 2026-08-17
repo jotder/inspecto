@@ -267,6 +267,12 @@ export class PipelineEditorComponent implements OnInit {
      * tab's graph lives in {@link model} as before; this is where the inactive ones wait.
      */
     private readonly cachedModels = new Map<string, AuthoredPipeline>();
+    /**
+     * The tab the most recent load was issued FOR. Every path that changes the active tab stamps it,
+     * so a response that arrives after the operator has moved on can recognise itself as superseded
+     * and drop out instead of overwriting the graph they are now editing.
+     */
+    private pendingSelect: string | null = null;
     private readonly dirtyIds = signal<ReadonlySet<string>>(new Set());
     /**
      * The sample thread, ONE PER TAB (operator-decided 2026-08-16; the wizard's D5 thread re-homed
@@ -879,6 +885,7 @@ export class PipelineEditorComponent implements OnInit {
         this.clearSelection();
         const cached = this.cachedModels.get(id);
         if (cached) {
+            this.pendingSelect = id; // an in-flight load for another tab must not land over this one
             this.model.set(cached);
             this.selectedId.set(id);
             this.dirty.set(this.dirtyIds().has(id));
@@ -919,6 +926,7 @@ export class PipelineEditorComponent implements OnInit {
 
     /** No active tab — the empty canvas state. */
     private clearActive(): void {
+        this.pendingSelect = null;
         this.closeDefinition();
         this.clearSelection();
         this.selectedId.set(null);
@@ -948,14 +956,24 @@ export class PipelineEditorComponent implements OnInit {
         if (!this.openIds().includes(id)) this.openIds.update((ids) => [...ids, id]);
         // Every path that opens a tab lands here, so this is the one place a thread is born.
         if (!this.sampleThreads.has(id)) this.sampleThreads.set(id, new DefinitionStateService());
+        // The tab this load is FOR. ⚠ `activateTab` returns immediately when `selectedId()` already
+        // matches, and `select()` only moves `selectedId` when its response lands — so clicking an
+        // uncached tab C and then going back to A left A legitimately editable while C's fetch was still
+        // in flight. C then landed and did `model.set(flow)` unconditionally: A's edits since the switch
+        // were destroyed, `selectedId` jumped to C, and `dirty.set(false)` erased the unsaved marker.
+        // They were not recoverable from `cachedModels` either — `parkCurrent()` had cached the OLDER A.
+        this.pendingSelect = id;
         // W5: the editor edits the CANONICAL *_pipeline.toon — lift it to the editable graph.
         this.api.pipelineGraphRaw(id).subscribe({
             next: (flow) => {
+                if (this.pendingSelect !== id) return; // superseded — the operator moved on
                 this.model.set(flow);
                 this.selectedId.set(id); // drives the host rebuild (graphKey)
                 this.dirty.set(false);
             },
-            error: (err) => this.toast.error(apiErrorMessage(err, 'Could not load the pipeline')),
+            error: (err) => {
+                if (this.pendingSelect === id) this.toast.error(apiErrorMessage(err, 'Could not load the pipeline'));
+            },
         });
         this.loadLastRun(id);
     }
