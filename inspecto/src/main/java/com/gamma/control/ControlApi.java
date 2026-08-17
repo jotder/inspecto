@@ -784,12 +784,34 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         ex.getResponseHeaders().set("ETag", etag);
         if (etag.equals(ex.getRequestHeaders().getFirst("If-None-Match"))) {
             ex.sendResponseHeaders(304, -1);   // -1 ⇒ no body, as 304 requires
+            logStatic(ex, file, 304, 0);
             return;
         }
         byte[] bytes = Files.readAllBytes(file);
         ex.getResponseHeaders().set("Content-Type", contentType(file.getFileName().toString()));
         ex.sendResponseHeaders(200, bytes.length);
         ex.getResponseBody().write(bytes);
+        logStatic(ex, file, 200, bytes.length);
+    }
+
+    /**
+     * DEBUG-level access log for the static UI surface — the capture BACKLOG §5 BUNDLE-1 asks for and
+     * could not previously get: <em>"log every static request with its status and byte count on a cold
+     * server and diff that against a clean load."</em> There was no per-request logging anywhere in this
+     * class, so a failing first load left nothing behind to diff.
+     *
+     * <p>Logged AFTER the body is written, so a line's absence is itself evidence — a request that threw
+     * mid-write never logs, which is precisely the "module came back short" shape being hunted. The
+     * byte count is what was actually handed to the response body, not the file size.
+     *
+     * <p>⚠ DEBUG deliberately: one line per chunk is ~130 lines per cold load, which is diagnostic gold
+     * for an hour and noise for ever after. Enable with
+     * {@code -Dorg.slf4j.simpleLogger.log.com.gamma.control.ControlApi=debug}.
+     */
+    private void logStatic(HttpExchange ex, Path file, int status, int bytes) {
+        if (!log.isDebugEnabled()) return;
+        log.debug("[UI-STATIC] {} {} -> {} ({} bytes, etag-match={})",
+                ex.getRequestMethod(), ex.getRequestURI().getPath(), status, bytes, status == 304);
     }
 
     /** True when the last path segment carries a file extension (e.g. {@code main.js}, not {@code dashboard}). */

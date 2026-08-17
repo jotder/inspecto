@@ -284,10 +284,34 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 > - **Not a duplicated Angular core, and not a version skew** — one `ProfilerEvent` enum in the output,
 >   every `@angular/*` at its declared version, one exactly-pinned esbuild.
 >
-> **Next step for whoever picks this up:** capture the FAILING first load specifically — the importer's
-> URL is not in the message, so log every static request with its status and byte count on a cold
-> server and diff that against a clean load. Suspect the cold-start window (the browser opens ~100
-> parallel module requests at once against a just-started `HttpServer`) rather than the build.
+> - **NOT a mixed-build directory** (added 2026-08-17). `package.ps1` copying into a non-empty
+>   `inspecto-deploy/ui/` would leave a previous build's chunks beside the new ones, and since Angular
+>   reuses short chunk names across builds a lazily-imported name could resolve to a STALE FILE ON DISK
+>   — no cache required, which would have explained why a fresh origin still failed. Measured: all
+>   **129** chunks share a single mtime (`2026-08-17 16:10`). One build on disk.
+> - **The ~100-parallel-requests theory is WEAK, not merely unproven** (2026-08-17). HTTP/1.1 browsers
+>   cap at ~**6** connections per origin, so a cold `HttpServer` never sees 100 at once; and the
+>   executor is `newVirtualThreadPerTaskExecutor()` with a default accept backlog, not a small pool.
+>   The initial load pulls only ~**56** resources, not 129. ⛔ Don't spend a shift on server concurrency
+>   on the strength of that sentence — it was a guess, and it is the row's own.
+> - **Response framing is correct on inspection**: 304 is sent bodiless (`-1`), a 200 declares exactly
+>   `bytes.length`, and the exchange is closed in the outermost filter's `finally` (`correlation`).
+>
+> **Not reproduced on 2026-08-17** across **three** cold starts, each on a fresh port (a new origin ⇒
+> a genuinely empty HTTP cache, the closest available analogue of "first load"), driven with the in-app
+> browser: 56/56 resources, zero non-200s, zero zero-byte bodies, `app-root` populated every time. So
+> the repro needs either a different browser or many more attempts — **it is rarer than "intermittent"
+> suggests.**
+>
+> **Instrumentation is now IN PLACE (2026-08-17).** The row asked for a per-request capture, which was
+> impossible: `ControlApi` had **no per-request logging at all**, only three lifecycle `log.info` lines.
+> `writeFile` now emits `[UI-STATIC] <method> <path> -> <status> (<n> bytes, etag-match=…)` at DEBUG,
+> written AFTER the body, so **a missing line is itself the evidence** — a request that threw mid-write
+> never logs. Enable with
+> `-Dorg.slf4j.simpleLogger.log.com.gamma.control.ControlApi=debug`, reproduce, and diff the failing
+> load against a clean one.
+>
+> **Next step for whoever picks this up:** run the instrumented bundle until it fails, then diff.
 > Workaround for operators today: **reload the page once.**
 
 > ### ✅ BUILDER-2 — nine more defects found by driving the editor as a builder, all FIXED (2026-08-17)
