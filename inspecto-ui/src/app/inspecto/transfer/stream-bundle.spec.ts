@@ -192,6 +192,48 @@ describe('stream-bundle — import plan', () => {
         expect(built['segments']).toEqual({ 'mo-call': 'cdr_mo_call.toon' });
     });
 
+    /**
+     * REGRESSION (2026-08-17, found by sweeping for callers of `6dd86e5a`): a bundle carried the SOURCE
+     * pipeline's `id`, and the plan spread it through untouched. `ConfigService.write` derives the file
+     * and the registered identity from the config's own `id`, so the import registered under the
+     * source's identity and the operator's typed name was silently ignored — and a same-space re-import
+     * 409'd for ever, because renaming could never change the id it collided on.
+     *
+     * It only became reachable when new pipelines started carrying an `id` at birth; before that almost
+     * no config had one, so there was nothing to carry.
+     */
+    it('registers under an id stamped from the TYPED name, never the source bundle\'s', () => {
+        const b = build({ pipeline: { ...PIPELINE, id: 'orders_feed' } });
+        const p = planStreamImport(b, { name: 'Orders-EU', space: 'prod' });
+        expect(p.pipeline['id']).toBe('orders_eu');
+        expect(p.pipeline['name']).toBe('Orders-EU');
+        // Export strips it too, so a NEW bundle never carries identity in the first place.
+        expect(b.pipeline).not.toHaveProperty('id');
+    });
+
+    /**
+     * All three satellites key off the IDENTITY, and all three agree. Keyed off the display name they
+     * produced three spellings of one convention — `Orders-EU_schema` unsanitised, `Orders_EU_<key>`
+     * sanitised — and the editor, which computes companions from the id, then orphaned them on the
+     * first schema edit.
+     */
+    it('names every satellite off the stamped id, consistently sanitised', () => {
+        const b = build({
+            pipeline: {
+                ...PIPELINE,
+                parsing: { frontend: 'plugin', plugin: { ingester: 'X', segments: { 'mo-call': 'old.toon' } } },
+            },
+            segments: { 'mo-call': { raw: { name: 'old' } } },
+            enrichment: { joins: [] },
+        });
+        const p = planStreamImport(b, { name: 'Orders-EU', space: 'prod' });
+        expect(p.schema?.name).toBe('orders_eu_schema');
+        expect(p.segments[0].name).toBe('orders_eu_mo_call');
+        expect(p.enrichment?.name).toBe('orders_eu_enrich');
+        const processing = p.pipeline['processing'] as Record<string, unknown>;
+        expect(processing['schema_file']).toBe('orders_eu_schema.toon');
+    });
+
     it('carries requirements and masked-secret warnings into the plan notes', () => {
         const p = planFor();
         expect(p.requires[0].id).toBe('prod_sftp');

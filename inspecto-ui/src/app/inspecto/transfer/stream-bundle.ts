@@ -1,5 +1,6 @@
 // Deep import on purpose: the segments barrel also exports the editor COMPONENT, and this codec is
 // pure — it must not drag an Angular component into whatever imports it.
+import { pipelineId } from '../component-model/pipeline-scaffold';
 import { companionSchemaName, portableConfigRef } from '../segments/segment-drafts';
 import { hashContent } from './content-hash';
 
@@ -36,8 +37,17 @@ import { hashContent } from './content-hash';
 export const STREAM_BUNDLE_FORMAT = 'inspecto-stream-config';
 export const STREAM_BUNDLE_VERSION = 1;
 
-/** Config keys removed at export because they identify or locate the artifact, not configure it. */
-const NON_PORTABLE_KEYS = ['name', 'active', 'dirs'] as const;
+/**
+ * Config keys removed at export because they identify or locate the artifact, not configure it.
+ *
+ * ⚠ `id` joined this list on 2026-08-17. It is the pipeline's IDENTITY — the most non-portable key
+ * there is — but it used to be absent from almost every config, so carrying it through cost nothing
+ * and the omission went unnoticed. Since new pipelines are stamped with an `id` at birth, a bundle
+ * that carried one made the import register under the SOURCE's identity, ignoring the name the
+ * operator typed. {@link planStreamImport} additionally re-stamps, so bundles already exported into
+ * the wild with an `id` import correctly too.
+ */
+const NON_PORTABLE_KEYS = ['name', 'id', 'active', 'dirs'] as const;
 
 /** Something the target instance must already provide — the bundle's contract with it. */
 export interface StreamRequirement {
@@ -206,7 +216,14 @@ export interface StreamImportPlan {
  */
 export function planStreamImport(bundle: StreamBundle, opts: { name: string; space: string | null }): StreamImportPlan {
     const { name, space } = opts;
-    const pipeline: Record<string, unknown> = { ...bundle.pipeline, name, active: false };
+    // The IDENTITY the import registers under, stamped from the typed name exactly as a fresh create
+    // would. ⚠ Set explicitly rather than trusted from the bundle: an older bundle still carries the
+    // SOURCE's `id`, and spreading that would register the draft under the source's identity — the
+    // operator's typed name silently ignored, a same-space re-import 409ing for ever (the id never
+    // changes, so renaming cannot clear it), and every satellite below keyed off a different string
+    // than the pipeline itself.
+    const id = pipelineId(name);
+    const pipeline: Record<string, unknown> = { ...bundle.pipeline, name, id, active: false };
     const notes: string[] = [];
 
     // dirs are always re-derived: the source paths name the source space and the source's own
@@ -229,7 +246,13 @@ export function planStreamImport(bundle: StreamBundle, opts: { name: string; spa
     const plan: StreamImportPlan = { pipeline, segments: [], notes, requires: bundle.requires ?? [] };
 
     if (bundle.schema) {
-        const schemaName = `${name}_schema`;
+        // ⚠ Off the IDENTITY, not the display name — and via `companionSchemaName`, which is what every
+        // other surface uses (the editor's delete cascade, the parse pane). Keyed off the display name
+        // these three satellites got THREE spellings of one convention: `Orders-Daily_schema` and
+        // `Orders-Daily_enrich` unsanitised, but segments `Orders_Daily_<key>` sanitised — and the first
+        // schema edit in the editor then wrote `<id>_schema`, orphaning the imported file the pipeline's
+        // own `processing.schema_file` still pointed at.
+        const schemaName = companionSchemaName(id, 'schema');
         plan.schema = { name: schemaName, config: { ...bundle.schema, raw: renameRaw(bundle.schema, schemaName) } };
         const processing = isRecord(pipeline['processing']) ? { ...pipeline['processing'] } : {};
         processing['schema_file'] = portableConfigRef(schemaName);
@@ -239,7 +262,7 @@ export function planStreamImport(bundle: StreamBundle, opts: { name: string; spa
     if (bundle.segments && Object.keys(bundle.segments).length) {
         const paths: Record<string, string> = {};
         for (const [key, config] of Object.entries(bundle.segments)) {
-            const segName = companionSchemaName(name, key);
+            const segName = companionSchemaName(id, key);
             plan.segments.push({ name: segName, config: { ...config, raw: renameRaw(config, segName) } });
             paths[key] = portableConfigRef(segName);
         }
@@ -252,8 +275,8 @@ export function planStreamImport(bundle: StreamBundle, opts: { name: string; spa
 
     if (bundle.enrichment) {
         plan.enrichment = {
-            name: `${name}_enrich`,
-            config: retargetEnrichment(bundle.enrichment, bundle.source.name, name, space),
+            name: companionSchemaName(id, 'enrich'),
+            config: retargetEnrichment(bundle.enrichment, bundle.source.name, id, space),
         };
     }
 
