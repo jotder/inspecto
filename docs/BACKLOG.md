@@ -253,10 +253,12 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 
 ## 5. UI residuals + security-module residuals
 
-> ### 🟠 REVIEW-1 — defects found by the 2026-08-17 Angular sweep that were NOT fixed
+> ### ~~🟠 REVIEW-1 — defects found by the 2026-08-17 Angular sweep~~ **✅ ALL 18 FIXED 2026-08-17**
 >
-> Each was read and confirmed against the source; they are unfixed only because the fix needs a product
-> decision or is larger than the review. **Do not re-hunt these — go straight to the line.**
+> Closed by `e2166e2f` + `c191d9fc`. The table is kept as the record of what each was and where, since
+> several are worth recognising again elsewhere (a `patchValue` that leaves a control pristine; an
+> `effect` that transitively tracks a signal through the methods it calls; an error arm that renders as
+> an affirmative empty state). ⛔ Do not re-open — grep the line before assuming any row is still live.
 >
 > | Where | Defect |
 > |---|---|
@@ -282,12 +284,20 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 > `if (authored.length) this.patternPacks.set(authored)` — a space authoring ONE pattern pack makes all
 > six built-ins disappear. Deliberate curation or an accident?
 
-> ### 🟡 CD-1 — 64 components still carry the v22 `ChangeDetectionStrategy.Eager` shim (2026-08-17)
+> ### 🟡 CD-1 — **39 remaining** (was 64) `ChangeDetectionStrategy.Eager` shims (2026-08-17)
 >
 > `ng update` stamped `Eager` on every component that had no explicit strategy, because v22 flipped the
-> default to `OnPush`. The angular-ui skill calls it "legacy, not a target … a candidate for removal",
-> and new components still use `OnPush`. 64 files remain, densest in `objects` (12), `inspecto/components`
-> (8) and `pipelines` (4).
+> default to `OnPush`. The angular-ui skill calls it "legacy, not a target … a candidate for removal".
+>
+> **19 were converted in `057703e0`** — every component that writes no plain (non-signal) instance field
+> from an async callback, which is the precise condition that makes OnPush unsafe. Spot-verified in the
+> preview, not just the suite: the OnPush `categorize.dialog`'s Category→Subcategory cascade still
+> re-renders, and the whole Accept→categorize→transition flow moves the row between folders.
+>
+> **39 remain**, and each needs its FIELDS converting to signals first — a real refactor per component,
+> not a strategy swap. The list is reproducible: a component is unsafe when a plain field is assigned
+> inside a `subscribe(`/`then(`/`setTimeout(` callback. Densest: alerts, catalog, dashboard, run-detail,
+> object-detail, and the three ResizeObserver hosts (chart / map-view / graph-view).
 >
 > ⛔ **Not a blanket change, and NOT sed-able.** Sampled during the 2026-08-17 review sweep:
 > `objects/object-detail.component.ts` holds `id = ''` and friends as plain mutable fields with **zero**
