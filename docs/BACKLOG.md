@@ -253,6 +253,51 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 
 ## 5. UI residuals + security-module residuals
 
+> ### 🔴 BUILDER-1 — four defects found by driving the Pipelines editor as an end user (2026-08-17)
+>
+> A shift drove the real offline UI as a builder (new pipeline → Collect → parse → sample → test →
+> Apply → Save) across CSV, NDJSON and fixed-width. **One was fixed in that session** (`3a23e56d`:
+> a fixed-width test parse never sent its slice table, so it ALWAYS failed "fixed width needs at
+> least one field"). The rest are filed here, unfixed, each reproduced live:
+>
+> **(a) 🔴 A derived output schema does not make the Parse drawer dirty, so Apply stays disabled.**
+> Capture a sample → Test parse → a full output schema is derived → **Apply is greyed out**. The
+> operator must hand-edit a grid cell (and BLUR it) before they can apply the schema the product
+> just derived for them. `pipeline-parse-definition.component.ts`'s `emitDirty()` considers
+> `form.dirty`, `templateDirty`, the grammar editor, the segments editor and `schemaGrid.form.dirty`
+> — a *programmatically seeded* schema grid is pristine, and the captured sample is not an input at
+> all. Reproduced on both the delimited and JSON drawers. ⚠ Whether a derived-only schema SHOULD be
+> appliable is a product call — but "the button that persists my work is disabled with no
+> explanation" is not.
+>
+> **(b) 🔴 Changing a pipeline's parse format is a hard dead-end: `schema edit is not
+> BACKWARD-compatible; not written`.** The output schema name is `<pipeline>_schema` — one slot per
+> pipeline. Author a CSV parse (writes `X_schema` with its columns), then swap to a JSON parse over
+> different data: Apply refuses, because the compatibility save-gate diffs the new columns against
+> the old ones. The drawer surfaces the raw gate message and offers neither escape hatch the route
+> supports (copy to a new name, or `compatibility: 'none'`). A builder who changes their mind about
+> the file format cannot proceed.
+>
+> **(c) ⚠ Click-to-add always drops an UNCONNECTED node, and the editor explains it wrongly.** Any
+> palette click adds a floating node; the Recipe view immediately falls back to Canvas saying the
+> topology *"has a branch or connection the Recipe view can't represent"* — but there is no branch,
+> there is a disconnected node. Worse, a new pipeline already lifts to Collect → Parser → Map → Sink,
+> so adding a format-specific parse node yields TWO parse nodes and the save refuses with
+> `MULTI_PARSER` naming an internal node id (`'parse'`). The builder's natural path — "I want a CSV
+> parser, I'll click Delimited" — is a dead end; the required move (delete the generic Parser first)
+> is nowhere indicated.
+>
+> **(d) ⚠ The fixed-width FIELDS inputs have no accessible name.** Every input in that table reports
+> `aria-label: null` with no placeholder and no associated `<label>`, while the schema grid beside it
+> uses `aria-label="Field name"`. WCAG 2.2 AA (4.1.2) on a surface the project gates with axe-core.
+>
+> **Two more observations, not defects:** the generic `parser` node opens the Grammar DIALOG, whose
+> sample picker is **file-only** — the "Paste text" affordance exists only in the per-format drawer,
+> and the dialog's sample does not join the tab's sample thread. And a pipeline named with spaces
+> ("Orders CSV Feed") correctly stamps `id: orders_csv_feed`, but its `path` and every `dirs.*` keep
+> the raw spaced name — a live instance of the three-disagreeing-name-rules decision still open above.
+
+
 > ### 🟡 DATA-GOV-1 — operator CDR data lives on disk only; git exposure CLOSED (opened 2026-07-30, git half closed 2026-07-31)
 >
 > **The git hazard is resolved — verified 2026-07-31.** The original row flagged 7 commits
@@ -846,7 +891,16 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   test needs). The guard was true when written and is not true now. ⚠ Still real when it is built:
   `NodeConfigDialog` is handed no thread today (`pipeline-editor.component.ts:1466-1478`), so the slice is
   "thread the sample through + decide the no-sample UX", not "add a button"; and `openNodeConfig` is
-  `canAuthor()`-gated, so the affordance is invisible in View mode / the Business lens. ⛔ `schema`/`mapping` deliberately have no preview arm, mirroring `/test`.
+  `canAuthor()`-gated, so the affordance is invisible in View mode / the Business lens. 🔴 **And the
+  affordance that closure DID ship is now unreachable dead UI — confirmed live 2026-08-17**: the only
+  production opener of `NodeConfigDialog` is `pipeline-editor.component.ts:1466`, in the `category !==
+  'PARSE'` branch, where `bindKindFor(category)` is **always `null`**; `testableComponentId()` requires
+  a `bindKind`, so the "Test <component>…" button can never render. Opening a `transform.filter` node in
+  the running app shows only Cancel/Save. The whole `data.bindKind` half of that dialog — the component
+  picker, "New <kind>", `loadComponents`, `createComponent`, `openComponentTest` — is dead with it. Its
+  specs pass because they construct the dialog with `bindKind` set directly, bypassing the editor.
+  ⚠ NOT deleted: pre-existing dead code is filed, not removed (CLAUDE.md §3), and the honest choice is
+  between deleting it and rewiring it to the new inline-preview route — an operator call, not a cleanup. ⛔ `schema`/`mapping` deliberately have no preview arm, mirroring `/test`.
   - ~~G1 two of three test affordances 404~~ **CLOSED** — both gated behind `environment.mockFlows`
     rather than deleted (run-to-here is a complete mock-backed feature and is literally the Step 5 UI).
     ⚠ **Retraction:** a mid-flight note here claimed `/components/*` did not exist in the backend —
