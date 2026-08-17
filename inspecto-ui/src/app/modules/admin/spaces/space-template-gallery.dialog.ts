@@ -9,6 +9,8 @@ import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, Space, SpacesService, SpaceTemplateInfo } from 'app/inspecto/api';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 
 export interface SpaceTemplateGalleryData {
     /** Space ids already in use — the id control rejects a duplicate inline (product-wide rule). */
@@ -88,7 +90,7 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                 }
             </mat-dialog-content>
             <mat-dialog-actions align="end">
-                <button type="button" mat-button mat-dialog-close>Cancel</button>
+                <button type="button" mat-button (click)="requestClose()">Cancel</button>
             </mat-dialog-actions>
         } @else {
             <form [formGroup]="form" (ngSubmit)="submit()">
@@ -121,7 +123,7 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                 </mat-dialog-content>
                 <mat-dialog-actions align="end">
                     <button type="button" mat-button (click)="back()">Back</button>
-                    <button type="button" mat-button mat-dialog-close>Cancel</button>
+                    <button type="button" mat-button (click)="requestClose()">Cancel</button>
                     <button type="submit" mat-flat-button color="primary" [disabled]="form.invalid || saving()">
                         Create space
                     </button>
@@ -135,6 +137,10 @@ export class SpaceTemplateGalleryDialog {
     private api = inject(SpacesService);
     private toastr = inject(ToastrService);
     private ref = inject(MatDialogRef<SpaceTemplateGalleryDialog, Space>);
+    private confirm = inject(InspectoConfirmService);
+
+    /** Cancel/Esc/backdrop ask before discarding typed input (ui-design-review R2). */
+    readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
     readonly data: SpaceTemplateGalleryData = inject(MAT_DIALOG_DATA);
 
     readonly loading = signal(true);

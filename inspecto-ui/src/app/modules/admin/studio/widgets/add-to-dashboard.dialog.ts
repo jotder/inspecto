@@ -6,6 +6,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { Dashboard } from '../dashboards/dashboard-types';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 
 export interface AddToDashboardData {
     widgetId: string;
@@ -85,7 +87,7 @@ const NEW_DASHBOARD = '__new__';
             </form>
         </mat-dialog-content>
         <mat-dialog-actions align="end">
-            <button type="button" mat-button mat-dialog-close>Cancel</button>
+            <button type="button" mat-button (click)="requestClose()">Cancel</button>
             <button type="button" mat-flat-button color="primary" (click)="add()">Add</button>
         </mat-dialog-actions>
     `,
@@ -93,6 +95,10 @@ const NEW_DASHBOARD = '__new__';
 export class AddToDashboardDialog {
     private fb = inject(FormBuilder);
     private ref = inject(MatDialogRef<AddToDashboardDialog, AddToDashboardResult>);
+    private confirm = inject(InspectoConfirmService);
+
+    /** Cancel/Esc/backdrop ask before discarding typed input (ui-design-review R2). */
+    readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
     readonly data = inject<AddToDashboardData>(MAT_DIALOG_DATA);
     readonly NEW = NEW_DASHBOARD;
 

@@ -6,6 +6,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { BiTemplate } from 'app/inspecto/api';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 
 export interface ApplyTemplateData {
     template: BiTemplate;
@@ -62,7 +64,7 @@ export interface ApplyTemplateResult {
             </form>
         </mat-dialog-content>
         <mat-dialog-actions align="end">
-            <button type="button" mat-button mat-dialog-close>Cancel</button>
+            <button type="button" mat-button (click)="requestClose()">Cancel</button>
             <button type="button" mat-flat-button color="primary" (click)="apply()">Apply</button>
         </mat-dialog-actions>
     `,
@@ -70,6 +72,10 @@ export interface ApplyTemplateResult {
 export class ApplyTemplateDialog {
     private fb = inject(FormBuilder);
     private ref = inject(MatDialogRef<ApplyTemplateDialog, ApplyTemplateResult>);
+    private confirm = inject(InspectoConfirmService);
+
+    /** Cancel/Esc/backdrop ask before discarding typed input (ui-design-review R2). */
+    readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
     readonly data = inject<ApplyTemplateData>(MAT_DIALOG_DATA);
 
     readonly form = this.fb.group({

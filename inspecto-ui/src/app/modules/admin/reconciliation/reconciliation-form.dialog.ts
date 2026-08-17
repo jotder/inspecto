@@ -17,6 +17,8 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { Dataset } from '../studio/datasets/dataset-types';
 import { DatasetsService } from '../studio/datasets/datasets.service';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import {
     CompareColumn,
     DEFAULT_BANDS,
@@ -201,7 +203,7 @@ const breachNotBelowWarn: ValidatorFn = (c: AbstractControl): ValidationErrors |
                 </div>
             </mat-dialog-content>
             <mat-dialog-actions align="end">
-                <button type="button" mat-button mat-dialog-close>Cancel</button>
+                <button type="button" mat-button (click)="requestClose()">Cancel</button>
                 <button type="submit" mat-flat-button color="primary" [disabled]="form.invalid">
                     {{ editing ? 'Save' : 'Create' }}
                 </button>
@@ -213,6 +215,10 @@ export class ReconciliationFormDialog {
     private fb = inject(FormBuilder);
     private datasetsApi = inject(DatasetsService);
     private ref = inject(MatDialogRef<ReconciliationFormDialog, ReconciliationFormResult>);
+    private confirm = inject(InspectoConfirmService);
+
+    /** Cancel/Esc/backdrop ask before discarding typed input (ui-design-review R2). */
+    readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
     private data = inject<ReconciliationFormData | null>(MAT_DIALOG_DATA, { optional: true });
 
     readonly duplicating = !!this.data?.recon && !!this.data?.duplicate;

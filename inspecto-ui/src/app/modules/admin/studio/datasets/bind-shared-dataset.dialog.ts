@@ -7,6 +7,8 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { ExchangeGrant, ExchangeService } from 'app/inspecto/api';
 import { uniqueNameValidator } from 'app/inspecto/investigation';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 
 export interface BindSharedDatasetData {
     /** The active space id — grants where it is the consumer are the bindable ones. */
@@ -82,7 +84,7 @@ const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
             }
         </mat-dialog-content>
         <mat-dialog-actions align="end">
-            <button mat-button mat-dialog-close>Cancel</button>
+            <button mat-button (click)="requestClose()">Cancel</button>
             <button mat-flat-button color="primary" [disabled]="grants().length === 0" (click)="submit()">Bind</button>
         </mat-dialog-actions>
     `,
@@ -90,6 +92,10 @@ const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 export class BindSharedDatasetDialog {
     readonly data = inject<BindSharedDatasetData>(MAT_DIALOG_DATA);
     private ref = inject(MatDialogRef<BindSharedDatasetDialog>);
+    private confirm = inject(InspectoConfirmService);
+
+    /** Cancel/Esc/backdrop ask before discarding typed input (ui-design-review R2). */
+    readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
     private exchange = inject(ExchangeService);
     private fb = inject(FormBuilder);
 

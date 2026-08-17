@@ -40,6 +40,8 @@ import { pipelineOptionLoader, referenceOptionLoader } from 'app/inspecto/compon
 import { EnrichmentEditorComponent } from 'app/inspecto/enrichment/enrichment-editor.component';
 import { ENRICHMENT_WIRING_ATTRIBUTES } from 'app/inspecto/enrichment/enrichment-attributes';
 import { enrichmentWiringDefaults } from 'app/inspecto/enrichment/enrichment-wiring';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { ComponentFormDialog, ComponentFormResult } from 'app/modules/admin/components/component-form.dialog';
 import { groupByValidator, measuresValidator } from './measure-grammar';
 import { nodeAttributesFor } from './node-attributes';
@@ -353,7 +355,7 @@ export interface NodeConfigResult {
                 }
             </mat-dialog-content>
             <mat-dialog-actions align="end">
-                <button type="button" mat-button mat-dialog-close>Cancel</button>
+                <button type="button" mat-button (click)="requestClose()">Cancel</button>
                 <button type="submit" mat-flat-button color="primary" [disabled]="savingEnrichment()">
                     @if (savingEnrichment()) {
                         <mat-spinner diameter="16" class="mr-2"></mat-spinner>
@@ -374,6 +376,24 @@ export class NodeConfigDialog {
     private toastr = inject(ToastrService);
     private dialog = inject(MatDialog);
     private ref = inject(MatDialogRef<NodeConfigDialog, NodeConfigResult>);
+    private confirm = inject(InspectoConfirmService);
+
+    /**
+     * Cancel/Esc/backdrop ask before discarding typed input (ui-design-review R2). ⚠ The union of ALL
+     * FOUR surfaces this dialog can render: its own header fields plus whichever config editor the
+     * node type mounted. Asking only `configForm()` would miss the enrichment editor entirely, which
+     * `configForm()` deliberately does not cover — and this is the dialog where a discard costs most,
+     * since a node's config is the raw config-file section verbatim.
+     */
+    readonly requestClose = guardDirtyClose(
+        this.ref,
+        () =>
+            this.form.dirty ||
+            (this.schemaForm?.isDirty() ?? false) ||
+            (this.collector?.isDirty() ?? false) ||
+            (this.enrichEditor()?.isDirty() ?? false),
+        this.confirm,
+    );
     readonly data = inject<NodeConfigData>(MAT_DIALOG_DATA);
 
     @ViewChild(InspectoSchemaFormComponent)

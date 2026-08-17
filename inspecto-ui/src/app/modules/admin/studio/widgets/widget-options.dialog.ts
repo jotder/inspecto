@@ -4,6 +4,8 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { WidgetOptions } from './widget-types';
 import { WIDGET_OPTION_ATTRIBUTES } from './widget-option-attributes';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 
 /** The advanced (cog) dialog's input/output — the widget's current options, closed with the edited options
  *  (or undefined on cancel). A closed, curated set of knobs — no free-form styling. */
@@ -25,13 +27,17 @@ export type WidgetOptionsData = WidgetOptions;
             <inspecto-schema-form #sf [specs]="attributes" [initial]="initialValue"></inspecto-schema-form>
         </mat-dialog-content>
         <mat-dialog-actions align="end">
-            <button type="button" mat-button mat-dialog-close>Cancel</button>
+            <button type="button" mat-button (click)="requestClose()">Cancel</button>
             <button type="button" mat-flat-button color="primary" (click)="save()">Save</button>
         </mat-dialog-actions>
     `,
 })
 export class WidgetOptionsDialog {
     private ref = inject(MatDialogRef<WidgetOptionsDialog, WidgetOptions>);
+    private confirm = inject(InspectoConfirmService);
+
+    /** Cancel/Esc/backdrop ask before discarding typed input (ui-design-review R2). */
+    readonly requestClose = guardDirtyClose(this.ref, () => this.schemaForm?.isDirty() ?? false, this.confirm);
     readonly data = inject<WidgetOptionsData>(MAT_DIALOG_DATA);
 
     @ViewChild('sf') schemaForm!: InspectoSchemaFormComponent;

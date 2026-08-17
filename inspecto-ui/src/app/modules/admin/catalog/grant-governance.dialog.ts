@@ -5,6 +5,8 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { ExchangeGrant } from 'app/inspecto/api';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 
 export interface GrantGovernanceData {
     field: 'pin' | 'expiry';
@@ -52,7 +54,7 @@ export type GrantGovernanceResult = string | number | null;
             </form>
         </mat-dialog-content>
         <mat-dialog-actions align="end">
-            <button mat-button mat-dialog-close>Cancel</button>
+            <button mat-button (click)="requestClose()">Cancel</button>
             <button mat-button (click)="clear()">Clear</button>
             <button mat-flat-button color="primary" (click)="submit()">Save</button>
         </mat-dialog-actions>
@@ -61,6 +63,10 @@ export type GrantGovernanceResult = string | number | null;
 export class GrantGovernanceDialog {
     readonly data = inject<GrantGovernanceData>(MAT_DIALOG_DATA);
     private ref = inject(MatDialogRef<GrantGovernanceDialog>);
+    private confirm = inject(InspectoConfirmService);
+
+    /** Cancel/Esc/backdrop ask before discarding typed input (ui-design-review R2). */
+    readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
 
     readonly isPin = this.data.field === 'pin';
 

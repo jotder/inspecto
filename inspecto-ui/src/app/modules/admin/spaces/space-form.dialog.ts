@@ -10,6 +10,8 @@ import { forkJoin, of, switchMap } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { environment } from 'environments/environment';
 import { apiErrorMessage, Branding, BrandingService, Space, SpacesService } from 'app/inspecto/api';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 
 /** Rejects a value (case-insensitive, trimmed) already present in `taken` → `{ duplicate: true }`. */
 function uniqueNameValidator(taken: string[]): ValidatorFn {
@@ -149,7 +151,7 @@ export interface SpaceFormData {
                 </mat-form-field>
             </mat-dialog-content>
             <mat-dialog-actions align="end">
-                <button type="button" mat-button mat-dialog-close>Cancel</button>
+                <button type="button" mat-button (click)="requestClose()">Cancel</button>
                 <button type="submit" mat-flat-button color="primary" [disabled]="form.invalid || saving">
                     {{ editMode ? 'Save' : 'Create' }}
                 </button>
@@ -163,6 +165,10 @@ export class SpaceFormDialog {
     private brandingApi = inject(BrandingService);
     private toastr = inject(ToastrService);
     private ref = inject(MatDialogRef<SpaceFormDialog, Space>);
+    private confirm = inject(InspectoConfirmService);
+
+    /** Cancel/Esc/backdrop ask before discarding typed input (ui-design-review R2). */
+    readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
     protected data = inject<SpaceFormData | null>(MAT_DIALOG_DATA);
 
     readonly editMode = !!this.data?.space;

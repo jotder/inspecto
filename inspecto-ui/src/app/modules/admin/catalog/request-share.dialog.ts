@@ -6,6 +6,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { ExchangeOffer } from 'app/inspecto/api';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 
 export interface RequestShareData {
     offer: ExchangeOffer;
@@ -62,7 +64,7 @@ export interface RequestShareResult {
             </form>
         </mat-dialog-content>
         <mat-dialog-actions align="end">
-            <button mat-button mat-dialog-close>Cancel</button>
+            <button mat-button (click)="requestClose()">Cancel</button>
             <button mat-flat-button color="primary" (click)="submit()">Request</button>
         </mat-dialog-actions>
     `,
@@ -70,6 +72,10 @@ export interface RequestShareResult {
 export class RequestShareDialog {
     readonly data = inject<RequestShareData>(MAT_DIALOG_DATA);
     private ref = inject(MatDialogRef<RequestShareDialog>);
+    private confirm = inject(InspectoConfirmService);
+
+    /** Cancel/Esc/backdrop ask before discarding typed input (ui-design-review R2). */
+    readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
 
     readonly form = inject(FormBuilder).nonNullable.group({
         purpose: [''],
