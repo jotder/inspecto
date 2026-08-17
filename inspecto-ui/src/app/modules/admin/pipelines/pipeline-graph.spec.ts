@@ -810,7 +810,7 @@ const routedPipeline = (): AuthoredPipeline => ({
 });
 
 describe('addRouteBranch', () => {
-    it('adds the branch entry plus an unconfigured sink wired via route:<key>', () => {
+    it('adds the branch entry plus a sink wired via route:<key>, carrying a derived destination', () => {
         const next = addRouteBranch(routedPipeline(), 'route-1', 'apac')!;
         expect(next).not.toBeNull();
         const route = next.nodes.find((n) => n.id === 'route-1')!;
@@ -819,8 +819,29 @@ describe('addRouteBranch', () => {
         expect(edge.from).toBe('route-1');
         const sink = next.nodes.find((n) => n.id === edge.to)!;
         expect(sink.type).toBe('sink.persistent');
+        // 🔴 `database` is the branch↔sink join key on BOTH halves of the round-trip, so a sink created
+        // without one lowers to nothing and the branch loses its target. This fixture's existing sinks
+        // declare no database, so the destination falls back to the scaffold's `data/<name>` convention.
+        expect(sink.config!['database']).toBe('data/p/apac/database');
         // the whole thing stays recipe-expressible
         expect(detectStepChain(next)!.branches!.map((b) => b.key)).toEqual(['emea', 'other', 'apac']);
+    });
+
+    /** With a primary sink present the branch store lands BESIDE it, whatever its path. */
+    it('derives the branch store beside the primary sink home', () => {
+        const withPrimary: AuthoredPipeline = {
+            name: 'orders',
+            active: false,
+            nodes: [
+                an('route-1', 'transform.route', { mode: 'case', branches: [] }),
+                an('sink', 'sink.persistent', { database: '/srv/lake/orders/database' }),
+            ],
+            edges: [],
+        };
+        const next = addRouteBranch(withPrimary, 'route-1', 'late')!;
+        const added = next.nodes.find((n) => n.id !== 'sink' && n.type === 'sink.persistent')!;
+        expect(added.config!['database']).toBe('/srv/lake/orders/late/database');
+        expect(added.config!['backup']).toBe('/srv/lake/orders/late/backup');
     });
 
     it('refuses a duplicate key (the recipe branches map would silently collapse it server-side) and a blank key', () => {
@@ -964,5 +985,41 @@ describe('route parity round trip (mock lift/lower mirrors PipelineEditable/Pipe
         // and the round trip re-lifts both branches
         const relifted = detectStepChain(liftConfig(out))!;
         expect(relifted.branches!.map((b) => b.key).sort()).toEqual(['errors', 'main']);
+    });
+
+    /**
+     * 🔴 The same trip WITHOUT hand-configuring the new branch's destination — i.e. what the Recipe
+     * editor actually produces. The test above passed while this was broken precisely because it set
+     * `database: '/db-errors'` itself, supplying by hand the one thing the UI never supplied: the branch
+     * sink was created with an empty config, `routeSection` skips a branch whose target declares no
+     * database, `sinks:` is keyed by distinct database — so the branch lowered to NOTHING, the save
+     * reported success, and reopening showed the destination gone. Reproduced live 2026-08-17.
+     */
+    it('keeps a branch added in the editor across a save, with no manual destination', async () => {
+        const { liftConfig, lowerGraph } = await import('app/inspecto/mock/pipeline-editable');
+        const cfg = {
+            name: 'orders',
+            active: false,
+            collector: { id: 'SRC' },
+            dirs: { poll: '/in', database: '/db' },
+            parsing: { grammar: 'grammar/pipe' },
+            route: { mode: 'case', branches: [{ key: 'main', where: 'AMT > 0', database: '/db' }] },
+        } as Record<string, unknown>;
+
+        const edited = addRouteBranch(liftConfig(structuredClone(cfg)), 'route', 'errors')!;
+        const lowered = lowerGraph(edited, structuredClone(cfg), false);
+        expect('config' in lowered, JSON.stringify(lowered)).toBe(true);
+        const out = (lowered as { config: Record<string, unknown> }).config;
+
+        // the branch entry carries a destination, and it is a SECOND one, so `sinks:` is emitted
+        const route = out['route'] as { branches: { key: string; database?: string }[] };
+        expect(route.branches[1]).toMatchObject({ key: 'errors', database: '/db/errors/database' });
+        expect((out['sinks'] as unknown[]).length).toBe(2);
+
+        // …and the branch still has a target after the reopen, which is the whole point
+        const relifted = liftConfig(out);
+        const branchEdge = relifted.edges.find((e) => e.rel === 'route:errors');
+        expect(branchEdge, 'the branch lost its destination on the round trip').toBeDefined();
+        expect(relifted.nodes.some((n) => n.id === branchEdge!.to && n.type === 'sink.persistent')).toBe(true);
     });
 });

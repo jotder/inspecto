@@ -253,11 +253,11 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 
 ## 5. UI residuals + security-module residuals
 
-> ### ✅ BUILDER-2 — seven more defects found by driving the editor as a builder, all FIXED (2026-08-17)
+> ### ✅ BUILDER-2 — nine more defects found by driving the editor as a builder, all FIXED (2026-08-17)
 >
 > A second builder session drove **create → pick a parse format → sample → Test parse → Apply → Save →
-> Test mapping → Dry-run → Activate** across **CSV, NDJSON, regex and fixed-width**. Seven defects, each
-> reproduced live and each fixed in the same shift, every one pinned by a spec:
+> Test mapping → Dry-run → Activate** across **CSV, NDJSON, regex and fixed-width**. Nine defects, each
+> reproduced live and each fixed in the same shift, every one pinned by a spec. **Item 8 is DATA LOSS**:
 >
 > 1. **The Load drawer's Apply was never armed by a mapping edit** — the worst of the set. The pane
 >    emitted `dirtyChange` only from the node effect and from `submit()` itself, so a builder could
@@ -289,7 +289,23 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 >    and fixed-width `start` never said it is a **0-based** offset — a builder counting from 1 gets every
 >    field shifted one character, which "parses" fine and is visible only in the preview values.
 >
-> 8. **The offline `json` preview ignored `json.format`** and always read NDJSON, so a builder pasting a
+> 8. 🔴 **DATA LOSS — a branch added in the Recipe editor was silently destroyed on save.** Add a Route,
+>    type a branch key, press *Add a branch*: the reducer wired a companion `sink.persistent` with an
+>    **empty config**. But `database` is the branch↔sink **JOIN KEY on both halves of the round-trip** —
+>    `routeSection` stamps each branch entry with the database of the node its `route:<key>` edge feeds and
+>    `continue`s when there is none, the plural `sinks:` list is keyed by *distinct database*, and the lift
+>    pairs branches back to sinks by that same value. So the branch lowered to **nothing**: the save
+>    answered success and cleared the dirty dot, and reopening showed 5 nodes where there had been 6, the
+>    `route:<key>` edge gone and the branch entry left dangling. Fixed by deriving the destination
+>    (`branchDestination`) beside the primary sink's own home, falling back to `pipelineScaffold`'s
+>    `data/<name>` convention — derive-instead-of-ask, as the enrichment wiring does.
+>    🔴 **A round-trip spec for this already existed and passed**, because it set
+>    `database: '/db-errors'` on the new sink itself — supplying by hand the one thing the UI never
+>    supplied. The new spec omits it, and was probe-verified to fail against the old reducer.
+>    **⚠ The lesson generalises: a round-trip test that configures the artifact under test is not a test of
+>    the surface that creates it.**
+>
+> 9. **The offline `json` preview ignored `json.format`** and always read NDJSON, so a builder pasting a
 >    JSON **array** document and choosing "One JSON array of records" — the *correct* setting — was told 1
 >    row parsed and **3 were REJECTED**. Being misleading is worse than being limited: the arm now honours
 >    the published `newline | array | auto` enum, tries the array first for `auto`, and 422s an NDJSON

@@ -893,3 +893,30 @@ limited**: a JSON *array* document with the correct "One JSON array of records" 
 3 rejected, so a builder would blame their file. It now reads the array shape, tries it first under `auto`,
 and 422s an NDJSON sample under `array`. The rule this restores is the mock's own: **stricter than the
 server, never more lenient — and never differently right.**
+
+## A route branch's destination is its IDENTITY, not decoration (2026-08-17)
+
+`database` is the **branch↔sink join key on both halves of the lift/lower round trip**, because edges do
+not survive the flat file:
+
+- lowering stamps every branch entry with the database of the node its `route:<key>` edge feeds
+  (`routeSection`), and skips a branch whose target declares none;
+- the plural `sinks:` block is keyed by **distinct** database, so a destination-less sink contributes
+  nothing and `sinks:` is not even emitted;
+- the lift rebuilds branch→sink pairing from that stamped value.
+
+🔴 So `addRouteBranch` creating its companion sink with an **empty config** was silent DATA LOSS: the
+branch lowered to nothing, the save reported success and cleared the dirty flag, and reopening the
+pipeline showed the branch's destination gone and its entry dangling. `branchDestination()` now derives it
+beside the primary sink's own home (`<primary home>/<branchKey>/database`), falling back to
+`pipelineScaffold`'s `data/<name>` convention when no sink declares one yet. ⚠ Quarantine sinks are
+excluded by the `typeof database === 'string'` test — they carry only `dir`.
+
+⛔ **Do not "simplify" this by leaving the sink blank and validating later.** "Needs configuration" on the
+new node looks like the same state as any unconfigured Step, and it is not: this one cannot be saved at
+all, and says nothing about why.
+
+🔴 **A round-trip spec for the route existed and passed the whole time** — it set `database` on the new
+branch sink itself, supplying by hand the one thing the editor never supplied. **A round-trip test that
+configures the artifact under test is not a test of the surface that creates it.** The replacement omits
+the manual step and was probe-verified to fail against the old reducer.

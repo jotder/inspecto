@@ -814,9 +814,35 @@ function routeBranchesOf(node: AuthoredNode): { key?: string; where?: string; [k
 }
 
 /**
+ * Where a newly-added branch writes.
+ *
+ * <p>🔴 **The destination is not cosmetic — `database` is the branch↔sink JOIN KEY on BOTH halves of the
+ * round-trip.** Lowering stamps each branch entry with the database of the node its `route:<key>` edge
+ * feeds (`routeSection`), the plural `sinks:` list is keyed by distinct database, and the lift pairs
+ * branches back to sinks by that same value. A branch sink created with an EMPTY config therefore
+ * lowered to nothing at all: the save answered success and cleared the dirty flag, and reopening the
+ * pipeline showed the branch's destination gone — found by adding a branch in the Recipe editor and
+ * saving (2026-08-17).
+ *
+ * <p>Derived from the primary sink's own home so the branch store lands BESIDE it, falling back to the
+ * same `data/<name>` convention {@link pipelineScaffold} writes. Derive-instead-of-ask, as the
+ * enrichment wiring does.
+ */
+function branchDestination(model: AuthoredPipeline, key: string): Record<string, unknown> {
+    // Quarantine sinks carry only `dir`, so the string test excludes them — same filter the editor uses.
+    const primary = model.nodes.find(
+        (n) => n.type === 'sink.persistent' && typeof n.config?.['database'] === 'string',
+    );
+    const database = String(primary?.config?.['database'] ?? `data/${model.name}/database`);
+    const home = `${database.replace(/\/database$/, '')}/${key}`;
+    return { database: `${home}/database`, backup: `${home}/backup`, temp: `${home}/temp` };
+}
+
+/**
  * Add a named branch to a route Step: the branch entry lands in the node's `branches` list and a new
- * UNCONFIGURED persistent sink is wired via a `route:<key>` edge — RecipeCompiler's rule (a branch
- * compiles as exactly one sink step for now), so the graph never holds a dangling branch entry.
+ * persistent sink is wired via a `route:<key>` edge — RecipeCompiler's rule (a branch compiles as
+ * exactly one sink step for now), so the graph never holds a dangling branch entry. The sink carries a
+ * DERIVED destination ({@link branchDestination}); everything else about it is still the author's.
  * Returns `null` for a missing/non-route node, a blank key, or a duplicate key (the recipe `branches`
  * map would silently collapse duplicates server-side — the UI refuses instead).
  */
@@ -832,7 +858,7 @@ export function addRouteBranch(model: AuthoredPipeline, routeId: string, key: st
         id: uniqueNodeId(model, 'sink.persistent'),
         type: 'sink.persistent',
         name: k,
-        config: {},
+        config: branchDestination(model, k),
     };
     return {
         ...model,
