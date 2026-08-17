@@ -9,6 +9,8 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, CaseRule, ObjectsService } from 'app/inspecto/api';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { INCIDENT_PRIORITIES, INCIDENT_STATUSES } from './mail-model';
 
 /**
@@ -148,7 +150,7 @@ import { INCIDENT_PRIORITIES, INCIDENT_STATUSES } from './mail-model';
             </section>
         </mat-dialog-content>
         <mat-dialog-actions align="end">
-            <button mat-button [mat-dialog-close]="changed()">Close</button>
+            <button mat-button (click)="requestClose()">Close</button>
             <button mat-stroked-button [disabled]="busy()" (click)="save(false)">Save</button>
             <button mat-flat-button color="primary" [disabled]="busy()" (click)="save(true)">
                 Save &amp; evaluate
@@ -161,6 +163,14 @@ export class CaseRulesDialog {
     private ref = inject(MatDialogRef<CaseRulesDialog>);
     private toastr = inject(ToastrService);
     private fb = inject(FormBuilder);
+    private confirm = inject(InspectoConfirmService);
+
+    /**
+     * ⚠ Carries `changed()` as the close value: the shell reloads on it, so closing bare would drop
+     * every rule edit made in this dialog from the list behind it. Guarded because the "add a rule"
+     * form is a draft — Esc used to bin a half-typed rule without asking.
+     */
+    readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm, () => this.changed());
 
     readonly rules = signal<CaseRule[]>([]);
     readonly busy = signal(false);

@@ -55,6 +55,32 @@ describe('guardDirtyClose', () => {
         expect(close).toHaveBeenCalledTimes(1);
     });
 
+    /**
+     * ⚠ A manage-rules dialog's close VALUE is a signal its caller reloads on ("did anything change").
+     * Adopting the guard without carrying it would swap that for `undefined` and silently drop the
+     * refresh — the edits would be saved on the server and invisible in the list behind the dialog.
+     */
+    it('closes with the caller-meaningful result when one is supplied', async () => {
+        const { ref, close } = fakeRef();
+        const { svc } = fakeConfirm(true);
+        let changed = false;
+        const requestClose = guardDirtyClose(ref, () => false, svc, () => changed);
+
+        await requestClose();
+        expect(close).toHaveBeenLastCalledWith(false);
+
+        changed = true; // a rule was saved in the meantime — the result is read AT close time
+        await requestClose();
+        expect(close).toHaveBeenLastCalledWith(true);
+    });
+
+    it('closes bare when no result is supplied, exactly as before', async () => {
+        const { ref, close } = fakeRef();
+        const { svc } = fakeConfirm(true);
+        await guardDirtyClose(ref, () => false, svc)();
+        expect(close).toHaveBeenLastCalledWith(undefined);
+    });
+
     it('ignores non-Escape keys', async () => {
         const { ref, keydown, close } = fakeRef();
         const { svc } = fakeConfirm(true);

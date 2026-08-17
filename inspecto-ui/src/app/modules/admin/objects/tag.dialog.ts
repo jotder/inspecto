@@ -9,6 +9,8 @@ import { MatInputModule } from '@angular/material/input';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, ObjectsService, OperationalObject, Tag } from 'app/inspecto/api';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { objectTags } from './mail-model';
 
 /** What the shell applies after the dialog closes: tags to add to / remove from every target. */
@@ -79,7 +81,7 @@ type TagState = 'all' | 'some' | 'none';
             </div>
         </mat-dialog-content>
         <mat-dialog-actions align="end">
-            <button mat-button [mat-dialog-close]="null">Cancel</button>
+            <button mat-button (click)="requestClose()">Cancel</button>
             <button mat-flat-button color="primary" [disabled]="!dirty()" (click)="apply()">Apply</button>
         </mat-dialog-actions>
     `,
@@ -88,6 +90,19 @@ export class TagDialog {
     private api = inject(ObjectsService);
     private ref = inject(MatDialogRef<TagDialog>);
     private toastr = inject(ToastrService);
+    private confirm = inject(InspectoConfirmService);
+
+    /**
+     * ⚠ A half-typed new-tag name counts as dirty too — `dirty` only tracks the tri-state toggles, so
+     * guarding on it alone would still bin what the operator was typing. Closes bare: the caller
+     * treats any falsy result as "cancelled, but re-read the registry" (a tag may have been created
+     * in here), which `undefined` satisfies exactly as the old `null` did.
+     */
+    readonly requestClose = guardDirtyClose(
+        this.ref,
+        () => this.dirty() || !!this.newTag.value?.trim(),
+        this.confirm,
+    );
     readonly data = inject<{ targets: OperationalObject[]; registry: Tag[] }>(MAT_DIALOG_DATA);
 
     readonly tags = signal<Tag[]>([...this.data.registry]);

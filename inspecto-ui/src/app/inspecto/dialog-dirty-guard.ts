@@ -13,11 +13,17 @@ import { InspectoConfirmService } from './confirm.service';
  * Returns the guarded close request — bind the dialog's Cancel button to it (instead of
  * `mat-dialog-close`, which would skip the guard). The subscriptions complete with the dialog
  * (MatDialogRef finalizes its event streams on close), so no teardown is needed.
+ *
+ * `result` is for a dialog whose close value MEANS something — e.g. a manage-rules dialog closing
+ * with "did anything change", which its caller reloads on. Adopting the guard without it would swap
+ * that signal for `undefined` and silently drop the caller's refresh. Omitted ⇒ `ref.close()`,
+ * exactly as before, so every existing adopter is unaffected.
  */
 export function guardDirtyClose(
     ref: MatDialogRef<unknown, unknown>,
     isDirty: () => boolean,
     confirm: InspectoConfirmService,
+    result?: () => unknown,
 ): () => Promise<void> {
     ref.disableClose = true;
     const tryClose = async (): Promise<void> => {
@@ -29,7 +35,7 @@ export function guardDirtyClose(
                 cancelText: 'Keep editing',
             }))
         ) {
-            ref.close();
+            ref.close(result?.());
         }
     };
     // Optional-chained so minimal test doubles (`{ close }`) keep working; a real MatDialogRef

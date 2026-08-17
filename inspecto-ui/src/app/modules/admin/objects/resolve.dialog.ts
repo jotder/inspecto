@@ -4,6 +4,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 
 /**
  * Resolve dialog — the state change to Resolved requires a resolution comment (GLOSSARY §9);
@@ -36,13 +38,17 @@ import { MatInputModule } from '@angular/material/input';
             </form>
         </mat-dialog-content>
         <mat-dialog-actions align="end">
-            <button mat-button [mat-dialog-close]="null">Cancel</button>
+            <button mat-button (click)="requestClose()">Cancel</button>
             <button mat-flat-button color="primary" (click)="apply()">Resolve</button>
         </mat-dialog-actions>
     `,
 })
 export class ResolveDialog {
     private ref = inject(MatDialogRef<ResolveDialog>);
+    private confirm = inject(InspectoConfirmService);
+
+    /** Cancel/Esc/backdrop ask before discarding typed input (ui-design-review R2). */
+    readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
     private fb = inject(FormBuilder);
     readonly data = inject<{ count: number; label: string }>(MAT_DIALOG_DATA);
 

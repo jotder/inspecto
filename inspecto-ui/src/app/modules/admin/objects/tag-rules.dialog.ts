@@ -9,6 +9,8 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, ObjectsService, Tag, TagRule } from 'app/inspecto/api';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { CASE_STATUSES, INCIDENT_PRIORITIES, INCIDENT_STATUSES } from './mail-model';
 
 /**
@@ -155,7 +157,7 @@ import { CASE_STATUSES, INCIDENT_PRIORITIES, INCIDENT_STATUSES } from './mail-mo
             </section>
         </mat-dialog-content>
         <mat-dialog-actions align="end">
-            <button mat-button [mat-dialog-close]="changed()">Close</button>
+            <button mat-button (click)="requestClose()">Close</button>
             <button mat-stroked-button [disabled]="busy()" (click)="save(false)">Save</button>
             <button mat-flat-button color="primary" [disabled]="busy()" (click)="save(true)">
                 Save &amp; apply now
@@ -174,6 +176,15 @@ export class TagRulesDialog {
         registry: Tag[];
         rules: TagRule[];
     }>(MAT_DIALOG_DATA);
+
+    private confirm = inject(InspectoConfirmService);
+
+    /**
+     * ⚠ Carries `changed()`: the shell reloads the list on it (and only re-reads tags otherwise), so
+     * closing bare would leave every rule edit invisible behind the dialog. Guarded because the
+     * "add a rule" form is a draft Esc used to discard silently.
+     */
+    readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm, () => this.changed());
 
     readonly rules = signal<TagRule[]>([...this.data.rules]);
     readonly busy = signal(false);

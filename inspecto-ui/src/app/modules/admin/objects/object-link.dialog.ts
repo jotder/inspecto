@@ -6,6 +6,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, ObjectsService, OperationalObject } from 'app/inspecto/api';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 
 /** Create a correlation link from one object to another — POST /objects/{id}/links. */
 @Component({
@@ -42,7 +44,7 @@ import { apiErrorMessage, ObjectsService, OperationalObject } from 'app/inspecto
             </form>
         </mat-dialog-content>
         <mat-dialog-actions align="end">
-            <button mat-button [mat-dialog-close]="null">Cancel</button>
+            <button mat-button (click)="requestClose()">Cancel</button>
             <button mat-flat-button color="primary" [disabled]="saving" (click)="save()">Link</button>
         </mat-dialog-actions>
     `,
@@ -50,6 +52,10 @@ import { apiErrorMessage, ObjectsService, OperationalObject } from 'app/inspecto
 export class ObjectLinkDialog implements OnInit {
     private api = inject(ObjectsService);
     private ref = inject(MatDialogRef<ObjectLinkDialog>);
+    private confirm = inject(InspectoConfirmService);
+
+    /** Cancel/Esc/backdrop ask before discarding typed input (ui-design-review R2). */
+    readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
     private toastr = inject(ToastrService);
     private fb = inject(FormBuilder);
     readonly data = inject<{ fromId: string; fromType: string }>(MAT_DIALOG_DATA);

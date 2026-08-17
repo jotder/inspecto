@@ -5,6 +5,8 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { INCIDENT_TAXONOMY, joinCategory, splitCategory } from './incident-taxonomy';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 
 /**
  * 3-layer categorization picker (cascading L1 → L2 → L3 selects over {@link INCIDENT_TAXONOMY}).
@@ -59,13 +61,17 @@ import { INCIDENT_TAXONOMY, joinCategory, splitCategory } from './incident-taxon
             </form>
         </mat-dialog-content>
         <mat-dialog-actions align="end">
-            <button mat-button [mat-dialog-close]="null">Cancel</button>
+            <button mat-button (click)="requestClose()">Cancel</button>
             <button mat-flat-button color="primary" (click)="apply()">Apply</button>
         </mat-dialog-actions>
     `,
 })
 export class CategorizeDialog {
     private ref = inject(MatDialogRef<CategorizeDialog>);
+    private confirm = inject(InspectoConfirmService);
+
+    /** Cancel/Esc/backdrop ask before discarding typed input (ui-design-review R2). */
+    readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
     private fb = inject(FormBuilder);
     readonly data = inject<{ current?: string; hint?: string }>(MAT_DIALOG_DATA);
 

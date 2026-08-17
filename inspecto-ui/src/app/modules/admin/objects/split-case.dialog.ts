@@ -8,6 +8,8 @@ import { MatInputModule } from '@angular/material/input';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, ObjectGraphNode, ObjectsService, OperationalObject } from 'app/inspecto/api';
 import { currentOperator } from './mail-model';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 
 /**
  * <b>Split</b> a Case (C2, GLOSSARY §9): tick the member incidents to carve out into a new case
@@ -60,7 +62,7 @@ import { currentOperator } from './mail-model';
             </div>
         </mat-dialog-content>
         <mat-dialog-actions align="end">
-            <button mat-button [mat-dialog-close]="false">Cancel</button>
+            <button mat-button (click)="requestClose()">Cancel</button>
             <button mat-flat-button color="primary" [disabled]="saving()" (click)="split()">Split</button>
         </mat-dialog-actions>
     `,
@@ -68,6 +70,10 @@ import { currentOperator } from './mail-model';
 export class SplitCaseDialog {
     private api = inject(ObjectsService);
     private ref = inject(MatDialogRef<SplitCaseDialog>);
+    private confirm = inject(InspectoConfirmService);
+
+    /** Cancel/Esc/backdrop ask before discarding typed input (ui-design-review R2). */
+    readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
     private toastr = inject(ToastrService);
     private fb = inject(FormBuilder);
     readonly data = inject<{
