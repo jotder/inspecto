@@ -749,12 +749,13 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         if (uiDir == null) return false;
         String rel = path.equals("/") ? "index.html" : path.substring(1);   // strip leading '/'
         Path target = uiDir.resolve(rel).normalize();
-        if (!target.startsWith(uiDir)) return false;                         // traversal guard
+        if (!target.startsWith(uiDir)) { logStaticMiss(ex, "outside the ui root"); return false; }
         if (Files.isRegularFile(target)) { writeFile(ex, target); return true; }
         if (!hasExtension(rel)) {                                            // SPA deep link
             Path index = uiDir.resolve("index.html");
             if (Files.isRegularFile(index)) { writeFile(ex, index); return true; }
         }
+        logStaticMiss(ex, "no such file under the ui root");
         return false;
     }
 
@@ -804,14 +805,29 @@ public final class ControlApi implements AutoCloseable, ApiContext {
      * mid-write never logs, which is precisely the "module came back short" shape being hunted. The
      * byte count is what was actually handed to the response body, not the file size.
      *
+     * <p>The SERVED file is logged, not just the request path: {@link #serveStatic} answers every
+     * extensionless path with {@code index.html}, so the URI alone cannot tell an SPA shell response
+     * apart from a real asset — and "a chunk came back as HTML" is one of the shapes being hunted.
+     *
      * <p>⚠ DEBUG deliberately: one line per chunk is ~130 lines per cold load, which is diagnostic gold
      * for an hour and noise for ever after. Enable with
      * {@code -Dorg.slf4j.simpleLogger.log.com.gamma.control.ControlApi=debug}.
      */
     private void logStatic(HttpExchange ex, Path file, int status, int bytes) {
         if (!log.isDebugEnabled()) return;
-        log.debug("[UI-STATIC] {} {} -> {} ({} bytes, etag-match={})",
-                ex.getRequestMethod(), ex.getRequestURI().getPath(), status, bytes, status == 304);
+        log.debug("[UI-STATIC] {} {} -> {} ({} bytes, served={})",
+                ex.getRequestMethod(), ex.getRequestURI().getPath(), status, bytes, file.getFileName());
+    }
+
+    /**
+     * The other half of the capture: a static request that resolves to NO file never reaches
+     * {@link #writeFile} — {@link #serveStatic} returns false and the caller answers a JSON 404. That is
+     * exactly the BUNDLE-1 shape (the new {@code index.html} importing a chunk the bundle does not ship),
+     * so leaving it unlogged would make the one decisive line missing from every capture.
+     */
+    private void logStaticMiss(HttpExchange ex, String why) {
+        if (!log.isDebugEnabled()) return;
+        log.debug("[UI-STATIC] {} {} -> 404 ({})", ex.getRequestMethod(), ex.getRequestURI().getPath(), why);
     }
 
     /** True when the last path segment carries a file extension (e.g. {@code main.js}, not {@code dashboard}). */
