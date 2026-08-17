@@ -79,22 +79,37 @@
                         <mat-icon svgIcon="heroicons_outline:document-duplicate"></mat-icon>
                         <span>Save as template&hellip;</span>
                     </button>
-                    <button mat-menu-item (click)="exportDocument()" [disabled]="exportingDocument()">
-                        <mat-icon svgIcon="heroicons_outline:document-text"></mat-icon>
-                        <span>Export document</span>
-                    </button>
-                    <!-- P6-e: the portable `inspecto-stream-config` bundle (config + satellites), re-homed
-                         from the retired onboarding shell. ⛔ NOT the transfer menu's Metadata Bundle. -->
-                    <button mat-menu-item (click)="exportConfig()" [disabled]="exportingConfig()">
-                        <mat-icon svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
-                        <span>Export configuration</span>
-                    </button>
                     <button mat-menu-item (click)="deletePipeline()">
                         <mat-icon svgIcon="heroicons_outline:trash"></mat-icon>
                         <span>Delete pipeline</span>
                     </button>
                 </mat-menu>
             }
+
+            <!-- Both exports are READ-ONLY, so they live OUTSIDE the canAuthor() block: a Business-lens
+                 operator handing a config to support is the point. They sat in the author menu from the
+                 P6-e re-homing until 2026-08-17, which contradicted that stated intent. -->
+            <button
+                mat-icon-button
+                [matMenuTriggerFor]="exportMenu"
+                [disabled]="!selectedId()"
+                matTooltip="Export"
+                aria-label="Export"
+            >
+                <mat-icon svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
+            </button>
+            <mat-menu #exportMenu="matMenu">
+                <button mat-menu-item (click)="exportDocument()" [disabled]="exportingDocument()">
+                    <mat-icon svgIcon="heroicons_outline:document-text"></mat-icon>
+                    <span>Export document</span>
+                </button>
+                <!-- P6-e: the portable `inspecto-stream-config` bundle (config + satellites), re-homed
+                     from the retired onboarding shell. ⛔ NOT the transfer menu's Metadata Bundle. -->
+                <button mat-menu-item (click)="exportConfig()" [disabled]="exportingConfig()">
+                    <mat-icon svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
+                    <span>Export configuration</span>
+                </button>
+            </mat-menu>
 
             <span class="mx-1 h-5 w-px shrink-0" style="background: var(--gamma-border)" aria-hidden="true"></span>
             <!-- Recipe | Canvas (ELT amendment UI plan §1) — Recipe is the second projection of the same
