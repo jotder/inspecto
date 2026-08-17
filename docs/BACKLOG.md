@@ -321,6 +321,14 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 > silently makes two tables share one persisted layout, which is worse than none — that is why they were
 > left rather than guessed. Exempt by design: the dashboard's mini card grid and the studio drill drawer.
 
+> ### ❓ PACK-1 — one authored pattern pack hides all six built-ins (2026-08-17)
+>
+> `studio/link-analysis/link-analysis-toolbox.component.ts:118` does `if (authored.length)
+> this.patternPacks.set(authored)` — a **replace**, not a merge, so the moment a space authors its first
+> pack the six built-in packs vanish from the toolbox. Needs a product call before a code change: this is
+> either deliberate curation (an authored set *overrides* the shipped one) or a bug (they should
+> concatenate). Left untouched by the 2026-08-17 sweep for exactly that reason.
+
 > ### ⚠ BUNDLE-1 — the packaged UI intermittently dies at bootstrap on FIRST load (2026-08-17)
 >
 > Reported from the shipped bundle as `Uncaught TypeError: Cannot read properties of undefined
