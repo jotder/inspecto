@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -13,15 +13,15 @@ import { DataTableComponent } from 'app/inspecto/data-table';
     selector: 'app-batch-detail-dialog',
     standalone: true,
     imports: [MatDialogModule, MatButtonModule, MatProgressSpinnerModule, DataTableComponent, RouterLink],
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Batch {{ data.batchId }}</h2>
         <mat-dialog-content>
-            @if (loading) {
+            @if (loading()) {
                 <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
             } @else {
                 <div class="font-semibold">Summary</div>
-                @if (!batchRow) {
+                @if (!batchRow()) {
                     <p class="text-secondary text-sm">No batch-summary row found for this id.</p>
                 } @else {
                     <table class="mt-1 text-sm">
@@ -36,32 +36,32 @@ import { DataTableComponent } from 'app/inspecto/data-table';
                             }
                         </tbody>
                     </table>
-                    @if (catalogNodeId) {
+                    @if (catalogNodeId()) {
                         <a
                             class="mt-2 inline-block text-primary hover:underline"
                             [routerLink]="['/catalog']"
-                            [queryParams]="{ tab: 'graph', from: catalogNodeId }"
+                            [queryParams]="{ tab: 'graph', from: catalogNodeId() }"
                             mat-dialog-close
                         >
-                            View {{ outputTable }} in the Catalog
+                            View {{ outputTable() }} in the Catalog
                         </a>
                     }
                 }
 
-                <div class="mt-4 font-semibold">Member files ({{ batchFiles.length }})</div>
+                <div class="mt-4 font-semibold">Member files ({{ batchFiles().length }})</div>
                 <inspecto-data-table
                     tier="mini"
                     sourceName="files"
-                    [rows]="batchFiles"
+                    [rows]="batchFiles()"
                     height="14rem"
                     noRowsTitle="No member files"
                 />
 
-                <div class="mt-4 font-semibold">Lineage ({{ batchLineage.length }})</div>
+                <div class="mt-4 font-semibold">Lineage ({{ batchLineage().length }})</div>
                 <inspecto-data-table
                     tier="mini"
                     sourceName="lineage"
-                    [rows]="batchLineage"
+                    [rows]="batchLineage()"
                     height="14rem"
                     noRowsTitle="No lineage"
                 />
@@ -77,17 +77,17 @@ export class BatchDetailDialog implements OnInit {
     private api = inject(RunsService);
     private catalog = inject(CatalogService);
 
-    loading = true;
-    batchRow: AuditRow | null = null;
-    batchFiles: AuditRow[] = [];
-    batchLineage: AuditRow[] = [];
+    readonly loading = signal(true);
+    readonly batchRow = signal<AuditRow | null>(null);
+    readonly batchFiles = signal<AuditRow[]>([]);
+    readonly batchLineage = signal<AuditRow[]>([]);
 
     /** The store this batch wrote, and the catalog node it resolved to — blank/null when unresolvable. */
-    outputTable = '';
-    catalogNodeId: string | null = null;
+    readonly outputTable = signal('');
+    readonly catalogNodeId = signal<string | null>(null);
 
     get batchSummary(): { key: string; value: string }[] {
-        return this.batchRow ? Object.entries(this.batchRow).map(([key, value]) => ({ key, value })) : [];
+        return this.batchRow() ? Object.entries(this.batchRow()).map(([key, value]) => ({ key, value })) : [];
     }
 
     ngOnInit(): void {
@@ -98,14 +98,14 @@ export class BatchDetailDialog implements OnInit {
             lineage: this.api.lineage(pipeline, batchId),
         }).subscribe({
             next: ({ batches, files, lineage }) => {
-                this.batchRow = batches.find((b) => b['consignment_id'] === batchId) || null;
-                this.batchFiles = files.filter((f) => f['consignment_id'] === batchId);
-                this.batchLineage = lineage;
-                this.loading = false;
+                this.batchRow.set(batches.find((b) => b['consignment_id'] === batchId) || null);
+                this.batchFiles.set(files.filter((f) => f['consignment_id'] === batchId));
+                this.batchLineage.set(lineage);
+                this.loading.set(false);
                 this.resolveCatalogNode();
             },
             error: () => {
-                this.loading = false;
+                this.loading.set(false);
             },
         });
     }
@@ -116,11 +116,11 @@ export class BatchDetailDialog implements OnInit {
      * wrong store is worse than no link at all.
      */
     private resolveCatalogNode(): void {
-        this.outputTable = this.batchRow?.['output_table'] || '';
-        if (!this.outputTable) return;
+        this.outputTable.set(this.batchRow()?.['output_table'] || '');
+        if (!this.outputTable()) return;
         this.catalog
-            .resolveTable(this.outputTable)
+            .resolveTable(this.outputTable())
             .pipe(catchError(() => of(null)))
-            .subscribe((hit) => (this.catalogNodeId = hit?.id ?? null));
+            .subscribe((hit) => this.catalogNodeId.set(hit?.id ?? null));
     }
 }

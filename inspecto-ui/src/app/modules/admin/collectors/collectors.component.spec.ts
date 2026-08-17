@@ -70,15 +70,15 @@ function create(
 describe('CollectorsComponent', () => {
     it('builds the acquisition metric cards and the discovered/downloaded/failed chart', () => {
         const c = create().componentInstance;
-        expect(c.cards.length).toBe(6);
-        expect(c.cards[0]).toEqual({ label: 'Files discovered', value: '100' });
-        expect(c.discoveredData?.datasets[0].data).toEqual([100, 90, 2]);
+        expect(c.cards().length).toBe(6);
+        expect(c.cards()[0]).toEqual({ label: 'Files discovered', value: '100' });
+        expect(c.discoveredData()?.datasets[0].data).toEqual([100, 90, 2]);
     });
 
     it('flags unavailable when the collectors endpoint 404s', () => {
         const c = create(throwError(() => ({ status: 404 }))).componentInstance;
-        expect(c.unavailable).toBe(true);
-        expect(c.collectors.length).toBe(0);
+        expect(c.unavailable()).toBe(true);
+        expect(c.collectors().length).toBe(0);
     });
 
     it('renders with no a11y violations', async () => {

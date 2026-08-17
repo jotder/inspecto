@@ -28,7 +28,7 @@
                         <mat-checkbox [formControl]="safetyCtrl">safety gate (hard-fail)</mat-checkbox>
                     </div>
 
-                    @if (specLoading) {
+                    @if (specLoading()) {
                         <!-- Skeleton mirrors the dynamic field grid rendered once the spec loads. -->
                         <div class="mt-4 grid grid-cols-1 gap-x-6 gap-y-3 md:grid-cols-2" aria-busy="true">
                             @for (i of [0, 1, 2, 3, 4, 5]; track i) {
@@ -40,27 +40,27 @@
                         </div>
                     }
 
-                    @if (!spec && !specLoading) {
+                    @if (!spec() && !specLoading()) {
                         <inspecto-empty-state
                             class="mt-4 block"
                             icon="heroicons_outline:document-text"
                             title="Spec unavailable"
                             [message]="
-                                'The field spec for &quot;' +
+                                'The field spec() for &quot;' +
                                 typeCtrl.value +
                                 '&quot; could not be loaded. Retry by re-selecting the config type.'
                             "
                         ></inspecto-empty-state>
                     }
 
-                    @if (spec && !specLoading) {
-                        <inspecto-schema-form class="mt-4 block" [specs]="attrSpecs" (submitted)="validateDraft()" />
+                    @if (spec() && !specLoading()) {
+                        <inspecto-schema-form class="mt-4 block" [specs]="attrSpecs()" (submitted)="validateDraft()" />
 
-                        @if (spec.rules.length) {
+                        @if (spec().rules.length) {
                             <div class="mt-6">
                                 <div class="font-semibold">Cross-field rules</div>
                                 <ul class="mt-1 list-inside list-disc text-sm">
-                                    @for (r of spec.rules; track r.description) {
+                                    @for (r of spec().rules; track r.description) {
                                         <li>
                                             {{ r.description }}
                                             <span class="text-secondary"
@@ -77,7 +77,7 @@
                                 <mat-icon svgIcon="heroicons_outline:clipboard-document"></mat-icon>
                                 <span class="ml-2">Copy config</span>
                             </button>
-                            <button mat-flat-button color="primary" [disabled]="validating" (click)="validateDraft()">
+                            <button mat-flat-button color="primary" [disabled]="validating()" (click)="validateDraft()">
                                 Validate draft
                             </button>
                         </div>
@@ -100,25 +100,25 @@
                     <mat-label>Config path</mat-label>
                     <input matInput [formControl]="configPathCtrl" placeholder="path to a saved .toon config" />
                 </mat-form-field>
-                <button mat-flat-button color="primary" [disabled]="validating" (click)="validateFile()">
+                <button mat-flat-button color="primary" [disabled]="validating()" (click)="validateFile()">
                     Validate file
                 </button>
             </div>
         }
 
         <!-- Findings -->
-        @if (result) {
+        @if (result()) {
             <div class="mt-8">
                 <p class="flex items-center gap-2 font-semibold">
                     <inspecto-status-badge
-                        [value]="result.clean ? 'OK' : 'ERROR'"
-                        [label]="result.clean ? 'Clean' : result.findings.length + ' finding(s)'"
+                        [value]="result().clean ? 'OK' : 'ERROR'"
+                        [label]="result().clean ? 'Clean' : result().findings.length + ' finding(s)'"
                     />
-                    @if (result.safetyChecked) {
+                    @if (result().safetyChecked) {
                         <span class="text-secondary text-sm font-normal">safety checked</span>
                     }
                 </p>
-                @if (result.findings.length) {
+                @if (result().findings.length) {
                     <table class="mt-2 w-full text-sm">
                         <thead>
                             <tr>
@@ -128,7 +128,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @for (f of result.findings; track $index) {
+                            @for (f of result().findings; track $index) {
                                 <tr>
                                     <td class="border-b px-2 py-1"><inspecto-status-badge [value]="f.severity" /></td>
                                     <td class="border-b px-2 py-1">{{ f.fieldPath }}</td>

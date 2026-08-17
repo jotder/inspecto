@@ -73,9 +73,9 @@ describe('AlertsComponent', () => {
     it('loads fired alerts and the armed rules on init', async () => {
         const { fixture } = await create();
         const c = fixture.componentInstance;
-        expect(c.alerts).toEqual([FIRED]);
-        expect(c.rules).toEqual([RULE]);
-        expect(c.loading).toBe(false);
+        expect(c.alerts()).toEqual([FIRED]);
+        expect(c.rules()).toEqual([RULE]);
+        expect(c.loading()).toBe(false);
         expect(fixture.nativeElement.textContent).toContain('Alert Rules');
     });
 
@@ -84,14 +84,14 @@ describe('AlertsComponent', () => {
         fixture.componentInstance.evaluate();
         expect(api.evaluate).toHaveBeenCalled();
         expect(toastr.info).toHaveBeenCalledWith('1 alert(s) fired');
-        expect(fixture.componentInstance.evaluating).toBe(false);
+        expect(fixture.componentInstance.evaluating()).toBe(false);
     });
 
     it('degrades to an empty grid + plain failure toast when the load fails', async () => {
         const { fixture, toastr } = await create({ recent: () => throwError(() => ({ status: 500 })) });
         const c = fixture.componentInstance;
-        expect(c.alerts).toEqual([]);
-        expect(c.loading).toBe(false);
+        expect(c.alerts()).toEqual([]);
+        expect(c.loading()).toBe(false);
         expect(toastr.error).toHaveBeenCalledWith('Failed to load alerts');
     });
 
@@ -114,7 +114,7 @@ describe('AlertsComponent', () => {
         const c = fixture.componentInstance;
         await c.removeRule(RULE);
         expect(api.removeRule).toHaveBeenCalledWith('failed_batches');
-        expect(c.rules).toEqual([]);
+        expect(c.rules()).toEqual([]);
     });
 
     it('a declined confirmation leaves the rule untouched', async () => {
@@ -122,7 +122,7 @@ describe('AlertsComponent', () => {
         const c = fixture.componentInstance;
         await c.removeRule(RULE);
         expect(api.removeRule).not.toHaveBeenCalled();
-        expect(c.rules).toEqual([RULE]);
+        expect(c.rules()).toEqual([RULE]);
     });
 
     it('renders the loaded state with no a11y violations', async () => {

@@ -124,7 +124,7 @@ export function assembleConfig(fields: FieldSpec[], values: Record<string, unkno
         StatusBadgeComponent,
     ],
     templateUrl: './config.component.html',
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,
 })
 export class ConfigComponent implements OnInit {
@@ -144,9 +144,9 @@ export class ConfigComponent implements OnInit {
     readonly safetyCtrl = new FormControl(false, { nonNullable: true });
     readonly configPathCtrl = new FormControl('', { nonNullable: true });
 
-    spec: ConfigSpec | null = null;
-    specLoading = false;
-    attrSpecs: AttributeSpec[] = [];
+    readonly spec = signal<ConfigSpec | null>(null);
+    readonly specLoading = signal(false);
+    readonly attrSpecs = signal<AttributeSpec[]>([]);
 
     /** Live JSON preview of the assembled config, refreshed from the schema-form's value changes.
      *  A signal: the ViewChild setter's initial refresh runs mid-CD (NG0100 with a plain property). */
@@ -167,8 +167,8 @@ export class ConfigComponent implements OnInit {
         this.previewSub = c.form.valueChanges.subscribe(refresh);
     }
 
-    result: ValidateResult | null = null;
-    validating = false;
+    readonly result = signal<ValidateResult | null>(null);
+    readonly validating = signal(false);
 
     constructor() {
         this.destroyRef.onDestroy(() => this.previewSub?.unsubscribe());
@@ -180,20 +180,20 @@ export class ConfigComponent implements OnInit {
     }
 
     loadSpec(): void {
-        this.result = null;
-        this.spec = null;
-        this.attrSpecs = [];
+        this.result.set(null);
+        this.spec.set(null);
+        this.attrSpecs.set([]);
         this.assembledPreview.set('{}');
-        this.specLoading = true;
+        this.specLoading.set(true);
         this.api.spec(this.typeCtrl.value).subscribe({
             next: (s) => {
-                this.spec = s;
-                this.attrSpecs = toAttrSpecs(s.fields);
-                this.specLoading = false;
+                this.spec.set(s);
+                this.attrSpecs.set(toAttrSpecs(s.fields));
+                this.specLoading.set(false);
             },
             error: (e) => {
-                this.spec = null;
-                this.specLoading = false;
+                this.spec.set(null);
+                this.specLoading.set(false);
                 this.toastr.warning(apiErrorMessage(e, `Could not load the "${this.typeCtrl.value}" spec.`));
             },
         });
@@ -201,23 +201,23 @@ export class ConfigComponent implements OnInit {
 
     private previewJson(values: Record<string, unknown>): string {
         try {
-            return JSON.stringify(assembleConfig(this.spec?.fields ?? [], values), null, 2);
+            return JSON.stringify(assembleConfig(this.spec()?.fields ?? [], values), null, 2);
         } catch {
             return '{}';
         }
     }
 
     validateDraft(): void {
-        const config = assembleConfig(this.spec?.fields ?? [], this.form?.value() ?? {});
-        this.validating = true;
-        this.result = null;
+        const config = assembleConfig(this.spec()?.fields ?? [], this.form?.value() ?? {});
+        this.validating.set(true);
+        this.result.set(null);
         this.api.validateDraft(this.typeCtrl.value, config, this.safetyCtrl.value).subscribe({
             next: (r) => {
-                this.result = r;
-                this.validating = false;
+                this.result.set(r);
+                this.validating.set(false);
             },
             error: (e) => {
-                this.validating = false;
+                this.validating.set(false);
                 this.toastr.error(apiErrorMessage(e, 'Validation failed.'));
             },
         });
@@ -229,15 +229,15 @@ export class ConfigComponent implements OnInit {
             this.toastr.warning('Enter a config path');
             return;
         }
-        this.validating = true;
-        this.result = null;
+        this.validating.set(true);
+        this.result.set(null);
         this.api.validateFile(path).subscribe({
             next: (r) => {
-                this.result = r;
-                this.validating = false;
+                this.result.set(r);
+                this.validating.set(false);
             },
             error: (e) => {
-                this.validating = false;
+                this.validating.set(false);
                 this.toastr.error(apiErrorMessage(e, 'Validation failed.'));
             },
         });

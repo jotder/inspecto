@@ -65,15 +65,15 @@ describe('AutonomyComponent', () => {
     it('loads the policy and action ledger on init', async () => {
         const { fixture } = await create();
         const c = fixture.componentInstance;
-        expect(c.policy?.killSwitch).toBe(false);
-        expect(c.actions).toEqual([ACTION]);
-        expect(c.unavailable).toBe(false);
+        expect(c.policy()?.killSwitch).toBe(false);
+        expect(c.actions()).toEqual([ACTION]);
+        expect(c.unavailable()).toBe(false);
         expect(fixture.nativeElement.textContent).toContain('Autonomy');
     });
 
     it('surfaces the pilot class even when unconfigured, and reflects configured values', async () => {
         const { fixture } = await create({ policy: () => of({ ...structuredClone(POLICY), classes: {} }) });
-        const rows = fixture.componentInstance.rows;
+        const rows = fixture.componentInstance.rows();
         expect(rows.some((r) => r.name === 'batch_rerun')).toBe(true);
         expect(rows.find((r) => r.name === 'batch_rerun')?.mode).toBe('OFF'); // default when unset
     });
@@ -82,7 +82,7 @@ describe('AutonomyComponent', () => {
         const { fixture, api } = await create();
         await fixture.componentInstance.toggleKillSwitch();
         expect(api.setKillSwitch).toHaveBeenCalledWith(true);
-        expect(fixture.componentInstance.policy?.killSwitch).toBe(true);
+        expect(fixture.componentInstance.policy()?.killSwitch).toBe(true);
     });
 
     it('a declined kill-switch confirmation calls nothing', async () => {
@@ -104,7 +104,7 @@ describe('AutonomyComponent', () => {
     it('savePolicy PUTs the edited per-class state', async () => {
         const { fixture, api } = await create();
         const c = fixture.componentInstance;
-        const row = c.rows.find((r) => r.name === 'batch_rerun')!;
+        const row = c.rows().find((r) => r.name === 'batch_rerun')!;
         row.mode = 'SHADOW';
         row.maxPerHour = 5;
         c.savePolicy();
@@ -117,8 +117,8 @@ describe('AutonomyComponent', () => {
     it('degrades to an unavailable state + toast when the policy read fails', async () => {
         const { fixture, toastr } = await create({ policy: () => throwError(() => ({ status: 503 })) });
         const c = fixture.componentInstance;
-        expect(c.unavailable).toBe(true);
-        expect(c.policy).toBeNull();
+        expect(c.unavailable()).toBe(true);
+        expect(c.policy()).toBeNull();
         expect(toastr.error).toHaveBeenCalledWith('Autonomy policy is not available');
     });
 

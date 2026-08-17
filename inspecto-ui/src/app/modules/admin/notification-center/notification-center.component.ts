@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, ViewEncapsulation, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -43,7 +43,7 @@ import { RuleFormDialog, RuleFormResult } from './rule-form.dialog';
         NotificationPreferencesComponent,
     ],
     templateUrl: './notification-center.component.html',
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,
 })
 export class NotificationCenterComponent implements OnInit {
@@ -52,12 +52,12 @@ export class NotificationCenterComponent implements OnInit {
     private confirm = inject(InspectoConfirmService);
     private toastr = inject(ToastrService);
 
-    channels: NotificationChannel[] = [];
-    deliveries: ChannelDelivery[] = [];
-    rules: NotificationRule[] = [];
-    loadingChannels = false;
-    loadingDeliveries = false;
-    loadingRules = false;
+    readonly channels = signal<NotificationChannel[]>([]);
+    readonly deliveries = signal<ChannelDelivery[]>([]);
+    readonly rules = signal<NotificationRule[]>([]);
+    readonly loadingChannels = signal(false);
+    readonly loadingDeliveries = signal(false);
+    readonly loadingRules = signal(false);
 
     readonly channelCols: ColDef<NotificationChannel>[] = [
         { field: 'id', headerName: 'Channel', flex: 1 },
@@ -174,30 +174,30 @@ export class NotificationCenterComponent implements OnInit {
     }
 
     loadChannels(): void {
-        this.loadingChannels = true;
+        this.loadingChannels.set(true);
         this.api.channels().subscribe({
             next: (c) => {
-                this.channels = c;
-                this.loadingChannels = false;
+                this.channels.set(c);
+                this.loadingChannels.set(false);
             },
             error: () => {
-                this.channels = [];
-                this.loadingChannels = false;
+                this.channels.set([]);
+                this.loadingChannels.set(false);
                 this.toastr.error('Failed to load channels');
             },
         });
     }
 
     loadDeliveries(): void {
-        this.loadingDeliveries = true;
+        this.loadingDeliveries.set(true);
         this.api.deliveries().subscribe({
             next: (d) => {
-                this.deliveries = d;
-                this.loadingDeliveries = false;
+                this.deliveries.set(d);
+                this.loadingDeliveries.set(false);
             },
             error: () => {
-                this.deliveries = [];
-                this.loadingDeliveries = false;
+                this.deliveries.set([]);
+                this.loadingDeliveries.set(false);
             },
         });
     }
@@ -205,7 +205,7 @@ export class NotificationCenterComponent implements OnInit {
     openForm(channel?: NotificationChannel): void {
         this.dialog
             .open(ChannelFormDialog, {
-                data: { channel, existingIds: this.channels.map((c) => c.id) },
+                data: { channel, existingIds: this.channels().map((c) => c.id) },
                 width: '560px',
                 maxHeight: '85vh',
             })
@@ -221,31 +221,31 @@ export class NotificationCenterComponent implements OnInit {
         optimisticMutate({
             apply: () => {
                 channel.enabled = !prev;
-                this.channels = [...this.channels];
+                this.channels.set([...this.channels()]);
             },
             commit: this.api.updateChannel(channel.id, { enabled: !prev }),
             reconcile: (r) => {
                 channel.enabled = r.enabled;
-                this.channels = [...this.channels];
+                this.channels.set([...this.channels()]);
             },
             rollback: () => {
                 channel.enabled = prev;
-                this.channels = [...this.channels];
+                this.channels.set([...this.channels()]);
             },
             onError: (e) => this.toastr.error(apiErrorMessage(e, 'Toggle failed')),
         });
     }
 
     loadRules(): void {
-        this.loadingRules = true;
+        this.loadingRules.set(true);
         this.api.rules().subscribe({
             next: (r) => {
-                this.rules = r;
-                this.loadingRules = false;
+                this.rules.set(r);
+                this.loadingRules.set(false);
             },
             error: () => {
-                this.rules = [];
-                this.loadingRules = false;
+                this.rules.set([]);
+                this.loadingRules.set(false);
                 this.toastr.error('Failed to load rules');
             },
         });
@@ -254,7 +254,7 @@ export class NotificationCenterComponent implements OnInit {
     openRuleForm(rule?: NotificationRule): void {
         this.dialog
             .open(RuleFormDialog, {
-                data: { rule, existingIds: this.rules.map((r) => r.id) },
+                data: { rule, existingIds: this.rules().map((r) => r.id) },
                 width: '560px',
                 maxHeight: '85vh',
             })
@@ -270,16 +270,16 @@ export class NotificationCenterComponent implements OnInit {
         optimisticMutate({
             apply: () => {
                 rule.enabled = !prev;
-                this.rules = [...this.rules];
+                this.rules.set([...this.rules()]);
             },
             commit: this.api.updateRule(rule.id, { ...rule, enabled: !prev }),
             reconcile: (r) => {
                 rule.enabled = r.enabled;
-                this.rules = [...this.rules];
+                this.rules.set([...this.rules()]);
             },
             rollback: () => {
                 rule.enabled = prev;
-                this.rules = [...this.rules];
+                this.rules.set([...this.rules()]);
             },
             onError: (e) => this.toastr.error(apiErrorMessage(e, 'Toggle failed')),
         });

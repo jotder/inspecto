@@ -76,16 +76,16 @@ describe('NotificationCenterComponent', () => {
     it('loads channels and the delivery ledger on init', async () => {
         const { fixture } = await create();
         const c = fixture.componentInstance;
-        expect(c.channels).toEqual([{ ...CHANNEL }]);
-        expect(c.deliveries).toEqual([DELIVERY]);
+        expect(c.channels()).toEqual([{ ...CHANNEL }]);
+        expect(c.deliveries()).toEqual([DELIVERY]);
     });
 
     it('toggles a channel optimistically and reconciles with the server result', async () => {
         const { fixture, api } = await create();
         const c = fixture.componentInstance;
-        c.toggle(c.channels[0]);
+        c.toggle(c.channels()[0]);
         expect(api.updateChannel).toHaveBeenCalledWith('ops_email', { enabled: false });
-        expect(c.channels[0].enabled).toBe(false);
+        expect(c.channels()[0].enabled).toBe(false);
     });
 
     it('rolls the toggle back when the server call fails', async () => {
@@ -93,8 +93,8 @@ describe('NotificationCenterComponent', () => {
             updateChannel: () => throwError(() => ({ status: 500 })),
         });
         const c = fixture.componentInstance;
-        c.toggle(c.channels[0]);
-        expect(c.channels[0].enabled).toBe(true); // rolled back
+        c.toggle(c.channels()[0]);
+        expect(c.channels()[0].enabled).toBe(true); // rolled back
         expect(toastr.error).toHaveBeenCalled();
     });
 
@@ -107,15 +107,15 @@ describe('NotificationCenterComponent', () => {
 
     it('loads the authored rules on init', async () => {
         const { fixture } = await create();
-        expect(fixture.componentInstance.rules).toEqual([{ ...RULE }]);
+        expect(fixture.componentInstance.rules()).toEqual([{ ...RULE }]);
     });
 
     it('toggles a rule optimistically, sending the FULL rule (server PUT is a full replace)', async () => {
         const { fixture, api } = await create();
         const c = fixture.componentInstance;
-        c.toggleRule(c.rules[0]);
+        c.toggleRule(c.rules()[0]);
         expect(api.updateRule).toHaveBeenCalledWith('custom_batch', { ...RULE, enabled: false });
-        expect(c.rules[0].enabled).toBe(false);
+        expect(c.rules()[0].enabled).toBe(false);
     });
 
     it('deletes a rule after the destructive confirm and reloads', async () => {

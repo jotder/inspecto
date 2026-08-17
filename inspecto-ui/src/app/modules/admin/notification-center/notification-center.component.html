@@ -23,7 +23,7 @@
                             mat-icon-button
                             (click)="loadChannels()"
                             matTooltip="Refresh"
-                            aria-label="Refresh channels"
+                            aria-label="Refresh channels()"
                         >
                             <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
                         </button>
@@ -34,13 +34,13 @@
                     </div>
                     <inspecto-data-table
                         tier="standard"
-                        sourceName="notification-channels"
-                        exportName="notification-channels"
-                        [rows]="channels"
+                        sourceName="notification-channels()"
+                        exportName="notification-channels()"
+                        [rows]="channels()"
                         [columns]="channelCols"
                         [rowActions]="channelActions"
-                        [loading]="loadingChannels"
-                        noRowsTitle="No channels configured"
+                        [loading]="loadingChannels()"
+                        noRowsTitle="No channels() configured"
                         noRowsHint="Add an email or webhook channel — fired alerts and opened incidents will fan out to it."
                     />
                 </div>
@@ -50,7 +50,7 @@
             <mat-tab label="Rules">
                 <div class="flex flex-col gap-4 pt-6">
                     <div class="flex items-center justify-end gap-2">
-                        <button mat-icon-button (click)="loadRules()" matTooltip="Refresh" aria-label="Refresh rules">
+                        <button mat-icon-button (click)="loadRules()" matTooltip="Refresh" aria-label="Refresh rules()">
                             <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
                         </button>
                         <button mat-flat-button color="primary" (click)="openRuleForm()">
@@ -60,14 +60,14 @@
                     </div>
                     <inspecto-data-table
                         tier="standard"
-                        sourceName="notification-rules"
-                        exportName="notification-rules"
-                        [rows]="rules"
+                        sourceName="notification-rules()"
+                        exportName="notification-rules()"
+                        [rows]="rules()"
                         [columns]="ruleCols"
                         [rowActions]="ruleActions"
-                        [loading]="loadingRules"
-                        noRowsTitle="No authored rules"
-                        noRowsHint="Built-in rules still fire. Author a rule to override a built-in's copy, cover a new event type, or mute one."
+                        [loading]="loadingRules()"
+                        noRowsTitle="No authored rules()"
+                        noRowsHint="Built-in rules() still fire. Author a rule to override a built-in's copy, cover a new event type, or mute one."
                     />
                 </div>
             </mat-tab>
@@ -80,18 +80,18 @@
                             mat-icon-button
                             (click)="loadDeliveries()"
                             matTooltip="Refresh"
-                            aria-label="Refresh deliveries"
+                            aria-label="Refresh deliveries()"
                         >
                             <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
                         </button>
                     </div>
                     <inspecto-data-table
                         tier="standard"
-                        sourceName="notification-deliveries"
-                        exportName="notification-deliveries"
-                        [rows]="deliveries"
+                        sourceName="notification-deliveries()"
+                        exportName="notification-deliveries()"
+                        [rows]="deliveries()"
                         [columns]="deliveryCols"
-                        [loading]="loadingDeliveries"
+                        [loading]="loadingDeliveries()"
                         noRowsTitle="Nothing delivered yet"
                         noRowsHint="When an alert fires or an incident opens, one entry per enabled channel lands here."
                     />

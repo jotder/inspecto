@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewEncapsulation, inject, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -42,7 +42,7 @@ const PILOT_CLASSES = ['batch_rerun', 'alert_triage'];
     standalone: true,
     imports: [FormsModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule, DataTableComponent],
     templateUrl: './autonomy.component.html',
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,
 })
 export class AutonomyComponent implements OnInit {
@@ -53,13 +53,13 @@ export class AutonomyComponent implements OnInit {
 
     readonly modes: AutonomyMode[] = ['OFF', 'SHADOW', 'AUTO'];
 
-    policy: AutonomyPolicy | null = null;
-    rows: ClassRow[] = [];
-    actions: AutonomyAction[] = [];
-    loading = false;
-    saving = false;
+    readonly policy = signal<AutonomyPolicy | null>(null);
+    readonly rows = signal<ClassRow[]>([]);
+    readonly actions = signal<AutonomyAction[]>([]);
+    readonly loading = signal(false);
+    readonly saving = signal(false);
     /** True once a policy read has failed (module absent / no L3 tier) — the editors are disabled then. */
-    unavailable = false;
+    readonly unavailable = signal(false);
 
     readonly columnDefs: ColDef<AutonomyAction>[] = [
         {
@@ -110,26 +110,26 @@ export class AutonomyComponent implements OnInit {
     }
 
     load(): void {
-        this.loading = true;
+        this.loading.set(true);
         this.api.policy().subscribe({
             next: (p) => {
-                this.policy = p;
-                this.unavailable = false;
-                this.rows = this.buildRows(p);
-                this.loading = false;
+                this.policy.set(p);
+                this.unavailable.set(false);
+                this.rows.set(this.buildRows(p));
+                this.loading.set(false);
             },
             error: () => {
                 // 503 (module absent) or connectivity — the editors disable and read as unavailable.
-                this.policy = null;
-                this.unavailable = true;
-                this.rows = [];
-                this.loading = false;
+                this.policy.set(null);
+                this.unavailable.set(true);
+                this.rows.set([]);
+                this.loading.set(false);
                 this.toastr.error('Autonomy policy is not available');
             },
         });
         this.api.actions(100).subscribe({
-            next: (a) => (this.actions = a),
-            error: () => (this.actions = []),
+            next: (a) => this.actions.set(a),
+            error: () => this.actions.set([]),
         });
     }
 
@@ -149,8 +149,8 @@ export class AutonomyComponent implements OnInit {
 
     /** Engage/disengage the kill switch. Disengaging (re-enabling autonomy) is the destructive confirm. */
     async toggleKillSwitch(): Promise<void> {
-        if (!this.policy || !this.canOperate) return;
-        const engaging = !this.policy.killSwitch;
+        if (!this.policy() || !this.canOperate) return;
+        const engaging = !this.policy().killSwitch;
         const ok = engaging
             ? await this.confirm.confirm(
                   'Engaging the kill switch immediately halts every autonomous action, regardless of mode.',
@@ -163,8 +163,8 @@ export class AutonomyComponent implements OnInit {
         if (!ok) return;
         this.api.setKillSwitch(engaging).subscribe({
             next: (p) => {
-                this.policy = p;
-                this.rows = this.buildRows(p);
+                this.policy.set(p);
+                this.rows.set(this.buildRows(p));
                 this.toastr.success(engaging ? 'Kill switch engaged' : 'Kill switch disengaged');
             },
             error: (err) => this.toastr.error(apiErrorMessage(err, 'Could not change the kill switch')),
@@ -173,25 +173,25 @@ export class AutonomyComponent implements OnInit {
 
     /** Persist the per-class editor state as a full policy replacement (PUT). Ops-gated. */
     savePolicy(): void {
-        if (!this.policy || !this.canOperate) return;
+        if (!this.policy() || !this.canOperate) return;
         const classes: Record<string, ClassPolicy> = {};
-        for (const r of this.rows) {
+        for (const r of this.rows()) {
             classes[r.name] = {
                 mode: r.mode,
                 maxPerHour: Number(r.maxPerHour) || 0,
                 maxPerDay: Number(r.maxPerDay) || 0,
             };
         }
-        this.saving = true;
-        this.api.updatePolicy({ killSwitch: this.policy.killSwitch, classes }).subscribe({
+        this.saving.set(true);
+        this.api.updatePolicy({ killSwitch: this.policy().killSwitch, classes }).subscribe({
             next: (p) => {
-                this.policy = p;
-                this.rows = this.buildRows(p);
-                this.saving = false;
+                this.policy.set(p);
+                this.rows.set(this.buildRows(p));
+                this.saving.set(false);
                 this.toastr.success('Autonomy policy saved');
             },
             error: (err) => {
-                this.saving = false;
+                this.saving.set(false);
                 this.toastr.error(apiErrorMessage(err, 'Could not save the policy'));
             },
         });

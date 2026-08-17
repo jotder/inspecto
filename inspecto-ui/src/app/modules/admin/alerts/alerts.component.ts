@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewEncapsulation, inject, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -33,7 +33,7 @@ import { AiStatusData, AiStatusDialog } from 'app/inspecto/ai-assist/ai-status.d
         DataTableComponent,
     ],
     templateUrl: './alerts.component.html',
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,
 })
 export class AlertsComponent implements OnInit {
@@ -43,10 +43,10 @@ export class AlertsComponent implements OnInit {
     private toastr = inject(ToastrService);
     protected lens = inject(LensService);
 
-    alerts: FiredAlert[] = [];
-    rules: AlertRule[] = [];
-    loading = false;
-    evaluating = false;
+    readonly alerts = signal<FiredAlert[]>([]);
+    readonly rules = signal<AlertRule[]>([]);
+    readonly loading = signal(false);
+    readonly evaluating = signal(false);
 
     readonly columnDefs: ColDef<FiredAlert>[] = [
         {
@@ -143,30 +143,30 @@ export class AlertsComponent implements OnInit {
     }
 
     load(): void {
-        this.loading = true;
+        this.loading.set(true);
         this.api.recent(100).subscribe({
             next: (a) => {
-                this.alerts = a;
-                this.loading = false;
+                this.alerts.set(a);
+                this.loading.set(false);
             },
             error: () => {
                 // Unreachable-backend messaging is the connectivity banner's job (§8) — plain failure toast only.
-                this.alerts = [];
-                this.loading = false;
+                this.alerts.set([]);
+                this.loading.set(false);
                 this.toastr.error('Failed to load alerts');
             },
         });
         this.api.rules().subscribe({
-            next: (r) => (this.rules = r),
-            error: () => (this.rules = []),
+            next: (r) => this.rules.set(r),
+            error: () => this.rules.set([]),
         });
     }
 
     evaluate(): void {
-        this.evaluating = true;
+        this.evaluating.set(true);
         this.api.evaluate().subscribe({
             next: (fired) => {
-                this.evaluating = false;
+                this.evaluating.set(false);
                 this.toastr.info(
                     fired.length === 0
                         ? 'Evaluation pass complete — nothing breached'
@@ -175,7 +175,7 @@ export class AlertsComponent implements OnInit {
                 this.load();
             },
             error: (e) => {
-                this.evaluating = false;
+                this.evaluating.set(false);
                 this.toastr.warning(apiErrorMessage(e, 'No alert rules armed — create one under Alert Rules below.'));
             },
         });
@@ -183,7 +183,7 @@ export class AlertsComponent implements OnInit {
 
     newRule(): void {
         const data: AlertRuleFormData = {
-            existingNames: this.rules.map((r) => r.name),
+            existingNames: this.rules().map((r) => r.name),
         };
         this.dialog
             .open(AlertRuleFormDialog, { data, width: '560px', maxHeight: '88vh' })
@@ -214,7 +214,7 @@ export class AlertsComponent implements OnInit {
         this.api.removeRule(rule.name).subscribe({
             next: () => {
                 this.toastr.success(`Alert rule "${rule.name}" deleted`);
-                this.rules = this.rules.filter((r) => r.name !== rule.name);
+                this.rules.set(this.rules().filter((r) => r.name !== rule.name));
             },
             error: (err) => this.toastr.error(apiErrorMessage(err, `Could not delete "${rule.name}".`)),
         });

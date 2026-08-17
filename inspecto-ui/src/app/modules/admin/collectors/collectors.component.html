@@ -21,9 +21,9 @@
     <!-- Main -->
     <div class="flex flex-auto flex-col p-6 sm:p-10">
         <!-- Acquisition metrics strip -->
-        @if (cards.length) {
+        @if (cards().length) {
             <div class="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-                @for (c of cards; track c.label) {
+                @for (c of cards(); track c.label) {
                     <div class="bg-card flex flex-col rounded-2xl p-4 shadow">
                         <div class="text-secondary text-sm">{{ c.label }}</div>
                         <div class="mt-1 text-2xl font-extrabold tracking-tight">{{ c.value }}</div>
@@ -32,30 +32,30 @@
             </div>
         }
 
-        @if (discoveredData) {
+        @if (discoveredData()) {
             <div class="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div class="bg-card rounded-2xl p-5 shadow">
                     <div class="mb-3 font-medium">Discovered vs downloaded vs failed</div>
-                    <inspecto-chart type="bar" [data]="discoveredData"></inspecto-chart>
+                    <inspecto-chart type="bar" [data]="discoveredData()"></inspecto-chart>
                 </div>
             </div>
         }
 
-        @if (unavailable) {
+        @if (unavailable()) {
             <inspecto-empty-state
                 icon="heroicons_outline:inbox-arrow-down"
-                message="No acquisition collectors are configured (no pipeline declares a collector block)."
+                message="No acquisition collectors() are configured (no pipeline declares a collector block)."
             ></inspecto-empty-state>
         } @else {
             <inspecto-data-table
-                stateKey="collectors"
+                stateKey="collectors()"
                 tier="standard"
-                sourceName="collectors"
-                exportName="collectors"
-                [rows]="collectors"
+                sourceName="collectors()"
+                exportName="collectors()"
+                [rows]="collectors()"
                 [columns]="columnDefs"
                 [rowActions]="rowActions"
-                [loading]="loading"
+                [loading]="loading()"
                 [autoHeight]="true"
             />
         }

@@ -90,14 +90,14 @@ describe('config spec → attribute mapping', () => {
 describe('ConfigComponent', () => {
     it('renders the spec-driven schema form with no a11y violations', async () => {
         const fixture = create({});
-        expect(fixture.componentInstance.spec).toEqual(SPEC);
+        expect(fixture.componentInstance.spec()).toEqual(SPEC);
         expect(fixture.nativeElement.querySelector('inspecto-schema-form')).toBeTruthy();
         await expectNoA11yViolations(fixture.nativeElement);
     });
 
     it('shows the spec-unavailable empty state when the spec fails to load', async () => {
         const fixture = create({ spec: () => throwError(() => ({ status: 500 })) });
-        expect(fixture.componentInstance.spec).toBeNull();
+        expect(fixture.componentInstance.spec()).toBeNull();
         expect(fixture.nativeElement.textContent).toContain('Spec unavailable');
         await expectNoA11yViolations(fixture.nativeElement);
     });

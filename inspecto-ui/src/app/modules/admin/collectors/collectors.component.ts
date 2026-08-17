@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, ViewEncapsulation, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -48,7 +48,7 @@ interface MetricCard {
         InspectoEmptyStateComponent,
     ],
     templateUrl: './collectors.component.html',
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,
 })
 export class CollectorsComponent implements OnInit {
@@ -59,12 +59,12 @@ export class CollectorsComponent implements OnInit {
     private confirm = inject(InspectoConfirmService);
     private toastr = inject(ToastrService);
 
-    collectors: CollectorView[] = [];
-    loading = false;
-    unavailable = false;
+    readonly collectors = signal<CollectorView[]>([]);
+    readonly loading = signal(false);
+    readonly unavailable = signal(false);
 
-    cards: MetricCard[] = [];
-    discoveredData: ChartData | null = null;
+    readonly cards = signal<MetricCard[]>([]);
+    readonly discoveredData = signal<ChartData | null>(null);
 
     readonly columnDefs: ColDef<CollectorView>[] = [
         { field: 'pipeline', headerName: 'Pipeline', flex: 1 },
@@ -109,29 +109,29 @@ export class CollectorsComponent implements OnInit {
     }
 
     load(): void {
-        this.loading = true;
-        this.unavailable = false;
+        this.loading.set(true);
+        this.unavailable.set(false);
         this.api.list().subscribe({
             next: (s) => {
-                this.collectors = s;
-                this.loading = false;
+                this.collectors.set(s);
+                this.loading.set(false);
             },
             error: (e) => {
-                this.loading = false;
-                this.collectors = [];
+                this.loading.set(false);
+                this.collectors.set([]);
                 // 404 genuinely means "this deployment has no collector surface". Any OTHER status is a
                 // FAILURE, and rendering the affirmative "none are registered" empty state for it told
                 // the operator their collectors were gone. The connectivity banner cannot cover this —
                 // it fires only on status 0.
-                this.unavailable = e?.status === 404;
+                this.unavailable.set(e?.status === 404);
                 if (e?.status !== 404) this.toastr.warning('Could not load collectors — is ControlApi running?');
             },
         });
         this.metricsApi.get().subscribe({
             next: (m) => this.buildMetrics(m),
             error: () => {
-                this.cards = [];
-                this.discoveredData = null;
+                this.cards.set([]);
+                this.discoveredData.set(null);
             },
         });
     }
@@ -150,16 +150,16 @@ export class CollectorsComponent implements OnInit {
         const bytes = this.total(m, 'inspecto_bytes_transferred_total');
         const active = this.total(m, 'inspecto_active_connections');
 
-        this.cards = [
+        this.cards.set([
             { label: 'Files discovered', value: fmtInt(discovered) },
             { label: 'Files downloaded', value: fmtInt(downloaded) },
             { label: 'Downloads failed', value: fmtInt(failed) },
             { label: 'Watermark skipped', value: fmtInt(skipped) },
             { label: 'Bytes transferred', value: fmtBytes(bytes) },
             { label: 'Active connections', value: fmtInt(active) },
-        ];
+        ]);
 
-        this.discoveredData = {
+        this.discoveredData.set({
             labels: ['Discovered', 'Downloaded', 'Failed'],
             datasets: [
                 {
@@ -168,7 +168,7 @@ export class CollectorsComponent implements OnInit {
                     backgroundColor: [CHART_SERIES.primary, CHART_SERIES.success, CHART_SERIES.error],
                 },
             ],
-        };
+        });
     }
 
     async trigger(collector: CollectorView): Promise<void> {

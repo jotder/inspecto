@@ -56,10 +56,10 @@ describe('BatchDetailDialog', () => {
         const { fixture, stub } = create();
         const c = fixture.componentInstance;
         expect(stub.lineage).toHaveBeenCalledWith('cdr', 'b-1');
-        expect(c.loading).toBe(false);
-        expect(c.batchRow?.['consignment_id']).toBe('b-1');
-        expect(c.batchFiles.map((f) => f['file'])).toEqual(['a.csv', 'b.csv']);
-        expect(c.batchLineage).toEqual(LINEAGE);
+        expect(c.loading()).toBe(false);
+        expect(c.batchRow()?.['consignment_id']).toBe('b-1');
+        expect(c.batchFiles().map((f) => f['file'])).toEqual(['a.csv', 'b.csv']);
+        expect(c.batchLineage()).toEqual(LINEAGE);
         expect(c.batchSummary.map((kv) => kv.key)).toContain('status');
     });
 
@@ -67,7 +67,7 @@ describe('BatchDetailDialog', () => {
         const { fixture, catalog } = create();
         fixture.detectChanges();
         expect(catalog.resolveTable).toHaveBeenCalledWith('cdr_output');
-        expect(fixture.componentInstance.catalogNodeId).toBe('event:cdr/main');
+        expect(fixture.componentInstance.catalogNodeId()).toBe('event:cdr/main');
         expect(fixture.nativeElement.textContent).toContain('View cdr_output in the Catalog');
     });
 
@@ -75,7 +75,7 @@ describe('BatchDetailDialog', () => {
         // a 404 means unknown OR ambiguous — either way a link would point somewhere unproven
         const { fixture } = create(null);
         fixture.detectChanges();
-        expect(fixture.componentInstance.catalogNodeId).toBeNull();
+        expect(fixture.componentInstance.catalogNodeId()).toBeNull();
         expect(fixture.nativeElement.textContent).not.toContain('in the Catalog');
     });
 
@@ -83,7 +83,7 @@ describe('BatchDetailDialog', () => {
         const { fixture, catalog } = create({ id: 'x', label: 'x' }, 'b-2');
         fixture.detectChanges();
         expect(catalog.resolveTable).not.toHaveBeenCalled();
-        expect(fixture.componentInstance.catalogNodeId).toBeNull();
+        expect(fixture.componentInstance.catalogNodeId()).toBeNull();
     });
 
     it('renders with no a11y violations', async () => {

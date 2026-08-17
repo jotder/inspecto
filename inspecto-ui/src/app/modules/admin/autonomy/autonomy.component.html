@@ -9,16 +9,16 @@
             </div>
         </div>
         <div class="flex items-center gap-3">
-            @if (loading) {
+            @if (loading()) {
                 <mat-spinner diameter="24"></mat-spinner>
             }
-            <button mat-icon-button (click)="load()" [disabled]="loading" aria-label="Refresh">
+            <button mat-icon-button (click)="load()" [disabled]="loading()" aria-label="Refresh">
                 <mat-icon [svgIcon]="'heroicons_outline:arrow-path'"></mat-icon>
             </button>
         </div>
     </div>
 
-    @if (unavailable) {
+    @if (unavailable()) {
         <div class="mt-6 rounded-lg border border-warn-200 bg-warn-50 p-4 text-secondary">
             The autonomy policy is unavailable — the intelligence module may be absent or its L3 tier is not configured.
             The controls below are disabled.
@@ -30,27 +30,27 @@
         <div>
             <div class="text-lg font-semibold">Kill switch</div>
             <div class="text-secondary text-sm">
-                @if (policy?.killSwitch) {
+                @if (policy()?.killSwitch) {
                     <span class="font-medium text-warn-600">Engaged</span> — all autonomous actions are halted.
                 } @else {
                     Disengaged — actions run per the modes below.
                 }
-                @if (policy?.updatedBy) {
-                    <span class="ml-1">Last changed by {{ policy?.updatedBy }}.</span>
+                @if (policy()?.updatedBy) {
+                    <span class="ml-1">Last changed by {{ policy()?.updatedBy }}.</span>
                 }
             </div>
         </div>
         <button
             mat-flat-button
-            [color]="policy?.killSwitch ? 'primary' : 'warn'"
-            [disabled]="!canOperate || unavailable || !policy"
+            [color]="policy()?.killSwitch ? 'primary' : 'warn'"
+            [disabled]="!canOperate || unavailable() || !policy()"
             (click)="toggleKillSwitch()"
         >
             <mat-icon
                 class="icon-size-5"
-                [svgIcon]="policy?.killSwitch ? 'heroicons_outline:play' : 'heroicons_outline:stop'"
+                [svgIcon]="policy()?.killSwitch ? 'heroicons_outline:play' : 'heroicons_outline:stop'"
             ></mat-icon>
-            <span class="ml-2">{{ policy?.killSwitch ? 'Disengage' : 'Engage kill switch' }}</span>
+            <span class="ml-2">{{ policy()?.killSwitch ? 'Disengage' : 'Engage kill switch' }}</span>
         </button>
     </div>
 
@@ -61,10 +61,10 @@
             <button
                 mat-flat-button
                 color="primary"
-                [disabled]="!canOperate || unavailable || saving || !policy"
+                [disabled]="!canOperate || unavailable() || saving() || !policy()"
                 (click)="savePolicy()"
             >
-                @if (saving) {
+                @if (saving()) {
                     <mat-spinner diameter="18"></mat-spinner>
                 } @else {
                     <span>Save policy</span>
@@ -87,14 +87,14 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @for (row of rows; track row.name) {
+                    @for (row of rows(); track row.name) {
                         <tr class="border-b border-gray-100 dark:border-gray-800">
                             <td class="py-2 pr-4 font-mono">{{ row.name }}</td>
                             <td class="py-2 pr-4">
                                 <select
                                     class="rounded border border-gray-300 bg-transparent px-2 py-1 dark:border-gray-600"
                                     [(ngModel)]="row.mode"
-                                    [disabled]="!canOperate || unavailable"
+                                    [disabled]="!canOperate || unavailable()"
                                     [attr.aria-label]="'Mode for ' + row.name"
                                 >
                                     @for (m of modes; track m) {
@@ -108,7 +108,7 @@
                                     min="0"
                                     class="w-24 rounded border border-gray-300 bg-transparent px-2 py-1 dark:border-gray-600"
                                     [(ngModel)]="row.maxPerHour"
-                                    [disabled]="!canOperate || unavailable"
+                                    [disabled]="!canOperate || unavailable()"
                                     [attr.aria-label]="'Max per hour for ' + row.name"
                                 />
                             </td>
@@ -118,7 +118,7 @@
                                     min="0"
                                     class="w-24 rounded border border-gray-300 bg-transparent px-2 py-1 dark:border-gray-600"
                                     [(ngModel)]="row.maxPerDay"
-                                    [disabled]="!canOperate || unavailable"
+                                    [disabled]="!canOperate || unavailable()"
                                     [attr.aria-label]="'Max per day for ' + row.name"
                                 />
                             </td>
@@ -139,12 +139,12 @@
             <inspecto-data-table
                 stateKey="autonomy"
                 tier="pro"
-                sourceName="agent-actions"
-                exportName="agent-actions"
-                [rows]="actions"
+                sourceName="agent-actions()"
+                exportName="agent-actions()"
+                [rows]="actions()"
                 [columns]="columnDefs"
-                [loading]="loading"
-                noRowsTitle="No autonomous actions yet"
+                [loading]="loading()"
+                noRowsTitle="No autonomous actions() yet"
                 noRowsHint="When ops_monitor is enabled and an action class is set to Shadow or Auto, its decisions appear here."
             />
         </div>
