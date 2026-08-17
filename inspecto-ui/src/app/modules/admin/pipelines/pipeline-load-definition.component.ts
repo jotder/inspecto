@@ -389,6 +389,12 @@ export class PipelineLoadDefinitionComponent {
         });
         // Any rule edit invalidates a mapped preview taken from the rules as they were.
         this.ruleRows.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.invalidateMapping());
+        // …and arms the drawer's Apply. ⚠ Without this the pane emitted `dirtyChange` only from the node
+        // effect and from `submit()` itself, so EVERY mapping edit left Apply greyed out: a builder could
+        // author rules, press Apply, and watch the Map Step stay "Needs config" — the same dead end
+        // BUILDER-1a closed on the Parse drawer. `dirty` is a form flag, so the programmatic seeding in
+        // `seedRules` (which ends `markAsPristine`) reports false and cannot arm it spuriously.
+        this.form.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.emitDirty());
     }
 
     /**

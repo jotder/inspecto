@@ -253,6 +253,49 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 
 ## 5. UI residuals + security-module residuals
 
+> ### ✅ BUILDER-2 — seven more defects found by driving the editor as a builder, all FIXED (2026-08-17)
+>
+> A second builder session drove **create → pick a parse format → sample → Test parse → Apply → Save →
+> Test mapping → Dry-run → Activate** across **CSV, NDJSON, regex and fixed-width**. Seven defects, each
+> reproduced live and each fixed in the same shift, every one pinned by a spec:
+>
+> 1. **The Load drawer's Apply was never armed by a mapping edit** — the worst of the set. The pane
+>    emitted `dirtyChange` only from the node effect and from `submit()` itself, so a builder could
+>    author rules, press Apply and watch the Map Step stay *"Needs config"* for ever, which also blocks
+>    Activate. Fixed by emitting on `form.valueChanges`. ⚠ The spec drives the DOM on purpose:
+>    `setValue` does not mark a control dirty, so a programmatic test passes against the broken build.
+> 2. **BUILDER-1(c) CLOSED, not just explained.** Adding a parse Step now **re-types the untouched
+>    generic `parser` placeholder in place**, keeping its id and both edges, instead of dropping a
+>    floating second parse node that could only ever fail `MULTI_PARSER`. A parse Step that carries
+>    config is authored work: that one is refused with a message naming its format, pointing at the
+>    drawer that can change it. ⛔ Still no auto-connect of an ordinary palette Step — unchanged.
+> 3. **A duplicate pipeline name printed "A name is required"** over a field that visibly held a name —
+>    the create field had one hard-coded `mat-error` for two ways of being invalid.
+> 4. **The output-schema grid kept the columns of a superseded grammar silently.** After a failed
+>    re-test the derived columns still described the parse before it, and Apply stayed live. Apply
+>    deliberately stays live (blocking it is the dead end BUILDER-1a closed) — the grid now says the
+>    columns are stale.
+> 5. **The dry-run asked a builder to hand-type JSON rows** they had just parsed. It now offers
+>    *"Use the captured sample (N rows)"* from the tab's sample thread, closing the sample strip's own
+>    promise that the sample follows you through every test.
+> 6. **A dry-run result outlived its pipeline** — the panel is mounted once, so "sink → other_pipeline,
+>    2 rows" read as the newly-opened tab's result. The outcome is now stamped with the pipeline it came
+>    from. ⚠ Scoped by stamp, not cleared in an effect: an effect flushes on Angular's schedule and could
+>    wipe a fresh result.
+> 7. **Five `<mat-icon>` LIGATURES rendered as literal words** — `auto_fix_high`, `add`,
+>    `delete_outline`, `close` in the segments editor and `remove_circle_outline` on every fixed-width
+>    slice row. The app registers heroicons SVGs and **no Material icon font**. Plus: an
+>    activated pipeline still read *inactive* in the Open dialog until a reload (`flows` is loaded once),
+>    and fixed-width `start` never said it is a **0-based** offset — a builder counting from 1 gets every
+>    field shifted one character, which "parses" fine and is visible only in the preview values.
+>
+> **Two observations recorded, NOT fixed** (both are deliberate server behaviour, not UI bugs):
+> `delimited.has_header` defaults **true for fixedwidth** (`BuiltinParsers`, described as "header/banner
+> line to skip"), so a 3-line fixed-width sample previews 2 rows with nothing saying a line was skipped —
+> changing a published spec default is a migration, not a UI fix. And the offline mock **cannot evaluate a
+> DuckDB expression** (documented in `onboarding.handler.ts`), so an `EXPR` mapping rule shows an empty
+> column offline while reporting "N rows mapped" — mock fidelity, not a product defect.
+>
 > ### 🔴 BUILDER-1 — four defects found by driving the Pipelines editor as an end user (2026-08-17)
 >
 > A shift drove the real offline UI as a builder (new pipeline → Collect → parse → sample → test →
@@ -281,7 +324,7 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 > supports (copy to a new name, or `compatibility: 'none'`). A builder who changes their mind about
 > the file format cannot proceed.
 >
-> **(c) ⚠ PARTLY FIXED 2026-08-17 — click-to-add always drops an UNCONNECTED node, and the editor explained it wrongly.** Any
+> **(c) ✅ FULLY FIXED 2026-08-17 — see BUILDER-2 item 2 above; a parse Step now re-types the placeholder.** Any
 > palette click adds a floating node; the Recipe view immediately falls back to Canvas saying the
 > topology *"has a branch or connection the Recipe view can't represent"* — but there is no branch,
 > there is a disconnected node. Worse, a new pipeline already lifts to Collect → Parser → Map → Sink,

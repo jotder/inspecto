@@ -62,7 +62,11 @@ import { PipelineGuaranteesPanelComponent } from './pipeline-guarantees-panel.co
 import { PipelineStepCardsComponent } from './pipeline-step-cards.component';
 import { EnrichmentHostPipeline, NodeConfigDialog, NodeConfigResult } from './node-config.dialog';
 import { PipelineCollectionDefinitionComponent } from './pipeline-collection-definition.component';
-import { PARSE_NODE_FRONTENDS, PipelineParseDefinitionComponent } from './pipeline-parse-definition.component';
+import {
+    PARSE_NODE_FRONTENDS,
+    PipelineParseDefinitionComponent,
+    isParseNodeType,
+} from './pipeline-parse-definition.component';
 import { PipelineLoadDefinitionComponent } from './pipeline-load-definition.component';
 import { GrammarEditorDialog } from './grammar-editor.dialog';
 import { PipelineOpenDialog } from './pipeline-open.dialog';
@@ -1607,7 +1611,7 @@ export class PipelineEditorComponent implements OnInit {
      * `{columns, rules}` — so the host, which holds the whole graph, is the one place that can supply it.
      */
     readonly parserSchemaFile = computed(() => {
-        const parser = (this.model()?.nodes ?? []).find((n) => n.type === 'parser' || n.type in PARSE_NODE_FRONTENDS);
+        const parser = (this.model()?.nodes ?? []).find((n) => isParseNodeType(n.type));
         return String(parser?.config?.['schema_file'] ?? '').trim();
     });
 
@@ -1776,6 +1780,11 @@ export class PipelineEditorComponent implements OnInit {
     /** Palette drag-drop: place the new node where it was dropped. */
     onDropAdd(e: { type: string; x: number; y: number }): void {
         if (!this.canAuthor() || !this.model()) return; // read-only (Business lens or View mode): palette drag can't mutate
+        const claimed = this.claimParseSlot(e.type);
+        if (claimed) {
+            if (claimed !== 'refused') this.selectNewNode(claimed);
+            return;
+        }
         const node = this.insertNode(e.type);
         this.canvas?.addNode(node.id, node.id, this.visualKind(e.type), e.x, e.y);
         this.selectNewNode(node);
@@ -1784,9 +1793,53 @@ export class PipelineEditorComponent implements OnInit {
     /** Palette click / keyboard (Enter): add the node at the canvas centre — the no-mouse path to add. */
     addFromPalette(type: string): void {
         if (!this.canAuthor() || !this.model()) return; // read-only (Business lens or View mode): palette click can't mutate
+        const claimed = this.claimParseSlot(type);
+        if (claimed) {
+            if (claimed !== 'refused') this.selectNewNode(claimed);
+            return;
+        }
         const node = this.insertNode(type);
         this.canvas?.addNodeAtCenter(node.id, node.id, this.visualKind(type));
         this.selectNewNode(node);
+    }
+
+    /**
+     * The palette's **parse-slot** rule, and the reason it exists: the flat pipeline config has ONE
+     * `parsing:` block, so a second parse node of EITHER spelling is refused at lowering with
+     * `MULTI_PARSER`. Every new pipeline lifts with a GENERIC `parser` placeholder nobody authored, so
+     * the builder's natural first move — "I want CSV, I'll click Delimited" — used to drop a floating
+     * second parse Step and dead-end at Save on an internal node id.
+     *
+     * <p>So: adding a parse Step **re-types the untouched placeholder in place**, keeping its id and
+     * both its edges (the visual kind is PARSE either way, so the canvas node needs no rebuild). A parse
+     * Step that carries config is authored work — that one is REFUSED, pointing at the drawer that can
+     * change its format, rather than adding a node that could never be saved.
+     *
+     * @returns `null` to carry on and insert a new node · the re-typed node · `'refused'` (nothing added).
+     */
+    private claimParseSlot(type: string): AuthoredNode | 'refused' | null {
+        if (!isParseNodeType(type)) return null;
+        const held = (this.model()?.nodes ?? []).find((n) => isParseNodeType(n.type));
+        if (!held) return null;
+        const labels = this.typeLabel();
+        if (held.type !== 'parser' || Object.keys(held.config ?? {}).length > 0) {
+            const heldLabel = labels.get(held.type) ?? held.type;
+            this.toast.warning(
+                `This pipeline already has a Parse Step (${heldLabel}) and it has room for one. ` +
+                    `Open it to change its format, or delete it first.`,
+            );
+            return 'refused';
+        }
+        // The placeholder's display name is the GENERIC label ("Parser"); carrying it onto a re-typed node
+        // would leave a Delimited Step calling itself Parser in every inspector. An authored name stays.
+        const label = labels.get(type) ?? type;
+        const generic = !held.name?.trim() || held.name.trim() === (labels.get(held.type) ?? 'Parser');
+        const retyped: AuthoredNode = { ...held, type, ...(generic ? { name: label } : {}) };
+        this.model.update((m) =>
+            m ? { ...m, nodes: m.nodes.map((n) => (n.id === held.id ? retyped : n)) } : m,
+        );
+        this.toast.info(`Set the Parse Step '${held.id}' to ${label}.`);
+        return retyped;
     }
 
     private visualKind(type: string): ReturnType<typeof categoryVisualKind> {
@@ -1969,6 +2022,10 @@ export class PipelineEditorComponent implements OnInit {
                 this.activating.set(false);
                 this.model.set(updated);
                 this.dirty.set(false);
+                // The list row carries the `active` chip the Open dialog shows, and it is loaded once —
+                // without this a pipeline activated in this session still read "inactive" everywhere but
+                // the toolbar until a reload. Same in-place list patch as rename and delete.
+                this.flows.update((fs) => fs.map((f) => (f.name === id ? { ...f, active: goingLive } : f)));
                 this.toast.success(ok);
                 if (goingLive) this.ensureDataset(id, updated.name || id);
             },

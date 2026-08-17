@@ -86,6 +86,14 @@ export const PARSE_NODE_FRONTENDS: Record<string, ParsingFrontend | 'asn1' | 'pl
 };
 
 /**
+ * Does this node type occupy the pipeline's single **parse slot**? The generic `parser` node and every
+ * per-format subtype both do — the flat config has one `parsing:` block, so a second one of EITHER
+ * spelling is refused at lowering with `MULTI_PARSER`. Callers that reason about "the parse node"
+ * (the Load pane's schema context, the palette's add rule) must ask this, not just the subtype map.
+ */
+export const isParseNodeType = (type: string): boolean => type === 'parser' || type in PARSE_NODE_FRONTENDS;
+
+/**
  * The **Parse definition pane** (definition-surface P3a; fixed width P3b, ASN.1 P3c) — the per-format
  * path of the parse node, re-hosted inside `<inspecto-definition-drawer>` instead of
  * `grammar-editor.dialog`. Renders name/description plus the shared `<inspecto-grammar-editor>`
@@ -260,6 +268,12 @@ export const PARSE_NODE_FRONTENDS: Record<string, ParsingFrontend | 'asn1' | 'pl
                             }
                         }
                         @if (schemaSeed().length) {
+                            @if (schemaStale()) {
+                                <p class="text-warn m-0 mb-2 text-sm" role="status" aria-live="polite">
+                                    These columns came from an earlier test — the settings above no longer parse
+                                    the sample. Fix them and test again, or Apply keeps the columns shown.
+                                </p>
+                            }
                             <inspecto-schema-fields-editor [rows]="schemaSeed()" />
                             <!--
                                 BUILDER-1b. One pipeline has ONE output schema (pipeline_schema), and a save
@@ -459,11 +473,12 @@ export class PipelineParseDefinitionComponent {
      */
     readonly previewFn = (type: string, grammar: Record<string, unknown>, text: string): Observable<ParserPreview> => {
         const thread = this.sample();
-        if (!thread) return this.parsersApi.preview(type, grammar, text);
-        thread.parseError.set(null);
+        thread?.parseError.set(null);
         return this.parsersApi.preview(type, grammar, text).pipe(
             tap((p) => {
                 if (p.kind !== 'table') return;
+                this.schemaStale.set(false); // these columns and these settings agree again
+                if (!thread) return;
                 thread.parsePreview.set({
                     frontend: type,
                     columns: p.columns,
@@ -476,12 +491,23 @@ export class PipelineParseDefinitionComponent {
                 thread.schemaError.set(null);
             }),
             catchError((e) => {
-                thread.parsePreview.set(null);
-                thread.parseError.set(apiErrorMessage(e, 'The sample does not parse with these settings.'));
+                // The grid still shows the columns of the LAST parse that worked; the settings under it
+                // have since stopped parsing. Apply stays available (blocking it is the dead end
+                // BUILDER-1a fixed) — but the schema must say it no longer describes these settings.
+                if (this.schemaSeed().length) this.schemaStale.set(true);
+                thread?.parsePreview.set(null);
+                thread?.parseError.set(apiErrorMessage(e, 'The sample does not parse with these settings.'));
                 return throwError(() => e);
             }),
         );
     };
+
+    /**
+     * The seeded columns outlived the parse that produced them — the last Test parse FAILED. Never
+     * blocks anything; it exists so a builder cannot apply columns from a superseded grammar believing
+     * the product still stands behind them.
+     */
+    readonly schemaStale = signal(false);
 
     /** Keep both halves of the discriminated preview: the tree feeds segments, the table feeds schema. */
     onPreviewed(p: ParserPreview): void {

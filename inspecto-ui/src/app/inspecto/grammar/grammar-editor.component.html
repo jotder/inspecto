@@ -76,6 +76,12 @@
 @if (!pluginDef() && frontend() === 'fixedwidth') {
     <div class="mt-3" [formGroup]="fwForm">
         <div class="mb-1 text-xs font-semibold uppercase opacity-70">Fields</div>
+        <!-- `start` is a 0-based offset (the engine slices `line.substring(start, start + length)`), and
+             nothing on the row said so: a builder counting columns from 1 gets every field shifted by one
+             character, which parses "successfully" and is only visible in the preview values. -->
+        <p class="text-secondary m-0 mb-2 text-xs">
+            Start is a 0-based character offset — the first character of the line is 0.
+        </p>
         <div formArrayName="fields" class="flex flex-col gap-2">
             @for (g of fwFields.controls; track $index) {
                 <div [formGroupName]="$index" class="flex items-start gap-2">
@@ -104,7 +110,9 @@
                         [attr.aria-label]="'Remove field ' + ($index + 1)"
                         (click)="removeField($index)"
                     >
-                        <mat-icon class="icon-size-4">remove_circle_outline</mat-icon>
+                        <!-- The app ships heroicons as SVG and no Material icon FONT, so a ligature name
+                             renders as the literal words "remove_circle_outline" beside every slice row. -->
+                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:trash"></mat-icon>
                     </button>
                 </div>
             }

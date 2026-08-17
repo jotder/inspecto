@@ -9,6 +9,7 @@ import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { StreamTransferService } from 'app/inspecto/transfer/stream-transfer.service';
 import { ToastrService } from 'ngx-toastr';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { GAMMA_CONFIG } from '@gamma/services/config/config.constants';
 
 /** A canvas double — the real G6 host can't instantiate in jsdom, so we assert the mutation calls. */
 function canvasMock() {
@@ -154,6 +155,9 @@ describe('PipelineEditorComponent', () => {
             imports: [PipelineEditorComponent],
             providers: [
                 provideNoopAnimations(),
+                // Rendering the toolbar's create field pulls the shell config service, which walks up
+                // to this token — without it the editor cannot be rendered at all in a spec.
+                { provide: GAMMA_CONFIG, useValue: {} },
                 { provide: PipelinesService, useValue: api },
                 { provide: ConfigService, useValue: config },
                 { provide: StreamTransferService, useValue: transfer },
@@ -410,6 +414,22 @@ describe('PipelineEditorComponent', () => {
             expect(confirmOf().confirm).toHaveBeenCalled();
             expect(api.savePipelineGraph).toHaveBeenCalledWith('demo', expect.objectContaining({ active: true }));
             expect(components.create).toHaveBeenCalledWith('dataset', expect.objectContaining({ physicalRef: 'demo' }));
+        });
+
+        /**
+         * The list row carries the `active` chip the Open dialog renders, and `flows` is loaded once —
+         * found by driving the editor: a pipeline activated in-session still read inactive everywhere
+         * but the toolbar.
+         */
+        it('marks the list row active, and inactive again on deactivate', async () => {
+            const c = make();
+            c.flows.set([{ name: 'demo', active: false, nodeCount: 2, edgeCount: 1, produces: [], consumes: [] }]);
+            c.select('demo');
+            await c.activate();
+            expect(c.flows()[0].active).toBe(true);
+
+            await c.deactivate();
+            expect(c.flows()[0].active).toBe(false);
         });
 
         it('does not activate when the confirm is declined', async () => {
@@ -719,6 +739,60 @@ describe('PipelineEditorComponent', () => {
             c.openNodeConfig(node);
             expect(dialog.open).not.toHaveBeenCalled();
             expect(c.definitionNode()?.id).toBe(node.id);
+        });
+
+        /**
+         * BUILDER-1c. The flat config has ONE parse slot, and every new pipeline lifts with a GENERIC
+         * `parser` placeholder nobody authored — so "I want CSV, I'll click Delimited" used to drop a
+         * floating SECOND parse Step whose only outcome was `MULTI_PARSER` at Save, named after an
+         * internal node id. Adding a parse Step re-types the placeholder in place instead, keeping its
+         * id and its edges.
+         */
+        it('re-types the untouched parser placeholder instead of adding a second parse Step', () => {
+            api.pipelineGraphRaw.mockReturnValue(
+                of({
+                    name: 'demo',
+                    active: false,
+                    nodes: [
+                        { id: 'acq', type: 'acquisition', config: { poll: 'in' } },
+                        { id: 'parse', type: 'parser', name: 'Parser' },
+                        { id: 'sink', type: 'sink.persistent', config: { database: 'db' } },
+                    ],
+                    edges: [
+                        { from: 'acq', rel: 'data', to: 'parse' },
+                        { from: 'parse', rel: 'data', to: 'sink' },
+                    ],
+                }),
+            );
+            const c = make();
+            c.select('demo');
+            c.addFromPalette('parser.delimited');
+
+            const parseNodes = c.model()!.nodes.filter((n) => n.type === 'parser' || n.type.startsWith('parser.'));
+            expect(parseNodes).toHaveLength(1);
+            expect(parseNodes[0].id).toBe('parse'); // same node — so both its edges survive
+            expect(parseNodes[0].type).toBe('parser.delimited');
+            expect(c.model()!.edges).toHaveLength(2);
+        });
+
+        /** A parse Step carrying config is authored work: refuse rather than add a node that can never
+         *  be saved, and point at the drawer that CAN change its format. */
+        it('refuses a second parse Step when the slot is held by a configured one', () => {
+            api.pipelineGraphRaw.mockReturnValue(
+                of({
+                    name: 'demo',
+                    active: false,
+                    nodes: [{ id: 'parse', type: 'parser.delimited', config: { parsing: { frontend: 'delimited' } } }],
+                    edges: [],
+                }),
+            );
+            const c = make();
+            c.select('demo');
+            c.addFromPalette('parser.json');
+
+            expect(c.model()!.nodes).toHaveLength(1);
+            expect(c.model()!.nodes[0].type).toBe('parser.delimited');
+            expect(toast.warning).toHaveBeenCalledWith(expect.stringContaining('already has a Parse Step'));
         });
 
         /** S3: a bound delimited node now reaches the drawer too, materialised into an inline COPY of
@@ -1381,6 +1455,38 @@ describe('PipelineEditorComponent', () => {
         c.select('demo');
         expect(c.lastRunBatch()).toBeNull();
         expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Found by driving the editor: the create field had ONE `mat-error`, hard-coded to the `required`
+     * message, so a 409 (`duplicate`) printed "A name is required" over a field that visibly held a
+     * name — a dead end with nothing to act on.
+     */
+    it('names a duplicate pipeline rather than claiming the field is empty', () => {
+        config.write.mockReturnValue(throwError(() => ({ status: 409 })));
+        const fixture = TestBed.createComponent(PipelineEditorComponent);
+        const c = fixture.componentInstance;
+        // A linear model keeps `effectiveMode()` on Recipe. ⚠ Without one, `stepChain()` is null, the
+        // template falls back to the G6 canvas, and jsdom's context-less canvas throws an UNHANDLED
+        // `clearRect` that exits vitest 1 even though every assertion passes.
+        c.model.set(structuredClone(FLOW));
+        fixture.detectChanges();
+        c.startNew();
+        c.newName.setValue('orders');
+        c.newName.markAsTouched();
+        fixture.detectChanges();
+        // Clicked, not called: a plain FormControl is not a signal, so only a real event marks the
+        // OnPush view for check — calling the method leaves the message unrendered in the harness.
+        const create = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].find(
+            (b) => b.textContent?.trim() === 'Create',
+        ) as HTMLButtonElement;
+        create.click();
+        expect(c.newName.hasError('duplicate')).toBe(true);
+        fixture.detectChanges();
+
+        const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+        expect(text).toContain('already exists');
+        expect(text).not.toContain('A name is required');
     });
 
     it('the empty path has no accessibility violations', async () => {

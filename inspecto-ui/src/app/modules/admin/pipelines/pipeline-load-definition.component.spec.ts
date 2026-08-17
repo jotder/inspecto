@@ -402,6 +402,25 @@ describe('PipelineLoadDefinitionComponent — mapped output (B1)', () => {
         expect(p.ruleRows.length).toBe(2);
     });
 
+    /**
+     * Found by driving the editor: the pane emitted `dirtyChange` only from the node effect and from
+     * `submit()` itself, so the drawer's Apply stayed greyed out through EVERY mapping edit — a builder
+     * could author rules, press Apply, and watch the Map Step stay "Needs config" for ever. Driven
+     * through the DOM on purpose: `setValue` does not mark a control dirty, only a user edit does, so a
+     * programmatic spec would pass against the broken build.
+     */
+    it('arms the drawer Apply when a rule is edited', async () => {
+        const fixture = await create();
+        expect(fixture.componentInstance.dirty).toBe(false); // seeding alone must not arm it
+        const cell = fixture.nativeElement.querySelectorAll(
+            'input[aria-label="Target column"]',
+        )[0] as HTMLInputElement;
+        cell.value = 'MSISDN';
+        cell.dispatchEvent(new Event('input'));
+        fixture.detectChanges();
+        expect(fixture.componentInstance.dirty).toBe(true);
+    });
+
     it('has no a11y violations with the mapped grid rendered', async () => {
         const fixture = await create(mapNode(), 'spaces/default/config/cdr_schema.toon', threadWithParsedRows());
         pane(fixture).testMapping();

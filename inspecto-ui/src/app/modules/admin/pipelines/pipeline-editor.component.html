@@ -12,7 +12,12 @@
             <mat-form-field subscriptSizing="dynamic" class="w-56">
                 <mat-label>New pipeline name</mat-label>
                 <input matInput [formControl]="newName" placeholder="orders_rollup" (keyup.enter)="createPipeline()" />
-                @if (newName.touched && newName.invalid) {
+                <!-- Two ways to be invalid, and they must not share a message: a 409 from the write route
+                     sets `duplicate` (createPipeline), and printing "a name is required" over a field that
+                     visibly HOLDS a name is a dead end — the builder cannot tell what to change. -->
+                @if (newName.touched && newName.hasError('duplicate')) {
+                    <mat-error>A pipeline called that already exists — pick another name</mat-error>
+                } @else if (newName.touched && newName.invalid) {
                     <mat-error>A name is required</mat-error>
                 }
             </mat-form-field>
@@ -720,7 +725,10 @@
                     class="min-h-0 flex-1 overflow-y-auto p-3"
                 >
                     @if (tab === 'dryrun') {
-                        <app-pipeline-dry-run-panel [pipelineId]="selectedId()"></app-pipeline-dry-run-panel>
+                        <app-pipeline-dry-run-panel
+                            [pipelineId]="selectedId()"
+                            [capturedRows]="sampleThread()?.parsePreview()?.rows ?? null"
+                        ></app-pipeline-dry-run-panel>
                     } @else {
                         @if (!findings().length) {
                             <p class="inline-flex items-center gap-1 text-sm" style="color: var(--gamma-primary)">

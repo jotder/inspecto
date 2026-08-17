@@ -783,3 +783,76 @@ carried over (it needs the kind, hence an extra settings hop, and the Catalog's 
 directly reachable). And Export configuration lives inside the `canAuthor()` menu, so unlike the
 shell's every-lens export it is hidden from the Business lens — consistent with its neighbour *Export
 document*, but narrower than what it replaced.
+
+## The parse slot is claimed, not queued (BUILDER-2, 2026-08-17)
+
+A flat pipeline config has **one `parsing:` block**. Every new pipeline lifts with a *generic* `parser`
+placeholder nobody authored — so a builder's natural first move, "I want CSV, I'll click Delimited",
+used to add a **second** parse node whose only possible outcome was `MULTI_PARSER` at Save, reported
+against an internal node id.
+
+`claimParseSlot()` (in the editor) is the rule, and it runs before either palette entry point:
+
+- **The untouched placeholder is RE-TYPED in place** — same id, both edges intact, so the graph stays a
+  linear recipe and the Recipe view never falls back to Canvas. The visual kind is PARSE either way, so
+  the canvas node needs no rebuild. A placeholder display name that is just the generic label follows
+  the new type; an authored name is kept.
+- **A parse Step carrying config is authored work and the add is REFUSED**, naming the format that holds
+  the slot and pointing at the drawer that can change it — never a node that could not be saved.
+- The predicate is `isParseNodeType` (`pipeline-parse-definition.component.ts`), which is the generic
+  `parser` **plus** every `PARSE_NODE_FRONTENDS` subtype. ⛔ Do not key this on the node-type CATEGORY:
+  the rule must hold before the catalog resolves, and it is about the config format, not the palette.
+
+⛔ This is **not** auto-connecting a palette Step. An ordinary Step still lands unconnected on purpose —
+that was considered and declined, because it changes authoring semantics.
+
+## Apply is armed by an edit, and every pane has to say so (BUILDER-2, 2026-08-17)
+
+The definition drawer's Apply is gated on `definitionDirty()`, which each pane feeds through
+`dirtyChange`. The panes derive dirty **on interaction rather than streaming it**, and that convention
+has now failed twice in the same way:
+
+- the Parse drawer did not count a *derived* output schema (BUILDER-1a), and
+- the Load drawer counted **no mapping edit at all** — it emitted only from its node effect and from
+  `submit()`, so authoring rules and pressing Apply left the Map Step "Needs config" for ever.
+
+The Load pane now emits on `form.valueChanges`. `dirty` is a form flag, so the programmatic seeding in
+`seedRules` (which ends `markAsPristine`) cannot arm it spuriously. 🔴 **A spec for this must drive the
+DOM**: `setValue` does not mark a control dirty, so a programmatic test passes against the broken build.
+
+**A derived artifact can outlive what derived it.** The output-schema grid keeps the columns of the last
+parse that WORKED, so a failed re-test leaves them describing a grammar the pane no longer holds.
+`schemaStale` says so in the grid; Apply deliberately stays live, because blocking it is the dead end
+BUILDER-1a closed.
+
+## The captured sample reaches the dry-run too, and a result cannot outlive its pipeline (BUILDER-2)
+
+The sample strip promises the captured sample "follows you through the definition, so every test shows
+your data". The dry-run was the one test that broke it, asking for hand-typed JSON — it now offers
+**"Use the captured sample (N rows)"** from the tab's thread (`parsePreview().rows`), passed in as an
+input because the thread belongs to the TAB.
+
+⚠ The panel is mounted **once** and outlives the tab switch, so its outcome is **stamped with the
+pipeline id it came from** and `result`/`error` are computed against the current one. ⛔ Do not replace
+that with an effect that clears on id change: an effect flushes on Angular's schedule and can wipe a
+result the operator just produced.
+
+## Icons are heroicons SVGs — a ligature renders as words (BUILDER-2, 2026-08-17)
+
+The app registers heroicons/feather/material **SVG sprites** and **no Material icon font**, so
+`<mat-icon>add</mat-icon>` renders the literal text `add`. Five such ligatures shipped unnoticed (four in
+the segments editor, one on every fixed-width slice row) because no unit test reads icon glyphs. Always
+`svgIcon="heroicons_outline:…"`. It is only visible by looking at the page.
+
+## Fixed width: `start` is 0-based, and the header default eats a line (BUILDER-2, 2026-08-17)
+
+Two things a builder cannot discover from the form, both grounded in the engine:
+
+- **`start` is a 0-based character offset** — `FixedWidthRecordIngester` requires `start >= 0` and slices
+  `new String(buf, start, len)`. A builder counting columns from 1 gets **every field shifted one
+  character**, which parses "successfully" and is visible only in the preview values. The slice table now
+  says so above the rows.
+- ⚠ **`delimited.has_header` defaults `true` for the `fixedwidth` frontend too** (`BuiltinParsers`,
+  described there as "header/banner line to skip before the records"), so a 3-line fixed-width sample
+  previews **2 rows** and nothing says a line was skipped. Recorded, deliberately **not** changed: it is a
+  server-published spec default that existing configs rely on, so flipping it is a migration, not a UI fix.

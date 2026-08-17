@@ -1,3 +1,6 @@
+<!-- ⚠ Icons are heroicons SVGs. The app registers no Material icon FONT, so a `<mat-icon>name</mat-icon>`
+     ligature renders as the literal words — this pane showed "auto_fix_high", "add" and "delete_outline"
+     as text beside every button until 2026-08-17. Always `svgIcon="heroicons_outline:…"`. -->
 <section class="flex flex-col gap-3" [formGroup]="form">
     <div class="flex items-start justify-between gap-3">
         <div>
@@ -16,7 +19,7 @@
                 (click)="deriveFromPreview()"
                 matTooltip="Replace the segments below with one per record type in the preview"
             >
-                <mat-icon>auto_fix_high</mat-icon>
+                <mat-icon svgIcon="heroicons_outline:sparkles"></mat-icon>
                 Derive from preview
             </button>
         }
@@ -48,7 +51,7 @@
                             (click)="removeSegment(si)"
                             [attr.aria-label]="'Remove segment ' + (segment.get('key')?.value || si + 1)"
                         >
-                            <mat-icon>delete_outline</mat-icon>
+                            <mat-icon svgIcon="heroicons_outline:trash"></mat-icon>
                         </button>
                     }
                 </div>
@@ -102,7 +105,7 @@
                                     (click)="removeColumn(segment, ci)"
                                     [attr.aria-label]="'Remove column ' + (column.get('name')?.value || ci + 1)"
                                 >
-                                    <mat-icon>close</mat-icon>
+                                    <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
                                 </button>
                             }
                         </div>
@@ -110,7 +113,7 @@
                     @if (editable()) {
                         <div>
                             <button mat-stroked-button type="button" (click)="addColumn(segment)">
-                                <mat-icon>add</mat-icon>
+                                <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
                                 Add column
                             </button>
                         </div>
@@ -123,7 +126,7 @@
     @if (editable()) {
         <div>
             <button mat-stroked-button type="button" (click)="addSegment()">
-                <mat-icon>add</mat-icon>
+                <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
                 Add segment
             </button>
         </div>

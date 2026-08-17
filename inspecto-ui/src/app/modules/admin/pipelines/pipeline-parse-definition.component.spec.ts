@@ -327,6 +327,36 @@ describe('PipelineParseDefinitionComponent', () => {
             expect(thread.parseError()).toBeTruthy();
         });
 
+        /**
+         * The grid keeps the columns of the last parse that WORKED, so after a failed re-test it
+         * describes a grammar the pane no longer holds — and Apply stays available (blocking it is the
+         * dead end BUILDER-1a closed). Found by driving the Regex drawer: a pattern edited to one that
+         * matches nothing still offered five columns from the pattern before it, silently.
+         */
+        it('marks the derived columns stale when a re-test fails, and clears it on the next success', async () => {
+            const thread = new DefinitionStateService();
+            thread.captureSample('cdr.csv', 'a|b\n1|2\n');
+            const fixture = await create(delimitedNode(), [], [], 0, thread);
+            fixture.componentInstance.pipelineName = 'cdr'; // owns `cdr_schema.toon`, so the block renders
+            fixture.detectChanges();
+            const parsers = TestBed.inject(ParsersService) as unknown as { preview: ReturnType<typeof vi.fn> };
+            const table = { kind: 'table', columns: ['a', 'b'], rows: [{ a: '1' }], rowCount: 1, rejectedRows: 0 };
+            parsers.preview.mockReturnValue(of(table));
+            editor(fixture).test();
+            expect(pane(fixture).schemaSeed().length).toBeGreaterThan(0);
+            expect(pane(fixture).schemaStale()).toBe(false);
+
+            parsers.preview.mockReturnValue(throwError(() => new Error('nope')));
+            editor(fixture).test();
+            expect(pane(fixture).schemaStale()).toBe(true);
+            fixture.detectChanges();
+            expect(fixture.nativeElement.textContent).toContain('These columns came from an earlier test');
+
+            parsers.preview.mockReturnValue(of(table));
+            editor(fixture).test();
+            expect(pane(fixture).schemaStale()).toBe(false);
+        });
+
         /** ⚠ A record tree is not "rows a downstream step can cast" — leave the thread alone. */
         it('leaves the thread untouched for a tree preview', async () => {
             const thread = new DefinitionStateService();

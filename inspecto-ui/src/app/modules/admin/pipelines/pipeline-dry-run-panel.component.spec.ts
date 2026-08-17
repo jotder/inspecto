@@ -70,6 +70,53 @@ describe('PipelineDryRunPanelComponent', () => {
         expect(fixture.nativeElement.querySelector('[role="status"]')).toBeNull();
     });
 
+    /**
+     * The sample strip promises the captured sample follows the builder through every test. Before this
+     * the dry-run was the one test that broke it: a builder who had just parsed their own file had to
+     * hand-type JSON rows here.
+     */
+    it('fills the sample box from the rows the parse step produced', () => {
+        const fixture = TestBed.createComponent(PipelineDryRunPanelComponent);
+        fixture.componentRef.setInput('pipelineId', 'demo');
+        fixture.componentRef.setInput('capturedRows', [{ acct: 'A1' }, { acct: 'A2' }]);
+        fixture.detectChanges();
+        const button = [...fixture.nativeElement.querySelectorAll('button')].find((b: HTMLButtonElement) =>
+            b.textContent?.includes('Use the captured sample'),
+        ) as HTMLButtonElement;
+        expect(button.textContent).toContain('2 rows');
+        button.click();
+        fixture.componentInstance.run();
+        expect(api.dryRunAuthored).toHaveBeenCalledWith('demo', [{ acct: 'A1' }, { acct: 'A2' }]);
+    });
+
+    /** No thread, or a thread that never parsed: the affordance must not appear at all. */
+    it('offers no captured sample when the thread has no rows', () => {
+        const fixture = TestBed.createComponent(PipelineDryRunPanelComponent);
+        fixture.componentRef.setInput('pipelineId', 'demo');
+        fixture.detectChanges();
+        const labels = [...fixture.nativeElement.querySelectorAll('button')].map(
+            (b: HTMLButtonElement) => b.textContent ?? '',
+        );
+        expect(labels.some((t: string) => t.includes('Use the captured sample'))).toBe(false);
+    });
+
+    /**
+     * The panel is mounted once and outlives the tab switch. Found by driving the editor: after a
+     * dry-run on one pipeline, opening another still showed "sink → <the other pipeline>" under the new
+     * tab's name.
+     */
+    it('drops a result when the selected pipeline changes', () => {
+        const fixture = TestBed.createComponent(PipelineDryRunPanelComponent);
+        fixture.componentRef.setInput('pipelineId', 'first');
+        fixture.detectChanges();
+        fixture.componentInstance.run();
+        expect(fixture.componentInstance.result()).not.toBeNull();
+
+        fixture.componentRef.setInput('pipelineId', 'second');
+        fixture.detectChanges();
+        expect(fixture.componentInstance.result()).toBeNull();
+    });
+
     it('is a11y-clean with no pipeline selected', async () => {
         const fixture = TestBed.createComponent(PipelineDryRunPanelComponent);
         fixture.detectChanges();
