@@ -26,6 +26,11 @@ const CATEGORIES = new Set<PatternPack['category']>(['money', 'telecom', 'identi
 const TOOLS = new Set<NonNullable<PatternPack['tool']>>(['cycles', 'cohesion', 'similarity']);
 const DIRECTIONS = new Set<NonNullable<PatternStep['direction']>>(['out', 'in', 'both']);
 
+/** One authored kind field, kept only when it is a non-blank string — blank is the wildcard spelling. */
+function kindOf(value: unknown, key: 'nodeKind' | 'edgeKind'): Partial<PatternStep> {
+    return typeof value === 'string' && value.trim() ? { [key]: value.trim() } : {};
+}
+
 /**
  * Map an authored `pattern-pack` component's content onto a {@link PatternPack}, or `null` when it is not
  * usable. Deliberately defensive: pack content is free-form TOON (no backend `validateKind` branch), so a
@@ -33,7 +38,8 @@ const DIRECTIONS = new Set<NonNullable<PatternStep['direction']>>(['out', 'in', 
  *
  * ⚠ A step's `direction` is the EMPTY STRING for the start node, not an absent key — TOON cannot encode `{}`
  * as a list element (JToon writes a bare `-` and then fails to decode its own output), so the persisted
- * shape spells the wildcard as a blank and it maps back to `undefined` here.
+ * shape spells the wildcard as a blank and it maps back to `undefined` here. The same blank-means-wildcard
+ * rule carries the `nodeKind`/`edgeKind` fields.
  */
 export function patternPackFromContent(content: Record<string, unknown>): PatternPack | null {
     const id = typeof content['name'] === 'string' ? content['name'] : '';
@@ -43,10 +49,20 @@ export function patternPackFromContent(content: Record<string, unknown>): Patter
     if (!id || !label || !CATEGORIES.has(category) || !Array.isArray(rawSteps) || rawSteps.length === 0) return null;
 
     const steps: PatternStep[] = rawSteps.map((s) => {
-        const direction = (s as Record<string, unknown>)?.['direction'];
-        return DIRECTIONS.has(direction as NonNullable<PatternStep['direction']>)
-            ? { direction: direction as PatternStep['direction'] }
-            : {}; // blank / unknown ⇒ wildcard, the start node's shape
+        const step = (s as Record<string, unknown>) ?? {};
+        const direction = step['direction'];
+        return {
+            // ⚠ Carried, not dropped. A PatternStep is {nodeKind, edgeKind, direction}, and reading only
+            // the direction turned an authored pack that PINS its kinds — the domain-seeded case this
+            // file's own header anticipates — into an all-wildcard motif. It still drew as a valid
+            // option with the right label, length and arrows, and just quietly matched far more of the
+            // graph than it was authored to, which is the worst way for this to be wrong.
+            ...kindOf(step['nodeKind'], 'nodeKind'),
+            ...kindOf(step['edgeKind'], 'edgeKind'),
+            ...(DIRECTIONS.has(direction as NonNullable<PatternStep['direction']>)
+                ? { direction: direction as PatternStep['direction'] }
+                : {}), // blank / unknown ⇒ wildcard, the start node's shape
+        };
     });
     const tool = content['tool'] as NonNullable<PatternPack['tool']>;
     return {
