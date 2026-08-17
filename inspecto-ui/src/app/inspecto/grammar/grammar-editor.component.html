@@ -81,18 +81,21 @@
                 <div [formGroupName]="$index" class="flex items-start gap-2">
                     <mat-form-field class="flex-1" subscriptSizing="dynamic">
                         <mat-label>Name</mat-label>
-                        <input matInput formControlName="name" />
+                        <!-- Row-distinct accessible names: every row's visible label is the same word,
+                             so without these a screen reader reads "Name / Start / Length" N times with
+                             nothing to tell the slices apart. -->
+                        <input matInput formControlName="name" [attr.aria-label]="'Field ' + ($index + 1) + ' name'" />
                         @if (g.get('name')?.hasError('required')) {
                             <mat-error>Required</mat-error>
                         }
                     </mat-form-field>
                     <mat-form-field class="w-24" subscriptSizing="dynamic">
                         <mat-label>Start</mat-label>
-                        <input matInput type="number" formControlName="start" />
+                        <input matInput type="number" formControlName="start" [attr.aria-label]="'Field ' + ($index + 1) + ' start'" />
                     </mat-form-field>
                     <mat-form-field class="w-24" subscriptSizing="dynamic">
                         <mat-label>Length</mat-label>
-                        <input matInput type="number" formControlName="length" />
+                        <input matInput type="number" formControlName="length" [attr.aria-label]="'Field ' + ($index + 1) + ' length'" />
                     </mat-form-field>
                     <button
                         mat-icon-button

@@ -215,8 +215,11 @@ former root reference docs** (each index lists them):
   execution half of the gate is S3-blocked. **Phase 3: S1/S2/S4 shipped, S3 deferred.** Next: the
   S3 design (operator call), Phase 4 (Guarantees + Stage C + per-Step `enabled:`), or UI S1–S3.
 
-- [`superpower/elt-amendment-ui-plan.md`](superpower/elt-amendment-ui-plan.md) — **v1.0
-  (2026-08-05) — the amendment's unified UI plan** (companion to the above). One design call:
+- [`archived-documents/plans-archive/elt-amendment-ui-plan.md`](archived-documents/plans-archive/elt-amendment-ui-plan.md)
+  — **ARCHIVED 2026-08-17** (S1–S6 + S7's summarize half shipped; only S7's table-entry half remains and
+  it is triple-gated — no `dataset.write` Signal publisher, `PipelineConfigParser` still requires
+  `dirs.poll`/`dirs.database` at parse time, and there is no `table` collector mode. Open item lives in
+  `BACKLOG.md`.) **v1.0 (2026-08-05) — the amendment's unified UI plan** (companion to the above). One design call:
   the recipe editor is a **second projection of the existing `AuthoredPipeline` model** — same
   reducers, same `PUT /pipelines/{name}/graph` save, canvas kept behind a mode toggle for
   non-expressible graphs. Seven slices S1–S7 (S1–S3 unblocked before any backend phase): Step

@@ -21,7 +21,7 @@ Document/§5.1, the dedup boundary/§2.4, and schema-registry semantics/§3.4 be
 > node taxonomy, the pipeline/enrichment/matrix trichotomy, and the vocabulary.
 >
 > **Relationship to in-flight work.** This plan is the umbrella for, and successor of scope in:
-> - [`branch-aware-executor-plan.md`](branch-aware-executor-plan.md) — its §3 operator model
+> - [`branch-aware-executor-plan.md`](../archived-documents/plans-archive/branch-aware-executor-plan.md) — its §3 operator model
 >   (*"Every unit is a job… fires the next task on another virtual thread… The execution model is
 >   separate from the UI abstraction"*) is **this plan's execution model**, recorded 2026-08-01.
 >   Stage A 1–3 shipped (dormant graph-execution machinery), Stage B CLOSED (B1–B5), and **Stage C

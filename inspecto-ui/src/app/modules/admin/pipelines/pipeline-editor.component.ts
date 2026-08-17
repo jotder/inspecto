@@ -481,6 +481,23 @@ export class PipelineEditorComponent implements OnInit {
     /** Whether the preference is Recipe but the open graph forced a Canvas fallback — drives the alert. */
     readonly forcedToCanvas = computed(() => this.viewMode() === 'recipe' && !this.stepChain() && !!this.model());
 
+    /**
+     * Steps with no edge at either end. The overwhelmingly common reason the Recipe view gives up is
+     * NOT a branch — it is a Step added from the palette, which lands unconnected. Blaming "a branch
+     * this view can't represent" sent a builder hunting for a branch that was never there
+     * (BUILDER-1c, found by driving the real UI 2026-08-17).
+     */
+    readonly danglingStepNames = computed(() => {
+        const m = this.model();
+        if (!m) return [];
+        const wired = new Set<string>();
+        for (const e of m.edges) {
+            wired.add(e.from);
+            wired.add(e.to);
+        }
+        return m.nodes.filter((n) => !wired.has(n.id)).map((n) => n.name || n.id);
+    });
+
     /** The served recipe-verb palette (S4), `null` until it loads / on an old server. */
     private readonly servedVerbs = signal<{ type: string; label: string }[] | null>(null);
 

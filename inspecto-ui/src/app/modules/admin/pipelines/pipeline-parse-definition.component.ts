@@ -463,6 +463,11 @@ export class PipelineParseDefinitionComponent {
         // include flags are the truth, and a fresh sample would silently replace them on Apply.
         // Instead, ASK what changed — that is exactly the drift question (B3).
         if (this.schemaHydrated()) return this.checkDrift(p.rows);
+        // The derived schema is unapplied work — see {@link parsedSinceApply}. Set HERE and not in
+        // `previewFn`, which only runs for a node that has a sample thread, and not on the drift
+        // path above, which deliberately re-derives nothing.
+        this.parsedSinceApply = true;
+        this.emitDirty();
         this.schemaSeed.set(
             p.columns.map((col, i) => ({
                 include: true,
@@ -523,6 +528,16 @@ export class PipelineParseDefinitionComponent {
      * on a real change. Tracked here instead of inferred from the editor.
      */
     private templateDirty = false;
+    /**
+     * 🔴 A successful Test parse is an EDIT of the pane's unapplied state: it derives the OUTPUT
+     * SCHEMA, and Apply is what writes that schema and names it on the node. None of the other
+     * dirty inputs see it — the schema grid is seeded PROGRAMMATICALLY (so its form stays pristine)
+     * and the captured sample is not a form at all. Without this, a builder who pasted a sample,
+     * ran the parse and got a full derived schema found **Apply greyed out**, and had to hand-edit
+     * and blur a grid cell to persist work the product had already done for them (BUILDER-1a,
+     * found by driving the real UI 2026-08-17).
+     */
+    private parsedSinceApply = false;
 
     constructor() {
         // A stateless catalog fetch, same as the shared editor's own — used only to build the picker's
@@ -714,6 +729,7 @@ export class PipelineParseDefinitionComponent {
         const dirty =
             this.form.dirty ||
             this.templateDirty ||
+            this.parsedSinceApply ||
             (this.editor?.isDirty() ?? false) ||
             (this.segmentsEditor?.isDirty() ?? false) ||
             (this.schemaGrid?.form.dirty ?? false);
@@ -904,6 +920,7 @@ export class PipelineParseDefinitionComponent {
         this.form.markAsPristine();
         this.editor?.markPristine();
         this.templateDirty = false; // Apply consumed the pick, same as any other edit
+        this.parsedSinceApply = false; // …and the derived schema it wrote
         this.emitDirty();
         this.applied.emit(node);
     }

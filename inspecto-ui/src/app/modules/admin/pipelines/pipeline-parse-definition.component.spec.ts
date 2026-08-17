@@ -382,6 +382,32 @@ describe('PipelineParseDefinitionComponent', () => {
         expect(parsing['delimited']).toEqual({ delimiter: ',', has_header: true });
     });
 
+    /**
+     * 🔴 BUILDER-1a, found by driving the real UI: a builder pasted a sample, ran Test parse, watched a
+     * full output schema derive — and Apply was GREYED OUT. The schema grid is seeded programmatically
+     * so its form stays pristine, and the sample is not a form at all, so nothing reported dirty. The
+     * derived schema is exactly what Apply persists, so producing one must arm it.
+     */
+    it('arms Apply when a test parse derives the output schema', async () => {
+        const fixture = await create();
+        expect(fixture.componentInstance.dirty).toBe(false);
+
+        pane(fixture).onPreviewed({
+            kind: 'table' as const,
+            columns: ['A', 'B'],
+            rows: [{ A: '1', B: '2' }],
+            rowCount: 1,
+            rejectedRows: 0,
+        });
+        fixture.detectChanges();
+
+        expect(fixture.componentInstance.dirty).toBe(true);
+
+        pane(fixture).submit();
+        fixture.detectChanges();
+        expect(fixture.componentInstance.dirty).toBe(false); // Apply consumed it
+    });
+
     it('reports dirty on an edit, and pristine again after Apply', async () => {
         const fixture = await create();
         editor(fixture).schemaForm!.form.patchValue({ delimited__delimiter: ';' });

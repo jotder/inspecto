@@ -398,8 +398,15 @@
                 }
                 @if (forcedToCanvas()) {
                     <inspecto-alert class="block px-2 pt-2" variant="info">
-                        This pipeline's topology can't be shown as a linear recipe (it has a branch or connection the
-                        Recipe view can't represent) — showing Canvas instead.
+                        @if (danglingStepNames().length; as d) {
+                            Showing Canvas instead: {{ d === 1 ? 'this Step is' : 'these Steps are' }} not connected to
+                            anything yet — <code>{{ danglingStepNames().join(', ') }}</code
+                            >. Drag from a Step's handle (or use <b>Connect</b>) to wire
+                            {{ d === 1 ? 'it' : 'them' }} in, and the Recipe view comes back.
+                        } @else {
+                            This pipeline's topology can't be shown as a linear recipe (it has a branch or connection
+                            the Recipe view can't represent) — showing Canvas instead.
+                        }
                     </inspecto-alert>
                 }
                 @if (effectiveMode() === 'recipe') {

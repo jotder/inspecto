@@ -256,11 +256,9 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 > ### 🔴 BUILDER-1 — four defects found by driving the Pipelines editor as an end user (2026-08-17)
 >
 > A shift drove the real offline UI as a builder (new pipeline → Collect → parse → sample → test →
-> Apply → Save) across CSV, NDJSON and fixed-width. **One was fixed in that session** (`3a23e56d`:
-> a fixed-width test parse never sent its slice table, so it ALWAYS failed "fixed width needs at
-> least one field"). The rest are filed here, unfixed, each reproduced live:
+> Apply → Save) across CSV, NDJSON and fixed-width. **Four of the five are now FIXED** (`3a23e56d` and the commit that carries this edit); one is refuted and one remains open. Each was reproduced live:
 >
-> **(a) 🔴 A derived output schema does not make the Parse drawer dirty, so Apply stays disabled.**
+> **(a) ✅ FIXED 2026-08-17 — a derived output schema does not make the Parse drawer dirty, so Apply stayed disabled.**
 > Capture a sample → Test parse → a full output schema is derived → **Apply is greyed out**. The
 > operator must hand-edit a grid cell (and BLUR it) before they can apply the schema the product
 > just derived for them. `pipeline-parse-definition.component.ts`'s `emitDirty()` considers
@@ -278,7 +276,7 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 > supports (copy to a new name, or `compatibility: 'none'`). A builder who changes their mind about
 > the file format cannot proceed.
 >
-> **(c) ⚠ Click-to-add always drops an UNCONNECTED node, and the editor explains it wrongly.** Any
+> **(c) ⚠ PARTLY FIXED 2026-08-17 — click-to-add always drops an UNCONNECTED node, and the editor explained it wrongly.** Any
 > palette click adds a floating node; the Recipe view immediately falls back to Canvas saying the
 > topology *"has a branch or connection the Recipe view can't represent"* — but there is no branch,
 > there is a disconnected node. Worse, a new pipeline already lifts to Collect → Parser → Map → Sink,
@@ -287,9 +285,14 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 > parser, I'll click Delimited" — is a dead end; the required move (delete the generic Parser first)
 > is nowhere indicated.
 >
-> **(d) ⚠ The fixed-width FIELDS inputs have no accessible name.** Every input in that table reports
-> `aria-label: null` with no placeholder and no associated `<label>`, while the schema grid beside it
-> uses `aria-label="Field name"`. WCAG 2.2 AA (4.1.2) on a surface the project gates with axe-core.
+> **(d) ⛔ REFUTED, then improved anyway.** The original claim — "the fixed-width FIELDS inputs have no
+> accessible name, WCAG 4.1.2" — was **WRONG**, and is recorded here as a caution: the probe read only
+> `aria-label`/`placeholder` and concluded "unlabelled", but each input sits in a `mat-form-field` with
+> a real `<mat-label>`, which Material associates properly. The component's own `expectNoA11yViolations`
+> spec was passing the whole time and would have said so. ⚠ **Do not conclude "no accessible name" from
+> a missing `aria-label`.** The genuine (smaller) issue: every row's visible label is the same word, so
+> a screen reader read "Name / Start / Length" N times with nothing to tell the slices apart — row-
+> distinct `aria-label`s ("Field 2 start") were added 2026-08-17.
 >
 > **Two more observations, not defects:** the generic `parser` node opens the Grammar DIALOG, whose
 > sample picker is **file-only** — the "Paste text" affordance exists only in the per-format drawer,
@@ -1007,7 +1010,7 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   §13 R3, which would let the editor lower (and the ingest path run) the full graph vocabulary. Largest
   remaining pipeline-graph piece; explicitly out of scope for W5.
   - **IN FLIGHT — plan of record:**
-    [`superpower/branch-aware-executor-plan.md`](superpower/branch-aware-executor-plan.md). The operator
+    [`archived-documents/plans-archive/branch-aware-executor-plan.md`](archived-documents/plans-archive/branch-aware-executor-plan.md). The operator
     reordered the stages 2026-08-01: **throughput/decoupling (Stage B) first**, multi-destination sinks
     later as a plural `sinks:` section, the executor bridge (Stage A) deferred behind B.
     Shipped so far: **B1** per-pipeline run guard (`ingestLock` was one global lock across the whole
