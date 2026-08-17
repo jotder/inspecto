@@ -757,6 +757,65 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md).
 
 **Open:**
+- 🔴 **JAVA-1 — a mid-file failure in generation mode orphans already-revealed Parquet output**
+  (opened 2026-08-18 by the module-by-module Java review sweep). `DuckDbRecordSink.generationFlush`
+  reveals real output into `cfg.dirs().database()` on every `flushRows`; if the ingester then throws
+  partway through the file, `GenerationModeIngester` quarantines the source and `continue`s — but the
+  generations already flushed are never rolled back, never deleted, and never reach `sink.outputs()`,
+  so `BatchProcessor.finalizeSource` puts them in no manifest and no §11.3 registry row. Per the
+  documented D3 policy an unregistered file reads as *unknown, not excluded*, so a glob-based read
+  includes them. On reprocess the output basename is derived from the file name (`<stem>_g<seq>`), not
+  the batch id, so any divergence in generation count leaves the first run's files behind as permanent
+  duplicated CDR rows with no audit trail. ⚠ Deliberately **not** patched during the sweep: this is a
+  live customer-data path and the fix is a design choice (discard-on-failure vs. register as PARTIAL),
+  not an edit. ⛔ Ground it before building: the reviewer did **not** read `PartitionWriter` itself, so
+  whether `reveal()` is atomic per generation — which sets the severity — is unverified.
+- 🟡 **JAVA-2 — OIDC audience validation is optional, so a shared-issuer IdP has no audience isolation**
+  (opened 2026-08-18, same sweep). `OidcAuthenticator` applies the `aud` check only when
+  `-Dauth.oidc.audience` is set; unset, any correctly-signed token from the trusted issuer is accepted,
+  with no startup warning. For a tenant IdP minting tokens for several clients under one issuer, a
+  token intended for an unrelated app authenticates here. Making it mandatory (like `issuer`, via
+  `requireProperty`) is the fail-closed answer but is a **breaking change for any deployment that boots
+  without it today** — an operator decision, which is why the sweep filed it rather than shipping it.
+  Note the module has no logging dependency at all, so even the softer "warn loudly at boot" option
+  needs a slf4j import added.
+- 🟡 **JAVA-3 — `CircuitBreaker` never evicts a per-source entry, and the obvious hook would be a no-op**
+  (opened 2026-08-18, same sweep). Every other process-wide per-key map has a cleanup hook
+  (`IntakeGovernor.forget`, `StabilityGate.forget`, `ConnectionRegistry.forget`,
+  `DecisionRules.forget`); `CircuitBreaker` has only a test-only global `reset()`, so its map grows for
+  the life of the process under source/pipeline churn. ⛔ Do **not** just add `forget(id)` next to
+  `IntakeGovernor.shared().forget(id)` in `PipelineScheduler`: that hook passes the **pipeline** id,
+  while the breaker is keyed by `src.id()` — the **collector** id, which defaults to the pipeline name
+  but is overridable via `source.id`. Wired that way it silently misses every collector with a custom
+  id. Closing it needs the collector id available at unregister time.
+- 🟡 **JAVA-4 — `BatchProcessor.finalizeSource` catch asymmetry can mark a batch FAILED after its data
+  landed** (opened 2026-08-18, same sweep). The ledger-fingerprint loop tolerates a member vanishing
+  pre-backup (logs and skips), but the later `backupFile` does not — `Files.move` throws, the exception
+  propagates, and the batch is demoted to FAILED *after* the DuckLake register, the manifest write and
+  the §11.3 output registration have all already happened. Audit says FAILED, the manifest says the
+  outputs registered, and nothing will re-drive the (now absent) file. Make the backup step degrade the
+  same way the ledger step 15 lines above it already does.
+- 🟢 **JAVA-5 — five confirmed duplication seams worth one extraction each** (opened 2026-08-18, same
+  sweep; no behaviour change, so none of these is urgent): one `SqlIdent` for the byte-identical
+  `RowShaper.q()/sqlStr()` and `ScratchTables.q()/sqlStr()`; one `DirectoryScan` for the four
+  "scan dir → parse → tolerate corrupt file" copies (`ComponentPreview`/`ComponentRegistry`/
+  `ComponentStore`/`PipelineStore.list`/`ViewStore.list`); one `AbstractHttpObjectStoreConnector` for
+  S3/GCS/Azure, which each re-implement `execute`/`errorDetail`/`parseLong`/`nameOf`/`join`/escaping;
+  one `AbstractJdbcStore` for the four near-identical `Db*Store` CRUD classes in `ops`; and one
+  `TarUtil.forEachEntry` for the three hand-rolled dry-run archive peeks in `inspecto-util`.
+- 🟢 **JAVA-6 — the sweep's second pass: the surface it sampled rather than exhausted** (opened
+  2026-08-18). The 2026-08-18 review read every file in `inspecto-{api,util,config,sql,etl,event,
+  acquire,agent-hosted,security,policy}` and in the engine's `job`, `pipeline`(+`exec`),
+  `consignment`, `inspector`, `enrich`, `parse`, `ingester`. It **sampled** the rest, so these are
+  unread, not clean: engine `ops/*` beyond the four `Db*Store`s + `ObjectService` + `ReconService`
+  (notably `FindingsSpec`, the largest unread file, and the whole `signal` package, which feeds every
+  alert/incident correlation); in the control plane, ~55 `control` files and most of `service` —
+  prioritise `PipelineRoutes`/`ObjectRoutes`/`BundleRoutes` line-by-line for the
+  *gate-enforced-on-one-route-but-not-its-sibling* pattern (this repo's most repeated defect class),
+  and `Roles`/`AccessPolicies`/`AccessRoutes` for the RBAC/ABAC evaluation itself, which the sweep saw
+  invoked correctly but never verified internally; plus `InspectoTools` (1672 lines) and
+  `InspectoIntelligenceAgent` in `inspecto-intelligence`, to confirm every mutating tool routes
+  through `AgentApprovals` rather than a shortcut.
 - 🟡 **WRITE-1 — `/config/write`'s legacy-filename fallback cannot tell "this pipeline gaining an id"
   from "a different pipeline with the same label"** (opened 2026-08-17 by review of `6dd86e5a`). A
   pipeline's file is now named for its `id`; when that file does not exist the route probes the display
