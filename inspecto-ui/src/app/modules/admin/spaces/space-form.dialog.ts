@@ -55,7 +55,7 @@ export interface SpaceFormData {
     selector: 'app-space-form-dialog',
     standalone: true,
     imports: [ReactiveFormsModule, MatDialogModule, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule],
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>{{ editMode ? 'Edit space' : 'New space' }}</h2>
         <form [formGroup]="form" (ngSubmit)="submit()">
@@ -152,7 +152,7 @@ export interface SpaceFormData {
             </mat-dialog-content>
             <mat-dialog-actions align="end">
                 <button type="button" mat-button (click)="requestClose()">Cancel</button>
-                <button type="submit" mat-flat-button color="primary" [disabled]="form.invalid || saving">
+                <button type="submit" mat-flat-button color="primary" [disabled]="form.invalid || saving()">
                     {{ editMode ? 'Save' : 'Create' }}
                 </button>
             </mat-dialog-actions>
@@ -174,7 +174,7 @@ export class SpaceFormDialog {
     readonly editMode = !!this.data?.space;
     readonly defaultLogo = environment.appLogo;
 
-    saving = false;
+    readonly saving = signal(false);
     /** Whether the id field is being shown/overridden manually (create mode only). */
     readonly editId = signal(false);
     idManual = false;
@@ -262,7 +262,7 @@ export class SpaceFormDialog {
             caption: String(v.caption ?? '').trim() || null,
             footerText: String(v.footerText ?? '').trim() || null,
         };
-        this.saving = true;
+        this.saving.set(true);
 
         const existing = this.data?.space;
         const save$ = existing
@@ -287,12 +287,12 @@ export class SpaceFormDialog {
             )
             .subscribe({
                 next: ({ space }) => {
-                    this.saving = false;
+                    this.saving.set(false);
                     this.toastr.success(`Space "${space.id}" ${existing ? 'updated' : 'created'}`);
                     this.ref.close(space);
                 },
                 error: (e) => {
-                    this.saving = false;
+                    this.saving.set(false);
                     const id = existing?.id ?? v.id;
                     const msg =
                         e?.status === 409

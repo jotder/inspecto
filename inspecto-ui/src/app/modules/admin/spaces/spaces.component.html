@@ -10,10 +10,10 @@
             </div>
         </div>
         <div class="flex flex-wrap items-center gap-3">
-            @if (loading) {
+            @if (loading()) {
                 <mat-spinner diameter="24"></mat-spinner>
             }
-            <button mat-icon-button (click)="reload()" [disabled]="loading" aria-label="Refresh">
+            <button mat-icon-button (click)="reload()" [disabled]="loading()" aria-label="Refresh">
                 <mat-icon [svgIcon]="'heroicons_outline:arrow-path'"></mat-icon>
             </button>
             @if (spaces.multiSpace()) {
@@ -37,7 +37,7 @@
         </div>
     </div>
 
-    @if (!loading && !spaces.multiSpace()) {
+    @if (!loading() && !spaces.multiSpace()) {
         <inspecto-empty-state
             class="mt-8 block"
             icon="heroicons_outline:square-3-stack-3d"
@@ -46,7 +46,7 @@
         ></inspecto-empty-state>
     }
 
-    @if (!loading && spaces.multiSpace() && spaces.availableSpaces().length === 0) {
+    @if (!loading() && spaces.multiSpace() && spaces.availableSpaces().length === 0) {
         <inspecto-empty-state
             class="mt-8 block"
             icon="heroicons_outline:square-3-stack-3d"

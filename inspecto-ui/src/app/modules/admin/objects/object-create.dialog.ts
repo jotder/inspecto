@@ -37,7 +37,7 @@ import { currentOperator, INCIDENT_PRIORITIES } from './mail-model';
         MatInputModule,
         MatSelectModule,
     ],
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>New {{ data.label }}</h2>
         <mat-dialog-content class="flex flex-col gap-3 pt-2">
@@ -190,7 +190,7 @@ import { currentOperator, INCIDENT_PRIORITIES } from './mail-model';
         </mat-dialog-content>
         <mat-dialog-actions align="end">
             <button mat-button (click)="requestClose()">Cancel</button>
-            <button mat-flat-button color="primary" [disabled]="saving" (click)="save()">Create</button>
+            <button mat-flat-button color="primary" [disabled]="saving()" (click)="save()">Create</button>
         </mat-dialog-actions>
     `,
 })
@@ -210,7 +210,7 @@ export class ObjectCreateDialog {
     /** Guarded close: Esc / backdrop / Cancel confirm before discarding entered data. */
     readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty || this.tags().length > 0, this.confirm);
 
-    saving = false;
+    readonly saving = signal(false);
     readonly form = this.fb.group({
         title: ['', Validators.required],
         description: [''],
@@ -307,7 +307,7 @@ export class ObjectCreateDialog {
             this.form.markAllAsTouched();
             return;
         }
-        this.saving = true;
+        this.saving.set(true);
         const v = this.form.getRawValue();
         const body: CreateObject = { type: this.data.type, title: v.title };
         if (v.description) body.description = v.description;
@@ -330,7 +330,7 @@ export class ObjectCreateDialog {
                 this.ref.close(o);
             },
             error: (e) => {
-                this.saving = false;
+                this.saving.set(false);
                 this.toastr.error(apiErrorMessage(e, 'Create failed'));
             },
         });

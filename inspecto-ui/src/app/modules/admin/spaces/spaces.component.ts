@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, ViewEncapsulation, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -33,7 +33,7 @@ import { ImportBundleData, ImportBundleDialog } from './import-bundle.dialog';
         StatusBadgeComponent,
     ],
     templateUrl: './spaces.component.html',
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,
 })
 export class SpacesComponent implements OnInit {
@@ -42,7 +42,7 @@ export class SpacesComponent implements OnInit {
     private toastr = inject(ToastrService);
     private confirm = inject(InspectoConfirmService);
 
-    loading = false;
+    readonly loading = signal(false);
     /** Per-space data-source expansion state + lazily-loaded ids. */
     expanded: Record<string, boolean> = {};
     dataSources: Record<string, string[]> = {};
@@ -53,11 +53,11 @@ export class SpacesComponent implements OnInit {
     }
 
     reload(): void {
-        this.loading = true;
+        this.loading.set(true);
         this.spaces.refresh().subscribe({
-            next: () => (this.loading = false),
+            next: () => this.loading.set(false),
             error: (e) => {
-                this.loading = false;
+                this.loading.set(false);
                 this.toastr.warning(apiErrorMessage(e, 'Could not load spaces.'));
             },
         });
