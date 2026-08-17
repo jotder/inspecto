@@ -6,6 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
 import { ToastrService } from 'ngx-toastr';
 import { PipelineNodeType, PipelinesService, IconMap, IconMapService, apiErrorMessage } from 'app/inspecto/api';
+import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { GLYPH_LIBRARY, ICON_COLOR_SWATCHES, iconDataUri } from 'app/modules/admin/catalog/catalog-graph';
 import {
     NodeTypeGroup,
@@ -23,7 +24,14 @@ import {
 @Component({
     selector: 'app-icon-settings',
     standalone: true,
-    imports: [NgTemplateOutlet, MatButtonModule, MatFormFieldModule, MatIconModule, MatSelectModule],
+    imports: [
+        NgTemplateOutlet,
+        MatButtonModule,
+        MatFormFieldModule,
+        MatIconModule,
+        MatSelectModule,
+        InspectoAlertComponent,
+    ],
     templateUrl: './icon-settings.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -40,6 +48,13 @@ export class IconSettingsComponent implements OnInit {
     readonly draft = signal<IconMap>({});
     readonly loading = signal(true);
     readonly saving = signal(false);
+    /**
+     * The load FAILED, as opposed to returning an empty map. ⚠ The two used to be indistinguishable:
+     * a 500 emptied the draft, every row rendered as '— inherit —', and Save became enabled the moment
+     * the spinner cleared. `PUT /config/icon-map` is a whole-map REPLACE, so one click destroyed every
+     * configured rule and reported success.
+     */
+    readonly loadFailed = signal(false);
 
     readonly groups = computed<NodeTypeGroup[]>(() => groupByCategory(this.types()));
 
@@ -57,10 +72,12 @@ export class IconSettingsComponent implements OnInit {
         this.iconMapApi.get().subscribe({
             next: (m) => {
                 this.draft.set({ ...m });
+                this.loadFailed.set(false);
                 this.loading.set(false);
             },
             error: () => {
                 this.draft.set({});
+                this.loadFailed.set(true);
                 this.loading.set(false);
             },
         });

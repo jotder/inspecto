@@ -1,4 +1,12 @@
 <div class="flex min-w-0 flex-auto flex-col p-6 md:p-8">
+    @if (loadFailed()) {
+        <!-- Save stays disabled while this shows: an empty draft after a failed load is NOT "no rules",
+             and PUT /config/icon-map replaces the whole map. -->
+        <inspecto-alert variant="error" title="Could not load the icon map">
+            The saved rules could not be read, so this page is showing defaults rather than your configuration. Saving
+            is disabled until a reload succeeds — otherwise it would overwrite the stored map with these blanks.
+        </inspecto-alert>
+    }
     <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
             <h1 class="text-3xl font-extrabold leading-tight tracking-tight">Processor Icons</h1>
@@ -10,7 +18,7 @@
         </div>
         <div class="flex items-center gap-2">
             <button mat-stroked-button (click)="reset()" [disabled]="saving()">Reset</button>
-            <button mat-flat-button color="primary" (click)="save()" [disabled]="saving() || loading()">
+            <button mat-flat-button color="primary" (click)="save()" [disabled]="saving() || loading() || loadFailed()">
                 <mat-icon svgIcon="heroicons_outline:check"></mat-icon>
                 <span class="ml-1">Save</span>
             </button>

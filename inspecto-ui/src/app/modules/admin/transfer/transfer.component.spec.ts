@@ -314,7 +314,12 @@ describe('TransferComponent', () => {
         );
 
         expect(c.rows().every((r) => r.result === undefined)).toBe(true);
-        expect(c.applied()).toBe(true);
+        // ⚠ Was `toBe(true)`, which pinned a user-visible falsehood. `applied()` has exactly one use in
+        // the template — it renders "Done — imported artifacts are live (see Viz Library, Dashboard
+        // Builder, Pipelines)". On a whole-bundle gate rejection NOTHING was written, as this test's own
+        // first assertion states, so that line sat on screen beside the error toast telling the operator
+        // to go and look at artifacts that do not exist.
+        expect(c.applied()).toBe(false);
     });
 
     it('renders with no a11y violations', async () => {

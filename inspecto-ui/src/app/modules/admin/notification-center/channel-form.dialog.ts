@@ -107,7 +107,10 @@ export class ChannelFormDialog implements AfterViewInit {
             id: this.isEdit ? this.data.channel!.id : String(v.id ?? '').trim(),
             kind: v.kind,
             target: String((v.kind === 'WEBHOOK' ? v.targetUrl : v.target) ?? '').trim(),
-            description: v.description?.trim() || undefined,
+            // '' not undefined: the channel PUT is a server-side MERGE (NotificationRoutes putAll),
+            // so omitting the key left the OLD description in place — clearing the field silently
+            // did nothing. The rule dialog's PUT rebuilds from the body alone, hence its `undefined`.
+            description: v.description?.trim() ?? '',
             enabled: v.enabled !== false,
         };
         this.saving.set(true);

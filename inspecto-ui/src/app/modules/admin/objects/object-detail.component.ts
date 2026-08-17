@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, ViewEncapsulation, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnInit, ViewEncapsulation } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -7,6 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { forkJoin, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
@@ -76,6 +77,7 @@ export class ObjectDetailComponent implements OnInit {
     private api = inject(ObjectsService);
     private eventsApi = inject(EventsService);
     private route = inject(ActivatedRoute);
+    private destroyRef = inject(DestroyRef);
     private router = inject(Router);
     private dialog = inject(MatDialog);
     private toastr = inject(ToastrService);
@@ -148,8 +150,24 @@ export class ObjectDetailComponent implements OnInit {
     }
 
     ngOnInit(): void {
-        this.id = this.route.snapshot.paramMap.get('id') ?? '';
-        this.loadObject();
+        // ⚠ paramMap, not the snapshot. `onNodeClick` navigates to a SIBLING of this same route config
+        // (`:id` in both incidents.routes and cases.routes), which Angular REUSES rather than recreating,
+        // so ngOnInit does not run again. Read once from the snapshot, `this.id` stayed on the previous
+        // object: the URL said INC-2 while the whole page still showed INC-1 — and transition(),
+        // addComment() and applyRca() all post to `this.id`, so an action the operator took believing
+        // they were looking at INC-2 mutated INC-1. Stale render is the mild half of that bug.
+        this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+            const next = params.get('id') ?? '';
+            if (next === this.id) return;
+            this.id = next;
+            // Per-object caches, or the new object shows the previous one's comments and timeline until
+            // each tab happens to refetch.
+            this.obj = null;
+            this.comments = [];
+            this.relatedEvents = [];
+            this.eventsLoaded = false;
+            this.loadObject();
+        });
     }
 
     loadObject(): void {

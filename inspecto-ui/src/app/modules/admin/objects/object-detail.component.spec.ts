@@ -43,7 +43,16 @@ function create(overrides: Partial<Record<keyof ObjectsService, unknown>> = {}) 
             { provide: ToastrService, useValue: { success: vi.fn(), error: vi.fn() } },
             // A real router (RouterLink needs createUrlTree); at the root URL listBase falls back to 'incidents'.
             provideRouter([]),
-            { provide: ActivatedRoute, useValue: { snapshot: { paramMap: new Map([['id', 'obj-9']]) } } },
+            // ⚠ `paramMap` as an OBSERVABLE, not just the snapshot: the component tracks param changes,
+            // because navigating from the graph tab to a neighbour reuses this same route config and
+            // ngOnInit does not run again. A snapshot-only stub is what the component used to read.
+            {
+                provide: ActivatedRoute,
+                useValue: {
+                    snapshot: { paramMap: new Map([['id', 'obj-9']]) },
+                    paramMap: of(new Map([['id', 'obj-9']])),
+                },
+            },
         ],
     });
     const fixture = TestBed.createComponent(ObjectDetailComponent);

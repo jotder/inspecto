@@ -209,7 +209,17 @@ export class ComponentFormDialog {
             const { type, ...rest } = c as { type?: string };
             this.form.patchValue({
                 subtype: typeof type === 'string' ? type : TRANSFORM_SUBTYPES[0],
-                config: Object.keys(rest).length ? JSON.stringify(rest, null, 2) : this.form.get('config')!.value,
+                // ⚠ On an EDIT, "no config keys" means an empty config — not the create-time placeholder.
+                // Falling back to the control's default seeded an existing `{type: transform.dedup.marker}`
+                // with the example predicate `{"where": "CAST(amt AS INT) >= 100"}`, and since
+                // `PUT /components` is a wholesale replace, merely opening such a transform and pressing
+                // Save gave it a filter it had never had. The grammar branch above already guards its own
+                // version of this trap; this one did not.
+                config: Object.keys(rest).length
+                    ? JSON.stringify(rest, null, 2)
+                    : this.isEdit
+                      ? '{}'
+                      : this.form.get('config')!.value,
             });
         } else if (this.kind === 'sink') {
             // Keep the original partitions entries (some carry {column, source} maps) keyed by their

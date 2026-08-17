@@ -209,13 +209,15 @@ export class TransferComponent implements OnInit {
             .pipe(catchError((err) => of(apiErrorMessage(err, 'Import failed.'))))
             .subscribe((outcome) => {
                 this.applying.set(false);
-                this.applied.set(true);
                 if (typeof outcome === 'string') {
                     // A whole-bundle gate rejection (422 integrity / 503 writes disabled): nothing was
-                    // written, so no row gets a result.
+                    // written, so no row gets a result — and `applied` must stay FALSE. Setting it before
+                    // this branch put the persistent "Done — imported artifacts are live" line on screen
+                    // next to the error toast, for a run in which nothing had been imported at all.
                     this.toastr.error(outcome);
                     return;
                 }
+                this.applied.set(true);
                 const byRef = new Map(outcome.results.map((r) => [`${r.kind}/${r.id}`, r]));
                 this.rows.update((rows) =>
                     rows.map((r) => {

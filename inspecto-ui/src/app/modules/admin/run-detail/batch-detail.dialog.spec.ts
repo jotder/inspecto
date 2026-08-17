@@ -21,8 +21,10 @@ const FILES: AuditRow[] = [
 ];
 const LINEAGE: AuditRow[] = [{ input_file: 'a.csv', output: 'cdr/part-0.parquet' }];
 
-function create(resolved: { id: string; label: string } | null = { id: 'event:cdr/main', label: 'cdr_output' },
-                batchId = 'b-1') {
+function create(
+    resolved: { id: string; label: string } | null = { id: 'event:cdr/main', label: 'cdr_output' },
+    batchId = 'b-1',
+) {
     const stub = {
         batches: vi.fn(() => of(BATCHES)),
         files: vi.fn(() => of(FILES)),
