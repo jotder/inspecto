@@ -276,7 +276,11 @@ export function planStreamImport(bundle: StreamBundle, opts: { name: string; spa
     if (bundle.enrichment) {
         plan.enrichment = {
             name: companionSchemaName(id, 'enrich'),
-            config: retargetEnrichment(bundle.enrichment, bundle.source.name, id, space),
+            // ⚠ The pipeline's OWN database dir is handed over, not re-derived from a name: an
+            // enrichment reads what the pipeline wrote, so the two must be the same string. `dirs` are
+            // keyed off the display name while identity keys off `id`, and once those two diverge any
+            // second derivation points the enrichment at a directory nothing ever writes to.
+            config: retargetEnrichment(bundle.enrichment, bundle.source.name, id, space, `${home}/database`),
         };
     }
 
@@ -323,11 +327,14 @@ function retargetEnrichment(
     sourceName: string,
     name: string,
     space: string | null,
+    inputDatabase: string,
 ): Record<string, unknown> {
     const base = space ? `spaces/${space}` : '.';
     const out: Record<string, unknown> = { ...enrichment, name: `${name}_enrich` };
     if (isRecord(out['input'])) {
-        out['input'] = { ...out['input'], database: `${base}/data/${name}/database` };
+        // The pipeline's own `dirs.database`, passed in — ⛔ never re-derived from `name`, which is the
+        // IDENTITY here and no longer the string the directory set is keyed by.
+        out['input'] = { ...out['input'], database: inputDatabase };
     }
     if (isRecord(out['output'])) {
         const dbPath = String(out['output']['database'] ?? '');

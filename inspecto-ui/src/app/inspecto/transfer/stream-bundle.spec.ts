@@ -283,6 +283,25 @@ describe('stream-bundle — import plan', () => {
         expect((e['input'] as Record<string, unknown>)['format']).toBe('PARQUET');
     });
 
+    /**
+     * ⚠ Every other case in this file imports as `orders_copy`, where the stamped id EQUALS the typed
+     * name — so both sides of this pair agree no matter which string builds them, and the suite could
+     * not see the two diverge. An enrichment reads what the pipeline wrote: its `input.database` must
+     * be the pipeline's own `dirs.database`, not a second derivation from whichever name is to hand.
+     */
+    it('feeds the enrichment the pipeline OWN database, for a name whose id differs', () => {
+        const b = build({
+            enrichment: {
+                name: 'orders_feed_enrich',
+                input: { database: 'spaces/demo/data/orders_feed/database', format: 'PARQUET' },
+            },
+        });
+        const p = planStreamImport(b, { name: 'Orders-Daily', space: 'prod' });
+        expect(p.pipeline['id']).toBe('orders_daily'); // narrowed — no longer the typed name
+        const dirs = p.pipeline['dirs'] as Record<string, string>;
+        expect((p.enrichment!.config['input'] as Record<string, unknown>)['database']).toBe(dirs['database']);
+    });
+
     it('omits satellites the source never had', () => {
         const bare = buildStreamBundle({
             name: 'a',
