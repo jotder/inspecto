@@ -836,8 +836,17 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   the registry and nothing is written, so there is no stored object to authorize; same posture as
   `/components/mapping/validate`. Proven by a test that runs with **no write root at all**, where the
   by-id arm cannot work. ⚠ **No UI caller yet, and no offline mock** — the API-surface gap is closed, but
-  wiring a node-dialog affordance to it is a separate slice (and would hit gotcha: `openNodeConfig` is
-  `canAuthor()`-gated). ⛔ `schema`/`mapping` deliberately have no preview arm, mirroring `/test`.
+  wiring a node-dialog affordance to it is a separate slice, and **it reverses a recorded decision**, so
+  it needs an operator call rather than a quiet build. 🔴 That decision's stated reason is now STALE and
+  whoever revisits it should start from that: `node-config.dialog.ts:594-598` says the node dialog
+  *"deliberately does not grow its own test: a real test needs sample rows / sample text, and that editor
+  [`ComponentFormDialog`] is the one place that collects them"* — but the Pipelines editor has collected a
+  sample **per tab** since the sample-thread work (`pipeline-editor.component.ts:269,303` hold a
+  `Map<tabId, DefinitionStateService>`, whose `sample`/`parsePreview` are exactly the raw text and rows a
+  test needs). The guard was true when written and is not true now. ⚠ Still real when it is built:
+  `NodeConfigDialog` is handed no thread today (`pipeline-editor.component.ts:1466-1478`), so the slice is
+  "thread the sample through + decide the no-sample UX", not "add a button"; and `openNodeConfig` is
+  `canAuthor()`-gated, so the affordance is invisible in View mode / the Business lens. ⛔ `schema`/`mapping` deliberately have no preview arm, mirroring `/test`.
   - ~~G1 two of three test affordances 404~~ **CLOSED** — both gated behind `environment.mockFlows`
     rather than deleted (run-to-here is a complete mock-backed feature and is literally the Step 5 UI).
     ⚠ **Retraction:** a mid-flight note here claimed `/components/*` did not exist in the backend —
