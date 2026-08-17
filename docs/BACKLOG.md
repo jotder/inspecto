@@ -829,8 +829,15 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   `testGrammar`/`testTransform`/`testSink` methods. Gated on the node binding a registered component of a
   dry-runnable family (transform/grammar/sink — `schema`/`mapping` have no `/test` route), so an
   inline-config node shows no action. `PipelinesService.testNode` + `ComponentTestResult` deleted with it.
-  ⛔ Testing an inline (unregistered) node config needs a **new route** — the component test routes 404
-  through `ComponentStore`, and the config-body previews cover only grammar parsing and schema casting.
+  ~~⛔ Testing an inline (unregistered) node config needs a **new route**~~ — **SHIPPED 2026-08-17**:
+  `POST /components/{transform|grammar|sink}/preview` takes the config in the request BODY and runs the
+  identical `ComponentPreview` entry points as the by-id `/test` arm (pinned by a test asserting the two
+  return the same `relations`). No write-root gate and no `ComponentAccess` check — nothing is read from
+  the registry and nothing is written, so there is no stored object to authorize; same posture as
+  `/components/mapping/validate`. Proven by a test that runs with **no write root at all**, where the
+  by-id arm cannot work. ⚠ **No UI caller yet, and no offline mock** — the API-surface gap is closed, but
+  wiring a node-dialog affordance to it is a separate slice (and would hit gotcha: `openNodeConfig` is
+  `canAuthor()`-gated). ⛔ `schema`/`mapping` deliberately have no preview arm, mirroring `/test`.
   - ~~G1 two of three test affordances 404~~ **CLOSED** — both gated behind `environment.mockFlows`
     rather than deleted (run-to-here is a complete mock-backed feature and is literally the Step 5 UI).
     ⚠ **Retraction:** a mid-flight note here claimed `/components/*` did not exist in the backend —

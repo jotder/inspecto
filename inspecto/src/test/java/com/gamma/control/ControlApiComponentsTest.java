@@ -283,6 +283,75 @@ class ControlApiComponentsTest {
         }
     }
 
+    // ── the INLINE preview arm: POST /components/{family}/preview ─────────────────────
+
+    /**
+     * The gap this closes: a pipeline node authors its config INLINE, so before this route the only
+     * configs an operator could test were the registered ones — precisely not the one being written.
+     * Run with NO write root at all, because that is the proof it needs no registry: the by-id arm
+     * would 503/404 here.
+     */
+    @Test
+    void inlinePreviewsRunWithoutAnyRegistry(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, null)) {                       // no write root — nothing is stored
+            HttpResponse<String> t = send(c.port, "POST", "/components/transform/preview",
+                    "{\"config\":{\"type\":\"transform.filter\",\"where\":\"CAST(amt AS INT) >= 100\"},"
+                    + "\"sampleRows\":[{\"id\":\"1\",\"amt\":\"150\"},{\"id\":\"2\",\"amt\":\"50\"}]}");
+            assertEquals(200, t.statusCode(), t.body());
+            int data = 0, dropped = 0;
+            for (JsonNode rel : json(t).get("relations")) {
+                if ("data".equals(rel.get("rel").asText())) data = rel.get("rowCount").asInt();
+                if ("dropped".equals(rel.get("rel").asText())) dropped = rel.get("rowCount").asInt();
+            }
+            assertEquals(1, data, t.body());
+            assertEquals(1, dropped, t.body());
+
+            HttpResponse<String> g = send(c.port, "POST", "/components/grammar/preview",
+                    "{\"config\":{\"delimiter\":\"|\",\"has_header\":true},"
+                    + "\"sampleText\":\"a|b|c\\n1|2|3\\n4|5|6\\n\"}");
+            assertEquals(200, g.statusCode(), g.body());
+            assertEquals(2, json(g).get("rowCount").asInt(), g.body());
+            assertEquals("a", json(g).get("columns").get(0).asText());
+
+            HttpResponse<String> k = send(c.port, "POST", "/components/sink/preview",
+                    "{\"config\":{\"store\":\"results\",\"format\":\"parquet\",\"partitions\":[\"year\"]},"
+                    + "\"sampleRows\":[{\"id\":\"1\"},{\"id\":\"2\"}]}");
+            assertEquals(200, k.statusCode(), k.body());
+            assertEquals("results", json(k).get("store").asText());
+            assertEquals(1, json(k).get("warnings").size(), k.body());   // missing partition column 'year'
+        }
+    }
+
+    /** An inline preview reports the SAME result as the by-id arm — one code path, two ways in. */
+    @Test
+    void inlineAndRegisteredPreviewsAgree(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, dir.resolve("wr"))) {
+            String cfg = "{\"type\":\"transform.filter\",\"where\":\"CAST(amt AS INT) >= 100\"}";
+            String rows = "\"sampleRows\":[{\"id\":\"1\",\"amt\":\"150\"},{\"id\":\"2\",\"amt\":\"50\"}]";
+            assertEquals(200, send(c.port, "POST", "/components/transform",
+                    "{\"id\":\"big-only\",\"type\":\"transform.filter\",\"where\":\"CAST(amt AS INT) >= 100\"}")
+                    .statusCode());
+
+            JsonNode byId = json(send(c.port, "POST", "/components/transform/big-only/test", "{" + rows + "}"));
+            JsonNode inline = json(send(c.port, "POST", "/components/transform/preview",
+                    "{\"config\":" + cfg + "," + rows + "}"));
+            assertEquals(byId.get("relations").toString(), inline.get("relations").toString());
+        }
+    }
+
+    @Test
+    void inlinePreviewGates(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, null)) {
+            assertEquals(400, send(c.port, "POST", "/components/transform/preview", "{\"sampleRows\":[]}").statusCode(),
+                    "no 'config' in the body");
+            assertEquals(400, send(c.port, "POST", "/components/grammar/preview",
+                    "{\"config\":\"not-an-object\",\"sampleText\":\"x\"}").statusCode());
+            assertEquals(422, send(c.port, "POST", "/components/transform/preview",
+                    "{\"config\":{\"type\":\"sink.persistent\"},\"sampleRows\":[]}").statusCode(),
+                    "a non-transform type is refused, same as the by-id arm");
+        }
+    }
+
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));

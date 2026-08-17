@@ -480,8 +480,10 @@ infra probes: `/health`, `/ready`, `/metrics`, `/metrics/acquisition`.
   `POST /pipelines/authored/{n}/nodes|edges|dry-run` *(503)*.
 - **Components:** `GET /components/{type}[/{id}]` *(single-GET carries a strong `ETag`=content hash; `If-None-Match`→304)*,
   `POST/PUT/DELETE` *(503; PUT honours `If-Match`→409 `CONFLICT_STALE_VERSION`; DELETE 409 if referenced)*,
-  `POST /components/{transform|grammar|schema|sink}/{id}/test` *(503)*. Writable types (v4.8.0): grammar, schema,
-  transform, sink, **dataset, widget, dashboard**.
+  `POST /components/{transform|grammar|schema|sink}/{id}/test` *(503)*,
+  `POST /components/{transform|grammar|sink}/preview` *(the same previews over a config in the request `config`
+  body key instead of a registered id — needs no write root and reads nothing)*. Writable types (v4.8.0):
+  grammar, schema, transform, sink, **dataset, widget, dashboard**.
 - **Catalog:** `GET /catalog`, `/catalog/kpis`, `/catalog/graph`, `/catalog/tables/{id}`.
 - **Assist:** `GET /assist/diagnoses|settings|metrics`, `POST /assist/settings|settings/test|{intent}` (503 if absent).
 

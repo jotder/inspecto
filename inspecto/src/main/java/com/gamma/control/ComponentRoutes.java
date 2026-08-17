@@ -44,6 +44,13 @@ final class ComponentRoutes implements RouteModule {
         api.post("/components/transform/([^/]+)/test", (e, m) -> previewTransform(api, e, ApiContext.name(m), api.body(e)));
         api.post("/components/grammar/([^/]+)/test", (e, m) -> previewGrammar(api, e, ApiContext.name(m), api.body(e)));
         api.post("/components/sink/([^/]+)/test", (e, m) -> previewSink(api, e, ApiContext.name(m), api.body(e)));
+        // The INLINE arm of the same previews: the body carries the config instead of naming a stored
+        // component. A pipeline node authors its config inline (AUTHORED-vs-DERIVED), so without this
+        // the only testable configs were the registered ones — the gap this closes. Literal paths, so
+        // they cannot be reached by a component whose id happens to be "preview".
+        api.post("/components/transform/preview", (e, m) -> previewInlineTransform(api.body(e)));
+        api.post("/components/grammar/preview", (e, m) -> previewInlineGrammar(api.body(e)));
+        api.post("/components/sink/preview", (e, m) -> previewInlineSink(api.body(e)));
         // S6b: validate mapping rules WITHOUT writing — the import loop's gate. Un-gated like the
         // /test previews (it reads nothing and writes nothing) and never touches the registry.
         api.post("/components/mapping/validate", (e, m) -> validateMapping(api.body(e)));
@@ -316,6 +323,67 @@ final class ComponentRoutes implements RouteModule {
         } catch (IllegalArgumentException e) {
             throw new ApiException(400, e.getMessage());
         }
+    }
+
+    /**
+     * {@code POST /components/{family}/preview} — the same three previews as {@code /{id}/test}, but
+     * over a config carried in the request body rather than one loaded from the registry.
+     *
+     * <p>The pipeline editor authors node configs INLINE; only a registered component could be tested,
+     * so exactly the configs an operator is in the middle of writing were the ones they could not try.
+     * These run the identical {@link ComponentPreview} entry points on a throwaway DuckDB and touch no
+     * production output.
+     *
+     * <p>No write-root gate and no {@link ComponentAccess} check: nothing is read from the registry and
+     * nothing is written, so there is no stored object to authorize — the caller is previewing a config
+     * it already possesses. Same posture as {@code /components/mapping/validate}. 400 on a missing or
+     * non-object {@code config}, 422 on a preview failure, exactly as the by-id arm.
+     */
+    private Object previewInlineTransform(Map<String, Object> body) {
+        Map<String, Object> config = requireInlineConfig(body);
+        String type = ApiContext.str(config, "type");
+        if (type == null || !type.startsWith("transform."))
+            throw new ApiException(422, "inline config is not a transform ('type: transform.*' required)");
+        try {
+            return ComponentPreview.transform(new PipelineNode(INLINE_ID, type, config, null),
+                    ApiContext.sampleRows(body));
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(400, e.getMessage());
+        } catch (java.sql.SQLException | IOException e) {
+            throw new ApiException(422, "preview failed: " + e.getMessage());
+        }
+    }
+
+    private Object previewInlineGrammar(Map<String, Object> body) {
+        Map<String, Object> config = requireInlineConfig(body);
+        try {
+            return ComponentPreview.grammar(config, sampleText(body));
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(400, e.getMessage());
+        } catch (java.sql.SQLException | IOException e) {
+            throw new ApiException(422, "preview failed: " + e.getMessage());
+        }
+    }
+
+    private Object previewInlineSink(Map<String, Object> body) {
+        Map<String, Object> config = requireInlineConfig(body);
+        try {
+            return ComponentPreview.sink(config, ApiContext.sampleRows(body));
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(400, e.getMessage());
+        }
+    }
+
+    /** The node id an inline preview reports under — it has no identity of its own to borrow. */
+    private static final String INLINE_ID = "(inline)";
+
+    /** The {@code config} object every inline preview requires, or the standard 400. */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> requireInlineConfig(Map<String, Object> body) {
+        Object cfg = body.get("config");
+        if (!(cfg instanceof Map<?, ?>))
+            throw new ApiException(400, "body must include 'config' (the node config object to preview)");
+        return (Map<String, Object>) cfg;
     }
 
     /** Load a component by {@code type}/{@code id} or fail with the standard 400/404 (shared by the preview handlers). */
