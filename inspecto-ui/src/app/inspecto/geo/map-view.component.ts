@@ -1,18 +1,19 @@
 import {
     AfterViewInit,
+    ChangeDetectionStrategy,
     Component,
     DestroyRef,
     ElementRef,
     EventEmitter,
+    inject,
     Input,
+    NgZone,
     OnChanges,
     OnDestroy,
     Output,
+    signal,
     SimpleChanges,
     ViewChild,
-    inject,
-    NgZone,
-    ChangeDetectionStrategy,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { GammaConfigService } from '@gamma/services/config';
@@ -83,7 +84,7 @@ const PLACE_LABEL_LAYERS = ['places-major', 'places-mid', 'places-minor'];
     selector: 'inspecto-map-view',
     standalone: true,
     template: '<div #host class="h-full w-full"></div>',
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     host: {
         '[class]': `fill ? 'block w-full min-h-0 flex-auto' : 'block w-full min-h-96 h-[62vh]'`,
     },

@@ -1,4 +1,4 @@
-import { Component, inject, Input, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, Input, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -39,7 +39,7 @@ const SQL_INTENTS = ['kpi-to-sql', 'report-sql'];
         MatProgressSpinnerModule,
         A2uiRenderComponent,
     ],
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     templateUrl: './assist-panel.component.html',
 })
 export class AssistPanelComponent implements OnInit {
@@ -56,8 +56,8 @@ export class AssistPanelComponent implements OnInit {
     /** hide the free-text input (pure contextual embed). */
     @Input() hideInput = false;
 
-    loading = false;
-    result: AssistResult | null = null;
+    readonly loading = signal(false);
+    readonly result = signal<AssistResult | null>(null);
 
     get isSql(): boolean {
         return SQL_INTENTS.includes(this.intent);
@@ -79,8 +79,8 @@ export class AssistPanelComponent implements OnInit {
             if (text && partialInput['kpiDescription'] === undefined) partialInput['kpiDescription'] = text;
             if (this.wantSample) partialInput['sampleRows'] = true;
         }
-        this.loading = true;
-        this.result = null;
+        this.loading.set(true);
+        this.result.set(null);
         this.api
             .run(this.intent, {
                 screenContext: this.screenContext,
@@ -89,11 +89,11 @@ export class AssistPanelComponent implements OnInit {
             })
             .subscribe({
                 next: (r) => {
-                    this.result = r;
-                    this.loading = false;
+                    this.result.set(r);
+                    this.loading.set(false);
                 },
                 error: (e) => {
-                    this.loading = false;
+                    this.loading.set(false);
                     this.toastr.error(
                         e?.status === 503
                             ? 'Assist agent is not available (inspecto-agent absent).'
@@ -107,7 +107,7 @@ export class AssistPanelComponent implements OnInit {
 
     // ── data accessors (data is a loose Record) ─────────────────────────────────
     private d<T = unknown>(key: string): T | undefined {
-        return this.result?.data?.[key] as T | undefined;
+        return this.result()?.data?.[key] as T | undefined;
     }
     get sql(): string | undefined {
         return this.d<string>('sql');
@@ -145,8 +145,8 @@ export class AssistPanelComponent implements OnInit {
      * `<inspecto-a2ui-render>` host. Null when there is nothing artifact-shaped to render.
      */
     get artifact(): A2uiArtifact | null {
-        if (!this.result) return null;
-        const served = this.result.artifact ?? this.d('artifact');
+        if (!this.result()) return null;
+        const served = this.result().artifact ?? this.d('artifact');
         if (isRecord(served) && typeof served['kind'] === 'string') return served as unknown as A2uiArtifact;
         const parts: A2uiArtifact[] = [];
         if (this.humanReadable) parts.push({ kind: 'text', config: { text: this.humanReadable } });

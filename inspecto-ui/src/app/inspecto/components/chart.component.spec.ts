@@ -29,8 +29,11 @@ describe('InspectoChartComponent', () => {
         expect(canvas.getAttribute('role')).toBe('img');
         expect(canvas.getAttribute('aria-label')).toBe('bar chart');
 
-        // Assign directly (not setInput) so ngOnChanges/rebuild — which needs a real canvas — is not run.
-        fixture.componentInstance.data = { labels: ['a', 'b'], datasets: [{ data: [1, 2] }] };
+        // ⚠ setInput, NOT a raw field write. The old direct assignment avoided ngOnChanges (the rebuild
+        // wants a real canvas), but it also marks nothing dirty — fine under CD.Default, invisible under
+        // OnPush, which this component now uses. setInput is what every real caller does and it marks the
+        // view; the rebuild it triggers is already guarded for jsdom.
+        fixture.componentRef.setInput('data', { labels: ['a', 'b'], datasets: [{ data: [1, 2] }] });
         fixture.detectChanges();
         expect(canvas.getAttribute('aria-label')).toBe('bar chart. a: 1, b: 2.');
     });

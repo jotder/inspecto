@@ -1,16 +1,17 @@
 import {
     AfterViewInit,
+    ChangeDetectionStrategy,
     Component,
     DestroyRef,
     ElementRef,
     EventEmitter,
+    inject,
     Input,
     OnChanges,
     OnDestroy,
     Output,
+    signal,
     ViewChild,
-    inject,
-    ChangeDetectionStrategy,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { GammaConfigService } from '@gamma/services/config';
@@ -37,7 +38,7 @@ function summarize(v: unknown): string {
     selector: 'inspecto-chart',
     standalone: true,
     template: '<canvas #canvas role="img" [attr.aria-label]="altText"></canvas>',
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     host: { class: 'block relative h-64 w-full' },
 })
 export class InspectoChartComponent implements AfterViewInit, OnChanges, OnDestroy {

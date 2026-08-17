@@ -8,7 +8,7 @@
                 @if (isSql) {
                     <mat-checkbox [(ngModel)]="wantSample">include sample rows</mat-checkbox>
                 }
-                <button mat-flat-button color="primary" [disabled]="loading" (click)="run()">
+                <button mat-flat-button color="primary" [disabled]="loading()" (click)="run()">
                     <mat-icon svgIcon="heroicons_outline:chat-bubble-left-ellipsis"></mat-icon>
                     <span class="ml-2">Ask</span>
                 </button>
@@ -16,28 +16,28 @@
         </div>
     }
 
-    @if (loading) {
+    @if (loading()) {
         <div class="flex items-center gap-3">
             <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
             <span class="text-secondary">Asking the agent…</span>
         </div>
     }
 
-    @if (result && !loading) {
+    @if (result() && !loading()) {
         <div class="flex flex-col gap-2">
-            <p class="font-medium">{{ result.answer }}</p>
+            <p class="font-medium">{{ result().answer }}</p>
             <p class="text-secondary text-sm">
-                status <b>{{ result.status }}</b> · confidence {{ (result.confidence * 100).toFixed(0) }}% ·
-                {{ result.validated ? 'validated' : 'unvalidated' }}
-                @if (!result.applyVia) {
+                status <b>{{ result().status }}</b> · confidence {{ (result().confidence * 100).toFixed(0) }}% ·
+                {{ result().validated ? 'validated' : 'unvalidated' }}
+                @if (!result().applyVia) {
                     <span>· draft only</span>
                 }
             </p>
-            @if (result.message) {
-                <p class="text-sm">{{ result.message }}</p>
+            @if (result().message) {
+                <p class="text-sm">{{ result().message }}</p>
             }
-            @if (result.rationale) {
-                <p class="text-secondary text-sm italic">{{ result.rationale }}</p>
+            @if (result().rationale) {
+                <p class="text-secondary text-sm italic">{{ result().rationale }}</p>
             }
             <!-- S7: humanReadable / narrative / sampleRows / findings (or a server-shaped
                  result.artifact) render through the generic A2UI host -->
@@ -84,12 +84,12 @@
             }
 
             <!-- citations / links -->
-            @if (result.citations?.length || result.links?.length) {
+            @if (result().citations?.length || result().links?.length) {
                 <div class="flex flex-wrap items-center gap-2">
-                    @for (c of result.citations; track c) {
+                    @for (c of result().citations; track c) {
                         <inspecto-chip variant="soft">{{ c.source }}: {{ c.ref }}</inspecto-chip>
                     }
-                    @for (l of result.links; track l) {
+                    @for (l of result().links; track l) {
                         <a class="text-primary text-xs underline" [href]="l" target="_blank" rel="noopener">{{ l }}</a>
                     }
                 </div>
@@ -99,7 +99,7 @@
             <details>
                 <summary class="text-secondary cursor-pointer text-sm">Raw data</summary>
                 <pre class="overflow-auto rounded bg-gray-100 p-3 text-xs dark:bg-gray-800">{{
-                    pretty(result.data)
+                    pretty(result().data)
                 }}</pre>
             </details>
         </div>
