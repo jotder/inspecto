@@ -93,7 +93,11 @@ final class PipelineConfigParser {
         // Stronger than `active: false`, which still registers and can still be triggered on demand.
         b.template = Boolean.parseBoolean(String.valueOf(raw.getOrDefault("template", "false")));
         // Display only — parsed so the list route can project it, never consulted by the engine.
-        b.description = String.valueOf(raw.getOrDefault("description", "")).trim();
+        // ⚠ get, not getOrDefault + String.valueOf: `description:` with an empty/null value is a PRESENT
+        // key holding null, so getOrDefault hands the null straight through and String.valueOf turns it
+        // into the literal text "null" — which the list route would then happily show as the subtitle.
+        Object rawDescription = raw.get("description");
+        b.description = rawDescription == null ? "" : String.valueOf(rawDescription).trim();
         // `template: true` + `active: true` is a contradiction, and refusing it HERE is what makes the
         // template guarantee hold everywhere: every authoring path (POST /config/write, PUT
         // /pipelines/{name}/graph, a hand-edited file, boot) funnels through this parse, so a template can
