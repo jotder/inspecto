@@ -40,7 +40,13 @@ import {
     apiErrorMessage,
     datasetManualHint,
 } from 'app/inspecto/api';
-import { type AttributeSpec, derivedPipelineId, parseUseRef, pipelineScaffold } from 'app/inspecto/component-model';
+import {
+    type AttributeSpec,
+    derivedPipelineId,
+    parseUseRef,
+    pipelineId,
+    pipelineScaffold,
+} from 'app/inspecto/component-model';
 import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
 import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
@@ -991,6 +997,10 @@ export class PipelineEditorComponent implements OnInit {
             return;
         }
         const name = this.newName.value.trim();
+        // ⚠ The typed value is the DISPLAY name; the pipeline is registered under the narrowed id the
+        // scaffold stamps ("my-pipe" → "my_pipe"). Every route below the write is keyed by that id, so
+        // selecting by the typed name opens a tab on a pipeline the server has never heard of.
+        const id = pipelineId(name);
         // W5: a new pipeline IS a canonical draft — write the space-convention scaffold (inactive,
         // with the parser-required dirs) and register it, then load its lifted graph.
         this.configApi.write('pipeline', pipelineScaffold(name)).subscribe({
@@ -1000,14 +1010,22 @@ export class PipelineEditorComponent implements OnInit {
                         this.creating.set(false);
                         this.flows.update((fs) => [
                             ...fs,
-                            { name, active: false, nodeCount: 0, edgeCount: 0, produces: [], consumes: [] },
+                            {
+                                name: id,
+                                ...(name === id ? {} : { displayName: name }),
+                                active: false,
+                                nodeCount: 0,
+                                edgeCount: 0,
+                                produces: [],
+                                consumes: [],
+                            },
                         ]);
-                        this.select(name);
+                        this.select(id);
                     },
                     error: () => {
                         // the file exists; the row appears after the next rescan
                         this.creating.set(false);
-                        this.select(name);
+                        this.select(id);
                     },
                 });
             },

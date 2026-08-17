@@ -9,7 +9,7 @@ import { MatInputModule } from '@angular/material/input';
 import { ToastrService } from 'ngx-toastr';
 import { ConfigService, SpacesService, apiErrorMessage } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
-import { pipelineScaffold } from 'app/inspecto/component-model';
+import { configPipelineId, pipelineScaffold } from 'app/inspecto/component-model';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { StreamBundle, parseStreamBundle, planStreamImport } from 'app/inspecto/transfer/stream-bundle';
@@ -338,18 +338,24 @@ export class OnboardingCreateDialog {
             reference: this.kind() === 'reference',
         });
 
+        // ⚠ The caller redirects to onboarding by whatever this dialog closes with, and that route is
+        // keyed by the pipeline's IDENTITY — the id the scaffold stamps, which is the typed name
+        // narrowed into the spec's alphabet ("Orders-Daily" → "orders_daily"). Closing with the display
+        // name lands the operator on a pipeline no route can resolve, right after a success toast.
+        const id = configPipelineId(config, name);
+
         this.creating.set(true);
         this.configApi.write('pipeline', config).subscribe({
             next: (written) => {
                 this.configApi.registerPipeline(written.path).subscribe({
                     next: () => {
                         this.toastr.success(`Draft "${name}" created`);
-                        this.ref.close({ name });
+                        this.ref.close({ name: id });
                     },
                     error: (e) => {
                         // The file exists — onboarding still opens; the catalog row appears after a restart/rescan.
                         this.toastr.warning(apiErrorMessage(e, 'Draft saved, but registering it failed.'));
-                        this.ref.close({ name });
+                        this.ref.close({ name: id });
                     },
                 });
             },
@@ -394,7 +400,9 @@ export class OnboardingCreateDialog {
                         ? `Imported "${name}" with ${extras.join(', ')} — review the stages, then go live.`
                         : `Imported "${name}" — review the stages, then go live.`,
                 );
-                this.ref.close({ name });
+                // Same rule as a fresh create: redirect by the identity, not the display name. An
+                // imported bundle may carry its own `id:`, which is why this reads the plan's config.
+                this.ref.close({ name: configPipelineId(plan.pipeline, name) });
             },
             error: (e) => {
                 this.creating.set(false);

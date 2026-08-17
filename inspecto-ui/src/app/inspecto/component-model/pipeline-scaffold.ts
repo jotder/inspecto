@@ -33,6 +33,19 @@ export function pipelineId(name: string): string {
 }
 
 /**
+ * The identity a config is REGISTERED under: its explicit `id:`, else {@link derivedPipelineId} of its
+ * `name`. Mirrors `PipelineConfigParser` and `ConfigRoutes.identityFields`, and it is the key every
+ * route addresses the pipeline by — so a create surface must navigate by THIS, never by the display
+ * name it just collected from the operator.
+ */
+export function configPipelineId(config: Record<string, unknown>, fallback: string): string {
+    const explicit = String(config['id'] ?? '').trim();
+    if (explicit) return explicit;
+    const name = String(config['name'] ?? '').trim();
+    return name ? derivedPipelineId(name) : fallback;
+}
+
+/**
  * The **home directory** a pipeline's dirs hang off: its `database` less the conventional `/database`
  * leaf, or `data/<name>` when nothing declares one. The one place that knows the convention — a second
  * copy would let a branch store land outside the pipeline home, and that path is load-bearing (a route

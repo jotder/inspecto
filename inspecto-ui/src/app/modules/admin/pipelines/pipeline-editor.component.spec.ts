@@ -1489,6 +1489,22 @@ describe('PipelineEditorComponent', () => {
         expect(text).not.toContain('A name is required');
     });
 
+    /**
+     * The scaffold narrows the typed name into the `id` pattern's alphabet ("my-pipe" → "my_pipe") and the
+     * server keys the pipeline by THAT. Selecting by the typed name opened a tab on a pipeline no route
+     * could resolve — the row and the load must both use the identity, with the typed value kept as the
+     * display label.
+     */
+    it('selects a new pipeline by its stamped id, not the typed display name', () => {
+        const c = make();
+        c.startNew();
+        c.newName.setValue('my-pipe');
+        c.createPipeline();
+        expect(config.write).toHaveBeenCalledWith('pipeline', expect.objectContaining({ id: 'my_pipe' }));
+        expect(c.selectedId()).toBe('my_pipe');
+        expect(c.flows().at(-1)).toMatchObject({ name: 'my_pipe', displayName: 'my-pipe' });
+    });
+
     it('the empty path has no accessibility violations', async () => {
         const fixture = TestBed.createComponent(PipelineEditorComponent);
         fixture.detectChanges(); // no flows → empty-state, the G6 canvas is not mounted

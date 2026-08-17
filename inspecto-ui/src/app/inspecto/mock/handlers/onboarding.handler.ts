@@ -1,6 +1,6 @@
 import type { ComponentDef } from '../../api/components.service';
 import type { ConfigDependent } from '../../api/models';
-import { derivedPipelineId } from '../../component-model/pipeline-scaffold';
+import { configPipelineId } from '../../component-model/pipeline-scaffold';
 import { MockFlags } from '../mock-flags';
 import { error, json, match, MockHandler, MockRequest } from '../mock-http';
 import { MockStore } from '../mock-store';
@@ -123,13 +123,8 @@ function scanDependents(store: MockStore, space: string, id: string): Record<str
     return out;
 }
 
-/** A pipeline's registered id: explicit `id:`, else `name` lower-cased with spaces underscored. */
-function pipelineIdOf(config: Record<string, unknown>, fallback: string): string {
-    const explicit = String(config['id'] ?? '').trim();
-    if (explicit) return explicit;
-    const name = String(config['name'] ?? '').trim();
-    return name ? derivedPipelineId(name) : fallback;
-}
+/** `WriteGates.safeName` — a name/id unusable as a jailed filename is a 422, not a silent slug. */
+const SAFE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 function collFor(type: string): string {
     return type === 'schema'
@@ -149,8 +144,15 @@ export function onboardingHandler(flags: MockFlags): MockHandler {
             const body = (req.body ?? {}) as { type?: string; config?: Record<string, unknown>; overwrite?: boolean };
             if (!body.config) return undefined;
             if (body.type === 'pipeline') {
-                const name = String(body.config['name'] ?? '').trim();
-                if (!name) return error(422, "config is missing its identity field 'name'");
+                const display = String(body.config['name'] ?? '').trim();
+                if (!display) return error(422, "config is missing its identity field 'name'");
+                // ⚠ The file — and this store's key — is named for the config's IDENTITY, not its
+                // display label: `id:` when stamped, else the derivation. Keyed by `name` this mock
+                // stored "My Pipe" where the server stores "my_pipe", so every later read by the id
+                // the list route hands back would miss. Mirrors `ConfigRoutes.identityFields`.
+                const name = configPipelineId(body.config, display);
+                if (!SAFE_NAME.test(name))
+                    return error(422, `unsafe config name '${name}' (allowed: letters, digits, '.', '_', '-')`);
                 const existing = store.get<StoredPipelineConfig>(space, PIPELINE_CONFIGS_COLL, name);
                 if (existing && !body.overwrite)
                     return error(409, `file exists: ${name}.toon (pass overwrite:true to replace)`);
@@ -356,7 +358,7 @@ export function onboardingHandler(flags: MockFlags): MockHandler {
         if (method === 'GET' && (m = match(url, CONFIG_IMPACT))) {
             const rec = store.get<StoredPipelineConfig>(space, PIPELINE_CONFIGS_COLL, m[1]);
             if (!rec) return error(404, `no such config: ${m[1]}.toon`);
-            const id = pipelineIdOf(rec.config, rec.id);
+            const id = configPipelineId(rec.config, rec.id);
             const dependents = scanDependents(store, space, id);
             const total = Object.values(dependents).reduce((n, xs) => n + xs.length, 0);
             return json({ pipeline: id, total, truncated: false, dependents });
@@ -370,7 +372,7 @@ export function onboardingHandler(flags: MockFlags): MockHandler {
                 return error(409, `pipeline '${rec.id}' is active; deactivate (active: false) before deleting`);
             }
             if (type === 'pipeline' && String(req.params['force'] ?? '').toLowerCase() !== 'true') {
-                const id = pipelineIdOf((rec as StoredPipelineConfig).config, rec.id);
+                const id = configPipelineId((rec as StoredPipelineConfig).config, rec.id);
                 const dependents = scanDependents(store, space, id);
                 const names = Object.entries(dependents).flatMap(([kind, xs]) => xs.map((x) => `${kind}/${x.name}`));
                 if (names.length) {
