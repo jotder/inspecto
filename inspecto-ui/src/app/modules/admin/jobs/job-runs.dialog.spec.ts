@@ -44,8 +44,8 @@ describe('JobRunsDialog', () => {
     it('loads the run history for the job on init', () => {
         const { fixture, runs } = create();
         expect(runs).toHaveBeenCalledWith('rollup');
-        expect(fixture.componentInstance.loading).toBe(false);
-        expect(fixture.componentInstance.runs).toEqual(RUNS);
+        expect(fixture.componentInstance.loading()).toBe(false);
+        expect(fixture.componentInstance.runs()).toEqual(RUNS);
         expect((fixture.nativeElement as HTMLElement).textContent).toContain('Run history — rollup');
     });
 

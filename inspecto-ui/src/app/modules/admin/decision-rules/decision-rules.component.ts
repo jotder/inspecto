@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, ViewEncapsulation, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -61,7 +61,7 @@ export function summarizeConsequences(r: DecisionRule): string {
         InspectoEmptyStateComponent,
     ],
     templateUrl: './decision-rules.component.html',
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,
 })
 export class DecisionRulesComponent implements OnInit {
@@ -73,8 +73,8 @@ export class DecisionRulesComponent implements OnInit {
     private toastr = inject(ToastrService);
     protected lens = inject(LensService);
 
-    rows: DecisionRule[] = [];
-    loading = false;
+    readonly rows = signal<DecisionRule[]>([]);
+    readonly loading = signal(false);
 
     readonly columnDefs: ColDef<DecisionRule>[] = [
         { field: 'priority', headerName: 'Prio', width: 90 },
@@ -154,14 +154,14 @@ export class DecisionRulesComponent implements OnInit {
     }
 
     load(): void {
-        this.loading = true;
+        this.loading.set(true);
         this.api.list().subscribe({
             next: (rows) => {
-                this.rows = rows;
-                this.loading = false;
+                this.rows.set(rows);
+                this.loading.set(false);
             },
             error: (e) => {
-                this.loading = false;
+                this.loading.set(false);
                 this.toastr.warning(apiErrorMessage(e, 'Could not load decision rules.'));
             },
         });
@@ -169,7 +169,7 @@ export class DecisionRulesComponent implements OnInit {
 
     newRule(): void {
         const data: DecisionRuleFormData = {
-            existingNames: this.rows.map((r) => r.name),
+            existingNames: this.rows().map((r) => r.name),
         };
         this.dialog
             .open(DecisionRuleFormDialog, { data, width: '760px', maxHeight: '88vh' })
@@ -206,7 +206,7 @@ export class DecisionRulesComponent implements OnInit {
                         description: res.answer,
                     };
                     const data: DecisionRuleFormData = {
-                        existingNames: this.rows.map((r) => r.name),
+                        existingNames: this.rows().map((r) => r.name),
                         prefill,
                     };
                     this.dialog
@@ -263,7 +263,7 @@ export class DecisionRulesComponent implements OnInit {
     private runSimulate(rule: DecisionRule, sampleRows: Record<string, unknown>[]): void {
         this.api.simulate(rule.name, sampleRows).subscribe({
             next: (res) => {
-                this.rows = this.rows.map((r) => (r.name === res.name ? res : r));
+                this.rows.set(this.rows().map((r) => (r.name === res.name ? res : r)));
                 const s = res.lastSimulation!;
                 const from = sampleRows.length
                     ? ` sampled from "${rule.target}"`
@@ -290,7 +290,7 @@ export class DecisionRulesComponent implements OnInit {
         this.api.remove(rule.name).subscribe({
             next: () => {
                 this.toastr.success(`Decision rule "${rule.name}" deleted`);
-                this.rows = this.rows.filter((r) => r.name !== rule.name);
+                this.rows.set(this.rows().filter((r) => r.name !== rule.name));
             },
             error: (err) => this.toastr.error(apiErrorMessage(err, `Could not delete "${rule.name}".`)),
         });

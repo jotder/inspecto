@@ -9,10 +9,10 @@
             </div>
         </div>
         <div class="flex items-center gap-3">
-            @if (loading) {
+            @if (loading()) {
                 <mat-spinner diameter="24"></mat-spinner>
             }
-            <button mat-icon-button (click)="load()" [disabled]="loading" aria-label="Refresh">
+            <button mat-icon-button (click)="load()" [disabled]="loading()" aria-label="Refresh">
                 <mat-icon [svgIcon]="'heroicons_outline:arrow-path'"></mat-icon>
             </button>
         </div>
@@ -52,13 +52,13 @@
             <inspecto-data-table
                 stateKey="learning"
                 tier="pro"
-                sourceName="agent-feedback"
-                exportName="agent-feedback"
-                [rows]="feedback"
+                sourceName="agent-feedback()"
+                exportName="agent-feedback()"
+                [rows]="feedback()"
                 [columns]="columnDefs"
-                [loading]="loading"
-                noRowsTitle="No feedback yet"
-                noRowsHint="When operators rate the agent's investigation Cases (helpful / not helpful), their feedback appears here and feeds the helpful-rate above."
+                [loading]="loading()"
+                noRowsTitle="No feedback() yet"
+                noRowsHint="When operators rate the agent's investigation Cases (helpful / not helpful), their feedback() appears here and feeds the helpful-rate above."
             />
         </div>
     </div>

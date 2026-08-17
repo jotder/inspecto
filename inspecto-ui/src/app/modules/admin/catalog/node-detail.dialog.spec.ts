@@ -50,8 +50,8 @@ describe('NodeDetailDialog', () => {
         const { fixture, node } = create();
         const c = fixture.componentInstance;
         expect(node).toHaveBeenCalledWith('source/cdr');
-        expect(c.loading).toBe(false);
-        expect(c.detail?.node.label).toBe('cdr');
+        expect(c.loading()).toBe(false);
+        expect(c.detail()?.node.label).toBe('cdr');
         expect((fixture.nativeElement as HTMLElement).textContent).toContain('Neighbours (1 nodes, 1 edges)');
 
         c.onNeighbourClicked(DETAIL.neighbors.nodes[0]);

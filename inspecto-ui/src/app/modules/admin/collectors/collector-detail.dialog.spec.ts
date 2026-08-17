@@ -53,7 +53,7 @@ describe('CollectorDetailDialog', () => {
         expect(text).toContain('Pending: 3');
         expect(text).toContain('ops-sftp');
         expect(text).toContain('*.csv');
-        expect(fixture.componentInstance.statusLoading).toBe(false);
+        expect(fixture.componentInstance.statusLoading()).toBe(false);
     });
 
     it('renders with no a11y violations', async () => {

@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -16,7 +16,7 @@ import { ChipComponent } from 'app/inspecto/components/chip.component';
     selector: 'app-collector-detail-dialog',
     standalone: true,
     imports: [RouterLink, MatDialogModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule, ChipComponent],
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>
             <span class="font-mono">{{ data.id }}</span>
@@ -25,20 +25,20 @@ import { ChipComponent } from 'app/inspecto/components/chip.component';
         <mat-dialog-content class="space-y-4">
             <!-- Live inbox status -->
             <div class="bg-card flex items-center gap-4 rounded-xl p-4 shadow-sm">
-                @if (statusLoading) {
+                @if (statusLoading()) {
                     <mat-progress-spinner diameter="20" mode="indeterminate"></mat-progress-spinner>
                     <span class="text-secondary">Loading inbox status…</span>
-                } @else if (status) {
+                } @else if (status()) {
                     <div class="flex items-center gap-2">
                         <mat-icon
                             class="icon-size-5"
-                            [svgIcon]="status.running ? 'heroicons_outline:bolt' : 'heroicons_outline:pause'"
+                            [svgIcon]="status().running ? 'heroicons_outline:bolt' : 'heroicons_outline:pause'"
                         ></mat-icon>
-                        <span class="font-medium">{{ status.running ? 'Processing' : 'Idle' }}</span>
+                        <span class="font-medium">{{ status().running ? 'Processing' : 'Idle' }}</span>
                     </div>
                     <div class="text-secondary">
                         Pending:
-                        <span class="font-medium">{{ status.pending < 0 ? '—' : status.pending }}</span>
+                        <span class="font-medium">{{ status().pending < 0 ? '—' : status().pending }}</span>
                     </div>
                 } @else {
                     <span class="text-secondary">Inbox status unavailable.</span>
@@ -141,17 +141,17 @@ export class CollectorDetailDialog implements OnInit {
     private runs = inject(RunsService);
     private ref = inject(MatDialogRef<CollectorDetailDialog>);
 
-    status: InboxStatus | null = null;
-    statusLoading = true;
+    readonly status = signal<InboxStatus | null>(null);
+    readonly statusLoading = signal(true);
 
     ngOnInit(): void {
         this.runs.pending(this.data.pipeline).subscribe({
             next: (s) => {
-                this.status = s;
-                this.statusLoading = false;
+                this.status.set(s);
+                this.statusLoading.set(false);
             },
             error: () => {
-                this.statusLoading = false;
+                this.statusLoading.set(false);
             },
         });
     }

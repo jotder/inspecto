@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewEncapsulation, inject, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -23,7 +23,7 @@ import { fmtDateTime, InspectoRowAction } from 'app/inspecto/grid';
     standalone: true,
     imports: [MatButtonModule, MatIconModule, MatProgressSpinnerModule, DataTableComponent],
     templateUrl: './approvals.component.html',
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,
 })
 export class ApprovalsComponent implements OnInit {
@@ -32,8 +32,8 @@ export class ApprovalsComponent implements OnInit {
     private toastr = inject(ToastrService);
     protected lens = inject(LensService);
 
-    approvals: AgentApproval[] = [];
-    loading = false;
+    readonly approvals = signal<AgentApproval[]>([]);
+    readonly loading = signal(false);
 
     readonly columnDefs: ColDef<AgentApproval>[] = [
         {
@@ -84,17 +84,17 @@ export class ApprovalsComponent implements OnInit {
     }
 
     load(): void {
-        this.loading = true;
+        this.loading.set(true);
         this.api.list(100).subscribe({
             next: (a) => {
-                this.approvals = a;
-                this.loading = false;
+                this.approvals.set(a);
+                this.loading.set(false);
             },
             error: () => {
                 // Module-absent (503) / act-tier-off (empty) both land here as an empty inbox + toast;
                 // connectivity messaging is the banner's job, as on the Alerts pane.
-                this.approvals = [];
-                this.loading = false;
+                this.approvals.set([]);
+                this.loading.set(false);
                 this.toastr.error('Failed to load approvals');
             },
         });
@@ -126,7 +126,7 @@ export class ApprovalsComponent implements OnInit {
             next: (updated) => {
                 this.toastr.success(decision === 'approve' ? 'Request approved' : 'Request declined');
                 // Reflect the terminal status in place — the PENDING-only row actions then fall away.
-                this.approvals = this.approvals.map((x) => (x.id === updated.id ? updated : x));
+                this.approvals.set(this.approvals().map((x) => (x.id === updated.id ? updated : x)));
             },
             error: (err) =>
                 this.toastr.error(apiErrorMessage(err, `Could not ${decision} the request (it may have lapsed).`)),

@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, ViewEncapsulation, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -31,7 +31,7 @@ import { DiagnosisDetailDialog } from './diagnosis-detail.dialog';
         DataTableComponent,
     ],
     templateUrl: './diagnoses.component.html',
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,
 })
 export class DiagnosesComponent implements OnInit {
@@ -39,8 +39,8 @@ export class DiagnosesComponent implements OnInit {
     private dialog = inject(MatDialog);
     private toastr = inject(ToastrService);
 
-    diagnoses: Diagnosis[] = [];
-    loading = false;
+    readonly diagnoses = signal<Diagnosis[]>([]);
+    readonly loading = signal(false);
     limit = 50;
 
     readonly columnDefs: ColDef<Diagnosis>[] = [
@@ -74,15 +74,15 @@ export class DiagnosesComponent implements OnInit {
     }
 
     load(): void {
-        this.loading = true;
+        this.loading.set(true);
         this.api.diagnoses(this.limit).subscribe({
             next: (d) => {
-                this.diagnoses = d;
-                this.loading = false;
+                this.diagnoses.set(d);
+                this.loading.set(false);
             },
             error: () => {
-                this.diagnoses = [];
-                this.loading = false;
+                this.diagnoses.set([]);
+                this.loading.set(false);
                 // Unreachable-backend messaging is the connectivity banner's job (§8) — plain failure toast only.
                 this.toastr.error('Failed to load diagnoses');
             },

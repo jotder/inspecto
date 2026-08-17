@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -14,7 +14,7 @@ import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
     selector: 'app-object-link-dialog',
     standalone: true,
     imports: [ReactiveFormsModule, MatButtonModule, MatDialogModule, MatFormFieldModule, MatSelectModule],
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Link this {{ data.fromType }}</h2>
         <mat-dialog-content class="flex flex-col gap-3 pt-2" style="min-width: 26rem">
@@ -31,7 +31,7 @@ import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
                 <mat-form-field subscriptSizing="dynamic">
                     <mat-label>Target object</mat-label>
                     <mat-select formControlName="to" required>
-                        @for (o of candidates; track o.id) {
+                        @for (o of candidates(); track o.id) {
                             <mat-option [value]="o.id"
                                 >{{ o.objectType }} · {{ o.title || o.id }} ({{ o.status }})</mat-option
                             >
@@ -45,7 +45,7 @@ import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
         </mat-dialog-content>
         <mat-dialog-actions align="end">
             <button mat-button (click)="requestClose()">Cancel</button>
-            <button mat-flat-button color="primary" [disabled]="saving" (click)="save()">Link</button>
+            <button mat-flat-button color="primary" [disabled]="saving()" (click)="save()">Link</button>
         </mat-dialog-actions>
     `,
 })
@@ -60,8 +60,8 @@ export class ObjectLinkDialog implements OnInit {
     private fb = inject(FormBuilder);
     readonly data = inject<{ fromId: string; fromType: string }>(MAT_DIALOG_DATA);
 
-    candidates: OperationalObject[] = [];
-    saving = false;
+    readonly candidates = signal<OperationalObject[]>([]);
+    readonly saving = signal(false);
     readonly form = this.fb.group({
         relationship: ['RELATED_TO', Validators.required],
         to: ['', Validators.required],
@@ -69,8 +69,8 @@ export class ObjectLinkDialog implements OnInit {
 
     ngOnInit(): void {
         this.api.list({ limit: 200 }).subscribe({
-            next: (os) => (this.candidates = os.filter((o) => o.id !== this.data.fromId)),
-            error: () => (this.candidates = []),
+            next: (os) => this.candidates.set(os.filter((o) => o.id !== this.data.fromId)),
+            error: () => this.candidates.set([]),
         });
     }
 
@@ -79,7 +79,7 @@ export class ObjectLinkDialog implements OnInit {
             this.form.markAllAsTouched();
             return;
         }
-        this.saving = true;
+        this.saving.set(true);
         const { to, relationship } = this.form.getRawValue();
         this.api.link(this.data.fromId, to, relationship).subscribe({
             next: (l) => {
@@ -87,7 +87,7 @@ export class ObjectLinkDialog implements OnInit {
                 this.ref.close(l);
             },
             error: (e) => {
-                this.saving = false;
+                this.saving.set(false);
                 this.toastr.error(apiErrorMessage(e, 'Link failed'));
             },
         });

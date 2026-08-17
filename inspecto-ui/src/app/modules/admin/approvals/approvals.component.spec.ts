@@ -66,8 +66,8 @@ describe('ApprovalsComponent', () => {
     it('loads the inbox on init', async () => {
         const { fixture } = await create();
         const c = fixture.componentInstance;
-        expect(c.approvals).toEqual([PENDING]);
-        expect(c.loading).toBe(false);
+        expect(c.approvals()).toEqual([PENDING]);
+        expect(c.loading()).toBe(false);
         expect(fixture.nativeElement.textContent).toContain('Approvals Inbox');
     });
 
@@ -89,7 +89,7 @@ describe('ApprovalsComponent', () => {
         const c = fixture.componentInstance;
         await c.approve(PENDING);
         expect(api.decide).toHaveBeenCalledWith('a1', 'approve');
-        expect(c.approvals[0].status).toBe('APPROVED');
+        expect(c.approvals()[0].status).toBe('APPROVED');
     });
 
     it('a declined confirmation leaves the request pending and calls nothing', async () => {
@@ -97,7 +97,7 @@ describe('ApprovalsComponent', () => {
         const c = fixture.componentInstance;
         await c.decline(PENDING);
         expect(api.decide).not.toHaveBeenCalled();
-        expect(c.approvals[0].status).toBe('PENDING');
+        expect(c.approvals()[0].status).toBe('PENDING');
     });
 
     it('a decide failure surfaces a toast and leaves the row unchanged', async () => {
@@ -105,14 +105,14 @@ describe('ApprovalsComponent', () => {
         const c = fixture.componentInstance;
         await c.approve(PENDING);
         expect(toastr.error).toHaveBeenCalled();
-        expect(c.approvals[0].status).toBe('PENDING');
+        expect(c.approvals()[0].status).toBe('PENDING');
     });
 
     it('degrades to an empty inbox + plain failure toast when the load fails', async () => {
         const { fixture, toastr } = await create({ list: () => throwError(() => ({ status: 503 })) });
         const c = fixture.componentInstance;
-        expect(c.approvals).toEqual([]);
-        expect(c.loading).toBe(false);
+        expect(c.approvals()).toEqual([]);
+        expect(c.loading()).toBe(false);
         expect(toastr.error).toHaveBeenCalledWith('Failed to load approvals');
     });
 

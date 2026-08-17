@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -12,21 +12,21 @@ import { fmtDateTime } from 'app/inspecto/grid';
     selector: 'app-job-runs-dialog',
     standalone: true,
     imports: [MatDialogModule, MatButtonModule, MatProgressSpinnerModule, DataTableComponent],
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Run history — {{ data.job }}</h2>
         <mat-dialog-content>
-            @if (loading) {
+            @if (loading()) {
                 <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
             } @else {
                 <inspecto-data-table
                     tier="standard"
-                    sourceName="runs"
-                    exportName="runs"
-                    [rows]="runs"
+                    sourceName="runs()"
+                    exportName="runs()"
+                    [rows]="runs()"
                     [columns]="columnDefs"
                     height="24rem"
-                    noRowsTitle="No runs yet"
+                    noRowsTitle="No runs() yet"
                 />
             }
         </mat-dialog-content>
@@ -39,8 +39,8 @@ export class JobRunsDialog implements OnInit {
     readonly data = inject<{ job: string }>(MAT_DIALOG_DATA);
     private api = inject(JobsService);
 
-    runs: JobRun[] = [];
-    loading = true;
+    readonly runs = signal<JobRun[]>([]);
+    readonly loading = signal(true);
 
     readonly columnDefs: ColDef<JobRun>[] = [
         { field: 'runId', headerName: 'Run', flex: 1 },
@@ -65,11 +65,11 @@ export class JobRunsDialog implements OnInit {
     ngOnInit(): void {
         this.api.runs(this.data.job).subscribe({
             next: (r) => {
-                this.runs = r;
-                this.loading = false;
+                this.runs.set(r);
+                this.loading.set(false);
             },
             error: () => {
-                this.loading = false;
+                this.loading.set(false);
             },
         });
     }

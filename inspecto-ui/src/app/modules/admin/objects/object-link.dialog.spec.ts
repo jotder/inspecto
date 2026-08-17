@@ -39,7 +39,7 @@ function create() {
 describe('ObjectLinkDialog', () => {
     it('excludes the source object from candidates and only links once a target is picked', () => {
         const { c, ref, api } = create();
-        expect(c.candidates.map((o) => o.id)).toEqual(['OBJ-2']);
+        expect(c.candidates().map((o) => o.id)).toEqual(['OBJ-2']);
 
         c.save();
         expect(api.link).not.toHaveBeenCalled();

@@ -10,10 +10,10 @@
             </div>
         </div>
         <div class="flex items-center gap-3">
-            @if (loading) {
+            @if (loading()) {
                 <mat-spinner diameter="24"></mat-spinner>
             }
-            <button mat-icon-button (click)="load()" [disabled]="loading" aria-label="Refresh">
+            <button mat-icon-button (click)="load()" [disabled]="loading()" aria-label="Refresh">
                 <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
             </button>
             @if (lens.canAuthorWorkbench()) {
@@ -35,7 +35,7 @@
 
     <!-- Main -->
     <div class="flex flex-auto flex-col p-6 sm:p-10">
-        @if (!loading && rows.length === 0) {
+        @if (!loading() && rows().length === 0) {
             <inspecto-empty-state
                 icon="heroicons_outline:arrows-right-left"
                 title="No decision rules yet"
@@ -49,10 +49,10 @@
                 tier="standard"
                 sourceName="decision-rules"
                 exportName="decision-rules"
-                [rows]="rows"
+                [rows]="rows()"
                 [columns]="columnDefs"
                 [rowActions]="rowActions"
-                [loading]="loading"
+                [loading]="loading()"
                 [autoHeight]="true"
             />
         }

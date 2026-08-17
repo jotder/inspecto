@@ -82,7 +82,7 @@ async function create(
 describe('DecisionRulesComponent', () => {
     it('lists rules with no a11y violations', async () => {
         const { fixture } = await create();
-        expect(fixture.componentInstance.rows).toEqual([RULE]);
+        expect(fixture.componentInstance.rows()).toEqual([RULE]);
         await expectNoA11yViolations(fixture.nativeElement);
     });
 
@@ -107,7 +107,7 @@ describe('DecisionRulesComponent', () => {
         expect(table).toHaveBeenCalledWith(expect.objectContaining({ name: 'cdr_ingest' }));
         expect(simulate).toHaveBeenCalledWith('quarantine_high_cost', sample);
         expect(toastr.info).toHaveBeenCalledWith(expect.stringContaining('1 of 1'));
-        expect(fixture.componentInstance.rows[0].lastSimulation?.matched).toBe(1);
+        expect(fixture.componentInstance.rows()[0].lastSimulation?.matched).toBe(1);
     });
 
     it('simulate over a target with no browsable store falls back to an empty sample', async () => {

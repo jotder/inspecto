@@ -61,8 +61,8 @@ describe('LearningComponent', () => {
 
     it('degrades to an empty state + toast when the load fails', async () => {
         const { fixture, toastr } = await create({ feedback: () => throwError(() => ({ status: 503 })) });
-        expect(fixture.componentInstance.feedback).toEqual([]);
-        expect(fixture.componentInstance.loading).toBe(false);
+        expect(fixture.componentInstance.feedback()).toEqual([]);
+        expect(fixture.componentInstance.loading()).toBe(false);
         expect(toastr.error).toHaveBeenCalledWith('Failed to load feedback');
     });
 

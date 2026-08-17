@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewEncapsulation, inject, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -20,15 +20,15 @@ import { fmtDateTime } from 'app/inspecto/grid';
     standalone: true,
     imports: [MatButtonModule, MatIconModule, MatProgressSpinnerModule, DataTableComponent],
     templateUrl: './learning.component.html',
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,
 })
 export class LearningComponent implements OnInit {
     private api = inject(LearningService);
     private toastr = inject(ToastrService);
 
-    feedback: CaseFeedback[] = [];
-    loading = false;
+    readonly feedback = signal<CaseFeedback[]>([]);
+    readonly loading = signal(false);
 
     readonly columnDefs: ColDef<CaseFeedback>[] = [
         {
@@ -57,11 +57,11 @@ export class LearningComponent implements OnInit {
     ];
 
     get total(): number {
-        return this.feedback.length;
+        return this.feedback().length;
     }
 
     get helpful(): number {
-        return this.feedback.filter((f) => f.rating === 'HELPFUL').length;
+        return this.feedback().filter((f) => f.rating === 'HELPFUL').length;
     }
 
     get notHelpful(): number {
@@ -78,15 +78,15 @@ export class LearningComponent implements OnInit {
     }
 
     load(): void {
-        this.loading = true;
+        this.loading.set(true);
         this.api.feedback(500).subscribe({
             next: (f) => {
-                this.feedback = f;
-                this.loading = false;
+                this.feedback.set(f);
+                this.loading.set(false);
             },
             error: () => {
-                this.feedback = [];
-                this.loading = false;
+                this.feedback.set([]);
+                this.loading.set(false);
                 this.toastr.error('Failed to load feedback');
             },
         });

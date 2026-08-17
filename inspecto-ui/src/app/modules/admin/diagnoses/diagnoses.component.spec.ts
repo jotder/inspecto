@@ -46,7 +46,7 @@ describe('DiagnosesComponent', () => {
     it('loads recent diagnoses on init with the default limit', async () => {
         const { fixture, api } = await create();
         expect(api.diagnoses).toHaveBeenCalledWith(50);
-        expect(fixture.componentInstance.diagnoses).toEqual([DIAGNOSIS]);
+        expect(fixture.componentInstance.diagnoses()).toEqual([DIAGNOSIS]);
     });
 
     it('row click opens the detail dialog', async () => {
@@ -57,7 +57,7 @@ describe('DiagnosesComponent', () => {
 
     it('degrades to an empty grid + plain failure toast when the load fails', async () => {
         const { fixture, toastr } = await create({ diagnoses: () => throwError(() => ({ status: 500 })) });
-        expect(fixture.componentInstance.diagnoses).toEqual([]);
+        expect(fixture.componentInstance.diagnoses()).toEqual([]);
         expect(toastr.error).toHaveBeenCalledWith('Failed to load diagnoses');
     });
 

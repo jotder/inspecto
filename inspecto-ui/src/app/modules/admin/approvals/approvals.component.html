@@ -9,10 +9,10 @@
             </div>
         </div>
         <div class="flex items-center gap-3">
-            @if (loading) {
+            @if (loading()) {
                 <mat-spinner diameter="24"></mat-spinner>
             }
-            <button mat-icon-button (click)="load()" [disabled]="loading" aria-label="Refresh">
+            <button mat-icon-button (click)="load()" [disabled]="loading()" aria-label="Refresh">
                 <mat-icon [svgIcon]="'heroicons_outline:arrow-path'"></mat-icon>
             </button>
         </div>
@@ -21,15 +21,15 @@
     <!-- Approvals grid -->
     <div class="mt-4 flex-auto">
         <inspecto-data-table
-            stateKey="approvals"
+            stateKey="approvals()"
             tier="pro"
-            sourceName="agent-approvals"
-            exportName="agent-approvals"
-            [rows]="approvals"
+            sourceName="agent-approvals()"
+            exportName="agent-approvals()"
+            [rows]="approvals()"
             [columns]="columnDefs"
             [rowActions]="rowActions"
-            [loading]="loading"
-            noRowsTitle="No approvals waiting"
+            [loading]="loading()"
+            noRowsTitle="No approvals() waiting"
             noRowsHint="When the agent's act tier is enabled and it proposes a mutating action, the request appears here for review."
         />
     </div>
