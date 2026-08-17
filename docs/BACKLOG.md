@@ -284,7 +284,7 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 > `if (authored.length) this.patternPacks.set(authored)` — a space authoring ONE pattern pack makes all
 > six built-ins disappear. Deliberate curation or an accident?
 
-> ### 🟡 CD-1 — **39 remaining** (was 64) `ChangeDetectionStrategy.Eager` shims (2026-08-17)
+> ### 🟡 CD-1 — **36 remaining** (was 64) `ChangeDetectionStrategy.Eager` shims (2026-08-17)
 >
 > `ng update` stamped `Eager` on every component that had no explicit strategy, because v22 flipped the
 > default to `OnPush`. The angular-ui skill calls it "legacy, not a target … a candidate for removal".
@@ -294,10 +294,20 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 > preview, not just the suite: the OnPush `categorize.dialog`'s Category→Subcategory cascade still
 > re-renders, and the whole Accept→categorize→transition flow moves the row between folders.
 >
-> **39 remain**, and each needs its FIELDS converting to signals first — a real refactor per component,
-> not a strategy swap. The list is reproducible: a component is unsafe when a plain field is assigned
-> inside a `subscribe(`/`then(`/`setTimeout(` callback. Densest: alerts, catalog, dashboard, run-detail,
+> **A further 3 were fully refactored** in `?` (object-create.dialog, space-form.dialog, spaces.component):
+> the async-written boolean became a signal, its writes `.set()`, its template reads gained the call.
+> That is the shape the rest need — a strategy flip alone would leave them silently stale.
+>
+> **36 remain: 30 under `modules/admin`, 6 in the app shell** (`app.component`, `layout/**` — the Fuse
+> layout the skill puts out of scope for restyling/auditing; decide deliberately before touching those).
+> Each of the 30 carries 2-6 plain fields, several of them arrays and objects rendered through separate
+> multi-hundred-line templates, so each is its own refactor plus a template sweep. Reproducible test for
+> whether one is safe to flip WITHOUT that work: no plain field is assigned inside a
+> `subscribe(`/`then(`/`setTimeout(` callback. Densest: alerts, catalog, dashboard, run-detail,
 > object-detail, and the three ResizeObserver hosts (chart / map-view / graph-view).
+>
+> ⚠ Count these with `grep -rl` from `inspecto-ui/src/app` — a run from the repo root silently reported
+> zero during this shift.
 >
 > ⛔ **Not a blanket change, and NOT sed-able.** Sampled during the 2026-08-17 review sweep:
 > `objects/object-detail.component.ts` holds `id = ''` and friends as plain mutable fields with **zero**
