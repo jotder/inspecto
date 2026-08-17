@@ -1088,10 +1088,25 @@ export class PipelineEditorComponent implements OnInit {
         this.selectedEdgeId.set(null);
     }
 
-    save(): void {
+    async save(): Promise<void> {
         const m = this.model();
         const id = this.selectedId();
         if (!m || !id) return;
+        // ⚠ The definition drawer's edits live OUTSIDE the graph until Apply, and every other transition
+        // that could lose them stops and asks — switching tabs (activateTab), closing one (closeTab),
+        // moving the drawer to another node. Save was the exception, and the worst place for it: it
+        // persisted the model without the drawer's work and then cleared `dirty`, so the surface
+        // asserted everything was saved while the edits sat unapplied in the pane.
+        //
+        // Proceeding does NOT clear `definitionDirty` — the drawer keeps its edits and its own guard, so
+        // the operator can still Apply and save again.
+        if (this.definitionDirty()) {
+            const ok = await this.confirm.confirmDestructive(
+                'The open definition has edits that have not been applied. Saving now writes the pipeline without them.',
+                { title: 'Save without the unapplied edits?', confirmText: 'Save anyway' },
+            );
+            if (!ok) return;
+        }
         this.saving.set(true);
         this.api.savePipelineGraph(id, m).subscribe({
             next: () => {
@@ -1449,11 +1464,19 @@ export class PipelineEditorComponent implements OnInit {
             .subscribe({
                 next: () => {
                     this.flows.update((fs) => fs.filter((f) => f.name !== id));
-                    this.model.set(null);
-                    this.selectedId.set(null);
-                    this.clearSelection();
-                    const next = this.flows()[0];
-                    if (next) this.select(next.name);
+                    // ⚠ The same teardown `closeTab` does, and for the same reason. Dropping the pipeline
+                    // from `flows` alone left its TAB alive: `tabs` maps `openIds`, not `flows`, and
+                    // `cachedModels` still held the graph. So a deleted pipeline kept a clickable tab —
+                    // labelled with its raw id, because the list lookup now missed — `activateTab`
+                    // restored it from cache as if it were live, and a Save then PUT it straight back,
+                    // resurrecting the pipeline the operator had just confirmed deleting.
+                    this.forgetTab(id);
+                    this.openIds.update((ids) => ids.filter((x) => x !== id));
+                    this.clearActive();
+                    // Fall back to the next OPEN tab, as closing does — not `flows()[0]`, which opened a
+                    // brand-new tab on an unrelated pipeline the operator had never asked to see.
+                    const next = this.openIds()[0];
+                    if (next) void this.activateTab(next);
                 },
                 error: (err) => this.onWriteError(err, 'Delete failed'),
             });

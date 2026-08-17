@@ -82,11 +82,12 @@ export class PipelineGuaranteesPanelComponent {
         // its own node, so both are read (mirrors `PipelineLift.markerHome`) — the card must not go
         // dark for either shape, and its owner is whichever node actually holds the keys.
         const legacyMarker = m.nodes.find((n) => n.type === 'transform.dedup.marker');
-        const marker = acq?.config?.['duplicate_check'] != null
-            ? acq.config['duplicate_check'] === true
-                ? acq
-                : undefined
-            : legacyMarker;
+        const marker =
+            acq?.config?.['duplicate_check'] != null
+                ? acq.config['duplicate_check'] === true
+                    ? acq
+                    : undefined
+                : legacyMarker;
         const quarantine = m.nodes.find(
             (n) => n.type === 'sink.persistent' && n.config?.['dir'] != null && n.config?.['database'] == null,
         );
@@ -123,10 +124,27 @@ export class PipelineGuaranteesPanelComponent {
             {
                 key: 'backup',
                 label: 'Backup',
-                summary: sink?.config?.['backup'] != null ? String(sink.config['backup']) : null,
+                // ⚠ `!= null` admitted an explicit `backup: false`, whose String() is the NON-EMPTY
+                // "false" — and the template keys its green check purely off `row.summary` being
+                // truthy. A pipeline that had deliberately turned backup OFF therefore rendered in
+                // this checklist as a satisfied guarantee. A safety panel that reports a disabled
+                // guarantee as configured is worse than one that omits it.
+                summary: backupSummary(sink?.config?.['backup']),
                 owner: sink,
             },
         ];
         return rows;
     });
+}
+
+/**
+ * The Backup row's summary, or `null` when backup is not actually in force.
+ *
+ * ⚠ An explicit `false` — and the string `'false'`, which is how a TOON-authored boolean can arrive —
+ * mean backup is OFF, so they must read as unconfigured. Everything else (a `true`, a directory) is a
+ * real setting and shows verbatim.
+ */
+function backupSummary(value: unknown): string | null {
+    if (value == null || value === '') return null;
+    return String(value).trim().toLowerCase() === 'false' ? null : String(value);
 }
