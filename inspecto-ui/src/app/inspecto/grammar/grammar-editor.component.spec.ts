@@ -132,6 +132,32 @@ describe('GrammarEditorComponent', () => {
         expect(c.error()).toContain('at least one field');
     });
 
+    /**
+     * 🔴 Found by driving the real UI: a fixed-width test parse ALWAYS failed with "fixed width needs
+     * at least one field", whatever the operator typed. `test()` sent {@link grammar} — the property
+     * sheet alone — while the slice table lives in its own `fwFields` FormArray that only
+     * {@link value} injects. The request therefore carried no `fixedwidth.fields` at all.
+     */
+    it('sends the fixed-width slice table with the test parse', () => {
+        const fixture = create({ frontend: 'fixedwidth' });
+        const c = fixture.componentInstance;
+        c.fwFields.clear();
+        c.addField();
+        c.fwFields.at(0).patchValue({ name: 'ACCOUNT', start: 0, length: 7 });
+        c.sample = 'ACC0001rest';
+
+        const sent: Record<string, unknown>[] = [];
+        c.previewFn = (_t, grammar) => {
+            sent.push(grammar);
+            return of(TABLE);
+        };
+
+        c.test();
+
+        const fw = sent[0]?.['fixedwidth'] as { fields?: unknown[] } | undefined;
+        expect(fw?.fields).toEqual([{ name: 'ACCOUNT', start: 0, length: 7 }]);
+    });
+
     it('emits the preview and exposes its rows', () => {
         const fixture = create();
         const c = fixture.componentInstance;

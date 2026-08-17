@@ -464,7 +464,11 @@ export class GrammarEditorComponent {
         const text = this.sampleText();
         if (!text || !this.validate()) return;
         const type = this.activeType();
-        const grammar = this.grammar();
+        // 🔴 Fixed width's slice table is its OWN FormArray, not part of the property sheet, so
+        // `grammar()` carries no `fixedwidth.fields` and the preview ALWAYS failed with "fixed width
+        // needs at least one field" — no matter what the operator typed. Only {@link value} injects
+        // them. Plugins keep `grammar()`: `value()` would stamp a built-in block shape over theirs.
+        const grammar = this.frontend() === 'fixedwidth' && !this.pluginDef() ? this.value() : this.grammar();
         this.testing.set(true);
         this.error.set(null);
         const req$ = this.previewFn
