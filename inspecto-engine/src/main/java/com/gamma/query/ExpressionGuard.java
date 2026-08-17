@@ -32,9 +32,15 @@ public final class ExpressionGuard {
 
     private ExpressionGuard() {}
 
-    private static final int MAX_LENGTH = 500;
+    // ── The constants below are package-private, not private, so ExpressionGuardContractTest can assert
+    // each one against inspecto-ui/src/app/inspecto/mock/expression-guard.contract.json — the file the
+    // Angular inline-feedback mirror IMPORTS. Both sides therefore compare to one checked-in artifact,
+    // and a divergence surfaces as a reviewable diff on the contract instead of a form that quietly
+    // accepts what the engine will refuse. ⛔ Do not re-narrow the visibility. ──
 
-    private static final Pattern TOKEN = Pattern.compile(
+    static final int MAX_LENGTH = 500;
+
+    static final Pattern TOKEN = Pattern.compile(
             "\\s+"                                   // whitespace (skipped)
           + "|[A-Za-z_][A-Za-z0-9_]*"                // identifier / keyword / function name
           + "|[0-9]+(?:\\.[0-9]+)?"                  // numeric literal
@@ -42,18 +48,18 @@ public final class ExpressionGuard {
           + "|\\|\\||!=|<>|>=|<=|[+\\-*/%=<>(),]");  // operators, parens, comma
 
     /** Statement/structure keywords that must never appear, even as bare identifiers (rule 2). */
-    private static final Set<String> DENIED = Set.of(
+    static final Set<String> DENIED = Set.of(
             "select", "from", "where", "group", "having", "union", "join", "with", "values",
             "insert", "update", "delete", "drop", "create", "alter", "attach", "copy",
             "pragma", "install", "load", "call", "set", "table", "exec", "execute");
 
     /** Flow keywords of a CASE expression + predicate glue — allowed as bare words (never called). */
-    private static final Set<String> FLOW_KEYWORDS = Set.of(
+    static final Set<String> FLOW_KEYWORDS = Set.of(
             "case", "when", "then", "else", "end", "and", "or", "not", "is", "null",
             "in", "like", "between", "as");
 
     /** The scalar functions a calculated column may call (rule 3). */
-    private static final Set<String> FUNCTIONS = Set.of(
+    static final Set<String> FUNCTIONS = Set.of(
             "abs", "round", "floor", "ceil", "coalesce", "nullif", "greatest", "least",
             "upper", "lower", "trim", "ltrim", "rtrim", "length", "substr", "substring",
             "concat", "replace", "cast", "try_cast");
@@ -61,17 +67,17 @@ public final class ExpressionGuard {
     /** Functions callable ONLY as a window call — the call must be immediately followed by {@code OVER (…)}
      *  (rule 3 + window rule). The windowed aggregates ({@code sum}/{@code avg}/{@code count}/{@code min}/
      *  {@code max}) are deliberately absent from {@link #FUNCTIONS}, so used bare they stay rejected. */
-    private static final Set<String> WINDOW_FUNCTIONS = Set.of(
+    static final Set<String> WINDOW_FUNCTIONS = Set.of(
             "sum", "avg", "count", "min", "max",
             "row_number", "rank", "dense_rank", "percent_rank", "cume_dist",
             "ntile", "lag", "lead", "first_value", "last_value", "nth_value");
 
     /** Bare words allowed only inside an {@code OVER (…)} clause (never call targets). */
-    private static final Set<String> WINDOW_KEYWORDS = Set.of(
+    static final Set<String> WINDOW_KEYWORDS = Set.of(
             "partition", "by", "order", "asc", "desc", "nulls", "first", "last");
 
     /** The type names a {@code cast(x AS type)} may target. */
-    private static final Set<String> TYPES = Set.of(
+    static final Set<String> TYPES = Set.of(
             "integer", "int", "bigint", "smallint", "double", "float", "real", "decimal",
             "varchar", "text", "boolean", "date", "timestamp");
 

@@ -1,0 +1,27 @@
+{
+  "maxLength": 500,
+  "token": "\\s+|[A-Za-z_][A-Za-z0-9_]*|[0-9]+(?:\\.[0-9]+)?|'(?:[^']|'')*'|\\|\\||!=|<>|>=|<=|[+\\-*/%=<>(),]",
+  "denied": [
+    "alter", "attach", "call", "copy", "create", "delete", "drop", "exec", "execute", "from",
+    "group", "having", "insert", "install", "join", "load", "pragma", "select", "set", "table",
+    "union", "update", "values", "where", "with"
+  ],
+  "flowKeywords": [
+    "and", "as", "between", "case", "else", "end", "in", "is", "like", "not", "null", "or",
+    "then", "when"
+  ],
+  "functions": [
+    "abs", "cast", "ceil", "coalesce", "concat", "floor", "greatest", "least", "length", "lower",
+    "ltrim", "nullif", "replace", "round", "rtrim", "substr", "substring", "trim", "try_cast",
+    "upper"
+  ],
+  "windowFunctions": [
+    "avg", "count", "cume_dist", "dense_rank", "first_value", "lag", "last_value", "lead", "max",
+    "min", "nth_value", "ntile", "percent_rank", "rank", "row_number", "sum"
+  ],
+  "windowKeywords": [ "asc", "by", "desc", "first", "last", "nulls", "order", "partition" ],
+  "types": [
+    "bigint", "boolean", "date", "decimal", "double", "float", "int", "integer", "real",
+    "smallint", "text", "timestamp", "varchar"
+  ]
+}

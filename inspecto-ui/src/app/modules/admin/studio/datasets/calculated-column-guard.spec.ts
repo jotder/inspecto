@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import GUARD_CONTRACT from 'app/inspecto/mock/expression-guard.contract.json';
 import { checkCalculatedExpr, checkCalculatedName } from './calculated-column-guard';
 
 describe('checkCalculatedExpr', () => {
@@ -89,5 +90,52 @@ describe('checkCalculatedName', () => {
         expect(checkCalculatedName('total-with-tax')).toMatch(/letters, digits, underscore/i);
         expect(checkCalculatedName('total.tax')).toMatch(/letters, digits, underscore/i);
         expect(checkCalculatedName('1total')).toMatch(/letters, digits, underscore/i);
+    });
+});
+
+/**
+ * The client half of the expression-guard contract. `ExpressionGuardContractTest` (Java) asserts the
+ * engine's own constants against this same committed JSON, so the two implementations cannot diverge
+ * without a reviewable diff on the contract file.
+ *
+ * ⚠ These assertions are deliberately BEHAVIOURAL, not `expect(FUNCTIONS).toEqual(contract.functions)`.
+ * The guard imports the JSON, so comparing its sets back to the JSON would be a tautology that passes
+ * even if nothing were wired up. Driving `checkCalculatedExpr` proves each vocabulary actually reaches
+ * the decision.
+ */
+describe('the committed expression-guard contract drives the guard', () => {
+    it('accepts every function the contract publishes, and rejects one it does not', () => {
+        for (const fn of GUARD_CONTRACT.functions) {
+            const expr = fn === 'cast' || fn === 'try_cast' ? `${fn}(amt as integer)` : `${fn}(amt)`;
+            expect(checkCalculatedExpr(expr), fn).toBeNull();
+        }
+        expect(checkCalculatedExpr('sqrt(amt)')).toMatch(/not allowed/);
+    });
+
+    it('rejects every denied keyword, wherever it appears', () => {
+        for (const kw of GUARD_CONTRACT.denied) {
+            expect(checkCalculatedExpr(`amt + ${kw}`), kw).toMatch(/not allowed/);
+        }
+    });
+
+    it('allows a window function only with OVER (…), never bare', () => {
+        for (const fn of GUARD_CONTRACT.windowFunctions) {
+            const call = fn === 'count' ? `${fn}(*)` : `${fn}(amt)`;
+            expect(checkCalculatedExpr(`${call} over (partition by msisdn)`), fn).toBeNull();
+            expect(checkCalculatedExpr(call), fn).toMatch(/OVER/);
+        }
+    });
+
+    it('accepts every cast target the contract publishes, and rejects one it does not', () => {
+        for (const t of GUARD_CONTRACT.types) {
+            expect(checkCalculatedExpr(`cast(amt as ${t})`), t).toBeNull();
+        }
+        expect(checkCalculatedExpr('cast(amt as blob)')).toMatch(/not allowed/);
+    });
+
+    it('enforces the contract length cap, off by exactly one character', () => {
+        const fits = 'a'.repeat(GUARD_CONTRACT.maxLength);
+        expect(checkCalculatedExpr(fits)).toBeNull();
+        expect(checkCalculatedExpr(fits + 'a')).toMatch(/exceeds/);
     });
 });
