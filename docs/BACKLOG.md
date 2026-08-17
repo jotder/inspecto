@@ -253,6 +253,43 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 
 ## 5. UI residuals + security-module residuals
 
+> ### ⚠ BUNDLE-1 — the packaged UI intermittently dies at bootstrap on FIRST load (2026-08-17)
+>
+> Reported from the shipped bundle as `Uncaught TypeError: Cannot read properties of undefined
+> (reading 'BootstrapApplicationStart')`, and reproduced here twice as `w$1 is not a function` and
+> `The requested module './chunk-<hash>.js' does not provide an export named 'G'`. All three are the
+> same shape: **an export the importing chunk expects comes back undefined**, so bootstrap dies on a
+> missing esbuild helper. It presents as a corrupt bundle and is nowhere near its cause.
+>
+> **One real defect was found and FIXED (`3e714e02`):** `ControlApi.writeFile` sent `Content-Type` and
+> nothing else — no `Cache-Control`, no `ETag`, no `Last-Modified`. That is not "do not cache": with
+> neither a directive nor a validator a browser falls back to **heuristic** freshness and may reuse a
+> response without revalidating, so an upgrade served from the same host:port can pair the new
+> `index.html` with stale chunks. Now `no-cache` + a size+mtime ETag with a bodiless 304, pinned by
+> three tests in `ControlApiStaticAndCorsTest` (13/13).
+>
+> **⚠ NOT PROVEN to be the whole cause — this row stays OPEN.** After the fix shipped, a fresh bundle
+> on a fresh port still failed on its FIRST load and then rendered correctly on reload; a later
+> cold-start attempt was clean on first load. So it is intermittent and the cache defect may be only
+> one contributor. What was **ruled out** by measurement, so nobody re-treads it:
+>
+> - **The Angular output is NOT corrupt.** The same `dist` boots cleanly under a plain static server,
+>   the chunk in question *does* export the name claimed missing (46 exports), and a dynamic `import()`
+>   of it from the failing page succeeds.
+> - **The server does not mis-serve bytes.** All 129 chunks fetched 40-way concurrently are
+>   byte-identical to disk, with correct `Content-Type` and `Content-Length`.
+> - **Not a case-collision on Windows' case-insensitive filesystem** (the theory the 53 `…2`-suffixed
+>   chunk names invite): zero case-collapsed names, and all 67 statically referenced chunks exist with
+>   exact case.
+> - **Not a duplicated Angular core, and not a version skew** — one `ProfilerEvent` enum in the output,
+>   every `@angular/*` at its declared version, one exactly-pinned esbuild.
+>
+> **Next step for whoever picks this up:** capture the FAILING first load specifically — the importer's
+> URL is not in the message, so log every static request with its status and byte count on a cold
+> server and diff that against a clean load. Suspect the cold-start window (the browser opens ~100
+> parallel module requests at once against a just-started `HttpServer`) rather than the build.
+> Workaround for operators today: **reload the page once.**
+
 > ### ✅ BUILDER-2 — nine more defects found by driving the editor as a builder, all FIXED (2026-08-17)
 >
 > A second builder session drove **create → pick a parse format → sample → Test parse → Apply → Save →
