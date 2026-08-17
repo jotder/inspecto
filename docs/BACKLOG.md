@@ -253,6 +253,32 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 
 ## 5. UI residuals + security-module residuals
 
+> ### 🟡 CD-1 — 64 components still carry the v22 `ChangeDetectionStrategy.Eager` shim (2026-08-17)
+>
+> `ng update` stamped `Eager` on every component that had no explicit strategy, because v22 flipped the
+> default to `OnPush`. The angular-ui skill calls it "legacy, not a target … a candidate for removal",
+> and new components still use `OnPush`. 64 files remain, densest in `objects` (12), `inspecto/components`
+> (8) and `pipelines` (4).
+>
+> ⛔ **Not a blanket change, and NOT sed-able.** Sampled during the 2026-08-17 review sweep:
+> `objects/object-detail.component.ts` holds `id = ''` and friends as plain mutable fields with **zero**
+> signals, fed from a route subscription — under `OnPush` it would silently stop updating. Each conversion
+> needs its own proof that every template-read value is a signal, an immutable input, or explicitly
+> `markForCheck`ed.
+>
+> ⚠ **Unit tests will not catch a regression here** — specs call `detectChanges()` explicitly, so a
+> component that has stopped reacting to its own state still renders in a fixture. Verification is the
+> preview, per component. Convert opportunistically when a component is being touched for another reason;
+> do not open this as a sweep.
+
+> ### 🟢 GRID-1 — routed panes still missing a `stateKey` (2026-08-17)
+>
+> 14 single-table routed panes got one (`11260a1d`); the remainder are the **multi-table** panes, where
+> each section needs its own key: catalog (4 tables), sharing (4), notification-center (3),
+> reconciliation-detail (3), run-detail (2), job-detail (2), enrichment (2), alerts (2). ⚠ A duplicate key
+> silently makes two tables share one persisted layout, which is worse than none — that is why they were
+> left rather than guessed. Exempt by design: the dashboard's mini card grid and the studio drill drawer.
+
 > ### ⚠ BUNDLE-1 — the packaged UI intermittently dies at bootstrap on FIRST load (2026-08-17)
 >
 > Reported from the shipped bundle as `Uncaught TypeError: Cannot read properties of undefined
