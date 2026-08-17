@@ -24,6 +24,7 @@ import {
     resolveBreak,
 } from 'app/inspecto/reconciliation';
 import { ReconExecService } from './recon-exec.service';
+import { ChipComponent } from 'app/inspecto/components/chip.component';
 
 /**
  * Breaks page (`/reconciliation/:id/breaks?path=…`) — the record sets behind one Board cell: three
@@ -37,6 +38,7 @@ import { ReconExecService } from './recon-exec.service';
     selector: 'app-reconciliation-detail',
     standalone: true,
     imports: [
+        ChipComponent,
         RouterLink,
         MatButtonModule,
         MatButtonToggleModule,

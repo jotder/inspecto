@@ -25,7 +25,7 @@
                         >B <span class="font-mono">{{ r.rightDataset }}</span></span
                     >
                     @for (p of pathEntries(); track p[0]) {
-                        <span class="rounded-full border px-2 py-0.5 text-xs">{{ p[0] }} = {{ p[1] }}</span>
+                        <inspecto-chip>{{ p[0] }} = {{ p[1] }}</inspecto-chip>
                     }
                 </div>
             </div>

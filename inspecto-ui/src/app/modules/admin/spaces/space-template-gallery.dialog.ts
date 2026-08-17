@@ -11,6 +11,7 @@ import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
+import { ChipComponent } from 'app/inspecto/components/chip.component';
 
 export interface SpaceTemplateGalleryData {
     /** Space ids already in use — the id control rejects a duplicate inline (product-wide rule). */
@@ -40,6 +41,7 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
     selector: 'app-space-template-gallery-dialog',
     standalone: true,
     imports: [
+        ChipComponent,
         ReactiveFormsModule,
         MatDialogModule,
         MatButtonModule,
@@ -79,9 +81,7 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                                 <span class="text-secondary text-sm">{{ t.tagline }}</span>
                                 <div class="flex flex-wrap gap-1">
                                     @for (c of t.contents; track c) {
-                                        <span class="text-secondary rounded-full border px-2 py-0.5 text-xs">{{
-                                            c
-                                        }}</span>
+                                        <inspecto-chip>{{ c }}</inspecto-chip>
                                     }
                                 </div>
                             </button>

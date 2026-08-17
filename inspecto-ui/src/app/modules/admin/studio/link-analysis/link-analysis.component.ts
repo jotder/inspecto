@@ -81,6 +81,7 @@ import { LinkAnalysisCommentsDialog } from './link-analysis-comments.dialog';
 import { LinkAnalysisService, LinkAnalysisView } from './link-analysis.service';
 import { LinkAnalysisToolboxComponent } from './link-analysis-toolbox.component';
 import { LinkAnalysisQueryPanelComponent, QuerySummaryItem } from './link-analysis-query-panel.component';
+import { ChipComponent } from 'app/inspecto/components/chip.component';
 
 /** Inline duplicate-name guard (house form rule) — blocks saving a view under a taken name. */
 function uniqueNameValidator(taken: () => string[]): ValidatorFn {
@@ -120,6 +121,7 @@ interface PresentationSnapshot {
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        ChipComponent,
         ReactiveFormsModule,
         MatButtonModule,
         MatButtonToggleModule,

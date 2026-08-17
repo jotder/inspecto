@@ -14,7 +14,7 @@
                 <mat-icon class="icon-size-5" [svgIcon]="t.icon"></mat-icon>
                 <span class="font-medium">{{ t.label }}</span>
                 @if (toolBadge(t.id); as badge) {
-                    <span class="truncate rounded-full border px-2 py-0.5 text-xs">{{ badge }}</span>
+                    <inspecto-chip class="whitespace-nowrap">{{ badge }}</inspecto-chip>
                 }
                 <mat-icon
                     class="icon-size-4 ml-auto shrink-0"

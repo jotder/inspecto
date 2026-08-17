@@ -10,6 +10,7 @@ import { ToastrService } from 'ngx-toastr';
 import { AssistIntent, AssistResult, AssistService } from 'app/inspecto/api';
 import { A2uiArtifact, isRecord } from 'app/inspecto/a2ui/a2ui-artifact';
 import { A2uiRenderComponent } from 'app/inspecto/a2ui/a2ui-render.component';
+import { ChipComponent } from './chip.component';
 
 /** SQL-producing intents that can return a sampleRows preview. */
 const SQL_INTENTS = ['kpi-to-sql', 'report-sql'];
@@ -28,6 +29,7 @@ const SQL_INTENTS = ['kpi-to-sql', 'report-sql'];
     selector: 'app-assist-panel',
     standalone: true,
     imports: [
+        ChipComponent,
         FormsModule,
         MatButtonModule,
         MatCheckboxModule,

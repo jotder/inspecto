@@ -5,12 +5,13 @@ import { MatIconModule } from '@angular/material/icon';
 import { ToastrService } from 'ngx-toastr';
 import { Diagnosis } from 'app/inspecto/api';
 import { AssistPanelComponent } from 'app/inspecto/components/assist-panel.component';
+import { ChipComponent } from 'app/inspecto/components/chip.component';
 
 /** Detail view for one diagnosis — replaces inspector-ui's dx-popup drawer. */
 @Component({
     selector: 'app-diagnosis-detail-dialog',
     standalone: true,
-    imports: [MatDialogModule, MatButtonModule, MatIconModule, AssistPanelComponent],
+    imports: [ChipComponent, MatDialogModule, MatButtonModule, MatIconModule, AssistPanelComponent],
     changeDetection: ChangeDetectionStrategy.Eager,
     template: `
         <h2 mat-dialog-title>Diagnosis</h2>
@@ -42,9 +43,7 @@ import { AssistPanelComponent } from 'app/inspecto/components/assist-panel.compo
             @if (d.citations?.length) {
                 <div class="mt-3 flex flex-wrap gap-2">
                     @for (c of d.citations; track c) {
-                        <span class="rounded-full bg-gray-200 px-3 py-0.5 text-xs dark:bg-gray-700">
-                            {{ c.source }}: {{ c.ref }}
-                        </span>
+                        <inspecto-chip variant="soft">{{ c.source }}: {{ c.ref }}</inspecto-chip>
                     }
                 </div>
             }

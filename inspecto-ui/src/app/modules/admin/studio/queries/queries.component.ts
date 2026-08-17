@@ -39,6 +39,7 @@ import { DatasetRows, DatasetRowsService } from 'app/inspecto/viz/dataset-rows.s
 import { Query, QueryType, buildQuery } from './query-types';
 import { QueriesService } from './queries.service';
 import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
+import { ChipComponent } from 'app/inspecto/components/chip.component';
 import './query.kind'; // ensure the query kind is registered
 
 /** The default (empty) structured model — a fresh Query Core builder state. */
@@ -80,6 +81,7 @@ function tokenName(raw: string): string {
     selector: 'app-queries',
     standalone: true,
     imports: [
+        ChipComponent,
         AiExplainComponent,
         ReactiveFormsModule,
         MatButtonModule,

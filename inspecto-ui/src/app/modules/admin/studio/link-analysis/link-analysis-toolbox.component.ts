@@ -46,6 +46,7 @@ import {
 } from 'app/inspecto/graph';
 import { GraphEmphasis } from 'app/modules/admin/catalog/graph-view.component';
 import { PATTERN_PACKS, PatternPack, patternPackFromContent } from './pattern-packs';
+import { ChipComponent } from 'app/inspecto/components/chip.component';
 
 type AnalysisTab =
     | 'path'
@@ -85,6 +86,7 @@ type CentralityMetric =
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        ChipComponent,
         DecimalPipe,
         MatButtonModule,
         MatButtonToggleModule,

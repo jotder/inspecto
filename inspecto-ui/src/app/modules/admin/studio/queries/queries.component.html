@@ -87,9 +87,8 @@
                         <span class="text-secondary text-sm font-medium">Parameters</span>
                         <div class="flex flex-wrap items-center gap-2">
                             @for (t of builtinTokens(); track t) {
-                                <span
-                                    class="rounded-full border border-gray-300 px-2 py-0.5 font-mono text-xs dark:border-gray-600"
-                                    >{{ t }}</span
+                                <inspecto-chip
+                                    ><span class="font-mono">{{ t }}</span></inspecto-chip
                                 >
                             }
                             @for (name of userParamNames(); track name) {
@@ -178,10 +177,7 @@
                             @if (p.recommended?.length) {
                                 <span class="text-secondary">· fits:</span>
                                 @for (r of p.recommended; track r) {
-                                    <span
-                                        class="rounded-full border border-gray-300 px-2 py-0.5 text-xs dark:border-gray-600"
-                                        >{{ r }}</span
-                                    >
+                                    <inspecto-chip>{{ r }}</inspecto-chip>
                                 }
                             }
                         </div>
