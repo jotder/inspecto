@@ -186,9 +186,8 @@ describe('OnboardingCreateDialog', () => {
         expect(pipeline['name']).toBe('orders_copy');
         expect(pipeline['active']).toBe(false);
         expect((pipeline['dirs'] as Record<string, string>)['poll']).toBe('spaces/demo/data/inbox/orders_copy');
-        expect((pipeline['processing'] as Record<string, unknown>)['schema_file']).toBe(
-            'spaces/demo/config/orders_copy_schema.toon',
-        );
+        // W3: portable bare ref. `dirs` above still embeds the space — dirs are NOT config-relative.
+        expect((pipeline['processing'] as Record<string, unknown>)['schema_file']).toBe('orders_copy_schema.toon');
         expect((pipeline['processing'] as Record<string, unknown>)['threads']).toBe(2); // body preserved
         expect(ref.close).toHaveBeenCalledWith({ name: 'orders_copy' });
     });

@@ -466,7 +466,7 @@ describe('PipelineParseDefinitionComponent', () => {
             const a = parsing['asn1'] as Record<string, unknown>;
             expect(a['root_type']).toBe('CallEventRecord');
             expect(a['grammar']).toContain('DEFINITIONS');
-            expect(a['segments']).toEqual({ Record: 'spaces/default/config/asn1_cdr_Record.toon' });
+            expect(a['segments']).toEqual({ Record: 'asn1_cdr_Record.toon' }); // W3: portable, beside the config
         });
 
         /** A node pointing at schemas that failed to write is the state the ordering exists to prevent. */
@@ -794,9 +794,8 @@ describe('PipelineParseDefinitionComponent', () => {
             expect(schemaWrites[0].type).toBe('schema');
             expect((schemaWrites[0].config['raw'] as Record<string, unknown>)['name']).toBe('parse_schema');
             // hop 2: the node naming what was just written
-            expect(fixture.componentInstance.applied!.config!['schema_file']).toBe(
-                'spaces/default/config/parse_schema.toon',
-            );
+            // W3: the PORTABLE bare ref — resolves config-relative first, so the space tree moves.
+            expect(fixture.componentInstance.applied!.config!['schema_file']).toBe('parse_schema.toon');
         });
 
         it('applies nothing when the schema write fails, so no node names a missing file', async () => {
@@ -826,6 +825,20 @@ describe('PipelineParseDefinitionComponent', () => {
             pane(fixture).onPreviewed(TABLE_PREVIEW);
             fixture.detectChanges();
             expect(pane(fixture).schemaSeed().map((r) => r.name)).toEqual(['IMSI']);
+        });
+
+        /**
+         * 🔴 W3 compat guard. This pane now WRITES the portable bare `<name>.toon`, but every pipeline
+         * saved before that carries `spaces/<space>/config/<name>.toon` and is just as much ours.
+         * `foreignSchema` therefore compares by NAME — a path comparison would have declared every
+         * pre-W3 pipeline's own schema hand-authored and quietly stopped maintaining it.
+         */
+        it('still owns a pre-W3 schema_file written as a full space path', async () => {
+            const n = unschemadNode();
+            (n.config as Record<string, unknown>)['schema_file'] = 'spaces/default/config/parse_schema.toon';
+            const fixture = await create(n);
+            fixture.detectChanges();
+            expect(pane(fixture).foreignSchema()).toBe(false);
         });
 
         it('leaves a hand-authored schema_file alone — no editor, no write', async () => {

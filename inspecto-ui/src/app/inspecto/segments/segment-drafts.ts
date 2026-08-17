@@ -116,6 +116,22 @@ function leafSelectors(nodes: readonly ParserTreeNode[], prefix: string): string
  * selected) still re-hydrates. Returns `''` for anything that is not a `.toon` file reference —
  * the caller treats that as "not recoverable, re-derive".
  */
+/**
+ * The PORTABLE reference to a config the engine loads beside its pipeline — a bare `<name>.toon`.
+ *
+ * <p>Since unification W1b (2026-07-31) `schema_file` and `parsing.<asn1|plugin>.segments` values
+ * resolve **config-relative first, working-directory second**, so a bare basename beside the
+ * pipeline config is what makes a space tree relocatable / renamable / importable. Every UI writer
+ * used to emit `spaces/<space>/config/<name>.toon` instead — reading portable refs worked, writing
+ * them did not (W3). This is the one spelling of the written form.
+ *
+ * <p>⚠ Never COMPARE a stored ref against this. Configs written before this change carry the long
+ * form and are still correct — compare by {@link schemaNameFromPath} instead, which reads both.
+ */
+export function portableConfigRef(name: string): string {
+    return `${name}.toon`;
+}
+
 export function schemaNameFromPath(path: unknown): string {
     const s = String(path ?? '').trim();
     if (!s.toLowerCase().endsWith('.toon')) return '';

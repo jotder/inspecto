@@ -160,20 +160,22 @@ describe('stream-bundle — import plan', () => {
         expect(p.notes.join(' ')).toContain('inactive draft');
     });
 
-    it('rewires the schema path to the target convention and retargets raw.name', () => {
+    it('writes the PORTABLE bare schema ref and retargets raw.name', () => {
         const p = planFor();
         expect(p.schema?.name).toBe('orders_copy_schema');
         expect((p.schema?.config['raw'] as Record<string, unknown>)['name']).toBe('orders_copy_schema');
+        // W3: a bare basename beside the pipeline, so the import needs no path rewrite at all.
         expect((p.pipeline['processing'] as Record<string, unknown>)['schema_file']).toBe(
-            'spaces/prod/config/orders_copy_schema.toon',
+            'orders_copy_schema.toon',
         );
     });
 
     it('handles a single-space (no space id) target', () => {
         const p = planFor('orders_copy', null);
         expect((p.pipeline['dirs'] as Record<string, string>)['poll']).toBe('./data/inbox/orders_copy');
+        // Identical to the spaced target — that portability is the whole point of the bare form.
         expect((p.pipeline['processing'] as Record<string, unknown>)['schema_file']).toBe(
-            './config/orders_copy_schema.toon',
+            'orders_copy_schema.toon',
         );
     });
 
@@ -187,7 +189,7 @@ describe('stream-bundle — import plan', () => {
         expect(p.segments).toHaveLength(1);
         expect(p.segments[0].name).toBe('cdr_mo_call'); // '-' is not identifier-safe
         const built = (p.pipeline['parsing'] as Record<string, unknown>)['plugin'] as Record<string, unknown>;
-        expect(built['segments']).toEqual({ 'mo-call': 'spaces/prod/config/cdr_mo_call.toon' });
+        expect(built['segments']).toEqual({ 'mo-call': 'cdr_mo_call.toon' });
     });
 
     it('carries requirements and masked-secret warnings into the plan notes', () => {

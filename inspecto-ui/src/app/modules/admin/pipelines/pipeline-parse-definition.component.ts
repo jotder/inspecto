@@ -28,7 +28,6 @@ import {
     ParserTreeNode,
     SchemaDrift,
     ParsersService,
-    SpacesService,
     apiErrorMessage,
 } from 'app/inspecto/api';
 import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
@@ -49,6 +48,8 @@ import {
     InspectoSegmentsEditorComponent,
     SegmentDraft,
     schemaDraftFor,
+    companionSchemaName,
+    portableConfigRef,
     schemaNameFromPath,
     segmentDraftFrom,
     segmentPathsOf,
@@ -278,7 +279,6 @@ export const PARSE_NODE_FRONTENDS: Record<string, ParsingFrontend | 'asn1' | 'pl
 export class PipelineParseDefinitionComponent {
     private fb = inject(FormBuilder);
     private configApi = inject(ConfigService);
-    private spaces = inject(SpacesService);
     private parsersApi = inject(ParsersService);
 
     /** The per-format parse node being defined (identity fixed; config/name/description editable). */
@@ -392,14 +392,18 @@ export class PipelineParseDefinitionComponent {
 
     readonly existingSchemaFile = computed(() => String(this.node().config?.['schema_file'] ?? '').trim());
     private schemaName(): string {
-        return `${this.pipelineName() || this.node().id}_schema`.replace(/[^A-Za-z0-9_]+/g, '_');
+        return companionSchemaName(this.pipelineName() || this.node().id, 'schema');
     }
-    private schemaConventionPath(): string {
-        return `${this.base()}/config/${this.schemaName()}.toon`;
-    }
-    /** A `schema_file` this editor did not write — hand-authored in the TOON; never touched here. */
+    /**
+     * A `schema_file` this editor did not write — hand-authored in the TOON; never touched here.
+     *
+     * <p>Compared by NAME, not by path: this pane writes the PORTABLE bare `<name>.toon` since W3,
+     * but every config written before that carries `spaces/<space>/config/<name>.toon` and is just
+     * as much ours. A path comparison would have declared every pre-W3 pipeline's own schema foreign
+     * and quietly stopped maintaining it.
+     */
     readonly foreignSchema = computed(
-        () => this.existingSchemaFile() !== '' && this.existingSchemaFile() !== this.schemaConventionPath(),
+        () => this.existingSchemaFile() !== '' && schemaNameFromPath(this.existingSchemaFile()) !== this.schemaName(),
     );
     /**
      * Whether this node authors an output schema. Segment-authoring nodes (ASN.1 / plugin) carry their
@@ -670,16 +674,12 @@ export class PipelineParseDefinitionComponent {
         });
     }
 
-    private base(): string {
-        return this.spaces.currentSpaceId() ? `spaces/${this.spaces.currentSpaceId()}` : '.';
-    }
     /** One schema toon per segment, named by the Onboarding Parsing stage's convention. */
     private schemaNameFor(segmentKey: string): string {
-        const pipeline = this.pipelineName() || this.node().id;
-        return `${pipeline}_${segmentKey}`.replace(/[^A-Za-z0-9_]+/g, '_');
+        return companionSchemaName(this.pipelineName() || this.node().id, segmentKey);
     }
     private schemaPathFor(segmentKey: string): string {
-        return `${this.base()}/config/${this.schemaNameFor(segmentKey)}.toon`;
+        return portableConfigRef(this.schemaNameFor(segmentKey));
     }
 
     /**
@@ -877,7 +877,7 @@ export class PipelineParseDefinitionComponent {
             next: () => {
                 this.writing.set(false);
                 grid.markPristine();
-                this.applyWith(this.parsingValue(), this.schemaConventionPath());
+                this.applyWith(this.parsingValue(), portableConfigRef(name));
             },
             error: (e) => {
                 this.writing.set(false);

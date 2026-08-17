@@ -1,6 +1,6 @@
 // Deep import on purpose: the segments barrel also exports the editor COMPONENT, and this codec is
 // pure — it must not drag an Angular component into whatever imports it.
-import { companionSchemaName } from '../segments/segment-drafts';
+import { companionSchemaName, portableConfigRef } from '../segments/segment-drafts';
 import { hashContent } from './content-hash';
 
 /**
@@ -16,9 +16,10 @@ import { hashContent } from './content-hash';
  * *schema*: `BundleKind` already has `'schema'` meaning the registry component, while a Stream's
  * schema is a `config`-type TOON at `<base>/config/<pipeline>_schema.toon`. Filing Stream schemas
  * under the existing kind would import them into the wrong store. On top of that, a Stream's
- * satellite references are **paths that embed the source space** (`spaces/demo/config/...`), so they
- * must be REWRITTEN for the target — something the bundle's id-based `BundleRef` model cannot
- * express. Hence a sibling format that reuses the proven primitives (`hashContent`, the
+ * satellite references may be **paths that embed the source space** (`spaces/demo/config/...`), so
+ * they must be REWRITTEN for the target — something the bundle's id-based `BundleRef` model cannot
+ * express. (Since W3 an import writes the PORTABLE bare `<name>.toon` instead, which needs no
+ * rewriting at all; the rewrite stays because a bundle exported before W3 still carries long paths.) Hence a sibling format that reuses the proven primitives (`hashContent`, the
  * parse/validate shape, the object-URL download idiom) without contorting `BundleKind`.
  *
  * ## What travels, and what deliberately does not
@@ -197,10 +198,6 @@ export interface StreamImportPlan {
     requires: StreamRequirement[];
 }
 
-/** `<base>/config/<name>.toon` — the convention every onboarding pane writes and reads by. */
-const conventionPath = (space: string | null, name: string): string =>
-    `${space ? `spaces/${space}` : '.'}/config/${name}.toon`;
-
 
 /**
  * Turn a parsed bundle into the exact set of writes for THIS target, under a (possibly new) name.
@@ -235,7 +232,7 @@ export function planStreamImport(bundle: StreamBundle, opts: { name: string; spa
         const schemaName = `${name}_schema`;
         plan.schema = { name: schemaName, config: { ...bundle.schema, raw: renameRaw(bundle.schema, schemaName) } };
         const processing = isRecord(pipeline['processing']) ? { ...pipeline['processing'] } : {};
-        processing['schema_file'] = conventionPath(space, schemaName);
+        processing['schema_file'] = portableConfigRef(schemaName);
         pipeline['processing'] = processing;
     }
 
@@ -244,7 +241,7 @@ export function planStreamImport(bundle: StreamBundle, opts: { name: string; spa
         for (const [key, config] of Object.entries(bundle.segments)) {
             const segName = companionSchemaName(name, key);
             plan.segments.push({ name: segName, config: { ...config, raw: renameRaw(config, segName) } });
-            paths[key] = conventionPath(space, segName);
+            paths[key] = portableConfigRef(segName);
         }
         const parsing = isRecord(pipeline['parsing']) ? { ...pipeline['parsing'] } : {};
         const plugin = isRecord(parsing['plugin']) ? { ...parsing['plugin'] } : {};

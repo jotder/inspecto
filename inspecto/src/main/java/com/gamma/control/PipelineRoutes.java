@@ -378,7 +378,9 @@ final class PipelineRoutes implements RouteModule {
         // The same gate POST /config/write runs — the graph editor is a caller, not a second pipe.
         List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), lowered));
         findings.addAll(ConfigSafetyValidator.check("pipeline", lowered, SafetyPolicy.defaultPolicy()));
-        findings.addAll(ConfigRoutes.schemaFileFindings("pipeline", lowered, Severity.WARNING));
+        // W3: against the file's OWN directory — a reference resolves config-relative first, so the
+        // portable bare `<name>.toon` the Parse drawer writes would otherwise warn on every save.
+        findings.addAll(ConfigRoutes.schemaFileFindings("pipeline", lowered, Severity.WARNING, target.getParent()));
         if (findings.stream().anyMatch(f -> f.severity() == Severity.ERROR))
             return ApiContext.respondJson(e, 422, Map.of("written", false,
                     "error", "config has ERROR-level findings; not written", "findings", findings));
@@ -1163,7 +1165,9 @@ final class PipelineRoutes implements RouteModule {
         // The same gate POST /config/write runs — a template is still a real config and must be safe.
         List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), tpl));
         findings.addAll(ConfigSafetyValidator.check("pipeline", tpl, SafetyPolicy.defaultPolicy()));
-        findings.addAll(ConfigRoutes.schemaFileFindings("pipeline", tpl, Severity.WARNING));
+        // W3: against the template's own directory — see saveGraph. `neutralizeForTemplate` copies the
+        // schema next to the template and re-points `schema_file` at it, so it resolves exactly there.
+        findings.addAll(ConfigRoutes.schemaFileFindings("pipeline", tpl, Severity.WARNING, target.getParent()));
         if (findings.stream().anyMatch(f -> f.severity() == Severity.ERROR))
             return ApiContext.respondJson(e, 422, Map.of("written", false,
                     "error", "config has ERROR-level findings; not written", "findings", findings));

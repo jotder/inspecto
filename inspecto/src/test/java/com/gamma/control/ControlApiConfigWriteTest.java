@@ -187,6 +187,38 @@ class ControlApiConfigWriteTest {
         }
     }
 
+    /**
+     * 🔴 W3. The UI now writes the PORTABLE form of a schema reference — a bare {@code <name>.toon}
+     * that resolves beside its own config file. The pre-flight check used to run BEFORE the target
+     * path was resolved, so it had no directory to be relative to and fell back to the server's
+     * working directory: every portable reference was reported "does not resolve", on every save.
+     *
+     * <p>The two writes here are ordered exactly as the Parse drawer orders them — schema first,
+     * then the pipeline naming it — which is the only order in which the file can already exist.
+     */
+    @Test
+    void aPortableSchemaReferenceBesideTheConfigIsNotWarnedAbout(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String schema = """
+                    {"type":"schema","config":{"raw":{"name":"portable_schema","format":"CSV",
+                       "fields":[{"name":"ID","selector":"0","type":"VARCHAR"}]}}}""";
+            assertEquals(200, post(c.port, "/config/write", schema).statusCode());
+
+            String armed = """
+                    {"type":"pipeline","config":{
+                       "name":"portable","active":true,
+                       "dirs":{"poll":"in","database":"out"},
+                       "processing":{"schema_file":"portable_schema.toon","threads":1}}}""";
+            HttpResponse<String> r = post(c.port, "/config/write", armed);
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode out = V1Body.of(r.body());
+            assertTrue(out.get("written").asBoolean());
+            assertFalse(out.get("findings").toString().contains("does not resolve"),
+                    "a bare basename beside the config resolves; nothing to warn about: " + out.get("findings"));
+        }
+    }
+
     @Test
     void pathJailRejectsEscapingSubdirAndAbsolute(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {

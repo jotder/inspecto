@@ -44,8 +44,12 @@ timestamp: 2026-07-16T00:00:00Z
   `orders_schema.toon` resolves while a bare `dirs.poll: inbox` still means `<CWD>/inbox`.
   ⚠ ⚠ Anything that *validates* a schema reference must mirror `resolveSchemaRef` or it will reject configs
   the engine runs. `ConfigRoutes.schemaFileFindings` is an **ERROR** gate at registration and takes a
-  `configDir` for exactly this reason; its two WARNING call sites still pass `null` (a draft has no directory),
-  so a portable draft gets a spurious "unresolvable" warning at validate/save until W3 lands.
+  `configDir` for exactly this reason. **W3 (2026-08-17) closed the spurious-warning half**: `POST /config/write`
+  now runs the check *after* it resolves the target path (passing `target.getParent()`), `POST /validate` passes
+  the write root as the draft's prospective home, and `PipelineRoutes`' graph-save and save-as-template both pass
+  their own target's parent. ⚠ The 2-arg `schemaFileFindings` overload still exists and still means "CWD only" —
+  it is correct for a lowered graph or template body that is not landing anywhere, and **wrong** for anything
+  whose directory is known. Prefer the 4-arg form.
 * **`PartitionWriter` requires non-empty partition columns** (it emits `PARTITION_BY (...)`). The unpartitioned
   single-file `COPY` path is `PartitionSinkWriter.writeUnpartitioned()`. See [output & sinks](../engine/output-sinks.md).
 * **Pipeline seed must be ≥ 1 `source_store`** — `PipelineJobRunner.seedsOf` throws on zero; multi-source merge is the

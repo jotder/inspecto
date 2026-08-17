@@ -49,7 +49,7 @@ final class ConfigRoutes implements RouteModule {
             if (spec == null) throw new ApiException(404, "unknown config type: " + ApiContext.name(m));
             return spec;
         });
-        api.post("/validate", (e, m) -> validate(api.body(e)));
+        api.post("/validate", (e, m) -> validate(api, api.body(e)));
         // Parse a raw sample with a draft's parsing: settings — stateless, scratch-only (stream
         // onboarding's sample-as-thread; the raw→parsed hop).
         api.post("/config/preview/parsing", (e, m) -> previewParsing(api.body(e)));
@@ -78,7 +78,7 @@ final class ConfigRoutes implements RouteModule {
                 (e, m) -> readConfig(api, e, ApiContext.name(m), ApiContext.param(m, 2)));
     }
 
-    private Object validate(Map<String, Object> body) throws IOException {
+    private Object validate(ApiContext api, Map<String, Object> body) throws IOException {
         String configPath = ApiContext.str(body, "configPath");
         if (configPath != null) {
             PipelineConfig cfg = PipelineConfig.load(configPath);
@@ -105,7 +105,13 @@ final class ConfigRoutes implements RouteModule {
         List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(spec, draft));
         // Pre-flight: warn when a pipeline draft's schema_file won't resolve on this server —
         // registration would otherwise fail later with an opaque error (v4.1.0).
-        findings.addAll(schemaFileFindings(type, draft, Severity.WARNING));
+        //
+        // W3: checked against the WRITE ROOT, because that is where this draft would land and a
+        // reference resolves config-relative FIRST. Without it every portable bare `<name>.toon` —
+        // the form the UI now writes — was reported unresolvable purely for not existing in the
+        // server's CWD. Null when writes are disabled: then there is no prospective home, and the
+        // CWD-only check is all that can honestly be said.
+        findings.addAll(schemaFileFindings(type, draft, Severity.WARNING, api.writeRoot()));
         // Opt-in hard-fail safety gate (R6): merged in only when the caller asks, so the default
         // /validate response is byte-for-byte unchanged for existing callers.
         boolean safety = "true".equalsIgnoreCase(String.valueOf(body.get("safety")));
@@ -135,9 +141,6 @@ final class ConfigRoutes implements RouteModule {
         // Gate: spec validation + the hard-fail safety check (R6). Block on ERRORs; warnings pass.
         List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(spec, draft));
         findings.addAll(ConfigSafetyValidator.check(type, draft, SafetyPolicy.defaultPolicy()));
-        // Warning only: the save still succeeds (the schema file may be created afterwards), but
-        // the operator learns now that Register would fail on this host.
-        findings.addAll(schemaFileFindings(type, draft, Severity.WARNING));
         // ERROR: an armed pipeline with no schema source parses nowhere. Without this the write
         // returns written:true and the config is then silently dropped from the index forever.
         findings.addAll(armedWithoutSchemaFindings(type, draft));
@@ -166,6 +169,14 @@ final class ConfigRoutes implements RouteModule {
             dir = WriteGates.jail(writeRoot, writeRoot.resolve(sub), "subdir");
         }
         Path target = WriteGates.jail(writeRoot, dir.resolve(fileName + ".toon"), "resolved path");
+
+        // Warning only: the save still succeeds (the schema file may be created afterwards), but
+        // the operator learns now that Register would fail on this host.
+        //
+        // W3: deliberately AFTER `target`, so the check knows the directory the config is landing in.
+        // A reference resolves config-relative first, so the portable bare `<name>.toon` the UI now
+        // writes is only checkable against that parent; run earlier it warned on every single write.
+        findings.addAll(schemaFileFindings(type, draft, Severity.WARNING, target.getParent()));
 
         boolean exists = Files.exists(target);
         boolean overwrite = "true".equalsIgnoreCase(String.valueOf(body.get("overwrite")));
@@ -843,8 +854,10 @@ final class ConfigRoutes implements RouteModule {
     }
 
     /**
-     * For a draft that has no directory yet (validate / pre-write), where a config-relative reference
-     * cannot be checked because there is nothing to be relative to.
+     * For a draft with no directory to be relative to — a lowered graph or a template body that is
+     * not landing anywhere yet. A config-relative reference cannot be checked, so this reports on the
+     * CWD alone. ⚠ Prefer the 4-arg form wherever the prospective directory IS known: the portable
+     * bare `<name>.toon` the UI writes resolves config-relative FIRST and will look unresolvable here.
      */
     static List<Finding> schemaFileFindings(String type, Map<String, Object> draft, Severity severity) {
         return schemaFileFindings(type, draft, severity, null);
@@ -863,8 +876,8 @@ final class ConfigRoutes implements RouteModule {
 
     private static String unresolvable(String schemaPath) {
         return "schema file does not resolve on the server: '" + schemaPath
-                + "' (relative paths resolve against the server's working directory: "
-                + Path.of("").toAbsolutePath() + ")";
+                + "' (a relative reference resolves beside its own config file first, then against"
+                + " the server's working directory: " + Path.of("").toAbsolutePath() + ")";
     }
 
     /**
