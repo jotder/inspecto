@@ -1496,7 +1496,7 @@ export class PipelineEditorComponent implements OnInit {
                           attributes: this.typeAttributes().get(node.type),
                           enrichmentHost: node.type === 'enrichment' ? this.enrichmentHost() : undefined,
                           // What the tab's sample thread parsed — the rows an inline test runs over.
-                          sampleRows: this.sampleThread()?.parsePreview()?.rows,
+                          sampleRows: this.sampleThread()?.parsedRows(),
                       },
                   });
         ref.afterClosed().subscribe((res?: NodeConfigResult) => {
@@ -1782,11 +1782,7 @@ export class PipelineEditorComponent implements OnInit {
     /** Palette drag-drop: place the new node where it was dropped. */
     onDropAdd(e: { type: string; x: number; y: number }): void {
         if (!this.canAuthor() || !this.model()) return; // read-only (Business lens or View mode): palette drag can't mutate
-        const claimed = this.claimParseSlot(e.type);
-        if (claimed) {
-            if (claimed !== 'refused') this.selectNewNode(claimed);
-            return;
-        }
+        if (this.claimParseSlot(e.type)) return;
         const node = this.insertNode(e.type);
         this.canvas?.addNode(node.id, node.id, this.visualKind(e.type), e.x, e.y);
         this.selectNewNode(node);
@@ -1795,11 +1791,7 @@ export class PipelineEditorComponent implements OnInit {
     /** Palette click / keyboard (Enter): add the node at the canvas centre — the no-mouse path to add. */
     addFromPalette(type: string): void {
         if (!this.canAuthor() || !this.model()) return; // read-only (Business lens or View mode): palette click can't mutate
-        const claimed = this.claimParseSlot(type);
-        if (claimed) {
-            if (claimed !== 'refused') this.selectNewNode(claimed);
-            return;
-        }
+        if (this.claimParseSlot(type)) return;
         const node = this.insertNode(type);
         this.canvas?.addNodeAtCenter(node.id, node.id, this.visualKind(type));
         this.selectNewNode(node);
@@ -1817,12 +1809,14 @@ export class PipelineEditorComponent implements OnInit {
      * Step that carries config is authored work — that one is REFUSED, pointing at the drawer that can
      * change its format, rather than adding a node that could never be saved.
      *
-     * @returns `null` to carry on and insert a new node · the re-typed node · `'refused'` (nothing added).
+     * <p>Owns its own outcome — the toast AND the selection — so both palette entry points are one line.
+     *
+     * @returns whether the slot claim HANDLED the add (re-typed or refused); `false` = insert a new node.
      */
-    private claimParseSlot(type: string): AuthoredNode | 'refused' | null {
-        if (!isParseNodeType(type)) return null;
+    private claimParseSlot(type: string): boolean {
+        if (!isParseNodeType(type)) return false;
         const held = (this.model()?.nodes ?? []).find((n) => isParseNodeType(n.type));
-        if (!held) return null;
+        if (!held) return false;
         const labels = this.typeLabel();
         if (held.type !== 'parser' || Object.keys(held.config ?? {}).length > 0) {
             const heldLabel = labels.get(held.type) ?? held.type;
@@ -1830,18 +1824,17 @@ export class PipelineEditorComponent implements OnInit {
                 `This pipeline already has a Parse Step (${heldLabel}) and it has room for one. ` +
                     `Open it to change its format, or delete it first.`,
             );
-            return 'refused';
+            return true;
         }
         // The placeholder's display name is the GENERIC label ("Parser"); carrying it onto a re-typed node
         // would leave a Delimited Step calling itself Parser in every inspector. An authored name stays.
         const label = labels.get(type) ?? type;
         const generic = !held.name?.trim() || held.name.trim() === (labels.get(held.type) ?? 'Parser');
         const retyped: AuthoredNode = { ...held, type, ...(generic ? { name: label } : {}) };
-        this.model.update((m) =>
-            m ? { ...m, nodes: m.nodes.map((n) => (n.id === held.id ? retyped : n)) } : m,
-        );
+        this.model.update((m) => (m ? applyNodePatchInModel(m, retyped) : m));
         this.toast.info(`Set the Parse Step '${held.id}' to ${label}.`);
-        return retyped;
+        this.selectNewNode(retyped);
+        return true;
     }
 
     private visualKind(type: string): ReturnType<typeof categoryVisualKind> {

@@ -727,7 +727,7 @@
                     @if (tab === 'dryrun') {
                         <app-pipeline-dry-run-panel
                             [pipelineId]="selectedId()"
-                            [capturedRows]="sampleThread()?.parsePreview()?.rows ?? null"
+                            [capturedRows]="sampleThread()?.parsedRows() ?? null"
                         ></app-pipeline-dry-run-panel>
                     } @else {
                         @if (!findings().length) {

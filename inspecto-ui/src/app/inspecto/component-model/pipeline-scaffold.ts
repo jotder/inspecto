@@ -20,11 +20,30 @@ export function derivedPipelineId(name: string): string {
 /** The `id:` FieldSpec's pattern (`ConfigSpecs.pipeline()`) — enforced only on an EXPLICIT id. */
 const PIPELINE_ID_PATTERN = /^[a-z0-9][a-z0-9_]*$/;
 
+/**
+ * The **home directory** a pipeline's dirs hang off: its `database` less the conventional `/database`
+ * leaf, or `data/<name>` when nothing declares one. The one place that knows the convention — a second
+ * copy would let a branch store land outside the pipeline home, and that path is load-bearing (a route
+ * branch's `database` is its identity in the lowered config).
+ */
+export function pipelineHome(name: string, database?: string): string {
+    return (database || `data/${name}/database`).replace(/\/database$/, '');
+}
+
+/**
+ * The three store dirs a persistent sink declares, derived off a {@link pipelineHome}. `pipelineScaffold`
+ * derives seven more siblings (`errors`/`quarantine`/`markers`/`status`/`logs`) off the same home; a sink
+ * NODE carries only these three.
+ */
+export function storeDirs(home: string): { database: string; backup: string; temp: string } {
+    return { database: `${home}/database`, backup: `${home}/backup`, temp: `${home}/temp` };
+}
+
 export function pipelineScaffold(
     name: string,
     opts: { poll?: string; database?: string; description?: string; reference?: boolean } = {},
 ): Record<string, unknown> {
-    const home = (opts.database || `data/${name}/database`).replace(/\/database$/, '');
+    const home = pipelineHome(name, opts.database);
     const id = derivedPipelineId(name);
     const config: Record<string, unknown> = {
         name,

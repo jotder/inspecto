@@ -858,6 +858,13 @@ describe('NodeConfigDialog', () => {
      * node's own TYPE now, plus rows to run over.
      */
     describe('inline test', () => {
+        /** Stub the preview arm under test; `list`/`get` are load-bearing scaffolding the dialog constructs with. */
+        const withPreview = (over: Record<string, unknown>): void => {
+            TestBed.overrideProvider(ComponentsService, {
+                useValue: { list: () => of([]), get: () => of(GRAMMARS[0]), ...over },
+            });
+        };
+
         const filter = (): Partial<NodeConfigData> => ({
             node: { id: 'flt', type: 'transform.filter' },
             typeLabel: 'transform.filter',
@@ -868,7 +875,7 @@ describe('NodeConfigDialog', () => {
 
         it('is not offered without rows — a test over no data would report success over nothing', async () => {
             const fixture = await create({ ...filter(), sampleRows: [] });
-            expect(fixture.componentInstance.canTestInline()).toBe(false);
+            expect(fixture.componentInstance.canTestInline).toBe(false);
             expect(fixture.nativeElement.textContent).not.toContain('Test this Step');
         });
 
@@ -880,16 +887,14 @@ describe('NodeConfigDialog', () => {
                 bindKind: null,
                 sampleRows: [{ qty: '2' }],
             });
-            expect(fixture.componentInstance.testFamily()).toBeNull();
+            expect(fixture.componentInstance.testFamily).toBeNull();
         });
 
         it('sends the node type inside config and renders the per-relation counts', async () => {
             const previewTransform = vi.fn(() =>
                 of({ inputColumns: ['qty'], relations: [{ rel: 'data', rowCount: 1, rows: [{ qty: '2' }] }] }),
             );
-            TestBed.overrideProvider(ComponentsService, {
-                useValue: { list: () => of([]), get: () => of(GRAMMARS[0]), previewTransform },
-            });
+            withPreview({ previewTransform });
             const fixture = await create(filter());
             fixture.componentInstance.runInlineTest();
             fixture.detectChanges();
@@ -906,9 +911,7 @@ describe('NodeConfigDialog', () => {
             const previewSink = vi.fn(() =>
                 of({ store: null, rowCount: 2, rows: [], warnings: ["sink declares no 'store' name"] }),
             );
-            TestBed.overrideProvider(ComponentsService, {
-                useValue: { list: () => of([]), get: () => of(GRAMMARS[0]), previewSink },
-            });
+            withPreview({ previewSink });
             const fixture = await create({
                 node: { id: 'out', type: 'sink.persistent' },
                 typeLabel: 'sink.persistent',
@@ -925,20 +928,16 @@ describe('NodeConfigDialog', () => {
         });
 
         it('surfaces a refusal instead of a result', async () => {
-            TestBed.overrideProvider(ComponentsService, {
-                useValue: {
-                    list: () => of([]),
-                    get: () => of(GRAMMARS[0]),
-                    // A real HttpErrorResponse: `apiErrorMessage` only reads the server's message off one.
-                    previewTransform: () =>
-                        throwError(
-                            () =>
-                                new HttpErrorResponse({
-                                    status: 422,
-                                    error: { error: { message: 'preview failed: no such column' } },
-                                }),
-                        ),
-                },
+            // A real HttpErrorResponse: `apiErrorMessage` only reads the server's message off one.
+            withPreview({
+                previewTransform: () =>
+                    throwError(
+                        () =>
+                            new HttpErrorResponse({
+                                status: 422,
+                                error: { error: { message: 'preview failed: no such column' } },
+                            }),
+                    ),
             });
             const fixture = await create(filter());
             fixture.componentInstance.runInlineTest();

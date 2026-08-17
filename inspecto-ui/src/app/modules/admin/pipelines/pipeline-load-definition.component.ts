@@ -345,7 +345,7 @@ export class PipelineLoadDefinitionComponent {
     readonly testing = signal(false);
 
     /** The parsed rows the thread carries — the input a mapping test runs over. */
-    readonly parsedRows = computed<Record<string, unknown>[]>(() => this.sample()?.parsePreview()?.rows ?? []);
+    readonly parsedRows = computed<Record<string, unknown>[]>(() => this.sample()?.parsedRows() ?? []);
     /** The thread's cast hop, but only once it carries the mapped half this pane asked for. */
     readonly mapped = computed(() => {
         const p = this.sample()?.schemaPreview();

@@ -17,6 +17,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { map } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import {
     apiErrorMessage,
@@ -45,6 +46,13 @@ import { nodeAttributesFor } from './node-attributes';
 
 /** The component families `ComponentRoutes` can dry-run — `schema`/`mapping` have no `/test` route. */
 const TESTABLE_KINDS: ComponentType[] = ['transform', 'grammar', 'sink'];
+
+/**
+ * How many captured rows an inline test posts. The sample thread stores the parse preview UNCAPPED, while
+ * both the route and its offline arm only ever answer with `rows.slice(0, 20)` — so sending the whole
+ * sample buys a bigger request body and nothing else.
+ */
+const MAX_TEST_ROWS = 50;
 
 /**
  * Dialog data: the node to configure, its (already-resolved) type/category labels for the header, and the
@@ -321,14 +329,14 @@ export interface NodeConfigResult {
 
                 <!-- The INLINE test: the config on screen, over the tab's own parsed rows. Offered only
                      when there are rows — a test with no data would report success over nothing. -->
-                @if (canTestInline()) {
+                @if (canTestInline) {
                     <div class="pt-2">
                         <button type="button" mat-stroked-button [disabled]="testing()" (click)="runInlineTest()">
                             <mat-icon class="icon-size-5" svgIcon="heroicons_outline:bolt"></mat-icon>
                             <span class="ml-1">Test this Step</span>
                         </button>
                         <div class="text-secondary mt-1 text-sm">
-                            Runs these settings over the {{ data.sampleRows!.length }} row(s) your parse step
+                            Runs these settings over the {{ testRows.length }} row(s) your parse step
                             produced. Nothing is written.
                         </div>
                         @if (testError(); as e) {
@@ -336,7 +344,7 @@ export interface NodeConfigResult {
                         }
                         @if (testResult(); as lines) {
                             <ul class="m-0 mt-2 list-none p-0 text-sm" role="status" aria-live="polite">
-                                @for (line of lines; track line) {
+                                @for (line of lines; track $index) {
                                     <li>{{ line }}</li>
                                 }
                             </ul>
@@ -518,17 +526,16 @@ export class NodeConfigDialog {
      *
      * <p>`grammar` is deliberately absent: a parse node never reaches this dialog.
      */
-    testFamily(): 'transform' | 'sink' | null {
-        const type = this.data.node.type;
-        if (type.startsWith('transform.')) return 'transform';
-        if (type.startsWith('sink.')) return 'sink';
-        return null;
-    }
+    readonly testFamily = ComponentsService.previewFamilyFor(this.data.node.type);
 
-    /** Whether an inline test can run: a supported family AND rows to run it over. */
-    canTestInline(): boolean {
-        return !!this.testFamily() && !!this.data.sampleRows?.length;
-    }
+    /**
+     * Whether an inline test can run: a supported family AND rows to run it over. Plain FIELDS, not
+     * methods or `computed`s — both derive from `MAT_DIALOG_DATA`, which cannot change for the dialog's
+     * lifetime, so a template-bound method would re-answer the same question every change-detection pass.
+     */
+    readonly canTestInline = !!this.testFamily && !!this.data.sampleRows?.length;
+    /** The rows a test posts. Capped: the preview answers 20 either way, and the sample thread is uncapped. */
+    readonly testRows = (this.data.sampleRows ?? []).slice(0, MAX_TEST_ROWS);
 
     readonly testing = signal(false);
     /** The last inline preview, as lines to render — one shape for both families, since only text is shown. */
@@ -542,8 +549,8 @@ export class NodeConfigDialog {
      * node's `type` inside `config`: the route 422s a config that is not `transform.*`.
      */
     runInlineTest(): void {
-        const family = this.testFamily();
-        const rows = this.data.sampleRows ?? [];
+        const family = this.testFamily;
+        const rows = this.testRows;
         if (!family || !rows.length) return;
         const surface = this.configForm();
         if (surface && !surface.validate()) return;
@@ -562,34 +569,33 @@ export class NodeConfigDialog {
         this.testing.set(true);
         this.testError.set(null);
         this.testResult.set(null);
-        const done = {
-            error: (e: unknown) => {
+        // One observable per family, then ONE subscribe: the arms differ only in the call and how the
+        // response reads as text, so a third family adds a `map`, not another handler pair.
+        const lines$ =
+            family === 'transform'
+                ? this.components.previewTransform({ ...config, type: this.data.node.type }, rows).pipe(
+                      map((p) => [
+                          `in: ${p.inputColumns.length} column(s) over ${rows.length} row(s)`,
+                          ...p.relations.map((r) => `out '${r.rel}': ${r.rowCount} row(s)`),
+                      ]),
+                  )
+                : this.components
+                      .previewSink(config, rows)
+                      .pipe(
+                          map((p) => [
+                              `store: ${p.store ?? '(none declared)'} — ${p.rowCount} row(s) would be written`,
+                              ...p.warnings,
+                          ]),
+                      );
+        lines$.subscribe({
+            next: (lines) => {
+                this.testing.set(false);
+                this.testResult.set(lines);
+            },
+            error: (e) => {
                 this.testing.set(false);
                 this.testError.set(apiErrorMessage(e, 'The test failed.'));
             },
-        };
-        if (family === 'transform') {
-            this.components.previewTransform({ ...config, type: this.data.node.type }, rows).subscribe({
-                next: (p) => {
-                    this.testing.set(false);
-                    this.testResult.set([
-                        `in: ${p.inputColumns.length} column(s) over ${rows.length} row(s)`,
-                        ...p.relations.map((r) => `out '${r.rel}': ${r.rowCount} row(s)`),
-                    ]);
-                },
-                ...done,
-            });
-            return;
-        }
-        this.components.previewSink(config, rows).subscribe({
-            next: (p) => {
-                this.testing.set(false);
-                this.testResult.set([
-                    `store: ${p.store ?? '(none declared)'} — ${p.rowCount} row(s) would be written`,
-                    ...p.warnings,
-                ]);
-            },
-            ...done,
         });
     }
 

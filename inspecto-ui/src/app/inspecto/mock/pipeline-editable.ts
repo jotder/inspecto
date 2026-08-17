@@ -94,7 +94,7 @@ const USE_HOME: Record<string, string[]> = {
  * `PipelineEditable.SUBTYPE_FRONTENDS`). Fixed width answers to two spellings, so neither
  * contradicts a node typed for it; the first entry is the canonical one `lower` stamps back.
  */
-const SUBTYPE_FRONTENDS: Record<string, string[]> = {
+export const SUBTYPE_FRONTENDS: Record<string, string[]> = {
     'parser.delimited': ['delimited'],
     'parser.fixedwidth': ['fixedwidth', 'fixed_width'],
     'parser.asn1': ['asn1'],

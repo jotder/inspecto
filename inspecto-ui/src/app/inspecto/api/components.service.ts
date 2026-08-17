@@ -187,6 +187,21 @@ export class ComponentsService {
     }
 
     /**
+     * Which inline-preview family, if any, will accept a node of this type — the **route's own
+     * acceptance rule**, not a category lookup, which is why it lives beside the two calls below.
+     *
+     * ⛔ Do not "improve" this into a `PipelineNodeCategory` test. `enrichment` is `category: 'TRANSFORM'`
+     * in the served catalog but its type carries no `transform.` prefix, and `previewInlineTransform`
+     * **422s** a config whose `type` is not `transform.*` — so a category-keyed predicate would offer a
+     * test that can only ever fail. If enrichment should become testable, the server accepts it first.
+     */
+    static previewFamilyFor(type: string): 'transform' | 'sink' | null {
+        if (type.startsWith('transform.')) return 'transform';
+        if (type.startsWith('sink.')) return 'sink';
+        return null;
+    }
+
+    /**
      * Run an **INLINE** transform config over sample rows — `POST /components/transform/preview`.
      * The pipeline editor authors node configs inline, so before this route only a *registered*
      * component could be tried: exactly the config an operator is in the middle of writing was the one

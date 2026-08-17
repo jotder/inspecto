@@ -1,4 +1,4 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, computed, signal } from '@angular/core';
 import { ParsingPreview, SchemaPreview } from 'app/inspecto/api';
 
 /**
@@ -24,6 +24,13 @@ export class DefinitionStateService {
     readonly parseError = signal<string | null>(null);
     readonly schemaPreview = signal<SchemaPreview | null>(null);
     readonly schemaError = signal<string | null>(null);
+
+    /**
+     * The rows the parse hop produced — **always an array**, so every consumer asks emptiness the same
+     * way. Three surfaces had each reached into `parsePreview()?.rows` themselves and settled on three
+     * different absences (`[]`, `null`, `undefined`), which is three emptiness checks for one fact.
+     */
+    readonly parsedRows = computed<Record<string, unknown>[]>(() => this.parsePreview()?.rows ?? []);
 
     /** Capture a new sample. Every downstream test result is invalidated — the thread restarts at raw. */
     captureSample(name: string, text: string): void {

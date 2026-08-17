@@ -11,6 +11,9 @@ import { PipelineDryRunResult, PipelinesService, apiErrorMessage } from 'app/ins
  * {@link PipelineEditorComponent} (BACKLOG §4) — self-contained state (sample text, result, error),
  * the host only owns the open/closed toggle and which pipeline id is selected.
  */
+
+/** How many captured rows seed the sample box — a dry-run is a bounded probe, not a data load. */
+const MAX_SEEDED_ROWS = 50;
 @Component({
     selector: 'app-pipeline-dry-run-panel',
     standalone: true,
@@ -34,11 +37,15 @@ export class PipelineDryRunPanelComponent {
 
     readonly sampleText = this.fb.control('[\n  {}\n]', { nonNullable: true });
 
-    /** Fill the sample box with the rows the parse step produced. Explicit — it overwrites what is typed. */
+    /**
+     * Fill the sample box with the rows the parse step produced. Explicit — it overwrites what is typed.
+     * ⚠ CAPPED: the thread stores the parse preview uncapped, and setting a multi-megabyte string into a
+     * FormControl re-runs its validators and fires `valueChanges` on the whole value.
+     */
     useCapturedSample(): void {
         const rows = this.capturedRows();
         if (!rows?.length) return;
-        this.sampleText.setValue(JSON.stringify(rows, null, 2));
+        this.sampleText.setValue(JSON.stringify(rows.slice(0, MAX_SEEDED_ROWS), null, 2));
     }
 
     /**
@@ -48,9 +55,7 @@ export class PipelineDryRunPanelComponent {
      * flushes on Angular's schedule, so a clear could land AFTER a run and wipe a fresh result. The
      * typed sample is the operator's own text and deliberately survives the switch.
      */
-    private readonly outcome = signal<{ id: string | null; result?: PipelineDryRunResult; error?: string } | null>(
-        null,
-    );
+    private readonly outcome = signal<{ id: string; result?: PipelineDryRunResult; error?: string } | null>(null);
     private readonly mine = computed(() => (this.outcome()?.id === this.pipelineId() ? this.outcome() : null));
     readonly result = computed(() => this.mine()?.result ?? null);
     readonly error = computed(() => this.mine()?.error ?? null);

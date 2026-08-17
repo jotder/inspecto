@@ -53,6 +53,9 @@ const MAPPING_VALIDATE = /\/components\/mapping\/validate$/;
 // inline grammar arm — a parse node opens the grammar editor, never the node dialog.
 const COMPONENT_PREVIEW = /\/components\/(transform|sink)\/preview$/;
 
+/** Rows an inline preview echoes back — the server's own `ComponentPreview` bound. */
+const MAX_PREVIEW_ROWS = 20;
+
 /** The transform-type vocabulary — mirrors `TransformCompiler.TRANSFORM_TYPES`. */
 const TRANSFORM_TYPES = new Set(['DIRECT', 'EXPR', 'CONCAT_DT', 'FILENAME_DATE']);
 
@@ -367,21 +370,21 @@ function previewInline(family: string, body: Record<string, unknown> | null): Mo
     const rows = body?.['sampleRows'];
     if (!Array.isArray(rows) || !rows.length) return error(400, 'sampleRows is required');
     const sample = rows as Record<string, unknown>[];
-    const columns = [...new Set(sample.flatMap((r) => Object.keys(r ?? {})))];
     if (family === 'sink') {
-        const store = typeof cfg['store'] === 'string' ? (cfg['store'] as string) : null;
+        const store = cfg['store'];
+        const named = typeof store === 'string' ? store : null;
         return json({
-            store,
+            store: named,
             rowCount: sample.length,
-            rows: sample.slice(0, 20),
-            warnings: store ? [] : ["sink declares no 'store' name"],
+            rows: sample.slice(0, MAX_PREVIEW_ROWS),
+            warnings: named ? [] : ["sink declares no 'store' name"],
         });
     }
-    const type = typeof cfg['type'] === 'string' ? (cfg['type'] as string) : '';
-    if (!type.startsWith('transform.'))
+    const type = cfg['type'];
+    if (typeof type !== 'string' || !type.startsWith('transform.'))
         return error(422, "inline config is not a transform ('type: transform.*' required)");
     return json({
-        inputColumns: columns,
-        relations: [{ rel: 'data', rowCount: sample.length, rows: sample.slice(0, 20) }],
+        inputColumns: [...new Set(sample.flatMap((r) => Object.keys(r ?? {})))],
+        relations: [{ rel: 'data', rowCount: sample.length, rows: sample.slice(0, MAX_PREVIEW_ROWS) }],
     });
 }

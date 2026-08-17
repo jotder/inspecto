@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import BIND_KINDS from 'app/inspecto/mock/bind-kinds.contract.json';
-import { DERIVED_USE } from 'app/inspecto/mock/pipeline-editable';
+import { DERIVED_USE, SUBTYPE_FRONTENDS } from 'app/inspecto/mock/pipeline-editable';
 
 import { bindKindFor } from './pipeline-graph';
+import { PARSE_NODE_FRONTENDS } from './pipeline-parse-definition.component';
 
 /**
  * The client half of the bind-kind contract (AUTHOR-1(b) residual). `BindKindHomeContractTest` (Java)
@@ -60,5 +61,35 @@ describe('derived-use contract', () => {
             'parser.asn1': 'ingester/',
             'parser.plugin': 'ingester/',
         });
+    });
+});
+
+/**
+ * The parse-subtype vocabulary exists TWICE and the two copies must list the same types:
+ * `PARSE_NODE_FRONTENDS` (which drawer a parse node opens, and — via `isParseNodeType` — whether the
+ * palette lets you add one) and the lowering's `SUBTYPE_FRONTENDS` (which types occupy the single parse
+ * slot, i.e. what `MULTI_PARSER` refuses).
+ *
+ * They are deliberately NOT merged: the lowering module must not import from a feature component, and the
+ * two maps answer different questions (one maps a subtype to its editor frontend, the other to every
+ * spelling the engine accepts — fixed width has two). But if a seventh format lands in only one of them
+ * the failure mode is the ugly one: the palette lets a builder add a Step that Save then refuses. This is
+ * the tripwire. Same remedy as the DERIVED_USE pin above, for the same reason.
+ */
+describe('parse-subtype vocabulary contract', () => {
+    it('lists the same subtypes on the editor side and the lowering side', () => {
+        expect(Object.keys(PARSE_NODE_FRONTENDS).sort()).toEqual(Object.keys(SUBTYPE_FRONTENDS).sort());
+    });
+
+    /** Pinned so emptying both maps cannot turn the comparison above into a vacuous pass. */
+    it('still holds the six built-in parse subtypes', () => {
+        expect(Object.keys(PARSE_NODE_FRONTENDS).sort()).toEqual([
+            'parser.asn1',
+            'parser.delimited',
+            'parser.fixedwidth',
+            'parser.json',
+            'parser.plugin',
+            'parser.text_regex',
+        ]);
     });
 });

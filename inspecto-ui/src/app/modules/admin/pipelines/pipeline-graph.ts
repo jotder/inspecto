@@ -11,6 +11,7 @@ import {
     IconMap,
     ProvenanceCount,
 } from 'app/inspecto/api';
+import { pipelineHome, storeDirs } from 'app/inspecto/component-model/pipeline-scaffold';
 import { GLYPH_LIBRARY, G6GraphData, iconDataUri, nodeColor, nodeIcon } from 'app/modules/admin/catalog/catalog-graph';
 
 /**
@@ -829,13 +830,12 @@ function routeBranchesOf(node: AuthoredNode): { key?: string; where?: string; [k
  * enrichment wiring does.
  */
 function branchDestination(model: AuthoredPipeline, key: string): Record<string, unknown> {
-    // Quarantine sinks carry only `dir`, so the string test excludes them — same filter the editor uses.
-    const primary = model.nodes.find(
-        (n) => n.type === 'sink.persistent' && typeof n.config?.['database'] === 'string',
-    );
-    const database = String(primary?.config?.['database'] ?? `data/${model.name}/database`);
-    const home = `${database.replace(/\/database$/, '')}/${key}`;
-    return { database: `${home}/database`, backup: `${home}/backup`, temp: `${home}/temp` };
+    // ⚠ A `sink.persistent` that declares a string `database` — which excludes a quarantine sink, since
+    // that one carries only `dir`. This module is pure and has no node-type catalog, so it cannot ask by
+    // CATEGORY the way the editor's `enrichmentHost()` does; the type test is the available equivalent.
+    const primary = model.nodes.find((n) => n.type === 'sink.persistent' && typeof n.config?.['database'] === 'string');
+    const home = pipelineHome(model.name, primary?.config?.['database'] as string | undefined);
+    return storeDirs(`${home}/${key}`);
 }
 
 /**
