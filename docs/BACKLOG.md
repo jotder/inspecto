@@ -284,41 +284,34 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 > `if (authored.length) this.patternPacks.set(authored)` — a space authoring ONE pattern pack makes all
 > six built-ins disappear. Deliberate curation or an accident?
 
-> ### 🟡 CD-1 — **36 remaining** (was 64) `ChangeDetectionStrategy.Eager` shims (2026-08-17)
+> ### ~~🟡 CD-1 — the v22 `ChangeDetectionStrategy.Eager` shims~~ **✅ ALL 64 CONVERTED 2026-08-17**
 >
-> `ng update` stamped `Eager` on every component that had no explicit strategy, because v22 flipped the
-> default to `OnPush`. The angular-ui skill calls it "legacy, not a target … a candidate for removal".
+> `ng update` stamped `Eager` on every component that had no explicit strategy when v22 flipped the
+> default. **Zero non-spec files declare it now** (9 spec files still do — test-host stubs declaring a
+> strategy for their own throwaway components, which is not debt).
 >
-> **19 were converted in `057703e0`** — every component that writes no plain (non-signal) instance field
-> from an async callback, which is the precise condition that makes OnPush unsafe. Spot-verified in the
-> preview, not just the suite: the OnPush `categorize.dialog`'s Category→Subcategory cascade still
-> re-renders, and the whole Accept→categorize→transition flow moves the row between folders.
+> Done in seven verified batches, not one sweep, for a reason worth keeping: **the failure mode is
+> largely invisible to the toolchain.** `strictTemplates` catches a signal in a property binding, but
+> not `@if (x)` on a signal (a function is always truthy — the condition silently never fires) and not a
+> signal left inside a static attribute's prose. Two real regressions were introduced and caught:
 >
-> **A further 3 were fully refactored** in `?` (object-create.dialog, space-form.dialog, spaces.component):
-> the async-written boolean became a signal, its writes `.set()`, its template reads gained the call.
-> That is the shape the rest need — a strategy flip alone would leave them silently stale.
+> - `@if (detail() && !loading)` — a whole panel stopped rendering. Caught only because that spec
+>   happened to assert on DOM text.
+> - **84 corrupted static attributes across 17 files** — prose (`message="No events() match…"`) and,
+>   worse, identifiers: `stateKey="jobs()"`, `sourceName="alerts()"`. The stateKeys were the grid-layout
+>   keys added earlier the same day, so the sweep was quietly undoing its own earlier commit. Exactly ONE
+>   of the 84 was caught by the suite.
 >
-> **36 remain: 30 under `modules/admin`, 6 in the app shell** (`app.component`, `layout/**` — the Fuse
-> layout the skill puts out of scope for restyling/auditing; decide deliberately before touching those).
-> Each of the 30 carries 2-6 plain fields, several of them arrays and objects rendered through separate
-> multi-hundred-line templates, so each is its own refactor plus a template sweep. Reproducible test for
-> whether one is safe to flip WITHOUT that work: no plain field is assigned inside a
-> `subscribe(`/`then(`/`setTimeout(` callback. Densest: alerts, catalog, dashboard, run-detail,
-> object-detail, and the three ResizeObserver hosts (chart / map-view / graph-view).
->
-> ⚠ Count these with `grep -rl` from `inspecto-ui/src/app` — a run from the repo root silently reported
-> zero during this shift.
->
-> ⛔ **Not a blanket change, and NOT sed-able.** Sampled during the 2026-08-17 review sweep:
-> `objects/object-detail.component.ts` holds `id = ''` and friends as plain mutable fields with **zero**
-> signals, fed from a route subscription — under `OnPush` it would silently stop updating. Each conversion
-> needs its own proof that every template-read value is a signal, an immutable input, or explicitly
-> `markForCheck`ed.
->
-> ⚠ **Unit tests will not catch a regression here** — specs call `detectChanges()` explicitly, so a
-> component that has stopped reacting to its own state still renders in a fixture. Verification is the
-> preview, per component. Convert opportunistically when a component is being touched for another reason;
-> do not open this as a sweep.
+> ⚠ **The lasting rules**, if this shape of refactor comes round again:
+> 1. Only fields the TEMPLATE reads need to be signals — an async-written field nothing renders cannot
+>    cause a stale view (`catalog/graph-view` needed zero field changes).
+> 2. `[(ngModel)]` / `[(selectedIndex)]` two-way-bound fields must stay plain — a signal cannot be
+>    assigned through a banana-in-a-box binding. Their writes come from template events, which mark an
+>    OnPush view dirty anyway.
+> 3. Audit templates for un-invoked references AND for `()` appended inside static attributes, after
+>    every batch. Do not rely on the suite.
+> 4. Finish with `npm run build` — a full AOT compile of every template, which the three tsc configs
+>    do not perform.
 
 > ### 🟢 GRID-1 — routed panes still missing a `stateKey` (2026-08-17)
 >
