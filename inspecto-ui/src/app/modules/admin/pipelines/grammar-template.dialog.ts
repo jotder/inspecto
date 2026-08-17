@@ -62,7 +62,9 @@ export interface GrammarTemplateResultData {
                         <mat-error>An id is required.</mat-error>
                     }
                     @if (form.controls.id.hasError('pattern')) {
-                        <mat-error>Lowercase letters, digits and underscores only; start with a letter or digit.</mat-error>
+                        <mat-error
+                            >Lowercase letters, digits and underscores only; start with a letter or digit.</mat-error
+                        >
                     }
                     @if (form.controls.id.hasError('duplicate')) {
                         <mat-error>A Grammar template with this id already exists.</mat-error>

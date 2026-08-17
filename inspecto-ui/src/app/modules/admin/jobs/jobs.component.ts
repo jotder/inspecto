@@ -90,7 +90,7 @@ export { fmtDuration };
         JobDetailComponent,
     ],
     templateUrl: './jobs.component.html',
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,
 })
 export class JobsComponent implements OnInit, OnDestroy {
@@ -104,25 +104,25 @@ export class JobsComponent implements OnInit, OnDestroy {
     /** Business lens = read-only across the Workbench (Wave-1 interview decision) — hides authoring. */
     protected lens = inject(LensService);
 
-    mode: JobsViewMode = 'schedules';
+    readonly mode = signal<JobsViewMode>('schedules');
 
     /** Job open in the side panel — driven by the `/jobs/:name` route param (R5). */
     readonly detailName = signal<string | null>(null);
 
     // ── schedules view ───────────────────────────────────────────────────────────
-    jobs: JobView[] = [];
-    loading = false;
-    unavailable = false;
+    readonly jobs = signal<JobView[]>([]);
+    readonly loading = signal(false);
+    readonly unavailable = signal(false);
 
     // ── reporting view (T27) ─────────────────────────────────────────────────────
-    metrics: JobMetrics | null = null;
-    runs: JobRunRow[] = [];
-    chartData: ChartData | null = null;
-    reportLoaded = false;
-    reportLoading = false;
+    readonly metrics = signal<JobMetrics | null>(null);
+    readonly runs = signal<JobRunRow[]>([]);
+    readonly chartData = signal<ChartData | null>(null);
+    readonly reportLoaded = signal(false);
+    readonly reportLoading = signal(false);
     /** True when the reporting backend is off (endpoints 404) — distinct from a transient failure. */
-    reportDisabled = false;
-    live = false;
+    readonly reportDisabled = signal(false);
+    readonly live = signal(false);
     private liveSub?: Subscription;
 
     fJob = '';
@@ -136,7 +136,7 @@ export class JobsComponent implements OnInit, OnDestroy {
     newJob(): void {
         this.dialog
             .open(JobFormDialog, {
-                data: { existingNames: this.jobs.map((j) => j.name) },
+                data: { existingNames: this.jobs().map((j) => j.name) },
                 width: '640px',
                 maxHeight: '88vh',
             })
@@ -288,25 +288,25 @@ export class JobsComponent implements OnInit, OnDestroy {
     }
 
     setMode(m: JobsViewMode): void {
-        if (this.mode === m) return;
-        this.mode = m;
-        if (m === 'reporting' && !this.reportLoaded && !this.reportLoading) this.loadReport();
+        if (this.mode() === m) return;
+        this.mode.set(m);
+        if (m === 'reporting' && !this.reportLoaded() && !this.reportLoading()) this.loadReport();
     }
 
     // ── schedules ────────────────────────────────────────────────────────────────
 
     load(): void {
-        this.loading = true;
-        this.unavailable = false;
+        this.loading.set(true);
+        this.unavailable.set(false);
         this.api.list().subscribe({
             next: (j) => {
-                this.jobs = j;
-                this.loading = false;
+                this.jobs.set(j);
+                this.loading.set(false);
             },
             error: (e) => {
-                this.loading = false;
-                this.jobs = [];
-                this.unavailable = e?.status === 404;
+                this.loading.set(false);
+                this.jobs.set([]);
+                this.unavailable.set(e?.status === 404);
             },
         });
     }
@@ -381,12 +381,12 @@ export class JobsComponent implements OnInit, OnDestroy {
 
     /** Success rate as a whole-number percentage for the metric card. */
     get successPct(): number {
-        return this.metrics ? Math.round(this.metrics.successRate * 100) : 0;
+        return this.metrics() ? Math.round(this.metrics().successRate * 100) : 0;
     }
 
     /** Run all three reporting queries. `silent` (live-tail tick) keeps the view instead of flashing the loader. */
     loadReport(silent = false): void {
-        if (!silent) this.reportLoading = true;
+        if (!silent) this.reportLoading.set(true);
         const job = this.fJob.trim() || undefined;
         forkJoin({
             metrics: this.api.metrics(job),
@@ -394,21 +394,21 @@ export class JobsComponent implements OnInit, OnDestroy {
             failures: this.api.failures(this.fDays),
         }).subscribe({
             next: ({ metrics, runs, failures }) => {
-                this.metrics = metrics;
-                this.runs = runs;
-                this.chartData = this.toChartData(failures);
-                this.reportDisabled = false;
-                this.reportLoaded = true;
-                this.reportLoading = false;
+                this.metrics.set(metrics);
+                this.runs.set(runs);
+                this.chartData.set(this.toChartData(failures));
+                this.reportDisabled.set(false);
+                this.reportLoaded.set(true);
+                this.reportLoading.set(false);
             },
             error: (e) => {
-                this.reportLoading = false;
+                this.reportLoading.set(false);
                 if (!silent) {
-                    this.reportDisabled = e?.status === 404; // backend off vs a transient failure
-                    this.metrics = null;
-                    this.runs = [];
-                    this.chartData = null;
-                    this.reportLoaded = true;
+                    this.reportDisabled.set(e?.status === 404); // backend off vs a transient failure
+                    this.metrics.set(null);
+                    this.runs.set([]);
+                    this.chartData.set(null);
+                    this.reportLoaded.set(true);
                 }
             },
         });
@@ -443,7 +443,7 @@ export class JobsComponent implements OnInit, OnDestroy {
     }
 
     toggleLive(on: boolean): void {
-        this.live = on;
+        this.live.set(on);
         this.liveSub?.unsubscribe();
         this.liveSub = undefined;
         if (on) this.liveSub = visibleInterval(LIVE_TAIL_MS).subscribe(() => this.loadReport(true));

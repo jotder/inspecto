@@ -20,8 +20,7 @@ describe('bind-kind contract', () => {
      *  but is not a `ComponentType`, so the collector component owns that picker). */
     it('never offers a picker on a category the save path has no home for', () => {
         for (const category of BIND_KINDS.categories) {
-            if (bindKindFor(category) !== null)
-                expect(BIND_KINDS.bindableCategories).toContain(category);
+            if (bindKindFor(category) !== null) expect(BIND_KINDS.bindableCategories).toContain(category);
         }
     });
 

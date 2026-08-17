@@ -106,7 +106,7 @@ describe('CatalogComponent', () => {
     it('loads the Streams tab on init (data origins are the default tab)', () => {
         const c = create({ streams: () => of([STREAM]) }).componentInstance;
         expect(c.activeTab).toBe('streams');
-        expect(c.streams).toEqual([STREAM]);
+        expect(c.streams()).toEqual([STREAM]);
     });
 
     it('offers the two Exchange tabs when bootstrap.features.exchange is on', () => {
@@ -120,19 +120,19 @@ describe('CatalogComponent', () => {
         c.tabIndex = 3; // kpis
         c.loadTab();
         expect(c.activeTab).toBe('kpis');
-        expect(c.kpis).toEqual([]);
+        expect(c.kpis()).toEqual([]);
     });
 
     it('degrades gracefully when the streams call fails', () => {
         const c = create({ streams: () => throwError(() => ({ status: 404 })) }).componentInstance;
-        expect(c.streams).toEqual([]);
-        expect(c.loading).toBe(false);
+        expect(c.streams()).toEqual([]);
+        expect(c.loading()).toBe(false);
     });
 
     it('runs a graph traversal and derives the G6 legend', () => {
         const c = create().componentInstance;
         c.runGraph();
-        expect(c.graph?.nodes).toEqual([TABLE]);
+        expect(c.graph()?.nodes).toEqual([TABLE]);
         expect(c.legend).toEqual([{ kind: 'TABLE', fill: expect.any(String), label: 'TABLE' }]);
     });
 
@@ -150,7 +150,7 @@ describe('CatalogComponent', () => {
     it('opens the requested tab without a from and does not traverse', () => {
         const c = create({}, { tab: 'graph' }).componentInstance;
         expect(c.activeTab).toBe('graph');
-        expect(c.graph).toBeNull(); // no ?from ⇒ empty Lineage tab, user traverses manually
+        expect(c.graph()).toBeNull(); // no ?from ⇒ empty Lineage tab, user traverses manually
     });
 
     it('renders the empty-graph state with no a11y violations', async () => {

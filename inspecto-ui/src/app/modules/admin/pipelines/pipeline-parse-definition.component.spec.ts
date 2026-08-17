@@ -147,9 +147,7 @@ const ACME_DEF = {
     hierarchical: true,
     ingestable: true,
     ingesterClass: 'com.example.acme.AcmeFeedIngester',
-    grammarSchema: [
-        { path: 'ingester_config.mode', label: 'Mode', type: 'STRING', description: 'Decode strictness.' },
-    ],
+    grammarSchema: [{ path: 'ingester_config.mode', label: 'Mode', type: 'STRING', description: 'Decode strictness.' }],
 };
 
 /** The served definition the editor renders asn1 from — the shape parsers.handler.ts transcribes. */
@@ -738,16 +736,40 @@ describe('PipelineParseDefinitionComponent', () => {
 
     describe('start from a template (S2)', () => {
         const TEMPLATES = [
-            { name: 'pipe_delimited', ref: 'grammar/pipe_delimited', type: 'grammar', content: { delimiter: '|', has_header: false } },
-            { name: 'nested_tsv', ref: 'grammar/nested_tsv', type: 'grammar', content: { frontend: 'delimited', delimited: { delimiter: '\t' } } },
-            { name: 'invoice_xml', ref: 'grammar/invoice_xml', type: 'grammar', content: { parser_type: 'xml', record_xpath: '//x' } },
-            { name: 'mainframe_fixed', ref: 'grammar/mainframe_fixed', type: 'grammar', content: { frontend: 'fixedwidth' } },
+            {
+                name: 'pipe_delimited',
+                ref: 'grammar/pipe_delimited',
+                type: 'grammar',
+                content: { delimiter: '|', has_header: false },
+            },
+            {
+                name: 'nested_tsv',
+                ref: 'grammar/nested_tsv',
+                type: 'grammar',
+                content: { frontend: 'delimited', delimited: { delimiter: '\t' } },
+            },
+            {
+                name: 'invoice_xml',
+                ref: 'grammar/invoice_xml',
+                type: 'grammar',
+                content: { parser_type: 'xml', record_xpath: '//x' },
+            },
+            {
+                name: 'mainframe_fixed',
+                ref: 'grammar/mainframe_fixed',
+                type: 'grammar',
+                content: { frontend: 'fixedwidth' },
+            },
         ] as unknown as ComponentDef[];
 
         /** A component naming another frontend could only author a PARSER_FRONTEND_MISMATCH block. */
         it('offers only delimited-compatible templates', async () => {
             const fixture = await create(delimitedNode(), TEMPLATES);
-            expect(pane(fixture).seedableTemplates().map((t) => t.name)).toEqual(['pipe_delimited', 'nested_tsv']);
+            expect(
+                pane(fixture)
+                    .seedableTemplates()
+                    .map((t) => t.name),
+            ).toEqual(['pipe_delimited', 'nested_tsv']);
         });
 
         /**
@@ -758,7 +780,11 @@ describe('PipelineParseDefinitionComponent', () => {
          */
         it('offers only fixed-width-compatible templates on a fixed-width node', async () => {
             const fixture = await create(fixedWidthNode(), TEMPLATES);
-            expect(pane(fixture).seedableTemplates().map((t) => t.name)).toEqual(['mainframe_fixed']);
+            expect(
+                pane(fixture)
+                    .seedableTemplates()
+                    .map((t) => t.name),
+            ).toEqual(['mainframe_fixed']);
         });
 
         /** The editor is locked to the format the node's TYPE means — never a picker.
@@ -846,9 +872,17 @@ describe('PipelineParseDefinitionComponent', () => {
             fixture.detectChanges();
 
             // Derived, not hand-typed: the column name is sanitised into an identifier.
-            expect(pane(fixture).schemaSeed().map((r) => r.name)).toEqual(['A_NUMBER', 'DURATION']);
+            expect(
+                pane(fixture)
+                    .schemaSeed()
+                    .map((r) => r.name),
+            ).toEqual(['A_NUMBER', 'DURATION']);
             // Delimited addresses parsed columns by POSITION, so selectors are indices.
-            expect(pane(fixture).schemaSeed().map((r) => r.selector)).toEqual(['0', '1']);
+            expect(
+                pane(fixture)
+                    .schemaSeed()
+                    .map((r) => r.selector),
+            ).toEqual(['0', '1']);
 
             pane(fixture).submit();
             fixture.detectChanges();
@@ -926,11 +960,19 @@ describe('PipelineParseDefinitionComponent', () => {
             const fixture = await create(n);
             fixture.detectChanges();
             // The harness's read() returns a one-field saved schema.
-            expect(pane(fixture).schemaSeed().map((r) => r.name)).toEqual(['IMSI']);
+            expect(
+                pane(fixture)
+                    .schemaSeed()
+                    .map((r) => r.name),
+            ).toEqual(['IMSI']);
 
             pane(fixture).onPreviewed(TABLE_PREVIEW);
             fixture.detectChanges();
-            expect(pane(fixture).schemaSeed().map((r) => r.name)).toEqual(['IMSI']);
+            expect(
+                pane(fixture)
+                    .schemaSeed()
+                    .map((r) => r.name),
+            ).toEqual(['IMSI']);
         });
 
         /**
@@ -982,7 +1024,11 @@ describe('PipelineParseDefinitionComponent', () => {
                 expect(pane(fixture).schemaDrift()?.drifted).toBe(true);
                 expect(fixture.nativeElement.textContent).toContain('no longer matches the saved schema');
                 // The saved schema is untouched by merely observing drift.
-                expect(pane(fixture).schemaSeed().map((r) => r.name)).toEqual(['IMSI']);
+                expect(
+                    pane(fixture)
+                        .schemaSeed()
+                        .map((r) => r.name),
+                ).toEqual(['IMSI']);
             });
 
             it('adds the new columns on request, keeping every existing row including excluded ones', async () => {
@@ -994,7 +1040,11 @@ describe('PipelineParseDefinitionComponent', () => {
                 pane(fixture).addDriftedFields();
                 fixture.detectChanges();
 
-                expect(pane(fixture).schemaSeed().map((r) => r.name)).toEqual(['IMSI', 'DURATION']);
+                expect(
+                    pane(fixture)
+                        .schemaSeed()
+                        .map((r) => r.name),
+                ).toEqual(['IMSI', 'DURATION']);
                 expect(pane(fixture).schemaDrift()).toBeNull();
             });
         });

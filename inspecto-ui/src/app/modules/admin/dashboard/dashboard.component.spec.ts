@@ -75,8 +75,8 @@ function create(overrides: { ready?: ReadyStatus | null; status?: StatusReport |
 describe('DashboardComponent', () => {
     it('loads service health, status and the batch-outcome report on init', () => {
         const c = create().componentInstance;
-        expect(c.ready?.status).toBe('READY');
-        expect(c.status?.pipelineCount).toBe(2);
+        expect(c.ready()?.status).toBe('READY');
+        expect(c.status()?.pipelineCount).toBe(2);
         expect(c.errorRatePct).toBe('10.0%');
     });
 
@@ -107,8 +107,8 @@ describe('DashboardComponent', () => {
         });
         const fixture = TestBed.createComponent(DashboardComponent);
         fixture.detectChanges();
-        expect(fixture.componentInstance.ready).toBeNull();
-        expect(fixture.componentInstance.loading).toBe(false);
+        expect(fixture.componentInstance.ready()).toBeNull();
+        expect(fixture.componentInstance.loading()).toBe(false);
     });
 
     it('renders with no a11y violations', async () => {

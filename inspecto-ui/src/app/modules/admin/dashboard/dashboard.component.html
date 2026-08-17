@@ -17,7 +17,7 @@
 
     <!-- Main -->
     <div class="flex flex-auto flex-col gap-6 p-6 sm:p-10">
-        @if (loading && !status) {
+        @if (loading() && !status()) {
             <!-- Skeleton mirrors the KPI tiles + charts below so the layout doesn't jump on load. -->
             <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6" aria-busy="true">
                 @for (i of [0, 1, 2, 3, 4, 5]; track i) {
@@ -37,14 +37,14 @@
             </div>
         }
 
-        @if (status || ready) {
+        @if (status() || ready()) {
             <!-- KPI tiles -->
             <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
                 <div class="bg-card rounded-2xl p-4 shadow">
                     <div class="text-secondary text-sm">Service</div>
                     <div class="mt-1">
-                        @if (ready) {
-                            <inspecto-status-badge [value]="ready.status" />
+                        @if (ready()) {
+                            <inspecto-status-badge [value]="ready().status" />
                         } @else {
                             <span class="text-2xl font-bold">—</span>
                         }
@@ -52,27 +52,27 @@
                 </div>
                 <div class="bg-card rounded-2xl p-4 shadow">
                     <div class="text-secondary text-sm">Pipelines</div>
-                    <div class="mt-1 text-2xl font-bold">{{ status?.pipelineCount ?? '—' }}</div>
+                    <div class="mt-1 text-2xl font-bold">{{ status()?.pipelineCount ?? '—' }}</div>
                 </div>
-                <div class="bg-card rounded-2xl p-4 shadow" [class.text-amber-600]="(status?.pausedCount || 0) > 0">
+                <div class="bg-card rounded-2xl p-4 shadow" [class.text-amber-600]="(status()?.pausedCount || 0) > 0">
                     <div class="text-secondary text-sm">Paused</div>
-                    <div class="mt-1 text-2xl font-bold">{{ status?.pausedCount ?? '—' }}</div>
+                    <div class="mt-1 text-2xl font-bold">{{ status()?.pausedCount ?? '—' }}</div>
                 </div>
                 <div class="bg-card rounded-2xl p-4 shadow">
                     <div class="text-secondary text-sm">Committed batches</div>
-                    <div class="mt-1 text-2xl font-bold">{{ status?.totalCommittedBatches ?? '—' }}</div>
+                    <div class="mt-1 text-2xl font-bold">{{ status()?.totalCommittedBatches ?? '—' }}</div>
                 </div>
                 <div
                     class="bg-card rounded-2xl p-4 shadow"
-                    [class.text-amber-600]="(status?.totalQuarantineFiles || 0) > 0"
+                    [class.text-amber-600]="(status()?.totalQuarantineFiles || 0) > 0"
                 >
                     <div class="text-secondary text-sm">Quarantine files</div>
-                    <div class="mt-1 text-2xl font-bold">{{ status?.totalQuarantineFiles ?? '—' }}</div>
+                    <div class="mt-1 text-2xl font-bold">{{ status()?.totalQuarantineFiles ?? '—' }}</div>
                 </div>
                 <div
                     class="bg-card rounded-2xl p-4 shadow"
-                    [class.text-amber-600]="(report?.errorRate || 0) > 0 && (report?.errorRate || 0) < 0.1"
-                    [class.text-red-600]="(report?.errorRate || 0) >= 0.1"
+                    [class.text-amber-600]="(report()?.errorRate || 0) > 0 && (report()?.errorRate || 0) < 0.1"
+                    [class.text-red-600]="(report()?.errorRate || 0) >= 0.1"
                 >
                     <div class="text-secondary text-sm">Error rate</div>
                     <div class="mt-1 text-2xl font-bold">{{ errorRatePct }}</div>
@@ -100,21 +100,21 @@
             </div>
         }
 
-        @if (report) {
+        @if (report()) {
             <!-- Charts -->
             <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 <div class="bg-card rounded-2xl p-6 shadow">
                     <div class="font-semibold">Batch duration percentiles (ms)</div>
-                    <inspecto-chart class="mt-4" type="bar" [data]="latencyData"></inspecto-chart>
+                    <inspecto-chart class="mt-4" type="bar" [data]="latencyData()"></inspecto-chart>
                 </div>
                 <div class="bg-card rounded-2xl p-6 shadow">
-                    <div class="font-semibold">Batch outcomes ({{ report.totalBatches }} total)</div>
-                    <inspecto-chart class="mt-4" type="doughnut" [data]="outcomeData"></inspecto-chart>
+                    <div class="font-semibold">Batch outcomes ({{ report().totalBatches }} total)</div>
+                    <inspecto-chart class="mt-4" type="doughnut" [data]="outcomeData()"></inspecto-chart>
                 </div>
             </div>
         }
 
-        @if (recentEvents.length) {
+        @if (recentEvents().length) {
             <!-- Recent activity feed -->
             <div class="bg-card rounded-2xl p-6 shadow">
                 <div class="mb-3 flex items-center justify-between">
@@ -124,7 +124,7 @@
                     >
                 </div>
                 <div class="flex flex-col divide-y divide-gray-100 dark:divide-gray-800">
-                    @for (e of recentEvents; track e.eventId) {
+                    @for (e of recentEvents(); track e.eventId) {
                         <div class="flex flex-wrap items-center gap-x-3 py-2 text-sm">
                             <span class="text-secondary w-24 shrink-0 tabular-nums">{{ fmtTime(e.ts) }}</span>
                             <inspecto-status-badge [value]="e.level" />
@@ -136,14 +136,14 @@
             </div>
         }
 
-        @if (status) {
+        @if (status()) {
             <!-- Per-pipeline status grid -->
             <div class="bg-card rounded-2xl p-6 shadow">
                 <div class="mb-4 font-semibold">Pipelines</div>
                 <inspecto-data-table
                     tier="mini"
                     sourceName="dashboard-pipelines"
-                    [rows]="status.pipelines || []"
+                    [rows]="status().pipelines || []"
                     [columns]="pipelineColumns"
                     height="18rem"
                     noRowsTitle="No pipelines configured"
@@ -151,7 +151,7 @@
             </div>
         }
 
-        @if (!loading) {
+        @if (!loading()) {
             <!-- Raw metrics -->
             <div class="bg-card rounded-2xl p-6 shadow">
                 <button mat-stroked-button (click)="showMetrics = !showMetrics">
@@ -159,7 +159,7 @@
                 </button>
                 @if (showMetrics) {
                     <pre class="mt-4 max-h-96 overflow-auto rounded bg-gray-100 p-3 text-xs dark:bg-gray-800">{{
-                        metricsText
+                        metricsText()
                     }}</pre>
                 }
             </div>

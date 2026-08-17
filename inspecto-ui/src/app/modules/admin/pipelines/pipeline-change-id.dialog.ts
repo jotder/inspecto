@@ -47,10 +47,10 @@ export interface PipelineChangeIdResultData {
         <h2 mat-dialog-title inspectoDialogResize>Change pipeline id</h2>
         <mat-dialog-content>
             <inspecto-alert variant="warning" title="This moves the identity itself">
-                Unlike Rename&hellip; (which only changes the label), this moves the config file, run history,
-                dedup ledger and data catalog to the new id. The pipeline must be inactive and not currently
-                running; dependent configs (enrichment/job triggers, targets, dataset references) are
-                rewritten on a best-effort basis.
+                Unlike Rename&hellip; (which only changes the label), this moves the config file, run history, dedup
+                ledger and data catalog to the new id. The pipeline must be inactive and not currently running;
+                dependent configs (enrichment/job triggers, targets, dataset references) are rewritten on a best-effort
+                basis.
             </inspecto-alert>
             <form [formGroup]="form" (ngSubmit)="save()" class="mt-4 flex flex-col gap-3">
                 <mat-form-field class="w-full" subscriptSizing="dynamic">

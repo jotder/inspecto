@@ -40,8 +40,8 @@ export interface PipelineSettingsData {
         <h2 mat-dialog-title inspectoDialogResize>Pipeline settings</h2>
         <mat-dialog-content>
             <inspecto-alert variant="info" title="What this produces">
-                A Stream is the default output. A Reference is a versioned dataset other pipelines' enrichments
-                can bind to by name — pick a load mode to make one.
+                A Stream is the default output. A Reference is a versioned dataset other pipelines' enrichments can bind
+                to by name — pick a load mode to make one.
             </inspecto-alert>
             <form [formGroup]="form" (ngSubmit)="save()" class="mt-4 flex flex-col gap-3">
                 <mat-form-field class="w-full" subscriptSizing="dynamic">
@@ -64,7 +64,10 @@ export interface PipelineSettingsData {
                         <mat-label>Key columns</mat-label>
                         <input matInput formControlName="key" placeholder="e.g. msisdn, event_date" />
                         @if (form.controls.load.value !== 'replace') {
-                            <mat-hint>Comma-separated. Required for upsert/scd2 — this is the identity the dataset dedupes on.</mat-hint>
+                            <mat-hint
+                                >Comma-separated. Required for upsert/scd2 — this is the identity the dataset dedupes
+                                on.</mat-hint
+                            >
                         }
                         @if (form.controls.key.hasError('required')) {
                             <mat-error>upsert/scd2 requires at least one key column.</mat-error>

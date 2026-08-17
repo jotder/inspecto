@@ -412,9 +412,7 @@ describe('PipelineLoadDefinitionComponent — mapped output (B1)', () => {
     it('arms the drawer Apply when a rule is edited', async () => {
         const fixture = await create();
         expect(fixture.componentInstance.dirty).toBe(false); // seeding alone must not arm it
-        const cell = fixture.nativeElement.querySelectorAll(
-            'input[aria-label="Target column"]',
-        )[0] as HTMLInputElement;
+        const cell = fixture.nativeElement.querySelectorAll('input[aria-label="Target column"]')[0] as HTMLInputElement;
         cell.value = 'MSISDN';
         cell.dispatchEvent(new Event('input'));
         fixture.detectChanges();

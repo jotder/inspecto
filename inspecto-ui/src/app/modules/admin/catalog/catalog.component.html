@@ -31,7 +31,7 @@
             }
         </mat-tab-group>
 
-        @if (loading) {
+        @if (loading()) {
             <div class="mt-6 flex items-center gap-3">
                 <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
                 <span class="text-secondary">Loading…</span>
@@ -39,13 +39,13 @@
         }
 
         <!-- Tables -->
-        @if (activeTab === 'tables' && !loading) {
+        @if (activeTab === 'tables' && !loading()) {
             <inspecto-data-table
                 class="mt-6"
                 tier="standard"
                 sourceName="tables"
                 exportName="catalog-tables"
-                [rows]="nodes"
+                [rows]="nodes()"
                 [columns]="nodeColumns"
                 noRowsTitle="No tables found"
                 noRowsHint="No catalog tables match the current filter."
@@ -54,13 +54,13 @@
         }
 
         <!-- Streams -->
-        @if (activeTab === 'streams' && !loading) {
+        @if (activeTab === 'streams' && !loading()) {
             <inspecto-data-table
                 class="mt-6"
                 tier="standard"
                 sourceName="streams"
                 exportName="catalog-streams"
-                [rows]="streams"
+                [rows]="streams()"
                 [columns]="streamColumns"
                 [rowActions]="originRowActions"
                 noRowsTitle="No streams found"
@@ -70,13 +70,13 @@
         }
 
         <!-- References -->
-        @if (activeTab === 'references' && !loading) {
+        @if (activeTab === 'references' && !loading()) {
             <inspecto-data-table
                 class="mt-6"
                 tier="standard"
                 sourceName="references"
                 exportName="catalog-references"
-                [rows]="references"
+                [rows]="references()"
                 [columns]="referenceColumns"
                 [rowActions]="originRowActions"
                 noRowsTitle="No references found"
@@ -86,13 +86,13 @@
         }
 
         <!-- KPIs -->
-        @if (activeTab === 'kpis' && !loading) {
+        @if (activeTab === 'kpis' && !loading()) {
             <inspecto-data-table
                 class="mt-6"
                 tier="standard"
                 sourceName="kpis"
                 exportName="catalog-kpis"
-                [rows]="kpis"
+                [rows]="kpis()"
                 [columns]="kpiColumns"
                 noRowsTitle="No KPIs found"
                 noRowsHint="No KPI definitions are registered in the catalog."
@@ -127,16 +127,16 @@
                     <input matInput [(ngModel)]="graphEdgeKinds" />
                 </mat-form-field>
                 <mat-checkbox [(ngModel)]="graphOverlay">overlay</mat-checkbox>
-                <button mat-flat-button color="primary" [disabled]="loading" (click)="runGraph()">Traverse</button>
+                <button mat-flat-button color="primary" [disabled]="loading()" (click)="runGraph()">Traverse</button>
             </div>
 
-            @if (graph && !loading) {
-                @if (graph.nodes.length) {
+            @if (graph() && !loading()) {
+                @if (graph().nodes.length) {
                     <div class="bg-card mt-6 rounded-2xl p-4 shadow">
                         <div class="text-secondary mb-2 text-sm">
-                            {{ graph.nodes.length }} nodes, {{ graph.edges.length }} edges — click a node to inspect
+                            {{ graph().nodes.length }} nodes, {{ graph().edges.length }} edges — click a node to inspect
                         </div>
-                        <inspecto-graph-view [data]="g6Data" (nodeClick)="openNode($event)"></inspecto-graph-view>
+                        <inspecto-graph-view [data]="g6Data()" (nodeClick)="openNode($event)"></inspecto-graph-view>
                         <div class="mt-3 flex flex-wrap gap-4">
                             @for (l of legend; track l.kind) {
                                 <span class="flex items-center gap-1.5 text-sm">

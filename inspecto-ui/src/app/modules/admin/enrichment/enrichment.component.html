@@ -16,7 +16,7 @@
 
     <!-- Main -->
     <div class="flex flex-auto flex-col p-6 sm:p-10">
-        @if (unavailable) {
+        @if (unavailable()) {
             <inspecto-empty-state
                 icon="heroicons_outline:sparkles"
                 message="No enrichment jobs are registered."
@@ -26,9 +26,9 @@
                 tier="standard"
                 sourceName="enrichment_jobs"
                 exportName="enrichment_jobs"
-                [rows]="jobs"
+                [rows]="jobs()"
                 [columns]="jobColumns"
-                [loading]="loading"
+                [loading]="loading()"
                 [singleSelect]="true"
                 [pageSize]="10"
                 height="20rem"
@@ -36,9 +36,9 @@
             />
         }
 
-        @if (selected) {
+        @if (selected()) {
             <div class="mt-8">
-                <div class="text-xl font-semibold">{{ selected.name }}</div>
+                <div class="text-xl font-semibold">{{ selected().name }}</div>
                 <mat-tab-group [(selectedIndex)]="selectedIndex" (selectedIndexChange)="onTabChange()">
                     @for (t of tabs; track t.id) {
                         <mat-tab [label]="t.label"></mat-tab>
@@ -73,53 +73,53 @@
                     </div>
                 }
 
-                @if (detailLoading) {
+                @if (detailLoading()) {
                     <div class="mt-4 flex items-center gap-3">
                         <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
                         <span class="text-secondary">Loading…</span>
                     </div>
                 }
 
-                @if (activeTab === 'report' && report && !detailLoading) {
+                @if (activeTab === 'report' && report() && !detailLoading()) {
                     <table
                         class="mt-6 w-fit text-sm [&_td]:px-3 [&_td]:py-1.5 [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left"
                     >
                         <tbody>
                             <tr class="border-b">
                                 <th scope="row">Total runs</th>
-                                <td>{{ report.totalRuns }}</td>
+                                <td>{{ report().totalRuns }}</td>
                                 <th scope="row">Success</th>
-                                <td>{{ report.success }}</td>
+                                <td>{{ report().success }}</td>
                                 <th scope="row">Failed</th>
-                                <td>{{ report.failed }}</td>
+                                <td>{{ report().failed }}</td>
                             </tr>
                             <tr class="border-b">
                                 <th scope="row">Error rate</th>
-                                <td>{{ report.errorRate | fmtPercent }}</td>
+                                <td>{{ report().errorRate | fmtPercent }}</td>
                                 <th scope="row">Output rows</th>
-                                <td>{{ report.totalOutputRows }}</td>
+                                <td>{{ report().totalOutputRows }}</td>
                                 <th scope="row">Output files</th>
-                                <td>{{ report.totalOutputFiles ?? '—' }}</td>
+                                <td>{{ report().totalOutputFiles ?? '—' }}</td>
                             </tr>
                             <tr>
                                 <th scope="row">p50 (ms)</th>
-                                <td>{{ report.p50DurationMs }}</td>
+                                <td>{{ report().p50DurationMs }}</td>
                                 <th scope="row">p95 (ms)</th>
-                                <td>{{ report.p95DurationMs }}</td>
+                                <td>{{ report().p95DurationMs }}</td>
                                 <th scope="row">p99 (ms)</th>
-                                <td>{{ report.p99DurationMs }}</td>
+                                <td>{{ report().p99DurationMs }}</td>
                             </tr>
                         </tbody>
                     </table>
                 }
 
-                @if (activeTab !== 'report' && !detailLoading) {
+                @if (activeTab !== 'report' && !detailLoading()) {
                     <div class="mt-4">
                         <inspecto-data-table
                             tier="pro"
                             sourceName="enrichment"
                             exportName="enrichment"
-                            [rows]="rows"
+                            [rows]="rows()"
                             height="24rem"
                         />
                     </div>

@@ -8,22 +8,22 @@
                 tier.
             </div>
         </div>
-        @if (loading) {
+        @if (loading()) {
             <mat-spinner diameter="28"></mat-spinner>
         }
     </div>
 
-    @if (settings && !settings.supported) {
+    @if (settings() && !settings().supported) {
         <div class="bg-card mt-6 max-w-160 rounded-2xl p-6 shadow">
             <div class="font-semibold">Settings not supported</div>
             <p class="text-secondary mt-1 text-sm">
-                The running assist agent does not expose model-provider settings (older inspecto-agent build, or
-                no agent on the classpath).
+                The running assist agent does not expose model-provider settings (older inspecto-agent build, or no
+                agent on the classpath).
             </p>
         </div>
     }
 
-    @if (settings?.supported) {
+    @if (settings()?.supported) {
         <div class="bg-card mt-6 max-w-160 rounded-2xl p-6 shadow sm:p-8">
             @if (hostedJarMissing) {
                 <inspecto-alert class="mb-6 block" variant="warning">
@@ -35,7 +35,7 @@
             <!-- Provider -->
             <mat-form-field class="w-full">
                 <mat-label>Model provider</mat-label>
-                <mat-select [ngModel]="provider" (ngModelChange)="onProviderChange($event)" name="provider">
+                <mat-select [ngModel]="provider()" (ngModelChange)="onProviderChange($event)" name="provider">
                     <mat-optgroup label="Hosted">
                         @for (p of hostedProviders; track p) {
                             <mat-option [value]="p" [disabled]="!isSelectable(p)">{{ label(p) }}</mat-option>
@@ -66,7 +66,7 @@
                         [(ngModel)]="apiKey"
                         autocomplete="off"
                         [placeholder]="
-                            settings?.apiKeySet ? '••••••••  (a key is configured)' : 'Paste the provider API key'
+                            settings()?.apiKeySet ? '••••••••  (a key is configured)' : 'Paste the provider() API key'
                         "
                     />
                     <button
@@ -103,7 +103,7 @@
                 @for (t of tiers; track t) {
                     <mat-form-field>
                         <mat-label>{{ t | uppercase }} tier model</mat-label>
-                        <input matInput [name]="'model-' + t" [(ngModel)]="models[t]" />
+                        <input matInput [name]="'model-' + t" [(ngModel)]="models()[t]" />
                     </mat-form-field>
                 }
             </div>
@@ -115,30 +115,30 @@
 
             <!-- Actions -->
             <div class="mt-6 flex items-center gap-3">
-                <button mat-flat-button color="primary" (click)="save()" [disabled]="saving || testing">
-                    @if (saving) {
+                <button mat-flat-button color="primary" (click)="save()" [disabled]="saving() || testing()">
+                    @if (saving()) {
                         Saving…
                     } @else {
                         Save &amp; apply
                     }
                 </button>
-                <button mat-stroked-button (click)="test()" [disabled]="saving || testing">
-                    @if (testing) {
+                <button mat-stroked-button (click)="test()" [disabled]="saving() || testing()">
+                    @if (testing()) {
                         Testing…
                     } @else {
                         Test connection
                     }
                 </button>
-                @if (testing) {
+                @if (testing()) {
                     <mat-spinner diameter="22"></mat-spinner>
                 }
             </div>
 
             <!-- Test results -->
-            @if (testResult) {
+            @if (testResult()) {
                 <div class="mt-5 flex flex-col gap-2">
                     @for (t of tiers; track t) {
-                        @if (testResult[t]; as r) {
+                        @if (testResult()[t]; as r) {
                             <div
                                 class="flex items-center gap-2 rounded-lg border p-2 text-sm"
                                 [class.border-green-500]="r.ok"

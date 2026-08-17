@@ -21,15 +21,15 @@
     <!-- Approvals grid -->
     <div class="mt-4 flex-auto">
         <inspecto-data-table
-            stateKey="approvals()"
+            stateKey="approvals"
             tier="pro"
-            sourceName="agent-approvals()"
-            exportName="agent-approvals()"
+            sourceName="agent-approvals"
+            exportName="agent-approvals"
             [rows]="approvals()"
             [columns]="columnDefs"
             [rowActions]="rowActions"
             [loading]="loading()"
-            noRowsTitle="No approvals() waiting"
+            noRowsTitle="No approvals waiting"
             noRowsHint="When the agent's act tier is enabled and it proposes a mutating action, the request appears here for review."
         />
     </div>

@@ -1,4 +1,12 @@
-import { Component, inject, OnDestroy, OnInit, ViewEncapsulation, ChangeDetectionStrategy } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    inject,
+    OnDestroy,
+    OnInit,
+    signal,
+    ViewEncapsulation,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -57,7 +65,7 @@ const LIVE_TAIL_SECONDS = [2, 5, 10, 30, 60] as const;
         DataTableComponent,
     ],
     templateUrl: './events.component.html',
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,
 })
 export class EventsComponent implements OnInit, OnDestroy {
@@ -70,11 +78,11 @@ export class EventsComponent implements OnInit, OnDestroy {
     readonly types = EVENT_TYPES;
     readonly limitOptions = [50, 100, 250, 500, 1000];
 
-    events: EventRow[] = [];
-    loading = false;
+    readonly events = signal<EventRow[]>([]);
+    readonly loading = signal(false);
     /** True when the last fetched page came back full — there may be more (R6). */
-    hasMore = false;
-    live = false;
+    readonly hasMore = signal(false);
+    readonly live = signal(false);
     /** Live-tail cadence in seconds (operator-selectable); the toggle uses whatever is chosen here. */
     readonly liveSecondsOptions = LIVE_TAIL_SECONDS;
     liveSeconds: number = 5;
@@ -87,11 +95,11 @@ export class EventsComponent implements OnInit, OnDestroy {
     fq = '';
     fLimit = 100;
     /** Set only via the detail dialog "View related" drill-down; surfaced as a removable chip. */
-    fCorrelation = '';
+    readonly fCorrelation = signal('');
 
     // ── saved views ────────────────────────────────────────────────────────────
-    views: SavedEventView[] = [];
-    selectedView = '';
+    readonly views = signal<SavedEventView[]>([]);
+    readonly selectedView = signal('');
     saveName = '';
 
     readonly columnDefs: ColDef<EventRow>[] = [
@@ -166,7 +174,7 @@ export class EventsComponent implements OnInit, OnDestroy {
             level: this.fLevel || undefined,
             type: this.fType || undefined,
             pipeline: this.fPipeline.trim() || undefined,
-            correlationId: this.fCorrelation || undefined,
+            correlationId: this.fCorrelation() || undefined,
             q: this.fq.trim() || undefined,
             limit: this.fLimit,
         };
@@ -175,15 +183,15 @@ export class EventsComponent implements OnInit, OnDestroy {
     /** Fetch the NEXT offset page and append — true offset paging (R6; no refetch from 0).
      *  Any full refetch (filter change, refresh, live-tail tick) resets back to page 0. */
     loadMore(): void {
-        this.loading = true;
-        this.api.search({ ...this.buildFilter(), offset: this.events.length }).subscribe({
+        this.loading.set(true);
+        this.api.search({ ...this.buildFilter(), offset: this.events().length }).subscribe({
             next: (rows) => {
-                this.events = [...this.events, ...rows];
-                this.hasMore = rows.length >= this.fLimit;
-                this.loading = false;
+                this.events.set([...this.events(), ...rows]);
+                this.hasMore.set(rows.length >= this.fLimit);
+                this.loading.set(false);
             },
             error: () => {
-                this.loading = false;
+                this.loading.set(false);
                 this.toastr.error('Failed to load more events');
             },
         });
@@ -191,18 +199,18 @@ export class EventsComponent implements OnInit, OnDestroy {
 
     /** Run the current query. `silent` (live-tail tick) keeps the grid visible instead of flashing the loader. */
     load(silent = false): void {
-        if (!silent) this.loading = true;
+        if (!silent) this.loading.set(true);
         this.api.search(this.buildFilter()).subscribe({
             next: (rows) => {
-                this.events = rows;
-                this.hasMore = rows.length >= this.fLimit;
-                this.loading = false;
+                this.events.set(rows);
+                this.hasMore.set(rows.length >= this.fLimit);
+                this.loading.set(false);
             },
             error: () => {
-                this.loading = false;
+                this.loading.set(false);
                 if (!silent) {
-                    this.events = [];
-                    this.hasMore = false;
+                    this.events.set([]);
+                    this.hasMore.set(false);
                     this.toastr.error('Failed to load events');
                 }
             },
@@ -215,18 +223,18 @@ export class EventsComponent implements OnInit, OnDestroy {
         this.fPipeline = '';
         this.fq = '';
         this.fLimit = 100;
-        this.fCorrelation = '';
-        this.selectedView = '';
+        this.fCorrelation.set('');
+        this.selectedView.set('');
         this.load();
     }
 
     clearCorrelation(): void {
-        this.fCorrelation = '';
+        this.fCorrelation.set('');
         this.load();
     }
 
     toggleLive(on: boolean): void {
-        this.live = on;
+        this.live.set(on);
         this.restartLiveTail();
     }
 
@@ -234,7 +242,7 @@ export class EventsComponent implements OnInit, OnDestroy {
     restartLiveTail(): void {
         this.liveSub?.unsubscribe();
         this.liveSub = undefined;
-        if (this.live) this.liveSub = visibleInterval(this.liveSeconds * 1000).subscribe(() => this.load(true));
+        if (this.live()) this.liveSub = visibleInterval(this.liveSeconds * 1000).subscribe(() => this.load(true));
     }
 
     openDetail(row: EventRow): void {
@@ -243,7 +251,7 @@ export class EventsComponent implements OnInit, OnDestroy {
             .afterClosed()
             .subscribe((d?: EventDrilldown) => {
                 if (!d) return;
-                if (d.correlationId) this.fCorrelation = d.correlationId;
+                if (d.correlationId) this.fCorrelation.set(d.correlationId);
                 if (d.type) this.fType = d.type;
                 this.load();
             });
@@ -268,20 +276,20 @@ export class EventsComponent implements OnInit, OnDestroy {
 
     private loadViews(): void {
         this.api.views().subscribe({
-            next: (v) => (this.views = v),
-            error: () => (this.views = []),
+            next: (v) => this.views.set(v),
+            error: () => this.views.set([]),
         });
     }
 
     applyView(name: string): void {
-        this.selectedView = name;
-        const v = this.views.find((x) => x.name === name);
+        this.selectedView.set(name);
+        const v = this.views().find((x) => x.name === name);
         if (!v) return;
         const f = v.filters ?? {};
         this.fLevel = f['level'] ?? '';
         this.fType = f['type'] ?? '';
         this.fPipeline = f['pipeline'] ?? '';
-        this.fCorrelation = f['correlationId'] ?? '';
+        this.fCorrelation.set(f['correlationId'] ?? '');
         this.fq = f['q'] ?? '';
         this.load();
     }
@@ -300,7 +308,7 @@ export class EventsComponent implements OnInit, OnDestroy {
             next: () => {
                 this.toastr.success(`Saved view "${name}"`);
                 this.saveName = '';
-                this.selectedView = name;
+                this.selectedView.set(name);
                 this.loadViews();
             },
             error: () => this.toastr.error('Save failed'),
@@ -308,11 +316,11 @@ export class EventsComponent implements OnInit, OnDestroy {
     }
 
     async deleteView(): Promise<void> {
-        if (!this.selectedView) {
+        if (!this.selectedView()) {
             this.toastr.error('Select a saved view first');
             return;
         }
-        const name = this.selectedView;
+        const name = this.selectedView();
         if (
             !(await this.confirm.confirmDestructive(`Delete saved view "${name}"?`, {
                 title: 'Delete view',
@@ -322,7 +330,7 @@ export class EventsComponent implements OnInit, OnDestroy {
         this.api.deleteView(name).subscribe({
             next: () => {
                 this.toastr.success(`Deleted "${name}"`);
-                this.selectedView = '';
+                this.selectedView.set('');
                 this.loadViews();
             },
             error: () => this.toastr.error('Delete failed'),

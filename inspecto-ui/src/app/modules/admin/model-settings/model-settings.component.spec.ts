@@ -44,7 +44,7 @@ describe('ModelSettingsComponent', () => {
         const { fixture, api } = create();
         const c = fixture.componentInstance;
         expect(api.settings).toHaveBeenCalled();
-        expect(c.provider).toBe('ollama');
+        expect(c.provider()).toBe('ollama');
         expect(c.baseUrl).toBe('http://localhost:11434');
         expect(c.timeoutSeconds).toBe(45);
         expect(c.currentIsLocal).toBe(true);

@@ -12,13 +12,13 @@
         </div>
         <div class="mt-4 flex items-center gap-3 sm:mt-0">
             <mat-slide-toggle
-                [checked]="live"
+                [checked]="live()"
                 (change)="toggleLive($event.checked)"
-                [matTooltip]="'Auto-refresh the newest events every ' + liveSeconds + 's'"
+                [matTooltip]="'Auto-refresh the newest events() every ' + liveSeconds + 's'"
             >
                 Live tail
             </mat-slide-toggle>
-            @if (live) {
+            @if (live()) {
                 <mat-form-field class="gamma-mat-dense w-24" subscriptSizing="dynamic">
                     <mat-label>Every</mat-label>
                     <mat-select
@@ -98,7 +98,7 @@
                 <span class="ml-2">Export CSV</span>
             </button>
 
-            @if (fCorrelation) {
+            @if (fCorrelation()) {
                 <inspecto-chip
                     variant="soft"
                     tone="primary"
@@ -106,7 +106,7 @@
                     removeLabel="Clear correlation filter"
                     (removed)="clearCorrelation()"
                 >
-                    correlation: <span class="font-mono">{{ fCorrelation }}</span>
+                    correlation: <span class="font-mono">{{ fCorrelation() }}</span>
                 </inspecto-chip>
             }
         </div>
@@ -114,7 +114,7 @@
         <!-- Saved-views menu (collapses the former second toolbar row) -->
         <mat-menu #viewsMenu="matMenu">
             <div class="min-w-72">
-                @for (v of views; track v.name) {
+                @for (v of views(); track v.name) {
                     <div class="flex items-center">
                         <button mat-menu-item class="flex-auto" (click)="applyView(v.name)">
                             <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
@@ -123,7 +123,7 @@
                         <button
                             mat-icon-button
                             class="mr-1"
-                            (click)="$event.stopPropagation(); selectedView = v.name; deleteView()"
+                            (click)="$event.stopPropagation(); selectedView.set(v.name); deleteView()"
                             [attr.aria-label]="'Delete view ' + v.name"
                         >
                             <mat-icon class="icon-size-5" svgIcon="heroicons_outline:trash"></mat-icon>
@@ -150,7 +150,7 @@
             </div>
         </mat-menu>
 
-        @if (!loading && events.length === 0) {
+        @if (!loading() && events().length === 0) {
             <inspecto-empty-state
                 icon="heroicons_outline:queue-list"
                 message="No events match the current filters."
@@ -161,16 +161,16 @@
                 sourceName="events"
                 exportName="events"
                 stateKey="events"
-                [rows]="events"
+                [rows]="events()"
                 [columns]="columnDefs"
                 [rowActions]="actions"
                 [pinActions]="true"
-                [loading]="loading"
+                [loading]="loading()"
                 [searchable]="false"
                 [exportable]="false"
                 [pageSize]="50"
                 [serverPage]="true"
-                [hasMore]="hasMore"
+                [hasMore]="hasMore()"
                 (loadMore)="loadMore()"
             />
         }

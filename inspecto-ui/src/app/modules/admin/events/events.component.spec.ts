@@ -81,9 +81,9 @@ describe('EventsComponent', () => {
     it('loads events and saved views on init', async () => {
         const { fixture } = await create();
         const c = fixture.componentInstance;
-        expect(c.events).toEqual([EVENT]);
-        expect(c.views).toEqual([VIEW]);
-        expect(c.loading).toBe(false);
+        expect(c.events()).toEqual([EVENT]);
+        expect(c.views()).toEqual([VIEW]);
+        expect(c.loading()).toBe(false);
     });
 
     it('sends only the set filters in the search query', async () => {
@@ -116,17 +116,17 @@ describe('EventsComponent', () => {
     it('clearing the correlation chip re-runs the query without it', async () => {
         const { fixture, api } = await create();
         const c = fixture.componentInstance;
-        c.fCorrelation = 'corr-1';
+        c.fCorrelation.set('corr-1');
         c.clearCorrelation();
-        expect(c.fCorrelation).toBe('');
+        expect(c.fCorrelation()).toBe('');
         expect(api.search).toHaveBeenLastCalledWith(expect.objectContaining({ correlationId: undefined }));
     });
 
     it('degrades to an empty grid + toast when the search fails', async () => {
         const { fixture } = await create({ search: () => throwError(() => ({ status: 500 })) });
         const c = fixture.componentInstance;
-        expect(c.events).toEqual([]);
-        expect(c.loading).toBe(false);
+        expect(c.events()).toEqual([]);
+        expect(c.loading()).toBe(false);
     });
 
     it('live-tail polls at the selected cadence and re-arms when the cadence changes', async () => {

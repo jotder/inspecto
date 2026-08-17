@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -65,7 +65,7 @@ type CatTab = 'tables' | 'streams' | 'references' | 'kpis' | 'graph' | 'usage' |
         RegistryComponent,
         SharingComponent,
     ],
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     templateUrl: './catalog.component.html',
 })
 export class CatalogComponent implements OnInit {
@@ -98,11 +98,11 @@ export class CatalogComponent implements OnInit {
         return this.tabs[this.tabIndex].id;
     }
 
-    loading = false;
-    nodes: MetadataNode[] = [];
-    streams: MetadataNode[] = [];
-    references: MetadataNode[] = [];
-    kpis: KpiCatalogEntry[] = [];
+    readonly loading = signal(false);
+    readonly nodes = signal<MetadataNode[]>([]);
+    readonly streams = signal<MetadataNode[]>([]);
+    readonly references = signal<MetadataNode[]>([]);
+    readonly kpis = signal<KpiCatalogEntry[]>([]);
 
     // graph traversal
     graphFrom = '';
@@ -111,11 +111,11 @@ export class CatalogComponent implements OnInit {
     graphKinds = '';
     graphEdgeKinds = '';
     graphOverlay = true;
-    graph: MetadataGraph | null = null;
+    readonly graph = signal<MetadataGraph | null>(null);
     readonly directions: GraphDirection[] = ['out', 'in', 'both'];
 
     // graph view (derived from `graph` on each successful traversal)
-    g6Data: G6GraphData | null = null;
+    readonly g6Data = signal<G6GraphData | null>(null);
     legend: { kind: NodeKind; fill: string; label: string }[] = [];
 
     readonly nodeColumns: ColDef[] = [
@@ -243,62 +243,62 @@ export class CatalogComponent implements OnInit {
 
     loadTab(): void {
         if (this.activeTab === 'tables') {
-            this.loading = true;
+            this.loading.set(true);
             this.api.tables().subscribe({
                 next: (n) => {
-                    this.nodes = n;
-                    this.loading = false;
+                    this.nodes.set(n);
+                    this.loading.set(false);
                 },
                 error: () => {
-                    this.nodes = [];
-                    this.loading = false;
+                    this.nodes.set([]);
+                    this.loading.set(false);
                 },
             });
         } else if (this.activeTab === 'streams') {
-            this.loading = true;
+            this.loading.set(true);
             this.api.streams().subscribe({
                 next: (s) => {
-                    this.streams = s;
-                    this.loading = false;
+                    this.streams.set(s);
+                    this.loading.set(false);
                     this.runPendingOnboard();
                 },
                 error: () => {
-                    this.streams = [];
-                    this.loading = false;
+                    this.streams.set([]);
+                    this.loading.set(false);
                     this.runPendingOnboard();
                 },
             });
         } else if (this.activeTab === 'references') {
-            this.loading = true;
+            this.loading.set(true);
             this.api.references().subscribe({
                 next: (r) => {
-                    this.references = r;
-                    this.loading = false;
+                    this.references.set(r);
+                    this.loading.set(false);
                     this.runPendingOnboard();
                 },
                 error: () => {
-                    this.references = [];
-                    this.loading = false;
+                    this.references.set([]);
+                    this.loading.set(false);
                     this.runPendingOnboard();
                 },
             });
         } else if (this.activeTab === 'kpis') {
-            this.loading = true;
+            this.loading.set(true);
             this.api.kpis().subscribe({
                 next: (k) => {
-                    this.kpis = k.kpis || [];
-                    this.loading = false;
+                    this.kpis.set(k.kpis || []);
+                    this.loading.set(false);
                 },
                 error: () => {
-                    this.kpis = [];
-                    this.loading = false;
+                    this.kpis.set([]);
+                    this.loading.set(false);
                 },
             });
         }
     }
 
     runGraph(): void {
-        this.loading = true;
+        this.loading.set(true);
         this.api
             .graph({
                 from: this.graphFrom.trim() || undefined,
@@ -311,18 +311,18 @@ export class CatalogComponent implements OnInit {
             .subscribe({
                 next: (g) => {
                     this.setGraph(g);
-                    this.loading = false;
+                    this.loading.set(false);
                 },
                 error: () => {
                     this.setGraph(null);
-                    this.loading = false;
+                    this.loading.set(false);
                 },
             });
     }
 
     private setGraph(g: MetadataGraph | null): void {
-        this.graph = g;
-        this.g6Data = g ? toG6Data(g.nodes, g.edges) : null;
+        this.graph.set(g);
+        this.g6Data.set(g ? toG6Data(g.nodes, g.edges) : null);
         this.legend = g ? legendFor(g.nodes) : [];
     }
 
@@ -364,8 +364,8 @@ export class CatalogComponent implements OnInit {
         // exists to prevent. Both fall back to what is already cached, so a failed list degrades to the
         // old behaviour rather than blocking the CTA.
         forkJoin({
-            streams: this.api.streams().pipe(catchError(() => of(this.streams))),
-            references: this.api.references().pipe(catchError(() => of(this.references))),
+            streams: this.api.streams().pipe(catchError(() => of(this.streams()))),
+            references: this.api.references().pipe(catchError(() => of(this.references()))),
         }).subscribe(({ streams, references }) => this.openOnboarding(kind, [...streams, ...references]));
     }
 

@@ -45,22 +45,22 @@ function create(list: Observable<EnrichmentJobView[]> = of([JOB])) {
 describe('EnrichmentComponent', () => {
     it('loads the enrichment jobs list', () => {
         const c = create().componentInstance;
-        expect(c.jobs.length).toBe(1);
-        expect(c.unavailable).toBe(false);
+        expect(c.jobs().length).toBe(1);
+        expect(c.unavailable()).toBe(false);
     });
 
     it('flags unavailable when the endpoint 404s', () => {
         const c = create(throwError(() => ({ status: 404 }))).componentInstance;
-        expect(c.unavailable).toBe(true);
-        expect(c.jobs.length).toBe(0);
+        expect(c.unavailable()).toBe(true);
+        expect(c.jobs().length).toBe(0);
     });
 
     it('selecting a job loads its runs into the detail grid', () => {
         const c = create().componentInstance;
         c.onRowClick(JOB);
-        expect(c.selected?.name).toBe('geo_enrich');
+        expect(c.selected()?.name).toBe('geo_enrich');
         expect(c.activeTab).toBe('runs');
-        expect(c.rows.length).toBe(1);
+        expect(c.rows().length).toBe(1);
     });
 
     it('renders with no a11y violations', async () => {

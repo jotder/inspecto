@@ -47,19 +47,17 @@ const REFUSAL = {
 function create(def?: ComponentDef, config: Partial<ConfigService> = {}, sampleRows?: Record<string, unknown>[]) {
     const ref = { close: vi.fn(), disableClose: false };
     const api = {
-        write: vi
-            .fn()
-            .mockReturnValue(
-                of({
-                    type: 'schema',
-                    written: true,
-                    path: 'ev.toon',
-                    name: 'ev',
-                    bytes: 1,
-                    overwritten: true,
-                    findings: [],
-                }),
-            ),
+        write: vi.fn().mockReturnValue(
+            of({
+                type: 'schema',
+                written: true,
+                path: 'ev.toon',
+                name: 'ev',
+                bytes: 1,
+                overwritten: true,
+                findings: [],
+            }),
+        ),
         suggestSchema: vi.fn().mockReturnValue(
             of({
                 fields: [

@@ -302,7 +302,12 @@ describe('computeNodeStatus', () => {
         );
         expect(computeNodeStatus({ id: 'w', type: 'sink.persistent' }, 'SINK', refs, noTests)).toBe('unconfigured');
         expect(
-            computeNodeStatus({ id: 'f', type: 'transform.filter', config: { where: 'x > 1' } }, 'TRANSFORM', refs, noTests),
+            computeNodeStatus(
+                { id: 'f', type: 'transform.filter', config: { where: 'x > 1' } },
+                'TRANSFORM',
+                refs,
+                noTests,
+            ),
         ).toBe('configured');
     });
 

@@ -8,14 +8,14 @@
                 <mat-icon svgIcon="heroicons_outline:arrow-left"></mat-icon>
             </button>
             <div class="min-w-0">
-                <inspecto-breadcrumb [listLink]="['/' + listBase]" [listLabel]="listLabel" [current]="id" />
+                <inspecto-breadcrumb [listLink]="['/' + listBase]" [listLabel]="listLabel" [current]="id()" />
                 <h1 class="truncate text-2xl font-extrabold leading-none tracking-tight">
-                    {{ obj?.title || id }}
+                    {{ obj()?.title || id() }}
                 </h1>
                 <div class="text-secondary mt-1.5">
-                    {{ obj?.objectType }} · {{ obj?.status }}
-                    @if (obj?.severity) {
-                        · {{ obj?.severity }}
+                    {{ obj()?.objectType }} · {{ obj()?.status }}
+                    @if (obj()?.severity) {
+                        · {{ obj()?.severity }}
                     }
                 </div>
             </div>
@@ -24,8 +24,8 @@
             <!-- "Why is this red" (AGT-6a A4-status) — only when the Incident/Case carries a correlation
                  id: that is the only thing here the timeline can be addressed by, and without it the
                  dialog would have nothing to reconstruct. -->
-            @if (obj?.correlationId) {
-                <inspecto-ai-status [label]="id" [correlationId]="obj!.correlationId!" />
+            @if (obj()?.correlationId) {
+                <inspecto-ai-status [label]="id()" [correlationId]="obj()!.correlationId!" />
             }
             @for (a of actions; track a) {
                 <button mat-stroked-button (click)="transition(a)">
@@ -50,52 +50,53 @@
         <mat-tab-group [(selectedIndex)]="selectedIndex" (selectedIndexChange)="onTabChange()" animationDuration="0ms">
             <!-- Overview -->
             <mat-tab label="Overview">
-                @if (obj) {
+                @if (obj()) {
                     <div class="grid grid-cols-1 gap-x-8 gap-y-1 pt-6 sm:grid-cols-2">
                         <div class="flex justify-between border-b py-2">
-                            <span class="text-secondary">Status</span><span class="font-medium">{{ obj.status }}</span>
+                            <span class="text-secondary">Status</span
+                            ><span class="font-medium">{{ obj().status }}</span>
                         </div>
                         <div class="flex justify-between border-b py-2">
                             <span class="text-secondary">Type</span
-                            ><span class="font-medium">{{ obj.objectType }}</span>
+                            ><span class="font-medium">{{ obj().objectType }}</span>
                         </div>
                         <div class="flex justify-between border-b py-2">
                             <span class="text-secondary">Severity</span
-                            ><span class="font-medium">{{ obj.severity || '—' }}</span>
+                            ><span class="font-medium">{{ obj().severity || '—' }}</span>
                         </div>
                         <div class="flex justify-between border-b py-2">
                             <span class="text-secondary">Priority</span
-                            ><span class="font-medium">{{ obj.priority || '—' }}</span>
+                            ><span class="font-medium">{{ obj().priority || '—' }}</span>
                         </div>
                         <div class="flex justify-between border-b py-2">
                             <span class="text-secondary">Owner</span
-                            ><span class="font-medium">{{ obj.owner || '—' }}</span>
+                            ><span class="font-medium">{{ obj().owner || '—' }}</span>
                         </div>
                         <div class="flex justify-between border-b py-2">
                             <span class="text-secondary">Assignee</span
-                            ><span class="font-medium">{{ obj.assignee || '—' }}</span>
+                            ><span class="font-medium">{{ obj().assignee || '—' }}</span>
                         </div>
                         <div class="flex justify-between border-b py-2">
                             <span class="text-secondary">Correlation</span
-                            ><span class="font-medium">{{ obj.correlationId || '—' }}</span>
+                            ><span class="font-medium">{{ obj().correlationId || '—' }}</span>
                         </div>
                         <div class="flex justify-between border-b py-2">
                             <span class="text-secondary">Created</span
-                            ><span class="font-medium">{{ fmt(obj.createdAt) }}</span>
+                            ><span class="font-medium">{{ fmt(obj().createdAt) }}</span>
                         </div>
                         <div class="flex justify-between border-b py-2">
                             <span class="text-secondary">Updated</span
-                            ><span class="font-medium">{{ fmt(obj.updatedAt) }}</span>
+                            ><span class="font-medium">{{ fmt(obj().updatedAt) }}</span>
                         </div>
                         <div class="flex justify-between border-b py-2">
                             <span class="text-secondary">Closed</span
-                            ><span class="font-medium">{{ obj.closedAt ? fmt(obj.closedAt) : '—' }}</span>
+                            ><span class="font-medium">{{ obj().closedAt ? fmt(obj().closedAt) : '—' }}</span>
                         </div>
                     </div>
-                    @if (obj.description) {
+                    @if (obj().description) {
                         <div class="mt-6">
                             <div class="text-secondary mb-1">Description</div>
-                            <div class="whitespace-pre-wrap">{{ obj.description }}</div>
+                            <div class="whitespace-pre-wrap">{{ obj().description }}</div>
                         </div>
                     }
                     @if (attributeRows.length) {
@@ -109,7 +110,7 @@
                             }
                         </div>
                     }
-                } @else if (loading) {
+                } @else if (loading()) {
                     <div class="grid grid-cols-1 gap-x-8 gap-y-1 pt-6 sm:grid-cols-2" aria-busy="true">
                         @for (i of [0, 1, 2, 3, 4, 5, 6, 7]; track i) {
                             <div class="flex items-center justify-between border-b py-2">
@@ -130,8 +131,8 @@
                             <span class="ml-2">Link…</span>
                         </button>
                     </div>
-                    @if (g6 && g6.nodes.length) {
-                        <inspecto-graph-view [data]="g6" (nodeClick)="onNodeClick($event)"></inspecto-graph-view>
+                    @if (g6() && g6().nodes.length) {
+                        <inspecto-graph-view [data]="g6()" (nodeClick)="onNodeClick($event)"></inspecto-graph-view>
                     } @else {
                         <inspecto-empty-state
                             icon="heroicons_outline:link"
@@ -144,15 +145,15 @@
             <!-- Member timeline (a Case's contained incidents' activity, merged chronologically) -->
             <mat-tab label="Member timeline">
                 <div class="pt-6">
-                    @if (memberTimeline.length) {
+                    @if (memberTimeline().length) {
                         <div class="text-secondary mb-3 text-sm">
-                            {{ memberTimeline.length }} activity entr{{
-                                memberTimeline.length === 1 ? 'y' : 'ies'
+                            {{ memberTimeline().length }} activity entr{{
+                                memberTimeline().length === 1 ? 'y' : 'ies'
                             }}
-                            across {{ members.length }} member{{ members.length === 1 ? '' : 's' }}, newest first
+                            across {{ members().length }} member{{ members().length === 1 ? '' : 's' }}, newest first
                         </div>
                         <div class="flex flex-col divide-y divide-gray-100 dark:divide-gray-800">
-                            @for (t of memberTimeline; track t.memberId + ':' + t.createdAt + ':' + t.author) {
+                            @for (t of memberTimeline(); track t.memberId + ':' + t.createdAt + ':' + t.author) {
                                 <div class="flex flex-wrap items-start gap-x-3 py-2 text-sm">
                                     <span class="text-secondary w-44 shrink-0 tabular-nums">{{
                                         fmt(t.createdAt)
@@ -172,11 +173,11 @@
                                 </div>
                             }
                         </div>
-                    } @else if (memberTimelineLoaded) {
+                    } @else if (memberTimelineLoaded()) {
                         <inspecto-empty-state
                             icon="heroicons_outline:queue-list"
                             message="No member activity — this {{
-                                obj?.objectType?.toLowerCase() || 'object'
+                                obj()?.objectType?.toLowerCase() || 'object'
                             }} contains no other objects with comments yet."
                         ></inspecto-empty-state>
                     }
@@ -186,21 +187,21 @@
             <!-- Events -->
             <mat-tab label="Events">
                 <div class="pt-6">
-                    @if (!obj?.correlationId) {
+                    @if (!obj()?.correlationId) {
                         <inspecto-empty-state
                             icon="heroicons_outline:queue-list"
                             message="This {{
-                                obj?.objectType?.toLowerCase() || 'object'
+                                obj()?.objectType?.toLowerCase() || 'object'
                             }} has no correlation id, so it can't be tied to engine events."
                         ></inspecto-empty-state>
                     } @else {
                         <div class="text-secondary mb-3 text-sm">
                             Events sharing correlation
-                            <span class="font-mono">{{ obj?.correlationId }}</span>
+                            <span class="font-mono">{{ obj()?.correlationId }}</span>
                         </div>
-                        @if (relatedEvents.length) {
+                        @if (relatedEvents().length) {
                             <div class="flex flex-col divide-y divide-gray-100 dark:divide-gray-800">
-                                @for (e of relatedEvents; track e.eventId) {
+                                @for (e of relatedEvents(); track e.eventId) {
                                     <div class="flex flex-wrap items-center gap-x-3 py-2 text-sm">
                                         <span class="text-secondary w-44 shrink-0 tabular-nums">{{ fmt(e.ts) }}</span>
                                         <inspecto-status-badge [value]="e.level" />
@@ -211,7 +212,7 @@
                                     </div>
                                 }
                             </div>
-                        } @else if (eventsLoaded) {
+                        } @else if (eventsLoaded()) {
                             <inspecto-empty-state
                                 icon="heroicons_outline:queue-list"
                                 message="No events recorded for this correlation id."
@@ -234,7 +235,7 @@
                         </mat-form-field>
                         <button type="submit" mat-flat-button color="primary" class="mt-1">Add</button>
                     </form>
-                    @for (c of comments; track c.id) {
+                    @for (c of comments(); track c.id) {
                         <div class="bg-card rounded-lg border p-4">
                             <div class="text-secondary mb-1 text-sm">
                                 {{ c.author || 'unknown' }} · {{ fmt(c.createdAt) }}
@@ -274,7 +275,7 @@
                         </mat-form-field>
                         <button type="submit" mat-flat-button color="primary" class="mt-1">Attach</button>
                     </form>
-                    @for (a of attachments; track a.id) {
+                    @for (a of attachments(); track a.id) {
                         <div class="bg-card flex items-center justify-between rounded-lg border p-4">
                             <div class="min-w-0">
                                 <div class="truncate font-medium">

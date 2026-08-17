@@ -900,10 +900,10 @@ describe('NodeConfigDialog', () => {
             fixture.detectChanges();
 
             // ⚠ `type` is mandatory in the body: the route 422s a config that is not `transform.*`.
-            expect(previewTransform).toHaveBeenCalledWith(
-                expect.objectContaining({ type: 'transform.filter' }),
-                [{ qty: '2' }, { qty: '1' }],
-            );
+            expect(previewTransform).toHaveBeenCalledWith(expect.objectContaining({ type: 'transform.filter' }), [
+                { qty: '2' },
+                { qty: '1' },
+            ]);
             expect(fixture.nativeElement.textContent).toContain("out 'data': 1 row(s)");
         });
 

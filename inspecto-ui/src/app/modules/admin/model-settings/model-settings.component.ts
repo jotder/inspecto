@@ -1,5 +1,5 @@
 import { UpperCasePipe } from '@angular/common';
-import { Component, OnInit, ViewEncapsulation, inject, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -51,7 +51,7 @@ const TIERS = ['small', 'medium', 'large'] as const;
         InspectoAlertComponent,
     ],
     templateUrl: './model-settings.component.html',
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,
 })
 export class ModelSettingsComponent implements OnInit {
@@ -60,19 +60,19 @@ export class ModelSettingsComponent implements OnInit {
 
     readonly tiers = TIERS;
 
-    loading = false;
-    saving = false;
-    testing = false;
-    settings: AssistSettings | null = null;
-    testResult: AssistSettingsTest | null = null;
+    readonly loading = signal(false);
+    readonly saving = signal(false);
+    readonly testing = signal(false);
+    readonly settings = signal<AssistSettings | null>(null);
+    readonly testResult = signal<AssistSettingsTest | null>(null);
 
     // Form state
-    provider = 'ollama';
+    readonly provider = signal('ollama');
     baseUrl = '';
     apiKeyRef = '';
     apiKey = '';
     showKey = false;
-    models: Record<string, string> = { small: '', medium: '', large: '' };
+    readonly models = signal<Record<string, string>>({ small: '', medium: '', large: '' });
     timeoutSeconds = 60;
 
     ngOnInit(): void {
@@ -84,56 +84,56 @@ export class ModelSettingsComponent implements OnInit {
     }
 
     get hostedProviders(): string[] {
-        return (this.settings?.knownProviders ?? []).filter((p) => !this.isLocal(p));
+        return (this.settings()?.knownProviders ?? []).filter((p) => !this.isLocal(p));
     }
 
     get localProviders(): string[] {
-        return (this.settings?.knownProviders ?? []).filter((p) => this.isLocal(p));
+        return (this.settings()?.knownProviders ?? []).filter((p) => this.isLocal(p));
     }
 
     isLocal(p: string): boolean {
-        return this.settings?.defaults?.[p]?.local ?? (p === 'ollama' || p === 'llamacpp');
+        return this.settings()?.defaults?.[p]?.local ?? (p === 'ollama' || p === 'llamacpp');
     }
 
     isSelectable(p: string): boolean {
-        return (this.settings?.availableProviders ?? []).includes(p);
+        return (this.settings()?.availableProviders ?? []).includes(p);
     }
 
     get hostedJarMissing(): boolean {
-        return !!this.settings && this.hostedProviders.some((p) => !this.isSelectable(p));
+        return !!this.settings() && this.hostedProviders.some((p) => !this.isSelectable(p));
     }
 
     get currentIsLocal(): boolean {
-        return this.isLocal(this.provider);
+        return this.isLocal(this.provider());
     }
 
     /** Seed the form from a provider's defaults (called on dropdown change). */
     onProviderChange(p: string): void {
-        const d = this.settings?.defaults?.[p];
-        this.provider = p;
+        const d = this.settings()?.defaults?.[p];
+        this.provider.set(p);
         this.baseUrl = d?.baseUrl ?? '';
         this.apiKeyRef = d?.apiKeyRef ?? '';
-        this.models = { small: '', medium: '', large: '', ...(d?.models ?? {}) };
+        this.models.set({ small: '', medium: '', large: '', ...(d?.models ?? {}) });
         this.apiKey = '';
-        this.testResult = null;
+        this.testResult.set(null);
     }
 
     load(): void {
-        this.loading = true;
+        this.loading.set(true);
         this.api.settings().subscribe({
             next: (s) => {
-                this.settings = s;
-                this.loading = false;
+                this.settings.set(s);
+                this.loading.set(false);
                 if (!s.supported) return;
-                this.provider = s.provider || 'ollama';
-                this.baseUrl = s.baseUrl ?? this.settings?.defaults?.[this.provider]?.baseUrl ?? '';
+                this.provider.set(s.provider || 'ollama');
+                this.baseUrl = s.baseUrl ?? this.settings()?.defaults?.[this.provider()]?.baseUrl ?? '';
                 this.apiKeyRef = s.apiKeyRef ?? '';
-                this.models = { small: '', medium: '', large: '', ...(s.models ?? {}) };
+                this.models.set({ small: '', medium: '', large: '', ...(s.models ?? {}) });
                 this.timeoutSeconds = s.timeoutSeconds ?? 60;
             },
             error: () => {
-                this.loading = false;
-                this.settings = { supported: false };
+                this.loading.set(false);
+                this.settings.set({ supported: false });
                 this.toastr.warning('Could not load assist settings — is ControlApi running?');
             },
         });
@@ -141,42 +141,42 @@ export class ModelSettingsComponent implements OnInit {
 
     save(): void {
         const update: AssistSettingsUpdate = {
-            provider: this.provider,
+            provider: this.provider(),
             baseUrl: this.baseUrl || undefined,
             apiKeyRef: this.apiKeyRef || undefined,
             apiKey: this.apiKey || undefined,
-            models: this.models,
+            models: this.models(),
             timeoutSeconds: this.timeoutSeconds,
         };
-        this.saving = true;
+        this.saving.set(true);
         this.api.saveSettings(update).subscribe({
             next: (s) => {
-                this.settings = s;
-                this.saving = false;
+                this.settings.set(s);
+                this.saving.set(false);
                 this.apiKey = '';
-                this.testResult = null;
-                this.toastr.success(`Model provider set to ${this.label(this.provider)}`);
+                this.testResult.set(null);
+                this.toastr.success(`Model provider set to ${this.label(this.provider())}`);
             },
             error: (e) => {
-                this.saving = false;
+                this.saving.set(false);
                 this.toastr.error(apiErrorMessage(e, 'Save failed — check the control token scope (assist.write)'));
             },
         });
     }
 
     test(): void {
-        this.testing = true;
-        this.testResult = null;
+        this.testing.set(true);
+        this.testResult.set(null);
         this.api.testSettings().subscribe({
             next: (r) => {
-                this.testing = false;
-                this.testResult = r;
+                this.testing.set(false);
+                this.testResult.set(r);
                 const all = TIERS.map((t) => r[t]).filter(Boolean);
                 if (all.length && all.every((x) => x!.ok)) this.toastr.success('All tiers responded');
                 else this.toastr.warning('Some tiers failed — see results below');
             },
             error: (e) => {
-                this.testing = false;
+                this.testing.set(false);
                 this.toastr.error(apiErrorMessage(e, 'Test failed — check the control token scope (assist.write)'));
             },
         });

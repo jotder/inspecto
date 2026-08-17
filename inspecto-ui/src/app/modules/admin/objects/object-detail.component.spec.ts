@@ -64,7 +64,7 @@ describe('ObjectDetailComponent', () => {
     it('loads the object and derives its legal transitions', () => {
         const { fixture } = create();
         const c = fixture.componentInstance;
-        expect(c.obj).toEqual(CASE);
+        expect(c.obj()).toEqual(CASE);
         expect(c.actions).toEqual(['escalate', 'resolve']); // CASE @ INVESTIGATING
         expect(c.listBase).toBe('incidents'); // root test URL → fallback list base
         expect(c.listLabel).toBe('Incidents');
@@ -77,7 +77,7 @@ describe('ObjectDetailComponent', () => {
         ).toBeTruthy();
 
         // Same fixture, no correlation id: nothing the timeline could be addressed by.
-        fixture.componentInstance.obj = { ...CASE, correlationId: undefined };
+        fixture.componentInstance.obj.set({ ...CASE, correlationId: undefined });
         fixture.detectChanges();
         expect(fixture.nativeElement.querySelector('inspecto-ai-status')).toBeNull();
     });
@@ -87,7 +87,7 @@ describe('ObjectDetailComponent', () => {
         const c = fixture.componentInstance;
         c.transition('escalate');
         expect(api.transition).toHaveBeenCalledWith('obj-9', 'escalate');
-        expect(c.obj?.status).toBe('ESCALATED');
+        expect(c.obj()?.status).toBe('ESCALATED');
     });
 
     it('blocks an empty comment and submits a valid one', () => {
@@ -103,8 +103,8 @@ describe('ObjectDetailComponent', () => {
 
     it('degrades to not-found when the object load fails', () => {
         const { fixture } = create({ get: () => throwError(() => ({ status: 404 })) });
-        expect(fixture.componentInstance.obj).toBeNull();
-        expect(fixture.componentInstance.loading).toBe(false);
+        expect(fixture.componentInstance.obj()).toBeNull();
+        expect(fixture.componentInstance.loading()).toBe(false);
     });
 
     it('builds the member timeline: CONTAINS members merged, comments newest-first, attributed', () => {
@@ -134,10 +134,10 @@ describe('ObjectDetailComponent', () => {
         const c = fixture.componentInstance;
         c.loadMemberTimeline();
         // Only the two CONTAINS members (not the RELATED alert) contribute.
-        expect(c.members.map((m) => m.id)).toEqual(['inc-1', 'inc-2']);
-        expect(c.memberTimeline.map((t) => t.body)).toEqual(['later', 'first']); // newest-first
-        expect(c.memberTimeline[0].memberTitle).toBe('Geo anomaly');
-        expect(c.memberTimelineLoaded).toBe(true);
+        expect(c.members().map((m) => m.id)).toEqual(['inc-1', 'inc-2']);
+        expect(c.memberTimeline().map((t) => t.body)).toEqual(['later', 'first']); // newest-first
+        expect(c.memberTimeline()[0].memberTitle).toBe('Geo anomaly');
+        expect(c.memberTimelineLoaded()).toBe(true);
     });
 
     it('member timeline empty-states when the object contains nothing', () => {
@@ -152,9 +152,9 @@ describe('ObjectDetailComponent', () => {
         });
         const c = fixture.componentInstance;
         c.loadMemberTimeline();
-        expect(c.members).toEqual([]);
-        expect(c.memberTimeline).toEqual([]);
-        expect(c.memberTimelineLoaded).toBe(true);
+        expect(c.members()).toEqual([]);
+        expect(c.memberTimeline()).toEqual([]);
+        expect(c.memberTimelineLoaded()).toBe(true);
     });
 
     it('renders the overview with no a11y violations', async () => {

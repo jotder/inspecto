@@ -84,21 +84,21 @@ describe('JobsComponent', () => {
 
     it('lazy-loads the reporting projection when switching to reporting mode', () => {
         const c = create('ok').componentInstance;
-        expect(c.metrics).toBeNull();
+        expect(c.metrics()).toBeNull();
         c.setMode('reporting');
-        expect(c.mode).toBe('reporting');
-        expect(c.metrics?.total).toBe(4);
+        expect(c.mode()).toBe('reporting');
+        expect(c.metrics()?.total).toBe(4);
         expect(c.successPct).toBe(75);
-        expect(c.runs.length).toBe(1);
-        expect(c.chartData?.datasets.length).toBe(2); // Total + Failed series
+        expect(c.runs().length).toBe(1);
+        expect(c.chartData()?.datasets.length).toBe(2); // Total + Failed series
     });
 
     it('flags the reporting backend as disabled on a 404', () => {
         const c = create('404').componentInstance;
         c.setMode('reporting');
-        expect(c.reportDisabled).toBe(true);
-        expect(c.metrics).toBeNull();
-        expect(c.runs.length).toBe(0);
+        expect(c.reportDisabled()).toBe(true);
+        expect(c.metrics()).toBeNull();
+        expect(c.runs().length).toBe(0);
     });
 
     it('renders an accessible empty state when reporting is unavailable', async () => {

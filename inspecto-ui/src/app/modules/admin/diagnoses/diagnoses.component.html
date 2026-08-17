@@ -21,14 +21,14 @@
     <!-- Main -->
     <div class="flex flex-auto flex-col p-6 sm:p-10">
         <inspecto-data-table
-            stateKey="diagnoses()"
+            stateKey="diagnoses"
             tier="standard"
-            sourceName="diagnoses()"
-            exportName="diagnoses()"
+            sourceName="diagnoses"
+            exportName="diagnoses"
             [rows]="diagnoses()"
             [columns]="columnDefs"
             [loading]="loading()"
-            noRowsTitle="No diagnoses() yet"
+            noRowsTitle="No diagnoses yet"
             noRowsHint="None recorded, or the assist agent is not running."
             (rowClick)="openDetail($any($event))"
         />

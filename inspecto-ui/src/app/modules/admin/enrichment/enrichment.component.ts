@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, ViewEncapsulation, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDatepickerModule } from '@angular/material/datepicker';
@@ -42,18 +42,18 @@ type EnrTab = 'runs' | 'lineage' | 'report';
         FmtPercentPipe,
     ],
     templateUrl: './enrichment.component.html',
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,
 })
 export class EnrichmentComponent implements OnInit {
     private toastr = inject(ToastrService);
     private api = inject(EnrichmentService);
 
-    jobs: EnrichmentJobView[] = [];
-    loading = false;
-    unavailable = false;
+    readonly jobs = signal<EnrichmentJobView[]>([]);
+    readonly loading = signal(false);
+    readonly unavailable = signal(false);
 
-    selected: EnrichmentJobView | null = null;
+    readonly selected = signal<EnrichmentJobView | null>(null);
 
     readonly tabs: { id: EnrTab; label: string }[] = [
         { id: 'runs', label: 'Runs' },
@@ -65,13 +65,13 @@ export class EnrichmentComponent implements OnInit {
         return this.tabs[this.selectedIndex].id;
     }
 
-    rows: AuditRow[] = [];
-    detailLoading = false;
+    readonly rows = signal<AuditRow[]>([]);
+    readonly detailLoading = signal(false);
     lineageRunId = '';
 
     from: Date | null = null;
     to: Date | null = null;
-    report: EnrichmentRunReport | null = null;
+    readonly report = signal<EnrichmentRunReport | null>(null);
 
     readonly jobColumns: ColDef<EnrichmentJobView>[] = [
         { field: 'name', headerName: 'Job', flex: 1 },
@@ -99,19 +99,19 @@ export class EnrichmentComponent implements OnInit {
     }
 
     load(): void {
-        this.loading = true;
-        this.unavailable = false;
+        this.loading.set(true);
+        this.unavailable.set(false);
         this.api.list().subscribe({
             next: (j) => {
-                this.jobs = j;
-                this.loading = false;
+                this.jobs.set(j);
+                this.loading.set(false);
             },
             error: (e) => {
-                this.loading = false;
-                this.jobs = [];
+                this.loading.set(false);
+                this.jobs.set([]);
                 // See collectors: only a 404 means "no such surface here". Anything else is a failure and
                 // must not render as the affirmative "no enrichment jobs are registered".
-                this.unavailable = e?.status === 404;
+                this.unavailable.set(e?.status === 404);
                 if (e?.status !== 404) this.toastr.warning('Could not load enrichment jobs — is ControlApi running?');
             },
         });
@@ -119,9 +119,9 @@ export class EnrichmentComponent implements OnInit {
 
     onRowClick(row: EnrichmentJobView): void {
         if (!row) return;
-        this.selected = row;
+        this.selected.set(row);
         this.selectedIndex = 0;
-        this.report = null;
+        this.report.set(null);
         this.lineageRunId = '';
         this.loadTab();
     }
@@ -131,44 +131,44 @@ export class EnrichmentComponent implements OnInit {
     }
 
     loadTab(): void {
-        if (!this.selected) return;
-        const job = this.selected.name;
+        if (!this.selected()) return;
+        const job = this.selected().name;
         if (this.activeTab === 'report') {
             this.loadReport();
             return;
         }
-        this.detailLoading = true;
+        this.detailLoading.set(true);
         const call =
             this.activeTab === 'runs'
                 ? this.api.runs(job)
                 : this.api.lineage(job, this.lineageRunId.trim() || undefined);
         call.subscribe({
             next: (r) => {
-                this.rows = r;
-                this.detailLoading = false;
+                this.rows.set(r);
+                this.detailLoading.set(false);
             },
             error: () => {
-                this.rows = [];
-                this.detailLoading = false;
+                this.rows.set([]);
+                this.detailLoading.set(false);
             },
         });
     }
 
     loadReport(): void {
-        if (!this.selected) return;
-        this.detailLoading = true;
+        if (!this.selected()) return;
+        this.detailLoading.set(true);
         const window = {
             from: this.from ? this.from.toISOString() : undefined,
             to: this.to ? this.to.toISOString() : undefined,
         };
-        this.api.report(this.selected.name, window).subscribe({
+        this.api.report(this.selected().name, window).subscribe({
             next: (r) => {
-                this.report = r;
-                this.detailLoading = false;
+                this.report.set(r);
+                this.detailLoading.set(false);
             },
             error: () => {
-                this.report = null;
-                this.detailLoading = false;
+                this.report.set(null);
+                this.detailLoading.set(false);
             },
         });
     }

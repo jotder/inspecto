@@ -1,4 +1,4 @@
-import { Component, DestroyRef, OnInit, inject, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -51,7 +51,7 @@ import { CHART_SERIES } from 'app/inspecto/theme/chart-tokens';
         StatusBadgeComponent,
         DataTableComponent,
     ],
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     templateUrl: './dashboard.component.html',
 })
 export class DashboardComponent implements OnInit {
@@ -63,20 +63,20 @@ export class DashboardComponent implements OnInit {
     private destroyRef = inject(DestroyRef);
 
     autoRefresh = true;
-    loading = true;
-    ready: ReadyStatus | null = null;
-    status: StatusReport | null = null;
-    report: ServiceReport | null = null;
-    metricsText = '';
+    readonly loading = signal(true);
+    readonly ready = signal<ReadyStatus | null>(null);
+    readonly status = signal<StatusReport | null>(null);
+    readonly report = signal<ServiceReport | null>(null);
+    readonly metricsText = signal('');
     showMetrics = false;
 
-    latencyData: ChartData | null = null;
-    outcomeData: ChartData | null = null;
+    readonly latencyData = signal<ChartData | null>(null);
+    readonly outcomeData = signal<ChartData | null>(null);
 
     /** Compact acquisition KPIs (empty when the deployment has no acquisition activity). */
     acqCards: { label: string; value: string }[] = [];
     /** Newest few events for the activity feed (GET /events/search?limit=8). */
-    recentEvents: EventRow[] = [];
+    readonly recentEvents = signal<EventRow[]>([]);
 
     readonly pipelineColumns: ColDef<RunStatus>[] = [
         { field: 'pipeline', headerName: 'Pipeline', flex: 1 },
@@ -113,7 +113,7 @@ export class DashboardComponent implements OnInit {
     }
 
     refresh(): void {
-        this.loading = true;
+        this.loading.set(true);
         // Each source degrades independently — a single failing endpoint shouldn't blank the whole
         // dashboard. forkJoin then always completes; we warn only if every core call failed.
         forkJoin({
@@ -122,12 +122,12 @@ export class DashboardComponent implements OnInit {
             report: this.reports.serviceReport().pipe(catchError(() => of(null))),
             metrics: this.health.metrics().pipe(catchError(() => of(null))),
         }).subscribe(({ ready, status, report, metrics }) => {
-            this.ready = ready;
-            this.status = status;
-            this.report = report;
-            this.metricsText = metrics ?? '';
+            this.ready.set(ready);
+            this.status.set(status);
+            this.report.set(report);
+            this.metricsText.set(metrics ?? '');
             if (report) {
-                this.latencyData = {
+                this.latencyData.set({
                     labels: ['p50', 'p95', 'p99'],
                     datasets: [
                         {
@@ -136,8 +136,8 @@ export class DashboardComponent implements OnInit {
                             backgroundColor: CHART_SERIES.primary,
                         },
                     ],
-                };
-                this.outcomeData = {
+                });
+                this.outcomeData.set({
                     labels: ['Success', 'Failed'],
                     datasets: [
                         {
@@ -145,9 +145,9 @@ export class DashboardComponent implements OnInit {
                             backgroundColor: [CHART_SERIES.success, CHART_SERIES.error],
                         },
                     ],
-                };
+                });
             }
-            this.loading = false;
+            this.loading.set(false);
             if (!ready && !status && !report && metrics === null) {
                 this.toastr.error('Failed to load service status. The backend may be unreachable.');
             }
@@ -160,13 +160,13 @@ export class DashboardComponent implements OnInit {
             error: () => (this.acqCards = []),
         });
         this.eventsApi.search({ limit: 8 }).subscribe({
-            next: (e) => (this.recentEvents = e),
-            error: () => (this.recentEvents = []),
+            next: (e) => this.recentEvents.set(e),
+            error: () => this.recentEvents.set([]),
         });
     }
 
     get errorRatePct(): string {
-        return this.report ? fmtPercent(this.report.errorRate) : '—';
+        return this.report() ? fmtPercent(this.report().errorRate) : '—';
     }
 
     private total(m: AcquisitionMetrics, name: string): number {

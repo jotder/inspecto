@@ -220,15 +220,17 @@ export class OperationalDbComponent {
         this.testing.set(true);
         this.result.set(null);
         const v = this.form.getRawValue();
-        this.system.testOperationalDb({ url: v.url, user: v.user || undefined, password: v.password || undefined }).subscribe({
-            next: (r) => {
-                this.result.set(r);
-                this.testing.set(false);
-            },
-            error: (e) => {
-                this.toastr.error(apiErrorMessage(e, 'The connection test could not run.'));
-                this.testing.set(false);
-            },
-        });
+        this.system
+            .testOperationalDb({ url: v.url, user: v.user || undefined, password: v.password || undefined })
+            .subscribe({
+                next: (r) => {
+                    this.result.set(r);
+                    this.testing.set(false);
+                },
+                error: (e) => {
+                    this.toastr.error(apiErrorMessage(e, 'The connection test could not run.'));
+                    this.testing.set(false);
+                },
+            });
     }
 }

@@ -76,7 +76,7 @@ describe('RunDetailComponent', () => {
 
     it('loads the batches tab on init', () => {
         const c = create().componentInstance;
-        expect(c.rows).toEqual([BATCH]);
+        expect(c.rows()).toEqual([BATCH]);
     });
 
     it('shows Reprocess in the default (Builder) lens on the Batches tab', () => {
@@ -102,7 +102,7 @@ describe('RunDetailComponent', () => {
         const c = create().componentInstance;
         c.selectedIndex = c.tabs.findIndex((t) => t.id === 'quarantine');
         c.onTabChange();
-        expect(c.rows).toEqual([QUARANTINED]);
+        expect(c.rows()).toEqual([QUARANTINED]);
         const actions = c.auditRowActions;
         expect(actions.map((a) => a.hint)).toEqual([
             'Lineage & details',

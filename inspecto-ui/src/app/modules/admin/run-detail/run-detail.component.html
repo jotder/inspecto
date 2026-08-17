@@ -36,7 +36,7 @@
             }
         </mat-tab-group>
 
-        @if (loading) {
+        @if (loading()) {
             <div class="mt-6 flex items-center gap-3">
                 <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
                 <span class="text-secondary">Loading…</span>
@@ -71,38 +71,38 @@
                 </mat-form-field>
                 <button mat-flat-button color="primary" (click)="loadReport()">Run report</button>
             </div>
-            @if (report && !loading) {
+            @if (report() && !loading()) {
                 <table class="mt-6 w-fit text-sm [&_td]:px-3 [&_td]:py-1.5 [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left">
                     <tbody>
                         <tr class="border-b">
                             <th scope="row">Total batches</th>
-                            <td>{{ report.totalBatches }}</td>
+                            <td>{{ report().totalBatches }}</td>
                             <th scope="row">Success</th>
-                            <td>{{ report.success }}</td>
+                            <td>{{ report().success }}</td>
                             <th scope="row">Failed</th>
-                            <td>{{ report.failed }}</td>
+                            <td>{{ report().failed }}</td>
                         </tr>
                         <tr class="border-b">
                             <th scope="row">Error rate</th>
-                            <td>{{ report.errorRate | fmtPercent }}</td>
+                            <td>{{ report().errorRate | fmtPercent }}</td>
                             <th scope="row">Output rows</th>
-                            <td>{{ report.totalOutputRows }}</td>
+                            <td>{{ report().totalOutputRows }}</td>
                             <th scope="row">Output files</th>
-                            <td>{{ report.totalOutputFiles ?? '—' }}</td>
+                            <td>{{ report().totalOutputFiles ?? '—' }}</td>
                         </tr>
                         <tr class="border-b">
                             <th scope="row">p50 (ms)</th>
-                            <td>{{ report.p50DurationMs }}</td>
+                            <td>{{ report().p50DurationMs }}</td>
                             <th scope="row">p95 (ms)</th>
-                            <td>{{ report.p95DurationMs }}</td>
+                            <td>{{ report().p95DurationMs }}</td>
                             <th scope="row">p99 (ms)</th>
-                            <td>{{ report.p99DurationMs }}</td>
+                            <td>{{ report().p99DurationMs }}</td>
                         </tr>
                         <tr>
                             <th scope="row">Window from</th>
-                            <td colspan="2">{{ report.windowFrom }}</td>
+                            <td colspan="2">{{ report().windowFrom }}</td>
                             <th scope="row">Window to</th>
-                            <td colspan="2">{{ report.windowTo }}</td>
+                            <td colspan="2">{{ report().windowTo }}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -110,20 +110,22 @@
         }
 
         <!-- Files tab: processing-status breakdown + search -->
-        @if (activeTab === 'files' && !loading) {
+        @if (activeTab === 'files' && !loading()) {
             <div class="mt-4 flex flex-wrap items-center gap-2">
                 <div
                     class="rounded-xl border px-4 py-2 text-center"
-                    [class.border-amber-500]="(inbox?.pending || 0) > 0"
+                    [class.border-amber-500]="(inbox()?.pending || 0) > 0"
                 >
-                    <div class="text-xl font-bold">{{ inbox ? (inbox.pending < 0 ? '—' : inbox.pending) : '…' }}</div>
+                    <div class="text-xl font-bold">
+                        {{ inbox() ? (inbox().pending < 0 ? '—' : inbox().pending) : '…' }}
+                    </div>
                     <div class="text-secondary text-xs">Pending</div>
                 </div>
-                <div class="rounded-xl border px-4 py-2 text-center" [class.border-blue-500]="inbox?.running">
-                    <div class="text-xl font-bold">{{ inbox ? (inbox.running ? 'Yes' : 'No') : '…' }}</div>
+                <div class="rounded-xl border px-4 py-2 text-center" [class.border-blue-500]="inbox()?.running">
+                    <div class="text-xl font-bold">{{ inbox() ? (inbox().running ? 'Yes' : 'No') : '…' }}</div>
                     <div class="text-secondary text-xs">Processing</div>
                 </div>
-                @if (inbox?.current; as cur) {
+                @if (inbox()?.current; as cur) {
                     <div
                         class="rounded-xl border border-blue-500 px-4 py-2"
                         [matTooltip]="'batch ' + cur.batchId + ' · started ' + cur.startedAt"
@@ -132,14 +134,14 @@
                         <div class="text-secondary text-xs">Current file ({{ cur.index }} of {{ cur.total }})</div>
                     </div>
                 }
-                @if (inbox?.step; as st) {
+                @if (inbox()?.step; as st) {
                     <div
                         class="rounded-xl border border-blue-500 px-4 py-2"
                         [matTooltip]="'consignment ' + st.consignmentId + ' · started ' + st.startedAt"
                     >
                         <div class="font-mono text-sm font-bold">{{ st.step }}</div>
                         <div class="text-secondary text-xs">
-                            Step {{ st.index }} of {{ st.total }} · in step for {{ stepAgeText }}
+                            Step {{ st.index }} of {{ st.total }} · in step for {{ stepAgeText() }}
                         </div>
                     </div>
                 }
@@ -183,9 +185,9 @@
             </div>
             <p class="text-secondary mt-2 text-sm">
                 <b>Pending</b> / <b>Processing</b> are live from the inbox
-                @if (inbox?.inbox) {
+                @if (inbox()?.inbox) {
                     <span>
-                        (<code>{{ inbox?.inbox }}</code
+                        (<code>{{ inbox()?.inbox }}</code
                         >)</span
                     >
                 }
@@ -218,19 +220,19 @@
         }
 
         <!-- Generic audit-row grid (batches / lineage / quarantine / commits) -->
-        @if (activeTab === 'batches' && hasFailedBatches && !loading) {
+        @if (activeTab === 'batches' && hasFailedBatches() && !loading()) {
             <inspecto-alert class="mt-4 block" variant="info" title="Failed consignments retry automatically">
                 A FAILED consignment leaves no processed marker, so its files are rediscovered on the next inbox poll
                 and retried — they reappear as Pending on the Files tab without any action needed.
             </inspecto-alert>
         }
-        @if (activeTab !== 'report' && activeTab !== 'files' && !loading) {
+        @if (activeTab !== 'report' && activeTab !== 'files' && !loading()) {
             <inspecto-data-table
                 class="mt-4 block"
                 tier="standard"
                 [sourceName]="activeTab"
                 [exportName]="activeTab"
-                [rows]="rows"
+                [rows]="rows()"
                 [rowActions]="auditRowActions"
                 noRowsTitle="No rows"
             />

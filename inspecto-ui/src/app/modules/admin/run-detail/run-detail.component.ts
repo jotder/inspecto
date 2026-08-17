@@ -1,12 +1,13 @@
 import {
+    ChangeDetectionStrategy,
     Component,
     effect,
     inject,
     input,
     OnInit,
     output,
+    signal,
     ViewEncapsulation,
-    ChangeDetectionStrategy,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -64,7 +65,7 @@ type FileFilter = 'ALL' | 'SUCCESS' | 'REJECTED' | 'ERRORED';
         RouterLink,
     ],
     templateUrl: './run-detail.component.html',
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,
 })
 export class RunDetailComponent implements OnInit {
@@ -84,18 +85,18 @@ export class RunDetailComponent implements OnInit {
     readonly closed = output<void>();
 
     name = '';
-    loading = false;
+    readonly loading = signal(false);
 
     /** The panel stays mounted while the user clicks through runs — reload when the bound name changes. */
     private readonly reloadOnName = effect(() => {
         const n = this.nameInput();
         if (n === undefined || n === this.name) return;
         this.name = n;
-        this.rows = [];
+        this.rows.set([]);
         this.allFiles = [];
-        this.inbox = null;
-        this.stepAgeText = '';
-        this.report = null;
+        this.inbox.set(null);
+        this.stepAgeText.set('');
+        this.report.set(null);
         this.lineageBatchId = '';
         this.loadTab();
     });
@@ -113,24 +114,24 @@ export class RunDetailComponent implements OnInit {
         return this.tabs[this.selectedIndex].id;
     }
 
-    rows: AuditRow[] = []; // generic grid (batches/lineage/quarantine/commits)
+    readonly rows = signal<AuditRow[]>([]); // generic grid (batches/lineage/quarantine/commits)
     /** Batches tab only: whether any consignment is FAILED — gates the retry-is-automatic notice. */
-    hasFailedBatches = false;
+    readonly hasFailedBatches = signal(false);
     lineageBatchId = '';
 
     // files tab
     allFiles: AuditRow[] = [];
-    inbox: InboxStatus | null = null;
+    readonly inbox = signal<InboxStatus | null>(null);
     /** Age of the step gauge's `startedAt`, computed ONCE per load — a template call to a
      *  Date.now()-based formatter changes between change-detection passes and throws NG0100. */
-    stepAgeText = '';
+    readonly stepAgeText = signal('');
     fileStatus: FileFilter = 'ALL';
     readonly fileFilters: FileFilter[] = ['ALL', 'SUCCESS', 'REJECTED', 'ERRORED'];
 
     // report tab
     from: Date | null = null;
     to: Date | null = null;
-    report: BatchAuditReport | null = null;
+    readonly report = signal<BatchAuditReport | null>(null);
 
     ngOnInit(): void {
         this.name = this.nameInput() ?? this.route.snapshot.paramMap.get('name') ?? '';
@@ -151,7 +152,7 @@ export class RunDetailComponent implements OnInit {
             this.loadFiles();
             return;
         }
-        this.loading = true;
+        this.loading.set(true);
         const call: Observable<AuditRow[] | string[]> =
             tab === 'batches'
                 ? this.api.batches(this.name)
@@ -163,21 +164,23 @@ export class RunDetailComponent implements OnInit {
 
         call.subscribe({
             next: (data: AuditRow[] | string[]) => {
-                this.rows = (data as unknown[]).map((d) =>
-                    typeof d === 'string' ? ({ commit: d } as AuditRow) : (d as AuditRow),
+                this.rows.set(
+                    (data as unknown[]).map((d) =>
+                        typeof d === 'string' ? ({ commit: d } as AuditRow) : (d as AuditRow),
+                    ),
                 );
-                this.hasFailedBatches = tab === 'batches' && this.rows.some((r) => r['status'] === 'FAILED');
-                this.loading = false;
+                this.hasFailedBatches.set(tab === 'batches' && this.rows().some((r) => r['status'] === 'FAILED'));
+                this.loading.set(false);
             },
             error: () => {
-                this.loading = false;
-                this.rows = [];
+                this.loading.set(false);
+                this.rows.set([]);
             },
         });
     }
 
     loadFiles(): void {
-        this.loading = true;
+        this.loading.set(true);
         // processed history (audit) + live inbox/processing status, together.
         forkJoin({
             files: this.api.files(this.name),
@@ -185,33 +188,33 @@ export class RunDetailComponent implements OnInit {
         }).subscribe({
             next: ({ files, inbox }) => {
                 this.allFiles = files;
-                this.inbox = inbox;
-                this.stepAgeText = inbox?.step ? this.stepAge(inbox.step.startedAt) : '';
-                this.loading = false;
+                this.inbox.set(inbox);
+                this.stepAgeText.set(inbox?.step ? this.stepAge(inbox.step.startedAt) : '');
+                this.loading.set(false);
             },
             error: () => {
                 this.allFiles = [];
-                this.inbox = null;
-                this.stepAgeText = '';
-                this.loading = false;
+                this.inbox.set(null);
+                this.stepAgeText.set('');
+                this.loading.set(false);
             },
         });
     }
 
     loadReport(): void {
-        this.loading = true;
+        this.loading.set(true);
         const window = {
             from: this.from ? this.from.toISOString() : undefined,
             to: this.to ? this.to.toISOString() : undefined,
         };
         this.api.report(this.name, window).subscribe({
             next: (r) => {
-                this.report = r;
-                this.loading = false;
+                this.report.set(r);
+                this.loading.set(false);
             },
             error: () => {
-                this.loading = false;
-                this.report = null;
+                this.loading.set(false);
+                this.report.set(null);
             },
         });
     }

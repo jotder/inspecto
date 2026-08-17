@@ -44,14 +44,14 @@
         @if (unavailable()) {
             <inspecto-empty-state
                 icon="heroicons_outline:inbox-arrow-down"
-                message="No acquisition collectors() are configured (no pipeline declares a collector block)."
+                message="No acquisition collectors are configured (no pipeline declares a collector block)."
             ></inspecto-empty-state>
         } @else {
             <inspecto-data-table
-                stateKey="collectors()"
+                stateKey="collectors"
                 tier="standard"
-                sourceName="collectors()"
-                exportName="collectors()"
+                sourceName="collectors"
+                exportName="collectors"
                 [rows]="collectors()"
                 [columns]="columnDefs"
                 [rowActions]="rowActions"

@@ -67,9 +67,7 @@ describe('PipelineGuaranteesPanelComponent', () => {
         const withAcq: AuthoredPipeline = {
             ...MODEL,
             nodes: MODEL.nodes.map((n) =>
-                n.id === 'acq'
-                    ? { ...n, config: { ...n.config, duplicate_check: true, markers_dir: '/markers' } }
-                    : n,
+                n.id === 'acq' ? { ...n, config: { ...n.config, duplicate_check: true, markers_dir: '/markers' } } : n,
             ),
         };
         const { fixture, c } = create({ model: withAcq, editable: true });

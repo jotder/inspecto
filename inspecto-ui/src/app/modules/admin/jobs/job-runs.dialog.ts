@@ -21,12 +21,12 @@ import { fmtDateTime } from 'app/inspecto/grid';
             } @else {
                 <inspecto-data-table
                     tier="standard"
-                    sourceName="runs()"
-                    exportName="runs()"
+                    sourceName="runs"
+                    exportName="runs"
                     [rows]="runs()"
                     [columns]="columnDefs"
                     height="24rem"
-                    noRowsTitle="No runs() yet"
+                    noRowsTitle="No runs yet"
                 />
             }
         </mat-dialog-content>
