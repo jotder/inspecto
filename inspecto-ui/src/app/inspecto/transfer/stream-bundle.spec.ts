@@ -165,18 +165,14 @@ describe('stream-bundle — import plan', () => {
         expect(p.schema?.name).toBe('orders_copy_schema');
         expect((p.schema?.config['raw'] as Record<string, unknown>)['name']).toBe('orders_copy_schema');
         // W3: a bare basename beside the pipeline, so the import needs no path rewrite at all.
-        expect((p.pipeline['processing'] as Record<string, unknown>)['schema_file']).toBe(
-            'orders_copy_schema.toon',
-        );
+        expect((p.pipeline['processing'] as Record<string, unknown>)['schema_file']).toBe('orders_copy_schema.toon');
     });
 
     it('handles a single-space (no space id) target', () => {
         const p = planFor('orders_copy', null);
         expect((p.pipeline['dirs'] as Record<string, string>)['poll']).toBe('./data/inbox/orders_copy');
         // Identical to the spaced target — that portability is the whole point of the bare form.
-        expect((p.pipeline['processing'] as Record<string, unknown>)['schema_file']).toBe(
-            'orders_copy_schema.toon',
-        );
+        expect((p.pipeline['processing'] as Record<string, unknown>)['schema_file']).toBe('orders_copy_schema.toon');
     });
 
     it('rewires every segment path and sanitizes the derived names', () => {
@@ -202,7 +198,7 @@ describe('stream-bundle — import plan', () => {
      * It only became reachable when new pipelines started carrying an `id` at birth; before that almost
      * no config had one, so there was nothing to carry.
      */
-    it('registers under an id stamped from the TYPED name, never the source bundle\'s', () => {
+    it("registers under an id stamped from the TYPED name, never the source bundle's", () => {
         const b = build({ pipeline: { ...PIPELINE, id: 'orders_feed' } });
         const p = planStreamImport(b, { name: 'Orders-EU', space: 'prod' });
         expect(p.pipeline['id']).toBe('orders_eu');

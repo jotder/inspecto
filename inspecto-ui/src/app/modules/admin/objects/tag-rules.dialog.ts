@@ -184,7 +184,12 @@ export class TagRulesDialog {
      * closing bare would leave every rule edit invisible behind the dialog. Guarded because the
      * "add a rule" form is a draft Esc used to discard silently.
      */
-    readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm, () => this.changed());
+    readonly requestClose = guardDirtyClose(
+        this.ref,
+        () => this.form.dirty,
+        this.confirm,
+        () => this.changed(),
+    );
 
     readonly rules = signal<TagRule[]>([...this.data.rules]);
     readonly busy = signal(false);

@@ -98,11 +98,7 @@ export class TagDialog {
      * treats any falsy result as "cancelled, but re-read the registry" (a tag may have been created
      * in here), which `undefined` satisfies exactly as the old `null` did.
      */
-    readonly requestClose = guardDirtyClose(
-        this.ref,
-        () => this.dirty() || !!this.newTag.value?.trim(),
-        this.confirm,
-    );
+    readonly requestClose = guardDirtyClose(this.ref, () => this.dirty() || !!this.newTag.value?.trim(), this.confirm);
     readonly data = inject<{ targets: OperationalObject[]; registry: Tag[] }>(MAT_DIALOG_DATA);
 
     readonly tags = signal<Tag[]>([...this.data.registry]);

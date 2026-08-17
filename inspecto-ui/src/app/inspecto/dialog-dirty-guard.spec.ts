@@ -64,7 +64,12 @@ describe('guardDirtyClose', () => {
         const { ref, close } = fakeRef();
         const { svc } = fakeConfirm(true);
         let changed = false;
-        const requestClose = guardDirtyClose(ref, () => false, svc, () => changed);
+        const requestClose = guardDirtyClose(
+            ref,
+            () => false,
+            svc,
+            () => changed,
+        );
 
         await requestClose();
         expect(close).toHaveBeenLastCalledWith(false);

@@ -208,7 +208,6 @@ export interface StreamImportPlan {
     requires: StreamRequirement[];
 }
 
-
 /**
  * Turn a parsed bundle into the exact set of writes for THIS target, under a (possibly new) name.
  * Pure — the caller performs the writes. Every rewrite that changes behaviour is reported in

@@ -338,8 +338,8 @@ export interface NodeConfigResult {
                             <span class="ml-1">Test this Step</span>
                         </button>
                         <div class="text-secondary mt-1 text-sm">
-                            Runs these settings over the {{ testRows.length }} row(s) your parse step
-                            produced. Nothing is written.
+                            Runs these settings over the {{ testRows.length }} row(s) your parse step produced. Nothing
+                            is written.
                         </div>
                         @if (testError(); as e) {
                             <p class="text-warn m-0 mt-2 text-sm" role="alert">{{ e }}</p>
@@ -593,12 +593,14 @@ export class NodeConfigDialog {
         // response reads as text, so a third family adds a `map`, not another handler pair.
         const lines$ =
             family === 'transform'
-                ? this.components.previewTransform({ ...config, type: this.data.node.type }, rows).pipe(
-                      map((p) => [
-                          `in: ${p.inputColumns.length} column(s) over ${rows.length} row(s)`,
-                          ...p.relations.map((r) => `out '${r.rel}': ${r.rowCount} row(s)`),
-                      ]),
-                  )
+                ? this.components
+                      .previewTransform({ ...config, type: this.data.node.type }, rows)
+                      .pipe(
+                          map((p) => [
+                              `in: ${p.inputColumns.length} column(s) over ${rows.length} row(s)`,
+                              ...p.relations.map((r) => `out '${r.rel}': ${r.rowCount} row(s)`),
+                          ]),
+                      )
                 : this.components
                       .previewSink(config, rows)
                       .pipe(

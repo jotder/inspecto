@@ -170,7 +170,12 @@ export class CaseRulesDialog {
      * every rule edit made in this dialog from the list behind it. Guarded because the "add a rule"
      * form is a draft — Esc used to bin a half-typed rule without asking.
      */
-    readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm, () => this.changed());
+    readonly requestClose = guardDirtyClose(
+        this.ref,
+        () => this.form.dirty,
+        this.confirm,
+        () => this.changed(),
+    );
 
     readonly rules = signal<CaseRule[]>([]);
     readonly busy = signal(false);
