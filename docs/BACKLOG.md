@@ -681,6 +681,18 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md).
 
 **Open:**
+- 🟡 **WRITE-1 — `/config/write`'s legacy-filename fallback cannot tell "this pipeline gaining an id"
+  from "a different pipeline with the same label"** (opened 2026-08-17 by review of `6dd86e5a`). A
+  pipeline's file is now named for its `id`; when that file does not exist the route probes the display
+  `name` so a pre-id config keeps being edited in place rather than forked. A file that declares a
+  *different* `id` is now refused (`ConfigRoutes.adoptable`, with a test), but a legacy file carrying **no
+  `id:` at all** is genuinely indistinguishable from the same pipeline gaining one — the request carries
+  nothing that separates them. With `overwrite:true` that adopts, and replaces, the other config. ⚠ No UI
+  caller passes `overwrite:true` for a pipeline today, so this is latent, not live. Closing it needs the
+  caller to name the file it means (an explicit `path`/`legacyName` in the body) — an API-shape decision,
+  not a patch. ⛔ Do **not** "fix" it by teaching the server the UI's slug-narrowing rule: that would make
+  the control plane depend on a client-side derivation, and adopting a file whose registered identity
+  differs is a *rename*, which `PipelineRoutes.rename` already owns.
 - ~~🟢 **MOCK-1 — the offline mock's lift emits no *derived* map node**~~ **✅ SHIPPED 2026-08-15** (opened
   the same day while shipping `processing.map`). `PipelineLift.branch` puts a `transform.map` node on
   **every** path through `lift()` — only its config is conditional — while `mock/pipeline-editable.ts`

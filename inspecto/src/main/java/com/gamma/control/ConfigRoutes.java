@@ -163,10 +163,10 @@ final class ConfigRoutes implements RouteModule {
 
         // Filename from the config's own identity field — no caller-controlled path component.
         List<String> idFields = identityFields(type);
-        String idField = firstPresent(draft, idFields);
-        if (idField == null)
+        String identity = firstPresentValue(draft, idFields);
+        if (identity == null)
             throw new ApiException(422, "config is missing its identity field '" + idFields.getFirst() + "'");
-        String safeIdentity = WriteGates.safeName(dottedString(draft, idField), "config name");
+        String safeIdentity = WriteGates.safeName(identity, "config name");
         Path target = WriteGates.jail(writeRoot,
                 dir.resolve(fileBase(type, safeIdentity) + ".toon"), "resolved path");
 
@@ -175,14 +175,18 @@ final class ConfigRoutes implements RouteModule {
         //
         // ⚠ A fallback candidate is PROBED, never enforced: a display `name` has no pattern of its own, so
         // `safeName` here would 422 the very writes the id-keyed filename exists to make possible.
+        //
+        // ⛔ And it is only ADOPTED when the file on disk agrees it is the same config — see
+        // {@link #adoptable}. Two pipelines may legitimately share a display name; retargeting on the
+        // label alone would let a write to one silently replace the other.
         if (idFields.size() > 1 && !Files.exists(target)) {
             for (String fallback : idFields.subList(1, idFields.size())) {
                 String raw = dottedString(draft, fallback);
                 if (!WriteGates.isSafeName(raw)) continue;
-                Path legacy = WriteGates.jail(writeRoot,
-                        dir.resolve(fileBase(type, raw.trim()) + ".toon"), "resolved path");
-                if (Files.exists(legacy)) {
-                    safeIdentity = raw.trim();
+                // resolveConfigFile, not a hand-rolled join: a legacy config may sit under the bare
+                // `<name>.toon` back-compat form, which /config/read and /config/patch both honour.
+                Path legacy = resolveConfigFile(writeRoot, dir, type, raw.trim());
+                if (Files.isRegularFile(legacy) && adoptable(legacy, idFields.getFirst(), identity)) {
                     target = legacy;
                     break;
                 }
@@ -937,13 +941,30 @@ final class ConfigRoutes implements RouteModule {
         };
     }
 
-    /** The first of {@code fields} the draft actually carries a non-blank value for, or {@code null}. */
-    private static String firstPresent(Map<String, Object> draft, List<String> fields) {
+    /** The value of the first of {@code fields} the draft carries a non-blank value for, else {@code null}. */
+    private static String firstPresentValue(Map<String, Object> draft, List<String> fields) {
         for (String f : fields) {
             String v = dottedString(draft, f);
-            if (v != null && !v.isBlank()) return f;
+            if (v != null && !v.isBlank()) return v;
         }
         return null;
+    }
+
+    /**
+     * Whether an existing file found by a FALLBACK identity field may be adopted as this draft's target:
+     * true only when the file is genuinely a pre-{@code id} config (it declares no {@code idField} of its
+     * own) or already declares exactly this identity.
+     *
+     * <p>⛔ Without this the probe matches on the display label alone, and a display name is not unique —
+     * writing a new pipeline {@code {name: "Orders", id: "orders_v2"}} beside a legacy {@code Orders}
+     * would retarget onto the legacy file and, with {@code overwrite:true}, destroy it.
+     *
+     * <p>⚠ Partial by construction: a candidate declaring NO id is indistinguishable from "the same
+     * pipeline gaining one", so it is still adopted. BACKLOG §6 WRITE-1 tracks the API-shape decision.
+     */
+    private static boolean adoptable(Path candidate, String idField, String identity) throws IOException {
+        String declared = dottedString(ConfigLoader.filesystem().decode(candidate.toString()), idField);
+        return declared == null || declared.isBlank() || declared.trim().equals(identity.trim());
     }
 
     /** Read a dotted key (e.g. {@code job.name}) from a nested config map, or {@code null} if absent. */

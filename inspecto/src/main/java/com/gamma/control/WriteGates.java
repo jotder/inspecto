@@ -25,11 +25,10 @@ final class WriteGates {
 
     /** Gate 2 — a name/id unusable as a jailed filename → 422. Returns the trimmed name. */
     static String safeName(String raw, String what) {
-        String safe = raw == null ? "" : raw.trim();
-        if (!isSafeName(safe))
+        if (!isSafeName(raw))
             throw new ApiException(422,
                     "unsafe " + what + " '" + raw + "' (allowed: letters, digits, '.', '_', '-')");
-        return safe;
+        return raw.trim();
     }
 
     /**

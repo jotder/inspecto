@@ -302,30 +302,72 @@ class ControlApiConfigWriteTest {
     /**
      * A pipeline written before the id was stamped at birth lives under a name-derived filename. Editing it
      * must UPDATE that file, not fork a second config beside it under the id.
+     *
+     * <p>⚠ The two candidates differ by more than CASE on purpose. An earlier version of this test used
+     * {@code Legacy}/{@code legacy}, and on a case-insensitive filesystem (Windows — where this team's
+     * gate runs) the id-cased path already resolves to the legacy file, so {@code Files.exists(target)}
+     * is true and the fallback branch never executes. It asserted a file count that held either way and
+     * therefore pinned nothing on the platform it actually ran on.
      */
     @Test
     void anIdStampedOntoALegacyConfigKeepsEditingTheExistingFile(@TempDir Path cfg, @TempDir Path root)
             throws Exception {
         try (Ctx c = open(cfg, root)) {
-            assertEquals(200, post(c.port, "/config/write", pipeline("Legacy")).statusCode());
-            assertTrue(Files.exists(root.resolve("Legacy_pipeline.toon")), "legacy file is named for `name`");
+            assertEquals(200, post(c.port, "/config/write", pipeline("Legacy-Feed")).statusCode());
+            assertTrue(Files.exists(root.resolve("Legacy-Feed_pipeline.toon")), "legacy file is named for `name`");
 
             String stamped = """
                     {"type":"pipeline","overwrite":true,"config":{
-                       "name":"Legacy","id":"legacy",
+                       "name":"Legacy-Feed","id":"legacy_feed",
                        "dirs":{"poll":"in","database":"out"},
                        "processing":{"threads":1}}}""";
             JsonNode out = V1Body.of(post(c.port, "/config/write", stamped).body());
             assertTrue(out.get("overwritten").asBoolean(), "the existing file was updated");
-            // ⚠ Asserted as a COUNT, not a filename. The two candidates differ only in case, and on a
-            // case-insensitive filesystem (Windows) the id-cased path already resolves to the legacy file —
-            // so the fallback never fires there and `path` comes back lowercased, while on Linux it fires
-            // and `path` keeps the original casing. Either way exactly one config exists, which is the
-            // property under test; asserting the string would pass on one platform and fail on the other.
+            assertEquals("Legacy-Feed_pipeline.toon", out.get("path").asText(), "the legacy file is edited in place");
+            // The reported identity stays the ID even though the FILE kept its legacy name — a caller
+            // using this to address the pipeline afterwards must get the key the routes are keyed by.
+            assertEquals("legacy_feed", out.get("name").asText());
             try (var entries = Files.list(root)) {
                 assertEquals(1, entries.filter(p -> p.toString().endsWith(".toon")).count(),
                         "no second config forked beside the legacy one");
             }
+        }
+    }
+
+    /**
+     * ⛔ The legacy-filename fallback matches on the display LABEL, and a label is not unique. A file that
+     * declares an identity of its own is definitively not "this config before it had an id", so it is
+     * never adopted — otherwise a write to one pipeline would destroy another that merely shares a name,
+     * silently and with {@code written:true}.
+     *
+     * <p>⚠ The residual case the server cannot decide: a legacy file with NO {@code id:} at all is
+     * indistinguishable from "the same pipeline gaining an id", because the request carries nothing that
+     * separates them. Closing that needs the caller to name the file it means — BACKLOG §6 WRITE-1.
+     */
+    @Test
+    void aPipelineDeclaringADifferentIdIsNeverAdoptedAsTheLegacyFile(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            // A config already keyed by its own id, but stored under a display-name filename.
+            String legacy = """
+                    {"type":"pipeline","config":{
+                       "name":"Orders","id":"orders",
+                       "dirs":{"poll":"in","database":"out"},
+                       "processing":{"threads":1}}}""";
+            assertEquals(200, post(c.port, "/config/write", legacy).statusCode());
+            Files.move(root.resolve("orders_pipeline.toon"), root.resolve("Orders_pipeline.toon"));
+            String legacyBefore = Files.readString(root.resolve("Orders_pipeline.toon"));
+
+            String other = """
+                    {"type":"pipeline","overwrite":true,"config":{
+                       "name":"Orders","id":"orders_v2",
+                       "dirs":{"poll":"in","database":"out"},
+                       "processing":{"threads":1}}}""";
+            JsonNode out = V1Body.of(post(c.port, "/config/write", other).body());
+            assertEquals("orders_v2_pipeline.toon", out.get("path").asText());
+            assertFalse(out.get("overwritten").asBoolean(), "a brand-new file, not the one named 'Orders'");
+            assertEquals(legacyBefore, Files.readString(root.resolve("Orders_pipeline.toon")),
+                    "the other pipeline's config is untouched");
         }
     }
 
