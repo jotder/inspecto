@@ -174,8 +174,10 @@ const ASN1_DEF = {
 };
 
 /** Segment-schema writes the pane made, in order — the two-hop contract is what these assert. */
-const schemaWrites: { type: string; config: Record<string, unknown> }[] = [];
+const schemaWrites: { type: string; config: Record<string, unknown>; opts?: Record<string, unknown> }[] = [];
 let schemaWriteFails = false;
+/** Arms the schema BACKWARD save-gate's 422 (BUILDER-1b), which the pane must offer to override. */
+let schemaBackwardRefusal = false;
 let savedSchemaMissing = false;
 
 /**
@@ -205,8 +207,14 @@ async function create(
             {
                 provide: ConfigService,
                 useValue: {
-                    write: (type: string, config: Record<string, unknown>) => {
-                        schemaWrites.push({ type, config });
+                    write: (type: string, config: Record<string, unknown>, opts?: Record<string, unknown>) => {
+                        schemaWrites.push({ type, config, opts });
+                        if (schemaBackwardRefusal && opts?.['compatibility'] !== 'none') {
+                            return throwError(() => ({
+                                status: 422,
+                                error: { error: { message: 'schema edit is not BACKWARD-compatible; not written' } },
+                            }));
+                        }
                         return schemaWriteFails ? throwError(() => new Error('disk full')) : of({ written: true });
                     },
                     // The node's saved `asn1.segments` re-hydrate from the schema toons they point at —
@@ -822,6 +830,48 @@ describe('PipelineParseDefinitionComponent', () => {
             // hop 2: the node naming what was just written
             // W3: the PORTABLE bare ref — resolves config-relative first, so the space tree moves.
             expect(fixture.componentInstance.applied!.config!['schema_file']).toBe('parse_schema.toon');
+        });
+
+        /**
+         * 🔴 BUILDER-1b, found by driving the real UI: one pipeline has ONE output schema
+         * (`<pipeline>_schema`), so changing its parse FORMAT legitimately drops columns and the
+         * BACKWARD save-gate refuses — leaving the builder with a raw 422 and no way forward. The
+         * refusal now arms an explicit override; nothing is applied until they take it.
+         */
+        it('offers to replace an output schema the BACKWARD gate refused, and retries with the override', async () => {
+            schemaBackwardRefusal = true;
+            try {
+                const fixture = await create(unschemadNode());
+                pane(fixture).onPreviewed(TABLE_PREVIEW);
+                fixture.detectChanges();
+
+                pane(fixture).submit();
+                fixture.detectChanges();
+                expect(pane(fixture).schemaReplaceNeeded()).toBe(true);
+                expect(fixture.componentInstance.applied).toBeUndefined(); // nothing applied on a refusal
+
+                pane(fixture).replaceOutputSchema();
+                fixture.detectChanges();
+                expect(schemaWrites.at(-1)?.opts?.['compatibility']).toBe('none');
+                expect(fixture.componentInstance.applied!.config!['schema_file']).toBe('parse_schema.toon');
+            } finally {
+                schemaBackwardRefusal = false;
+            }
+        });
+
+        /** ⛔ An ordinary write failure is NOT recoverable by replacing — the banner must stay away. */
+        it('does not offer the replace override for an unrelated write failure', async () => {
+            schemaWriteFails = true;
+            try {
+                const fixture = await create(unschemadNode());
+                pane(fixture).onPreviewed(TABLE_PREVIEW);
+                fixture.detectChanges();
+                pane(fixture).submit();
+                fixture.detectChanges();
+                expect(pane(fixture).schemaReplaceNeeded()).toBe(false);
+            } finally {
+                schemaWriteFails = false;
+            }
         });
 
         it('applies nothing when the schema write fails, so no node names a missing file', async () => {

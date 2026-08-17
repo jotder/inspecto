@@ -256,7 +256,7 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 > ### 🔴 BUILDER-1 — four defects found by driving the Pipelines editor as an end user (2026-08-17)
 >
 > A shift drove the real offline UI as a builder (new pipeline → Collect → parse → sample → test →
-> Apply → Save) across CSV, NDJSON and fixed-width. **Four of the five are now FIXED** (`3a23e56d` and the commit that carries this edit); one is refuted and one remains open. Each was reproduced live:
+> Apply → Save) across CSV, NDJSON and fixed-width. **Four of the five are now FIXED** (`3a23e56d`, `115d861e`, and the commit carrying this edit); one is refuted and one remains open. Each was reproduced live:
 >
 > **(a) ✅ FIXED 2026-08-17 — a derived output schema does not make the Parse drawer dirty, so Apply stayed disabled.**
 > Capture a sample → Test parse → a full output schema is derived → **Apply is greyed out**. The
@@ -268,8 +268,13 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 > appliable is a product call — but "the button that persists my work is disabled with no
 > explanation" is not.
 >
-> **(b) 🔴 Changing a pipeline's parse format is a hard dead-end: `schema edit is not
-> BACKWARD-compatible; not written`.** The output schema name is `<pipeline>_schema` — one slot per
+> **(b) ✅ FIXED 2026-08-17 — changing a pipeline's parse format was a hard dead-end: `schema edit is
+> not BACKWARD-compatible; not written`.** The refusal now arms an explicit **"Replace the output
+> schema"** affordance that retries with the write route's own `compatibility: 'none'` escape hatch.
+> ⛔ Deliberately NOT closed by weakening the gate or by overriding automatically — the gate exists to
+> make the column loss a decision, so it stays a decision, and nothing is applied until it is taken.
+> The refusal is matched narrowly (422 + the server's own phrase) so an ordinary write failure never
+> offers a destructive replace; both halves are pinned by spec. Original report follows. The output schema name is `<pipeline>_schema` — one slot per
 > pipeline. Author a CSV parse (writes `X_schema` with its columns), then swap to a JSON parse over
 > different data: Apply refuses, because the compatibility save-gate diffs the new columns against
 > the old ones. The drawer surfaces the raw gate message and offers neither escape hatch the route

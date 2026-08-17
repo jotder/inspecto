@@ -30,6 +30,7 @@ import {
     ParsersService,
     apiErrorMessage,
 } from 'app/inspecto/api';
+import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
 import { InspectoSamplePanelComponent } from 'app/inspecto/definition/sample-panel.component';
 import {
@@ -122,6 +123,7 @@ export const PARSE_NODE_FRONTENDS: Record<string, ParsingFrontend | 'asn1' | 'pl
         MatSelectModule,
         MatTooltipModule,
         GrammarEditorComponent,
+        InspectoAlertComponent,
         InspectoSamplePanelComponent,
         InspectoSegmentsEditorComponent,
         InspectoSchemaFieldsEditorComponent,
@@ -259,6 +261,33 @@ export const PARSE_NODE_FRONTENDS: Record<string, ParsingFrontend | 'asn1' | 'pl
                         }
                         @if (schemaSeed().length) {
                             <inspecto-schema-fields-editor [rows]="schemaSeed()" />
+                            <!--
+                                BUILDER-1b. One pipeline has ONE output schema (pipeline_schema), and a save
+                                that drops or narrows columns is refused by the BACKWARD gate. Changing a
+                                pipeline's parse format legitimately does exactly that, so without this the
+                                operator hit a wall with no way forward. compatibility:none is the write
+                                route's own documented escape hatch — offered explicitly, never applied
+                                automatically, because the gate exists to make the loss a decision.
+                            -->
+                            @if (schemaReplaceNeeded()) {
+                                <inspecto-alert class="mt-3 block" variant="warning">
+                                    <p class="m-0 text-sm">
+                                        The saved output schema has columns this parse no longer produces, so it was
+                                        not overwritten. Replacing it is the right move when you have changed what
+                                        this pipeline reads — anything downstream that expects the old columns will
+                                        need updating.
+                                    </p>
+                                    <button
+                                        mat-stroked-button
+                                        type="button"
+                                        class="!text-xs mt-2"
+                                        [disabled]="writing()"
+                                        (click)="replaceOutputSchema()"
+                                    >
+                                        Replace the output schema
+                                    </button>
+                                </inspecto-alert>
+                            }
                         } @else {
                             <p class="text-secondary m-0 text-sm">
                                 Test the parse above — the output schema is derived from the columns it
@@ -483,6 +512,13 @@ export class PipelineParseDefinitionComponent {
     readonly segmentsLoading = signal(false);
     /** A segment-schema write is in flight — Apply is a server round-trip for an ASN.1 node. */
     readonly writing = signal(false);
+    /**
+     * The saved `<pipeline>_schema` refused this parse's columns under the BACKWARD gate — the state
+     * a builder reaches by changing a pipeline's parse FORMAT (BUILDER-1b). Armed only by that exact
+     * refusal, and cleared on every fresh attempt, so a stale banner can never offer a destructive
+     * write against a different draft.
+     */
+    readonly schemaReplaceNeeded = signal(false);
 
     /**
      * Whether this node authors segments: an ASN.1 or generic-plugin node whose served parser has
@@ -871,7 +907,7 @@ export class PipelineParseDefinitionComponent {
      * not exist yet). A node with no schema grid in play applies straight through, so a parser can
      * still be defined before its schema is.
      */
-    private submitWithSchema(): void {
+    private submitWithSchema(replace = false): void {
         const grid = this.schemaGrid;
         if (!this.authorsSchema() || !grid || !this.schemaSeed().length) return this.applyWith(this.parsingValue());
         if (!grid.validate()) {
@@ -889,19 +925,33 @@ export class PipelineParseDefinitionComponent {
             },
         };
         this.writing.set(true);
-        this.configApi.write('schema', draft, { overwrite: true }).subscribe({
-            next: () => {
-                this.writing.set(false);
-                grid.markPristine();
-                this.applyWith(this.parsingValue(), portableConfigRef(name));
-            },
-            error: (e) => {
-                this.writing.set(false);
-                // Nothing is applied: a node naming a schema that failed to write is the state this
-                // ordering exists to prevent, and the pane stays dirty so the edits survive.
-                this.editor?.error.set(apiErrorMessage(e, 'Could not save the output schema.'));
-            },
-        });
+        this.schemaReplaceNeeded.set(false);
+        this.configApi
+            .write('schema', draft, { overwrite: true, ...(replace ? { compatibility: 'none' as const } : {}) })
+            .subscribe({
+                next: () => {
+                    this.writing.set(false);
+                    grid.markPristine();
+                    this.applyWith(this.parsingValue(), portableConfigRef(name));
+                },
+                error: (e) => {
+                    this.writing.set(false);
+                    // Nothing is applied: a node naming a schema that failed to write is the state this
+                    // ordering exists to prevent, and the pane stays dirty so the edits survive.
+                    this.editor?.error.set(apiErrorMessage(e, 'Could not save the output schema.'));
+                    // …but a BACKWARD refusal is recoverable, so offer the override instead of a dead end.
+                    if (isBackwardRefusal(e)) this.schemaReplaceNeeded.set(true);
+                },
+            });
+    }
+
+    /**
+     * Operator-confirmed override of the schema BACKWARD gate (BUILDER-1b) — the same write, with the
+     * route's `compatibility: 'none'` escape hatch. Only reachable from the banner that a real refusal
+     * armed, so this cannot silently replace a schema nobody was warned about.
+     */
+    replaceOutputSchema(): void {
+        this.submitWithSchema(true);
     }
 
     /** Rebuild the node around the finished block, emit it, and consume the pane's edits. */
@@ -924,4 +974,15 @@ export class PipelineParseDefinitionComponent {
         this.emitDirty();
         this.applied.emit(node);
     }
+}
+
+/**
+ * The schema BACKWARD save-gate's 422, told apart from every other write failure. Matched on the
+ * server's own phrase because the route returns no machine code for it; a wrong match here would
+ * offer a destructive "replace" for an unrelated error, so it is deliberately narrow.
+ */
+function isBackwardRefusal(e: unknown): boolean {
+    const err = e as { status?: number; error?: { error?: { message?: string } } };
+    if (err?.status !== 422) return false;
+    return /BACKWARD-compatible/i.test(err.error?.error?.message ?? '');
 }
