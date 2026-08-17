@@ -94,10 +94,28 @@ export interface DrillEvent {
                                 (categoryClick)="onCategoryClick($event)"
                             />
                         }
+                    } @else if (datasetFailed()) {
+                        <!-- The dataset fetch FAILED (deleted dataset, backend down). Without this the
+                             branch simply drew nothing: a title row above an empty body, forever.
+                             Gated on the failure flag rather than a bare else, so a dataset still in
+                             flight keeps showing nothing rather than briefly accusing the server. -->
+                        <inspecto-empty-state
+                            icon="heroicons_outline:exclamation-triangle"
+                            title="Dataset unavailable"
+                            message="This widget's dataset could not be loaded. It may have been deleted, or the backend is unreachable."
+                        />
                     }
                 } @else {
                     <div class="text-secondary text-sm">Unknown visualization “{{ widget.vizType }}”.</div>
                 }
+            } @else if (loadFailed()) {
+                <!-- A 404 (deleted widget, stale bookmark) used to sit on “Loading…” for ever, which is
+                     indistinguishable from a slow server and gives the operator nothing to act on. -->
+                <inspecto-empty-state
+                    icon="heroicons_outline:exclamation-triangle"
+                    title="Widget unavailable"
+                    message="This widget could not be loaded. It may have been deleted, or the backend is unreachable."
+                />
             } @else {
                 <div class="text-secondary flex h-32 items-center justify-center text-sm">Loading…</div>
             }
@@ -119,6 +137,11 @@ export class WidgetHostComponent {
     readonly filter = input<ConditionGroup | null>(null);
     /** A category click, resolved to the field it should filter on (drill-down). */
     readonly drill = output<DrillEvent>();
+
+    /** A widget/dataset fetch came back an ERROR — distinct from 'not yet arrived', which renders
+     *  as Loading. Without the distinction a 404 sat on the loading placeholder for ever. */
+    protected readonly loadFailed = signal(false);
+    protected readonly datasetFailed = signal(false);
 
     private readonly fetchedWidget = signal<Widget | undefined>(undefined);
     private readonly fetchedDataset = signal<Dataset | undefined>(undefined);
@@ -148,14 +171,17 @@ export class WidgetHostComponent {
         effect(() => {
             const id = this.widgetId();
             if (!id || this.widget()) return;
-            this.widgetsApi.get(id).subscribe({ next: (w) => this.fetchedWidget.set(w), error: () => undefined });
+            this.widgetsApi.get(id).subscribe({
+                next: (w) => this.fetchedWidget.set(w),
+                error: () => this.loadFailed.set(true),
+            });
         });
         effect(() => {
             const w = this.resolvedWidget();
             if (!w || !w.datasetId || this.dataset()) return; // view-bound widgets have no dataset
             this.datasetsApi
                 .get(w.datasetId)
-                .subscribe({ next: (d) => this.fetchedDataset.set(d), error: () => undefined });
+                .subscribe({ next: (d) => this.fetchedDataset.set(d), error: () => this.datasetFailed.set(true) });
         });
 
         // Run the query whenever the resolved widget/dataset/filter change — deduped: two hosts (e.g. two

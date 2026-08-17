@@ -101,10 +101,14 @@ export class DatasetMeasuresComponent {
     }
 
     add(): void {
-        const next = [
-            ...this.rows(),
-            { id: `measure_${this.rows().length + 1}`, label: 'New measure', expression: 'count(*)' },
-        ];
+        // ⚠ Not `length + 1`. Add twice then remove the first and the count is back to 1, so the next
+        // add re-mints `measure_2` — a duplicate `track m.id` key, which misrenders the repeater, and
+        // downstream the field picker offers two identical options whose `.find()` always resolves to
+        // the first, leaving the second measure permanently unbindable.
+        const taken = new Set(this.rows().map((m) => m.id));
+        let n = taken.size + 1;
+        while (taken.has(`measure_${n}`)) n++;
+        const next = [...this.rows(), { id: `measure_${n}`, label: 'New measure', expression: 'count(*)' }];
         this.rows.set(next);
         this.measuresChange.emit(next);
     }

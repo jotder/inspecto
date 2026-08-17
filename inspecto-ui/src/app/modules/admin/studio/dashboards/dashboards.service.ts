@@ -54,8 +54,15 @@ export class DashboardsService {
     }
 }
 
+// ⚠ These two are the dashboard's ONLY persistence seam, so a field missing from the pair is a field
+// that cannot survive a save — silently, because everything upstream of here works. `exposedFields`
+// (the viewer-facing Quick filters) was authored, passed through `buildDashboard`, and read back by the
+// editor as `d.exposedFields ?? []`, but was never written or read HERE: every save dropped it, every
+// load returned empty, and `<app-dashboard-filter-bar>` — gated on `exposedFields().length` — could
+// therefore never render. Keep the two functions in step; a key added to one belongs in the other.
+
 function toContent(d: Dashboard): Record<string, unknown> {
-    return { name: d.name, tiles: d.tiles, filter: d.filter ?? null };
+    return { name: d.name, tiles: d.tiles, filter: d.filter ?? null, exposedFields: d.exposedFields ?? [] };
 }
 
 function fromContent(name: string, content: Record<string, unknown>): Dashboard {
@@ -64,5 +71,6 @@ function fromContent(name: string, content: Record<string, unknown>): Dashboard 
         name: (content['name'] as string) ?? name,
         tiles: (content['tiles'] as DashboardTile[]) ?? [],
         filter: (content['filter'] as ConditionGroup) ?? emptyGroup('AND'),
+        exposedFields: (content['exposedFields'] as string[]) ?? [],
     };
 }

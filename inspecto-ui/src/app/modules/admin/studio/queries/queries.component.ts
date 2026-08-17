@@ -187,7 +187,15 @@ export class QueriesComponent implements OnInit {
                 this.queries.set(q);
                 this.loading.set(false);
             },
-            error: () => this.loading.set(false),
+            // A bare `loading.set(false)` cleared the spinner and let the "no queries yet" empty state
+            // render, so a failed load was indistinguishable from an empty library — the operator
+            // concludes their queries are gone and re-authors ones that already exist. Both sibling
+            // libraries (widgets, datasets) already say so out loud; this one now matches.
+            error: () => {
+                this.queries.set([]);
+                this.loading.set(false);
+                this.toastr.warning('Could not load queries — is ControlApi running?');
+            },
         });
     }
 
