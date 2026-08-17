@@ -1,4 +1,12 @@
-import { Component, OnDestroy, OnInit, ViewEncapsulation, inject, ChangeDetectionStrategy } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    inject,
+    OnDestroy,
+    OnInit,
+    signal,
+    ViewEncapsulation,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { ActivatedRoute, Router, RouterOutlet } from '@angular/router';
@@ -17,7 +25,7 @@ import { Subject, takeUntil } from 'rxjs';
     selector: 'dense-layout',
     templateUrl: './dense.component.html',
     encapsulation: ViewEncapsulation.None,
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
         GammaLoadingBarComponent,
         GammaVerticalNavigationComponent,
@@ -31,7 +39,7 @@ import { Subject, takeUntil } from 'rxjs';
 export class DenseLayoutComponent implements OnInit, OnDestroy {
     isScreenSmall: boolean;
     navigation: Navigation;
-    navigationAppearance: 'default' | 'dense' = 'dense';
+    readonly navigationAppearance = signal<'default' | 'dense'>('dense');
     /** Active-space branding — the dense header shows the logo only. */
     protected readonly branding = inject(BrandingService);
     private _unsubscribeAll: Subject<any> = new Subject<any>();
@@ -81,7 +89,7 @@ export class DenseLayoutComponent implements OnInit, OnDestroy {
                 this.isScreenSmall = !matchingAliases.includes('md');
 
                 // Change the navigation appearance
-                this.navigationAppearance = this.isScreenSmall ? 'default' : 'dense';
+                this.navigationAppearance.set(this.isScreenSmall ? 'default' : 'dense');
             });
     }
 
@@ -117,6 +125,6 @@ export class DenseLayoutComponent implements OnInit, OnDestroy {
      * Toggle the navigation appearance
      */
     toggleNavigationAppearance(): void {
-        this.navigationAppearance = this.navigationAppearance === 'default' ? 'dense' : 'default';
+        this.navigationAppearance.set(this.navigationAppearance() === 'default' ? 'dense' : 'default');
     }
 }

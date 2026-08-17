@@ -1,12 +1,13 @@
 import { DOCUMENT } from '@angular/common';
 import {
+    ChangeDetectionStrategy,
     Component,
     Inject,
     OnDestroy,
     OnInit,
     Renderer2,
+    signal,
     ViewEncapsulation,
-    ChangeDetectionStrategy,
 } from '@angular/core';
 import { ActivatedRoute, NavigationEnd, Router } from '@angular/router';
 import { GammaConfig, GammaConfigService } from '@gamma/services/config';
@@ -25,7 +26,7 @@ import { DenseLayoutComponent } from './layouts/vertical/dense/dense.component';
     templateUrl: './layout.component.html',
     styleUrls: ['./layout.component.scss'],
     encapsulation: ViewEncapsulation.None,
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
         ConnectivityBannerComponent,
         EmptyLayoutComponent,

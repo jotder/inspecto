@@ -1,13 +1,14 @@
 import {
+    ChangeDetectionStrategy,
     Component,
+    effect,
     HostListener,
+    inject,
     OnDestroy,
     OnInit,
+    signal,
     ViewChild,
     ViewEncapsulation,
-    effect,
-    inject,
-    ChangeDetectionStrategy,
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -43,7 +44,7 @@ import { Subject, takeUntil } from 'rxjs';
     selector: 'classic-layout',
     templateUrl: './classic.component.html',
     encapsulation: ViewEncapsulation.None,
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
         GammaLoadingBarComponent,
         GammaVerticalNavigationComponent,

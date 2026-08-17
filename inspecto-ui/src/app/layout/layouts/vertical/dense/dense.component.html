@@ -4,7 +4,7 @@
 <!-- Navigation -->
 <gamma-vertical-navigation
     class="dark bg-gray-900 print:hidden"
-    [appearance]="navigationAppearance"
+    [appearance]="navigationAppearance()"
     [mode]="isScreenSmall ? 'over' : 'side'"
     [name]="'mainNavigation'"
     [navigation]="navigation.default"

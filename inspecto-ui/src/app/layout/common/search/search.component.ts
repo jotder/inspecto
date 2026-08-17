@@ -1,19 +1,20 @@
 import { Overlay } from '@angular/cdk/overlay';
 import { NgTemplateOutlet } from '@angular/common';
 import {
+    ChangeDetectionStrategy,
     Component,
     ElementRef,
     HostBinding,
+    inject,
     Input,
     OnChanges,
     OnDestroy,
     OnInit,
     Renderer2,
+    signal,
     SimpleChanges,
     ViewChild,
     ViewEncapsulation,
-    inject,
-    ChangeDetectionStrategy,
 } from '@angular/core';
 import { FormsModule, ReactiveFormsModule, UntypedFormControl } from '@angular/forms';
 import {
@@ -83,7 +84,7 @@ const RECENTS_MAX = 5;
         MatFormFieldModule,
         MatInputModule,
     ],
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     providers: [
         {
             provide: MAT_AUTOCOMPLETE_SCROLL_STRATEGY,
@@ -106,7 +107,7 @@ export class SearchComponent implements OnChanges, OnInit, OnDestroy {
     opened: boolean = false;
     /** Rows shown in the panel; `null` = nothing to show (panel closed). With an empty query this
      *  holds recents + commands, so an opened palette is useful before the user types. */
-    results: PaletteItem[] | null = null;
+    readonly results = signal<PaletteItem[] | null>(null);
     searchControl: UntypedFormControl = new UntypedFormControl();
 
     private readonly destinations: SearchDestination[] = this.buildDestinations();
@@ -151,15 +152,17 @@ export class SearchComponent implements OnChanges, OnInit, OnDestroy {
                 const q = (typeof value === 'string' ? value : '').trim().toLowerCase();
                 if (!q || q.length < this.minLength) {
                     // Empty query while open ⇒ show recents + commands, not a bare panel.
-                    this.results = this.opened ? this.suggestions() : null;
+                    this.results.set(this.opened ? this.suggestions() : null);
                     return;
                 }
                 const matches = (title: string, group?: string) =>
                     title.toLowerCase().includes(q) || !!group?.toLowerCase().includes(q);
-                this.results = [
-                    ...this.destinations.filter((d) => matches(d.title, d.group)),
-                    ...this.commands.filter((c) => matches(c.title, c.group)),
-                ].slice(0, 10);
+                this.results.set(
+                    [
+                        ...this.destinations.filter((d) => matches(d.title, d.group)),
+                        ...this.commands.filter((c) => matches(c.title, c.group)),
+                    ].slice(0, 10),
+                );
             });
     }
 
@@ -221,13 +224,13 @@ export class SearchComponent implements OnChanges, OnInit, OnDestroy {
     /** Open the bar search and seed the panel with recents + commands. */
     open(): void {
         this.opened = true;
-        this.results = this.suggestions();
+        this.results.set(this.suggestions());
     }
 
     /** Clear + close the search. */
     close(): void {
         this.searchControl.setValue('');
-        this.results = null;
+        this.results.set(null);
         this.opened = false;
     }
 

@@ -22,10 +22,10 @@ describe('SearchComponent (command palette)', () => {
 
     it('open() seeds the panel with the supplied commands (usable before typing)', () => {
         const c = create([{ title: 'Switch to Ops lens', group: 'Lens', run: () => {} }]).componentInstance;
-        expect(c.results).toBeNull();
+        expect(c.results()).toBeNull();
         c.open();
         expect(c.opened).toBe(true);
-        expect(c.results?.map((r) => r.title)).toContain('Switch to Ops lens');
+        expect(c.results()?.map((r) => r.title)).toContain('Switch to Ops lens');
     });
 
     it('goTo() runs a command and closes; does not navigate', () => {
@@ -35,7 +35,7 @@ describe('SearchComponent (command palette)', () => {
         const nav = vi.spyOn(router, 'navigateByUrl');
         const c = fixture.componentInstance;
         c.open();
-        c.goTo(c.results!.find((r) => r.title === 'Switch to Ops lens')!);
+        c.goTo(c.results()!.find((r) => r.title === 'Switch to Ops lens')!);
         expect(run).toHaveBeenCalledTimes(1);
         expect(nav).not.toHaveBeenCalled();
         expect(c.opened).toBe(false);
@@ -68,11 +68,11 @@ describe('SearchComponent (command palette)', () => {
         } finally {
             vi.useRealTimers();
         }
-        expect(c.results?.some((r) => r.title === 'Switch to Ops lens')).toBe(true);
+        expect(c.results()?.some((r) => r.title === 'Switch to Ops lens')).toBe(true);
         expect(
-            c.results?.every(
-                (r) => r.title.toLowerCase().includes('ops') || (r.group ?? '').toLowerCase().includes('ops'),
-            ),
+            c
+                .results()
+                ?.every((r) => r.title.toLowerCase().includes('ops') || (r.group ?? '').toLowerCase().includes('ops')),
         ).toBe(true);
     });
 

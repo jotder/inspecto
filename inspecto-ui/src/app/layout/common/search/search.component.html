@@ -62,12 +62,12 @@
 
 <!-- Shared result list: jump-to-page destinations -->
 <ng-template #optionList>
-    @if (results && !results.length) {
+    @if (results() && !results().length) {
         <mat-option class="text-secondary pointer-events-none bg-transparent px-6 text-md">
             No matching pages
         </mat-option>
     }
-    @for (r of results; track trackByFn($index, r)) {
+    @for (r of results(); track trackByFn($index, r)) {
         <mat-option class="px-6 text-md" [value]="r">
             <div class="flex items-center gap-3">
                 @if (r.icon) {
