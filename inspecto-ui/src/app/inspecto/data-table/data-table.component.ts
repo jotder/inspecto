@@ -212,6 +212,20 @@ export class DataTableComponent {
     readonly runOnServer = output<string>();
     /** Server paging: emitted when "Load more" is pressed — the host fetches the next offset page and appends. */
     readonly loadMore = output<void>();
+
+    /**
+     * The strip's click. ⚠ Re-entrant by default: every host computes the next page's offset as
+     * `rows.length`, so a second click while the first fetch is in flight asks for the SAME offset
+     * and the host appends that page TWICE — duplicate rows, on exactly the slow backend that
+     * provokes the second click.
+     *
+     * <p>Gated on {@link loading}, which every `serverPage` host already binds and — the part a
+     * private latch here would get wrong — also clears on ERROR, so a failed page stays retryable.
+     */
+    requestMore(): void {
+        if (this.loading()) return;
+        this.loadMore.emit();
+    }
     /** Pro: emits the current projection/filter/SQL (model + compiled SQL) whenever it changes — for a
      *  host authoring a reusable query (a saved Query template, a virtual dataset's view). */
     readonly queryModelChange = output<QueryChange>();

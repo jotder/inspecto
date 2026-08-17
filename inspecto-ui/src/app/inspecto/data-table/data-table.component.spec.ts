@@ -97,6 +97,37 @@ describe('DataTableComponent', () => {
         expect(el.textContent).not.toContain('there may be more on the server');
     });
 
+    /**
+     * ⚠ Hosts derive the next page's offset from `rows.length`, so a second click before the first
+     * page lands re-requests the SAME offset and the host appends it twice — duplicate rows, on
+     * exactly the slow backend that makes someone click again. Gated on `loading`, which every
+     * serverPage host binds and clears on error too, so a FAILED page stays retryable (a private
+     * latch cleared by incoming rows would have disabled the button for ever on that path).
+     */
+    it('serverPage: Load more cannot be double-fired while the page is in flight', async () => {
+        const f = await create('standard');
+        f.componentRef.setInput('serverPage', true);
+        f.componentRef.setInput('hasMore', true);
+        f.componentRef.setInput('loading', true);
+        f.detectChanges();
+        const el = f.nativeElement as HTMLElement;
+        const btn = Array.from(el.querySelectorAll('button')).find((b) =>
+            b.textContent?.includes('Load more'),
+        ) as HTMLButtonElement;
+
+        let emissions = 0;
+        f.componentInstance.loadMore.subscribe(() => emissions++);
+        expect(btn.disabled).toBe(true);
+        f.componentInstance.requestMore(); // the method is the gate, not just the disabled attribute
+        expect(emissions).toBe(0);
+
+        f.componentRef.setInput('loading', false); // the page landed (or the fetch failed and cleared)
+        f.detectChanges();
+        expect(btn.disabled).toBe(false);
+        f.componentInstance.requestMore();
+        expect(emissions).toBe(1);
+    });
+
     it('the column chooser drives the SQL projection', async () => {
         const c = (await create('pro')).componentInstance;
         expect(c.generatedSql()).toContain('SELECT *');

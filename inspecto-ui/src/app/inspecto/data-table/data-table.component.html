@@ -151,7 +151,7 @@
     <!-- Honest paging strip (R6b): the host's fetch returned a full page — say so instead of silently capping. -->
     <div class="text-secondary mb-2 flex items-center gap-2 text-sm" role="status">
         <span>Showing {{ rows().length }} — there may be more on the server.</span>
-        <button mat-button type="button" (click)="loadMore.emit()">Load more</button>
+        <button mat-button type="button" [disabled]="loading()" (click)="requestMore()">Load more</button>
     </div>
 }
 
