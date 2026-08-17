@@ -64,6 +64,55 @@ describe('parsersHandler', () => {
         expect(t.rows[0]['b']).toBe('{"c":2}');
     });
 
+    /**
+     * `json.format` is a real enum the server honours (`BuiltinParsers`: newline | array | auto). This arm
+     * used to ignore it and always read NDJSON, which made a correct setting look like a broken file —
+     * found by pasting a JSON array document into the drawer and picking "One JSON array of records": the
+     * preview reported 1 row and 3 REJECTED. Misleading is worse than limited.
+     */
+    it('reads one JSON array of records when the grammar says so', () => {
+        const res = send('POST', '/api/parsers/json/preview', {
+            grammar: { json: { format: 'array' } },
+            sample_text: '[\n  {"tower_id": "T-01", "lat": 22.57},\n  {"tower_id": "T-02", "lat": 19.07}\n]',
+        })!;
+        const t = res.body as ParserTablePreview;
+        expect(t.columns).toEqual(['tower_id', 'lat']);
+        expect(t.rowCount).toBe(2);
+        expect(t.rejectedRows).toBe(0);
+    });
+
+    it('counts a non-object entry of the array as a rejected record', () => {
+        const res = send('POST', '/api/parsers/json/preview', {
+            grammar: { json: { format: 'array' } },
+            sample_text: '[{"a": 1}, 7]',
+        })!;
+        const t = res.body as ParserTablePreview;
+        expect(t.rowCount).toBe(1);
+        expect(t.rejectedRows).toBe(1);
+    });
+
+    it('refuses an NDJSON sample under format: array rather than quietly reading it line-wise', () => {
+        const res = send('POST', '/api/parsers/json/preview', {
+            grammar: { json: { format: 'array' } },
+            sample_text: '{"a": 1}\n{"a": 2}\n',
+        })!;
+        expect(res.status).toBe(422);
+    });
+
+    /** `auto` tries the array first and falls back — exactly what the enum's own description promises. */
+    it('auto-detects either shape', () => {
+        const arrayDoc = send('POST', '/api/parsers/json/preview', {
+            grammar: { json: { format: 'auto' } },
+            sample_text: '[{"a": 1}, {"a": 2}]',
+        })!;
+        expect((arrayDoc.body as ParserTablePreview).rowCount).toBe(2);
+        const ndjsonDoc = send('POST', '/api/parsers/json/preview', {
+            grammar: { json: { format: 'auto' } },
+            sample_text: '{"a": 1}\n{"a": 2}\n',
+        })!;
+        expect((ndjsonDoc.body as ParserTablePreview).rowCount).toBe(2);
+    });
+
     it('previews XML as a record tree with @attr leaves and counts all matches', () => {
         const res = send('POST', '/api/parsers/xml/preview', {
             grammar: { xml: { max_records: 1 } },

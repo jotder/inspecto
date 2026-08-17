@@ -1,6 +1,6 @@
 import type { ComponentDef, ComponentVersion } from '../../api/components.service';
 import { MockFlags } from '../mock-flags';
-import { error, json, match, MockHandler, MockRequest } from '../mock-http';
+import { error, json, match, MockHandler, MockRequest, MockResponse } from '../mock-http';
 import { MockStore } from '../mock-store';
 import { emitAudit } from '../signals';
 
@@ -48,6 +48,10 @@ const COMPONENT_RESTORE = /\/components\/([^/]+)\/([^/]+)\/versions\/([^/]+)\/re
 const COMPONENT_ONE = /\/components\/([^/]+)\/([^/]+)$/;
 const COMPONENTS = /\/components\/([^/]+)$/;
 const MAPPING_VALIDATE = /\/components\/mapping\/validate$/;
+// ⛔ `grammar` is deliberately EXCLUDED, though the server registers it: this domain gave the grammar
+// preview up to the served `/parsers` framework, a boundary a spec pins, and no UI caller needs the
+// inline grammar arm — a parse node opens the grammar editor, never the node dialog.
+const COMPONENT_PREVIEW = /\/components\/(transform|sink)\/preview$/;
 
 /** The transform-type vocabulary — mirrors `TransformCompiler.TRANSFORM_TYPES`. */
 const TRANSFORM_TYPES = new Set(['DIRECT', 'EXPR', 'CONCAT_DT', 'FILENAME_DATE']);
@@ -121,6 +125,12 @@ export function componentsHandler(flags: MockFlags): MockHandler {
             // parser framework (`/parsers` — see parsers.handler); this domain keeps only the
             // component registry + per-component test.
             if (method === 'POST' && (m = match(url, COMPONENT_TEST))) return json(componentTest(m[1], m[2]));
+        }
+
+        // Inline preview — before COMPONENT_ONE, which would otherwise read `preview` as a component id
+        // (the same ordering the server uses: the literal paths register ahead of the `{id}` patterns).
+        if (method === 'POST' && (m = match(url, COMPONENT_PREVIEW))) {
+            return previewInline(m[1], req.body as Record<string, unknown> | null);
         }
 
         // S6b mapping validate — before COMPONENT_ONE, which would otherwise read `validate` as an id.
@@ -338,4 +348,40 @@ function componentTest(type: string, idRef: string): unknown {
             { id: 1002, msisdn: '8801700000002', duration_s: 17 },
         ],
     };
+}
+
+/**
+ * `POST /components/{transform|sink}/preview` — the offline arm of the inline preview
+ * (`ComponentRoutes.previewInline*`). It mirrors the server's REFUSALS exactly, which is the point: the
+ * 400 on a missing `config`, the 400 on an empty sample, and the 422 when a transform config is not
+ * `transform.*` are all decisions an operator must meet offline too. What it cannot mirror is the
+ * OUTCOME — the server runs the production `RowShaper` on a throwaway DuckDB and this has no SQL engine
+ * — so the happy path reports the shape it can compute honestly: the input columns, and the sample's own
+ * row count on the default relation. ⛔ Do not grow this into a second transform evaluator.
+ */
+function previewInline(family: string, body: Record<string, unknown> | null): MockResponse {
+    const config = body?.['config'];
+    if (typeof config !== 'object' || config === null || Array.isArray(config))
+        return error(400, "body must include 'config' (the node config object to preview)");
+    const cfg = config as Record<string, unknown>;
+    const rows = body?.['sampleRows'];
+    if (!Array.isArray(rows) || !rows.length) return error(400, 'sampleRows is required');
+    const sample = rows as Record<string, unknown>[];
+    const columns = [...new Set(sample.flatMap((r) => Object.keys(r ?? {})))];
+    if (family === 'sink') {
+        const store = typeof cfg['store'] === 'string' ? (cfg['store'] as string) : null;
+        return json({
+            store,
+            rowCount: sample.length,
+            rows: sample.slice(0, 20),
+            warnings: store ? [] : ["sink declares no 'store' name"],
+        });
+    }
+    const type = typeof cfg['type'] === 'string' ? (cfg['type'] as string) : '';
+    if (!type.startsWith('transform.'))
+        return error(422, "inline config is not a transform ('type: transform.*' required)");
+    return json({
+        inputColumns: columns,
+        relations: [{ rel: 'data', rowCount: sample.length, rows: sample.slice(0, 20) }],
+    });
 }

@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { By } from '@angular/platform-browser';
@@ -848,6 +849,104 @@ describe('NodeConfigDialog', () => {
 
     it('has no a11y violations (free-form type)', async () => {
         await expectNoA11yViolations((await create()).nativeElement);
+    });
+
+    /**
+     * The inline test (`POST /components/{family}/preview`). ⚠ Its predecessor — "Test <component>…" —
+     * was DEAD UI: it gated on `data.bindKind`, which is `bindKindFor(category)` and therefore null for
+     * every node that actually reaches this dialog (PARSE goes to the grammar editor). The gate is the
+     * node's own TYPE now, plus rows to run over.
+     */
+    describe('inline test', () => {
+        const filter = (): Partial<NodeConfigData> => ({
+            node: { id: 'flt', type: 'transform.filter' },
+            typeLabel: 'transform.filter',
+            categoryLabel: 'Transformer',
+            bindKind: null,
+            sampleRows: [{ qty: '2' }, { qty: '1' }],
+        });
+
+        it('is not offered without rows — a test over no data would report success over nothing', async () => {
+            const fixture = await create({ ...filter(), sampleRows: [] });
+            expect(fixture.componentInstance.canTestInline()).toBe(false);
+            expect(fixture.nativeElement.textContent).not.toContain('Test this Step');
+        });
+
+        it('is not offered for a family the route has no preview for', async () => {
+            const fixture = await create({
+                node: { id: 'e', type: 'enrichment' },
+                typeLabel: 'enrichment',
+                categoryLabel: 'Transform',
+                bindKind: null,
+                sampleRows: [{ qty: '2' }],
+            });
+            expect(fixture.componentInstance.testFamily()).toBeNull();
+        });
+
+        it('sends the node type inside config and renders the per-relation counts', async () => {
+            const previewTransform = vi.fn(() =>
+                of({ inputColumns: ['qty'], relations: [{ rel: 'data', rowCount: 1, rows: [{ qty: '2' }] }] }),
+            );
+            TestBed.overrideProvider(ComponentsService, {
+                useValue: { list: () => of([]), get: () => of(GRAMMARS[0]), previewTransform },
+            });
+            const fixture = await create(filter());
+            fixture.componentInstance.runInlineTest();
+            fixture.detectChanges();
+
+            // ⚠ `type` is mandatory in the body: the route 422s a config that is not `transform.*`.
+            expect(previewTransform).toHaveBeenCalledWith(
+                expect.objectContaining({ type: 'transform.filter' }),
+                [{ qty: '2' }, { qty: '1' }],
+            );
+            expect(fixture.nativeElement.textContent).toContain("out 'data': 1 row(s)");
+        });
+
+        it('reports a sink preview as its store plus any warnings', async () => {
+            const previewSink = vi.fn(() =>
+                of({ store: null, rowCount: 2, rows: [], warnings: ["sink declares no 'store' name"] }),
+            );
+            TestBed.overrideProvider(ComponentsService, {
+                useValue: { list: () => of([]), get: () => of(GRAMMARS[0]), previewSink },
+            });
+            const fixture = await create({
+                node: { id: 'out', type: 'sink.persistent' },
+                typeLabel: 'sink.persistent',
+                categoryLabel: 'Sink',
+                bindKind: null,
+                sampleRows: [{ qty: '2' }, { qty: '1' }],
+            });
+            fixture.componentInstance.runInlineTest();
+            fixture.detectChanges();
+
+            expect(previewSink).toHaveBeenCalled();
+            expect(fixture.nativeElement.textContent).toContain('(none declared)');
+            expect(fixture.nativeElement.textContent).toContain("sink declares no 'store' name");
+        });
+
+        it('surfaces a refusal instead of a result', async () => {
+            TestBed.overrideProvider(ComponentsService, {
+                useValue: {
+                    list: () => of([]),
+                    get: () => of(GRAMMARS[0]),
+                    // A real HttpErrorResponse: `apiErrorMessage` only reads the server's message off one.
+                    previewTransform: () =>
+                        throwError(
+                            () =>
+                                new HttpErrorResponse({
+                                    status: 422,
+                                    error: { error: { message: 'preview failed: no such column' } },
+                                }),
+                        ),
+                },
+            });
+            const fixture = await create(filter());
+            fixture.componentInstance.runInlineTest();
+            fixture.detectChanges();
+
+            expect(fixture.componentInstance.testResult()).toBeNull();
+            expect(fixture.nativeElement.querySelector('[role="alert"]')?.textContent).toContain('no such column');
+        });
     });
 
     it('has no a11y violations (schema-backed type)', async () => {

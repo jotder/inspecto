@@ -76,6 +76,12 @@ export interface NodeConfigData {
      * opens blank, exactly as it did before.
      */
     enrichmentHost?: EnrichmentHostPipeline;
+    /**
+     * The rows the tab's sample thread parsed — what an inline test runs over. Plain rows, not the
+     * thread itself: the dialog reads and never writes them, and the thread belongs to the TAB. Absent
+     * or empty ⇒ no test is offered, because a test with no data is a lie.
+     */
+    sampleRows?: Record<string, unknown>[];
 }
 
 /** The host pipeline's identity plus where its Stage-1 output lands. */
@@ -312,6 +318,31 @@ export interface NodeConfigResult {
                         </div>
                     </div>
                 }
+
+                <!-- The INLINE test: the config on screen, over the tab's own parsed rows. Offered only
+                     when there are rows — a test with no data would report success over nothing. -->
+                @if (canTestInline()) {
+                    <div class="pt-2">
+                        <button type="button" mat-stroked-button [disabled]="testing()" (click)="runInlineTest()">
+                            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:bolt"></mat-icon>
+                            <span class="ml-1">Test this Step</span>
+                        </button>
+                        <div class="text-secondary mt-1 text-sm">
+                            Runs these settings over the {{ data.sampleRows!.length }} row(s) your parse step
+                            produced. Nothing is written.
+                        </div>
+                        @if (testError(); as e) {
+                            <p class="text-warn m-0 mt-2 text-sm" role="alert">{{ e }}</p>
+                        }
+                        @if (testResult(); as lines) {
+                            <ul class="m-0 mt-2 list-none p-0 text-sm" role="status" aria-live="polite">
+                                @for (line of lines; track line) {
+                                    <li>{{ line }}</li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                }
             </mat-dialog-content>
             <mat-dialog-actions align="end">
                 <button type="button" mat-button mat-dialog-close>Cancel</button>
@@ -472,14 +503,94 @@ export class NodeConfigDialog {
     /**
      * The registered component this node binds, when it is one of the families the backend can test
      * (`ComponentRoutes` registers `POST /components/{transform|grammar|sink}/{id}/test`). Null for an
-     * unbound node — one holding inline config binds no registered component, and **no backend surface
-     * tests inline config**: the test routes look the component up in the `ComponentStore` and 404 when
-     * it is absent, while the two config-body previews (`/config/preview/parsing`, `/config/preview/schema`)
-     * cover only grammar parsing and schema casting, not arbitrary node types.
+     * unbound node — one holding inline config binds no registered component.
      */
     testableComponentId(): string | null {
         if (!this.data.bindKind || !TESTABLE_KINDS.includes(this.data.bindKind)) return null;
         return this.selectedComponentId();
+    }
+
+    /**
+     * The inline-preview family this node belongs to, or null. Keyed on the node's own TYPE — ⛔ not on
+     * `data.bindKind`, which is `bindKindFor(category)` and therefore `'grammar'` for PARSE and **null
+     * for everything else**; since `openNodeConfig` routes PARSE to the grammar editor, every node that
+     * reaches this dialog had a null bindKind, and the Test affordance below could never render at all.
+     *
+     * <p>`grammar` is deliberately absent: a parse node never reaches this dialog.
+     */
+    testFamily(): 'transform' | 'sink' | null {
+        const type = this.data.node.type;
+        if (type.startsWith('transform.')) return 'transform';
+        if (type.startsWith('sink.')) return 'sink';
+        return null;
+    }
+
+    /** Whether an inline test can run: a supported family AND rows to run it over. */
+    canTestInline(): boolean {
+        return !!this.testFamily() && !!this.data.sampleRows?.length;
+    }
+
+    readonly testing = signal(false);
+    /** The last inline preview, as lines to render — one shape for both families, since only text is shown. */
+    readonly testResult = signal<string[] | null>(null);
+    readonly testError = signal<string | null>(null);
+
+    /**
+     * Test the config **being edited** through `POST /components/{family}/preview`, over the tab's own
+     * parsed rows. Reads the live config surface rather than `node.config`, so it tests what is on screen
+     * — an unsaved edit is exactly what an operator wants to try. ⚠ The transform arm must send the
+     * node's `type` inside `config`: the route 422s a config that is not `transform.*`.
+     */
+    runInlineTest(): void {
+        const family = this.testFamily();
+        const rows = this.data.sampleRows ?? [];
+        if (!family || !rows.length) return;
+        const surface = this.configForm();
+        if (surface && !surface.validate()) return;
+        // Assemble through the SAME `buildConfiguredNode` the save path uses, so the test runs over the
+        // config that would actually be written — nesting, free-form rows and all. A second, simpler
+        // merge here would drift from the save and test a config that never ships.
+        const config =
+            buildConfiguredNode({
+                node: this.data.node,
+                specs: this.specs(),
+                formValues: surface ? surface.value() : null,
+                freeRows: this.form.getRawValue().config as { key: string; value: string }[],
+                isAcquisition: false,
+                connector: null,
+            }).config ?? {};
+        this.testing.set(true);
+        this.testError.set(null);
+        this.testResult.set(null);
+        const done = {
+            error: (e: unknown) => {
+                this.testing.set(false);
+                this.testError.set(apiErrorMessage(e, 'The test failed.'));
+            },
+        };
+        if (family === 'transform') {
+            this.components.previewTransform({ ...config, type: this.data.node.type }, rows).subscribe({
+                next: (p) => {
+                    this.testing.set(false);
+                    this.testResult.set([
+                        `in: ${p.inputColumns.length} column(s) over ${rows.length} row(s)`,
+                        ...p.relations.map((r) => `out '${r.rel}': ${r.rowCount} row(s)`),
+                    ]);
+                },
+                ...done,
+            });
+            return;
+        }
+        this.components.previewSink(config, rows).subscribe({
+            next: (p) => {
+                this.testing.set(false);
+                this.testResult.set([
+                    `store: ${p.store ?? '(none declared)'} — ${p.rowCount} row(s) would be written`,
+                    ...p.warnings,
+                ]);
+            },
+            ...done,
+        });
     }
 
     readonly form = this.fb.group({

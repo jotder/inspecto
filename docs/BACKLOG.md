@@ -289,6 +289,17 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 >    and fixed-width `start` never said it is a **0-based** offset — a builder counting from 1 gets every
 >    field shifted one character, which "parses" fine and is visible only in the preview values.
 >
+> 8. **The offline `json` preview ignored `json.format`** and always read NDJSON, so a builder pasting a
+>    JSON **array** document and choosing "One JSON array of records" — the *correct* setting — was told 1
+>    row parsed and **3 were REJECTED**. Being misleading is worse than being limited: the arm now honours
+>    the published `newline | array | auto` enum, tries the array first for `auto`, and 422s an NDJSON
+>    sample under `array` rather than quietly reading it line-wise. ⚠ This is the mock's own stated posture
+>    — *stricter than the server, never more lenient* — which the NDJSON-only shortcut had violated.
+>
+> **Parser types driven live end-to-end**: delimited/CSV · NDJSON · text/regex (with the no-named-group
+> negative case) · fixed-width · JSON array document (both shapes + `auto`) · ASN.1 as far as its segments
+> editor (a real BER sample is binary; the mock refuses by design).
+>
 > **Two observations recorded, NOT fixed** (both are deliberate server behaviour, not UI bugs):
 > `delimited.has_header` defaults **true for fixedwidth** (`BuiltinParsers`, described as "header/banner
 > line to skip"), so a 3-line fixed-width sample previews 2 rows with nothing saying a line was skipped —
@@ -952,6 +963,21 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   specs pass because they construct the dialog with `bindKind` set directly, bypassing the editor.
   ⚠ NOT deleted: pre-existing dead code is filed, not removed (CLAUDE.md §3), and the honest choice is
   between deleting it and rewiring it to the new inline-preview route — an operator call, not a cleanup. ⛔ `schema`/`mapping` deliberately have no preview arm, mirroring `/test`.
+  **✅ REWIRED 2026-08-17 (the delegated call: rewire, never delete).** The dialog now offers **"Test this
+  Step"**, which posts the config *being edited* to `POST /components/{transform|sink}/preview` and runs it
+  over the tab's own parsed rows. The three things that made this more than "add a button":
+  🔴 the gate is the node's own **TYPE** (`testFamily()`), ⛔ never `data.bindKind` — that is
+  `bindKindFor(category)`, null for every node that reaches this dialog, which is precisely why the old
+  affordance could not render; 🔴 the body is assembled through the **same `buildConfiguredNode`** the save
+  path uses, so the test runs the config that would actually be written rather than a second, drifting
+  merge; and the rows arrive as `NodeConfigData.sampleRows` (plain rows, not the thread — the dialog reads
+  and never writes them). ⚠ The transform arm must send the node's `type` **inside** `config` or the route
+  422s. The offline mock gained the matching arm, mirroring the route's REFUSALS exactly (400 no `config`,
+  400 empty sample, 422 non-`transform.*`) while reporting only the shape it can honestly compute — it has
+  no SQL engine, so a predicate is NOT evaluated offline. ⛔ `grammar` is excluded from the mock arm even
+  though the server registers it: a spec pins that this domain gave the grammar preview to `/parsers`, and
+  no UI caller needs it (a parse node opens the grammar editor, never this dialog). The old
+  "Test <component>…" block is untouched and still serves a node that binds a registered component.
   - ~~G1 two of three test affordances 404~~ **CLOSED** — both gated behind `environment.mockFlows`
     rather than deleted (run-to-here is a complete mock-backed feature and is literally the Step 5 UI).
     ⚠ **Retraction:** a mid-flight note here claimed `/components/*` did not exist in the backend —

@@ -1495,6 +1495,8 @@ export class PipelineEditorComponent implements OnInit {
                           bindKind: bindKindFor(category),
                           attributes: this.typeAttributes().get(node.type),
                           enrichmentHost: node.type === 'enrichment' ? this.enrichmentHost() : undefined,
+                          // What the tab's sample thread parsed — the rows an inline test runs over.
+                          sampleRows: this.sampleThread()?.parsePreview()?.rows,
                       },
                   });
         ref.afterClosed().subscribe((res?: NodeConfigResult) => {

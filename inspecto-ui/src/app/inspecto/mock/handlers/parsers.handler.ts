@@ -251,7 +251,7 @@ function parse(id: string, grammar: Record<string, unknown>, sample: string): Pa
         case 'fixedwidth':
             return fixedwidth(grammar, sample);
         case 'json':
-            return ndjson(sample);
+            return jsonRecords(grammar, sample);
         case 'text_regex':
             return textRegex(grammar, sample);
         case 'xml':
@@ -304,22 +304,62 @@ function fixedwidth(grammar: Record<string, unknown>, sample: string): ParserPre
     );
 }
 
+/**
+ * The `json` frontend, honouring the **document shape** the grammar declares (`json.format`, the same
+ * `newline | array | auto` enum `BuiltinParsers` publishes).
+ *
+ * <p>⚠ This arm used to be NDJSON-only and ignore `json.format` outright, which made the offline preview
+ * actively misleading rather than merely limited: a builder pasting a JSON **array** document and picking
+ * "One JSON array of records" — the correct setting — was told 3 of its 4 lines were REJECTED, and would
+ * reasonably conclude the file was broken. Refusing would have been acceptable; answering wrongly is not.
+ * `auto` tries the array first and falls back, exactly as the enum's own description says.
+ */
+function jsonRecords(grammar: Record<string, unknown>, sample: string): ParserPreview {
+    const format = String(sub(grammar, 'json')['format'] ?? 'newline');
+    if (format === 'array' || format === 'auto') {
+        const asArray = parseArrayDocument(sample);
+        if (asArray) return asArray;
+        if (format === 'array')
+            throw new Error('sample does not parse with this grammar: not one JSON array of records');
+    }
+    return ndjson(sample);
+}
+
+/** One JSON array of objects, or null when the sample is not that shape (so `auto` can fall back). */
+function parseArrayDocument(sample: string): ParserPreview | null {
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(sample);
+    } catch {
+        return null;
+    }
+    if (!Array.isArray(parsed)) return null;
+    const records = parsed.filter((v) => typeof v === 'object' && v !== null && !Array.isArray(v));
+    if (!records.length) return null;
+    // A non-object entry is a rejected record, the same accounting the NDJSON path uses for a bad line.
+    return jsonTable(records as Record<string, unknown>[], parsed.length - records.length);
+}
+
 /** Mirrors the server's NDJSON path: json_valid filter (invalid lines REJECTED, never null-padded),
  *  then top-level keys in first-seen order become the columns. */
 function ndjson(sample: string): ParserPreview {
-    const keys: string[] = [];
     const records: Record<string, unknown>[] = [];
     let rejected = 0;
     for (const l of lines(sample)) {
         try {
-            const v = JSON.parse(l) as Record<string, unknown>;
-            for (const k of Object.keys(v)) if (!keys.includes(k)) keys.push(k);
-            records.push(v);
+            records.push(JSON.parse(l) as Record<string, unknown>);
         } catch {
             rejected++;
         }
     }
     if (records.length === 0) throw new Error('sample does not parse with this grammar: no valid JSON records');
+    return jsonTable(records, rejected);
+}
+
+/** Decoded records → the flat table both shapes produce: first-seen top-level keys as the columns. */
+function jsonTable(records: Record<string, unknown>[], rejected: number): ParserPreview {
+    const keys: string[] = [];
+    for (const r of records) for (const k of Object.keys(r)) if (!keys.includes(k)) keys.push(k);
     const rows = records.map((r) =>
         Object.fromEntries(
             keys.map((k) => {

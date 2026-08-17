@@ -201,6 +201,67 @@ describe('componentsHandler', () => {
         });
     });
 
+    /**
+     * The INLINE preview (`POST /components/{family}/preview`). It exists offline to rehearse the
+     * server's REFUSALS — those are decisions an operator must meet either way. ⚠ It cannot rehearse the
+     * OUTCOME: the server runs the production RowShaper on a throwaway DuckDB and the mock has no SQL
+     * engine, so the transform arm reports the sample's own row count. ⛔ Do not "fix" that by writing a
+     * second evaluator here; that is the passing-rehearsal failure this layer exists to prevent.
+     */
+    describe('inline preview', () => {
+        it('refuses a body with no config, exactly as the route does', () => {
+            const res = handler(req('POST', '/api/components/transform/preview', { sampleRows: [{ a: 1 }] }), seededStore());
+            expect(res?.status).toBe(400);
+        });
+
+        it('refuses a transform config that is not transform.* with the route 422', () => {
+            const res = handler(
+                req('POST', '/api/components/transform/preview', {
+                    config: { type: 'sink.persistent' },
+                    sampleRows: [{ a: 1 }],
+                }),
+                seededStore(),
+            );
+            expect(res?.status).toBe(422);
+        });
+
+        it('refuses an empty sample', () => {
+            const res = handler(
+                req('POST', '/api/components/transform/preview', { config: { type: 'transform.filter' }, sampleRows: [] }),
+                seededStore(),
+            );
+            expect(res?.status).toBe(400);
+        });
+
+        it('answers a transform with the input columns and one relation', () => {
+            const res = handler(
+                req('POST', '/api/components/transform/preview', {
+                    config: { type: 'transform.filter', where: 'a > 0' },
+                    sampleRows: [{ a: 1 }, { a: 2, b: 'x' }],
+                }),
+                seededStore(),
+            );
+            expect(res?.status).toBe(200);
+            const body = res?.body as { inputColumns: string[]; relations: { rel: string; rowCount: number }[] };
+            expect(body.inputColumns).toEqual(['a', 'b']);
+            expect(body.relations).toEqual([{ rel: 'data', rowCount: 2, rows: [{ a: 1 }, { a: 2, b: 'x' }] }]);
+        });
+
+        it('warns when a sink declares no store, and names it when it does', () => {
+            const store = seededStore();
+            const bare = handler(
+                req('POST', '/api/components/sink/preview', { config: {}, sampleRows: [{ a: 1 }] }),
+                store,
+            );
+            expect((bare?.body as { warnings: string[] }).warnings).toEqual(["sink declares no 'store' name"]);
+            const named = handler(
+                req('POST', '/api/components/sink/preview', { config: { store: 'orders' }, sampleRows: [{ a: 1 }] }),
+                store,
+            );
+            expect(named?.body).toMatchObject({ store: 'orders', rowCount: 1, warnings: [] });
+        });
+    });
+
     it('no longer owns the grammar preview — that moved to the served /parsers domain', () => {
         const store = seededStore();
         const res = handler(

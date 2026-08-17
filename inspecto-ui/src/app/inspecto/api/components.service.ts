@@ -187,6 +187,24 @@ export class ComponentsService {
     }
 
     /**
+     * Run an **INLINE** transform config over sample rows — `POST /components/transform/preview`.
+     * The pipeline editor authors node configs inline, so before this route only a *registered*
+     * component could be tried: exactly the config an operator is in the middle of writing was the one
+     * they could not test. ⚠ The body's `config` must carry the node's own `type`, or the route 422s.
+     */
+    previewTransform(
+        config: Record<string, unknown>,
+        sampleRows: Record<string, unknown>[],
+    ): Observable<RelationsPreview> {
+        return this.http.post<RelationsPreview>(apiUrl('/components/transform/preview'), { config, sampleRows });
+    }
+
+    /** Scratch-validate an **INLINE** sink config against sample rows (no write). */
+    previewSink(config: Record<string, unknown>, sampleRows: Record<string, unknown>[]): Observable<SinkPreview> {
+        return this.http.post<SinkPreview>(apiUrl('/components/sink/preview'), { config, sampleRows });
+    }
+
+    /**
      * Validate draft mapping rules WITHOUT writing (S6b) — the import loop's gate. Findings are
      * anchored to `rules[N].<key>`, which the grid editor maps onto cells. Server-side on purpose:
      * every rule is a `TransformCompiler` precondition, and a browser-side copy would drift into

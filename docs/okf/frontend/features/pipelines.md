@@ -856,3 +856,40 @@ Two things a builder cannot discover from the form, both grounded in the engine:
   described there as "header/banner line to skip before the records"), so a 3-line fixed-width sample
   previews **2 rows** and nothing says a line was skipped. Recorded, deliberately **not** changed: it is a
   server-published spec default that existing configs rely on, so flipping it is a migration, not a UI fix.
+
+## A node dialog tests the config it is editing (2026-08-17)
+
+`POST /components/{transform|sink}/preview` runs an **inline** config — one carried in the request body
+rather than looked up in the registry — so the node dialog's **"Test this Step"** tries exactly what the
+operator is in the middle of writing, over the tab's own parsed rows.
+
+Three things make this more than a button:
+
+- 🔴 **The gate is the node's own TYPE** (`testFamily()`), ⛔ never `data.bindKind`. `bindKind` is
+  `bindKindFor(category)`, which is `'grammar'` for PARSE and **null for everything else** — and
+  `openNodeConfig` routes PARSE to the grammar editor, so every node that reaches this dialog had a null
+  bindKind. That is exactly why the predecessor affordance ("Test <component>…", shipped 2026-08-14) was
+  unreachable dead UI: its gate could never be true in production while its specs passed by constructing
+  the dialog with a `bindKind` directly.
+- 🔴 **The body is assembled through the same `buildConfiguredNode` the save path uses**, so the test runs
+  the config that would actually be written — nesting, free-form rows and all. A simpler second merge here
+  would drift and test a config that never ships.
+- The rows arrive as `NodeConfigData.sampleRows` — plain rows, not the thread. The dialog reads and never
+  writes them, and the thread belongs to the TAB.
+
+⚠ The transform arm must send the node's `type` **inside** `config`, or the route 422s
+(`'type: transform.*' required`). `grammar` has a server arm but deliberately no mock arm and no UI caller.
+
+⚠ **The offline mock rehearses the REFUSALS, not the outcome.** 400 on a missing `config`, 400 on an empty
+sample and 422 on a non-`transform.*` type are decisions an operator must meet either way; the *result* it
+cannot reproduce, because it has no SQL engine — a predicate is not evaluated offline, so a filter reports
+every sample row through. ⛔ Do not close that gap with a second transform evaluator in the mock.
+
+## The offline `json` preview honours the document shape (2026-08-17)
+
+`json.format` is a real published enum (`BuiltinParsers`: `newline | array | auto`). The mock's `json` arm
+used to ignore it and always read NDJSON, which made the offline preview **misleading rather than merely
+limited**: a JSON *array* document with the correct "One JSON array of records" setting reported 1 row and
+3 rejected, so a builder would blame their file. It now reads the array shape, tries it first under `auto`,
+and 422s an NDJSON sample under `array`. The rule this restores is the mock's own: **stricter than the
+server, never more lenient — and never differently right.**
