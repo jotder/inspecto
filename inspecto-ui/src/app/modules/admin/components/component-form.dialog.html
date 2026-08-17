@@ -212,7 +212,7 @@
         </div>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
-        <button type="button" mat-button mat-dialog-close>Cancel</button>
+        <button type="button" mat-button (click)="requestClose()">Cancel</button>
         <button
             type="submit"
             mat-flat-button

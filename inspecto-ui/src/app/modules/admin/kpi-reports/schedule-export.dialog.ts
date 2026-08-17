@@ -7,6 +7,8 @@ import { apiErrorMessage, JobDetail, JobsService, JobUpsert } from 'app/inspecto
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { SCHEDULE_EXPORT_ATTRIBUTES } from './schedule-export-attributes';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 
 /** Dialog input: which dashboard the export is scheduled against, and an existing schedule to edit. */
 export interface ScheduleExportData {
@@ -62,7 +64,7 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
             <inspecto-schema-form [specs]="attributes" [initial]="initialValue"></inspecto-schema-form>
         </mat-dialog-content>
         <mat-dialog-actions align="end">
-            <button type="button" mat-button mat-dialog-close [disabled]="saving()">Cancel</button>
+            <button type="button" mat-button [disabled]="saving()" (click)="requestClose()">Cancel</button>
             <button type="button" mat-flat-button color="primary" [disabled]="saving()" (click)="save()">
                 {{ isEdit ? 'Save' : 'Schedule' }}
             </button>
@@ -72,6 +74,10 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
 export class ScheduleExportDialog implements AfterViewInit {
     private api = inject(JobsService);
     private ref = inject(MatDialogRef<ScheduleExportDialog, ScheduleExportResult>);
+    private confirm = inject(InspectoConfirmService);
+
+    /** Cancel/Esc/backdrop ask before discarding typed input (ui-design-review R2). */
+    readonly requestClose = guardDirtyClose(this.ref, () => this.schemaForm?.isDirty() ?? false, this.confirm);
     private toastr = inject(ToastrService);
     readonly data = inject<ScheduleExportData>(MAT_DIALOG_DATA);
 

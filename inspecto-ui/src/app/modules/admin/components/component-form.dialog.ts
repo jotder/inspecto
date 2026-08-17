@@ -38,6 +38,8 @@ import {
     nonDelimitedGrammarBlock,
 } from 'app/inspecto/grammar';
 import { isRecord } from 'app/inspecto/a2ui/a2ui-artifact';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 
 /** Dialog data: `def` set ⇒ edit mode (id locked, Test available); absent ⇒ create. */
 interface ComponentFormData {
@@ -108,6 +110,10 @@ export class ComponentFormDialog {
     private api = inject(ComponentsService);
     private toastr = inject(ToastrService);
     private ref = inject(MatDialogRef<ComponentFormDialog, ComponentFormResult>);
+    private confirm = inject(InspectoConfirmService);
+
+    /** Cancel/Esc/backdrop ask before discarding typed input (ui-design-review R2). */
+    readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
     readonly data = inject<ComponentFormData>(MAT_DIALOG_DATA);
 
     readonly kind = this.data.kind;
