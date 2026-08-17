@@ -10,15 +10,27 @@
  */
 /**
  * The identity `PipelineConfigParser` derives from a name when no explicit `id:` is present
- * (`PipelineConfigParser.java:81` — lower-case, spaces underscored). Mirrored here so a stamped id is
- * byte-identical to the derived one; if that derivation ever changes, this must change with it.
+ * (`PipelineConfigParser.java:81` — lower-case, spaces underscored). That derivation is NOT constrained
+ * to the `id` pattern, so it can emit an id the spec rejects; {@link pipelineId} narrows it. Kept as the
+ * separate, faithful mirror because it is what a config with no `id:` is keyed by TODAY.
  */
 export function derivedPipelineId(name: string): string {
     return name.trim().toLowerCase().replaceAll(' ', '_');
 }
 
-/** The `id:` FieldSpec's pattern (`ConfigSpecs.pipeline()`) — enforced only on an EXPLICIT id. */
-const PIPELINE_ID_PATTERN = /^[a-z0-9][a-z0-9_]*$/;
+/**
+ * The id stamped on a NEW pipeline: {@link derivedPipelineId} narrowed into the spec's alphabet, so a
+ * name the create form accepts can always carry an explicit identity. Anything outside `[a-z0-9_]`
+ * becomes `_`, and a leading non-alphanumeric is prefixed — `"My-Pipe!"` → `my_pipe_`, `"café"` → `caf_`.
+ *
+ * ⚠ Only ever applied at CREATION. The parser's unconstrained derivation stays the fallback for a
+ * config with no `id:`, because narrowing THAT would silently re-key every such pipeline already on
+ * disk — its config filename, `<id>_commits.log` audit trail, ledger `sourceId` and Catalog Stream.
+ */
+export function pipelineId(name: string): string {
+    const slug = derivedPipelineId(name).replace(/[^a-z0-9_]/g, '_');
+    return /^[a-z0-9]/.test(slug) ? slug : `p_${slug}`;
+}
 
 /**
  * The **home directory** a pipeline's dirs hang off: its `database` less the conventional `/database`
@@ -44,19 +56,17 @@ export function pipelineScaffold(
     opts: { poll?: string; database?: string; description?: string; reference?: boolean } = {},
 ): Record<string, unknown> {
     const home = pipelineHome(name, opts.database);
-    const id = derivedPipelineId(name);
     const config: Record<string, unknown> = {
         name,
         // Stamp identity at CREATION so `name` is a display label from day one: a later relabel is then
         // a one-field edit with zero migration, instead of `PipelineRoutes.relabel` having to stamp the
-        // derived id first. The value is exactly what the parser would have derived, so this changes
-        // nothing about how the pipeline is keyed — it only stops the id moving when the name does.
+        // derived id first.
         //
-        // ⚠ Omitted when the slug would not satisfy the spec's `id` pattern. That pattern is enforced
-        // ONLY on an explicit id, so writing one for e.g. "my-pipe" would newly REJECT a name the
-        // create form accepts today. Such a pipeline keeps deriving (and stays un-renameable) until
-        // someone decides whether the derivation or the pattern is wrong — see BACKLOG.
-        ...(PIPELINE_ID_PATTERN.test(id) ? { id } : {}),
+        // ALWAYS stamped, because {@link pipelineId} narrows into the `id` pattern's alphabet. It used
+        // to be omitted whenever the raw slug failed that pattern (e.g. "my-pipe"), which left the
+        // pipeline deriving its id — and `PipelineRoutes.rename` enforces the same pattern, so such a
+        // pipeline could never be renamed for the rest of its life.
+        id: pipelineId(name),
         active: false,
         dirs: {
             poll: opts.poll || `data/inbox/${name}`,

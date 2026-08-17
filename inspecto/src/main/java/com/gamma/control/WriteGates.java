@@ -26,10 +26,20 @@ final class WriteGates {
     /** Gate 2 — a name/id unusable as a jailed filename → 422. Returns the trimmed name. */
     static String safeName(String raw, String what) {
         String safe = raw == null ? "" : raw.trim();
-        if (safe.isEmpty() || safe.contains("..") || !safe.matches("[A-Za-z0-9][A-Za-z0-9._-]*"))
+        if (!isSafeName(safe))
             throw new ApiException(422,
                     "unsafe " + what + " '" + raw + "' (allowed: letters, digits, '.', '_', '-')");
         return safe;
+    }
+
+    /**
+     * Gate 2 as a predicate, for a caller weighing a name it is allowed to REJECT rather than refuse the
+     * request over — e.g. probing whether a legacy filename candidate is even usable. A caller that must
+     * have the name uses {@link #safeName} so the 422 carries the reason.
+     */
+    static boolean isSafeName(String raw) {
+        String safe = raw == null ? "" : raw.trim();
+        return !safe.isEmpty() && !safe.contains("..") && safe.matches("[A-Za-z0-9][A-Za-z0-9._-]*");
     }
 
     /**

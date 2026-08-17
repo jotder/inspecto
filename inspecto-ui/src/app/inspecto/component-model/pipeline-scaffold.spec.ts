@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { derivedPipelineId, pipelineScaffold } from './pipeline-scaffold';
+import { derivedPipelineId, pipelineId, pipelineScaffold } from './pipeline-scaffold';
+
+const SPEC_PATTERN = /^[a-z0-9][a-z0-9_]*$/;
 
 describe('pipelineScaffold', () => {
     it('stamps an explicit id equal to what the parser would derive', () => {
@@ -9,13 +11,23 @@ describe('pipelineScaffold', () => {
         expect(config['id']).toBe(derivedPipelineId('My Pipeline'));
     });
 
-    // The pattern is enforced ONLY on an explicit id, so stamping one for a name the create form
-    // accepts today would newly reject it. Omitting keeps the old derivation and the old behaviour.
-    it('omits the id when the slug would violate the spec pattern', () => {
-        expect(pipelineScaffold('my-pipe')['id']).toBeUndefined();
+    // An omitted id left the pipeline deriving one the rename gate refuses forever. The slug is now
+    // narrowed into the pattern's alphabet instead, so every name the create form accepts gets an id.
+    it('always stamps an id that satisfies the spec pattern', () => {
+        for (const name of ['my-pipe', '9lives', '_leading', 'has.dot', 'My Pipeline 2!', 'café']) {
+            const id = pipelineScaffold(name)['id'] as string;
+            expect(id, name).toMatch(SPEC_PATTERN);
+        }
+        expect(pipelineScaffold('my-pipe')['id']).toBe('my_pipe');
         expect(pipelineScaffold('9lives')['id']).toBe('9lives');
-        expect(pipelineScaffold('_leading')['id']).toBeUndefined();
-        expect(pipelineScaffold('has.dot')['id']).toBeUndefined();
+        expect(pipelineScaffold('_leading')['id']).toBe('p__leading');
+        expect(pipelineScaffold('has.dot')['id']).toBe('has_dot');
+    });
+
+    it('leaves the parser fallback derivation unnarrowed', () => {
+        // Narrowing THIS would silently re-key every on-disk pipeline that carries no `id:`.
+        expect(derivedPipelineId('my-pipe')).toBe('my-pipe');
+        expect(pipelineId('my-pipe')).toBe('my_pipe');
     });
 
     it('keeps the rest of the draft shape unchanged', () => {

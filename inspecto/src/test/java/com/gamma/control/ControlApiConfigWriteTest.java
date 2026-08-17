@@ -252,6 +252,83 @@ class ControlApiConfigWriteTest {
         }
     }
 
+    /** A pipeline carrying an explicit identity, plus a display `name` that differs from it. */
+    private static String pipelineWithId(String id, String name) {
+        return """
+                {"type":"pipeline","config":{
+                   "name":"%s","id":"%s",
+                   "dirs":{"poll":"in","database":"out"},
+                   "processing":{"threads":1}}}""".formatted(name, id);
+    }
+
+    /**
+     * A pipeline's filename comes from its {@code id} — the field {@code PipelineRoutes.rename} already
+     * named the file from, so create and rename finally agree on one name. Until 2026-08-17 create used
+     * {@code name}, which has no pattern of its own.
+     */
+    @Test
+    void pipelineFilenameComesFromTheIdNotTheDisplayName(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> r = post(c.port, "/config/write", pipelineWithId("orders_daily", "Orders Daily"));
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode out = V1Body.of(r.body());
+            assertEquals("orders_daily", out.get("name").asText());
+            assertEquals("orders_daily_pipeline.toon", out.get("path").asText());
+            assertTrue(Files.exists(root.resolve("orders_daily_pipeline.toon")));
+            // The display name survives verbatim; only the FILE stopped being keyed by it.
+            assertEquals("Orders Daily",
+                    ConfigLoader.filesystem().decode(root.resolve("orders_daily_pipeline.toon").toString()).get("name"));
+        }
+    }
+
+    /**
+     * The case that used to be unwritable: a space is legal in a display `name` (no pattern) but illegal in
+     * a filename, so keying the file off `name` 422'd every such pipeline before the id existed.
+     */
+    @Test
+    void aDisplayNameWithASpaceIsWritableOnceAnIdCarriesIdentity(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            assertEquals(422, post(c.port, "/config/write", pipeline("My Pipe")).statusCode(),
+                    "no id ⇒ the filename still comes from `name`, and a space is not a safe name");
+            HttpResponse<String> r = post(c.port, "/config/write", pipelineWithId("my_pipe", "My Pipe"));
+            assertEquals(200, r.statusCode(), r.body());
+            assertEquals("my_pipe_pipeline.toon", V1Body.of(r.body()).get("path").asText(), r.body());
+            assertTrue(Files.exists(root.resolve("my_pipe_pipeline.toon")));
+        }
+    }
+
+    /**
+     * A pipeline written before the id was stamped at birth lives under a name-derived filename. Editing it
+     * must UPDATE that file, not fork a second config beside it under the id.
+     */
+    @Test
+    void anIdStampedOntoALegacyConfigKeepsEditingTheExistingFile(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            assertEquals(200, post(c.port, "/config/write", pipeline("Legacy")).statusCode());
+            assertTrue(Files.exists(root.resolve("Legacy_pipeline.toon")), "legacy file is named for `name`");
+
+            String stamped = """
+                    {"type":"pipeline","overwrite":true,"config":{
+                       "name":"Legacy","id":"legacy",
+                       "dirs":{"poll":"in","database":"out"},
+                       "processing":{"threads":1}}}""";
+            JsonNode out = V1Body.of(post(c.port, "/config/write", stamped).body());
+            assertTrue(out.get("overwritten").asBoolean(), "the existing file was updated");
+            // ⚠ Asserted as a COUNT, not a filename. The two candidates differ only in case, and on a
+            // case-insensitive filesystem (Windows) the id-cased path already resolves to the legacy file —
+            // so the fallback never fires there and `path` comes back lowercased, while on Linux it fires
+            // and `path` keeps the original casing. Either way exactly one config exists, which is the
+            // property under test; asserting the string would pass on one platform and fail on the other.
+            try (var entries = Files.list(root)) {
+                assertEquals(1, entries.filter(p -> p.toString().endsWith(".toon")).count(),
+                        "no second config forked beside the legacy one");
+            }
+        }
+    }
+
     /** A pipeline whose collector binds a connection by id. */
     private static String pipelineBoundTo(String name, String connectionId) {
         return """

@@ -152,14 +152,6 @@ final class ConfigRoutes implements RouteModule {
                     "error", "config has ERROR-level findings; not written", "findings", findings));
         }
 
-        // Filename from the config's own identity field — no caller-controlled path component.
-        String idField = identityField(type);
-        String rawName = dottedString(draft, idField);
-        if (rawName == null || rawName.isBlank())
-            throw new ApiException(422, "config is missing its identity field '" + idField + "'");
-        String safeIdentity = WriteGates.safeName(rawName, "config name");
-        String fileName = fileBase(type, safeIdentity);
-
         // Resolve under the write root; an optional subdir must stay inside it (path jail).
         Path dir = writeRoot;
         String subdir = ApiContext.str(body, "subdir");
@@ -168,7 +160,34 @@ final class ConfigRoutes implements RouteModule {
             if (sub.isAbsolute()) throw new ApiException(400, "subdir must be relative");
             dir = WriteGates.jail(writeRoot, writeRoot.resolve(sub), "subdir");
         }
-        Path target = WriteGates.jail(writeRoot, dir.resolve(fileName + ".toon"), "resolved path");
+
+        // Filename from the config's own identity field — no caller-controlled path component.
+        List<String> idFields = identityFields(type);
+        String idField = firstPresent(draft, idFields);
+        if (idField == null)
+            throw new ApiException(422, "config is missing its identity field '" + idFields.getFirst() + "'");
+        String safeIdentity = WriteGates.safeName(dottedString(draft, idField), "config name");
+        Path target = WriteGates.jail(writeRoot,
+                dir.resolve(fileBase(type, safeIdentity) + ".toon"), "resolved path");
+
+        // A pipeline written before its `id` was stamped at birth lives under a name-derived filename.
+        // Keep editing THAT file rather than forking a second config beside it under the id.
+        //
+        // ⚠ A fallback candidate is PROBED, never enforced: a display `name` has no pattern of its own, so
+        // `safeName` here would 422 the very writes the id-keyed filename exists to make possible.
+        if (idFields.size() > 1 && !Files.exists(target)) {
+            for (String fallback : idFields.subList(1, idFields.size())) {
+                String raw = dottedString(draft, fallback);
+                if (!WriteGates.isSafeName(raw)) continue;
+                Path legacy = WriteGates.jail(writeRoot,
+                        dir.resolve(fileBase(type, raw.trim()) + ".toon"), "resolved path");
+                if (Files.exists(legacy)) {
+                    safeIdentity = raw.trim();
+                    target = legacy;
+                    break;
+                }
+            }
+        }
 
         // Warning only: the save still succeeds (the schema file may be created afterwards), but
         // the operator learns now that Register would fail on this host.
@@ -328,12 +347,13 @@ final class ConfigRoutes implements RouteModule {
 
         // The filename derives from the identity field, so a patch may not move it — a renamed
         // identity under the old filename would silently split the config from its index entry.
-        String idField = identityField(type);
-        String before = dottedString(existing, idField);
-        String after = dottedString(merged, idField);
-        WriteGates.conflictIf(before != null && !before.equals(after),
-                "patch changes the identity field '" + idField + "' (" + before + " → " + after
-                        + "); rename via /config/write");
+        for (String idField : identityFields(type)) {
+            String before = dottedString(existing, idField);
+            String after = dottedString(merged, idField);
+            WriteGates.conflictIf(before != null && !before.equals(after),
+                    "patch changes the identity field '" + idField + "' (" + before + " → " + after
+                            + "); rename via /config/write");
+        }
 
         // Same gate as /config/write, over the WHOLE merged draft: spec + hard-fail safety check;
         // schema references resolve config-relative here because the file has a home directory.
@@ -902,13 +922,28 @@ final class ConfigRoutes implements RouteModule {
         return WriteGates.jail(writeRoot, dir.resolve(safeName + ".toon"), "resolved path");
     }
 
-    /** Dotted path into the config map that holds a config's stable identity (its filename source). */
-    private static String identityField(String type) {
+    /**
+     * Dotted paths into the config map that hold a config's stable identity (its filename source),
+     * best first. A pipeline's is its {@code id} — the field {@code PipelineRoutes.rename} already
+     * names the file from, so create and rename now agree on one filename; {@code name} stays as the
+     * fallback for a config written before the id was stamped at birth.
+     */
+    private static List<String> identityFields(String type) {
         return switch (type) {
-            case "job"    -> "job.name";
-            case "schema" -> "raw.name";
-            default       -> "name";   // pipeline, enrichment, meta
+            case "job"      -> List.of("job.name");
+            case "schema"   -> List.of("raw.name");
+            case "pipeline" -> List.of("id", "name");
+            default         -> List.of("name");   // enrichment, meta
         };
+    }
+
+    /** The first of {@code fields} the draft actually carries a non-blank value for, or {@code null}. */
+    private static String firstPresent(Map<String, Object> draft, List<String> fields) {
+        for (String f : fields) {
+            String v = dottedString(draft, f);
+            if (v != null && !v.isBlank()) return f;
+        }
+        return null;
     }
 
     /** Read a dotted key (e.g. {@code job.name}) from a nested config map, or {@code null} if absent. */
