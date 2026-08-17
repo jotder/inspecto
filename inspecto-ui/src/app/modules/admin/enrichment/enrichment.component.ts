@@ -15,6 +15,7 @@ import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component'
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { FmtPercentPipe } from 'app/inspecto/format';
 import { fmtDateTime } from 'app/inspecto/grid';
+import { ToastrService } from 'ngx-toastr';
 
 type EnrTab = 'runs' | 'lineage' | 'report';
 
@@ -45,6 +46,7 @@ type EnrTab = 'runs' | 'lineage' | 'report';
     encapsulation: ViewEncapsulation.None,
 })
 export class EnrichmentComponent implements OnInit {
+    private toastr = inject(ToastrService);
     private api = inject(EnrichmentService);
 
     jobs: EnrichmentJobView[] = [];
@@ -107,7 +109,10 @@ export class EnrichmentComponent implements OnInit {
             error: (e) => {
                 this.loading = false;
                 this.jobs = [];
+                // See collectors: only a 404 means "no such surface here". Anything else is a failure and
+                // must not render as the affirmative "no enrichment jobs are registered".
                 this.unavailable = e?.status === 404;
+                if (e?.status !== 404) this.toastr.warning('Could not load enrichment jobs — is ControlApi running?');
             },
         });
     }

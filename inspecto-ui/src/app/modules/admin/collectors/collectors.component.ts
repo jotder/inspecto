@@ -119,7 +119,12 @@ export class CollectorsComponent implements OnInit {
             error: (e) => {
                 this.loading = false;
                 this.collectors = [];
+                // 404 genuinely means "this deployment has no collector surface". Any OTHER status is a
+                // FAILURE, and rendering the affirmative "none are registered" empty state for it told
+                // the operator their collectors were gone. The connectivity banner cannot cover this —
+                // it fires only on status 0.
                 this.unavailable = e?.status === 404;
+                if (e?.status !== 404) this.toastr.warning('Could not load collectors — is ControlApi running?');
             },
         });
         this.metricsApi.get().subscribe({

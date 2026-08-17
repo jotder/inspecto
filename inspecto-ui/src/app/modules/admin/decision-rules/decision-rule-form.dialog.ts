@@ -346,6 +346,12 @@ export class DecisionRuleFormDialog implements AfterViewInit {
     ngAfterViewInit(): void {
         if (this.isEdit) {
             this.saveForm.patchValue({ name: this.data.rule!.name, description: this.data.rule!.description ?? '' });
+        } else if (this.data.prefill?.description) {
+            // A "Propose with AI" prefill carries the assistant's answer as the rule's description, but
+            // `buildInitial()` only feeds the CONFIG step (targetType/target/priority/enabled) and this
+            // seed was gated on isEdit — so the proposed description was dropped on the floor and the
+            // rule was created with none, while its target and consequences came through.
+            this.saveForm.patchValue({ description: this.data.prefill.description });
         }
         // The when-clause field choices follow the target the schema form holds.
         const target = this.schemaForm.form.get('target');

@@ -103,6 +103,15 @@ export interface RunToHereData {
                             (select)="onSelect($event)"
                         />
                     </div>
+                } @else if (exploreFailed()) {
+                    <!-- A connection that is down / mis-credentialed used to render the affirmative
+                         "Nothing to list", so the operator ran over the built-in sample believing their
+                         inbox was empty. A failure and an empty inbox must not look the same. -->
+                    <inspecto-empty-state
+                        icon="heroicons_outline:exclamation-triangle"
+                        title="Could not list this connection"
+                        message="The connection could not be read — it may be down, or its credentials may be wrong."
+                    />
                 } @else {
                     <inspecto-empty-state
                         icon="heroicons_outline:folder-open"
@@ -221,6 +230,8 @@ export class RunToHereDialog implements OnInit {
 
     readonly exploring = signal(false);
     readonly rootNodes = signal<ResourceNode[]>([]);
+    /** The root explore FAILED, as opposed to returning nothing — see the template. */
+    readonly exploreFailed = signal(false);
     readonly childrenByPath = signal<Record<string, ResourceNode[]>>({});
     readonly expanded = signal<Set<string>>(new Set());
     readonly loadingPaths = signal<Set<string>>(new Set());
@@ -236,9 +247,13 @@ export class RunToHereDialog implements OnInit {
         this.probe.explore(this.data.connectionId).subscribe({
             next: (ns) => {
                 this.rootNodes.set(ns);
+                this.exploreFailed.set(false);
                 this.exploring.set(false);
             },
-            error: () => this.exploring.set(false),
+            error: () => {
+                this.exploreFailed.set(true);
+                this.exploring.set(false);
+            },
         });
     }
 
@@ -258,7 +273,16 @@ export class RunToHereDialog implements OnInit {
                 this.childrenByPath.set({ ...this.childrenByPath(), [node.path]: kids });
                 this.clearLoading(node.path);
             },
-            error: () => this.clearLoading(node.path),
+            error: () => {
+                // Collapse it again: left expanded with no children the folder looked empty AND could
+                // never be retried — the next click just toggled it shut, so the fetch never re-ran.
+                this.expanded.update((e) => {
+                    const next = new Set(e);
+                    next.delete(node.path);
+                    return next;
+                });
+                this.clearLoading(node.path);
+            },
         });
     }
 

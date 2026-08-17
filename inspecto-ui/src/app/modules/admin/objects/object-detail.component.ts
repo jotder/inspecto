@@ -176,6 +176,9 @@ export class ObjectDetailComponent implements OnInit {
             next: (o) => {
                 this.obj = o;
                 this.loading = false;
+                // The active tab may have been opened before the object existed; its loader bailed out
+                // rather than latching an empty result, so drive it now that there is something to read.
+                this.onTabChange();
             },
             error: () => {
                 this.obj = null;
@@ -250,7 +253,12 @@ export class ObjectDetailComponent implements OnInit {
     /** Events sharing this object's correlation id — the engine-level timeline behind the object. */
     loadEvents(): void {
         this.eventsLoaded = false;
-        const cid = this.obj?.correlationId;
+        // ⚠ No object yet is NOT "no events". Opening this tab while the header is still a skeleton used
+        // to latch `eventsLoaded = true` over an empty list, and nothing re-drove it — onTabChange fires
+        // only on a CHANGE, so staying put never retried and the operator had to switch away and back.
+        // Left unloaded here, `loadObject()`'s completion re-drives the active tab.
+        if (!this.obj) return;
+        const cid = this.obj.correlationId;
         if (!cid) {
             this.relatedEvents = [];
             this.eventsLoaded = true;

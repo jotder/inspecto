@@ -373,6 +373,11 @@ export class ExpectationFormDialog implements AfterViewInit {
                 name: String(s['name'] ?? this.suggestedName()),
                 description: String(s['description'] ?? ''),
             });
+            // ⚠ patchValue leaves the control PRISTINE, and the save step regenerates the id from the
+            // target/column whenever it is pristine — so the accepted suggestion's own name was silently
+            // replaced on Continue while its description survived, changing only the id under the
+            // operator. Marking it dirty is what tells that check a human's choice is already in there.
+            this.saveForm.controls.name.markAsDirty();
         }
     }
 

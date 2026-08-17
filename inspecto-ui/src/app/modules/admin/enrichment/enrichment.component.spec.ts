@@ -1,11 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Observable, of, throwError } from 'rxjs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { AuditRow, EnrichmentJobView, EnrichmentService } from 'app/inspecto/api';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { EnrichmentComponent } from './enrichment.component';
+import { ToastrService } from 'ngx-toastr';
 
 const JOB = {
     name: 'geo_enrich',
@@ -31,6 +32,9 @@ function create(list: Observable<EnrichmentJobView[]> = of([JOB])) {
             provideNoopAnimations(),
             { provide: EnrichmentService, useValue: stub },
             { provide: InspectoGridThemeService, useValue: { theme: () => ({}) } },
+            // The component toasts when a non-404 load fails — a failed list must not render as the
+            // affirmative "no enrichment jobs are registered".
+            { provide: ToastrService, useValue: { warning: vi.fn(), error: vi.fn(), success: vi.fn() } },
         ],
     });
     const fixture = TestBed.createComponent(EnrichmentComponent);

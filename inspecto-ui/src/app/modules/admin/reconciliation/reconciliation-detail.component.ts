@@ -244,6 +244,9 @@ export class ReconciliationDetailComponent implements OnInit {
 
     /** Switch the compared side (3-way) and recompute. */
     setSide(side: 'b' | 'c'): void {
+        // Defense in depth behind the template's [disabled]: `compute()` early-returns while one is in
+        // flight, so flipping `side` here regardless would re-label the headers over the OLD rows.
+        if (this.computing()) return;
         this.side.set(side);
         void this.compute();
     }

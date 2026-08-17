@@ -305,6 +305,32 @@ export const DEFAULT_CASE_WORKFLOW: WorkflowDef = {
     ],
 };
 
+/**
+ * The INCIDENT lifecycle, which {@link DEFAULT_CASE_WORKFLOW} cannot express — its actions
+ * (investigate/escalate) and its `from` states (OPEN/INVESTIGATING/…) are both the wrong vocabulary.
+ *
+ * ⚠ `from` is in DISPLAY terms (GLOSSARY §9: IDENTIFIED → DIAGNOSING → RESOLVED → ARCHIVED) because
+ * that is what `displayStatus()` yields and what the matcher compares against, while `to` is the RAW
+ * status the server will store, so an optimistically-patched row normalises exactly like a fetched one.
+ *
+ * Without this, the mail view fell back to the CASE workflow for incidents — `workflowDef()` is only
+ * fetched when the type is not INCIDENT — so no transition ever matched and every incident action's
+ * optimistic patch was a silent no-op: the toast announced the new status while the row kept the old
+ * badge and stayed in its old folder until the server round-trip landed.
+ */
+export const DEFAULT_INCIDENT_WORKFLOW: WorkflowDef = {
+    type: 'INCIDENT',
+    initial: 'OPEN',
+    states: [...INCIDENT_STATUSES],
+    terminal: ['ARCHIVED'],
+    transitions: [
+        { from: 'IDENTIFIED', to: 'IN_PROGRESS', action: 'accept' },
+        { from: 'DIAGNOSING', to: 'RESOLVED', action: 'resolve' },
+        { from: 'RESOLVED', to: 'CLOSED', action: 'archive' },
+        { from: 'ARCHIVED', to: 'OPEN', action: 'reopen' },
+    ],
+};
+
 const STATE_ICONS: Record<string, string> = {
     OPEN: 'heroicons_outline:inbox',
     INVESTIGATING: 'heroicons_outline:magnifying-glass',

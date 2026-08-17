@@ -1891,6 +1891,11 @@ export class PipelineEditorComponent implements OnInit {
 
     private selectNewNode(node: AuthoredNode): void {
         this.canvas?.setNodeStatus(node.id, this.statusOf(node)); // a new node starts unconfigured/configured
+        // Re-typing the parse placeholder renames the node ("Parser" → "Delimited") and reaches here, but
+        // only the STATUS was pushed — `g6Data` is re-fed to the host on a graphKey (tab) change alone, so
+        // the canvas kept the stale label until the tab was reopened. Every other rename path goes through
+        // `applyNodePatch`, which does call updateNodeLabel.
+        if (node.name) this.canvas?.updateNodeLabel?.(node.id, node.name);
         this.dirty.set(true);
         this.selectedNode.set(node);
         this.inspectorOpen.set(true);
@@ -2121,6 +2126,11 @@ export class PipelineEditorComponent implements OnInit {
         if (!m) return;
         this.model.set(removeNodeFromModel(m, id));
         this.canvas?.removeElement(id);
+        // ⚠ `clearSelection()` touches selectedNode/selectedEdgeId/connectFrom only, so the definition
+        // drawer kept rendering the node that had just been deleted. Its Apply then reached a reducer
+        // whose `map` matches nothing — a silent no-op — while still setting dirty and clearing
+        // definitionDirty, i.e. the pane reported "applied" over work it had thrown away.
+        if (this.definitionNode()?.id === id) this.closeDefinition();
         this.clearSelection();
         this.dirty.set(true);
     }

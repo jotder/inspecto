@@ -74,7 +74,13 @@ export class AgentChatComponent {
 
     send(): void {
         const q = this.question.value.trim();
-        if (!q || this.unavailable()) return;
+        // ⚠ `busy()`, not just `unavailable()`. On the FIRST send `cancelInFlight()` no-ops (no controller
+        // yet) and `sessionId()` is still null, so two quick Enters opened TWO sessions. Both then streamed
+        // into `patchCurrent`, which always patches the LAST agent bubble: the first stream's tokens landed
+        // in the second bubble and the first stuck on "Answering…" for ever, un-abortable because its
+        // controller reference had already been overwritten.
+        if (!q || this.unavailable() || this.busy()) return;
+        this.busy.set(true);
         this.cancelInFlight();
         const sessionId = this.sessionId();
         if (sessionId) {

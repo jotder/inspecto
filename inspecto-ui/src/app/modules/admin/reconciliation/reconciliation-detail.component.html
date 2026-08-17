@@ -31,9 +31,14 @@
             </div>
             <div class="flex items-center gap-2">
                 @if (threeWay()) {
+                    <!-- ⚠ Disabled while a compute runs, exactly as Refresh is. Switching mid-compute
+                         re-labelled the headers to the new side while `liveBreaks()` still held the old
+                         pair's rows — B's differences shown under C's name — and the dropped recompute
+                         never retried, so the only way out was to leave the page. -->
                     <mat-button-toggle-group
                         [value]="side()"
                         (change)="setSide($event.value)"
+                        [disabled]="computing()"
                         hideSingleSelectionIndicator
                         aria-label="Compared side"
                     >

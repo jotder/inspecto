@@ -41,6 +41,7 @@ import {
     caseFoldersFrom,
     currentOperator,
     DEFAULT_CASE_WORKFLOW,
+    DEFAULT_INCIDENT_WORKFLOW,
     displayStatus,
     INCIDENT_FOLDERS,
     INCIDENT_PRIORITIES,
@@ -131,7 +132,9 @@ export class ObjectMailComponent implements OnInit {
     readonly me = currentOperator();
 
     /** The effective CASE lifecycle (C6) — folders + toolbar verbs derive from it; TOON overrides win. */
-    readonly workflowDef = signal<WorkflowDef>(DEFAULT_CASE_WORKFLOW);
+    /** The lifecycle this pane's type actually follows. ⚠ Seeded per TYPE: defaulting both to the CASE
+     *  workflow made every incident transition unmatchable, since only the CASE one is ever fetched. */
+    readonly workflowDef = signal<WorkflowDef>(this.isIncident ? DEFAULT_INCIDENT_WORKFLOW : DEFAULT_CASE_WORKFLOW);
     /** C3/D6: the effective Findings sections, served per object type; null until loaded. */
     readonly findingsSpec = signal<FindingsSpecDef | null>(null);
     readonly folders = computed<MailFolder[]>(() =>
