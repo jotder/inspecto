@@ -778,11 +778,35 @@ lowering the open graph, and refuses while the tab is dirty. An export that carr
 state while the screen shows something else is worse than no export. Stream-vs-reference comes from
 **that config's own `produces`** — ⛔ not `PipelineSummary.produces`, which is the list of stores.
 
-⚠ **Two deliberate narrowings, recorded so they are not mistaken for bugs.** *View as graph* was not
-carried over (it needs the kind, hence an extra settings hop, and the Catalog's lineage tab is
-directly reachable). And Export configuration lives inside the `canAuthor()` menu, so unlike the
-shell's every-lens export it is hidden from the Business lens — consistent with its neighbour *Export
-document*, but narrower than what it replaced.
+⚠ **One deliberate narrowing survives, recorded so it is not mistaken for a bug.** *View as graph* was
+not carried over (it needs the kind, hence an extra settings hop, and the Catalog's lineage tab is
+directly reachable). Re-confirmed 2026-08-17 as the end state, not a deferral.
+
+**The export narrowing was REVERSED 2026-08-17 (A6).** Export configuration had lived inside the
+`canAuthor()` menu, which contradicted `exportConfig()`'s own doc comment — inherited verbatim from
+the shell — that a Business-lens operator handing a config to support is the point. Both exports are
+read-only, so **both** moved out together into an always-visible **Export** menu rather than diverging
+from each other (consistency with *Export document* was the narrowing's stated justification). Nothing
+pinned the old placement — no spec, mock or backend. ⚠ The author menu keeps its five actions and the
+exports appear **once**, in their own host: a `mat-menu`'s items cannot be shared between two menus, so
+re-homing them means moving them, not duplicating them.
+
+## `description` is declared and displayed (2026-08-17)
+
+A pipeline's top-level `description` used to be a **spec-orphaned passthrough**: the Catalog's create
+dialog has a real form input for it and `PipelineEditable.lower()` preserved it end-to-end, but nothing
+declared it and no surface rendered it — an operator typed it once and could never see it again.
+(`ConfigLoader.validate` walks `spec.fields()`, never `raw.keySet()`, so an undeclared key is absorbed
+silently rather than rejected. That is why this was invisible rather than broken.)
+
+Now declared in `ConfigSpecs.pipeline()`, parsed onto `PipelineConfig.description()`, projected by
+`GET /pipelines` in the same **conditional** style as `template`/`displayName` (absent ⇒ the payload is
+byte-identical to before), and rendered as the row subtitle in the open-pipelines dialog with the
+`text-secondary` class widgets/connections/spaces already use.
+
+⛔ **Display only** — no engine code reads it. ⚠ Still only **settable at creation**: the pipeline
+settings dialog is a hand-built form, not spec-driven, so the new `FieldSpec` does not generate a
+control there. Editing an existing pipeline's description needs a field added to that dialog.
 
 ## The parse slot is claimed, not queued (BUILDER-2, 2026-08-17)
 

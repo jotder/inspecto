@@ -10,23 +10,49 @@
 immutable once set). **Since 2026-08-17 a newly created pipeline carries `id:` from birth** — the UI's
 `pipelineScaffold()` stamps it, and that function is the single payload builder behind *both* create
 surfaces (the Pipelines editor's inline "New pipeline" and the Catalog `onboarding-create.dialog`), so
-neither can drift from the other. The stamped value is **byte-identical to the derivation below**
-(`derivedPipelineId()` mirrors `PipelineConfigParser.java:81`), so nothing is keyed differently and this
-is not a migration; it only stops the id following the name, which makes `label` below a pure one-field
-edit rather than a stamp-then-edit.
+neither can drift from the other. It only stops the id following the name, which makes `label` below a
+pure one-field edit rather than a stamp-then-edit.
+
+The stamped value is `pipelineId()` — `derivedPipelineId()` (the faithful mirror of
+`PipelineConfigParser.java:81`) **narrowed into the spec's alphabet**: anything outside `[a-z0-9_]`
+becomes `_`, and a leading non-alphanumeric is prefixed (`"My-Pipe!"` → `my_pipe_`, `"café"` → `caf_`).
+So the stamp is byte-identical to the derivation for any name that already slugs cleanly, and legal for
+every other name the create form accepts.
 
 ⛔ **The id is deliberately NOT opaque/minted.** It names the config file, `<id>_commits.log`, the ledger
 `source_id` and the Catalog Stream — a random id makes an operator's config directory unreadable. If a
 fully-decoupled identity is ever wanted, that is a product decision with an on-disk cost, not a cleanup.
 
-🔴 **Three rules derive an identity-ish string from `name`, and they do not agree.** The `id` **pattern**
-(`[a-z0-9][a-z0-9_]*`) is enforced only on an **explicit** id; the **derivation** lower-cases and
-underscores spaces and nothing else; the **filename** comes from a third path (`ConfigRoutes`'
-`identityField("pipeline")` → `name`). So a name like `my-pipe` or `has.dot` derives an id its own spec
-would reject — and stamping it would newly refuse a name the create form accepts today. `pipelineScaffold`
-therefore **omits** `id` in exactly that case, leaving such a pipeline on the derivation (and
-un-renameable). Whether the derivation or the pattern is wrong is an open decision; ⛔ do not resolve it by
-widening the pattern without reconciling the filename rule too.
+### The three-rules disagreement — RESOLVED 2026-08-17
+
+Three rules derived an identity-ish string from `name` and did not agree: the `id` **pattern**
+(`[a-z0-9][a-z0-9_]*`, enforced only on an **explicit** id), the **derivation** (lower-case, spaces
+underscored, nothing else), and the **filename** (`[A-Za-z0-9][A-Za-z0-9._-]*`, taken from
+`ConfigRoutes.identityField("pipeline")` → `name`, a field with **no pattern of its own**). Two live
+defects fell out of that, both now closed:
+
+- `"my-pipe"` derived an id its own spec rejects, so `pipelineScaffold` omitted the id — and because
+  `PipelineRoutes.rename` enforces the same pattern, such a pipeline was **un-renameable for life**.
+- `"My Pipeline"` stamped a perfectly valid `my_pipeline` and was **422'd anyway**, because the filename
+  came from `name` and a space is not a safe filename.
+
+Fixed at the two ends rather than in the middle: `pipelineId()` narrows the slug (above), and a
+pipeline's filename now comes from **`id`** — the field `rename` already used, so create and rename
+finally agree. `identityFields("pipeline")` returns `["id", "name"]`, and a config still living under a
+name-derived filename keeps being **edited in place** rather than forked into a second config beside it.
+
+⛔ **The parser's fallback derivation was deliberately NOT narrowed.** It is what a config carrying no
+`id:` is keyed by *today*; narrowing it would silently re-key every such pipeline already on disk — its
+filename, `<id>_commits.log`, ledger `source_id` and Catalog Stream. The divergence is pinned by a spec
+(`derivedPipelineId('my-pipe')` → `my-pipe`, `pipelineId('my-pipe')` → `my_pipe`) so the next reader does
+not "tidy" it. Migrating the legacy path is a data migration, not an edit.
+
+⚠ A fallback filename candidate is **probed** (`WriteGates.isSafeName`), never enforced. Calling
+`safeName` there throws — which 422'd exactly the writes the id-keyed filename exists to enable. Caught
+by a new test, not by review.
+
+⚠ `ConfigRoutes.fileBase` does not double-suffix, so an id ending in `_pipeline` yields
+`<id>.toon`, not `<id>_pipeline.toon`.
 
 `id` is **absent from every config written before 2026-08-02** — identity is
 *derived* from `name` (`lowercase, spaces→underscores`) and baked into ~140 call sites: the config
