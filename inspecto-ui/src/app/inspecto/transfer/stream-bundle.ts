@@ -1,3 +1,6 @@
+// Deep import on purpose: the segments barrel also exports the editor COMPONENT, and this codec is
+// pure — it must not drag an Angular component into whatever imports it.
+import { companionSchemaName } from '../segments/segment-drafts';
 import { hashContent } from './content-hash';
 
 /**
@@ -198,9 +201,6 @@ export interface StreamImportPlan {
 const conventionPath = (space: string | null, name: string): string =>
     `${space ? `spaces/${space}` : '.'}/config/${name}.toon`;
 
-/** Mirrors `parsing-pane`'s `schemaNameFor` — a segment schema is `<pipeline>_<segmentKey>`. */
-const segmentSchemaName = (pipeline: string, segmentKey: string): string =>
-    `${pipeline}_${segmentKey}`.replace(/[^A-Za-z0-9_]+/g, '_');
 
 /**
  * Turn a parsed bundle into the exact set of writes for THIS target, under a (possibly new) name.
@@ -242,7 +242,7 @@ export function planStreamImport(bundle: StreamBundle, opts: { name: string; spa
     if (bundle.segments && Object.keys(bundle.segments).length) {
         const paths: Record<string, string> = {};
         for (const [key, config] of Object.entries(bundle.segments)) {
-            const segName = segmentSchemaName(name, key);
+            const segName = companionSchemaName(name, key);
             plan.segments.push({ name: segName, config: { ...config, raw: renameRaw(config, segName) } });
             paths[key] = conventionPath(space, segName);
         }
