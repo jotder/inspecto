@@ -253,6 +253,35 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 
 ## 5. UI residuals + security-module residuals
 
+> ### 🟠 REVIEW-1 — defects found by the 2026-08-17 Angular sweep that were NOT fixed
+>
+> Each was read and confirmed against the source; they are unfixed only because the fix needs a product
+> decision or is larger than the review. **Do not re-hunt these — go straight to the line.**
+>
+> | Where | Defect |
+> |---|---|
+> | `pipelines/pipeline-parse-definition.component.ts:616` | The seed `effect` transitively tracks `plugin()` (via `loadSavedSchema` → `authorsSchema` → `authorsSegments`), so when the served parser catalog lands the whole effect re-runs: typed Name/Description revert, the picked Grammar template is discarded, and `markAsPristine()` reports clean. **Fix needs the seed made one-shot** — an `effect` is the wrong shape here. |
+> | `pipelines/pipeline-parse-definition.component.ts:666` | `addDriftedFields()` arms no dirty flag and the new `schemaSeed` reference re-seeds the grid pristine, so columns the product just derived from a Test parse can never be applied. |
+> | `pipelines/pipeline-load-definition.component.ts:437` | `setSourcePart` writes with `patchValue`, which does not mark the form dirty, and this component (unlike Parse and Collection) has no `onInteraction` host listener — so editing a CONCAT_DT/FILENAME_DATE source leaves Apply greyed out. |
+> | `pipelines/pipeline-editor.component.ts:952` | An in-flight `select()` has no still-current guard: click tab C (uncached), then back to A and keep editing — when C lands it does `model.set(flow)` unconditionally, destroying A's post-switch edits and clearing `dirty`. |
+> | `pipelines/pipeline-editor.component.ts:1851` | Re-typing the parse placeholder renames the node in the model but never calls `updateNodeLabel`, so the canvas keeps the old label until the tab is reopened. |
+> | `pipelines/pipeline-editor.component.ts:2096` | `removeNode` does not `closeDefinition()`, so the drawer stays open on a deleted node; its Apply then no-ops through the reducer's `map` while still reporting "applied". |
+> | `pipelines/grammar-editor.dialog.ts:139,144,133` | Three: a node bound to a Grammar the list does not return is never seeded and Save overwrites it with delimited defaults **and drops the `use:` binding**; the async list callback closes over a stale `boundId` const instead of `boundGrammarId()`; and the dirty guard reads a `@ViewChild` unmounted during the name step, so Cancel there discards the whole authored Grammar without asking. |
+> | `pipelines/run-to-here.dialog.ts:241,261` | A failed connection explore renders as "Nothing to list on this connection"; a failed directory expand leaves the folder open, empty, and unretryable. |
+> | `objects/object-mail.component.ts:743` | `expectTransition` looks actions up in `DEFAULT_CASE_WORKFLOW` even for incidents (`workflowDef()` is only fetched when `!isIncident`), so no transition ever matches and every incident's optimistic status patch is a no-op — the toast claims the new status while the row keeps the old one. |
+> | `objects/object-detail.component.ts:236` | Opening the Events tab before the object arrives latches `eventsLoaded = true` with an empty list and never re-resolves. |
+> | `catalog/catalog.component.ts:358` | The onboarding duplicate-name guard is built from `streams ∪ references`, but `loadTab()` only ever fetches the ACTIVE tab — so on the default Streams tab the reference names are missing and a colliding name only fails as a 409 after the write. |
+> | `reconciliation/reconciliation-detail.component.ts:254` | The side toggle is not disabled during a compute (Refresh is), so switching A/B→A/C mid-compute re-labels the headers while `liveBreaks()` still holds the old pair — B's differences shown under C's name, with no retry. Same shape at `recon-board.component.ts:154`. |
+> | `decision-rules/decision-rule-form.dialog.ts:323` | An AI-proposed rule's `description` is dropped: `buildInitial()` omits it and the only seed is gated on `isEdit`. |
+> | `expectations/expectation-form.dialog.ts:395` | An AI-applied suggestion's `name` is overwritten on Continue, because `patchValue` leaves the control pristine and the pristine check then regenerates the id. |
+> | `agent-chat/agent-chat.component.ts:78` | No in-flight guard on the first send: two quick Enters open two sessions, both stream into `patchCurrent` (which patches the LAST bubble), so one stream's tokens land in the other's bubble and the first sticks on "Answering…" un-abortable. |
+> | `enrichment/enrichment.component.ts:110`, `collectors/collectors.component.ts:121` | A 500/422 renders the affirmative "nothing is registered" empty state; the connectivity banner cannot cover it (it fires only on `status === 0`). |
+> | studio ×4 | `uniqueNameValidator` is reimplemented in `dashboard-editor:57`, `dataset-editor:36`, `widget-save.dialog:20`, `add-to-dashboard.dialog:25` over the shared `inspecto/investigation/unique-name.ts`. The copies snapshot `taken: string[]` where the shared one takes a thunk, so a future call site attaching before its list loads would never block a duplicate. |
+>
+> ⚠ Also worth a product decision, not a bug: `link-analysis-toolbox.component.ts:116` does
+> `if (authored.length) this.patternPacks.set(authored)` — a space authoring ONE pattern pack makes all
+> six built-ins disappear. Deliberate curation or an accident?
+
 > ### 🟡 CD-1 — 64 components still carry the v22 `ChangeDetectionStrategy.Eager` shim (2026-08-17)
 >
 > `ng update` stamped `Eager` on every component that had no explicit strategy, because v22 flipped the
