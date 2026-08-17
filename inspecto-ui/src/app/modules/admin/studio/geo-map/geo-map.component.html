@@ -664,6 +664,7 @@
         @if (geo() && dataOpen()) {
             <div class="bg-card min-w-0 overflow-x-auto rounded-2xl p-3 shadow">
                 <inspecto-data-table
+                    stateKey="geo-map-rows"
                     tier="standard"
                     [rows]="rows()"
                     height="15rem"

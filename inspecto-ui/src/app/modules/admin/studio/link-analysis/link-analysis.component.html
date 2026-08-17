@@ -669,6 +669,7 @@
                 <!-- ── Data ── -->
                 <div [hidden]="bottomTab() !== 'data'">
                     <inspecto-data-table
+                        stateKey="link-analysis-rows"
                         tier="standard"
                         [rows]="tableRows()"
                         height="15rem"
