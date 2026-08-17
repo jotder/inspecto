@@ -529,6 +529,8 @@ function configSummary(r: StoredPipelineConfig): PipelineSummary {
     if (cfg['template'] === true || cfg['template'] === 'true') s.template = true;
     const display = typeof cfg['name'] === 'string' ? (cfg['name'] as string) : '';
     if (display && display !== s.name) s.displayName = display;
+    const description = typeof cfg['description'] === 'string' ? (cfg['description'] as string).trim() : '';
+    if (description) s.description = description;
     return s;
 }
 

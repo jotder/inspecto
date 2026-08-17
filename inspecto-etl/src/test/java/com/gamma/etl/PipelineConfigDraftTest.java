@@ -34,6 +34,19 @@ class PipelineConfigDraftTest {
         assertEquals("draft", cfg.identity().pipelineName());
     }
 
+    /**
+     * {@code description:} is display-only, but it must survive the parse so the list route can project it
+     * as the row subtitle. Before 2026-08-17 it was an unmodelled passthrough: the create dialog collected
+     * it and no surface could ever show it back.
+     */
+    @Test
+    void descriptionIsParsedAndTrimmed() throws Exception {
+        Map<String, Object> m = minimal(false);
+        m.put("description", "  Nightly orders feed  ");
+        assertEquals("Nightly orders feed", PipelineConfig.fromMap(m).description());
+        assertEquals("", PipelineConfig.fromMap(minimal(false)).description(), "absent ⇒ empty, never null");
+    }
+
     @Test
     void armingWithoutASchemaIsRejectedClearly() {
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,

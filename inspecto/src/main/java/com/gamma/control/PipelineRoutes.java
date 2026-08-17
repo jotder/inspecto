@@ -133,6 +133,8 @@ final class PipelineRoutes implements RouteModule {
                 // it actually differs. Absent ⇒ the id is the label, exactly as before.
                 if (!c.identity().name().equals(c.identity().pipelineName()))
                     s.put("displayName", c.identity().name());
+                // Same conditional style: absent ⇒ the payload is byte-identical to before.
+                if (!c.description().isEmpty()) s.put("description", c.description());
                 out.add(s);
             });
         }

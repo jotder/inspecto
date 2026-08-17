@@ -836,6 +836,16 @@ public final class PipelineConfig {
      */
     private final boolean template;
 
+    /**
+     * Free-text note on what this pipeline is for ({@code description:} top-level key). Purely a display
+     * label — the list route surfaces it as the row subtitle and <b>nothing in the engine reads it</b>.
+     * Modelled here only so it can be projected; before this it was an unmodelled passthrough that an
+     * operator could type into the create dialog and then never see again.
+     *
+     * <p>Never null; empty when absent.
+     */
+    private final String description;
+
     /** What the output registers as in the Catalog ({@code produces:}, v5.1.0; default STREAM). */
     private final Produces produces;
 
@@ -955,6 +965,8 @@ public final class PipelineConfig {
     public boolean        active()     { return active; }
     /** Whether this is a non-runnable authoring template ({@code template:}, default {@code false}). */
     public boolean        template()   { return template; }
+    /** Free-text note on what this pipeline is for ({@code description:}); {@code ""} when absent. */
+    public String         description() { return description; }
     /** What the output registers as in the Catalog ({@code produces:}, default {@link Produces#STREAM}). */
     public Produces       produces()   { return produces; }
     /** Whether this pipeline's output is a Reference Dataset ({@code produces: reference}). */
@@ -1043,6 +1055,7 @@ public final class PipelineConfig {
         this.statusDirToPrepare = b.statusDirToPrepare;
         this.active = b.active;
         this.template = b.template;
+        this.description = b.description;
         this.produces = b.produces;
         this.reference = b.reference;
         this.stream = b.stream;
@@ -1115,6 +1128,7 @@ public final class PipelineConfig {
         this.statusDirToPrepare = src.statusDirToPrepare;
         this.active = src.active;
         this.template = src.template;
+        this.description = src.description;
         this.produces = src.produces;
         this.reference = src.reference;
         this.stream = src.stream;
@@ -1389,6 +1403,7 @@ public final class PipelineConfig {
         String runTimestamp  = "";
         boolean active       = false;   // opt-in: a pipeline runs only with `active: true`
         boolean template     = false;   // `template: true` ⇒ never registered, so never runnable
+        String  description  = "";      // free-text label only; no engine behaviour keys off it
         Produces produces    = Produces.STREAM;   // catalog product; `produces: reference` ⇒ Reference Dataset
         Reference reference  = Reference.DEFAULT;  // `reference:` block; full-replace/no-key when absent
         String   stream;                           // logical Catalog Stream; parser defaults it to pipelineName

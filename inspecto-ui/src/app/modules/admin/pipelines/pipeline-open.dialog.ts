@@ -52,7 +52,12 @@ export interface PipelineOpenData {
                         class="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm hover:bg-black/5 dark:hover:bg-white/10"
                     >
                         <mat-checkbox [checked]="picked().has(p.name)" (change)="toggle(p.name)"> </mat-checkbox>
-                        <span class="min-w-0 flex-auto truncate">{{ p.displayName || p.name }}</span>
+                        <span class="flex min-w-0 flex-auto flex-col">
+                            <span class="truncate">{{ p.displayName || p.name }}</span>
+                            @if (p.description) {
+                                <span class="text-secondary truncate text-xs">{{ p.description }}</span>
+                            }
+                        </span>
                         @if (p.template) {
                             <span class="shrink-0 text-xs opacity-60">template</span>
                         } @else if (p.active) {

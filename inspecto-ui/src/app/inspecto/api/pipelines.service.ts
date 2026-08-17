@@ -23,6 +23,8 @@ export interface PipelineSummary {
     template?: boolean;
     /** The display name, sent only when it differs from {@link name}; absent ⇒ the id IS the label. */
     displayName?: string;
+    /** Free-text note on what the pipeline is for, sent only when set. Display only — the row subtitle. */
+    description?: string;
 }
 
 /** One node in a pipeline graph projection (structural only — no raw config; the inspector shows this). */

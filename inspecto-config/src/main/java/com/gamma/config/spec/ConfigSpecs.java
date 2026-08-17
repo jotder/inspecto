@@ -68,6 +68,9 @@ public final class ConfigSpecs {
                         "Stable identity, immutable once created. Absent = derived from `name` (the legacy "
                                 + "behaviour). Lowercase letters, digits and underscores.",
                         FieldType.STRING, false, null, List.of(), "[a-z0-9][a-z0-9_]*", null, null),
+                FieldSpec.of("description", "Description", FieldType.STRING,
+                        "What this pipeline is for — the subtitle on its list row. Free text, read by no "
+                                + "engine code."),
                 FieldSpec.enumField("produces", "Produces", List.of("stream", "reference"), "stream",
                         "What the output registers as in the Catalog: an event/fact Stream (default) or a "
                                 + "Reference Dataset (dimension/lookup) that enrichments can bind by name."),

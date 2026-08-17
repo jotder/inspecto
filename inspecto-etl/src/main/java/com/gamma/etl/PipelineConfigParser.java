@@ -92,6 +92,8 @@ final class PipelineConfigParser {
         // refused by registerPipeline, so it never enters the run registry that every run path consults.
         // Stronger than `active: false`, which still registers and can still be triggered on demand.
         b.template = Boolean.parseBoolean(String.valueOf(raw.getOrDefault("template", "false")));
+        // Display only — parsed so the list route can project it, never consulted by the engine.
+        b.description = String.valueOf(raw.getOrDefault("description", "")).trim();
         // `template: true` + `active: true` is a contradiction, and refusing it HERE is what makes the
         // template guarantee hold everywhere: every authoring path (POST /config/write, PUT
         // /pipelines/{name}/graph, a hand-edited file, boot) funnels through this parse, so a template can
