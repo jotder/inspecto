@@ -40,7 +40,7 @@ type TagState = 'all' | 'some' | 'none';
         MatInputModule,
         MatTooltipModule,
     ],
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Tag {{ data.targets.length }} item{{ data.targets.length === 1 ? '' : 's' }}</h2>
         <mat-dialog-content class="flex flex-col gap-1 pt-2">

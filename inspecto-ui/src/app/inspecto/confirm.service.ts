@@ -21,7 +21,7 @@ interface ConfirmData {
     selector: 'inspecto-confirm-dialog',
     standalone: true,
     imports: [MatDialogModule, MatButtonModule, MatFormFieldModule, MatInputModule, FormsModule],
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>{{ data.title }}</h2>
         <mat-dialog-content>

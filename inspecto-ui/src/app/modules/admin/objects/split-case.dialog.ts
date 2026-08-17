@@ -26,7 +26,7 @@ import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
         MatFormFieldModule,
         MatInputModule,
     ],
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Split "{{ data.caseObj.title }}"</h2>
         <mat-dialog-content class="flex flex-col gap-3 pt-2">

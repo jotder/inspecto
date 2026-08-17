@@ -17,7 +17,7 @@ import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
     selector: 'app-categorize-dialog',
     standalone: true,
     imports: [ReactiveFormsModule, MatButtonModule, MatDialogModule, MatFormFieldModule, MatSelectModule],
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Categorize incident</h2>
         <mat-dialog-content class="flex flex-col gap-3 pt-2">

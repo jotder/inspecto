@@ -12,7 +12,7 @@ import { ChipComponent } from 'app/inspecto/components/chip.component';
     selector: 'app-diagnosis-detail-dialog',
     standalone: true,
     imports: [ChipComponent, MatDialogModule, MatButtonModule, MatIconModule, AssistPanelComponent],
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Diagnosis</h2>
         <mat-dialog-content>

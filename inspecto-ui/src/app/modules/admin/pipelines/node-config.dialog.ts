@@ -138,7 +138,7 @@ export interface NodeConfigResult {
         CollectorConfigComponent,
         EnrichmentEditorComponent,
     ],
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title class="flex items-center gap-2" inspectoDialogResize #chrome="inspectoDialogResize">
             <span class="min-w-0 truncate">Configure · {{ data.node.id }}</span>

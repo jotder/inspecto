@@ -16,7 +16,7 @@ import { currentOperator, displayStatus } from './mail-model';
     selector: 'app-add-member-dialog',
     standalone: true,
     imports: [ReactiveFormsModule, MatButtonModule, MatDialogModule, MatFormFieldModule, MatSelectModule],
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Add member incident</h2>
         <mat-dialog-content class="pt-2">

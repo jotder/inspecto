@@ -165,7 +165,7 @@ export interface InspectoRowAction<T = unknown> {
     selector: 'inspecto-actions-cell',
     standalone: true,
     imports: [MatButtonModule, MatIconModule, MatTooltipModule],
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         @for (a of shown; track $index) {
             <button

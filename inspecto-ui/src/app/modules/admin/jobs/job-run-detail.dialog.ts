@@ -10,7 +10,7 @@ import { fmtDuration } from './jobs.component';
     selector: 'app-job-run-detail-dialog',
     standalone: true,
     imports: [MatDialogModule, MatButtonModule, StatusBadgeComponent],
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title class="flex items-center gap-3">
             <inspecto-status-badge [value]="data.status" />

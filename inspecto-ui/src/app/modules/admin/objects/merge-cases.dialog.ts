@@ -15,7 +15,7 @@ import { currentOperator, objectTags } from './mail-model';
     selector: 'app-merge-cases-dialog',
     standalone: true,
     imports: [MatButtonModule, MatDialogModule, MatRadioModule],
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Merge {{ data.cases.length }} cases</h2>
         <mat-dialog-content class="flex flex-col gap-2 pt-2">

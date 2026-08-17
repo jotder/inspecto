@@ -85,7 +85,7 @@ const INTENTS: IntentMeta[] = [
             </div>
         </div>
     `,
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,
 })
 export class AssistComponent {

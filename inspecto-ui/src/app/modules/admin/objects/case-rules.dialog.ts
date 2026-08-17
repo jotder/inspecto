@@ -32,7 +32,7 @@ import { INCIDENT_PRIORITIES, INCIDENT_STATUSES } from './mail-model';
         MatSelectModule,
         MatTooltipModule,
     ],
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Case rules</h2>
         <mat-dialog-content class="flex flex-col gap-4 pt-2">

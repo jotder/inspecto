@@ -16,7 +16,7 @@ import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
     selector: 'app-resolve-dialog',
     standalone: true,
     imports: [ReactiveFormsModule, MatButtonModule, MatDialogModule, MatFormFieldModule, MatInputModule],
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Resolve {{ data.count }} {{ data.label }}{{ data.count === 1 ? '' : 's' }}</h2>
         <mat-dialog-content class="pt-2">

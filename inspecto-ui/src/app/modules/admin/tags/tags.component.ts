@@ -51,7 +51,7 @@ import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component'
         InspectoEmptyStateComponent,
     ],
     templateUrl: './tags.component.html',
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,
 })
 export class TagsComponent implements OnInit {

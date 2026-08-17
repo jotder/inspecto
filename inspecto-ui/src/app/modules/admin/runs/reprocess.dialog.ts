@@ -10,7 +10,7 @@ import { MatInputModule } from '@angular/material/input';
     selector: 'app-reprocess-dialog',
     standalone: true,
     imports: [ReactiveFormsModule, MatDialogModule, MatButtonModule, MatFormFieldModule, MatInputModule],
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Reprocess batch</h2>
         <mat-dialog-content>

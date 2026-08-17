@@ -8,7 +8,7 @@ import { AssistPanelComponent } from './assist-panel.component';
     selector: 'app-assist-dialog',
     standalone: true,
     imports: [MatDialogModule, MatButtonModule, AssistPanelComponent],
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>{{ data.title }}</h2>
         <mat-dialog-content>

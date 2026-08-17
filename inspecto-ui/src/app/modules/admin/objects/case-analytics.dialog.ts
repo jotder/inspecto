@@ -28,7 +28,7 @@ interface Tile {
         InspectoEmptyStateComponent,
         InspectoSkeletonComponent,
     ],
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>{{ typeLabel }} analytics</h2>
         <mat-dialog-content class="pt-2" style="min-width: 34rem">

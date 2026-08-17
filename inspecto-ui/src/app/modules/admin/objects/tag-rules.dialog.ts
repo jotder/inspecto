@@ -32,7 +32,7 @@ import { CASE_STATUSES, INCIDENT_PRIORITIES, INCIDENT_STATUSES } from './mail-mo
         MatSelectModule,
         MatTooltipModule,
     ],
-    changeDetection: ChangeDetectionStrategy.Eager,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Tag rules — {{ data.typeLabel }}</h2>
         <mat-dialog-content class="flex flex-col gap-4 pt-2">
