@@ -613,7 +613,12 @@ public final class ControlApi implements AutoCloseable, ApiContext {
             authorize(ex, method, path);
             Object result = r.handler.handle(ex, m);
             if (result != HANDLED) respond(ex, 200, result);
-            AuditTrail.record(ex, method, path, 200);   // audit successful state-changing requests
+            // The REAL status, not a literal 200. A handler that responds itself and returns HANDLED
+            // routinely sends 422 (a rejected config write, a failed compatibility gate) — recording
+            // those as 200 made a refused write indistinguishable from a successful one in the audit
+            // log, which is the one record an incident investigator is entitled to trust.
+            int sent = ex.getResponseCode();
+            AuditTrail.record(ex, method, path, sent > 0 ? sent : 200);
             return;
         }
         // No API route matched the path: a GET may be an SPA asset / deep link (PUBLIC).

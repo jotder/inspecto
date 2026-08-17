@@ -2,6 +2,7 @@ package com.gamma.acquire;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -137,7 +138,7 @@ public final class LocalFileSystemConnector implements CollectorConnector {
                     }
                     Path target = archiveRoot.resolve(file.relativePath());
                     if (target.getParent() != null) Files.createDirectories(target.getParent());
-                    Files.move(src, target, StandardCopyOption.REPLACE_EXISTING);
+                    moveWithoutClobbering(src, target);
                 }
                 case RENAME -> {
                     Path target = src.resolveSibling("processed_" + file.name());
@@ -151,6 +152,38 @@ public final class LocalFileSystemConnector implements CollectorConnector {
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
+
+    /**
+     * Move into the archive without destroying an earlier archived copy.
+     *
+     * <p>The archive's whole purpose is to retain what was ingested, so {@code REPLACE_EXISTING} here
+     * defeated it in exactly the case most likely to hit it: the same relative path arriving twice —
+     * a producer re-dropping a filename, a reprocess-on-change, or a re-upload after a ledger prune.
+     * On collision the incoming file takes a {@code <stem>.<n><ext>} suffix rather than overwriting.
+     * The retry loop closes the race between the existence check and the move.
+     */
+    private static void moveWithoutClobbering(Path src, Path target) throws IOException {
+        try {
+            Files.move(src, target);
+            return;
+        } catch (FileAlreadyExistsException first) {
+            // fall through to the disambiguating suffix
+        }
+        String name = target.getFileName().toString();
+        int dot     = name.indexOf('.');           // first dot: keeps ".csv.gz" intact as the extension
+        String stem = dot < 0 ? name : name.substring(0, dot);
+        String ext  = dot < 0 ? ""   : name.substring(dot);
+        for (int n = 1; n < 10_000; n++) {
+            try {
+                Files.move(src, target.resolveSibling(stem + "." + n + ext));
+                return;
+            } catch (FileAlreadyExistsException taken) {
+                // next n
+            }
+        }
+        throw new FileAlreadyExistsException(target.toString(), null,
+                "archive already holds 10000 copies of this name");
+    }
 
     private RemoteFile toRemote(Path p) {
         // size/mtime intentionally not stat'd here (see RemoteFile javadoc + class note) — keep discovery

@@ -63,7 +63,15 @@ public final class SqlSandbox implements AutoCloseable {
             throw new SQLException("DuckDB JDBC driver not on the classpath", e);
         }
         File db = DuckDbUtil.tempDbFile("sql_sandbox_");
-        Connection conn = DuckDbUtil.openConnection(db);
+        Connection conn;
+        try {
+            conn = DuckDbUtil.openConnection(db);
+        } catch (SQLException e) {
+            // The temp DB (and its -wal sibling) exists already; a failed open would otherwise leak
+            // one pair of files per attempt, which under a persistent driver fault grows without bound.
+            DuckDbUtil.deleteTempDb(db);
+            throw e;
+        }
         try (Statement st = conn.createStatement()) {
             // Block extension escalation up front; these are immutable once configuration is locked.
             st.execute("SET autoinstall_known_extensions=false");

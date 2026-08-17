@@ -54,9 +54,17 @@ public final class DataRef {
      * @throws IllegalArgumentException if {@code ref} is null, traverses, or is not ref-shaped (→ 422)
      */
     public static String requireShape(String ref, String what) {
-        if (ref == null || ref.contains("..") || !SAFE_REF.matcher(ref).matches())
+        if (!isSafeShape(ref))
             throw new IllegalArgumentException("unsafe " + what + " '" + ref + "'");
         return ref;
+    }
+
+    /**
+     * The same shape verdict as {@link #requireShape}, without the throw — for a gate that
+     * <em>collects</em> findings rather than failing on the first one (the 422 write validator).
+     */
+    public static boolean isSafeShape(String ref) {
+        return ref != null && !ref.contains("..") && SAFE_REF.matcher(ref).matches();
     }
 
     /**

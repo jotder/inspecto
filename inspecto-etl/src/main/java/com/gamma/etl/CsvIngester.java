@@ -169,7 +169,7 @@ public final class CsvIngester {
                         rawLine   = firstDataLine;
                         hasPending = false;
                     } else {
-                        rawLine = br.readLine();
+                        rawLine = readRecord(br, cfg.csv().delimiter().charAt(0));
                         if (rawLine == null) break;
                     }
                     lineNum++;
@@ -205,7 +205,8 @@ public final class CsvIngester {
                     if (row.length <= maxSelector) {
                         if (errOut == null) {
                             Files.createDirectories(errorDir);
-                            errOut = new PrintWriter(new FileWriter(errorFilePath.toFile()));
+                            errOut = new PrintWriter(new FileWriter(errorFilePath.toFile(),
+                                    java.nio.charset.StandardCharsets.UTF_8));
                             errOut.println("line_number,reason,raw_line");
                         }
                         String reason = String.format(
@@ -246,6 +247,78 @@ public final class CsvIngester {
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────
+
+    /**
+     * Hard ceiling on how many physical lines one logical record may span. A single stray {@code "}
+     * in an otherwise unquoted file would otherwise swallow the rest of the file into one record;
+     * past the cap we stop joining and hand back what we have, degrading to line-at-a-time behaviour
+     * rather than destroying the batch.
+     */
+    private static final int MAX_RECORD_LINES = 1_000;
+
+    /**
+     * Read one logical CSV record, joining physical lines while a quoted field is still open.
+     *
+     * <p>RFC 4180 lets a quoted field contain a literal newline. This path used to call
+     * {@code readLine()} and hand each physical line to {@code parseLine} independently, so such a
+     * record was silently split into two malformed fragments — either two corrupted rows or a bogus
+     * "insufficient columns" rejection, with no error either way. That is silent data corruption, and
+     * it is reachable: this Java frontend is still selected for {@code csv.engine: java} and for
+     * {@code auto} with a non-zero {@code skip_tail_lines}.
+     *
+     * <p>⚠ Continuation is decided by a field-boundary scan, <b>not</b> by counting {@code "}
+     * characters. A bare parity count would treat a literal quote in unquoted data ({@code 1,10",x})
+     * as an open field and swallow every following line into one record — turning a cosmetic oddity
+     * into whole-file corruption. Only a quote that <em>opens a field</em> (at the start of the record
+     * or immediately after a delimiter) can begin a multi-line value, which is exactly RFC 4180's
+     * rule. For data with no field-opening quotes — the common CDR case — this returns precisely what
+     * {@code readLine()} returned.
+     *
+     * @return the joined record, or {@code null} at end of input
+     */
+    private static String readRecord(BufferedReader br, char delimiter) throws IOException {
+        String first = br.readLine();
+        if (first == null) return null;
+        if (!endsInsideQuotedField(first, delimiter, false)) return first;   // common path, no copy
+
+        StringBuilder sb = new StringBuilder(first);
+        boolean open = true;
+        for (int lines = 1; open && lines < MAX_RECORD_LINES; lines++) {
+            String next = br.readLine();
+            if (next == null) break;               // EOF inside a quote: return what we have
+            sb.append('\n').append(next);
+            // Resume the scan mid-field: the continuation line starts inside the open quoted value.
+            open = endsInsideQuotedField(next, delimiter, true);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Scan one physical line and report whether it ends with a quoted field still open.
+     *
+     * @param inQuotes whether the line begins inside a quoted value (a continuation line)
+     */
+    private static boolean endsInsideQuotedField(String s, char delimiter, boolean inQuotes) {
+        boolean atFieldStart = !inQuotes;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (inQuotes) {
+                if (c != '"') continue;
+                if (i + 1 < s.length() && s.charAt(i + 1) == '"') {
+                    i++;                            // "" is an escaped quote, the field stays open
+                } else {
+                    inQuotes = false;
+                    atFieldStart = false;
+                }
+            } else if (c == '"' && atFieldStart) {
+                inQuotes = true;                    // only a field-OPENING quote can span lines
+                atFieldStart = false;
+            } else {
+                atFieldStart = (c == delimiter);
+            }
+        }
+        return inQuotes;
+    }
 
     /** Build a lenient CsvParser for the given delimiter. */
     public static CsvParser buildParser(String delimiter) {

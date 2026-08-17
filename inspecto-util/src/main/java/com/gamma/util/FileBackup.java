@@ -74,7 +74,8 @@ public class FileBackup {
         ExecutorService exec = Executors.newVirtualThreadPerTaskExecutor();
         Phaser          ph   = new Phaser(1);
 
-        try (CSVReader reader = Csv.reader(new FileReader(logAvailablePath))) {
+        try (CSVReader reader = Csv.reader(
+                new FileReader(logAvailablePath, java.nio.charset.StandardCharsets.UTF_8))) {
             reader.readNext(); // skip header
 
             String[] row;

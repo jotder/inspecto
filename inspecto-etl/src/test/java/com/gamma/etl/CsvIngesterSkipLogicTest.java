@@ -156,4 +156,54 @@ class CsvIngesterSkipLogicTest {
         assertFalse(Files.exists(dir.resolve("errors").resolve("clean_errors.csv")),
                 "no error CSV when there are no rejects");
     }
+
+    /**
+     * RFC 4180 lets a quoted field hold a literal newline. This path split on physical lines before
+     * parsing, so such a record became two malformed fragments — both rejected for "insufficient
+     * columns", losing the row with no indication the data was ever there.
+     */
+    @Test
+    void quotedFieldWithEmbeddedNewlineStaysOneRow(@TempDir Path dir) throws Exception {
+        File csv = dir.resolve("multiline.csv").toFile();
+        Files.writeString(csv.toPath(), """
+                ID,AMT,EVENT_DATE
+                1,"10
+                20",2020-01-01
+                2,30,2020-01-02
+                """);
+        PipelineConfig cfg = TestConfigs.csv(dir, SCHEMA).load();
+
+        File db = DuckDbUtil.tempDbFile("ci_ml_");
+        try (Connection conn = DuckDbUtil.openConnection(db)) {
+            IngestResult r = CsvIngester.ingest(csv, conn, cfg.schemas().single(), cfg, "raw_f0");
+            assertEquals(2, r.parsedRows(), "the multi-line record is one row, not two fragments");
+            assertEquals(0, r.errorRows(), "neither fragment may be rejected as short");
+            try (Statement st = conn.createStatement();
+                 ResultSet rs = st.executeQuery("SELECT AMT FROM raw_f0 WHERE ID = '1'")) {
+                assertTrue(rs.next());
+                assertEquals("10\n20", rs.getString(1), "the embedded newline must survive intact");
+            }
+        } finally {
+            DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
+    /**
+     * A literal quote inside an unquoted field is not a field-opening quote, so it must not start a
+     * multi-line value. A naive parity count would merge every following line into one record here.
+     */
+    @Test
+    void strayQuoteDoesNotConsumeFollowingRows(@TempDir Path dir) throws Exception {
+        File csv = dir.resolve("stray.csv").toFile();
+        Files.writeString(csv.toPath(), """
+                ID,AMT,EVENT_DATE
+                1,10",2020-01-01
+                2,20,2020-01-02
+                3,30,2020-01-03
+                """);
+        PipelineConfig cfg = TestConfigs.csv(dir, SCHEMA).load();
+        IngestResult r = ingest(cfg, csv);
+        assertEquals(3, r.parsedRows(), "each line stays its own row despite the stray quote");
+        assertEquals(0, r.errorRows());
+    }
 }

@@ -80,6 +80,16 @@ public final class ParquetEventStore implements EventStore {
     private long bufferOpenedAt;
     /** Monotonic flush sequence — keeps each flush's output filenames unique (no overwrite). */
     private long flushSeq;
+
+    /** Consecutive failed flushes; reset by the first success. Drives the retain-and-retry above. */
+    private int flushFailures;
+
+    /**
+     * Hard ceiling on retained-but-undrained events. Past this the buffer is dropped rather than
+     * grown without bound — the trade is bounded memory over a complete audit trail, taken only
+     * after the flush has failed repeatedly and loudly.
+     */
+    private static final int MAX_RETAINED = 50_000;
     private boolean closed;
 
     /** Open a store under {@code dir} with default flush/roll/tail settings. */
@@ -156,17 +166,37 @@ public final class ParquetEventStore implements EventStore {
             String baseName = "events_" + System.currentTimeMillis() + "_" + (flushSeq++);
             PartitionWriter.write(conn, BUF_TABLE, root.toString(), "PARQUET", "zstd", baseName,
                     List.of("level", "year", "month", "day"), List.of());
+            flushFailures = 0;
         } catch (Exception e) {
-            // Never propagate to the caller (often the log appender). The events survive in the live-tail
-            // ring; we drop the buffer to avoid unbounded growth on a persistent failure.
-            log.warn("Event flush to Parquet failed, dropping {} buffered event(s): {}",
-                    buffer.size(), e.getMessage());
-        } finally {
+            // Never propagate to the caller (often the log appender). But do NOT drop the batch on the
+            // first failure: this store holds AUDIT events, and a transient fault (disk full, a locked
+            // file) would otherwise destroy the only durable copy — the live-tail ring is a bounded
+            // in-memory ring, not a durability guarantee. Retain and retry on the next append/flush,
+            // and only give up once the buffer would grow without bound.
+            flushFailures++;
+            boolean giveUp = buffer.size() >= MAX_RETAINED;
+            log.warn("Event flush to Parquet failed ({} consecutive), {} {} buffered event(s): {}",
+                    flushFailures, giveUp ? "dropping" : "retaining", buffer.size(), e.getMessage());
+            clearBufferTable();
+            if (!giveUp) return;   // keep `buffer` for the next attempt
+            log.error("Event buffer reached {} undrained events; dropping them to bound memory."
+                    + " Durable event/audit history for this window is lost.", buffer.size());
             buffer.clear();
-            try (Statement st = conn.createStatement()) {
-                st.execute("DELETE FROM " + BUF_TABLE);
-            } catch (SQLException ignore) { /* best effort */ }
+            flushFailures = 0;
+            return;
         }
+        buffer.clear();
+        clearBufferTable();
+    }
+
+    /**
+     * Drop the staging rows. Always safe to call: a retained buffer is re-inserted from scratch on the
+     * next attempt, so leaving rows behind here would double-write every event that did land.
+     */
+    private void clearBufferTable() {
+        try (Statement st = conn.createStatement()) {
+            st.execute("DELETE FROM " + BUF_TABLE);
+        } catch (SQLException ignore) { /* best effort */ }
     }
 
     // ── reads ─────────────────────────────────────────────────────────────────────

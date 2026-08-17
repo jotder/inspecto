@@ -48,7 +48,8 @@ public final class CsvLedger<T> {
     /** Append rows contiguously under one file-open (header first on a fresh file). */
     public synchronized void appendAll(Iterable<? extends T> rows) {
         boolean exists = new java.io.File(path).exists();
-        try (PrintWriter pw = new PrintWriter(new FileWriter(path, true))) {
+        try (PrintWriter pw = new PrintWriter(
+                new FileWriter(path, java.nio.charset.StandardCharsets.UTF_8, true))) {
             if (!exists) pw.println(header);
             for (T row : rows) pw.println(codec.apply(row));
         } catch (IOException e) {

@@ -237,7 +237,7 @@ public final class DuckDbCsvIngester {
                 .append(fields.get(i).get("name")).append('"');
         }
 
-        String readCsv = "read_csv('" + filePath + "'"
+        String readCsv = "read_csv('" + escapeSql(filePath) + "'"
                 + ", columns=" + cols
                 + ", delim='" + escapeSql(delim) + "'"
                 + ", header=false"
@@ -286,7 +286,7 @@ public final class DuckDbCsvIngester {
                 .append(" AS \"").append(fields.get(i).get("name")).append('"');
         }
 
-        String readCsv = "(SELECT \"line\" FROM read_csv('" + filePath + "'"
+        String readCsv = "(SELECT \"line\" FROM read_csv('" + escapeSql(filePath) + "'"
                 + ", columns={'line':'VARCHAR'}"
                 + ", delim='', quote='', escape=''"
                 + ", header=false"
@@ -665,13 +665,33 @@ public final class DuckDbCsvIngester {
                 count++;
             }
         } catch (Exception e) {
-            // reject_errors absent (no rejects ever stored on this conn) or query
-            // failed — treat as zero rejects rather than failing ingest.
-            log.debug("No reject_errors for {} ({})", file.getName(), e.getMessage());
+            // The ordinary case is that reject_errors simply does not exist — no rejects were ever
+            // stored on this connection — and that is genuinely "zero rejects", worth only a debug line.
+            // Anything else (disk full writing the error CSV, a reject_scans/reject_errors schema change
+            // after a DuckDB upgrade) means rows WERE dropped by read_csv and we could not drain them;
+            // reporting that at debug made a real failure indistinguishable from a clean file.
+            if (isMissingRejectTable(e)) {
+                log.debug("No reject_errors for {} ({})", file.getName(), e.getMessage());
+            } else {
+                log.warn("Could not drain rejected rows for {} — the reject count below is NOT reliable: {}",
+                        file.getName(), e.getMessage());
+            }
         } finally {
             if (errOut != null) errOut.close();
         }
         return count;
+    }
+
+    /**
+     * Is this the benign "the reject tables were never created on this connection" case, as opposed to a
+     * genuine failure to drain rejects that really existed? DuckDB reports the former as a Catalog Error.
+     */
+    private static boolean isMissingRejectTable(Exception e) {
+        String m = e.getMessage();
+        if (m == null) return false;
+        String s = m.toLowerCase(java.util.Locale.ROOT);
+        return s.contains("catalog error")
+                || (s.contains("does not exist") && (s.contains("reject_errors") || s.contains("reject_scans")));
     }
 
     private static String nz(String s) { return s == null ? "" : s; }

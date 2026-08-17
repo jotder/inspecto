@@ -95,7 +95,11 @@ public final class ConsignmentSelector {
         List<String> kept = new ArrayList<>();
         int removed = 0;
         try (Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery("SELECT file FROM glob('" + glob.replace("\\", "/") + "')")) {
+             // Escape the quote as well as normalising separators: this catch fails OPEN (reads
+             // unfiltered), so a configured root containing a single quote would silently let a
+             // superseded file back into a read — the exact staleness this class exists to prevent.
+             ResultSet rs = st.executeQuery(
+                     "SELECT file FROM glob('" + glob.replace("\\", "/").replace("'", "''") + "')")) {
             while (rs.next()) {
                 String file = rs.getString(1);
                 if (file == null) continue;

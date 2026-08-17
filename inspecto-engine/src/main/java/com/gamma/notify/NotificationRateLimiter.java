@@ -42,10 +42,29 @@ final class NotificationRateLimiter {
     synchronized boolean allow(String dedupeKey) {
         if (dedupeKey == null || dedupeKey.isBlank()) return true;
         long now = clock.getAsLong();
+        sweepExpired(now);
         Deque<Long> window = hits.computeIfAbsent(dedupeKey, k -> new ArrayDeque<>());
         while (!window.isEmpty() && now - window.peekFirst() >= windowMs) window.pollFirst();
         if (window.size() >= maxPerWindow) return false;
         window.addLast(now);
         return true;
+    }
+
+    /** Timestamp of the last full sweep; keeps the scan to at most once per window. */
+    private long lastSweep;
+
+    /**
+     * Drop keys whose whole window has expired.
+     *
+     * <p>Without this the map grows for the life of the process: a key is only ever trimmed when it is
+     * next seen, and dedupe keys are per-incident/per-correlation-id, so most are seen exactly once.
+     * A service meant to run for months would accumulate one live entry per alert ever raised.
+     * Removing a fully-expired key is behaviourally identical to trimming it to empty on next access.
+     * Bounded to one pass per window, so the cost is negligible against the dispatch it guards.
+     */
+    private void sweepExpired(long now) {
+        if (now - lastSweep < windowMs) return;
+        lastSweep = now;
+        hits.values().removeIf(w -> w.isEmpty() || now - w.peekLast() >= windowMs);
     }
 }

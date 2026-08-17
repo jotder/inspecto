@@ -144,9 +144,26 @@ public final class DbTagAssignmentStore implements TagAssignmentStore, com.gamma
         // Delete-then-insert rather than a bulk UPDATE: an UPDATE would violate the primary key for any
         // target already carrying `to`, failing the whole rename. Merging is the correct outcome there
         // (the triple is the edge identity), and add() already merges.
-        removeTag(f);
-        for (TagAssignment e : moving)
-            add(new TagAssignment(t, e.targetKind(), e.targetId(), e.actor(), e.createdAt()));
+        // One transaction: the delete and the re-inserts are a single rename. Run as separate
+        // auto-commit statements, a failure between them (connection loss, disk) leaves the
+        // assignments deleted and never re-added — the rename would silently destroy every edge
+        // carrying the old tag rather than moving it.
+        try {
+            conn.setAutoCommit(false);
+            try {
+                removeTag(f);
+                for (TagAssignment e : moving)
+                    add(new TagAssignment(t, e.targetKind(), e.targetId(), e.actor(), e.createdAt()));
+                conn.commit();
+            } catch (RuntimeException | SQLException ex) {
+                conn.rollback();
+                throw ex;
+            } finally {
+                conn.setAutoCommit(true);
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("could not rename tag " + f + " to " + t + ": " + e.getMessage(), e);
+        }
         return moving.size();
     }
 

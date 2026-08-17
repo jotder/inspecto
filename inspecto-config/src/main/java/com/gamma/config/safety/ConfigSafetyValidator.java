@@ -105,8 +105,8 @@ public final class ConfigSafetyValidator {
             for (int i = 0; i < schemas.size(); i++) {
                 if (schemas.get(i) instanceof Map<?, ?> entry) {
                     Object sf = entry.get("schema_file");
-                    if (sf != null && !sf.toString().isBlank() && !isRegistryRef(sf.toString()))
-                        checkPathValue("processing.schemas[" + i + "].schema_file", sf.toString(), p, out);
+                    if (sf != null)
+                        checkConfigRefValue("processing.schemas[" + i + "].schema_file", sf.toString(), p, out);
                 }
             }
         }
@@ -328,14 +328,47 @@ public final class ConfigSafetyValidator {
      * {@code registry/<kind>/<id>} and jails <em>that</em>, which is the value that is really read.
      */
     private static void checkConfigRef(Map<String, Object> raw, String field, SafetyPolicy p, List<Finding> out) {
-        String v = RawConfig.str(raw, field);
-        if (v == null || v.isBlank() || isRegistryRef(v)) return;
+        checkConfigRefValue(field, RawConfig.str(raw, field), p, out);
+    }
+
+    /**
+     * The scalar half of {@link #checkConfigRef}, shared with the multi-schema table form — where the
+     * same registry-ref skip was open-coded, so any rule added to one gate silently missed the other.
+     */
+    private static void checkConfigRefValue(String field, String v, SafetyPolicy p, List<Finding> out) {
+        if (v == null || v.isBlank()) return;
+        String prefix = registryRefPrefix(v);
+        if (prefix != null) {
+            checkRegistryId(field, v.trim(), prefix, out);
+            return;
+        }
         checkPathValue(field, v, p, out);
     }
 
-    private static boolean isRegistryRef(String value) {
+    /**
+     * A registry reference is an <b>id</b>, so its remainder must be id-shaped — not a path.
+     *
+     * <p>Skipping the jail for a recognized prefix (which is correct: see {@link #checkConfigRef})
+     * previously exited the gate with the remainder unvalidated, so {@code schema/../../../etc/passwd}
+     * drew no finding here. The loader does still refuse it — {@code PipelineConfigParser} rewrites the
+     * ref to {@code registry/<kind>/<id>} and puts <em>that</em> through {@code PathJail} — so this was
+     * never an escape. It was a gate disagreeing with the gate it exists to pre-empt: the draft passed
+     * authoring and then failed at load, which is precisely what this 422 validator is for.
+     */
+    private static void checkRegistryId(String field, String value, String prefix, List<Finding> out) {
+        String id = value.substring(prefix.length());
+        if (id.isBlank()) {
+            out.add(Finding.error(field, field + " reference '" + value + "' names no id after '" + prefix + "'"));
+        } else if (!DataRef.isSafeShape(id)) {
+            out.add(Finding.error(field, field + " reference '" + value
+                    + "' is not a registry id — '" + id + "' must be a bare id, not a path"));
+        }
+    }
+
+    /** The recognized registry prefix {@code value} carries, or {@code null} when it is a plain path. */
+    private static String registryRefPrefix(String value) {
         String s = value.trim();
-        return REGISTRY_REF_PREFIXES.stream().anyMatch(s::startsWith);
+        return REGISTRY_REF_PREFIXES.stream().filter(s::startsWith).findFirst().orElse(null);
     }
 
     private static void checkPath(Map<String, Object> raw, String field, SafetyPolicy p, List<Finding> out) {

@@ -46,9 +46,12 @@ final class AuditTrail {
             String actor = ApiContext.actor(ex);
             String targetType = resource(path);
             String targetId = targetId(path);
+            // Say so when the action was REFUSED. The action name is the one that was attempted, so a
+            // 4xx/5xx must not read as an accomplished mutation in the one log an investigator trusts.
+            String outcome = status >= 400 ? " (refused, HTTP " + status + ")" : "";
             EventLog.current().emit(Event.builder(EventType.AUDIT)
                     .source("audit")
-                    .message(actor + " " + action.name() + (targetId == null ? "" : " " + targetId))
+                    .message(actor + " " + action.name() + (targetId == null ? "" : " " + targetId) + outcome)
                     .actor(actor).actorType(ApiContext.actorType(ex))
                     .action(action.name()).actionCategory(action.category())
                     .target(targetType, targetId)

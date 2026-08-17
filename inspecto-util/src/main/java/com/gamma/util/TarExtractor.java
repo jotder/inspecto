@@ -60,7 +60,8 @@ public class TarExtractor {
         if (!Files.isDirectory(baseDir))
             throw new IllegalArgumentException("base directory does not exist: " + baseDir);
         // Opened only after validation so a failed run never leaves a locked log file behind.
-        this.eventLogger = new PrintWriter(new BufferedWriter(new FileWriter(logPath.toFile(), true)));
+        this.eventLogger = new PrintWriter(new BufferedWriter(
+                new FileWriter(logPath.toFile(), java.nio.charset.StandardCharsets.UTF_8, true)));
         if (dryRun) System.out.println("!!! DRY-RUN MODE ENABLED - No files will be extracted !!!");
         logEvent("run_start", "-", "-", "base=" + baseDir, "temp=" + tempDir);
 
@@ -186,7 +187,8 @@ public class TarExtractor {
     private void writeReport() throws IOException {
         String[] h = {"rel_path", "source", "archive", "stem", "src_abs", "target_abs",
                        "status", "members", "bytes", "started_at", "finished_at", "error"};
-        try (CSVWriter w = new CSVWriter(new FileWriter(reportPath.toFile()))) {
+        try (CSVWriter w = new CSVWriter(
+                new FileWriter(reportPath.toFile(), java.nio.charset.StandardCharsets.UTF_8))) {
             w.writeNext(h);
             for (Map<String, Object> r : reportRows) {
                 String[] l = new String[h.length];

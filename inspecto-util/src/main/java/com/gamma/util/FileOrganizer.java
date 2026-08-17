@@ -4,6 +4,7 @@ import com.opencsv.CSVReader;
 import com.opencsv.CSVWriter;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -124,9 +125,23 @@ public class FileOrganizer {
 
     private void initLoggers() throws IOException {
         String suffix = dryRun ? ".dryrun" : "";
-        this.availableLogger = openWriter(logAvailablePath + suffix);
-        this.missingLogger   = openWriter(logMissingPath   + suffix);
-        this.errorLogger     = openWriter(logErrorPath     + suffix);
+        // Open all three before publishing any of them: a failure on the second or third (an
+        // unwritable log dir is the ordinary case) must not strand the ones already open, since
+        // the constructor throws and nothing would ever hold a reference to close them.
+        CSVWriter available = null;
+        CSVWriter missing   = null;
+        CSVWriter errors    = null;
+        try {
+            available = openWriter(logAvailablePath + suffix);
+            missing   = openWriter(logMissingPath   + suffix);
+            errors    = openWriter(logErrorPath     + suffix);
+        } catch (IOException e) {
+            closeQuietly(available, missing, errors);
+            throw e;
+        }
+        this.availableLogger = available;
+        this.missingLogger   = missing;
+        this.errorLogger     = errors;
 
         availableLogger.writeNext(new String[]{"TAB", "source", "Date", "FILENAME",
                                                "Status", "found_path", "copied_to_path"});
@@ -134,14 +149,25 @@ public class FileOrganizer {
         errorLogger.writeNext(new String[]{"path", "error_message"});
     }
 
+    private static void closeQuietly(CSVWriter... writers) {
+        for (CSVWriter w : writers) {
+            if (w == null) continue;
+            try {
+                w.close();
+            } catch (IOException ignored) {
+                // Already unwinding on the original failure; a close error must not mask it.
+            }
+        }
+    }
+
     private static CSVWriter openWriter(String path) throws IOException {
-        return new CSVWriter(new FileWriter(path));
+        return new CSVWriter(new FileWriter(path, StandardCharsets.UTF_8));
     }
 
     // ── walk + match ───────────────────────────────────────────────────────────
 
     private void loadWantedFiles() throws Exception {
-        try (CSVReader reader = Csv.reader(new FileReader(csvInput))) {
+        try (CSVReader reader = Csv.reader(new FileReader(csvInput, StandardCharsets.UTF_8))) {
             reader.readNext(); // skip header
             String[] row;
             while ((row = reader.readNext()) != null) {

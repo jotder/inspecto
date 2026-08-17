@@ -78,8 +78,6 @@ public class SchemaExtractor {
 
         // DuckDB setup — in-memory, type inference only
         Class.forName("org.duckdb.DuckDBDriver");
-        Connection conn = DriverManager.getConnection("jdbc:duckdb:");
-        Statement stmt = conn.createStatement();
 
         CsvParserSettings settings = new CsvParserSettings();
         settings.getFormat().setDelimiter(delimiter.charAt(0));
@@ -91,7 +89,9 @@ public class SchemaExtractor {
 
         String[] headers;
         try (BufferedReader br = new BufferedReader(
-                new InputStreamReader(new FileInputStream(inputFile), StandardCharsets.UTF_8))) {
+                new InputStreamReader(new FileInputStream(inputFile), StandardCharsets.UTF_8));
+             Connection conn = DriverManager.getConnection("jdbc:duckdb:");
+             Statement stmt = conn.createStatement()) {
 
             // Skip junk lines that appear before the header
             for (int i = 0; i < skipHeaderLines; i++)
@@ -110,7 +110,9 @@ public class SchemaExtractor {
             // Write a small sample (≤ 1000 rows) to a temp file so DuckDB can read it
             File tempSample = File.createTempFile("sample_" + sourceName, ".csv");
             tempSample.deleteOnExit();
-            try (PrintWriter pw = new PrintWriter(new FileWriter(tempSample))) {
+            // UTF-8 explicitly: DuckDB's read_csv_auto below decodes as UTF-8, so writing the sample
+            // in the platform default charset mojibakes every non-ASCII header on a non-UTF-8 host.
+            try (PrintWriter pw = new PrintWriter(new FileWriter(tempSample, StandardCharsets.UTF_8))) {
                 pw.println(String.join(delimiter, headers));
                 String line;
                 int count = 0;
@@ -129,29 +131,30 @@ public class SchemaExtractor {
                     tempSample.getAbsolutePath().replace("\\", "/"), delimiter);
             stmt.execute(viewSql);
 
-            ResultSet rs = stmt.executeQuery("DESCRIBE sample_view");
             List<Map<String, String>> fields = new ArrayList<>();
             String potentialPartitionKey = "";
             int colIdx = 0;
-            while (rs.next()) {
-                String rawName  = colIdx < headers.length ? headers[colIdx] : "COLUMN_" + colIdx;
-                String colName  = rawName.trim()
-                        .replace(" ", "_").replace("-", "_")
-                        .replace("(", "").replace(")", "");
-                String duckType = rs.getString("column_type");
-                String toonType = mapType(duckType, colName);
+            try (ResultSet rs = stmt.executeQuery("DESCRIBE sample_view")) {
+                while (rs.next()) {
+                    String rawName  = colIdx < headers.length ? headers[colIdx] : "COLUMN_" + colIdx;
+                    String colName  = rawName.trim()
+                            .replace(" ", "_").replace("-", "_")
+                            .replace("(", "").replace(")", "");
+                    String duckType = rs.getString("column_type");
+                    String toonType = mapType(duckType, colName);
 
-                if (potentialPartitionKey.isEmpty()
-                        && (toonType.equals("DATE") || toonType.equals("TIMESTAMP"))) {
-                    potentialPartitionKey = colName;
+                    if (potentialPartitionKey.isEmpty()
+                            && (toonType.equals("DATE") || toonType.equals("TIMESTAMP"))) {
+                        potentialPartitionKey = colName;
+                    }
+
+                    Map<String, String> field = new LinkedHashMap<>();
+                    field.put("name",     colName);
+                    field.put("selector", String.valueOf(colIdx));
+                    field.put("type",     toonType);
+                    fields.add(field);
+                    colIdx++;
                 }
-
-                Map<String, String> field = new LinkedHashMap<>();
-                field.put("name",     colName);
-                field.put("selector", String.valueOf(colIdx));
-                field.put("type",     toonType);
-                fields.add(field);
-                colIdx++;
             }
 
             // Resolve output directory alongside the gen-config file
