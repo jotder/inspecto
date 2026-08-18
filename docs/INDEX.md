@@ -75,6 +75,16 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- ~~`superpower/java-codebase-review-sweep.md`~~ — **COMPLETE and ARCHIVED 2026-08-18**
+  ([archive copy](archived-documents/plans-archive/java-codebase-review-sweep.md), kept for the
+  per-file evidence base). The module-by-module Java review: 13 fixes in the first pass, then JAVA-1…6
+  all closed in the second (orphaned Parquet generations on quarantine, the OIDC audience warning,
+  `CircuitBreaker` eviction, the post-commit FAILED demotion, five duplication extractions, and the
+  second-pass review itself — which found a data-scope bypass on five `ObjectRoutes` routes, a dedup
+  predicate that silently swallowed Incidents, and an ungated `/components/schema` back door).
+  **As-built:** [Java review coverage](okf/backend/modules/review-coverage.md) — what has been read
+  line-by-line, what has not, and the defect classes worth hunting first.
+
 - ~~`superpower/definition-surface-unification-plan.md`~~ — **SHIPPED END-TO-END and ARCHIVED 2026-08-16**
   ([archive copy](archived-documents/plans-archive/definition-surface-unification-plan.md), kept for the
   grounding and the per-slice as-built). Collapsed the onboarding wizard and the pipeline-editor dialogs

@@ -8,6 +8,7 @@ modules. Reactor shape, version management, and the module-extraction playbook:
 # Modules
 
 * [Reactor & modularization](reactor.md) - build order, parent `dependencyManagement`, extraction rules (S5 + WS-D, 2026-07-21).
+* [Java review coverage](review-coverage.md) - what has been read line-by-line, what has not, and the defect classes that keep recurring (2026-08-18).
 * `inspecto-api/` — dependency-free leaf: the `@PublicApi` annotation (`inspecto-api`).
 * `inspecto-util/` — leaf (w.r.t. `com.gamma`): DuckDB access + CSV/file/tar helpers (`inspecto-util`).
 * `inspecto-config/` — config spec/codec/safety (`inspecto-config`); depends only on fp-api.
