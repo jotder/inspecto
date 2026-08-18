@@ -210,7 +210,7 @@ values:
 
 | Value | `sourceExpression` format | Description |
 |---|---|---|
-| `DIRECT` *(default — leave blank/omit)* | column name | Pass-through with a type cast (DATE/TIMESTAMP/DOUBLE/VARCHAR) driven by the field's declared type in `raw.fields[]` |
+| `DIRECT` *(default — leave blank/omit)* | column name | Pass-through with a type cast (DATE/TIMESTAMP/DOUBLE/VARCHAR) driven by the field's declared type in `raw.fields[]`. ⚠ Those four are the **only** coerced types (`TransformCompiler.direct`): any other declared type — notably `INTEGER` — falls through uncast and lands as VARCHAR. For a true integer column declare the field `VARCHAR` and add an `EXPR` rule, `TRY_CAST(COL AS INTEGER)`. |
 | `EXPR` | any DuckDB **scalar** expression | Emitted **verbatim**. Unqualified column names resolve against the source row, so the full DuckDB scalar-function library is available — e.g. `UPPER(TRIM(MSISDN))`, `TRY_CAST(AMT AS DOUBLE) / 100.0`, `CASE WHEN ERRORCODE='0' THEN 'OK' ELSE 'FAIL' END`. You own validity and any explicit cast. **Per-row scalar only** — no aggregates or joins (those are Stage-2). |
 | `CONCAT_DT` | `DATE_COL\|TIME_COL` | Concatenate two raw columns into a single TIMESTAMP: `COALESCE(TRY_STRPTIME(date \|\| ' ' \|\| time, ...))` |
 | `FILENAME_DATE` | `COL\|PREFIX` or `COL\|PREFIX\|FORMAT` | Extract an 8-digit date from a filename-style column using a fixed prefix. The default format is `%Y%m%d`. **Restricted to `EVENT_DATE` only** — an `IllegalArgumentException` is thrown at startup if used on any other target column. |
