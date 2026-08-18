@@ -53,7 +53,7 @@ import static com.gamma.acquire.CollectorConnector.Capability.*;
  * same-account fast path; a {@code pending} copy fails the post-action rather than risking the source);
  * TAG is Set Blob Tags.
  */
-public final class AzureBlobConnector implements CollectorConnector {
+public final class AzureBlobConnector extends AbstractHttpObjectStoreConnector implements CollectorConnector {
 
     private static final int MAX_RESULTS_PAGE = 5000;
 
@@ -61,10 +61,9 @@ public final class AzureBlobConnector implements CollectorConnector {
     private final String container;
     private final String prefix;      // blob-name prefix under the container, "" when base_path is just the container
     private final String account;
-    private final URI endpoint;       // scheme://host[:port], no path
-    private final HttpClient http;
 
     public AzureBlobConnector(ConnectionProfile profile) {
+        super("Azure", endpointOf(profile));
         this.profile = profile;
         String bp = profile.basePath() == null ? "" : profile.basePath().trim();
         String stripped = bp.startsWith("/") ? bp.substring(1) : bp;
@@ -77,10 +76,13 @@ public final class AzureBlobConnector implements CollectorConnector {
         this.account = profile.username();
         if (account == null || account.isBlank())
             throw new IllegalArgumentException("azure connection '" + profile.id() + "' needs username = storage account name");
+    }
+
+    /** Static so it can be computed for {@code super(...)}, which must run first. */
+    private static URI endpointOf(ConnectionProfile profile) {
         String protocol = profile.options().getOrDefault("protocol", "https");
         int port = profile.port();
-        this.endpoint = URI.create(protocol + "://" + profile.host() + (port > 0 ? ":" + port : ""));
-        this.http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
+        return URI.create(protocol + "://" + profile.host() + (port > 0 ? ":" + port : ""));
     }
 
     @Override
@@ -139,7 +141,7 @@ public final class AzureBlobConnector implements CollectorConnector {
 
     @Override
     public InputStream open(RemoteFile file) throws AcquisitionException {
-        HttpResponse<InputStream> resp = executeStreaming(blobPath(file), Map.of(), "open " + file.relativePath());
+        HttpResponse<InputStream> resp = executeStreaming(blobPath(file), Map.of(), Map.of(), "open " + file.relativePath());
         return resp.body();
     }
 
@@ -154,7 +156,7 @@ public final class AzureBlobConnector implements CollectorConnector {
                 if (have > 0 && (!file.hasSize() || have < file.size())) offset = have; // resume (RESUMABLE)
             }
             Map<String, String> headers = offset > 0 ? Map.of("Range", "bytes=" + offset + "-") : Map.of();
-            HttpResponse<InputStream> resp = executeStreaming(blobPath(file), headers, "fetch " + file.relativePath());
+            HttpResponse<InputStream> resp = executeStreaming(blobPath(file), Map.of(), headers, "fetch " + file.relativePath());
             boolean append = offset > 0 && resp.statusCode() == 206;   // server honoured the range
             try (InputStream in = resp.body();
                  var out = append
@@ -211,43 +213,10 @@ public final class AzureBlobConnector implements CollectorConnector {
 
     // ── HTTP + signing ────────────────────────────────────────────────────────
 
-    /** Execute a signed request whose response is small (listing XML, copy/delete acks). */
-    private HttpResponse<byte[]> execute(String method, String path, Map<String, String> query,
-                                         Map<String, String> headers, byte[] body, String what)
-            throws AcquisitionException {
-        try {
-            HttpRequest req = signed(method, path, query, headers, body);
-            HttpResponse<byte[]> resp = http.send(req, HttpResponse.BodyHandlers.ofByteArray());
-            if (resp.statusCode() / 100 != 2)
-                throw new AcquisitionException("Azure " + what + " failed: HTTP " + resp.statusCode()
-                        + errorDetail(resp.body()));
-            return resp;
-        } catch (IOException | InterruptedException e) {
-            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
-            throw new AcquisitionException("Azure " + what + " failed on " + endpoint.getHost() + ": " + e.getMessage(), e);
-        }
-    }
-
-    /** Execute a signed GET whose body should stream (blob reads). */
-    private HttpResponse<InputStream> executeStreaming(String path, Map<String, String> headers, String what)
-            throws AcquisitionException {
-        try {
-            HttpRequest req = signed("GET", path, Map.of(), headers, null);
-            HttpResponse<InputStream> resp = http.send(req, HttpResponse.BodyHandlers.ofInputStream());
-            if (resp.statusCode() / 100 != 2) {
-                byte[] err;
-                try (InputStream in = resp.body()) { err = in.readNBytes(2048); }
-                throw new AcquisitionException("Azure " + what + " failed: HTTP " + resp.statusCode() + errorDetail(err));
-            }
-            return resp;
-        } catch (IOException | InterruptedException e) {
-            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
-            throw new AcquisitionException("Azure " + what + " failed on " + endpoint.getHost() + ": " + e.getMessage(), e);
-        }
-    }
-
-    private HttpRequest signed(String method, String encodedPath, Map<String, String> query,
-                               Map<String, String> headers, byte[] body) throws IOException {
+    /** Build a Shared Key-signed request. */
+    @Override
+    protected HttpRequest request(String method, String encodedPath, Map<String, String> query,
+                                  Map<String, String> headers, byte[] body) throws IOException {
         StringBuilder qs = new StringBuilder();
         query.forEach((k, v) -> {
             if (!qs.isEmpty()) qs.append('&');
@@ -293,37 +262,15 @@ public final class AzureBlobConnector implements CollectorConnector {
         return n.getLength() > 0 ? n.item(0).getTextContent() : null;
     }
 
-    private static String errorDetail(byte[] body) {
-        if (body == null || body.length == 0) return "";
-        String s = new String(body, 0, Math.min(body.length, 500), StandardCharsets.UTF_8);
-        return " — " + s.replaceAll("\\s+", " ").trim();
-    }
-
-    private static String nameOf(String rel) {
-        int i = rel.lastIndexOf('/');
-        return i < 0 ? rel : rel.substring(i + 1);
-    }
-
     private static String unquote(String s) {
         if (s == null) return null;
         String t = s.trim();
         return t.length() >= 2 && t.startsWith("\"") && t.endsWith("\"") ? t.substring(1, t.length() - 1) : t;
     }
 
-    private static String join(String a, String b) {
-        if (a == null || a.isBlank()) return b;
-        String left = a.endsWith("/") ? a.substring(0, a.length() - 1) : a;
-        return left + "/" + (b.startsWith("/") ? b.substring(1) : b);
-    }
-
     private static String escapeXml(String s) {
         return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                 .replace("\"", "&quot;").replace("'", "&apos;");
-    }
-
-    private static long parseLong(String s, long dflt) {
-        if (s == null || s.isBlank()) return dflt;
-        try { return Long.parseLong(s.trim()); } catch (NumberFormatException e) { return dflt; }
     }
 
     /** Blob listing timestamps are RFC 1123 ({@code Tue, 07 Jul 2026 10:00:00 GMT}), unlike S3's ISO instant. */
@@ -399,7 +346,7 @@ public final class AzureBlobConnector implements CollectorConnector {
         @Override
         InputStream openObject(String relKey, Long size) throws AcquisitionException {
             String path = "/" + conn.container + "/" + AwsSigV4.uriEncode(conn.prefix + relKey, false);
-            return conn.executeStreaming(path, Map.of(), "open " + relKey).body();
+            return conn.executeStreaming(path, Map.of(), Map.of(), "open " + relKey).body();
         }
     }
 }

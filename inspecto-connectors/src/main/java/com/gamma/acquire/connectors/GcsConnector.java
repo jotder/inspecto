@@ -54,17 +54,16 @@ import static com.gamma.acquire.CollectorConnector.Capability.*;
  * is always {@code READY}. MOVE/RENAME are rewrite/copy + delete (object storage has no rename); TAG maps to
  * GCS custom object metadata (a metadata PATCH), the native equivalent of S3 object tags.
  */
-public final class GcsConnector implements CollectorConnector {
+public final class GcsConnector extends AbstractHttpObjectStoreConnector implements CollectorConnector {
 
     private static final int MAX_RESULTS_PAGE = 1000;
 
     private final String bucket;
     private final String prefix;      // object-name prefix under the bucket, "" when base_path is just the bucket
-    private final URI endpoint;       // scheme://host[:port], no path — default https://storage.googleapis.com
-    private final HttpClient http;
     private final GcpServiceAccountToken token;
 
     public GcsConnector(ConnectionProfile profile) {
+        super("GCS", resolveEndpoint(profile));
         String bp = profile.basePath() == null ? "" : profile.basePath().trim();
         String stripped = bp.startsWith("/") ? bp.substring(1) : bp;
         if (stripped.isBlank())
@@ -73,9 +72,6 @@ public final class GcsConnector implements CollectorConnector {
         this.bucket = slash < 0 ? stripped : stripped.substring(0, slash);
         String p = slash < 0 ? "" : stripped.substring(slash + 1);
         this.prefix = p.isBlank() ? "" : (p.endsWith("/") ? p : p + "/");
-        this.endpoint = resolveEndpoint(profile);
-        this.http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
-
         String saJson = SecretResolver.resolve(profile.password());
         if (saJson == null || saJson.isBlank())
             throw new IllegalArgumentException("gcs connection '" + profile.id() + "' needs password = the"
@@ -215,44 +211,10 @@ public final class GcsConnector implements CollectorConnector {
 
     // ── HTTP + auth ───────────────────────────────────────────────────────────
 
-    /** Execute a bearer-authenticated request whose response is small (listing JSON, copy/delete acks). */
-    private HttpResponse<byte[]> execute(String method, String path, Map<String, String> query,
-                                         Map<String, String> headers, byte[] body, String what)
-            throws AcquisitionException {
-        try {
-            HttpRequest req = authed(method, path, query, headers, body);
-            HttpResponse<byte[]> resp = http.send(req, HttpResponse.BodyHandlers.ofByteArray());
-            if (resp.statusCode() / 100 != 2)
-                throw new AcquisitionException("GCS " + what + " failed: HTTP " + resp.statusCode()
-                        + errorDetail(resp.body()));
-            return resp;
-        } catch (IOException | InterruptedException e) {
-            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
-            throw new AcquisitionException("GCS " + what + " failed on " + endpoint.getHost() + ": " + e.getMessage(), e);
-        }
-    }
-
-    /** Execute a bearer-authenticated GET whose body should stream (object reads). */
-    private HttpResponse<InputStream> executeStreaming(String path, Map<String, String> query,
-                                                       Map<String, String> headers, String what)
-            throws AcquisitionException {
-        try {
-            HttpRequest req = authed("GET", path, query, headers, null);
-            HttpResponse<InputStream> resp = http.send(req, HttpResponse.BodyHandlers.ofInputStream());
-            if (resp.statusCode() / 100 != 2) {
-                byte[] err;
-                try (InputStream in = resp.body()) { err = in.readNBytes(2048); }
-                throw new AcquisitionException("GCS " + what + " failed: HTTP " + resp.statusCode() + errorDetail(err));
-            }
-            return resp;
-        } catch (IOException | InterruptedException e) {
-            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
-            throw new AcquisitionException("GCS " + what + " failed on " + endpoint.getHost() + ": " + e.getMessage(), e);
-        }
-    }
-
-    private HttpRequest authed(String method, String encodedPath, Map<String, String> query,
-                               Map<String, String> headers, byte[] body) throws IOException {
+    /** Build a bearer-token-authenticated request. */
+    @Override
+    protected HttpRequest request(String method, String encodedPath, Map<String, String> query,
+                                  Map<String, String> headers, byte[] body) throws IOException {
         StringBuilder qs = new StringBuilder();
         query.forEach((k, v) -> {
             if (!qs.isEmpty()) qs.append('&');
@@ -291,30 +253,8 @@ public final class GcsConnector implements CollectorConnector {
         return o.has(field) && !o.get(field).isJsonNull() ? o.get(field).getAsString() : null;
     }
 
-    private static String errorDetail(byte[] body) {
-        if (body == null || body.length == 0) return "";
-        String s = new String(body, 0, Math.min(body.length, 500), StandardCharsets.UTF_8);
-        return " — " + s.replaceAll("\\s+", " ").trim();
-    }
-
-    private static String nameOf(String rel) {
-        int i = rel.lastIndexOf('/');
-        return i < 0 ? rel : rel.substring(i + 1);
-    }
-
-    private static String join(String a, String b) {
-        if (a == null || a.isBlank()) return b;
-        String left = a.endsWith("/") ? a.substring(0, a.length() - 1) : a;
-        return left + "/" + (b.startsWith("/") ? b.substring(1) : b);
-    }
-
     private static String escapeJson(String s) {
         return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
-    }
-
-    private static long parseLong(String s, long dflt) {
-        if (s == null || s.isBlank()) return dflt;
-        try { return Long.parseLong(s.trim()); } catch (NumberFormatException e) { return dflt; }
     }
 
     private static Instant parseInstant(String s) {

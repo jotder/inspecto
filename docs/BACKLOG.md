@@ -831,7 +831,7 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   the §11.3 output registration have all already happened. Audit says FAILED, the manifest says the
   outputs registered, and nothing will re-drive the (now absent) file. Make the backup step degrade the
   same way the ledger step 15 lines above it already does.
-- 🟢 **JAVA-5 — four of five extractions DONE 2026-08-18; the connector one is the remainder.**
+- ✅ **JAVA-5 — CLOSED 2026-08-18: all five extractions done.**
   - ✅ **`SqlIdent`** (`pipeline/exec`) — `RowShaper.q()/sqlStr()`, `ScratchTables.q()/sqlStr()` **and**
     `ComponentPreview.quoteIdent()` (a third copy the row did not list) now delegate to it. Their own
     thin helpers stay, so ~65 call sites are untouched: the duplicated *logic* is what mattered, and a
@@ -852,13 +852,19 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     `TarArranger`, `TarInboxPreparer`). The visitor gets the entry, not the stream: a peek must not be
     able to read entry data. The load-bearing part is the gzip branch — a copy that omits it does not
     fail to compile, it silently reports an empty archive.
-  - ⬜ **`AbstractHttpObjectStoreConnector` for S3/GCS/Azure — still open**, and it is the biggest of the
-    five (~1200 lines across three files). Grounded 2026-08-18: `errorDetail`/`nameOf`/`join`/`parseLong`
-    are byte-identical in all three, `unquote`/`escapeXml`/`parseXml`/`text` in S3+Azure, and — the part
-    worth having — `execute`/`executeStreaming` are **structurally identical**, differing only in a
-    provider label and in `signed(...)` vs `authed(...)`. So the right shape really is a template-method
-    base (`provider()` + `request(...)` abstract), not a bag of static helpers. Deferred to its own
-    verified change rather than appended to a 38-file batch.
+  - ✅ **`AbstractHttpObjectStoreConnector`** — the biggest of the five. `execute`/`executeStreaming` were
+    **structurally identical** across S3/GCS/Azure, varying only in a provider label and in
+    `signed(...)` vs `authed(...)`, so the base is a template method: the label goes to the constructor,
+    the request build to an abstract `request(...)`. It also owns `endpoint`, the (identically built)
+    `HttpClient`, and `errorDetail`/`nameOf`/`join`/`parseLong`. Each connector's endpoint derivation
+    became a static `endpointOf(profile)` so it can be computed for the `super(...)` call.
+    ⚠ **`executeStreaming` gained a `query` parameter** in the S3 and Azure call sites — GCS always had
+    one. ⚠ **The XML helpers (`parseXml`/`text`/`unquote`/`escapeXml`) stay duplicated in S3+Azure on
+    purpose:** GCS speaks JSON, so they are shared by two of three, and they belong to the wire FORMAT
+    rather than to this transport. Two things the copies made easy to get wrong are now single-sourced:
+    the non-2xx test is `status / 100 != 2` rather than a code list, and an `InterruptedException`
+    re-sets the thread's interrupt flag before being rethrown — dropping that is invisible in tests and
+    breaks cancellation of a long fetch. All 28 connector tests green.
 - 🟡 **JAVA-6 — second pass DONE 2026-08-18; it found 2 real defects, both FIXED, and refuted the rest.**
   Three read-only passes over the three named surfaces. What survived independent verification:
   - 🔴 **SEC — `ObjectRoutes.scoped()` only ever guarded the URL `{id}`.** Every route taking a SECOND
