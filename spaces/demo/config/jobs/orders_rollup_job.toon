@@ -1,5 +1,5 @@
 job:
   name: orders_rollup
   type: pipeline
-  flow: orders_rollup_flow
+  pipeline_config: spaces/demo/config/orders/orders_pipeline.toon
   on_pipeline: orders

@@ -116,8 +116,11 @@ Types: `enrich`, `report`, `maintenance`, `pipeline` (`JobConfig.load()` — enu
 
 ### G — Authored flows (`*_flow.toon`)
 
-Node types from `PipelineNodeTypes.catalog()`. (The `demo` space now ships a real authored-flow example —
-`spaces/demo/config/flows/orders_rollup_flow.toon` — and the shape also appears in test Java strings
+Node types from `PipelineNodeTypes.catalog()`. (⚠ **Corrected 2026-08-18**: the `demo` space no longer
+ships an authored-flow example — `orders_rollup_flow.toon` was converted to the canonical at-rest shape
+(`steps:` + `output_store:` in `orders/orders_pipeline.toon`, run via the job's `pipeline_config:`), and
+the unconvertible `regional_orders_merge_flow.toon` was removed. The format stays GRANDFATHERED — readable,
+runnable and deletable, never newly written (`PipelineRoutes`). The shape now lives only in test Java strings
 (`ControlApiPipelineCrudTest`, `PipelineJobRunnerTest`). `PipelineCodec` round-trips
 `nodes[id,type,name?,description?,use?,config?]` + `edges[from,rel,to]` + `name` + `active`.)
 
@@ -283,10 +286,12 @@ the rest are planned in subsequent phases. Features that can't run offline (remo
 ## 6. Known gaps
 
 - ~~No `*_flow.toon` or `*_rca.toon` example exists in the repo — the shapes live only in tests.~~
-  **Stale, corrected 2026-07-22**: the `demo` sample catalog now ships both — a flow
-  (`spaces/demo/config/flows/orders_rollup_flow.toon`) and an RCA template
-  (`spaces/demo/config/ops/orders_rca.toon`), each also mirrored under `spaces/uat/config/`. The TOON
-  shapes are additionally exercised in tests (`ControlApiPipelineCrudTest`, `PipelineJobRunnerTest`).
+  ~~**Stale, corrected 2026-07-22**: the `demo` sample catalog now ships both.~~
+  **Re-corrected 2026-08-18**: the demo space's authored flows were converted/removed, so only the RCA
+  template (`spaces/demo/config/ops/orders_rca.toon`) still ships. The one remaining `*_flow.toon` in the
+  repo is `inspecto/examples/06-serve/pipeline-job/write/flows/sales_rollup_flow.toon` — deliberately
+  retained as the live end-to-end proof for PIP-1. The TOON shapes are additionally exercised in tests
+  (`ControlApiPipelineCrudTest`, `PipelineJobRunnerTest`).
 - ~~`json` / `text_regex` frontends are `[LIVE]` — runnable examples can now be added to the suite.~~
   **SHIPPED 2026-07-20**: `examples/02-parsing/json-frontend` and `examples/02-parsing/text-regex-frontend`
   added (NDJSON + named-capture-group regex, each with `samples/` and a README catalog row).

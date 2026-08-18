@@ -4,5 +4,5 @@ alert:
   comparator: gt
   threshold: 3
   window: 1h
-  onPipeline: orders_rollup_flow
+  onPipeline: orders
   severity: CRITICAL

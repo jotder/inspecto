@@ -30,6 +30,12 @@ processing:
     date_formats[1]: "%Y-%m-%d"
     timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
 
+output_store: rollup
+
+steps[1]:
+  - filter:
+      where: "STATUS = 'SHIPPED'"
+
 collector:
   gap_detection:
     enabled: true

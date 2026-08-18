@@ -33,9 +33,11 @@ N independent collector pipelines          one flow job                      one
   in-memory: a restart forgets partial progress and waits for a full cycle again — a late run,
   never a wrong one (`JobService.onBatchEvent`). Cron remains fine when arrival times are known.
 
-Demo: `spaces/demo/config/flows/regional_orders_merge_flow.toon` +
-`spaces/demo/config/jobs/regional_orders_merge_job.toon` (a disabled template — the demo space
-ships no east/west collectors).
+Demo: none shipped. The disabled `regional_orders_merge_flow.toon` template was removed
+(2026-08-18) when the demo space's authored flows were converted to canonical pipelines — a
+`transform.merge` fan-in has **no** `*_pipeline.toon` form (`PipelineEditable.lower` refuses it
+with `UNSUPPORTED_NODE`; the flat vocabulary has no join/union node), so the pattern stays
+canvas-authored. `PipelineJobRunnerTest.unionsTwoSourceStores` remains the executable pin.
 
 ## Why the answers fall out by construction
 
