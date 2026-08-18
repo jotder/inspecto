@@ -1,0 +1,6 @@
+store: sites_active
+pipeline: sites
+flow: sites
+source_store[1]: sites
+derived_sql: "SELECT * FROM read_parquet('spaces/ucc/data/sites/database/**/*.parquet', union_by_name=true) WHERE STATUS = 'ACTIVE'"
+defined_at: 2026-08-18T00:00:00Z

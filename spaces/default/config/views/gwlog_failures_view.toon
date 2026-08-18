@@ -1,0 +1,6 @@
+store: gwlog_failures
+pipeline: gwlog
+flow: gwlog
+source_store[1]: gwlog
+derived_sql: "SELECT * FROM read_parquet('spaces/default/data/gwlog/database/**/*.parquet', union_by_name=true) WHERE RESULT <> 'OK'"
+defined_at: 2026-08-18T00:00:00Z

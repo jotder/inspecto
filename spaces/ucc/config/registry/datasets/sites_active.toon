@@ -1,0 +1,23 @@
+name: sites_active
+kind: virtual
+sourceName: sites
+view: sites_active
+query:
+  projection: *
+  where:
+    kind: group
+    op: AND
+    items[1]{kind,field,operator,value,value2}:
+      condition,STATUS,=,ACTIVE,""
+  sqlOverride: null
+physicalRef: null
+columns[6]{name,type,role}:
+  SITE_ID,string,dimension
+  SITE_NAME,string,dimension
+  SITE_LAT,number,measure
+  SITE_LON,number,measure
+  CAPACITY,number,measure
+  STATUS,string,dimension
+measures[0]:
+calculated[0]:
+viz: null

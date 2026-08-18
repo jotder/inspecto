@@ -279,8 +279,12 @@ the rest are planned in subsequent phases. Features that can't run offline (remo
 **F. Jobs** — enrich-on-commit, enrich-cron (+catch_up), maintenance-cleanup, flow-job-on-pipeline.
 **G. Flows** — filter-route, merge-two-sources, sink-view.
 
-**View definitions (`<space>/config/views/<store>_view.toon`)** — `spaces/default/config/views/premium_cdr_view_view.toon`
-is the repo's first, added 2026-08-18. A `ViewDefinition` is normally *engine-written*
+**View definitions (`<space>/config/views/<store>_view.toon`)** — three ship as of 2026-08-18:
+`default/config/views/premium_cdr_view_view.toon` (`TARIFF = 'premium'`),
+`default/config/views/gwlog_failures_view.toon` (`RESULT <> 'OK'`) and
+`ucc/config/views/sites_active_view.toon` (`STATUS = 'ACTIVE'`), each bound by a `view:` dataset of
+the same name. ⚠ `premium_cdr_view`'s store name already ended in `_view`, hence its doubled
+filename; new views use a clean store name. A `ViewDefinition` is normally *engine-written*
 (`PipelineJobRunner.registerViews`), and only an **authored flow** can produce one: `registerViews`
 returns early when `pipelineStore == null`, and a canonical `*_pipeline.toon` at-rest run
 (`pipeline_config:`) "only ever carries `sink.persistent`". Since authored flows are grandfathered
