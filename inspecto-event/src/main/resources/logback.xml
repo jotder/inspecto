@@ -28,6 +28,17 @@
         </filter>
     </appender>
 
+    <!--
+      BACKLOG §5 BUNDLE-1's static-request capture, switchable on a PACKAGED bundle: run with
+      -Dui.static.log=DEBUG to get one [UI-STATIC] line per served asset.
+
+      ⚠ Without this line there is NO way to enable it on a bundle. The row documented
+      -Dorg.slf4j.simpleLogger.log.com.gamma.control.ControlApi=debug, which is INERT here: the binding
+      is logback, not slf4j-simple, and root is INFO. Measured 2026-08-18 — a capture run against the
+      shipped bundle produced zero lines until an external -Dlogback.configurationFile was supplied.
+    -->
+    <logger name="com.gamma.control.ControlApi" level="${ui.static.log:-INFO}"/>
+
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="EVENT_STORE"/>

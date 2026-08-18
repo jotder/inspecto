@@ -399,7 +399,45 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 > `-Dorg.slf4j.simpleLogger.log.com.gamma.control.ControlApi=debug`, reproduce, and diff the failing
 > load against a clean one.
 >
-> **Next step for whoever picks this up:** run the instrumented bundle until it fails, then diff.
+> **⛔ THE INSTRUMENT WAS THE PROBLEM — measured 2026-08-18. Do not spend another shift driving the
+> in-app browser at this row.** 36 cold loads (12 landing + 12 landing + 12 deep-link, each on its own
+> fresh port ⇒ a genuinely new origin) all rendered, zero console errors, and the per-route request
+> counts were *identical* on every repeat. That is not evidence the bug is gone, because:
+>
+> **The in-app browser's HTTP cache is DISABLED.** On a second navigation to an already-loaded origin,
+> `performance.getEntriesByType('resource')` reports **0 of 41** JS resources with `transferSize === 0`
+> — every byte re-fetched — and the server logged **49×200, zero 304s**, i.e. the browser never sent a
+> conditional request. BUNDLE-1's only identified mechanism is *a stale CACHED chunk paired with a new
+> `index.html`*. A browser with no cache cannot exhibit it. **Both this shift's 36 "clean" loads and the
+> previous shift's 3 are therefore weak evidence**, run on an instrument that cannot show the fault.
+> Reproducing it needs a browser with a normal cache — a real Chrome profile, not this one.
+>
+> **The server side of the fix IS verified** (by curl, which the browser could not exercise): a GET
+> returns `200` + `Cache-Control: no-cache` + `ETag: "<mtimeHex>-<sizeHex>"`, and the same request with
+> `If-None-Match` returns a **bodiless 304**.
+>
+> **⚠ The enablement instruction in this row was INERT and is now FIXED.** The documented
+> `-Dorg.slf4j.simpleLogger.log.com.gamma.control.ControlApi=debug` does nothing on a packaged bundle:
+> the binding is **logback**, not slf4j-simple, and `logback.xml` pins root at INFO. A capture run
+> against the shipped bundle produced **zero** `[UI-STATIC]` lines until an external
+> `-Dlogback.configurationFile` was supplied. `inspecto-event/src/main/resources/logback.xml` now
+> carries `<logger name="com.gamma.control.ControlApi" level="${ui.static.log:-INFO}"/>`, so the
+> capture is switched on with **`-Dui.static.log=DEBUG`**. Both arms verified on the bundle: the
+> property produces the lines, its absence produces none.
+>
+> **Clean-load signature (the baseline to diff a failure against), bundle of 2026-08-18, 129 chunks:**
+> landing `/` = **44** static requests (42×200 + 2×404) · `/studio/link-analysis` = 51 · `/catalog` = 46
+> · `/pipelines` = 44 · `/studio/geo-map` = 36 · `/jobs` = 35 · `/overview` = 26 · `/data-browser` = 25.
+> The two 404s on every route are `/favicon.ico` and `/favicon-16x16.png` — cosmetic, unrelated, and
+> present on clean loads, so do NOT read them as the defect. A failing load fetches FEWER chunks than
+> its route's number, which makes the server log alone a sufficient failure detector.
+>
+> **Also confirmed NOT a mixed build in this bundle:** all 131 JS/CSS chunks share one mtime. The ~60
+> files with an older mtime are repo-tracked static assets under `assets/`, copied with their source
+> timestamps — benign, and not the stale-artifact signal they resemble.
+>
+> **Next step for whoever picks this up:** reproduce in a browser with a *working* cache, with
+> `-Dui.static.log=DEBUG` on, then diff against the signature above.
 > Workaround for operators today: **reload the page once.**
 
 > ### ✅ BUILDER-2 — nine more defects found by driving the editor as a builder, all FIXED (2026-08-17)
