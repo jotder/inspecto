@@ -903,7 +903,7 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     the non-2xx test is `status / 100 != 2` rather than a code list, and an `InterruptedException`
     re-sets the thread's interrupt flag before being rethrown — dropping that is invisible in tests and
     breaks cancellation of a long fetch. All 28 connector tests green.
-- 🟡 **JAVA-6 — second pass DONE 2026-08-18; it found 2 real defects, both FIXED, and refuted the rest.**
+- ✅ **JAVA-6 — COMPLETE 2026-08-18. Second pass + residual done; 3 real defects found and FIXED, the rest refuted.**
   Three read-only passes over the three named surfaces. What survived independent verification:
   - 🔴 **SEC — `ObjectRoutes.scoped()` only ever guarded the URL `{id}`.** Every route taking a SECOND
     object id took it ungated, so a data-scoped caller could name an object hidden from them as the other
@@ -953,11 +953,22 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
       "simplification": `validateType` guards `list`/`read`/`versions` too, so dropping the type breaks
       the Components pane's READS as well. `InspectoTools`' javadoc claimed that retirement had already
       happened — **it had not**, and that stale claim is corrected in place.
-    - ⚠ The **BACKWARD-compatibility** half is deliberately NOT mirrored. `/config/write` pairs it with a
-      `compatibility:"none"` override in its body envelope; a component body **is** the content, so there
-      is nowhere to put one, and an escape-hatch-less compat gate would make this route *stricter* than
-      its sibling. Closing that half needs an override channel (a query parameter) — an API-shape
-      decision, not a patch. **That is the one piece of this row still open.**
+    - ✅ **The BACKWARD-compatibility half is now mirrored too (2026-08-18).** `updateComponent` runs
+      `SchemaCompatibility.check(current, draft)` and answers the same 422 with cell-level `findings` its
+      sibling does. **The override is a QUERY parameter — `?compatibility=none` — not a body key**, and
+      that is the whole API-shape decision: a component body *is* the content, so a `compatibility` key
+      placed there would be **persisted into the schema itself**. `/config/write` can carry it in the body
+      only because its body is an envelope (`{type, config, …}`) around the draft. A test asserts the
+      override never lands in the stored content.
+    - ⚠ **Scoped to `updateComponent` on purpose**, which makes the other two write paths exempt for
+      *reasons* rather than by oversight: **create** has no previous version to be compatible with, and
+      **restore** (`/versions/{v}/restore`) is a ROLLBACK — a recovery action whose target was itself a
+      valid schema, so gating it would let a bad edit lock an operator out of the version that fixes it.
+      Restore still passes the structural + safety gates. The exemption is **pinned directly**
+      (`schemaRestoreIsExemptFromTheBackwardGate`): the restored version really is backward-breaking
+      against current — the same content is refused 422 as a PUT in the same test — so moving the gate
+      from `updateComponent` into `writeComponent` turns that test red instead of silently blocking
+      rollbacks. **JAVA-6 is now fully closed.**
   - **Read in full and CLEAN — no defects:** `WriteGates` + the `PathJail.contains` verdict it delegates
     to, `AccessDecider`, `AccessDeciders`, the Enterprise `PolicyEngine`, and both PEPs
     (`ControlApi.authorize`, `RowScope`). Four probes, all negative: an unparseable policy doc denies
