@@ -1402,6 +1402,37 @@ canonical `*_pipeline.toon` written with the full space-convention dir set + `re
 to the graph). The mock's TS lift/lower (`inspecto-ui/.../mock/pipeline-editable.ts`) pins the same
 refusals so the offline preview cannot pass a topology the server 422s.*
 
+#### The chain has two spellings, and the FILE owns which one (fixed 2026-08-18)
+
+A pipeline's transform chain is written **one of two ways, never both** — the legacy singular blocks
+(`processing.dedup` / `join` / `summarize`, `csv_settings.where`, top-level `route:`) or an explicit
+top-level `steps:` list — because `PipelineConfigParser` refuses the two spellings in one file (there is
+no non-arbitrary position at which a singular block would join a sequence). Two rules follow, and both
+were violated by shipped code until 2026-08-18:
+
+- ⛔ **The spellings are NOT interchangeable, so normalising one into the other is not cosmetic.**
+  `PipelineConfig.hasExplicitSteps()` decides whether `PipelineLift` walks the **authored order** or its
+  own constant `filter → join → dedup → summarize → route`, and whether `prepare()` demands a top-level
+  `output_store:` before it will arm. `lower` used to pick the spelling from the **graph shape alone**
+  (`isLegacyShaped`), so a hand-authored `steps:` file whose chain happened to fit the singular keys was
+  rewritten into them on save. It now keeps `steps:` whenever `existing` already carries a non-empty one:
+  **the spelling is the file's, not the graph's** — the same ownership rule as every unmodelled key. A
+  file with no `steps:` key is untouched, so every pre-existing file and every editor-authored graph
+  still takes the byte-for-byte legacy path.
+- 🔴 **A reader that knows only one spelling cannot tell "absent" from "empty".**
+  `RecipeConverter.toRecipe` synthesised its transform steps **only** from the singular blocks — which a
+  `steps:` file never carries — so it projected an **empty chain in silence**, and the round trip wrote
+  the config back with no transforms at all. Worst for a chain the singular keys *cannot* hold
+  (`dedup → summarize → dedup`): every step gone, nothing raised. It now projects the authored list in
+  order, through one builder per kind **shared with the legacy path** so the two cannot drift, and an
+  unmodelled kind travels **verbatim** so `RecipeCompiler` names it in an `UNSUPPORTED_STEP` refusal — a
+  projection must never quietly shorten a chain.
+
+*Verified: `RecipeConverterTest` — the every-repo-fixture round trip (which is what caught it, once a
+shift authored the repo's first `steps:` fixture in `ae2c0909`) plus 3 explicit guards: authored order
+preserved, round trip in the authored spelling, and an unmodelled kind refusing rather than vanishing.
+Full `-Pedition-enterprise -fae` reactor 3458/0/0/5 at `f72f7fc8`.*
+
 ---
 
 ## 17. Pipeline-level settings — a dedicated surface for what the graph editor never models (2026-08-13)

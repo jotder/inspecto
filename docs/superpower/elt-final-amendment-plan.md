@@ -676,6 +676,18 @@ parse carries parser-owned processing keys on the node (not inside `parsing:`), 
 converter's sink step carries the sink-owned write-tuning keys (`threads`, `duckdb_threads`,
 `batch_max_*`) — the gate caught both as real drops.
 
+> 🔴 **Amended 2026-08-18 (`f72f7fc8`): the corpus gate is only as wide as the corpus, and S4 shipped
+> blind to the `steps:` spelling.** The converter synthesised its transform steps solely from the legacy
+> singular blocks, which an explicit-`steps:` file never carries (the parser refuses both spellings in
+> one file) — so such a config projected an **empty chain in silence**. It went unnoticed for 13 days
+> because no fixture used that spelling; it turned the gate red the moment `ae2c0909` authored one
+> (`spaces/demo/config/orders/orders_pipeline.toon`). The fix also needed a second half in
+> `PipelineEditable.lower`, which chose the chain spelling from the graph shape alone and so renormalised
+> an authored `steps:` file back to the singular keys — exactness was unreachable without it. As-built
+> in `okf/backend/pipeline-graph/pipeline-graph-design.md` §16. **Two standing lessons for the remaining
+> phases: a fixture-corpus parity gate proves nothing about a shape no fixture uses, and every reader
+> of a multi-spelling key must be checked against EVERY spelling before it is called lossless.**
+
 **P2 S5 SHIPPED 2026-08-06** — `route` + `dedup` (QUALIFY) lowering, closing Phase 2's two
 remaining verbs. `dedup` shipped as full lowering **and** real execution in the same slice
 (avoiding the W1 dead-config trap): new `BuiltinNodeType.TRANSFORM_DEDUP` node kind; flat home

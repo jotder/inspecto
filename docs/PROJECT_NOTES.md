@@ -252,6 +252,13 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   **A pass is only a pass if a `Tests run:` line appeared for each class you named** — otherwise run them
   as separate invocations.
 
+- **Ask a verify agent for the MODULE COUNT, not just the total.** Two `-Pedition-enterprise -fae` runs on
+  the same tree reported 3355 and 3458 (2026-08-18); nothing had changed but the summariser, which dropped a
+  module. The known cause is Maven logging `Tests run:` at `[WARNING]` for any module with skips, so a grep
+  filtered on `[INFO]` silently loses whole modules — but the *total alone cannot reveal that*, because a
+  plausible number looks like a real one. **19 test-reporting modules** is the current shape of a full
+  enterprise run; a total that moves without a module count is not evidence either way.
+
 - **TOON schema serialization** — `ConfigCodec.toToon(map)` does **not** emit tabular-array format. A schema
   whose `fields`/`rules` are Java-constructed `List<Map>` round-trips as nested maps, and the TOON parser then
   throws `Array length mismatch: declared N, found 0`. In any test that writes a schema file for TOON loading,
