@@ -28,6 +28,24 @@ Per request: strip an optional `/api` prefix (Angular dev-proxy); apply CORS if 
 MDC — see [multi-space](multi-space.md)); match `routes` by pattern+method; fall through to static SPA assets
 for unmatched GETs (`-Dui.dir`); always clear the space MDC in `finally`.
 
+## Request-scoped attributes — never the JDK's exchange map
+
+Everything a stage stamps for later stages (`ATTR_EFFECTIVE_PATH`, `ATTR_SUBJECT`, `ATTR_RAW_BODY`,
+correlation id, idempotency, pagination, `ATTR_HELD_ROLES`, `ATTR_MATCHED_POLICY`) lives in
+`ApiContext.REQUEST_SCOPES` — a map keyed by exchange **identity**, dropped in the outermost stage's
+`finally` — accessed via `ApiContext.attr(ex, key[, value])` in-package and via the typed seams
+`Roles.configRoot` / `ComponentAccess.heldRoles` / `AccessDecider.matchedPolicy` from the security and
+policy modules. **Never store request state via `HttpExchange.set/getAttribute`:** on any pre-JDK-26
+runtime (the bundle embeds GraalVM 25) that map is the *shared HttpContext map*, one map for every
+in-flight request. The route-matching path once rode it, and concurrent bursts crossed requests — the
+server served one URL with another request's file (BACKLOG §5 BUNDLE-1, closed `fb1511c0`: 53/1200
+crossed on GraalVM 25, 0/3000 with the fix). The reactor gate runs on JDK 26, where exchange attributes
+are per-exchange — **it structurally cannot catch a regression here**; the pins are
+`ExchangeAttributeScopeTest` (two exchanges sharing one JDK map stay isolated, and the shared map stays
+empty) and, for behaviour, a concurrent probe against the *shipped* runtime
+(`inspecto-deploy/runtime/bin/java.exe`). The static handler's `-Dui.static.log=DEBUG` line logs
+`served=<file>` beside the request URL precisely so a crossed pairing is visible in one grep.
+
 ## Route families
 
 Registered via `RouteModule`s: health/ready (`/health`,`/ready`), metrics (`/metrics`, Prometheus text),
