@@ -313,21 +313,33 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 > 4. Finish with `npm run build` — a full AOT compile of every template, which the three tsc configs
 >    do not perform.
 
-> ### 🟢 GRID-1 — routed panes still missing a `stateKey` (2026-08-17)
+> ### ✅ GRID-1 — CLOSED 2026-08-18: every multi-table pane now keys each section
 >
-> 14 single-table routed panes got one (`11260a1d`); the remainder are the **multi-table** panes, where
-> each section needs its own key: catalog (4 tables), sharing (4), notification-center (3),
-> reconciliation-detail (3), run-detail (2), job-detail (2), enrichment (2), alerts (2). ⚠ A duplicate key
-> silently makes two tables share one persisted layout, which is worse than none — that is why they were
-> left rather than guessed. Exempt by design: the dashboard's mini card grid and the studio drill drawer.
+> 22 keys across the 8 named panes — catalog (4), sharing (4), notification-center (3),
+> reconciliation-detail (3), run-detail (2), job-detail (2), enrichment (2), alerts (2) — added to the
+> 14 single-table panes done earlier (`11260a1d`). Uniqueness was **verified globally**, not assumed:
+> no duplicate among the 45 keys now in the templates, and none of the new static keys collides with the
+> three DYNAMIC ones (`db-`, `mail-`, `run-detail-` prefixes).
+>
+> ⚠ **`run-detail`'s second grid is keyed PER TAB** (`[stateKey]="'run-detail-' + activeTab"`), not once:
+> its columns change with the tab, so a single key would restore the previous tab's chosen columns over
+> a different column set. It cannot collide with `run-detail-files` — the generic grid is guarded by
+> `activeTab !== 'files'`.
+>
+> ⚠ The earlier survey that produced the "0 keys" counts used a `stateKey=` grep, which does **not**
+> match a property binding — `data-browser` and `object-mail` were already keyed and were false
+> negatives. Exempt by design, unchanged: the dashboard's mini card grid and the studio drill drawer;
+> `maintenance-overview` and `design-system` were never in this row's scope.
 
-> ### ❓ PACK-1 — one authored pattern pack hides all six built-ins (2026-08-17)
+> ### ✅ PACK-1 — ANSWERED + FIXED 2026-08-18: authored packs MERGE over the built-ins
 >
-> `studio/link-analysis/link-analysis-toolbox.component.ts:118` does `if (authored.length)
-> this.patternPacks.set(authored)` — a **replace**, not a merge, so the moment a space authors its first
-> pack the six built-in packs vanish from the toolbox. Needs a product call before a code change: this is
-> either deliberate curation (an authored set *overrides* the shipped one) or a bug (they should
-> concatenate). Left untouched by the 2026-08-17 sweep for exactly that reason.
+> Operator call: it was a bug, not curation. `link-analysis-toolbox.component.ts` now sets
+> `[...PATTERN_PACKS.filter(not overridden), ...authored]`, so authoring one pack no longer removes the
+> other six. ⚠ The merge is **id-aware**: an authored pack reusing a built-in id *overrides* it rather
+> than appending, because `loadPatternPack` resolves by id through `find` — a plain concatenation would
+> have left the authored pack permanently unreachable behind the built-in of the same name. Pinned in
+> `link-analysis-toolbox.component.spec.ts` (built-ins still present · authored added · an id reused
+> once, with the authored label winning).
 
 > ### ⚠ BUNDLE-1 — the packaged UI intermittently dies at bootstrap on FIRST load (2026-08-17)
 >
@@ -757,8 +769,17 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md).
 
 **Open:**
-- 🔴 **JAVA-1 — a mid-file failure in generation mode orphans already-revealed Parquet output**
-  (opened 2026-08-18 by the module-by-module Java review sweep). `DuckDbRecordSink.generationFlush`
+- ✅ **JAVA-1 — CLOSED 2026-08-18: the quarantine path now DISCARDS what it already revealed.**
+  Operator call: discard-on-failure, not register-as-PARTIAL — a quarantined member contributed nothing
+  and that is what the audit says, so its generations go with it. `GenerationModeIngester.discardRevealed`
+  deletes exactly the files in `sink.outputs()` (whose absolute paths it already holds) before
+  quarantining, on **both** quarantine paths; a delete that fails fails the *batch* rather than leaving
+  an orphan we know about. Pinned by `midFileFailureDiscardsAlreadyRevealedGenerations`.
+  ⚠ **The row's ⛔ is answered:** `PartitionWriter.reveal()` is atomic **per file, not per generation** —
+  a generation with N partitions reveals N files in a loop (parallel above 16). That does *not* widen the
+  hole, because a `PartitionWriter` failure throws `SinkFlushException`, which fails the whole batch; the
+  only window is the one this row described, where whole generations completed and the *ingester* then
+  threw. Original report follows. `DuckDbRecordSink.generationFlush`
   reveals real output into `cfg.dirs().database()` on every `flushRows`; if the ingester then throws
   partway through the file, `GenerationModeIngester` quarantines the source and `continue`s — but the
   generations already flushed are never rolled back, never deleted, and never reach `sink.outputs()`,
@@ -770,8 +791,13 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   live customer-data path and the fix is a design choice (discard-on-failure vs. register as PARTIAL),
   not an edit. ⛔ Ground it before building: the reviewer did **not** read `PartitionWriter` itself, so
   whether `reveal()` is atomic per generation — which sets the severity — is unverified.
-- 🟡 **JAVA-2 — OIDC audience validation is optional, so a shared-issuer IdP has no audience isolation**
-  (opened 2026-08-18, same sweep). `OidcAuthenticator` applies the `aud` check only when
+- ✅ **JAVA-2 — ANSWERED + SHIPPED 2026-08-18: warn loudly at boot, do NOT make it mandatory.**
+  Operator call: a `requireProperty` would stop every deployment that boots without an audience today
+  from booting at all. `OidcAuthenticator.warnIfNoAudience` logs one WARN naming the risk and the
+  property, and does it for the **gateway** audience too — the gateway processor had the identical hole.
+  `slf4j-api` added to `inspecto-security` (the module genuinely had no logging dependency, as the row
+  said). The posture is announced, not enforced: a deployment that wants isolation must still set it.
+  Original report follows. `OidcAuthenticator` applies the `aud` check only when
   `-Dauth.oidc.audience` is set; unset, any correctly-signed token from the trusted issuer is accepted,
   with no startup warning. For a tenant IdP minting tokens for several clients under one issuer, a
   token intended for an unrelated app authenticates here. Making it mandatory (like `issuer`, via
@@ -779,8 +805,12 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   without it today** — an operator decision, which is why the sweep filed it rather than shipping it.
   Note the module has no logging dependency at all, so even the softer "warn loudly at boot" option
   needs a slf4j import added.
-- 🟡 **JAVA-3 — `CircuitBreaker` never evicts a per-source entry, and the obvious hook would be a no-op**
-  (opened 2026-08-18, same sweep). Every other process-wide per-key map has a cleanup hook
+- ✅ **JAVA-3 — CLOSED 2026-08-18, with the row's ⛔ respected.** `CircuitBreaker.forget(sourceId)` is
+  called from `CollectorService.unregisterPipeline`, **not** from `PipelineScheduler.forget` — and with
+  the **collector** id, resolved via `configRegistry.configForPath(...).map(c -> c.collector().id())`
+  *before* the registry rebuild drops the config. Wiring it next to `IntakeGovernor.shared().forget(id)`
+  would have passed the pipeline id and silently missed every collector declaring its own `source.id`,
+  exactly as the row warned. Original report follows. Every other process-wide per-key map has a cleanup hook
   (`IntakeGovernor.forget`, `StabilityGate.forget`, `ConnectionRegistry.forget`,
   `DecisionRules.forget`); `CircuitBreaker` has only a test-only global `reset()`, so its map grows for
   the life of the process under source/pipeline churn. ⛔ Do **not** just add `forget(id)` next to
@@ -788,23 +818,82 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   while the breaker is keyed by `src.id()` — the **collector** id, which defaults to the pipeline name
   but is overridable via `source.id`. Wired that way it silently misses every collector with a custom
   id. Closing it needs the collector id available at unregister time.
-- 🟡 **JAVA-4 — `BatchProcessor.finalizeSource` catch asymmetry can mark a batch FAILED after its data
-  landed** (opened 2026-08-18, same sweep). The ledger-fingerprint loop tolerates a member vanishing
+- ✅ **JAVA-4 — CLOSED 2026-08-18.** The backup loop now catches `NoSuchFileException` and logs, the way
+  the ledger loop 15 lines above already did, so a member that vanished between ingest and backup no
+  longer demotes a batch whose register + manifest + §11.3 registration are all already durable. Pinned by
+  `finalizeSourceToleratesAMemberThatVanishedBeforeBackup`.
+  ⚠ **Deliberately NOT a blanket catch.** Only the vanished case degrades: a real backup failure
+  (unwritable destination, full disk) leaves the file in the inbox, where FAILED is the honest answer and
+  the rerun is idempotent — swallowing that one would strand the file behind a marker instead.
+  Original report follows. The ledger-fingerprint loop tolerates a member vanishing
   pre-backup (logs and skips), but the later `backupFile` does not — `Files.move` throws, the exception
   propagates, and the batch is demoted to FAILED *after* the DuckLake register, the manifest write and
   the §11.3 output registration have all already happened. Audit says FAILED, the manifest says the
   outputs registered, and nothing will re-drive the (now absent) file. Make the backup step degrade the
   same way the ledger step 15 lines above it already does.
-- 🟢 **JAVA-5 — five confirmed duplication seams worth one extraction each** (opened 2026-08-18, same
-  sweep; no behaviour change, so none of these is urgent): one `SqlIdent` for the byte-identical
-  `RowShaper.q()/sqlStr()` and `ScratchTables.q()/sqlStr()`; one `DirectoryScan` for the four
-  "scan dir → parse → tolerate corrupt file" copies (`ComponentPreview`/`ComponentRegistry`/
-  `ComponentStore`/`PipelineStore.list`/`ViewStore.list`); one `AbstractHttpObjectStoreConnector` for
-  S3/GCS/Azure, which each re-implement `execute`/`errorDetail`/`parseLong`/`nameOf`/`join`/escaping;
-  one `AbstractJdbcStore` for the four near-identical `Db*Store` CRUD classes in `ops`; and one
-  `TarUtil.forEachEntry` for the three hand-rolled dry-run archive peeks in `inspecto-util`.
-- 🟢 **JAVA-6 — the sweep's second pass: the surface it sampled rather than exhausted** (opened
-  2026-08-18). The 2026-08-18 review read every file in `inspecto-{api,util,config,sql,etl,event,
+- 🟢 **JAVA-5 — four of five extractions DONE 2026-08-18; the connector one is the remainder.**
+  - ✅ **`SqlIdent`** (`pipeline/exec`) — `RowShaper.q()/sqlStr()`, `ScratchTables.q()/sqlStr()` **and**
+    `ComponentPreview.quoteIdent()` (a third copy the row did not list) now delegate to it. Their own
+    thin helpers stay, so ~65 call sites are untouched: the duplicated *logic* is what mattered, and a
+    65-site rename would have been churn with no safety win.
+  - ✅ **`DirectoryScan`** (`pipeline`) — `ComponentRegistry`, `PipelineStore` and `ViewStore`.
+    ⚠ **The row's list of five was wrong on two counts:** `ComponentPreview` has no such scan at all, and
+    `ComponentStore.historyFiles` is a *different* shape (a version filter that degrades to `List.of()`,
+    not a warn-and-continue). Three copies existed, three were extracted. Per-file failure deliberately
+    stays with each caller — whether a corrupt file warns or is dropped silently differs by store.
+    (Also fixed in passing, since the line was being touched: two log messages said *flow* where the
+    glossary says **pipeline**.)
+  - ✅ **`AbstractJdbcStore`** (`ops`) — `DbObjectStore`, `DbLinkStore`, `DbNoteStore` and
+    `DbTagAssignmentStore` now extend it; it owns `conn`, the four `BrowsableStore` methods and `close()`.
+    ⚠ **Schema init deliberately stayed in the subclasses.** An `initSchema()` called from the base
+    constructor runs before subclass fields are assigned — it would work today only because every DDL
+    lives in a static constant, and would break silently for the first subclass that changes that.
+  - ✅ **`TarUtil.forEachEntry`** — `peekTar` plus the three dry-run peeks (`IntegratedProcessor`,
+    `TarArranger`, `TarInboxPreparer`). The visitor gets the entry, not the stream: a peek must not be
+    able to read entry data. The load-bearing part is the gzip branch — a copy that omits it does not
+    fail to compile, it silently reports an empty archive.
+  - ⬜ **`AbstractHttpObjectStoreConnector` for S3/GCS/Azure — still open**, and it is the biggest of the
+    five (~1200 lines across three files). Grounded 2026-08-18: `errorDetail`/`nameOf`/`join`/`parseLong`
+    are byte-identical in all three, `unquote`/`escapeXml`/`parseXml`/`text` in S3+Azure, and — the part
+    worth having — `execute`/`executeStreaming` are **structurally identical**, differing only in a
+    provider label and in `signed(...)` vs `authed(...)`. So the right shape really is a template-method
+    base (`provider()` + `request(...)` abstract), not a bag of static helpers. Deferred to its own
+    verified change rather than appended to a 38-file batch.
+- 🟡 **JAVA-6 — second pass DONE 2026-08-18; it found 2 real defects, both FIXED, and refuted the rest.**
+  Three read-only passes over the three named surfaces. What survived independent verification:
+  - 🔴 **SEC — `ObjectRoutes.scoped()` only ever guarded the URL `{id}`.** Every route taking a SECOND
+    object id took it ungated, so a data-scoped caller could name an object hidden from them as the other
+    end of a write. **Merge is the sharp one: it absorbs AND CLOSES the source case** — a state mutation
+    on a resource the caller cannot even read, from a route that believed it was scope-gated. Fixed with
+    one `requireVisible` helper (absent and out-of-scope answer the identical 404, so it also subsumes the
+    plain existence checks these routes already made). ⚠ **The review reported 3 routes; there were 5** —
+    it missed `deleteLink` and `splitCase`. Pinned by `outOfScopeObjectNamedInTheBodyIs404Too`.
+    ⚠ **One deliberate status change:** `POST /objects/{id}/split` with a member id that does not resolve
+    now answers **404, not 422**. It has to: SEC-7d requires absent and out-of-scope to be
+    indistinguishable, and a 404-vs-422 split would tell a scoped caller that a hidden object exists. A
+    member that EXISTS but the case does not contain is still 422 — `ControlApiCaseGroupTest` now pins
+    both arms separately, where it previously used a nonexistent id to stand for "foreign".
+  - **`IncidentAccess.over()` swallowed unrelated Incidents.** `Objects.equals(null, null)` is true, so an
+    Incident whose attributes simply lack the dedupe key "matched" any other active Incident in the same
+    scope that also lacked it, and was silently suppressed. Nothing in the contract obliges a caller to
+    include the key; the engine's own two callers only escape it by always populating `"rule"`. No dedupe
+    value now means no dedupe. An extra Incident an operator can close beats one that never opened.
+  - **REFUTED / not acted on:** `BundleRoutes` export being ungated where import is gated (read vs write
+    is this codebase's established convention, and the reviewer could not name a sibling proving
+    otherwise) · `saveGraph`'s gate order (every route in the file is internally self-consistent with its
+    own documented order and no request exploits the difference — a doc/expectation mismatch, not a
+    defect) · `TagRule`'s `startsWith` category prefix (PLAUSIBLE only, no caller traced) · the
+    `ops_monitor` autonomy driver bypassing `AgentApprovals` (**confirmed as fact, correct by design** —
+    it substitutes `AutonomyPolicyEngine`, opt-in and off by default).
+  - **The agent-tools question is answered NO-DEFECT:** all 22 tools declare `mutating` correctly (7
+    true), all 7 route through the approval gate, and `runTool`/`deriveTool` refuse any mutating tool
+    before the model is even called. The two previously-known schema/implementation mismatches are both
+    already fixed in-tree.
+  - ⬜ **Residual, honestly stated:** the control-plane pass read `PipelineRoutes`/`ObjectRoutes`/
+    `BundleRoutes`/`Roles`/`AccessPolicies`/`AccessRoutes`/`RowScope` in full but did NOT read
+    `WriteGates`, `AccessDecider(s)`, `ConfigRoutes` or `ComponentRoutes` internals, nor the Enterprise
+    `PolicyEngine`. Those are what remains of this row. Original scope follows.
+  The 2026-08-18 review read every file in `inspecto-{api,util,config,sql,etl,event,
   acquire,agent-hosted,security,policy}` and in the engine's `job`, `pipeline`(+`exec`),
   `consignment`, `inspector`, `enrich`, `parse`, `ingester`. It **sampled** the rest, so these are
   unread, not clean: engine `ops/*` beyond the four `Db*Store`s + `ObjectService` + `ReconService`
@@ -816,8 +905,19 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   invoked correctly but never verified internally; plus `InspectoTools` (1672 lines) and
   `InspectoIntelligenceAgent` in `inspecto-intelligence`, to confirm every mutating tool routes
   through `AgentApprovals` rather than a shortcut.
-- 🟡 **WRITE-1 — `/config/write`'s legacy-filename fallback cannot tell "this pipeline gaining an id"
-  from "a different pipeline with the same label"** (opened 2026-08-17 by review of `6dd86e5a`). A
+- 🟡 **WRITE-1 — PARTLY CLOSED 2026-08-18: `legacyName` shipped; the implicit ambiguity STAYS, and the
+  approved refusal was REFUTED by the code.** The operator call was "refuse the ambiguous overwrite (409)
+  unless the caller passes `legacyName`". ⛔ **That is unimplementable without removing the feature:**
+  adoption only ever runs when the id-named target does *not* exist, so an adopting write is **always** an
+  `overwrite:true` of the legacy file — the refusal would fire on the ordinary "a pipeline gains an id and
+  keeps editing its file" path, which `anIdStampedOntoALegacyConfigKeepsEditingTheExistingFile` pins. The
+  row's own premise ("no UI caller passes `overwrite:true`") is what made the refusal look free; the
+  adoption path itself is the caller. **Shipped instead:** an optional `legacyName` in the body naming the
+  file to probe, which also covers a case the implicit probe never could — adopting a file while the
+  display label *changes in the same save*. It is a probe, not an override: a file declaring a DIFFERENT
+  id is still never adopted, so `legacyName` cannot be pointed at someone else's config. Pinned by
+  `legacyNameNamesTheFileToAdoptInsteadOfGuessingFromTheLabel`. The residual ambiguity is now documented
+  at the code, not only here. Original report follows. A
   pipeline's file is now named for its `id`; when that file does not exist the route probes the display
   `name` so a pre-id config keeps being edited in place rather than forked. A file that declares a
   *different* `id` is now refused (`ConfigRoutes.adoptable`, with a test), but a legacy file carrying **no
