@@ -1,0 +1,10 @@
+name: premium_cdr_link_view
+description: "Sample link analysis: premium subscribers (CALLER_MSISDN) linked to the cell towers (CELL_ID) they connected through"
+sourceId: entity-projection
+query:
+  projection:
+    datasetId: premium_cdr_view
+    sourceCol: CALLER_MSISDN
+    targetCol: CELL_ID
+    attrCols[2]: DURATION_S,COST_USD
+layout: layered
