@@ -1,0 +1,25 @@
+partitionKey: TOPUP_DATE
+raw:
+  name: TOPUPS
+  format: CSV
+  fields[8]{name,selector,type}:
+    TOPUP_ID,"topup_id",VARCHAR
+    AGENT_ID,"agent_id",VARCHAR
+    SUBSCRIBER_MSISDN,"subscriber_msisdn",VARCHAR
+    CHANNEL,"channel",VARCHAR
+    AMOUNT,"amount",DOUBLE
+    CURRENCY,"currency",VARCHAR
+    TOPPED_UP_AT,"topped_up_at",TIMESTAMP
+    TOPUP_DATE,"topup_date",DATE
+mapping:
+  canonicalName: topups
+  rawName: TOPUPS
+  rules[8]{targetColumn,sourceExpression,transformType}:
+    TOPUP_ID,TOPUP_ID,DIRECT
+    AGENT_ID,AGENT_ID,DIRECT
+    SUBSCRIBER_MSISDN,SUBSCRIBER_MSISDN,DIRECT
+    CHANNEL,CHANNEL,DIRECT
+    AMOUNT,AMOUNT,DIRECT
+    CURRENCY,CURRENCY,DIRECT
+    TOPPED_UP_AT,TOPPED_UP_AT,DIRECT
+    TOPUP_DATE,TOPUP_DATE,DIRECT

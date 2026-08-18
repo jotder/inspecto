@@ -1,0 +1,32 @@
+partitionKey: CALL_DATE
+raw:
+  name: CDR
+  format: CSV
+  fields[11]{name,selector,type}:
+    CALL_ID,"call_id",VARCHAR
+    CALLER_MSISDN,"caller_msisdn",VARCHAR
+    CALLEE_MSISDN,"callee_msisdn",VARCHAR
+    CALL_TYPE,"call_type",VARCHAR
+    START_TIME,"start_time",TIMESTAMP
+    CALL_DATE,"call_date",DATE
+    DURATION_S,"duration_s",VARCHAR
+    CELL_ID,"cell_id",VARCHAR
+    CELL_LAT,"cell_lat",DOUBLE
+    CELL_LON,"cell_lon",DOUBLE
+    COST_USD,"cost_usd",DOUBLE
+mapping:
+  canonicalName: cdr
+  rawName: CDR
+  rules[12]{targetColumn,sourceExpression,transformType}:
+    CALL_ID,CALL_ID,DIRECT
+    CALLER_MSISDN,CALLER_MSISDN,DIRECT
+    CALLEE_MSISDN,CALLEE_MSISDN,DIRECT
+    CALL_TYPE,CALL_TYPE,DIRECT
+    START_TIME,START_TIME,DIRECT
+    CALL_DATE,CALL_DATE,DIRECT
+    DURATION_S,"TRY_CAST(DURATION_S AS INTEGER)",EXPR
+    CELL_ID,CELL_ID,DIRECT
+    CELL_LAT,CELL_LAT,DIRECT
+    CELL_LON,CELL_LON,DIRECT
+    COST_USD,COST_USD,DIRECT
+    TARIFF,"CASE WHEN TRY_CAST(COST_USD AS DOUBLE) >= 0.40 THEN 'premium' ELSE 'standard' END",EXPR

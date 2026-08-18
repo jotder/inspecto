@@ -1,0 +1,42 @@
+name: topups
+active: true
+version: 1
+
+dirs:
+  poll:       spaces/ucc/data/inbox/topups
+  database:   spaces/ucc/data/topups/database
+  backup:     spaces/ucc/data/topups/backup
+  temp:       spaces/ucc/data/topups/temp
+  errors:     spaces/ucc/data/topups/errors
+  quarantine: spaces/ucc/data/topups/quarantine
+  markers:    spaces/ucc/data/topups/markers
+  status_dir: spaces/ucc/data/topups/status
+  log_dir:    spaces/ucc/data/topups/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.json"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 90
+  schema_file: spaces/ucc/config/topups/topups_schema.toon
+  csv_settings:
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+parsing:
+  frontend: json
+  json:
+    format: newline
+
+collector:
+  discovery: poll
+  connector: local
+  gap_detection:
+    enabled: true
+    sequence: "TOPUPS_{yyyyMMdd}"

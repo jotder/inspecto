@@ -1,0 +1,32 @@
+name: sites
+active: true
+version: 1
+
+dirs:
+  poll:       spaces/ucc/data/inbox/sites
+  database:   spaces/ucc/data/sites/database
+  backup:     spaces/ucc/data/sites/backup
+  temp:       spaces/ucc/data/sites/temp
+  errors:     spaces/ucc/data/sites/errors
+  quarantine: spaces/ucc/data/sites/quarantine
+  markers:    spaces/ucc/data/sites/markers
+  status_dir: spaces/ucc/data/sites/status
+  log_dir:    spaces/ucc/data/sites/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.dat"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 90
+  grammar:     spaces/ucc/config/sites/sites.grammar.toon
+  schema_file: spaces/ucc/config/sites/sites_schema.toon
+
+collector:
+  discovery: poll
+  connector: local

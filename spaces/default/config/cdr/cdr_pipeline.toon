@@ -1,0 +1,42 @@
+name: cdr
+active: true
+version: 1
+
+dirs:
+  poll:       spaces/default/data/inbox/cdr
+  database:   spaces/default/data/cdr/database
+  backup:     spaces/default/data/cdr/backup
+  temp:       spaces/default/data/cdr/temp
+  errors:     spaces/default/data/cdr/errors
+  quarantine: spaces/default/data/cdr/quarantine
+  markers:    spaces/default/data/cdr/markers
+  status_dir: spaces/default/data/cdr/status
+  log_dir:    spaces/default/data/cdr/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.json"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: spaces/default/config/cdr/cdr_schema.toon
+  csv_settings:
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+parsing:
+  frontend: json
+  json:
+    format: newline
+
+collector:
+  discovery: poll
+  connector: local
+  gap_detection:
+    enabled: true
+    sequence: "CDR_{yyyyMMdd}"

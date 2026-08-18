@@ -1,0 +1,8 @@
+2026-08-01 08:14:06 INFO  gw-edge-01 session=S00001 msisdn=9715550001 action=AUTH result=OK latency_ms=42
+2026-08-01 08:31:45 INFO  gw-edge-02 session=S00002 msisdn=9715550002 action=AUTH result=OK latency_ms=57
+2026-08-01 09:02:12 WARN  gw-edge-01 session=S00003 msisdn=9715550003 action=TOPUP result=RETRY latency_ms=812
+2026-08-01 10:19:58 INFO  gw-edge-03 session=S00004 msisdn=9715550004 action=AUTH result=OK latency_ms=38
+2026-08-01 11:45:03 ERROR gw-edge-02 session=S00005 msisdn=9715550005 action=TOPUP result=DENIED latency_ms=1204
+2026-08-01 13:07:31 INFO  gw-edge-01 session=S00006 msisdn=9715550003 action=BALANCE result=OK latency_ms=29
+2026-08-01 15:22:19 WARN  gw-edge-03 session=S00007 msisdn=9715550001 action=AUTH result=RETRY latency_ms=655
+2026-08-01 17:50:42 INFO  gw-edge-02 session=S00008 msisdn=9715550006 action=BALANCE result=OK latency_ms=33

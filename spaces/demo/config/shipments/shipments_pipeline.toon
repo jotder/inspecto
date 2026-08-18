@@ -1,0 +1,42 @@
+name: shipments
+active: true
+version: 1
+
+dirs:
+  poll:       spaces/demo/data/inbox/shipments
+  database:   spaces/demo/data/shipments/database
+  backup:     spaces/demo/data/shipments/backup
+  temp:       spaces/demo/data/shipments/temp
+  errors:     spaces/demo/data/shipments/errors
+  quarantine: spaces/demo/data/shipments/quarantine
+  markers:    spaces/demo/data/shipments/markers
+  status_dir: spaces/demo/data/shipments/status
+  log_dir:    spaces/demo/data/shipments/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.json"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: spaces/demo/config/shipments/shipments_schema.toon
+  csv_settings:
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+parsing:
+  frontend: json
+  json:
+    format: newline
+
+collector:
+  discovery: poll
+  connector: local
+  gap_detection:
+    enabled: true
+    sequence: "SHIPMENTS_{yyyyMMdd}"

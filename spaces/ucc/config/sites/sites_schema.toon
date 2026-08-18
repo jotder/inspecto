@@ -1,0 +1,20 @@
+raw:
+  name: SITES
+  format: CSV
+  fields[6]{name,selector,type}:
+    SITE_ID,"0",VARCHAR
+    SITE_NAME,"1",VARCHAR
+    SITE_LAT,"2",DOUBLE
+    SITE_LON,"3",DOUBLE
+    CAPACITY,"4",VARCHAR
+    STATUS,"5",VARCHAR
+mapping:
+  canonicalName: sites
+  rawName: SITES
+  rules[6]{targetColumn,sourceExpression,transformType}:
+    SITE_ID,SITE_ID,DIRECT
+    SITE_NAME,SITE_NAME,DIRECT
+    SITE_LAT,SITE_LAT,DIRECT
+    SITE_LON,SITE_LON,DIRECT
+    CAPACITY,"TRY_CAST(CAPACITY AS INTEGER)",EXPR
+    STATUS,STATUS,DIRECT

@@ -1,0 +1,7 @@
+{"topup_id":"T900001","agent_id":"AG0001","subscriber_msisdn":"9715550001","channel":"RETAIL","amount":50.0,"currency":"USD","topped_up_at":"2026-08-01 08:20:00","topup_date":"2026-08-01"}
+{"topup_id":"T900002","agent_id":"AG0001","subscriber_msisdn":"9715550002","channel":"RETAIL","amount":20.0,"currency":"USD","topped_up_at":"2026-08-01 09:05:00","topup_date":"2026-08-01"}
+{"topup_id":"T900003","agent_id":"AG0002","subscriber_msisdn":"9715550003","channel":"ONLINE","amount":100.0,"currency":"USD","topped_up_at":"2026-08-01 10:41:00","topup_date":"2026-08-01"}
+{"topup_id":"T900004","agent_id":"AG0001","subscriber_msisdn":"9715550004","channel":"RETAIL","amount":15.0,"currency":"USD","topped_up_at":"2026-08-01 12:12:00","topup_date":"2026-08-01"}
+{"topup_id":"T900005","agent_id":"AG0003","subscriber_msisdn":"9715550001","channel":"USSD","amount":5.0,"currency":"USD","topped_up_at":"2026-08-01 13:58:00","topup_date":"2026-08-01"}
+{"topup_id":"T900006","agent_id":"AG0002","subscriber_msisdn":"9715550005","channel":"ONLINE","amount":75.0,"currency":"USD","topped_up_at":"2026-08-01 16:30:00","topup_date":"2026-08-01"}
+{"topup_id":"T900007","agent_id":"AG0003","subscriber_msisdn":"9715550002","channel":"USSD","amount":10.0,"currency":"USD","topped_up_at":"2026-08-01 18:47:00","topup_date":"2026-08-01"}

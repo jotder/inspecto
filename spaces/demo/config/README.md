@@ -41,8 +41,8 @@ java --enable-native-access=ALL-UNNAMED -Dspaces.root=spaces \
 ```
 
 Space-scoped API calls use the path prefix: `GET /spaces/demo/pipelines`, `POST /spaces/demo/bi/query`, …
-Sample input lives in `../data/samples/orders/` (committed, pristine — the seed script copies it
-into the consumed inbox). Everything under `../data/` except `samples/` is generated and gitignored.
+Sample input lives in `../data/samples/{orders,payments,shipments}/` (committed, pristine — the
+seed script copies it into the consumed inbox). Everything under `../data/` except `samples/` is generated and gitignored.
 
 ## Catalog
 
@@ -51,6 +51,8 @@ into the consumed inbox). Everything under `../data/` except `samples/` is gener
 | Space manifest | `../space.toon` | `-Dspaces.root` scan | Spaces switcher |
 | Connection | `connections/demo_local_connection.toon` (offline-runnable), `connections/warehouse_sftp_connection.toon` (reference shape, `${ENV:…}` secret) | `*_connection.toon` | Workbench → Connections |
 | Pipeline (Stage-1) | `orders/orders_pipeline.toon` + `orders/orders_schema.toon` (EXPR transform + derived GROSS; gap detection `ORDERS_{yyyyMMdd}`) | `*_pipeline.toon` | Pipelines |
+| Pipeline: pipe-delimited | `payments/payments_pipeline.toon` + `payments/payments_schema.toon` (`delimiter: "\|"`, header row, geo columns; `UPPER(TRIM(MERCHANT))` EXPR) | `*_pipeline.toon` | Pipelines |
+| Pipeline: NDJSON | `shipments/shipments_pipeline.toon` + `shipments/shipments_schema.toon` (`parsing.frontend: json`, `format: newline`; the `selector` is the JSON key, and `ORDER_ID` joins the orders store) | `*_pipeline.toon` | Pipelines |
 | Enrichment (Stage-2) | `orders/orders_daily_enrich.toon` (on-commit + hourly rollup) | `*_enrich.toon` | Enrichment |
 | Semantic catalog | `orders/orders_meta.toon` | `*_meta.toon` | Catalog |
 | Alert Rule | `orders/orders_volume_alert.toon` (WARN while < 10 orders loaded) | `*_alert.toon` | Alerts |
@@ -69,7 +71,7 @@ into the consumed inbox). Everything under `../data/` except `samples/` is gener
 | Expectation | `registry/expectations/orders_id_non_null.toon`, `…/orders_gross_non_null.toon` | `registry/expectations/` | Expectations |
 | Widget | `registry/widgets/orders_kpi_total.toon` (kpi), `…/orders_revenue_by_region.toon` (bar), `…/orders_daily_trend.toon` (line + series) | `registry/widgets/` | Studio → Viz Library / Widget Builder |
 | Dashboard | `registry/dashboards/orders_overview.toon` | `registry/dashboards/` | Studio → Dashboard Builder |
-| Grammar / Schema / Transform / Sink (reusable parts) | `registry/grammars/pipe_delimited.toon`, `registry/schemas/payments_schema.toon`, `registry/transforms/mask_pii.toon`, `registry/sinks/parquet_sink.toon` | `registry/<type>/` | Studio → Components |
+| Grammar / Schema / Transform / Sink (reusable parts) | `registry/grammars/pipe_delimited.toon`, `registry/transforms/mask_pii.toon`, `registry/sinks/parquet_sink.toon` | `registry/<type>/` | Studio → Components |
 | Requirement | `registry/requirements/orders_kpi_requirement.toon` | `registry/requirements/` | Requirements |
 | Saved views | `registry/link-analysis-views/orders_link_view.toon`, `registry/geo-map-views/orders_geo_view.toon` (freeform content) | `registry/<type>/` | Link Analysis / Geo Map studios |
 | Reconciliation (DAT-7) | `registry/reconciliations/orders_regional_recon.toon` (3-way anchor: raw vs enriched vs SHIPPED-only rollup, keyed by REGION — the rollup side shows real breaks) | `registry/reconciliations/` | Reconciliation |

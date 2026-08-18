@@ -1,0 +1,19 @@
+name: sites_fixedwidth_grammar
+version: 1
+
+frontend: fixedwidth
+encoding: utf-8
+has_header: false
+date_formats[1]: "%Y-%m-%d"
+timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+fixedwidth:
+  record: line
+  trim: both
+  fields[6]{name,start,length}:
+    SITE_ID,0,8
+    SITE_NAME,8,13
+    SITE_LAT,21,9
+    SITE_LON,31,9
+    CAPACITY,40,6
+    STATUS,46,8

@@ -1,0 +1,29 @@
+partitionKey: SHIPPED_DATE
+raw:
+  name: SHIPMENTS
+  format: CSV
+  fields[10]{name,selector,type}:
+    SHIPMENT_ID,"shipment_id",VARCHAR
+    ORDER_ID,"order_id",VARCHAR
+    CARRIER,"carrier",VARCHAR
+    STATUS,"status",VARCHAR
+    HUB,"hub",VARCHAR
+    HUB_LAT,"hub_lat",DOUBLE
+    HUB_LON,"hub_lon",DOUBLE
+    WEIGHT_KG,"weight_kg",DOUBLE
+    SHIPPED_AT,"shipped_at",TIMESTAMP
+    SHIPPED_DATE,"shipped_date",DATE
+mapping:
+  canonicalName: shipments
+  rawName: SHIPMENTS
+  rules[10]{targetColumn,sourceExpression,transformType}:
+    SHIPMENT_ID,SHIPMENT_ID,DIRECT
+    ORDER_ID,ORDER_ID,DIRECT
+    CARRIER,CARRIER,DIRECT
+    STATUS,STATUS,DIRECT
+    HUB,HUB,DIRECT
+    HUB_LAT,HUB_LAT,DIRECT
+    HUB_LON,HUB_LON,DIRECT
+    WEIGHT_KG,WEIGHT_KG,DIRECT
+    SHIPPED_AT,SHIPPED_AT,DIRECT
+    SHIPPED_DATE,SHIPPED_DATE,DIRECT

@@ -1,0 +1,42 @@
+name: gwlog
+active: true
+version: 1
+
+dirs:
+  poll:       spaces/default/data/inbox/gwlog
+  database:   spaces/default/data/gwlog/database
+  backup:     spaces/default/data/gwlog/backup
+  temp:       spaces/default/data/gwlog/temp
+  errors:     spaces/default/data/gwlog/errors
+  quarantine: spaces/default/data/gwlog/quarantine
+  markers:    spaces/default/data/gwlog/markers
+  status_dir: spaces/default/data/gwlog/status
+  log_dir:    spaces/default/data/gwlog/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.log"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: spaces/default/config/gwlog/gwlog_schema.toon
+  csv_settings:
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+parsing:
+  frontend: text_regex
+  text_regex:
+    pattern: "^(?P<event_date>[0-9]{4}-[0-9]{2}-[0-9]{2}) (?P<event_time>[0-9]{2}:[0-9]{2}:[0-9]{2}) +(?P<level>[A-Z]+) +(?P<gateway>[a-z0-9-]+) session=(?P<session_id>[A-Z0-9]+) msisdn=(?P<msisdn>[0-9]+) action=(?P<action>[A-Z]+) result=(?P<result>[A-Z]+) latency_ms=(?P<latency_ms>[0-9]+)$"
+
+collector:
+  discovery: poll
+  connector: local
+  gap_detection:
+    enabled: true
+    sequence: "GW_{yyyyMMdd}"

@@ -1,0 +1,5 @@
+{"shipment_id":"S500001","order_id":"1001","carrier":"NORTHFREIGHT","status":"IN_TRANSIT","hub":"DXB-NORTH","hub_lat":25.2048,"hub_lon":55.2708,"weight_kg":12.4,"shipped_at":"2026-08-01 07:00:00","shipped_date":"2026-08-01"}
+{"shipment_id":"S500002","order_id":"1002","carrier":"MARINALOG","status":"DELIVERED","hub":"DXB-MARINA","hub_lat":25.0757,"hub_lon":55.1394,"weight_kg":3.1,"shipped_at":"2026-08-01 07:45:00","shipped_date":"2026-08-01"}
+{"shipment_id":"S500003","order_id":"1003","carrier":"NORTHFREIGHT","status":"IN_TRANSIT","hub":"DXB-AIRPORT","hub_lat":25.2532,"hub_lon":55.3657,"weight_kg":27.8,"shipped_at":"2026-08-01 09:30:00","shipped_date":"2026-08-01"}
+{"shipment_id":"S500004","order_id":"1013","carrier":"JLTCOURIER","status":"DELAYED","hub":"DXB-JLT","hub_lat":25.1124,"hub_lon":55.2,"weight_kg":8.6,"shipped_at":"2026-08-01 11:15:00","shipped_date":"2026-08-01"}
+{"shipment_id":"S500005","order_id":"1014","carrier":"MARINALOG","status":"DELIVERED","hub":"DXB-MARINA","hub_lat":25.0757,"hub_lon":55.1394,"weight_kg":1.9,"shipped_at":"2026-08-01 14:00:00","shipped_date":"2026-08-01"}
