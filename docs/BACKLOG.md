@@ -933,10 +933,46 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     true), all 7 route through the approval gate, and `runTool`/`deriveTool` refuse any mutating tool
     before the model is even called. The two previously-known schema/implementation mismatches are both
     already fixed in-tree.
-  - ⬜ **Residual, honestly stated:** the control-plane pass read `PipelineRoutes`/`ObjectRoutes`/
-    `BundleRoutes`/`Roles`/`AccessPolicies`/`AccessRoutes`/`RowScope` in full but did NOT read
-    `WriteGates`, `AccessDecider(s)`, `ConfigRoutes` or `ComponentRoutes` internals, nor the Enterprise
-    `PolicyEngine`. Those are what remains of this row. Original scope follows.
+  - ✅ **RESIDUAL CLOSED 2026-08-18 — the last control-plane files are read, and they yielded one real
+    defect.** 🔴 **`PUT|POST /components/schema/{id}` was an ungated back door to a live,
+    engine-executed artifact.** It and `POST /config/write {type:"schema"}` write the **same file** —
+    `registry/schemas/<id>.toon`, which `PipelineConfigParser.resolveSchemaRef` loads for a
+    `schema_file: schema/<id>` ref — but only the `/config/write` side ran the structural + safety
+    gates; `ComponentRoutes.validateKind` had branches for `findings-spec` and `mapping` only. Fixed by
+    giving the sibling the same gates (`ConfigSpecs.forType("schema")` + `ConfigSafetyValidator`),
+    pinned by `schemaComponentIsGatedLikeItsConfigWriteSibling` on both the create and update verbs.
+    - ⚠ **The review's severity was WRONG and the grounding matters.** It reported "live pipelines
+      already consume" this: they do not. **No** shipped space has a `registry/schemas/` directory and
+      **every** shipped pipeline references its schema by path (`schema_file: spaces/.../x_schema.toon`),
+      never by the `schema/<id>` ref. The hole was **latent** — real and reachable, not live.
+    - ⚠ **The UI already knew.** `schema-editor.dialog.ts` authors through `POST /config/write` and its
+      own comment says *"never the generic component CRUD, which bypasses the BACKWARD"* gate. The
+      product avoided the back door by **convention**; the agent tool `component_apply` (which writes via
+      `PUT /components/{type}/{id}`) did not — which is why the gate belongs on the server.
+    - ⛔ **Do NOT close this by retiring `schema` from `ComponentStore.WRITABLE_TYPES`,** the obvious
+      "simplification": `validateType` guards `list`/`read`/`versions` too, so dropping the type breaks
+      the Components pane's READS as well. `InspectoTools`' javadoc claimed that retirement had already
+      happened — **it had not**, and that stale claim is corrected in place.
+    - ⚠ The **BACKWARD-compatibility** half is deliberately NOT mirrored. `/config/write` pairs it with a
+      `compatibility:"none"` override in its body envelope; a component body **is** the content, so there
+      is nowhere to put one, and an escape-hatch-less compat gate would make this route *stricter* than
+      its sibling. Closing that half needs an override channel (a query parameter) — an API-shape
+      decision, not a patch. **That is the one piece of this row still open.**
+  - **Read in full and CLEAN — no defects:** `WriteGates` + the `PathJail.contains` verdict it delegates
+    to, `AccessDecider`, `AccessDeciders`, the Enterprise `PolicyEngine`, and both PEPs
+    (`ControlApi.authorize`, `RowScope`). Four probes, all negative: an unparseable policy doc denies
+    loudly (never "no policies") and a bad `when` 422s at write time · a condition that cannot evaluate
+    yields false, and a non-matching `deny` falls through to the capability gates rather than opening a
+    door (`ALLOW`/`ABSTAIN` never bypass a capability) · **no mutating route is exposed over GET**, which
+    would have dodged a policy denying `write` since `actionFor` maps GET→`read` · `authorize` runs in
+    the dispatch loop for every matched route, not opted into per route.
+  - **Recorded, deliberately NOT changed** (all three verified as non-exploitable): `writeConfig` runs
+    ERROR-findings 422 *before* the jail 403 while `patchConfig` runs them after, so two routes can
+    answer 403 vs 422 for the same doubly-invalid request — both still refuse · `DELETE
+    /components/{type}/{id}` has no `?force=true` escape where `DELETE /config/pipeline` does ·
+    ComponentRoutes surfaces traversal refusals as 400 (via `ComponentStore.validId`/`fileFor`) where
+    ConfigRoutes uses 403/422 — containment holds in both, only the status differs.
+  Original scope follows.
   The 2026-08-18 review read every file in `inspecto-{api,util,config,sql,etl,event,
   acquire,agent-hosted,security,policy}` and in the engine's `job`, `pipeline`(+`exec`),
   `consignment`, `inspector`, `enrich`, `parse`, `ingester`. It **sampled** the rest, so these are
