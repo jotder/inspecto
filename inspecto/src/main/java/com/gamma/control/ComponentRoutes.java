@@ -3,6 +3,7 @@ package com.gamma.control;
 import com.gamma.config.io.ConfigLoader;
 import com.gamma.config.safety.ConfigSafetyValidator;
 import com.gamma.config.safety.SafetyPolicy;
+import com.gamma.config.safety.SchemaCompatibility;
 import com.gamma.config.spec.ConfigSpec;
 import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.config.spec.Finding;
@@ -180,7 +181,43 @@ final class ComponentRoutes implements RouteModule {
         // R3: edit access against the current envelope, carry owner/shares forward, owner-only envelope changes.
         Map<String, Object> merged = ComponentAccess.onUpdate(ex, type, id, current.content(), body);
         ETags.requireMatch(ex, ETags.of(ContentHash.of(current.content())));
+        Object incompatible = schemaCompatibilityGate(ex, type, current.content(), merged);
+        if (incompatible != null) return incompatible;
         return writeComponent(api, store, ex, type, id, merged);
+    }
+
+    /**
+     * The BACKWARD-compatibility save-gate for a {@code schema} component — the other half of the parity
+     * with {@code POST /config/write {type:"schema"}}, whose identical gate diffs old→new and 422s a
+     * breaking edit (a removed field, a narrowed type, a moved selector) with cell-level findings.
+     * Returns a 422 response to return, or {@code null} to proceed.
+     *
+     * <p><b>The override is a QUERY parameter, {@code ?compatibility=none}</b>, deliberately — not a body
+     * key. A component body <em>is</em> the content, so a {@code compatibility} key placed there would be
+     * persisted into the schema itself; {@code /config/write} can carry it in the body only because its
+     * body is an envelope ({@code {type, config, …}}) around the draft.
+     *
+     * <p>⚠ Scoped to {@code updateComponent} on purpose, which is what makes the other two write paths
+     * exempt for the right reasons rather than by oversight:
+     * <ul>
+     *   <li><b>create</b> has no previous version to be compatible WITH;</li>
+     *   <li><b>restore</b> ({@code /versions/{v}/restore}) is a ROLLBACK — a recovery action, whose target
+     *       was itself a valid schema. Gating it would let a bad edit lock an operator out of the version
+     *       that fixes it. It still passes the structural + safety gates in {@link #validateKind}.</li>
+     * </ul>
+     */
+    private static Object schemaCompatibilityGate(com.sun.net.httpserver.HttpExchange ex, String type,
+                                                  Map<String, Object> current, Map<String, Object> draft)
+            throws IOException {
+        if (!"schema".equals(type)) return null;
+        if ("none".equalsIgnoreCase(ApiContext.query(ex, "compatibility"))) return null;
+        List<Finding> breaking = SchemaCompatibility.check(current, draft);
+        if (breaking.isEmpty()) return null;
+        return ApiContext.respondJson(ex, 422, Map.of(
+                "type", type, "written", false,
+                "error", "schema edit is not BACKWARD-compatible; not written"
+                        + " (pass ?compatibility=none to override)",
+                "findings", breaking));
     }
 
     /** The current component or {@code null}; maps a bad type to the standard 400. */

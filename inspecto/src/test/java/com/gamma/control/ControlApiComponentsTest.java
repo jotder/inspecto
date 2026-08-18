@@ -384,6 +384,76 @@ class ControlApiComponentsTest {
         }
     }
 
+    /**
+     * The other half of the /config/write parity: a BACKWARD-breaking schema edit is refused on the
+     * component route too, with the same cell-level findings — and the override is a QUERY parameter,
+     * because a component body IS the content (a `compatibility` key there would be persisted into the
+     * schema). Create and restore are exempt for their own reasons, asserted elsewhere.
+     */
+    @Test
+    void schemaComponentUpdateIsBackwardGatedWithAQueryParamOverride(@TempDir Path dir) throws Exception {
+        Path wr = dir.resolve("wr");
+        try (Ctx c = open(dir, wr)) {
+            String v1 = "{\"id\":\"orders\",\"raw\":{\"name\":\"orders\",\"format\":\"CSV\","
+                    + "\"fields\":[{\"name\":\"ID\",\"selector\":\"0\",\"type\":\"VARCHAR\"},"
+                    + "{\"name\":\"AMT\",\"selector\":\"1\",\"type\":\"VARCHAR\"}]}}";
+            assertEquals(200, send(c.port, "POST", "/components/schema", v1).statusCode());
+
+            // dropping AMT is BACKWARD-breaking
+            String v2 = "{\"raw\":{\"name\":\"orders\",\"format\":\"CSV\","
+                    + "\"fields\":[{\"name\":\"ID\",\"selector\":\"0\",\"type\":\"VARCHAR\"}]}}";
+            HttpResponse<String> refused = send(c.port, "PUT", "/components/schema/orders", v2);
+            assertEquals(422, refused.statusCode(), refused.body());
+            assertTrue(refused.body().contains("BACKWARD"), refused.body());
+            assertTrue(refused.body().contains("findings"), refused.body());
+            // …and the refusal did not write: AMT is still there
+            assertTrue(send(c.port, "GET", "/components/schema/orders", null).body().contains("AMT"));
+
+            // the override is on the QUERY STRING, not in the content
+            HttpResponse<String> forced = send(c.port, "PUT",
+                    "/components/schema/orders?compatibility=none", v2);
+            assertEquals(200, forced.statusCode(), forced.body());
+            String after = send(c.port, "GET", "/components/schema/orders", null).body();
+            assertFalse(after.contains("AMT"), "the breaking edit landed once overridden");
+            assertFalse(after.contains("compatibility"),
+                    "the override is a query param and must never be persisted into the schema");
+        }
+    }
+
+    /**
+     * The compat gate's restore EXEMPTION, pinned directly rather than inferred. A rollback is a recovery
+     * action whose target was itself a valid schema, so gating it would let a bad edit lock an operator
+     * out of the version that fixes it. The restore below IS backward-breaking relative to current (it
+     * drops a field that was added after it) and must still succeed — if someone moves the gate from
+     * `updateComponent` into `writeComponent`, this is the test that goes red.
+     */
+    @Test
+    void schemaRestoreIsExemptFromTheBackwardGate(@TempDir Path dir) throws Exception {
+        Path wr = dir.resolve("wr");
+        try (Ctx c = open(dir, wr)) {
+            String oneField = "{\"id\":\"orders\",\"raw\":{\"name\":\"orders\",\"format\":\"CSV\","
+                    + "\"fields\":[{\"name\":\"ID\",\"selector\":\"0\",\"type\":\"VARCHAR\"}]}}";
+            assertEquals(200, send(c.port, "POST", "/components/schema", oneField).statusCode());
+
+            // ADDING a field is backward-compatible, so this update passes the gate normally
+            String twoFields = "{\"raw\":{\"name\":\"orders\",\"format\":\"CSV\","
+                    + "\"fields\":[{\"name\":\"ID\",\"selector\":\"0\",\"type\":\"VARCHAR\"},"
+                    + "{\"name\":\"AMT\",\"selector\":\"1\",\"type\":\"VARCHAR\"}]}}";
+            assertEquals(200, send(c.port, "PUT", "/components/schema/orders", twoFields).statusCode());
+
+            // Rolling back to v1 DROPS AMT — the same edit the gate refuses on an update path…
+            assertEquals(422, send(c.port, "PUT", "/components/schema/orders", oneField).statusCode(),
+                    "sanity: this content really is backward-breaking against current");
+
+            // …yet the restore of that very version succeeds, with no override needed.
+            HttpResponse<String> restored = send(c.port, "POST",
+                    "/components/schema/orders/versions/1/restore", "");
+            assertEquals(200, restored.statusCode(), restored.body());
+            assertFalse(send(c.port, "GET", "/components/schema/orders", null).body().contains("AMT"),
+                    "the rollback landed");
+        }
+    }
+
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));
