@@ -1,0 +1,6 @@
+store: premium_cdr_view
+pipeline: cdr
+flow: cdr
+source_store[1]: cdr
+derived_sql: "SELECT * FROM read_parquet('spaces/default/data/cdr/database/**/*.parquet', union_by_name=true) WHERE TARIFF = 'premium'"
+defined_at: 2026-08-18T00:00:00Z

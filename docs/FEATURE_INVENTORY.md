@@ -183,7 +183,8 @@ runnable and deletable, never newly written (`PipelineRoutes`). The shape now li
 ### K — Views, metrics, events (serve mode)
 
 `GET /metrics` (Prometheus) · `GET /events` / `/events/search` · `GET /views` / `/views/{name}/data`
-(needs a flow `sink.view` + `-Dassist.write.root`) · `GET /catalog` / `/catalog/graph` (lineage) ·
+(a `sink.view` registration, or a hand-authored definition — see below) · `GET /catalog` /
+`/catalog/graph` (lineage) ·
 `GET /sources` (current DB watermark).
 
 ---
@@ -277,6 +278,19 @@ the rest are planned in subsequent phases. Features that can't run offline (remo
 **E. Acquisition** — stability-gate, dedup-path, dedup-checksum, incremental-watermark, gap-detection; sftp-with-retry `[ref]`, post-action-move `[ref]`.
 **F. Jobs** — enrich-on-commit, enrich-cron (+catch_up), maintenance-cleanup, flow-job-on-pipeline.
 **G. Flows** — filter-route, merge-two-sources, sink-view.
+
+**View definitions (`<space>/config/views/<store>_view.toon`)** — `spaces/default/config/views/premium_cdr_view_view.toon`
+is the repo's first, added 2026-08-18. A `ViewDefinition` is normally *engine-written*
+(`PipelineJobRunner.registerViews`), and only an **authored flow** can produce one: `registerViews`
+returns early when `pipelineStore == null`, and a canonical `*_pipeline.toon` at-rest run
+(`pipeline_config:`) "only ever carries `sink.persistent`". Since authored flows are grandfathered
+(never newly written), a shipped sample view is hand-authored into the same path the engine would
+use — `PipelineStore`'s root is `config/pipelines`, so its `views` sibling is exactly the
+`writeRoot.resolve("views")` every reader uses. Two deliberate differences from a generated one: the
+glob is **repo-root-relative** (a generated `derived_sql` embeds an absolute machine path, which is
+not committable), and `hive_partitioning` is **off**, matching `DatasetRelation`'s choice for
+`physicalRef` datasets. A dataset binds to it with `view: <store>`; `DatasetRelation` binds on
+`view` or `physicalRef` only — never on `sourceName`.
 **H. Stage-2** — daily-kpi enrichment.
 **I. Ops intelligence** — alert-error-rate, alert-gap-sequence, durable-events.
 **_reference** — SFTP/FTP/FTPS/DB connections, JSON/text_regex frontends, plugin ingester, RCA template.

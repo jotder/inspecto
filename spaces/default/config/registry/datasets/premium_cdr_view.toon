@@ -1,6 +1,7 @@
 name: premium_cdr_view
 kind: virtual
 sourceName: cdr
+view: premium_cdr_view
 query:
   projection: *
   where:
