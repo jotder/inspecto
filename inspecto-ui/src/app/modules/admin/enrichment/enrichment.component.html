@@ -26,6 +26,7 @@
                 tier="standard"
                 sourceName="enrichment_jobs"
                 exportName="enrichment_jobs"
+                stateKey="enrichment-jobs"
                 [rows]="jobs()"
                 [columns]="jobColumns"
                 [loading]="loading()"
@@ -119,6 +120,7 @@
                             tier="pro"
                             sourceName="enrichment"
                             exportName="enrichment"
+                            stateKey="enrichment-rows"
                             [rows]="rows()"
                             height="24rem"
                         />

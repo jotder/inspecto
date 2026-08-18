@@ -104,9 +104,10 @@ export class LinkAnalysisToolboxComponent {
     private componentsApi = inject(ComponentsService);
 
     constructor() {
-        // This Space's authored pattern packs, if it has any. Degrades silently: an error (no write root,
-        // intelligence-free edition, offline) leaves the shipped built-ins in place, which is the whole point
-        // of seeding the signal with them — there is no error surface to show for a catalog that has a default.
+        // This Space's authored pattern packs, if it has any — merged over the shipped built-ins. Degrades
+        // silently: an error (no write root, intelligence-free edition, offline) leaves the shipped built-ins
+        // in place, which is the whole point of seeding the signal with them — there is no error surface to
+        // show for a catalog that has a default.
         this.componentsApi
             .list('pattern-pack')
             .pipe(takeUntilDestroyed(inject(DestroyRef)))
@@ -115,7 +116,15 @@ export class LinkAnalysisToolboxComponent {
                     const authored = defs
                         .map((d) => patternPackFromContent(d.content))
                         .filter((p): p is PatternPack => !!p);
-                    if (authored.length) this.patternPacks.set(authored);
+                    // Authored packs ADD to the shipped built-ins rather than replacing them (PACK-1):
+                    // authoring one pack should never silently remove the other six. An authored pack that
+                    // reuses a built-in id overrides it — `selectPack` resolves by id and would otherwise
+                    // never reach the authored one.
+                    if (authored.length)
+                        this.patternPacks.set([
+                            ...PATTERN_PACKS.filter((b) => !authored.some((a) => a.id === b.id)),
+                            ...authored,
+                        ]);
                 },
                 error: () => undefined,
             });

@@ -371,6 +371,54 @@ class ControlApiConfigWriteTest {
         }
     }
 
+    /**
+     * WRITE-1's closure: the server cannot tell "this pipeline gaining an id" from "a different pipeline
+     * sharing the display label" when the legacy file declares no {@code id} — the request carries nothing
+     * that separates them. {@code legacyName} lets the caller say which file it means instead of leaving
+     * the server to guess from a label, and it works even when the label no longer matches the file.
+     *
+     * <p>⚠ It is a probe, not an override: a file declaring a DIFFERENT id is still never adopted, so
+     * {@code legacyName} cannot be used to point a write at someone else's config.
+     */
+    @Test
+    void legacyNameNamesTheFileToAdoptInsteadOfGuessingFromTheLabel(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            assertEquals(200, post(c.port, "/config/write", pipeline("Legacy-Feed")).statusCode());
+            assertTrue(Files.exists(root.resolve("Legacy-Feed_pipeline.toon")));
+
+            // The label is CHANGING in the same save, so the implicit probe (which derives from the draft's
+            // own `name`) could never find the file. The caller names it.
+            String renamed = """
+                    {"type":"pipeline","overwrite":true,"legacyName":"Legacy-Feed","config":{
+                       "name":"Orders Feed","id":"orders_feed",
+                       "dirs":{"poll":"in","database":"out"},
+                       "processing":{"threads":1}}}""";
+            JsonNode out = V1Body.of(post(c.port, "/config/write", renamed).body());
+            assertEquals("Legacy-Feed_pipeline.toon", out.get("path").asText(), "the named file was adopted");
+            assertTrue(out.get("overwritten").asBoolean());
+            try (var entries = Files.list(root)) {
+                assertEquals(1, entries.filter(p -> p.toString().endsWith(".toon")).count(),
+                        "no second config forked beside the named one");
+            }
+
+            // …and it cannot reach a file that declares an identity of its own: the same file now carries
+            // id `orders_feed`, so naming it from a third config writes a NEW file instead of adopting it.
+            String third = """
+                    {"type":"pipeline","overwrite":true,"legacyName":"Legacy-Feed","config":{
+                       "name":"Third","id":"third",
+                       "dirs":{"poll":"in","database":"out"},
+                       "processing":{"threads":1}}}""";
+            String adoptedBefore = Files.readString(root.resolve("Legacy-Feed_pipeline.toon"));
+            JsonNode refused = V1Body.of(post(c.port, "/config/write", third).body());
+            assertEquals("third_pipeline.toon", refused.get("path").asText(),
+                    "the named file declares id 'orders_feed' — not this config's file, so a new one is written");
+            assertFalse(refused.get("overwritten").asBoolean());
+            assertEquals(adoptedBefore, Files.readString(root.resolve("Legacy-Feed_pipeline.toon")),
+                    "the named file is untouched");
+        }
+    }
+
     /** A pipeline whose collector binds a connection by id. */
     private static String pipelineBoundTo(String name, String connectionId) {
         return """

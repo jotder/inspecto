@@ -179,17 +179,32 @@ final class ConfigRoutes implements RouteModule {
         // ⛔ And it is only ADOPTED when the file on disk agrees it is the same config — see
         // {@link #adoptable}. Two pipelines may legitimately share a display name; retargeting on the
         // label alone would let a write to one silently replace the other.
+        //
+        // ⛔ WRITE-1: a candidate that declares NO id of its own is genuinely ambiguous — "this pipeline
+        // gaining an id" and "a different pipeline that happens to share the display label" are the same
+        // request on the wire. It stays ADOPTED, and that is not a shortcut: adoption only ever runs when
+        // the id-named target does NOT exist, so an adopting write is necessarily an `overwrite:true` of
+        // the legacy file — refusing the ambiguous case would refuse the in-place edit this fallback
+        // exists to perform (pinned by `anIdStampedOntoALegacyConfigKeepsEditingTheExistingFile`). What a
+        // caller gets instead is `legacyName`: name the file you mean and the probe takes it verbatim,
+        // rather than a display label the server has to guess from.
+        String legacyName = ApiContext.str(body, "legacyName");
+        boolean namedLegacy = legacyName != null && !legacyName.isBlank();
         if (idFields.size() > 1 && !Files.exists(target)) {
-            for (String fallback : idFields.subList(1, idFields.size())) {
-                String raw = dottedString(draft, fallback);
+            List<String> probes = namedLegacy
+                    ? List.of(legacyName)
+                    : idFields.subList(1, idFields.size()).stream().map(f -> dottedString(draft, f)).toList();
+            for (String raw : probes) {
                 if (!WriteGates.isSafeName(raw)) continue;
                 // resolveConfigFile, not a hand-rolled join: a legacy config may sit under the bare
                 // `<name>.toon` back-compat form, which /config/read and /config/patch both honour.
                 Path legacy = resolveConfigFile(writeRoot, dir, type, raw.trim());
-                if (Files.isRegularFile(legacy) && adoptable(legacy, idFields.getFirst(), identity)) {
-                    target = legacy;
-                    break;
-                }
+                if (!Files.isRegularFile(legacy)) continue;
+                String declared = declaredIdentity(legacy, idFields.getFirst());
+                boolean sameId = declared != null && declared.equals(identity.trim());
+                if (!sameId && declared != null) continue;      // a DIFFERENT id — never this config's file
+                target = legacy;
+                break;
             }
         }
 
@@ -951,20 +966,19 @@ final class ConfigRoutes implements RouteModule {
     }
 
     /**
-     * Whether an existing file found by a FALLBACK identity field may be adopted as this draft's target:
-     * true only when the file is genuinely a pre-{@code id} config (it declares no {@code idField} of its
-     * own) or already declares exactly this identity.
+     * The identity a fallback candidate declares for itself, or {@code null} when it declares none (a
+     * genuine pre-{@code id} config). The caller decides what to do with each case.
      *
-     * <p>⛔ Without this the probe matches on the display label alone, and a display name is not unique —
-     * writing a new pipeline {@code {name: "Orders", id: "orders_v2"}} beside a legacy {@code Orders}
-     * would retarget onto the legacy file and, with {@code overwrite:true}, destroy it.
+     * <p>⛔ A display label is not unique, so a candidate declaring a DIFFERENT identity is never this
+     * draft's file: writing {@code {name: "Orders", id: "orders_v2"}} beside a legacy {@code Orders} must
+     * not retarget onto it and, with {@code overwrite:true}, destroy it.
      *
-     * <p>⚠ Partial by construction: a candidate declaring NO id is indistinguishable from "the same
-     * pipeline gaining one", so it is still adopted. BACKLOG §6 WRITE-1 tracks the API-shape decision.
+     * <p>⚠ A candidate declaring NO identity stays indistinguishable from "the same config gaining one"
+     * — WRITE-1's residual ambiguity, which the caller resolves with {@code legacyName}.
      */
-    private static boolean adoptable(Path candidate, String idField, String identity) throws IOException {
+    private static String declaredIdentity(Path candidate, String idField) throws IOException {
         String declared = dottedString(ConfigLoader.filesystem().decode(candidate.toString()), idField);
-        return declared == null || declared.isBlank() || declared.trim().equals(identity.trim());
+        return declared == null || declared.isBlank() ? null : declared.trim();
     }
 
     /** Read a dotted key (e.g. {@code job.name}) from a nested config map, or {@code null} if absent. */

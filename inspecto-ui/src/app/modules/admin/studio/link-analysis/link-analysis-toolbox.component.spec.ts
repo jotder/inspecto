@@ -267,7 +267,7 @@ describe('LinkAnalysisToolboxComponent', () => {
         expect(c.loadedPack()).toBeNull();
     });
 
-    it("pattern packs: a Space's authored packs replace the built-ins, a malformed one is skipped", () => {
+    it("pattern packs: a Space's authored packs merge over the built-ins, a malformed one is skipped", () => {
         const def = (name: string, content: Record<string, unknown>): ComponentDef => ({
             type: 'pattern-pack',
             name,
@@ -284,9 +284,21 @@ describe('LinkAnalysisToolboxComponent', () => {
                 tool: 'cohesion',
             }),
             def('broken-pack', { label: 'No category, no steps' }),
+            // reuses a built-in id — the authored one must WIN, and must not appear twice
+            def('circular-flow', {
+                label: 'Circular flow (house)',
+                category: 'money',
+                description: 'The Space overrides the shipped pack.',
+                steps: [{ direction: '' }, { direction: 'out' }],
+                tool: 'cycles',
+            }),
         ]);
 
-        expect(c.patternPacks().map((p) => p.id)).toEqual(['smurfing-fan']); // built-ins replaced, junk dropped
+        const ids = c.patternPacks().map((p) => p.id);
+        expect(ids).toContain('layering-chain'); // PACK-1: authoring a pack no longer removes the built-ins
+        expect(ids).toContain('smurfing-fan'); // junk dropped, the authored pack added
+        expect(ids.filter((id) => id === 'circular-flow')).toHaveLength(1); // overridden, not duplicated
+        expect(c.patternPacks().find((p) => p.id === 'circular-flow')!.label).toBe('Circular flow (house)');
         c.loadPatternPack('smurfing-fan');
         expect(c.patternSteps()).toHaveLength(3);
         expect(c.patternSteps()[0].direction).toBeUndefined(); // blank start ⇒ wildcard

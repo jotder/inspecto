@@ -26,6 +26,7 @@
             tier="pro"
             sourceName="alerts"
             exportName="alerts"
+            stateKey="alerts-fired"
             [rows]="alerts()"
             [columns]="columnDefs"
             [rowActions]="firedActions"
@@ -50,6 +51,7 @@
         <inspecto-data-table
             tier="mini"
             sourceName="alert-rules"
+            stateKey="alerts-rules"
             [rows]="rules()"
             [columns]="ruleColumnDefs"
             [rowActions]="ruleActions"
