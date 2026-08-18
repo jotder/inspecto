@@ -458,6 +458,23 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 > capture is switched on with **`-Dui.static.log=DEBUG`**. Both arms verified on the bundle: the
 > property produces the lines, its absence produces none.
 >
+> **⚠ A SECOND inertness, in how the flag is DELIVERED, was found and FIXED 2026-08-18.** The
+> launchers *assigned* over the operator's environment (`JAVA_OPTS=(...)` in `serve.sh`,
+> `set "OPTS=..."` in `serve.bat`), so `JAVA_OPTS=-Dui.static.log=DEBUG ./serve.sh` was silently
+> discarded and a diagnostic run reported "no errors" only because the flag never reached the JVM.
+> Both scripts now honour **`INSPECTO_JAVA_OPTS`** (fallback `EXTRA_JAVA_OPTS`), whitespace-separated
+> and appended **after** the scripts' own flags so the mandatory ones — `--enable-native-access=ALL-UNNAMED`,
+> port, spaces root, auth — cannot be clobbered from the environment. The launch banner echoes the
+> extra flags, so an inert flag is now visible rather than silent. **Capture command:**
+>
+> ```bash
+> INSPECTO_JAVA_OPTS="-Dui.static.log=DEBUG" CONTROL_TOKEN=secret bash serve.sh   # Linux
+> ```
+>
+> ```
+> set "INSPECTO_JAVA_OPTS=-Dui.static.log=DEBUG" && set CONTROL_TOKEN=secret && serve.bat   rem Windows
+> ```
+>
 > **Clean-load signature (the baseline to diff a failure against), bundle of 2026-08-18, 129 chunks:**
 > landing `/` = **44** static requests (42×200 + 2×404) · `/studio/link-analysis` = 51 · `/catalog` = 46
 > · `/pipelines` = 44 · `/studio/geo-map` = 36 · `/jobs` = 35 · `/overview` = 26 · `/data-browser` = 25.
@@ -469,8 +486,9 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 > files with an older mtime are repo-tracked static assets under `assets/`, copied with their source
 > timestamps — benign, and not the stale-artifact signal they resemble.
 >
-> **Next step for whoever picks this up:** reproduce in a browser with a *working* cache, with
-> `-Dui.static.log=DEBUG` on, then diff against the signature above.
+> **Next step for whoever picks this up:** reproduce in a browser with a *working* cache, launching the
+> bundle with `INSPECTO_JAVA_OPTS="-Dui.static.log=DEBUG"` (see the capture command above), then diff
+> against the signature above.
 > Workaround for operators today: **reload the page once.**
 
 > ### ✅ BUILDER-2 — nine more defects found by driving the editor as a builder, all FIXED (2026-08-17)

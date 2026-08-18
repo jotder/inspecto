@@ -415,6 +415,7 @@ Write-CrlfScript -Path "$bundleDir\ura.bat" -Content $uraBatContent
 $serveShContent = @'
 #!/usr/bin/env bash
 # Usage: CONTROL_TOKEN=... [ASSIST_TOKEN=...] [PORT=8080] [SPACES_ROOT=spaces] ./serve.sh
+# Extra JVM flags: INSPECTO_JAVA_OPTS="-Dui.static.log=DEBUG" ./serve.sh   (see below)
 # Starts the control plane + operator UI over every space under the spaces/ root (discover mode).
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -454,8 +455,18 @@ fi
 # PostgreSQL JDBC driver sidecar (PG-1): present in Standard/Enterprise bundles, and honored on ANY
 # bundle so a drop-in works — the classpath entry is inert until -Dinspecto.db=postgres selects it.
 [ -f postgresql.jar ] && CP="${CP}:postgresql.jar"
+# Operator-supplied extra JVM flags. Appended LAST, on purpose: the flags this script requires
+# (--enable-native-access=ALL-UNNAMED, port, spaces root, auth) are already in the array and
+# cannot be clobbered from the environment. Whitespace-separated; INSPECTO_JAVA_OPTS wins over
+# EXTRA_JAVA_OPTS. Deliberately NOT named JAVA_OPTS: that name is ASSIGNED above, so exporting it
+# never reached the JVM -- a silently inert flag fabricates evidence (BUNDLE-1, 2026-08-18).
+EXTRA_OPTS="${INSPECTO_JAVA_OPTS:-${EXTRA_JAVA_OPTS:-}}"
+if [ -n "${EXTRA_OPTS}" ]; then
+    read -r -a _extra_opts <<< "${EXTRA_OPTS}"
+    JAVA_OPTS+=("${_extra_opts[@]}")
+fi
 JAVA="java"; [ -x "runtime/bin/java" ] && JAVA="runtime/bin/java"
-echo "[serve.sh] ControlApi on :${PORT}  (spaces: ./${SPACES_ROOT}, UI: $([ -d ui ] && echo ./ui || echo none), edition: ${EDITION})"
+echo "[serve.sh] ControlApi on :${PORT}  (spaces: ./${SPACES_ROOT}, UI: $([ -d ui ] && echo ./ui || echo none), edition: ${EDITION})${EXTRA_OPTS:+  extra JVM opts: ${EXTRA_OPTS}}"
 exec "$JAVA" "${JAVA_OPTS[@]}" -cp "$CP" com.gamma.control.ControlApi
 '@
 Write-LfScript -Path "$bundleDir\serve.sh" -Content $serveShContent
@@ -464,6 +475,7 @@ $serveBatContent = @'
 @echo off
 rem Usage: set CONTROL_TOKEN=... && serve.bat
 rem Optional env: ASSIST_TOKEN, PORT (default 8080), CORS_ORIGIN, SPACES_ROOT (default spaces).
+rem Extra JVM flags: set "INSPECTO_JAVA_OPTS=-Dui.static.log=DEBUG"   (see below)
 rem Starts the control plane + operator UI over every space under .\spaces (serves bundled .\ui).
 setlocal
 cd /d "%~dp0"
@@ -502,6 +514,15 @@ if exist inspecto-security.jar (
 rem PostgreSQL JDBC driver sidecar (PG-1): present in Standard/Enterprise bundles, and honored on ANY
 rem bundle so a drop-in works - the classpath entry is inert until -Dinspecto.db=postgres selects it.
 if exist postgresql.jar set "CP=%CP%;postgresql.jar"
+rem Operator-supplied extra JVM flags. Appended LAST, on purpose: the flags this script requires
+rem (--enable-native-access=ALL-UNNAMED, port, spaces root, auth) are already in OPTS and cannot
+rem be clobbered from the environment. INSPECTO_JAVA_OPTS wins over EXTRA_JAVA_OPTS. Deliberately
+rem NOT named JAVA_OPTS: that name is ASSIGNED above, so setting it never reached the JVM - a
+rem silently inert flag fabricates evidence (BUNDLE-1, 2026-08-18).
+set "EXTRA_OPTS=%INSPECTO_JAVA_OPTS%"
+if "%EXTRA_OPTS%"=="" set "EXTRA_OPTS=%EXTRA_JAVA_OPTS%"
+if not "%EXTRA_OPTS%"=="" set "OPTS=%OPTS% %EXTRA_OPTS%"
+if not "%EXTRA_OPTS%"=="" echo [serve.bat] extra JVM opts: %EXTRA_OPTS%
 set "JAVA=java"
 if exist "runtime\bin\java.exe" set "JAVA=runtime\bin\java.exe"
 echo [serve.bat] ControlApi on :%PORT%  (spaces: .\%SPACES_ROOT%, edition: %EDITION%)

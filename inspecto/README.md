@@ -328,6 +328,12 @@ served same-origin by `ControlApi`, so one process hosts both the API and the UI
 CONTROL_TOKEN=secret bash serve.sh            # → http://localhost:8080/  (Linux)
 set CONTROL_TOKEN=secret && serve.bat         # Windows
 
+# Extra JVM flags for a packaged bundle: INSPECTO_JAVA_OPTS (fallback EXTRA_JAVA_OPTS).
+# Whitespace-separated, appended AFTER the launcher's own flags, so the mandatory ones
+# (--enable-native-access=ALL-UNNAMED, -Dcontrol.port, -Dspaces.root, auth) can't be clobbered.
+# Do NOT use JAVA_OPTS: the launchers ASSIGN that name, so it is silently discarded.
+INSPECTO_JAVA_OPTS="-Dui.static.log=DEBUG" CONTROL_TOKEN=secret bash serve.sh   # static-serving trace
+
 # Dev: run the SPA on :4204 with a live backend (CORS + proxy)
 java -Dcontrol.token=dev -Dassist.read.token=dev -Dcontrol.cors=http://localhost:4204 \
      -cp inspecto.jar com.gamma.control.ControlApi config/
