@@ -247,9 +247,10 @@ pwsh examples/run-example.ps1 01-ingest/hello-csv                   |  bash exam
 
 The launchers bake in `--enable-native-access=ALL-UNNAMED` (mandatory; DuckDB JNI). `-Dassist.write.root`
 is **not** set by default → write APIs (connections/pipelines/registry) return 503 until the user adds it.
-Extra JVM flags go in **`INSPECTO_JAVA_OPTS`** (fallback `EXTRA_JAVA_OPTS`), appended after the launcher's
-own flags so the mandatory ones can't be clobbered — `JAVA_OPTS` is *assigned* by the scripts and is
-silently discarded.
+Extra JVM flags go in **`INSPECTO_JAVA_OPTS`** (fallback `EXTRA_JAVA_OPTS`) — honored by all six
+launchers (`serve`/`run`/`ura` × `.sh`/`.bat`), whitespace-separated, appended after the script's own
+flags so the mandatory ones can't be clobbered, and echoed at launch so an inert flag is visible.
+`JAVA_OPTS` is *assigned* by the scripts and is silently discarded — do not use it.
 
 ---
 

@@ -318,7 +318,7 @@ if (Test-Path $examplesSrc) {
 # ── step 5: bundle run scripts (Linux + Windows) ───────────────────────────────
 $runShContent = @'
 #!/usr/bin/env bash
-# Usage: ./run.sh <adapter>
+# Usage: [INSPECTO_JAVA_OPTS="-Xmx4g"] ./run.sh <adapter>
 # Looks up the pipeline file as spaces/<space>/config/<adapter>/*_pipeline.toon (first match wins),
 # so it transparently handles both "<adapter>_pipeline.toon" and variants like
 # "<adapter>_unknown_pipeline.toon" across every space.
@@ -332,7 +332,18 @@ if [ -z "$PIPELINE" ]; then
 fi
 echo "[run.sh] Using pipeline: $PIPELINE"
 JAVA="java"; [ -x "runtime/bin/java" ] && JAVA="runtime/bin/java"
-exec "$JAVA" --enable-native-access=ALL-UNNAMED \
+# Extra JVM flags from the operator, same contract as serve.sh: INSPECTO_JAVA_OPTS (fallback
+# EXTRA_JAVA_OPTS), whitespace-separated, appended AFTER the mandatory
+# --enable-native-access=ALL-UNNAMED and BEFORE -jar (a JVM flag after it would be parsed as a
+# program argument). Not read from JAVA_OPTS: that name is assigned, so it is silently discarded.
+JAVA_OPTS=(--enable-native-access=ALL-UNNAMED)
+EXTRA_OPTS="${INSPECTO_JAVA_OPTS:-${EXTRA_JAVA_OPTS:-}}"
+if [ -n "${EXTRA_OPTS}" ]; then
+    read -r -a _extra_opts <<< "${EXTRA_OPTS}"
+    JAVA_OPTS+=("${_extra_opts[@]}")
+    echo "[run.sh] extra JVM opts: ${EXTRA_OPTS}"
+fi
+exec "$JAVA" "${JAVA_OPTS[@]}" \
           -jar inspecto.jar \
           "$PIPELINE"
 '@
@@ -340,7 +351,7 @@ Write-LfScript -Path "$bundleDir\run.sh" -Content $runShContent
 
 $runBatContent = @'
 @echo off
-rem Usage: run.bat ADAPTER         (e.g. voucher)
+rem Usage: [set "INSPECTO_JAVA_OPTS=-Xmx4g"] run.bat ADAPTER    (e.g. voucher)
 rem Looks up the pipeline file as spaces\SPACE\config\ADAPTER\*_pipeline.toon (first match wins),
 rem so it handles both "ADAPTER_pipeline.toon" and variants like
 rem "ADAPTER_unknown_pipeline.toon" across every space.
@@ -361,7 +372,16 @@ if not defined PIPELINE (
 echo [run.bat] Using pipeline: %PIPELINE%
 set "JAVA=java"
 if exist "runtime\bin\java.exe" set "JAVA=runtime\bin\java.exe"
-"%JAVA%" --enable-native-access=ALL-UNNAMED ^
+rem Extra JVM flags from the operator, same contract as serve.bat: INSPECTO_JAVA_OPTS (fallback
+rem EXTRA_JAVA_OPTS), appended AFTER the mandatory --enable-native-access=ALL-UNNAMED and BEFORE
+rem -jar (a JVM flag after it would be parsed as a program argument). Not read from JAVA_OPTS:
+rem that name is assigned, so it is silently discarded.
+set "OPTS=--enable-native-access=ALL-UNNAMED"
+set "EXTRA_OPTS=%INSPECTO_JAVA_OPTS%"
+if "%EXTRA_OPTS%"=="" set "EXTRA_OPTS=%EXTRA_JAVA_OPTS%"
+if not "%EXTRA_OPTS%"=="" set "OPTS=%OPTS% %EXTRA_OPTS%"
+if not "%EXTRA_OPTS%"=="" echo [run.bat] extra JVM opts: %EXTRA_OPTS%
+"%JAVA%" %OPTS% ^
      -jar inspecto.jar ^
      "%PIPELINE%"
 '@
@@ -372,7 +392,7 @@ $uraShContent = @'
 #!/usr/bin/env bash
 # URA File Management Suite — utility CLI runner
 #
-# Usage: ./ura.sh [--dry-run] <command> <pipeline.toon> [args...]
+# Usage: [INSPECTO_JAVA_OPTS="-Xmx4g"] ./ura.sh [--dry-run] <command> <pipeline.toon> [args...]
 #
 # Examples:
 #   ./ura.sh help
@@ -384,7 +404,18 @@ $uraShContent = @'
 set -euo pipefail
 cd "$(dirname "$0")"
 JAVA="java"; [ -x "runtime/bin/java" ] && JAVA="runtime/bin/java"
-exec "$JAVA" --enable-native-access=ALL-UNNAMED \
+# Extra JVM flags from the operator, same contract as serve.sh: INSPECTO_JAVA_OPTS (fallback
+# EXTRA_JAVA_OPTS), whitespace-separated, appended AFTER the mandatory
+# --enable-native-access=ALL-UNNAMED and BEFORE -cp (a JVM flag after it would be parsed as a
+# program argument). Not read from JAVA_OPTS: that name is assigned, so it is silently discarded.
+JAVA_OPTS=(--enable-native-access=ALL-UNNAMED)
+EXTRA_OPTS="${INSPECTO_JAVA_OPTS:-${EXTRA_JAVA_OPTS:-}}"
+if [ -n "${EXTRA_OPTS}" ]; then
+    read -r -a _extra_opts <<< "${EXTRA_OPTS}"
+    JAVA_OPTS+=("${_extra_opts[@]}")
+    echo "[ura.sh] extra JVM opts: ${EXTRA_OPTS}"
+fi
+exec "$JAVA" "${JAVA_OPTS[@]}" \
           -cp inspecto.jar \
           com.gamma.inspector.MainApp "$@"
 '@
@@ -393,7 +424,7 @@ Write-LfScript -Path "$bundleDir\ura.sh" -Content $uraShContent
 $uraBatContent = @'
 @echo off
 rem URA File Management Suite - utility CLI runner
-rem Usage: ura.bat [--dry-run] COMMAND pipeline.toon [args...]
+rem Usage: [set "INSPECTO_JAVA_OPTS=-Xmx4g"] ura.bat [--dry-run] COMMAND pipeline.toon [args...]
 rem   Commands: search, copy, copy-tars, extract, backup, prepare-inbox,
 rem             create-schema, move-by-date, extract-unknown, extract-move, help
 rem   Run 'ura.bat help' for full command reference.
@@ -401,7 +432,16 @@ setlocal
 cd /d "%~dp0"
 set "JAVA=java"
 if exist "runtime\bin\java.exe" set "JAVA=runtime\bin\java.exe"
-"%JAVA%" --enable-native-access=ALL-UNNAMED ^
+rem Extra JVM flags from the operator, same contract as serve.bat: INSPECTO_JAVA_OPTS (fallback
+rem EXTRA_JAVA_OPTS), appended AFTER the mandatory --enable-native-access=ALL-UNNAMED and BEFORE
+rem -cp (a JVM flag after it would be parsed as a program argument). Not read from JAVA_OPTS:
+rem that name is assigned, so it is silently discarded.
+set "OPTS=--enable-native-access=ALL-UNNAMED"
+set "EXTRA_OPTS=%INSPECTO_JAVA_OPTS%"
+if "%EXTRA_OPTS%"=="" set "EXTRA_OPTS=%EXTRA_JAVA_OPTS%"
+if not "%EXTRA_OPTS%"=="" set "OPTS=%OPTS% %EXTRA_OPTS%"
+if not "%EXTRA_OPTS%"=="" echo [ura.bat] extra JVM opts: %EXTRA_OPTS%
+"%JAVA%" %OPTS% ^
      -cp inspecto.jar ^
      com.gamma.inspector.MainApp %*
 '@
