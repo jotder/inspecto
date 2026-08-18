@@ -140,7 +140,7 @@ public final class OidcAuthenticator implements Authenticator {
             capabilities.removeAll(AccessGrants.deniedCapabilities(ex, held));
             // RBAC R3: expose the recognised role names server-internally so component sharing can
             // match `subjectType: role` shares — the Subject itself stays capabilities-only.
-            ex.setAttribute(ComponentAccess.ATTR_HELD_ROLES, Set.copyOf(held));
+            ComponentAccess.heldRoles(ex, Set.copyOf(held));
             return Optional.of(new Subject(subjectId, Set.copyOf(capabilities),
                     RoleMapper.dataScopesFor(claims, rolesClaim, defs),
                     attributes(claims, Roles.attributeClaims(ex))));

@@ -105,7 +105,7 @@ class OidcAuthenticatorTest {
         AtomicReference<Optional<Subject>> result = new AtomicReference<>();
         CountDownLatch done = new CountDownLatch(1);
         server.createContext("/", ex -> {
-            if (configRoot != null) ex.setAttribute(Roles.ATTR_CONFIG_ROOT, configRoot);
+            if (configRoot != null) Roles.configRoot(ex, configRoot);
             result.set(auth.authenticate(ex));
             ex.sendResponseHeaders(204, -1);
             ex.close();
@@ -261,7 +261,7 @@ class OidcAuthenticatorTest {
         CountDownLatch done = new CountDownLatch(1);
         server.createContext("/", ex -> {
             authenticator(ISSUER, AUDIENCE).authenticate(ex);
-            stamped.set(ex.getAttribute(com.gamma.control.ComponentAccess.ATTR_HELD_ROLES));
+            stamped.set(com.gamma.control.ComponentAccess.heldRoles(ex));
             ex.sendResponseHeaders(204, -1);
             ex.close();
             done.countDown();

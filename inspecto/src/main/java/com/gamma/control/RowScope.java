@@ -30,12 +30,12 @@ public final class RowScope {
     public static boolean visible(HttpExchange ex, String resourceKind, Map<String, Object> resource) {
         AccessDecider d = AccessDeciders.active().orElse(null);
         if (d == null) return true;
-        if (!(ex.getAttribute(ApiContext.ATTR_SUBJECT) instanceof Subject s)) return true;
-        ex.setAttribute(AccessDecider.ATTR_MATCHED_POLICY, null);   // clear stale; the decider re-stamps
+        if (!(ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject s)) return true;
+        ApiContext.attr(ex, AccessDecider.ATTR_MATCHED_POLICY, null);   // clear stale; the decider re-stamps
         String route = ex.getRequestURI().getPath();
         if (d.decide(ex, s, "read", route, resourceKind, resource) != AccessDecider.Decision.DENY)
             return true;
-        String policy = ex.getAttribute(AccessDecider.ATTR_MATCHED_POLICY) instanceof String p ? p : null;
+        String policy = ApiContext.attr(ex, AccessDecider.ATTR_MATCHED_POLICY) instanceof String p ? p : null;
         String id = resource.get("id") == null ? null : String.valueOf(resource.get("id"));
         AuditTrail.policyDecision(ex, false, "read", route, resourceKind, id, policy);
         return false;

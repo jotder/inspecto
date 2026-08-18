@@ -15,6 +15,7 @@ import java.time.temporal.Temporal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 
 /**
@@ -106,16 +107,54 @@ interface ApiContext {
         return path.equals("/api/v1") || path.startsWith("/api/v1/");
     }
 
+    // ── the per-exchange attribute SCOPE — the storage behind every ATTR_* above ────────────────
+    //
+    // SEC-EXCHANGE-ATTRS, closed for real 2026-08-19: request-scoped values are NEVER stored via
+    // HttpExchange.set/getAttribute. On any pre-JDK-26 runtime that map is the shared HttpContext map
+    // (see the block comment above), and clearing it at dispatch start only fixed the SEQUENTIAL leak —
+    // two requests IN FLIGHT still raced on it. Observed shipping on the bundle's GraalVM 25 runtime:
+    // 53 of 1200 concurrent static-asset responses carried ANOTHER request's file, because the
+    // effective path itself rode that map (request B read request A's path between A's setPath and A's
+    // serveStatic). The same race crossed ATTR_RAW_BODY (a handler reading another request's body) and,
+    // under auth, ATTR_SUBJECT/ATTR_HELD_ROLES (another request's identity).
+    //
+    // This map is keyed by exchange IDENTITY (HttpExchange does not override equals), so a scope is
+    // per-request by construction on every runtime. Writes create the scope lazily; a null value is a
+    // remove (matching the old setAttribute(k, null) idiom); ControlApi's correlation stage — the
+    // outermost pipeline stage — drops the whole scope in its finally, so entries cannot outlive their
+    // request. Do not "simplify" back to exchange attributes: the JDK's map choice is a static final
+    // read at class-init, invisible to every test run on JDK 26.
+    ConcurrentHashMap<HttpExchange, ConcurrentHashMap<String, Object>> REQUEST_SCOPES = new ConcurrentHashMap<>();
+
+    /** The request-scoped value stamped under {@code key}, or {@code null}. Never reads the JDK map. */
+    static Object attr(HttpExchange ex, String key) {
+        ConcurrentHashMap<String, Object> scope = REQUEST_SCOPES.get(ex);
+        return scope == null ? null : scope.get(key);
+    }
+
+    /** Stamp a request-scoped value ({@code null} removes). Never writes the JDK map. */
+    static void attr(HttpExchange ex, String key, Object value) {
+        if (value == null) {
+            ConcurrentHashMap<String, Object> scope = REQUEST_SCOPES.get(ex);
+            if (scope != null) scope.remove(key);
+        } else {
+            REQUEST_SCOPES.computeIfAbsent(ex, x -> new ConcurrentHashMap<>()).put(key, value);
+        }
+    }
+
+    /** Drop the whole scope — the outermost stage's finally. After this the request left no trace. */
+    static void dropAttrScope(HttpExchange ex) { REQUEST_SCOPES.remove(ex); }
+
     /** The request's correlation id (set by dispatch on every request), or {@code null} pre-dispatch. */
     static String correlationId(HttpExchange ex) {
-        Object v = ex.getAttribute(ATTR_CORRELATION_ID);
+        Object v = attr(ex, ATTR_CORRELATION_ID);
         return v == null ? null : v.toString();
     }
 
     /** The authenticated {@link Subject}, when {@link ControlApi#dispatch} resolved one for this request
      *  (W6: Standard edition, security module present). Empty on Personal edition. */
     static java.util.Optional<Subject> subject(HttpExchange ex) {
-        return ex.getAttribute(ATTR_SUBJECT) instanceof Subject s ? java.util.Optional.of(s) : java.util.Optional.empty();
+        return attr(ex, ATTR_SUBJECT) instanceof Subject s ? java.util.Optional.of(s) : java.util.Optional.empty();
     }
 
     /** AuthZ gate (W6): when a {@link Subject} is attached (Standard edition, authenticated request) it
@@ -123,7 +162,7 @@ interface ApiContext {
      *  {@link Authenticator} is ever present there, so no {@link Subject} is ever attached and every route
      *  stays open, unchanged. */
     static void requireCapability(HttpExchange ex, String capability) {
-        if (ex.getAttribute(ATTR_SUBJECT) instanceof Subject s && !s.capabilities().contains(capability))
+        if (attr(ex, ATTR_SUBJECT) instanceof Subject s && !s.capabilities().contains(capability))
             throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "missing capability '" + capability + "'");
     }
 
@@ -132,7 +171,7 @@ interface ApiContext {
      *  {@code permissions = subject grants ∩ applicable} (per-resource ∩ resource-state, §8) instead of
      *  the session-wide array. An affordance signal only — enforcement stays {@link #requireCapability}. */
     static void resourcePermissions(HttpExchange ex, java.util.Set<String> applicable) {
-        ex.setAttribute(ATTR_RESOURCE_PERMISSIONS, java.util.Set.copyOf(applicable));
+        attr(ex, ATTR_RESOURCE_PERMISSIONS, java.util.Set.copyOf(applicable));
     }
 
     /** Declare this list response's cursor-pagination block (api-contract-design §7): {@code cursor}
@@ -145,7 +184,7 @@ interface ApiContext {
         p.put("nextCursor", nextCursor);
         p.put("limit", limit);
         p.put("total", total);
-        ex.setAttribute(ATTR_PAGINATION, p);
+        attr(ex, ATTR_PAGINATION, p);
     }
 
     /** Wrap {@code h} so it first runs the {@link #requireCapability} gate for {@code capability} — the
@@ -214,7 +253,7 @@ interface ApiContext {
      *  authenticate stage rejects any {@code X-Actor} outright (SEC-7a spoof guard), so the actor is
      *  always the authenticated {@link Subject}. */
     static String actor(HttpExchange ex) {
-        if (ex.getAttribute(ATTR_SUBJECT) instanceof Subject s) return s.id();
+        if (attr(ex, ATTR_SUBJECT) instanceof Subject s) return s.id();
         String agentSession = ex.getRequestHeaders().getFirst(HEADER_AGENT_SESSION);
         if (agentSession != null && !agentSession.isBlank()) return "agent:" + agentSession.trim();
         String a = ex.getRequestHeaders().getFirst("X-Actor");
@@ -225,7 +264,7 @@ interface ApiContext {
      *  is present (and no authenticated human {@link Subject} overrides it), else the historic
      *  {@code "user"}. Additive-only companion to {@link #actor} — see there for precedence. */
     static String actorType(HttpExchange ex) {
-        if (ex.getAttribute(ATTR_SUBJECT) instanceof Subject) return "user";
+        if (attr(ex, ATTR_SUBJECT) instanceof Subject) return "user";
         String agentSession = ex.getRequestHeaders().getFirst(HEADER_AGENT_SESSION);
         return (agentSession != null && !agentSession.isBlank()) ? "agent" : "user";
     }

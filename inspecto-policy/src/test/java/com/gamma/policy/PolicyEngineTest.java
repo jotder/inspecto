@@ -53,8 +53,8 @@ class PolicyEngineTest {
         AtomicReference<Decision> result = new AtomicReference<>();
         CountDownLatch done = new CountDownLatch(1);
         server.createContext("/", ex -> {
-            if (configRoot != null) ex.setAttribute(Roles.ATTR_CONFIG_ROOT, configRoot);
-            if (heldRoles != null) ex.setAttribute(ComponentAccess.ATTR_HELD_ROLES, heldRoles);
+            if (configRoot != null) Roles.configRoot(ex, configRoot);
+            if (heldRoles != null) ComponentAccess.heldRoles(ex, heldRoles);
             if (space != null) MDC.put(EventLog.SPACE_MDC_KEY, space);
             try {
                 result.set(ENGINE.decide(ex, subject, action, "/route/under/test", resourceKind, resource));
@@ -84,8 +84,8 @@ class PolicyEngineTest {
         AtomicReference<Explanation> result = new AtomicReference<>();
         CountDownLatch done = new CountDownLatch(1);
         server.createContext("/", ex -> {
-            if (configRoot != null) ex.setAttribute(Roles.ATTR_CONFIG_ROOT, configRoot);
-            if (heldRoles != null) ex.setAttribute(ComponentAccess.ATTR_HELD_ROLES, heldRoles);
+            if (configRoot != null) Roles.configRoot(ex, configRoot);
+            if (heldRoles != null) ComponentAccess.heldRoles(ex, heldRoles);
             if (space != null) MDC.put(EventLog.SPACE_MDC_KEY, space);
             try {
                 result.set(ENGINE.explain(ex, subject, action, "/route/under/test", resourceKind, resource));

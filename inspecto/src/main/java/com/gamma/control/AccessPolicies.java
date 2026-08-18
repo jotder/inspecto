@@ -91,7 +91,7 @@ public final class AccessPolicies {
     /** Per-request policies for the bound space (via {@link Roles#ATTR_CONFIG_ROOT}, stamped by
      *  {@code ControlApi} pre-auth). Never null; empty doc when no root is bound. */
     public static Doc effective(HttpExchange ex) {
-        return load(ex.getAttribute(Roles.ATTR_CONFIG_ROOT) instanceof Path p ? p : null);
+        return load(ApiContext.attr(ex, Roles.ATTR_CONFIG_ROOT) instanceof Path p ? p : null);
     }
 
     /** The authored doc at {@code configRoot} (mtime/size-cached — an on-disk edit or an

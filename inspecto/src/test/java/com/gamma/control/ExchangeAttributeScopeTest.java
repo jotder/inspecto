@@ -37,14 +37,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code actor()}, and {@code authorize()}. {@code ATTR_RAW_BODY} (the request body) rides the same map.
  *
  * <h3>The fix and what this test pins</h3>
- * {@link ControlApi#clearRequestScope} clears the {@link ControlApi#REQUEST_SCOPED_ATTRS} roster as
- * dispatch's first act (outermost stage, before anything reads an attribute), making a shared-map
- * runtime behave like a private-map one. As with {@code ApiContextV1DerivationTest}, the JDK's map
- * choice is a {@code static final} read at class-init, so the shared-map runtime cannot be reproduced
- * in-process — the test instead drives the clear directly against an exchange pre-populated the way a
- * shared map would be, which holds on <em>every</em> runtime. The reflection test makes the roster
- * self-maintaining: a new {@code ATTR_*} constant on ApiContext that is not also added to the roster
- * fails the build rather than silently leaking.
+ * Since 2026-08-19 request-scoped values live in {@link ApiContext#REQUEST_SCOPES} — a map keyed by
+ * exchange identity — and NEVER in the JDK's attribute map. Clearing the shared map at dispatch start
+ * (the previous fix) only cured the sequential leak: two requests IN FLIGHT still raced on it, and on
+ * the bundle's GraalVM 25 runtime that crossed static-asset bodies between concurrent requests
+ * (53/1200 measured), with the same race open for {@code ATTR_RAW_BODY} and {@code ATTR_SUBJECT}.
+ * As with {@code ApiContextV1DerivationTest}, the JDK's map choice is a {@code static final} read at
+ * class-init, so the shared-map runtime cannot be reproduced in-process — instead the isolation test
+ * hands two exchanges ONE backing map (exactly what a pre-JDK-26 runtime does) and proves the scope
+ * neither reads nor writes it. The reflection test keeps the {@link ControlApi#REQUEST_SCOPED_ATTRS}
+ * roster — now documentation of the request-scoped contract — in sync with the ATTR_* constants.
  */
 class ExchangeAttributeScopeTest {
 
@@ -52,7 +54,7 @@ class ExchangeAttributeScopeTest {
     @Test
     void aStaleSubjectFromAPreviousRequestIsNotReadableAfterTheClear() {
         FakeExchange ex = new FakeExchange("/health");   // request B: public path, nothing re-stamped
-        ex.setAttribute(ApiContext.ATTR_SUBJECT, new Subject("alice", Set.of("canOperateRuns")));
+        ApiContext.attr(ex, ApiContext.ATTR_SUBJECT, new Subject("alice", Set.of("canOperateRuns")));
 
         ControlApi.clearRequestScope(ex);
 
@@ -63,16 +65,46 @@ class ExchangeAttributeScopeTest {
                         + "never to the previous request's identity");
     }
 
+    /**
+     * THE regression this class exists for since 2026-08-19: on a pre-JDK-26 runtime every exchange of
+     * a context SHARES one attribute map. Two concurrent requests must not see each other's values, and
+     * the scope must not touch the shared JDK map at all — reads through it were how one request served
+     * another request's file (the effective path rode the shared map; GraalVM 25, 53/1200 crossed).
+     */
+    @Test
+    void twoExchangesSharingTheJdkAttributeMapStayIsolated() {
+        Map<String, Object> sharedJdkMap = new HashMap<>();          // what ExchangeImpl does pre-26
+        FakeExchange a = new FakeExchange("/api/v1/pipelines", sharedJdkMap);
+        FakeExchange b = new FakeExchange("/chunk-D3sHIiwq.js", sharedJdkMap);
+
+        ApiContext.attr(a, ApiContext.ATTR_SUBJECT, new Subject("alice", Set.of("canOperateRuns")));
+        ApiContext.attr(a, "inspecto.effectivePath", "/pipelines");
+
+        assertNull(ApiContext.attr(b, ApiContext.ATTR_SUBJECT),
+                "request B must never observe request A's Subject through the shared JDK map");
+        assertNull(ApiContext.attr(b, "inspecto.effectivePath"),
+                "request B must never observe request A's effective path — this exact read served "
+                        + "A's file under B's URL on the shipped GraalVM 25 runtime");
+        assertTrue(sharedJdkMap.isEmpty(),
+                "the scope must never write the JDK attribute map — anything stored there is shared "
+                        + "by every in-flight request on a pre-JDK-26 runtime");
+
+        ApiContext.dropAttrScope(a);
+        ApiContext.dropAttrScope(b);
+        assertNull(ApiContext.attr(a, ApiContext.ATTR_SUBJECT),
+                "a dropped scope leaves nothing readable — entries must not outlive their request");
+    }
+
     /** Every attribute on the roster is actually cleared — including the other requests' raw body. */
     @Test
     void everyRosterAttributeIsClearedNotJustTheSubject() {
         FakeExchange ex = new FakeExchange("/health");
-        for (String attr : ControlApi.REQUEST_SCOPED_ATTRS) ex.setAttribute(attr, "stale-" + attr);
+        for (String attr : ControlApi.REQUEST_SCOPED_ATTRS) ApiContext.attr(ex, attr, "stale-" + attr);
 
         ControlApi.clearRequestScope(ex);
 
         for (String attr : ControlApi.REQUEST_SCOPED_ATTRS)
-            assertNull(ex.getAttribute(attr), "'" + attr + "' must not survive into the next request");
+            assertNull(ApiContext.attr(ex, attr), "'" + attr + "' must not survive into the next request");
     }
 
     /**
@@ -115,11 +147,17 @@ class ExchangeAttributeScopeTest {
      */
     private static final class FakeExchange extends HttpExchange {
         private final URI uri;
-        private final Map<String, Object> attributes = new HashMap<>();
+        private final Map<String, Object> attributes;
         private final Headers requestHeaders = new Headers();
         private final Headers responseHeaders = new Headers();
 
-        private FakeExchange(String path) { this.uri = URI.create(path); }
+        private FakeExchange(String path) { this(path, new HashMap<>()); }
+
+        /** A pre-JDK-26 exchange: its JDK attribute map is the CONTEXT's, shared with its siblings. */
+        private FakeExchange(String path, Map<String, Object> sharedJdkMap) {
+            this.uri = URI.create(path);
+            this.attributes = sharedJdkMap;
+        }
 
         @Override public URI getRequestURI() { return uri; }
         @Override public Object getAttribute(String name) { return attributes.get(name); }

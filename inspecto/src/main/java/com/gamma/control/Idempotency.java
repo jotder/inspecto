@@ -65,8 +65,8 @@ final class Idempotency {
     /** Cache a just-computed JSON response (pre-compression) for replay, when this exchange carries a key. */
     static void capture(HttpExchange ex, int status, byte[] jsonBytes) {
         if (status >= 500) return;
-        if (ex.getAttribute(ApiContext.ATTR_IDEMPOTENCY_STORE) instanceof Store s
-                && ex.getAttribute(ApiContext.ATTR_IDEMPOTENCY_KEY) instanceof String k) {
+        if (ApiContext.attr(ex, ApiContext.ATTR_IDEMPOTENCY_STORE) instanceof Store s
+                && ApiContext.attr(ex, ApiContext.ATTR_IDEMPOTENCY_KEY) instanceof String k) {
             s.put(k, status, jsonBytes);
         }
     }

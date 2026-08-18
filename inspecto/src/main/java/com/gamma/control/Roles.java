@@ -51,6 +51,13 @@ public final class Roles {
      *  authored role doc. Absent/null ⇒ {@link #effective} serves the seed table. */
     public static final String ATTR_CONFIG_ROOT = "inspecto.roles.configRoot";
 
+    /** Bind this request's config root (the {@link #ATTR_CONFIG_ROOT} write seam — ControlApi's
+     *  authenticate stage, and tests standing in for it). Request-scoped via {@link ApiContext#attr},
+     *  never the JDK's exchange map (shared across in-flight requests on pre-JDK-26 runtimes). */
+    public static void configRoot(com.sun.net.httpserver.HttpExchange ex, java.nio.file.Path root) {
+        ApiContext.attr(ex, ATTR_CONFIG_ROOT, root);
+    }
+
     static final String FILE = "roles.toon";
 
     // ── capability vocabulary (must stay congruent with the withCapability route gates; R4 will
@@ -140,7 +147,7 @@ public final class Roles {
     /** Per-request table for an {@link Authenticator}: resolves the bound space's authored doc via
      *  {@link #ATTR_CONFIG_ROOT} (seed-only when unset). Never null; see class doc for merge rules. */
     public static Map<String, Def> effective(HttpExchange ex) {
-        return effective(ex.getAttribute(ATTR_CONFIG_ROOT) instanceof Path p ? p : null);
+        return effective(ApiContext.attr(ex, ATTR_CONFIG_ROOT) instanceof Path p ? p : null);
     }
 
     /** The effective table for {@code configRoot}: authored roles overlaid on {@link #SEED} per role
@@ -190,7 +197,7 @@ public final class Roles {
      *  only IdP claims an {@link Authenticator} may surface as {@link Subject#attributes()}. Empty
      *  when unset — and when the doc is unreadable (fail-closed: no grants, no attributes). */
     public static List<String> attributeClaims(HttpExchange ex) {
-        return load(ex.getAttribute(ATTR_CONFIG_ROOT) instanceof Path p ? p : null).attributeClaims();
+        return load(ApiContext.attr(ex, ATTR_CONFIG_ROOT) instanceof Path p ? p : null).attributeClaims();
     }
 
     // ── validation (shared by the PUT route and the file parser — one grammar) ──────

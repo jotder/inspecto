@@ -52,7 +52,7 @@ class ControlApiComponentSharesTest {
     };
 
     private static Optional<Subject> subject(HttpExchange ex, String id, Set<String> caps, Set<String> roles) {
-        ex.setAttribute(ComponentAccess.ATTR_HELD_ROLES, roles);   // what OidcAuthenticator stamps (R3)
+        ComponentAccess.heldRoles(ex, roles);   // what OidcAuthenticator stamps (R3)
         return Optional.of(new Subject(id, caps));
     }
 

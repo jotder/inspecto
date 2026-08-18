@@ -35,6 +35,16 @@ public interface AccessDecider {
      */
     String ATTR_MATCHED_POLICY = "com.gamma.control.AccessDecider.matchedPolicy";
 
+    /** Stamp the matched policy name ({@code null} clears) — the decider-side write seam. Request-scoped
+     *  via {@link ApiContext#attr}, never the JDK's exchange map (shared across in-flight requests on
+     *  pre-JDK-26 runtimes — see ApiContext.REQUEST_SCOPES). */
+    static void matchedPolicy(HttpExchange ex, String policy) { ApiContext.attr(ex, ATTR_MATCHED_POLICY, policy); }
+
+    /** The stamped matched-policy name, or {@code null}. */
+    static String matchedPolicy(HttpExchange ex) {
+        return ApiContext.attr(ex, ATTR_MATCHED_POLICY) instanceof String s ? s : null;
+    }
+
     /**
      * Decide one access. Route-level calls pass {@code resourceKind = null} and an empty
      * {@code resource} (nothing is resolved yet — policies targeting {@code resourceKinds} must not

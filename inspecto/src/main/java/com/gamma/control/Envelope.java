@@ -30,16 +30,16 @@ final class Envelope {
     private static Object success(HttpExchange ex, Object body) {
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("timestamp", Instant.now().toString());
-        if (ex.getAttribute(ApiContext.ATTR_START_NANOS) instanceof Long nanos)
+        if (ApiContext.attr(ex, ApiContext.ATTR_START_NANOS) instanceof Long nanos)
             metadata.put("durationMs", (System.nanoTime() - nanos) / 1_000_000);
         metadata.put("apiVersion", "v1");
-        if (ex.getAttribute(ApiContext.ATTR_PAGINATION) instanceof Map<?, ?> pagination)
+        if (ApiContext.attr(ex, ApiContext.ATTR_PAGINATION) instanceof Map<?, ?> pagination)
             metadata.put("pagination", pagination);
 
         Map<String, Object> envelope = new LinkedHashMap<>();
         envelope.put("data", body);
         envelope.put("metadata", metadata);
-        if (ex.getAttribute(ApiContext.ATTR_SELF_PATH) instanceof String self)
+        if (ApiContext.attr(ex, ApiContext.ATTR_SELF_PATH) instanceof String self)
             envelope.put("links", Map.of("self", self));
         ApiContext.subject(ex).ifPresent(s -> envelope.put("permissions", permissions(ex, s)));
         envelope.put("diagnostics", Map.of("correlationId", String.valueOf(ApiContext.correlationId(ex))));
@@ -49,7 +49,7 @@ final class Envelope {
     /** SEC-7(b): the Subject's session grants, narrowed to the route-declared per-resource applicable
      *  set when one is present (sorted for a stable wire order). */
     private static java.util.List<String> permissions(HttpExchange ex, Subject s) {
-        if (ex.getAttribute(ApiContext.ATTR_RESOURCE_PERMISSIONS) instanceof java.util.Set<?> applicable)
+        if (ApiContext.attr(ex, ApiContext.ATTR_RESOURCE_PERMISSIONS) instanceof java.util.Set<?> applicable)
             return s.capabilities().stream().filter(applicable::contains).sorted().toList();
         return java.util.List.copyOf(s.capabilities());
     }
@@ -68,7 +68,7 @@ final class Envelope {
         }
         if (message == null) message = String.valueOf(body);
 
-        Object code = ex.getAttribute(ApiContext.ATTR_ERROR_CODE);
+        Object code = ApiContext.attr(ex, ApiContext.ATTR_ERROR_CODE);
         Map<String, Object> error = new LinkedHashMap<>();
         error.put("errorCode", code instanceof String c ? c : ErrorCodes.defaultFor(status));
         error.put("message", message);

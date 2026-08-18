@@ -341,7 +341,34 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 > `link-analysis-toolbox.component.spec.ts` (built-ins still present · authored added · an id reused
 > once, with the authored label winning).
 
-> ### ⚠ BUNDLE-1 — the packaged UI intermittently dies at bootstrap on FIRST load (2026-08-17)
+> ### ✅ BUNDLE-1 — CLOSED 2026-08-19: a request-attribute RACE on the bundle's pre-JDK-26 runtime
+>
+> **Root cause (proven, not the stale cache this row spent two days on):** on the embedded GraalVM 25,
+> `HttpExchange` attributes live in ONE map shared by every in-flight request (per-exchange is a
+> JDK-26+ default). The route-matching path rode that map (`ATTR_EFFECTIVE_PATH`), so under a
+> concurrent burst request B read request A's path and **served A's file under B's URL** — measured
+> 53/1200 crossed on GraalVM 25, 0/1200 on JDK 26, same jar. Every symptom in this row is that one
+> bug: `BootstrapApplicationStart` undefined (a 1.4KB helper URL carrying a 190KB module), "does not
+> provide an export named ..." with a DIFFERENT name each load, the module served as `image/svg+xml`
+> (the logo's bytes under a chunk URL), fine-on-first-load-broken-after-idle (an idle browser
+> revalidates in one wide burst). The test gate could never see it — it runs on JDK 26.
+>
+> **Fix:** every request-scoped attribute moved out of the JDK map into `ApiContext.REQUEST_SCOPES`
+> (keyed by exchange identity; dropped in the outermost stage's finally). Public seams for the SPI
+> modules: `Roles.configRoot` / `ComponentAccess.heldRoles` / `AccessDecider.matchedPolicy`. Pinned by
+> `ExchangeAttributeScopeTest.twoExchangesSharingTheJdkAttributeMapStayIsolated`; proven by the probe:
+> **0/3000 crossed on GraalVM 25 with the fix**. Gate 3459/0/0/5.
+>
+> ⚠ The same shared map also carried `ATTR_RAW_BODY` (crossed request bodies) and, under auth,
+> `ATTR_SUBJECT`/`ATTR_HELD_ROLES` (crossed identities) — closed by the same sweep, on every runtime.
+>
+> The history below is preserved as written; its "stale cached chunk" mechanism and clear-site-data
+> remedy were WRONG (a fresh tab reproduced the failure; the served= field in the `-Dui.static.log`
+> capture — added while chasing this — is what finally showed the server pairing bodies with the
+> wrong URLs). The cache-header work (`3e714e02`) and unique ETag (`e7b6b2ac`) stand on their own
+> merits; neither was the cause.
+>
+> ### ⚠ BUNDLE-1 (history) — the packaged UI intermittently dies at bootstrap on FIRST load (2026-08-17)
 >
 > **✅ MECHANISM CONFIRMED 2026-08-18 — from a REAL browser with a working cache, which is exactly the
 > instrument this row asked for.** An operator on the freshly packaged bundle reported two console errors:

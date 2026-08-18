@@ -53,7 +53,7 @@ public final class AccessGrants {
      *  from {@link Roles#ATTR_CONFIG_ROOT} (nothing denied when unset). */
     public static Set<String> deniedCapabilities(HttpExchange ex, Collection<String> roleNames) {
         return deniedCapabilities(
-                ex.getAttribute(Roles.ATTR_CONFIG_ROOT) instanceof Path p ? p : null, roleNames);
+                ApiContext.attr(ex, Roles.ATTR_CONFIG_ROOT) instanceof Path p ? p : null, roleNames);
     }
 
     /** The capabilities denied to a subject holding {@code roleNames} (case-insensitive) under

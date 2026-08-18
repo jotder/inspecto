@@ -43,6 +43,13 @@ public final class ComponentAccess {
      *  {@link Subject}. Server-internal only. Absent ⇒ no {@code subjectType: role} share matches. */
     public static final String ATTR_HELD_ROLES = "inspecto.access.heldRoles";
 
+    /** The {@link #ATTR_HELD_ROLES} write seam for the security module's {@link Authenticator} — the
+     *  one out-of-package writer. Request-scoped via {@link ApiContext#attr}, never the JDK's exchange
+     *  map (shared across in-flight requests on pre-JDK-26 runtimes — see ApiContext.REQUEST_SCOPES). */
+    public static void heldRoles(HttpExchange ex, Set<String> roles) {
+        ApiContext.attr(ex, ATTR_HELD_ROLES, roles);
+    }
+
     static final String OWNER = "owner";
     static final String SHARES = "shares";
 
@@ -84,7 +91,7 @@ public final class ComponentAccess {
      *  authenticated subject when absent (provenance; no restriction until shares are added). */
     static Map<String, Object> onCreate(HttpExchange ex, Map<String, Object> content) {
         Map<String, Object> out = new LinkedHashMap<>(content);
-        if (ex.getAttribute(ApiContext.ATTR_SUBJECT) instanceof Subject s && !out.containsKey(OWNER))
+        if (ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject s && !out.containsKey(OWNER))
             out.put(OWNER, s.id());
         validate(out);
         return out;
@@ -114,7 +121,7 @@ public final class ComponentAccess {
     // ── decision ─────────────────────────────────────────────────────────────────
 
     private static int level(HttpExchange ex, Map<String, Object> content) {
-        if (!(ex.getAttribute(ApiContext.ATTR_SUBJECT) instanceof Subject s)) return OWN;  // Personal: fail-open
+        if (!(ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject s)) return OWN;  // Personal: fail-open
         String owner = str(content.get(OWNER));
         boolean ownerMatch = !owner.isEmpty() && owner.equals(s.id());
         boolean admin = s.capabilities().contains(Roles.CAN_CONFIGURE_ACCESS);
@@ -138,14 +145,16 @@ public final class ComponentAccess {
     /** May this request manage the envelope? True with no subject, for an access admin, for the
      *  declared owner — and for anyone when no owner is declared yet (first claim on a legacy doc). */
     private static boolean ownsEnvelope(HttpExchange ex, Map<String, Object> current) {
-        if (!(ex.getAttribute(ApiContext.ATTR_SUBJECT) instanceof Subject s)) return true;
+        if (!(ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject s)) return true;
         if (s.capabilities().contains(Roles.CAN_CONFIGURE_ACCESS)) return true;
         String owner = str(current.get(OWNER));
         return owner.isEmpty() || owner.equals(s.id());
     }
 
-    private static Set<String> heldRoles(HttpExchange ex) {
-        if (!(ex.getAttribute(ATTR_HELD_ROLES) instanceof Set<?> roles)) return Set.of();
+    /** The stamped recognised role names, lowercased; empty when unstamped. The read seam paired with
+     *  {@link #heldRoles(HttpExchange, Set)} — deciders read through here, never the JDK exchange map. */
+    public static Set<String> heldRoles(HttpExchange ex) {
+        if (!(ApiContext.attr(ex, ATTR_HELD_ROLES) instanceof Set<?> roles)) return Set.of();
         Set<String> out = new java.util.LinkedHashSet<>();
         for (Object r : roles) if (r != null) out.add(String.valueOf(r).toLowerCase(Locale.ROOT));
         return out;

@@ -429,9 +429,9 @@ public final class ControlApi implements AutoCloseable, ApiContext {
      *  (its {@code /api[/v1]} and {@code /spaces/{id}} prefixes stripped). Defaults to the raw path. */
     private static final String ATTR_EFFECTIVE_PATH = "inspecto.effectivePath";
     private static String path(HttpExchange ex) {
-        return ex.getAttribute(ATTR_EFFECTIVE_PATH) instanceof String s ? s : ex.getRequestURI().getPath();
+        return ApiContext.attr(ex, ATTR_EFFECTIVE_PATH) instanceof String s ? s : ex.getRequestURI().getPath();
     }
-    private static void setPath(HttpExchange ex, String path) { ex.setAttribute(ATTR_EFFECTIVE_PATH, path); }
+    private static void setPath(HttpExchange ex, String path) { ApiContext.attr(ex, ATTR_EFFECTIVE_PATH, path); }
 
     /** SEC-EXCHANGE-ATTRS (BACKLOG §1 0-b): every request-scoped attribute any stage or route stamps on
      *  the exchange. The attribute map is private to the exchange only by DEFAULT — see the note on
@@ -450,9 +450,14 @@ public final class ControlApi implements AutoCloseable, ApiContext {
             ApiContext.ATTR_PAGINATION, ATTR_EFFECTIVE_PATH, Roles.ATTR_CONFIG_ROOT,
             AccessDecider.ATTR_MATCHED_POLICY };
 
-    /** Clear every {@link #REQUEST_SCOPED_ATTRS} entry — dispatch's first act (see {@link #correlation}). */
+    /** Drop the request's whole attribute scope — dispatch's first act (see {@link #correlation}).
+     *  Since 2026-08-19 the scope lives in {@link ApiContext#REQUEST_SCOPES}, keyed by exchange identity and
+     *  never in the JDK's attribute map — which is SHARED across in-flight requests on pre-JDK-26
+     *  runtimes (the bundle ships GraalVM 25), where clearing keys at dispatch start fixed only the
+     *  sequential leak and left concurrent requests racing (crossed static-asset bodies, crossed
+     *  RAW_BODY/SUBJECT). A fresh exchange has no scope, so this is a belt for exchange-object reuse. */
     static void clearRequestScope(HttpExchange ex) {
-        for (String attr : REQUEST_SCOPED_ATTRS) ex.setAttribute(attr, null);
+        ApiContext.dropAttrScope(ex);
     }
 
     private void dispatch(HttpExchange ex) throws IOException {
@@ -476,7 +481,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         clearRequestScope(ex);   // SEC-EXCHANGE-ATTRS: nothing from a previous request may be readable
         String cid = ex.getRequestHeaders().getFirst("Correlation-ID");
         cid = (cid == null || cid.isBlank()) ? java.util.UUID.randomUUID().toString() : cid.trim();
-        ex.setAttribute(ApiContext.ATTR_CORRELATION_ID, cid);
+        ApiContext.attr(ex, ApiContext.ATTR_CORRELATION_ID, cid);
         ex.getResponseHeaders().set("Correlation-ID", cid);
         MDC.put("correlationId", cid);
         try {
@@ -484,6 +489,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         } finally {
             MDC.remove("correlationId");
             ex.close();
+            ApiContext.dropAttrScope(ex);   // the scope must not outlive the request (see clearRequestScope)
         }
     }
 
@@ -504,7 +510,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         try {
             next.proceed(ex);
         } catch (ApiException ae) {
-            if (ae.errorCode != null) ex.setAttribute(ApiContext.ATTR_ERROR_CODE, ae.errorCode);
+            if (ae.errorCode != null) ApiContext.attr(ex, ApiContext.ATTR_ERROR_CODE, ae.errorCode);
             respond(ex, ae.status, Map.of("error", ae.getMessage()));
         } catch (Exception e) {
             // A client that walks away mid-write is not a server fault. The browser cancels in-flight
@@ -551,8 +557,8 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         if (path.equals("/api/v1") || path.startsWith("/api/v1/")) {
             // No "this is v1" marker is stamped: ApiContext.v1 derives it from the URI, because a stamped
             // flag survives the request wherever exchange attributes fall back to the shared HttpContext map.
-            ex.setAttribute(ApiContext.ATTR_START_NANOS, System.nanoTime());
-            ex.setAttribute(ApiContext.ATTR_SELF_PATH, path);
+            ApiContext.attr(ex, ApiContext.ATTR_START_NANOS, System.nanoTime());
+            ApiContext.attr(ex, ApiContext.ATTR_SELF_PATH, path);
             path = path.length() == 7 ? "/" : path.substring(7);
         } else if (path.equals("/api") || path.startsWith("/api/")) {
             respond(ex, 404, Map.of("error", "unknown API version — every route is served under /api/v1"));
@@ -576,8 +582,8 @@ public final class ControlApi implements AutoCloseable, ApiContext {
                 AuditTrail.record(ex, method, path(ex), hit.status());
                 return;
             }
-            ex.setAttribute(ApiContext.ATTR_IDEMPOTENCY_STORE, idempotency);
-            ex.setAttribute(ApiContext.ATTR_IDEMPOTENCY_KEY, idemKey);
+            ApiContext.attr(ex, ApiContext.ATTR_IDEMPOTENCY_STORE, idempotency);
+            ApiContext.attr(ex, ApiContext.ATTR_IDEMPOTENCY_KEY, idemKey);
         }
         next.proceed(ex);
     }
@@ -692,7 +698,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
             // resolve the roles root only when one is hosted: Roles.effective(null) degrades to the seeded
             // roles, and the recovery route (POST /spaces) stays reachable instead of 500ing in the gate.
             java.nio.file.Path rolesRoot = spaces.size() == 0 ? null : writeRoot();
-            if (rolesRoot != null) ex.setAttribute(Roles.ATTR_CONFIG_ROOT, rolesRoot);
+            if (rolesRoot != null) Roles.configRoot(ex, rolesRoot);
             // SEC-7(a): on Standard the acting identity is authoritative from the authenticated Subject; a
             // client-supplied X-Actor header is an attempted actor spoof and is rejected outright. (Personal
             // has no Authenticator, so this branch never runs there and X-Actor stays the historic actor.)
@@ -701,7 +707,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
                 throw new ApiException(403, ErrorCodes.PERMISSION_DENIED,
                         "X-Actor is not accepted on this edition; the actor is taken from the authenticated session");
             java.util.Optional<Subject> subject = a.authenticate(ex);
-            if (subject.isPresent()) ex.setAttribute(ApiContext.ATTR_SUBJECT, subject.get());
+            if (subject.isPresent()) ApiContext.attr(ex, ApiContext.ATTR_SUBJECT, subject.get());
             else if (required) throw new ApiException(401, ErrorCodes.UNAUTHENTICATED, "authentication required");
         });
     }
@@ -718,12 +724,12 @@ public final class ControlApi implements AutoCloseable, ApiContext {
     private void authorize(HttpExchange ex, String method, String path) {
         AccessDecider decider = AccessDeciders.active().orElse(null);
         if (decider == null || PUBLIC_PATHS.contains(path) || isSelfVerifyingPublic(path)) return;
-        if (!(ex.getAttribute(ApiContext.ATTR_SUBJECT) instanceof Subject subject)) return;
+        if (!(ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject subject)) return;
         String action = actionFor(method, path);
-        ex.setAttribute(AccessDecider.ATTR_MATCHED_POLICY, null);   // clear stale; the decider re-stamps
+        ApiContext.attr(ex, AccessDecider.ATTR_MATCHED_POLICY, null);   // clear stale; the decider re-stamps
         AccessDecider.Decision decision = decider.decide(ex, subject, action, path, null, Map.of());
         if (decision == AccessDecider.Decision.ABSTAIN) return;
-        String policy = ex.getAttribute(AccessDecider.ATTR_MATCHED_POLICY) instanceof String p ? p : null;
+        String policy = ApiContext.attr(ex, AccessDecider.ATTR_MATCHED_POLICY) instanceof String p ? p : null;
         boolean granted = decision == AccessDecider.Decision.ALLOW;
         AuditTrail.policyDecision(ex, granted, action, path, null, null, policy);
         if (!granted) throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "denied by access policy");
@@ -915,12 +921,12 @@ public final class ControlApi implements AutoCloseable, ApiContext {
     public byte[] rawBody(HttpExchange ex) throws IOException {
         // Cached, because getRequestBody() is single-read: a route that verifies a signature over the raw
         // payload and then parses it would otherwise see an empty body on the second call (D8, §4.1).
-        if (ex.getAttribute(ApiContext.ATTR_RAW_BODY) instanceof byte[] cached) return cached;
+        if (ApiContext.attr(ex, ApiContext.ATTR_RAW_BODY) instanceof byte[] cached) return cached;
         byte[] raw;
         try (InputStream in = ex.getRequestBody()) {
             raw = in.readAllBytes();
         }
-        ex.setAttribute(ApiContext.ATTR_RAW_BODY, raw);
+        ApiContext.attr(ex, ApiContext.ATTR_RAW_BODY, raw);
         return raw;
     }
 

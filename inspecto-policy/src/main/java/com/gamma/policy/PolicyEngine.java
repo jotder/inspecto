@@ -77,7 +77,7 @@ public final class PolicyEngine implements AccessDecider {
         if (doc.unreadable()) {
             LOG.warn("access-policies doc unreadable — DENY {} {} for '{}' (fail-closed until fixed)",
                     action, route, subject.id());
-            ex.setAttribute(AccessDecider.ATTR_MATCHED_POLICY, "<policies-unreadable>");
+            AccessDecider.matchedPolicy(ex, "<policies-unreadable>");
             return Decision.DENY;
         }
         Map<String, Object> context = context(ex, subject, action, route, resourceKind, resource);
@@ -87,13 +87,13 @@ public final class PolicyEngine implements AccessDecider {
             if (!targets(p, action, resourceKind)) continue;
             if (!p.condition().test(context)) continue;
             if (p.deny()) {   // deny overrides — no later allow can rescue
-                ex.setAttribute(AccessDecider.ATTR_MATCHED_POLICY, p.name());
+                AccessDecider.matchedPolicy(ex, p.name());
                 return Decision.DENY;
             }
             verdict = Decision.ALLOW;
             matched = p.name();
         }
-        if (verdict == Decision.ALLOW) ex.setAttribute(AccessDecider.ATTR_MATCHED_POLICY, matched);
+        if (verdict == Decision.ALLOW) AccessDecider.matchedPolicy(ex, matched);
         return verdict;
     }
 
@@ -185,7 +185,6 @@ public final class PolicyEngine implements AccessDecider {
      *  authenticator-stamped {@link ComponentAccess#ATTR_HELD_ROLES} exchange attribute (the Subject
      *  itself never carries role names). Empty when unstamped. */
     private static List<String> heldRoles(HttpExchange ex) {
-        return ex.getAttribute(ComponentAccess.ATTR_HELD_ROLES) instanceof Collection<?> c
-                ? c.stream().map(String::valueOf).toList() : List.of();
+        return List.copyOf(ComponentAccess.heldRoles(ex));
     }
 }
