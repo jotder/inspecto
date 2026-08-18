@@ -570,7 +570,20 @@ public final class PipelineEditable {
         //
         // A chain that is not legacy-shaped is, by construction, one that refused to save at all before
         // this slice — so nothing that runs today starts being written differently.
-        boolean legacyShaped = isLegacyShaped(chain);
+        //
+        // ⚠ …with one exception, and it is lower()'s own ownership rule rather than a new policy: when
+        // the file ALREADY says `steps:`, the spelling is the file's, not the graph's. Renormalising a
+        // legacy-shaped chain back to the singular keys rewrites a hand-authored sequence into a
+        // different spelling behind the author's back — and it is not a spelling-only difference:
+        // PipelineConfig.hasExplicitSteps() decides whether PipelineLift walks the authored order or
+        // its own constant one, and whether prepare() demands an output_store:. A file with no
+        // `steps:` key is untouched by this, so every pre-existing file and every editor-authored
+        // graph still takes the byte-for-byte legacy path above.
+        // (…and only while there is still a chain to write: emptying the canvas of transforms leaves
+        // no sequence to preserve, so that returns to the legacy path and the key goes.)
+        boolean authoredSteps = existing.get("steps") instanceof List<?> l && !l.isEmpty()
+                && !chain.isEmpty();
+        boolean legacyShaped = isLegacyShaped(chain) && !authoredSteps;
         PipelineNode recordDedup   = legacyShaped ? first(chain, PipelineConfig.Step.DEDUP)     : null;
         PipelineNode routeNode     = legacyShaped ? first(chain, PipelineConfig.Step.ROUTE)     : null;
         PipelineNode summarizeNode = legacyShaped ? first(chain, PipelineConfig.Step.SUMMARIZE) : null;
@@ -718,8 +731,9 @@ public final class PipelineEditable {
 
         // ── the ordered chain ──────────────────────────────────────────────────────
         if (legacyShaped) {
-            // The singular keys said it all; a file that had grown a steps: block and was edited back
-            // down to a legacy shape loses it, or the two spellings would collide on the next load.
+            // The singular keys said it all, and the file never said otherwise (a file that DID say
+            // `steps:` keeps saying it — see authoredSteps). Removing the key here is what stops the
+            // two spellings colliding on the next load.
             out.remove("steps");
         } else {
             out.put("steps", stepsOf(g, chain));

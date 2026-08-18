@@ -169,4 +169,69 @@ class RecipeConverterTest {
                 "the row predicate projects as its own transform step");
         assertEquals("PARQUET", ((Map<String, Object>) steps.get(4).get("sink")).get("format"));
     }
+
+    /**
+     * ⚠ <b>An explicit {@code steps:} chain is the authored sequence, and the projection has to read
+     * THAT.</b> Until this test the converter only synthesised steps from the legacy singular blocks —
+     * which a {@code steps:} file never carries, because the parser refuses the two spellings together —
+     * so every step in the chain vanished from the recipe without a word, and the round trip wrote the
+     * config back with no transforms at all. Silent step loss is the exact failure the multiplicity
+     * plan exists to remove; a projection that cannot see the chain reintroduces it one layer down.
+     *
+     * <p>Two dedups either side of a summarize: a chain the singular keys provably cannot hold, so the
+     * loss cannot be excused as a spelling normalisation.
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void projectsAnAuthoredStepsChainInOrder() {
+        Map<String, Object> recipe = RecipeConverter.toRecipe(stepsConfig(
+                new LinkedHashMap<>(Map.of("dedup", Map.of("keys", List.of("ID")))),
+                new LinkedHashMap<>(Map.of("summarize", Map.of("group_by", List.of("DAY")))),
+                new LinkedHashMap<>(Map.of("dedup", Map.of("keys", List.of("AMT"))))));
+
+        List<Map<String, Object>> steps = (List<Map<String, Object>>) recipe.get("steps");
+        assertEquals(List.of("collect", "parse", "dedup", "summarize", "dedup", "sink"),
+                steps.stream().map(v -> v.keySet().iterator().next()).toList());
+        assertEquals(List.of("ID"), ((Map<String, Object>) steps.get(2).get("dedup")).get("key"));
+        assertEquals(List.of("AMT"), ((Map<String, Object>) steps.get(4).get("dedup")).get("key"),
+                "the second dedup keeps its own key rather than being merged into the first");
+    }
+
+    /** …and the whole chain survives the round trip back to the file, in its authored spelling. */
+    @Test
+    void anAuthoredStepsChainRoundTripsAsAStepsChain() {
+        Map<String, Object> cfg = stepsConfig(
+                new LinkedHashMap<>(Map.of("filter", Map.of("where", "STATUS = 'SHIPPED'"))),
+                new LinkedHashMap<>(Map.of("dedup", Map.of("keys", List.of("ID")))));
+
+        Map<String, Object> back = RecipeCompiler.compile(RecipeConverter.toRecipe(cfg), cfg, false);
+        assertEquals(cfg, back);
+    }
+
+    /**
+     * A kind the recipe does not model must REFUSE, never shorten the chain — the whole point of the
+     * fix is that a step the projection cannot speak is loud rather than absent.
+     */
+    @Test
+    void anUnmodelledStepKindRefusesRatherThanDisappearing() {
+        Map<String, Object> cfg = stepsConfig(new LinkedHashMap<>(Map.of("teleport", Map.of("to", "mars"))));
+        PipelineCompileException e = assertThrows(PipelineCompileException.class,
+                () -> RecipeCompiler.compile(RecipeConverter.toRecipe(cfg), cfg, false));
+        assertTrue(e.getMessage().contains("teleport"), "the refusal names the step it could not compile");
+    }
+
+    /** A minimal explicit-{@code steps:} config: the chain plus the least the projection needs around it. */
+    private static Map<String, Object> stepsConfig(Object... steps) {
+        Map<String, Object> cfg = new LinkedHashMap<>();
+        cfg.put("name", "orders");
+        cfg.put("active", false);
+        cfg.put("dirs", new LinkedHashMap<>(Map.of("poll", "/in", "database", "/db")));
+        cfg.put("parsing", new LinkedHashMap<>(Map.of("grammar", "grammar/pipe")));
+        // processing: is present because lower() always emits the block; its absence is a pre-existing
+        // asymmetry of the lowering, not a property of the chain under test here
+        cfg.put("processing", new LinkedHashMap<>(Map.of("file_pattern", "glob:**/*.csv")));
+        cfg.put("output", new LinkedHashMap<>(Map.of("format", "PARQUET")));
+        cfg.put("steps", List.of(steps));
+        return cfg;
+    }
 }
