@@ -506,9 +506,34 @@ public final class ControlApi implements AutoCloseable, ApiContext {
             if (ae.errorCode != null) ex.setAttribute(ApiContext.ATTR_ERROR_CODE, ae.errorCode);
             respond(ex, ae.status, Map.of("error", ae.getMessage()));
         } catch (Exception e) {
+            // A client that walks away mid-write is not a server fault. The browser cancels in-flight
+            // asset fetches on every reload or navigation, and the write then fails with a platform
+            // socket message ("An established connection was aborted...", "Broken pipe", "Connection
+            // reset"). The response is already committed, so respond() cannot send a 500 either — it
+            // would throw again on the same dead socket. Logged at DEBUG so a routine reload stops
+            // filling the operator log with 30-frame stacks that look like a real failure.
+            if (isClientDisconnect(e)) {
+                log.debug("{} {} aborted by the client: {}", ex.getRequestMethod(), path(ex), e.getMessage());
+                return;
+            }
             log.error("{} {} failed", ex.getRequestMethod(), path(ex), e);
             respond(ex, 500, Map.of("error", String.valueOf(e.getMessage())));
         }
+    }
+
+    /** True when an exception is the socket giving way because the peer went first, not a server fault. */
+    private static boolean isClientDisconnect(Throwable t) {
+        for (Throwable c = t; c != null; c = c.getCause()) {
+            if (!(c instanceof IOException)) continue;
+            String m = c.getMessage();
+            if (m == null) continue;
+            String lower = m.toLowerCase();
+            if (lower.contains("aborted") || lower.contains("broken pipe")
+                    || lower.contains("connection reset") || lower.contains("connection was closed")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Resolve the route-matching path: mark a "/api/v1/…" request for the v1 transport contract (Envelope +

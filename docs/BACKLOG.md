@@ -343,6 +343,39 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 
 > ### ⚠ BUNDLE-1 — the packaged UI intermittently dies at bootstrap on FIRST load (2026-08-17)
 >
+> **✅ MECHANISM CONFIRMED 2026-08-18 — from a REAL browser with a working cache, which is exactly the
+> instrument this row asked for.** An operator on the freshly packaged bundle reported two console errors:
+>
+> ```
+> Failed to load module script: ... server responded with a MIME type of "image/svg+xml"
+> chunk-CmaG16E-.js: The requested module './chunk-CrIZLQP_.js' does not provide an export named 'v'
+> ```
+>
+> Measured against the bundle on disk, this is **a stale cached chunk paired with a new importer** — the
+> row's own hypothesis, now positive evidence rather than an absence:
+>
+> - `chunk-CrIZLQP_.js` in the shipped bundle **does** export `v` (`Ue as v`), so the file the browser
+>   executed was a DIFFERENT, older copy of that name.
+> - All **68** statically imported chunk names resolve to files that exist; one mtime across the bundle.
+> - The server **cannot** produce either error: a missing `.js` answers `404 application/json` (never
+>   `image/svg+xml`), a present one answers `200 text/javascript; charset=utf-8`. Verified by curl.
+> - The same bundle on a cold origin loads with **zero** console errors (56 resources, DOMContentLoaded
+>   1.36 s, `app-root` populated).
+>
+> ⚠ The `image/svg+xml` half is still only *explained*, not measured: no `.svg` sits at the UI root and
+> no bundle module imports one, so that response cannot have come from this server — it is a heuristically
+> cached entry from a deployment that predates the `no-cache` + ETag fix (`3e714e02`). Those pre-fix
+> entries were stored with **no validator and no directive**, so a browser may reuse them indefinitely;
+> the fix stops NEW stale entries, it cannot evict OLD ones.
+>
+> **Operator remedy: clear site data / hard-reload once** — after that the ETag path keeps it fixed.
+> **Remaining open question** (do not treat as settled): whether `no-cache` on all 129 content-hashed
+> chunks is now costing a per-load revalidation storm (~44–51 conditional requests per route over ~6
+> connections). Serving hashed chunks `immutable` and reserving `no-cache` for `index.html` alone would
+> remove that, but it is only safe if Angular never reuses a chunk name for different content — the
+> assumption this row's `writeFile` comment asserts and NOBODY has measured across two builds. Measure
+> first.
+>
 > Reported from the shipped bundle as `Uncaught TypeError: Cannot read properties of undefined
 > (reading 'BootstrapApplicationStart')`, and reproduced here twice as `w$1 is not a function` and
 > `The requested module './chunk-<hash>.js' does not provide an export named 'G'`. All three are the
