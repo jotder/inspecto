@@ -18,6 +18,7 @@ import org.slf4j.MDC;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -810,7 +811,8 @@ public final class ControlApi implements AutoCloseable, ApiContext {
     private void writeFile(HttpExchange ex, Path file) throws IOException {
         BasicFileAttributes attrs = Files.readAttributes(file, BasicFileAttributes.class);
         String etag = '"' + Long.toHexString(attrs.lastModifiedTime().toMillis())
-                    + '-' + Long.toHexString(attrs.size()) + '"';
+                    + '-' + Long.toHexString(attrs.size())
+                    + '-' + Integer.toHexString(file.getFileName().toString().hashCode()) + '"';
         ex.getResponseHeaders().set("Cache-Control", "no-cache");
         ex.getResponseHeaders().set("ETag", etag);
         if (etag.equals(ex.getRequestHeaders().getFirst("If-None-Match"))) {
@@ -821,7 +823,18 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         byte[] bytes = Files.readAllBytes(file);
         ex.getResponseHeaders().set("Content-Type", contentType(file.getFileName().toString()));
         ex.sendResponseHeaders(200, bytes.length);
-        ex.getResponseBody().write(bytes);
+        try (OutputStream body = ex.getResponseBody()) {
+            body.write(bytes);
+        } catch (IOException e) {
+            // Content-Length is already committed, so a body that stops short leaves this keep-alive
+            // connection DESYNCED: the next response on it is framed against THIS request's outstanding
+            // length, and a later chunk then arrives under an earlier chunk's URL. The module graph links
+            // against the wrong file and bootstrap dies on an export the named chunk does not have.
+            // Close the exchange so the connection cannot be handed back to the keep-alive pool.
+            log.debug("[UI-STATIC] body write aborted for {} - closing the connection", file.getFileName(), e);
+            ex.close();
+            throw e;
+        }
         logStatic(ex, file, 200, bytes.length);
     }
 
