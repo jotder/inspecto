@@ -1233,9 +1233,16 @@ final class InspectoTools {
      * config ({@code raw.name} required) and a registry component the Components pane authored
      * ({@code {fields:[…]}}). Judging a pane draft by the config spec reported *"Missing required field
      * 'raw.name'"*, and the A5.2 repair loop then pushed the model toward a {@code {raw:{…}}} shape the pane
-     * could not read back, so Apply silently no-opped. **The registry {@code schema} component is retired**
-     * (`ComponentStore.WRITABLE_TYPES`), so the word now has exactly one meaning — the config TOON — and
-     * {@code forType} is once again the whole answer. Do not reintroduce a component reading here.
+     * could not read back, so Apply silently no-opped. The word now has exactly one meaning — the config
+     * TOON — and {@code forType} is once again the whole answer. Do not reintroduce a component reading here.
+     *
+     * <p>⚠ <b>Corrected 2026-08-18:</b> this note used to claim the registry {@code schema} component was
+     * "retired (`ComponentStore.WRITABLE_TYPES`)". It was not — {@code schema} is still in that set, so
+     * {@code PUT /components/schema/&#123;id&#125;} still writes {@code registry/schemas/<id>.toon}, the very
+     * file the engine parses for a {@code schema_file: schema/<id>} ref. What made the unification safe is
+     * that both writers now speak the config TOON shape, and {@code ComponentRoutes.validateKind} applies
+     * the same structural + safety gates {@code /config/write} does. Retiring the type is NOT a free
+     * simplification: {@code validateType} guards {@code list}/{@code read}/{@code versions} as well.
      */
     private static ConfigSpec specFor(String kind) {
         return ConfigSpecs.forType(configType(kind));

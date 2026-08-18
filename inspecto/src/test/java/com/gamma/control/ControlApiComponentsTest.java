@@ -352,6 +352,38 @@ class ControlApiComponentsTest {
         }
     }
 
+    /**
+     * JAVA-6: `/components/schema/{id}` and `POST /config/write {type:"schema"}` write the SAME FILE —
+     * `registry/schemas/<id>.toon`, which the engine loads for a `schema_file: schema/<id>` ref — but only
+     * the /config/write side ran the structural + safety gates. This route was an ungated back door to a
+     * live, engine-executed artifact. The UI already avoided it by convention (the schema editor's own
+     * comment says so); `component_apply` did not, so the gate belongs on the server.
+     */
+    @Test
+    void schemaComponentIsGatedLikeItsConfigWriteSibling(@TempDir Path dir) throws Exception {
+        Path wr = dir.resolve("wr");
+        try (Ctx c = open(dir, wr)) {
+            // a schema with no `raw.name` is structurally invalid — its sibling 422s, so this must too
+            HttpResponse<String> bad = send(c.port, "POST", "/components/schema",
+                    "{\"id\":\"orders\",\"raw\":{\"format\":\"CSV\"}}");
+            assertEquals(422, bad.statusCode(), bad.body());
+            assertTrue(bad.body().contains("raw.name"), bad.body());
+            assertFalse(Files.exists(wr.resolve("registry/schemas/orders.toon")),
+                    "a refused schema must not reach the file the engine parses");
+
+            // a structurally valid one still writes — the gate matches its sibling, it is not stricter
+            HttpResponse<String> ok = send(c.port, "POST", "/components/schema",
+                    "{\"id\":\"orders\",\"raw\":{\"name\":\"orders\",\"format\":\"CSV\"}}");
+            assertEquals(200, ok.statusCode(), ok.body());
+            assertTrue(Files.exists(wr.resolve("registry/schemas/orders.toon")));
+
+            // and the gate is on the UPDATE path too, not only create — same back door, different verb
+            HttpResponse<String> badUpdate = send(c.port, "PUT", "/components/schema/orders",
+                    "{\"raw\":{\"format\":\"CSV\"}}");
+            assertEquals(422, badUpdate.statusCode(), badUpdate.body());
+        }
+    }
+
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));

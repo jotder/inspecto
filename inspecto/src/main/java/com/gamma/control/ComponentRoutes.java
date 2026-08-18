@@ -1,6 +1,12 @@
 package com.gamma.control;
 
+import com.gamma.config.io.ConfigLoader;
+import com.gamma.config.safety.ConfigSafetyValidator;
+import com.gamma.config.safety.SafetyPolicy;
+import com.gamma.config.spec.ConfigSpec;
+import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.config.spec.Finding;
+import com.gamma.config.spec.Severity;
 import com.gamma.ops.findings.FindingsSpec;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.MappingRules;
@@ -464,6 +470,38 @@ final class ComponentRoutes implements RouteModule {
                         + "' must match the component id '" + id + "' (one spec per object type)");
             FindingsSpec.fromMap(stamped);
         }
+        // A `schema` component is the SAME FILE the engine parses as a pipeline's schema:
+        // `/components/schema/{id}` and `POST /config/write {type:"schema"}` both land on
+        // `registry/schemas/<id>.toon`, which `PipelineConfigParser.resolveSchemaRef` loads for a
+        // `schema_file: schema/<id>` ref. Only the /config/write side ran the structural + safety gates,
+        // so this route was an ungated back door to a live, engine-executed artifact — the
+        // gate-on-one-route-but-not-its-sibling shape. The gates below are exactly its sibling's.
+        //
+        // ⚠ The BACKWARD-compatibility gate is deliberately NOT mirrored here. /config/write pairs it
+        // with a `compatibility:"none"` override in its body envelope; a component body IS the content,
+        // so there is nowhere to put one, and a compat gate with no escape hatch would make this route
+        // STRICTER than its sibling — refusing edits the config route allows. Closing that half needs an
+        // override channel (a query parameter) and is an API-shape decision, not a patch.
+        //
+        // ⛔ Do NOT "fix" this by retiring `schema` from ComponentStore.WRITABLE_TYPES instead. The
+        // InspectoTools javadoc claims that already happened; it has not, and it cannot be done blind:
+        // `validateType` guards `list`/`read`/`versions` too, so dropping the type would break the
+        // Components pane's reads, not just this write.
+        if ("schema".equals(type)) {
+            Map<String, Object> stamped = new LinkedHashMap<>(content);
+            stamped.put("name", id);   // the store stamps it; validate what will actually be persisted
+            ConfigSpec spec = ConfigSpecs.forType("schema");
+            List<Finding> schemaFindings = new java.util.ArrayList<>(
+                    ConfigLoader.filesystem().validate(spec, stamped));
+            schemaFindings.addAll(ConfigSafetyValidator.check("schema", stamped, SafetyPolicy.defaultPolicy()));
+            List<Finding> errors = schemaFindings.stream()
+                    .filter(f -> f.severity() == Severity.ERROR).toList();
+            if (!errors.isEmpty())
+                throw new IllegalArgumentException("schema is invalid: " + errors.stream()
+                        .map(f -> (f.fieldPath().isEmpty() ? "" : f.fieldPath() + ": ") + f.message())
+                        .collect(java.util.stream.Collectors.joining("; ")));
+        }
+
         // S6b: a mapping whose rules break a TransformCompiler precondition cannot run — it either
         // fails the batch or (CONCAT_DT without a separator) throws mid-materialize. Refuse it at
         // authoring time, so /components/mapping/validate is a PREVIEW of this gate, not the only one.
