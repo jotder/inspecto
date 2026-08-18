@@ -82,11 +82,11 @@ final class ScratchTables {
 
     /** Quote a SQL identifier. */
     static String q(String ident) {
-        return "\"" + ident.replace("\"", "\"\"") + "\"";
+        return SqlIdent.q(ident);
     }
 
     /** A single-quoted SQL string literal (escaping embedded quotes). */
     static String sqlStr(String s) {
-        return "'" + s.replace("'", "''") + "'";
+        return SqlIdent.sqlStr(s);
     }
 }

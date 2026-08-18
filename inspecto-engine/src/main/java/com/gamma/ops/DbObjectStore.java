@@ -32,7 +32,7 @@ import java.util.Optional;
  * @since 4.3.0
  */
 @com.gamma.api.PublicApi(since = "4.3.0")
-public final class DbObjectStore implements ObjectStore, com.gamma.util.BrowsableStore {
+public final class DbObjectStore extends AbstractJdbcStore implements ObjectStore {
 
     private static final Logger log = LoggerFactory.getLogger(DbObjectStore.class);
 
@@ -41,17 +41,9 @@ public final class DbObjectStore implements ObjectStore, com.gamma.util.Browsabl
     private static final String COLS = "id, object_type, title, description, status, severity, priority, "
             + "\"owner\", assignee, correlation_id, attributes, created_at, updated_at, closed_at";
 
-    private final Connection conn;
-
-    // ── raw table browser seam (BrowsableStore) — read-only, synchronized(this) ──
-    @Override public String browseId() { return "objects"; }
-    @Override public String browseLabel() { return "Objects"; }
-    @Override public java.util.List<String> browseTables() { return java.util.List.of(TABLE); }
-    @Override public Connection browseConnection() { return conn; }
-
     /** Wrap an already-open JDBC connection (any engine); the schema is created if absent. */
     public DbObjectStore(Connection conn) {
-        this.conn = conn;
+        super(conn, "objects", "Objects", TABLE, "object");
         initSchema();
     }
 
@@ -171,15 +163,6 @@ public final class DbObjectStore implements ObjectStore, com.gamma.util.Browsabl
             log.warn("object query failed: {}", e.getMessage());
         }
         return out;
-    }
-
-    @Override
-    public void close() {
-        try {
-            conn.close();
-        } catch (SQLException e) {
-            log.warn("Error closing object DB connection: {}", e.getMessage());
-        }
     }
 
     // ── schema + helpers ─────────────────────────────────────────────────────────

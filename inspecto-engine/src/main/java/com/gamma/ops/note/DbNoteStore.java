@@ -26,7 +26,7 @@ import java.util.Map;
  * @since 4.6.0
  */
 @com.gamma.api.PublicApi(since = "4.6.0")
-public final class DbNoteStore implements NoteStore, com.gamma.util.BrowsableStore {
+public final class DbNoteStore extends com.gamma.ops.AbstractJdbcStore implements NoteStore {
 
     private static final Logger log = LoggerFactory.getLogger(DbNoteStore.class);
 
@@ -34,17 +34,9 @@ public final class DbNoteStore implements NoteStore, com.gamma.util.BrowsableSto
     private static final String COLS =
             "id, object_id, target_kind, kind, author, body, attributes, created_at";
 
-    private final Connection conn;
-
-    // ── raw table browser seam (BrowsableStore) — read-only, synchronized(this) ──
-    @Override public String browseId() { return "notes"; }
-    @Override public String browseLabel() { return "Notes"; }
-    @Override public java.util.List<String> browseTables() { return java.util.List.of(TABLE); }
-    @Override public Connection browseConnection() { return conn; }
-
     /** Wrap an already-open JDBC connection (any engine); the schema is created if absent. */
     public DbNoteStore(Connection conn) {
-        this.conn = conn;
+        super(conn, "notes", "Notes", TABLE, "note");
         initSchema();
     }
 
@@ -110,15 +102,6 @@ public final class DbNoteStore implements NoteStore, com.gamma.util.BrowsableSto
             // quietly "deleted 0" would orphan the rows the caller is purging an object to remove.
             throw new IllegalStateException("could not delete notes for " + tk + "/" + targetId
                     + ": " + e.getMessage(), e);
-        }
-    }
-
-    @Override
-    public void close() {
-        try {
-            conn.close();
-        } catch (SQLException e) {
-            log.warn("Error closing note DB connection: {}", e.getMessage());
         }
     }
 

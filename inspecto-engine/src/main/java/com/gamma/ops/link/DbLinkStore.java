@@ -26,24 +26,16 @@ import java.util.List;
  * @since 4.5.0
  */
 @com.gamma.api.PublicApi(since = "4.5.0")
-public final class DbLinkStore implements LinkStore, com.gamma.util.BrowsableStore {
+public final class DbLinkStore extends com.gamma.ops.AbstractJdbcStore implements LinkStore {
 
     private static final Logger log = LoggerFactory.getLogger(DbLinkStore.class);
 
     private static final String TABLE = "inspecto_ops_links";
     private static final String COLS = "from_id, from_type, to_id, to_type, relationship, created_at";
 
-    private final Connection conn;
-
-    // ── raw table browser seam (BrowsableStore) — read-only, synchronized(this) ──
-    @Override public String browseId() { return "links"; }
-    @Override public String browseLabel() { return "Correlation Links"; }
-    @Override public java.util.List<String> browseTables() { return java.util.List.of(TABLE); }
-    @Override public Connection browseConnection() { return conn; }
-
     /** Wrap an already-open JDBC connection (any engine); the schema is created if absent. */
     public DbLinkStore(Connection conn) {
-        this.conn = conn;
+        super(conn, "links", "Correlation Links", TABLE, "link");
         initSchema();
     }
 
@@ -123,15 +115,6 @@ public final class DbLinkStore implements LinkStore, com.gamma.util.BrowsableSto
         } catch (SQLException e) {
             log.warn("link query failed: {}", e.getMessage());
             return List.of();
-        }
-    }
-
-    @Override
-    public void close() {
-        try {
-            conn.close();
-        } catch (SQLException e) {
-            log.warn("Error closing link DB connection: {}", e.getMessage());
         }
     }
 

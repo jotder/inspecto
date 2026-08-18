@@ -175,25 +175,16 @@ public class TarInboxPreparer {
      * Dry-run only: peeks inside the archive and reports what would be extracted.
      */
     private void peekAndReport(Path src) throws IOException {
-        try (InputStream fi = Files.newInputStream(src);
-             InputStream bi = new BufferedInputStream(fi);
-             InputStream ci = TarUtil.isGzipped(src)
-                     ? new org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream(bi) : bi;
-             org.apache.commons.compress.archivers.tar.TarArchiveInputStream ti =
-                     new org.apache.commons.compress.archivers.tar.TarArchiveInputStream(ci)) {
-
-            org.apache.commons.compress.archivers.tar.TarArchiveEntry entry;
-            while ((entry = ti.getNextEntry()) != null) {
-                if (!entry.isDirectory()) {
-                    String fname = Paths.get(entry.getName()).getFileName().toString();
-                    if (TarUtil.isCsv(fname))
-                        System.out.printf("[DRY-RUN] Would move CSV: %s → %s/%s%n",
-                                fname,
-                                sourceDir.resolve(TarUtil.extractDate(fname)),
-                                fname);
-                }
+        TarUtil.forEachEntry(src, entry -> {
+            if (!entry.isDirectory()) {
+                String fname = Paths.get(entry.getName()).getFileName().toString();
+                if (TarUtil.isCsv(fname))
+                    System.out.printf("[DRY-RUN] Would move CSV: %s → %s/%s%n",
+                            fname,
+                            sourceDir.resolve(TarUtil.extractDate(fname)),
+                            fname);
             }
-        }
+        });
     }
 
     // ── step 2 helper: arrange extracted CSVs by date ────────────────────────

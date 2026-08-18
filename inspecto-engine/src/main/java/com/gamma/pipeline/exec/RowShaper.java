@@ -520,12 +520,12 @@ public final class RowShaper {
 
     /** Double-quote an identifier (escaping embedded quotes). */
     private static String q(String ident) {
-        return "\"" + ident.replace("\"", "\"\"") + "\"";
+        return SqlIdent.q(ident);
     }
 
     /** A single-quoted SQL string literal. */
     private static String sqlStr(String s) {
-        return "'" + s.replace("'", "''") + "'";
+        return SqlIdent.sqlStr(s);
     }
 
     private static String str(PipelineNode n, String key) {

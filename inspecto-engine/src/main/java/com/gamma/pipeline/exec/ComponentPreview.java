@@ -312,7 +312,7 @@ public final class ComponentPreview {
 
     /** Quote a projection identifier, escaping embedded quotes. */
     private static String quoteIdent(String name) {
-        return '"' + name.replace("\"", "\"\"") + '"';
+        return SqlIdent.q(name);
     }
 
     /** Wrap an expression in the configured fixed-width trim function (mirrors the ingester). */

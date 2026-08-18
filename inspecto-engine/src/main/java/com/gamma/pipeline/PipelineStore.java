@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
 /**
  * Persistence for authored flows (doc §7.1 / §14 T19): create / replace / delete / list {@code *_flow.toon}
@@ -49,20 +48,13 @@ public final class PipelineStore {
     public List<PipelineGraph> list() {
         List<PipelineGraph> out = new ArrayList<>();
         if (!Files.isDirectory(pipelinesRoot)) return out;
-        try (Stream<Path> files = Files.list(pipelinesRoot)) {
-            files.filter(Files::isRegularFile)
-                    .filter(p -> p.getFileName().toString().endsWith(TOON))
-                    .sorted()
-                    .forEach(p -> {
-                        try {
-                            out.add(PipelineCodec.fromMap(ToonHelper.load(p.toString())));
-                        } catch (Exception e) {
-                            log.warn("Could not load authored flow {}: {}", p, e.getMessage());
-                        }
-                    });
-        } catch (IOException e) {
-            log.warn("Cannot scan flows dir {}: {}", pipelinesRoot, e.getMessage());
-        }
+        DirectoryScan.forEachFile(pipelinesRoot, TOON, "pipeline", p -> {
+            try {
+                out.add(PipelineCodec.fromMap(ToonHelper.load(p.toString())));
+            } catch (Exception e) {
+                log.warn("Could not load authored pipeline {}: {}", p, e.getMessage());
+            }
+        });
         return out;
     }
 

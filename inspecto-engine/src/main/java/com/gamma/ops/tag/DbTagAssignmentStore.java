@@ -26,24 +26,16 @@ import java.util.List;
  * @since 4.9.0
  */
 @com.gamma.api.PublicApi(since = "4.9.0")
-public final class DbTagAssignmentStore implements TagAssignmentStore, com.gamma.util.BrowsableStore {
+public final class DbTagAssignmentStore extends com.gamma.ops.AbstractJdbcStore implements TagAssignmentStore {
 
     private static final Logger log = LoggerFactory.getLogger(DbTagAssignmentStore.class);
 
     private static final String TABLE = "inspecto_ops_tag_assignments";
     private static final String COLS = "tag, target_kind, target_id, actor, created_at";
 
-    private final Connection conn;
-
-    // ── raw table browser seam (BrowsableStore) — read-only ──
-    @Override public String browseId() { return "tag-assignments"; }
-    @Override public String browseLabel() { return "Tag assignments"; }
-    @Override public java.util.List<String> browseTables() { return java.util.List.of(TABLE); }
-    @Override public Connection browseConnection() { return conn; }
-
     /** Wrap an already-open JDBC connection (any engine); the schema is created if absent. */
     public DbTagAssignmentStore(Connection conn) {
-        this.conn = conn;
+        super(conn, "tag-assignments", "Tag assignments", TABLE, "tag");
         initSchema();
     }
 
@@ -188,15 +180,6 @@ public final class DbTagAssignmentStore implements TagAssignmentStore, com.gamma
         } catch (SQLException e) {
             throw new IllegalStateException("could not clear tags on " + tk + "/" + targetId
                     + ": " + e.getMessage(), e);
-        }
-    }
-
-    @Override
-    public void close() {
-        try {
-            conn.close();
-        } catch (SQLException e) {
-            log.warn("Error closing tag DB connection: {}", e.getMessage());
         }
     }
 

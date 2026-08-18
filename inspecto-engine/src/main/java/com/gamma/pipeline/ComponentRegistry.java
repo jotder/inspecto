@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Stream;
 
 /**
  * Index of reusable, named components addressed by a typed <b>in-file identity</b> {@code <type>/<name>}
@@ -126,14 +125,7 @@ public final class ComponentRegistry {
                 if (!Files.isDirectory(dir)) continue;
                 String type = e.getValue();
                 String suffix = CSV_KINDS.contains(type) ? CSV : TOON;
-                try (Stream<Path> files = Files.list(dir)) {
-                    files.filter(Files::isRegularFile)
-                            .filter(p -> p.getFileName().toString().endsWith(suffix))
-                            .sorted()
-                            .forEach(p -> load(type, p, idx));
-                } catch (IOException io) {
-                    log.warn("Cannot scan component dir {}: {}", dir, io.getMessage());
-                }
+                DirectoryScan.forEachFile(dir, suffix, "component", p -> load(type, p, idx));
             }
         }
         return new ComponentRegistry(Map.copyOf(idx));

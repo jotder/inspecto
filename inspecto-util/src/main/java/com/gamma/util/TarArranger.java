@@ -229,21 +229,13 @@ public class TarArranger {
 
     private void dryRunPeek(Path archive, Path scratchDir) throws IOException {
         System.out.printf("[DRY-RUN] Would extract: %s → %s%n", archive.getFileName(), scratchDir);
-        // Walk tar entries using commons-compress via TarUtil; replicate just enough for reporting
-        try (var fi = Files.newInputStream(archive);
-             var bi = new java.io.BufferedInputStream(fi);
-             var ci = TarUtil.isGzipped(archive)
-                     ? new org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream(bi) : bi;
-             var tar = new org.apache.commons.compress.archivers.tar.TarArchiveInputStream(ci)) {
-            org.apache.commons.compress.archivers.tar.TarArchiveEntry entry;
-            while ((entry = tar.getNextEntry()) != null) {
-                if (!entry.isDirectory()) {
-                    String fname = Paths.get(entry.getName()).getFileName().toString();
-                    if (TarUtil.isCsv(fname))
-                        System.out.printf("[DRY-RUN] Would move CSV: %s → %s/%s%n",
-                                fname, TarUtil.extractDate(fname), fname);
-                }
+        TarUtil.forEachEntry(archive, entry -> {
+            if (!entry.isDirectory()) {
+                String fname = Paths.get(entry.getName()).getFileName().toString();
+                if (TarUtil.isCsv(fname))
+                    System.out.printf("[DRY-RUN] Would move CSV: %s → %s/%s%n",
+                            fname, TarUtil.extractDate(fname), fname);
             }
-        }
+        });
     }
 }

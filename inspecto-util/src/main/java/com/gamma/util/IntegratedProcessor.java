@@ -104,24 +104,16 @@ public class IntegratedProcessor {
     }
 
     private void peekAndReport(Path src) throws IOException {
-        try (InputStream fi = Files.newInputStream(src);
-             InputStream bi = new java.io.BufferedInputStream(fi);
-             InputStream ci = TarUtil.isGzipped(src)
-                     ? new org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream(bi) : bi;
-             org.apache.commons.compress.archivers.tar.TarArchiveInputStream ti =
-                     new org.apache.commons.compress.archivers.tar.TarArchiveInputStream(ci)) {
-            org.apache.commons.compress.archivers.tar.TarArchiveEntry entry;
-            while ((entry = ti.getNextEntry()) != null) {
-                String innerName = entry.getName();
-                Matcher m = CBS_ADJ_DATE_PATTERN.matcher(innerName);
-                if (m.find()) {
-                    String date = m.group(1);
-                    System.out.println("[DRY-RUN] Would extract and move: " + innerName
-                            + " -> " + targetBaseDir.resolve(date));
-                    filesMoved.incrementAndGet();
-                }
+        TarUtil.forEachEntry(src, entry -> {
+            String innerName = entry.getName();
+            Matcher m = CBS_ADJ_DATE_PATTERN.matcher(innerName);
+            if (m.find()) {
+                String date = m.group(1);
+                System.out.println("[DRY-RUN] Would extract and move: " + innerName
+                        + " -> " + targetBaseDir.resolve(date));
+                filesMoved.incrementAndGet();
             }
-        }
+        });
     }
 
     private void scanAndMove(Path dir) {

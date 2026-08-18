@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
 /**
  * <b>T32 Phase C — persistence for logical {@code sink.view} definitions.</b> When a flow job produces a
@@ -46,14 +45,7 @@ public final class ViewStore {
     public List<ViewDefinition> list() {
         List<ViewDefinition> out = new ArrayList<>();
         if (!Files.isDirectory(viewsRoot)) return out;
-        try (Stream<Path> files = Files.list(viewsRoot)) {
-            files.filter(Files::isRegularFile)
-                    .filter(p -> p.getFileName().toString().endsWith(SUFFIX))
-                    .sorted()
-                    .forEach(p -> load(p).ifPresent(out::add));
-        } catch (IOException e) {
-            log.warn("Cannot scan views dir {}: {}", viewsRoot, e.getMessage());
-        }
+        DirectoryScan.forEachFile(viewsRoot, SUFFIX, "view", p -> load(p).ifPresent(out::add));
         return out;
     }
 

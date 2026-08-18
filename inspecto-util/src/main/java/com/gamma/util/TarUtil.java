@@ -128,14 +128,37 @@ public final class TarUtil {
      * @return total entry count (directories and files)
      */
     public static int peekTar(Path archive) throws IOException {
-        int count = 0;
+        int[] count = {0};
+        forEachEntry(archive, entry -> count[0]++);
+        return count[0];
+    }
+
+    /** What {@link #forEachEntry} hands each entry; may throw, and the throw aborts the walk. */
+    @FunctionalInterface
+    public interface EntryVisitor {
+        void visit(TarArchiveEntry entry) throws IOException;
+    }
+
+    /**
+     * Walk every entry of a tar/tar.gz archive without extracting anything (JAVA-5).
+     *
+     * <p>Opening the archive is four nested streams whose middle link depends on {@link #isGzipped} —
+     * a preamble three dry-run peeks each carried verbatim, differing only in what they printed per
+     * entry. A copy that forgets the gzip branch does not fail to compile; it fails to see any entry
+     * in a {@code .tar.gz} and reports an empty archive, which is exactly the kind of silence a
+     * dry-run must not produce.
+     *
+     * <p>The visitor gets the entry, not the stream: this is a peek, so entry <em>data</em> is
+     * deliberately out of reach — {@link #extractTar} owns reading it.
+     */
+    public static void forEachEntry(Path archive, EntryVisitor visitor) throws IOException {
         try (InputStream fi  = Files.newInputStream(archive);
              InputStream bi  = new BufferedInputStream(fi);
              InputStream ci  = isGzipped(archive) ? new GzipCompressorInputStream(bi) : bi;
              TarArchiveInputStream tar = new TarArchiveInputStream(ci)) {
-            while (tar.getNextEntry() != null) count++;
+            TarArchiveEntry entry;
+            while ((entry = tar.getNextEntry()) != null) visitor.visit(entry);
         }
-        return count;
     }
 
     // ── extraction sentinel (.extracted.json) ─────────────────────────────────
