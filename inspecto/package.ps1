@@ -325,7 +325,10 @@ $runShContent = @'
 set -euo pipefail
 cd "$(dirname "$0")"
 ADAPTER="${1:?Usage: run.sh <adapter>   (e.g. voucher)}"
-PIPELINE=$(ls spaces/*/config/"${ADAPTER}"/*_pipeline.toon 2>/dev/null | head -1)
+# `|| true` is load-bearing: under `set -euo pipefail` a non-matching glob makes `ls` fail, the pipe
+# fail, and the assignment fail -- so the script died at THIS line with exit 2 and no message, and
+# the friendly error below was unreachable (found alongside PKG-2, 2026-08-18).
+PIPELINE=$(ls spaces/*/config/"${ADAPTER}"/*_pipeline.toon 2>/dev/null | head -1 || true)
 if [ -z "$PIPELINE" ]; then
     echo "ERROR: no pipeline file found at spaces/*/config/${ADAPTER}/*_pipeline.toon" >&2
     exit 1
@@ -361,9 +364,15 @@ if "%1"=="" (
     echo Usage: run.bat ADAPTER   [e.g. voucher]
     exit /b 1
 )
+rem PKG-2: the lookup used to be a single `for %%F in (spaces\*\config\%1\*_pipeline.toon)`, which
+rem NEVER matched -- cmd's set-based FOR globs the FILENAME only, so a wildcard in a DIRECTORY
+rem component silently finds nothing. `for /d` DOES glob directories, so enumerate the spaces first
+rem and leave only the filename wildcard to the inner FOR. First match wins, as in run.sh.
 set "PIPELINE="
-for %%F in (spaces\*\config\%1\*_pipeline.toon) do (
-    if not defined PIPELINE set "PIPELINE=%%F"
+for /d %%S in (spaces\*) do (
+    for %%F in ("%%S\config\%1\*_pipeline.toon") do (
+        if not defined PIPELINE if exist "%%~F" set "PIPELINE=%%~F"
+    )
 )
 if not defined PIPELINE (
     echo ERROR: no pipeline file found at spaces\*\config\%1\*_pipeline.toon

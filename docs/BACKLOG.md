@@ -858,19 +858,23 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md).
 
 **Open:**
-- 🟡 **PKG-2 — `run.bat ADAPTER` has NEVER resolved a pipeline (found 2026-08-18, NOT fixed).**
-  The lookup is `for %%F in (spaces\*\config\%1\*_pipeline.toon)`. cmd's set-based `FOR` globs the
-  **filename only** — a wildcard in a *directory* component never matches — so the Windows launcher always
-  prints `ERROR: no pipeline file found at spaces\*\config\<adapter>\*_pipeline.toon` and exits 1, while
-  `run.sh`'s `ls`-based glob resolves the same adapter fine. Reproduced on a freshly packaged bundle with
-  `run.bat cdr` against an existing `spaces/default/config/cdr/cdr_pipeline.toon`. The fix is a `for /f`
-  over `dir /b /s *_pipeline.toon` filtered on the adapter directory, in `package.ps1`'s `$runBatContent`.
-  ⚠ Left alone deliberately: found while verifying an unrelated launcher change (`560e9f13`), and the
-  glob line is not part of that change. **Nobody has reported it**, which suggests Windows operators run
-  the jar directly — worth asking before investing in the launcher.
-  ⚠ Also noted while probing: this sandbox sets `NoDefaultCurrentDirectoryInExePath=1`, so a bare
-  `cmd /c run.bat` reports *"not recognized as an internal or external command"* — use `.\run.bat`.
-  That looks exactly like a broken script and produced a run of empty "no output" probe results here.
+- ✅ **PKG-2 — CLOSED 2026-08-18: `run.bat ADAPTER` resolves a pipeline for the first time.**
+  The lookup was a single `for %%F in (spaces\*\config\%1\*_pipeline.toon)`, which NEVER matched —
+  cmd's set-based `FOR` globs the **filename only**, so a wildcard in a *directory* component silently
+  finds nothing and every invocation printed `ERROR: no pipeline file found` and exited 1. `for /d` DOES
+  glob directories, so the fix enumerates the spaces first and leaves only the filename wildcard to an
+  inner `FOR`. Verified on a packaged bundle: **7/7 parity with `run.sh`** across all three bundled spaces
+  (`cdr`, `events` in `default`; `payments`, `orders` in `demo`; `voucher`, `sites` in `ucc`; plus an
+  unknown adapter ⇒ error + exit 1), including the multi-match `orders` case where both pick the same
+  first match. This also made `run.bat`'s `INSPECTO_JAVA_OPTS` pass-through verifiable **end-to-end**,
+  which `1768978f` could only probe with the script's own extracted lines.
+  ⚠ **The sibling `run.sh` had the mirror defect and is fixed in the same change:** under
+  `set -euo pipefail` a non-matching glob made `ls` fail, the pipe fail, and the assignment fail, so the
+  script died at that line with **exit 2 and no message** — its friendly error branch was unreachable
+  dead code. `|| true` on the assignment restores it (now exit 1 + the message, matching `run.bat`).
+  ⚠ Worth knowing when probing `.bat` files here: this sandbox sets `NoDefaultCurrentDirectoryInExePath=1`,
+  so a bare `cmd /c run.bat` reports *"not recognized as an internal or external command"* — use
+  `.\run.bat`. It looks exactly like a broken script and yields empty "no output" probe results.
 - ✅ **JAVA-1 — CLOSED 2026-08-18: the quarantine path now DISCARDS what it already revealed.**
   Operator call: discard-on-failure, not register-as-PARTIAL — a quarantined member contributed nothing
   and that is what the audit says, so its generations go with it. `GenerationModeIngester.discardRevealed`
