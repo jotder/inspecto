@@ -930,6 +930,21 @@ CONTROL_TOKEN=secret ASSIST_TOKEN=secret bash serve.sh    # Linux/Mac → http:/
 set CONTROL_TOKEN=secret && serve.bat                     # Windows
 ```
 
+**Extra JVM flags — `INSPECTO_JAVA_OPTS`** (fallback `EXTRA_JAVA_OPTS`), honored by all six launchers
+since `1768978f`. Whitespace-separated, appended **after** each script's own flags (and, in
+`run`/`ura`, before `-jar`/`-cp`), so the mandatory `--enable-native-access=ALL-UNNAMED`, the port,
+the spaces root and the auth wiring cannot be clobbered from the environment. The launch banner
+echoes whatever was passed, so a flag that did not land is visible rather than silent.
+
+```bash
+INSPECTO_JAVA_OPTS="-Dui.static.log=DEBUG" CONTROL_TOKEN=secret bash serve.sh   # static-serving trace
+INSPECTO_JAVA_OPTS="-Xmx8g" bash run.sh <data_source>                           # bigger heap for one run
+```
+
+⛔ **Do not use `JAVA_OPTS`.** The scripts *assign* that name, so an exported `JAVA_OPTS` is silently
+discarded — before `560e9f13` this was the only thing an operator would think to try, and a BUNDLE-1
+diagnostic run once reported "no errors" purely because the flag never reached the JVM.
+
 **Direct invocation** (without the run scripts):
 ```bash
 java --enable-native-access=ALL-UNNAMED \

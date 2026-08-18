@@ -75,7 +75,9 @@ inspecto-deploy/
 - **Entry points**: `serve.*` → `com.gamma.control.ControlApi` (long-running control plane + UI — the
   service process); `run.*` → one-shot ETL (`CollectorProcessor`, the JAR's default main class); `ura.*` →
   pre-ETL utility CLI. All launchers carry the **mandatory** `--enable-native-access=ALL-UNNAMED`
-  (DuckDB JNI — the JVM crashes on DuckDB init without it).
+  (DuckDB JNI — the JVM crashes on DuckDB init without it). Since `1768978f` all six also honor
+  **`INSPECTO_JAVA_OPTS`** (fallback `EXTRA_JAVA_OPTS`) for operator-supplied flags, appended after
+  their own so the mandatory ones cannot be clobbered; ⛔ `JAVA_OPTS` is *assigned* and discarded.
 - `serve.*` reads environment: `PORT`, `SPACES_ROOT`, `CORS_ORIGIN`, `HTTPS_KEYSTORE`/`HTTPS_KEYSTORE_PASSWORD`,
   `AUTH_OIDC_*` — secrets are forwarded as `${ENV:…}` **references**, never literal values. It auto-detects
   `inspecto-security.jar` and flips to `-Dauth.mode=oidc` (Standard).
