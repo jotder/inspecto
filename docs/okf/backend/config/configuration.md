@@ -334,6 +334,7 @@ All seven core `dirs.*` entries are required for CollectorProcessor (`poll`, `da
 **`processing.duplicate_check.retention_days`** — how far back duplicate detection reaches (default: `90`). A file delivered more than 90 days after its first processing will be treated as a new file and processed again. Increase this value for sources that occasionally re-deliver old data.
 
 > **JToon note:** The `.toon` format does not support `#` comment lines. Parsing stops at the first unrecognised character, so do not add inline or standalone comments.
+> 🔴 **This is not always an error.** A comment between two top-level sections makes `JToon.decode` **truncate the file there**, and `PipelineConfig.load` accepts the truncated map with no error and no warning — every key after the comment is silently gone (verified 2026-08-18: a comment block in `spaces/demo/config/orders/orders_pipeline.toon` dropped `output_store:`, `steps:` and `collector:`). Decode an edited config and compare its top-level key list; a successful load is not evidence.
 
 **`processing.csv_settings.has_header`** (default: `true`) — when set to `false`, the first data line is treated as a row rather than a column-name header. Use for source files that contain no header row; columns are bound to the schema by `selector` index. Omitting the key is equivalent to `true`.
 

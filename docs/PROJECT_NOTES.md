@@ -365,7 +365,14 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
 - **Hand-authored `.toon` rules (verified live 2026-07-10, `spaces/demo` shakeout):** (1) **No `#` comments
   anywhere** — suffix-scanned loaders (`*_pipeline/_job/_connection/_alert/_queue/…`) strict-reject the file
   ("Multiple primitives at root depth"), and even the lenient registry read mangles comment lines into junk
-  keys. Some loaders tolerate them today (template/escalation) — do not rely on it. (2) **Lists need counts**:
+  keys. Some loaders tolerate them today (template/escalation) — do not rely on it.
+  🔴 **A hard reject is the BEST case, and not what happens for a comment between two top-level sections
+  (re-verified 2026-08-18).** There, `JToon.decode` **silently truncates at the comment** and
+  `PipelineConfig.load` accepts the result with **no error and no warning** — a 4-line explanatory block added
+  to `orders/orders_pipeline.toon` dropped `output_store:`, `steps:` AND the pre-existing `collector:` gap
+  detection (9 top-level keys → 6), and the file still "loaded". The job then pointed at a Stage-2 chain that
+  did not exist in the parsed config. ⇒ after editing any `.toon`, **decode it and diff the top-level key
+  list**; a clean load proves nothing. (2) **Lists need counts**:
   inline `members[1]: operator` or tabular `tiles[3]{widgetId,span}:`; bare `- item` lists fail (exception:
   authored-flow `nodes[n]:` blocks accept `- id:` maps). (3) **Alert rules need an `alert:` wrapper** and
   `severity` ∈ {CRITICAL, INFO, WARNING} — not WARN. (4) **Job-type params are FLAT keys under `job:`**

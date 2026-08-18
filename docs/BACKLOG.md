@@ -2242,6 +2242,7 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 | Parser required-vs-advanced field tiers | **Parked by decision (D13, 2026-07-25)** — needs a real onboarding-observation session (interview #2); explicitly NOT an engineering guess |
 | Template seed-pack enrichment (frontend C7) | Ongoing, continuous — not a discrete item |
 | Reconciliation explicit **non-goals** (N>3, non-additive aggs, fuzzy keys) | Recorded, not open work — `okf/frontend/features/reconciliation.md` |
+| `spaces/default/config/csv_demo` residuals (SAMPLE-1) | Open, small. The `csv_demo` feed has the two defects the 2026-08-18 sweep fixed everywhere else: its samples are **not seeded** by `spaces/default/data/samples/seed-inbox.{sh,ps1}` (so `data/samples/csv_demo/` is unreachable via the documented run path), and `csv_demo_schema.toon` declares `QUANTITY,"3",INTEGER`, which lands as **VARCHAR** — `DIRECT` coerces DATE/TIMESTAMP/DOUBLE only (`okf/backend/config/configuration.md`). Fix = add a `csv_demo` arm to both seed scripts + swap the field to VARCHAR with a `TRY_CAST(QUANTITY AS INTEGER)` EXPR rule. ⚠ The whole `csv_demo` tree is **untracked operator work** — confirm with its author before committing it. |
 
 ## 8. Duplicate map (same work, multiple IDs — update all sources when closing)
 
