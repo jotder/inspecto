@@ -6,6 +6,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -60,6 +63,7 @@ final class GenerationModeIngester {
                         } catch (SinkFlushException e) {
                             throw e;   // framework/schema fault → fail the batch (don't quarantine)
                         } catch (Exception e) {
+                            discardRevealed(sink, m);
                             QuarantineManager.quarantine(m.file(), "unreadable", false, cfg);
                             memberAudits.add(MemberAudit.rejected(m, "QUARANTINED_UNREADABLE", msg(e), mStart));
                             continue;
@@ -68,6 +72,7 @@ final class GenerationModeIngester {
                         long memberParsed = sink.parsedRows();
                         long memberErrors = sink.errorRows();
                         if (memberParsed == 0) {
+                            discardRevealed(sink, m);
                             QuarantineManager.quarantine(m.file(), "field_mismatch", memberErrors > 0, cfg);
                             memberAudits.add(MemberAudit.rejected(m, "QUARANTINED_MISMATCH",
                                     "0 valid rows across all segments", mStart));
@@ -99,6 +104,36 @@ final class GenerationModeIngester {
         String schemaNames = String.join(",", cfg.schemas().segments().keySet());
         return new IngestOutcome(batchStart, batchStatus, batchError, survivors, memberAudits,
                 allOutputs, allLineage, totalInputRows, schemaNames);
+    }
+
+    /**
+     * Delete the generations this member already revealed into the database dir, before quarantining it.
+     *
+     * <p>Generation mode reveals real output on every {@code flushRows} rows, so a member that fails
+     * partway through has already published complete files under {@code <stem>_gNNNNN_out.*}. Quarantining
+     * without deleting them orphans that output: it never reaches {@code sink.outputs()}, so no manifest
+     * and no §11.3 registry row names it — and per D3 an unregistered file reads as <em>unknown, not
+     * excluded</em>, so a glob-based read counts those rows. Because the basename derives from the file
+     * stem and not the batch id, a reprocess with a different generation count would leave the first run's
+     * files behind permanently. A quarantined member contributed nothing, and that is what the audit says,
+     * so the revealed generations go too.
+     *
+     * <p>A delete that fails fails the <em>batch</em> ({@link SinkFlushException} propagates to
+     * {@link #run}'s outer catch): an orphan we know about is worse than a batch an operator retries.
+     */
+    private static void discardRevealed(DuckDbRecordSink sink, Batch.Member m) {
+        List<PartitionOutput> revealed = sink.outputs();
+        if (revealed.isEmpty()) return;
+        for (PartitionOutput o : revealed) {
+            try {
+                Files.deleteIfExists(Paths.get(o.outputFile()));
+            } catch (IOException e) {
+                throw new SinkFlushException("cannot discard revealed generation " + o.outputFile()
+                        + " for quarantined member " + m.file().getName(), e);
+            }
+        }
+        log.warn("[INGEST] [{}] quarantined mid-file — discarded {} already-revealed generation file(s)",
+                m.file().getName(), revealed.size());
     }
 
     private static StreamingFileIngester instantiate(PipelineConfig cfg) {

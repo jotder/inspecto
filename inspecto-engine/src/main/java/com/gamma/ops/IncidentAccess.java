@@ -3,7 +3,6 @@ package com.gamma.ops;
 import com.gamma.api.PublicApi;
 
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -40,9 +39,16 @@ public interface IncidentAccess {
     static IncidentAccess over(Supplier<ObjectService> objects) {
         return (title, message, severity, scope, attributes, dedupeAttribute) -> {
             ObjectService svc = objects.get();
-            boolean active = svc.active(ObjectType.INCIDENT, scope).stream()
-                    .anyMatch(o -> Objects.equals(attributes.get(dedupeAttribute),
-                            o.attributes().get(dedupeAttribute)));
+            // ⚠ No dedupe VALUE means no dedupe — never a match. `Objects.equals(null, null)` is true, so
+            // comparing an absent key against another Incident that also lacks it made two unrelated
+            // Incidents in the same scope look like duplicates and SILENTLY swallowed the second. Nothing in
+            // this contract obliges a caller to put `dedupeAttribute` in `attributes`, and the engine's own
+            // two callers only avoid it by always populating "rule". An extra Incident an operator can close
+            // beats an Incident that never opened.
+            String key = dedupeAttribute == null ? null : attributes.get(dedupeAttribute);
+            boolean active = key != null && !key.isBlank()
+                    && svc.active(ObjectType.INCIDENT, scope).stream()
+                        .anyMatch(o -> key.equals(o.attributes().get(dedupeAttribute)));
             if (active) return Optional.empty();
             return Optional.of(svc.open(ObjectType.INCIDENT, title, message, severity, scope, attributes));
         };

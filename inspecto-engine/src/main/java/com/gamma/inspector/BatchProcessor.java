@@ -249,7 +249,21 @@ public final class BatchProcessor {
 
         // Backup BEFORE markers — see ordering rationale at top of method.
         if (backup != null) {
-            for (Batch.Member m : survivors) backupFile(m.file(), cfg);
+            for (Batch.Member m : survivors) {
+                try {
+                    backupFile(m.file(), cfg);
+                } catch (NoSuchFileException vanished) {
+                    // A member that disappeared from the inbox between ingest and backup degrades the same way
+                    // the fingerprint-ledger loop above it already does. Letting it propagate here demotes the
+                    // batch to FAILED *after* the DuckLake register, the manifest and the §11.3 registration are
+                    // all durable — an audit that says FAILED over a manifest that says the outputs landed, and
+                    // nothing will ever re-drive a file that is no longer there. Only the vanished case is
+                    // tolerated: a genuine backup failure (unwritable destination, full disk) leaves the file in
+                    // the inbox, where a FAILED batch is the honest answer and the rerun is idempotent.
+                    log.warn("Batch {} member {} vanished before backup; skipping its backup",
+                            batch.batchId(), m.file().getName());
+                }
+            }
             recordStages(stageSourceId, batchIdForStages, survivors, cfg, FileStage.BACKED_UP);
         }
 

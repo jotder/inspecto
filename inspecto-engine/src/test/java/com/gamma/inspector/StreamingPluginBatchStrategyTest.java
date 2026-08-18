@@ -51,6 +51,22 @@ class StreamingPluginBatchStrategyTest {
         }
     }
 
+    /**
+     * Emits every line it can, then throws — the JAVA-1 shape: real generations are revealed before the
+     * decode failure that quarantines the member.
+     */
+    public static class PartialThenFailingStreamingIngester implements StreamingFileIngester {
+        @Override
+        public void ingest(File file, RecordSink sink, int srcId, PipelineConfig cfg) throws Exception {
+            for (String line : Files.readAllLines(file.toPath())) {
+                if (line.isBlank()) continue;
+                String[] p = line.split(",", -1);
+                sink.emit(p[0], p[1], p[0], p[2]);
+            }
+            throw new IOException("truncated trailer in " + file.getName());
+        }
+    }
+
     // ── tests ─────────────────────────────────────────────────────────────────
 
     @Test
@@ -157,6 +173,38 @@ class StreamingPluginBatchStrategyTest {
 
         assertEquals("EMPTY", out.status());
         assertEquals("QUARANTINED_UNREADABLE", out.memberAudits().get(0).status());
+    }
+
+    @Test
+    void midFileFailureDiscardsAlreadyRevealedGenerations(@TempDir Path dir) throws Exception {
+        // JAVA-1: generation mode reveals real output every `flushRows` rows, so a member that fails
+        // partway has already published files. Quarantining without deleting them orphans that output —
+        // it reaches no manifest and no §11.3 registry row, and an unregistered file reads as *unknown,
+        // not excluded*, so a glob-based read counts those rows forever.
+        PipelineConfig cfg = setup(dir, PartialThenFailingStreamingIngester.class.getName());
+        File input = writeInput(cfg, "truncated_20200403.bin",
+                "CALL,C001,2020-04-03\n" +
+                "CALL,C002,2020-04-03\n" +
+                "CALL,C003,2020-04-04\n" +
+                "SMS,S001,2020-04-03\n" +
+                "SMS,S002,2020-04-04\n");
+        Batch batch = buildBatch(cfg, input);
+
+        IngestOutcome out = new StreamingPluginBatchStrategy(2).ingest(batch, cfg);
+
+        assertEquals("EMPTY", out.status());
+        assertEquals("QUARANTINED_UNREADABLE", out.memberAudits().get(0).status());
+        assertTrue(out.outputs().isEmpty(), "a quarantined member contributes no outputs");
+
+        List<Path> orphans;
+        Path db = Path.of(cfg.dirs().database());
+        try (Stream<Path> s = Files.walk(db)) {
+            orphans = s.filter(Files::isRegularFile)
+                    .filter(p -> p.getFileName().toString().contains("_g"))
+                    .toList();
+        }
+        assertTrue(orphans.isEmpty(),
+                "revealed generations must be discarded with the quarantined member, found " + orphans);
     }
 
     // ── harness ─────────────────────────────────────────────────────────────────

@@ -43,6 +43,24 @@ class IncidentAccessTest {
     }
 
     @Test
+    void anAbsentDedupeValueNeverSuppresses() {
+        // JAVA-6: `Objects.equals(null, null)` is true, so an Incident whose attributes simply lack the
+        // dedupe key used to "match" any other active Incident in the same scope that also lacked it —
+        // two unrelated Incidents, the second silently swallowed. Nothing requires a caller to include it.
+        ObjectService objects = new ObjectService(new InMemoryObjectStore());
+        IncidentAccess incidents = IncidentAccess.over(() -> objects);
+
+        assertTrue(incidents.openIncident("first", "m", "error", "orders",
+                Map.of("owner", "a"), "rule").isPresent());
+        assertTrue(incidents.openIncident("second, unrelated", "m", "error", "orders",
+                Map.of("owner", "b"), "rule").isPresent(),
+                "neither call carries a 'rule' — that is no dedupe key, not a match");
+        assertTrue(incidents.openIncident("third", "m", "error", "orders",
+                Map.of("rule", " "), "rule").isPresent(), "a blank dedupe value is no key either");
+        assertEquals(3, objects.query(ObjectQuery.builder().objectType(ObjectType.INCIDENT).build()).size());
+    }
+
+    @Test
     void anArchivedIncidentNoLongerSuppresses() {
         ObjectService objects = new ObjectService(new InMemoryObjectStore());
         IncidentAccess incidents = IncidentAccess.over(() -> objects);

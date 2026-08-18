@@ -91,6 +91,20 @@ public final class CircuitBreaker {
         return e == null ? State.CLOSED : e.state;
     }
 
+    /**
+     * Drop one source's breaker state when its collector is unregistered, so {@link #entries} cannot
+     * accumulate an orphan per deleted pipeline for the life of the process — the same leak-under-churn
+     * reason {@code IntakeGovernor.forget} and {@code PipelineRunGuard.forget} exist.
+     *
+     * <p>⚠ The key is {@code source.id()} — the <b>collector</b> id, which defaults to the pipeline name but
+     * is overridable via {@code source.id}. Calling this with a pipeline id silently misses every collector
+     * that declares its own, which is why the caller resolves the config's collector id rather than reusing
+     * the pipeline id it already has.
+     */
+    public synchronized void forget(String sourceId) {
+        entries.remove(sourceId);
+    }
+
     /** Forget all breaker state — for test isolation. */
     public synchronized void reset() {
         entries.clear();

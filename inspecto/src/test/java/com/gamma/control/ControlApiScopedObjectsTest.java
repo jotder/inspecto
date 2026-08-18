@@ -127,6 +127,40 @@ class ControlApiScopedObjectsTest {
         }
     }
 
+    @Test
+    void outOfScopeObjectNamedInTheBodyIs404Too(@TempDir Path dir) throws Exception {
+        // JAVA-6: `scoped` only ever sees the URL {id}. Every route that takes a SECOND object id — a link
+        // target, a merge source, a split member — was ungated on it, so a scoped caller could name an object
+        // hidden from them as the other end of a write. Merge is the sharp one: it absorbs AND CLOSES the
+        // source case, a state mutation on a resource the caller cannot even read.
+        try (Ctx c = open(dir)) {
+            Seed s = seed(c);
+            String fraud = s.fraud().id(), billing = s.billing().id();
+
+            assertEquals(404, post(c.port, "/objects/" + fraud + "/merge",
+                    "{\"sources\":[\"" + billing + "\"]}", "fraud").statusCode(),
+                    "merge source out of scope: indistinguishable from absence");
+            assertEquals(404, post(c.port, "/objects/" + fraud + "/links",
+                    "{\"to\":\"" + billing + "\"}", "fraud").statusCode(), "link target out of scope");
+            assertEquals(404, post(c.port, "/objects",
+                    "{\"title\":\"new\",\"links\":[{\"to\":\"" + billing + "\"}]}", "fraud").statusCode(),
+                    "create-with-links target out of scope");
+            assertEquals(404, delete(c.port, "/objects/" + fraud + "/links?to=" + billing, "fraud").statusCode(),
+                    "unlink target out of scope");
+
+            // the hidden case is untouched — still readable, still in its opening state, for a subject
+            // that may see it (a merge would have CLOSED it)
+            JsonNode after = V1Body.of(get(c.port, "/objects/" + billing, "all").body());
+            assertEquals("IDENTIFIED", after.get("status").asText(),
+                    "the out-of-scope case was not closed by the merge");
+
+            // and the gate is the SCOPE, not the shape: the unscoped subject reaches the service, which
+            // refuses the same call on its own merits (these are INCIDENTs, not CASEs).
+            assertEquals(422, post(c.port, "/objects/" + fraud + "/merge",
+                    "{\"sources\":[\"" + billing + "\"]}", "all").statusCode());
+        }
+    }
+
     private HttpResponse<String> get(int port, String path, String bearer) throws Exception {
         return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
                 .header("Authorization", "Bearer " + bearer).GET().build(), BodyHandlers.ofString());
@@ -137,5 +171,9 @@ class ControlApiScopedObjectsTest {
                 .header("Authorization", "Bearer " + bearer)
                 .header("Content-Type", "application/json")
                 .method("POST", BodyPublishers.ofString(body)).build(), BodyHandlers.ofString());
+    }
+    private HttpResponse<String> delete(int port, String path, String bearer) throws Exception {
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
+                .header("Authorization", "Bearer " + bearer).DELETE().build(), BodyHandlers.ofString());
     }
 }

@@ -1058,6 +1058,11 @@ public final class CollectorService implements AutoCloseable {
         registryLock.lock();   // serialise the registry mutation against a cycle's selection pass
         try {
             Optional<String> id = configRegistry.idForPath(norm);
+            // Resolve the COLLECTOR id before the rebuild drops the config: the circuit breaker is keyed by
+            // source.id(), which defaults to the pipeline name but is overridable, so forgetting by pipeline
+            // id would silently miss every collector that declares its own.
+            Optional<String> collectorId = configRegistry.configForPath(norm)
+                    .map(c -> c.collector().id());
             boolean removed = registry.remove(norm);
             if (!removed) return false;
             configRegistry.rebuild(registry);   // refresh the read surface now; fires catalog invalidation
@@ -1068,6 +1073,8 @@ public final class CollectorService implements AutoCloseable {
                 var timer = referenceRefreshTimers.remove(i);   // else compaction of a deleted store keeps firing
                 if (timer != null) timer.cancel(false);
             });
+            // Breaker state is keyed by collector id, not pipeline id — see above.
+            collectorId.ifPresent(c -> com.gamma.acquire.CircuitBreaker.shared().forget(c));
             log.info("Unregistered pipeline{} from {} ({} pipeline(s) now active)",
                     id.map(i -> " '" + i + "'").orElse(""), norm, registry.size());
             this.eventLog.emit(Event.builder(EventType.PIPELINE_UNREGISTERED)

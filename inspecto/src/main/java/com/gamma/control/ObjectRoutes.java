@@ -41,7 +41,7 @@ final class ObjectRoutes implements RouteModule {
         api.get("/objects", (e, m) -> objectsList(api, e));
         // Registered before the /objects/{id} catch-all so "analytics" is not read as an id (C4).
         api.get("/objects/analytics", (e, m) -> api.service().objects().analytics(parseObjectType(ApiContext.query(e, "type"))));
-        api.post("/objects", (e, m) -> createObject(api, api.body(e)));
+        api.post("/objects", (e, m) -> createObject(api, e, api.body(e)));
         // Every by-id route runs behind the SEC-7d data-scope guard: an object whose caseType is outside
         // the caller's dataScopes answers 404, indistinguishable from absence (existence-hiding).
         api.post("/objects/([^/]+)/ack", scoped(api, (e, m) -> transition(api, ApiContext.name(m), "ack", null, api.body(e))));
@@ -51,11 +51,11 @@ final class ObjectRoutes implements RouteModule {
         api.post("/objects/([^/]+)/watch", scoped(api, (e, m) -> setWatch(api, ApiContext.name(m), api.body(e), true)));
         api.post("/objects/([^/]+)/unwatch", scoped(api, (e, m) -> setWatch(api, ApiContext.name(m), api.body(e), false)));
         api.get("/objects/([^/]+)/watchers", scoped(api, (e, m) -> watchersOf(api, ApiContext.name(m))));
-        api.post("/objects/([^/]+)/links", scoped(api, (e, m) -> createLink(api, ApiContext.name(m), api.body(e))));
+        api.post("/objects/([^/]+)/links", scoped(api, (e, m) -> createLink(api, e, ApiContext.name(m), api.body(e))));
         api.get("/objects/([^/]+)/links", scoped(api, (e, m) -> toLinkMaps(api.service().objects().linksOf(ApiContext.name(m)))));
         api.delete("/objects/([^/]+)/links", scoped(api, (e, m) -> deleteLink(api, ApiContext.name(m), e)));
-        api.post("/objects/([^/]+)/merge", scoped(api, (e, m) -> mergeCases(api, ApiContext.name(m), api.body(e))));
-        api.post("/objects/([^/]+)/split", scoped(api, (e, m) -> splitCase(api, ApiContext.name(m), api.body(e))));
+        api.post("/objects/([^/]+)/merge", scoped(api, (e, m) -> mergeCases(api, e, ApiContext.name(m), api.body(e))));
+        api.post("/objects/([^/]+)/split", scoped(api, (e, m) -> splitCase(api, e, ApiContext.name(m), api.body(e))));
         api.get("/objects/([^/]+)/graph", scoped(api, (e, m) -> objectGraph(api, ApiContext.name(m), e)));
         api.post("/objects/([^/]+)/comments", scoped(api, (e, m) -> addComment(api, ApiContext.name(m), api.body(e))));
         api.get("/objects/([^/]+)/comments", scoped(api, (e, m) -> toNoteMaps(api.service().objects().notesOf(ApiContext.name(m), NoteKind.COMMENT))));
@@ -207,6 +207,21 @@ final class ObjectRoutes implements RouteModule {
         return objs.stream().filter(o -> visibleTo(ex, o)).toList();
     }
 
+    /**
+     * The same SEC-7d gate {@link #scoped} applies to the URL {@code {id}}, for an object id that arrives in
+     * the BODY or the QUERY instead — a link target, a merge source, a split member.
+     *
+     * <p>⛔ {@link #scoped} only ever sees the path id. Without this, a scoped caller could name an object
+     * they cannot even read as the *other* end of a write: merging absorbs and <b>closes</b> the source case,
+     * so the gate on the survivor alone left a state-mutation authorization bypass on a resource hidden from
+     * the caller. Absent and out-of-scope answer the identical 404 (existence-hiding), so the check also
+     * subsumes the plain existence checks these routes already made.
+     */
+    private static void requireVisible(ApiContext api, HttpExchange ex, String id) {
+        OperationalObject o = api.service().objects().get(id).orElse(null);
+        if (o == null || !visibleTo(ex, o)) throw new ApiException(404, "no object with id '" + id + "'");
+    }
+
     /** Wrap a by-id handler: out-of-scope answers the same 404 an absent id does (existence-hiding). */
     private Handler scoped(ApiContext api, Handler h) {
         return (e, m) -> {
@@ -327,14 +342,14 @@ final class ObjectRoutes implements RouteModule {
      * objects directly via {@code ObjectService.open} are unaffected). The object opens in its workflow's
      * initial state; lifecycle moves go through {@code /objects/{id}/transition}.
      */
-    private Object createObject(ApiContext api, Map<String, Object> body) {
+    private Object createObject(ApiContext api, HttpExchange ex, Map<String, Object> body) {
         String title = ApiContext.str(body, "title");
         if (title == null) throw new ApiException(400, "body must include 'title'");
         ObjectType type;
         try {
             type = ObjectType.of(ApiContext.str(body, "type"));
-        } catch (IllegalArgumentException ex) {
-            throw new ApiException(400, ex.getMessage());
+        } catch (IllegalArgumentException badType) {
+            throw new ApiException(400, badType.getMessage());
         }
         if (type == null) type = ObjectType.INCIDENT;   // the create path exists for operator-created incidents
 
@@ -342,9 +357,7 @@ final class ObjectRoutes implements RouteModule {
         // can't leave an orphan object behind (open() then link() is not atomic).
         List<LinkSpec> links = parseLinks(body.get("links"));
         if (links.isEmpty()) throw new ApiException(400, "body must include at least one entry in 'links'");
-        for (LinkSpec l : links)
-            if (api.service().objects().get(l.to()).isEmpty())
-                throw new ApiException(404, "no object with id '" + l.to() + "'");
+        for (LinkSpec l : links) requireVisible(api, ex, l.to());
 
         Map<String, String> attrs = new LinkedHashMap<>();
         if (body.get("attributes") instanceof Map<?, ?> bag)
@@ -416,9 +429,10 @@ final class ObjectRoutes implements RouteModule {
      * {@code {to, relationship?, actor?}} (e.g. a CASE {@code CONTAINS} an INCIDENT). A missing {@code to}
      * → 400; an unknown {@code id} or {@code to} → 404. Idempotent (a duplicate edge returns the existing one).
      */
-    private Object createLink(ApiContext api, String fromId, Map<String, Object> body) {
+    private Object createLink(ApiContext api, HttpExchange ex, String fromId, Map<String, Object> body) {
         String to = ApiContext.str(body, "to");
         if (to == null) throw new ApiException(400, "body must include 'to'");
+        requireVisible(api, ex, to);
         try {
             return api.service().objects().link(fromId, to, ApiContext.str(body, "relationship"), ApiContext.str(body, "actor")).toMap();
         } catch (java.util.NoSuchElementException notFound) {
@@ -439,6 +453,7 @@ final class ObjectRoutes implements RouteModule {
         String to = ApiContext.query(ex, "to");
         String relationship = ApiContext.query(ex, "relationship");
         if (to == null || to.isBlank()) throw new ApiException(400, "query must include 'to'");
+        requireVisible(api, ex, to);
         try {
             if (!api.service().objects().unlink(fromId, to, relationship, ApiContext.query(ex, "actor")))
                 throw new ApiException(404, "no such link " + fromId + " -> " + to);
@@ -454,9 +469,10 @@ final class ObjectRoutes implements RouteModule {
      * {@code MERGED_INTO} trace. Body {@code {sources:[caseId…], actor?}}. Empty sources → 400;
      * unknown ids → 404; non-CASE / self-merge / already-closed-or-merged → 422.
      */
-    private Object mergeCases(ApiContext api, String survivorId, Map<String, Object> body) {
+    private Object mergeCases(ApiContext api, HttpExchange ex, String survivorId, Map<String, Object> body) {
         List<String> sources = stringList(body.get("sources"));
         if (sources.isEmpty()) throw new ApiException(400, "body must include non-empty 'sources'");
+        for (String source : sources) requireVisible(api, ex, source);
         try {
             var result = api.service().objects().mergeCases(survivorId, sources, ApiContext.str(body, "actor"));
             Map<String, Object> out = new LinkedHashMap<>();
@@ -479,11 +495,12 @@ final class ObjectRoutes implements RouteModule {
      * assignee?|queue?, actor?}}; repeat the call for multi-way splits. Blank title / empty members →
      * 400; unknown case → 404; non-CASE / closed case / a member not contained → 422.
      */
-    private Object splitCase(ApiContext api, String caseId, Map<String, Object> body) {
+    private Object splitCase(ApiContext api, HttpExchange ex, String caseId, Map<String, Object> body) {
         String title = ApiContext.str(body, "title");
         List<String> members = stringList(body.get("members"));
         if (title == null || title.isBlank()) throw new ApiException(400, "body must include 'title'");
         if (members.isEmpty()) throw new ApiException(400, "body must include non-empty 'members'");
+        for (String member : members) requireVisible(api, ex, member);
         try {
             var result = api.service().objects().splitCase(caseId, title, members,
                     ApiContext.str(body, "assignee"), ApiContext.str(body, "queue"), ApiContext.str(body, "actor"));

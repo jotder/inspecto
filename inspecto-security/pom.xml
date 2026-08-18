@@ -46,6 +46,13 @@
             <version>${nimbus-jose-jwt.version}</version>
         </dependency>
 
+        <!-- slf4j-api facade — this module's only logging need is the boot-time posture warning when
+             `auth.oidc.audience` is unset (JAVA-2); version is managed by the parent. -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>

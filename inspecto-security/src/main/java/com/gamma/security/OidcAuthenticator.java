@@ -15,6 +15,8 @@ import com.nimbusds.jwt.proc.ConfigurableJWTProcessor;
 import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier;
 import com.nimbusds.jwt.proc.DefaultJWTProcessor;
 import com.sun.net.httpserver.HttpExchange;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -47,6 +49,8 @@ import java.util.Set;
  */
 public final class OidcAuthenticator implements Authenticator {
 
+    private static final Logger log = LoggerFactory.getLogger(OidcAuthenticator.class);
+
     private final ConfigurableJWTProcessor<SecurityContext> processor;
     private final ConfigurableJWTProcessor<SecurityContext> gatewayProcessor;   // null = gateway mode off
     private final String gatewayHeader;
@@ -55,7 +59,7 @@ public final class OidcAuthenticator implements Authenticator {
     /** No-arg constructor required by {@code ServiceLoader}; reads {@code -Dauth.oidc.*}. */
     public OidcAuthenticator() {
         this(jwksSource("auth.oidc.jwksUri"), requireProperty("auth.oidc.issuer"),
-                System.getProperty("auth.oidc.audience"),
+                warnIfNoAudience(System.getProperty("auth.oidc.audience"), "auth.oidc.audience"),
                 System.getProperty("auth.oidc.rolesClaim", "roles"),
                 gatewayJwksSourceFromSystemProperties(),
                 System.getProperty("auth.oidc.gateway.issuer"),
@@ -75,8 +79,26 @@ public final class OidcAuthenticator implements Authenticator {
         this.rolesClaim = rolesClaim;
         this.processor = processor(jwkSource, issuer, audience);
         this.gatewayProcessor = gatewayJwkSource == null ? null
-                : processor(gatewayJwkSource, requireValue(gatewayIssuer, "auth.oidc.gateway.issuer"), gatewayAudience);
+                : processor(gatewayJwkSource, requireValue(gatewayIssuer, "auth.oidc.gateway.issuer"),
+                        warnIfNoAudience(gatewayAudience, "auth.oidc.gateway.audience"));
         this.gatewayHeader = gatewayHeader;
+    }
+
+    /**
+     * Warn at boot when no audience is configured, and return the value unchanged (JAVA-2).
+     *
+     * <p>Without an {@code aud} claim to match, <em>any</em> correctly-signed, unexpired token from the
+     * trusted issuer authenticates here — including one an IdP minted for a completely different client
+     * under the same issuer, which is the normal shape of a tenant IdP. The check stays optional rather
+     * than {@code requireProperty}-mandatory because making it mandatory stops every deployment that boots
+     * without it today from booting at all; the posture is therefore announced instead of enforced.
+     */
+    private static String warnIfNoAudience(String audience, String key) {
+        if (audience == null || audience.isBlank())
+            log.warn("OIDC audience validation is OFF: -D{} is not set, so any correctly-signed token from "
+                    + "the trusted issuer is accepted — including tokens minted for another client of the "
+                    + "same issuer. Set -D{} to the audience this deployment expects.", key, key);
+        return audience;
     }
 
     private static ConfigurableJWTProcessor<SecurityContext> processor(

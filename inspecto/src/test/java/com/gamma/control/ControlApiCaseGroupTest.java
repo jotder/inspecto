@@ -87,10 +87,18 @@ class ControlApiCaseGroupTest {
             c.svc.objects().link(original.id(), i1.id(), LinkRelationship.CONTAINS, null);
             c.svc.objects().link(original.id(), i2.id(), LinkRelationship.CONTAINS, null);
 
-            // gates: no title → 400; foreign member → 422; unknown case → 404
+            // gates: no title → 400; foreign member → 422; unknown member or case → 404
             assertEquals(400, send(c.port, "POST", "/objects/" + original.id() + "/split",
                     "{\"members\":[\"" + i1.id() + "\"]}").statusCode());
+            // A member that EXISTS but this case does not contain — the "foreign member" the gate means.
+            OperationalObject foreign = c.svc.objects().open(ObjectType.INCIDENT, "three", "d", "HIGH",
+                    null, null, null, "corr", Map.of());
             assertEquals(422, send(c.port, "POST", "/objects/" + original.id() + "/split",
+                    "{\"title\":\"x\",\"members\":[\"" + foreign.id() + "\"]}").statusCode());
+            // A member id that does not resolve is 404, like every other unknown id on these routes.
+            // SEC-7d requires absent and out-of-scope to be INDISTINGUISHABLE, so this cannot stay 422:
+            // a 404-vs-422 split would tell a scoped caller that a hidden object exists.
+            assertEquals(404, send(c.port, "POST", "/objects/" + original.id() + "/split",
                     "{\"title\":\"x\",\"members\":[\"nope\"]}").statusCode());
             assertEquals(404, send(c.port, "POST", "/objects/nope/split",
                     "{\"title\":\"x\",\"members\":[\"" + i1.id() + "\"]}").statusCode());

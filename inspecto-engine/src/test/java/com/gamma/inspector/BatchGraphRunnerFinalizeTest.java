@@ -96,6 +96,31 @@ class BatchGraphRunnerFinalizeTest {
         assertEquals(1, finalised[0], "finalize invoked exactly once across both cycles");
     }
 
+    @Test
+    void finalizeSourceToleratesAMemberThatVanishedBeforeBackup(@TempDir Path dir) throws Exception {
+        // JAVA-4: the ledger loop already tolerates a member vanishing pre-backup, but the backup step did
+        // not — Files.move threw and demoted the batch to FAILED *after* the DuckLake register, the manifest
+        // write and the §11.3 registration were all durable. Audit says FAILED, manifest says the outputs
+        // landed, and nothing re-drives a file that is no longer there.
+        Path toon = PipelineConfigBatchTestRef.writePipeline(dir, "");
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+
+        Path inbox = Path.of(cfg.dirs().poll());
+        Files.createDirectories(inbox);
+        Path solo = inbox.resolve("solo.csv");
+        Files.writeString(solo, "ID,AMT,EVENT_DATE\nx,9.0,2020-04-03\n");
+
+        List<Batch.Member> survivors = List.of(member(cfg, solo.toFile(), 0));
+        Batch batch = new Batch(cfg.identity().runTimestamp() + "_mini_0002", "mini", null, survivors);
+
+        Files.delete(solo);   // vanished between ingest and backup
+
+        assertDoesNotThrow(() ->
+                BatchProcessor.finalizeSource(batch, cfg, survivors, List.of(), List.of()));
+        assertTrue(Files.exists(Path.of(cfg.dirs().manifestsDir(), batch.batchId() + ".json")),
+                "the batch still finalises — the manifest is written and the batch is not demoted");
+    }
+
     /** One poll cycle: a fresh per-batch DuckDB connection holding the parsed seed, run through the graph. */
     private BatchGraphRunner.Result runCycle(PipelineConfig cfg, PipelineGraph g, Batch batch,
                                              Path branchLog, BatchGraphRunner.SourceFinalizer finalizer,
