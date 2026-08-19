@@ -49,6 +49,35 @@ class ComponentPreviewParsingTest {
         assertInstanceOf(String.class, r.rows().get(0).get("when"));
     }
 
+    /**
+     * B2: the response additionally carries per-column INFERRED types from a second auto_detect
+     * sniff — advisory (the parsed rows above stay all-VARCHAR), feeding the UI's Data-types Auto
+     * mode. Non-delimited frontends carry no sniff.
+     */
+    @Test
+    void delimitedReturnsInferredColumnTypesBesideTheVarcharRows() throws Exception {
+        ComponentPreview.GrammarResult r = ComponentPreview.parsing(
+                cfg(null), "id,when,city\n1,2026-07-15,london\n2,2026-07-16,paris\n");
+
+        assertEquals(3, r.columnTypes().size());
+        Map<String, String> byName = new LinkedHashMap<>();
+        for (Map<String, String> c : r.columnTypes()) byName.put(c.get("name"), c.get("type"));
+        assertEquals("BIGINT", byName.get("id"));
+        assertEquals("DATE", byName.get("when"));
+        assertEquals("VARCHAR", byName.get("city"));
+        // …while the parsed rows themselves stay VARCHAR (production ingest parity).
+        assertInstanceOf(String.class, r.rows().get(0).get("when"));
+    }
+
+    @Test
+    void nonDelimitedFrontendsCarryNoInferredTypes() throws Exception {
+        PipelineConfig c = cfg(Map.of(
+                "frontend", "text_regex",
+                "text_regex", Map.of("pattern", "(?P<level>[A-Z]+) (?P<msg>.+)")));
+        ComponentPreview.GrammarResult r = ComponentPreview.parsing(c, "INFO started\n");
+        assertTrue(r.columnTypes().isEmpty());
+    }
+
     @Test
     void delimitedDefaultsToCommaAndAHeaderLine() throws Exception {
         // Engine default dialect: comma-delimited, has_header true — the first line names columns.

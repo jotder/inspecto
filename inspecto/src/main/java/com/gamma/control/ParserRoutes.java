@@ -108,6 +108,9 @@ final class ParserRoutes implements RouteModule {
             out.put("rows", t.rows());
             out.put("rowCount", t.rowCount());
             out.put("rejectedRows", t.rejectedRows());
+            // B2, additive: per-column inferred types from the auto_detect sniff — old clients
+            // ignore the key; formats without a sniff simply omit it.
+            if (!t.columnTypes().isEmpty()) out.put("columnTypes", t.columnTypes());
         } else if (r instanceof ParseResult.Tree t) {
             out.put("kind", "tree");
             out.put("recordCount", t.recordCount());

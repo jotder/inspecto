@@ -71,9 +71,25 @@ public final class ComponentPreview {
 
     // ── grammar (parse raw sample text via DuckDB read_csv) ────────────────────────
 
-    /** A grammar parse preview: the columns the dialect produced, the parsed rows, and the reject count. */
+    /**
+     * A grammar parse preview: the columns the dialect produced, the parsed rows, and the reject count.
+     * {@code columnTypes} (B2, additive — old clients ignore the key) carries a per-column
+     * {@code {name, type}} pair from a second {@code auto_detect=true} sniff of the same sample —
+     * advisory only (production ingest stays all-VARCHAR); empty when the frontend has no sniff
+     * (non-delimited) or the sniff failed.
+     */
     public record GrammarResult(List<String> columns, int rowCount, List<Map<String, Object>> rows,
-                                int rejectedRows) {}
+                                int rejectedRows, List<Map<String, String>> columnTypes) {
+        public GrammarResult {
+            columnTypes = columnTypes == null ? List.of() : List.copyOf(columnTypes);
+        }
+
+        /** The pre-B2 shape — no inferred types. */
+        public GrammarResult(List<String> columns, int rowCount, List<Map<String, Object>> rows,
+                             int rejectedRows) {
+            this(columns, rowCount, rows, rejectedRows, List.of());
+        }
+    }
 
     /**
      * Preview a {@code grammar} component over raw {@code sampleText}: parse it with the grammar's CSV dialect
@@ -161,11 +177,13 @@ public final class ComponentPreview {
                 try (java.sql.Statement st = conn.createStatement()) {
                     st.execute("CREATE TABLE preview_parsed AS " + parsingSelect(cfg, path));
                 }
+                boolean delimited = cfg.fixedWidth() == null && cfg.json() == null && cfg.textRegex() == null;
                 return new GrammarResult(
                         ScratchTables.columnNames(conn, "preview_parsed"),
                         ScratchTables.count(conn, "preview_parsed"),
                         ScratchTables.readRows(conn, "preview_parsed", MAX_ROWS),
-                        rejectCount(conn));
+                        rejectCount(conn),
+                        delimited ? sniffColumnTypes(conn, cfg, path) : List.of());
             }
         } finally {
             java.nio.file.Files.deleteIfExists(sample);
@@ -233,27 +251,59 @@ public final class ComponentPreview {
     }
 
     private static String delimitedSelect(PipelineConfig cfg, String path) {
-        String delim = (cfg.csv().delimiter() == null || cfg.csv().delimiter().isEmpty())
-                ? "," : cfg.csv().delimiter();
         // all_varchar mirrors production raw ingest (100% VARCHAR columns) AND keeps the preview
         // rows JSON-serializable — auto-detect would otherwise type a date column as a DuckDB
         // DATE, which the parsed→typed hop is precisely meant to make explicit, not implicit.
-        StringBuilder dialect = new StringBuilder();
+        return "SELECT * FROM read_csv(" + ScratchTables.sqlStr(path)
+                + delimitedReadOptions(cfg)
+                + ", auto_detect=true, all_varchar=true, ignore_errors=true, store_rejects=true)";
+    }
+
+    /** The shared delimited read options: dialect chars + header/skip, mirroring production. */
+    private static String delimitedReadOptions(PipelineConfig cfg) {
+        String delim = (cfg.csv().delimiter() == null || cfg.csv().delimiter().isEmpty())
+                ? "," : cfg.csv().delimiter();
+        StringBuilder opts = new StringBuilder();
+        opts.append(", delim=").append(ScratchTables.sqlStr(delim));
+        opts.append(", header=").append(cfg.csv().hasHeader());
+        opts.append(", skip=").append(cfg.csv().skipHeaderLines());
         if (cfg.csv().quote() != null)
-            dialect.append(", quote=").append(ScratchTables.sqlStr(cfg.csv().quote()));
+            opts.append(", quote=").append(ScratchTables.sqlStr(cfg.csv().quote()));
         // Escape defaults to the quote char (RFC doubling) when a custom quote is set — the same
         // rule DuckDbCsvIngester.dialectOptions applies, so the preview mirrors production.
         String parseEscape = cfg.csv().escape() != null ? cfg.csv().escape() : cfg.csv().quote();
         if (parseEscape != null)
-            dialect.append(", escape=").append(ScratchTables.sqlStr(parseEscape));
+            opts.append(", escape=").append(ScratchTables.sqlStr(parseEscape));
         if (cfg.csv().comment() != null)
-            dialect.append(", comment=").append(ScratchTables.sqlStr(cfg.csv().comment()));
-        return "SELECT * FROM read_csv(" + ScratchTables.sqlStr(path)
-                + ", delim=" + ScratchTables.sqlStr(delim)
-                + ", header=" + cfg.csv().hasHeader()
-                + ", skip=" + cfg.csv().skipHeaderLines()
-                + dialect
-                + ", auto_detect=true, all_varchar=true, ignore_errors=true, store_rejects=true)";
+            opts.append(", comment=").append(ScratchTables.sqlStr(cfg.csv().comment()));
+        return opts.toString();
+    }
+
+    /**
+     * B2: a second, {@code auto_detect=true} sniff of the same sample — per-column inferred types for
+     * the Data-types Auto mode. Advisory by construction: production ingest stays all-VARCHAR, so a
+     * failed sniff returns empty rather than failing the preview. Deliberately no {@code store_rejects}
+     * — the sniff must not pollute the reject count the parse above just produced.
+     */
+    private static List<Map<String, String>> sniffColumnTypes(Connection conn, PipelineConfig cfg, String path) {
+        try (java.sql.Statement st = conn.createStatement()) {
+            st.execute("CREATE TABLE preview_sniff AS SELECT * FROM read_csv(" + ScratchTables.sqlStr(path)
+                    + delimitedReadOptions(cfg)
+                    + ", auto_detect=true, ignore_errors=true)");
+            List<Map<String, String>> out = new java.util.ArrayList<>();
+            try (java.sql.ResultSet rs = st.executeQuery(
+                    "SELECT column_name, column_type FROM (DESCRIBE preview_sniff)")) {
+                while (rs.next()) {
+                    Map<String, String> col = new java.util.LinkedHashMap<>();
+                    col.put("name", rs.getString(1));
+                    col.put("type", rs.getString(2));
+                    out.add(col);
+                }
+            }
+            return out;
+        } catch (Exception sniffFail) {
+            return List.of();
+        }
     }
 
     /** The engine's single-column line reader: each physical line intact as VARCHAR {@code line}. */

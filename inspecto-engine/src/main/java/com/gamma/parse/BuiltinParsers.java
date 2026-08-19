@@ -135,7 +135,7 @@ final class BuiltinParsers {
             draft.put("parsing", parsing);
             PipelineConfig cfg = PipelineConfig.fromMap(draft);
             ComponentPreview.GrammarResult r = ComponentPreview.parsing(cfg, text);
-            return new ParseResult.Table(r.columns(), r.rows(), r.rowCount(), r.rejectedRows());
+            return new ParseResult.Table(r.columns(), r.rows(), r.rowCount(), r.rejectedRows(), r.columnTypes());
         }
     }
 

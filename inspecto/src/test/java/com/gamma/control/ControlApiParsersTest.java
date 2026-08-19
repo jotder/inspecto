@@ -82,6 +82,22 @@ class ControlApiParsersTest {
         }
     }
 
+    /** B2: the delimited preview additionally serves per-column INFERRED types (auto_detect sniff). */
+    @Test
+    void builtinPreviewCarriesInferredColumnTypes(@TempDir Path cfg) throws Exception {
+        try (Ctx c = open(cfg)) {
+            JsonNode r = json(send(c.port, "POST", "/parsers/delimited/preview",
+                    "{\"grammar\":{\"delimited\":{\"has_header\":true}},"
+                            + "\"sample_text\":\"id,when,city\\n1,2026-07-15,london\\n2,2026-07-16,paris\\n\"}"));
+            JsonNode types = r.get("columnTypes");
+            assertEquals(3, types.size(), r.toString());
+            assertEquals("id", types.get(0).get("name").asText());
+            assertEquals("BIGINT", types.get(0).get("type").asText());
+            assertEquals("DATE", types.get(1).get("type").asText());
+            assertEquals("VARCHAR", types.get(2).get("type").asText());
+        }
+    }
+
     @Test
     void xmlPreviewReturnsATreeAndAcceptsBase64Samples(@TempDir Path cfg) throws Exception {
         try (Ctx c = open(cfg)) {

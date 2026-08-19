@@ -631,6 +631,8 @@ final class ConfigRoutes implements RouteModule {
             out.put("rowCount", r.rowCount());
             out.put("rows", r.rows());
             out.put("rejectedRows", r.rejectedRows());
+            // B2, additive: per-column inferred types (delimited sniff) — absent for other frontends.
+            if (!r.columnTypes().isEmpty()) out.put("columnTypes", r.columnTypes());
             return out;
         } catch (IllegalArgumentException unsupported) {
             throw new ApiException(422, unsupported.getMessage());
