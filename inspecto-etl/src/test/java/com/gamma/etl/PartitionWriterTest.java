@@ -44,6 +44,44 @@ class PartitionWriterTest {
         }
     }
 
+    /** E1: an EMPTY partition list writes ONE flat file — same staging + atomic reveal, no sentinel. */
+    @Test
+    void emptyPartitionListWritesOneFlatFile(@TempDir Path dir) throws Exception {
+        File db = DuckDbUtil.tempDbFile("test_flat_");
+        try (Connection conn = DuckDbUtil.openConnection(db);
+             Statement st = conn.createStatement()) {
+            st.execute("CREATE TABLE transformed AS SELECT * FROM (VALUES " +
+                    "('a', 0), ('b', 1), ('c', 0)) t(ID, __src_id)");
+
+            for (String fmt : List.of("CSV", "PARQUET")) {
+                String out = dir.resolve("out_" + fmt).toString();
+                List<PartitionOutput> outs = PartitionWriter.write(
+                        conn, "transformed", out, fmt, null, "FLAT", List.of());
+
+                assertEquals(1, outs.size(), fmt + ": one unpartitioned file");
+                assertEquals("", outs.get(0).partition(), fmt + ": no partition path");
+                Path file = Path.of(outs.get(0).outputFile());
+                assertEquals(Path.of(out), file.getParent(), fmt + ": lands at the store root");
+                assertTrue(file.getFileName().toString().startsWith("FLAT_out"), file.toString());
+                assertTrue(Files.size(file) > 0);
+                // No sentinel directory, no leftover staging.
+                try (Stream<Path> w = Files.walk(Path.of(out))) {
+                    assertTrue(w.noneMatch(p -> p.toString().contains("year=1900")
+                            || p.toString().endsWith(".tmp")));
+                }
+                // All three rows survive, __src_id stays excluded.
+                try (ResultSet rs = st.executeQuery("CSV".equals(fmt)
+                        ? "SELECT count(*) FROM read_csv('" + outs.get(0).outputFile().replace("\\", "/") + "')"
+                        : "SELECT count(*) FROM read_parquet('" + outs.get(0).outputFile().replace("\\", "/") + "')")) {
+                    assertTrue(rs.next());
+                    assertEquals(3, rs.getLong(1));
+                }
+            }
+        } finally {
+            DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
     /** B4: filename_column translates __src_id into per-row source filenames (both formats). */
     @Test
     void filenameColumnTranslatesSrcIdIntoSourceFilenames(@TempDir Path dir) throws Exception {

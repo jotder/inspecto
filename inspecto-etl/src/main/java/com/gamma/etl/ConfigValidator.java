@@ -46,13 +46,14 @@ public final class ConfigValidator {
         // Partitioning declared? Each schema should produce a non-empty partition list.
         if (cfg.schemas().single() != null && PartitionDef.fromSchema(cfg.schemas().single()).isEmpty())
             warn(warnings, "No partitions[] or partitionKey on the single schema — " +
-                    "all rows will land in the year=1900/month=01/day=01 sentinel partition.");
+                    "output will be written as unpartitioned flat files (fine for smaller stores; " +
+                    "declare a partition source to enable pruning).");
 
         if (cfg.schemas().segments() != null) {
             for (var e : cfg.schemas().segments().entrySet()) {
                 if (PartitionDef.fromSchema(e.getValue()).isEmpty())
                     warn(warnings, "Segment '" + e.getKey() + "' has no partitions[] / partitionKey — " +
-                            "rows for this segment will collapse to the sentinel partition.");
+                            "its output will be written as unpartitioned flat files.");
             }
         }
 

@@ -113,8 +113,8 @@ public final class DataTransformer {
         // ── partition columns ─────────────────────────────────────────────────
         List<PartitionDef> partDefs = PartitionDef.fromSchema(schemaConfig);
         if (partDefs.isEmpty()) {
-            // No partition key at all — land everything in the 1900/01/01 sentinel
-            select.append(", '1900' AS year, '01' AS month, '01' AS day");
+            // E1: no partition key ⇒ no partition columns — the write lands as a flat file
+            // (the year=1900/month=01/day=01 sentinel is retired for new writes).
         } else {
             for (PartitionDef pd : partDefs) {
                 select.append(", ");

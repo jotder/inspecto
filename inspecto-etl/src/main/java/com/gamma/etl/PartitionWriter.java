@@ -154,7 +154,13 @@ public final class PartitionWriter {
                 baseName, partitionColumns);
     }
 
-    /** The write core: COPY {@code projection} to Hive-partitioned staging, then reveal atomically. */
+    /**
+     * The write core: COPY {@code projection} to staging, then reveal atomically. E1
+     * (delimited-grammar-properties plan Part II): an EMPTY {@code partitionColumns} writes one
+     * unpartitioned file — same staging + atomic-reveal machinery, no {@code PARTITION_BY} — so
+     * "no key declared → flat store" holds on every lane and the {@code year=1900} sentinel is
+     * retired for new writes.
+     */
     private static List<PartitionOutput> writeProjected(Connection conn, String projection,
                                                         String databaseDir, String outputFormat,
                                                         String compression, String baseName,
@@ -163,6 +169,7 @@ public final class PartitionWriter {
 
         OutputFormat fmt = OutputFormat.resolve(outputFormat);
         String  outputFileName = baseName + "_out" + fmt.extension();
+        boolean partitioned = partitionColumns != null && !partitionColumns.isEmpty();
 
         new File(databaseDir).mkdirs();
         String workerTag   = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
@@ -173,13 +180,16 @@ public final class PartitionWriter {
         List<PartitionOutput> outputs;
 
         try (Statement stmt = conn.createStatement()) {
-            String partBy = String.join(", ", partitionColumns);
-            StringBuilder copyOpts = new StringBuilder("FORMAT ").append(fmt.copyToken())
-                    .append(", PARTITION_BY (").append(partBy).append("), OVERWRITE_OR_IGNORE 1");
+            StringBuilder copyOpts = new StringBuilder("FORMAT ").append(fmt.copyToken());
+            if (partitioned)
+                copyOpts.append(", PARTITION_BY (").append(String.join(", ", partitionColumns))
+                        .append("), OVERWRITE_OR_IGNORE 1");
             if (fmt.supportsCompression() && compression != null && !compression.isBlank())
                 copyOpts.append(", COMPRESSION ").append(compression);
 
-            stmt.execute(String.format("COPY (%s) TO '%s' (%s)", projection, stagingDir, copyOpts));
+            // Partitioned: COPY to the staging DIRECTORY; unpartitioned: one staged FILE.
+            String target = partitioned ? stagingDir : stagingDir + "/" + outputFileName;
+            stmt.execute(String.format("COPY (%s) TO '%s' (%s)", projection, target, copyOpts));
 
             // Collect the staged partition files in one walk, then reveal each under its
             // stable name. The reveal (a cross-dir rename into place + an atomic same-dir
@@ -224,7 +234,8 @@ public final class PartitionWriter {
             Files.move(dstTemp, dstFinal,
                     StandardCopyOption.REPLACE_EXISTING,
                     StandardCopyOption.ATOMIC_MOVE);
-            String partition = rel.getParent().toString().replace("\\", "/");
+            // An unpartitioned (E1) staged file sits at the staging root — no partition path.
+            String partition = rel.getParent() == null ? "" : rel.getParent().toString().replace("\\", "/");
             return new PartitionOutput(partition, dstFinal.toString(), Files.size(dstFinal));
         } catch (IOException e) {
             throw new UncheckedIOException(e);

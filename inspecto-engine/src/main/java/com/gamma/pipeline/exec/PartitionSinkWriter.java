@@ -8,14 +8,10 @@ import com.gamma.etl.PartitionOutput;
 import com.gamma.etl.PartitionWriter;
 import com.gamma.pipeline.PipelineNode;
 import com.gamma.pipeline.PipelineStores;
-import com.gamma.sql.SqlViews;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.sql.Connection;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -28,11 +24,9 @@ import java.util.Map;
  * {@code OVERWRITE_OR_IGNORE} Hive-partitioned write the legacy engine and the enrichment engine use).
  *
  * <p>A sink declares its {@code store}, {@code format} ({@code PARQUET}/{@code CSV}, default Parquet),
- * optional {@code compression}, and optional {@code partitions}. When partitions are declared the rows
- * are written Hive-partitioned via {@link PartitionWriter}; when none are declared the branch is written
- * as a single unpartitioned file (the legacy {@code PartitionWriter} always partitions, so this writer
- * owns the unpartitioned case rather than forcing a {@code (year,month,day)} default onto a store that
- * may not have those columns).
+ * optional {@code compression}, and optional {@code partitions}. Both modes delegate to
+ * {@link PartitionWriter} (E1): declared partitions write Hive-partitioned, none write a single
+ * unpartitioned file — one writer owns staging + atomic reveal for both, on every lane.
  *
  * <p>{@code sink.view} subtypes ({@link PipelineStores.Produced#restsOnDisk() non-resting}) write no bytes —
  * this writer skips the byte write; the flow job registers the view's durable definition instead
@@ -104,9 +98,10 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
         List<String> partCols = SinkPartitions.columns(sink.cfg("partitions"));
         String dir = dataDir.replace("\\", "/") + "/" + store;
 
-        List<PartitionOutput> outs = partCols.isEmpty()
-                ? writeUnpartitioned(inputTable, dir, format, compression)
-                : PartitionWriter.write(conn, inputTable, dir, format, compression, baseName, partCols, List.of());
+        // E1: one writer owns BOTH modes — an empty partCols list is the unpartitioned single-file
+        // write, with the same staging + atomic reveal the partitioned path always had.
+        List<PartitionOutput> outs =
+                PartitionWriter.write(conn, inputTable, dir, format, compression, baseName, partCols, List.of());
         outputs.addAll(outs);
         // Per-partition counts serve both purposes: they give every registry row a real row_count (§11.3 slice 2)
         // and they sum to the branch total this used to get from a separate COUNT(*) over the whole relation.
@@ -135,27 +130,9 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
 
     // ── helpers ──────────────────────────────────────────────────────────────────
 
-    /** Single-file write when a sink declares no partitions (the legacy writer always partitions). */
-    private List<PartitionOutput> writeUnpartitioned(String inputTable, String dir,
-                                                     String format, String compression) throws Exception {
-        Files.createDirectories(Path.of(dir));
-        String file = dir + "/" + baseName + "_out." + SqlViews.ext(format);
-        try (Statement st = conn.createStatement()) {
-            st.execute("COPY (SELECT * FROM \"" + inputTable + "\") TO '" + file
-                    + "' (" + copyOptions(format, compression) + ")");
-        }
-        long bytes = Files.exists(Path.of(file)) ? Files.size(Path.of(file)) : 0L;
-        return List.of(new PartitionOutput("", file, bytes));
-    }
-
-    private static String copyOptions(String format, String compression) {
-        return switch (format) {
-            case "PARQUET" -> "FORMAT PARQUET, COMPRESSION "
-                    + (compression == null || compression.isBlank() ? "SNAPPY" : compression);
-            case "CSV" -> "FORMAT CSV, HEADER true";
-            default -> throw new IllegalArgumentException("Unsupported sink format: " + format);
-        };
-    }
+    // E1: writeUnpartitioned/copyOptions were merged down into PartitionWriter — one class owns
+    // partitioned COPY … PARTITION_BY and the unpartitioned single-file COPY, staging + atomic
+    // reveal for both, so the two lanes cannot drift on write semantics.
 
     /**
      * Event-time bounds per partition for this sink branch, or an empty map when the sink declares nothing that

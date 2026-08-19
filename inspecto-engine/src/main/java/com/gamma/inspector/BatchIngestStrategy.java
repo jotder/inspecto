@@ -68,10 +68,17 @@ interface BatchIngestStrategy {
 
     // ── shared ingest-tail helpers (used by both strategies) ─────────────────────
 
-    /** Partition columns from a schema ({@code year/month/day} when none are declared). */
+    /**
+     * Partition columns from a schema. E1: a schema declaring NO partition source yields an EMPTY
+     * list — the write lands as one flat file per batch instead of the {@code year=1900/month=01/
+     * day=01} sentinel bucket the old {@code (year,month,day)} default degenerated to. Read-back is
+     * layout-agnostic (depth-agnostic globs; the Selector subtracts by catalog status), so existing
+     * sentinel directories stay readable beside new flat files — old data is deliberately left in
+     * place (D6).
+     */
     static List<String> partitionColumns(Map<String, Object> schema) {
         List<PartitionDef> defs = PartitionDef.fromSchema(schema);
-        return defs.isEmpty() ? List.of("year", "month", "day") : PartitionDef.columnNames(defs);
+        return defs.isEmpty() ? List.of() : PartitionDef.columnNames(defs);
     }
 
     /**
