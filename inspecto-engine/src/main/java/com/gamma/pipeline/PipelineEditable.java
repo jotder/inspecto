@@ -86,6 +86,7 @@ public final class PipelineEditable {
             BuiltinNodeType.PARSER_DELIMITED.type(), BuiltinNodeType.PARSER_FIXEDWIDTH.type(),
             BuiltinNodeType.PARSER_ASN1.type(),
             BuiltinNodeType.PARSER_JSON.type(), BuiltinNodeType.PARSER_TEXT_REGEX.type(),
+            BuiltinNodeType.PARSER_XLSX.type(),
             BuiltinNodeType.PARSER_PLUGIN.type(),
             BuiltinNodeType.GAP.type(),
             // read-compat only since P5-a: never emitted, still accepted (see PipelineLift.markerHome)
@@ -211,6 +212,7 @@ public final class PipelineEditable {
      */
     private static final Map<String, List<String>> SUBTYPE_FRONTENDS = Map.of(
             BuiltinNodeType.PARSER_DELIMITED.type(), List.of("delimited"),
+            BuiltinNodeType.PARSER_XLSX.type(), List.of("xlsx", "excel"),
             BuiltinNodeType.PARSER_FIXEDWIDTH.type(), List.of("fixedwidth", "fixed_width"),
             BuiltinNodeType.PARSER_ASN1.type(), List.of("asn1"),
             BuiltinNodeType.PARSER_JSON.type(), List.of("json"),
@@ -245,6 +247,7 @@ public final class PipelineEditable {
             BuiltinNodeType.PARSER_ASN1.type(), List.of(GRAMMAR_REF_PREFIX),
             BuiltinNodeType.PARSER_JSON.type(), List.of(GRAMMAR_REF_PREFIX),
             BuiltinNodeType.PARSER_TEXT_REGEX.type(), List.of(GRAMMAR_REF_PREFIX),
+            BuiltinNodeType.PARSER_XLSX.type(), List.of(GRAMMAR_REF_PREFIX),
             // The plugin subtype is the one exception: it IS the plain parser's plugin path, so it takes
             // ingester/ too — see DERIVED_USE below for why that ref is accepted but never authored.
             BuiltinNodeType.PARSER_PLUGIN.type(), List.of(GRAMMAR_REF_PREFIX, "ingester/"));

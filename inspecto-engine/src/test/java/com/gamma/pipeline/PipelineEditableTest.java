@@ -783,7 +783,9 @@ class PipelineEditableTest {
     void theRemainingBuiltinFrontendsRoundTripVerbatimThroughTheirSubtypes(@TempDir Path dir) throws Exception {
         for (String[] c : new String[][]{
                 {"json", "parser.json", "  json:\n    format: newline\n"},
-                {"text_regex", "parser.text_regex", "  text_regex:\n    pattern: \"(?<ID>\\\\w+) (?<EVENT_DATE>.+)\"\n"}}) {
+                {"text_regex", "parser.text_regex", "  text_regex:\n    pattern: \"(?<ID>\\\\w+) (?<EVENT_DATE>.+)\"\n"},
+                // multiformat X3: xlsx joins the same never-implicit contract, its block verbatim.
+                {"xlsx", "parser.xlsx", "  xlsx:\n    sheet: Data\n    header: true\n"}}) {
             Path toon = writeSimpleFrontendPipeline(dir, c[0], c[2]);
             Map<String, Object> raw = decode(toon);
             PipelineConfig cfg = PipelineConfig.load(toon.toString());
@@ -799,7 +801,7 @@ class PipelineEditableTest {
     /** A JSON / text-regex node authored fresh from the palette gets its frontend word stamped in. */
     @Test
     void aNewJsonOrTextRegexParserNodeIsStampedWithItsFrontend() {
-        for (String frontend : List.of("json", "text_regex")) {
+        for (String frontend : List.of("json", "text_regex", "xlsx")) {
             Map<String, Object> lowered = PipelineEditable.lower(new PipelineGraph("x", true, List.of(
                     node("acq", "acquisition", Map.of("poll", "in")),
                     node("parse", "parser." + frontend, Map.of("parsing", Map.of())),

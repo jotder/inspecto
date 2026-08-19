@@ -51,20 +51,22 @@ class ControlApiParsersTest {
     void catalogServesTheBuiltinsPlusXmlAndAsn1WithSchemasAndHonestIngestability(@TempDir Path cfg) throws Exception {
         try (Ctx c = open(cfg)) {
             JsonNode list = json(send(c.port, "GET", "/parsers", null));
-            assertEquals(6, list.size(), list.toString());
+            assertEquals(7, list.size(), list.toString());
             assertEquals("delimited", list.get(0).get("id").asText());
-            assertEquals("xml", list.get(4).get("id").asText());
-            assertEquals("asn1", list.get(5).get("id").asText());
+            assertEquals("xlsx", list.get(3).get("id").asText()); // multiformat X2: the fifth builtin
+            assertEquals("xml", list.get(5).get("id").asText());
+            assertEquals("asn1", list.get(6).get("id").asText());
             for (JsonNode p : list) {
                 assertTrue(p.get("grammarSchema").size() > 0, p.get("id").asText() + " has no schema");
                 assertTrue(p.get("grammarSchema").get(0).hasNonNull("path"));
             }
+            assertTrue(list.get(3).get("ingestable").asBoolean(), "a builtin is ingestable by identity");
             // Both plugins are hierarchical; only ASN.1 names an ingester, and the catalog says so.
-            JsonNode xml = list.get(4);
+            JsonNode xml = list.get(5);
             assertTrue(xml.get("hierarchical").asBoolean());
             assertFalse(xml.get("ingestable").asBoolean(),
                     "tree data cannot load to Tables before the flatten config");
-            JsonNode asn1 = list.get(5);
+            JsonNode asn1 = list.get(6);
             assertTrue(asn1.get("hierarchical").asBoolean());
             assertTrue(asn1.get("ingestable").asBoolean(), "Asn1RecordIngester flattens onto segments");
             assertTrue(list.get(0).get("ingestable").asBoolean());

@@ -145,6 +145,51 @@ class ComponentPreviewParsingTest {
         assertTrue(String.valueOf(at).contains("2026-07-15"), "the timestamp value survives: " + at);
     }
 
+    // ── xlsx (multiformat X2) — assumption-gated on the DuckDB excel extension ──
+
+    /** Round-trip parity: the workbook is WRITTEN by DuckDB and read back with the same relation
+     *  ingest builds; all-VARCHAR rows + the B2 sniff carrying the extension's own cell types. */
+    @Test
+    void xlsxPreviewsFromBytesWithVarcharRowsAndInferredTypes(@TempDir java.nio.file.Path dir) throws Exception {
+        byte[] wb = workbook(dir);
+        PipelineConfig c = cfg(Map.of("frontend", "xlsx"));
+        ComponentPreview.GrammarResult r = ComponentPreview.parsingXlsx(c, wb);
+        assertEquals(List.of("account", "event_date", "amount"), r.columns());
+        assertEquals(2, r.rowCount());
+        assertInstanceOf(String.class, r.rows().get(0).get("amount"), "cells land as VARCHAR");
+        assertFalse(r.columnTypes().isEmpty(), "the non-all_varchar sniff supplies inferred types");
+        assertEquals("amount", r.columnTypes().get(2).get("name"));
+        assertNotEquals("VARCHAR", r.columnTypes().get(2).get("type"),
+                "a numeric cell sniffs as a numeric type, not text");
+    }
+
+    @Test
+    void xlsxRefusesPastedText() throws Exception {
+        PipelineConfig c = cfg(Map.of("frontend", "xlsx"));
+        Exception e = assertThrows(IllegalArgumentException.class,
+                () -> ComponentPreview.parsing(c, "not a workbook"));
+        assertTrue(e.getMessage().contains("sample_b64"), e.getMessage());
+    }
+
+    /** Build a 2-row workbook through DuckDB itself; SKIP (visibly) when the extension can't load. */
+    private static byte[] workbook(java.nio.file.Path dir) throws Exception {
+        java.io.File db = com.gamma.util.DuckDbUtil.tempDbFile("xlsx_prev_");
+        try (java.sql.Connection conn = com.gamma.util.DuckDbUtil.openConnection(db)) {
+            org.junit.jupiter.api.Assumptions.assumeTrue(com.gamma.etl.ExcelExtension.tryLoad(conn),
+                    "DuckDB excel extension unavailable — run once with network or set -Dduckdb.extension.dir");
+            java.io.File f = dir.resolve("wb.xlsx").toFile();
+            try (java.sql.Statement st = conn.createStatement()) {
+                st.execute("COPY (SELECT * FROM (VALUES ('A1','2020-04-03',1.5),('B2','2020-04-04',2.5))"
+                        + " v(account, event_date, amount) ORDER BY account)"
+                        + " TO '" + f.getAbsolutePath().replace("\\", "/").replace("'", "''")
+                        + "' WITH (FORMAT xlsx, HEADER true)");
+            }
+            return java.nio.file.Files.readAllBytes(f.toPath());
+        } finally {
+            com.gamma.util.DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
     @Test
     void binaryFixedWidthIsRejected() throws Exception {
         PipelineConfig c = cfg(Map.of(

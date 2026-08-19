@@ -128,6 +128,7 @@ class BindKindHomeContractTest {
                 List.of(BuiltinNodeType.PARSER, BuiltinNodeType.PARSER_DELIMITED,
                         BuiltinNodeType.PARSER_FIXEDWIDTH, BuiltinNodeType.PARSER_ASN1,
                         BuiltinNodeType.PARSER_JSON, BuiltinNodeType.PARSER_TEXT_REGEX,
+                        BuiltinNodeType.PARSER_XLSX,
                         BuiltinNodeType.PARSER_PLUGIN),
                 types(NodeCategory.PARSE));
         for (BuiltinNodeType t : types(NodeCategory.PARSE))

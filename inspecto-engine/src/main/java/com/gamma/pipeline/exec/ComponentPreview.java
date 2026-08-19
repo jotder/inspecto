@@ -161,6 +161,10 @@ public final class ComponentPreview {
         if (cfg.fixedWidth() != null && cfg.fixedWidth().binary())
             throw new IllegalArgumentException(
                     "binary fixed-width records cannot be previewed from pasted text");
+        if (cfg.xlsx() != null)
+            throw new IllegalArgumentException(
+                    "an xlsx workbook is binary and cannot be previewed from pasted text — "
+                    + "send the file bytes (sample_b64)");
         if (cfg.fixedWidth() == null && cfg.json() == null && cfg.textRegex() == null
                 && cfg.schemas().ingesterClass() != null)
             throw new IllegalArgumentException("parsing preview is not supported for the plugin frontend ("
@@ -188,6 +192,66 @@ public final class ComponentPreview {
         } finally {
             java.nio.file.Files.deleteIfExists(sample);
             DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
+    /**
+     * Preview a draft's <b>xlsx</b> parsing frontend over the workbook's BYTES (multiformat X2):
+     * the binary sibling of {@link #parsing(PipelineConfig, String)}. Writes the bytes to a scratch
+     * {@code .xlsx}, loads the excel extension fail-closed, and reads with the SAME
+     * {@code read_xlsx} relation ingest builds ({@code DuckDbCsvIngester.xlsxReadRelation}) —
+     * all-VARCHAR for the rows, plus a second non-all-VARCHAR sniff for the B2 {@code columnTypes}.
+     */
+    public static GrammarResult parsingXlsx(PipelineConfig cfg, byte[] sample)
+            throws SQLException, java.io.IOException {
+        if (cfg.xlsx() == null) throw new IllegalArgumentException("draft's parsing frontend is not xlsx");
+        if (sample == null || sample.length == 0)
+            throw new IllegalArgumentException("a workbook sample is required");
+
+        File db = DuckDbUtil.tempDbFile("preview_");
+        java.nio.file.Path wb = java.nio.file.Files.createTempFile("preview_parsing_", ".xlsx");
+        try {
+            java.nio.file.Files.write(wb, sample);
+            String path = wb.toAbsolutePath().toString().replace("\\", "/");
+            try (Connection conn = DuckDbUtil.openConnection(db)) {
+                com.gamma.etl.ExcelExtension.ensureLoaded(conn);
+                try (java.sql.Statement st = conn.createStatement()) {
+                    st.execute("CREATE TABLE preview_parsed AS SELECT * FROM "
+                            + com.gamma.etl.DuckDbCsvIngester.xlsxReadRelation(path, cfg.xlsx(), true));
+                }
+                return new GrammarResult(
+                        ScratchTables.columnNames(conn, "preview_parsed"),
+                        ScratchTables.count(conn, "preview_parsed"),
+                        ScratchTables.readRows(conn, "preview_parsed", MAX_ROWS),
+                        0,
+                        sniffXlsxColumnTypes(conn, cfg, path));
+            }
+        } finally {
+            java.nio.file.Files.deleteIfExists(wb);
+            DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
+    /** B2 for xlsx: the same relation without {@code all_varchar} — the extension's own cell typing.
+     *  Advisory by construction, so a failed sniff returns empty rather than failing the preview. */
+    private static List<Map<String, String>> sniffXlsxColumnTypes(Connection conn, PipelineConfig cfg,
+                                                                  String path) {
+        try (java.sql.Statement st = conn.createStatement()) {
+            st.execute("CREATE TABLE preview_sniff AS SELECT * FROM "
+                    + com.gamma.etl.DuckDbCsvIngester.xlsxReadRelation(path, cfg.xlsx(), false));
+            List<Map<String, String>> out = new java.util.ArrayList<>();
+            try (java.sql.ResultSet rs = st.executeQuery(
+                    "SELECT column_name, column_type FROM (DESCRIBE preview_sniff)")) {
+                while (rs.next()) {
+                    Map<String, String> col = new java.util.LinkedHashMap<>();
+                    col.put("name", rs.getString(1));
+                    col.put("type", rs.getString(2));
+                    out.add(col);
+                }
+            }
+            return out;
+        } catch (Exception sniffFail) {
+            return List.of();
         }
     }
 

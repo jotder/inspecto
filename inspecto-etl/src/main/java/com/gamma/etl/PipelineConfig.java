@@ -339,6 +339,35 @@ public final class PipelineConfig {
     }
 
     /**
+     * MS Excel parsing frontend (additive, multiformat-parser-lanes plan X1). Non-null only when the
+     * resolved parsing settings set {@code frontend: xlsx} (alias {@code excel}); {@code null}
+     * otherwise, so every existing pipeline is unaffected.
+     *
+     * <p>Compiles to DuckDB {@code read_xlsx(...)} (the {@code excel} extension —
+     * {@link ExcelExtension} loads it fail-closed). The ingest read always stamps
+     * {@code all_varchar=true}: like every other frontend, raw columns land as VARCHAR and typing is
+     * the mapping's concern, which is also why {@code empty_as_varchar} is not an option here. Each
+     * schema field lands keyed by {@code raw.fields[].selector} — for this frontend the selector is
+     * the <b>sheet column name</b> as {@code read_xlsx} yields it (the header cell when
+     * {@code header: true}, else DuckDB's positional letters {@code A, B, C…}).
+     *
+     * <p>Every option below is a named parameter {@code read_xlsx} actually reads (probed against
+     * duckdb_jdbc 1.5.2.1 via {@code duckdb_functions()} — there is deliberately no {@code columns}
+     * option, because {@code read_xlsx} has none).
+     *
+     * @param sheet          sheet NAME to read; null = the extension's default (the first sheet)
+     * @param range          A1-style cell range ({@code A1:F100} or a single anchor {@code B2}); null = whole sheet
+     * @param header         first row of the range is a header row (default true)
+     * @param stopAtEmpty    stop reading at the first fully empty row (default false; forced true by
+     *                       the extension when no explicit range is given — its own documented rule)
+     * @param ignoreErrors   replace unrepresentable cells with NULL instead of failing (default false)
+     * @param normalizeNames normalize header names to lower_snake identifiers (default false)
+     */
+    @PublicApi(since = "5.8.0")
+    public record Xlsx(String sheet, String range, boolean header, boolean stopAtEmpty,
+                       boolean ignoreErrors, boolean normalizeNames) {}
+
+    /**
      * Text/regex parsing frontend (additive, 4.8; block records additive, 4.9). Non-null only when
      * the resolved parsing settings set {@code frontend: text_regex}; {@code null} otherwise.
      *
@@ -827,6 +856,7 @@ public final class PipelineConfig {
     private final Intake         intake;
     private final FixedWidth     fixedWidth;
     private final Json           json;
+    private final Xlsx           xlsx;
     private final TextRegex      textRegex;
     private final Collector      collector;
 
@@ -976,6 +1006,8 @@ public final class PipelineConfig {
     public FixedWidth     fixedWidth() { return fixedWidth; }
     /** JSON/NDJSON frontend config, or {@code null} unless {@code frontend: json}. */
     public Json           json()       { return json; }
+    /** MS Excel frontend config, or {@code null} unless {@code frontend: xlsx}. */
+    public Xlsx           xlsx()       { return xlsx; }
     /** Text/regex frontend config, or {@code null} unless {@code frontend: text_regex}. */
     public TextRegex      textRegex()  { return textRegex; }
     /** Data-acquisition source binding; never null (defaults to local-FS over {@code dirs.poll}). */
@@ -1066,6 +1098,7 @@ public final class PipelineConfig {
         this.intake = b.intake;
         this.fixedWidth = b.fixedWidth;
         this.json = b.json;
+        this.xlsx = b.xlsx;
         this.textRegex = b.textRegex;
         this.collector = new Collector(b.sourceId, b.collectorConnector, b.sourceIncludes,
                 b.sourceExcludes, b.sourceDepth, b.sourceStability, b.sourceConnection, b.sourceDuplicate,
@@ -1143,6 +1176,7 @@ public final class PipelineConfig {
         this.intake = src.intake;
         this.fixedWidth = src.fixedWidth;
         this.json = src.json;
+        this.xlsx = src.xlsx;
         this.textRegex = src.textRegex;
         this.collector = src.collector;
         this.statusDirToPrepare = src.statusDirToPrepare;
@@ -1496,6 +1530,7 @@ public final class PipelineConfig {
         String       filenameColumn;    // output.filename_column (B4); null ⇒ no lineage column in rows
         FixedWidth   fixedWidth;          // null ⇒ delimited frontend (the default)
         Json         json;                // null unless frontend: json
+        Xlsx         xlsx;                // null unless frontend: xlsx
         TextRegex    textRegex;           // null unless frontend: text_regex
         String       sourceId;
         String       collectorConnector = "local";

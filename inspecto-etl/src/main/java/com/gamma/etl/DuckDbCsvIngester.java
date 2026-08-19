@@ -85,8 +85,8 @@ public final class DuckDbCsvIngester {
         // Fixed-width TEXT is parsed natively (read_csv + substring) only — the Java parser has no
         // fixed-width path, so it is always native regardless of the engine knob.
         if (cfg.fixedWidth() != null && !cfg.fixedWidth().binary()) return true;
-        // json / text_regex frontends are native-only too (read_json / read_csv+regexp_extract).
-        if (cfg.json() != null || cfg.textRegex() != null) return true;
+        // json / text_regex / xlsx frontends are native-only too.
+        if (cfg.json() != null || cfg.textRegex() != null || cfg.xlsx() != null) return true;
         return switch (cfg.csv().engine() == null ? "auto" : cfg.csv().engine().toLowerCase()) {
             case "duckdb" -> true;
             case "java"   -> false;
@@ -106,7 +106,7 @@ public final class DuckDbCsvIngester {
      */
     public static boolean decideNative(Batch batch, PipelineConfig cfg) {
         if (cfg.fixedWidth() != null && !cfg.fixedWidth().binary()) return true;   // fixed-width text: native-only
-        if (cfg.json() != null || cfg.textRegex() != null) return true;           // json / text_regex: native-only
+        if (cfg.json() != null || cfg.textRegex() != null || cfg.xlsx() != null) return true; // native-only frontends
         String engine = cfg.csv().engine() == null ? "auto" : cfg.csv().engine().toLowerCase();
         if (engine.equals("java"))   return false;
         if (engine.equals("duckdb")) return true;
@@ -133,6 +133,7 @@ public final class DuckDbCsvIngester {
                                       String targetTable) throws Exception {
 
         ReadSpec spec = buildReadSpec(file, schemaConfig, cfg);
+        if (cfg.xlsx() != null) ExcelExtension.ensureLoaded(conn);
 
         long parsed;
         try (Statement st = conn.createStatement()) {
@@ -179,6 +180,7 @@ public final class DuckDbCsvIngester {
                                           PipelineConfig cfg,
                                           String viewName, int srcId) throws Exception {
         ReadSpec spec = buildReadSpec(file, schemaConfig, cfg);
+        if (cfg.xlsx() != null) ExcelExtension.ensureLoaded(conn);
         try (Statement st = conn.createStatement()) {
             st.execute("DROP VIEW IF EXISTS \"" + viewName + "\"");
             st.execute("CREATE VIEW \"" + viewName + "\" AS SELECT " + spec.projection()
@@ -197,6 +199,8 @@ public final class DuckDbCsvIngester {
             return buildFixedWidthReadSpec(file, schemaConfig, cfg);
         if (cfg.json() != null)
             return buildJsonReadSpec(file, schemaConfig, cfg);
+        if (cfg.xlsx() != null)
+            return buildXlsxReadSpec(file, schemaConfig, cfg);
         if (cfg.textRegex() != null)
             return buildTextRegexReadSpec(file, schemaConfig, cfg);
 
@@ -315,6 +319,57 @@ public final class DuckDbCsvIngester {
      * {@code read_json} with an explicit all-VARCHAR {@code columns} map (a malformed document
      * fails the file as unreadable, per JSON-array semantics).
      */
+    /**
+     * Build the MS Excel read spec (multiformat X1): DuckDB {@code read_xlsx} over the workbook, all
+     * options passed as the extension's own named parameters (probed set — sheet, range, header,
+     * stop_at_empty, ignore_errors, normalize_names). {@code all_varchar=true} is STAMPED, not an
+     * option: raw columns land as VARCHAR and typing is the mapping's concern, the same contract as
+     * every other frontend, so {@code DataTransformer}/{@code PartitionWriter}/lineage run unchanged.
+     *
+     * <p>Selectors are the sheet's <b>column names</b> as {@code read_xlsx} yields them — the header
+     * cell when {@code header: true} (post-{@code normalize_names} when that is set), else DuckDB's
+     * positional letters ({@code A, B, C…}). The caller loads the {@code excel} extension first
+     * ({@link ExcelExtension#ensureLoaded}); this method stays pure string assembly.
+     */
+    private static ReadSpec buildXlsxReadSpec(File file, Map<String, Object> schemaConfig,
+                                              PipelineConfig cfg) {
+        PipelineConfig.Xlsx x = cfg.xlsx();
+        List<Map<String, Object>> fields = rawFields(schemaConfig);
+        String filePath = file.getAbsolutePath().replace("\\", "/");
+
+        StringBuilder proj = new StringBuilder();
+        for (int i = 0; i < fields.size(); i++) {
+            if (i > 0) proj.append(", ");
+            proj.append('"').append(escapeIdent(String.valueOf(fields.get(i).get("selector"))))
+                .append("\" AS \"").append(fields.get(i).get("name")).append('"');
+        }
+
+        return new ReadSpec(proj.toString(), xlsxReadRelation(filePath, x, true));
+    }
+
+    /**
+     * The {@code read_xlsx(...)} relation for a workbook — the ONE assembly of the extension's
+     * options, shared by ingest and the preview route so the two can never drift (the parity rule
+     * {@code Parsers} documents). {@code allVarchar=false} is the preview's B2 type sniff; ingest
+     * always passes {@code true}.
+     */
+    public static String xlsxReadRelation(String filePath, PipelineConfig.Xlsx x, boolean allVarchar) {
+        StringBuilder rx = new StringBuilder("read_xlsx('");
+        rx.append(escapeSql(filePath)).append("'")
+          .append(", all_varchar=").append(allVarchar)
+          .append(", header=").append(x.header());
+        if (x.sheet() != null) rx.append(", sheet='").append(escapeSql(x.sheet())).append("'");
+        if (x.range() != null) rx.append(", range='").append(escapeSql(x.range())).append("'");
+        if (x.stopAtEmpty())    rx.append(", stop_at_empty=true");
+        if (x.ignoreErrors())   rx.append(", ignore_errors=true");
+        if (x.normalizeNames()) rx.append(", normalize_names=true");
+        rx.append(')');
+        return rx.toString();
+    }
+
+    /** A double-quoted SQL identifier's escape ({@code "} doubles) — selectors are sheet-column names. */
+    private static String escapeIdent(String s) { return s.replace("\"", "\"\""); }
+
     private static ReadSpec buildJsonReadSpec(File file, Map<String, Object> schemaConfig,
                                               PipelineConfig cfg) {
         PipelineConfig.Json j = cfg.json();

@@ -22,7 +22,7 @@ class ParsersTest {
     @Test
     void catalogCarriesBuiltinsThenDiscoveredPlugins() {
         List<String> ids = Parsers.catalog().stream().map(ParserPlugin::id).toList();
-        assertEquals(List.of("delimited", "fixedwidth", "json", "text_regex", "xml", "asn1"), ids);
+        assertEquals(List.of("delimited", "fixedwidth", "json", "xlsx", "text_regex", "xml", "asn1"), ids);
     }
 
     @Test

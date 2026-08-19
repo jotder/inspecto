@@ -55,6 +55,14 @@ a new `okf/backend/engine/parser-frontends.md` if the builder grows enough to de
 
 ## 2. Slices (each gated: reactor `-Pedition-enterprise` + UI suite/lint/tsc + preview)
 
+> **Progress 2026-08-19:** X1 ✅ (7 tests, incl. the header-false positional-letters probe and the
+> range/normalize_names paths) · X2 ✅ (`parsingXlsx` byte preview + B2 sniff; pasted-text refused
+> toward `sample_b64`) · X3 ✅ (`PARSER_XLSX` + LOWERABLE/SUBTYPE_FRONTENDS/USE_HOME + lift/lower
+> round-trip pins; ⚠ the step-types/node-attributes contract fixtures are legitimately UNCHANGED —
+> that contract is the RECIPE-VERB palette, which has always carried only the bare `parser`; the
+> per-format graph palette is UI-side and lands with X4) · X4/J1/F1/D1 open (D1's xlsx §6.4b
+> written with the engine).
+
 - **X1 — xlsx engine lane**: `PipelineConfig.Xlsx` record (8 probed keys) + `PipelineConfigParser`
   root `xlsx:` + `buildXlsxReadSpec` (all-VARCHAR projection by selector, `filterWhere` composes) +
   `ExcelExtension.ensureLoaded` (P1) + ingest→parquet test on a real generated `.xlsx` fixture

@@ -74,6 +74,14 @@ public enum BuiltinNodeType implements PipelineNodeType {
     PARSER_TEXT_REGEX("parser.text_regex", NodeCategory.PARSE, "Regex",
             "Reads matching lines into rows via named capture groups; non-matching lines are dropped.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true),
+    // MS Excel (multiformat X3). Never implicit — a config is xlsx only by saying so — and, like the
+    // others, both accepted spellings (`xlsx` / `excel`, see PipelineConfigParser#parseXlsx) name this
+    // type; `xlsx` is what lower stamps back. read_xlsx runs via the DuckDB excel extension, loaded
+    // fail-closed by com.gamma.etl.ExcelExtension at ingest/preview time — the node type itself is
+    // pure authoring surface and carries the xlsx: block verbatim.
+    PARSER_XLSX("parser.xlsx", NodeCategory.PARSE, "Excel",
+            "Reads an .xlsx workbook sheet into rows via DuckDB read_xlsx; header cells name the columns.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true),
     // The custom-plugin subtype (P3d slice D): a deployed ParserPlugin the four built-ins and ASN.1
     // don't cover, wired through the existing `parsing.plugin` machinery (ingester/ingester_config/
     // segments) that framework already had before this family existed. Never implicit, like every

@@ -349,6 +349,31 @@ two path layers are independent, so a dotted field selector still walks inside e
   an error. (The `[*]` wildcard form was rejected precisely because it returns zero rows silently in
   all three cases.)
 
+### 6.4b MS Excel (.xlsx) `[LIVE]` (multiformat X1–X3, 2026-08-19)
+```yaml
+parsing:
+  frontend: xlsx                   # alias: excel
+  xlsx:
+    sheet: "Invoices"              # optional; omitted = the workbook's first sheet
+    range: "A1:H500"               # optional A1-style anchor or span; omitted = the whole sheet
+    header: true                   # default true — header cells name the columns
+    stop_at_empty: false           # stop at the first fully empty row
+    ignore_errors: false           # unrepresentable cells land NULL instead of failing the file
+    normalize_names: false         # lower_snake identifiers from the header cells
+# raw.fields[].selector = the SHEET COLUMN NAME as read_xlsx yields it: the header cell when
+# header: true (post-normalize_names when set), else DuckDB's positional letters A, B, C…
+# Every field lands VARCHAR (all_varchar is STAMPED by ingest, not an option) and is typed by the
+# schema exactly like a CSV column.
+```
+Runs on DuckDB's **`excel` extension**, which is *not* statically linked into the JDBC driver —
+`com.gamma.etl.ExcelExtension` loads it fail-closed in three layers: `LOAD` (cached/pre-installed) →
+`LOAD` from `-Dduckdb.extension.dir` (**the air-gapped deployment**: ship this platform's
+`excel.duckdb_extension` beside the jar) → `INSTALL excel` (networked, caches under `~/.duckdb`).
+All three failing fails the batch with a message naming every remedy. ⛔ `read_xlsx` has **no
+`columns` parameter** (probed on 1.5.2.1) — the columns table is the columns mechanism, as on every
+frontend. Preview rides `sample_b64` (the workbook is binary) and its B2 type sniff is the same
+relation without `all_varchar`.
+
 ### 6.5 XML `[PLUGIN]` (or `text_regex` `[LIVE]` for *flat* XML)
 DuckDB has no core XML reader. For flat, one-element-per-line XML, `text_regex` with
 `regexp_extract` works. For real nested XML, write a `StreamingFileIngester` around a StAX/SAX

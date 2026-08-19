@@ -375,6 +375,8 @@ final class PipelineConfigParser {
             // 4.8 additive: json / text_regex frontends (null unless selected)
             b.json             = parseJson(csv);
             b.textRegex        = parseTextRegex(csv);
+            // multiformat X1 additive: MS Excel frontend (null unless frontend: xlsx / excel)
+            b.xlsx             = parseXlsx(csv);
         }
 
         // ── output ────────────────────────────────────────────────────────────
@@ -1211,7 +1213,7 @@ final class PipelineConfigParser {
 
     /** The recognised {@code parsing.frontend} values (docs/parsing-options-reference.md §5). */
     private static final Set<String> FRONTENDS =
-            Set.of("delimited", "fixedwidth", "fixed_width", "json", "text_regex", "asn1", "plugin");
+            Set.of("delimited", "fixedwidth", "fixed_width", "json", "text_regex", "xlsx", "excel", "asn1", "plugin");
 
     /**
      * Overlay the unified {@code parsing:} block onto the legacy grammar/{@code csv_settings} map
@@ -1229,7 +1231,7 @@ final class PipelineConfigParser {
         if (parsing.get("delimited") instanceof Map<?, ?> del)
             merged.putAll((Map<String, Object>) del);
         for (String key : new String[]{"frontend", "encoding", "compression",
-                                       "fixedwidth", "json", "text_regex", "asn1"}) {
+                                       "fixedwidth", "json", "text_regex", "xlsx", "asn1"}) {
             Object v = parsing.get(key);
             if (v != null) merged.put(key, v);
         }
@@ -1278,7 +1280,7 @@ final class PipelineConfigParser {
         String f = String.valueOf(csv.getOrDefault("frontend", "delimited")).trim().toLowerCase();
         if (!FRONTENDS.contains(f))
             throw new IllegalArgumentException("Unknown parsing.frontend '" + f
-                    + "' — expected one of: delimited, fixedwidth, json, text_regex, asn1, plugin");
+                    + "' — expected one of: delimited, fixedwidth, json, text_regex, xlsx, asn1, plugin");
         return f;
     }
 
@@ -1313,6 +1315,39 @@ final class PipelineConfigParser {
                     + "enclosing document, but json.format is 'newline' (NDJSON), where each line is "
                     + "already one record — use format: array or auto, or keep records_path: '$'");
         return new PipelineConfig.Json(format, recordsPath);
+    }
+
+    /** A1-style cell range: an anchor cell or a cell:cell span (probed read_xlsx accepts both). */
+    private static final java.util.regex.Pattern XLSX_RANGE =
+            java.util.regex.Pattern.compile("^[A-Za-z]{1,3}[0-9]{1,7}(:[A-Za-z]{1,3}[0-9]{1,7})?$");
+
+    /**
+     * Parse the optional MS Excel frontend (multiformat-parser-lanes plan X1). Returns {@code null}
+     * unless {@code frontend} is {@code xlsx} (or the alias {@code excel}); otherwise builds a
+     * {@link PipelineConfig.Xlsx} from the (optional) {@code xlsx:} block. Hard-fails — a draft is
+     * rejected before any run — on a malformed {@code range} or a blank-but-present {@code sheet},
+     * because both are interpolated into the {@code read_xlsx} SQL and a key the engine cannot honor
+     * must never load looking honored.
+     */
+    @SuppressWarnings("unchecked")
+    private static PipelineConfig.Xlsx parseXlsx(Map<String, Object> csv) {
+        String frontend = String.valueOf(csv.getOrDefault("frontend", "delimited")).trim().toLowerCase();
+        if (!frontend.equals("xlsx") && !frontend.equals("excel")) return null;
+        Map<String, Object> x = (csv.get("xlsx") instanceof Map<?, ?> xm)
+                ? (Map<String, Object>) xm : Map.of();
+        String sheet = blankToNull(x.get("sheet"));
+        if (x.containsKey("sheet") && sheet == null)
+            throw new IllegalArgumentException("xlsx.sheet must name a sheet when present (or be omitted "
+                    + "for the workbook's first sheet)");
+        String range = blankToNull(x.get("range"));
+        if (range != null && !XLSX_RANGE.matcher(range).matches())
+            throw new IllegalArgumentException("xlsx.range must be an A1-style cell or span "
+                    + "(e.g. B2 or A1:F100), got '" + range + "'");
+        boolean header         = Boolean.parseBoolean(String.valueOf(x.getOrDefault("header", "true")));
+        boolean stopAtEmpty    = Boolean.parseBoolean(String.valueOf(x.getOrDefault("stop_at_empty", "false")));
+        boolean ignoreErrors   = Boolean.parseBoolean(String.valueOf(x.getOrDefault("ignore_errors", "false")));
+        boolean normalizeNames = Boolean.parseBoolean(String.valueOf(x.getOrDefault("normalize_names", "false")));
+        return new PipelineConfig.Xlsx(sheet, range, header, stopAtEmpty, ignoreErrors, normalizeNames);
     }
 
     /**

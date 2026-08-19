@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * The four built-in {@link ParserPlugin}s — thin self-description adapters over the engine's own
+ * The five built-in {@link ParserPlugin}s — thin self-description adapters over the engine's own
  * DuckDB-native parsing frontends. Their {@link ParserPlugin#preview} builds a minimal pipeline
  * draft around the grammar and delegates to {@link ComponentPreview#parsing}, i.e. the exact
  * read specs {@code DuckDbCsvIngester} runs at ingest — full transparency: the caller never learns
@@ -26,7 +26,7 @@ import java.util.Set;
  */
 final class BuiltinParsers {
 
-    private static final Set<String> IDS = Set.of("delimited", "fixedwidth", "json", "text_regex");
+    private static final Set<String> IDS = Set.of("delimited", "fixedwidth", "json", "text_regex", "xlsx");
 
     private BuiltinParsers() {}
 
@@ -103,6 +103,19 @@ final class BuiltinParsers {
                         FieldSpec.of("delimited.skip_header_lines", "Skip leading lines", FieldType.INT,
                                 "Non-JSON preamble lines before the records."),
                         FieldSpec.of("compression", "Input compression", FieldType.STRING, "e.g. gzip."))),
+                new Builtin("xlsx", "MS Excel — read_xlsx over a workbook (DuckDB excel extension)", List.of(
+                        FieldSpec.of("xlsx.sheet", "Sheet", FieldType.STRING,
+                                "Sheet NAME to read; empty = the workbook's first sheet."),
+                        FieldSpec.of("xlsx.range", "Cell range", FieldType.STRING,
+                                "A1-style anchor or span (B2 or A1:F100); empty = the whole sheet."),
+                        FieldSpec.withDefault("xlsx.header", "First row is a header", FieldType.BOOL, true,
+                                "Header cells name the columns; without one, columns are A, B, C…"),
+                        FieldSpec.withDefault("xlsx.stop_at_empty", "Stop at first empty row", FieldType.BOOL, false,
+                                "Forced on by the extension when no explicit range is given."),
+                        FieldSpec.withDefault("xlsx.ignore_errors", "Ignore cell errors", FieldType.BOOL, false,
+                                "Unrepresentable cells land as NULL instead of failing the file."),
+                        FieldSpec.withDefault("xlsx.normalize_names", "Normalize header names", FieldType.BOOL, false,
+                                "Lower-snake identifiers from the header cells."))),
                 new Builtin("text_regex", "Text / regex — named capture groups over matching lines", List.of(
                         FieldSpec.required("text_regex.pattern", "Pattern", FieldType.STRING,
                                 "At least one named capture group — group names become the columns; "
@@ -122,7 +135,6 @@ final class BuiltinParsers {
 
         @Override
         public ParseResult preview(byte[] sample, Map<String, Object> grammar) throws Exception {
-            String text = new String(sample, charsetOf(grammar));
             Map<String, Object> parsing = new LinkedHashMap<>(grammar == null ? Map.of() : grammar);
             parsing.put("frontend", id);
             Map<String, Object> draft = new LinkedHashMap<>();
@@ -134,7 +146,11 @@ final class BuiltinParsers {
             draft.put("processing", Map.of("threads", 1));
             draft.put("parsing", parsing);
             PipelineConfig cfg = PipelineConfig.fromMap(draft);
-            ComponentPreview.GrammarResult r = ComponentPreview.parsing(cfg, text);
+            // xlsx is BINARY: the sample stays bytes (sample_b64 transport) and never round-trips
+            // through a charset — the same rule the ASN.1 plugin follows.
+            ComponentPreview.GrammarResult r = "xlsx".equals(id)
+                    ? ComponentPreview.parsingXlsx(cfg, sample)
+                    : ComponentPreview.parsing(cfg, new String(sample, charsetOf(grammar)));
             return new ParseResult.Table(r.columns(), r.rows(), r.rowCount(), r.rejectedRows(), r.columnTypes());
         }
     }
