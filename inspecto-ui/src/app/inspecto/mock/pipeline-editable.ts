@@ -29,6 +29,7 @@ export const LOWERABLE = new Set([
     'parser.asn1', // the third (P3c) — first-class `frontend: asn1`, grammar carried inline
     'parser.json', // P3d slice C — the two remaining built-in frontends, never implicit, so both retype
     'parser.text_regex',
+    'parser.xlsx', // multiformat X3 — read_xlsx via the DuckDB excel extension, never implicit
     'parser.plugin', // P3d slice D — the custom-plugin subtype, wired through the existing plugin: block
     'gap',
     // read-compat only since P5-a: never emitted by the lift, still accepted by lower
@@ -84,6 +85,7 @@ const USE_HOME: Record<string, string[]> = {
     'parser.asn1': ['grammar/'],
     'parser.json': ['grammar/'],
     'parser.text_regex': ['grammar/'],
+    'parser.xlsx': ['grammar/'],
     // The one exception: parser.plugin IS the plain parser's plugin path, so it takes ingester/ too —
     // see DERIVED_USE below for why that ref is accepted but never authored.
     'parser.plugin': ['grammar/', 'ingester/'],
@@ -100,6 +102,7 @@ export const SUBTYPE_FRONTENDS: Record<string, string[]> = {
     'parser.asn1': ['asn1'],
     'parser.json': ['json'],
     'parser.text_regex': ['text_regex'],
+    'parser.xlsx': ['xlsx', 'excel'],
     'parser.plugin': ['plugin'],
 };
 
@@ -110,6 +113,7 @@ const PARSER_SUBTYPE_LABELS: Record<string, string> = {
     'parser.asn1': 'ASN.1',
     'parser.json': 'JSON',
     'parser.text_regex': 'Regex',
+    'parser.xlsx': 'Excel',
     'parser.plugin': 'Custom',
 };
 

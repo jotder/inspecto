@@ -26,14 +26,14 @@ describe('parsersHandler', () => {
     it('serves the catalog: built-ins first, then the two hierarchical plugins', () => {
         const res = send('GET', '/api/parsers')!;
         const list = res.body as ParserDef[];
-        expect(list.map((p) => p.id)).toEqual(['delimited', 'fixedwidth', 'json', 'text_regex', 'xml', 'asn1']);
+        expect(list.map((p) => p.id)).toEqual(['delimited', 'fixedwidth', 'json', 'xlsx', 'text_regex', 'xml', 'asn1']);
         // Both plugins are tree-shaped; they differ on whether they can load to Tables, and that
         // difference is exactly what a guided Save gates on.
-        const xml = list[4];
+        const xml = list[5];
         expect(xml.hierarchical).toBe(true);
         expect(xml.ingestable).toBe(false); // preview-only until the flatten configuration
         expect(xml.ingesterClass).toBeUndefined();
-        const asn1 = list[5];
+        const asn1 = list[6];
         expect(asn1.hierarchical).toBe(true);
         expect(asn1.ingestable).toBe(true);
         expect(asn1.ingesterClass).toBe('com.gamma.ingester.Asn1RecordIngester');

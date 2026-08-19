@@ -43,7 +43,7 @@ import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { ParserTreeComponent } from 'app/inspecto/components/parser-tree.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
-import { GRAMMAR_TABS, PARSING_FRONTENDS, ParsingFrontend, parsingAttributesFor } from './parsing-attributes';
+import { PARSING_FRONTENDS, ParsingFrontend, grammarTabsFor, parsingAttributesFor } from './parsing-attributes';
 import { FrontendSuggestion, jsonSampleToTree, sniffFrontend } from './parsing-sniff';
 
 /** The `parsing:` roots this editor owns — switching frontend clears the others' sub-blocks. */
@@ -53,6 +53,7 @@ export const PARSING_ROOTS = [
     'fixedwidth',
     'json',
     'text_regex',
+    'xlsx',
     'encoding',
     'compression',
     'plugin',
@@ -138,6 +139,12 @@ export class GrammarEditorComponent implements AfterViewInit {
     @Input() set sample(v: string | null | undefined) {
         this.sampleText.set(v ?? '');
     }
+
+    /** A BINARY sample's bytes as base64 (an .xlsx workbook — multiformat X4), host-supplied. When
+     *  set it wins over `sample`, whose text is then only the strip's human summary. */
+    @Input() set sampleBytes(v: string | null | undefined) {
+        this.sampleB64.set(v || null);
+    }
     @Input() sampleMode: SampleMode = 'own';
 
     /**
@@ -167,7 +174,12 @@ export class GrammarEditorComponent implements AfterViewInit {
      * so the result feeds the sample thread and the Schema stage; without an override the editor uses
      * the stateless `POST /parsers/{id}/preview`, which is all a dialog needs.
      */
-    @Input() previewFn?: (type: string, grammar: Record<string, unknown>, text: string) => Observable<ParserPreview>;
+    @Input() previewFn?: (
+        type: string,
+        grammar: Record<string, unknown>,
+        text: string,
+        b64?: string,
+    ) => Observable<ParserPreview>;
 
     /** Enter on the form, or the editor's own Save affordance in a host that renders one. */
     @Output() readonly submitted = new EventEmitter<void>();
@@ -189,6 +201,8 @@ export class GrammarEditorComponent implements AfterViewInit {
     protected readonly block = signal<Record<string, unknown>>({});
     protected readonly seed = signal<Record<string, unknown>>({});
     readonly sampleText = signal('');
+    /** Base64 bytes of a binary sample; non-null wins over {@link sampleText} at Test parse. */
+    readonly sampleB64 = signal<string | null>(null);
     readonly frontends = PARSING_FRONTENDS;
     readonly frontend = signal<ParsingFrontend>('delimited');
 
@@ -215,20 +229,27 @@ export class GrammarEditorComponent implements AfterViewInit {
 
     /**
      * The tab split of the active spec set, or null to render flat. A set names tabs by `spec.tab`
-     * (GRAMMAR_TABS order); fewer than 2 distinct tabs ⇒ flat — json/fixedwidth/text_regex and every
+     * (grammarTabsFor order); fewer than 2 distinct tabs ⇒ flat — json/fixedwidth/text_regex and every
      * served plugin render byte-identical to before. Untabbed specs in a tabbed set fall into tab 1.
      */
     readonly tabs = computed<{ id: string; label: string; specs: AttributeSpec[] }[] | null>(() => {
         const specs = this.specs();
         const ids = new Set(specs.map((s) => s.tab).filter((t): t is string => !!t));
         if (ids.size < 2) return null;
-        const fallback = GRAMMAR_TABS[0].id;
-        return GRAMMAR_TABS.filter((t) => ids.has(t.id) || (t.id === fallback && specs.some((s) => !s.tab))).map(
-            (t) => ({
+        const shell = grammarTabsFor(this.frontend());
+        const fallback = shell[0].id;
+        // The 'files' tab is kept even when no spec names it: it anchors the Collection pointer and
+        // the host's [tabFiles] projection (the column-metadata grid) — xlsx has no file-level
+        // option of its own but the tab's content is not the specs'.
+        return shell
+            .filter(
+                (t) =>
+                    ids.has(t.id) || t.id === 'files' || (t.id === fallback && specs.some((s) => !s.tab)),
+            )
+            .map((t) => ({
                 ...t,
                 specs: specs.filter((s) => (s.tab ?? fallback) === t.id),
-            }),
-        );
+            }));
     });
 
     /** The selected tab of a tabbed set — `validate()` steers it to the first failing tab. */
@@ -525,15 +546,38 @@ export class GrammarEditorComponent implements AfterViewInit {
 
     onSampleText(text: string): void {
         this.sampleText.set(text);
+        this.sampleB64.set(null); // typing replaces any captured binary sample
         this.preview.set(null);
         this.error.set(null);
         this.sampleChange.emit(text);
     }
 
-    /** Load sample content from a local file (text, capped). */
+    /** Load sample content from a local file (text, capped; an .xlsx workbook captures as BYTES). */
     onSampleFile(files: FileList | null): void {
         const file = files?.[0];
         if (!file) return;
+        // Binary: text() would round-trip the zip through a charset. No truncation — a sliced zip is
+        // unreadable, so an oversized workbook is refused whole rather than silently maimed.
+        if (this.frontend() === 'xlsx' || /\.xlsx$/i.test(file.name)) {
+            if (file.size > MAX_SAMPLE_BYTES) {
+                this.error.set(`Workbook too large for a preview sample (max ${MAX_SAMPLE_BYTES / 1024} KB).`);
+                return;
+            }
+            file.arrayBuffer().then(
+                (buf) => {
+                    let bin = '';
+                    for (const b of new Uint8Array(buf)) bin += String.fromCharCode(b);
+                    this.sampleB64.set(btoa(bin));
+                    this.sampleText.set(
+                        `[${file.name} — binary workbook, ${Math.max(1, Math.round(file.size / 1024))} KB]`,
+                    );
+                    this.preview.set(null);
+                    this.error.set(null);
+                },
+                () => this.error.set('Could not read the file.'),
+            );
+            return;
+        }
         const truncated = file.size > MAX_SAMPLE_BYTES;
         file.slice(0, MAX_SAMPLE_BYTES)
             .text()
@@ -612,7 +656,8 @@ export class GrammarEditorComponent implements AfterViewInit {
     /** Parse the sample with the in-progress Grammar (no save) → table or tree. */
     test(): void {
         const text = this.sampleText();
-        if (!text || !this.validate()) return;
+        const b64 = this.sampleB64() ?? undefined;
+        if ((!text && !b64) || !this.validate()) return;
         const type = this.activeType();
         // 🔴 Fixed width's slice table is its OWN FormArray, not part of the property sheet, so
         // `grammar()` carries no `fixedwidth.fields` and the preview ALWAYS failed with "fixed width
@@ -622,8 +667,8 @@ export class GrammarEditorComponent implements AfterViewInit {
         this.testing.set(true);
         this.error.set(null);
         const req$ = this.previewFn
-            ? this.previewFn(type, grammar, text)
-            : this.parsersApi.preview(type, grammar, text);
+            ? this.previewFn(type, grammar, text, b64)
+            : this.parsersApi.preview(type, grammar, text, b64);
         req$.subscribe({
             next: (p) => {
                 this.testing.set(false);
@@ -647,5 +692,6 @@ function normalizeFrontend(raw: unknown): ParsingFrontend {
     if (f === 'fixed_width' || f === 'fixedwidth') return 'fixedwidth';
     if (f === 'json') return 'json';
     if (f === 'text_regex') return 'text_regex';
+    if (f === 'xlsx' || f === 'excel') return 'xlsx';
     return 'delimited';
 }

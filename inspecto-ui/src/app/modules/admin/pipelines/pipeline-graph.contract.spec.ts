@@ -81,7 +81,7 @@ describe('parse-subtype vocabulary contract', () => {
     });
 
     /** Pinned so emptying both maps cannot turn the comparison above into a vacuous pass. */
-    it('still holds the six built-in parse subtypes', () => {
+    it('still holds the seven built-in parse subtypes', () => {
         expect(Object.keys(PARSE_NODE_FRONTENDS).sort()).toEqual([
             'parser.asn1',
             'parser.delimited',
@@ -89,6 +89,7 @@ describe('parse-subtype vocabulary contract', () => {
             'parser.json',
             'parser.plugin',
             'parser.text_regex',
+            'parser.xlsx',
         ]);
     });
 });

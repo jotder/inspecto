@@ -93,6 +93,7 @@ export const PARSE_NODE_FRONTENDS: Record<string, ParsingFrontend | 'asn1' | 'pl
     'parser.asn1': 'asn1',
     'parser.json': 'json',
     'parser.text_regex': 'text_regex',
+    'parser.xlsx': 'xlsx', // multiformat X4 — read_xlsx via the DuckDB excel extension
     'parser.plugin': 'plugin',
 };
 
@@ -237,6 +238,7 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                 [lockType]="true"
                 [sampleMode]="sample() ? 'host' : 'own'"
                 [sample]="sample()?.sample()?.text"
+                [sampleBytes]="sample()?.sample()?.b64"
                 [previewFn]="sample() ? previewFn : undefined"
                 (pluginChange)="plugin.set($event)"
                 (previewed)="onPreviewed($event)"
@@ -343,7 +345,7 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                             <inspecto-schema-fields-editor
                                 [rows]="schemaSeed()"
                                 [autoTypes]="typesMode() === 'auto'"
-                                [nameBasedSelectors]="frontend() === 'json' || frontend() === 'text_regex'"
+                                [nameBasedSelectors]="frontend() === 'json' || frontend() === 'text_regex' || frontend() === 'xlsx'"
                             />
                             <!--
                                 BUILDER-1b. One pipeline has ONE output schema (pipeline_schema), and a save
@@ -604,10 +606,15 @@ export class PipelineParseDefinitionComponent {
      * than clearing it — the thread's parsed hop means "rows a downstream step can cast", and a record
      * tree is not that.
      */
-    readonly previewFn = (type: string, grammar: Record<string, unknown>, text: string): Observable<ParserPreview> => {
+    readonly previewFn = (
+        type: string,
+        grammar: Record<string, unknown>,
+        text: string,
+        b64?: string,
+    ): Observable<ParserPreview> => {
         const thread = this.sample();
         thread?.parseError.set(null);
-        return this.parsersApi.preview(type, grammar, text).pipe(
+        return this.parsersApi.preview(type, grammar, text, b64).pipe(
             tap((p) => {
                 if (p.kind !== 'table') return;
                 this.schemaStale.set(false); // these columns and these settings agree again

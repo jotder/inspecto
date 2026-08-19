@@ -40,6 +40,7 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
         'parser.asn1', // P3c: the third — first-class `frontend: asn1`, grammar carried inline
         'parser.json', // P3d slice C: the last two built-in frontends; neither is implicit, so both retype
         'parser.text_regex',
+        'parser.xlsx',
         'parser.plugin', // P3d slice D: the generic custom-plugin subtype
         'transform.map',
         'transform.filter',
@@ -121,6 +122,7 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
             'parser.json',
             'parser.plugin',
             'parser.text_regex',
+            'parser.xlsx',
             'sink.persistent',
             'transform.dedup',
             'transform.dedup.marker',
@@ -130,7 +132,7 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
             'transform.route',
             'transform.summarize',
         ]);
-        expect(NODE_TYPES.length).toBe(28);
+        expect(NODE_TYPES.length).toBe(29);
     });
 
     /**
@@ -157,6 +159,7 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
             'parser.asn1',
             'parser.json',
             'parser.text_regex',
+            'parser.xlsx',
             'parser.plugin',
             'transform.route',
         ]);

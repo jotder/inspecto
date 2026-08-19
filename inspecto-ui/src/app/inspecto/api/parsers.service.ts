@@ -49,10 +49,16 @@ export class ParsersService {
      * scratch-only. Caller errors (bad grammar, unparseable sample) come back as 422 with the
      * reason.
      */
-    preview(id: string, grammar: Record<string, unknown>, sampleText: string): Observable<ParserPreview> {
+    /** `sampleB64` (a binary format's bytes — an .xlsx workbook) wins over `sampleText` when set. */
+    preview(
+        id: string,
+        grammar: Record<string, unknown>,
+        sampleText: string,
+        sampleB64?: string,
+    ): Observable<ParserPreview> {
         return this.http.post<ParserPreview>(apiUrl(`/parsers/${encodeURIComponent(id)}/preview`), {
             grammar,
-            sample_text: sampleText,
+            ...(sampleB64 ? { sample_b64: sampleB64 } : { sample_text: sampleText }),
         });
     }
 }

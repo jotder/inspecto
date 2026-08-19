@@ -209,6 +209,44 @@ const CATALOG: ParserDef[] = [
         ],
     },
     {
+        id: 'xlsx',
+        label: 'MS Excel — read_xlsx over a workbook (DuckDB excel extension)',
+        hierarchical: false,
+        ingestable: true,
+        grammarSchema: [
+            str('xlsx.sheet', 'Sheet', "Sheet NAME to read; empty = the workbook's first sheet."),
+            str('xlsx.range', 'Cell range', 'A1-style anchor or span (B2 or A1:F100); empty = the whole sheet.'),
+            {
+                path: 'xlsx.header',
+                label: 'First row is a header',
+                type: 'BOOL',
+                defaultValue: true,
+                description: 'Header cells name the columns; without one, columns are A, B, C…',
+            },
+            {
+                path: 'xlsx.stop_at_empty',
+                label: 'Stop at first empty row',
+                type: 'BOOL',
+                defaultValue: false,
+                description: 'Forced on by the extension when no explicit range is given.',
+            },
+            {
+                path: 'xlsx.ignore_errors',
+                label: 'Ignore cell errors',
+                type: 'BOOL',
+                defaultValue: false,
+                description: 'Unrepresentable cells land as NULL instead of failing the file.',
+            },
+            {
+                path: 'xlsx.normalize_names',
+                label: 'Normalize header names',
+                type: 'BOOL',
+                defaultValue: false,
+                description: 'Lower-snake identifiers from the header cells.',
+            },
+        ],
+    },
+    {
         id: 'text_regex',
         label: 'Text / regex — named capture groups over matching lines',
         hierarchical: false,
@@ -321,9 +359,9 @@ export function parsersHandler(): MockHandler {
 function preview(id: string, req: MockRequest) {
     const def = CATALOG.find((p) => p.id === id);
     if (!def) return error(404, `unknown parser: ${id}`);
-    const b = (req.body ?? {}) as { grammar?: Record<string, unknown>; sample_text?: string };
+    const b = (req.body ?? {}) as { grammar?: Record<string, unknown>; sample_text?: string; sample_b64?: string };
     const sample = String(b.sample_text ?? '');
-    if (!sample.trim()) return error(400, "body must include 'sample_text' or 'sample_b64'");
+    if (!sample.trim() && !b.sample_b64) return error(400, "body must include 'sample_text' or 'sample_b64'");
     if (sample.length > MAX_SAMPLE_CHARS) return error(400, `sample_text too large (max ${MAX_SAMPLE_CHARS} chars)`);
     const grammar = b.grammar ?? {};
     try {
@@ -350,6 +388,11 @@ function parse(id: string, grammar: Record<string, unknown>, sample: string): Pa
         // way. Refuse honestly: STRICTER than the server, never more lenient.
         case 'asn1':
             throw new Error('ASN.1 preview needs the real decoder — not available in mock mode');
+        // Same rule as ASN.1: a workbook is binary and read_xlsx is the real DuckDB extension —
+        // a mock xlsx reader would be a second implementation and a lie either way. STRICTER than
+        // the server, never more lenient.
+        case 'xlsx':
+            throw new Error('Excel preview needs the real read_xlsx — not available in mock mode');
         default:
             throw new Error(`unknown parser: ${id}`);
     }

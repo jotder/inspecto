@@ -102,6 +102,7 @@ export function grammarBlockAsContent(block: Record<string, unknown>, nested: bo
 const FRONTEND_ALIASES: Record<string, readonly string[]> = {
     delimited: ['delimited', 'csv', 'dsv'],
     fixedwidth: ['fixedwidth', 'fixed_width'],
+    xlsx: ['xlsx', 'excel'],
 };
 
 /**

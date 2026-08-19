@@ -50,9 +50,13 @@ export function grammarCsvFilename(pipelineName: string): string {
     return `${base}_parser.csv`;
 }
 
-/** The engine key an editor spec key maps to (`delimited__delimiter` → `delimiter`; shared keys as-is). */
+/**
+ * The engine key an editor spec key maps to (`delimited__delimiter` → `delimiter`,
+ * `xlsx__sheet` → `sheet`; shared keys as-is). The file's `meta.format` scopes the bare name, so
+ * stripping ANY frontend prefix is unambiguous — a Grammar CSV is per-format by construction.
+ */
 function engineKeyOf(specKey: string): string {
-    return specKey.replace(/^delimited__/, '');
+    return specKey.replace(/^[a-z_]+__/, '');
 }
 
 const COLUMN_ATTRS = ['include', 'name', 'type', 'synonym', 'description', 'unit', 'classification'] as const;
@@ -104,6 +108,9 @@ export function parseGrammarCsv(text: string, specs: AttributeSpec[]): GrammarCs
     const body = rows.filter((r) => r[0]?.trim().toLowerCase() !== 'section');
     const meta: Partial<GrammarCsvMeta> = {};
     const byEngineKey = new Map<string, AttributeSpec>(specs.map((s) => [engineKeyOf(s.key), s]));
+    // Back-compat: files exported before the prefix-strip generalized carried the RAW spec key for
+    // non-delimited frontends (e.g. `fixedwidth__min_record_length`) — keep accepting those spellings.
+    for (const s of specs) if (!byEngineKey.has(s.key)) byEngineKey.set(s.key, s);
     const options: Record<string, unknown> = {};
     const unknownKeys: string[] = [];
     const columnRows = new Map<string, Record<string, string>>();

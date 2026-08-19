@@ -14,7 +14,7 @@ import { AttributeSpec } from 'app/inspecto/component-model';
  * line-based frontend, e.g. `delimited.has_header` also drives the fixed-width header skip);
  * per-frontend sub-blocks are `fixedwidth.*`, `json.*`, `text_regex.*`.
  */
-export type ParsingFrontend = 'delimited' | 'fixedwidth' | 'json' | 'text_regex';
+export type ParsingFrontend = 'delimited' | 'fixedwidth' | 'json' | 'text_regex' | 'xlsx';
 
 /**
  * The Grammar editor's tab shell for the delimited frontend (delimited-grammar-properties plan §4.1).
@@ -37,7 +37,18 @@ export const PARSING_FRONTENDS: { id: ParsingFrontend; label: string; hint: stri
     { id: 'fixedwidth', label: 'Fixed width', hint: 'Positional slices carved from each line' },
     { id: 'json', label: 'JSON', hint: 'NDJSON (one object per line) or a JSON array document' },
     { id: 'text_regex', label: 'Text / regex', hint: 'Named capture groups over matching lines' },
+    { id: 'xlsx', label: 'Excel', hint: 'An .xlsx workbook sheet, read natively (DuckDB read_xlsx)' },
 ];
+
+/**
+ * The tab shell per frontend (multiformat X4): same ids as {@link GRAMMAR_TABS} — the editor keys
+ * slots and badges on the id — with the first tab's label speaking the format's own language.
+ * Formats without a tabbed spec set never reach this (the editor renders them flat).
+ */
+export function grammarTabsFor(frontend: string): { id: string; label: string }[] {
+    if (frontend === 'xlsx') return [{ id: 'dialect', label: 'Sheet & range' }, ...GRAMMAR_TABS.slice(1)];
+    return GRAMMAR_TABS;
+}
 
 export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[] {
     switch (frontend) {
@@ -345,6 +356,91 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     tier: 'advanced',
                     placeholder: 'gzip',
                 },
+            ];
+        case 'xlsx':
+            // The PROBED read_xlsx option set (multiformat plan §0) — every key is a named parameter
+            // the extension reads; all_varchar is STAMPED by ingest, never an option, and read_xlsx
+            // has NO columns/compression/encoding params (a workbook is its own container). The
+            // date/timestamp formats are transform-time keys shared with every frontend.
+            return [
+                {
+                    key: 'xlsx__sheet',
+                    label: 'Sheet',
+                    type: 'string',
+                    tier: 'required',
+                    required: false,
+                    placeholder: 'first sheet',
+                    help: "Sheet NAME to read. Blank = the workbook's first sheet.",
+                    tab: 'dialect',
+                },
+                {
+                    key: 'xlsx__range',
+                    label: 'Cell range',
+                    type: 'string',
+                    tier: 'optional',
+                    pattern: '[A-Za-z]{1,3}[0-9]{1,7}(:[A-Za-z]{1,3}[0-9]{1,7})?',
+                    placeholder: 'A1:F100',
+                    help: 'A1-style anchor or span. Blank = the whole sheet.',
+                    tab: 'dialect',
+                },
+                {
+                    key: 'xlsx__header',
+                    label: 'First row is a header',
+                    type: 'boolean',
+                    tier: 'required',
+                    required: false,
+                    default: true,
+                    help: 'Header cells name the columns; without one they are A, B, C…',
+                    tab: 'dialect',
+                },
+                {
+                    key: 'xlsx__normalize_names',
+                    label: 'Normalize header names',
+                    type: 'boolean',
+                    tier: 'optional',
+                    help: 'Lower-snake identifiers from the header cells.',
+                    tab: 'dialect',
+                },
+                // ── tab 2: Types & columns (transform-time typing, shared keys) ──
+                {
+                    key: 'delimited__date_formats',
+                    label: 'Date formats',
+                    type: 'list',
+                    tier: 'optional',
+                    placeholder: '%Y-%m-%d',
+                    help: 'Accepted DATE parse patterns, tried in order.',
+                    tab: 'types',
+                },
+                {
+                    key: 'delimited__timestamp_formats',
+                    label: 'Timestamp formats',
+                    type: 'list',
+                    tier: 'optional',
+                    placeholder: '%Y-%m-%d %H:%M:%S',
+                    help: 'Accepted TIMESTAMP parse patterns, tried in order.',
+                    tab: 'types',
+                },
+                // ── tab 3: Robustness / error handling ───────────────────────────
+                {
+                    // ⚠ No default (the delimited rule): a spec default materializes into every
+                    // value() and would mutate faithful copies of stored grammars.
+                    key: 'xlsx__stop_at_empty',
+                    label: 'Stop at first empty row',
+                    type: 'boolean',
+                    tier: 'optional',
+                    help: 'Stop reading at the first fully empty row (the extension forces this on when no range is given).',
+                    tab: 'robustness',
+                },
+                {
+                    key: 'xlsx__ignore_errors',
+                    label: 'Ignore cell errors',
+                    type: 'boolean',
+                    tier: 'optional',
+                    help: 'Unrepresentable cells land as NULL instead of failing the file.',
+                    tab: 'robustness',
+                },
+                // tab 4 (Files & metadata) carries no xlsx option — the tab still renders: the
+                // Collection pointer and the host-projected column-metadata grid live there.
             ];
         case 'text_regex':
             return [

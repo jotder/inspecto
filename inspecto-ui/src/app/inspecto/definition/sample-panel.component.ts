@@ -165,6 +165,29 @@ export class InspectoSamplePanelComponent {
         const file = input.files?.[0];
         input.value = '';
         if (!file) return;
+        // Binary formats (an .xlsx workbook — multiformat X4) capture BYTES: text() would round-trip
+        // the zip through a charset and corrupt it. No truncation either — a sliced zip is unreadable,
+        // so an oversized workbook is refused whole rather than silently maimed.
+        if (/\.xlsx$/i.test(file.name)) {
+            if (file.size > MAX_SAMPLE_BYTES) {
+                this.toastr.error(`Workbook too large for a preview sample (max ${MAX_SAMPLE_BYTES / 1024} KB).`);
+                return;
+            }
+            file.arrayBuffer()
+                .then((buf) => {
+                    let bin = '';
+                    for (const b of new Uint8Array(buf)) bin += String.fromCharCode(b);
+                    this.state().captureBinarySample(
+                        file.name,
+                        btoa(bin),
+                        `[binary workbook — ${Math.max(1, Math.round(file.size / 1024))} KB]`,
+                    );
+                    this.pasting.set(false);
+                    this.expanded.set(false); // nothing readable to expand
+                })
+                .catch(() => this.toastr.error('Could not read the file.'));
+            return;
+        }
         const truncated = file.size > MAX_SAMPLE_BYTES;
         file.slice(0, MAX_SAMPLE_BYTES)
             .text()

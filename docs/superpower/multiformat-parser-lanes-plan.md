@@ -60,8 +60,12 @@ a new `okf/backend/engine/parser-frontends.md` if the builder grows enough to de
 > toward `sample_b64`) · X3 ✅ (`PARSER_XLSX` + LOWERABLE/SUBTYPE_FRONTENDS/USE_HOME + lift/lower
 > round-trip pins; ⚠ the step-types/node-attributes contract fixtures are legitimately UNCHANGED —
 > that contract is the RECIPE-VERB palette, which has always carried only the bare `parser`; the
-> per-format graph palette is UI-side and lands with X4) · X4/J1/F1/D1 open (D1's xlsx §6.4b
-> written with the engine).
+> per-format graph palette is UI-side and lands with X4) · X4 ✅ (2026-08-20: palette `parser.xlsx` +
+> drawer routing + the tabbed spec set with `grammarTabsFor` first-tab labels and the files tab
+> ANCHORED specless; binary sample capture → `sample_b64` through service/editor/pane; Grammar CSV
+> `engineKeyOf` generalized to bare names with back-compat for raw-spec-key files; mock mirrors
+> updated + the honest mock refusal, the ASN.1 precedent; UI suite 2657/5 exit 0, AOT 0, verified
+> live offline) · J1/F1 open (D1's xlsx §6.4b written with the engine).
 
 - **X1 — xlsx engine lane**: `PipelineConfig.Xlsx` record (8 probed keys) + `PipelineConfigParser`
   root `xlsx:` + `buildXlsxReadSpec` (all-VARCHAR projection by selector, `filterWhere` composes) +

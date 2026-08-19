@@ -122,6 +122,15 @@ export const NODE_TYPES: PipelineNodeType[] = (
             emitsNamedRoutes: true,
         },
         {
+            type: 'parser.xlsx',
+            category: 'PARSE',
+            label: 'Excel',
+            description: 'Reads an .xlsx workbook sheet into rows via DuckDB read_xlsx; header cells name the columns.',
+            accepts: ['data'],
+            emits: ['data', 'unmatched'],
+            emitsNamedRoutes: true,
+        },
+        {
             type: 'parser.plugin',
             category: 'PARSE',
             label: 'Custom',

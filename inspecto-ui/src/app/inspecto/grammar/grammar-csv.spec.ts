@@ -77,6 +77,36 @@ describe('grammar CSV round-trip', () => {
         expect(back.columns).toBeNull();
     });
 
+    it('round-trips an xlsx Grammar with bare engine key names (multiformat X4)', () => {
+        const xlsxSpecs = parsingAttributesFor('xlsx');
+        const values: Record<string, unknown> = {
+            xlsx__sheet: 'Invoices',
+            xlsx__range: 'A1:H500',
+            xlsx__header: true,
+            xlsx__ignore_errors: true,
+        };
+        const csv = grammarToCsv({ format: 'xlsx', pipeline: 'inv' }, xlsxSpecs, values, []);
+        expect(csv).toContain('option,sheet,,Invoices');
+        expect(csv).not.toContain('xlsx__');
+
+        const back = parseGrammarCsv(csv, xlsxSpecs);
+        expect(back.meta.format).toBe('xlsx');
+        expect(back.options).toEqual(values);
+        expect(back.unknownKeys).toEqual([]);
+    });
+
+    it('still reads a pre-generalization file carrying the raw spec-key spelling', () => {
+        // Files exported before engineKeyOf stripped every frontend prefix wrote the spec key
+        // verbatim for non-delimited frontends — those spellings must keep importing.
+        const fwSpecs = parsingAttributesFor('fixedwidth');
+        const back = parseGrammarCsv(
+            'section,key,attr,value\nmeta,format,,fixedwidth\noption,fixedwidth__min_record_length,,40\n',
+            fwSpecs,
+        );
+        expect(back.options).toEqual({ fixedwidth__min_record_length: 40 });
+        expect(back.unknownKeys).toEqual([]);
+    });
+
     it('names the file <pipeline>_parser.csv, verbatim per the operator', () => {
         expect(grammarCsvFilename('orders_daily')).toBe('orders_daily_parser.csv');
         expect(grammarCsvFilename('bad name!')).toBe('bad_name_parser.csv');

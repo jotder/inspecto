@@ -279,6 +279,24 @@ describe('GrammarEditorComponent', () => {
         expect(labels[3]).toContain('Files & metadata');
     });
 
+    it('renders the xlsx spec set as 4 tabs, files anchored despite carrying no xlsx option', () => {
+        // multiformat X4: the first tab speaks the format's own language (grammarTabsFor), and the
+        // 'files' tab renders even with zero specs — it anchors the Collection pointer and the
+        // host's [tabFiles] projection (the column-metadata grid).
+        const fixture = create({ frontend: 'xlsx', xlsx: { sheet: 'Data' } });
+        const labels = Array.from(fixture.nativeElement.querySelectorAll('.mat-mdc-tab')).map((e) =>
+            (e as HTMLElement).textContent?.trim(),
+        );
+        expect(labels).toHaveLength(4);
+        expect(labels[0]).toContain('Sheet & range');
+        expect(labels[1]).toContain('Types & columns');
+        expect(labels[2]).toContain('Robustness / error handling');
+        expect(labels[3]).toContain('Files & metadata');
+        // The seeded sheet survives value() from tab 1 (the R9 mounted-panels rule, xlsx edition).
+        const xlsx = fixture.componentInstance.value()['xlsx'] as Record<string, unknown>;
+        expect(xlsx['sheet']).toBe('Data');
+    });
+
     it('renders an untabbed spec set (json) flat, exactly as before', () => {
         const flat = create({ frontend: 'json' });
         expect(flat.nativeElement.querySelector('mat-tab-group')).toBeNull();

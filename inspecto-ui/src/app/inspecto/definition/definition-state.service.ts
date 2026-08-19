@@ -19,7 +19,10 @@ import { ParsingPreview, SchemaPreview } from 'app/inspecto/api';
  */
 @Injectable()
 export class DefinitionStateService {
-    readonly sample = signal<{ name: string; text: string } | null>(null);
+    /** The captured sample. `b64` is set INSTEAD of a readable `text` for a binary format (an .xlsx
+     *  workbook — multiformat X4): `text` then holds a short human summary for the strip, never bytes
+     *  round-tripped through a charset. */
+    readonly sample = signal<{ name: string; text: string; b64?: string } | null>(null);
     readonly parsePreview = signal<ParsingPreview | null>(null);
     readonly parseError = signal<string | null>(null);
     readonly schemaPreview = signal<SchemaPreview | null>(null);
@@ -35,6 +38,12 @@ export class DefinitionStateService {
     /** Capture a new sample. Every downstream test result is invalidated — the thread restarts at raw. */
     captureSample(name: string, text: string): void {
         this.sample.set({ name, text });
+        this.resetDownstream();
+    }
+
+    /** Capture a BINARY sample (an .xlsx workbook): bytes as base64, a summary line for the strip. */
+    captureBinarySample(name: string, b64: string, summary: string): void {
+        this.sample.set({ name, text: summary, b64 });
         this.resetDownstream();
     }
 
