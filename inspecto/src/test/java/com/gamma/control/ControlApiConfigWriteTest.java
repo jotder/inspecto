@@ -96,6 +96,35 @@ class ControlApiConfigWriteTest {
         }
     }
 
+    /**
+     * B3 (delimited-grammar-properties plan): the additive schema metadata — a per-field
+     * {@code synonym} and the {@code raw.types} Auto/Declared marker — must round-trip VERBATIM
+     * through {@code POST /config/write} kind {@code schema}. Falsify-first: if the codec dropped
+     * unknown keys, this is the failing test that would have made that the slice.
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void schemaSynonymAndTypesMarkerRoundTripVerbatim(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String schema = """
+                    {"type":"schema","config":{
+                       "raw":{"name":"syn_rt","format":"CSV","types":"auto",
+                          "fields":[
+                             {"name":"ID","selector":"0","type":"VARCHAR","synonym":"cust_no"},
+                             {"name":"AMT","selector":"1","type":"DOUBLE"}]}}}""";
+            HttpResponse<String> r = post(c.port, "/config/write", schema);
+            assertEquals(200, r.statusCode(), r.body());
+            String path = V1Body.of(r.body()).get("path").asText();
+
+            Map<String, Object> decoded = ConfigLoader.filesystem().decode(root.resolve(path).toString());
+            Map<String, Object> raw = (Map<String, Object>) decoded.get("raw");
+            assertEquals("auto", raw.get("types"), "the Auto/Declared marker survives the write verbatim");
+            List<Map<String, Object>> fields = (List<Map<String, Object>>) raw.get("fields");
+            assertEquals("cust_no", fields.get(0).get("synonym"), "the synonym survives verbatim");
+            assertFalse(fields.get(1).containsKey("synonym"), "an absent synonym stays absent");
+        }
+    }
+
     @Test
     void refusesOverwriteByDefaultThenAllowsWithFlag(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {

@@ -73,6 +73,17 @@ class SchemaProjectionTest {
                 || !c.description().isPresent()));
     }
 
+    /** B3: `synonym` is one more additive, ETL-ignored, Catalog-read field column. */
+    @Test
+    void projectsTheAdditiveSynonym() {
+        Map<String, String> withSynonym = field("ID", "0", "VARCHAR", null, null, null);
+        withSynonym.put("synonym", "cust_no");
+        List<SchemaProjection.Column> cols = SchemaProjection.columns(
+                schema("T", null, List.of(withSynonym, field("AMT", "1", "DOUBLE", null, null, null))));
+        assertEquals("cust_no", cols.get(0).synonym());
+        assertEquals("", cols.get(1).synonym(), "absent synonym projects blank, like unit/classification");
+    }
+
     @Test
     void canonicalNameFallsBackThroughMappingThenRaw() {
         assertEquals("call_events",

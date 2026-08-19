@@ -17,9 +17,17 @@ public final class SchemaProjection {
 
     private SchemaProjection() {}
 
-    /** One projected column with its domain metadata. */
+    /** One projected column with its domain metadata. {@code synonym} (B3, additive) is an optional
+     *  unique alias for lookups — like the other metadata columns, never read by the ETL. */
     public record Column(String name, String type, Description description,
-                         String unit, String classification) {}
+                         String unit, String classification, String synonym) {
+
+        /** The pre-B3 shape — no synonym. */
+        public Column(String name, String type, Description description,
+                      String unit, String classification) {
+            this(name, type, description, unit, classification, "");
+        }
+    }
 
     /** Project the {@code raw.fields[]} of a schema into columns (empty if absent/malformed). */
     public static List<Column> columns(Map<String, Object> schema) {
@@ -35,7 +43,7 @@ public final class SchemaProjection {
             String desc = str(f.get("description"));
             Description d = desc.isBlank() ? Description.EMPTY : Description.manual(desc);
             out.add(new Column(name, str(f.get("type")), d,
-                    str(f.get("unit")), str(f.get("classification"))));
+                    str(f.get("unit")), str(f.get("classification")), str(f.get("synonym"))));
         }
         return out;
     }
