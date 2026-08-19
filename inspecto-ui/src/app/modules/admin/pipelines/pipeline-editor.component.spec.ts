@@ -1313,6 +1313,30 @@ describe('PipelineEditorComponent', () => {
         expect(canvasOf(c).removeElement).toHaveBeenCalledWith('src');
     });
 
+    it('renameSelected patches name/description into the model without invalidating a test outcome', () => {
+        const c = make();
+        c.model.set(structuredClone(FLOW));
+        const node = c.model()!.nodes[0];
+        c.selectedNode.set(node);
+        c['testedStatus'].update((m) => new Map(m).set(node.id, 'tested'));
+
+        c.renameSelected({ name: 'Renamed Step', description: 'what it does' });
+
+        const patched = c.model()!.nodes.find((n) => n.id === node.id)!;
+        expect(patched.name).toBe('Renamed Step');
+        expect(patched.description).toBe('what it does');
+        expect(c.selectedNode()!.name).toBe('Renamed Step');
+        expect(canvasOf(c).updateNodeLabel).toHaveBeenCalledWith(node.id, 'Renamed Step');
+        expect(c.dirty()).toBe(true);
+        // A rename is not a config edit — the node's test outcome must survive it.
+        expect(c['testedStatus']().get(node.id)).toBe('tested');
+
+        // Blanked values clear rather than persist empty strings; the canvas label falls back to the id.
+        c.renameSelected({ name: '', description: '' });
+        expect(c.model()!.nodes.find((n) => n.id === node.id)!.name).toBeUndefined();
+        expect(canvasOf(c).updateNodeLabel).toHaveBeenCalledWith(node.id, node.id);
+    });
+
     it('save PUTs the model and clears the dirty flag', () => {
         const c = make();
         c.selectedId.set('demo');

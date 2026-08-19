@@ -11,12 +11,10 @@ import {
     untracked,
     ViewChild,
 } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Observable, forkJoin, of, throwError } from 'rxjs';
@@ -108,8 +106,8 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
 /**
  * The **Parse definition pane** (definition-surface P3a; fixed width P3b, ASN.1 P3c) — the per-format
  * path of the parse node, re-hosted inside `<inspecto-definition-drawer>` instead of
- * `grammar-editor.dialog`. Renders name/description plus the shared `<inspecto-grammar-editor>`
- * locked to the node's own format: a per-format node's format IS its type (B6), so the picker would
+ * `grammar-editor.dialog`. Renders the shared `<inspecto-grammar-editor>` locked to the node's own
+ * format (Name/Description moved to the canvas inspector's rename affordance): a per-format node's format IS its type (B6), so the picker would
  * only author a block the save path refuses with PARSER_FRONTEND_MISMATCH.
  *
  * <p>**One pane serves every per-format subtype**, keyed on {@link frontend}. B6 banned a generic
@@ -136,12 +134,10 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
-        ReactiveFormsModule,
         MatButtonModule,
         MatButtonToggleModule,
         MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         MatSelectModule,
         MatTooltipModule,
         ChipComponent,
@@ -160,16 +156,9 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
         @if (sample(); as thread) {
             <div class="mb-3"><inspecto-sample-panel [state]="thread" /></div>
         }
-        <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-1">
-            <mat-form-field class="w-full" subscriptSizing="dynamic">
-                <mat-label>Name</mat-label>
-                <input matInput formControlName="name" [placeholder]="node().id" />
-            </mat-form-field>
-            <mat-form-field class="w-full" subscriptSizing="dynamic">
-                <mat-label>Description</mat-label>
-                <input matInput formControlName="description" />
-            </mat-form-field>
-
+        <!-- Name/Description live on the canvas inspector's rename affordance now, not here: this
+             pane defines the Grammar, and the node's display identity is a graph concern. -->
+        <div class="space-y-1">
             <div class="mb-1 mt-2 flex items-center gap-2">
                 <span class="text-xs font-semibold uppercase opacity-70">Grammar</span>
                 @if (seedableTemplates().length) {
@@ -395,16 +384,15 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                     }
                 </div>
             </inspecto-grammar-editor>
-        </form>
+        </div>
     `,
 })
 export class PipelineParseDefinitionComponent {
-    private fb = inject(FormBuilder);
     private configApi = inject(ConfigService);
     private parsersApi = inject(ParsersService);
     private confirm = inject(InspectoConfirmService);
 
-    /** The per-format parse node being defined (identity fixed; config/name/description editable). */
+    /** The per-format parse node being defined (identity fixed; config editable — name/description carried verbatim). */
     readonly node = input.required<AuthoredNode>();
 
     /**
@@ -691,11 +679,6 @@ export class PipelineParseDefinitionComponent {
         return (f === 'asn1' || f === 'plugin') && !!p?.ingestable && !!p.ingesterClass;
     });
 
-    readonly form = this.fb.group({
-        name: this.fb.control(''),
-        description: this.fb.control(''),
-    });
-
     /** The node's inline `parsing:` block, seeding (and re-seeding) the editor. */
     readonly parsingBlock = computed<Record<string, unknown>>(() => {
         const p = this.node().config?.['parsing'];
@@ -763,8 +746,6 @@ export class PipelineParseDefinitionComponent {
     /** The one-shot seed body — see the effect above for why it must not be tracked. */
     private seedFromNode(n: AuthoredNode): void {
         {
-            this.form.patchValue({ name: n.name ?? '', description: n.description ?? '' });
-            this.form.markAsPristine();
             // A different node (or a Discard-driven re-seed) makes any template pick stale — the
             // seed must fall back to the node's own block, or the previous node's template lingers.
             this.pickedTemplate.set(null);
@@ -948,7 +929,6 @@ export class PipelineParseDefinitionComponent {
 
     private emitDirty(): void {
         const dirty =
-            this.form.dirty ||
             this.templateDirty ||
             this.typesModeTouched ||
             this.parsedSinceApply ||
@@ -1228,18 +1208,15 @@ export class PipelineParseDefinitionComponent {
 
     /** Rebuild the node around the finished block, emit it, and consume the pane's edits. */
     private applyWith(block: Record<string, unknown>, schemaFile?: string): void {
-        const v = this.form.getRawValue();
         // `use` is dropped, never carried: this pane's whole contract is that the node owns its
         // Grammar inline. A node opened here BOUND to a `grammar/<id>` component is materialised into
         // an independent copy by Applying (D4) — one place decides that, and it is this one.
+        // Name/Description are carried VERBATIM — renaming lives on the canvas inspector.
         const { use: _unbound, ...n } = this.node();
         const node: AuthoredNode = {
             ...n,
-            name: (v.name ?? '').trim() || n.name,
-            description: (v.description ?? '').trim() || undefined,
             config: { ...(n.config ?? {}), parsing: block, ...(schemaFile ? { schema_file: schemaFile } : {}) },
         };
-        this.form.markAsPristine();
         this.editor?.markPristine();
         this.templateDirty = false; // Apply consumed the pick, same as any other edit
         this.parsedSinceApply = false; // …and the derived schema it wrote

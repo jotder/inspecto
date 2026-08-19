@@ -1900,6 +1900,21 @@ export class PipelineEditorComponent implements OnInit {
         }
     }
 
+    /**
+     * The inspector's inline rename (the canvas rename affordance — the only rename path for
+     * drawer-parse nodes). Deliberately NOT {@link applyNodePatch}: a rename changes no config, so it
+     * must not invalidate the node's test outcome the way a config edit does.
+     */
+    renameSelected(v: { name: string; description: string }): void {
+        const n = this.selectedNode();
+        if (!n || !this.canAuthor()) return;
+        const updated: AuthoredNode = { ...n, name: v.name || undefined, description: v.description || undefined };
+        this.model.update((m) => (m ? applyNodePatchInModel(m, updated) : m));
+        this.selectedNode.set(updated);
+        this.canvas?.updateNodeLabel(updated.id, updated.name || updated.id);
+        this.dirty.set(true);
+    }
+
     /** Arm two-click edge creation from the inspector's selected node. */
     armConnect(): void {
         const n = this.selectedNode();

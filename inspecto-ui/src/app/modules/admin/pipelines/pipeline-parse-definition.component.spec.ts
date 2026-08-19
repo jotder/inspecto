@@ -399,6 +399,26 @@ describe('PipelineParseDefinitionComponent', () => {
     });
 
     /**
+     * Name/Description moved to the canvas inspector's rename affordance — this pane defines the
+     * Grammar only. It must render no Name field and carry the node's stored identity VERBATIM
+     * through an Apply, or a Grammar edit would silently strip a node's name.
+     */
+    it('renders no Name/Description fields and carries name/description verbatim through Apply', async () => {
+        const fixture = await create({ ...delimitedNode(), description: 'pipe-delimited CDR feed' });
+        const labels = Array.from(fixture.nativeElement.querySelectorAll('mat-label')).map(
+            (l) => (l as HTMLElement).textContent,
+        );
+        expect(labels).not.toContain('Name');
+        expect(labels).not.toContain('Description');
+
+        pane(fixture).submit();
+
+        const applied = fixture.componentInstance.applied!;
+        expect(applied.name).toBe('Parser (delimited)');
+        expect(applied.description).toBe('pipe-delimited CDR feed');
+    });
+
+    /**
      * The palette seeds a new node as `{id, type}` with no config at all — so the pane must host a
      * node with no `parsing:` block and still Apply a block the save path accepts. A delimited
      * Grammar is complete without a schema (`has_header` reads the header row), which is why

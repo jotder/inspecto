@@ -162,6 +162,51 @@ describe('PipelineInspectorComponent', () => {
         expect(fixture.nativeElement.querySelector('[aria-label="Delete connection"]')).toBeNull();
     });
 
+    it('renames in place: pencil opens the form seeded from the node, Save emits the trimmed values', () => {
+        const { fixture, c } = create({ node: NODE, status: 'configured', category: 'PARSE' });
+        const el = fixture.nativeElement as HTMLElement;
+        const rename = vi.fn();
+        c.rename.subscribe(rename);
+
+        (el.querySelector('[aria-label="Rename Step"]') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        expect(c.renameForm.getRawValue()).toEqual({ name: 'Parse CSV', description: '' });
+
+        c.renameForm.setValue({ name: '  Delimited CDRs ', description: ' pipe-delimited feed ' });
+        (el.querySelector('form button[type="submit"]') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        expect(rename).toHaveBeenCalledWith({ name: 'Delimited CDRs', description: 'pipe-delimited feed' });
+        expect(c.renaming()).toBe(false);
+    });
+
+    it('cancel closes the rename form without emitting, and a selection change discards a draft', () => {
+        const { fixture, c } = create({ node: NODE, status: 'configured', category: 'PARSE' });
+        const el = fixture.nativeElement as HTMLElement;
+        const rename = vi.fn();
+        c.rename.subscribe(rename);
+
+        (el.querySelector('[aria-label="Rename Step"]') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        const cancel = Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.includes('Cancel'));
+        cancel?.click();
+        fixture.detectChanges();
+        expect(rename).not.toHaveBeenCalled();
+        expect(c.renaming()).toBe(false);
+
+        // A different selection makes an in-progress rename stale — never carry one node's draft
+        // onto another node.
+        c.startRename();
+        expect(c.renaming()).toBe(true);
+        fixture.componentRef.setInput('node', { id: 'other', type: 'sink.dataset' });
+        fixture.detectChanges();
+        expect(c.renaming()).toBe(false);
+    });
+
+    it('readOnly offers no rename affordance', () => {
+        const { fixture } = create({ node: NODE, status: 'configured', category: 'PARSE', readOnly: true });
+        expect(fixture.nativeElement.querySelector('[aria-label="Rename Step"]')).toBeNull();
+    });
+
     it('has no a11y violations in any of the three states', async () => {
         // One TestBed/fixture, mutated between assertions — TestBed can only be configured once per test.
         const { fixture, c } = create();
