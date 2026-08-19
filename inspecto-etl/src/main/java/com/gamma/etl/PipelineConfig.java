@@ -142,7 +142,13 @@ public final class PipelineConfig {
 
     /** Output format/compression and the optional {@code output.ducklake} map ({@code null} if absent). */
     @PublicApi(since = "2.0.0")
-    public record Output(String format, String compression, Map<String, Object> duckLake) {}
+    public record Output(String format, String compression, Map<String, Object> duckLake,
+                         String filenameColumn) {
+        /** The pre-B4 shape — no filename column. */
+        public Output(String format, String compression, Map<String, Object> duckLake) {
+            this(format, compression, duckLake, null);
+        }
+    }
 
     /**
      * One output <b>destination</b>: the write-root {@code database} dir plus the {@code format}/
@@ -159,7 +165,13 @@ public final class PipelineConfig {
      * executor is wired (Stage A step 3, see {@code docs/superpower/sinks-config-format-plan.md}).
      */
     @PublicApi(since = "4.8.0")
-    public record Sink(String database, String format, String compression, Map<String, Object> duckLake) {}
+    public record Sink(String database, String format, String compression, Map<String, Object> duckLake,
+                       String filenameColumn) {
+        /** The pre-B4 shape — no filename column. */
+        public Sink(String database, String format, String compression, Map<String, Object> duckLake) {
+            this(database, format, compression, duckLake, null);
+        }
+    }
 
     /**
      * One entry of the ordered {@code steps:} transform chain — <b>the flat file's answer to "how many,
@@ -1040,7 +1052,7 @@ public final class PipelineConfig {
                 Collections.unmodifiableList(b.excludePrefixes),
                 Collections.unmodifiableList(b.excludeRegex),
                 b.filterTargetColumn, b.rowWhere);
-        this.output = new Output(b.outputFormat, b.compression, b.duckLakeCfg);
+        this.output = new Output(b.outputFormat, b.compression, b.duckLakeCfg, b.filenameColumn);
         this.sinks = resolveSinks(b.sinks, this.output, b.databaseDir);
         this.steps = resolveSteps(b.steps, b.rowWhere, b.join, b.dedup, b.summarize, b.route);
         this.explicitSteps = b.steps != null && !b.steps.isEmpty();
@@ -1206,7 +1218,8 @@ public final class PipelineConfig {
             // Distinct subdir per destination so a fan-out's outputs stay distinguishable in the preview.
             String dbDir = (sinks.size() == 1)
                     ? d.database() : Paths.get(d.database(), "sink" + i).toString();
-            scratchSinks.add(new Sink(dbDir, s.format(), s.compression(), Map.of()));  // duckLake: never register
+            scratchSinks.add(new Sink(dbDir, s.format(), s.compression(), Map.of(),  // duckLake: never register
+                    s.filenameColumn()));
         }
         return new PipelineConfig(this, identity, d, List.copyOf(scratchSinks));
     }
@@ -1220,7 +1233,8 @@ public final class PipelineConfig {
      */
     private static List<Sink> resolveSinks(List<Sink> declared, Output output, String database) {
         return (declared == null || declared.isEmpty())
-                ? List.of(new Sink(database, output.format(), output.compression(), output.duckLake()))
+                ? List.of(new Sink(database, output.format(), output.compression(), output.duckLake(),
+                        output.filenameColumn()))
                 : List.copyOf(declared);
     }
 
@@ -1479,6 +1493,7 @@ public final class PipelineConfig {
         List<String> excludeRegex    = new ArrayList<>();
         int          filterTargetColumn = 0;
         String       rowWhere;          // post-parse SQL predicate (csv_settings.where); null ⇒ no filter
+        String       filenameColumn;    // output.filename_column (B4); null ⇒ no lineage column in rows
         FixedWidth   fixedWidth;          // null ⇒ delimited frontend (the default)
         Json         json;                // null unless frontend: json
         TextRegex    textRegex;           // null unless frontend: text_regex

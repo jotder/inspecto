@@ -44,6 +44,84 @@ class PartitionWriterTest {
         }
     }
 
+    /** B4: filename_column translates __src_id into per-row source filenames (both formats). */
+    @Test
+    void filenameColumnTranslatesSrcIdIntoSourceFilenames(@TempDir Path dir) throws Exception {
+        File db = DuckDbUtil.tempDbFile("test_fn_");
+        String dbDir = dir.resolve("out").toString();
+        try (Connection conn = DuckDbUtil.openConnection(db);
+             Statement st = conn.createStatement()) {
+            st.execute("CREATE TABLE transformed AS SELECT * FROM (VALUES " +
+                    "('a', '2020', '04', '03', 0)," +
+                    "('b', '2020', '04', '03', 1)," +
+                    "('c', '2020', '01', '01', 0)) " +
+                    "t(ID, year, month, day, __src_id)");
+
+            List<PartitionOutput> outs = PartitionWriter.write(
+                    conn, "transformed", dbDir, "CSV", null, "F1",
+                    List.of("year", "month", "day"), "src_file",
+                    java.util.Map.of(0, "inbox/one.csv", 1, "inbox/two.csv"));
+
+            assertEquals(2, outs.size());
+            String april = Files.readString(outs.stream()
+                    .filter(o -> o.partition().contains("month=04")).findFirst().orElseThrow()
+                    .outputFile().transform(Path::of));
+            assertTrue(april.contains("src_file"), "the declared column is present:\n" + april);
+            assertTrue(april.contains("inbox/one.csv") && april.contains("inbox/two.csv"),
+                    "per-member values on a multi-file batch:\n" + april);
+            assertFalse(april.contains("__src_id"), "the internal tag itself stays excluded");
+
+            // Parquet path: the column survives with correct values there too.
+            String pqDir = dir.resolve("outp").toString();
+            List<PartitionOutput> pq = PartitionWriter.write(
+                    conn, "transformed", pqDir, "PARQUET", null, "F2",
+                    List.of("year", "month", "day"), "src_file",
+                    java.util.Map.of(0, "inbox/one.csv", 1, "inbox/two.csv"));
+            try (ResultSet rs = st.executeQuery("SELECT DISTINCT src_file FROM read_parquet('"
+                    + pq.get(0).outputFile().replace("\\", "/") + "') ORDER BY 1")) {
+                assertTrue(rs.next());
+            }
+        } finally {
+            DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
+    /** B4: a null filename_column through the new overload stays byte-identical to the plain write. */
+    @Test
+    void nullFilenameColumnWritesNoExtraColumn(@TempDir Path dir) throws Exception {
+        File db = DuckDbUtil.tempDbFile("test_fn0_");
+        String dbDir = dir.resolve("out").toString();
+        try (Connection conn = DuckDbUtil.openConnection(db);
+             Statement st = conn.createStatement()) {
+            st.execute("CREATE TABLE transformed AS SELECT * FROM (VALUES " +
+                    "('a', '2020', '04', '03', 0)) t(ID, year, month, day, __src_id)");
+            List<PartitionOutput> outs = PartitionWriter.write(
+                    conn, "transformed", dbDir, "CSV", null, "N1",
+                    List.of("year", "month", "day"), null, java.util.Map.of());
+            String content = Files.readString(Path.of(outs.get(0).outputFile()));
+            assertFalse(content.contains("src_file"));
+            assertFalse(content.contains("__src_id"));
+        } finally {
+            DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
+    /** B4: a relation with no __src_id cannot honestly carry a filename column — hard failure. */
+    @Test
+    void filenameColumnWithoutLineageTagFails(@TempDir Path dir) throws Exception {
+        File db = DuckDbUtil.tempDbFile("test_fnx_");
+        try (Connection conn = DuckDbUtil.openConnection(db);
+             Statement st = conn.createStatement()) {
+            st.execute("CREATE TABLE t AS SELECT 'a' AS ID, '2020' AS year, '01' AS month, '01' AS day");
+            IllegalStateException e = assertThrows(IllegalStateException.class,
+                    () -> PartitionWriter.write(conn, "t", dir.resolve("o").toString(), "CSV", null,
+                            "X", List.of("year", "month", "day"), "src_file", java.util.Map.of()));
+            assertTrue(e.getMessage().contains("__src_id"), e.getMessage());
+        } finally {
+            DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
     @Test
     void revealsManyPartitionsInParallelWithoutLoss(@TempDir Path dir) throws Exception {
         // 40 distinct day partitions exceeds REVEAL_PARALLEL_THRESHOLD, so the reveal

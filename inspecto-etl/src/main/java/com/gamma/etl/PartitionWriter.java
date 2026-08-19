@@ -102,6 +102,40 @@ public final class PartitionWriter {
     }
 
     /**
+     * B4 ({@code output.filename_column} / {@code sinks[].filename_column}): like
+     * {@link #write(Connection, String, String, String, String, String, List)} but when
+     * {@code filenameColumn} is set, the internal {@code __src_id} tag is <b>translated</b> into a
+     * VARCHAR column of source filenames (via {@code srcIdToFile}, the same map the lineage ledger
+     * uses) instead of only being excluded. Null/blank {@code filenameColumn} ⇒ byte-identical to the
+     * plain overload. Fails when the relation carries no {@code __src_id} — a declared lineage column
+     * that silently wrote NULLs would look like it worked.
+     */
+    public static List<PartitionOutput> write(Connection conn, String table,
+                                              String databaseDir, String outputFormat,
+                                              String compression, String baseName,
+                                              List<String> partitionColumns,
+                                              String filenameColumn,
+                                              java.util.Map<Integer, String> srcIdToFile)
+            throws Exception {
+        List<String> exclude = internalColumnsPresent(conn, table, "__src_id", TransformCompiler.EVENT_TIME_COL);
+        if (filenameColumn == null || filenameColumn.isBlank())
+            return write(conn, table, databaseDir, outputFormat, compression, baseName,
+                    partitionColumns, exclude);
+        if (!exclude.contains("__src_id"))
+            throw new IllegalStateException("filename_column '" + filenameColumn
+                    + "' requires per-row source lineage (__src_id), which relation '" + table
+                    + "' does not carry");
+        StringBuilder proj = new StringBuilder("SELECT * EXCLUDE (")
+                .append(String.join(", ", exclude)).append("), CASE \"__src_id\"");
+        for (var e : srcIdToFile.entrySet())
+            proj.append(" WHEN ").append(e.getKey())
+                .append(" THEN '").append(e.getValue().replace("'", "''")).append('\'');
+        proj.append(" ELSE NULL END AS \"").append(filenameColumn).append("\" FROM ").append(table);
+        return writeProjected(conn, proj.toString(), databaseDir, outputFormat, compression,
+                baseName, partitionColumns);
+    }
+
+    /**
      * Full overload: write {@code table} partitioned by {@code partitionColumns},
      * excluding {@code excludeColumns} from the written rows. Pass an empty list to
      * write every column — e.g. the enrichment engine, whose output has no
@@ -112,6 +146,19 @@ public final class PartitionWriter {
                                               String compression, String baseName,
                                               List<String> partitionColumns,
                                               List<String> excludeColumns)
+            throws Exception {
+        String projection = (excludeColumns == null || excludeColumns.isEmpty())
+                ? "SELECT * FROM " + table
+                : "SELECT * EXCLUDE (" + String.join(", ", excludeColumns) + ") FROM " + table;
+        return writeProjected(conn, projection, databaseDir, outputFormat, compression,
+                baseName, partitionColumns);
+    }
+
+    /** The write core: COPY {@code projection} to Hive-partitioned staging, then reveal atomically. */
+    private static List<PartitionOutput> writeProjected(Connection conn, String projection,
+                                                        String databaseDir, String outputFormat,
+                                                        String compression, String baseName,
+                                                        List<String> partitionColumns)
             throws Exception {
 
         OutputFormat fmt = OutputFormat.resolve(outputFormat);
@@ -132,9 +179,6 @@ public final class PartitionWriter {
             if (fmt.supportsCompression() && compression != null && !compression.isBlank())
                 copyOpts.append(", COMPRESSION ").append(compression);
 
-            String projection = (excludeColumns == null || excludeColumns.isEmpty())
-                    ? "SELECT * FROM " + table
-                    : "SELECT * EXCLUDE (" + String.join(", ", excludeColumns) + ") FROM " + table;
             stmt.execute(String.format("COPY (%s) TO '%s' (%s)", projection, stagingDir, copyOpts));
 
             // Collect the staged partition files in one walk, then reveal each under its

@@ -104,6 +104,9 @@ class NodeConfigNameContractTest {
                         c -> c.output().format(), "PARQUET"),
                 new Contract("sink.persistent", "compression", "compression", "zstd",
                         c -> c.output().compression(), "zstd"),
+                // B4: the source-filename lineage column — lowers onto output.filename_column.
+                new Contract("sink.persistent", "filename_column", "filename_column", "src_file",
+                        c -> c.output().filenameColumn(), "src_file"),
 
                 // ── Consignment grouping — the nested batch map (G3). The dialog's nestKeys turns
                 // batch__max_files into node cfg batch.max_files; lower writes processing.batch:,

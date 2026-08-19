@@ -157,8 +157,11 @@ interface BatchIngestStrategy {
 
         for (PipelineConfig.Sink dest : sinks) {
             String destDir = fanOut ? Paths.get(dest.database()).resolve(rel).toString() : dbDir;
+            // B4: dest.filenameColumn() (null = byte-identical) translates __src_id into a source-file
+            // column via the same map the lineage ledger uses.
             List<PartitionOutput> outs = PartitionWriter.write(conn, writeTable, destDir,
-                    dest.format(), dest.compression(), writeBase, partCols);
+                    dest.format(), dest.compression(), writeBase, partCols,
+                    dest.filenameColumn(), srcIdToFile);
             outputs.addAll(outs);
             lineage.addAll(LineageCollector.collect(conn, writeTable, batchId, srcIdToFile, outs, partCols));
             // Re-key onto files, and only these files: applied.outputs() came from a different relation.

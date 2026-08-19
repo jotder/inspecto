@@ -331,6 +331,7 @@ describe('NodeConfigDialog', () => {
             'database',
             'format',
             'compression',
+            'filename_column',
             'batch__max_files',
             'batch__max_bytes',
             'batch__order',

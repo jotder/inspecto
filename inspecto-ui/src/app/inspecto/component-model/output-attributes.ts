@@ -35,4 +35,12 @@ export const OUTPUT_ATTRIBUTES: AttributeSpec[] = [
         placeholder: 'snappy',
         help: 'Codec for the output (e.g. snappy / zstd / gzip); blank = format default.',
     },
+    {
+        key: 'filename_column',
+        label: 'Source filename column',
+        type: 'identifier',
+        tier: 'advanced',
+        placeholder: 'src_file',
+        help: 'Adds a column of this name carrying each row’s source file. Blank = no column (lineage stays in the ledger only).',
+    },
 ];

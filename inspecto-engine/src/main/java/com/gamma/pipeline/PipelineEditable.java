@@ -334,7 +334,8 @@ public final class PipelineEditable {
 
     /** The sinks[]-entry keys the graph models (and therefore owns) — everything else in a
      *  pre-existing entry is preserved verbatim through a save, per lower()'s contract. */
-    private static final Set<String> SINK_ENTRY_MODELED = Set.of("database", "format", "compression", "ducklake");
+    private static final Set<String> SINK_ENTRY_MODELED =
+            Set.of("database", "format", "compression", "ducklake", "filename_column");
 
     // ═════════════════════════════ editable lift ═════════════════════════════
 
@@ -453,6 +454,7 @@ public final class PipelineEditable {
                 putIfPresent(c, "format", output.get("format"));
                 putIfPresent(c, "compression", output.get("compression"));
                 putIfPresent(c, "ducklake", output.get("ducklake"));
+                putIfPresent(c, "filename_column", output.get("filename_column"));
                 putIfPresent(c, "database", dirs.get("database"));
                 putIfPresent(c, "backup", dirs.get("backup"));
                 putIfPresent(c, "temp", dirs.get("temp"));
@@ -766,6 +768,7 @@ public final class PipelineEditable {
             putIfPresent(output, "format", primarySink.cfg("format"));
             putIfPresent(output, "compression", primarySink.cfg("compression"));
             putIfPresent(output, "ducklake", primarySink.cfg("ducklake"));
+            putIfPresent(output, "filename_column", primarySink.cfg("filename_column"));
             replaceOrRemove(dirs, "database", primarySink.cfg("database"));
             replaceOrRemove(dirs, "backup", primarySink.cfg("backup"));
             replaceOrRemove(dirs, "temp", primarySink.cfg("temp"));
@@ -798,6 +801,7 @@ public final class PipelineEditable {
                 putIfPresent(sink, "format", s.cfg("format"));
                 putIfPresent(sink, "compression", s.cfg("compression"));
                 putIfPresent(sink, "ducklake", s.cfg("ducklake"));
+                putIfPresent(sink, "filename_column", s.cfg("filename_column"));
                 Map<?, ?> prior = priorByDatabase.get(String.valueOf(s.cfg("database")));
                 if (prior != null)
                     for (Map.Entry<?, ?> e : prior.entrySet())

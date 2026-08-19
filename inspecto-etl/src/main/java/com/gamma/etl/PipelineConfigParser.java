@@ -383,6 +383,11 @@ final class PipelineConfigParser {
             b.outputFormat = String.valueOf(out.getOrDefault("format", "CSV")).toUpperCase();
             b.compression  = (String) out.get("compression");
             b.duckLakeCfg  = (Map<String, Object>) out.get("ducklake");
+            // B4: source-filename lineage as an output-row column. Validated as an identifier here;
+            // collision with a declared schema column is checked after the schemas load below.
+            b.filenameColumn = blankToNull(out.get("filename_column"));
+            if (b.filenameColumn != null)
+                Identifiers.validate(b.filenameColumn, "output.filename_column");
         }
 
         // ── sinks (plural destinations) ─────────────────────────────────────────
@@ -400,11 +405,15 @@ final class PipelineConfigParser {
                 if (db == null || db.toString().isBlank()) {
                     throw new IllegalArgumentException("each sinks[] entry requires a non-blank 'database' dir");
                 }
+                String sinkFilenameCol = blankToNull(sink.get("filename_column"));
+                if (sinkFilenameCol != null)
+                    Identifiers.validate(sinkFilenameCol, "sinks[].filename_column");
                 b.sinks.add(new PipelineConfig.Sink(
                         db.toString(),
                         String.valueOf(sink.getOrDefault("format", "CSV")).toUpperCase(),
                         (String) sink.get("compression"),
-                        (Map<String, Object>) sink.get("ducklake")));
+                        (Map<String, Object>) sink.get("ducklake"),
+                        sinkFilenameCol));
             }
         }
 
@@ -605,6 +614,20 @@ final class PipelineConfigParser {
                 validateFixedWidthSelectors(b.fixedWidth, b.singleSchema, "schema_file");
                 validateTextRegexSelectors(b.textRegex, b.singleSchema, "schema_file");
             }
+        }
+
+        // B4: a filename_column colliding with a declared data column would silently shadow real data
+        // in every written file — fail the load instead (checked here, once the schemas are resolved;
+        // a draft with no schema yet has nothing to collide with).
+        if (!declaredColumns.isEmpty()) {
+            List<String> lineageCols = new ArrayList<>();
+            if (b.filenameColumn != null) lineageCols.add(b.filenameColumn);
+            for (PipelineConfig.Sink s : b.sinks)
+                if (s.filenameColumn() != null) lineageCols.add(s.filenameColumn());
+            for (String col : lineageCols)
+                if (declaredColumns.contains(col))
+                    throw new IllegalArgumentException("Config error in " + sourceLabel
+                            + ": filename_column '" + col + "' collides with a declared schema column");
         }
 
         // ── reference load semantics (Reference Phase-2; absent ⇒ full-replace = today's behaviour) ──

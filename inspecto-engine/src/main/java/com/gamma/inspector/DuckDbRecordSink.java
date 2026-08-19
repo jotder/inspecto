@@ -270,8 +270,10 @@ final class DuckDbRecordSink implements RecordSink, Closeable {
             dropTable(conn, dest);
             DataTransformer.materialize(conn, s.schema, cfg, raw, dest);
             String baseName = fileStem + "_g" + String.format("%05d", s.genSeq);
+            // B4: the wrap lane gets filename_column too — one source file per sink, same translation.
             List<PartitionOutput> outs = PartitionWriter.write(conn, dest, s.dbDir,
-                    cfg.output().format(), cfg.output().compression(), baseName, s.partCols);
+                    cfg.output().format(), cfg.output().compression(), baseName, s.partCols,
+                    cfg.output().filenameColumn(), Map.of(srcId, lineageName));
             List<LineageRow> lin = LineageCollector.collect(conn, dest, batchId,
                     Map.of(srcId, lineageName), outs, s.partCols);
             outputs.addAll(outs);

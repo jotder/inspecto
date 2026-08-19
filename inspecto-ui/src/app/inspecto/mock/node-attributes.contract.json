@@ -284,6 +284,13 @@
     "help" : "Codec for the output (e.g. snappy / zstd / gzip); blank = format default.",
     "placeholder" : "snappy"
   }, {
+    "key" : "filename_column",
+    "label" : "Source filename column",
+    "type" : "identifier",
+    "tier" : "advanced",
+    "help" : "Adds a column of this name carrying each row’s source file. Blank = no column (lineage stays in the ledger only).",
+    "placeholder" : "src_file"
+  }, {
     "key" : "batch__max_files",
     "label" : "Max files per consignment",
     "type" : "number",
@@ -334,6 +341,13 @@
     "tier" : "optional",
     "help" : "Codec for the output (e.g. snappy / zstd / gzip); blank = format default.",
     "placeholder" : "snappy"
+  }, {
+    "key" : "filename_column",
+    "label" : "Source filename column",
+    "type" : "identifier",
+    "tier" : "advanced",
+    "help" : "Adds a column of this name carrying each row’s source file. Blank = no column (lineage stays in the ledger only).",
+    "placeholder" : "src_file"
   } ],
   "sink.view" : [ {
     "key" : "format",
@@ -357,5 +371,12 @@
     "tier" : "optional",
     "help" : "Codec for the output (e.g. snappy / zstd / gzip); blank = format default.",
     "placeholder" : "snappy"
+  }, {
+    "key" : "filename_column",
+    "label" : "Source filename column",
+    "type" : "identifier",
+    "tier" : "advanced",
+    "help" : "Adds a column of this name carrying each row’s source file. Blank = no column (lineage stays in the ledger only).",
+    "placeholder" : "src_file"
   } ]
 }

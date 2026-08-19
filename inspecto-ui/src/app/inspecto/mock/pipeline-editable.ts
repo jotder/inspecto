@@ -385,6 +385,7 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
     if (output['format'] != null) sinkCfg['format'] = output['format'];
     if (output['compression'] != null) sinkCfg['compression'] = output['compression'];
     if (output['ducklake'] != null) sinkCfg['ducklake'] = output['ducklake'];
+    if (output['filename_column'] != null) sinkCfg['filename_column'] = output['filename_column'];
     if (dirs['database'] != null) sinkCfg['database'] = dirs['database'];
     if (dirs['backup'] != null) sinkCfg['backup'] = dirs['backup'];
     if (dirs['temp'] != null) sinkCfg['temp'] = dirs['temp'];
@@ -409,7 +410,7 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
     for (const s of sinksList) {
         if (s['database'] == null || String(s['database']) === String(dirs['database'])) continue; // primary already lifted
         const c: Cfg = { database: s['database'] };
-        for (const k of ['format', 'compression', 'ducklake']) if (s[k] != null) c[k] = s[k];
+        for (const k of ['format', 'compression', 'ducklake', 'filename_column']) if (s[k] != null) c[k] = s[k];
         sinkDefs.push({ id: `sink_${extra}`, name: `out_${extra}`, cfg: c });
         extra++;
     }
@@ -745,6 +746,7 @@ export function lowerGraph(
         setOrDel(output, 'format', primarySink.config?.['format']);
         setOrDel(output, 'compression', primarySink.config?.['compression']);
         setOrDel(output, 'ducklake', primarySink.config?.['ducklake']);
+        setOrDel(output, 'filename_column', primarySink.config?.['filename_column']);
         setOrDel(dirs, 'database', primarySink.config?.['database']);
         setOrDel(dirs, 'backup', primarySink.config?.['backup']);
         setOrDel(dirs, 'temp', primarySink.config?.['temp']);
@@ -763,6 +765,7 @@ export function lowerGraph(
             if (s.config?.['format'] != null) sink['format'] = s.config['format'];
             if (s.config?.['compression'] != null) sink['compression'] = s.config['compression'];
             if (s.config?.['ducklake'] != null) sink['ducklake'] = s.config['ducklake'];
+            if (s.config?.['filename_column'] != null) sink['filename_column'] = s.config['filename_column'];
             return sink;
         });
     } else {

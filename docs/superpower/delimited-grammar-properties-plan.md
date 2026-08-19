@@ -242,6 +242,11 @@ A `mat-button-toggle` at the head of tab 2.
   parse first" (seeding already requires it in practice).
 - **Declared:** icons editable via the menu; if a parse ran, an "Apply suggested types" chip offers
   the inferred set as a one-click, non-destructive starting point.
+- **As-built deviation (2026-08-19):** the "Run Test parse first" save-block was NOT implemented —
+  with no derived columns nothing is written at all (a parser may be defined before its schema, the
+  BUILDER-1a dead-end rule the drawer already pins in a test), and once columns exist they always
+  came from a parse. The one residue — an old server serving no `columnTypes` — saves `types: auto`
+  over VARCHAR, recording everything the sniff could say.
 - The mode persists as `raw.types: auto|declared` on the schema companion (additive, ETL-ignored,
   B3), so reopening restores it. Existing schemas without the marker load as Declared.
 
@@ -348,6 +353,15 @@ on both adopters.
 - Config home: `output.filename_column` / `sinks[].filename_column`. Collision with an existing
   data column fails at load. The sink node's served FieldSpec gains the row, so the sink pane
   renders the field with **zero UI work** (server-published attribute-spec contract).
+- **As-built deviation (2026-08-19):** the column ships on the **ingest lane** (`BatchIngestStrategy`,
+  all sinks) and the **wrap lane** (`DuckDbRecordSink`, plugin ingesters) — the two lanes whose rows
+  carry a real `__src_id`. The graph lane (`PartitionSinkWriter`) was NOT wired: `PipelineJobRunner`
+  executes over data **at rest**, where rows have no source files, so a filename column there could
+  only be invented. `PartitionWriter` fails hard when `filename_column` is declared over a relation
+  with no `__src_id` — a lineage column that silently wrote NULLs would look like it worked. The
+  "zero UI work" claim also under-counted: `NodeAttributes.OUTPUT` has a hand-mirrored TS table
+  (`output-attributes.ts`) + the byte-compared contract JSON + `PipelineEditable` lift/lower (Java
+  AND mock TS) — five touchpoints, all updated together.
 - **Verify:** writer tests — partitioned + unpartitioned × parquet + csv: column present with
   correct per-member values on a multi-file batch, absent when unset, load-fails on collision;
   lineage ledger unchanged; reactor green.

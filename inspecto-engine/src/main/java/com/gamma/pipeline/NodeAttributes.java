@@ -123,7 +123,10 @@ public final class NodeAttributes {
                     .options("CSV", "CSV", "PARQUET", "Parquet")
                     .help("Stage-1 output file format; absent = CSV (the engine default)."),
             NodeAttribute.of("compression", "Compression", "string", "optional").placeholder("snappy")
-                    .help("Codec for the output (e.g. snappy / zstd / gzip); blank = format default."));
+                    .help("Codec for the output (e.g. snappy / zstd / gzip); blank = format default."),
+            NodeAttribute.of("filename_column", "Source filename column", "identifier", "advanced")
+                    .placeholder("src_file")
+                    .help("Adds a column of this name carrying each row’s source file. Blank = no column (lineage stays in the ledger only)."));
 
     /**
      * {@code sink.persistent} = the destination ({@code database}) plus the shared {@code output:} block.
