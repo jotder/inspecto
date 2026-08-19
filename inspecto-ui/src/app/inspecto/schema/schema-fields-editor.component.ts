@@ -2,8 +2,10 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, input, si
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -42,12 +44,14 @@ export function narrowToSchemaType(serverType: string): string {
     return (SCHEMA_TYPES as readonly string[]).includes(t) ? t : 'VARCHAR';
 }
 
-/** One editable row of a schema's `raw.fields[]`. */
+/** One editable row of a schema's `raw.fields[]`. `synonym` (B3, additive) is an optional unique
+ *  alias — Catalog-facing metadata, never read by the ETL. */
 export interface SchemaFieldRow {
     include: boolean;
     name: string;
     selector: string;
     type: string;
+    synonym?: string;
 }
 
 type SortKey = 'source' | 'name' | 'selector' | 'type';
@@ -90,10 +94,12 @@ export function deriveSelector(frontend: string, index: number, columnName: stri
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
         ReactiveFormsModule,
+        MatButtonModule,
         MatCheckboxModule,
         MatFormFieldModule,
         MatIconModule,
         MatInputModule,
+        MatMenuModule,
         MatPaginatorModule,
         MatSelectModule,
         MatTooltipModule,
@@ -109,6 +115,19 @@ export class InspectoSchemaFieldsEditorComponent {
      * signal. (The same identity discipline P2 landed on for re-seeding a pane.)
      */
     readonly rows = input<SchemaFieldRow[]>([]);
+
+    /**
+     * Data-types Auto mode (§4.4): the type cells render read-only inferred icons — the menu is
+     * disabled with a tooltip pointing at the Declared toggle. The host owns the mode.
+     */
+    readonly autoTypes = input(false);
+
+    /**
+     * Name-based frontends (json / text_regex) address parsed columns by key/group NAME, so the
+     * `#` column shows the row's position and a separate read-only Source column shows the
+     * selector. Positional frontends (delimited / fixedwidth) leave this false: `#` IS the source.
+     */
+    readonly nameBasedSelectors = input(false);
 
     readonly types = SCHEMA_TYPES;
     protected readonly typeMeta = TYPE_META;
@@ -158,7 +177,12 @@ export class InspectoSchemaFieldsEditorComponent {
         }));
         if (q)
             entries = entries.filter(
-                ({ v }) => v.name.toUpperCase().includes(q) || String(v.selector).toUpperCase().includes(q),
+                ({ v }) =>
+                    v.name.toUpperCase().includes(q) ||
+                    String(v.selector).toUpperCase().includes(q) ||
+                    String(v.synonym ?? '')
+                        .toUpperCase()
+                        .includes(q),
             );
         if (tf !== 'all') entries = entries.filter(({ v }) => v.type === tf);
         if (key === 'source') return dir === 1 ? entries : [...entries].reverse();
@@ -244,9 +268,22 @@ export class InspectoSchemaFieldsEditorComponent {
             name: [row.name, [Validators.required, Validators.pattern(IDENTIFIER_RE)]],
             selector: [{ value: row.selector, disabled: true }],
             type: [row.type],
+            synonym: [row.synonym ?? '', [Validators.pattern(IDENTIFIER_RE)]],
         });
         g.valueChanges.subscribe(() => this.syncIncludedNames());
         this.fieldRows.push(g);
+    }
+
+    /** Pick a type from the icon menu (§4.3 col ③). */
+    setType(group: FormGroup, type: string): void {
+        const c = group.get('type');
+        c?.setValue(type);
+        c?.markAsDirty();
+        this.form.markAsDirty();
+    }
+
+    typeName(group: FormGroup): string {
+        return String(group.get('type')?.value ?? 'VARCHAR');
     }
 
     private syncIncludedNames(): void {
@@ -281,8 +318,9 @@ export class InspectoSchemaFieldsEditorComponent {
             const bad = this.fieldRows.controls.findIndex((g) => g.invalid);
             this.revealRow(bad);
             const badName = String(this.fieldRows.at(bad)?.get('name')?.value ?? '').trim();
+            const what = this.fieldRows.at(bad)?.get('synonym')?.invalid ? 'synonyms' : 'names';
             this.problem.set(
-                `Field ${bad + 1}${badName ? ` ("${badName}")` : ''}: names must start with a letter or _ and use only letters, digits, _.`,
+                `Field ${bad + 1}${badName ? ` ("${badName}")` : ''}: ${what} must start with a letter or _ and use only letters, digits, _.`,
             );
             return false;
         }
@@ -303,15 +341,36 @@ export class InspectoSchemaFieldsEditorComponent {
             }
             seen.add(n);
         }
+        // D3: a synonym must be unique across synonyms ∪ column names — a lookup resolving a
+        // synonym must never be ambiguous with another column. `seen` already holds the names.
+        for (const e of included) {
+            const s = String(e.v.synonym ?? '').trim();
+            if (!s) continue;
+            if (seen.has(s)) {
+                this.revealRow(e.index);
+                const c = this.fieldRows.at(e.index)?.get('synonym');
+                c?.setErrors({ duplicate: true });
+                c?.markAsTouched();
+                this.problem.set(`Duplicate synonym "${s}" — synonyms must be unique across synonyms and names.`);
+                return false;
+            }
+            seen.add(s);
+        }
         return true;
     }
 
-    /** The included rows, trimmed — call {@link validate} first. */
+    /** The included rows, trimmed — call {@link validate} first. An empty synonym is dropped. */
     value(): SchemaFieldRow[] {
         return this.fieldRows.controls
             .map((g) => g.getRawValue() as SchemaFieldRow)
             .filter((r) => r.include)
-            .map((r) => ({ ...r, name: r.name.trim() }));
+            .map((r) => {
+                const synonym = String(r.synonym ?? '').trim();
+                const out: SchemaFieldRow = { ...r, name: r.name.trim() };
+                if (synonym) out.synonym = synonym;
+                else delete out.synonym;
+                return out;
+            });
     }
 
     markPristine(): void {

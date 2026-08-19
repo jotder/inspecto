@@ -6,7 +6,7 @@
         <input
             matInput
             type="text"
-            placeholder="Search name or source"
+            placeholder="Search name, synonym or source"
             aria-label="Search fields"
             [value]="search()"
             (input)="setSearch($any($event.target).value)"
@@ -31,6 +31,10 @@
 </div>
 
 <div>
+    <!-- Column order per the delimited-grammar-properties plan §4.3:
+         ① include ② sequence (# — the selector verbatim for positional frontends) ③ type as an
+         ICON-ONLY button opening a menu ④ name ⑤ synonym (unique, D3) — plus a read-only Source
+         column only for name-based frontends, where the selector is a key/group name, not ②. -->
     <table class="w-full border-collapse">
         <thead>
             <tr class="text-secondary text-left text-xs font-semibold uppercase tracking-wider">
@@ -41,6 +45,38 @@
                         (change)="toggleAllVisible($event.checked)"
                         aria-label="Include all fields matching the current search and filter"
                     ></mat-checkbox>
+                </th>
+                <th scope="col" class="w-16 pb-1" [attr.aria-sort]="ariaSort('selector')">
+                    <button
+                        type="button"
+                        class="inline-flex items-center gap-1 uppercase"
+                        (click)="sortBy('selector')"
+                        matTooltip="0-based position in the record"
+                        aria-label="Sort by column sequence"
+                    >
+                        #
+                        @if (sortKey() === 'selector') {
+                            <mat-icon
+                                class="icon-size-3"
+                                [svgIcon]="
+                                    sortDir() === 1 ? 'heroicons_outline:chevron-up' : 'heroicons_outline:chevron-down'
+                                "
+                            ></mat-icon>
+                        }
+                    </button>
+                </th>
+                <th scope="col" class="w-14 pb-1" [attr.aria-sort]="ariaSort('type')">
+                    <button type="button" class="inline-flex items-center gap-1 uppercase" (click)="sortBy('type')">
+                        Type
+                        @if (sortKey() === 'type') {
+                            <mat-icon
+                                class="icon-size-3"
+                                [svgIcon]="
+                                    sortDir() === 1 ? 'heroicons_outline:chevron-up' : 'heroicons_outline:chevron-down'
+                                "
+                            ></mat-icon>
+                        }
+                    </button>
                 </th>
                 <th scope="col" class="pb-1" [attr.aria-sort]="ariaSort('name')">
                     <button type="button" class="inline-flex items-center gap-1 uppercase" (click)="sortBy('name')">
@@ -55,32 +91,10 @@
                         }
                     </button>
                 </th>
-                <th scope="col" class="w-24 pb-1" [attr.aria-sort]="ariaSort('selector')">
-                    <button type="button" class="inline-flex items-center gap-1 uppercase" (click)="sortBy('selector')">
-                        Source
-                        @if (sortKey() === 'selector') {
-                            <mat-icon
-                                class="icon-size-3"
-                                [svgIcon]="
-                                    sortDir() === 1 ? 'heroicons_outline:chevron-up' : 'heroicons_outline:chevron-down'
-                                "
-                            ></mat-icon>
-                        }
-                    </button>
-                </th>
-                <th scope="col" class="w-48 pb-1" [attr.aria-sort]="ariaSort('type')">
-                    <button type="button" class="inline-flex items-center gap-1 uppercase" (click)="sortBy('type')">
-                        Type
-                        @if (sortKey() === 'type') {
-                            <mat-icon
-                                class="icon-size-3"
-                                [svgIcon]="
-                                    sortDir() === 1 ? 'heroicons_outline:chevron-up' : 'heroicons_outline:chevron-down'
-                                "
-                            ></mat-icon>
-                        }
-                    </button>
-                </th>
+                <th scope="col" class="pb-1">Synonym</th>
+                @if (nameBasedSelectors()) {
+                    <th scope="col" class="w-24 pb-1">Source</th>
+                }
             </tr>
         </thead>
         <tbody>
@@ -92,6 +106,40 @@
                             [aria-label]="'Include ' + (e.group.get('name')?.value || 'field ' + (e.index + 1))"
                         ></mat-checkbox>
                     </td>
+                    <td class="w-16 py-1 pr-2">
+                        <span
+                            class="text-secondary block max-w-16 truncate text-xs tabular-nums"
+                            [matTooltip]="
+                                nameBasedSelectors()
+                                    ? 'Position in the parsed record'
+                                    : '0-based position in the record'
+                            "
+                            >{{ nameBasedSelectors() ? e.index : e.group.get('selector')?.value }}</span
+                        >
+                    </td>
+                    <td class="w-14 py-1">
+                        <span
+                            [matTooltip]="
+                                autoTypes()
+                                    ? 'Inferred — switch Data types to Declared to override'
+                                    : typeName(e.group)
+                            "
+                        >
+                            <button
+                                mat-icon-button
+                                type="button"
+                                [matMenuTriggerFor]="typeMenu"
+                                [matMenuTriggerData]="{ group: e.group }"
+                                [disabled]="autoTypes()"
+                                [attr.aria-label]="'Column type: ' + typeName(e.group) + ' — change'"
+                            >
+                                <mat-icon
+                                    class="icon-size-4"
+                                    [svgIcon]="typeIcon($safeNavigationMigration(e.group.get('type')?.value))"
+                                ></mat-icon>
+                            </button>
+                        </span>
+                    </td>
                     <td class="py-1 pr-2">
                         <mat-form-field class="w-full" subscriptSizing="dynamic">
                             <input matInput formControlName="name" aria-label="Field name" />
@@ -100,37 +148,29 @@
                             }
                         </mat-form-field>
                     </td>
-                    <td class="w-24 py-1 pr-2">
-                        <span
-                            class="text-secondary block max-w-24 truncate text-xs"
-                            [matTooltip]="'Parsed source: ' + $safeNavigationMigration(e.group.get('selector')?.value)"
-                            >{{ e.group.get('selector')?.value }}</span
-                        >
-                    </td>
-                    <td class="w-48 py-1">
+                    <td class="py-1 pr-2">
                         <mat-form-field class="w-full" subscriptSizing="dynamic">
-                            <mat-select formControlName="type" aria-label="Field type">
-                                <mat-select-trigger>
-                                    <span class="inline-flex items-center gap-1.5">
-                                        <mat-icon
-                                            class="icon-size-4"
-                                            [svgIcon]="typeIcon($safeNavigationMigration(e.group.get('type')?.value))"
-                                        ></mat-icon>
-                                        {{ e.group.get('type')?.value }}
-                                    </span>
-                                </mat-select-trigger>
-                                @for (t of types; track t) {
-                                    <mat-option [value]="t">
-                                        <span class="inline-flex items-center gap-2">
-                                            <mat-icon class="icon-size-4" [svgIcon]="typeMeta[t].icon"></mat-icon>
-                                            <span>{{ t }}</span>
-                                            <span class="text-secondary text-xs">{{ typeMeta[t].hint }}</span>
-                                        </span>
-                                    </mat-option>
-                                }
-                            </mat-select>
+                            <input matInput formControlName="synonym" aria-label="Field synonym" />
+                            @if (e.group.get('synonym')?.hasError('duplicate') && e.group.get('synonym')?.touched) {
+                                <mat-error>Synonym must be unique across synonyms and names.</mat-error>
+                            } @else if (
+                                e.group.get('synonym')?.hasError('pattern') && e.group.get('synonym')?.touched
+                            ) {
+                                <mat-error>Letters, digits, _ — start with a letter or _.</mat-error>
+                            }
                         </mat-form-field>
                     </td>
+                    @if (nameBasedSelectors()) {
+                        <td class="w-24 py-1">
+                            <span
+                                class="text-secondary block max-w-24 truncate text-xs"
+                                [matTooltip]="
+                                    'Parsed source: ' + $safeNavigationMigration(e.group.get('selector')?.value)
+                                "
+                                >{{ e.group.get('selector')?.value }}</span
+                            >
+                        </td>
+                    }
                 </tr>
             }
         </tbody>
@@ -148,3 +188,16 @@
         aria-label="Field table pages"
     />
 </div>
+
+<!-- One shared type menu (§4.3 ③): icon + name + plain-words hint per row, no classic dropdown. -->
+<mat-menu #typeMenu="matMenu">
+    <ng-template matMenuContent let-group="group">
+        @for (t of types; track t) {
+            <button mat-menu-item type="button" (click)="setType(group, t)">
+                <mat-icon class="icon-size-4" [svgIcon]="typeMeta[t].icon"></mat-icon>
+                <span>{{ t }}</span>
+                <span class="text-secondary ml-2 text-xs">{{ typeMeta[t].hint }}</span>
+            </button>
+        }
+    </ng-template>
+</mat-menu>

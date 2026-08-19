@@ -179,6 +179,104 @@ describe('InspectoSchemaFieldsEditorComponent', () => {
         });
     });
 
+    // ── §4.3 redesign (delimited-grammar-properties U2): ①–⑤ order, icon type menu, synonym ──
+
+    it('renders the ①–⑤ column order: include, #, Type, Name, Synonym', async () => {
+        const { fixture } = await create(rows(2));
+        const headers = Array.from(fixture.nativeElement.querySelectorAll('thead th')).map((h) =>
+            (h as HTMLElement).textContent?.trim(),
+        );
+        // Header ① is the master checkbox (no text); no Source column for positional frontends.
+        expect(headers).toHaveLength(5);
+        expect(headers[1]).toContain('#');
+        expect(headers[2]).toContain('Type');
+        expect(headers[3]).toContain('Name');
+        expect(headers[4]).toContain('Synonym');
+    });
+
+    it('shows the Source column only for name-based frontends', async () => {
+        const { fixture } = await create(rows(2));
+        fixture.componentRef.setInput('nameBasedSelectors', true);
+        fixture.detectChanges();
+        const headers = Array.from(fixture.nativeElement.querySelectorAll('thead th')).map((h) =>
+            (h as HTMLElement).textContent?.trim(),
+        );
+        expect(headers).toHaveLength(6);
+        expect(headers[5]).toContain('Source');
+    });
+
+    it('replaces the type dropdown with an icon-only menu button, labelled and operable', async () => {
+        const { fixture, c } = await create(rows(1));
+        const btn = fixture.nativeElement.querySelector(
+            'tbody button[aria-label^="Column type:"]',
+        ) as HTMLButtonElement;
+        expect(btn).toBeTruthy();
+        expect(btn.getAttribute('aria-label')).toBe('Column type: VARCHAR — change');
+        expect(fixture.nativeElement.querySelector('tbody mat-select')).toBeNull();
+
+        // The menu picks a type onto the row's control and dirties the form.
+        c.setType(c.fieldRows.at(0), 'DOUBLE');
+        fixture.detectChanges();
+        expect(c.fieldRows.at(0).get('type')?.value).toBe('DOUBLE');
+        expect(c.form.dirty).toBe(true);
+        expect(btn.getAttribute('aria-label')).toBe('Column type: DOUBLE — change');
+    });
+
+    it('disables the type menu in Auto mode', async () => {
+        const { fixture } = await create(rows(1));
+        fixture.componentRef.setInput('autoTypes', true);
+        fixture.detectChanges();
+        const btn = fixture.nativeElement.querySelector(
+            'tbody button[aria-label^="Column type:"]',
+        ) as HTMLButtonElement;
+        expect(btn.disabled).toBe(true);
+    });
+
+    it('refuses a synonym duplicating another column name, and RENDERS the row error', async () => {
+        const { fixture, c } = await create([
+            { include: true, name: 'AMOUNT', selector: '0', type: 'VARCHAR' },
+            { include: true, name: 'QTY', selector: '1', type: 'VARCHAR', synonym: 'AMOUNT' },
+        ]);
+        expect(c.validate()).toBe(false);
+        expect(String(c.problem())).toContain('Duplicate synonym "AMOUNT"');
+        fixture.detectChanges();
+        // The error must reach the screen, not just the problem signal (the invisible-list-error rule).
+        const err = fixture.nativeElement.querySelector('mat-error');
+        expect(err?.textContent).toContain('Synonym must be unique');
+    });
+
+    it('refuses a synonym duplicating another synonym', async () => {
+        const { c } = await create([
+            { include: true, name: 'A', selector: '0', type: 'VARCHAR', synonym: 'ALIAS' },
+            { include: true, name: 'B', selector: '1', type: 'VARCHAR', synonym: 'ALIAS' },
+        ]);
+        expect(c.validate()).toBe(false);
+        expect(String(c.problem())).toContain('Duplicate synonym "ALIAS"');
+    });
+
+    it('value() carries the synonym and drops an empty one', async () => {
+        // A PADDED synonym fails the identifier pattern in validate() — the same rule the Name
+        // column applies — so trimming happens on honest values, not as a laundering step.
+        const { c } = await create([
+            { include: true, name: 'A', selector: '0', type: 'VARCHAR', synonym: 'cust_no' },
+            { include: true, name: 'B', selector: '1', type: 'VARCHAR' },
+        ]);
+        expect(c.validate()).toBe(true);
+        const v = c.value();
+        expect(v[0].synonym).toBe('cust_no');
+        expect('synonym' in v[1]).toBe(false);
+    });
+
+    it('search also matches synonyms', async () => {
+        const { c } = await create([
+            { include: true, name: 'A', selector: '0', type: 'VARCHAR', synonym: 'CUSTNO' },
+            { include: true, name: 'B', selector: '1', type: 'VARCHAR' },
+        ]);
+        c.setSearch('custno');
+        expect(c.filteredEntries().length).toBe(1);
+        expect(c.filteredEntries()[0].index).toBe(0);
+    });
+
     it('has no a11y violations', async () => {
         const { fixture } = await create(rows(3));
         await expectNoA11yViolations(fixture.nativeElement);
