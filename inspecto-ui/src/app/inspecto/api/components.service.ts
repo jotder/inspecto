@@ -108,6 +108,9 @@ export interface ParserTablePreview {
     rows: Record<string, unknown>[];
     rowCount: number;
     rejectedRows: number;
+    /** B2, additive: per-column INFERRED types from the server's auto_detect sniff — advisory
+     *  (ingest stays all-VARCHAR); absent for formats without a sniff and from old servers. */
+    columnTypes?: { name: string; type: string }[];
 }
 
 /** Hierarchical parse preview — a forest of records for the collapsible tree view. */

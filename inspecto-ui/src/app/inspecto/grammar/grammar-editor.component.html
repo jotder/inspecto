@@ -123,6 +123,9 @@
         }
     } @else {
         <inspecto-schema-form [specs]="specs()" [initial]="seedValue()" (submitted)="submitted.emit()" />
+        <!-- Untabbed formats still render the hosts' slotted content — below the flat form. -->
+        <ng-content select="[tabTypes]"></ng-content>
+        <ng-content select="[tabFiles]"></ng-content>
     }
 </div>
 

@@ -359,8 +359,40 @@ const lines = (sample: string): string[] => sample.split(/\r?\n/).filter((l) => 
 const sub = (grammar: Record<string, unknown>, key: string): Record<string, unknown> =>
     (grammar[key] ?? {}) as Record<string, unknown>;
 
-function table(columns: string[], rows: Record<string, unknown>[], rejected = 0): ParserPreview {
-    return { kind: 'table', columns, rows, rowCount: rows.length, rejectedRows: rejected };
+function table(
+    columns: string[],
+    rows: Record<string, unknown>[],
+    rejected = 0,
+    columnTypes?: { name: string; type: string }[],
+): ParserPreview {
+    const t: ParserPreview = { kind: 'table', columns, rows, rowCount: rows.length, rejectedRows: rejected };
+    // B2 parity: the key is ADDITIVE and only the delimited arm supplies it — exactly like the
+    // server, whose auto_detect sniff runs for the delimited frontend only.
+    if (columnTypes?.length) t.columnTypes = columnTypes;
+    return t;
+}
+
+/**
+ * B2 mock parity: a small DETERMINISTIC type inferrer mirroring the server's auto_detect sniff —
+ * same key, same casing, never more lenient (an all-empty column is VARCHAR, not a guess).
+ */
+function inferColumnTypes(columns: string[], rows: Record<string, unknown>[]): { name: string; type: string }[] {
+    const typeOf = (values: string[]): string => {
+        if (!values.length) return 'VARCHAR';
+        if (values.every((v) => /^-?\d+$/.test(v))) return 'BIGINT';
+        if (values.every((v) => /^-?\d+(\.\d+)?$/.test(v))) return 'DOUBLE';
+        if (values.every((v) => /^\d{4}-\d{2}-\d{2}$/.test(v))) return 'DATE';
+        if (values.every((v) => /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(v))) return 'TIMESTAMP';
+        if (values.every((v) => /^(true|false)$/i.test(v))) return 'BOOLEAN';
+        return 'VARCHAR';
+    };
+    return columns.map((name) => {
+        const values = rows
+            .map((r) => r[name])
+            .filter((v): v is string => v !== null && v !== undefined && String(v) !== '')
+            .map(String);
+        return { name, type: typeOf(values) };
+    });
 }
 
 function delimited(grammar: Record<string, unknown>, sample: string): ParserPreview {
@@ -376,7 +408,7 @@ function delimited(grammar: Record<string, unknown>, sample: string): ParserPrev
         const cells = l.split(delim);
         return Object.fromEntries(header.map((h, i) => [h, cells[i] ?? null]));
     });
-    return table(header, rows);
+    return table(header, rows, 0, inferColumnTypes(header, rows));
 }
 
 function fixedwidth(grammar: Record<string, unknown>, sample: string): ParserPreview {

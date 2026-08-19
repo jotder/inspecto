@@ -13,6 +13,7 @@ import {
 } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
@@ -32,12 +33,14 @@ import {
     apiErrorMessage,
 } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
 import { InspectoSamplePanelComponent } from 'app/inspecto/definition/sample-panel.component';
 import {
     InspectoSchemaFieldsEditorComponent,
     SchemaFieldRow,
     deriveSelector,
+    narrowToSchemaType,
     sanitizeIdentifier,
 } from 'app/inspecto/schema';
 import {
@@ -127,10 +130,12 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
     imports: [
         ReactiveFormsModule,
         MatButtonModule,
+        MatButtonToggleModule,
         MatFormFieldModule,
         MatInputModule,
         MatSelectModule,
         MatTooltipModule,
+        ChipComponent,
         GrammarEditorComponent,
         InspectoAlertComponent,
         InspectoSamplePanelComponent,
@@ -226,13 +231,43 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                         </div>
                         <inspecto-segments-editor [tree]="previewTree()" [initial]="initialSegments()" />
                     }
-                    <!--
-                        Output schema (P4-2a-ii). §4b's icon table always listed "+ output schema" for
-                        the flat formats; schema_file is the PARSER node's key, so this is its home.
-                        Same two-hop write as segments: the toon lands before the node names it.
-                    -->
+                </div>
+                <!--
+                    Output schema (P4-2a-ii), re-homed onto the "Types & columns" tab (§4.1 U3) —
+                    projected into [tabTypes] so the delimited 4-tab surface shows the columns table
+                    inside tab 2; untabbed formats render this below the flat options, as before.
+                    Same two-hop write as segments: the toon lands before the node names it.
+                -->
+                <div tabTypes>
                     @if (authorsSchema()) {
-                        <div class="mb-1 mt-3 flex items-center gap-2">
+                        <!-- §4.4 Data types: Auto (inferred snapshot, read-only icons) / Declared. -->
+                        <div class="mb-1 mt-3 flex flex-wrap items-center gap-3">
+                            <span class="text-xs font-semibold uppercase opacity-70">Data types</span>
+                            <mat-button-toggle-group
+                                [value]="typesMode()"
+                                (change)="setTypesMode($event.value)"
+                                aria-label="Data types mode"
+                            >
+                                <mat-button-toggle
+                                    value="auto"
+                                    matTooltip="Types come from the Test parse's inference; saving records the inferred snapshot"
+                                    >Auto</mat-button-toggle
+                                >
+                                <mat-button-toggle value="declared" matTooltip="Pick each column's type yourself"
+                                    >Declared</mat-button-toggle
+                                >
+                            </mat-button-toggle-group>
+                            @if (typesMode() === 'declared' && inferredTypes()) {
+                                <button
+                                    type="button"
+                                    (click)="applySuggestedTypes()"
+                                    matTooltip="One-click starting point: set every column to its inferred type — you can still change any of them"
+                                >
+                                    <inspecto-chip variant="soft" tone="primary">Apply suggested types</inspecto-chip>
+                                </button>
+                            }
+                        </div>
+                        <div class="mb-1 mt-1 flex items-center gap-2">
                             <span class="text-xs font-semibold uppercase opacity-70">Output schema</span>
                             @if (schemaLoading()) {
                                 <span class="text-secondary text-xs">Loading the saved schema…</span>
@@ -278,7 +313,11 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                                     sample. Fix them and test again, or Apply keeps the columns shown.
                                 </p>
                             }
-                            <inspecto-schema-fields-editor [rows]="schemaSeed()" />
+                            <inspecto-schema-fields-editor
+                                [rows]="schemaSeed()"
+                                [autoTypes]="typesMode() === 'auto'"
+                                [nameBasedSelectors]="frontend() === 'json' || frontend() === 'text_regex'"
+                            />
                             <!--
                                 BUILDER-1b. One pipeline has ONE output schema (pipeline_schema), and a save
                                 that drops or narrows columns is refused by the BACKWARD gate. Changing a
@@ -434,6 +473,57 @@ export class PipelineParseDefinitionComponent {
     readonly schemaLoading = signal(false);
     /** A saved schema was read back, so a fresh parse must NOT re-derive over the operator's edits. */
     private readonly schemaHydrated = signal(false);
+
+    // ── Data types: Auto / Declared (§4.4, U3; D2: Auto is the default for new parse steps) ──
+    /** Persisted as `raw.types` on the schema companion; existing schemas without the marker load Declared. */
+    readonly typesMode = signal<'auto' | 'declared'>('auto');
+    /** The last parse's INFERRED types by column position, narrowed to the grid's vocabulary; null until
+     *  a parse returns them (an old server never does — everything then behaves exactly as before). */
+    readonly inferredTypes = signal<string[] | null>(null);
+    private typesModeTouched = false;
+
+    setTypesMode(mode: 'auto' | 'declared'): void {
+        if (mode === this.typesMode()) return;
+        this.typesMode.set(mode);
+        this.typesModeTouched = true;
+        // Entering Auto with a fresh inference re-snapshots the icons; entering Declared keeps
+        // whatever is shown (the inferred set stays offered via the chip, never forced).
+        if (mode === 'auto') this.applyInferredToGrid();
+        this.emitDirty();
+    }
+
+    /** Declared mode's one-click, non-destructive starting point (§4.4). */
+    applySuggestedTypes(): void {
+        this.applyInferredToGrid();
+        this.emitDirty();
+    }
+
+    /**
+     * Stamp the inferred types onto the grid rows, matched by POSITION (delimited selectors are
+     * 0-based positions — the same order the sniff's columns come back in). Types only: names,
+     * include flags and synonyms are the operator's.
+     */
+    private applyInferredToGrid(): void {
+        const inferred = this.inferredTypes();
+        if (!inferred) return;
+        const grid = this.schemaGrid;
+        if (grid) {
+            for (const g of grid.fieldRows.controls) {
+                const pos = Number(g.getRawValue()['selector']);
+                if (Number.isInteger(pos) && inferred[pos] !== undefined) g.get('type')?.setValue(inferred[pos]);
+            }
+            grid.form.markAsDirty();
+        } else {
+            this.schemaSeed.update((rows) =>
+                rows.map((r) => {
+                    const pos = Number(r.selector);
+                    return Number.isInteger(pos) && inferred[pos] !== undefined
+                        ? { ...r, type: inferred[pos] }
+                        : r;
+                }),
+            );
+        }
+    }
     /** How the saved schema differs from what THIS sample suggests (B3) — null until a parse runs. */
     readonly schemaDrift = signal<SchemaDrift | null>(null);
 
@@ -518,21 +608,29 @@ export class PipelineParseDefinitionComponent {
         this.previewTree.set(p.kind === 'tree' ? p.nodes : null);
         if (p.kind !== 'table') return;
         this.previewTable.set(p);
+        // U3: keep the parse's inferred types (narrowed to the grid vocabulary), by position.
+        // Backward-compatible: an old server serves no columnTypes and everything reads as before.
+        this.inferredTypes.set(p.columnTypes ? p.columnTypes.map((ct) => narrowToSchemaType(ct.type)) : null);
         // ⛔ Never re-derive over a schema read back from disk: the operator's saved names, types and
         // include flags are the truth, and a fresh sample would silently replace them on Apply.
         // Instead, ASK what changed — that is exactly the drift question (B3).
-        if (this.schemaHydrated()) return this.checkDrift(p.rows);
+        if (this.schemaHydrated()) {
+            // …except the TYPES in Auto mode, which are the sniffer's by definition (§4.4).
+            if (this.typesMode() === 'auto') this.applyInferredToGrid();
+            return this.checkDrift(p.rows);
+        }
         // The derived schema is unapplied work — see {@link parsedSinceApply}. Set HERE and not in
         // `previewFn`, which only runs for a node that has a sample thread, and not on the drift
         // path above, which deliberately re-derives nothing.
         this.parsedSinceApply = true;
         this.emitDirty();
+        const inferred = this.typesMode() === 'auto' ? this.inferredTypes() : null;
         this.schemaSeed.set(
             p.columns.map((col, i) => ({
                 include: true,
                 name: sanitizeIdentifier(col, i),
                 selector: deriveSelector(this.frontend(), i, col),
-                type: 'VARCHAR',
+                type: inferred?.[i] ?? 'VARCHAR',
             })),
         );
     }
@@ -730,8 +828,12 @@ export class PipelineParseDefinitionComponent {
                         name: String(f['name'] ?? ''),
                         selector: String(f['selector'] ?? ''),
                         type: String(f['type'] ?? 'VARCHAR'),
+                        ...(f['synonym'] ? { synonym: String(f['synonym']) } : {}),
                     })),
                 );
+                // §4.4: the mode is the schema's own `raw.types` marker; a schema without one predates
+                // the marker and loads as Declared — its stored types are the operator's.
+                this.typesMode.set(raw['types'] === 'auto' ? 'auto' : 'declared');
                 this.schemaHydrated.set(true);
             },
             // A 404 is ordinary: the node names a schema whose file was never written. Deriving from
@@ -816,6 +918,7 @@ export class PipelineParseDefinitionComponent {
         const dirty =
             this.form.dirty ||
             this.templateDirty ||
+            this.typesModeTouched ||
             this.parsedSinceApply ||
             (this.editor?.isDirty() ?? false) ||
             (this.segmentsEditor?.isDirty() ?? false) ||
@@ -960,6 +1063,11 @@ export class PipelineParseDefinitionComponent {
      */
     private submitWithSchema(replace = false): void {
         const grid = this.schemaGrid;
+        // §4.4's "block Auto-save without a parse" guard is deliberately NOT here: with no derived
+        // columns nothing is written at all (a parser may be defined before its schema — the
+        // BUILDER-1a rule), and once columns exist they always came from a parse. The one residue —
+        // an OLD server that serves no columnTypes — saves `types: auto` over VARCHAR, which honestly
+        // records everything the sniff was able to say.
         if (!this.authorsSchema() || !grid || !this.schemaSeed().length) return this.applyWith(this.parsingValue());
         if (!grid.validate()) {
             this.editor?.error.set(grid.problem() ?? 'Fix the output schema before applying.');
@@ -971,7 +1079,16 @@ export class PipelineParseDefinitionComponent {
             raw: {
                 name,
                 format: 'CSV',
-                fields: fields.map((f) => ({ name: f.name, selector: f.selector, type: f.type })),
+                // §4.4: the Auto/Declared marker rides the schema companion (additive, ETL-ignored);
+                // in Auto the written types ARE the inferred snapshot — declared = inferred by
+                // construction, so downstream stays deterministic.
+                types: this.typesMode(),
+                fields: fields.map((f) => ({
+                    name: f.name,
+                    selector: f.selector,
+                    type: f.type,
+                    ...(f.synonym ? { synonym: f.synonym } : {}),
+                })),
             },
             mapping: {
                 canonicalName: name,
@@ -1026,6 +1143,7 @@ export class PipelineParseDefinitionComponent {
         this.editor?.markPristine();
         this.templateDirty = false; // Apply consumed the pick, same as any other edit
         this.parsedSinceApply = false; // …and the derived schema it wrote
+        this.typesModeTouched = false; // …and the mode switch, now persisted as raw.types
         this.emitDirty();
         this.applied.emit(node);
     }

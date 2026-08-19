@@ -1060,6 +1060,98 @@ describe('PipelineParseDefinitionComponent', () => {
         });
     });
 
+    // ── Data types: Auto / Declared (§4.4, U3) ────────────────────────────────────
+
+    describe('data types mode', () => {
+        /** A delimited node with NO schema_file — fresh from the palette, nothing hydrates. */
+        function unschemadNode(): AuthoredNode {
+            return {
+                id: 'parse',
+                type: 'parser.delimited',
+                name: 'Parser (delimited)',
+                config: { parsing: { frontend: 'delimited', delimited: { delimiter: ',' } } },
+            };
+        }
+
+        const typedPreview = {
+            kind: 'table' as const,
+            columns: ['id', 'when', 'city'],
+            rows: [{ id: '1', when: '2026-07-15', city: 'london' }],
+            rowCount: 1,
+            rejectedRows: 0,
+            columnTypes: [
+                { name: 'id', type: 'BIGINT' },
+                { name: 'when', type: 'DATE' },
+                { name: 'city', type: 'VARCHAR' },
+            ],
+        };
+
+        it('defaults to Auto (D2) and seeds the preview’s inferred types, narrowed', async () => {
+            const fixture = await create(unschemadNode());
+            const p = pane(fixture);
+            expect(p.typesMode()).toBe('auto');
+
+            p.onPreviewed(typedPreview);
+            fixture.detectChanges();
+
+            // BIGINT narrows to DOUBLE — the grid's honest vocabulary.
+            expect(p.schemaSeed().map((r) => r.type)).toEqual(['DOUBLE', 'DATE', 'VARCHAR']);
+        });
+
+        it('seeds VARCHAR when the server serves no columnTypes (old server, byte-identical)', async () => {
+            const fixture = await create(unschemadNode());
+            const p = pane(fixture);
+            p.onPreviewed({ ...typedPreview, columnTypes: undefined });
+            fixture.detectChanges();
+            expect(p.schemaSeed().map((r) => r.type)).toEqual(['VARCHAR', 'VARCHAR', 'VARCHAR']);
+        });
+
+        it('save snapshots the mode as raw.types and the inferred types into the fields', async () => {
+            const fixture = await create(unschemadNode());
+            const p = pane(fixture);
+            p.onPreviewed(typedPreview);
+            fixture.detectChanges();
+
+            p.submit();
+            fixture.detectChanges();
+
+            expect(schemaWrites).toHaveLength(1);
+            const raw = schemaWrites[0].config['raw'] as Record<string, unknown>;
+            expect(raw['types']).toBe('auto');
+            const fields = raw['fields'] as { name: string; type: string; synonym?: string }[];
+            expect(fields.map((f) => f.type)).toEqual(['DOUBLE', 'DATE', 'VARCHAR']);
+            expect('synonym' in fields[0]).toBe(false);
+        });
+
+        it('Declared mode keeps VARCHAR until "Apply suggested types" stamps the inferred set', async () => {
+            const fixture = await create(unschemadNode());
+            const p = pane(fixture);
+            p.setTypesMode('declared');
+            p.onPreviewed(typedPreview);
+            expect(p.schemaSeed().map((r) => r.type)).toEqual(['VARCHAR', 'VARCHAR', 'VARCHAR']);
+
+            p.applySuggestedTypes();
+            expect(p.schemaSeed().map((r) => r.type)).toEqual(['DOUBLE', 'DATE', 'VARCHAR']);
+        });
+
+        it('a hydrated schema without the raw.types marker loads as Declared', async () => {
+            const fixture = await create();
+            fixture.componentInstance.pipelineName = 'cdr';
+            fixture.componentInstance.node = delimitedNode(); // new identity → the pane re-loads
+            fixture.detectChanges();
+
+            expect(pane(fixture).typesMode()).toBe('declared');
+        });
+
+        it('switching the mode marks the pane dirty', async () => {
+            const fixture = await create(unschemadNode());
+            expect(fixture.componentInstance.dirty).toBe(false);
+            pane(fixture).setTypesMode('declared');
+            fixture.detectChanges();
+            expect(fixture.componentInstance.dirty).toBe(true);
+        });
+    });
+
     it('has no a11y violations', async () => {
         const fixture = await create();
         await expectNoA11yViolations(fixture.nativeElement);

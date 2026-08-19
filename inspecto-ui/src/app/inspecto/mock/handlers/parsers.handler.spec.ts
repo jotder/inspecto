@@ -150,6 +150,29 @@ describe('parsersHandler', () => {
         expect(String((noMatch.body as { error: string }).error)).toContain('ghost');
     });
 
+    /** B2 parity: the delimited preview serves additive columnTypes with the ROUTE's key shape —
+     *  {name, type} — and only the delimited arm does (the server sniffs only there). */
+    it('serves inferred columnTypes on the delimited preview, and only there', () => {
+        const res = send('POST', '/api/parsers/delimited/preview', {
+            grammar: { delimited: { has_header: true } },
+            sample_text: 'id,when,city\n1,2026-07-15,london\n2,2026-07-16,paris\n',
+        })!;
+        expect(res.status).toBe(200);
+        const body = res.body as { columnTypes?: { name: string; type: string }[] };
+        expect(body.columnTypes).toEqual([
+            { name: 'id', type: 'BIGINT' },
+            { name: 'when', type: 'DATE' },
+            { name: 'city', type: 'VARCHAR' },
+        ]);
+
+        const rx = send('POST', '/api/parsers/text_regex/preview', {
+            grammar: { text_regex: { pattern: '(?<level>[A-Z]+) (?<msg>.+)' } },
+            sample_text: 'INFO started\n',
+        })!;
+        expect(rx.status).toBe(200);
+        expect('columnTypes' in (rx.body as Record<string, unknown>)).toBe(false);
+    });
+
     it('ignores unrelated routes', () => {
         expect(send('GET', '/api/pipelines')).toBeUndefined();
     });
