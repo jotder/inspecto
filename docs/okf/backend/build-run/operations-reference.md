@@ -945,6 +945,16 @@ INSPECTO_JAVA_OPTS="-Xmx8g" bash run.sh <data_source>                           
 discarded — before `560e9f13` this was the only thing an operator would think to try, and a BUNDLE-1
 diagnostic run once reported "no errors" purely because the flag never reached the JVM.
 
+**Reading the control-plane log: a cancelled asset fetch is DEBUG, not an error** (`994d21ca`). A
+browser aborts its in-flight requests on every reload or navigation, and the static write then fails
+with a platform socket message (*"An established connection was aborted by the software in your host
+machine"*, *"Connection reset by peer"*). That used to surface as `ERROR … failed` plus a ~30-frame
+stack, which reads like a server fault and is the single noisiest line in a normal session's log;
+`errorBoundary` now classifies it via `isClientDisconnect` and logs one DEBUG line. **So a stack trace
+in this log is now signal.** ⚠ It also means an aborted request no longer produces any INFO-level
+trace at all — if you are counting served assets against the BUNDLE-1 clean-load signature
+(`docs/BACKLOG.md` §5), turn on `-Dui.static.log=DEBUG` or the abort will be invisible.
+
 **Direct invocation** (without the run scripts):
 ```bash
 java --enable-native-access=ALL-UNNAMED \
