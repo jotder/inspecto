@@ -58,6 +58,13 @@ What else the redesign shipped, all §-referenced to the plan (in `superpower/` 
   unknown keys WITHOUT applying them, and replaces the columns wholesale behind a confirm.
   "Start from a template" stays; stored templates are created in the Components registry
   (`GrammarTemplateDialog` deleted).
+- **Column-metadata grid (D1(b), shipped 2026-08-19)**: `<inspecto-schema-metadata-grid>` on the
+  Files & metadata tab (`[tabFiles]`) edits `raw.fields[].{description,unit,classification}` —
+  Catalog-facing (read by `SchemaProjection.Column`), never read by the ETL. It is a **second VIEW
+  over the columns table's rows** (same seed signal, keyed by the read-only `selector`), merged onto
+  `grid.value()` by the pane's `withMetadata()` at submit — never a second owner. ⚠ Three places
+  used to silently DROP those keys and are fixed: the Grammar CSV *import* (the export always wrote
+  them), the schema-write field map, and the drift-add reseed (which rebuilds both grids).
 - **Drawer maximize** (§4.6): the shared `<inspecto-definition-drawer>` toggle emits
   `(maximizedChange)`; the pipeline-editor binds the dock to 100% over the canvas, split handle
   kept MOUNTED (`[class.hidden]`, never `@if`).

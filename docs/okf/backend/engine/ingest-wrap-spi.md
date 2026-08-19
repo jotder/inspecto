@@ -61,7 +61,15 @@ the unpartitioned single-file `COPY`, with staging + atomic per-file reveal for 
 (CALL/SMS segments, `event_type/year/month/day`) and — `unkeyedSegmentWritesAFlatStoreWithLineage`
 — into an **unpartitioned flat** store, asserting rows, layout (no sentinel), and the lineage
 ledger. The concurrency claims of the finalization stores are pinned at the ledger by
-`BatchAuditWriterTest.concurrentFlushesKeepEachBatchBlockContiguous` (E4, narrowed — see the plan).
+`BatchAuditWriterTest.concurrentFlushesKeepEachBatchBlockContiguous` (E4, narrowed — see the plan),
+and since 2026-08-19 by **`FinalizeSourceConcurrencyTest`** (the E4 remainder, ex-BACKLOG §4 (b)):
+8 distinct batches finalizing concurrently through the SHARED `DbConsignmentOutputStore` /
+`DbAcquisitionLedger` / `DbFileStageStore` (registry reconciliation, ledger PROCESSED, the full
+crash-ordered stage trail, one manifest per batch), plus the same-file marker race — exactly ONE
+loser, on the atomic `Files.createFile`. ⚠ The race fixture deliberately has no backup dir (a
+same-file `Files.move` race throws platform-dependent exceptions before the marker), and the
+harness pins exactly the stores' own `synchronized`+one-connection claim — a future connection
+pool must re-run it.
 
 ## Related
 
