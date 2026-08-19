@@ -340,6 +340,11 @@ final class PipelineConfigParser {
                     && !csv.containsKey("has_header"))
                 csv.put("has_header", "false");
             b.delimiter       = opt(csv, "delimiter", ",");
+            // 5.2 additive dialect chars — validated fail-closed: a key the engine cannot honor
+            // must never load looking honored (docs/parsing-options-reference.md §5).
+            b.quote           = singleChar(csv.get("quote"),   "quote");
+            b.escape          = singleChar(csv.get("escape"),  "escape");
+            b.comment         = singleChar(csv.get("comment"), "comment");
             b.skipHeaderLines = toInt(csv.getOrDefault("skip_header_lines", 0));
             b.skipJunkLines   = toInt(csv.getOrDefault("skip_junk_lines",   0));
             b.skipTailLines   = toInt(csv.getOrDefault("skip_tail_lines",   0));
@@ -1047,6 +1052,22 @@ final class PipelineConfigParser {
         if (v == null) return null;
         String s = String.valueOf(v).trim();
         return s.isEmpty() ? null : s;
+    }
+
+    /**
+     * A single-character dialect option ({@code quote}/{@code escape}/{@code comment}): empty/absent
+     * ⇒ {@code null} (engine default), more than one character fails the load. Deliberately not
+     * trimmed — a whitespace character is a valid (if odd) dialect char, and trimming would turn a
+     * one-char tab into "absent".
+     */
+    private static String singleChar(Object v, String key) {
+        if (v == null) return null;
+        String s = String.valueOf(v);
+        if (s.isEmpty()) return null;
+        if (s.length() != 1)
+            throw new IllegalArgumentException(
+                    "parsing '" + key + "' must be a single character, got \"" + s + "\"");
+        return s;
     }
 
     /**

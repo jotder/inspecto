@@ -198,6 +198,98 @@ class DuckDbCsvIngesterTest {
         return PipelineConfig.load(p.toString());
     }
 
+    /**
+     * 5.2 dialect pass-through: a custom quote (with the default doubled-quote escaping) and a
+     * comment char must parse identically on BOTH engines — a quoted field with an embedded
+     * delimiter stays one field, a doubled quote becomes a literal quote, and comment lines are
+     * skipped (not rejected).
+     */
+    @Test
+    void quoteAndCommentParityAcrossEngines(@TempDir Path dir) throws Exception {
+        File csv = dir.resolve("quoted.csv").toFile();
+        Files.writeString(csv.toPath(), """
+                ID,AMT,TXN_DATE
+                'a''1','10,5',2020-04-01
+                2,20.0,2020-04-02
+                ; a trailing operator note
+                """);
+
+        List<String[]> javaRows = dialectIngestAndDump(dir, "java", csv);
+        List<String[]> duckRows = dialectIngestAndDump(dir, "duckdb", csv);
+
+        assertEquals(2, javaRows.size(), "2 data rows; the comment line is skipped, not parsed");
+        assertEquals(javaRows.size(), duckRows.size(), "row count parity");
+        for (int i = 0; i < javaRows.size(); i++)
+            assertArrayEquals(javaRows.get(i), duckRows.get(i), "row " + i + " differs between engines");
+        assertArrayEquals(new String[]{"2", "20.0", "2020-04-02"}, javaRows.get(0));
+        assertArrayEquals(new String[]{"a'1", "10,5", "2020-04-01"}, javaRows.get(1),
+                "embedded delimiter kept, doubled quote unescaped");
+    }
+
+    /** Like {@link #ingestAndDump} but with quote {@code '} + comment {@code ;} in csv_settings. */
+    private static List<String[]> dialectIngestAndDump(Path dir, String engine, File csv) throws Exception {
+        Path schemaFile = dir.resolve("s_q" + engine + ".toon");
+        Files.writeString(schemaFile, """
+                partitionKey: TXN_DATE
+                raw:
+                  name: t
+                  format: CSV
+                  fields[1]{name,selector,type}:
+                    ID,"0",VARCHAR
+                mapping:
+                  canonicalName: t
+                  rawName: t
+                  rules[1]{targetColumn,sourceExpression,transformType}:
+                    ID,ID,DIRECT
+                """);
+        Path p = dir.resolve("p_q" + engine + ".toon");
+        Files.writeString(p, """
+                name: TQ_ETL
+                version: 1
+                dirs:
+                  poll: %s/inbox
+                  database: %s/db
+                  backup: %s/backup
+                  temp: %s/temp
+                  errors: %s/errors
+                  quarantine: %s/quarantine
+                  status_dir: %s/status
+                  log_dir: %s/logs
+                output:
+                  format: CSV
+                processing:
+                  threads: 1
+                  file_pattern: "glob:**/*.csv"
+                  schema_file: %s
+                  csv_settings:
+                    delimiter: ","
+                    engine: %s
+                    quote: "'"
+                    comment: ";"
+                    date_formats[1]: "%%Y-%%m-%%d"
+                    timestamp_formats[1]: "%%Y-%%m-%%d"
+                """.formatted(dir, dir, dir, dir, dir, dir, dir, dir,
+                schemaFile.toString().replace("\\", "/"), engine));
+        PipelineConfig c = PipelineConfig.load(p.toString());
+
+        File db = DuckDbUtil.tempDbFile("dtq_" + engine + "_");
+        try (Connection conn = DuckDbUtil.openConnection(db)) {
+            if ("java".equals(engine))
+                CsvIngester.ingest(csv, conn, schema(), c, "raw_f0");
+            else
+                DuckDbCsvIngester.ingest(csv, conn, schema(), c, "raw_f0");
+            List<String[]> rows = new ArrayList<>();
+            try (Statement st = conn.createStatement();
+                 ResultSet rs = st.executeQuery("SELECT ID, AMT, TXN_DATE FROM raw_f0 ORDER BY ID")) {
+                while (rs.next())
+                    rows.add(new String[]{rs.getString(1), rs.getString(2), rs.getString(3)});
+            }
+            return rows;
+        } finally {
+            DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private static List<String[]> ingestAndDump(Path dir, String engine, File csv) throws Exception {

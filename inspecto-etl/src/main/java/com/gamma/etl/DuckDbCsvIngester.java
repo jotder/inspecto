@@ -243,6 +243,7 @@ public final class DuckDbCsvIngester {
                 + ", header=false"
                 + ", skip=" + skipLines
                 + readOptions(cfg)
+                + dialectOptions(cfg)
                 + ", ignore_errors=true"
                 + ", null_padding=false"
                 + ", auto_detect=false"
@@ -720,6 +721,27 @@ public final class DuckDbCsvIngester {
         }
         if (c.strictMode() != null)
             sb.append(", strict_mode=").append(c.strictMode().booleanValue());
+        return sb.toString();
+    }
+
+    /**
+     * Dialect characters ({@code quote}/{@code escape}/{@code comment}) — <b>delimited frontend
+     * only</b>. The line-reader frontends (fixed-width / json / text_regex) hardcode
+     * {@code quote='', escape=''} to keep each physical line intact; emitting these there would
+     * duplicate the named parameter. Each is emitted only when set, so an unset config produces
+     * the exact same SQL as before.
+     */
+    private static String dialectOptions(PipelineConfig cfg) {
+        PipelineConfig.CsvSettings c = cfg.csv();
+        StringBuilder sb = new StringBuilder();
+        if (c.quote() != null)   sb.append(", quote='").append(escapeSql(c.quote())).append('\'');
+        // Default the escape to the quote char (RFC-4180 doubling) whenever a custom quote is set:
+        // DuckDB's escape default stays '"' regardless of quote, so a doubled custom quote would
+        // otherwise be a parse error — and the univocity fallback already defaults escape=quote,
+        // so without this the two engines diverge on the same file.
+        String escape = c.escape() != null ? c.escape() : c.quote();
+        if (escape != null)      sb.append(", escape='").append(escapeSql(escape)).append('\'');
+        if (c.comment() != null) sb.append(", comment='").append(escapeSql(c.comment())).append('\'');
         return sb.toString();
     }
 

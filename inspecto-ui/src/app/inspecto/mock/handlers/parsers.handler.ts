@@ -31,6 +31,12 @@ const int = (path: string, label: string, description: string): ServedFieldSpec 
     description,
     type: 'INT',
 });
+const list = (path: string, label: string, description: string): ServedFieldSpec => ({
+    path,
+    label,
+    description,
+    type: 'LIST',
+});
 
 /** The catalog `Parsers.catalog()` serves — built-ins first, then discovered plugins. */
 const CATALOG: ParserDef[] = [
@@ -40,6 +46,7 @@ const CATALOG: ParserDef[] = [
         hierarchical: false,
         ingestable: true,
         grammarSchema: [
+            // Dialect
             {
                 path: 'delimited.delimiter',
                 label: 'Delimiter',
@@ -47,6 +54,21 @@ const CATALOG: ParserDef[] = [
                 defaultValue: ',',
                 description: 'Column separator character.',
             },
+            str(
+                'delimited.quote',
+                'Quote character',
+                'Single character wrapping fields that contain the delimiter (default ").',
+            ),
+            str(
+                'delimited.escape',
+                'Escape character',
+                'Single character escaping a literal quote inside a quoted field (default: the quote, doubled).',
+            ),
+            str(
+                'delimited.comment',
+                'Comment character',
+                'Lines starting with this single character are skipped (default: none).',
+            ),
             {
                 path: 'delimited.has_header',
                 label: 'First line is a header',
@@ -59,9 +81,76 @@ const CATALOG: ParserDef[] = [
                 'Skip leading lines',
                 'Banner/preamble lines before the data (and header).',
             ),
-            str('delimited.null_strings', 'Null strings', 'Values read as NULL; comma-separate multiple.'),
+            int(
+                'delimited.skip_junk_lines',
+                'Skip junk lines (adaptive)',
+                'Max preamble lines to probe past until a parseable data row; -1 = unlimited.',
+            ),
+            int('delimited.skip_tail_lines', 'Skip trailing lines', 'Footer lines dropped from the end of each file.'),
+            int(
+                'delimited.skip_tail_columns',
+                'Skip trailing columns',
+                'Phantom columns stripped from the right of each record.',
+            ),
             str('encoding', 'Encoding', 'Character encoding (default UTF-8).'),
-            str('compression', 'Input compression', 'e.g. gzip.'),
+            // Types & columns
+            list('delimited.date_formats', 'Date formats', 'Accepted DATE parse patterns, tried in order.'),
+            list(
+                'delimited.timestamp_formats',
+                'Timestamp formats',
+                'Accepted TIMESTAMP parse patterns, tried in order.',
+            ),
+            list('delimited.null_strings', 'Null strings', "Literal text values read as NULL, e.g. ['', 'NULL', 'N/A']."),
+            // Robustness
+            {
+                path: 'delimited.strict_mode',
+                label: 'Strict mode (RFC-4180)',
+                type: 'BOOL',
+                description: 'Blank = engine default (true). false tolerates quote/column drift.',
+            },
+            {
+                path: 'delimited.engine',
+                label: 'Parse engine',
+                type: 'ENUM',
+                enumValues: ['auto', 'duckdb', 'java'],
+                defaultValue: 'auto',
+                description: 'duckdb = native reader; java = univocity fallback for messy files.',
+            },
+            list(
+                'delimited.include_prefixes',
+                'Include rows: prefixes',
+                'Keep only rows whose filter target column starts with any of these.',
+            ),
+            list(
+                'delimited.include_regex',
+                'Include rows: regex',
+                'Keep only rows whose filter target column matches any of these.',
+            ),
+            list(
+                'delimited.exclude_prefixes',
+                'Exclude rows: prefixes',
+                'Drop rows whose filter target column starts with any of these.',
+            ),
+            list(
+                'delimited.exclude_regex',
+                'Exclude rows: regex',
+                'Drop rows whose filter target column matches any of these.',
+            ),
+            {
+                path: 'delimited.filter_target_column',
+                label: 'Filter target column',
+                type: 'INT',
+                defaultValue: 0,
+                description: '0-based physical column the include/exclude filters apply to.',
+            },
+            {
+                path: 'delimited.where',
+                label: 'Row filter (SQL)',
+                type: 'SQL',
+                description: 'Post-parse SQL predicate over the mapped, typed columns, e.g. amount > 0.',
+            },
+            // Files
+            str('compression', 'Input compression', 'auto / gzip / zstd / none — decompressed inline at read.'),
         ],
     },
     {

@@ -57,6 +57,8 @@ read_csv('<file>',
   delim='<csv_settings.delimiter>',
   header=false,
   skip=<skip_header_lines + (has_header?1:0)>,
+  -- optional, only when set: encoding=, compression=, nullstr=[…], strict_mode=,
+  --                          quote=, escape=, comment=   (delimited frontend only)
   ignore_errors=true,
   null_padding=false,
   auto_detect=false,
@@ -72,11 +74,13 @@ So the config knobs that actually reach DuckDB today are **only**:
 | `engine` (`auto`/`duckdb`/`java`) | selects native vs Java path | `[LIVE]` |
 | `skip_junk_lines`, `skip_tail_lines`, `skip_tail_columns` | **Java path only** (route away from native) | `[LIVE]` |
 | `date_formats`, `timestamp_formats` | used at **transform** time (`TRY_STRPTIME`), *not* at read time | `[LIVE]` |
+| `quote`, `escape`, `comment` | `quote`/`escape`/`comment` (single char, validated fail-closed at load; both engines) | `[LIVE]` (5.2) |
+| `encoding`, `compression`, `null_strings`, `strict_mode` | `encoding`/`compression`/`nullstr`/`strict_mode` | `[LIVE]` (4.1) |
 
-Everything else in the PDF — `quote`, `escape`, `comment`, `nullstr`, `strict_mode`,
-`decimal_separator`, `sample_size`, `auto_type_candidates`, `names`, `union_by_name`,
-`hive_partitioning`, read-time `dateformat`, `encoding`, `compression` — is **`[NATIVE]`**: DuckDB
-supports it, but it is **not reachable from config**. Section 5 proposes the grammar to expose them.
+Everything else in the PDF — `decimal_separator`, `sample_size`, `auto_type_candidates`, `names`,
+`union_by_name`, `hive_partitioning`, read-time `dateformat` — is **`[NATIVE]`**: DuckDB supports
+it, but it is **not reachable from config** (deliberately: ingest is all-VARCHAR; typing is the
+mapping's job).
 
 > Type detection difference worth internalizing: this engine reads **everything as VARCHAR** and
 > types later via `mapping.rules[]` + `TRY_STRPTIME`/`TRY_CAST` (so a bad value becomes `NULL`, never
@@ -191,7 +195,7 @@ parsing:
     skip_tail_lines: 0       # footer drop ("N rows selected.")
     skip_tail_columns: 0
     null_strings: ["", "NULL", "NaN", "N/A"]
-    strict: true             # false → tolerate quote/column drift
+    strict_mode: true        # false → tolerate quote/column drift (the engine reads strict_mode, NOT strict)
     engine: auto             # auto | duckdb | java
 
   # ── frontend: fixedwidth (positional slices; text = read_csv 1-col + substring) ──
@@ -253,9 +257,12 @@ plugin — §6.3), `json` (`read_ndjson`/`read_json`, selectors = top-level JSON
 `text_regex` (`read_csv` 1-col + `regexp_extract` named groups, selectors = group names — §6.5),
 and `asn1` (synthesized `Asn1RecordIngester` binding, grammar inline — P3c).
 Not yet implemented within them: `text_regex.record_split`
-`"\n\n"` (blank-line block records, e.g. LDIF entries), and the §8 step-1 extra delimited knobs
-(`quote`/`escape`/`comment`/`skip_junk` renames). Each unsupported knob is rejected at load with a
-clear message.
+`"\n\n"` (blank-line block records, e.g. LDIF entries). `quote`/`escape`/`comment` are `[LIVE]`
+since 5.2 (single-char, validated fail-closed at load, honored by both engines).
+⚠ **An unknown `delimited.*` key is NOT rejected at load** — `mergeParsing` flattens the block with
+no key allow-list, so an unread key is carried but silently ignored. Only an unknown
+`parsing.frontend` and a malformed known key (e.g. a multi-char `quote`) fail the load. Author from
+the served grammar schema (`GET /parsers`), which lists exactly the keys the engine reads.
 
 ---
 

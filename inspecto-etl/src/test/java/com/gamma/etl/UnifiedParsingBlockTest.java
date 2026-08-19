@@ -85,6 +85,55 @@ class UnifiedParsingBlockTest {
         assertEquals("gzip", cfg.csv().inputCompression());
     }
 
+    // ── 5.2 dialect chars: quote / escape / comment ─────────────────────────────
+
+    @Test
+    void quoteEscapeCommentAreReadFromBothSpellings(@TempDir Path dir) throws Exception {
+        PipelineConfig unified = load(dir, "qec", "", """
+                parsing:
+                  frontend: delimited
+                  delimited:
+                    quote: "'"
+                    escape: "~"
+                    comment: ";"
+                """);
+        assertEquals("'", unified.csv().quote());
+        assertEquals("~", unified.csv().escape());
+        assertEquals(";", unified.csv().comment());
+
+        PipelineConfig legacy = load(dir, "qecl", """
+                  csv_settings:
+                    quote: "'"
+                """, "");
+        assertEquals("'", legacy.csv().quote(), "legacy csv_settings spelling reads the same key");
+    }
+
+    @Test
+    void dialectCharsDefaultToNullWhenAbsent(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = load(dir, "qed", "", """
+                parsing:
+                  frontend: delimited
+                  delimited:
+                    delimiter: "|"
+                """);
+        assertNull(cfg.csv().quote());
+        assertNull(cfg.csv().escape());
+        assertNull(cfg.csv().comment());
+    }
+
+    /** Fail-closed: a value the engine cannot honor must never load looking honored. */
+    @Test
+    void multiCharDialectCharFailsLoad(@TempDir Path dir) {
+        Exception e = assertThrows(IllegalArgumentException.class, () -> load(dir, "qex", "", """
+                parsing:
+                  frontend: delimited
+                  delimited:
+                    quote: "ab"
+                """));
+        assertTrue(e.getMessage().contains("quote"), e.getMessage());
+        assertTrue(e.getMessage().contains("single character"), e.getMessage());
+    }
+
     @Test
     void noParsingBlockIsBehaviourPreserving(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = load(dir, "leg", """

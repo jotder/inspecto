@@ -87,6 +87,12 @@ public final class PipelineConfig {
      * to a row-filter {@code WHERE} clause on the native path and an in-loop filter on the Java path.
      * {@code strictMode} is {@code null} when unset (⇒ DuckDB default).
      *
+     * <p>Dialect characters (5.2): {@code quote}/{@code escape}/{@code comment} are single-character
+     * strings, {@code null} when unset (⇒ engine defaults: quote {@code "} / escape = the quote char,
+     * i.e. RFC-4180 doubling / no comment). They
+     * pass through to DuckDB {@code read_csv} and to the univocity fallback identically, so the two
+     * engines cannot diverge on quoting.
+     *
      * <p><b>Two distinct filtering moments</b> — do not conflate them. The {@code includePrefixes}/
      * {@code includeRegex}/{@code excludePrefixes}/{@code excludeRegex} lists are <em>pre-parse</em>:
      * they match one raw physical column ({@code c<filterTargetColumn>}) inside the {@code read_csv}
@@ -99,7 +105,8 @@ public final class PipelineConfig {
      * are rejected outright ({@code ConfigValidator}).
      */
     @PublicApi(since = "2.0.0")
-    public record CsvSettings(String delimiter, int skipHeaderLines, int skipJunkLines,
+    public record CsvSettings(String delimiter, String quote, String escape, String comment,
+                              int skipHeaderLines, int skipJunkLines,
                               int skipTailLines, int skipTailCols, boolean hasHeader,
                               String engine, List<String> dateFormats, List<String> tsFormats,
                               String encoding, String inputCompression, Boolean strictMode,
@@ -127,7 +134,7 @@ public final class PipelineConfig {
          * the builder would; do not use this where the real parse settings matter.
          */
         public static CsvSettings ofFormats(List<String> dateFormats, List<String> tsFormats) {
-            return new CsvSettings(",", 0, 0, 0, 0, true, "auto",
+            return new CsvSettings(",", null, null, null, 0, 0, 0, 0, true, "auto",
                     List.copyOf(dateFormats), List.copyOf(tsFormats),
                     null, null, null, List.of(), List.of(), List.of(), List.of(), List.of(), 0, null);
         }
@@ -1021,7 +1028,8 @@ public final class PipelineConfig {
         this.processing = new Processing(b.threads, b.duckdbThreads, b.filePattern,
                 b.batchMaxFiles, b.batchMaxBytes, b.batchOrder, b.duplicateCheckEnabled,
                 b.markerExtension, b.retentionDays, b.largeFileBytes, b.flushRecords);
-        this.csv = new CsvSettings(b.delimiter, b.skipHeaderLines, b.skipJunkLines,
+        this.csv = new CsvSettings(b.delimiter, b.quote, b.escape, b.comment,
+                b.skipHeaderLines, b.skipJunkLines,
                 b.skipTailLines, b.skipTailCols, b.hasHeader, b.csvEngine,
                 Collections.unmodifiableList(b.dateFormats),
                 Collections.unmodifiableList(b.tsFormats),
@@ -1450,6 +1458,9 @@ public final class PipelineConfig {
         String  markerExtension       = ".processed";
         int     retentionDays         = 90;
         String       delimiter       = ",";
+        String       quote;             // single char; null ⇒ engine default (")
+        String       escape;            // single char; null ⇒ engine default (")
+        String       comment;           // single char; null ⇒ no comment handling
         int          skipHeaderLines = 0;
         int          skipJunkLines   = 0;
         int          skipTailLines   = 0;

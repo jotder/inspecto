@@ -56,7 +56,7 @@ public final class BoundaryScanner {
         int maxJunk    = skipJunk < 0 ? Integer.MAX_VALUE : skipJunk;
         int windowCap  = skipJunk < 0 ? UNLIMITED_WINDOW : Math.max(skipJunk, 1024);
 
-        CsvParser parser = CsvIngester.buildParser(cfg.csv().delimiter());
+        CsvParser parser = CsvIngester.buildParser(cfg.csv());
 
         try (InputStream rawIs = new FileInputStream(file);
              InputStream is = Compression.decompress(file, rawIs, 1 << 20);

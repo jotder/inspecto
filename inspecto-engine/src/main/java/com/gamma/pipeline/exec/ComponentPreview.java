@@ -98,8 +98,12 @@ public final class ComponentPreview {
             opts.append(", skip=").append(intOr(content, "skip_header_lines", 0));
             String quote = strOrNull(content, "quote");
             if (quote != null) opts.append(", quote=").append(ScratchTables.sqlStr(quote));
+            // Same escape-defaults-to-quote rule as the ingest path (DuckDbCsvIngester.dialectOptions).
             String escape = strOrNull(content, "escape");
+            if (escape == null) escape = quote;
             if (escape != null) opts.append(", escape=").append(ScratchTables.sqlStr(escape));
+            String comment = strOrNull(content, "comment");
+            if (comment != null) opts.append(", comment=").append(ScratchTables.sqlStr(comment));
             String enc = strOrNull(content, "encoding");
             if (enc != null) opts.append(", encoding=").append(ScratchTables.sqlStr(enc));
             opts.append(", auto_detect=true, ignore_errors=true, store_rejects=true");
@@ -234,10 +238,21 @@ public final class ComponentPreview {
         // all_varchar mirrors production raw ingest (100% VARCHAR columns) AND keeps the preview
         // rows JSON-serializable — auto-detect would otherwise type a date column as a DuckDB
         // DATE, which the parsed→typed hop is precisely meant to make explicit, not implicit.
+        StringBuilder dialect = new StringBuilder();
+        if (cfg.csv().quote() != null)
+            dialect.append(", quote=").append(ScratchTables.sqlStr(cfg.csv().quote()));
+        // Escape defaults to the quote char (RFC doubling) when a custom quote is set — the same
+        // rule DuckDbCsvIngester.dialectOptions applies, so the preview mirrors production.
+        String parseEscape = cfg.csv().escape() != null ? cfg.csv().escape() : cfg.csv().quote();
+        if (parseEscape != null)
+            dialect.append(", escape=").append(ScratchTables.sqlStr(parseEscape));
+        if (cfg.csv().comment() != null)
+            dialect.append(", comment=").append(ScratchTables.sqlStr(cfg.csv().comment()));
         return "SELECT * FROM read_csv(" + ScratchTables.sqlStr(path)
                 + ", delim=" + ScratchTables.sqlStr(delim)
                 + ", header=" + cfg.csv().hasHeader()
                 + ", skip=" + cfg.csv().skipHeaderLines()
+                + dialect
                 + ", auto_detect=true, all_varchar=true, ignore_errors=true, store_rejects=true)";
     }
 

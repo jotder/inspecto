@@ -82,7 +82,7 @@ public final class CsvIngester {
         Path errorFilePath = ParserSpec.errorFile(file, cfg);
         Path errorDir      = errorFilePath.getParent();
 
-        CsvParser parser = buildParser(cfg.csv().delimiter());
+        CsvParser parser = buildParser(cfg.csv());
 
         long parsedRows        = 0;
         long errorRows         = 0;
@@ -169,7 +169,7 @@ public final class CsvIngester {
                         rawLine   = firstDataLine;
                         hasPending = false;
                     } else {
-                        rawLine = readRecord(br, cfg.csv().delimiter().charAt(0));
+                        rawLine = readRecord(br, cfg.csv().delimiter().charAt(0), quoteChar(cfg.csv()));
                         if (rawLine == null) break;
                     }
                     lineNum++;
@@ -276,10 +276,10 @@ public final class CsvIngester {
      *
      * @return the joined record, or {@code null} at end of input
      */
-    private static String readRecord(BufferedReader br, char delimiter) throws IOException {
+    private static String readRecord(BufferedReader br, char delimiter, char quote) throws IOException {
         String first = br.readLine();
         if (first == null) return null;
-        if (!endsInsideQuotedField(first, delimiter, false)) return first;   // common path, no copy
+        if (!endsInsideQuotedField(first, delimiter, quote, false)) return first;   // common path, no copy
 
         StringBuilder sb = new StringBuilder(first);
         boolean open = true;
@@ -288,7 +288,7 @@ public final class CsvIngester {
             if (next == null) break;               // EOF inside a quote: return what we have
             sb.append('\n').append(next);
             // Resume the scan mid-field: the continuation line starts inside the open quoted value.
-            open = endsInsideQuotedField(next, delimiter, true);
+            open = endsInsideQuotedField(next, delimiter, quote, true);
         }
         return sb.toString();
     }
@@ -298,19 +298,19 @@ public final class CsvIngester {
      *
      * @param inQuotes whether the line begins inside a quoted value (a continuation line)
      */
-    private static boolean endsInsideQuotedField(String s, char delimiter, boolean inQuotes) {
+    private static boolean endsInsideQuotedField(String s, char delimiter, char quote, boolean inQuotes) {
         boolean atFieldStart = !inQuotes;
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
             if (inQuotes) {
-                if (c != '"') continue;
-                if (i + 1 < s.length() && s.charAt(i + 1) == '"') {
-                    i++;                            // "" is an escaped quote, the field stays open
+                if (c != quote) continue;
+                if (i + 1 < s.length() && s.charAt(i + 1) == quote) {
+                    i++;                            // a doubled quote is an escaped quote, the field stays open
                 } else {
                     inQuotes = false;
                     atFieldStart = false;
                 }
-            } else if (c == '"' && atFieldStart) {
+            } else if (c == quote && atFieldStart) {
                 inQuotes = true;                    // only a field-OPENING quote can span lines
                 atFieldStart = false;
             } else {
@@ -320,16 +320,22 @@ public final class CsvIngester {
         return inQuotes;
     }
 
-    /** Build a lenient CsvParser for the given delimiter. */
-    public static CsvParser buildParser(String delimiter) {
+    /** Build a lenient CsvParser for the given dialect (delimiter + optional quote/escape/comment). */
+    public static CsvParser buildParser(PipelineConfig.CsvSettings csv) {
         CsvParserSettings s = new CsvParserSettings();
-        s.getFormat().setDelimiter(delimiter.charAt(0));
+        s.getFormat().setDelimiter(csv.delimiter().charAt(0));
         s.setMaxColumns(10_000);
         s.setMaxCharsPerColumn(1_000_000);
         s.setQuoteDetectionEnabled(false);
-        s.getFormat().setQuote('"');
-        s.getFormat().setQuoteEscape('"');
+        s.getFormat().setQuote(quoteChar(csv));
+        s.getFormat().setQuoteEscape(csv.escape() != null ? csv.escape().charAt(0) : quoteChar(csv));
+        if (csv.comment() != null) s.getFormat().setComment(csv.comment().charAt(0));
         return new CsvParser(s);
+    }
+
+    /** The configured quote character, defaulting to {@code "} — mirrors DuckDB's default. */
+    private static char quoteChar(PipelineConfig.CsvSettings csv) {
+        return csv.quote() != null ? csv.quote().charAt(0) : '"';
     }
 
     private static final java.util.regex.Pattern COMPRESS_SUFFIX =
