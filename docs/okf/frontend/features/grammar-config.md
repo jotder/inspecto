@@ -61,9 +61,11 @@ What else the redesign shipped, all §-referenced to the plan (in `superpower/` 
 - **Drawer maximize** (§4.6): the shared `<inspecto-definition-drawer>` toggle emits
   `(maximizedChange)`; the pipeline-editor binds the dock to 100% over the canvas, split handle
   kept MOUNTED (`[class.hidden]`, never `@if`).
-- ⚠ **Name/Description were NOT removed** despite the operator ask: drawer-parse nodes never reach
-  `NodeConfigDialog`, so the drawer's Name field is their ONLY rename path. Deferred until the
-  canvas grows a node rename (BACKLOG).
+- **Name/Description removed 2026-08-19 (`e004ae26`)**: the canvas inspector grew an inline
+  pencil-edit rename (the path drawer-parse nodes lacked — they never reach `NodeConfigDialog`),
+  so the Parse pane sheds its Name/Description form and Apply carries the node's stored identity
+  verbatim. ⚠ The host's `renameSelected` deliberately bypasses `applyNodePatch`: a rename is not
+  a config edit and must not invalidate the node's test outcome.
 
 ## Two hosts in the Pipelines editor — and the dialog is nearly gone (2026-08-15)
 
