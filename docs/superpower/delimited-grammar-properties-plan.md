@@ -576,7 +576,15 @@ lane's behavior too, retiring the sentinel for new writes.
   ingest pipeline produces flat files and reads back; maintenance ops (`retire_superseded`,
   compaction) run against a flat and a mixed (sentinel + flat) store in tests; reactor green.
 
-**E2 — One partition grammar** (`refactor(etl)`)
+**E2 — One partition grammar** (`refactor(etl)`) — **REFUSED as specced (2026-08-19).**
+`SinkPartitions`' own javadoc records a deliberate prior decision NOT to unify with
+`PartitionDef.fromSchema`: the ingest reader requires a `type` per entry, hard-fails on a non-list
+and carries the legacy `partitionKey` fallback, while the sink reader's posture is to DEGRADE (D3)
+— the two drifted twice only while the *sink* rules lived in two files, which is already fixed by
+`SinkPartitions` being that side's single reader. "A parse-layer unification only — no semantic
+change" is therefore unachievable: folding them either imports a hard failure into the degrade
+lane or softens the fail-closed lane. Each side has exactly one reader today; the doc collapse
+lands in U6 instead.
 - Single shared parser for `partitions[]` (bare column or `{column, source[, type]}`), used by both
   homes — schema (ingest lane) and sink node (graph lane); legacy `partitionKey:` still read.
   Docs collapse to one section. No semantic change — a parse-layer unification only.
@@ -593,7 +601,13 @@ lane's behavior too, retiring the sentinel for new writes.
   into a partitioned and an unpartitioned store, asserting rows, partitions, lineage ledger.
 - **Verify:** the contract test; `graphify update .`; INDEX.
 
-**E4 — Finalization concurrency pin** (`test(engine)`)
+**E4 — Finalization concurrency pin** (`test(engine)`) — **shipped NARROWED (2026-08-19):** the pin
+lands on the batches/status/lineage ledger (`BatchAuditWriter`), whose "contiguous per-batch blocks"
+claim is the one §12 quotes: 24 batches × 20 files flush from 8 threads, asserting no lost rows,
+contiguous consignment blocks, and no torn lines. The other three synchronized stores
+(`DbConsignmentOutputStore` / `DbAcquisitionLedger` / `DbFileStageStore`) and the
+marker/manifest fail-fast remain structurally argued, not stress-pinned — a full concurrent
+`finalizeSource` harness is real work left to BACKLOG, not silently claimed here.
 - A stress test: N batches finalize concurrently through `BatchProcessor.finalizeSource` + the four
   synchronized stores; assert contiguous per-batch ledger blocks, no lost output registrations, no
   marker/manifest collisions. This converts §12's structural safety argument into a pinned one.

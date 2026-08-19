@@ -10,6 +10,7 @@ lives in the engine modules extracted below the [core](../modules/engine.md) in 
 * [Ingestion](ingestion.md) - the `StreamingFileIngester` SPI, union vs generation mode, and the batch coordinators.
 * [DuckDB](duckdb.md) - Appender-based bulk ingest (~75×), thread auto-derivation, reserved-word quoting.
 * [Output & sinks](output-sinks.md) - `OutputFormat`, partitioned vs single-file writers, quarantine outcomes.
+* [Ingest wrap-SPI](ingest-wrap-spi.md) - `StreamingFileIngester` + `RecordSink` → `DuckDbRecordSink` (Appender), Generation/Union drive modes, ASN.1 as reference; E1's optional partitioning + the two deliberate `partitions[]` contracts (2026-08-19).
 * [Transforms & seams](transforms-seams.md) - `TransformCompiler` and the `BatchIngestStrategy` seam.
 * [Pipeline test run (run-to-here)](pipeline-test-run.md) - the scratch-only run over REAL inbox files: why the containment is the call graph rather than config, the `QuarantineManager` source-file trap, the connection-relative `files` jail, and the sample-vs-full row-count grains (2026-08-14).
 * [Parsing & grammar](parsing-grammar.md) - the three frontends / one backend model, CSV knobs, delimited grammar, plugin ingesters.

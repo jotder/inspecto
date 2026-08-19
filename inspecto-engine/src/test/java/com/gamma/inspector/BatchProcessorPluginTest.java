@@ -91,6 +91,62 @@ class BatchProcessorPluginTest {
         assertTrue(smsFiles > 0, "SMS should have at least one output file");
     }
 
+    /**
+     * E1/E3 (delimited-grammar-properties plan Part II): the wrap-SPI contract over an UNKEYED
+     * schema. A segment declaring no partitions[] / partitionKey lands as a FLAT store — one
+     * unpartitioned file per batch, no {@code year=1900/month=01/day=01} sentinel bucket — and the
+     * lineage ledger still records the input→output rows.
+     */
+    @Test
+    void unkeyedSegmentWritesAFlatStoreWithLineage(@TempDir Path dir) throws Exception {
+        Path callSchema = dir.resolve("call_schema.toon");
+        Path smsSchema = dir.resolve("sms_schema.toon");
+        // Strip the partitions[] block — the schema declares NO partition source.
+        String unkeyed = callSchemaToon().substring(callSchemaToon().indexOf("raw:"));
+        Files.writeString(callSchema, unkeyed);
+        Files.writeString(smsSchema, smsSchemaToon().substring(smsSchemaToon().indexOf("raw:")));
+
+        String pipeline = writePipelineToon(dir, callSchema, smsSchema);
+        PipelineConfig cfg = PipelineConfig.load(pipeline);
+
+        Path inbox = Path.of(cfg.dirs().poll());
+        Files.createDirectories(inbox);
+        Path inputFile = inbox.resolve("events_20200404.bin");
+        Files.writeString(inputFile, "CALL,C001,2020-04-03\nCALL,C002,2020-04-04\n");
+
+        Batch batch = buildBatch(cfg, inputFile.toFile());
+        BatchAuditWriter audit = new BatchAuditWriter(
+                cfg.dirs().statusFilePath(), cfg.dirs().batchesFilePath(), cfg.dirs().lineageFilePath());
+        BatchProcessor.process(batch, cfg, audit);
+
+        Path callOut = Path.of(cfg.dirs().database(), "CALL");
+        List<Path> files;
+        try (Stream<Path> s = Files.walk(callOut)) {
+            files = s.filter(Files::isRegularFile).toList();
+        }
+        assertEquals(1, files.size(), "one flat file per batch: " + files);
+        assertEquals(callOut, files.get(0).getParent(), "the file lands at the store root — no partition dirs");
+        try (Stream<Path> s = Files.walk(callOut)) {
+            assertTrue(s.noneMatch(p -> p.toString().contains("year=1900")), "the sentinel bucket is retired");
+        }
+        // Rows survive and read back.
+        File db = com.gamma.util.DuckDbUtil.tempDbFile("flat_rb_");
+        try (Connection conn = com.gamma.util.DuckDbUtil.openConnection(db);
+             Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT count(*) FROM read_csv('"
+                     + files.get(0).toString().replace("\\", "/") + "')")) {
+            assertTrue(rs.next());
+            assertEquals(2, rs.getLong(1), "both CALL rows land in the flat file");
+        } finally {
+            com.gamma.util.DuckDbUtil.deleteTempDb(db);
+        }
+        // The lineage ledger still records the input→output matrix for the flat write.
+        Path lineage = Path.of(cfg.dirs().lineageFilePath());
+        assertTrue(Files.exists(lineage), "lineage ledger written");
+        String ledger = Files.readString(lineage);
+        assertTrue(ledger.contains("events_20200404.bin"), "the source file is recorded:\n" + ledger);
+    }
+
     // ── schema toon content ────────────────────────────────────────────────────
 
     private static String callSchemaToon() {
