@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -39,6 +39,23 @@ import { InspectoConfirmService } from 'app/inspecto/confirm.service';
                 }
                 <button
                     class="ml-auto shrink-0"
+                    mat-icon-button
+                    type="button"
+                    [matTooltip]="maximized() ? 'Exit full width' : 'Full width'"
+                    [attr.aria-label]="maximized() ? 'Exit full width' : 'Maximize the drawer to full width'"
+                    (click)="toggleMaximize()"
+                >
+                    <mat-icon
+                        class="icon-size-5"
+                        [svgIcon]="
+                            maximized()
+                                ? 'heroicons_outline:arrows-pointing-in'
+                                : 'heroicons_outline:arrows-pointing-out'
+                        "
+                    ></mat-icon>
+                </button>
+                <button
+                    class="shrink-0"
                     mat-icon-button
                     type="button"
                     matTooltip="Close"
@@ -83,6 +100,20 @@ export class DefinitionDrawerComponent {
     readonly discard = output<void>();
     /** The user closed the drawer (already dirty-confirmed by {@link requestClose}). */
     readonly closed = output<void>();
+
+    /**
+     * Maximize (U5, delimited-grammar-properties §4.6): the configuration set is big, so the drawer
+     * can take the full editor width. The HOST owns the actual width — it mirrors this via
+     * `(maximizedChange)` and binds the dock's width to 100% over the canvas, keeping its split
+     * handle MOUNTED (`[class.hidden]`, never `@if` — the `#h=“inspectoSplit”` trap).
+     */
+    readonly maximized = signal(false);
+    readonly maximizedChange = output<boolean>();
+
+    toggleMaximize(): void {
+        this.maximized.update((m) => !m);
+        this.maximizedChange.emit(this.maximized());
+    }
 
     /** Close, confirming first when edits would be lost — the shell-owned dirty guard. */
     async requestClose(): Promise<void> {

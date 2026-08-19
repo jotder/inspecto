@@ -19,6 +19,7 @@ import { DefinitionDrawerComponent } from './definition-drawer.component';
             (apply)="applied = applied + 1"
             (discard)="discarded = discarded + 1"
             (closed)="closedCount = closedCount + 1"
+            (maximizedChange)="maximized = $event"
         >
             <p>projected definition content</p>
         </inspecto-definition-drawer>
@@ -31,6 +32,7 @@ class HostComponent {
     applied = 0;
     discarded = 0;
     closedCount = 0;
+    maximized: boolean | null = null;
 }
 
 async function create(confirmResult = true) {
@@ -114,6 +116,27 @@ describe('DefinitionDrawerComponent', () => {
         await fixture.whenStable();
         expect(confirm.confirmDestructive).toHaveBeenCalled();
         expect(fixture.componentInstance.closedCount).toBe(1);
+    });
+
+    /** U5 (delimited-grammar-properties §4.6): the maximize toggle — the HOST owns the width. */
+    it('toggles maximize, emitting the state and swapping the affordance label', async () => {
+        const { fixture } = await create();
+        const btn = fixture.nativeElement.querySelector(
+            'button[aria-label="Maximize the drawer to full width"]',
+        ) as HTMLButtonElement;
+        expect(btn).toBeTruthy();
+
+        btn.click();
+        fixture.detectChanges();
+        expect(fixture.componentInstance.maximized).toBe(true);
+        const exit = fixture.nativeElement.querySelector(
+            'button[aria-label="Exit full width"]',
+        ) as HTMLButtonElement;
+        expect(exit).toBeTruthy();
+
+        exit.click();
+        fixture.detectChanges();
+        expect(fixture.componentInstance.maximized).toBe(false);
     });
 
     it('has no a11y violations', async () => {
