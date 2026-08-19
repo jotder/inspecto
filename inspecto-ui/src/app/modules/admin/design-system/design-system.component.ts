@@ -32,6 +32,11 @@ import { QuerySource } from 'app/inspecto/query';
 import { DataTableComponent, DataTableTier } from 'app/inspecto/data-table';
 import { TreeTableComponent, TreeNode, varianceCell } from 'app/inspecto/tree-table';
 import { GeoData, MapViewComponent } from 'app/inspecto/geo';
+import {
+    InspectoSchemaFieldsEditorComponent,
+    InspectoSchemaMetadataGridComponent,
+    SchemaFieldRow,
+} from 'app/inspecto/schema';
 import { ResizeDemoDialog } from './resize-demo.dialog';
 
 interface DemoRow {
@@ -71,6 +76,8 @@ interface DemoRow {
         DataTableComponent,
         TreeTableComponent,
         MapViewComponent,
+        InspectoSchemaFieldsEditorComponent,
+        InspectoSchemaMetadataGridComponent,
     ],
     templateUrl: './design-system.component.html',
 })
@@ -225,6 +232,17 @@ export class DesignSystemComponent {
      *  date, and holding it to the date format would make the picker unusable). Never a global RegExp. */
     readonly tokenSyntax = /^\$(?!\$)/;
 
+    // ── Schema columns table + column metadata (delimited-grammar redesign U2/D1) ────────────
+    /** One seed, two views: the columns table edits identity/type, the metadata grid annotates. */
+    readonly schemaFieldRows = signal<SchemaFieldRow[]>([
+        { include: true, name: 'MSISDN', selector: '0', type: 'VARCHAR', synonym: 'subscriber' },
+        { include: true, name: 'DURATION', selector: '1', type: 'DOUBLE', unit: 'seconds' },
+        { include: true, name: 'START_TIME', selector: '2', type: 'TIMESTAMP' },
+        { include: false, name: 'RAW_NOTE', selector: '3', type: 'VARCHAR' },
+    ]);
+    /** §4.4 Auto mode: the icon-only type menu locks (inferred types are the sniffer's). */
+    readonly schemaAutoTypes = signal(false);
+
     // ── Data table (tiered: mini / standard / pro / pro max) ─────────────────────────────────
     readonly dtTiers: DataTableTier[] = ['mini', 'standard', 'pro', 'proMax'];
     readonly dtTier = signal<DataTableTier>('standard');
@@ -306,6 +324,33 @@ export class DesignSystemComponent {
         aiAssist: `<!-- the ONE inline authoring surface — adopt it, never fork it (AGT-6a A1) -->\n<!-- the pane's own context IS the tool's args, so the operator re-states nothing -->\n<inspecto-ai-assist\n  tool="suggest_expectations"        // any non-mutating tool; mutating ones are refused 403\n  [args]="{ table: table(), column: selectedColumn() }"\n  [current]="editing()?.config ?? null"   // omit/null for a create ⇒ every field reads as added\n  label="Suggest expectations"\n  [disabled]="!selectedColumn()"\n  disabledReason="Select a column first"\n  (applyDraft)="openForm($event.config)" />\n// The surface persists NOTHING. The pane applies the draft through its own\n// validated route, so the human is the audited actor (decision D2).`,
         aiExplain: `<!-- the read-only half — one icon button for a pane header (AGT-6a A4) -->\n<!-- the PANE declares the terms; nothing is typed, nothing is inferred -->\n<inspecto-ai-explain\n  screen="Pipelines"                       // reads as "About Pipelines" in the title + aria-label\n  [terms]="['Pipeline', 'Step', 'Trigger']" />  // canonical GLOSSARY.md spellings, never synonyms\n// No draft, no diff, no Apply — there is no write path at all, so this is NOT\n// gated on canAuthorWorkbench: a Business-lens user is who needs it most.\n// glossary_lookup, falling back to docs_search; a 503 explains itself.`,
         dataTable: `<!-- one component, four tiers; logic lives in inspecto/data-table/{core,sql} + inspecto/query -->\n<!-- standard: icon toolbar (columns · search · export) -->\n<!-- pro: + a CodeMirror SQL editor (runs offline via AlaSQL) + filter builder -->\n<!-- proMax: + "save as rule" (parameterized :fieldValue template) -->\n<inspecto-data-table\n  [tier]="'pro'"                 // 'mini' | 'standard' | 'pro' | 'proMax'\n  [rows]="rows"\n  [columns]="columnDefs"         // optional; omitted ⇒ one column per row key\n  [rowActions]="actions"\n  sourceName="cdr"\n  (rowClick)="open($event)"\n  (ruleSaved)="onRuleSaved($event)" />  // pro max`,
+        schemaFields: `<!-- the shared raw.fields[] grid — cols: include · # · icon-only type menu · Name · Synonym -->
+<!-- pure: seed [rows] from a SIGNAL (reference change = rebuild); read value() on submit -->
+<inspecto-schema-fields-editor
+  [rows]="schemaSeed()"
+  [autoTypes]="typesMode() === 'auto'"     // Auto: type icons render read-only
+  [nameBasedSelectors]="frontend() === 'json'" />  // json/text_regex: a Source column appears
+// on submit: if (!grid.validate()) return;  const fields = grid.value();
+
+<!-- the column-metadata grid (D1(b)) — description/unit/classification, Catalog-facing -->
+<!-- a second VIEW over the SAME rows signal; merge by selector at submit -->
+<inspecto-schema-metadata-grid [rows]="schemaSeed()" />
+// const fields = metaGrid.applyTo(grid.value());`,
+        grammarTabs: `// the 4-tab Grammar surface (delimited-grammar redesign U1) — driven by AttributeSpec.tab
+// ≥2 distinct tabs in a spec set ⇒ <inspecto-grammar-editor> renders a mat-tab-group,
+// one <inspecto-schema-form> per tab; any other spec set renders flat, byte-identical.
+const SPECS: AttributeSpec[] = [
+  { key: 'delimited__delimiter', label: 'Delimiter', tab: 'Dialect / parsing', ... },
+  { key: 'delimited__strict_mode', label: 'Strict', tab: 'Robustness / error handling', ... },
+];
+// ⚠ R9: the tab PANELS live OUTSIDE the mat-tab bodies, [hidden]-toggled — MatTab
+// instantiates body content on FIRST ACTIVATION, so a form inside a body is invisible
+// to value()/validate() until visited (silent loss on save).
+// Hosts project write-path content via the named slots:
+<inspecto-grammar-editor [initial]="block" [type]="'delimited'" [lockType]="true">
+  <div tabTypes><!-- tab 2: the columns table --></div>
+  <div tabFiles><!-- tab 4: the column-metadata grid --></div>
+</inspecto-grammar-editor>`,
         mapView: `<!-- offline MapLibre host (bundled Natural Earth basemap, no network) -->\n<inspecto-map-view\n  [data]="geoData"          // GeoData { points, routes }; null ⇒ unmounted (show an empty state)\n  [fill]="true"             // grow into a flex column (default: 62vh page band)\n  (pointClick)="open($event)" />\n// colours live in theme/map-tokens.ts (the map's chart-tokens analog)`,
         definitionDrawer: `<!-- the shared definition shell for an editor's right dock (definition-surface D1/D2) -->\n<inspecto-definition-drawer\n  [title]="node.name || node.id"\n  kindLabel="Collector"\n  icon="heroicons_outline:inbox-arrow-down"\n  [dirty]="paneDirty()"          // reported by the projected pane\n  (apply)="pane.submit()"         // Apply = in-memory patch — the toolbar Save persists (D2)\n  (discard)="recreatePane()"      // Discard = recreate the pane from the model\n  (closed)="closeDrawer()">       // dirty close already confirmed by the shell\n  <app-my-definition-pane [node]="node" (applied)="applyPatch($event)" (dirtyChange)="paneDirty.set($event)" />\n</inspecto-definition-drawer>`,
         dialogResize: `<!-- shared resizable/maximizable dialog chrome (inspecto/components/dialog-resize.directive.ts) -->\n<!-- the attribute goes on the dialog title; the drag grip is appended automatically -->\n<h2 mat-dialog-title class="flex items-center gap-2" inspectoDialogResize #chrome="inspectoDialogResize">\n  <span class="min-w-0 truncate">Edit Grammar · {{ node.id }}</span>\n  <span class="flex-1"></span>\n  <!-- big dialogs add a maximize button; it reuses the .dialog-fullscreen panel class -->\n  <button mat-icon-button type="button" (click)="chrome.toggleMaximize()"\n          [attr.aria-label]="chrome.maximized() ? 'Exit full screen' : 'Full screen'">\n    <mat-icon [svgIcon]="chrome.maximized() ? 'heroicons_outline:arrows-pointing-in'\n                                            : 'heroicons_outline:arrows-pointing-out'" />\n  </button>\n</h2>\n// panel styles live in styles.scss (.inspecto-dialog-resizable); outside a dialog the directive is inert`,

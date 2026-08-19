@@ -148,6 +148,11 @@ export function parseGrammarCsv(text: string, specs: AttributeSpec[]): GrammarCs
               selector,
               type: attrs['type'] ?? 'VARCHAR',
               ...(attrs['synonym'] ? { synonym: attrs['synonym'] } : {}),
+              // D1(b): the Catalog metadata attrs round-trip too (the export always wrote them;
+              // the import used to drop them silently).
+              ...(attrs['description'] ? { description: attrs['description'] } : {}),
+              ...(attrs['unit'] ? { unit: attrs['unit'] } : {}),
+              ...(attrs['classification'] ? { classification: attrs['classification'] } : {}),
           }))
         : null;
 

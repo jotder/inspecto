@@ -40,6 +40,7 @@ import { DefinitionStateService } from 'app/inspecto/definition/definition-state
 import { InspectoSamplePanelComponent } from 'app/inspecto/definition/sample-panel.component';
 import {
     InspectoSchemaFieldsEditorComponent,
+    InspectoSchemaMetadataGridComponent,
     SchemaFieldRow,
     deriveSelector,
     narrowToSchemaType,
@@ -146,6 +147,7 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
         InspectoSamplePanelComponent,
         InspectoSegmentsEditorComponent,
         InspectoSchemaFieldsEditorComponent,
+        InspectoSchemaMetadataGridComponent,
     ],
     template: `
         <!--
@@ -383,6 +385,22 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                         </p>
                     }
                 </div>
+                <!--
+                    D1(b): the column-metadata grid — description/unit/classification per column,
+                    Catalog-facing (raw.fields[]), first UI for a long-shipped model. Projected
+                    into [tabFiles] so the delimited 4-tab surface shows it on tab 4; untabbed
+                    formats render it below the flat options. A second VIEW over the columns
+                    table's rows (same seed signal, merged by selector at submit), never a second
+                    owner.
+                -->
+                <div tabFiles>
+                    @if (authorsSchema() && schemaSeed().length) {
+                        <div class="mb-1 mt-3 flex items-center gap-2">
+                            <span class="text-xs font-semibold uppercase opacity-70">Column metadata</span>
+                        </div>
+                        <inspecto-schema-metadata-grid [rows]="schemaSeed()" />
+                    }
+                </div>
             </inspecto-grammar-editor>
         </div>
     `,
@@ -432,6 +450,7 @@ export class PipelineParseDefinitionComponent {
     @ViewChild(GrammarEditorComponent) private editor?: GrammarEditorComponent;
     @ViewChild(InspectoSegmentsEditorComponent) private segmentsEditor?: InspectoSegmentsEditorComponent;
     @ViewChild(InspectoSchemaFieldsEditorComponent) private schemaGrid?: InspectoSchemaFieldsEditorComponent;
+    @ViewChild(InspectoSchemaMetadataGridComponent) private metaGrid?: InspectoSchemaMetadataGridComponent;
 
     // ── segments (asn1 / plugin) ─────────────────────────────────────────────────
 
@@ -772,6 +791,13 @@ export class PipelineParseDefinitionComponent {
         return grid.fieldRows.controls.map((g) => g.getRawValue() as SchemaFieldRow);
     }
 
+    /** Rows with the metadata grid's description/unit/classification merged on by selector (D1(b)) —
+     *  what persists and exports. The columns table's form does not carry those keys, so skipping the
+     *  merge would silently drop a hydrated schema's metadata on Apply. */
+    private withMetadata(rows: SchemaFieldRow[]): SchemaFieldRow[] {
+        return this.metaGrid ? this.metaGrid.applyTo(rows) : rows;
+    }
+
     /**
      * Ask the server how the saved schema differs from what this sample now votes for (B3). Only for a
      * HYDRATED schema: a freshly-derived one was built from this very sample, so it cannot have drifted.
@@ -795,7 +821,8 @@ export class PipelineParseDefinitionComponent {
     addDriftedFields(): void {
         const added = this.schemaDrift()?.added ?? [];
         if (!added.length) return;
-        const current = this.currentSchemaRows();
+        // The reseed rebuilds BOTH grids, so the metadata edits must ride the rows or they vanish.
+        const current = this.withMetadata(this.currentSchemaRows());
         const columns = this.previewTable()?.columns ?? [];
         this.schemaSeed.set([
             ...current,
@@ -842,6 +869,9 @@ export class PipelineParseDefinitionComponent {
                         selector: String(f['selector'] ?? ''),
                         type: String(f['type'] ?? 'VARCHAR'),
                         ...(f['synonym'] ? { synonym: String(f['synonym']) } : {}),
+                        ...(f['description'] ? { description: String(f['description']) } : {}),
+                        ...(f['unit'] ? { unit: String(f['unit']) } : {}),
+                        ...(f['classification'] ? { classification: String(f['classification']) } : {}),
                     })),
                 );
                 // §4.4: the mode is the schema's own `raw.types` marker; a schema without one predates
@@ -934,7 +964,8 @@ export class PipelineParseDefinitionComponent {
             this.parsedSinceApply ||
             (this.editor?.isDirty() ?? false) ||
             (this.segmentsEditor?.isDirty() ?? false) ||
-            (this.schemaGrid?.form.dirty ?? false);
+            (this.schemaGrid?.form.dirty ?? false) ||
+            (this.metaGrid?.form.dirty ?? false);
         if (dirty === this.lastDirty) return;
         this.lastDirty = dirty;
         this.dirtyChange.emit(dirty);
@@ -967,7 +998,7 @@ export class PipelineParseDefinitionComponent {
             },
             parsingAttributesFor(frontend),
             flattenBlock(this.editor.value()),
-            this.currentSchemaRows(),
+            this.withMetadata(this.currentSchemaRows()),
         );
         downloadCsv(grammarCsvFilename(this.pipelineName() || this.node().id), csv);
     }
@@ -1153,7 +1184,7 @@ export class PipelineParseDefinitionComponent {
             this.editor?.error.set(grid.problem() ?? 'Fix the output schema before applying.');
             return;
         }
-        const fields = grid.value();
+        const fields = this.withMetadata(grid.value());
         const name = this.schemaName();
         const draft = {
             raw: {
@@ -1168,6 +1199,9 @@ export class PipelineParseDefinitionComponent {
                     selector: f.selector,
                     type: f.type,
                     ...(f.synonym ? { synonym: f.synonym } : {}),
+                    ...(f.description ? { description: f.description } : {}),
+                    ...(f.unit ? { unit: f.unit } : {}),
+                    ...(f.classification ? { classification: f.classification } : {}),
                 })),
             },
             mapping: {
@@ -1184,6 +1218,7 @@ export class PipelineParseDefinitionComponent {
                 next: () => {
                     this.writing.set(false);
                     grid.markPristine();
+                    this.metaGrid?.markPristine();
                     this.applyWith(this.parsingValue(), portableConfigRef(name));
                 },
                 error: (e) => {

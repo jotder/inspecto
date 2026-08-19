@@ -950,6 +950,37 @@ describe('PipelineParseDefinitionComponent', () => {
         });
 
         /**
+         * D1(b): the Files & metadata tab's column-metadata grid — description/unit/classification
+         * are merged onto the columns table's rows by selector at submit, so the schema write
+         * carries them; the columns table's own form never holds those keys.
+         */
+        it('persists the metadata grid’s values into the schema write, merged by selector', async () => {
+            const n = unschemadNode();
+            (n.config as Record<string, unknown>)['schema_file'] = 'parse_schema.toon';
+            const fixture = await create(n); // hydrates the one-field saved schema (IMSI)
+            fixture.detectChanges();
+
+            const metaInputs = Array.from(
+                fixture.nativeElement.querySelectorAll('inspecto-schema-metadata-grid input'),
+            ) as HTMLInputElement[];
+            expect(metaInputs.length).toBe(3); // one row × description/unit/classification
+            metaInputs[0].value = 'subscriber id';
+            metaInputs[0].dispatchEvent(new Event('input', { bubbles: true }));
+            metaInputs[2].value = 'PII';
+            metaInputs[2].dispatchEvent(new Event('input', { bubbles: true }));
+
+            pane(fixture).submit();
+            fixture.detectChanges();
+
+            const raw = schemaWrites[0].config['raw'] as Record<string, unknown>;
+            const fields = raw['fields'] as Record<string, unknown>[];
+            expect(fields[0]['name']).toBe('IMSI');
+            expect(fields[0]['description']).toBe('subscriber id');
+            expect(fields[0]['classification']).toBe('PII');
+            expect(fields[0]['unit']).toBeUndefined();
+        });
+
+        /**
          * 🔴 W3 compat guard. This pane now WRITES the portable bare `<name>.toon`, but every pipeline
          * saved before that carries `spaces/<space>/config/<name>.toon` and is just as much ours.
          * `foreignSchema` therefore compares by NAME — a path comparison would have declared every

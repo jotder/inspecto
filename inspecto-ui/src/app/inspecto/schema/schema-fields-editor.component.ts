@@ -45,13 +45,17 @@ export function narrowToSchemaType(serverType: string): string {
 }
 
 /** One editable row of a schema's `raw.fields[]`. `synonym` (B3, additive) is an optional unique
- *  alias — Catalog-facing metadata, never read by the ETL. */
+ *  alias; `description`/`unit`/`classification` (D1(b)) are edited on the Files & metadata tab's
+ *  `<inspecto-schema-metadata-grid>` — all four are Catalog-facing metadata, never read by the ETL. */
 export interface SchemaFieldRow {
     include: boolean;
     name: string;
     selector: string;
     type: string;
     synonym?: string;
+    description?: string;
+    unit?: string;
+    classification?: string;
 }
 
 type SortKey = 'source' | 'name' | 'selector' | 'type';

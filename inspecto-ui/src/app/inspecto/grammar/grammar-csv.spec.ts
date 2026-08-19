@@ -6,7 +6,17 @@ import type { SchemaFieldRow } from 'app/inspecto/schema';
 const SPECS = parsingAttributesFor('delimited');
 
 const COLUMNS: SchemaFieldRow[] = [
-    { include: true, name: 'CUSTOMER_ID', selector: '0', type: 'DOUBLE', synonym: 'cust_no' },
+    // D1(b): the Catalog metadata attrs ride the round-trip — the import used to drop them silently.
+    {
+        include: true,
+        name: 'CUSTOMER_ID',
+        selector: '0',
+        type: 'DOUBLE',
+        synonym: 'cust_no',
+        description: 'billing account',
+        unit: 'n/a',
+        classification: 'PII',
+    },
     { include: false, name: 'NOTE', selector: '1', type: 'VARCHAR' },
 ];
 

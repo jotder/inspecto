@@ -7,3 +7,4 @@
  * here and each host supplies its own write path — the segments-editor relocation precedent.
  */
 export * from './schema-fields-editor.component';
+export * from './schema-metadata-grid.component';
