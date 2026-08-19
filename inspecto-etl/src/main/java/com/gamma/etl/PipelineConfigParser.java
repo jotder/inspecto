@@ -1314,7 +1314,18 @@ final class PipelineConfigParser {
             throw new IllegalArgumentException("json.records_path '" + recordsPath + "' needs an "
                     + "enclosing document, but json.format is 'newline' (NDJSON), where each line is "
                     + "already one record — use format: array or auto, or keep records_path: '$'");
-        return new PipelineConfig.Json(format, recordsPath);
+        // multiformat J1 — the two read_json reader knobs, additive and array/auto only: NDJSON's
+        // single-column line reader has neither (its json_valid filter already routes malformed
+        // lines), so a key the engine cannot honor there must refuse rather than load looking honored.
+        int maxObj = toInt(j.getOrDefault("maximum_object_size", 0));
+        if (maxObj < 0)
+            throw new IllegalArgumentException("json.maximum_object_size must be >= 0 (got " + maxObj + ")");
+        boolean ignoreErrors = Boolean.parseBoolean(String.valueOf(j.getOrDefault("ignore_errors", "false")));
+        if (format.equals("newline") && (maxObj > 0 || ignoreErrors))
+            throw new IllegalArgumentException("json.maximum_object_size / json.ignore_errors apply to "
+                    + "format: array or auto (DuckDB read_json) — NDJSON's line reader already routes "
+                    + "malformed lines away and has no such knobs");
+        return new PipelineConfig.Json(format, recordsPath, maxObj, ignoreErrors);
     }
 
     /** A1-style cell range: an anchor cell or a cell:cell span (probed read_xlsx accepts both). */

@@ -297,10 +297,37 @@ describe('GrammarEditorComponent', () => {
         expect(xlsx['sheet']).toBe('Data');
     });
 
-    it('renders an untabbed spec set (json) flat, exactly as before', () => {
-        const flat = create({ frontend: 'json' });
+    it('renders an untabbed spec set (text_regex) flat, exactly as before', () => {
+        const flat = create({ frontend: 'text_regex' });
         expect(flat.nativeElement.querySelector('mat-tab-group')).toBeNull();
         expect(flat.nativeElement.querySelectorAll('inspecto-schema-form')).toHaveLength(1);
+    });
+
+    it('tabs the json spec set with Format & records first (J1)', () => {
+        const json = create({ frontend: 'json', json: { format: 'auto' } });
+        const jsonLabels = Array.from(json.nativeElement.querySelectorAll('.mat-mdc-tab')).map((e) =>
+            (e as HTMLElement).textContent?.trim(),
+        );
+        expect(jsonLabels[0]).toContain('Format & records');
+    });
+
+    it('tabs fixedwidth with Record layout first, the slice table homed into tab 1 (F1)', () => {
+        const fw = create({
+            frontend: 'fixedwidth',
+            fixedwidth: { fields: [{ name: 'ID', start: 0, length: 6 }] },
+        });
+        const fwLabels = Array.from(fw.nativeElement.querySelectorAll('.mat-mdc-tab')).map((e) =>
+            (e as HTMLElement).textContent?.trim(),
+        );
+        expect(fwLabels[0]).toContain('Record layout');
+        // The slice table renders INSIDE the tabbed shell now (one template, two mounts) — and stays
+        // readable by value() since panels are [hidden]-mounted, never MatTab bodies (the R9 rule).
+        // ⚠ mat-tab-group renders its own (empty) [role="tabpanel"] bodies first — OUR panels are the
+        // [hidden]-toggled divs labelled by tab, so select by the label or the assertion tests Material.
+        const panel = fw.nativeElement.querySelector('[role="tabpanel"][aria-label="Record layout"]');
+        expect(panel?.querySelector('[formarrayname="fields"], [formArrayName="fields"]')).not.toBeNull();
+        const fwValue = fw.componentInstance.value()['fixedwidth'] as Record<string, unknown>;
+        expect((fwValue['fields'] as unknown[]).length).toBe(1);
     });
 
     it('keeps every tab panel MOUNTED so value() sees unvisited tabs', () => {

@@ -47,6 +47,8 @@ export const PARSING_FRONTENDS: { id: ParsingFrontend; label: string; hint: stri
  */
 export function grammarTabsFor(frontend: string): { id: string; label: string }[] {
     if (frontend === 'xlsx') return [{ id: 'dialect', label: 'Sheet & range' }, ...GRAMMAR_TABS.slice(1)];
+    if (frontend === 'json') return [{ id: 'dialect', label: 'Format & records' }, ...GRAMMAR_TABS.slice(1)];
+    if (frontend === 'fixedwidth') return [{ id: 'dialect', label: 'Record layout' }, ...GRAMMAR_TABS.slice(1)];
     return GRAMMAR_TABS;
 }
 
@@ -273,6 +275,8 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                 },
             ];
         case 'fixedwidth':
+            // Tabbed since multiformat F1: Record layout (+ the slice table the editor homes there),
+            // Types & columns (transform-time patterns), Robustness, Files & metadata.
             return [
                 {
                     key: 'delimited__has_header',
@@ -282,6 +286,25 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     required: false,
                     default: true,
                     help: 'Header/banner line to skip before the records.',
+                    tab: 'dialect',
+                },
+                {
+                    key: 'delimited__date_formats',
+                    label: 'Date formats',
+                    type: 'list',
+                    tier: 'optional',
+                    placeholder: '%Y-%m-%d',
+                    help: 'Accepted DATE parse patterns, tried in order.',
+                    tab: 'types',
+                },
+                {
+                    key: 'delimited__timestamp_formats',
+                    label: 'Timestamp formats',
+                    type: 'list',
+                    tier: 'optional',
+                    placeholder: '%Y-%m-%d %H:%M:%S',
+                    help: 'Accepted TIMESTAMP parse patterns, tried in order.',
+                    tab: 'types',
                 },
                 {
                     key: 'fixedwidth__min_record_length',
@@ -290,6 +313,7 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     tier: 'optional',
                     min: 0,
                     help: 'Shorter lines (footers, blanks) are dropped. Blank = the widest field end.',
+                    tab: 'robustness',
                 },
                 {
                     key: 'fixedwidth__trim',
@@ -303,14 +327,23 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                         { value: 'RIGHT', label: 'Right' },
                         { value: 'NONE', label: 'None' },
                     ],
+                    tab: 'robustness',
                 },
-                { key: 'encoding', label: 'Encoding', type: 'string', tier: 'advanced', placeholder: 'UTF-8' },
+                {
+                    key: 'encoding',
+                    label: 'Encoding',
+                    type: 'string',
+                    tier: 'advanced',
+                    placeholder: 'UTF-8',
+                    tab: 'files',
+                },
                 {
                     key: 'compression',
                     label: 'Input compression',
                     type: 'string',
                     tier: 'advanced',
                     placeholder: 'gzip',
+                    tab: 'files',
                 },
             ];
         case 'json':
@@ -327,6 +360,7 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                         { value: 'array', label: 'One JSON array of records' },
                         { value: 'auto', label: 'Auto-detect' },
                     ],
+                    tab: 'dialect',
                 },
                 {
                     key: 'json__records_path',
@@ -341,6 +375,7 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     // rejects at load. `$` = the document's top level IS the array.
                     dependsOn: { key: 'json__format', notEquals: 'newline' },
                     help: 'Dotted path to the array holding the records — same notation as a field selector. Blank or "$" = the whole document.',
+                    tab: 'dialect',
                 },
                 {
                     key: 'delimited__skip_header_lines',
@@ -348,6 +383,46 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     type: 'number',
                     tier: 'advanced',
                     min: 0,
+                    tab: 'dialect',
+                },
+                {
+                    key: 'delimited__date_formats',
+                    label: 'Date formats',
+                    type: 'list',
+                    tier: 'optional',
+                    placeholder: '%Y-%m-%d',
+                    help: 'Accepted DATE parse patterns, tried in order.',
+                    tab: 'types',
+                },
+                {
+                    key: 'delimited__timestamp_formats',
+                    label: 'Timestamp formats',
+                    type: 'list',
+                    tier: 'optional',
+                    placeholder: '%Y-%m-%d %H:%M:%S',
+                    help: 'Accepted TIMESTAMP parse patterns, tried in order.',
+                    tab: 'types',
+                },
+                // ── J1 reader knobs — read_json (array/auto) only; the load refuses them on NDJSON,
+                // so the form hides them there rather than authoring a config the parser rejects.
+                {
+                    key: 'json__ignore_errors',
+                    label: 'Keep malformed records as NULL rows',
+                    type: 'boolean',
+                    tier: 'optional',
+                    dependsOn: { key: 'json__format', notEquals: 'newline' },
+                    help: 'A record that fails to parse lands as an all-NULL row instead of failing the file (probed read_json semantics — kept, not skipped).',
+                    tab: 'robustness',
+                },
+                {
+                    key: 'json__maximum_object_size',
+                    label: 'Maximum object size (bytes)',
+                    type: 'number',
+                    tier: 'advanced',
+                    min: 0,
+                    dependsOn: { key: 'json__format', notEquals: 'newline' },
+                    help: 'Bound on a single document/record the reader will buffer. Blank = the engine default.',
+                    tab: 'robustness',
                 },
                 {
                     key: 'compression',
@@ -355,6 +430,7 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     type: 'string',
                     tier: 'advanced',
                     placeholder: 'gzip',
+                    tab: 'files',
                 },
             ];
         case 'xlsx':

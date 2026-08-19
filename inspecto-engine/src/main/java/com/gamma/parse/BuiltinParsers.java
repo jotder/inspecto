@@ -102,6 +102,14 @@ final class BuiltinParsers {
                                 "NDJSON, one JSON array of records, or auto-detect."),
                         FieldSpec.of("delimited.skip_header_lines", "Skip leading lines", FieldType.INT,
                                 "Non-JSON preamble lines before the records."),
+                        // J1 reader knobs — read_json (array/auto) only; the config load refuses them
+                        // under format: newline, whose line reader already routes malformed lines away.
+                        FieldSpec.withDefault("json.ignore_errors", "Keep malformed records as NULL rows",
+                                FieldType.BOOL, false,
+                                "array/auto only: a record that fails to parse lands as an all-NULL row "
+                                        + "instead of failing the file."),
+                        FieldSpec.of("json.maximum_object_size", "Maximum object size (bytes)", FieldType.INT,
+                                "array/auto only: bound on a single document/record the reader buffers."),
                         FieldSpec.of("compression", "Input compression", FieldType.STRING, "e.g. gzip."))),
                 new Builtin("xlsx", "MS Excel — read_xlsx over a workbook (DuckDB excel extension)", List.of(
                         FieldSpec.of("xlsx.sheet", "Sheet", FieldType.STRING,

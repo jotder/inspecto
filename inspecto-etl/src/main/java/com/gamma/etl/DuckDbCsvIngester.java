@@ -441,6 +441,7 @@ public final class DuckDbCsvIngester {
           .append(", format='").append("array".equals(j.format()) ? "array" : "auto").append('\'');
         if (cfg.csv().inputCompression() != null && !cfg.csv().inputCompression().isBlank())
             rj.append(", compression='").append(escapeSql(cfg.csv().inputCompression())).append('\'');
+        rj.append(jsonReaderOptions(j));
         rj.append(')');
 
         return new ReadSpec(proj.toString(), rj.toString());
@@ -477,6 +478,14 @@ public final class DuckDbCsvIngester {
      * <p>Per-field selectors then apply to each unnested record exactly as in the {@code $} case, so
      * dotted nested selectors ({@code addr.city}) compose with a nested records_path for free.
      */
+    /** The J1 reader knobs, shared by every read_json/read_json_objects call this class builds. */
+    private static String jsonReaderOptions(PipelineConfig.Json j) {
+        StringBuilder o = new StringBuilder();
+        if (j.maximumObjectSize() > 0) o.append(", maximum_object_size=").append(j.maximumObjectSize());
+        if (j.ignoreErrors()) o.append(", ignore_errors=true");
+        return o.toString();
+    }
+
     private static ReadSpec buildNestedJsonReadSpec(String filePath, List<Map<String, Object>> fields,
                                                     PipelineConfig.Json j, PipelineConfig cfg) {
         String recordsPath = jsonPath(recordsPathSegments(j.recordsPath()), 0);
@@ -493,6 +502,7 @@ public final class DuckDbCsvIngester {
         src.append(escapeSql(filePath)).append('\'');
         if (cfg.csv().inputCompression() != null && !cfg.csv().inputCompression().isBlank())
             src.append(", compression='").append(escapeSql(cfg.csv().inputCompression())).append('\'');
+        src.append(jsonReaderOptions(j));
         src.append(')');
 
         String records = "unnest((CASE WHEN json_type(\"json\", '" + recordsPath + "') IS NULL"

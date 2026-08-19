@@ -332,6 +332,15 @@ Malformed NDJSON lines are dropped (`json_valid` filter) — routed away from th
 failing the batch (they carry no `store_rejects` entry, so they do not land in the errors CSV).
 Explicit `json.columns` typing is unnecessary (the engine lands VARCHAR and types at transform).
 
+**Reader knobs (multiformat J1, 2026-08-20 — `format: array | auto` ONLY; refused at load under
+`newline`, whose line reader has neither):** `json.ignore_errors` — ⚠ probed semantics, not the
+docs' surface: with our explicit columns map a malformed record lands as an **all-NULL row**, kept
+not skipped, instead of failing the file. `json.maximum_object_size` — byte bound on a single
+document/record the reader buffers (blank = engine default). ⚠ Probed: read_json CLAMPS it up to
+its internal buffer, so it is unobservable at small scale — its real job is a memory ceiling for
+huge documents, and the test pin is assembly-level (option emitted, spelled right, accepted), not
+behavioral. Both knobs also ride `read_json_objects` on the nested `records_path` path.
+
 **Nested `records_path` (2026-07-31).** When the records sit in an array *inside* the document, point
 `records_path` at it with the **same dotted convention as a field selector** — `payload.records`, or
 `$.payload.records` (the `$.` prefix is optional; escape a literal dot as `\.`, doubled in TOON). The

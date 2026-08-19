@@ -333,7 +333,9 @@ public final class PipelineConfig {
      * @param recordsPath JSONPath to the record array; only {@code "$"} (the default) is supported
      */
     @PublicApi(since = "4.8.0")
-    public record Json(String format, String recordsPath) {
+    public record Json(String format, String recordsPath, int maximumObjectSize, boolean ignoreErrors) {
+        /** The 4.8 shape — no reader tuning (multiformat J1 added the two knobs additively). */
+        public Json(String format, String recordsPath) { this(format, recordsPath, 0, false); }
         /** Whether the input is newline-delimited (one JSON object per physical line). */
         public boolean newlineDelimited() { return "newline".equals(format); }
     }

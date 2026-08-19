@@ -236,6 +236,75 @@ class JsonParsingTest {
         assertEquals(List.of("data"), DuckDbCsvIngester.recordsPathSegments("$data"));
     }
 
+    // ── J1: the read_json reader knobs (array/auto only) ────────────────────────
+
+    @Test
+    void ignoreErrorsSkipsAMalformedRecordInsteadOfFailingTheFile(@TempDir Path dir) throws Exception {
+        String parsing = PARSING.replace("format: newline", "format: auto") + "    ignore_errors: true\n";
+        PipelineConfig cfg = load(dir, "ie", parsing);
+        assertTrue(cfg.json().ignoreErrors());
+
+        File json = write(dir, "ev.json", """
+                {"account":"A00001","event_date":"2020-04-03","amount":1}
+                {this is not json at all
+                {"account":"B00002","event_date":"2020-04-04","amount":2}
+                """);
+        try (Connection conn = open()) {
+            IngestResult r = DuckDbCsvIngester.ingest(json, conn, cfg.schemas().single(), cfg, "raw_f0");
+            // ⚠ Probed semantics, not the docs' surface: with an explicit columns map, read_json's
+            // ignore_errors keeps the malformed record as an all-NULL row rather than dropping it —
+            // the file survives, and the honest description is "NULL row", never "skipped".
+            assertEquals(3, r.parsedRows(), "the malformed record lands as an all-NULL row, not fatal");
+            List<String> accounts = col(conn, "raw_f0", "ACCOUNT_NUMBER");
+            assertTrue(accounts.containsAll(List.of("A00001", "B00002")), String.valueOf(accounts));
+            assertTrue(accounts.contains(null), "the malformed record's columns are NULL");
+        }
+    }
+
+    @Test
+    void withoutIgnoreErrorsAMalformedRecordFailsTheFile(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = load(dir, "ie0", PARSING.replace("format: newline", "format: auto"));
+        File json = write(dir, "ev.json",
+                "{\"account\":\"A00001\",\"event_date\":\"2020-04-03\",\"amount\":1}\n{oops\n");
+        try (Connection conn = open()) {
+            assertThrows(Exception.class,
+                    () -> DuckDbCsvIngester.ingest(json, conn, cfg.schemas().single(), cfg, "raw_f0"),
+                    "read_json fails the unreadable file — quarantine, never a silent partial parse");
+        }
+    }
+
+    /**
+     * ⚠ `maximum_object_size` is UNOBSERVABLE at fixture scale — probed on 1.5.2.1: read_json clamps
+     * it up to its internal buffer, so even size=8 over a 500-byte object parses fine; the bound only
+     * bites on documents beyond the buffer scale (its real job: a memory ceiling for huge docs).
+     * The honest pin is therefore assembly-level: the option reaches read_json correctly SPELLED and
+     * ACCEPTED — a misspelled named parameter raises a Binder Error and this test goes red.
+     */
+    @Test
+    void maximumObjectSizeIsEmittedAndAcceptedByTheReader(@TempDir Path dir) throws Exception {
+        String parsing = PARSING.replace("format: newline", "format: auto")
+                + "    maximum_object_size: 4194304\n";
+        PipelineConfig cfg = load(dir, "mos", parsing);
+        assertEquals(4194304, cfg.json().maximumObjectSize());
+
+        File json = write(dir, "ev.json",
+                "{\"account\":\"A00001\",\"event_date\":\"2020-04-03\",\"amount\":1}\n");
+        try (Connection conn = open()) {
+            IngestResult r = DuckDbCsvIngester.ingest(json, conn, cfg.schemas().single(), cfg, "raw_f0");
+            assertEquals(1, r.parsedRows(), "read_json accepted the emitted maximum_object_size option");
+        }
+    }
+
+    /** The knobs belong to read_json — NDJSON's line reader has neither, so they refuse at load. */
+    @Test
+    void readerKnobsOnNdjsonFailLoad(@TempDir Path dir) {
+        for (String knob : List.of("    ignore_errors: true\n", "    maximum_object_size: 1024\n")) {
+            Exception e = assertThrows(IllegalArgumentException.class,
+                    () -> load(dir, "k" + knob.length(), PARSING + knob));
+            assertTrue(e.getMessage().contains("array or auto"), e.getMessage());
+        }
+    }
+
     @Test
     void unknownFrontendFailsLoad(@TempDir Path dir) {
         Exception e = assertThrows(IllegalArgumentException.class,

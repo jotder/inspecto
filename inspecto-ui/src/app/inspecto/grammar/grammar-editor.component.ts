@@ -20,6 +20,7 @@ import {
     ReactiveFormsModule,
     Validators,
 } from '@angular/forms';
+import { NgTemplateOutlet } from '@angular/common';
 import { Subscription, merge } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -93,6 +94,7 @@ export type SampleMode = 'own' | 'host';
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        NgTemplateOutlet,
         ReactiveFormsModule,
         MatButtonModule,
         MatButtonToggleModule,
