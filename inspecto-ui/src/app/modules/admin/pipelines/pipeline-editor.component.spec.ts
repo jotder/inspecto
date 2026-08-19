@@ -704,29 +704,8 @@ describe('PipelineEditorComponent', () => {
             expect(c.definitionNode()).toBeNull();
         });
 
-        /** S1: the HOST owns the template write (the pane only emits), and it must leave the node
-         *  completely alone — a template is a copy, never a `use: grammar/<id>` binding. */
-        it('saves a Grammar template without touching the node', () => {
-            const c = make();
-            c.select('demo');
-            const node = { id: 'parse', type: 'parser.delimited', config: { parsing: { frontend: 'delimited' } } };
-            c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, node] }));
-            c.openNodeConfig(node);
-            dialog.open.mockReturnValue({ afterClosed: () => of({ id: 'pipe_delimited' }) });
-            components.create.mockReturnValue(of({ ref: 'grammar/pipe_delimited', name: 'pipe_delimited' }));
-
-            c.saveGrammarAsTemplate({ frontend: 'delimited', delimited: { delimiter: '|' } });
-
-            expect(components.create).toHaveBeenCalledWith('grammar', {
-                id: 'pipe_delimited',
-                frontend: 'delimited',
-                delimited: { delimiter: '|' },
-            });
-            const saved = c.model()!.nodes.find((n) => n.id === 'parse')!;
-            expect(saved.use).toBeUndefined();
-            expect(saved.config!['parsing']).toEqual({ frontend: 'delimited' });
-            expect(c.dirty()).toBe(false); // a template write is not a graph edit
-        });
+        // U4: the host's saveGrammarAsTemplate is gone — the Grammar CSV export replaced it, and the
+        // pane no longer emits a template block at all.
 
         /** The palette seeds `{id, type}` and nothing else — the drawer predicate keys on the type
          *  and the absence of a `grammar/` use, so a config-less fresh drop reaches the drawer too. */

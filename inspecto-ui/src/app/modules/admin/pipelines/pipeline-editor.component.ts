@@ -80,7 +80,6 @@ import { PipelineChangeIdDialog, PipelineChangeIdResultData } from './pipeline-c
 import { PipelineRenameDialog, PipelineRenameResultData } from './pipeline-rename.dialog';
 import { PipelineSettingsDialog } from './pipeline-settings.dialog';
 import type { PipelineSettings } from 'app/inspecto/api/pipelines.service';
-import { GrammarTemplateData, GrammarTemplateDialog, GrammarTemplateResultData } from './grammar-template.dialog';
 import { PipelineTemplateDialog, PipelineTemplateResultData } from './pipeline-template.dialog';
 import { RunToHereDialog } from './run-to-here.dialog';
 import { ViewPreviewDialog } from './view-preview.dialog';
@@ -1703,42 +1702,8 @@ export class PipelineEditorComponent implements OnInit {
         this.definitionDirty.set(false);
     }
 
-    /**
-     * The Parse pane asked to store its Grammar as a reusable template. The WRITE lives here, not in
-     * the pane: a `grammar` registry component is a third entity (P2 pure-pane rule), and this is the
-     * one definition action that is not an in-memory patch.
-     *
-     * ⚠ The node is deliberately NOT touched — no `use:` binding, and its inline `parsing:` block
-     * stays put. A template is a copy you start from, never a live reference (the behaviour this
-     * replaced did the opposite; see `docs/archived-documents/plans-archive/grammar-templates-not-bindings-plan.md`).
-     */
-    saveGrammarAsTemplate(block: Record<string, unknown>): void {
-        const node = this.definitionNode();
-        if (!node || !this.canAuthor()) return;
-        const existing = [...this.validRefs()]
-            .filter((r) => r.startsWith(GRAMMAR_REF_PREFIX))
-            .map((r) => r.slice(GRAMMAR_REF_PREFIX.length));
-        this.dialog
-            .open(GrammarTemplateDialog, {
-                width: '32rem',
-                data: {
-                    source: node.name || node.id,
-                    existingNames: existing,
-                    suggested: `${String(block['frontend'] ?? 'delimited')}_grammar`.replace(/[^a-z0-9_]+/g, '_'),
-                } satisfies GrammarTemplateData,
-            })
-            .afterClosed()
-            .subscribe((res?: GrammarTemplateResultData) => {
-                if (!res) return;
-                this.components.create('grammar', { id: res.id, ...block }).subscribe({
-                    next: (c) => {
-                        this.validRefs.update((rs) => new Set([...rs, c.ref ?? `${GRAMMAR_REF_PREFIX}${res.id}`]));
-                        this.toast.success(`Saved Grammar template '${res.id}'`);
-                    },
-                    error: (err) => this.onWriteError(err, 'Could not save the Grammar template'),
-                });
-            });
-    }
+    // U4: saveGrammarAsTemplate + GrammarTemplateDialog are gone — the Grammar CSV export is the
+    // portable template now; stored grammar templates are created in the Components registry.
 
     /** Drawer Discard: recreate the pane from the model — the epoch is what the `@for` tracks. */
     discardDefinition(): void {
@@ -1746,10 +1711,15 @@ export class PipelineEditorComponent implements OnInit {
         this.definitionDirty.set(false);
     }
 
+    /** U5: the drawer's full-width state, mirrored from `(maximizedChange)` — the dock binds its
+     *  width to 100% over the canvas while set; the split handle stays MOUNTED, only hidden. */
+    readonly drawerMaximized = signal(false);
+
     /** Close the drawer (the shell already dirty-confirmed); the inspector summary returns. */
     closeDefinition(): void {
         this.definitionNode.set(null);
         this.definitionDirty.set(false);
+        this.drawerMaximized.set(false);
     }
 
     /** Preview a `sink.view` node's data: bounded rows from its captured `derived_sql` (T32 follow-up). */

@@ -27,8 +27,8 @@ import {
     CsvImport,
     EditableGridColumn,
     EditableGridComponent,
-    parseCsv,
 } from 'app/inspecto/components/editable-grid.component';
+import { parseCsv } from 'app/inspecto/data-table/core/csv';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { ComponentFormResult } from './component-form.dialog';

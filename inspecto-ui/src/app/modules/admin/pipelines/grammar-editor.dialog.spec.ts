@@ -163,44 +163,8 @@ describe('GrammarEditorDialog', () => {
         expect(editor.value()['delimited']).toEqual({ delimiter: '|', has_header: false });
     });
 
-    /**
-     * The inverse of what this case asserted until 2026-08-15, deliberately: saving a template writes
-     * the component and leaves the node ALONE. A template is a copy source, never a binding — see
-     * `docs/archived-documents/plans-archive/grammar-templates-not-bindings-plan.md`.
-     */
-    it('save-as-template asks for a name, writes the component, and KEEPS the block on the node', async () => {
-        const node: AuthoredNode = {
-            id: 'parse',
-            type: 'parser.dsv',
-            config: { parsing: { frontend: 'delimited' }, schema_file: 'cdr.toon' },
-        };
-        const { c, fixture, components, close } = await create({ node });
-
-        c.extract();
-        expect(c.step()).toBe('name');
-        expect(c.nameForm.controls.name.value).toBe('delimited_grammar');
-        fixture.detectChanges();
-
-        c.save();
-        expect(components.create).toHaveBeenCalledWith(
-            'grammar',
-            expect.objectContaining({ id: 'delimited_grammar', frontend: 'delimited' }),
-        );
-        const closed = close.mock.calls[0][0];
-        expect(closed.node.use).toBeUndefined(); // a template is a copy, not a link
-        expect(closed.node.config['parsing']).toEqual(expect.objectContaining({ frontend: 'delimited' }));
-        expect(closed.node.config['schema_file']).toBe('cdr.toon');
-    });
-
-    it('blocks the name step on a duplicate id', async () => {
-        const { c, fixture, components } = await create({ grammars: [saved('taken')] });
-        c.extract();
-        fixture.detectChanges();
-        c.nameForm.patchValue({ name: 'taken' });
-        c.save();
-        expect(c.nameForm.controls.name.hasError('duplicate')).toBe(true);
-        expect(components.create).not.toHaveBeenCalled();
-    });
+    // U4: the extract/name-step path is gone — the Grammar CSV export is the portable template.
+    // Its round-trip is pinned framework-free in `inspecto/grammar/grammar-csv.spec.ts`.
 
     it('switching a bound node back to Inline drops the use: binding on save', async () => {
         const node: AuthoredNode = { id: 'parse', type: 'parser.dsv', use: 'grammar/cdr_csv' };
@@ -247,11 +211,8 @@ describe('GrammarEditorDialog', () => {
         expect(c.previewRows()).toEqual([]);
     });
 
-    it('has no a11y violations on the editor step or the name step', async () => {
-        const { c, fixture } = await create();
-        await expectNoA11yViolations(fixture.nativeElement);
-        c.extract();
-        fixture.detectChanges();
+    it('has no a11y violations', async () => {
+        const { fixture } = await create();
         await expectNoA11yViolations(fixture.nativeElement);
     });
 });

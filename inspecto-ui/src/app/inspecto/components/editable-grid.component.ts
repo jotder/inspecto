@@ -11,6 +11,7 @@ import {
     GridReadyEvent,
     ITooltipParams,
 } from 'ag-grid-community';
+import { parseCsv } from 'app/inspecto/data-table/core/csv';
 import { INSPECTO_DEFAULT_COL_DEF, InspectoGridThemeService, noRowsOverlay } from 'app/inspecto/grid';
 
 /** One column of an editable flat table. `options` set ⇒ a select editor over exactly those values. */
@@ -243,38 +244,6 @@ export class EditableGridComponent {
     }
 }
 
-/** Minimal RFC-4180 parse (quoted cells carry commas/newlines — how EXPR expressions travel). */
-export function parseCsv(text: string): string[][] {
-    const rows: string[][] = [];
-    let row: string[] = [];
-    let cell = '';
-    let quoted = false;
-    for (let i = 0; i < text.length; i++) {
-        const ch = text[i];
-        if (quoted) {
-            if (ch === '"' && text[i + 1] === '"') {
-                cell += '"';
-                i++;
-            } else if (ch === '"') quoted = false;
-            else cell += ch;
-        } else if (ch === '"') {
-            quoted = true;
-        } else if (ch === ',') {
-            row.push(cell);
-            cell = '';
-        } else if (ch === '\n' || ch === '\r') {
-            if (ch === '\r' && text[i + 1] === '\n') i++;
-            row.push(cell);
-            cell = '';
-            rows.push(row);
-            row = [];
-        } else {
-            cell += ch;
-        }
-    }
-    if (cell.length || row.length) {
-        row.push(cell);
-        rows.push(row);
-    }
-    return rows.filter((r) => r.some((c) => c.trim().length));
-}
+// parseCsv moved to `data-table/core/csv.ts` (U4 — one RFC-4180 parser for the grid, the mapping
+// editor and the Grammar CSV import); re-exported so existing imports keep resolving.
+export { parseCsv };

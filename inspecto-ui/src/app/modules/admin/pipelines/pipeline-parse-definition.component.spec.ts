@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthoredNode, ComponentDef, ConfigService, ParsersService, SpacesService } from 'app/inspecto/api';
 import { ToastrService } from 'ngx-toastr';
 import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
-import { GrammarEditorComponent } from 'app/inspecto/grammar';
+import { GrammarEditorComponent, grammarToCsv, parsingAttributesFor } from 'app/inspecto/grammar';
 import { InspectoSegmentsEditorComponent } from 'app/inspecto/segments';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { PipelineParseDefinitionComponent } from './pipeline-parse-definition.component';
@@ -30,7 +30,6 @@ import { PipelineParseDefinitionComponent } from './pipeline-parse-definition.co
             [sample]="sample"
             (applied)="applied = $event"
             (dirtyChange)="dirty = $event"
-            (saveAsTemplate)="template = $event"
         />
     `,
 })
@@ -42,7 +41,6 @@ class HostComponent {
     sample: DefinitionStateService | null = null;
     applied?: AuthoredNode;
     dirty = false;
-    template?: Record<string, unknown>;
 }
 
 function delimitedNode(): AuthoredNode {
@@ -459,30 +457,8 @@ describe('PipelineParseDefinitionComponent', () => {
         expect(fixture.componentInstance.dirty).toBe(false);
     });
 
-    /**
-     * S1: the pane EMITS the block and never writes it — a `grammar` registry component is a third
-     * entity, so the host owns that write (P2 pure-pane rule).
-     */
-    it('Save as template emits the block, leaves the node alone, and does not consume edits', async () => {
-        const fixture = await create();
-        editor(fixture).schemaForm!.form.patchValue({ delimited__delimiter: ';' });
-        editor(fixture).schemaForm!.form.markAsDirty();
-        fixture.debugElement
-            .query(By.directive(PipelineParseDefinitionComponent))
-            .nativeElement.dispatchEvent(new Event('input', { bubbles: true }));
-        fixture.detectChanges();
-        expect(fixture.componentInstance.dirty).toBe(true);
-
-        pane(fixture).requestSaveAsTemplate();
-        fixture.detectChanges();
-
-        expect(fixture.componentInstance.template).toEqual(
-            expect.objectContaining({ frontend: 'delimited', delimited: expect.objectContaining({ delimiter: ';' }) }),
-        );
-        // Saving a template neither persists to the node nor consumes the unapplied edits.
-        expect(fixture.componentInstance.applied).toBeUndefined();
-        expect(fixture.componentInstance.dirty).toBe(true);
-    });
+    // U4: "Save as template" is gone from the pane — the Grammar CSV round-trip replaced it
+    // (see the 'grammar CSV' describe below); stored templates are created in the Components registry.
 
     /**
      * P3c: asn1 is not a built-in `ParsingFrontend` — the editor hosts it as the served parser it is —
@@ -606,17 +582,6 @@ describe('PipelineParseDefinitionComponent', () => {
             expect(editor(fixture).error()).toContain('not available');
         });
 
-        it('Save as template strips segments — a template is grammar, not a deployment', async () => {
-            const fixture = await create(asn1Node(), [], [ASN1_DEF]);
-            pane(fixture).requestSaveAsTemplate();
-            fixture.detectChanges();
-
-            const template = fixture.componentInstance.template!;
-            expect(template['frontend']).toBe('asn1');
-            const a = template['asn1'] as Record<string, unknown>;
-            expect(a['grammar']).toContain('DEFINITIONS');
-            expect(a['segments']).toBeUndefined();
-        });
     });
 
     /**
@@ -682,17 +647,6 @@ describe('PipelineParseDefinitionComponent', () => {
             expect(editor(fixture).error()).toContain('No ingestable parser plugin');
         });
 
-        it('Save as template strips segments but keeps the ingester class', async () => {
-            const fixture = await create(pluginNode(), [], [ACME_DEF]);
-            pane(fixture).requestSaveAsTemplate();
-            fixture.detectChanges();
-
-            const template = fixture.componentInstance.template!;
-            expect(template['frontend']).toBe('plugin');
-            const p = template['plugin'] as Record<string, unknown>;
-            expect(p['ingester']).toBe('com.example.acme.AcmeFeedIngester');
-            expect(p['segments']).toBeUndefined();
-        });
     });
 
     /**
@@ -1149,6 +1103,63 @@ describe('PipelineParseDefinitionComponent', () => {
             pane(fixture).setTypesMode('declared');
             fixture.detectChanges();
             expect(fixture.componentInstance.dirty).toBe(true);
+        });
+    });
+
+    // ── Grammar CSV round-trip (§4.5, U4) — the drawer's import semantics ─────────
+
+    describe('grammar CSV import', () => {
+        function csvNode(): AuthoredNode {
+            return {
+                id: 'parse',
+                type: 'parser.delimited',
+                name: 'Parser (delimited)',
+                config: { parsing: { frontend: 'delimited', delimited: { delimiter: ',' } } },
+            };
+        }
+
+        it('refuses a format-mismatched file outright', async () => {
+            const fixture = await create(csvNode());
+            await pane(fixture).importCsvText('section,key,attr,value\nmeta,format,,json\n');
+            fixture.detectChanges();
+
+            expect(editor(fixture).error()).toContain("'json'");
+            expect(pane(fixture).schemaSeed()).toEqual([]);
+        });
+
+        it('applies known options + columns wholesale and restores the types mode', async () => {
+            const fixture = await create(csvNode());
+            const csv = grammarToCsv(
+                { format: 'delimited', pipeline: 'orders', types: 'declared' },
+                parsingAttributesFor('delimited'),
+                { delimited__delimiter: '|', delimited__null_strings: ['NULL'] },
+                [{ include: true, name: 'CUSTOMER_ID', selector: '0', type: 'DOUBLE', synonym: 'cust_no' }],
+            );
+
+            await pane(fixture).importCsvText(csv);
+            fixture.detectChanges();
+
+            const delimited = editor(fixture).value()['delimited'] as Record<string, unknown>;
+            expect(delimited['delimiter']).toBe('|');
+            expect(delimited['null_strings']).toEqual(['NULL']);
+            expect(pane(fixture).schemaSeed()).toEqual([
+                { include: true, name: 'CUSTOMER_ID', selector: '0', type: 'DOUBLE', synonym: 'cust_no' },
+            ]);
+            expect(pane(fixture).typesMode()).toBe('declared');
+            expect(fixture.componentInstance.dirty).toBe(true);
+        });
+
+        it('lists unknown option keys and does not apply them', async () => {
+            const fixture = await create(csvNode());
+            await pane(fixture).importCsvText(
+                'section,key,attr,value\nmeta,format,,delimited\noption,delimiter,,";"\noption,florble,,42\n',
+            );
+            fixture.detectChanges();
+
+            expect(pane(fixture).importWarning()).toContain('florble');
+            const delimited = editor(fixture).value()['delimited'] as Record<string, unknown>;
+            expect(delimited['delimiter']).toBe(';');
+            expect('florble' in delimited).toBe(false);
         });
     });
 

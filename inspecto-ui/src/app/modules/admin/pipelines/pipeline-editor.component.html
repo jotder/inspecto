@@ -479,7 +479,7 @@
                 [min]="240"
                 [max]="560"
                 [defaultWidth]="300"
-                [class.hidden]="!inspectorOpen()"
+                [class.hidden]="!inspectorOpen() || drawerMaximized()"
                 aria-label="Resize the properties panel (arrow keys or drag)"
             ></div>
 
@@ -487,7 +487,9 @@
             <aside
                 class="flex min-h-0 shrink-0 flex-col overflow-hidden border-l"
                 [class.w-10]="!inspectorOpen()"
-                [style.width.px]="inspectorOpen() ? inspectorSplit.width() : null"
+                [style.width]="
+                    inspectorOpen() ? (drawerMaximized() ? '100%' : inspectorSplit.width() + 'px') : null
+                "
                 style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
                 aria-label="Properties"
             >
@@ -563,6 +565,7 @@
                                     (apply)="applyDefinition()"
                                     (discard)="discardDefinition()"
                                     (closed)="closeDefinition()"
+                                    (maximizedChange)="drawerMaximized.set($event)"
                                 >
                                     @if (dn.type === 'acquisition') {
                                         <app-pipeline-collection-definition
@@ -607,7 +610,6 @@
                                             [sample]="sampleThread()"
                                             (applied)="onDefinitionApplied($event)"
                                             (dirtyChange)="definitionDirty.set($event)"
-                                            (saveAsTemplate)="saveGrammarAsTemplate($event)"
                                         />
                                     }
                                 </inspecto-definition-drawer>

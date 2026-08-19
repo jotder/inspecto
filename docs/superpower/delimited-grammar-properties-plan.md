@@ -289,6 +289,11 @@ on both adopters.
 - The drawer's Name + Description inputs (`pipeline-parse-definition.component.ts` template
   L150-157) go. U4 first verifies what they bind (step name/description) and confirms the canvas
   rename path still covers it before deleting.
+  **As-built (2026-08-19): NOT deleted — the verification failed.** Drawer-parse nodes never open
+  `NodeConfigDialog` (`openNodeConfig` routes them to the drawer), so the drawer's Name field is the
+  ONLY rename affordance those nodes have; deleting it would strand node renames entirely. The
+  removal is deferred until the canvas grows a node-rename path (BACKLOG follow-up), exactly as this
+  bullet's own precondition demands.
 - "Save as template…" goes from the drawer (L159-180 + host wiring at
   `pipeline-editor.component.ts:1715`) and from the dialog (incl. its whole *name step*, which
   simplifies its `guardDirtyClose`). **Consequence:** grammar *templates* can no longer be created

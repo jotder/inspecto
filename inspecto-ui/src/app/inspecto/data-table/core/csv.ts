@@ -14,6 +14,46 @@ export function toCsv(rows: readonly Record<string, unknown>[], columns: readonl
     return body ? `${header}\n${body}` : header;
 }
 
+/**
+ * Minimal RFC-4180 parse (quoted cells carry commas/newlines — how EXPR expressions travel).
+ * Extracted from `editable-grid.component.ts` (U4, delimited-grammar-properties plan) so the
+ * Grammar CSV import shares the one parser with the editable grid and the mapping editor.
+ */
+export function parseCsv(text: string): string[][] {
+    const rows: string[][] = [];
+    let row: string[] = [];
+    let cell = '';
+    let quoted = false;
+    for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (quoted) {
+            if (ch === '"' && text[i + 1] === '"') {
+                cell += '"';
+                i++;
+            } else if (ch === '"') quoted = false;
+            else cell += ch;
+        } else if (ch === '"') {
+            quoted = true;
+        } else if (ch === ',') {
+            row.push(cell);
+            cell = '';
+        } else if (ch === '\n' || ch === '\r') {
+            if (ch === '\r' && text[i + 1] === '\n') i++;
+            row.push(cell);
+            cell = '';
+            rows.push(row);
+            row = [];
+        } else {
+            cell += ch;
+        }
+    }
+    if (cell.length || row.length) {
+        row.push(cell);
+        rows.push(row);
+    }
+    return rows.filter((r) => r.some((c) => c.trim().length));
+}
+
 /** Trigger a client-side CSV download (browser DOM, not Angular). */
 export function downloadCsv(name: string, csv: string): void {
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });

@@ -14,6 +14,7 @@ import {
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
@@ -34,6 +35,9 @@ import {
 } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
+import { flattenBlock, nestKeys } from 'app/inspecto/component-model';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { downloadCsv } from 'app/inspecto/data-table/core/csv';
 import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
 import { InspectoSamplePanelComponent } from 'app/inspecto/definition/sample-panel.component';
 import {
@@ -47,7 +51,11 @@ import {
     GrammarEditorComponent,
     ParsingFrontend,
     grammarContentAsParsingBlock,
+    grammarCsvFilename,
     grammarSeedsFrontend,
+    grammarToCsv,
+    parseGrammarCsv,
+    parsingAttributesFor,
 } from 'app/inspecto/grammar';
 import {
     InspectoSegmentsEditorComponent,
@@ -132,6 +140,7 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
         MatButtonModule,
         MatButtonToggleModule,
         MatFormFieldModule,
+        MatIconModule,
         MatInputModule,
         MatSelectModule,
         MatTooltipModule,
@@ -173,16 +182,43 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                         </mat-select>
                     </mat-form-field>
                 }
-                <button
-                    class="ml-auto"
-                    mat-stroked-button
-                    type="button"
-                    (click)="requestSaveAsTemplate()"
-                    matTooltip="Store this Grammar as a reusable starting point. It is a copy — this node is unaffected by later edits to it."
-                >
-                    Save as template&hellip;
-                </button>
+                <!-- CSV export/import replaced "Save as template…" (U4): the file IS the portable
+                     template — options AND the columns table, Excel-editable, diff-friendly. -->
+                <span class="ml-auto"></span>
+                @if (csvCapable()) {
+                    <button
+                        mat-icon-button
+                        type="button"
+                        aria-label="Import Grammar from CSV"
+                        matTooltip="Import a Grammar CSV — known options and columns repopulate this surface"
+                        (click)="csvInput.click()"
+                    >
+                        <mat-icon class="icon-size-5" svgIcon="heroicons_outline:arrow-up-tray"></mat-icon>
+                    </button>
+                    <input
+                        #csvInput
+                        type="file"
+                        accept=".csv,text/csv"
+                        class="hidden"
+                        aria-label="Import Grammar from CSV"
+                        (change)="importCsv($event)"
+                    />
+                    <button
+                        mat-icon-button
+                        type="button"
+                        aria-label="Export Grammar as CSV"
+                        matTooltip="Export the whole property set as <pipeline>_parser.csv"
+                        (click)="exportCsv()"
+                    >
+                        <mat-icon class="icon-size-5" svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
+                    </button>
+                }
             </div>
+            @if (importWarning(); as warn) {
+                <inspecto-alert class="mb-2 block" variant="warning" title="Imported with unknown options">
+                    {{ warn }}
+                </inspecto-alert>
+            }
             <!--
                 The generic plugin's own picker (P3d slice D). Unlike every other subtype, this node's
                 TYPE does not name one served parser — it spans whichever ingestable, non-dedicated
@@ -366,6 +402,7 @@ export class PipelineParseDefinitionComponent {
     private fb = inject(FormBuilder);
     private configApi = inject(ConfigService);
     private parsersApi = inject(ParsersService);
+    private confirm = inject(InspectoConfirmService);
 
     /** The per-format parse node being defined (identity fixed; config/name/description editable). */
     readonly node = input.required<AuthoredNode>();
@@ -401,13 +438,8 @@ export class PipelineParseDefinitionComponent {
     readonly applied = output<AuthoredNode>();
     /** Whether the pane holds edits since creation / the last successful submit. */
     readonly dirtyChange = output<boolean>();
-    /**
-     * The operator asked to store this Grammar as a reusable template. The pane emits the validated
-     * block and nothing else: a `grammar` registry component is a THIRD entity, so writing it is the
-     * host's job, not the pane's (P2 pure-pane rule — only a stage's own companion artifact is a pane
-     * write). The node is deliberately untouched — a template is a copy, never a binding.
-     */
-    readonly saveAsTemplate = output<Record<string, unknown>>();
+    // U4: the `saveAsTemplate` output is gone — the Grammar CSV is the portable template now
+    // (grammar templates are created in the Components registry; "Start from a template" stays).
 
     @ViewChild(GrammarEditorComponent) private editor?: GrammarEditorComponent;
     @ViewChild(InspectoSegmentsEditorComponent) private segmentsEditor?: InspectoSegmentsEditorComponent;
@@ -933,17 +965,85 @@ export class PipelineParseDefinitionComponent {
      * saving a template neither consumes the operator's unapplied edits nor persists them to the node,
      * so a dirty pane must stay dirty.
      */
-    requestSaveAsTemplate(): void {
-        if (!this.editor?.validate() || this.asn1Unavailable() || this.pluginUnavailable()) return;
-        const block = this.parsingValue();
-        // A template is a Grammar copy; segments are deployment-specific schema paths, not grammar.
-        for (const key of ['asn1', 'plugin'] as const) {
-            if (block[key] && typeof block[key] === 'object') {
-                const { segments: _deployment, ...grammarOnly } = block[key] as Record<string, unknown>;
-                block[key] = grammarOnly;
-            }
+    // ── Grammar CSV round-trip (§4.5, U4 — the portable template) ────────────────
+
+    /** Only the BUILT-IN frontends round-trip as CSV; a plugin's options are served, not authored. */
+    readonly csvCapable = computed(() => {
+        const f = this.frontend();
+        return f !== 'asn1' && f !== 'plugin';
+    });
+    /** Unknown option keys the last import listed — shown, never applied (§2's silent-drop trap). */
+    readonly importWarning = signal<string | null>(null);
+
+    /** Export the whole property set — options + columns — as `<pipeline>_parser.csv`. */
+    exportCsv(): void {
+        if (!this.csvCapable() || !this.editor) return;
+        const frontend = this.frontend() as ParsingFrontend;
+        const csv = grammarToCsv(
+            {
+                format: frontend,
+                pipeline: this.pipelineName() || this.node().id,
+                ...(this.authorsSchema() && this.schemaSeed().length ? { types: this.typesMode() } : {}),
+            },
+            parsingAttributesFor(frontend),
+            flattenBlock(this.editor.value()),
+            this.currentSchemaRows(),
+        );
+        downloadCsv(grammarCsvFilename(this.pipelineName() || this.node().id), csv);
+    }
+
+    /**
+     * Import a Grammar CSV: refuse outright on a format mismatch, repopulate the options (the
+     * template-pick mechanism, so the editor re-seeds), list unknown keys without applying them, and
+     * replace the columns table WHOLESALE — behind a confirm when the current state is dirty.
+     */
+    async importCsv(event: Event): Promise<void> {
+        const input = event.target as HTMLInputElement;
+        const file = input.files?.[0];
+        input.value = '';
+        if (!file) return;
+        await this.importCsvText(await file.text());
+    }
+
+    /** The import core, file-reading shell removed — what the specs drive. */
+    async importCsvText(text: string): Promise<void> {
+        if (!this.csvCapable()) return;
+        const frontend = this.frontend() as ParsingFrontend;
+        let parsed: ReturnType<typeof parseGrammarCsv>;
+        try {
+            parsed = parseGrammarCsv(text, parsingAttributesFor(frontend));
+        } catch (e) {
+            this.editor?.error.set(e instanceof Error ? e.message : 'Could not read the file as a Grammar CSV.');
+            return;
         }
-        this.saveAsTemplate.emit(block);
+        if (parsed.meta.format !== frontend) {
+            this.editor?.error.set(
+                `That file is a '${parsed.meta.format}' Grammar — this node parses '${frontend}'.`,
+            );
+            return;
+        }
+        if (parsed.columns && (this.lastDirty || this.schemaSeed().length)) {
+            const ok = await this.confirm.confirm(
+                `The file carries ${parsed.columns.length} column(s), which replace the current table wholesale.`,
+                'Replace the columns table?',
+            );
+            if (!ok) return;
+        }
+        const block = nestKeys(parsed.options);
+        block['frontend'] = frontend;
+        this.templateBlock.set(block);
+        this.templateDirty = true;
+        if (parsed.columns) {
+            this.schemaSeed.set(parsed.columns);
+            this.schemaHydrated.set(false);
+        }
+        if (parsed.meta.types) this.typesMode.set(parsed.meta.types);
+        this.importWarning.set(
+            parsed.unknownKeys.length
+                ? `Not applied (the engine reads no such options): ${parsed.unknownKeys.join(', ')}`
+                : null,
+        );
+        this.emitDirty();
     }
 
     /**

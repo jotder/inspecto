@@ -1,29 +1,34 @@
 import { ChangeDetectionStrategy, Component, ViewChild, computed, inject, signal } from '@angular/core';
-import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
-import { Observable } from 'rxjs';
 import {
-    apiErrorMessage,
     AuthoredNode,
     ComponentDef,
     ComponentsService,
     ParserDef,
     ParserPreview,
 } from 'app/inspecto/api';
-import { parseUseRef } from 'app/inspecto/component-model';
+import { flattenBlock, nestKeys, parseUseRef } from 'app/inspecto/component-model';
+import { downloadCsv } from 'app/inspecto/data-table/core/csv';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-resize.directive';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
-import { GrammarEditorComponent, grammarContentAsParsingBlock } from 'app/inspecto/grammar';
+import {
+    GrammarEditorComponent,
+    grammarContentAsParsingBlock,
+    grammarCsvFilename,
+    grammarToCsv,
+    parseGrammarCsv,
+    parsingAttributesFor,
+    ParsingFrontend,
+    PARSING_FRONTENDS,
+} from 'app/inspecto/grammar';
 import { MappingEditorDialog } from 'app/modules/admin/components/mapping-editor.dialog';
 import { SchemaEditorData, SchemaEditorDialog } from 'app/modules/admin/components/schema-editor.dialog';
 import { NodeConfigResult } from './node-config.dialog';
@@ -42,8 +47,9 @@ export interface GrammarEditorDialogData {
  * the persistence.
  *
  * <p>**Always inline; templates are copies** (operator decision 2026-08-15): a Grammar lives in the
- * node's own `parsing:` block, full stop. *Save as template…* writes a `grammar` component as a
- * reusable starting point and leaves the node untouched — no `use:` binding, block still inline.
+ * node's own `parsing:` block, full stop. Since U4 (delimited-grammar-properties plan §4.5) the
+ * portable template is the **Grammar CSV** — export/import here — while "Start from" keeps offering
+ * the existing stored templates (creating one now happens in the Components registry).
  *
  * <p>⚠ This REVERSES the previous store contract, in which the same action MOVED the block into the
  * component and bound the node, making a later template edit reach back into every pipeline using it.
@@ -62,13 +68,10 @@ export interface GrammarEditorDialogData {
     selector: 'app-grammar-editor-dialog',
     standalone: true,
     imports: [
-        ReactiveFormsModule,
         MatDialogModule,
         MatButtonModule,
         MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
-        MatProgressSpinnerModule,
         MatSelectModule,
         MatTooltipModule,
         InspectoAlertComponent,
@@ -79,7 +82,6 @@ export interface GrammarEditorDialogData {
     templateUrl: './grammar-editor.dialog.html',
 })
 export class GrammarEditorDialog {
-    private fb = inject(FormBuilder);
     private components = inject(ComponentsService);
     private toastr = inject(ToastrService);
     private confirm = inject(InspectoConfirmService);
@@ -110,38 +112,18 @@ export class GrammarEditorDialog {
      *  editor's "Suggest from sample" when the user follows the Draft Schema link. */
     readonly previewRows = signal<Record<string, unknown>[]>([]);
 
-    readonly saving = signal(false);
-
-    /** `config` (author + test) → `name` (asked only when extracting to a reusable Grammar). */
-    readonly step = signal<'config' | 'name'>('config');
-    /** The block captured before the name step unmounts the editor (its form dies with the `@if`). */
-    private pendingBlock: Record<string, unknown> | null = null;
     /** The `use: grammar/<id>` this node names but which the registry does not return — see the ctor. */
     readonly missingBinding = signal<string | null>(null);
 
-    readonly nameForm = this.fb.group({
-        name: [
-            '',
-            [
-                Validators.required,
-                Validators.pattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/),
-                (c: AbstractControl): ValidationErrors | null =>
-                    this.grammars().some((g) => g.name === String(c.value ?? '').trim()) ? { duplicate: true } : null,
-            ],
-        ],
-    });
+    /** Unknown option keys the last CSV import listed — shown, never applied (§4.5). */
+    readonly importWarning = signal<string | null>(null);
+    /** A CSV import re-seeds the editor pristine, so the edit is tracked here (the template-pick idiom). */
+    private importedDirty = false;
 
-    /**
-     * Esc / backdrop / Cancel all confirm before discarding a dirty Grammar.
-     *
-     * ⚠ `pendingBlock` is part of the test. On the name step the `@if (step() === 'config')` block that
-     * hosts the editor is torn down, so `this.editor` is undefined and the guard reported CLEAN — Cancel
-     * or Esc there binned the whole authored Grammar, silently, at the one moment the operator had the
-     * most work in flight. The captured block lives only in memory, so it is the dirtiness there.
-     */
+    /** Esc / backdrop / Cancel all confirm before discarding a dirty Grammar. */
     readonly requestClose = guardDirtyClose(
         this.ref,
-        () => (this.editor?.isDirty() ?? false) || this.pendingBlock !== null,
+        () => (this.editor?.isDirty() ?? false) || this.importedDirty,
         this.confirm,
     );
 
@@ -214,7 +196,6 @@ export class GrammarEditorDialog {
     onGrammarChange(id: string): void {
         if (!id) {
             this.boundGrammarId.set(null);
-            this.nameForm.reset({ name: '' });
             this.seedFrom(nodeParsingBlock(this.data.node));
             return;
         }
@@ -224,35 +205,59 @@ export class GrammarEditorDialog {
         this.seedFrom(grammarBlock(def.content ?? {}));
     }
 
-    /** The suggested id for a freshly extracted Grammar: `<frontend>_grammar`, sanitized. */
-    suggestedName(): string {
-        const frontend = String(this.editor?.value()['frontend'] ?? 'delimited');
-        return `${frontend}_grammar`.replace(/[^A-Za-z0-9._-]+/g, '_');
+    /** The active FRONTEND the editor is on (plugins have no CSV round-trip — options are served). */
+    private activeFrontend(): ParsingFrontend | null {
+        if (this.plugin()) return null;
+        const f = String(this.editor?.value()['frontend'] ?? 'delimited');
+        return PARSING_FRONTENDS.some((x) => x.id === f) ? (f as ParsingFrontend) : null;
     }
 
-    /** Store the inline Grammar as a reusable template — the only path that asks for a name. */
-    extract(): void {
-        if (this.pluginBlocked() || !this.editor?.validate()) return;
-        this.pendingBlock = this.editor.value();
-        if (this.nameForm.controls.name.pristine) this.nameForm.patchValue({ name: this.suggestedName() });
-        this.step.set('name');
+    /** §4.5: export the whole property set — the portable template that replaced Save-as-template. */
+    exportCsv(): void {
+        const frontend = this.activeFrontend();
+        if (!frontend || !this.editor) {
+            this.toastr.warning('CSV export covers the built-in formats — plugin options are served.');
+            return;
+        }
+        const csv = grammarToCsv(
+            { format: frontend, pipeline: this.data.node.name || this.data.node.id },
+            parsingAttributesFor(frontend),
+            flattenBlock(this.editor.value()),
+            [],
+        );
+        downloadCsv(grammarCsvFilename(this.data.node.name || this.data.node.id), csv);
     }
 
-    /** Leave the name step back to the editor (the typed name is kept). */
-    backToConfig(): void {
-        this.step.set('config');
+    /** §4.5: import a Grammar CSV — refuse a format mismatch, apply known options, list unknown keys. */
+    async importCsv(event: Event): Promise<void> {
+        const input = event.target as HTMLInputElement;
+        const file = input.files?.[0];
+        input.value = '';
+        const frontend = this.activeFrontend();
+        if (!file || !frontend) return;
+        try {
+            const parsed = parseGrammarCsv(await file.text(), parsingAttributesFor(frontend));
+            if (parsed.meta.format !== frontend) {
+                this.toastr.error(
+                    "That file is a '" + parsed.meta.format + "' Grammar — this Step parses '" + frontend + "'.",
+                );
+                return;
+            }
+            const block = nestKeys(parsed.options);
+            block['frontend'] = frontend;
+            this.seedFrom(block);
+            this.importedDirty = true;
+            this.importWarning.set(
+                parsed.unknownKeys.length
+                    ? 'Not applied (the engine reads no such options): ' + parsed.unknownKeys.join(', ')
+                    : null,
+            );
+        } catch (e) {
+            this.toastr.error(e instanceof Error ? e.message : 'Could not read the file as a Grammar CSV.');
+        }
     }
 
     save(): void {
-        if (this.step() === 'name') {
-            if (this.nameForm.invalid) {
-                this.nameForm.markAllAsTouched();
-                return;
-            }
-            this.saveAsTemplate(String(this.nameForm.getRawValue().name ?? '').trim(), this.pendingBlock!);
-            return;
-        }
-
         if (this.pluginBlocked() || !this.editor?.validate()) return;
         // Always inline — a bound node MIGRATES to an independent copy rather than writing back to the
         // shared component (D4). `closeInline` already drops the `use:`, so both cases are one path.
@@ -263,37 +268,6 @@ export class GrammarEditorDialog {
     private closeInline(block: Record<string, unknown>): void {
         const { use: _unbound, ...node } = this.data.node;
         this.ref.close({ node: { ...node, config: { ...(this.data.node.config ?? {}), parsing: block } } });
-    }
-
-    /**
-     * Store the authored Grammar as a reusable **template** — a copy, not a link (2026-08-15).
-     *
-     * ⚠ Until this date the same action MOVED the block into the component and bound the node via
-     * `use: grammar/<id>`, so a later template edit reached back into every pipeline using it. It now
-     * writes the component and leaves the node exactly as it was, inline block and all. See
-     * `docs/archived-documents/plans-archive/grammar-templates-not-bindings-plan.md`.
-     */
-    private saveAsTemplate(name: string, block: Record<string, unknown>): void {
-        this.write(this.components.create('grammar', { id: name, ...block }), name, () => this.closeInline(block));
-    }
-
-    private write(req$: Observable<unknown>, name: string, onDone: () => void): void {
-        this.saving.set(true);
-        req$.subscribe({
-            next: () => {
-                this.saving.set(false);
-                this.toastr.success(`Grammar "${name}" saved`);
-                onDone();
-            },
-            error: (e) => {
-                this.saving.set(false);
-                this.toastr.error(
-                    e?.status === 503
-                        ? 'Writes are disabled (no write root configured).'
-                        : apiErrorMessage(e, `Could not save "${name}"`),
-                );
-            },
-        });
     }
 }
 
