@@ -1,21 +1,33 @@
 import {
+    AfterViewInit,
     ChangeDetectionStrategy,
     Component,
+    DestroyRef,
     EventEmitter,
     Input,
     Output,
-    ViewChild,
+    QueryList,
+    ViewChildren,
     computed,
     inject,
     signal,
 } from '@angular/core';
-import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+    AbstractControl,
+    FormArray,
+    FormBuilder,
+    FormGroup,
+    ReactiveFormsModule,
+    Validators,
+} from '@angular/forms';
+import { Subscription, merge } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatTabsModule } from '@angular/material/tabs';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Observable } from 'rxjs';
 import { ParserDef, ParserPreview, ParserTreeNode, ParsersService, apiErrorMessage } from 'app/inspecto/api';
@@ -31,7 +43,7 @@ import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { ParserTreeComponent } from 'app/inspecto/components/parser-tree.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
-import { PARSING_FRONTENDS, ParsingFrontend, parsingAttributesFor } from './parsing-attributes';
+import { GRAMMAR_TABS, PARSING_FRONTENDS, ParsingFrontend, parsingAttributesFor } from './parsing-attributes';
 import { FrontendSuggestion, jsonSampleToTree, sniffFrontend } from './parsing-sniff';
 
 /** The `parsing:` roots this editor owns — switching frontend clears the others' sub-blocks. */
@@ -87,6 +99,7 @@ export type SampleMode = 'own' | 'host';
         MatIconModule,
         MatInputModule,
         MatProgressSpinnerModule,
+        MatTabsModule,
         MatTooltipModule,
         InspectoAlertComponent,
         ChipComponent,
@@ -96,11 +109,22 @@ export type SampleMode = 'own' | 'host';
     ],
     templateUrl: './grammar-editor.component.html',
 })
-export class GrammarEditorComponent {
+export class GrammarEditorComponent implements AfterViewInit {
     private readonly parsersApi = inject(ParsersService);
     private readonly fb = inject(FormBuilder);
+    private readonly destroyRef = inject(DestroyRef);
 
-    @ViewChild(InspectoSchemaFormComponent) schemaForm?: InspectoSchemaFormComponent;
+    /**
+     * Every mounted schema-form — ONE for a flat spec set, one PER TAB for a tabbed set (§4.1 of the
+     * delimited-grammar-properties plan). All host-facing reads go through the aggregation helpers
+     * below so neither shape leaks to adopters.
+     */
+    @ViewChildren(InspectoSchemaFormComponent) private schemaForms?: QueryList<InspectoSchemaFormComponent>;
+
+    /** The single form of a flat (untabbed) spec set — legacy accessor for specs/hosts. */
+    get schemaForm(): InspectoSchemaFormComponent | undefined {
+        return this.schemaForms?.first;
+    }
 
     /** The Grammar as stored (a nested `parsing:`-shaped block); reseeds the form. */
     @Input() set initial(v: Record<string, unknown> | undefined) {
@@ -188,6 +212,121 @@ export class GrammarEditorComponent {
         const plugin = this.pluginDef();
         return plugin ? fieldSpecsToAttributes(plugin.grammarSchema) : parsingAttributesFor(this.frontend());
     });
+
+    /**
+     * The tab split of the active spec set, or null to render flat. A set names tabs by `spec.tab`
+     * (GRAMMAR_TABS order); fewer than 2 distinct tabs ⇒ flat — json/fixedwidth/text_regex and every
+     * served plugin render byte-identical to before. Untabbed specs in a tabbed set fall into tab 1.
+     */
+    readonly tabs = computed<{ id: string; label: string; specs: AttributeSpec[] }[] | null>(() => {
+        const specs = this.specs();
+        const ids = new Set(specs.map((s) => s.tab).filter((t): t is string => !!t));
+        if (ids.size < 2) return null;
+        const fallback = GRAMMAR_TABS[0].id;
+        return GRAMMAR_TABS.filter((t) => ids.has(t.id) || (t.id === fallback && specs.some((s) => !s.tab))).map(
+            (t) => ({
+                ...t,
+                specs: specs.filter((s) => (s.tab ?? fallback) === t.id),
+            }),
+        );
+    });
+
+    /** The selected tab of a tabbed set — `validate()` steers it to the first failing tab. */
+    readonly activeTab = signal(0);
+
+    /**
+     * The seed with legacy scalar spellings normalised for `list` controls: an old block authored as
+     * `null_strings: "NULL,N/A"` (the pre-tab UI wrote comma-joined strings) seeds the chips split,
+     * exactly as the engine's own `strList` reads it — otherwise the stored value renders as an empty
+     * list and a save would silently drop it.
+     */
+    readonly seedValue = computed<Record<string, unknown>>(() => {
+        const seed = this.seed();
+        const out: Record<string, unknown> = { ...seed };
+        for (const s of this.specs()) {
+            const v = out[s.key];
+            if (s.type === 'list' && typeof v === 'string') {
+                const items = v
+                    .split(',')
+                    .map((x) => x.trim())
+                    .filter(Boolean);
+                out[s.key] = items.length ? items : null;
+            }
+        }
+        return out;
+    });
+
+    /** Bumped on any form value/status change — drives the tab badges under OnPush. */
+    private readonly formTick = signal(0);
+    private formSubs = new Subscription();
+
+    /**
+     * Per-tab badge state: how many values are set away from their declared default (the count chip),
+     * and whether the tab holds an invalid touched control (the warn dot) — the operator sees where
+     * configuration lives without hunting (§4.1).
+     */
+    readonly tabBadges = computed<{ set: number; invalid: boolean }[]>(() => {
+        this.formTick();
+        const tabs = this.tabs();
+        if (!tabs) return [];
+        const forms = this.forms();
+        return tabs.map((t, i) => {
+            const form = forms[i];
+            if (!form) return { set: 0, invalid: false };
+            const value = form.value();
+            const blank = (x: unknown): boolean =>
+                x === undefined || x === null || x === '' || (Array.isArray(x) && x.length === 0);
+            let set = 0;
+            for (const s of t.specs) {
+                const v = value[s.key];
+                const d = s.default;
+                if (blank(v) && blank(d)) continue;
+                if (!blank(v) && !blank(d) && String(v) === String(d)) continue;
+                set++;
+            }
+            return { set, invalid: form.form.invalid && form.form.touched };
+        });
+    });
+
+    ngAfterViewInit(): void {
+        this.schemaForms?.changes.subscribe(() => this.resubscribeForms());
+        this.resubscribeForms();
+        this.destroyRef.onDestroy(() => this.formSubs.unsubscribe());
+    }
+
+    /** Re-wire the badge tick to the CURRENT set of mounted forms (a spec/tab swap remounts them). */
+    private resubscribeForms(): void {
+        this.formSubs.unsubscribe();
+        this.formSubs = new Subscription();
+        for (const f of this.forms()) {
+            this.formSubs.add(
+                merge(f.form.valueChanges, f.form.statusChanges).subscribe(() =>
+                    this.formTick.update((n) => n + 1),
+                ),
+            );
+        }
+        this.formTick.update((n) => n + 1);
+    }
+
+    // ── schema-form aggregation (one flat form, or one per tab) ────────────────
+
+    private forms(): InspectoSchemaFormComponent[] {
+        return this.schemaForms?.toArray() ?? [];
+    }
+
+    /** The merged live values of every mounted form (keys share one flat namespace). */
+    private formsValue(): Record<string, unknown> {
+        return Object.assign({}, ...this.forms().map((f) => f.value()));
+    }
+
+    /** The control for a flat key, wherever it is mounted. */
+    private controlFor(key: string): AbstractControl | null {
+        for (const f of this.forms()) {
+            const c = f.form.get(key);
+            if (c) return c;
+        }
+        return null;
+    }
 
     readonly preview = signal<ParserPreview | null>(null);
     readonly error = signal<string | null>(null);
@@ -304,9 +443,10 @@ export class GrammarEditorComponent {
         // Reassigning `specs` REBUILDS every control from its declared default, and a stable `initial`
         // reference is not re-applied — so carry the current values across the switch or the operator's
         // typing vanishes. (The exact trap found extracting <inspecto-collector-config>.)
-        this.seed.update((s) => ({ ...s, ...(this.schemaForm?.value() ?? {}) }));
+        this.seed.update((s) => ({ ...s, ...this.formsValue() }));
         this.pluginDef.set(null);
         this.frontend.set(f);
+        this.activeTab.set(0);
         this.typeTouched.set(true);
         this.preview.set(null);
         this.error.set(null);
@@ -323,7 +463,7 @@ export class GrammarEditorComponent {
             return;
         }
         if (this.pluginDef()?.id === plugin.id) return;
-        this.seed.update((s) => ({ ...s, ...(this.schemaForm?.value() ?? {}) }));
+        this.seed.update((s) => ({ ...s, ...this.formsValue() }));
         this.pluginDef.set(plugin);
         // Selecting a PREVIEW-ONLY plugin is not an unsaved change: there is nothing to save, so
         // nothing can be lost by navigating away — and a host that treats it as dirty raises an
@@ -357,7 +497,7 @@ export class GrammarEditorComponent {
         if (delim && delim !== ',') {
             // The schema-form rebuilds its controls for the new frontend on the next render.
             setTimeout(() => {
-                const c = this.schemaForm?.form.get('delimited__delimiter');
+                const c = this.controlFor('delimited__delimiter');
                 c?.setValue(delim);
                 c?.markAsDirty();
             });
@@ -408,9 +548,19 @@ export class GrammarEditorComponent {
 
     // ── host API ─────────────────────────────────────────────────────────────
 
-    /** Validate the property sheet and (for fixed width) the slice table. */
+    /** Validate every property sheet (all tabs) and (for fixed width) the slice table. */
     validate(): boolean {
-        if (!this.schemaForm?.validate()) return false;
+        // Validate ALL forms (marking each invalid one touched), then steer to the first failing tab
+        // rather than short-circuiting — cross-tab errors must all light up their badges at once.
+        let firstFailing = -1;
+        const forms = this.forms();
+        for (let i = 0; i < forms.length; i++) {
+            if (!forms[i].validate() && firstFailing < 0) firstFailing = i;
+        }
+        if (firstFailing >= 0) {
+            if (this.tabs()) this.activeTab.set(firstFailing);
+            return false;
+        }
         if (
             !this.pluginDef() &&
             this.frontend() === 'fixedwidth' &&
@@ -424,18 +574,18 @@ export class GrammarEditorComponent {
     }
 
     isDirty(): boolean {
-        return (this.schemaForm?.isDirty() ?? false) || this.fwForm.dirty || this.typeTouched();
+        return this.forms().some((f) => f.isDirty()) || this.fwForm.dirty || this.typeTouched();
     }
 
     markPristine(): void {
-        this.schemaForm?.form.markAsPristine();
+        for (const f of this.forms()) f.form.markAsPristine();
         this.fwForm.markAsPristine();
         this.typeTouched.set(false);
     }
 
     /** The nested grammar map as authored — a plugin's served options, or the built-in sub-blocks. */
     grammar(): Record<string, unknown> {
-        return nestKeys(this.schemaForm?.value() ?? {});
+        return nestKeys(this.formsValue());
     }
 
     /**

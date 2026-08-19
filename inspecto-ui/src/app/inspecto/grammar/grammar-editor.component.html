@@ -69,7 +69,61 @@
 <!-- ── properties ──────────────────────────────────────────────────────────── -->
 <div class="mt-4">
     <div class="mb-1 text-xs font-semibold uppercase opacity-70">Options</div>
-    <inspecto-schema-form [specs]="specs()" [initial]="seed()" (submitted)="submitted.emit()" />
+    @if (tabs(); as ts) {
+        <!-- Tabbed spec set (delimited, §4.1): the mat-tab-group is the TAB BAR ONLY — the panels
+             live below it, always mounted and [hidden]-toggled. MatTab instantiates a tab's body
+             content on FIRST ACTIVATION, so forms inside the bodies would be invisible to
+             value()/validate() until visited — a save would silently drop unvisited tabs' values
+             (the R9 [hidden]-wrap rule: schema-form ViewChilds must survive, never @if/@case). -->
+        <mat-tab-group [selectedIndex]="activeTab()" (selectedIndexChange)="activeTab.set($event)">
+            @for (t of ts; track t.id; let i = $index) {
+                <mat-tab>
+                    <ng-template mat-tab-label>
+                        <span>{{ t.label }}</span>
+                        @if (tabBadges()[i]; as b) {
+                            @if (b.set > 0) {
+                                <span
+                                    class="bg-hover ml-1.5 rounded-full px-1.5 text-xs tabular-nums"
+                                    [attr.aria-label]="b.set + ' options set'"
+                                    >{{ b.set }}</span
+                                >
+                            }
+                            @if (b.invalid) {
+                                <span class="text-warn ml-1" aria-label="This tab has an invalid value">⚠</span>
+                            }
+                        }
+                    </ng-template>
+                </mat-tab>
+            }
+        </mat-tab-group>
+        @for (t of ts; track t.id; let i = $index) {
+            <div class="pt-3" [class.hidden]="activeTab() !== i" role="tabpanel" [attr.aria-label]="t.label">
+                <inspecto-schema-form [specs]="t.specs" [initial]="seedValue()" (submitted)="submitted.emit()" />
+                @if (t.id === 'types') {
+                    <!-- Host-owned write-path content (the drawer's columns table). -->
+                    <ng-content select="[tabTypes]"></ng-content>
+                }
+                @if (t.id === 'robustness') {
+                    <div class="mt-3">
+                        <inspecto-alert variant="info">
+                            Unparseable rows are never dropped: they land in the rejects ledger. The
+                            <em>rejected</em> chip after Test parse counts them.
+                        </inspecto-alert>
+                    </div>
+                }
+                @if (t.id === 'files') {
+                    <ng-content select="[tabFiles]"></ng-content>
+                    <div class="mt-3">
+                        <inspecto-alert variant="info">
+                            Which files are read is configured on this pipeline's Collection step.
+                        </inspecto-alert>
+                    </div>
+                }
+            </div>
+        }
+    } @else {
+        <inspecto-schema-form [specs]="specs()" [initial]="seedValue()" (submitted)="submitted.emit()" />
+    }
 </div>
 
 <!-- Fixed-width slices: positional, so there is nothing a flat spec table could express. -->

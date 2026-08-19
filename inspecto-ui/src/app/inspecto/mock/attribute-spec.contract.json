@@ -6,5 +6,5 @@
     "default", "dependsOn", "help", "key", "label", "max", "min",
     "options", "pattern", "placeholder", "required", "tier", "type"
   ],
-  "frontendOnlyKeys": [ "group", "secret" ]
+  "frontendOnlyKeys": [ "group", "secret", "tab" ]
 }

@@ -82,6 +82,12 @@ export interface AttributeSpec {
      *  beneath one heading in declaration order; ungrouped specs render bare, as before. Grouping never
      *  crosses a tier: disclosure is the outer structure and a heading only organises what is shown. */
     group?: string;
+    /** Tab this attribute renders on, for editors that split one spec set across a `mat-tab-group`
+     *  (the Grammar editor's 4-tab delimited surface). Distinct from `group`, which is a heading
+     *  WITHIN a tier: `tab` partitions the whole set — each tab gets its own schema-form, tiers and
+     *  groups apply per tab. A set with fewer than 2 distinct tabs renders flat, exactly as before.
+     *  Frontend-only, like `group`: never authorable on a findings section. */
+    tab?: string;
     /** Mask the value on input (renders a password field). Presentation only — masking what the API
      *  reads BACK is the server's job at the response boundary, never this flag's. */
     secret?: boolean;
@@ -109,6 +115,7 @@ const ATTRIBUTE_KEY_SET: Record<keyof Required<AttributeSpec>, true> = {
     help: true,
     placeholder: true,
     group: true,
+    tab: true,
     secret: true,
 };
 

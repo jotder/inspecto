@@ -1,8 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { ParserDef, ParserPreview, ParsersService } from 'app/inspecto/api';
+import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { GrammarEditorComponent } from './grammar-editor.component';
 
@@ -259,6 +261,79 @@ describe('GrammarEditorComponent', () => {
 
     it('has no a11y violations', async () => {
         const fixture = create({}, [XML]);
+
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    // ── the 4-tab delimited surface (delimited-grammar-properties plan §4.1, U1) ──
+
+    it('renders the delimited spec set as 4 tabs', () => {
+        const fixture = create({ frontend: 'delimited' });
+        const labels = Array.from(fixture.nativeElement.querySelectorAll('.mat-mdc-tab')).map((e) =>
+            (e as HTMLElement).textContent?.trim(),
+        );
+        expect(labels).toHaveLength(4);
+        expect(labels[0]).toContain('Dialect / parsing');
+        expect(labels[1]).toContain('Types & columns');
+        expect(labels[2]).toContain('Robustness / error handling');
+        expect(labels[3]).toContain('Files & metadata');
+    });
+
+    it('renders an untabbed spec set (json) flat, exactly as before', () => {
+        const flat = create({ frontend: 'json' });
+        expect(flat.nativeElement.querySelector('mat-tab-group')).toBeNull();
+        expect(flat.nativeElement.querySelectorAll('inspecto-schema-form')).toHaveLength(1);
+    });
+
+    it('keeps every tab panel MOUNTED so value() sees unvisited tabs', () => {
+        // MatTab bodies instantiate on first activation — the panels live OUTSIDE them, [hidden]-
+        // toggled (the R9 rule). A save from tab 1 must still carry tab 3's seeded values.
+        const fixture = create({
+            frontend: 'delimited',
+            delimited: { delimiter: '|', where: 'amount > 0' },
+        });
+
+        expect(fixture.nativeElement.querySelectorAll('inspecto-schema-form')).toHaveLength(4);
+        const delimited = fixture.componentInstance.value()['delimited'] as Record<string, unknown>;
+        expect(delimited['delimiter']).toBe('|');
+        expect(delimited['where']).toBe('amount > 0');
+    });
+
+    it('validate() steers to the first failing tab', () => {
+        const fixture = create({ frontend: 'delimited' });
+        const c = fixture.componentInstance;
+        const forms = fixture.debugElement
+            .queryAll(By.directive(InspectoSchemaFormComponent))
+            .map((d) => d.componentInstance as InspectoSchemaFormComponent);
+        // filter_target_column lives on the Robustness tab (index 2); min is 0.
+        forms[2].form.get('delimited__filter_target_column')?.setValue(-1);
+
+        expect(c.validate()).toBe(false);
+        expect(c.activeTab()).toBe(2);
+    });
+
+    it('shows a count badge for values set away from default', () => {
+        const fixture = create({ frontend: 'delimited', delimited: { quote: "'" } });
+        fixture.detectChanges();
+
+        // quote has no default, so seeding it counts as one set value on the Dialect tab.
+        expect(fixture.componentInstance.tabBadges()[0].set).toBeGreaterThanOrEqual(1);
+        // delimiter ',' and has_header true ARE the defaults — they must not inflate the count.
+        expect(fixture.componentInstance.tabBadges()[0].set).toBe(1);
+    });
+
+    it('normalizes a legacy comma-joined null_strings string into list chips', () => {
+        // The pre-tab UI wrote null_strings as a comma-joined STRING; the engine's strList reads
+        // both. Seeding the list control with the raw string would render empty chips and a save
+        // would silently drop the stored value.
+        const fixture = create({ frontend: 'delimited', delimited: { null_strings: 'NULL,N/A' } });
+
+        const delimited = fixture.componentInstance.value()['delimited'] as Record<string, unknown>;
+        expect(delimited['null_strings']).toEqual(['NULL', 'N/A']);
+    });
+
+    it('has no a11y violations on the tabbed surface', async () => {
+        const fixture = create({ frontend: 'delimited' });
 
         await expectNoA11yViolations(fixture.nativeElement);
     });

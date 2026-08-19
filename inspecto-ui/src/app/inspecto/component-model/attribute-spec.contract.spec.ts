@@ -46,9 +46,9 @@ describe('AttributeSpec vocabulary contract', () => {
         expect(overlap).toEqual([]);
     });
 
-    /** ⚠ The deliberate asymmetry, stated rather than implied — `group` and `secret` are not authorable
-     *  on a findings section, and the Java side asserts the parser really refuses them. */
-    it('records group and secret as the frontend-only pair', () => {
-        expect(ATTRIBUTE_CONTRACT.frontendOnlyKeys).toEqual(['group', 'secret']);
+    /** ⚠ The deliberate asymmetry, stated rather than implied — `group`, `secret` and `tab` are not
+     *  authorable on a findings section, and the Java side asserts the parser really refuses them. */
+    it('records group, secret and tab as the frontend-only keys', () => {
+        expect(ATTRIBUTE_CONTRACT.frontendOnlyKeys).toEqual(['group', 'secret', 'tab']);
     });
 });
