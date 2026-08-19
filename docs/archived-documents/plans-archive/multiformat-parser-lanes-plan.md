@@ -1,6 +1,6 @@
 # Plan — Multi-format parser lanes: Excel (new), JSON/NDJSON + Fixed-length (enriched), tabbed UI for all three
 
-**Status:** IN FLIGHT (opened 2026-08-19, operator-directed). **Parent:** operator request 2026-08-19
+**Status:** COMPLETE + ARCHIVED 2026-08-20 — X1-X4, J1, F1, D1 all shipped (X gates 3489→3493/0/0/5 + UI 2659/5 exit 0 + AOT). As-built: okf/frontend/features/grammar-config.md (the multiformat section) + okf/backend/config/parsing-options-reference.md §6.4/§6.4b. Nothing open. **Parent:** operator request 2026-08-19
 ("a parser for Excel like delimited on the DuckDB excel extension; similar for fixed length and
 JSON/NDJSON; fixed length with single-column reader + vectorized slicing; robust grammars + an
 elegant, intuitive UI for all options"). **Concept homes on ship:**

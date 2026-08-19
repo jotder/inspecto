@@ -75,6 +75,19 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- ~~`superpower/multiformat-parser-lanes-plan.md`~~ — **COMPLETE and ARCHIVED 2026-08-20**
+  ([archive copy](archived-documents/plans-archive/multiformat-parser-lanes-plan.md)). Excel joins
+  the parser family end to end (new `frontend: xlsx` on DuckDB `read_xlsx`; the `excel` extension
+  is NOT statically linked — `ExcelExtension` loads it fail-closed in three layers, air-gap via
+  `-Dduckdb.extension.dir`; `PARSER_XLSX` node type; binary `sample_b64` preview + B2 sniff; the
+  tabbed *Sheet & range* drawer); JSON gains the two honest `read_json` knobs (array/auto only —
+  probed: `ignore_errors` keeps a malformed record as an all-NULL row, `maximum_object_size` is
+  clamped and pinned at assembly level) and the *Format & records* tabs; fixed length keeps its
+  single-column + vectorized-substring engine (already shipped — the ask was UI) and gains the
+  *Record layout* tabs with the slice table homed into tab 1. As-built:
+  [okf/frontend/features/grammar-config.md](okf/frontend/features/grammar-config.md) +
+  [okf/backend/config/parsing-options-reference.md](okf/backend/config/parsing-options-reference.md).
+
 - ~~`superpower/delimited-grammar-properties-plan.md`~~ — **COMPLETE and ARCHIVED 2026-08-19**
   ([archive copy](archived-documents/plans-archive/delimited-grammar-properties-plan.md)). The
   delimited Grammar properties redesign, shipped same-day: B1 quote/escape/comment pass-through on

@@ -74,6 +74,32 @@ What else the redesign shipped, all §-referenced to the plan (in `superpower/` 
   verbatim. ⚠ The host's `renameSelected` deliberately bypasses `applyNodePatch`: a rename is not
   a config edit and must not invalidate the node's test outcome.
 
+## Every DuckDB-native format is a tabbed lane now (multiformat plan, 2026-08-19/20)
+
+The delimited redesign's shell generalized: **xlsx** (new, DuckDB `read_xlsx` via the `excel`
+extension — see `okf/backend/config/parsing-options-reference.md` §6.4b for the engine lane and
+the fail-closed `ExcelExtension` loading), **json** and **fixedwidth** each render the 4-tab
+surface with their own first-tab language via `grammarTabsFor` (*Sheet & range* · *Format &
+records* · *Record layout*); `text_regex` stays flat. Load-bearing facts:
+
+- **The `files` tab is ANCHORED even specless** — it carries the Collection pointer and the
+  host-projected column-metadata grid, not options (xlsx has no file-level option at all).
+- **The fixed-width slice table lives INSIDE tab 1** — one `ng-template` (`#fwSliceTable`) mounted
+  in either shell (tabbed panel or flat flow), never two copies.
+- **A workbook sample is BYTES**: the sample thread and the editor's own file box capture `.xlsx`
+  as base64 (`sample.b64`; refused whole when oversized — a sliced zip is unreadable), the preview
+  transport sends `sample_b64`, and typing a text sample clears the captured bytes. The offline
+  mock REFUSES the xlsx preview honestly (the ASN.1 precedent).
+- **Grammar CSV keys are bare engine names for every frontend** (`engineKeyOf` strips any
+  `<frontend>__` prefix — `meta.format` scopes them), with back-compat for files exported under
+  the raw spec-key spelling.
+- ⚠ Two probed `read_json` refutations recorded in `parsing-options-reference.md` §6.4: J1's
+  `ignore_errors` keeps a malformed record as an **all-NULL row** (never "skipped"), and
+  `maximum_object_size` is **clamped** to the reader's buffer — unobservable at fixture scale,
+  pinned at assembly level only.
+- ⚠ Spec trap: `mat-tab-group` renders its own EMPTY `[role="tabpanel"]` bodies before our
+  `[hidden]` panels — a spec must select panels by `aria-label` or it asserts against Material.
+
 ## Two hosts in the Pipelines editor — and the dialog is nearly gone (2026-08-15)
 
 Definition-surface P3a moved the common case out of the popup: a **`parser.delimited`** node defines in the
