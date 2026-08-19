@@ -75,6 +75,21 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- [`superpower/delimited-grammar-properties-plan.md`](superpower/delimited-grammar-properties-plan.md) —
+  **IN FLIGHT — approved 2026-08-19 with the recommended §9/§14 decisions**. The delimited Grammar
+  properties redesign:
+  4-tab surface (Dialect / Types & columns / Robustness / Files & metadata) inside
+  `<inspecto-grammar-editor>`, the columns table reordered with an icon-only type menu + a new unique
+  per-column `synonym`, a Data-types Auto/Declared mode fed by preview-inferred types, CSV
+  export/import replacing Save-as-template, and a drawer maximize. Backend slices: `quote`/`escape`/
+  `comment` pass-through into `CsvSettings` (today silently dropped), preview `columnTypes`, additive
+  schema `synonym`, and sink `filename_column` lineage (B4 — hive-partitioned output and parallel
+  batches already ship; re-homed in the plan's §10). **Part II (§11–14)** adds the DuckDB-centric
+  execution-core direction: one writer with truly optional partitioning (the ingest lane's
+  `year=1900` sentinel bucket retired for unkeyed pipelines), one partition grammar, the
+  Appender-based wrap-SPI canonized (ASN.1 as reference), and a finalization-concurrency stress pin
+  — while the branch-aware/output-parity territory stays gated in the ELT amendment plan.
+
 - ~~`superpower/java-codebase-review-sweep.md`~~ — **COMPLETE and ARCHIVED 2026-08-18**
   ([archive copy](archived-documents/plans-archive/java-codebase-review-sweep.md), kept for the
   per-file evidence base). The module-by-module Java review: 13 fixes in the first pass, then JAVA-1…6
