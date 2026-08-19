@@ -158,6 +158,19 @@ src/app/
   even when `GET /parsers` fails; never "fix" that into an empty list. ⚠ A saved plugin is identified by
   its **`ingesterClass` FQCN**, never the parser id, so re-selection can only happen off the served
   catalog — and `configuredIngester` is a SETTER because inputs are not bound when the constructor runs.
+  **Since 2026-08-19 (delimited-grammar-properties U1–U5):** the delimited spec set renders as a
+  **4-tab surface** driven by the frontend-only `AttributeSpec.tab` field (≥2 distinct tabs ⇒ a
+  `mat-tab-group`, one schema-form per tab; anything else renders flat). ⚠ **The tab PANELS live
+  OUTSIDE the mat-tab bodies, `[hidden]`-toggled** — MatTab instantiates body content on first
+  activation, so forms inside would be invisible to `value()`/`validate()` until visited (silent
+  loss on save; the R9 rule). Hosts project write-path content via the `[tabTypes]`/`[tabFiles]`
+  slots (rendered below the flat form for untabbed formats). ⛔ Don't give `engine`/`strict_mode`
+  spec defaults — a default materializes into every `value()` and mutates faithful copies of stored
+  grammars. The portable template is the **Grammar CSV** (`inspecto/grammar/grammar-csv.ts`,
+  `<pipeline>_parser.csv`) — Save-as-template is gone from both parse surfaces; unknown option keys
+  are LISTED, never applied. The columns table (`inspecto/schema/`) is ordered ①include ②# ③icon-only
+  type menu ④name ⑤synonym (unique across synonyms ∪ names), with `[autoTypes]` disabling the menu in
+  Auto mode.
   ⚠ The segments editor stays HOST-side (projected via `[grammarExtras]`): segments need one schema
   `.toon` written per segment before the block that references them, which is a write path this
   component deliberately does not have. ⚠ **A host must never read a shared component through

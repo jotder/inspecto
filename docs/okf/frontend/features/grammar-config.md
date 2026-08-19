@@ -4,17 +4,66 @@ title: Grammar configuration (the one surface)
 description: The single shared surface and single store contract behind both Grammar-authoring screens.
 resource: inspecto-ui/src/app/inspecto/grammar/grammar-editor.component.ts
 tags: [feature, parsing, onboarding, pipelines, grammar]
-timestamp: 2026-08-04T00:00:00Z
+timestamp: 2026-08-19T00:00:00Z
 ---
 
 # Grammar configuration
 
-Two screens author how raw bytes become rows — a **Grammar** (`docs/GLOSSARY.md` §Grammar; ⛔ never
-"parser config" / "parse options", banned synonyms) — and they are now **one** feature:
+One surface authors how raw bytes become rows — a **Grammar** (`docs/GLOSSARY.md` §Grammar; ⛔ never
+"parser config" / "parse options", banned synonyms):
 
-- Onboarding's **Parsing** stage (`/catalog/onboard/<name>/parsing`) — see [Onboarding](onboarding.md);
 - the Pipelines editor's **`parse`** node — since 2026-08-15 either the right-dock **Parse drawer** or the
   `GrammarEditorDialog`, split by the rule below — see [Pipelines](pipelines.md).
+
+⚠ **The Onboarding Parsing stage no longer exists** (P6-e, definition-surface unification): the drawer
+and the dialog are the only two adopters of `<inspecto-grammar-editor>` today. Earlier sections below
+that mention the stage describe history, not a live host.
+
+## The 4-tab delimited surface (U1–U5, delimited-grammar-properties plan, 2026-08-19)
+
+The delimited Grammar renders as **four tabs** — *Dialect / parsing* · *Types & columns* ·
+*Robustness / error handling* · *Files & metadata* — driven by a new frontend-only
+`AttributeSpec.tab` field (distinct from `group`, which is a heading within a tier). A spec set
+naming ≥ 2 tabs renders a `mat-tab-group` with one `<inspecto-schema-form>` per tab, count badges
+for values set away from default and a warn dot on an invalid tab; `validate()` steers to the first
+failing tab. Every other format (and every served plugin) renders flat, byte-identical to before.
+
+⚠ **The tab PANELS live outside the `mat-tab` bodies, `[hidden]`-toggled** (the R9 rule): MatTab
+instantiates body content on FIRST ACTIVATION, so forms inside the bodies would be invisible to
+`value()`/`validate()` until visited and a save would silently drop unvisited tabs' values. The
+editor aggregates per-tab forms behind the same host API (`value()` merges, `isDirty()` any,
+`markPristine()` loops); hosts keep reading it exactly as before.
+
+What else the redesign shipped, all §-referenced to the plan (in `superpower/` until archived):
+
+- **The full live key set** — `parsingAttributesFor('delimited')` now offers every engine-read key,
+  including B1's `quote`/`escape`/`comment` (single-char, fail-closed at load; escape defaults to
+  the quote char — RFC-4180 doubling — on BOTH engines). ⛔ `engine`/`strict_mode` carry **no spec
+  default**: a default materializes into every `value()` and would mutate faithful copies of stored
+  grammars.
+- **Columns table ①–⑤** (`<inspecto-schema-fields-editor>`): include / `#` sequence / **icon-only
+  type menu** (mat-menu over the four honest `SCHEMA_TYPES`; no classic dropdown) / Name /
+  **Synonym** — a new optional identifier, unique across synonyms ∪ names (D3), persisted as the
+  additive `raw.fields[].synonym` (B3, ETL-ignored, Catalog-read). A read-only Source column appears
+  only for name-based frontends (`[nameBasedSelectors]`).
+- **Data types Auto/Declared** (§4.4): previews return additive `columnTypes` from a server-side
+  `auto_detect` sniff (B2, delimited only); Auto (the default for new steps, D2) seeds the icons
+  read-only and the save snapshots the inferred set — declared = inferred by construction; Declared
+  offers an "Apply suggested types" chip. The mode persists as `raw.types` on the schema companion;
+  a markerless schema loads Declared. The offline mock serves a deterministic inferrer, never more
+  lenient.
+- **Grammar CSV round-trip** (§4.5, `inspecto/grammar/grammar-csv.ts`) — replaced *Save as
+  template…* on BOTH adopters: export/import of the whole property set (engine-named option keys +
+  columns + the types marker) as `<pipeline>_parser.csv`. Import refuses a format mismatch, lists
+  unknown keys WITHOUT applying them, and replaces the columns wholesale behind a confirm.
+  "Start from a template" stays; stored templates are created in the Components registry
+  (`GrammarTemplateDialog` deleted).
+- **Drawer maximize** (§4.6): the shared `<inspecto-definition-drawer>` toggle emits
+  `(maximizedChange)`; the pipeline-editor binds the dock to 100% over the canvas, split handle
+  kept MOUNTED (`[class.hidden]`, never `@if`).
+- ⚠ **Name/Description were NOT removed** despite the operator ask: drawer-parse nodes never reach
+  `NodeConfigDialog`, so the drawer's Name field is their ONLY rename path. Deferred until the
+  canvas grows a node rename (BACKLOG).
 
 ## Two hosts in the Pipelines editor — and the dialog is nearly gone (2026-08-15)
 

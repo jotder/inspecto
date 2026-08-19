@@ -75,20 +75,22 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
-- [`superpower/delimited-grammar-properties-plan.md`](superpower/delimited-grammar-properties-plan.md) —
-  **IN FLIGHT — approved 2026-08-19 with the recommended §9/§14 decisions**. The delimited Grammar
-  properties redesign:
-  4-tab surface (Dialect / Types & columns / Robustness / Files & metadata) inside
-  `<inspecto-grammar-editor>`, the columns table reordered with an icon-only type menu + a new unique
-  per-column `synonym`, a Data-types Auto/Declared mode fed by preview-inferred types, CSV
-  export/import replacing Save-as-template, and a drawer maximize. Backend slices: `quote`/`escape`/
-  `comment` pass-through into `CsvSettings` (today silently dropped), preview `columnTypes`, additive
-  schema `synonym`, and sink `filename_column` lineage (B4 — hive-partitioned output and parallel
-  batches already ship; re-homed in the plan's §10). **Part II (§11–14)** adds the DuckDB-centric
-  execution-core direction: one writer with truly optional partitioning (the ingest lane's
-  `year=1900` sentinel bucket retired for unkeyed pipelines), one partition grammar, the
-  Appender-based wrap-SPI canonized (ASN.1 as reference), and a finalization-concurrency stress pin
-  — while the branch-aware/output-parity territory stays gated in the ELT amendment plan.
+- ~~`superpower/delimited-grammar-properties-plan.md`~~ — **COMPLETE and ARCHIVED 2026-08-19**
+  ([archive copy](archived-documents/plans-archive/delimited-grammar-properties-plan.md)). The
+  delimited Grammar properties redesign, shipped same-day: B1 quote/escape/comment pass-through on
+  both engines (escape defaults to the quote — RFC doubling); B2 preview-inferred `columnTypes`;
+  B3 additive schema `synonym` + `raw.types`; B4 `filename_column` source-file lineage (ingest +
+  wrap lanes; graph lane refused — data at rest has no source files); U1 the 4-tab editor surface
+  (`AttributeSpec.tab`, panels `[hidden]`-mounted outside the MatTab bodies); U2 the ①–⑤ columns
+  table with icon-only type menu + unique synonym; U3 Data-types Auto/Declared persisted as
+  `raw.types`; U4 the Grammar CSV round-trip replacing Save-as-template (`GrammarTemplateDialog`
+  deleted; Name/Description KEPT — the drawer is those nodes' only rename path); U5 drawer maximize.
+  Part II: E1 one writer with truly optional partitioning (the `year=1900` sentinel retired for new
+  writes), E3 the wrap-SPI canonized (`okf/backend/engine/ingest-wrap-spi.md`) + end-to-end contract
+  test, E4 the ledger-contiguity stress pin (narrowed). **E2 REFUSED** — `SinkPartitions` records the
+  deliberate two-contract split. Deferrals in BACKLOG §4. As-built:
+  `okf/frontend/features/grammar-config.md` · `okf/backend/engine/ingest-wrap-spi.md` ·
+  `okf/backend/config/parsing-options-reference.md`.
 
 - ~~`superpower/java-codebase-review-sweep.md`~~ — **COMPLETE and ARCHIVED 2026-08-18**
   ([archive copy](archived-documents/plans-archive/java-codebase-review-sweep.md), kept for the

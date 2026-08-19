@@ -1,8 +1,10 @@
 # Plan — Delimited Grammar properties: 4-tab surface, typed columns table, CSV round-trip
 
-**Status:** IN FLIGHT — grounded 2026-08-19; operator approved 2026-08-19 with the recommended
-decisions (D1 (b) · D2 Auto · D3 synonyms ∪ names · D4 refuse · D5 keep 4 · D6 leave in place).
-· **Opened:** 2026-08-19
+**Status:** COMPLETE + ARCHIVED 2026-08-19 — B1–B4, U1–U5, E1, E3, E4 shipped (E2 refused, see §13;
+D1's tab-4 metadata grid deferred with the gallery + canvas-rename rows to BACKLOG §4). As-built in
+`okf/frontend/features/grammar-config.md` + `okf/backend/engine/ingest-wrap-spi.md` +
+`okf/backend/config/parsing-options-reference.md`. Decisions applied: D1 (b, deferred UI) · D2 Auto ·
+D3 synonyms ∪ names · D4 refuse · D5 keep 4 · D6 leave in place. · **Opened:** 2026-08-19
 **Parent item:** operator request 2026-08-19 (redesign of the delimited parse-step properties on the
 pipeline canvas). · **Concept home on ship:**
 [`../okf/frontend/features/grammar-config.md`](../okf/frontend/features/grammar-config.md) +
