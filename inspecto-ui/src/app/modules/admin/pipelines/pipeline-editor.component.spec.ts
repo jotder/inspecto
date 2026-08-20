@@ -583,6 +583,49 @@ describe('PipelineEditorComponent', () => {
             }));
             expect(c.unsupportedNodes()).toEqual([]);
         });
+
+        /**
+         * The generic `parser` type joined READ_COMPAT_ONLY 2026-08-20: every per-format subtype
+         * exists now, so a NEW generic node is a dead end. It must still load unchanged — the
+         * legacy-delimited-implicit and dialog-bound `use: grammar/<id>` paths both carry it.
+         */
+        it('hides the generic parser type from the palette while a bound one still loads', () => {
+            api.nodeTypes.mockReturnValue(
+                of([
+                    {
+                        type: 'parser',
+                        category: 'PARSE',
+                        label: 'Parser',
+                        description: '',
+                        accepts: ['data'],
+                        emits: ['data', 'unmatched'],
+                        emitsNamedRoutes: true,
+                        lowerable: true,
+                        authorable: false,
+                    },
+                    {
+                        type: 'parser.delimited',
+                        category: 'PARSE',
+                        label: 'Delimited',
+                        description: '',
+                        accepts: ['data'],
+                        emits: ['data', 'unmatched'],
+                        emitsNamedRoutes: true,
+                        lowerable: true,
+                        authorable: true,
+                    },
+                ]),
+            );
+            const c = make();
+            expect(c.paletteGroups().flatMap((g) => g.types.map((t) => t.type))).toEqual(['parser.delimited']);
+
+            c.select('demo');
+            c.model.update((m) => ({
+                ...m!,
+                nodes: [...m!.nodes, { id: 'legacy_parse', type: 'parser', use: 'grammar/cdr_csv', config: {} }],
+            }));
+            expect(c.unsupportedNodes()).toEqual([]);
+        });
     });
 
     /**

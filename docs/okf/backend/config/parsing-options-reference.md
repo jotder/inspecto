@@ -186,7 +186,9 @@ parsing:
   # ── frontend: delimited (today's csv_settings, plus the [NATIVE] knobs) ──────
   delimited:
     delimiter: ","
-    quote: '"'
+    quote: "\""        # ⚠ TOON has no single-quote string delimiter — '"' parses as the LITERAL
+                        # three characters '"' , not a quoted ". Escape the double quote instead
+                        # (probed 2026-08-20 while authoring spaces/default/config/csv_example/).
     escape: '"'
     comment: "#"
     has_header: true
@@ -333,13 +335,26 @@ failing the batch (they carry no `store_rejects` entry, so they do not land in t
 Explicit `json.columns` typing is unnecessary (the engine lands VARCHAR and types at transform).
 
 **Reader knobs (multiformat J1, 2026-08-20 — `format: array | auto` ONLY; refused at load under
-`newline`, whose line reader has neither):** `json.ignore_errors` — ⚠ probed semantics, not the
-docs' surface: with our explicit columns map a malformed record lands as an **all-NULL row**, kept
-not skipped, instead of failing the file. `json.maximum_object_size` — byte bound on a single
+`newline`, whose line reader has neither):** `json.maximum_object_size` — byte bound on a single
 document/record the reader buffers (blank = engine default). ⚠ Probed: read_json CLAMPS it up to
 its internal buffer, so it is unobservable at small scale — its real job is a memory ceiling for
 huge documents, and the test pin is assembly-level (option emitted, spelled right, accepted), not
-behavioral. Both knobs also ride `read_json_objects` on the nested `records_path` path.
+behavioral. Rides `read_json_objects` on the nested `records_path` path too.
+
+`json.ignore_errors` — ⚠ **a second, sharper probed refutation, found while designing the format
+example.** DuckDB's `read_json` honors `ignore_errors` **only when the resolved shape is
+`newline_delimited`** — for a genuine JSON-array or single-object document it HARD-REJECTS the
+option: *"Parse errors cannot be ignored for JSON formats other than 'newline_delimited'"*. This
+holds for `read_json_objects` too (the nested `records_path` path), so it is not an `array`-only
+quirk. Consequences:
+- `format: array` **always** resolves to that rejected shape, so a config combining
+  `format: array` + `ignore_errors: true` would load looking honored and then fail every batch at
+  ingest — **refused at config load instead** (`PipelineConfigParser.parseJson`).
+- `format: auto` is content-dependent: DuckDB's own sniff decides the actual shape, so
+  `ignore_errors` takes effect only when the file *itself* looks line-delimited (multiple
+  JSON-ish values separated by newlines) — which is exactly what `JsonParsingTest`'s passing
+  fixture is, not a general array/object document. The UI gates the field to `format: auto` only
+  and documents this precisely; it is not offered under `array`.
 
 **Nested `records_path` (2026-07-31).** When the records sit in an array *inside* the document, point
 `records_path` at it with the **same dotted convention as a field selector** — `payload.records`, or

@@ -238,6 +238,12 @@ class JsonParsingTest {
 
     // ── J1: the read_json reader knobs (array/auto only) ────────────────────────
 
+    /**
+     * ⚠ format: auto over multi-line JSON-ish content resolves to DuckDB's OWN newline_delimited
+     * shape by its own sniff — which is the only shape ignore_errors is honored for at all (probed;
+     * see {@link #ignoreErrorsUnderExplicitArrayFormatFailsLoad}). This test's fixture works BECAUSE
+     * it looks like NDJSON to the sniffer, not because ignore_errors is unconditionally honored.
+     */
     @Test
     void ignoreErrorsSkipsAMalformedRecordInsteadOfFailingTheFile(@TempDir Path dir) throws Exception {
         String parsing = PARSING.replace("format: newline", "format: auto") + "    ignore_errors: true\n";
@@ -293,6 +299,18 @@ class JsonParsingTest {
             IngestResult r = DuckDbCsvIngester.ingest(json, conn, cfg.schemas().single(), cfg, "raw_f0");
             assertEquals(1, r.parsedRows(), "read_json accepted the emitted maximum_object_size option");
         }
+    }
+
+    /**
+     * ⚠ Probed refutation: format: array is a genuine JSON-array document, and DuckDB HARD-REJECTS
+     * ignore_errors for any shape other than newline_delimited — a config combining them would load
+     * looking honored and fail every batch at ingest. Refused at config load instead.
+     */
+    @Test
+    void ignoreErrorsUnderExplicitArrayFormatFailsLoad(@TempDir Path dir) {
+        String parsing = PARSING.replace("format: newline", "format: array") + "    ignore_errors: true\n";
+        Exception e = assertThrows(IllegalArgumentException.class, () -> load(dir, "iea", parsing));
+        assertTrue(e.getMessage().contains("format: array"), e.getMessage());
     }
 
     /** The knobs belong to read_json — NDJSON's line reader has neither, so they refuse at load. */

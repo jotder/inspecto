@@ -3,7 +3,7 @@ import { PIPELINES_COLL } from '../handlers/pipelines.handler';
 import { PIPELINE_CONFIGS_COLL, type StoredPipelineConfig } from '../handlers/onboarding.handler';
 import { MockStore } from '../mock-store';
 import { seedOperations } from './operations.seed';
-import { seedPipelineCaseStudies } from './pipeline-case-studies.seed';
+import { seedFormatExamplePipelines } from './format-examples.seed';
 import { putComponent, seedIconMap, seedPatternPacks } from './seed-utils';
 
 /**
@@ -531,7 +531,7 @@ export function seedDefaultSpace(store: MockStore, space: string): void {
 
     // ── Pipeline case-study pack CS1–CS5 (docs/superpower/pipeline-case-studies.md):
     //    five boundary-pushing authored pipelines + their reusable grammars ─────────────────────
-    seedPipelineCaseStudies(store, space);
+    seedFormatExamplePipelines(store, space);
 
     // ── Processor icon map (category defaults + sub-type overrides) ─────────────────────────────
     seedIconMap(store, space);

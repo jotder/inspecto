@@ -1,0 +1,41 @@
+name: excel_example
+active: true
+version: 1
+
+dirs:
+  poll:       spaces/default/data/inbox/excel_example
+  database:   spaces/default/data/excel_example/database
+  backup:     spaces/default/data/excel_example/backup
+  temp:       spaces/default/data/excel_example/temp
+  errors:     spaces/default/data/excel_example/errors
+  quarantine: spaces/default/data/excel_example/quarantine
+  markers:    spaces/default/data/excel_example/markers
+  status_dir: spaces/default/data/excel_example/status
+  log_dir:    spaces/default/data/excel_example/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.xlsx"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 90
+  schema_file: spaces/default/config/excel_example/excel_example_schema.toon
+
+parsing:
+  frontend: xlsx
+  xlsx:
+    sheet: Inventory
+    range: "A1:D6"
+    header: true
+    normalize_names: true
+    ignore_errors: true
+    stop_at_empty: false
+
+collector:
+  discovery: poll
+  connector: local

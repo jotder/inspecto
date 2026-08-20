@@ -131,8 +131,16 @@ public final class PipelineEditable {
      * two different questions, and P5-a made them diverge for the first time: {@code
      * transform.dedup.marker} must keep lowering (an editor opened before the fold holds a graph
      * carrying one) while nothing should ever create another.
+     *
+     * <p>{@code parser} (the generic, unconfigured type) joined it 2026-08-20: every per-format
+     * subtype now exists (delimited/fixedwidth/asn1/json/text_regex/xlsx/plugin), so authoring a new
+     * generic node is a dead end the operator would only discover in the drawer/dialog. It still
+     * lowers unchanged — the bare-legacy-delimited-implicit path and a dialog-bound
+     * {@code use: grammar/<id>} node both still carry this type, and nothing here touches {@code
+     * lower()} or the dialog's own routing.
      */
-    private static final Set<String> READ_COMPAT_ONLY = Set.of(BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type());
+    private static final Set<String> READ_COMPAT_ONLY =
+            Set.of(BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type(), BuiltinNodeType.PARSER.type());
 
     /**
      * Whether the palette may offer this type. ⚠ Not the same as {@link #isLowerable} — filtering the

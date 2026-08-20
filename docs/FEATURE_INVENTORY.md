@@ -189,7 +189,7 @@ runnable and deletable, never newly written (`PipelineRoutes`). The shape now li
 
 ---
 
-## 2. Existing example configs (under `spaces/<id>/config/` — `ucc` hosts voucher; `default` hosts subscriber, events, connections; `demo` hosts the full editable sample catalog — one sample of every authorable kind + committed sample data, see [`../spaces/demo/config/README.md`](../spaces/demo/config/README.md))
+## 2. Existing example configs (under `spaces/<id>/config/` — `ucc` hosts voucher; `default` hosts the format-example pack (csv/fixedwidth/excel/json — one worked pipeline per DuckDB-native parser frontend, replacing the retired subscriber/gwlog/cdr/csv_demo pipelines 2026-08-20) plus a Catalog/KPI demo (`events/`); `demo` hosts the full editable sample catalog — one sample of every authorable kind + committed sample data, see [`../spaces/demo/config/README.md`](../spaces/demo/config/README.md))
 
 | File | Demonstrates |
 |---|---|
@@ -198,13 +198,12 @@ runnable and deletable, never newly written (`PipelineRoutes`). The shape now li
 | `voucher/voucher_pipeline.toon` | Multi-schema dispatch (76/116/537 cols), filename-glob fast path, external grammar, `duckdb_threads: 0` |
 | `voucher/voucher.grammar.toon` | External delimited grammar (`has_header:false`, multi-format dates) |
 | `voucher/voucher_{76,116,537}.toon` | Schema variants incl. a 537-col wide schema |
-| `subscriber/subscriber_pipeline.toon` | Fixed-width pipeline (`.dat`), external grammar + schema |
-| `subscriber/subscriber.grammar.toon` | `frontend: fixedwidth`, slice layout |
-| `subscriber/subscriber_schema.toon` | Schema with `description`/`unit`/`classification` |
-| `events/call_schema.toon` | Plugin-segment schema (CALL) |
-| `events/events_daily_kpi.toon` | Stage-2 enrichment (input/output/references/transform SQL) |
-| `events/events_meta.toon` | Catalog metadata (tables, KPIs, reports) |
-| `connections/cdr_sftp_connection.toon` | SFTP: key auth, bastion tunnel, `${ENV:…}` secret |
+| `csv_example/csv_example_pipeline.toon` | Delimited: `\|` delim, quote/comment, two skip mechanisms stacked, `null_strings`, date/timestamp formats |
+| `fixedwidth_example/fixedwidth_example_pipeline.toon` | `frontend: fixedwidth` — single-column reader + vectorized `substring` slicing, `min_record_length` |
+| `excel_example/excel_example_pipeline.toon` | `frontend: xlsx` — named sheet + explicit range + `normalize_names` + `ignore_errors` (DuckDB `read_xlsx`) |
+| `json_example/json_example_pipeline.toon` | `frontend: json`, `format: auto`, nested `records_path` composing with a dotted field selector, `maximum_object_size` |
+| `events/call_schema.toon` | Schema with `description`/`unit`/`classification` (D1(b), CI-pinned by `ShippedCatalogSamplesTest`) |
+| `events/events_meta.toon` | Catalog metadata (tables, KPIs, reports; CI-pinned) |
 | `connections/local_demo_connection.toon` | Local/demo SFTP stub |
 
 **Sample input data**: every space now commits pristine samples under `spaces/<id>/data/samples/`

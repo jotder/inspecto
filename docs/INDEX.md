@@ -482,7 +482,10 @@ former root reference docs** (each index lists them):
   **architecture north-star** (seven networks over one Component metamodel); R1–R6 all shipped.
 - [`superpower/geo-map-case-studies.md`](superpower/geo-map-case-studies.md) — Geo Map CS1–CS5
   case-study pack (spec-pinned demo seeds) — reference.
-- [`superpower/pipeline-case-studies.md`](superpower/pipeline-case-studies.md) — Pipelines CS1–CS5
+- ~~`superpower/pipeline-case-studies.md`~~ — **RETIRED 2026-08-20**
+  ([archive copy](archived-documents/plans-archive/pipeline-case-studies.md)). Replaced by the
+  `format-examples.seed.ts` pack (one pipeline per DuckDB-native parser frontend) — operator
+  request, part of the multiformat parser-lanes work.
   case-study pack (spec-pinned demo seeds) — reference.
 - ~~`superpower/pipeline-rename-and-template-plan.md`~~ — **ALL PHASES SHIPPED 2026-08-02, plan archived**
   to [`archived-documents/plans-archive/pipeline-rename-and-template-plan.md`](archived-documents/plans-archive/pipeline-rename-and-template-plan.md).

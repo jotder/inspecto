@@ -1,0 +1,47 @@
+name: csv_example
+active: true
+version: 1
+
+dirs:
+  poll:       spaces/default/data/inbox/csv_example
+  database:   spaces/default/data/csv_example/database
+  backup:     spaces/default/data/csv_example/backup
+  temp:       spaces/default/data/csv_example/temp
+  errors:     spaces/default/data/csv_example/errors
+  quarantine: spaces/default/data/csv_example/quarantine
+  markers:    spaces/default/data/csv_example/markers
+  status_dir: spaces/default/data/csv_example/status
+  log_dir:    spaces/default/data/csv_example/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 90
+  schema_file: spaces/default/config/csv_example/csv_example_schema.toon
+
+parsing:
+  frontend: delimited
+  encoding: utf-8
+  compression: none
+  delimited:
+    delimiter: "|"
+    quote: "\""
+    comment: "#"
+    has_header: true
+    skip_header_lines: 1
+    null_strings[2]: "NULL", "N/A"
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+    strict_mode: true
+    engine: auto
+
+collector:
+  discovery: poll
+  connector: local

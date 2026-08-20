@@ -6,7 +6,7 @@ import { seedDefaultSpace } from './default-space.seed';
 import { seedFinancialAudit } from './financial-audit.seed';
 import { seedFraudMgmt } from './fraud-mgmt.seed';
 import { seedLinkAnalysis } from './link-analysis.seed';
-import { seedPipelineCaseStudies } from './pipeline-case-studies.seed';
+import { seedFormatExamplePipelines } from './format-examples.seed';
 import { seedTelecomRa } from './telecom-ra.seed';
 
 /**
@@ -27,13 +27,13 @@ import { seedTelecomRa } from './telecom-ra.seed';
  * per-type is plan §3.3's job, not this guard's.
  *
  * ⚠ **A key with zero readers is not automatically phantom — it may be MISNAMED.** `key_columns` and
- * `mode: 'upsert'` on the CS1/CS2 `sink.materialized` nodes have zero Java readers, but the capability they
+ * `mode: 'upsert'` on a `sink.materialized` node have zero Java readers, but the capability they
  * describe is real and lives at pipeline level as `reference: {load: upsert, key: [...]}`
- * (`PipelineConfigParser.java:406-412`). That is a D1-class misnaming, tracked as **D8** — deliberately NOT
- * banned here, because deleting it would defuse a documented case-study invariant
- * (`pipeline-case-studies.spec.ts` "upserts candidates by key", `docs/superpower/pipeline-case-studies.md`)
- * and the right fix is to rename to the engine's shape, not to drop the narrative. Confirm "no reader" AND
- * "no differently-named equivalent" before adding a key below.
+ * (`PipelineConfigParser.java:406-412`). That is a D1-class misnaming, tracked as **D8** —
+ * deliberately NOT banned here (the right fix is to rename to the engine's shape, not to ban the
+ * key). Confirm "no reader" AND "no differently-named equivalent" before adding a key below.
+ * (The CS1/CS2 case-study pack this note originally cited was retired 2026-08-20 in favor of the
+ * `format-examples.seed.ts` pack — the D8 rationale above stands independent of that narrative.)
  *
  * ⚠ This checks the seeds only. The bidirectional UI-spec ↔ engine-reader contract is a separate, larger
  * check — see `docs/okf/frontend/features/pipelines.md` (§3.3 of the archived plan), which must bind a node type
@@ -43,7 +43,7 @@ const PHANTOM = ['partition_by', 'route_column', 'min_age_seconds'] as const;
 
 const SEEDERS: Array<[string, (store: MockStore, space: string) => void]> = [
     ['default-space', seedDefaultSpace],
-    ['pipeline-case-studies', seedPipelineCaseStudies],
+    ['format-examples', seedFormatExamplePipelines],
     ['telecom-ra', seedTelecomRa],
     ['financial-audit', seedFinancialAudit],
     ['link-analysis', seedLinkAnalysis],

@@ -410,8 +410,12 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     label: 'Keep malformed records as NULL rows',
                     type: 'boolean',
                     tier: 'optional',
-                    dependsOn: { key: 'json__format', notEquals: 'newline' },
-                    help: 'A record that fails to parse lands as an all-NULL row instead of failing the file (probed read_json semantics — kept, not skipped).',
+                    // ⚠ Probed: format: array is a genuine JSON-array document, and DuckDB HARD-REJECTS
+                    // ignore_errors for any shape but newline_delimited — the load refuses that
+                    // combination outright (PipelineConfigParser). Auto-only, not "not newline": a
+                    // config authored here can never hit that refusal.
+                    dependsOn: { key: 'json__format', equals: 'auto' },
+                    help: 'auto only: takes effect when the file’s content is itself line-delimited (DuckDB’s own sniff) — a malformed record then lands as an all-NULL row rather than failing the file. Not available under format: array, which DuckDB always rejects this option for.',
                     tab: 'robustness',
                 },
                 {

@@ -210,7 +210,8 @@ const CATALOG: ParserDef[] = [
                 label: 'Keep malformed records as NULL rows',
                 type: 'BOOL',
                 defaultValue: false,
-                description: 'array/auto only: a record that fails to parse lands as an all-NULL row.',
+                description:
+                    'auto only, and only when the content is itself line-delimited: a malformed record lands as an all-NULL row. Refused under format: array.',
             },
             int('json.maximum_object_size', 'Maximum object size (bytes)',
                 'array/auto only: bound on a single document/record the reader buffers.'),

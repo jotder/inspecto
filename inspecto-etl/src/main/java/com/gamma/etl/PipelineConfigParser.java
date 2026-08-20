@@ -1325,6 +1325,19 @@ final class PipelineConfigParser {
             throw new IllegalArgumentException("json.maximum_object_size / json.ignore_errors apply to "
                     + "format: array or auto (DuckDB read_json) — NDJSON's line reader already routes "
                     + "malformed lines away and has no such knobs");
+        // ⚠ Probed against DuckDB 1.5.2 (multiformat J1 follow-up): read_json HARD-REJECTS
+        // ignore_errors whenever the resolved shape is a genuine JSON array/object document —
+        // "Parse errors cannot be ignored for JSON formats other than 'newline_delimited'" — so an
+        // explicit format: array config with ignore_errors: true would load looking honored and then
+        // fail every batch at ingest. format: array always resolves to that shape, so refuse it here,
+        // at config load, rather than let it surface as a confusing runtime failure. format: auto is
+        // left alone: its resolved shape depends on the file's actual content (auto-sniffed), so
+        // whether ignore_errors takes effect is content-dependent — documented, not refused.
+        if (format.equals("array") && ignoreErrors)
+            throw new IllegalArgumentException("json.ignore_errors is not honored under format: array — "
+                    + "DuckDB rejects it for any non-newline-delimited JSON shape, which format: array "
+                    + "always is. Use format: auto if the input may actually be line-delimited, or drop "
+                    + "ignore_errors");
         return new PipelineConfig.Json(format, recordsPath, maxObj, ignoreErrors);
     }
 

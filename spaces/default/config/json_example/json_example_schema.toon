@@ -1,0 +1,21 @@
+partitionKey: SHIPPED_AT
+raw:
+  name: json_example
+  format: CSV
+  fields[6]{name,selector,type,description,unit,classification}:
+    SHIPMENT_ID,"shipment_id",VARCHAR,"Shipment identifier","",""
+    ORIGIN,"origin",VARCHAR,"Origin airport/port code","",""
+    DEST,"dest",VARCHAR,"Destination airport/port code","",""
+    WEIGHT_KG,"weight_kg",DOUBLE,"Shipment weight","kg",""
+    SHIPPED_AT,"shipped_at",TIMESTAMP,"When the shipment left origin","",""
+    CARRIER_NAME,"carrier.name",VARCHAR,"Carrier company name (nested selector)","",""
+mapping:
+  canonicalName: json_example
+  rawName: json_example
+  rules[6]{targetColumn,sourceExpression,transformType}:
+    SHIPMENT_ID,SHIPMENT_ID,DIRECT
+    ORIGIN,ORIGIN,DIRECT
+    DEST,DEST,DIRECT
+    WEIGHT_KG,WEIGHT_KG,DIRECT
+    SHIPPED_AT,SHIPPED_AT,DIRECT
+    CARRIER_NAME,CARRIER_NAME,DIRECT

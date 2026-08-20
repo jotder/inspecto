@@ -1,0 +1,10 @@
+{
+  "meta": {"exported": "2026-08-20", "count": 3},
+  "payload": {
+    "shipments": [
+      {"shipment_id": "S-1001", "origin": "LON", "dest": "JFK", "weight_kg": 12.5, "shipped_at": "2026-08-18T10:00:00", "carrier": {"name": "AeroFreight"}},
+      {"shipment_id": "S-1002", "origin": "DXB", "dest": "SIN", "weight_kg": 340.0, "shipped_at": "2026-08-19T03:30:00", "carrier": {"name": "OceanLine"}},
+      {"shipment_id": "S-1003", "origin": "JFK", "dest": "LHR", "weight_kg": 5.2, "shipped_at": "2026-08-19T21:15:00", "carrier": {"name": "AeroFreight"}}
+    ]
+  }
+}

@@ -1,0 +1,47 @@
+name: fixedwidth_example
+active: true
+version: 1
+
+dirs:
+  poll:       spaces/default/data/inbox/fixedwidth_example
+  database:   spaces/default/data/fixedwidth_example/database
+  backup:     spaces/default/data/fixedwidth_example/backup
+  temp:       spaces/default/data/fixedwidth_example/temp
+  errors:     spaces/default/data/fixedwidth_example/errors
+  quarantine: spaces/default/data/fixedwidth_example/quarantine
+  markers:    spaces/default/data/fixedwidth_example/markers
+  status_dir: spaces/default/data/fixedwidth_example/status
+  log_dir:    spaces/default/data/fixedwidth_example/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.dat"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 90
+  schema_file: spaces/default/config/fixedwidth_example/fixedwidth_example_schema.toon
+
+parsing:
+  frontend: fixedwidth
+  encoding: utf-8
+  delimited:
+    has_header: true
+    skip_header_lines: 1
+  fixedwidth:
+    record: line
+    trim: both
+    min_record_length: 34
+    fields[4]{name,start,length}:
+      ACCT,     0,  8
+      TXN_DATE, 8,  10
+      AMOUNT,   18, 12
+      TXN_TYPE, 30, 4
+
+collector:
+  discovery: poll
+  connector: local

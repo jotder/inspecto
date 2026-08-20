@@ -106,8 +106,10 @@ final class BuiltinParsers {
                         // under format: newline, whose line reader already routes malformed lines away.
                         FieldSpec.withDefault("json.ignore_errors", "Keep malformed records as NULL rows",
                                 FieldType.BOOL, false,
-                                "array/auto only: a record that fails to parse lands as an all-NULL row "
-                                        + "instead of failing the file."),
+                                "auto only, and only when the file's content is itself line-delimited "
+                                        + "(DuckDB's own sniff): a malformed record then lands as an "
+                                        + "all-NULL row. Refused under format: array, which DuckDB always "
+                                        + "rejects this option for."),
                         FieldSpec.of("json.maximum_object_size", "Maximum object size (bytes)", FieldType.INT,
                                 "array/auto only: bound on a single document/record the reader buffers."),
                         FieldSpec.of("compression", "Input compression", FieldType.STRING, "e.g. gzip."))),

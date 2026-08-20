@@ -47,12 +47,20 @@ class PipelineProjectionTest {
         assertEquals(Boolean.TRUE, marker.get("lowerable"), "still lowers — an old graph must still save");
         assertEquals(Boolean.FALSE, marker.get("authorable"), "but the palette must never offer another");
 
+        // The generic `parser` type joined READ_COMPAT_ONLY 2026-08-20: every per-format subtype
+        // exists now (delimited/fixedwidth/asn1/json/text_regex/xlsx/plugin), so a NEW generic node
+        // is a dead end. It still lowers — legacy-delimited-implicit and dialog-bound
+        // `use: grammar/<id>` nodes both still carry it.
+        Map<String, Object> parser = byType(cat, "parser");
+        assertEquals(Boolean.TRUE, parser.get("lowerable"), "still lowers — legacy/dialog-bound nodes carry it");
+        assertEquals(Boolean.FALSE, parser.get("authorable"), "but the palette must never offer a new one");
+
         Map<String, Object> acq = byType(cat, "acquisition");
         assertEquals(Boolean.TRUE, acq.get("authorable"));
-        // the marker node is the ONLY type where the two answers differ
-        assertEquals(List.of("transform.dedup.marker"), cat.stream()
+        // the marker node and the generic parser are the ONLY types where the two answers differ
+        assertEquals(List.of("parser", "transform.dedup.marker"), cat.stream()
                 .filter(t -> !t.get("lowerable").equals(t.get("authorable")))
-                .map(t -> (String) t.get("type")).toList());
+                .map(t -> (String) t.get("type")).sorted().toList());
         // …and nothing unlowerable is authorable
         assertTrue(cat.stream().noneMatch(t -> Boolean.TRUE.equals(t.get("authorable"))
                 && Boolean.FALSE.equals(t.get("lowerable"))));

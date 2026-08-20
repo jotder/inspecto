@@ -1,0 +1,17 @@
+partitionKey: CATEGORY
+raw:
+  name: excel_example
+  format: CSV
+  fields[4]{name,selector,type,description,unit,classification}:
+    ITEM_NAME,"item_name",VARCHAR,"Inventory item name","",""
+    QTY_ON_HAND,"qty_on_hand",DOUBLE,"Units currently in stock","units",""
+    UNIT_PRICE,"unit_price",DOUBLE,"Price per unit","USD",""
+    CATEGORY,"category",VARCHAR,"Inventory category","",""
+mapping:
+  canonicalName: excel_example
+  rawName: excel_example
+  rules[4]{targetColumn,sourceExpression,transformType}:
+    ITEM_NAME,ITEM_NAME,DIRECT
+    QTY_ON_HAND,QTY_ON_HAND,DIRECT
+    UNIT_PRICE,UNIT_PRICE,DIRECT
+    CATEGORY,CATEGORY,DIRECT

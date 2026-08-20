@@ -1,3 +1,9 @@
+> **RETIRED 2026-08-20** (operator request): replaced by the `format-examples.seed.ts` pack — one
+> small authored pipeline per DuckDB-native parser frontend (delimited/fixedwidth/xlsx/json),
+> mirroring the real examples under `spaces/default/config/{csv,fixedwidth,excel,json}_example/`.
+> Kept here for provenance only — the pipelines/grammars/invariants below no longer exist in the
+> seed or the spec suite.
+
 # Pipelines — case-study pack (CS1–CS5)
 
 Five boundary-pushing, self-contained authored pipelines for the Pipelines editor (`/pipelines`),

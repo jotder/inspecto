@@ -138,12 +138,21 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
     /**
      * P5-a: `authorable` is NOT a synonym for `lowerable`. The marker node still lowers (an editor
      * opened before the fold holds a graph carrying one) but the palette must never offer another —
-     * a mock publishing them as equal would let the offline palette drift from production's.
+     * a mock publishing them as equal would let the offline palette drift from production's. The
+     * generic `parser` type joined it 2026-08-20: every per-format subtype exists now, so a NEW
+     * generic node is a dead end — it still lowers (legacy-delimited-implicit + dialog-bound
+     * `use: grammar/<id>` nodes both carry it).
      */
-    it('separates authorable from lowerable — only the retired marker node differs', () => {
-        const differ = NODE_TYPES.filter((t) => t.lowerable !== t.authorable).map((t) => t.type);
-        expect(differ).toEqual(['transform.dedup.marker']);
+    it('separates authorable from lowerable — only the retired marker + generic parser differ', () => {
+        const differ = NODE_TYPES.filter((t) => t.lowerable !== t.authorable)
+            .map((t) => t.type)
+            .sort();
+        expect(differ).toEqual(['parser', 'transform.dedup.marker']);
         expect(NODE_TYPES.find((t) => t.type === 'transform.dedup.marker')).toMatchObject({
+            lowerable: true,
+            authorable: false,
+        });
+        expect(NODE_TYPES.find((t) => t.type === 'parser')).toMatchObject({
             lowerable: true,
             authorable: false,
         });

@@ -1,0 +1,17 @@
+partitionKey: TXN_DATE
+raw:
+  name: fixedwidth_example
+  format: CSV
+  fields[4]{name,selector,type,description,unit,classification}:
+    ACCT,"0",VARCHAR,"Account number slice","",""
+    TXN_DATE,"1",DATE,"Transaction date slice","",""
+    AMOUNT,"2",DOUBLE,"Transaction amount slice","USD",""
+    TXN_TYPE,"3",VARCHAR,"Transaction type slice (DEP/WDR)","",""
+mapping:
+  canonicalName: fixedwidth_example
+  rawName: fixedwidth_example
+  rules[4]{targetColumn,sourceExpression,transformType}:
+    ACCT,ACCT,DIRECT
+    TXN_DATE,TXN_DATE,DIRECT
+    AMOUNT,AMOUNT,DIRECT
+    TXN_TYPE,TXN_TYPE,DIRECT

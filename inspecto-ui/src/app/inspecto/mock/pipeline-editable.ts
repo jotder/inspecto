@@ -49,8 +49,11 @@ export const LOWERABLE = new Set([
  * `PipelineEditable.READ_COMPAT_ONLY`). Read-compat and save-ability are different questions, and
  * P5-a made them diverge for the first time: `transform.dedup.marker` must keep lowering, because an
  * editor opened before the fold holds a graph carrying one — while nothing should create another.
+ * `parser` (the generic, unconfigured type) joined it 2026-08-20: every per-format subtype now
+ * exists, so a new generic node is a dead end. It still lowers — the legacy-delimited-implicit and
+ * dialog-bound `use: grammar/<id>` paths both still carry it.
  */
-export const READ_COMPAT_ONLY = new Set(['transform.dedup.marker']);
+export const READ_COMPAT_ONLY = new Set(['transform.dedup.marker', 'parser']);
 
 /**
  * Acquisition-node config keys that do NOT belong to the `collector:` block — each is borrowed from
