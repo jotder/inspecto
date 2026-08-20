@@ -30,6 +30,13 @@
 #                                      GraalVM jmods cache is present under .graalvm-cache)
 #   (both in the sandbox root, alongside inbox/ and database/)
 #
+# Both bundles also carry duckdb-extensions/{windows_amd64,linux_amd64}/excel.duckdb_extension
+# when a local DuckDB extension cache is found (multiformat X1 — frontend: xlsx's `excel`
+# extension is NOT statically linked into duckdb_jdbc, so an air-gapped deployment needs the file
+# shipped; see ExcelExtension.ensureLoaded and -DuckdbExtensionCache below). Missing = a warning,
+# never a build failure — serve/run/ura auto-detect it and ExcelExtension falls back to a
+# networked INSTALL on first use if there's no cached binary and the deployment has network access.
+#
 # The zip is a self-contained deployment unit.  On the target server:
 #   1. Unzip inspecto-deploy.zip  →  inspecto-deploy/
 #   2. Create your inbox directories under inspecto-deploy/inbox/<adapter>/
@@ -58,7 +65,18 @@ param(
     # in order: this param -> $env:GRAALVM_CACHE -> <repo>/.graalvm-cache (nested-in-repo layout)
     # -> <repo>/../.graalvm-cache (sibling-of-repo layout, e.g. C:\sandbox\.graalvm-cache next to
     # C:\sandbox\inspecto-clean). Resolved once the real path is known, below.
-    [string]$GraalvmCache = ''
+    [string]$GraalvmCache = '',
+    # Explicit override for the DuckDB extension cache (multiformat X1 — the `excel` extension for
+    # frontend: xlsx is NOT statically linked into duckdb_jdbc, so ExcelExtension.ensureLoaded needs
+    # the platform's excel.duckdb_extension file shipped alongside an air-gapped bundle or it can
+    # only LOAD when a prior networked `INSTALL excel` already cached it under ~/.duckdb). Defaults
+    # try, in order: this param -> $env:DUCKDB_EXTENSION_CACHE -> DuckDB's own default install cache
+    # (%USERPROFILE%\.duckdb\extensions or $HOME/.duckdb/extensions — wherever a local `INSTALL excel`
+    # already put it) -> <repo>/.duckdb-extension-cache -> <repo>/../.duckdb-extension-cache (same
+    # nested/sibling pair as -GraalvmCache). Best-effort per platform: a missing extension for one or
+    # both platforms is a warning, never a build failure — ExcelExtension itself still falls back to
+    # a networked INSTALL at runtime if the operator's deployment has network access.
+    [string]$DuckdbExtensionCache = ''
 )
 
 Set-StrictMode -Version Latest
@@ -113,6 +131,27 @@ if ($graalvmCacheDir) {
     Write-Host "GraalVM cache: $graalvmCacheDir" -ForegroundColor DarkGray
 } else {
     Write-Host "  (no .graalvm-cache found — tried: $($cacheCandidates -join ', '))" -ForegroundColor Yellow
+}
+
+# ── resolve the DuckDB extension cache (excel.duckdb_extension, per platform) ─
+# Same nested/sibling pair as the GraalVM cache, PLUS DuckDB's own default install location — a
+# prior `INSTALL excel` (this machine's own probing, or CI) already populates that one, so it is
+# tried before the repo-adjacent conventions. Glob for the version dir (v1.5.2, …) rather than
+# pinning it: it's DuckDB's own extension-ABI version, not the duckdb_jdbc artifact version in the
+# root pom, and a driver bump must not silently stop finding an already-cached extension.
+$duckdbExtCacheDir = $null
+$duckdbExtCandidates = @($DuckdbExtensionCache, $env:DUCKDB_EXTENSION_CACHE,
+    (Join-Path $env:USERPROFILE '.duckdb\extensions'),
+    (Join-Path $HOME '.duckdb/extensions'),
+    (Join-Path $sandboxRoot '.duckdb-extension-cache'),
+    (Join-Path (Split-Path -Parent $sandboxRoot) '.duckdb-extension-cache')) | Where-Object { $_ } | Select-Object -Unique
+foreach ($c in $duckdbExtCandidates) {
+    if (Test-Path $c) { $duckdbExtCacheDir = $c; break }
+}
+if ($duckdbExtCacheDir) {
+    Write-Host "DuckDB extension cache: $duckdbExtCacheDir" -ForegroundColor DarkGray
+} else {
+    Write-Host "  (no DuckDB extension cache found — tried: $($duckdbExtCandidates -join ', '))" -ForegroundColor Yellow
 }
 $bundleDir    = Join-Path $sandboxRoot  'inspecto-deploy'
 
@@ -340,6 +379,10 @@ JAVA="java"; [ -x "runtime/bin/java" ] && JAVA="runtime/bin/java"
 # --enable-native-access=ALL-UNNAMED and BEFORE -jar (a JVM flag after it would be parsed as a
 # program argument). Not read from JAVA_OPTS: that name is assigned, so it is silently discarded.
 JAVA_OPTS=(--enable-native-access=ALL-UNNAMED)
+# DuckDB excel extension (multiformat X1, frontend: xlsx) — auto-detect the bundled per-platform
+# binary, exactly like the runtime/ auto-detect above; a networked deployment without it still
+# falls back to INSTALL inside ExcelExtension.
+[ -d duckdb-extensions/linux_amd64 ] && JAVA_OPTS+=("-Dduckdb.extension.dir=duckdb-extensions/linux_amd64")
 EXTRA_OPTS="${INSPECTO_JAVA_OPTS:-${EXTRA_JAVA_OPTS:-}}"
 if [ -n "${EXTRA_OPTS}" ]; then
     read -r -a _extra_opts <<< "${EXTRA_OPTS}"
@@ -386,6 +429,10 @@ rem EXTRA_JAVA_OPTS), appended AFTER the mandatory --enable-native-access=ALL-UN
 rem -jar (a JVM flag after it would be parsed as a program argument). Not read from JAVA_OPTS:
 rem that name is assigned, so it is silently discarded.
 set "OPTS=--enable-native-access=ALL-UNNAMED"
+rem DuckDB excel extension (multiformat X1, frontend: xlsx) - auto-detect the bundled
+rem per-platform binary; a networked deployment without it still falls back to INSTALL
+rem inside ExcelExtension.
+if exist "duckdb-extensions\windows_amd64" set "OPTS=%OPTS% -Dduckdb.extension.dir=duckdb-extensions\windows_amd64"
 set "EXTRA_OPTS=%INSPECTO_JAVA_OPTS%"
 if "%EXTRA_OPTS%"=="" set "EXTRA_OPTS=%EXTRA_JAVA_OPTS%"
 if not "%EXTRA_OPTS%"=="" set "OPTS=%OPTS% %EXTRA_OPTS%"
@@ -418,6 +465,7 @@ JAVA="java"; [ -x "runtime/bin/java" ] && JAVA="runtime/bin/java"
 # --enable-native-access=ALL-UNNAMED and BEFORE -cp (a JVM flag after it would be parsed as a
 # program argument). Not read from JAVA_OPTS: that name is assigned, so it is silently discarded.
 JAVA_OPTS=(--enable-native-access=ALL-UNNAMED)
+[ -d duckdb-extensions/linux_amd64 ] && JAVA_OPTS+=("-Dduckdb.extension.dir=duckdb-extensions/linux_amd64")
 EXTRA_OPTS="${INSPECTO_JAVA_OPTS:-${EXTRA_JAVA_OPTS:-}}"
 if [ -n "${EXTRA_OPTS}" ]; then
     read -r -a _extra_opts <<< "${EXTRA_OPTS}"
@@ -446,6 +494,7 @@ rem EXTRA_JAVA_OPTS), appended AFTER the mandatory --enable-native-access=ALL-UN
 rem -cp (a JVM flag after it would be parsed as a program argument). Not read from JAVA_OPTS:
 rem that name is assigned, so it is silently discarded.
 set "OPTS=--enable-native-access=ALL-UNNAMED"
+if exist "duckdb-extensions\windows_amd64" set "OPTS=%OPTS% -Dduckdb.extension.dir=duckdb-extensions\windows_amd64"
 set "EXTRA_OPTS=%INSPECTO_JAVA_OPTS%"
 if "%EXTRA_OPTS%"=="" set "EXTRA_OPTS=%EXTRA_JAVA_OPTS%"
 if not "%EXTRA_OPTS%"=="" set "OPTS=%OPTS% %EXTRA_OPTS%"
@@ -472,6 +521,9 @@ PORT="${PORT:-8080}"
 SPACES_ROOT="${SPACES_ROOT:-spaces}"
 JAVA_OPTS=(--enable-native-access=ALL-UNNAMED "-Dcontrol.port=${PORT}" "-Dspaces.root=${SPACES_ROOT}")
 [ -d ui ] && JAVA_OPTS+=("-Dui.dir=./ui")
+# DuckDB excel extension (multiformat X1, frontend: xlsx) — auto-detect the bundled per-platform
+# binary; a networked deployment without it still falls back to INSTALL inside ExcelExtension.
+[ -d duckdb-extensions/linux_amd64 ] && JAVA_OPTS+=("-Dduckdb.extension.dir=duckdb-extensions/linux_amd64")
 [ -n "${CONTROL_TOKEN:-}" ] && JAVA_OPTS+=("-Dcontrol.token=${CONTROL_TOKEN}")
 [ -n "${ASSIST_TOKEN:-}" ]  && JAVA_OPTS+=("-Dassist.read.token=${ASSIST_TOKEN}")
 [ -n "${CORS_ORIGIN:-}" ]   && JAVA_OPTS+=("-Dcontrol.cors=${CORS_ORIGIN}")
@@ -532,6 +584,10 @@ if "%PORT%"=="" set "PORT=8080"
 if "%SPACES_ROOT%"=="" set "SPACES_ROOT=spaces"
 set "OPTS=--enable-native-access=ALL-UNNAMED -Dcontrol.port=%PORT% -Dspaces.root=%SPACES_ROOT%"
 if exist ui set "OPTS=%OPTS% -Dui.dir=./ui"
+rem DuckDB excel extension (multiformat X1, frontend: xlsx) - auto-detect the bundled
+rem per-platform binary; a networked deployment without it still falls back to INSTALL
+rem inside ExcelExtension.
+if exist "duckdb-extensions\windows_amd64" set "OPTS=%OPTS% -Dduckdb.extension.dir=duckdb-extensions\windows_amd64"
 if not "%CONTROL_TOKEN%"=="" set "OPTS=%OPTS% -Dcontrol.token=%CONTROL_TOKEN%"
 if not "%ASSIST_TOKEN%"=="" set "OPTS=%OPTS% -Dassist.read.token=%ASSIST_TOKEN%"
 if not "%CORS_ORIGIN%"=="" set "OPTS=%OPTS% -Dcontrol.cors=%CORS_ORIGIN%"
@@ -647,6 +703,35 @@ if (-not $NoRuntime) {
     }
 } else {
     Write-Host "  (-NoRuntime: skipping embedded JVM; target server must provide Java 24+)" -ForegroundColor Yellow
+}
+
+# ── step 6d: bundle the DuckDB excel extension (multiformat X1), per platform ──
+# ExcelExtension.ensureLoaded (inspecto-etl) loads it in three layers: LOAD (cached/preinstalled) ->
+# LOAD from -Dduckdb.extension.dir (THIS step's whole purpose — an air-gapped deployment ships the
+# file so frontend: xlsx works out of the box) -> INSTALL (networked fallback). Both platforms'
+# binaries are bundled into the SAME $bundleDir (harmless — like run.sh sitting unused in the
+# Windows zip): serve.bat/run.bat/ura.bat auto-detect windows_amd64, serve.sh/run.sh/ura.sh
+# auto-detect linux_amd64, each only on its own OS. Best-effort: a platform whose binary isn't
+# cached locally is a yellow warning, never a build failure — the fail-closed INSTALL fallback in
+# ExcelExtension still covers a networked deployment.
+$duckdbExtOut = Join-Path $bundleDir 'duckdb-extensions'
+$bundledAnyExt = $false
+if ($duckdbExtCacheDir) {
+    foreach ($plat in @('windows_amd64', 'linux_amd64')) {
+        $found = Get-ChildItem -Path $duckdbExtCacheDir -Recurse -Filter 'excel.duckdb_extension' -ErrorAction SilentlyContinue |
+                 Where-Object { $_.FullName -match [regex]::Escape($plat) } | Select-Object -First 1
+        if ($found) {
+            $dest = Join-Path $duckdbExtOut $plat
+            New-Item -ItemType Directory -Path $dest -Force | Out-Null
+            Copy-Item $found.FullName -Destination (Join-Path $dest 'excel.duckdb_extension') -Force
+            Write-Host "Bundled DuckDB excel extension ($plat) -> duckdb-extensions/$plat/" -ForegroundColor Green
+            $bundledAnyExt = $true
+        } else {
+            Write-Host "  (no cached excel.duckdb_extension for $plat under $duckdbExtCacheDir — xlsx pipelines need network on first run, or a manual -Dduckdb.extension.dir)" -ForegroundColor Yellow
+        }
+    }
+} else {
+    Write-Host "  (skipping excel extension bundling — no cache resolved; xlsx pipelines need network on first run, or a manual -Dduckdb.extension.dir)" -ForegroundColor Yellow
 }
 
 # ── step 7: copy README + docs tree ─────────────────────────────────────────────
