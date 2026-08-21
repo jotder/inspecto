@@ -952,6 +952,41 @@ describe('PipelineEditorComponent', () => {
         });
 
         /**
+         * S0 — a maximized drawer must OVERLAY the body row, never widen to 100% beside its
+         * still-mounted `shrink-0` siblings: the palette aside + its handle stay in the flex row, so
+         * `width:100%` overflowed it by exactly the palette's width and clipped the drawer's Apply
+         * button off-screen. jsdom cannot do layout, so this pins the class state that decides it.
+         */
+        it('overlays the body row when the drawer is maximized, instead of widening beside the palette', () => {
+            const fixture = TestBed.createComponent(PipelineEditorComponent);
+            fixture.componentRef.setInput('openId', 'demo');
+            const c = fixture.componentInstance;
+            c.ngOnInit();
+            (c as unknown as { canvas: unknown }).canvas = canvasMock();
+            fixture.detectChanges();
+
+            const el = fixture.nativeElement as HTMLElement;
+            const dock = el.querySelector('aside[aria-label="Properties"]') as HTMLElement;
+            expect(dock).not.toBeNull();
+            expect(dock.classList.contains('absolute')).toBe(false);
+            expect(dock.style.width).not.toBe('');
+
+            c.drawerMaximized.set(true);
+            fixture.detectChanges();
+
+            expect(dock.classList.contains('absolute')).toBe(true);
+            expect(dock.classList.contains('inset-0')).toBe(true);
+            // ⛔ no width at all while overlaid — a 100% width is what overflowed the row.
+            expect(dock.style.width).toBe('');
+            expect((dock.parentElement as HTMLElement).classList.contains('relative')).toBe(true);
+
+            c.drawerMaximized.set(false);
+            fixture.detectChanges();
+            expect(dock.classList.contains('absolute')).toBe(false);
+            expect(dock.style.width).not.toBe(''); // the split width comes back
+        });
+
+        /**
          * P6-a: the retired `/catalog/onboard/:name/:stage` route redirects here, so the editor has to
          * open a named pipeline — and land on a named stage — straight off the URL.
          */

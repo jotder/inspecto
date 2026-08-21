@@ -351,7 +351,7 @@
         </div>
     } @else {
         <!-- ── body: [palette dock] │ canvas │ [properties dock] ───────────────────────────────── -->
-        <div class="flex min-h-0 flex-1 overflow-hidden">
+        <div class="relative flex min-h-0 flex-1 overflow-hidden">
             <!-- left dock — the step palette; collapses to an icon rail -->
             <aside
                 class="flex min-h-0 shrink-0 flex-col overflow-hidden border-r"
@@ -487,9 +487,10 @@
             <aside
                 class="flex min-h-0 shrink-0 flex-col overflow-hidden border-l"
                 [class.w-10]="!inspectorOpen()"
-                [style.width]="
-                    inspectorOpen() ? (drawerMaximized() ? '100%' : inspectorSplit.width() + 'px') : null
-                "
+                [class.absolute]="drawerMaximized()"
+                [class.inset-0]="drawerMaximized()"
+                [class.z-20]="drawerMaximized()"
+                [style.width]="inspectorOpen() && !drawerMaximized() ? inspectorSplit.width() + 'px' : null"
                 style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
                 aria-label="Properties"
             >
