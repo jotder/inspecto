@@ -365,6 +365,16 @@ src/app/
   `#h="inspectoSplit"` ref the pane's width binds to stops resolving. Collapse-to-rail idiom (Pipelines
   editor, 2026-08-02): `[class.w-10]="!open()"` + `[style.width.px]="open() ? h.width() : null"` — the
   null drops the inline width so the rail class applies.
+  ⚠ **A dock that MAXIMIZES must leave the flex flow, never widen to `width:100%`** (S0/D9,
+  2026-08-21). Its siblings — the opposite dock and both split handles — are still-mounted `shrink-0`
+  children of the same `overflow-hidden` row, so a 100%-wide dock overflows the row by exactly their
+  width and its far edge (the footer buttons) is clipped off-screen. Render it `absolute inset-0 z-20`
+  over the row instead (the row gets `relative`), dropping the inline width binding so `inset-0` owns
+  the geometry; un-maximizing restores `h.width()`. Found in the Pipelines definition drawer, which
+  shipped clipped in U5. **jsdom cannot measure layout**, so the unit test pins the class contract and
+  the real proof is the preview: assert zero row overflow AND that the button hit-tests to ITSELF
+  (`document.elementFromPoint`) — a rect inside the viewport says nothing about what covers it, and a
+  *disabled* button legitimately hit-tests to its parent, so dirty the form before believing a miss.
 - **Full-bleed editor shells (Pipelines edit mode, 2026-08-02).** ⚠ **The admin shell scrolls at document
   level — `body` is `min-height:100%` and every ancestor is `min-height:auto`, so NOTHING above a routed
   pane is viewport-bounded.** A pane that wants IDE chrome (docks that give space back to a canvas) must
