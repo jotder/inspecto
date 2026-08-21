@@ -87,16 +87,9 @@ interface RuleRow {
     ],
     template: `
         <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-1">
-            <mat-form-field class="w-full" subscriptSizing="dynamic">
-                <mat-label>Name</mat-label>
-                <input matInput formControlName="name" [placeholder]="node().id" />
-            </mat-form-field>
-            <mat-form-field class="w-full" subscriptSizing="dynamic">
-                <mat-label>Description</mat-label>
-                <input matInput formControlName="description" />
-            </mat-form-field>
-
-            <div class="mb-1 mt-2 flex items-center gap-2">
+            <!-- S2/principle 5: identity is asked ONCE, on the inspector's rename pencil — never
+                 re-asked inside a definition pane. -->
+            <div class="mb-1 flex items-center gap-2">
                 <span class="text-xs font-semibold uppercase opacity-70">Mapping</span>
                 @if (loading()) {
                     <span class="text-secondary text-xs">Loading the schema's fields…</span>
@@ -327,8 +320,6 @@ export class PipelineLoadDefinitionComponent {
     readonly dirtyChange = output<boolean>();
 
     readonly form: FormGroup = this.fb.group({
-        name: [''],
-        description: [''],
         rules: this.fb.array<FormGroup>([]),
     });
     get ruleRows(): FormArray<FormGroup> {
@@ -379,8 +370,7 @@ export class PipelineLoadDefinitionComponent {
 
     constructor() {
         effect(() => {
-            const n = this.node();
-            this.form.patchValue({ name: n.name ?? '', description: n.description ?? '' });
+            this.node();
             this.form.markAsPristine();
             this.error.set(null);
             this.seedRules(this.authoredRules());
@@ -616,8 +606,6 @@ export class PipelineLoadDefinitionComponent {
         const n = this.node();
         const node: AuthoredNode = {
             ...n,
-            name: (v.name ?? '').trim() || n.name,
-            description: (v.description ?? '').trim() || undefined,
             // `columns` is left exactly as it was: this pane authors `rules` and nothing else.
             config: { ...(n.config ?? {}), ...(rules.length ? { rules } : {}) },
         };

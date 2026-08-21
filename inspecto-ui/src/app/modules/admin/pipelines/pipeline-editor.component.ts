@@ -66,13 +66,13 @@ import { PipelineInspectorComponent } from './pipeline-inspector.component';
 import { PipelinePaletteComponent } from './pipeline-palette.component';
 import { PipelineGuaranteesPanelComponent } from './pipeline-guarantees-panel.component';
 import { PipelineStepCardsComponent } from './pipeline-step-cards.component';
-import { EnrichmentHostPipeline, NodeConfigDialog, NodeConfigResult } from './node-config.dialog';
 import { PipelineCollectionDefinitionComponent } from './pipeline-collection-definition.component';
 import {
     PARSE_NODE_FRONTENDS,
     PipelineParseDefinitionComponent,
     isParseNodeType,
 } from './pipeline-parse-definition.component';
+import { EnrichmentHostPipeline, PipelineConfigDefinitionComponent } from './pipeline-config-definition.component';
 import { PipelineLoadDefinitionComponent } from './pipeline-load-definition.component';
 import { GrammarEditorDialog } from './grammar-editor.dialog';
 import { PipelineOpenDialog } from './pipeline-open.dialog';
@@ -92,7 +92,6 @@ import {
     addNodeToModel,
     applyNodePatchInModel,
     authoredToG6,
-    bindKindFor,
     candidateRelsFor,
     categoryLabel,
     categoryVisualKind,
@@ -170,6 +169,7 @@ function describeDependents(impact: ConfigImpact): string {
         DefinitionDrawerComponent,
         PipelineCollectionDefinitionComponent,
         PipelineParseDefinitionComponent,
+        PipelineConfigDefinitionComponent,
         PipelineLoadDefinitionComponent,
         PipelineDryRunPanelComponent,
         PipelineEditorGraphComponent,
@@ -419,6 +419,16 @@ export class PipelineEditorComponent implements OnInit {
     @ViewChild(PipelineCollectionDefinitionComponent) private definitionPane?: PipelineCollectionDefinitionComponent;
     @ViewChild(PipelineParseDefinitionComponent) private parseDefinitionPane?: PipelineParseDefinitionComponent;
     @ViewChild(PipelineLoadDefinitionComponent) private loadDefinitionPane?: PipelineLoadDefinitionComponent;
+    @ViewChild(PipelineConfigDefinitionComponent) private configDefinitionPane?: PipelineConfigDefinitionComponent;
+
+    /**
+     * Whether the drawer's node is a per-format parse node — which pane the template mounts. A method on
+     * the node TYPE, never an enumeration in the template (S2 widened the drawer to every kind, so the
+     * template now needs the discriminator the routing rule already uses).
+     */
+    isParseNode(node: AuthoredNode): boolean {
+        return isParseNodeType(node.type);
+    }
 
     /** Served specs for the drawer's node type (`undefined` until the catalog resolves — the pane falls back). */
     definitionAttributes(): AttributeSpec[] | undefined {
@@ -1512,6 +1522,32 @@ export class PipelineEditorComponent implements OnInit {
         this.selectedEdgeId.set(null);
         this.selectedNode.set(node);
         if (node) this.inspectorOpen.set(true); // reveal the property panel on selection
+        if (node) void this.followSelectionIntoDefinition(node);
+    }
+
+    /**
+     * S3 — selection and configuration converge. Two rules, both about clicks the builder should not
+     * have to spend:
+     * <ul>
+     *   <li>a drawer that is OPEN and CLEAN re-targets to the newly selected Step. Before this it kept
+     *       rendering the previous node's definition with no hint at all — the template prefers
+     *       `definitionNode()` over `selectedNode()`, so clicking Step B showed Step A's config. A DIRTY
+     *       drawer keeps `openDefinition`'s confirm, which is the whole point of that guard;</li>
+     *   <li>selecting an UNCONFIGURED Step opens its pane directly — a fresh Step's next action is
+     *       always "configure it", and it used to cost a second click every time.</li>
+     * </ul>
+     *
+     * ⚠ Deliberately does NOT open a pane for a configured Step with the drawer closed: that would take
+     * the summary away from someone who clicked a Step only to look at it.
+     */
+    private async followSelectionIntoDefinition(node: AuthoredNode): Promise<void> {
+        if (!this.canAuthor()) return;
+        const open = this.definitionNode();
+        if (open) {
+            if (open.id !== node.id) await this.openDefinition(node); // dirty ⇒ openDefinition confirms
+            return;
+        }
+        if (this.statusOf(node) === 'unconfigured') await this.openDefinition(node);
     }
 
     /** Double-click a node (or the inspector's Configure button) → open the per-processor config popup. */
@@ -1528,38 +1564,30 @@ export class PipelineEditorComponent implements OnInit {
         // slice lands (P3b–P3d, P4). A grammar-BOUND parser node stays on the dialog even when it is
         // delimited: updating a reusable Grammar component is its own write route, which the dialog
         // owns — the drawer's Apply is an in-memory patch only (D2).
-        if (node.type === 'acquisition' || this.isDrawerParse(node) || node.type === 'transform.map') {
+        // S2: EVERY kind now defines in the right-dock drawer — the canvas stays visible while it is
+        // configured, and Apply/Discard means one thing everywhere. The ONE surface still on a popup is
+        // the Grammar editor, for the parse nodes the drawer deliberately refuses (a grammar-BOUND node
+        // — updating a reusable Grammar component is its own write route — a DANGLING binding, and
+        // binary fixed-width; see isDrawerParse).
+        // ⚠ The predicate is the node TYPE (`isParseNodeType`), never the served category: the catalog
+        // may not have resolved, and a category of '' would route a generic `parser` — the one node
+        // kind that MUST keep the dialog — into the drawer.
+        if (!isParseNodeType(node.type) || this.isDrawerParse(node)) {
             void this.openDefinition(node);
             return;
         }
         const category = this.typeCategory(node.type);
-        // Parse nodes get THE shared Grammar editor; every other category uses the generic config popup.
-        const ref =
-            category === 'PARSE'
-                ? this.dialog.open(GrammarEditorDialog, {
-                      width: '1100px',
-                      maxWidth: '95vw',
-                      autoFocus: false,
-                      data: { node, typeLabel: node.type, categoryLabel: categoryLabel(category) },
-                  })
-                : this.dialog.open(NodeConfigDialog, {
-                      width: '680px',
-                      maxWidth: '95vw',
-                      autoFocus: false,
-                      data: {
-                          node,
-                          typeLabel: node.type,
-                          categoryLabel: categoryLabel(category),
-                          bindKind: bindKindFor(category),
-                          attributes: this.typeAttributes().get(node.type),
-                          enrichmentHost: node.type === 'enrichment' ? this.enrichmentHost() : undefined,
-                          // What the tab's sample thread parsed — the rows an inline test runs over.
-                          sampleRows: this.sampleThread()?.parsedRows(),
-                      },
-                  });
-        ref.afterClosed().subscribe((res?: NodeConfigResult) => {
-            if (res?.node) this.applyNodePatch(res.node);
-        });
+        this.dialog
+            .open(GrammarEditorDialog, {
+                width: '1100px',
+                maxWidth: '95vw',
+                autoFocus: false,
+                data: { node, typeLabel: node.type, categoryLabel: categoryLabel(category) },
+            })
+            .afterClosed()
+            .subscribe((res?: { node?: AuthoredNode }) => {
+                if (res?.node) this.applyNodePatch(res.node);
+            });
     }
 
     /**
@@ -1572,7 +1600,7 @@ export class PipelineEditorComponent implements OnInit {
      * point the transform at a store the author never chose. Quarantine is SINK-category too and
      * carries only `dir`, which is why the filter keys on the config, not the category alone.
      */
-    private enrichmentHost(): EnrichmentHostPipeline | undefined {
+    enrichmentHost(): EnrichmentHostPipeline | undefined {
         const id = this.selectedId();
         if (!id) return undefined;
         const stores = (this.model()?.nodes ?? []).filter(
@@ -1687,12 +1715,38 @@ export class PipelineEditorComponent implements OnInit {
     definitionKind(node: AuthoredNode): { label: string; icon: string } {
         if (node.type === 'acquisition') return { label: 'Collector', icon: 'heroicons_outline:inbox-arrow-down' };
         if (node.type === 'transform.map') return { label: 'Load', icon: 'heroicons_outline:arrows-right-left' };
-        return { label: 'Parse', icon: 'heroicons_outline:document-text' };
+        if (isParseNodeType(node.type)) return { label: 'Parse', icon: 'heroicons_outline:document-text' };
+        // S2 generalised the table: every other kind now reaches the drawer too, and there is no
+        // definition-stage name for them — so the header states the node's own CATEGORY, which is what
+        // the retired dialog's subtitle showed. ⛔ Do not fall through to 'Parse': that is exactly the
+        // bug the three-way choice replaced, one kind wider.
+        return { label: categoryLabel(this.typeCategory(node.type)), icon: this.categoryIcon(node.type) };
+    }
+
+    /** The drawer header glyph for a non-stage kind — the palette's own category icon. */
+    private categoryIcon(type: string): string {
+        switch (this.typeCategory(type)) {
+            case 'TRANSFORM':
+                return 'heroicons_outline:funnel';
+            case 'ENRICH':
+                return 'heroicons_outline:sparkles';
+            case 'SINK':
+                return 'heroicons_outline:circle-stack';
+            case 'CONTROL':
+                return 'heroicons_outline:adjustments-horizontal';
+            default:
+                return 'heroicons_outline:cube';
+        }
     }
 
     /** Drawer Apply: ask the pane to rebuild the node (it emits `applied` → {@link onDefinitionApplied}). */
     applyDefinition(): void {
-        (this.definitionPane ?? this.parseDefinitionPane ?? this.loadDefinitionPane)?.submit();
+        (
+            this.definitionPane ??
+            this.parseDefinitionPane ??
+            this.loadDefinitionPane ??
+            this.configDefinitionPane
+        )?.submit();
     }
 
     /** The pane's rebuilt node — an in-memory patch (D2), persisted only by the toolbar Save. */
@@ -1877,6 +1931,11 @@ export class PipelineEditorComponent implements OnInit {
         return node;
     }
 
+    /**
+     * S3 — a Step added from the palette lands in its own configuration pane, the parity the Recipe
+     * view's insert already had (`onRecipeInsert` has always ended in `openNodeConfig`). On canvas a
+     * "Needs config" Step used to cost an extra click every single time.
+     */
     private selectNewNode(node: AuthoredNode): void {
         this.canvas?.setNodeStatus(node.id, this.statusOf(node)); // a new node starts unconfigured/configured
         // Re-typing the parse placeholder renames the node ("Parser" → "Delimited") and reaches here, but
@@ -1887,6 +1946,7 @@ export class PipelineEditorComponent implements OnInit {
         this.dirty.set(true);
         this.selectedNode.set(node);
         this.inspectorOpen.set(true);
+        this.openNodeConfig(node);
     }
 
     onDeleteKey(): void {

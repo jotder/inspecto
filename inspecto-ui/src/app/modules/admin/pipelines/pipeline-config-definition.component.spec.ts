@@ -1,0 +1,608 @@
+import { HttpErrorResponse } from '@angular/common/http';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
+import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { of, throwError } from 'rxjs';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ToastrService } from 'ngx-toastr';
+import {
+    AuthoredNode,
+    CatalogService,
+    ComponentsService,
+    ConfigService,
+    LensService,
+    MetadataNode,
+    SpacesService,
+} from 'app/inspecto/api';
+import type { AttributeSpec } from 'app/inspecto/component-model';
+import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
+import { EnrichmentEditorComponent } from 'app/inspecto/enrichment/enrichment-editor.component';
+import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { EnrichmentHostPipeline, PipelineConfigDefinitionComponent } from './pipeline-config-definition.component';
+
+/**
+ * S2 — these are the config-surface cases of the retired `node-config.dialog.spec.ts`, RE-PINNED on the
+ * drawer pane that replaced it. ⚠ Its config-key list (the local-table fallback assertion) is one of the
+ * FIVE pinned OUTPUT touchpoints; it moves with the pane, it does not silently drop.
+ *
+ * <p>Two families of the dialog's cases are deliberately absent rather than ported:
+ * <ul>
+ *   <li>the **acquisition** cases — already re-pinned on `pipeline-collection-definition.component.spec.ts`
+ *       when the Collector pane took that path (nesting, unmodeled sub-keys, the Connection binding);</li>
+ *   <li>the **component-binding** cases (picker · "New &lt;kind&gt;" · "Test &lt;component&gt;…" · the
+ *       free-text `use` box) — that half was dead in production and is deleted with the dialog (D5).</li>
+ * </ul>
+ */
+
+const TOASTR = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() };
+
+const PRODUCED_REF: MetadataNode = {
+    id: 'ref:region_dim',
+    kind: 'REFERENCE_DATASET',
+    label: 'REGION_DIM',
+    attrs: { pipeline: 'region_dim', active: true },
+} as MetadataNode;
+
+interface PaneInputs {
+    node: AuthoredNode;
+    attributes?: AttributeSpec[];
+    enrichmentHost?: EnrichmentHostPipeline;
+    sampleRows?: Record<string, unknown>[];
+}
+
+async function create(inputs: PaneInputs, api: Partial<ConfigService> = {}) {
+    TestBed.configureTestingModule({
+        imports: [PipelineConfigDefinitionComponent],
+        providers: [
+            provideNoopAnimations(),
+            { provide: ComponentsService, useValue: { list: () => of([]) } },
+            {
+                provide: ConfigService,
+                useValue: {
+                    read: vi.fn(() => throwError(() => ({ status: 404 }))),
+                    write: vi.fn((type: string, cfg: Record<string, unknown>) =>
+                        of({
+                            type,
+                            written: true,
+                            path: `${String(cfg['name'])}.toon`,
+                            name: String(cfg['name']),
+                            bytes: 1,
+                            overwritten: false,
+                            findings: [],
+                        }),
+                    ),
+                    registerEnrichment: vi.fn(() =>
+                        of({ registered: true, name: 'x_enrich', path: 'x_enrich.toon', findings: [] }),
+                    ),
+                    ...api,
+                },
+            },
+            { provide: CatalogService, useValue: { references: vi.fn(() => of([PRODUCED_REF])) } },
+            { provide: LensService, useValue: { canAuthorWorkbench: () => true } },
+            // The derived `output.database` convention is space-relative (P6-c).
+            { provide: SpacesService, useValue: { currentSpaceId: () => 'demo' } },
+            { provide: ToastrService, useValue: TOASTR },
+        ],
+    });
+    await TestBed.compileComponents(); // the shared enrichment editor @defer-loads CodeMirror
+    const fixture = TestBed.createComponent(PipelineConfigDefinitionComponent);
+    fixture.componentRef.setInput('node', inputs.node);
+    if (inputs.attributes !== undefined) fixture.componentRef.setInput('attributes', inputs.attributes);
+    if (inputs.enrichmentHost) fixture.componentRef.setInput('enrichmentHost', inputs.enrichmentHost);
+    if (inputs.sampleRows) fixture.componentRef.setInput('sampleRows', inputs.sampleRows);
+    fixture.detectChanges();
+    return fixture;
+}
+
+/** The pane's schema form — the config one on a plain node, the wiring one on an enrichment. */
+function form(fixture: ComponentFixture<PipelineConfigDefinitionComponent>): InspectoSchemaFormComponent {
+    return fixture.debugElement.query(By.directive(InspectoSchemaFormComponent)).componentInstance;
+}
+
+/** The shared enrichment editor hosted by the pane (enrichment nodes only). */
+function editor(fixture: ComponentFixture<PipelineConfigDefinitionComponent>): EnrichmentEditorComponent {
+    return fixture.debugElement.query(By.directive(EnrichmentEditorComponent)).componentInstance;
+}
+
+/** Capture the node the pane emits on Apply. */
+function applied(fixture: ComponentFixture<PipelineConfigDefinitionComponent>): () => AuthoredNode | undefined {
+    let out: AuthoredNode | undefined;
+    fixture.componentInstance.applied.subscribe((n) => (out = n));
+    return () => out;
+}
+
+describe('PipelineConfigDefinitionComponent', () => {
+    beforeEach(() => vi.clearAllMocks());
+
+    it('uses the free-form config editor for a type with no schema', async () => {
+        const c = (await create({ node: { id: 'x', type: 'plugin.unknown' } })).componentInstance;
+        expect(c.specs()).toEqual([]);
+        expect(c.freeFormOpen()).toBe(true); // free-form is the primary surface
+    });
+
+    it('renders the schema-form for a known type and splits config into schema + free-form', async () => {
+        const fixture = await create({
+            node: {
+                id: 'w',
+                type: 'sink.persistent',
+                config: { format: 'CSV', compression: 'gzip', custom_flag: 'x' },
+            },
+        });
+        const c = fixture.componentInstance;
+        expect(c.specs().map((s) => s.key)).toContain('format');
+        // schema-known keys seed the schema-form; the unknown key falls to the free-form editor
+        expect(c.split().schemaInitial).toMatchObject({ format: 'CSV', compression: 'gzip' });
+        expect(c.split().schemaInitial['custom_flag']).toBeUndefined();
+        expect(c.configRows.length).toBe(1);
+        expect(c.freeFormOpen()).toBe(true); // an extra key is present ⇒ shown
+    });
+
+    it('merges schema-form values with free-form rows on apply', async () => {
+        const fixture = await create({ node: { id: 'w', type: 'sink.file', config: { format: 'CSV', extra: '1' } } });
+        const out = applied(fixture);
+        fixture.componentInstance.submit();
+        expect(out()?.config).toMatchObject({ format: 'CSV', extra: '1' });
+    });
+
+    /**
+     * D4: spec keys are FLAT (`__` = nesting) while the engine reads nested MAPS, so the apply has to run
+     * `nestKeys` — and sub-keys with no AttributeSpec must survive it. Pinned here on a SINK (`batch__*`);
+     * the acquisition `collector:` blocks are pinned on the Collector pane.
+     */
+    it('nests flat `__` spec keys before they reach node.config, keeping unmodeled sub-keys', async () => {
+        const fixture = await create({
+            node: {
+                id: 'w',
+                type: 'sink.persistent',
+                config: { batch: { max_files: 5, on_partial: 'HOLD' } },
+            },
+        });
+        const c = fixture.componentInstance;
+        expect(c.split().schemaInitial['batch__max_files']).toBe(5);
+        const out = applied(fixture);
+        c.submit();
+        const cfg = out()?.config as Record<string, unknown>;
+        // The flat forms must be gone — they are form-transport spellings, never config keys.
+        expect(Object.keys(cfg).filter((k) => k.includes('__'))).toEqual([]);
+        expect(cfg['batch']).toMatchObject({ max_files: 5, on_partial: 'HOLD' });
+    });
+
+    /** The nested block must reach the schema form, not the free-form escape hatch (D4, load half). */
+    it('seeds the schema form from a nested block instead of stringifying it into free-form', async () => {
+        const c = (
+            await create({
+                node: { id: 'w', type: 'sink.persistent', config: { batch: { max_files: 2 }, mystery: { a: 1 } } },
+            })
+        ).componentInstance;
+        expect(c.split().schemaInitial['batch__max_files']).toBe(2);
+        // Only the genuinely unknown root is free-form — and it stays literal there.
+        expect(c.configRows.value).toEqual([{ key: 'mystery', value: '{"a":1}' }]);
+    });
+
+    /**
+     * ⚠ The pane asks NO Name/Description (identity is the inspector's rename pencil, principle 5), but
+     * `buildConfiguredNode` rebuilds the node from scratch — so both must be carried through explicitly.
+     * Omitting them DELETED the node's name on every config apply.
+     */
+    it('carries the node identity through an apply even though it never asks for it', async () => {
+        const fixture = await create({
+            node: {
+                id: 'flt',
+                type: 'transform.filter',
+                name: 'Row filter',
+                description: 'drops test traffic',
+                config: { where: 'a > 1' },
+            },
+        });
+        expect(fixture.nativeElement.textContent).not.toContain('Description');
+        const out = applied(fixture);
+        fixture.componentInstance.submit();
+        expect(out()).toMatchObject({ id: 'flt', name: 'Row filter', description: 'drops test traffic' });
+    });
+
+    /**
+     * `transform.route`'s `branches` is a list of MAPS and deliberately has no spec, so it travels as an
+     * UNTOUCHED free-form row — which must restore verbatim, not as the JSON string it was seeded with.
+     * Applying a route node with no edits at all used to replace its routing with text.
+     */
+    it('restores an untouched unmodeled block verbatim instead of stringifying it', async () => {
+        const branches = [{ rel: 'kept', where: 'ok' }];
+        const fixture = await create({ node: { id: 'r', type: 'transform.route', config: { branches } } });
+        const out = applied(fixture);
+        fixture.componentInstance.submit();
+        expect((out()?.config as Record<string, unknown>)['branches']).toEqual(branches);
+    });
+
+    it('reports dirty transitions and returns pristine after a successful apply', async () => {
+        const fixture = await create({ node: { id: 'w', type: 'sink.file' } });
+        const seen: boolean[] = [];
+        fixture.componentInstance.dirtyChange.subscribe((d) => seen.push(d));
+        fixture.componentInstance.addConfigRow();
+        expect(seen.at(-1)).toBe(true);
+        fixture.componentInstance.submit();
+        expect(seen.at(-1)).toBe(false);
+    });
+
+    // ── §3.1: the SERVED vocabulary drives the form; the local table is only a fallback ──
+
+    it('prefers the server-published attributes over the local table', async () => {
+        const served: AttributeSpec[] = [
+            { key: 'served_only', label: 'Served only', type: 'string', tier: 'required' },
+        ];
+        const c = (await create({ node: { id: 'w', type: 'sink.persistent' }, attributes: served })).componentInstance;
+        expect(c.specs()).toBe(served);
+        expect(c.specs().map((s) => s.key)).not.toContain('format'); // the local table's key
+    });
+
+    /**
+     * Before the catalog resolves (and in the offline build) the client table must still drive the form.
+     * ⚠ This key list is a PINNED output touchpoint — it moved here from `node-config.dialog.spec.ts`.
+     */
+    it('falls back to the local table when the server said nothing', async () => {
+        const c = (await create({ node: { id: 'w', type: 'sink.persistent' } })).componentInstance;
+        expect(c.specs().map((s) => s.key)).toEqual([
+            'database',
+            'format',
+            'compression',
+            'filename_column',
+            'batch__max_files',
+            'batch__max_bytes',
+            'batch__order',
+        ]);
+    });
+
+    /**
+     * A served EMPTY list is the server stating "this type has no schema" — it must NOT silently re-enable
+     * the client table, or a type the server deliberately unspecced would keep drawing a stale form.
+     */
+    it('honours a served empty list instead of falling back', async () => {
+        const c = (await create({ node: { id: 'w', type: 'sink.persistent' }, attributes: [] })).componentInstance;
+        expect(c.specs()).toEqual([]);
+        expect(c.freeFormOpen()).toBe(true); // free-form becomes the only surface
+    });
+
+    // ── enrichment (W4b): the pane authors the REAL companion `*_enrich.toon` ──
+
+    it('renders the shared enrichment editor + wiring form for an enrichment node', async () => {
+        const fixture = await create({ node: { id: 'enrich1', type: 'enrichment' } });
+        const c = fixture.componentInstance;
+        expect(c.isEnrichment()).toBe(true);
+        expect(editor(fixture)).toBeTruthy();
+        expect(c.enrichName.value).toBe('enrich1');
+        expect(c.freeFormOpen()).toBe(false); // the editor is the primary surface, not the key/value grid
+    });
+
+    it('seeds a FRESH companion from the host pipeline instead of asking (P6-c)', async () => {
+        const fixture = await create({
+            node: { id: 'enrich1', type: 'enrichment' },
+            enrichmentHost: {
+                pipelineId: 'orders',
+                inputDatabase: 'spaces/demo/data/orders/database',
+                inputFormat: 'PARQUET',
+            },
+        });
+        const wiring = form(fixture);
+        expect(wiring.form.get('input__database')?.value).toBe('spaces/demo/data/orders/database');
+        expect(wiring.form.get('output__database')?.value).toBe('spaces/demo/data/enriched/enrich1');
+        expect(wiring.form.get('triggers__on_pipeline')?.value).toBe('orders');
+        expect(wiring.form.get('input__partitions')?.value).toEqual(['year', 'month', 'day']);
+    });
+
+    it('a host with no resolvable output store seeds everything EXCEPT the input store', async () => {
+        // Multi-destination (or store-less) pipeline: the editor sends no `inputDatabase` rather than
+        // pointing the transform at a store the author never chose.
+        const fixture = await create({
+            node: { id: 'enrich1', type: 'enrichment' },
+            enrichmentHost: { pipelineId: 'orders' },
+        });
+        expect(form(fixture).form.get('input__database')?.value).toBe('');
+        expect(form(fixture).form.get('triggers__on_pipeline')?.value).toBe('orders');
+    });
+
+    it('a host that supplies no pipeline context still opens the wiring form blank', async () => {
+        const fixture = await create({ node: { id: 'enrich1', type: 'enrichment' } });
+        expect(form(fixture).form.get('input__database')?.value).toBeFalsy();
+        expect(form(fixture).form.get('triggers__on_pipeline')?.value).toBeFalsy();
+    });
+
+    it('apply writes the companion, registers it, and binds by reference — config stays unmirrored', async () => {
+        const write = vi.fn((type: string, cfg: Record<string, unknown>) =>
+            of({
+                type,
+                written: true,
+                path: `${String(cfg['name'])}.toon`,
+                name: String(cfg['name']),
+                bytes: 1,
+                overwritten: false,
+                findings: [],
+            }),
+        );
+        const registerEnrichment = vi.fn(() =>
+            of({ registered: true, name: 'enrich1_enrich', path: 'enrich1.toon', findings: [] }),
+        );
+        const fixture = await create({ node: { id: 'enrich1', type: 'enrichment' } }, { write, registerEnrichment });
+        const out = applied(fixture);
+        editor(fixture).onSqlChange('SELECT * FROM input');
+        const wiring = form(fixture);
+        wiring.form.get('input__database')?.setValue('spaces/demo/data/orders/database');
+        wiring.form.get('output__database')?.setValue('spaces/demo/data/enriched/enrich1');
+        fixture.componentInstance.submit();
+
+        const [type, draft] = write.mock.calls[0] as [string, Record<string, unknown>];
+        expect(type).toBe('enrichment');
+        expect(draft['name']).toBe('enrich1');
+        expect(draft['transform']).toBe('SELECT * FROM input');
+        expect((draft['input'] as Record<string, unknown>)['database']).toBe('spaces/demo/data/orders/database');
+        expect(registerEnrichment).toHaveBeenCalledWith('enrich1.toon');
+        // The node binds by reference — the companion file is the single truth, never mirrored.
+        expect(out()?.use).toBe('enrichment/enrich1');
+        expect(out()?.config).toBeUndefined();
+    });
+
+    it('hydrates a bound companion and round-trips its partition lists through an apply', async () => {
+        const read = vi.fn(() =>
+            of({
+                type: 'enrichment',
+                name: 'orders_enrich',
+                path: 'orders_enrich.toon',
+                config: {
+                    name: 'orders_enrich',
+                    input: { database: 'in/db', format: 'PARQUET', partitions: ['year', 'month'] },
+                    output: { database: 'out/db', partitions: ['year'] },
+                    transform: 'SELECT 1 FROM input',
+                    triggers: { on_pipeline: 'orders' },
+                },
+            }),
+        );
+        const write = vi.fn((type: string, cfg: Record<string, unknown>) =>
+            of({
+                type,
+                written: true,
+                path: `${String(cfg['name'])}.toon`,
+                name: String(cfg['name']),
+                bytes: 1,
+                overwritten: false,
+                findings: [],
+            }),
+        );
+        const fixture = await create(
+            { node: { id: 'enrich1', type: 'enrichment', use: 'enrichment/orders_enrich' } },
+            { read, write },
+        );
+        const out = applied(fixture);
+        fixture.detectChanges(); // the async read landed; the hydrate effect sees the editor
+        expect(read).toHaveBeenCalledWith('enrichment', 'orders_enrich');
+        expect(fixture.componentInstance.enrichName.value).toBe('orders_enrich');
+        expect(editor(fixture).sql()).toBe('SELECT 1 FROM input');
+
+        fixture.componentInstance.submit();
+        const [, draft] = write.mock.calls[0] as [string, Record<string, unknown>];
+        // The form OWNS partitions (specced as `list` chips) — they survive because the form hydrated
+        // them, not because they were unmodeled and copied past it.
+        expect((draft['input'] as Record<string, unknown>)['partitions']).toEqual(['year', 'month']);
+        expect((draft['output'] as Record<string, unknown>)['partitions']).toEqual(['year']);
+        expect((draft['triggers'] as Record<string, unknown>)['on_pipeline']).toBe('orders');
+        expect(out()?.use).toBe('enrichment/orders_enrich');
+    });
+
+    it('a BOUND companion wins over the host-derived seed — the file is the truth', async () => {
+        const read = vi.fn(() =>
+            of({
+                type: 'enrichment',
+                name: 'orders_enrich',
+                path: 'orders_enrich.toon',
+                config: {
+                    name: 'orders_enrich',
+                    input: { database: 'in/db', format: 'CSV', partitions: ['dt'] },
+                    output: { database: 'out/db', partitions: [] },
+                    transform: 'SELECT 1 FROM input',
+                    triggers: { on_pipeline: 'other_pipeline' },
+                },
+            }),
+        );
+        const fixture = await create(
+            {
+                node: { id: 'enrich1', type: 'enrichment', use: 'enrichment/orders_enrich' },
+                enrichmentHost: { pipelineId: 'orders', inputDatabase: 'derived/db', inputFormat: 'PARQUET' },
+            },
+            { read },
+        );
+        fixture.detectChanges(); // the async read landed
+        const wiring = form(fixture);
+        expect(wiring.form.get('input__database')?.value).toBe('in/db');
+        expect(wiring.form.get('input__partitions')?.value).toEqual(['dt']);
+        // Even a trigger naming a DIFFERENT pipeline stands: this pane edits the companion, and
+        // re-pointing it at its host would be an unasked-for change to a deployed enrichment.
+        expect(wiring.form.get('triggers__on_pipeline')?.value).toBe('other_pipeline');
+    });
+
+    // `EnrichmentConfig.fromMap` THROWS `Missing or invalid list` when either partitions key is absent,
+    // so a fresh enrichment must still write `partitions: []` — the legal "unpartitioned" value.
+    it('writes both partition keys for a fresh enrichment, so the config can load', async () => {
+        const write = vi.fn((type: string, cfg: Record<string, unknown>) =>
+            of({
+                type,
+                written: true,
+                path: `${String(cfg['name'])}.toon`,
+                name: String(cfg['name']),
+                bytes: 1,
+                overwritten: false,
+                findings: [],
+            }),
+        );
+        const fixture = await create({ node: { id: 'enrich1', type: 'enrichment' } }, { write });
+        editor(fixture).onSqlChange('SELECT 1 FROM input');
+        const wiring = form(fixture);
+        wiring.form.get('input__database')?.setValue('in/db');
+        wiring.form.get('output__database')?.setValue('out/db');
+
+        fixture.componentInstance.submit();
+        const [, draft] = write.mock.calls[0] as [string, Record<string, unknown>];
+        expect((draft['input'] as Record<string, unknown>)['partitions']).toEqual([]);
+        expect((draft['output'] as Record<string, unknown>)['partitions']).toEqual([]);
+    });
+
+    // An `output.partitions` entry may be `{column, source}` where `source` declares event time and
+    // drives the recorded bounds. The chips control is string[]-only and a specced key is replaced
+    // wholesale — so without the re-marry, authoring the grain silently drops `source`.
+    it('keeps an output partition source across an apply that only touches other fields', async () => {
+        const read = vi.fn(() =>
+            of({
+                type: 'enrichment',
+                name: 'orders_enrich',
+                path: 'orders_enrich.toon',
+                config: {
+                    name: 'orders_enrich',
+                    input: { database: 'in/db', partitions: ['day'] },
+                    output: {
+                        database: 'out/db',
+                        partitions: [{ column: 'day', source: 'event_ts' }, 'region'],
+                    },
+                    transform: 'SELECT 1 FROM input',
+                },
+            }),
+        );
+        const write = vi.fn((type: string, cfg: Record<string, unknown>) =>
+            of({
+                type,
+                written: true,
+                path: `${String(cfg['name'])}.toon`,
+                name: String(cfg['name']),
+                bytes: 1,
+                overwritten: false,
+                findings: [],
+            }),
+        );
+        const fixture = await create(
+            { node: { id: 'e', type: 'enrichment', use: 'enrichment/orders_enrich' } },
+            { read, write },
+        );
+        fixture.detectChanges();
+
+        fixture.componentInstance.submit();
+        const [, draft] = write.mock.calls[0] as [string, Record<string, unknown>];
+        // The map entry keeps its source; the bare one stays bare.
+        expect((draft['output'] as Record<string, unknown>)['partitions']).toEqual([
+            { column: 'day', source: 'event_ts' },
+            'region',
+        ]);
+    });
+
+    it('refuses to overwrite a hand-authored transform_file config', async () => {
+        const read = vi.fn(() =>
+            of({
+                type: 'enrichment',
+                name: 'x_enrich',
+                path: 'x_enrich.toon',
+                config: {
+                    name: 'x_enrich',
+                    input: { database: 'a' },
+                    output: { database: 'b' },
+                    transform_file: 't.sql',
+                },
+            }),
+        );
+        const write = vi.fn();
+        const fixture = await create(
+            { node: { id: 'e', type: 'enrichment', use: 'enrichment/x_enrich' } },
+            { read, write },
+        );
+        fixture.detectChanges();
+        expect(fixture.componentInstance.enrichUneditable()).toBe(true);
+        expect(fixture.nativeElement.textContent).toContain('transform_file');
+        fixture.componentInstance.submit();
+        expect(write).not.toHaveBeenCalled(); // applying the binding is allowed; writing is not
+    });
+
+    /**
+     * The inline test (`POST /components/{family}/preview`) — gated on the node's own TYPE plus rows to
+     * run over. ⚠ Its predecessor, "Test &lt;component&gt;…", gated on `bindKind` and was therefore dead
+     * UI on every node that reached this surface; it is not carried here (D5).
+     */
+    describe('inline test', () => {
+        const withPreview = (over: Record<string, unknown>): void => {
+            TestBed.overrideProvider(ComponentsService, { useValue: { list: () => of([]), ...over } });
+        };
+        const filter = (): PaneInputs => ({
+            node: { id: 'flt', type: 'transform.filter' },
+            sampleRows: [{ qty: '2' }, { qty: '1' }],
+        });
+
+        it('is not offered without rows — a test over no data would report success over nothing', async () => {
+            const fixture = await create({ node: { id: 'flt', type: 'transform.filter' } });
+            expect(fixture.componentInstance.canTestInline()).toBe(false);
+            expect(fixture.nativeElement.textContent).not.toContain('Test this Step');
+        });
+
+        it('is not offered for a family the route has no preview for', async () => {
+            const fixture = await create({ node: { id: 'e', type: 'enrichment' }, sampleRows: [{ qty: '2' }] });
+            expect(fixture.componentInstance.testFamily()).toBeNull();
+        });
+
+        it('sends the node type inside config and renders the per-relation counts', async () => {
+            const previewTransform = vi.fn(() =>
+                of({ inputColumns: ['qty'], relations: [{ rel: 'data', rowCount: 1, rows: [{ qty: '2' }] }] }),
+            );
+            withPreview({ previewTransform });
+            const fixture = await create(filter());
+            fixture.componentInstance.runInlineTest();
+            fixture.detectChanges();
+
+            // ⚠ `type` is mandatory in the body: the route 422s a config that is not `transform.*`.
+            expect(previewTransform).toHaveBeenCalledWith(expect.objectContaining({ type: 'transform.filter' }), [
+                { qty: '2' },
+                { qty: '1' },
+            ]);
+            expect(fixture.nativeElement.textContent).toContain("out 'data': 1 row(s)");
+        });
+
+        it('reports a sink preview as its store plus any warnings', async () => {
+            const previewSink = vi.fn(() =>
+                of({ store: null, rowCount: 2, rows: [], warnings: ["sink declares no 'store' name"] }),
+            );
+            withPreview({ previewSink });
+            const fixture = await create({
+                node: { id: 'out', type: 'sink.persistent' },
+                sampleRows: [{ qty: '2' }, { qty: '1' }],
+            });
+            fixture.componentInstance.runInlineTest();
+            fixture.detectChanges();
+
+            expect(previewSink).toHaveBeenCalled();
+            expect(fixture.nativeElement.textContent).toContain('(none declared)');
+            expect(fixture.nativeElement.textContent).toContain("sink declares no 'store' name");
+        });
+
+        it('surfaces a refusal instead of a result', async () => {
+            // A real HttpErrorResponse: `apiErrorMessage` only reads the server's message off one.
+            withPreview({
+                previewTransform: () =>
+                    throwError(
+                        () =>
+                            new HttpErrorResponse({
+                                status: 422,
+                                error: { error: { message: 'preview failed: no such column' } },
+                            }),
+                    ),
+            });
+            const fixture = await create(filter());
+            fixture.componentInstance.runInlineTest();
+            fixture.detectChanges();
+
+            expect(fixture.componentInstance.testResult()).toBeNull();
+            expect(fixture.nativeElement.querySelector('[role="alert"]')?.textContent).toContain('no such column');
+        });
+    });
+
+    it('has no a11y violations (free-form type)', async () => {
+        await expectNoA11yViolations((await create({ node: { id: 'x', type: 'plugin.unknown' } })).nativeElement);
+    });
+
+    it('has no a11y violations (schema-backed type)', async () => {
+        await expectNoA11yViolations((await create({ node: { id: 'w', type: 'sink.file' } })).nativeElement);
+    });
+
+    it('has no a11y violations (enrichment node)', async () => {
+        await expectNoA11yViolations((await create({ node: { id: 'e', type: 'enrichment' } })).nativeElement);
+    });
+});

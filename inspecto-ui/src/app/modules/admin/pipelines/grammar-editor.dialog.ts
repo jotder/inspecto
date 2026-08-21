@@ -6,13 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
-import {
-    AuthoredNode,
-    ComponentDef,
-    ComponentsService,
-    ParserDef,
-    ParserPreview,
-} from 'app/inspecto/api';
+import { AuthoredNode, ComponentDef, ComponentsService, ParserDef, ParserPreview } from 'app/inspecto/api';
 import { flattenBlock, nestKeys, parseUseRef } from 'app/inspecto/component-model';
 import { downloadCsv } from 'app/inspecto/data-table/core/csv';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
@@ -31,7 +25,14 @@ import {
 } from 'app/inspecto/grammar';
 import { MappingEditorDialog } from 'app/modules/admin/components/mapping-editor.dialog';
 import { SchemaEditorData, SchemaEditorDialog } from 'app/modules/admin/components/schema-editor.dialog';
-import { NodeConfigResult } from './node-config.dialog';
+
+/**
+ * Dialog close payload: the edited node (absent ⇒ the user cancelled). Re-homed here from the retired
+ * `node-config.dialog` (S2) — this dialog is the only surface that still returns one.
+ */
+export interface NodeConfigResult {
+    node: AuthoredNode;
+}
 
 /** Dialog data: the parse node to configure + its (resolved) type/category labels for the header. */
 export interface GrammarEditorDialogData {

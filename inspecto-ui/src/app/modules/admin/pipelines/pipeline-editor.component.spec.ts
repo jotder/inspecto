@@ -644,13 +644,17 @@ describe('PipelineEditorComponent', () => {
             expect(c.inspectorOpen()).toBe(true);
         });
 
-        it('keeps the dialog for every other node kind', () => {
+        /**
+         * S2 — every other node kind now defines in the drawer too. The ONLY surface still on a popup is
+         * the Grammar editor, for the parse nodes `isDrawerParse` deliberately refuses (pinned below).
+         */
+        it('routes every other node kind to the drawer, not a dialog', () => {
             const c = make();
             c.select('demo');
             dialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
             c.openNodeConfig(c.model()!.nodes[1]); // transform.filter
-            expect(dialog.open).toHaveBeenCalled();
-            expect(c.definitionNode()).toBeNull();
+            expect(dialog.open).not.toHaveBeenCalled();
+            expect(c.definitionNode()?.id).toBe('flt');
         });
 
         it('an applied definition patches the model in memory and never persists (D2)', async () => {
@@ -909,14 +913,19 @@ describe('PipelineEditorComponent', () => {
             ];
             const enrich = { id: 'enr', type: 'enrichment', config: {} };
 
+            /**
+             * S2 moved the enrichment surface into the drawer, so the host context is no longer packed
+             * into dialog data — the template binds `enrichmentHost()` on the pane. The derivation
+             * itself is unchanged, and it is the derivation these cases are about.
+             */
             function open(sinks: { id: string; type: string; config: Record<string, unknown> }[]) {
                 api.nodeTypes.mockReturnValue(of(TYPES));
                 const c = make();
                 c.select('demo');
-                dialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
                 c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, enrich, ...sinks] }));
                 c.openNodeConfig(enrich);
-                return dialog.open.mock.calls[0][1].data.enrichmentHost;
+                expect(c.definitionNode()?.id).toBe('enr'); // it really is the drawer's pane asking
+                return c.enrichmentHost();
             }
 
             it('sends the pipeline id and its single output store', () => {
@@ -941,13 +950,77 @@ describe('PipelineEditorComponent', () => {
                 expect(host.inputDatabase).toBe('d/db');
             });
 
-            it('is not attached to a non-enrichment node', () => {
+            /** The template passes it only for an `enrichment` node — every other pane ignores it. */
+            it('is bound only for an enrichment node', () => {
                 api.nodeTypes.mockReturnValue(of(TYPES));
                 const c = make();
                 c.select('demo');
-                dialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
                 c.openNodeConfig(c.model()!.nodes[1]); // transform.filter
-                expect(dialog.open.mock.calls[0][1].data.enrichmentHost).toBeUndefined();
+                expect(c.definitionNode()?.type).toBe('transform.filter');
+            });
+        });
+
+        /**
+         * S3 — selection and configuration converge, so the common paths cost one click instead of two.
+         */
+        describe('fewer clicks (S3)', () => {
+            it('a Step added from the palette lands in its own config pane', () => {
+                const c = make();
+                c.select('demo');
+                c.addFromPalette('transform.filter');
+                const added = c.model()!.nodes.at(-1)!;
+                expect(c.definitionNode()?.id).toBe(added.id);
+            });
+
+            it('selecting an UNCONFIGURED Step opens its pane', async () => {
+                const c = make();
+                c.select('demo');
+                c.addFromPalette('transform.filter');
+                const fresh = c.model()!.nodes.at(-1)!;
+                c.closeDefinition();
+                c.onNodeSelected(fresh.id);
+                await Promise.resolve();
+                expect(c.definitionNode()?.id).toBe(fresh.id);
+            });
+
+            /** ⛔ Clicking a CONFIGURED Step just to look at it must not take its summary away. */
+            it('selecting a configured Step with the drawer closed leaves it closed', async () => {
+                const c = make();
+                c.select('demo');
+                c.onNodeSelected('flt'); // transform.filter, config: {where: …}
+                await Promise.resolve();
+                expect(c.definitionNode()).toBeNull();
+                expect(c.selectedNode()?.id).toBe('flt');
+            });
+
+            /**
+             * The silent bug S3 fixes: the template prefers `definitionNode()` over `selectedNode()`, so
+             * selecting Step B while A's pane was open kept showing A's definition with no hint at all.
+             */
+            it('a CLEAN open pane re-targets to the newly selected Step', async () => {
+                const c = make();
+                c.select('demo');
+                await c.openDefinition(c.model()!.nodes[0]); // 'src'
+                expect(c.definitionNode()?.id).toBe('src');
+                c.onNodeSelected('flt');
+                await Promise.resolve();
+                expect(c.definitionNode()?.id).toBe('flt');
+            });
+
+            /** A DIRTY pane keeps openDefinition's confirm — that guard is the whole point. */
+            it('a DIRTY open pane confirms before following the selection', async () => {
+                const confirm = TestBed.inject(InspectoConfirmService) as unknown as {
+                    confirmDestructive: ReturnType<typeof vi.fn>;
+                };
+                confirm.confirmDestructive.mockResolvedValue(false);
+                const c = make();
+                c.select('demo');
+                await c.openDefinition(c.model()!.nodes[0]);
+                c.definitionDirty.set(true);
+                c.onNodeSelected('flt');
+                await new Promise((r) => setTimeout(r)); // the confirm resolves on a microtask chain
+                expect(confirm.confirmDestructive).toHaveBeenCalled();
+                expect(c.definitionNode()?.id).toBe('src'); // declined ⇒ the pane stays put
             });
         });
 

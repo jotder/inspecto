@@ -625,23 +625,37 @@
                                             (applied)="onDefinitionApplied($event)"
                                             (dirtyChange)="definitionDirty.set($event)"
                                         />
-                                    } @else {
+                                    } @else if (isParseNode(dn)) {
                                         <!--
-                                            Every other node reaching the drawer is a per-format parse
-                                            node — `openDefinition` opens it for `acquisition`,
-                                            `isDrawerParse` or `transform.map` and nothing else. ONE
-                                            pane serves every parse format:
-                                            it reads its own format off the node type
-                                            (PARSE_NODE_FRONTENDS), so a new format needs no template
-                                            change at all. ⛔ Do not re-enumerate the subtypes here —
-                                            an arm per type is a second copy of the routing rule, free
-                                            to drift from the list that actually decides it.
+                                            ONE pane serves every parse format: it reads its own format
+                                            off the node type (PARSE_NODE_FRONTENDS), so a new format
+                                            needs no template change at all. ⛔ Do not re-enumerate the
+                                            subtypes here — an arm per type is a second copy of the
+                                            routing rule, free to drift from the list that actually
+                                            decides it.
                                         -->
                                         <app-pipeline-parse-definition
                                             [node]="dn"
                                             [templates]="grammarTemplates()"
                                             [pipelineName]="selectedId() ?? ''"
                                             [sample]="sampleThread()"
+                                            (applied)="onDefinitionApplied($event)"
+                                            (dirtyChange)="definitionDirty.set($event)"
+                                        />
+                                    } @else {
+                                        <!--
+                                            S2: every REMAINING kind — filter, route, join, summarize,
+                                            record dedup, enrichment, the sinks, gap detection and any
+                                            plugin type — shares this one pane, which is what retired
+                                            the 680px NodeConfigDialog. It asks no Name/Description
+                                            (the inspector rename owns identity) and carries no
+                                            component-binding half (dead in production, D5).
+                                        -->
+                                        <app-pipeline-config-definition
+                                            [node]="dn"
+                                            [attributes]="definitionAttributes()"
+                                            [enrichmentHost]="dn.type === 'enrichment' ? enrichmentHost() : undefined"
+                                            [sampleRows]="sampleThread()?.parsedRows()"
                                             (applied)="onDefinitionApplied($event)"
                                             (dirtyChange)="definitionDirty.set($event)"
                                         />

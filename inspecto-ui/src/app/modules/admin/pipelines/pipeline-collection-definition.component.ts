@@ -25,8 +25,8 @@ import { nodeAttributesFor } from './node-attributes';
 /**
  * The **Collector definition pane** (definition-surface P1) — the acquisition path of
  * `node-config.dialog`, re-hosted inside `<inspecto-definition-drawer>` instead of a popup. Renders
- * name/description, the shared `<inspecto-collector-config>` surface, and the free-form
- * additional-config escape hatch; {@link submit} rebuilds the node through the SAME
+ * the shared `<inspecto-collector-config>` surface, the dedup Guarantees group, and the free-form
+ * additional-config escape hatch (identity is the inspector's rename pencil, never re-asked here); {@link submit} rebuilds the node through the SAME
  * `buildConfiguredNode` the dialog uses and emits it — **pure**: nothing is persisted here (D2),
  * the host patches its in-memory model and the toolbar Save persists.
  *
@@ -48,16 +48,11 @@ import { nodeAttributesFor } from './node-attributes';
     ],
     template: `
         <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-1">
-            <mat-form-field class="w-full" subscriptSizing="dynamic">
-                <mat-label>Name</mat-label>
-                <input matInput formControlName="name" [placeholder]="node().id" />
-            </mat-form-field>
-            <mat-form-field class="w-full" subscriptSizing="dynamic">
-                <mat-label>Description</mat-label>
-                <input matInput formControlName="description" />
-            </mat-form-field>
-
-            <div class="mb-1 mt-2 text-xs font-semibold uppercase opacity-70">Config</div>
+            <!-- S2/principle 5: identity is asked ONCE, on the inspector's rename pencil — never
+                 re-asked inside a definition pane. Both values are carried through submit() anyway,
+                 because the node is rebuilt from scratch there.
+                 (no backticks in this comment: it lives inside a template literal) -->
+            <div class="mb-1 text-xs font-semibold uppercase opacity-70">Config</div>
             <inspecto-collector-config
                 [specs]="collectorSpecs()"
                 [initial]="split().schemaInitial"
@@ -141,7 +136,7 @@ import { nodeAttributesFor } from './node-attributes';
 export class PipelineCollectionDefinitionComponent {
     private fb = inject(FormBuilder);
 
-    /** The acquisition node being defined (identity fixed; config/name/use editable). */
+    /** The acquisition node being defined (identity fixed; config/use editable). */
     readonly node = input.required<AuthoredNode>();
     /**
      * The type's config vocabulary as published by the server (`GET /pipelines/node-types`).
@@ -179,8 +174,6 @@ export class PipelineCollectionDefinitionComponent {
     readonly freeFormOpen = signal(false);
 
     readonly form = this.fb.group({
-        name: this.fb.control(''),
-        description: this.fb.control(''),
         config: this.fb.array<ReturnType<PipelineCollectionDefinitionComponent['configRow']>>([]),
     });
 
@@ -190,8 +183,7 @@ export class PipelineCollectionDefinitionComponent {
         // Seed from the node input. The host recreates this component per node (and on Discard), so
         // this runs once per instance — but an input swap without recreation re-seeds correctly too.
         effect(() => {
-            const n = this.node();
-            this.form.patchValue({ name: n.name ?? '', description: n.description ?? '' });
+            this.node();
             this.configRows.clear();
             for (const row of this.split().extraRows) this.configRows.push(this.configRow(row.key, row.value));
             this.freeFormOpen.set(this.split().extraRows.length > 0);
@@ -253,8 +245,8 @@ export class PipelineCollectionDefinitionComponent {
             specs: this.specs(),
             formValues: { ...(this.collector?.value() ?? {}), ...(this.dedup?.value() ?? {}) },
             freeRows: v.config as { key: string; value: string }[],
-            name: v.name ?? undefined,
-            description: v.description ?? undefined,
+            name: this.node().name,
+            description: this.node().description,
             isAcquisition: true,
             connector,
         });
