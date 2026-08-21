@@ -1111,14 +1111,30 @@ describe('PipelineEditorComponent', () => {
                 expect(c.definitionNode()?.id).toBe(fresh.id);
             });
 
-            /** ⛔ Clicking a CONFIGURED Step just to look at it must not take its summary away. */
-            it('selecting a configured Step with the drawer closed leaves it closed', async () => {
+            /**
+             * Operator ask (2026-08-21): selection IS configuration — the summary + Configure click is
+             * gone, so selecting a CONFIGURED Step opens its pane too, and no summary renders beside it.
+             */
+            it('selecting a configured Step opens its pane directly', async () => {
                 const c = make();
                 c.select('demo');
                 c.onNodeSelected('flt'); // transform.filter, config: {where: …}
                 await Promise.resolve();
+                expect(c.definitionNode()?.id).toBe('flt');
+                expect(c.inspectorSummaryNode()).toBeNull();
+            });
+
+            /** Dialog-custody parse nodes keep select-then-Configure — a modal popping on mere
+             *  selection would be obnoxious, so the summary panel survives exactly there. */
+            it('a dialog-custody parser keeps the summary instead of auto-opening anything', async () => {
+                const c = make();
+                c.select('demo');
+                const custody = { id: 'pp', type: 'parser', use: 'grammar/missing', config: {} };
+                c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, custody] }));
+                c.onNodeSelected('pp');
+                await Promise.resolve();
                 expect(c.definitionNode()).toBeNull();
-                expect(c.selectedNode()?.id).toBe('flt');
+                expect(c.inspectorSummaryNode()?.id).toBe('pp');
             });
 
             /**

@@ -11,7 +11,8 @@ import {
     StepRow,
     categoryLabel,
     nodeConfigEntries,
-    paletteHeroIcon,
+    categoryColor,
+    typeHeroIcon,
     statusIcon,
     statusLabel,
     statusTint,
@@ -58,9 +59,12 @@ import {
                         style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
                     >
                         <div class="flex items-center gap-2">
+                            <!-- The Step's own glyph, tinted by category — same vocabulary as the
+                                 palette, so a card and its palette entry read as one thing. -->
                             <mat-icon
-                                class="icon-size-4 shrink-0 opacity-70"
-                                [svgIcon]="paletteHeroIcon(typeCat.get(row.node.type) ?? '')"
+                                class="icon-size-4 shrink-0"
+                                [svgIcon]="typeHeroIcon(row.node.type, typeCat.get(row.node.type) ?? '')"
+                                [style.color]="categoryColor(typeCat.get(row.node.type) ?? '')"
                             ></mat-icon>
                             <span class="truncate text-sm font-semibold">{{ stepTitle(row.node) }}</span>
                             @if (isNamed(row.node)) {
@@ -249,7 +253,10 @@ import {
         <mat-menu #verbMenu="matMenu">
             @for (v of verbs; track v.type) {
                 <button mat-menu-item (click)="insertStep.emit({ type: v.type, afterId: insertAfterId })">
-                    <mat-icon [svgIcon]="paletteHeroIcon(typeCat.get(v.type) ?? '')"></mat-icon>
+                    <mat-icon
+                        [svgIcon]="typeHeroIcon(v.type, typeCat.get(v.type) ?? '')"
+                        [style.color]="categoryColor(typeCat.get(v.type) ?? '')"
+                    ></mat-icon>
                     <span>{{ v.label }}</span>
                 </button>
             }
@@ -316,7 +323,8 @@ export class PipelineStepCardsComponent {
     stepTitle(n: AuthoredNode): string {
         return this.isNamed(n) ? n.name!.trim() : this.stepTypeLabel(n.type);
     }
-    readonly paletteHeroIcon = paletteHeroIcon;
+    readonly typeHeroIcon = typeHeroIcon;
+    readonly categoryColor = categoryColor;
     readonly statusIcon = statusIcon;
     readonly statusLabel = statusLabel;
     readonly statusTint = statusTint;

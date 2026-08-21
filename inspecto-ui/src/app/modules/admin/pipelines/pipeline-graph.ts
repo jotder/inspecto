@@ -416,6 +416,40 @@ export function paletteHeroIcon(category: string): string {
     }
 }
 
+/**
+ * Heroicon per NODE TYPE — every palette item carries its own glyph (operator ask, 2026-08-21:
+ * "choose an individual icon for each item, group with color"): the icon identifies the Step, the
+ * CATEGORY is conveyed by tinting it with `categoryColor`, never by sharing one glyph per group.
+ * Unknown/plugin-served types fall back to the category glyph, so a new served type is never blank.
+ */
+export function typeHeroIcon(type: string, category: string): string {
+    const icon = TYPE_HERO_ICONS[type];
+    return icon ? `heroicons_outline:${icon}` : paletteHeroIcon(category);
+}
+
+/** The per-type glyphs behind {@link typeHeroIcon}. Bare heroicon ids (v2 outline sprite). */
+const TYPE_HERO_ICONS: Record<string, string> = {
+    acquisition: 'arrow-down-on-square',
+    // Parsers: one glyph per FORMAT — the format IS the type (B6), so the icon can say which.
+    'parser.delimited': 'table-cells',
+    'parser.fixedwidth': 'view-columns',
+    'parser.asn1': 'cpu-chip',
+    'parser.json': 'code-bracket',
+    'parser.text_regex': 'variable',
+    'parser.xlsx': 'document-chart-bar',
+    'parser.plugin': 'puzzle-piece',
+    'transform.map': 'arrows-right-left',
+    'transform.filter': 'funnel',
+    'transform.dedup.record': 'document-duplicate',
+    'transform.route': 'share',
+    'transform.join': 'link',
+    'transform.summarize': 'calculator',
+    enrichment: 'squares-plus',
+    'sink.persistent': 'circle-stack',
+    'sink.view': 'eye',
+    'control.gap': 'signal-slash',
+};
+
 /** Heroicon for a node status (text + icon + colour → never colour alone). */
 export function statusIcon(s: NodeStatus): string {
     switch (s) {

@@ -146,6 +146,8 @@
             </div>
 
             <span class="mx-1 h-5 w-px shrink-0" style="background: var(--gamma-border)" aria-hidden="true"></span>
+            <!-- Dry-run is a REHEARSAL, not a run — the beaker says so, and it stops sharing the
+                 play glyph with the selection cluster's "Run to here" (they rendered identically). -->
             <button
                 mat-icon-button
                 [disabled]="!selectedId()"
@@ -153,7 +155,7 @@
                 matTooltip="Dry-run"
                 aria-label="Dry-run"
             >
-                <mat-icon svgIcon="heroicons_outline:play"></mat-icon>
+                <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>
             </button>
             <button
                 mat-icon-button
@@ -601,6 +603,19 @@
                                     (closed)="closeDefinition()"
                                     (maximizedChange)="drawerMaximized.set($event)"
                                 >
+                                    <!-- The identity strip: status · last run · description · rename.
+                                         The summary panel is gone (selection opens this pane), so the
+                                         facts the pane itself does not carry live here — including the
+                                         ONE rename path for definition-pane nodes. -->
+                                    <app-pipeline-inspector
+                                        class="mb-2 block"
+                                        [compact]="true"
+                                        [node]="dn"
+                                        [status]="statusOf(dn)"
+                                        [lastRun]="nodeLastRun(dn)"
+                                        [readOnly]="!canAuthor()"
+                                        (rename)="renameSelected($event)"
+                                    />
                                     @if (dn.type === 'acquisition') {
                                         <app-pipeline-collection-definition
                                             [node]="dn"
@@ -663,11 +678,17 @@
                                 </inspecto-definition-drawer>
                             }
                         } @else if (rightTab() === 'properties') {
+                            <!-- The summary renders only where the pane cannot serve: read-only lens +
+                                 dialog-custody parse nodes (inspectorSummaryNode is null otherwise, so
+                                 an authorable node with its pane closed shows the idle hint, never a
+                                 second summary of what the pane already edits). -->
                             <div>
                                 <app-pipeline-inspector
-                                    [node]="selectedNode()"
-                                    [status]="selectedNode() ? statusOf(selectedNode()!) : null"
-                                    [category]="selectedNode() ? typeCategory(selectedNode()!.type) : ''"
+                                    [node]="inspectorSummaryNode()"
+                                    [status]="inspectorSummaryNode() ? statusOf(inspectorSummaryNode()!) : null"
+                                    [category]="
+                                        inspectorSummaryNode() ? typeCategory(inspectorSummaryNode()!.type) : ''
+                                    "
                                     [lastRun]="selectedNodeLastRun()"
                                     [selectedEdgeId]="selectedEdgeId()"
                                     [selectedEdgeRel]="selectedEdgeRel()"

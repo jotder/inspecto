@@ -672,7 +672,11 @@ export class PipelineEditorComponent implements OnInit {
 
     /** The selected node's last-run output (T17), or `null` when that run recorded nothing for it. */
     selectedNodeLastRun(): { rowCount: number; runTs: string } | null {
-        const node = this.selectedNode();
+        return this.nodeLastRun(this.selectedNode());
+    }
+
+    /** A given node's last-run output — the drawer strip asks for ITS node, which can outlive the selection. */
+    nodeLastRun(node: AuthoredNode | null): { rowCount: number; runTs: string } | null {
         const batch = this.lastRunBatch();
         if (!node || !batch) return null;
         const rowCount = nodeLastRunTotal(node.id, this.lastRunCounts());
@@ -1535,29 +1539,40 @@ export class PipelineEditorComponent implements OnInit {
     }
 
     /**
-     * S3 — selection and configuration converge. Two rules, both about clicks the builder should not
-     * have to spend:
-     * <ul>
-     *   <li>a drawer that is OPEN and CLEAN re-targets to the newly selected Step. Before this it kept
-     *       rendering the previous node's definition with no hint at all — the template prefers
-     *       `definitionNode()` over `selectedNode()`, so clicking Step B showed Step A's config. A DIRTY
-     *       drawer keeps `openDefinition`'s confirm, which is the whole point of that guard;</li>
-     *   <li>selecting an UNCONFIGURED Step opens its pane directly — a fresh Step's next action is
-     *       always "configure it", and it used to cost a second click every time.</li>
-     * </ul>
+     * S3, completed by the 2026-08-21 operator ask ("remove the properties pane — render the detail
+     * the Configure icon opens"): selecting a Step IS configuring it. Every drawer-served kind opens
+     * its definition pane on selection; the intermediate summary + Configure click is gone. A DIRTY
+     * open pane keeps `openDefinition`'s confirm — declining leaves the previous pane in place.
      *
-     * ⚠ Deliberately does NOT open a pane for a configured Step with the drawer closed: that would take
-     * the summary away from someone who clicked a Step only to look at it.
+     * The summary panel survives only where the pane cannot serve: the read-only lens (no authoring
+     * surface to open) and the dialog-custody parse nodes (see {@link inspectorSummaryNode}) — popping
+     * a modal dialog on mere selection would be obnoxious, so those keep select-then-Configure.
      */
     private async followSelectionIntoDefinition(node: AuthoredNode): Promise<void> {
-        if (!this.canAuthor()) return;
-        const open = this.definitionNode();
-        if (open) {
-            if (open.id !== node.id) await this.openDefinition(node); // dirty ⇒ openDefinition confirms
-            return;
-        }
-        if (this.statusOf(node) === 'unconfigured') await this.openDefinition(node);
+        if (!this.canAuthor() || !this.isDrawerKind(node)) return;
+        if (this.definitionNode()?.id === node.id) return;
+        await this.openDefinition(node);
     }
+
+    /**
+     * Whether this node's configuration is served by the definition drawer — the same gate
+     * {@link openNodeConfig} routes by, spelled once. False = the Grammar dialog's custody cases.
+     */
+    private isDrawerKind(node: AuthoredNode): boolean {
+        return !isParseNodeType(node.type) || this.isDrawerParse(node);
+    }
+
+    /**
+     * The node the INSPECTOR SUMMARY should render, or null for the idle hint. Since selection opens
+     * the definition pane directly, the summary remains only for the read-only lens and for
+     * dialog-custody parse nodes (where Configure is still the way in). The template already prefers
+     * `definitionNode()`, so this only decides what shows when NO pane is open.
+     */
+    readonly inspectorSummaryNode = computed<AuthoredNode | null>(() => {
+        const n = this.selectedNode();
+        if (!n) return null;
+        return !this.canAuthor() || !this.isDrawerKind(n) ? n : null;
+    });
 
     /** Double-click a node (or the inspector's Configure button) → open the per-processor config popup. */
     onNodeOpen(id: string): void {
@@ -2038,6 +2053,12 @@ export class PipelineEditorComponent implements OnInit {
         const updated: AuthoredNode = { ...n, name: v.name || undefined, description: v.description || undefined };
         this.model.update((m) => (m ? applyNodePatchInModel(m, updated) : m));
         this.selectedNode.set(updated);
+        // The rename pencil lives INSIDE the drawer now, so the open draft must reflect it too — the
+        // drawer header binds the draft's name. The draft keeps its own type/config (it may be the
+        // S5 re-typed presentation), only identity moves.
+        this.definitionNode.update((d) =>
+            d && d.id === updated.id ? { ...d, name: updated.name, description: updated.description } : d,
+        );
         this.canvas?.updateNodeLabel(updated.id, updated.name || updated.id);
         this.dirty.set(true);
     }

@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Output, computed, input, signal } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { categoryColor, categoryLabel, NodeTypeGroup, paletteHeroIcon } from './pipeline-graph';
+import { categoryColor, categoryLabel, NodeTypeGroup, typeHeroIcon } from './pipeline-graph';
 
 /**
  * The processor palette — the editor's **left dock** content (the "Shapes" panel of the Visio-style
@@ -75,9 +75,12 @@ import { categoryColor, categoryLabel, NodeTypeGroup, paletteHeroIcon } from './
                                 (click)="pick.emit(t.type)"
                                 (dragstart)="$event.dataTransfer?.setData('text/flow-node-type', t.type)"
                             >
+                                <!-- Each item carries its OWN glyph; the category is the TINT
+                                     (matching the header dot), never a shared glyph per group. -->
                                 <mat-icon
                                     class="icon-size-4 shrink-0"
-                                    [svgIcon]="paletteHeroIcon(group.category)"
+                                    [svgIcon]="typeHeroIcon(t.type, group.category)"
+                                    [style.color]="categoryColor(group.category)"
                                 ></mat-icon>
                                 <span class="truncate">{{ t.label }}</span>
                             </button>
@@ -118,7 +121,7 @@ export class PipelinePaletteComponent {
 
     readonly categoryColor = categoryColor;
     readonly categoryLabel = categoryLabel;
-    readonly paletteHeroIcon = paletteHeroIcon;
+    readonly typeHeroIcon = typeHeroIcon;
 
     /** A searching user wants to see the hits — the fold state only applies to the unfiltered catalog. */
     isOpen(category: string): boolean {

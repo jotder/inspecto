@@ -151,6 +151,44 @@ describe('PipelineInspectorComponent', () => {
         expect(fixture.nativeElement.querySelector('[aria-label="Rename Step"]')).toBeNull();
     });
 
+    /**
+     * The COMPACT strip — rendered inside the definition drawer above the config pane (2026-08-21:
+     * selection opens the pane directly, so the full summary would duplicate the drawer header and
+     * the pane). Keeps only what the pane does not carry: status, last run, description, rename.
+     */
+    describe('compact mode (drawer identity strip)', () => {
+        it('drops the header, type, name line, config rows and Configure', () => {
+            const { fixture } = create({
+                node: NODE,
+                status: 'configured',
+                category: 'PARSE',
+                compact: true,
+            });
+            const el = fixture.nativeElement as HTMLElement;
+            const t = el.textContent ?? '';
+            expect(t).not.toContain('Node · parse');
+            expect(t).not.toContain('parser.dsv'); // the type line
+            expect(t).not.toContain('name:'); // the drawer header already shows the name
+            expect(t).not.toContain('delimiter:'); // config rows are the pane's job now
+            // ⚠ assert the BUTTON: the status chip's text 'Configured' contains 'Configure'.
+            const buttons = Array.from(el.querySelectorAll('button')).map((b) => b.textContent ?? '');
+            expect(buttons.some((b) => b.includes('Configure'))).toBe(false);
+            expect(t).toContain('Configured'); // the status chip stays
+        });
+
+        it('keeps the rename pencil, and it still round-trips the form', () => {
+            const { fixture, c } = create({ node: NODE, status: 'configured', category: 'PARSE', compact: true });
+            const el = fixture.nativeElement as HTMLElement;
+            const rename = vi.fn();
+            c.rename.subscribe(rename);
+            (el.querySelector('[aria-label="Rename Step"]') as HTMLButtonElement).click();
+            fixture.detectChanges();
+            c.renameForm.setValue({ name: 'CDR parse', description: '' });
+            c.commitRename();
+            expect(rename).toHaveBeenCalledWith({ name: 'CDR parse', description: '' });
+        });
+    });
+
     it('has no a11y violations in any of the three states', async () => {
         // One TestBed/fixture, mutated between assertions — TestBed can only be configured once per test.
         const { fixture, c } = create();

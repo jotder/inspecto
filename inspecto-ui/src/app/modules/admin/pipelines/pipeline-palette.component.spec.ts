@@ -106,6 +106,38 @@ describe('PipelinePaletteComponent', () => {
         expect(btn('File writer').getAttribute('draggable')).toBe('true');
     });
 
+    /**
+     * Operator ask (2026-08-21): each item carries its OWN glyph; the category is the COLOR. Two
+     * items of different types must not share an icon, and every item icon is tinted with its
+     * group's `categoryColor` — the glyph identifies the Step, the tint says which family.
+     */
+    it('gives every item its own type glyph, tinted by its category color', () => {
+        const { fixture } = create();
+        const items = Array.from(
+            (fixture.nativeElement as HTMLElement).querySelectorAll('button[draggable="true"] mat-icon'),
+        ) as HTMLElement[];
+        expect(items).toHaveLength(2);
+        const names = items.map((i) => i.getAttribute('data-mat-icon-name'));
+        expect(names[0]).toBe('arrow-down-on-square'); // acquisition's own glyph
+        expect(names[1]).toBe('circle-stack'); // sink.persistent's own glyph
+        expect(names[0]).not.toBe(names[1]);
+        for (const i of items) expect(i.style.color).not.toBe('');
+    });
+
+    /** An unknown / plugin-served type falls back to its CATEGORY glyph rather than rendering blank. */
+    it('falls back to the category glyph for a type it does not know', () => {
+        TestBed.configureTestingModule({ imports: [PipelinePaletteComponent], providers: [provideNoopAnimations()] });
+        const fixture = TestBed.createComponent(PipelinePaletteComponent);
+        fixture.componentRef.setInput('groups', [
+            { category: 'TRANSFORM', types: [type('plugin.acme', 'TRANSFORM', 'Acme')] },
+        ]);
+        fixture.detectChanges();
+        const icon = (fixture.nativeElement as HTMLElement).querySelector(
+            'button[draggable="true"] mat-icon',
+        ) as HTMLElement;
+        expect(icon.getAttribute('data-mat-icon-name')).toBe('arrows-right-left'); // TRANSFORM's glyph
+    });
+
     it('has no a11y violations expanded or filtered', async () => {
         const { fixture, c } = create();
         await expectNoA11yViolations(fixture.nativeElement);

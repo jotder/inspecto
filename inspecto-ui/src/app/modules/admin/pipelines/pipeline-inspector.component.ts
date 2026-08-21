@@ -27,8 +27,9 @@ import {
 } from './pipeline-graph';
 
 /**
- * The pipeline editor's property drawer — one of three states: a selected node's summary + actions, a
- * selected edge's relationship picker, or an idle hint (Wave-1 decomposition of `PipelineEditorComponent`,
+ * The pipeline editor's property strip — a selected node's summary (read-only lens / dialog-custody
+ * nodes), the COMPACT identity strip inside the definition drawer, a selected edge's relationship
+ * picker, or an idle hint (Wave-1 decomposition of `PipelineEditorComponent`,
  * see `docs/superpower/reviews/pipeline-editor.md`). Purely presentational: the host computes `status`
  * (it alone holds the registry-refs/test-outcome state `statusOf` needs) and `category`; every rendering
  * decision here uses the framework-free helpers in `pipeline-graph.ts` directly.
@@ -40,17 +41,19 @@ import {
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         @if (node) {
-            <div class="mb-1 flex items-center justify-between gap-2">
-                <h3 class="truncate text-sm font-semibold">Node · {{ node.id }}</h3>
-                <span
-                    class="shrink-0 rounded px-1.5 py-0.5 text-xs font-semibold"
-                    [style.color]="categoryColor(category)"
-                    style="background: var(--gamma-bg-default)"
-                >
-                    {{ categoryLabel(category) }}
-                </span>
-            </div>
-            <p class="mb-1 text-xs opacity-70">{{ node.type }}</p>
+            @if (!compact) {
+                <div class="mb-1 flex items-center justify-between gap-2">
+                    <h3 class="truncate text-sm font-semibold">Node · {{ node.id }}</h3>
+                    <span
+                        class="shrink-0 rounded px-1.5 py-0.5 text-xs font-semibold"
+                        [style.color]="categoryColor(category)"
+                        style="background: var(--gamma-bg-default)"
+                    >
+                        {{ categoryLabel(category) }}
+                    </span>
+                </div>
+                <p class="mb-1 text-xs opacity-70">{{ node.type }}</p>
+            }
             @if (status) {
                 <p class="mb-2 inline-flex items-center gap-1 text-xs font-semibold" [style.color]="statusTint(status)">
                     <mat-icon class="icon-size-4" [svgIcon]="statusIcon(status)"></mat-icon>
@@ -81,7 +84,7 @@ import {
             } @else {
                 <div class="flex items-start gap-1">
                     <div class="min-w-0 grow">
-                        @if (node.name) {
+                        @if (!compact && node.name) {
                             <p class="text-sm"><span class="opacity-70">name:</span> {{ node.name }}</p>
                         }
                         @if (node.description) {
@@ -105,7 +108,7 @@ import {
                 <p class="text-sm"><span class="opacity-70">use:</span> {{ node.use }}</p>
             }
 
-            @if (configEntries().length) {
+            @if (!compact && configEntries().length) {
                 <div class="mt-2">
                     <span class="text-xs font-semibold uppercase opacity-70">Config</span>
                     @for (c of configEntries(); track c.k) {
@@ -119,7 +122,7 @@ import {
             <!-- S1: Run to here / Preview data / Connect / Delete now live in the toolbar's selection
                  cluster — they act on the selection, and Delete rendered TWICE on screen at once. What
                  stays here is the one verb that opens this panel's own successor surface. -->
-            @if (!readOnly) {
+            @if (!readOnly && !compact) {
                 <div class="mt-3 flex flex-wrap gap-2">
                     <button mat-flat-button color="primary" type="button" (click)="configure.emit(node)">
                         <mat-icon svgIcon="heroicons_outline:cog-6-tooth"></mat-icon> Configure
@@ -146,9 +149,8 @@ import {
                 @if (readOnly) {
                     Click a Step or edge to inspect it. Authoring is read-only in the Business lens.
                 } @else {
-                    Drag a Step from the toolbar onto the canvas. Click a Step or edge to select it;
-                    <b>double-click</b> a Step (or use <b>Configure</b>) to edit its attributes.
-                    <b>Delete selected</b> removes the selected item.
+                    Drag a Step from the palette onto the canvas. <b>Click</b> a Step to edit its configuration right
+                    here; click an edge to pick its relationship. <b>Delete selected</b> removes the selected item.
                 }
             </p>
         }
@@ -169,6 +171,14 @@ export class PipelineInspectorComponent implements OnChanges {
     @Input() candidateRels: string[] = [];
     /** Business lens: hide every authoring action (Configure/relabel). */
     @Input() readOnly = false;
+    /**
+     * Compact strip mode — rendered INSIDE the definition drawer, above the config pane, since a
+     * selected Step now opens its configuration directly (operator ask, 2026-08-21) and the full
+     * summary panel would duplicate what the drawer header and the pane already show. Keeps only
+     * what the pane does not carry: the status chip, the last-run overlay, the description, and the
+     * rename pencil (the ONE rename path for definition-pane nodes).
+     */
+    @Input() compact = false;
 
     @Output() configure = new EventEmitter<AuthoredNode>();
     @Output() edgeRelChange = new EventEmitter<string>();
