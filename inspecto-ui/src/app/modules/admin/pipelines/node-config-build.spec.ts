@@ -13,11 +13,13 @@ const node = (config: Record<string, unknown>, over: Partial<AuthoredNode> = {})
 function roundTrip(cfg: Record<string, unknown>, specs: AttributeSpec[], isAcquisition = false) {
     const n = node(cfg);
     const split = splitNodeConfig(n, specs, isAcquisition);
+    // The extra-config editor emits untouched entries as their ORIGINAL value reference — modelled
+    // here by folding the split's typed rows straight back into a map.
     return buildConfiguredNode({
         node: n,
         specs,
         formValues: split.schemaInitial,
-        freeRows: split.extraRows,
+        extras: Object.fromEntries(split.extraRows.map((r) => [r.key, r.value])),
         isAcquisition,
         connector: isAcquisition ? 'local' : undefined,
     }).config;
@@ -27,8 +29,8 @@ describe('splitNodeConfig / buildConfiguredNode round-trip', () => {
     /**
      * ⚠ The regression this file exists for. A node's config is "the raw config-file section verbatim",
      * so an unmodelled key must survive a save. `transform.route`'s `branches` is a list of MAPS and
-     * deliberately has no AttributeSpec (the `list` type is string[]), so it lands in the free-form
-     * editor — where it was stringified on load and written back as a literal JSON STRING. Opening a
+     * deliberately has no AttributeSpec (the `list` type is string[]), so it lands in the extra-config
+     * editor — where it was once stringified on load and written back as a literal JSON STRING. Opening a
      * route node and pressing Save therefore replaced its routing with text, silently.
      */
     it('preserves an unmodelled list-of-maps instead of saving it as a JSON string', () => {
@@ -46,29 +48,31 @@ describe('splitNodeConfig / buildConfiguredNode round-trip', () => {
         expect(out!['retry']).toEqual({ attempts: 3, backoff: 'exp' });
     });
 
-    it('still writes a hand-typed free-form row literally', () => {
+    it('writes a typed extra literally — numbers and booleans stay typed', () => {
         const n = node({});
         const out = buildConfiguredNode({
             node: n,
             specs: [],
             formValues: null,
-            freeRows: [{ key: 'note', value: 'plain text' }],
+            extras: { note: 'plain text', retries: 3, enabled: false },
             isAcquisition: false,
         }).config;
         expect(out!['note']).toBe('plain text');
+        expect(out!['retries']).toBe(3);
+        expect(out!['enabled']).toBe(false);
     });
 
-    /** An EDITED seeded row is the operator overriding it — their text wins, exactly as before. */
-    it('honours an edit to a seeded row rather than restoring the original', () => {
+    /** An EDITED extra is the operator overriding it — the editor's typed value wins over the prior. */
+    it('honours an edited extra rather than restoring the original', () => {
         const n = node({ branches: [{ key: 'a' }] });
         const out = buildConfiguredNode({
             node: n,
             specs: [],
             formValues: null,
-            freeRows: [{ key: 'branches', value: 'hand edited' }],
+            extras: { branches: [{ key: 'b', where: '1=1' }] },
             isAcquisition: false,
         }).config;
-        expect(out!['branches']).toBe('hand edited');
+        expect(out!['branches']).toEqual([{ key: 'b', where: '1=1' }]);
     });
 
     it('seeds schema-known keys from the flattened config, nested ones included', () => {
@@ -96,7 +100,7 @@ describe('splitNodeConfig / buildConfiguredNode round-trip', () => {
                 node: n,
                 specs,
                 formValues: split.schemaInitial,
-                freeRows: split.extraRows,
+                extras: Object.fromEntries(split.extraRows.map((r) => [r.key, r.value])),
                 isAcquisition: true,
                 connector: 'sftp',
             });
@@ -111,7 +115,7 @@ describe('splitNodeConfig / buildConfiguredNode round-trip', () => {
                 node: n,
                 specs: [spec('connection')],
                 formValues: { connection: '' },
-                freeRows: [],
+                extras: {},
                 isAcquisition: true,
                 connector: 'local',
             });

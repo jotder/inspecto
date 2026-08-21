@@ -10,20 +10,16 @@ import { AttributeSpec, KEY_SEP, flattenBlock, mergeBlock, nestKeys } from 'app/
 /** `use: connection/<name>` prefix — the one place the binding's shape is spelled. */
 export const CONNECTION_REF = 'connection/';
 
-/**
- * How a non-string config value is rendered into a free-form row's text box. ⚠ ONE function, used both
- * to seed the row and to recognise an untouched one on the way back out — spelled twice, the two would
- * drift and every seeded row would read as edited, quietly reinstating the stringify-on-save data loss.
- */
-function stringify(value: unknown): string {
-    return typeof value === 'string' ? value : JSON.stringify(value);
-}
-
 export interface NodeConfigSplit {
     /** Schema-form seed: the node's config entries whose key the schema knows (flat `__` spelling). */
     schemaInitial: Record<string, unknown>;
-    /** Keys outside the schema, as literal free-form rows (values stringified when not strings). */
-    extraRows: { key: string; value: string }[];
+    /**
+     * Keys outside the schema, with their ORIGINAL (typed) values — the additional-config editor
+     * renders each with a control matching its value type (2026-08-21 operator ask: no generic
+     * key/value text pairs). An untouched entry round-trips the very same value reference, which is
+     * what keeps unmodelled blocks (`transform.route`'s `branches`) verbatim through an apply.
+     */
+    extraRows: { key: string; value: unknown }[];
 }
 
 /**
@@ -50,13 +46,13 @@ export function splitNodeConfig(node: AuthoredNode, specs: AttributeSpec[], isAc
     // rows; sub-keys the schema does not model survive via the merge in `buildConfiguredNode`.
     const ownsRoot = (root: string): boolean =>
         schemaKeys.has(root) || specs.some((s) => s.key.startsWith(root + KEY_SEP));
-    const extraRows: { key: string; value: string }[] = [];
+    const extraRows: { key: string; value: unknown }[] = [];
     for (const [key, value] of Object.entries(node.config ?? {})) {
         if (ownsRoot(key)) continue;
-        // `connector` is DERIVED, never asked — a free-form row for it would be a second control
-        // writing a field the save already computes, and free-form wins last.
+        // `connector` is DERIVED, never asked — an extra-config row for it would be a second control
+        // writing a field the save already computes, and extras win last.
         if (isAcquisition && key === 'connector') continue;
-        extraRows.push({ key, value: stringify(value) });
+        extraRows.push({ key, value });
     }
     return { schemaInitial, extraRows };
 }
@@ -67,8 +63,13 @@ export interface BuildConfiguredNodeInput {
     specs: AttributeSpec[];
     /** The config surface's flat values (`configForm.value()`), or `null` when none rendered. */
     formValues: Record<string, unknown> | null;
-    /** Literal free-form key/value rows — the escape hatch for keys outside the schema. */
-    freeRows: { key: string; value: string }[];
+    /**
+     * TYPED values for keys outside the schema — the additional-config editor's `value()`. Applied
+     * LAST, literally, so they keep overriding the schema as the free-form rows always did. The
+     * editor owns the untouched-round-trips-verbatim rule (it emits the original value reference for
+     * a pristine entry), so nothing here needs to reverse-engineer strings back into types.
+     */
+    extras: Record<string, unknown>;
     name?: string;
     description?: string;
     /** The raw `use` field value (ignored for acquisition, which derives it from `connection`). */
@@ -90,7 +91,7 @@ export interface BuildConfiguredNodeInput {
  * shape the seeds use and which `PipelineConfigParser.strList` prefers (it accepts either).
  */
 export function buildConfiguredNode(input: BuildConfiguredNodeInput): AuthoredNode {
-    const { node, specs, formValues, freeRows, isAcquisition } = input;
+    const { node, specs, formValues, extras, isAcquisition } = input;
     const config: Record<string, unknown> = {};
     const prior = node.config ?? {};
     if (formValues) {
@@ -115,24 +116,13 @@ export function buildConfiguredNode(input: BuildConfiguredNodeInput): AuthoredNo
             config[root] = plain(val) && plain(prior[root]) ? mergeBlock(prior[root], val) : val;
         }
     }
-    // Free-form rows stay LITERAL — a hand-typed key means exactly what was typed (this is the escape
-    // hatch for keys outside the schema), and it keeps overriding the schema as it always did.
-    //
-    // ⚠ …with one exception: a row the operator never TOUCHED restores the value verbatim. `splitNodeConfig`
-    // seeds these rows by `JSON.stringify`ing whatever the config held, so a non-string value — an
-    // unmodelled nested block, or `transform.route`'s `branches`, a list of MAPS that deliberately has no
-    // spec — came back as a literal JSON string. Opening a route node and pressing Save with no edits at
-    // all therefore replaced its routing with text, silently, in flat contradiction of the rule that a
-    // node's config is the raw config-file section verbatim and unmodelled keys survive a save.
-    //
-    // The test is byte-equality against the seed, so it can only ever restore a value the operator left
-    // exactly as loaded. Edit one character and the typed text wins, unchanged from before.
-    for (const row of freeRows) {
-        const key = row.key?.trim();
-        if (!key) continue;
-        const original = prior[key];
-        const untouched = original !== undefined && typeof original !== 'string' && stringify(original) === row.value;
-        config[key] = untouched ? original : row.value;
+    // Extras apply LAST and literally — they keep overriding the schema as the free-form rows always
+    // did. They arrive TYPED from the additional-config editor, which emits the original value
+    // reference for an untouched entry (so `transform.route`'s `branches` and other unmodelled
+    // blocks survive an apply verbatim) and a validated typed value for an edited one.
+    for (const [key, value] of Object.entries(extras)) {
+        const k = key.trim();
+        if (k) config[k] = value;
     }
     // An acquisition node's Connection is a binding: move it off cfg (where lower strips it) onto
     // `use: connection/<name>`, which is where the engine reads it from. Clearing it clears the binding.

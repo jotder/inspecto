@@ -30,15 +30,20 @@ describe('PipelineInspectorComponent', () => {
         expect((fixture.nativeElement as HTMLElement).textContent).toContain('Drag a Step');
     });
 
-    it('renders a selected node: category, status, name/use, and config rows', () => {
+    it('renders a selected node SLIM: category, status, name/use — config rows only read-only', () => {
         const { fixture } = create({ node: NODE, status: 'configured', category: 'PARSE' });
-        const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-        expect(text).toContain('Node · parse');
-        expect(text).toContain('Parser'); // categoryLabel('PARSE')
-        expect(text).toContain('Configured');
-        expect(text).toContain('name:');
-        expect(text).toContain('use:');
-        expect(text).toContain('delimiter:');
+        const text = () => (fixture.nativeElement as HTMLElement).textContent ?? '';
+        expect(text()).toContain('Node · parse');
+        expect(text()).toContain('Parser'); // categoryLabel('PARSE')
+        expect(text()).toContain('Configured');
+        expect(text()).toContain('name:');
+        expect(text()).toContain('use:');
+        // 2026-08-21 second pass: the author summary is SLIM — config detail is the pane's job.
+        expect(text()).not.toContain('delimiter:');
+
+        fixture.componentRef.setInput('readOnly', true);
+        fixture.detectChanges();
+        expect(text(), 'read-only has no pane, so the summary keeps the rows').toContain('delimiter:');
     });
 
     it('shows the last-run overlay (T17) when provided, and nothing when absent', () => {

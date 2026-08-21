@@ -43,6 +43,9 @@ export interface TransferItemRef {
             <mat-icon svgIcon="heroicons_outline:arrows-right-left"></mat-icon>
         </button>
         <mat-menu #menu="matMenu">
+            <!-- Host-specific verbs project FIRST (e.g. the Pipelines editor's two read-only exports,
+                 folded in 2026-08-21 when its standalone Export button duplicated this trigger). -->
+            <ng-content select="[transferExtras]"></ng-content>
             <button mat-menu-item [disabled]="!items().length" (click)="exportWithDeps()">
                 <mat-icon svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
                 <span>Export with dependencies</span>

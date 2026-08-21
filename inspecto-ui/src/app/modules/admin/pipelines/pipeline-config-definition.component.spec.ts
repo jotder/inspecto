@@ -19,6 +19,7 @@ import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form
 import { EnrichmentEditorComponent } from 'app/inspecto/enrichment/enrichment-editor.component';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { EnrichmentHostPipeline, PipelineConfigDefinitionComponent } from './pipeline-config-definition.component';
+import { PipelineExtraConfigComponent } from './pipeline-extra-config.component';
 
 /**
  * S2 — these are the config-surface cases of the retired `node-config.dialog.spec.ts`, RE-PINNED on the
@@ -104,6 +105,17 @@ function editor(fixture: ComponentFixture<PipelineConfigDefinitionComponent>): E
     return fixture.debugElement.query(By.directive(EnrichmentEditorComponent)).componentInstance;
 }
 
+/** The typed additional-config editor hosted by the pane. */
+function extraEditor(fixture: ComponentFixture<PipelineConfigDefinitionComponent>): PipelineExtraConfigComponent {
+    return fixture.debugElement.query(By.directive(PipelineExtraConfigComponent)).componentInstance;
+}
+
+/** A second fixture inside one `it` — TestBed can only be configured once, so this resets it first. */
+async function createSecond(inputs: PaneInputs) {
+    TestBed.resetTestingModule();
+    return create(inputs);
+}
+
 /** Capture the node the pane emits on Apply. */
 function applied(fixture: ComponentFixture<PipelineConfigDefinitionComponent>): () => AuthoredNode | undefined {
     let out: AuthoredNode | undefined;
@@ -133,7 +145,7 @@ describe('PipelineConfigDefinitionComponent', () => {
         // schema-known keys seed the schema-form; the unknown key falls to the free-form editor
         expect(c.split().schemaInitial).toMatchObject({ format: 'CSV', compression: 'gzip' });
         expect(c.split().schemaInitial['custom_flag']).toBeUndefined();
-        expect(c.configRows.length).toBe(1);
+        expect(c.split().extraRows).toEqual([{ key: 'custom_flag', value: 'x' }]);
         expect(c.freeFormOpen()).toBe(true); // an extra key is present ⇒ shown
     });
 
@@ -175,8 +187,8 @@ describe('PipelineConfigDefinitionComponent', () => {
             })
         ).componentInstance;
         expect(c.split().schemaInitial['batch__max_files']).toBe(2);
-        // Only the genuinely unknown root is free-form — and it stays literal there.
-        expect(c.configRows.value).toEqual([{ key: 'mystery', value: '{"a":1}' }]);
+        // Only the genuinely unknown root lands in the extra editor — TYPED, never stringified.
+        expect(c.split().extraRows).toEqual([{ key: 'mystery', value: { a: 1 } }]);
     });
 
     /**
@@ -214,13 +226,87 @@ describe('PipelineConfigDefinitionComponent', () => {
     });
 
     it('reports dirty transitions and returns pristine after a successful apply', async () => {
-        const fixture = await create({ node: { id: 'w', type: 'sink.file' } });
+        // A no-schema node, so the extra editor is the primary surface with add enabled.
+        const fixture = await create({ node: { id: 'x', type: 'plugin.unknown' } });
         const seen: boolean[] = [];
         fixture.componentInstance.dirtyChange.subscribe((d) => seen.push(d));
-        fixture.componentInstance.addConfigRow();
+        const extra = extraEditor(fixture);
+        extra.draftKey.setValue('threshold');
+        extra.draftKind.setValue('number');
+        extra.add();
+        fixture.detectChanges();
+        fixture.componentInstance.onInteraction();
         expect(seen.at(-1)).toBe(true);
         fixture.componentInstance.submit();
         expect(seen.at(-1)).toBe(false);
+    });
+
+    /**
+     * 2026-08-21 (second pass): the generic Key/Value grid is GONE — an unmodelled entry renders with
+     * its ACTUAL key and a control matching its value TYPE, and an edit round-trips TYPED.
+     */
+    describe('typed additional config', () => {
+        it('renders each extra with its own key and type-matched control', async () => {
+            const fixture = await create({
+                node: {
+                    id: 'x',
+                    type: 'plugin.unknown',
+                    config: { note: 'hi', retries: 3, enabled: true, block: { a: 1 } },
+                },
+            });
+            const el = fixture.nativeElement as HTMLElement;
+            const labels = Array.from(el.querySelectorAll('app-pipeline-extra-config mat-label')).map((l) =>
+                l.textContent?.trim(),
+            );
+            expect(labels).toContain('note');
+            expect(labels).toContain('retries');
+            expect(labels).toContain('enabled');
+            expect(labels).toContain('block (JSON)');
+            // number gets a numeric input; json a textarea; boolean a select
+            expect(el.querySelector('app-pipeline-extra-config input[type="number"]')).toBeTruthy();
+            expect(el.querySelector('app-pipeline-extra-config textarea')).toBeTruthy();
+            expect(el.querySelector('app-pipeline-extra-config mat-select')).toBeTruthy();
+        });
+
+        it('an edited number applies as a NUMBER, validated', async () => {
+            const fixture = await create({
+                node: { id: 'x', type: 'plugin.unknown', config: { retries: 3 } },
+            });
+            const extra = extraEditor(fixture);
+            const row = extra.rows()[0];
+            row.control.setValue('not-a-number');
+            row.control.markAsDirty();
+            expect(extra.validate()).toBe(false); // refused, not silently stringified
+
+            row.control.setValue('7');
+            const out = applied(fixture);
+            fixture.componentInstance.submit();
+            expect((out()?.config as Record<string, unknown>)['retries']).toBe(7);
+        });
+
+        it('an edited JSON block applies PARSED, and refuses unparseable JSON', async () => {
+            const fixture = await create({
+                node: { id: 'x', type: 'plugin.unknown', config: { block: { a: 1 } } },
+            });
+            const extra = extraEditor(fixture);
+            const row = extra.rows()[0];
+            row.control.setValue('{ nope');
+            row.control.markAsDirty();
+            expect(extra.validate()).toBe(false);
+
+            row.control.setValue('{"a": 2, "b": "x"}');
+            const out = applied(fixture);
+            fixture.componentInstance.submit();
+            expect((out()?.config as Record<string, unknown>)['block']).toEqual({ a: 2, b: 'x' });
+        });
+
+        it('offers add only where the editor is the PRIMARY surface (no schema)', async () => {
+            const bare = await create({ node: { id: 'x', type: 'plugin.unknown' } });
+            expect(extraEditor(bare).allowAdd()).toBe(true);
+
+            const schemad = await createSecond({ node: { id: 'w', type: 'sink.persistent', config: { zz: '1' } } });
+            expect(extraEditor(schemad).allowAdd()).toBe(false);
+        });
     });
 
     // ── §3.1: the SERVED vocabulary drives the form; the local table is only a fallback ──

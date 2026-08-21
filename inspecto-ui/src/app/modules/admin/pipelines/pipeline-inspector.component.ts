@@ -108,7 +108,9 @@ import {
                 <p class="text-sm"><span class="opacity-70">use:</span> {{ node.use }}</p>
             }
 
-            @if (!compact && configEntries().length) {
+            <!-- The config-row summary renders only READ-ONLY (2026-08-21 second pass): the author's
+                 summary is SLIM — config detail is the pane's job, one Configure away. -->
+            @if (!compact && readOnly && configEntries().length) {
                 <div class="mt-2">
                     <span class="text-xs font-semibold uppercase opacity-70">Config</span>
                     @for (c of configEntries(); track c.k) {
@@ -149,8 +151,9 @@ import {
                 @if (readOnly) {
                     Click a Step or edge to inspect it. Authoring is read-only in the Business lens.
                 } @else {
-                    Drag a Step from the palette onto the canvas. <b>Click</b> a Step to edit its configuration right
-                    here; click an edge to pick its relationship. <b>Delete selected</b> removes the selected item.
+                    Drag a Step from the palette onto the canvas. Click a Step to select it, then
+                    <b>Configure</b> (or double-click) to edit its attributes right here. <b>Delete selected</b> removes
+                    the selected item.
                 }
             </p>
         }

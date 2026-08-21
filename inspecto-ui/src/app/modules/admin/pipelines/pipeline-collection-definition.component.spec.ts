@@ -237,7 +237,7 @@ describe('PipelineCollectionDefinitionComponent', () => {
         });
         const p = pane(fixture);
         expect(p.split().schemaInitial['stability__window']).toBe('30s');
-        expect(p.configRows.value).toEqual([{ key: 'mystery', value: '42' }]);
+        expect(p.split().extraRows).toEqual([{ key: 'mystery', value: '42' }]);
         p.submit();
         const cfg = fixture.componentInstance.applied!.config as Record<string, unknown>;
         expect(cfg['mystery']).toBe('42');

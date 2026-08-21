@@ -1100,7 +1100,12 @@ describe('PipelineEditorComponent', () => {
                 expect(c.definitionNode()?.id).toBe(added.id);
             });
 
-            it('selecting an UNCONFIGURED Step opens its pane', async () => {
+            /**
+             * 2026-08-21 second pass: selection shows the slim SUMMARY; the pane opens on Configure
+             * (or double-click, or a palette add). Selecting even an unconfigured Step no longer
+             * auto-opens anything.
+             */
+            it('selecting an UNCONFIGURED Step shows the summary, not the pane', async () => {
                 const c = make();
                 c.select('demo');
                 c.addFromPalette('transform.filter');
@@ -1108,33 +1113,20 @@ describe('PipelineEditorComponent', () => {
                 c.closeDefinition();
                 c.onNodeSelected(fresh.id);
                 await Promise.resolve();
-                expect(c.definitionNode()?.id).toBe(fresh.id);
+                expect(c.definitionNode()).toBeNull();
+                expect(c.inspectorSummaryNode()?.id).toBe(fresh.id);
             });
 
-            /**
-             * Operator ask (2026-08-21): selection IS configuration — the summary + Configure click is
-             * gone, so selecting a CONFIGURED Step opens its pane too, and no summary renders beside it.
-             */
-            it('selecting a configured Step opens its pane directly', async () => {
+            /** 2026-08-21 second pass: selecting a CONFIGURED Step shows the slim summary too. */
+            it('selecting a configured Step shows the summary; Configure opens the pane', async () => {
                 const c = make();
                 c.select('demo');
                 c.onNodeSelected('flt'); // transform.filter, config: {where: …}
                 await Promise.resolve();
-                expect(c.definitionNode()?.id).toBe('flt');
-                expect(c.inspectorSummaryNode()).toBeNull();
-            });
-
-            /** Dialog-custody parse nodes keep select-then-Configure — a modal popping on mere
-             *  selection would be obnoxious, so the summary panel survives exactly there. */
-            it('a dialog-custody parser keeps the summary instead of auto-opening anything', async () => {
-                const c = make();
-                c.select('demo');
-                const custody = { id: 'pp', type: 'parser', use: 'grammar/missing', config: {} };
-                c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, custody] }));
-                c.onNodeSelected('pp');
-                await Promise.resolve();
                 expect(c.definitionNode()).toBeNull();
-                expect(c.inspectorSummaryNode()?.id).toBe('pp');
+                expect(c.inspectorSummaryNode()?.id).toBe('flt');
+                c.openNodeConfig(c.selectedNode()!); // the Configure button's path
+                expect(c.definitionNode()?.id).toBe('flt');
             });
 
             /**

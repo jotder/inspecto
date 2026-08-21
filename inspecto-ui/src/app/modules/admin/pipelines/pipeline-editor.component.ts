@@ -1539,18 +1539,16 @@ export class PipelineEditorComponent implements OnInit {
     }
 
     /**
-     * S3, completed by the 2026-08-21 operator ask ("remove the properties pane — render the detail
-     * the Configure icon opens"): selecting a Step IS configuring it. Every drawer-served kind opens
-     * its definition pane on selection; the intermediate summary + Configure click is gone. A DIRTY
-     * open pane keeps `openDefinition`'s confirm — declining leaves the previous pane in place.
-     *
-     * The summary panel survives only where the pane cannot serve: the read-only lens (no authoring
-     * surface to open) and the dialog-custody parse nodes (see {@link inspectorSummaryNode}) — popping
-     * a modal dialog on mere selection would be obnoxious, so those keep select-then-Configure.
+     * S3's follow rule, RE-SCOPED by the operator 2026-08-21 (second pass): selection shows the slim
+     * summary; the config pane opens on **Configure** (or double-click, or a palette add). The ONE
+     * selection-driven open that stays is re-targeting a pane that is ALREADY open — clicking Step B
+     * while A's pane shows would otherwise silently keep rendering A (the original S3 bug). A DIRTY
+     * pane keeps `openDefinition`'s confirm; declining leaves the previous pane in place.
      */
     private async followSelectionIntoDefinition(node: AuthoredNode): Promise<void> {
         if (!this.canAuthor() || !this.isDrawerKind(node)) return;
-        if (this.definitionNode()?.id === node.id) return;
+        const open = this.definitionNode();
+        if (!open || open.id === node.id) return;
         await this.openDefinition(node);
     }
 
@@ -1563,16 +1561,11 @@ export class PipelineEditorComponent implements OnInit {
     }
 
     /**
-     * The node the INSPECTOR SUMMARY should render, or null for the idle hint. Since selection opens
-     * the definition pane directly, the summary remains only for the read-only lens and for
-     * dialog-custody parse nodes (where Configure is still the way in). The template already prefers
-     * `definitionNode()`, so this only decides what shows when NO pane is open.
+     * The node the INSPECTOR SUMMARY should render, or null for the idle hint. Selection shows the
+     * slim summary again (operator, 2026-08-21 second pass) — the config pane opens on Configure.
+     * The template prefers `definitionNode()`, so this only decides what shows when NO pane is open.
      */
-    readonly inspectorSummaryNode = computed<AuthoredNode | null>(() => {
-        const n = this.selectedNode();
-        if (!n) return null;
-        return !this.canAuthor() || !this.isDrawerKind(n) ? n : null;
-    });
+    readonly inspectorSummaryNode = computed<AuthoredNode | null>(() => this.selectedNode());
 
     /** Double-click a node (or the inspector's Configure button) → open the per-processor config popup. */
     onNodeOpen(id: string): void {

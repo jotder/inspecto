@@ -46,16 +46,28 @@
                 >
                     <mat-icon svgIcon="heroicons_outline:check"></mat-icon>
                 </button>
-                <button
-                    mat-icon-button
-                    [matMenuTriggerFor]="pipelineMenu"
-                    [disabled]="!selectedId()"
-                    matTooltip="More pipeline actions"
-                    aria-label="More pipeline actions"
-                >
-                    <mat-icon svgIcon="heroicons_outline:ellipsis-vertical"></mat-icon>
+            }
+
+            <!-- The more-actions menu sits OUTSIDE the author gate since Dry-run moved into it
+                 (operator ask, 2026-08-21): a rehearsal is a READ the Business lens keeps, so the
+                 author verbs gate item-by-item instead of gating the trigger. -->
+            <button
+                mat-icon-button
+                [matMenuTriggerFor]="pipelineMenu"
+                [disabled]="!selectedId()"
+                matTooltip="More pipeline actions"
+                aria-label="More pipeline actions"
+            >
+                <mat-icon svgIcon="heroicons_outline:ellipsis-vertical"></mat-icon>
+            </button>
+            <mat-menu #pipelineMenu="matMenu">
+                <!-- Dry-run moved off the toolbar's prime row (operator ask): rehearse the pipeline
+                     over sample rows in the bottom dock. -->
+                <button mat-menu-item (click)="toggleDryRun()">
+                    <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>
+                    <span>Dry-run&hellip;</span>
                 </button>
-                <mat-menu #pipelineMenu="matMenu">
+                @if (canAuthor()) {
                     <button mat-menu-item (click)="renamePipeline()">
                         <mat-icon svgIcon="heroicons_outline:pencil"></mat-icon>
                         <span>Rename&hellip;</span>
@@ -83,32 +95,7 @@
                         <mat-icon svgIcon="heroicons_outline:trash"></mat-icon>
                         <span>Delete pipeline</span>
                     </button>
-                </mat-menu>
-            }
-
-            <!-- Both exports are READ-ONLY, so they live OUTSIDE the canAuthor() block: a Business-lens
-                 operator handing a config to support is the point. They sat in the author menu from the
-                 P6-e re-homing until 2026-08-17, which contradicted that stated intent. -->
-            <button
-                mat-icon-button
-                [matMenuTriggerFor]="exportMenu"
-                [disabled]="!selectedId()"
-                matTooltip="Export"
-                aria-label="Export"
-            >
-                <mat-icon svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
-            </button>
-            <mat-menu #exportMenu="matMenu">
-                <button mat-menu-item (click)="exportDocument()" [disabled]="exportingDocument()">
-                    <mat-icon svgIcon="heroicons_outline:document-text"></mat-icon>
-                    <span>Export document</span>
-                </button>
-                <!-- P6-e: the portable `inspecto-stream-config` bundle (config + satellites), re-homed
-                     from the retired onboarding shell. ⛔ NOT the transfer menu's Metadata Bundle. -->
-                <button mat-menu-item (click)="exportConfig()" [disabled]="exportingConfig()">
-                    <mat-icon svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
-                    <span>Export configuration</span>
-                </button>
+                }
             </mat-menu>
 
             <span class="mx-1 h-5 w-px shrink-0" style="background: var(--gamma-border)" aria-hidden="true"></span>
@@ -146,17 +133,6 @@
             </div>
 
             <span class="mx-1 h-5 w-px shrink-0" style="background: var(--gamma-border)" aria-hidden="true"></span>
-            <!-- Dry-run is a REHEARSAL, not a run — the beaker says so, and it stops sharing the
-                 play glyph with the selection cluster's "Run to here" (they rendered identically). -->
-            <button
-                mat-icon-button
-                [disabled]="!selectedId()"
-                (click)="toggleDryRun()"
-                matTooltip="Dry-run"
-                aria-label="Dry-run"
-            >
-                <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>
-            </button>
             <button
                 mat-icon-button
                 [disabled]="!selectedId()"
@@ -251,12 +227,28 @@
             >
                 <mat-icon svgIcon="heroicons_outline:sparkles"></mat-icon>
             </button>
+            <!-- ONE import/export trigger (operator ask, 2026-08-21 — the standalone Export button
+                 duplicated this menu's concept). The two READ-ONLY pipeline exports are projected in,
+                 so the Business lens keeps them; the bundle items below them are the shared menu's.
+                 The config export is the portable inspecto-stream-config bundle (P6-e) —
+                 ⛔ NOT the menu's own Metadata Bundle items beneath it. -->
             <inspecto-transfer-menu
                 [items]="transferItems()"
                 [allowedKinds]="['authored-pipeline']"
                 (changed)="load()"
                 label="Import / export pipeline"
-            />
+            >
+                <ng-container transferExtras>
+                    <button mat-menu-item [disabled]="!selectedId() || exportingDocument()" (click)="exportDocument()">
+                        <mat-icon svgIcon="heroicons_outline:document-text"></mat-icon>
+                        <span>Export document</span>
+                    </button>
+                    <button mat-menu-item [disabled]="!selectedId() || exportingConfig()" (click)="exportConfig()">
+                        <mat-icon svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
+                        <span>Export configuration</span>
+                    </button>
+                </ng-container>
+            </inspecto-transfer-menu>
 
             <!-- right-aligned: live status, then the host's own actions (view mode, explain) -->
             <span class="ml-auto flex flex-wrap items-center gap-2">

@@ -11,7 +11,7 @@ import {
     signal,
     viewChild,
 } from '@angular/core';
-import { FormArray, FormBuilder, ReactiveFormsModule, ValidatorFn } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, ValidatorFn } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -36,6 +36,7 @@ import { EnrichmentEditorComponent } from 'app/inspecto/enrichment/enrichment-ed
 import { ENRICHMENT_WIRING_ATTRIBUTES } from 'app/inspecto/enrichment/enrichment-attributes';
 import { enrichmentWiringDefaults } from 'app/inspecto/enrichment/enrichment-wiring';
 import { buildConfiguredNode, splitNodeConfig } from './node-config-build';
+import { PipelineExtraConfigComponent } from './pipeline-extra-config.component';
 import { groupByValidator, measuresValidator } from './measure-grammar';
 import { nodeAttributesFor } from './node-attributes';
 
@@ -94,6 +95,7 @@ const MAX_TEST_ROWS = 50;
         InspectoAlertComponent,
         InspectoSchemaFormComponent,
         EnrichmentEditorComponent,
+        PipelineExtraConfigComponent,
     ],
     template: `
         <!-- Enrichment (W4b): the node authors the REAL companion config through the shared editor —
@@ -139,63 +141,33 @@ const MAX_TEST_ROWS = 50;
             ></inspecto-schema-form>
         }
 
-        <!-- Additional / free-form config: the primary editor for unknown types, else a collapsed
-             escape hatch for keys outside the schema. Its own <form>: the schema form owns one, and
-             nesting forms is invalid. -->
-        <form [formGroup]="form" (ngSubmit)="submit()">
-            <div class="mb-1 mt-2 flex items-center justify-between">
-                <button
-                    type="button"
-                    class="flex items-center gap-1 text-xs font-semibold uppercase opacity-70"
-                    [attr.aria-expanded]="freeFormOpen()"
-                    (click)="freeFormOpen.set(!freeFormOpen())"
-                >
-                    <mat-icon
-                        class="icon-size-4"
-                        [svgIcon]="
-                            freeFormOpen() ? 'heroicons_outline:chevron-down' : 'heroicons_outline:chevron-right'
-                        "
-                    ></mat-icon>
-                    {{ specs().length || isEnrichment() ? 'Additional config' : 'Config' }}
-                    @if (configRows.length) {
-                        <span class="opacity-60">({{ configRows.length }})</span>
-                    }
-                </button>
-                @if (freeFormOpen()) {
-                    <button mat-stroked-button type="button" (click)="addConfigRow()">
-                        <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
-                        <span class="ml-1">Add</span>
-                    </button>
+        <!-- Additional config: keys OUTSIDE the schema render with their ACTUAL key and a control
+             matching the stored value's TYPE (2026-08-21 — the generic Key/Value grid is gone).
+             Adding a key is offered only where this is the node's PRIMARY surface (no schema). -->
+        <div class="mb-1 mt-2 flex items-center justify-between">
+            <button
+                type="button"
+                class="flex items-center gap-1 text-xs font-semibold uppercase opacity-70"
+                [attr.aria-expanded]="freeFormOpen()"
+                (click)="freeFormOpen.set(!freeFormOpen())"
+            >
+                <mat-icon
+                    class="icon-size-4"
+                    [svgIcon]="freeFormOpen() ? 'heroicons_outline:chevron-down' : 'heroicons_outline:chevron-right'"
+                ></mat-icon>
+                {{ specs().length || isEnrichment() ? 'Additional config' : 'Config' }}
+                @if (split().extraRows.length) {
+                    <span class="opacity-60">({{ split().extraRows.length }})</span>
                 }
-            </div>
-            @if (freeFormOpen()) {
-                <div formArrayName="config" class="space-y-2">
-                    @for (row of configRows.controls; track $index) {
-                        <div class="flex items-center gap-1" [formGroupName]="$index">
-                            <mat-form-field subscriptSizing="dynamic" class="flex-1">
-                                <mat-label>Key</mat-label>
-                                <input matInput formControlName="key" />
-                            </mat-form-field>
-                            <mat-form-field subscriptSizing="dynamic" class="flex-1">
-                                <mat-label>Value</mat-label>
-                                <input matInput formControlName="value" />
-                            </mat-form-field>
-                            <button
-                                mat-icon-button
-                                type="button"
-                                (click)="removeConfigRow($index)"
-                                aria-label="Remove config entry"
-                            >
-                                <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
-                            </button>
-                        </div>
-                    }
-                    @if (!configRows.length) {
-                        <p class="text-sm opacity-60">No extra config — add a key/value entry above.</p>
-                    }
-                </div>
-            }
-        </form>
+            </button>
+        </div>
+        @if (freeFormOpen()) {
+            <app-pipeline-extra-config
+                [entries]="split().extraRows"
+                [allowAdd]="!isEnrichment() && specs().length === 0"
+                (changed)="onInteraction()"
+            />
+        }
 
         <!-- The INLINE test: the config on screen, over the tab's own parsed rows. Offered only when
              there are rows — a test with no data would report success over nothing. -->
@@ -257,6 +229,7 @@ export class PipelineConfigDefinitionComponent {
     readonly dirtyChange = output<boolean>();
 
     @ViewChild('config') private schemaForm?: InspectoSchemaFormComponent;
+    @ViewChild(PipelineExtraConfigComponent) private extraConfig?: PipelineExtraConfigComponent;
     @ViewChild('wiring') private wiringForm?: InspectoSchemaFormComponent;
     private readonly enrichEditor = viewChild(EnrichmentEditorComponent);
 
@@ -277,10 +250,6 @@ export class PipelineConfigDefinitionComponent {
         group_by: [groupByValidator()],
     };
     readonly freeFormOpen = signal(false);
-
-    readonly form = this.fb.group({
-        config: this.fb.array<ReturnType<PipelineConfigDefinitionComponent['configRow']>>([]),
-    });
 
     // ── enrichment nodes (W4b): the pane authors the REAL companion `*_enrich.toon` ──
     readonly wiringSpecs = ENRICHMENT_WIRING_ATTRIBUTES;
@@ -340,13 +309,10 @@ export class PipelineConfigDefinitionComponent {
         // this runs once per instance — but an input swap without recreation re-seeds correctly too.
         effect(() => {
             const n = this.node();
-            this.configRows.clear();
-            for (const row of this.split().extraRows) this.configRows.push(this.configRow(row.key, row.value));
-            // Show the free-form editor up front only when it's the primary surface or already carries
-            // keys. For an enrichment node the primary surface is the shared editor (W4b).
+            // Show the additional-config editor up front only when it's the primary surface or already
+            // carries keys. For an enrichment node the primary surface is the shared editor (W4b).
             const extras = this.split().extraRows.length;
             this.freeFormOpen.set(this.isEnrichment() ? extras > 0 : this.specs().length === 0 || extras > 0);
-            this.form.markAsPristine();
             this.lastDirty = false;
             this.dirtyChange.emit(false);
             if (this.isEnrichment() && this.enrichInitFor !== n.id) {
@@ -414,7 +380,7 @@ export class PipelineConfigDefinitionComponent {
 
     private emitDirty(): void {
         const dirty =
-            this.form.dirty ||
+            (this.extraConfig?.isDirty() ?? false) ||
             (this.schemaForm?.isDirty() ?? false) ||
             (this.wiringForm?.isDirty() ?? false) ||
             this.enrichName.dirty ||
@@ -422,22 +388,6 @@ export class PipelineConfigDefinitionComponent {
         if (dirty === this.lastDirty) return;
         this.lastDirty = dirty;
         this.dirtyChange.emit(dirty);
-    }
-
-    get configRows(): FormArray {
-        return this.form.get('config') as FormArray;
-    }
-
-    addConfigRow(): void {
-        this.configRows.push(this.configRow('', ''));
-        this.form.markAsDirty();
-        this.emitDirty();
-    }
-
-    removeConfigRow(i: number): void {
-        this.configRows.removeAt(i);
-        this.form.markAsDirty();
-        this.emitDirty();
     }
 
     /**
@@ -499,7 +449,7 @@ export class PipelineConfigDefinitionComponent {
             node: n,
             specs: this.specs(),
             formValues: this.schemaForm ? this.schemaForm.value() : null,
-            freeRows: this.form.getRawValue().config as { key: string; value: string }[],
+            extras: this.extraConfig?.value() ?? {},
             name: n.name,
             description: n.description,
             use: n.use,
@@ -515,13 +465,14 @@ export class PipelineConfigDefinitionComponent {
             return;
         }
         if (this.schemaForm && !this.schemaForm.validate()) return;
+        if (this.extraConfig && !this.extraConfig.validate()) return;
         const node = this.buildNode();
         this.markPristine();
         this.applied.emit(node);
     }
 
     private markPristine(): void {
-        this.form.markAsPristine();
+        this.extraConfig?.markPristine();
         this.schemaForm?.form.markAsPristine();
         this.wiringForm?.form.markAsPristine();
         this.enrichName.markAsPristine();
@@ -609,13 +560,13 @@ export class PipelineConfigDefinitionComponent {
         });
     }
 
-    /** Emit the node bound to the companion by reference (plus any legacy free-form keys). */
+    /** Emit the node bound to the companion by reference (plus any legacy extra keys, typed). */
     private emitBinding(name: string): void {
         this.savingEnrichment.set(false);
         const n = this.node();
         const config: Record<string, unknown> = {};
-        for (const row of this.form.getRawValue().config as { key: string; value: string }[]) {
-            if (row.key && row.key.trim()) config[row.key.trim()] = row.value;
+        for (const [k, v] of Object.entries(this.extraConfig?.value() ?? {})) {
+            if (k.trim()) config[k.trim()] = v;
         }
         this.markPristine();
         this.applied.emit({
@@ -625,13 +576,6 @@ export class PipelineConfigDefinitionComponent {
             description: n.description,
             use: `enrichment/${name}`,
             config: Object.keys(config).length ? config : undefined,
-        });
-    }
-
-    private configRow(key: string, value: string) {
-        return this.fb.group({
-            key: this.fb.control(key, { nonNullable: true }),
-            value: this.fb.control(value, { nonNullable: true }),
         });
     }
 }

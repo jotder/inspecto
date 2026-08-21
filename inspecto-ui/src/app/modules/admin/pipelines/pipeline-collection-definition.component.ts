@@ -10,7 +10,7 @@ import {
     output,
     signal,
 } from '@angular/core';
-import { FormArray, FormBuilder, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -20,6 +20,7 @@ import { CollectorConfigComponent } from 'app/inspecto/collector/collector-confi
 import { AttributeSpec, MARKER_DEDUP_ATTRIBUTES } from 'app/inspecto/component-model';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { buildConfiguredNode, splitNodeConfig } from './node-config-build';
+import { PipelineExtraConfigComponent } from './pipeline-extra-config.component';
 import { nodeAttributesFor } from './node-attributes';
 
 /**
@@ -45,6 +46,7 @@ import { nodeAttributesFor } from './node-attributes';
         MatInputModule,
         CollectorConfigComponent,
         InspectoSchemaFormComponent,
+        PipelineExtraConfigComponent,
     ],
     template: `
         <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-1">
@@ -77,7 +79,9 @@ import { nodeAttributesFor } from './node-attributes';
                 />
             }
 
-            <!-- Additional / free-form config: the collapsed escape hatch for keys outside the schema. -->
+            <!-- Additional config: keys OUTSIDE the schema, each with its ACTUAL key and a control
+                 matching the stored value's TYPE (2026-08-21 — the generic Key/Value grid is gone).
+                 No add here: the collector's vocabulary is its schema. -->
             <div class="mb-1 mt-2 flex items-center justify-between">
                 <button
                     type="button"
@@ -92,43 +96,13 @@ import { nodeAttributesFor } from './node-attributes';
                         "
                     ></mat-icon>
                     Additional config
-                    @if (configRows.length) {
-                        <span class="opacity-60">({{ configRows.length }})</span>
+                    @if (split().extraRows.length) {
+                        <span class="opacity-60">({{ split().extraRows.length }})</span>
                     }
                 </button>
-                @if (freeFormOpen()) {
-                    <button mat-stroked-button type="button" (click)="addConfigRow()">
-                        <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
-                        <span class="ml-1">Add</span>
-                    </button>
-                }
             </div>
             @if (freeFormOpen()) {
-                <div formArrayName="config" class="space-y-2">
-                    @for (row of configRows.controls; track $index) {
-                        <div class="flex items-center gap-1" [formGroupName]="$index">
-                            <mat-form-field subscriptSizing="dynamic" class="flex-1">
-                                <mat-label>Key</mat-label>
-                                <input matInput formControlName="key" />
-                            </mat-form-field>
-                            <mat-form-field subscriptSizing="dynamic" class="flex-1">
-                                <mat-label>Value</mat-label>
-                                <input matInput formControlName="value" />
-                            </mat-form-field>
-                            <button
-                                mat-icon-button
-                                type="button"
-                                (click)="removeConfigRow($index)"
-                                aria-label="Remove config entry"
-                            >
-                                <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
-                            </button>
-                        </div>
-                    }
-                    @if (!configRows.length) {
-                        <p class="text-sm opacity-60">No extra config — add a key/value entry above.</p>
-                    }
-                </div>
+                <app-pipeline-extra-config [entries]="split().extraRows" (changed)="onInteraction()" />
             }
         </form>
     `,
@@ -151,6 +125,7 @@ export class PipelineCollectionDefinitionComponent {
     readonly dirtyChange = output<boolean>();
 
     @ViewChild(CollectorConfigComponent) private collector?: CollectorConfigComponent;
+    @ViewChild(PipelineExtraConfigComponent) private extraConfig?: PipelineExtraConfigComponent;
     @ViewChild('dedup') private dedup?: InspectoSchemaFormComponent;
 
     readonly specs = computed<AttributeSpec[]>(() => this.attributes() ?? nodeAttributesFor(this.node().type) ?? []);
@@ -173,9 +148,7 @@ export class PipelineCollectionDefinitionComponent {
 
     readonly freeFormOpen = signal(false);
 
-    readonly form = this.fb.group({
-        config: this.fb.array<ReturnType<PipelineCollectionDefinitionComponent['configRow']>>([]),
-    });
+    readonly form = this.fb.group({});
 
     private lastDirty = false;
 
@@ -184,10 +157,7 @@ export class PipelineCollectionDefinitionComponent {
         // this runs once per instance — but an input swap without recreation re-seeds correctly too.
         effect(() => {
             this.node();
-            this.configRows.clear();
-            for (const row of this.split().extraRows) this.configRows.push(this.configRow(row.key, row.value));
             this.freeFormOpen.set(this.split().extraRows.length > 0);
-            this.form.markAsPristine();
             this.emitDirty();
         });
     }
@@ -204,26 +174,13 @@ export class PipelineCollectionDefinitionComponent {
     }
 
     private emitDirty(): void {
-        const dirty = this.form.dirty || (this.collector?.isDirty() ?? false) || (this.dedup?.isDirty() ?? false);
+        const dirty =
+            (this.extraConfig?.isDirty() ?? false) ||
+            (this.collector?.isDirty() ?? false) ||
+            (this.dedup?.isDirty() ?? false);
         if (dirty === this.lastDirty) return;
         this.lastDirty = dirty;
         this.dirtyChange.emit(dirty);
-    }
-
-    get configRows(): FormArray {
-        return this.form.get('config') as FormArray;
-    }
-
-    addConfigRow(): void {
-        this.configRows.push(this.configRow('', ''));
-        this.form.markAsDirty();
-        this.emitDirty();
-    }
-
-    removeConfigRow(i: number): void {
-        this.configRows.removeAt(i);
-        this.form.markAsDirty();
-        this.emitDirty();
     }
 
     /**
@@ -234,9 +191,9 @@ export class PipelineCollectionDefinitionComponent {
     submit(): void {
         if (this.collector && !this.collector.validate()) return;
         if (this.dedup && !this.dedup.validate()) return;
+        if (this.extraConfig && !this.extraConfig.validate()) return;
         const connector = this.collector?.resolveConnector() ?? null;
         if (!connector) return;
-        const v = this.form.getRawValue();
         // Two schema surfaces, one node: the collector block's values plus the dedup group's. Merged
         // against the FULL spec list, so buildConfiguredNode still sees every specced key and none of
         // them leaks into the free-form rows.
@@ -244,23 +201,16 @@ export class PipelineCollectionDefinitionComponent {
             node: this.node(),
             specs: this.specs(),
             formValues: { ...(this.collector?.value() ?? {}), ...(this.dedup?.value() ?? {}) },
-            freeRows: v.config as { key: string; value: string }[],
+            extras: this.extraConfig?.value() ?? {},
             name: this.node().name,
             description: this.node().description,
             isAcquisition: true,
             connector,
         });
-        this.form.markAsPristine();
+        this.extraConfig?.markPristine();
         this.collector?.markPristine();
         this.dedup?.form.markAsPristine();
         this.emitDirty();
         this.applied.emit(node);
-    }
-
-    private configRow(key: string, value: string) {
-        return this.fb.group({
-            key: this.fb.control(key, { nonNullable: true }),
-            value: this.fb.control(value, { nonNullable: true }),
-        });
     }
 }
