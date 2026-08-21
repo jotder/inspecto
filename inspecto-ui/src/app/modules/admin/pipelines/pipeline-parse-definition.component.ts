@@ -157,7 +157,21 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
             switching tabs never shows another pipeline's sample.
         -->
         @if (sample(); as thread) {
-            <div class="mb-3"><inspecto-sample-panel [state]="thread" /></div>
+            <div class="mb-3">
+                <!--
+                    S4: the parse verb lives HERE, beside the chips it changes ("not parsed yet" →
+                    "parsed · N cols"), not below the option tabs where its only feedback landed
+                    silently on another tab. The shared editor hides its own button when the host owns
+                    the sample, so there is exactly one.
+                    (no backticks in this comment: it lives inside a template literal)
+                -->
+                <inspecto-sample-panel
+                    [state]="thread"
+                    parseLabel="Parse sample"
+                    [parseDisabled]="!thread.sample()"
+                    (parse)="parseSample()"
+                />
+            </div>
         }
         <!-- Name/Description live on the canvas inspector's rename affordance now, not here: this
              pane defines the Grammar, and the node's display identity is a graph concern. -->
@@ -319,6 +333,16 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                                             Add {{ d.added.length }} new
                                         </button>
                                     }
+                                    <!--
+                                        S4/D7 — the third verb of the generate loop. Add-new can only
+                                        append, and type changes are deliberately never applied, so a
+                                        schema whose sample has genuinely moved on had NO way back to a
+                                        derived one short of a CSV import. Destructive by nature, so the
+                                        confirm names exactly what it replaces.
+                                    -->
+                                    <button mat-stroked-button type="button" (click)="rederiveSchema()">
+                                        Re-derive from this sample
+                                    </button>
                                 </div>
                                 @if (d.typeChanged.length) {
                                     <p class="text-secondary m-0 mb-2 text-xs">
@@ -345,7 +369,9 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                             <inspecto-schema-fields-editor
                                 [rows]="schemaSeed()"
                                 [autoTypes]="typesMode() === 'auto'"
-                                [nameBasedSelectors]="frontend() === 'json' || frontend() === 'text_regex' || frontend() === 'xlsx'"
+                                [nameBasedSelectors]="
+                                    frontend() === 'json' || frontend() === 'text_regex' || frontend() === 'xlsx'
+                                "
                             />
                             <!--
                                 BUILDER-1b. One pipeline has ONE output schema (pipeline_schema), and a save
@@ -376,8 +402,8 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                             }
                         } @else {
                             <p class="text-secondary m-0 text-sm">
-                                Test the parse above — the output schema is derived from the columns it produces, never
-                                hand-typed.
+                                Parse the sample above — the output schema is derived from the columns it produces,
+                                never hand-typed.
                             </p>
                         }
                     } @else if (foreignSchema()) {
@@ -558,9 +584,7 @@ export class PipelineParseDefinitionComponent {
             this.schemaSeed.update((rows) =>
                 rows.map((r) => {
                     const pos = Number(r.selector);
-                    return Number.isInteger(pos) && inferred[pos] !== undefined
-                        ? { ...r, type: inferred[pos] }
-                        : r;
+                    return Number.isInteger(pos) && inferred[pos] !== undefined ? { ...r, type: inferred[pos] } : r;
                 }),
             );
         }
@@ -670,6 +694,12 @@ export class PipelineParseDefinitionComponent {
         // path above, which deliberately re-derives nothing.
         this.parsedSinceApply = true;
         this.emitDirty();
+        // S4: make the derivation VISIBLE. It lands on the Types & columns tab, which on a tabbed
+        // format is not the tab the operator is looking at — so the first one steers them there.
+        if (!this.revealedSchema) {
+            this.revealedSchema = true;
+            this.editor?.showTab('types');
+        }
         const inferred = this.typesMode() === 'auto' ? this.inferredTypes() : null;
         this.schemaSeed.set(
             p.columns.map((col, i) => ({
@@ -680,6 +710,22 @@ export class PipelineParseDefinitionComponent {
             })),
         );
     }
+
+    /**
+     * S4 — the parse verb, driven from the sample strip. The host already holds the editor's
+     * `@ViewChild`, so this is a pass-through rather than a second parse path.
+     */
+    parseSample(): void {
+        this.editor?.test();
+    }
+
+    /**
+     * Whether the Types tab has already been revealed for this pane instance (S4). The FIRST parse to
+     * derive a schema steers the operator to it — the derivation used to land there in silence. Every
+     * later parse leaves the tab alone: yanking the view out from under someone who is editing another
+     * tab is worse than the silence it would be fixing.
+     */
+    private revealedSchema = false;
 
     /** Segment drafts re-hydrated from the node's saved `asn1.segments`, keys AND columns. */
     readonly initialSegments = signal<SegmentDraft[]>([]);
@@ -853,6 +899,30 @@ export class PipelineParseDefinitionComponent {
         // a cell to keep them.
         this.parsedSinceApply = true;
         this.emitDirty();
+    }
+
+    /**
+     * S4/D7 — throw the hydrated schema away and derive a fresh one from the sample now on screen.
+     *
+     * <p>Implementation is deliberately "clear the hydrated flag and re-run the parse", so the derive
+     * branch of {@link onPreviewed} is the ONE place a schema is ever derived. A second derivation
+     * here would be free to drift from it.
+     *
+     * <p>Destructive, and the confirm says so in full: names, types, synonyms and the column metadata
+     * are all the operator's work, and none of it survives. The CSV import stays the file-based
+     * wholesale path — this one is the sample-based one.
+     */
+    async rederiveSchema(): Promise<void> {
+        const ok = await this.confirm.confirmDestructive(
+            'The saved output schema is replaced by one derived from the sample now captured. Column names, ' +
+                'declared types, synonyms and the description / unit / classification metadata are all lost.',
+            { title: 'Re-derive the output schema?', confirmText: 'Re-derive' },
+        );
+        if (!ok) return;
+        this.schemaHydrated.set(false);
+        this.schemaDrift.set(null);
+        this.revealedSchema = false; // the fresh derivation is worth revealing again
+        this.parseSample();
     }
 
     /**
@@ -1035,9 +1105,7 @@ export class PipelineParseDefinitionComponent {
             return;
         }
         if (parsed.meta.format !== frontend) {
-            this.editor?.error.set(
-                `That file is a '${parsed.meta.format}' Grammar — this node parses '${frontend}'.`,
-            );
+            this.editor?.error.set(`That file is a '${parsed.meta.format}' Grammar — this node parses '${frontend}'.`);
             return;
         }
         if (parsed.columns && (this.lastDirty || this.schemaSeed().length)) {

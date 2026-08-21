@@ -65,6 +65,46 @@ describe('InspectoSamplePanelComponent', () => {
         expect(fixture.nativeElement.textContent).not.toContain('other-tab.csv');
     });
 
+    /**
+     * S4 — the parse verb belongs beside the chips whose state it changes. The panel owns the sample,
+     * never a parser, so the button exists only when a host supplies the label and takes the output.
+     */
+    describe('the host-supplied parse action (S4)', () => {
+        it('is absent until a host labels it', () => {
+            const { fixture, state } = create();
+            state.captureSample('s.csv', 'a,b');
+            fixture.detectChanges();
+            expect(fixture.nativeElement.textContent).not.toContain('Parse sample');
+        });
+
+        it('renders beside the chips and emits when pressed', () => {
+            const { fixture, state } = create();
+            state.captureSample('s.csv', 'a,b');
+            fixture.componentRef.setInput('parseLabel', 'Parse sample');
+            fixture.detectChanges();
+            const parsed = vi.fn();
+            fixture.componentInstance.parse.subscribe(parsed);
+            const btn = Array.from(
+                (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
+            ).find((b) => b.textContent?.includes('Parse sample'));
+            expect(btn).toBeTruthy();
+            btn!.click();
+            expect(parsed).toHaveBeenCalled();
+        });
+
+        it('disables on the host’s say-so', () => {
+            const { fixture, state } = create();
+            state.captureSample('s.csv', 'a,b');
+            fixture.componentRef.setInput('parseLabel', 'Parse sample');
+            fixture.componentRef.setInput('parseDisabled', true);
+            fixture.detectChanges();
+            const btn = Array.from(
+                (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
+            ).find((b) => b.textContent?.includes('Parse sample')) as HTMLButtonElement;
+            expect(btn.disabled).toBe(true);
+        });
+    });
+
     it('has no a11y violations (empty and captured states)', async () => {
         const { fixture, state } = create();
         await expectNoA11yViolations(fixture.nativeElement);

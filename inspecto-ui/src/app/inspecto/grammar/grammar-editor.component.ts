@@ -12,14 +12,7 @@ import {
     inject,
     signal,
 } from '@angular/core';
-import {
-    AbstractControl,
-    FormArray,
-    FormBuilder,
-    FormGroup,
-    ReactiveFormsModule,
-    Validators,
-} from '@angular/forms';
+import { AbstractControl, FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { NgTemplateOutlet } from '@angular/common';
 import { Subscription, merge } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
@@ -244,10 +237,7 @@ export class GrammarEditorComponent implements AfterViewInit {
         // the host's [tabFiles] projection (the column-metadata grid) — xlsx has no file-level
         // option of its own but the tab's content is not the specs'.
         return shell
-            .filter(
-                (t) =>
-                    ids.has(t.id) || t.id === 'files' || (t.id === fallback && specs.some((s) => !s.tab)),
-            )
+            .filter((t) => ids.has(t.id) || t.id === 'files' || (t.id === fallback && specs.some((s) => !s.tab)))
             .map((t) => ({
                 ...t,
                 specs: specs.filter((s) => (s.tab ?? fallback) === t.id),
@@ -323,9 +313,7 @@ export class GrammarEditorComponent implements AfterViewInit {
         this.formSubs = new Subscription();
         for (const f of this.forms()) {
             this.formSubs.add(
-                merge(f.form.valueChanges, f.form.statusChanges).subscribe(() =>
-                    this.formTick.update((n) => n + 1),
-                ),
+                merge(f.form.valueChanges, f.form.statusChanges).subscribe(() => this.formTick.update((n) => n + 1)),
             );
         }
         this.formTick.update((n) => n + 1);
@@ -654,6 +642,24 @@ export class GrammarEditorComponent implements AfterViewInit {
     }
 
     // ── preview ──────────────────────────────────────────────────────────────
+
+    /**
+     * Steer a tabbed spec set to a named tab (S4) — the host reveals **Types & columns** the first
+     * time a parse DERIVES a schema, because the derivation used to land there silently while the
+     * viewport showed no schema anywhere. A no-op for an untabbed format or an unknown id, so a host
+     * may ask without first knowing which formats are tabbed.
+     */
+    showTab(id: string): void {
+        const tabs = this.tabs();
+        if (!tabs) return;
+        const i = tabs.findIndex((t) => t.id === id);
+        if (i >= 0) this.activeTab.set(i);
+    }
+
+    /** Whether this Grammar's spec set renders as tabs — the host sizes its dock accordingly (S4). */
+    get tabbed(): boolean {
+        return !!this.tabs();
+    }
 
     /** Parse the sample with the in-progress Grammar (no save) → table or tree. */
     test(): void {

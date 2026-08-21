@@ -7,6 +7,7 @@ import { delay } from 'rxjs/operators';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthoredNode, ComponentDef, ConfigService, ParsersService, SpacesService } from 'app/inspecto/api';
 import { ToastrService } from 'ngx-toastr';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
 import { GrammarEditorComponent, grammarToCsv, parsingAttributesFor } from 'app/inspecto/grammar';
 import { InspectoSegmentsEditorComponent } from 'app/inspecto/segments';
@@ -175,6 +176,8 @@ let schemaWriteFails = false;
 /** Arms the schema BACKWARD save-gate's 422 (BUILDER-1b), which the pane must offer to override. */
 let schemaBackwardRefusal = false;
 let savedSchemaMissing = false;
+/** S4/D7: what the destructive re-derive confirm answers. */
+let confirmAnswer = true;
 
 /**
  * `servedDelayMs` reproduces PRODUCTION ordering: `GET /parsers` is an HTTP hop, so the catalog lands
@@ -242,6 +245,13 @@ async function create(
                 },
             },
             { provide: SpacesService, useValue: { currentSpaceId: () => 'default' } },
+            {
+                provide: InspectoConfirmService,
+                useValue: {
+                    confirm: () => Promise.resolve(confirmAnswer),
+                    confirmDestructive: () => Promise.resolve(confirmAnswer),
+                },
+            },
             // The sample strip (rendered only with a thread) reports an unreadable file through toastr.
             { provide: ToastrService, useValue: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() } },
         ],
@@ -268,7 +278,10 @@ function segmentsEditor(fixture: ComponentFixture<HostComponent>): InspectoSegme
 }
 
 describe('PipelineParseDefinitionComponent', () => {
-    beforeEach(() => localStorage.removeItem('inspecto.currentLens'));
+    beforeEach(() => {
+        localStorage.removeItem('inspecto.currentLens');
+        confirmAnswer = true;
+    });
 
     /**
      * The per-tab sample thread. The pane does not own it — it renders the strip the host hands in and
@@ -601,7 +614,6 @@ describe('PipelineParseDefinitionComponent', () => {
             expect(fixture.componentInstance.applied).toBeUndefined();
             expect(editor(fixture).error()).toContain('not available');
         });
-
     });
 
     /**
@@ -666,7 +678,6 @@ describe('PipelineParseDefinitionComponent', () => {
             expect(fixture.componentInstance.applied).toBeUndefined();
             expect(editor(fixture).error()).toContain('No ingestable parser plugin');
         });
-
     });
 
     /**
@@ -1009,6 +1020,30 @@ describe('PipelineParseDefinitionComponent', () => {
         });
 
         /**
+         * S4 — the FIRST derivation is revealed: it lands on the Types & columns tab, which on a tabbed
+         * format is not the tab the operator is looking at, so the parse used to look like it did
+         * nothing. Later parses must NOT yank the tab out from under someone editing another one.
+         */
+        it('reveals the Types tab on the first derivation only', async () => {
+            const fixture = await create(unschemadNode());
+            const ed = editor(fixture);
+            expect(ed.tabbed).toBe(true); // delimited renders as tabs
+            ed.showTab('dialect');
+
+            pane(fixture).onPreviewed(TABLE_PREVIEW);
+            fixture.detectChanges();
+            expect(ed.activeTab()).toBe(1); // 'types'
+
+            // The operator moves to another tab and re-parses: the tab stays where they put it.
+            ed.showTab('robustness');
+            const parked = ed.activeTab();
+            pane(fixture).onPreviewed(TABLE_PREVIEW);
+            fixture.detectChanges();
+            expect(ed.activeTab()).toBe(parked);
+        });
+
+        /**
+         * 2a-iii: a hydrated schema does not re-derive        /**
          * 2a-iii: a hydrated schema does not re-derive — it asks what changed (B3). The indicator is the
          * consumer of the drift diff, and "add new" is the only half of a re-sync that cannot clobber.
          */
@@ -1029,6 +1064,49 @@ describe('PipelineParseDefinitionComponent', () => {
                 expect(pane(fixture).schemaDrift()?.drifted).toBe(true);
                 expect(fixture.nativeElement.textContent).toContain('no longer matches the saved schema');
                 // The saved schema is untouched by merely observing drift.
+                expect(
+                    pane(fixture)
+                        .schemaSeed()
+                        .map((r) => r.name),
+                ).toEqual(['IMSI']);
+            });
+
+            /**
+             * S4/D7 — the third verb. Add-new can only append and type changes are deliberately never
+             * applied, so a schema whose sample has genuinely moved on had no way back to a derived one.
+             * ⚠ It must go through the derive branch of `onPreviewed`, not a second derivation here.
+             */
+            it('re-derives from the sample on confirm: hydration is cleared and the parse re-runs', async () => {
+                const fixture = await create(schemadNode());
+                fixture.detectChanges();
+                pane(fixture).onPreviewed(TABLE_PREVIEW);
+                fixture.detectChanges();
+                expect(
+                    pane(fixture)
+                        .schemaSeed()
+                        .map((r) => r.name),
+                ).toEqual(['IMSI']); // hydrated, un-re-derived
+
+                const p = pane(fixture);
+                const test = vi.spyOn(editor(fixture), 'test');
+                await p.rederiveSchema();
+                expect(test).toHaveBeenCalled(); // the ONE derive path is re-run, not duplicated
+                expect(p.schemaDrift()).toBeNull();
+                // With hydration cleared, the next preview derives instead of asking about drift.
+                p.onPreviewed(TABLE_PREVIEW);
+                expect(p.schemaSeed()).toHaveLength(TABLE_PREVIEW.columns.length);
+                expect(p.schemaSeed().map((r) => r.name)).not.toContain('IMSI');
+            });
+
+            it('leaves the saved schema alone when the destructive confirm is declined', async () => {
+                confirmAnswer = false;
+                const fixture = await create(schemadNode());
+                fixture.detectChanges();
+                pane(fixture).onPreviewed(TABLE_PREVIEW);
+                fixture.detectChanges();
+
+                await pane(fixture).rederiveSchema();
+                pane(fixture).onPreviewed(TABLE_PREVIEW); // still hydrated ⇒ still the drift path
                 expect(
                     pane(fixture)
                         .schemaSeed()

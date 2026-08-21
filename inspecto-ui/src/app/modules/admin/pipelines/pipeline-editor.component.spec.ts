@@ -961,6 +961,35 @@ describe('PipelineEditorComponent', () => {
         });
 
         /**
+         * S4 — a parse pane's options render as TABS, and at the dock's 300px default the labels
+         * truncated to "Dialect | Typ…" with scroll arrows while the schema toolbar stacked. The host
+         * asks the dock for room. ⚠ Transient: nothing is persisted, so the operator's stored width
+         * survives the visit (pinned on the directive itself).
+         */
+        it('widens the properties dock for a parse pane, and leaves it alone for others', async () => {
+            localStorage.removeItem('inspecto.split.pipelines.inspector');
+            const fixture = TestBed.createComponent(PipelineEditorComponent);
+            fixture.componentRef.setInput('openId', 'demo');
+            const c = fixture.componentInstance;
+            c.ngOnInit();
+            (c as unknown as { canvas: unknown }).canvas = canvasMock();
+            fixture.detectChanges();
+            const dock = (fixture.nativeElement as HTMLElement).querySelector(
+                'aside[aria-label="Properties"]',
+            ) as HTMLElement;
+            expect(dock.style.width).toBe('300px');
+
+            await c.openDefinition({ id: 'flt', type: 'transform.filter' });
+            fixture.detectChanges();
+            expect(dock.style.width, 'a flat config pane needs no extra room').toBe('300px');
+
+            await c.openDefinition({ id: 'p', type: 'parser.delimited' });
+            fixture.detectChanges();
+            expect(dock.style.width).toBe('420px');
+        });
+
+        /**
+         * S3 — selection and configuration converge, so the common paths cost one click instead of two.        /**
          * S3 — selection and configuration converge, so the common paths cost one click instead of two.
          */
         describe('fewer clicks (S3)', () => {

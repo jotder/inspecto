@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -62,12 +62,30 @@ const RAW_PREVIEW_LINES = 40;
                             </inspecto-chip>
                         }
                     } @else {
-                        <inspecto-chip variant="outline" matTooltip="Run Test parse below">
+                        <inspecto-chip variant="outline" [matTooltip]="parseLabel() ? 'Run ' + parseLabel() : ''">
                             not parsed yet
                         </inspecto-chip>
                     }
 
                     <span class="flex-1"></span>
+                    <!--
+                        S4: the PRIMARY action, beside the chips whose state it changes. Parsing the
+                        sample is what derives the schema, and the control used to sit below the option
+                        tabs with its only feedback landing silently on another tab. Offered only when a
+                        host binds it (the panel itself has no parser).
+                    -->
+                    @if (parseLabel()) {
+                        <button
+                            mat-flat-button
+                            color="primary"
+                            type="button"
+                            [disabled]="parseDisabled()"
+                            (click)="parse.emit()"
+                        >
+                            <mat-icon svgIcon="heroicons_outline:bolt" class="icon-size-4"></mat-icon>
+                            <span class="ml-1">{{ parseLabel() }}</span>
+                        </button>
+                    }
                     <button mat-stroked-button type="button" (click)="fileInput.click()">Replace</button>
                     <button mat-stroked-button type="button" (click)="pasting.set(!pasting())">Paste text</button>
                     <button mat-stroked-button type="button" (click)="clear()">Clear</button>
@@ -139,6 +157,14 @@ export class InspectoSamplePanelComponent {
      * D2 rule every definition pane follows.
      */
     readonly state = input.required<DefinitionStateService>();
+    /**
+     * Label for the host's parse action, e.g. `'Parse sample'` (S4). Empty ⇒ no action is offered:
+     * this panel owns the sample, never a parser, so the verb only exists when a host supplies one.
+     */
+    readonly parseLabel = input('');
+    readonly parseDisabled = input(false);
+    /** The host should parse the captured sample with the settings currently on screen. */
+    readonly parse = output<void>();
     private toastr = inject(ToastrService);
 
     readonly pasting = signal(false);

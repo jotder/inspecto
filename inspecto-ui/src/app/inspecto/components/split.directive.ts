@@ -78,6 +78,18 @@ export class InspectoSplitDirective {
         if (e.key === 'ArrowRight') this.set(this.width() + 16 * dir);
     }
 
+    /**
+     * Widen the pane to at least `px` for THIS session, without touching the stored preference —
+     * canvas-UX compaction S4. A tabbed definition pane opened at the dock's 300px default truncated
+     * its own tab labels ("Dialect | Typ…" with scroll arrows) and stacked the schema toolbar, so the
+     * host asks for room when it mounts one. A stored preference that is already wider wins, and
+     * because nothing is persisted the operator's own choice survives the visit.
+     */
+    ensureAtLeast(px: number): void {
+        if (this.width() >= px) return;
+        this.override.set(this.clamp(px));
+    }
+
     private set(px: number): void {
         const w = this.clamp(px);
         this.override.set(w);

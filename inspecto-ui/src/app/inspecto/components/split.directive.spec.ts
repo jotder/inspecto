@@ -65,6 +65,44 @@ describe('InspectoSplitDirective', () => {
         expect(aside.style.width).toBe('100px'); // clamped at min
     });
 
+    /**
+     * S4 — a host that mounts a TABBED pane asks the dock for room. Transient by design: it must NOT
+     * write the stored preference, or one visit to a tabbed pane would silently redefine the
+     * operator's dock width for every pane after it.
+     */
+    describe('ensureAtLeast (S4)', () => {
+        it('widens to the floor without persisting it', () => {
+            const { fixture, aside } = create();
+            const dir = fixture.debugElement
+                .query((n) => !!n.attributes['inspectoSplit'])
+                .injector.get(InspectoSplitDirective);
+            dir.ensureAtLeast(280);
+            fixture.detectChanges();
+            expect(dir.width()).toBe(280);
+            expect(aside.style.width).toBe('280px');
+            expect(localStorage.getItem('inspecto.split.test.pane')).toBeNull();
+        });
+
+        it('leaves an already-wider width alone', () => {
+            localStorage.setItem('inspecto.split.test.pane', '300');
+            const { fixture } = create();
+            const dir = fixture.debugElement
+                .query((n) => !!n.attributes['inspectoSplit'])
+                .injector.get(InspectoSplitDirective);
+            dir.ensureAtLeast(280);
+            expect(dir.width()).toBe(300);
+        });
+
+        it('clamps the floor to the configured max', () => {
+            const { fixture } = create();
+            const dir = fixture.debugElement
+                .query((n) => !!n.attributes['inspectoSplit'])
+                .injector.get(InspectoSplitDirective);
+            dir.ensureAtLeast(9999);
+            expect(dir.width()).toBe(300); // [min 100, max 300]
+        });
+    });
+
     it('restores the persisted width in a fresh instance (clamped to the configured range)', () => {
         localStorage.setItem('inspecto.split.test.pane', '250');
         const { aside } = create();

@@ -158,11 +158,21 @@
                     </mat-form-field>
                     <mat-form-field class="w-24" subscriptSizing="dynamic">
                         <mat-label>Start</mat-label>
-                        <input matInput type="number" formControlName="start" [attr.aria-label]="'Field ' + ($index + 1) + ' start'" />
+                        <input
+                            matInput
+                            type="number"
+                            formControlName="start"
+                            [attr.aria-label]="'Field ' + ($index + 1) + ' start'"
+                        />
                     </mat-form-field>
                     <mat-form-field class="w-24" subscriptSizing="dynamic">
                         <mat-label>Length</mat-label>
-                        <input matInput type="number" formControlName="length" [attr.aria-label]="'Field ' + ($index + 1) + ' length'" />
+                        <input
+                            matInput
+                            type="number"
+                            formControlName="length"
+                            [attr.aria-label]="'Field ' + ($index + 1) + ' length'"
+                        />
                     </mat-form-field>
                     <button
                         mat-icon-button
@@ -188,18 +198,24 @@
 <!-- Host-owned extras that need a write path the editor deliberately does not have (segments). -->
 <ng-content select="[grammarExtras]"></ng-content>
 
-<!-- ── test ────────────────────────────────────────────────────────────────── -->
-<div class="mt-4 flex items-center gap-2">
-    <button mat-stroked-button type="button" [disabled]="testing() || !sampleText()" (click)="test()">
-        @if (testing()) {
-            <mat-spinner diameter="16" class="mr-2" />
+<!-- ── test ─────────────────────────────────────────────────────────────────
+     S4: with `sampleMode: 'host'` the HOST owns this verb and renders it beside the sample chips its
+     result changes — the primary action belongs where its feedback lands, not below the option tabs.
+     A host-owned sample without a host-owned button would leave no way to parse at all, so the
+     spinner/hint arm stays for `own`. -->
+@if (sampleMode === 'own') {
+    <div class="mt-4 flex items-center gap-2">
+        <button mat-stroked-button type="button" [disabled]="testing() || !sampleText()" (click)="test()">
+            @if (testing()) {
+                <mat-spinner diameter="16" class="mr-2" />
+            }
+            Test parse
+        </button>
+        @if (!sampleText()) {
+            <span class="text-secondary text-xs">Add a sample to test these settings.</span>
         }
-        Test parse
-    </button>
-    @if (!sampleText()) {
-        <span class="text-secondary text-xs">Add a sample to test these settings.</span>
-    }
-</div>
+    </div>
+}
 
 @if (error()) {
     <div class="mt-3">

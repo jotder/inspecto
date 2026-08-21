@@ -154,6 +154,13 @@ function describeDependents(impact: ConfigImpact): string {
  * CRUD orchestration, canvas event wiring, and keeping the canvas in sync with the model (review:
  * `docs/superpower/reviews/pipeline-editor.md`).
  */
+/**
+ * The properties dock width a TABBED definition pane needs to render whole (S4). Below it the four
+ * option tabs truncate with scroll arrows and the schema toolbar stacks. Transient: `ensureAtLeast`
+ * never persists it, so a stored preference (wider or narrower) is the operator's to keep.
+ */
+const TABBED_PANE_WIDTH = 420;
+
 @Component({
     selector: 'app-pipeline-editor',
     standalone: true,
@@ -420,6 +427,8 @@ export class PipelineEditorComponent implements OnInit {
     @ViewChild(PipelineParseDefinitionComponent) private parseDefinitionPane?: PipelineParseDefinitionComponent;
     @ViewChild(PipelineLoadDefinitionComponent) private loadDefinitionPane?: PipelineLoadDefinitionComponent;
     @ViewChild(PipelineConfigDefinitionComponent) private configDefinitionPane?: PipelineConfigDefinitionComponent;
+    /** The properties dock's resize handle — S4 asks it for room when a TABBED pane opens. */
+    @ViewChild('inspectorSplit') private inspectorSplitRef?: InspectoSplitDirective;
 
     /**
      * Whether the drawer's node is a per-format parse node — which pane the template mounts. A method on
@@ -1690,6 +1699,11 @@ export class PipelineEditorComponent implements OnInit {
         this.definitionDirty.set(false);
         this.rightTab.set('properties');
         this.inspectorOpen.set(true);
+        // S4: a parse pane's option set renders as TABS, and at the dock's 300px default the labels
+        // truncated to "Dialect | Typ…" with scroll arrows while the schema toolbar stacked — the pane
+        // only breathed after a maximize. Ask for room, transiently: a wider stored preference wins and
+        // nothing is persisted, so the operator's own width survives the visit.
+        if (isParseNodeType(node.type)) this.inspectorSplitRef?.ensureAtLeast(TABBED_PANE_WIDTH);
     }
 
     /**
