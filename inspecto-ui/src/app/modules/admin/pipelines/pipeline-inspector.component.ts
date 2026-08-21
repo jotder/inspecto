@@ -106,31 +106,16 @@ import {
                 </div>
             }
 
-            <div class="mt-3 flex flex-wrap gap-2">
-                @if (!readOnly) {
+            <!-- S1: Run to here / Preview data / Connect / Delete now live in the toolbar's selection
+                 cluster — they act on the selection, and Delete rendered TWICE on screen at once. What
+                 stays here is the one verb that opens this panel's own successor surface. -->
+            @if (!readOnly) {
+                <div class="mt-3 flex flex-wrap gap-2">
                     <button mat-flat-button color="primary" type="button" (click)="configure.emit(node)">
                         <mat-icon svgIcon="heroicons_outline:cog-6-tooth"></mat-icon> Configure
                     </button>
-                }
-                @if (canRunToHere) {
-                    <button mat-stroked-button type="button" (click)="runToHere.emit(node)">
-                        <mat-icon svgIcon="heroicons_outline:play"></mat-icon> Run to here
-                    </button>
-                }
-                @if (node.type === 'sink.view') {
-                    <button mat-stroked-button type="button" (click)="previewView.emit(node)">
-                        <mat-icon svgIcon="heroicons_outline:table-cells"></mat-icon> Preview data
-                    </button>
-                }
-                @if (!readOnly) {
-                    <button mat-stroked-button type="button" (click)="connect.emit()">
-                        <mat-icon svgIcon="heroicons_outline:arrow-right"></mat-icon> Connect
-                    </button>
-                    <button mat-stroked-button type="button" (click)="deleteSelected.emit()" aria-label="Delete Step">
-                        <mat-icon svgIcon="heroicons_outline:trash"></mat-icon> Delete
-                    </button>
-                }
-            </div>
+                </div>
+            }
         } @else if (selectedEdgeId) {
             <h3 class="mb-2 text-sm font-semibold">Connection</h3>
             <mat-form-field class="w-full" subscriptSizing="dynamic">
@@ -146,17 +131,6 @@ import {
                 </mat-select>
             </mat-form-field>
             <p class="mt-1 text-xs opacity-60">The source's output this connection carries.</p>
-            @if (!readOnly) {
-                <button
-                    class="mt-3"
-                    mat-stroked-button
-                    type="button"
-                    (click)="deleteSelected.emit()"
-                    aria-label="Delete connection"
-                >
-                    <mat-icon svgIcon="heroicons_outline:trash"></mat-icon> Delete connection
-                </button>
-            }
         } @else {
             <p class="text-sm opacity-70">
                 @if (readOnly) {
@@ -183,21 +157,10 @@ export class PipelineInspectorComponent implements OnChanges {
     @Input() selectedEdgeId: string | null = null;
     @Input() selectedEdgeRel: string | null = null;
     @Input() candidateRels: string[] = [];
-    /** Business lens: hide every authoring action (Configure/Connect/Delete/relabel), keep Run to here. */
+    /** Business lens: hide every authoring action (Configure/relabel). */
     @Input() readOnly = false;
-    /**
-     * Whether the scratch run-to-here backend is actually there. `POST /pipelines/authored/{id}/run`
-     * is a mock-only contract — the route is deliberately unregistered on the real ControlApi — so the
-     * host gates the button on `environment.mockPipelines` rather than shipping one that 404s.
-     */
-    @Input() canRunToHere = false;
 
     @Output() configure = new EventEmitter<AuthoredNode>();
-    @Output() runToHere = new EventEmitter<AuthoredNode>();
-    /** `sink.view` nodes only — fetch a bounded sample of the view's `derived_sql` output. */
-    @Output() previewView = new EventEmitter<AuthoredNode>();
-    @Output() connect = new EventEmitter<void>();
-    @Output() deleteSelected = new EventEmitter<void>();
     @Output() edgeRelChange = new EventEmitter<string>();
     /**
      * The node's display name/description, edited in place (the canvas rename affordance — the ONLY

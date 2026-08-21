@@ -1592,6 +1592,70 @@ describe('PipelineEditorComponent', () => {
         await expectNoA11yViolations(fixture.nativeElement);
     });
 
+    /**
+     * S1 — the selection cluster. Slots are STABLE and disable by selection kind rather than appearing
+     * and disappearing, and the gating matrix is exactly what the inspector carried: Run to here and
+     * Preview data are READS, so they survive the Business lens; Connect and Delete do not.
+     */
+    describe('toolbar selection cluster (S1)', () => {
+        function toolbar(lens?: 'business') {
+            if (lens) TestBed.inject(LensService).selectLens(lens);
+            const fixture = TestBed.createComponent(PipelineEditorComponent);
+            fixture.componentRef.setInput('openId', 'demo');
+            const c = fixture.componentInstance;
+            c.ngOnInit();
+            (c as unknown as { canvas: unknown }).canvas = canvasMock();
+            fixture.detectChanges();
+            const btn = (label: string) =>
+                (fixture.nativeElement as HTMLElement).querySelector(`[aria-label="${label}"]`) as HTMLButtonElement;
+            return { fixture, c, btn };
+        }
+        const RUN = 'Run the pipeline to the selected Step';
+        const PREVIEW = "Preview the selected view's data";
+        const CONNECT = 'Connect the selected Step to another';
+        const DELETE = 'Delete the selected Step or edge';
+
+        it('renders all four slots, disabled while nothing is selected', () => {
+            const { btn } = toolbar();
+            for (const label of [RUN, PREVIEW, CONNECT, DELETE]) {
+                expect(btn(label), label).toBeTruthy();
+                expect(btn(label).disabled, label).toBe(true);
+            }
+        });
+
+        it('enables the node verbs on a node selection, and Preview only for a view', () => {
+            const { fixture, c, btn } = toolbar();
+            c.selectedNode.set({ id: 'flt', type: 'transform.filter' });
+            fixture.detectChanges();
+            expect(btn(RUN).disabled).toBe(false);
+            expect(btn(CONNECT).disabled).toBe(false);
+            expect(btn(DELETE).disabled).toBe(false);
+            expect(btn(PREVIEW).disabled, 'not a view').toBe(true);
+
+            c.selectedNode.set({ id: 'v', type: 'sink.view' });
+            fixture.detectChanges();
+            expect(btn(PREVIEW).disabled).toBe(false);
+        });
+
+        it('an edge selection leaves only Delete enabled', () => {
+            const { fixture, c, btn } = toolbar();
+            c.selectedEdgeId.set('src->flt:data:1');
+            fixture.detectChanges();
+            expect(btn(DELETE).disabled).toBe(false);
+            expect(btn(RUN).disabled).toBe(true);
+            expect(btn(PREVIEW).disabled).toBe(true);
+            expect(btn(CONNECT).disabled).toBe(true);
+        });
+
+        it('the Business lens keeps the two READS and drops Connect/Delete', () => {
+            const { btn } = toolbar('business');
+            expect(btn(RUN)).toBeTruthy();
+            expect(btn(PREVIEW)).toBeTruthy();
+            expect(btn(CONNECT)).toBeNull();
+            expect(btn(DELETE)).toBeNull();
+        });
+    });
+
     it('hides New/Save/delete-selected in the Business (read-only) lens', () => {
         TestBed.inject(LensService).selectLens('business');
         const fixture = TestBed.createComponent(PipelineEditorComponent);

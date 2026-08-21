@@ -191,8 +191,41 @@
                 }
             }
 
+            <!-- S1 — the selection cluster. These act ON the selection, so they read as toolbar verbs;
+                 the Properties dock holds state you edit, never buttons that dispatch elsewhere. Slots are
+                 STABLE and disable by selection kind (an edge disables everything but Delete) rather than
+                 appearing and disappearing, matching how Delete selected already behaved. -->
+            <span class="mx-1 h-5 w-px shrink-0" style="background: var(--gamma-border)" aria-hidden="true"></span>
+            @if (scratchRunAvailable) {
+                <button
+                    mat-icon-button
+                    [disabled]="!selectedNode()"
+                    (click)="openRunToHere(selectedNode()!)"
+                    matTooltip="Run to here"
+                    aria-label="Run the pipeline to the selected Step"
+                >
+                    <mat-icon svgIcon="heroicons_outline:play"></mat-icon>
+                </button>
+            }
+            <button
+                mat-icon-button
+                [disabled]="selectedNode()?.type !== 'sink.view'"
+                (click)="openViewPreview(selectedNode()!)"
+                matTooltip="Preview data"
+                aria-label="Preview the selected view's data"
+            >
+                <mat-icon svgIcon="heroicons_outline:table-cells"></mat-icon>
+            </button>
             @if (canAuthor()) {
-                <span class="mx-1 h-5 w-px shrink-0" style="background: var(--gamma-border)" aria-hidden="true"></span>
+                <button
+                    mat-icon-button
+                    [disabled]="!selectedNode()"
+                    (click)="armConnect()"
+                    matTooltip="Connect"
+                    aria-label="Connect the selected Step to another"
+                >
+                    <mat-icon svgIcon="heroicons_outline:arrow-right"></mat-icon>
+                </button>
                 <button
                     mat-icon-button
                     [disabled]="!hasSelection()"
@@ -626,12 +659,7 @@
                                     [selectedEdgeRel]="selectedEdgeRel()"
                                     [candidateRels]="candidateRels()"
                                     [readOnly]="!canAuthor()"
-                                    [canRunToHere]="scratchRunAvailable"
                                     (configure)="openNodeConfig($event)"
-                                    (runToHere)="openRunToHere($event)"
-                                    (previewView)="openViewPreview($event)"
-                                    (connect)="armConnect()"
-                                    (deleteSelected)="onDeleteKey()"
                                     (edgeRelChange)="setEdgeRel($event)"
                                     (rename)="renameSelected($event)"
                                 >

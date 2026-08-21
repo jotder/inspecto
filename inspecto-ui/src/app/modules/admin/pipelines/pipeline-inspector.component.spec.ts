@@ -53,61 +53,29 @@ describe('PipelineInspectorComponent', () => {
         );
     });
 
-    it('emits configure/runToHere/connect/deleteSelected from the node actions', () => {
-        const { fixture, c } = create({
-            node: NODE,
-            status: 'configured',
-            category: 'PARSE',
-            canRunToHere: true,
-        });
+    it('emits configure from the node actions', () => {
+        const { fixture, c } = create({ node: NODE, status: 'configured', category: 'PARSE' });
         const configure = vi.fn();
-        const runToHere = vi.fn();
-        const connect = vi.fn();
-        const del = vi.fn();
         c.configure.subscribe(configure);
-        c.runToHere.subscribe(runToHere);
-        c.connect.subscribe(connect);
-        c.deleteSelected.subscribe(del);
         const buttons = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button'));
         buttons.find((b) => b.textContent?.includes('Configure'))?.click();
-        buttons.find((b) => b.textContent?.includes('Run to here'))?.click();
-        buttons.find((b) => b.textContent?.includes('Connect'))?.click();
-        buttons.find((b) => b.getAttribute('aria-label') === 'Delete Step')?.click();
         expect(configure).toHaveBeenCalledWith(NODE);
-        expect(runToHere).toHaveBeenCalledWith(NODE);
-        expect(connect).toHaveBeenCalled();
-        expect(del).toHaveBeenCalled();
     });
 
-    it('hides Run to here unless the scratch-run backend is available (it is mock-only)', () => {
-        const { fixture } = create({ node: NODE, status: 'configured', category: 'PARSE' });
-        const runBtn = () =>
-            Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button')).find((b) =>
-                b.textContent?.includes('Run to here'),
-            );
-        expect(runBtn(), 'no button that would 404 against the real ControlApi').toBeUndefined();
-
-        fixture.componentRef.setInput('canRunToHere', true);
-        fixture.detectChanges();
-        expect(runBtn()).toBeDefined();
-    });
-
-    it('shows Preview data only for a sink.view node, and emits previewView on click', () => {
-        const viewNode: AuthoredNode = { id: 'v', type: 'sink.view', name: 'orders_view' };
-        const { fixture, c } = create({ node: viewNode, status: 'configured', category: 'SINK' });
-        const preview = vi.fn();
-        c.previewView.subscribe(preview);
-        const buttons = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button'));
-        const btn = buttons.find((b) => b.textContent?.includes('Preview data'));
-        expect(btn).toBeTruthy();
-        btn?.click();
-        expect(preview).toHaveBeenCalledWith(viewNode);
-    });
-
-    it('hides Preview data for a non-view node', () => {
-        const { fixture } = create({ node: NODE, status: 'configured', category: 'PARSE' });
-        const buttons = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button'));
-        expect(buttons.some((b) => b.textContent?.includes('Preview data'))).toBe(false);
+    /**
+     * S1 — the selection VERBS moved to the toolbar's selection cluster (they act on the selection, and
+     * Delete rendered twice on screen at once). This panel holds state you read and edit; the only button
+     * left is the one that opens its own successor surface.
+     */
+    it('carries no selection commands: Run to here / Preview data / Connect / Delete all left', () => {
+        const view: AuthoredNode = { id: 'v', type: 'sink.view', name: 'orders_view' };
+        const { fixture } = create({ node: view, status: 'configured', category: 'SINK' });
+        const el = fixture.nativeElement as HTMLElement;
+        const labels = Array.from(el.querySelectorAll('button')).map((b) => b.textContent ?? '');
+        expect(labels.some((t) => t.includes('Run to here'))).toBe(false);
+        expect(labels.some((t) => t.includes('Preview data'))).toBe(false);
+        expect(labels.some((t) => t.includes('Connect'))).toBe(false);
+        expect(el.querySelector('[aria-label="Delete Step"]')).toBeNull();
     });
 
     it('renders the edge relationship picker when an edge is selected', () => {
@@ -119,47 +87,23 @@ describe('PipelineInspectorComponent', () => {
         expect((fixture.nativeElement as HTMLElement).textContent).toContain('Connection');
     });
 
-    it('emits edgeRelChange and deleteSelected for the edge view', () => {
+    it('emits edgeRelChange for the edge view, and carries no Delete connection (S1)', () => {
         const { fixture, c } = create({
             selectedEdgeId: 'a->b:data:1',
             selectedEdgeRel: 'data',
             candidateRels: ['data', 'kept'],
         });
         const change = vi.fn();
-        const del = vi.fn();
         c.edgeRelChange.subscribe(change);
-        c.deleteSelected.subscribe(del);
-        Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button'))
-            .find((b) => b.getAttribute('aria-label') === 'Delete connection')
-            ?.click();
-        expect(del).toHaveBeenCalled();
-    });
-
-    it('readOnly hides Configure/Connect/Delete but keeps Run to here', () => {
-        // One TestBed/fixture, mutated between assertions — TestBed can only be configured once per test.
-        const { fixture, c } = create({
-            node: NODE,
-            status: 'configured',
-            category: 'PARSE',
-            readOnly: true,
-            canRunToHere: true,
-        });
-        const el = fixture.nativeElement as HTMLElement;
-        const buttons = Array.from(el.querySelectorAll('button'));
-        expect(buttons.some((b) => b.textContent?.includes('Configure'))).toBe(false);
-        expect(buttons.some((b) => b.textContent?.includes('Connect'))).toBe(false);
-        expect(el.querySelector('[aria-label="Delete node"]')).toBeNull();
-        expect(buttons.some((b) => b.textContent?.includes('Run to here'))).toBe(true);
-    });
-
-    it('readOnly hides Delete connection in the edge view', () => {
-        const { fixture } = create({
-            selectedEdgeId: 'a->b:data:1',
-            selectedEdgeRel: 'data',
-            candidateRels: ['data', 'kept'],
-            readOnly: true,
-        });
         expect(fixture.nativeElement.querySelector('[aria-label="Delete connection"]')).toBeNull();
+        c.edgeRelChange.emit('kept');
+        expect(change).toHaveBeenCalledWith('kept');
+    });
+
+    it('readOnly hides Configure', () => {
+        const { fixture } = create({ node: NODE, status: 'configured', category: 'PARSE', readOnly: true });
+        const buttons = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button'));
+        expect(buttons.some((b) => b.textContent?.includes('Configure'))).toBe(false);
     });
 
     it('renames in place: pencil opens the form seeded from the node, Save emits the trimmed values', () => {
