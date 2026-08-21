@@ -183,9 +183,15 @@ src/app/
   A parser is always FORMAT-SPECIFIC (operator, 2026-08-21) — never author the generic type.
   **Step icons:** `typeHeroIcon(type, category)` (`pipelines/pipeline-graph.ts`) is the ONE glyph
   vocabulary for palette/step-cards/insert-menu — one icon per Step TYPE, tinted by `categoryColor`
-  (the glyph identifies, the color groups); category-glyph fallback for served/unknown types. And in
-  the Pipelines editor, SELECTION opens the definition pane directly — no summary-plus-Configure
-  panel; the inspector's `compact` mode is the identity strip inside the drawer.
+  (the glyph identifies, the color groups); category-glyph fallback for served/unknown types. In the
+  Pipelines editor, selection shows a SLIM summary and **Configure** (or double-click) opens the
+  definition pane (operator call 2026-08-21 second pass — an earlier same-day selection-opens-config
+  was explicitly reversed; a pane that is ALREADY open still follows the selection). The inspector's
+  `compact` mode is the identity strip inside the drawer. Unmodelled node-config keys are edited by
+  `pipelines/pipeline-extra-config.component` — the ACTUAL key as label, a control per stored value
+  TYPE (boolean select / validated number / validated-JSON textarea / text), typed round-trip through
+  `buildConfiguredNode({extras})`, untouched entries emitted as their ORIGINAL value reference; ⛔ no
+  generic Key/Value grid, and adding keys only where the node type has no schema at all.
   ⚠ The segments editor stays HOST-side (projected via `[grammarExtras]`): segments need one schema
   `.toon` written per segment before the block that references them, which is a write path this
   component deliberately does not have. ⚠ **A host must never read a shared component through

@@ -1025,3 +1025,25 @@ Three operator asks, same day, shipped as `e0abbc15`:
   presentation). The full summary survives only where the pane cannot serve
   (`inspectorSummaryNode`): the read-only lens, and dialog-custody parse nodes — auto-popping a
   modal on selection would be obnoxious, so those keep select-then-Configure.
+
+### Second-pass corrections, same day (2026-08-21 → `5dcd1a19`)
+
+Driving the shipped result produced four refinements, one of them a reversal:
+
+- **Selection-opens-config was REVERSED by the operator** (explicit pick when asked): selection shows
+  a **slim summary** — identity · status · last run · rename; NO config rows (those render only in
+  the read-only lens, which has no pane) — and **Configure** (or double-click, or a palette add)
+  opens the definition pane. The one selection-driven open that survives is re-targeting an
+  ALREADY-open pane (the stale-drawer fix). ⚠ Do not re-generalize this without asking; it has now
+  flipped twice in one day.
+- **Dry-run lives in the "More pipeline actions" menu**, and that menu moved OUTSIDE the author gate
+  (Dry-run is a read the Business lens keeps) with the author verbs gated item-by-item.
+- **One import/export trigger**: the transfer menu grew a `[transferExtras]` content-projection slot;
+  the editor projects its two read-only exports (document · configuration bundle) into it, and the
+  standalone Export button is gone.
+- **The generic Key/Value grid is gone** — `pipeline-extra-config.component.ts` renders every
+  unmodelled key with its actual name and a TYPE-matched, validated control (boolean select ·
+  numeric · JSON textarea · text). `buildConfiguredNode` now takes `extras: Record<string, unknown>`
+  (typed), and the untouched-verbatim rule (route `branches` survives an apply byte-identical) lives
+  in the editor, which emits the ORIGINAL value reference for pristine entries. Keys are not
+  editable; adding one is offered only where the type has no schema — the schema is the vocabulary.
