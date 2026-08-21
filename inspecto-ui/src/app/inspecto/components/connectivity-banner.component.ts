@@ -55,8 +55,10 @@ import { ConnectivityService } from 'app/inspecto/api/connectivity.service';
                             <mat-progress-spinner diameter="16" mode="indeterminate" />
                             <span class="ml-2">Retrying…</span>
                         } @else {
-                            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrow-path"></mat-icon>
-                            <span class="ml-1">Retry</span>
+                            <ng-container>
+                                <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrow-path"></mat-icon>
+                                <span class="ml-1">Retry</span>
+                            </ng-container>
                         }
                     </button>
                 }

@@ -38,8 +38,10 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
                     @if (busy()) {
                         <mat-progress-spinner diameter="20" mode="indeterminate" aria-label="Signing in" />
                     } @else {
-                        <mat-icon svgIcon="heroicons_outline:lock-closed" />
-                        <span>Sign in with SSO</span>
+                        <ng-container>
+                            <mat-icon svgIcon="heroicons_outline:lock-closed" />
+                            <span>Sign in with SSO</span>
+                        </ng-container>
                     }
                 </button>
             </div>
