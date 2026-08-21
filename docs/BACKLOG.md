@@ -635,9 +635,13 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 > a screen reader read "Name / Start / Length" N times with nothing to tell the slices apart — row-
 > distinct `aria-label`s ("Field 2 start") were added 2026-08-17.
 >
-> **Two more observations, not defects:** the generic `parser` node opens the Grammar DIALOG, whose
+> **Two more observations, not defects:** ~~the generic `parser` node opens the Grammar DIALOG, whose
 > sample picker is **file-only** — the "Paste text" affordance exists only in the per-format drawer,
-> and the dialog's sample does not join the tab's sample thread. And a pipeline named with spaces
+> and the dialog's sample does not join the tab's sample thread.~~ **CLOSED 2026-08-21 (canvas-UX S5)**
+> — a generic `parser` whose config maps to a built-in frontend now opens the per-format drawer
+> (re-typed on Apply, `csv_settings` folded into the seed with `parsing:` winning, mirroring the
+> engine's mergeParsing); only bound/dangling/binary/format-less nodes keep the dialog, so the
+> dialog-local sample residue now applies only to those. And a pipeline named with spaces
 > ("Orders CSV Feed") correctly stamps `id: orders_csv_feed`, but its `path` and every `dirs.*` keep
 > the raw spaced name — a live instance of the three-disagreeing-name-rules decision still open above.
 
@@ -1489,6 +1493,12 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   though the server registers it: a spec pins that this domain gave the grammar preview to `/parsers`, and
   no UI caller needs it (a parse node opens the grammar editor, never this dialog). The old
   "Test <component>…" block is untouched and still serves a node that binds a registered component.
+  **⚠ SUPERSEDED 2026-08-21 (canvas-UX S2/D5):** `NodeConfigDialog` is DELETED — every canvas kind now
+  configures in the Properties-dock `pipeline-config-definition` pane, which carries the "Test this
+  Step" affordance forward unchanged (same TYPE gate, same `buildConfiguredNode` assembly, same
+  `sampleRows` contract; its cases re-pinned in `pipeline-config-definition.component.spec.ts`). The
+  dead `bindKind` half (picker · "New <kind>" · "Test <component>…") went with the dialog by operator
+  decision D5 — deleted with the re-home, not a drive-by.
   - ~~G1 two of three test affordances 404~~ **CLOSED** — both gated behind `environment.mockFlows`
     rather than deleted (run-to-here is a complete mock-backed feature and is literally the Step 5 UI).
     ⚠ **Retraction:** a mid-flight note here claimed `/components/*` did not exist in the backend —

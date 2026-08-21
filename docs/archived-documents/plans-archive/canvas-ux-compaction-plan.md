@@ -1,6 +1,7 @@
 # Canvas UX compaction plan — the pipeline editor from the builder's chair
 
-**Status: APPROVED 2026-08-21 — D1–D9 all answered YES (§4). S0 SHIPPED (`68ac459a`).**
+**Status: COMPLETE 2026-08-21 — S0–S6 ALL SHIPPED; archived. As-built:
+`docs/okf/frontend/features/pipelines.md` §"The canvas-UX compaction".**
 **One amendment to the recommendations: D3 — `enrichment` moves in the SAME pass as wave 1
 (operator chose "all kinds in one pass"), not after it.**
 **Written 2026-08-21**, from (a) a full read of the editor stack and (b) driving the running UI

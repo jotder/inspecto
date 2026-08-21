@@ -273,10 +273,10 @@ describe('GrammarEditorComponent', () => {
             (e as HTMLElement).textContent?.trim(),
         );
         expect(labels).toHaveLength(4);
-        expect(labels[0]).toContain('Dialect / parsing');
-        expect(labels[1]).toContain('Types & columns');
-        expect(labels[2]).toContain('Robustness / error handling');
-        expect(labels[3]).toContain('Files & metadata');
+        expect(labels[0]).toContain('Dialect');
+        expect(labels[1]).toContain('Column Types');
+        expect(labels[2]).toContain('Robustness');
+        expect(labels[3]).toContain('Files & MetaData');
     });
 
     it('renders the xlsx spec set as 4 tabs, files anchored despite carrying no xlsx option', () => {
@@ -290,11 +290,53 @@ describe('GrammarEditorComponent', () => {
         expect(labels).toHaveLength(4);
         expect(labels[0]).toContain('Sheet & range');
         expect(labels[1]).toContain('Types & columns');
-        expect(labels[2]).toContain('Robustness / error handling');
-        expect(labels[3]).toContain('Files & metadata');
+        expect(labels[2]).toContain('Robustness');
+        expect(labels[3]).toContain('Files & MetaData');
         // The seeded sheet survives value() from tab 1 (the R9 mounted-panels rule, xlsx edition).
         const xlsx = fixture.componentInstance.value()['xlsx'] as Record<string, unknown>;
         expect(xlsx['sheet']).toBe('Data');
+    });
+
+    /**
+     * S4 — the derived schema lands on the Types tab, which on a tabbed format is not the tab the
+     * operator is looking at. `showTab` is how the host reveals it, and it must be a NO-OP for an
+     * untabbed format so a host may ask without first knowing which formats are tabbed.
+     */
+    it('showTab steers a tabbed set by id, and ignores an unknown one', () => {
+        const c = create({ frontend: 'delimited' }).componentInstance;
+        expect(c.tabbed).toBe(true);
+        c.showTab('types');
+        expect(c.activeTab()).toBe(1);
+        c.showTab('nope');
+        expect(c.activeTab()).toBe(1); // an unknown id changes nothing
+    });
+
+    /** ⚠ One TestBed per test, so the untabbed arm is its own case. */
+    it('showTab is a no-op for an untabbed format', () => {
+        const c = create({ frontend: 'text_regex' }).componentInstance;
+        expect(c.tabbed).toBe(false);
+        c.showTab('types');
+        expect(c.activeTab()).toBe(0);
+    });
+
+    /**
+     * S4 — with a host-owned sample the host renders the parse verb beside the sample chips, so the
+     * editor must not render a SECOND one. The `own` arm keeps it: there would otherwise be no way to
+     * parse at all.
+     */
+    it('hides its own Test parse button when the host owns the sample', () => {
+        const fixture = create({ frontend: 'delimited' });
+        // ⚠ Assert the BUTTON, not the page text: a hint elsewhere in the pane names Test parse too,
+        // so a textContent check passes while the duplicate button is still on screen.
+        const button = () =>
+            Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button')).find(
+                (b) => b.textContent?.trim() === 'Test parse',
+            );
+        expect(button()).toBeTruthy();
+
+        fixture.componentRef.setInput('sampleMode', 'host');
+        fixture.detectChanges();
+        expect(button()).toBeUndefined();
     });
 
     it('renders an untabbed spec set (text_regex) flat, exactly as before', () => {
@@ -375,6 +417,17 @@ describe('GrammarEditorComponent', () => {
 
         const delimited = fixture.componentInstance.value()['delimited'] as Record<string, unknown>;
         expect(delimited['null_strings']).toEqual(['NULL', 'N/A']);
+    });
+
+    /** S6: each tab header carries its own accessible NAME — they surfaced unnamed beside their
+     *  badge spans in the accessibility tree (plan §1.5). */
+    it('names every tab header for assistive tech', () => {
+        const fixture = create({ frontend: 'delimited' });
+        const names = Array.from(fixture.nativeElement.querySelectorAll('[role="tab"]')).map((t) =>
+            ((t as HTMLElement).getAttribute('aria-label') ?? '').trim(),
+        );
+        expect(names).toHaveLength(4);
+        for (const n of names) expect(n.length).toBeGreaterThan(0);
     });
 
     it('has no a11y violations on the tabbed surface', async () => {

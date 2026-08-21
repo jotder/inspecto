@@ -75,6 +75,16 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- ~~`superpower/canvas-ux-compaction-plan.md`~~ — **COMPLETE and ARCHIVED 2026-08-21**
+  (`archived-documents/plans-archive/canvas-ux-compaction-plan.md`). S0–S6 all shipped the same day
+  the operator answered D1–D9: the maximize-clipped-Apply P0 fixed as an overlay; the selection
+  commands consolidated onto the toolbar; `NodeConfigDialog` retired (every canvas kind, enrichment
+  included, configures in the Properties dock); selection/config converge; the parse loop reads as
+  parse → see schema → edit → re-derive; and the generic `parser` migrates to the per-format drawer
+  (grounded against the engine's `csv_settings`/`parsing:` merge first) — a parser is always
+  format-specific by operator directive, the demo seed included. As-built:
+  [`okf/frontend/features/pipelines.md`](okf/frontend/features/pipelines.md).
+
 - ~~`superpower/multiformat-parser-lanes-plan.md`~~ — **COMPLETE and ARCHIVED 2026-08-20**
   ([archive copy](archived-documents/plans-archive/multiformat-parser-lanes-plan.md)). Excel joins
   the parser family end to end (new `frontend: xlsx` on DuckDB `read_xlsx`; the `excel` extension

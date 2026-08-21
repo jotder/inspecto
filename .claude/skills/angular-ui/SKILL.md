@@ -115,7 +115,7 @@ src/app/
   `aria-pressed`/keyboard).
 - **Authoring an enrichment → `<inspecto-enrichment-editor>`** (`inspecto/enrichment/`, W4b 2026-08-01).
   ONE shared references+transform editor for the companion `*_enrich.toon`; adopters: the Onboarding
-  Enrichment stage and the Pipelines `enrichment` node dialog — never fork it. Hosts own everything
+  Enrichment stage and the Pipelines `enrichment` config pane (drawer since canvas-UX S2) — never fork it. Hosts own everything
   around it (reference options, derived-or-asked wiring via `ENRICHMENT_WIRING_ATTRIBUTES`, preview,
   save). ⚠ The save is always `POST /config/write type=enrichment` **then** `POST /enrichment`
   (register — no mtime hot-reload), NEVER a `*_job.toon` enrich job: the registered path is a
@@ -126,14 +126,14 @@ src/app/
   refused, not overwritten. ⚠ **The derived half is `enrichmentWiringDefaults`**
   (`inspecto/enrichment/enrichment-wiring.ts`, P6-c 2026-08-16) — input = the pipeline's Stage-1 output,
   output = `<base>/data/enriched/<name>`, trigger = `on_pipeline`. Both hosts derive through it (the
-  Onboarding stage silently, the node dialog as the seed of its asked form); never re-state the
+  Onboarding stage silently, the config pane as the seed of its asked form); never re-state the
   convention in a host. A host passes only facts it resolved itself, and passes **nothing** when the
   fact is ambiguous — a blank required field is honest, an invented store path reads zero rows and looks
   like it worked. A seed is **one-shot**: re-deriving it while the author edits clobbers the form.
 - **Asking where files come from → `<inspecto-collector-config>`** (`inspecto/collector/`, 2026-08-04).
   ONE shared surface for the `collector:` block: the local-inbox/Connection toggle, the schema form over
   the shared `COLLECTOR_ATTRIBUTES`, Test connection, create-a-Connection in place, and the derived
-  connector. Adopters: Onboarding's Collection stage and the Pipelines `acquisition` node dialog —
+  connector. Adopters: Onboarding's Collection stage and the Pipelines `acquisition` Collector pane —
   never fork it. Like the enrichment editor it has **no write path** — hosts read `value()`/`resolveConnector()`
   and save through their own route, because the two persisted shapes genuinely differ (a `collector:`
   block vs. a node's raw config plus a `use: connection/<id>` binding). ⚠ **Never ask for `connector`** —
@@ -142,14 +142,14 @@ src/app/
   profile named by `collector.connection`, without checking the two agree. ⚠ A host that swaps the spec
   list at runtime must carry the live values across the swap: reassigning `<inspecto-schema-form>`'s
   `specs` rebuilds every control from its declared default (the mode toggle silently wiped the form
-  until this component started re-seeding). ⚠ On the node dialog the way to UN-bind a Connection is the
+  until this component started re-seeding). ⚠ On the Collector pane the way to UN-bind a Connection is the
   **mode toggle**, not blanking the text — an empty picker while still in Connection mode is a refusal,
   because a non-local collector with no Connection is the state that used to fail at run time.
 - **Authoring how raw bytes become rows → `<inspecto-grammar-editor>`** (`inspecto/grammar/`, 2026-08-04).
   ONE surface for a **Grammar**: the built-in + served-plugin format catalog, the schema form over
   `parsingAttributesFor()`/the served `grammarSchema`, sample + sniff suggestion, Test parse, the
-  table/tree result, and the fixed-width slice table. Adopters: Onboarding's Parsing stage and the
-  Pipelines parse node dialog. **No write path** — hosts persist, because one writes a `parsing:` block
+  table/tree result, and the fixed-width slice table. Adopters: Onboarding's Parsing stage, the
+  Pipelines per-format Parse pane, and the custody-only Grammar dialog (bound/dangling/binary nodes). **No write path** — hosts persist, because one writes a `parsing:` block
   into a pipeline config and the other writes a reusable `grammar` component. ⚠ **Vocabulary is
   binding**: this authors a *Grammar*; ⛔ never "parser config"/"parse options" in UI copy
   (`GLOSSARY.md:272`). *Parser* = the engine that applies a Grammar; different concept.
@@ -171,6 +171,16 @@ src/app/
   are LISTED, never applied. The columns table (`inspecto/schema/`) is ordered ①include ②# ③icon-only
   type menu ④name ⑤synonym (unique across synonyms ∪ names), with `[autoTypes]` disabling the menu in
   Auto mode.
+  **Since 2026-08-21 (canvas-UX S4/S5):** the parse loop is host-legible — with `sampleMode: 'host'`
+  the editor HIDES its own Test parse button (the host renders **Parse sample** in the shared
+  `<inspecto-sample-panel>`'s chip row via its `parseLabel`/`(parse)` inputs, beside the state it
+  changes); `showTab(id)` steers a tabbed set (no-op untabbed — the host reveals `'types'` on the
+  FIRST derivation only, never on re-parses); a host mounting a tabbed pane in a dock calls the
+  split handle's `ensureAtLeast(420)` (transient — never persists over the stored width). And the
+  ONE remaining dialog host is custody-only: a generic `parser` whose config maps to a built-in
+  frontend opens the per-format drawer pane instead, re-typed to `parser.<frontend>` on Apply with
+  `csv_settings` folded into the seed (`parsing:` wins — the engine's own mergeParsing precedence).
+  A parser is always FORMAT-SPECIFIC (operator, 2026-08-21) — never author the generic type.
   ⚠ The segments editor stays HOST-side (projected via `[grammarExtras]`): segments need one schema
   `.toon` written per segment before the block that references them, which is a write path this
   component deliberately does not have. ⚠ **A host must never read a shared component through
@@ -355,7 +365,7 @@ src/app/
   calling `chrome.toggleMaximize()` / reading `chrome.maximized()`; maximize reuses the `.dialog-fullscreen`
   panel class. Never re-roll a per-dialog fullscreen toggle (the grammar dialog's local one was the extraction
   source). ⚠ Don't put an inline `[style.maxHeight]` on `mat-dialog-content` in an adopting dialog — the inline
-  style beats the sized/maximized CSS and pins the scrollbar back. Adopters: all 7 Pipelines dialogs.
+  style beats the sized/maximized CSS and pins the scrollbar back. Adopters: the surviving Pipelines dialogs (canvas-UX S2 retired NodeConfigDialog — canvas node config lives in the Properties-dock definition drawer, NOT a dialog; do not add a new per-node config popup).
 - **Resizable panes → `[inspectoSplit]`** (`inspecto/components/split.directive.ts`, R7): put it on the
   separator div between two panes (`inspectoSplit="<stateKey>"`, `#h="inspectoSplit"`, min/max/
   defaultWidth, `pane="right"` when the controlled pane sits right of the handle) and bind the pane's

@@ -944,3 +944,64 @@ all, and says nothing about why.
 branch sink itself, supplying by hand the one thing the editor never supplied. **A round-trip test that
 configures the artifact under test is not a test of the surface that creates it.** The replacement omits
 the manual step and was probe-verified to fail against the old reducer.
+
+## The canvas-UX compaction: one drawer, one toolbar, a legible parse loop (2026-08-21)
+
+The full plan and its D1–D9 operator decisions:
+`archived-documents/plans-archive/canvas-ux-compaction-plan.md`. What shipped, as built:
+
+**Commands moved to the toolbar; the Properties dock holds properties (S1).** The toolbar carries a
+STABLE selection cluster — Run to here · Preview data · Connect · Delete — whose slots disable by
+selection kind (an edge leaves only Delete) rather than appearing and disappearing. The gating matrix
+is the one the inspector carried: Run to here and Preview data are READS and live outside
+`canAuthor()` (the Business lens keeps them); Connect and Delete live inside it. The inspector keeps
+only Configure and the rename pencil; the edge branch's "Delete connection" is gone too (the toolbar
+Delete covers edges). Before this, Delete rendered twice on screen at once.
+
+**`NodeConfigDialog` is deleted (S2, D2/D3/D5).** Every canvas kind — filter, route, join, summarize,
+record dedup, the sinks, gap detection, plugins, and `enrichment` with its companion write+register —
+configures in the right-dock definition drawer via `pipeline-config-definition.component.ts`. The
+pane asks NO Name/Description (identity is the inspector rename, principle 5 — the Collector and Load
+panes were unified the same day), and ⚠ all three panes pass the node's own `name`/`description`
+through their build explicitly: the node is rebuilt from scratch, so omitting them DELETED the name
+on every apply. The dialog's dead `bindKind` half (picker · "New <kind>" · "Test <component>…") went
+with it (D5 — `bindKindFor` only answers for PARSE, which never reached the dialog); its "Test this
+Step" inline preview and the pinned config-key-list touchpoint moved to the pane's spec.
+
+**Selection and configuration converge (S3, D4).** Palette add opens the new Step's pane (the parity
+the Recipe insert always had); selecting an UNCONFIGURED Step opens its pane; a CLEAN open pane
+re-targets to the newly selected Step (it used to silently keep showing the previous node — the
+template prefers `definitionNode()` over `selectedNode()`); a DIRTY pane keeps the destructive
+confirm. ⚠ Clicking a CONFIGURED Step with the drawer closed still shows only the summary — S3 must
+not take the read view away.
+
+**The parse loop (S4, D6/D7).** `Parse sample` lives in the sample strip (`<inspecto-sample-panel>`
+grew `parseLabel`/`parseDisabled`/`(parse)`); the FIRST derivation steers the editor to the Types &
+columns tab (`GrammarEditorComponent.showTab`, no-op for untabbed formats; re-parses never move the
+tab); **Re-derive from this sample** appears beside the drift line for a hydrated schema, confirms
+destructively naming the loss (names, types, synonyms, column metadata), and is implemented as
+"clear `schemaHydrated` and re-run the parse" so `onPreviewed`'s derive branch stays the one
+derivation. Opening a parse pane transiently widens the dock to 420px
+(`InspectoSplitDirective.ensureAtLeast` — never persisted, a wider stored width wins).
+
+**The generic parser migrates on edit; the demo is specific from birth (S5, D8).** Grounded first:
+the engine merges `csv_settings` and `parsing:` into one map (`PipelineConfigParser.mergeParsing`,
+`parsing:` wins), the editable lift carries both spellings verbatim, and a lowered parsing-only
+config keeps its dialect. So `isDrawerParse` admits a generic `parser` whose config maps to a
+built-in frontend; `definitionDraft` presents it re-typed to `parser.<frontend>` with `csv_settings`
+folded into the seed under the engine's own precedence and then dropped — Apply converges the node on
+the specific type (B6 through ordinary editing). Fail-closed to the dialog: any `use:`, an unserved
+frontend, binary fixed-width, and a config-less placeholder (the palette parse-slot rule types
+those). **Operator directive (2026-08-21): a parser is always format-specific — never author the
+generic type.** The mock demo obeys from birth: `cdr_ingest` seeds its dialect in the unified
+`parsing:` block (lifting typed `parser.delimited`) plus its `cdr_ingest_schema` companion, so the
+load-for-edit half of the loop is demonstrable offline; `MOCK_STORE_KEY` → v23. The three
+`spaces/demo` TOONs still spelling `csv_settings` converge the first time anyone Applies them.
+
+**The maximize-overlay rule (S0, D9)** and its preview-verification method (hit-test the button,
+dirty the form first) are recorded in the `angular-ui` skill — a maximized dock overlays the body row
+absolutely; `width:100%` beside still-mounted `shrink-0` siblings clips its own footer.
+
+Deliberately unchanged (§6 of the plan): the Recipe view's row verbs, Topology mode, the edge
+relationship picker (it IS properties), the recorded parse-dialog refusals, and Apply staying an
+in-memory patch (D2).

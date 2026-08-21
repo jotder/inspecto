@@ -77,7 +77,11 @@
              (the R9 [hidden]-wrap rule: schema-form ViewChilds must survive, never @if/@case). -->
         <mat-tab-group [selectedIndex]="activeTab()" (selectedIndexChange)="activeTab.set($event)">
             @for (t of ts; track t.id; let i = $index) {
-                <mat-tab>
+                <!-- S6 a11y: `label` gives the MatTab an accessible name of its own — with only the
+                     ng-template, the tab surfaced in the accessibility tree as an unnamed control
+                     beside its badge spans (found driving the pane; plan §1.5). The template still
+                     renders the visible label + badges. -->
+                <mat-tab [aria-label]="t.label">
                     <ng-template mat-tab-label>
                         <span>{{ t.label }}</span>
                         @if (tabBadges()[i]; as b) {
