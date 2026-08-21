@@ -181,6 +181,11 @@ src/app/
   frontend opens the per-format drawer pane instead, re-typed to `parser.<frontend>` on Apply with
   `csv_settings` folded into the seed (`parsing:` wins — the engine's own mergeParsing precedence).
   A parser is always FORMAT-SPECIFIC (operator, 2026-08-21) — never author the generic type.
+  **Step icons:** `typeHeroIcon(type, category)` (`pipelines/pipeline-graph.ts`) is the ONE glyph
+  vocabulary for palette/step-cards/insert-menu — one icon per Step TYPE, tinted by `categoryColor`
+  (the glyph identifies, the color groups); category-glyph fallback for served/unknown types. And in
+  the Pipelines editor, SELECTION opens the definition pane directly — no summary-plus-Configure
+  panel; the inspector's `compact` mode is the identity strip inside the drawer.
   ⚠ The segments editor stays HOST-side (projected via `[grammarExtras]`): segments need one schema
   `.toon` written per segment before the block that references them, which is a write path this
   component deliberately does not have. ⚠ **A host must never read a shared component through

@@ -1005,3 +1005,23 @@ absolutely; `width:100%` beside still-mounted `shrink-0` siblings clips its own 
 Deliberately unchanged (§6 of the plan): the Recipe view's row verbs, Topology mode, the edge
 relationship picker (it IS properties), the recorded parse-dialog refusals, and Apply staying an
 in-memory patch (D2).
+
+### Follow-on: per-Step glyphs, the beaker, and selection-is-configuration (2026-08-21)
+
+Three operator asks, same day, shipped as `e0abbc15`:
+
+- **One glyph per Step type** — `typeHeroIcon(type, category)` (`pipeline-graph.ts`) is the single
+  icon vocabulary for the palette, the Recipe step cards and the Recipe insert menu. The glyph
+  identifies the Step; the **category is the color** (`categoryColor` tint, matching the group
+  header's dot). Unknown/plugin-served types fall back to `paletteHeroIcon(category)` so a new
+  served type is never blank. ⛔ Never give two palette items one glyph again — that is the state
+  this replaced.
+- **Dry-run is a `beaker`** — it shared `play` with the selection cluster's Run to here, two
+  identical icons on one toolbar.
+- **Selecting a Step opens its config pane directly.** The summary-panel-with-a-Configure-button is
+  gone; the pane IS the properties view. The identity strip (status chip · last run · description ·
+  rename pencil) renders as the inspector's `compact` mode INSIDE the drawer above the pane, and
+  `renameSelected` patches the open draft too (the draft's type may be the S5 re-typed
+  presentation). The full summary survives only where the pane cannot serve
+  (`inspectorSummaryNode`): the read-only lens, and dialog-custody parse nodes — auto-popping a
+  modal on selection would be obnoxious, so those keep select-then-Configure.
