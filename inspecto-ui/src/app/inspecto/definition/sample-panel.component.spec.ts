@@ -84,9 +84,9 @@ describe('InspectoSamplePanelComponent', () => {
             fixture.detectChanges();
             const parsed = vi.fn();
             fixture.componentInstance.parse.subscribe(parsed);
-            const btn = Array.from(
-                (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
-            ).find((b) => b.textContent?.includes('Parse sample'));
+            const btn = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button')).find((b) =>
+                b.textContent?.includes('Parse sample'),
+            );
             expect(btn).toBeTruthy();
             btn!.click();
             expect(parsed).toHaveBeenCalled();
@@ -98,9 +98,9 @@ describe('InspectoSamplePanelComponent', () => {
             fixture.componentRef.setInput('parseLabel', 'Parse sample');
             fixture.componentRef.setInput('parseDisabled', true);
             fixture.detectChanges();
-            const btn = Array.from(
-                (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
-            ).find((b) => b.textContent?.includes('Parse sample')) as HTMLButtonElement;
+            const btn = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button')).find((b) =>
+                b.textContent?.includes('Parse sample'),
+            ) as HTMLButtonElement;
             expect(btn.disabled).toBe(true);
         });
     });

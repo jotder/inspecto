@@ -56,7 +56,7 @@ import { DefinitionDrawerComponent } from 'app/inspecto/components/definition-dr
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoSplitDirective } from 'app/inspecto/components/split.directive';
 import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
-import { grammarContentAsParsingBlock } from 'app/inspecto/grammar';
+import { grammarContentAsParsingBlock, nonDelimitedGrammarBlock } from 'app/inspecto/grammar';
 import { TransferMenuComponent } from 'app/inspecto/transfer';
 import { StreamTransferService } from 'app/inspecto/transfer/stream-transfer.service';
 import { G6GraphData } from 'app/modules/admin/catalog/catalog-graph';
@@ -1639,10 +1639,43 @@ export class PipelineEditorComponent implements OnInit {
      * </ul>
      */
     private isDrawerParse(node: AuthoredNode): boolean {
-        if (!(node.type in PARSE_NODE_FRONTENDS)) return false;
+        const effectiveType = node.type === 'parser' ? this.retypedParserType(node) : node.type;
+        if (!effectiveType || !(effectiveType in PARSE_NODE_FRONTENDS)) return false;
         if (this.isBinaryFixedWidth(node)) return false;
         const id = this.boundGrammarId(node);
         return id === null || this.grammarTemplates().some((t) => t.name === id);
+    }
+
+    /**
+     * S5/D8 — the per-format type a legacy generic `parser` node's own config maps to, or `null` for
+     * the dialog. The shipped example pipeline carries this node, so most users' first contact with
+     * "configure a parse Step" was the one surface with none of the parse loop on it.
+     *
+     * <p>Grounded (2026-08-21) before this migration was allowed: the engine merges the legacy
+     * `csv_settings` map and the unified `parsing:` block into ONE map before building the delimited
+     * grammar (`PipelineConfigParser.mergeParsing` — `parsing:` keys win), the editable lift carries
+     * both spellings verbatim, and a lowered node whose config holds only `parsing.delimited.*` keeps
+     * its dialect on the next read. So converging on the unified spelling loses nothing — but the seed
+     * MUST fold `csv_settings` in ({@link definitionDraft}), or the drawer shows defaults over the
+     * node's real dialect, masked whenever the real delimiter happens to equal the default.
+     *
+     * <p>Refusals (fail closed to the dialog): a node with any `use:` (bound or dangling — custody /
+     * nothing faithful to copy), and a config whose normalized frontend is not a built-in the drawer
+     * serves. A config-less placeholder maps to nothing and keeps the dialog too — the palette's
+     * parse-slot rule is the intended way to give it a format.
+     */
+    private retypedParserType(node: AuthoredNode): string | null {
+        if (node.use) return null;
+        const cfg = node.config ?? {};
+        const parsing = cfg['parsing'];
+        if (parsing && typeof parsing === 'object' && !Array.isArray(parsing)) {
+            const block = grammarContentAsParsingBlock(parsing as Record<string, unknown>);
+            const nonDelimited = nonDelimitedGrammarBlock(block);
+            const frontend = nonDelimited === null ? 'delimited' : nonDelimited;
+            return `parser.${frontend}` in PARSE_NODE_FRONTENDS ? `parser.${frontend}` : null;
+        }
+        const csv = cfg['csv_settings'];
+        return csv && typeof csv === 'object' && !Array.isArray(csv) ? 'parser.delimited' : null;
     }
 
     /**
@@ -1674,6 +1707,26 @@ export class PipelineEditorComponent implements OnInit {
      * The `use:` itself is dropped by the pane on submit, so only one place decides that.
      */
     private definitionDraft(node: AuthoredNode): AuthoredNode {
+        // S5: a legacy generic `parser` node is presented as its per-format subtype, seeded from
+        // whichever spelling the file used — `parsing:` keys win over `csv_settings`, mirroring the
+        // engine's own mergeParsing precedence. The legacy map is folded in and DROPPED from the
+        // draft: the model is untouched until Apply, and an applied node whose config carries only
+        // the unified block round-trips fully (grounded — see retypedParserType). This is B6's
+        // convergence through ordinary editing: Apply re-types the node to `parser.<frontend>`.
+        if (node.type === 'parser') {
+            const retyped = this.retypedParserType(node);
+            if (!retyped) return node; // isDrawerParse already kept it off the drawer
+            const { csv_settings: legacyCsv, parsing: storedParsing, ...cfg } = node.config ?? {};
+            const stored = grammarContentAsParsingBlock((storedParsing as Record<string, unknown>) ?? {});
+            const legacy = (legacyCsv as Record<string, unknown>) ?? {};
+            const delimited = { ...legacy, ...((stored['delimited'] as Record<string, unknown>) ?? {}) };
+            const parsing: Record<string, unknown> = {
+                frontend: retyped.slice('parser.'.length),
+                ...stored,
+                ...(Object.keys(delimited).length ? { delimited } : {}),
+            };
+            return { ...node, type: retyped, config: { ...cfg, parsing } };
+        }
         const id = this.boundGrammarId(node);
         if (id === null) return node;
         const component = this.grammarTemplates().find((t) => t.name === id);

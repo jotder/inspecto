@@ -41,7 +41,7 @@ type StoreData = Record<string, SpaceData>; // space → collections
 // v22: the cdr_ingest seed's SQL predicate moved from `include_regex` (a pre-parse regex list, which
 // could never evaluate it) to `csv_settings.where`. A persisted v21 store would keep the wrong-vocabulary
 // value — the exact confusion D7 documents — on the Filter node the lift now surfaces it on.
-export const MOCK_STORE_KEY = 'inspecto.mock.v22'; // v20: pattern-pack component seeds (v19: case rule + flat impact attrs)
+export const MOCK_STORE_KEY = 'inspecto.mock.v23'; // v23: cdr_ingest parses via the unified parsing: block + its schema companion (v22: registry datasets)
 
 export class MockStore {
     private data: StoreData = {};

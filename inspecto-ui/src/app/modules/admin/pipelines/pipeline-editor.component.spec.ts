@@ -873,7 +873,9 @@ describe('PipelineEditorComponent', () => {
         /** ⚠ Since S3 the ONLY parse node left on the dialog is the plain `parser` type — it has no
          *  drawer pane yet (that is P3d's slice, which then retires the dialog entirely). A bound
          *  `parser.delimited` no longer belongs here; it has its own migration case above. */
-        it('keeps the dialog for the plain parser type', () => {
+        /** A config-less/format-less generic parser maps to nothing — the palette's parse-slot rule
+         *  is the intended way to give it a format, so it keeps the dialog (S5's fail-closed arm). */
+        it('keeps the dialog for a plain parser carrying no parse config', () => {
             const c = make();
             c.select('demo');
             dialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
@@ -882,6 +884,103 @@ describe('PipelineEditorComponent', () => {
             c.openNodeConfig(plain);
             expect(dialog.open).toHaveBeenCalledTimes(1);
             expect(c.definitionNode()).toBeNull();
+        });
+
+        /**
+         * S5/D8 — the legacy generic `parser` joins the drawer when its own config maps to a built-in
+         * frontend. Grounded first: the engine merges `csv_settings` and `parsing:` into one map
+         * (`parsing:` wins), and a lowered parsing-only config keeps its dialect — so the seed folds
+         * the legacy map in and the draft converges on the unified spelling.
+         */
+        describe('legacy generic parser → drawer (S5)', () => {
+            it('routes a csv_settings parser to the drawer, re-typed and seeded from the legacy map', () => {
+                const c = make();
+                c.select('demo');
+                const node = {
+                    id: 'parse',
+                    type: 'parser',
+                    config: {
+                        csv_settings: { delimiter: '|', has_header: true },
+                        schema_file: 'demo_schema.toon',
+                    },
+                };
+                c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, node] }));
+                c.openNodeConfig(node);
+                expect(dialog.open).not.toHaveBeenCalled();
+                const draft = c.definitionNode()!;
+                expect(draft.type).toBe('parser.delimited');
+                const parsing = draft.config!['parsing'] as Record<string, unknown>;
+                expect(parsing['frontend']).toBe('delimited');
+                expect(parsing['delimited']).toEqual({ delimiter: '|', has_header: true });
+                // The legacy spelling is folded in and dropped from the draft — the applied node
+                // carries only the unified block, which round-trips fully (grounded).
+                expect(draft.config!['csv_settings']).toBeUndefined();
+                expect(draft.config!['schema_file']).toBe('demo_schema.toon'); // untouched
+                // ⚠ The MODEL is untouched until Apply — the draft is presentation only.
+                expect(c.model()!.nodes.find((n) => n.id === 'parse')!.type).toBe('parser');
+            });
+
+            it('the parsing block wins over csv_settings, mirroring the engine precedence', () => {
+                const c = make();
+                c.select('demo');
+                const node = {
+                    id: 'parse',
+                    type: 'parser',
+                    config: {
+                        csv_settings: { delimiter: ',', has_header: false },
+                        parsing: { frontend: 'delimited', delimited: { delimiter: ';' } },
+                    },
+                };
+                c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, node] }));
+                c.openNodeConfig(node);
+                const parsing = c.definitionNode()!.config!['parsing'] as Record<string, unknown>;
+                expect(parsing['delimited']).toEqual({ delimiter: ';', has_header: false });
+            });
+
+            it('routes a parsing.frontend=json parser to the drawer as parser.json', () => {
+                const c = make();
+                c.select('demo');
+                const node = {
+                    id: 'parse',
+                    type: 'parser',
+                    config: { parsing: { frontend: 'json', json: { format: 'newline' } } },
+                };
+                c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, node] }));
+                c.openNodeConfig(node);
+                expect(dialog.open).not.toHaveBeenCalled();
+                expect(c.definitionNode()!.type).toBe('parser.json');
+            });
+
+            it('a BOUND generic parser keeps the dialog — component custody', () => {
+                const c = make();
+                c.select('demo');
+                dialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
+                const node = {
+                    id: 'parse',
+                    type: 'parser',
+                    use: 'grammar/cdr_csv',
+                    config: { csv_settings: { delimiter: ',' } },
+                };
+                c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, node] }));
+                c.openNodeConfig(node);
+                expect(dialog.open).toHaveBeenCalledTimes(1);
+                expect(c.definitionNode()).toBeNull();
+            });
+
+            it('a BINARY fixed-width generic parser keeps the dialog (P3b)', () => {
+                const c = make();
+                c.select('demo');
+                dialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
+                const node = {
+                    id: 'parse',
+                    type: 'parser',
+                    config: { parsing: { frontend: 'fixedwidth', fixedwidth: { record: 'bytes' } } },
+                };
+                c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, node] }));
+                c.openNodeConfig(node);
+                expect(dialog.open).toHaveBeenCalledTimes(1);
+                expect(c.definitionNode()).toBeNull();
+            });
         });
 
         /**

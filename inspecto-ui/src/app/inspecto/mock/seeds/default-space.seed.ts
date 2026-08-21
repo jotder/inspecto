@@ -1,6 +1,11 @@
 import type { AuthoredPipeline } from '../../api/pipelines.service';
 import { PIPELINES_COLL } from '../handlers/pipelines.handler';
-import { PIPELINE_CONFIGS_COLL, type StoredPipelineConfig } from '../handlers/onboarding.handler';
+import {
+    PIPELINE_CONFIGS_COLL,
+    SCHEMA_CONFIGS_COLL,
+    type StoredPipelineConfig,
+    type StoredSchemaConfig,
+} from '../handlers/onboarding.handler';
 import { MockStore } from '../mock-store';
 import { seedOperations } from './operations.seed';
 import { seedFormatExamplePipelines } from './format-examples.seed';
@@ -518,9 +523,15 @@ export function seedDefaultSpace(store: MockStore, space: string): void {
             // A SQL predicate belongs in `where` (post-parse, over the mapped columns), NOT in
             // `include_regex` — those are regexp_matches() patterns over ONE raw pre-parse column, so
             // this expression matched nothing there. Corrected with D7, 2026-08-03.
-            csv_settings: { delimiter: ',', has_header: true, where: "msisdn NOT LIKE '0000%'" },
+            //
+            // S5 (operator, 2026-08-21): a parser is always FORMAT-SPECIFIC — the dialect lives in the
+            // unified `parsing:` block, so the node lifts typed `parser.delimited` rather than the
+            // generic `parser` the drawer must first migrate. `where` stays the row filter's flat home
+            // (it lifts to the Filter node either way).
+            csv_settings: { where: "msisdn NOT LIKE '0000%'" },
             schema_file: 'cdr_ingest_schema.toon',
         },
+        parsing: { frontend: 'delimited', delimited: { delimiter: ',', has_header: true } },
     };
     store.put(space, PIPELINE_CONFIGS_COLL, 'cdr_ingest', {
         id: 'cdr_ingest',
@@ -528,6 +539,28 @@ export function seedDefaultSpace(store: MockStore, space: string): void {
         config: cdrIngestConfig,
         registered: true,
     } satisfies StoredPipelineConfig);
+
+    // The node names `cdr_ingest_schema.toon`, so the companion must EXIST or the demo's saved-schema
+    // half (load → edit → re-derive, the operator's case 2) can never be demonstrated offline — the
+    // pane's read 404s and honestly derives from the next parse instead. Columns match the CSV the
+    // dialect above parses; the Row filter's `msisdn` is among them by construction.
+    store.put(space, SCHEMA_CONFIGS_COLL, 'cdr_ingest_schema', {
+        id: 'cdr_ingest_schema',
+        path: 'cdr_ingest_schema.toon',
+        config: {
+            raw: {
+                name: 'cdr_ingest_schema',
+                format: 'CSV',
+                types: 'declared',
+                fields: [
+                    { name: 'MSISDN', selector: 'msisdn', type: 'VARCHAR' },
+                    { name: 'IMSI', selector: 'imsi', type: 'VARCHAR' },
+                    { name: 'CALL_START', selector: 'call_start', type: 'TIMESTAMP' },
+                    { name: 'DURATION_S', selector: 'duration_s', type: 'BIGINT' },
+                ],
+            },
+        },
+    } satisfies StoredSchemaConfig);
 
     // ── Pipeline case-study pack CS1–CS5 (docs/superpower/pipeline-case-studies.md):
     //    five boundary-pushing authored pipelines + their reusable grammars ─────────────────────
