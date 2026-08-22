@@ -456,7 +456,7 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                                 <input
                                     matInput
                                     [value]="t.value"
-                                    placeholder="src_file"
+                                    placeholder="file_name"
                                     aria-label="Source filename column"
                                     (change)="onFilenameColumnBlur($any($event.target).value)"
                                 />
@@ -484,11 +484,24 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                         <inspecto-schema-partitions-editor
                             [initial]="partitionSeed()"
                             [fieldNames]="schemaFieldNames()"
+                            [dateFieldNames]="schemaDateFieldNames()"
                         />
                         <div class="mb-1 mt-3 flex items-center gap-2">
                             <span class="text-xs font-semibold uppercase opacity-70">Column metadata</span>
                         </div>
                         <inspecto-schema-metadata-grid [rows]="schemaSeed()" />
+                        <!-- The lineage column belongs in this list too (operator ask 2026-08-22):
+                             it IS a column of the written rows. Read-only — stamped at write time,
+                             so description/unit/classification have no schema row to ride. -->
+                        @if (filenameColumnTarget()?.value; as filenameCol) {
+                            <p
+                                class="text-secondary m-0 mt-1 border-t pt-1 text-xs"
+                                style="border-color: var(--gamma-border)"
+                            >
+                                <span class="font-mono">{{ filenameCol }}</span> — each row's source file
+                                (lineage, stamped at write; configured above, not a parsed column).
+                            </p>
+                        }
                     }
                 </div>
             </inspecto-grammar-editor>
@@ -588,6 +601,13 @@ export class PipelineParseDefinitionComponent {
     readonly schemaFieldNames = computed(() =>
         this.schemaSeed()
             .filter((r) => r.include)
+            .map((r) => r.name),
+    );
+    /** The date-typed subset — the partitioning launcher's SUGGESTIONS (a date can also live in a
+     *  VARCHAR column the strptime chain parses, so the full list stays offered). */
+    readonly schemaDateFieldNames = computed(() =>
+        this.schemaSeed()
+            .filter((r) => r.include && ['DATE', 'TIMESTAMP', 'TIMESTAMPTZ'].includes(r.type))
             .map((r) => r.name),
     );
 

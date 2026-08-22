@@ -27,10 +27,10 @@ describe('InspectoSchemaPartitionsEditorComponent', () => {
         expect(c.form.pristine, 'a freshly seeded grid is pristine').toBe(true);
     });
 
-    it('the date trio adds year/month/day off ONE picked field, in one click', () => {
+    it('the date launcher adds year/month/day off ONE picked field, in one click (day grain default)', () => {
         const { c } = create();
         c.dateSource.set('TXN_DATE');
-        c.addDateTrio();
+        c.addDateGrain();
         expect(c.value()).toEqual([
             { column: 'year', source: 'TXN_DATE', type: 'DATE_YEAR' },
             { column: 'month', source: 'TXN_DATE', type: 'DATE_MONTH' },
@@ -38,6 +38,51 @@ describe('InspectoSchemaPartitionsEditorComponent', () => {
         ]);
         expect(c.form.dirty).toBe(true);
         expect(c.mixedDateSources(), 'one source ⇒ a single event time').toBe(false);
+    });
+
+    /** A shallower grain is a real choice (monthly = 12 healthy files a year, not 365 tiny ones). */
+    it('the grain select cuts shallower schemes: Year, and Year+Month', () => {
+        const { c } = create();
+        c.dateSource.set('TXN_DATE');
+        c.grain.set('year');
+        c.addDateGrain();
+        expect(c.value()).toEqual([{ column: 'year', source: 'TXN_DATE', type: 'DATE_YEAR' }]);
+
+        c.removeRow(c.partitionRows.controls[0]);
+        c.grain.set('month');
+        c.addDateGrain();
+        expect(c.value()).toEqual([
+            { column: 'year', source: 'TXN_DATE', type: 'DATE_YEAR' },
+            { column: 'month', source: 'TXN_DATE', type: 'DATE_MONTH' },
+        ]);
+    });
+
+    /**
+     * Smart pre-pick: exactly ONE date-typed field is unambiguous, so it comes pre-selected. Two or
+     * more stays the operator's call — guessing which date is THE event time is how wrong bounds
+     * happen — and the pick never overrides one already made.
+     */
+    it('pre-picks the date field only when exactly one date-typed field exists', () => {
+        TestBed.configureTestingModule({
+            imports: [InspectoSchemaPartitionsEditorComponent],
+            providers: [provideNoopAnimations()],
+        });
+        const fixture = TestBed.createComponent(InspectoSchemaPartitionsEditorComponent);
+        fixture.componentRef.setInput('fieldNames', ['MSISDN', 'CALL_START', 'LOAD_DATE']);
+        fixture.componentRef.setInput('dateFieldNames', ['CALL_START']);
+        fixture.detectChanges();
+        expect(fixture.componentInstance.dateSource()).toBe('CALL_START');
+
+        fixture.componentRef.setInput('dateFieldNames', ['CALL_START', 'LOAD_DATE']);
+        fixture.detectChanges();
+        expect(fixture.componentInstance.dateSource(), 'an existing pick is never overridden').toBe('CALL_START');
+
+        // Two candidates from the start ⇒ no guess.
+        const f2 = TestBed.createComponent(InspectoSchemaPartitionsEditorComponent);
+        f2.componentRef.setInput('fieldNames', ['CALL_START', 'LOAD_DATE']);
+        f2.componentRef.setInput('dateFieldNames', ['CALL_START', 'LOAD_DATE']);
+        f2.detectChanges();
+        expect(f2.componentInstance.dateSource()).toBe('');
     });
 
     it('warns (never blocks) when the date segments disagree on their source field', () => {
@@ -71,7 +116,7 @@ describe('InspectoSchemaPartitionsEditorComponent', () => {
         const { fixture, c } = create();
         await expectNoA11yViolations(fixture.nativeElement);
         c.dateSource.set('TXN_DATE');
-        c.addDateTrio();
+        c.addDateGrain();
         fixture.detectChanges();
         await expectNoA11yViolations(fixture.nativeElement);
     });

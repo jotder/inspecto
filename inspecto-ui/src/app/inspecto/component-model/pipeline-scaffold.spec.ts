@@ -39,4 +39,13 @@ describe('pipelineScaffold', () => {
         // `retention_days` is deliberately absent so the engine's own default of 90 governs.
         expect(config).not.toHaveProperty('retention_days');
     });
+
+    /**
+     * Source-file lineage ON by default for NEW pipelines (operator ask 2026-08-22): file_name,
+     * optional — clearing the Files & metadata field removes it. Existing pipelines are untouched
+     * because this is a SCAFFOLD default, never an engine one.
+     */
+    it('seeds output.filename_column as file_name for new pipelines', () => {
+        expect(pipelineScaffold('cdr')['output']).toEqual({ filename_column: 'file_name' });
+    });
 });

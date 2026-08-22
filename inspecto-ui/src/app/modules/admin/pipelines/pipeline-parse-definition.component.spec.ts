@@ -1498,6 +1498,8 @@ describe('PipelineParseDefinitionComponent', () => {
             expect(text).toContain('src_file');
             expect(text).toContain('lineage column');
             expect(text).toContain('Warehouse');
+            // …and in the Column metadata list too (operator ask 2026-08-22), read-only.
+            expect(text).toContain('stamped at write');
             // Read-only: never one of the editable schema rows.
             expect(pane(fixture).schemaSeed().map((r) => r.name)).not.toContain('src_file');
         });

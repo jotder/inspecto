@@ -126,26 +126,44 @@ const DATE_TYPES = new Set(['DATE_YEAR', 'DATE_MONTH', 'DATE_DAY']);
             </p>
         }
         <div class="mt-2 flex flex-wrap items-center gap-2">
+            <!-- Smart date partitioning (operator ask 2026-08-22): the field select SUGGESTS —
+                 date-typed schema fields first (pre-picked when there is exactly one obvious
+                 choice), everything else after, because a date can legitimately live in a VARCHAR
+                 column the strptime chain parses. The grain expands to rows, which stay editable. -->
+            <!-- ⚠ [selected] per option, never [value] on the select: the select's value property is
+                 assigned before @for materialises the options, so the binding silently lands on the
+                 first option instead of the picked one (found driving the preview). -->
             <select
                 class="bg-transparent text-sm"
-                aria-label="Date field for the year/month/day partitions"
-                [value]="dateSource()"
+                aria-label="Date field for the date partitions"
                 (change)="dateSource.set($any($event.target).value)"
             >
                 <option value="" disabled [selected]="!dateSource()">date field…</option>
-                @for (f of fieldNames(); track f) {
-                    <option [value]="f">{{ f }}</option>
+                @for (f of dateFieldNames(); track f) {
+                    <option [value]="f" [selected]="f === dateSource()">{{ f }} (date-typed)</option>
                 }
+                @for (f of nonDateFieldNames(); track f) {
+                    <option [value]="f" [selected]="f === dateSource()">{{ f }}</option>
+                }
+            </select>
+            <select
+                class="bg-transparent text-sm"
+                aria-label="Date partition grain"
+                (change)="grain.set($any($event.target).value)"
+            >
+                <option value="year" [selected]="grain() === 'year'">Year</option>
+                <option value="month" [selected]="grain() === 'month'">Year + Month</option>
+                <option value="day" [selected]="grain() === 'day'">Year + Month + Day</option>
             </select>
             <button
                 mat-stroked-button
                 type="button"
                 class="!text-xs"
                 [disabled]="!dateSource()"
-                matTooltip="Adds year/month/day segments cut from the picked date field — the standard scheme"
-                (click)="addDateTrio()"
+                matTooltip="Adds the date segments for the picked grain, all cut from one field — each row stays editable after"
+                (click)="addDateGrain()"
             >
-                Partition by date (year/month/day)
+                Partition by date
             </button>
             <button mat-stroked-button type="button" class="!text-xs" (click)="addRow()">Add segment</button>
         </div>
@@ -158,6 +176,17 @@ export class InspectoSchemaPartitionsEditorComponent {
     readonly initial = input<SchemaPartitionRow[]>([]);
     /** The schema's field names — what a partition may derive from. */
     readonly fieldNames = input<string[]>([]);
+    /**
+     * The date-typed subset (DATE/TIMESTAMP/TIMESTAMPTZ) — the host derives it from the schema's
+     * declared types. Suggestions only: a date can live in a VARCHAR column too (the strptime chain
+     * parses it), so {@link fieldNames} stays the full offer.
+     */
+    readonly dateFieldNames = input<string[]>([]);
+    /** The rest of the offer, after the date-typed suggestions. */
+    readonly nonDateFieldNames = computed(() => {
+        const dates = new Set(this.dateFieldNames());
+        return this.fieldNames().filter((f) => !dates.has(f));
+    });
 
     readonly types = PARTITION_TYPES;
     readonly form: FormGroup = this.fb.group({ rows: this.fb.array<FormGroup>([]) });
@@ -165,8 +194,10 @@ export class InspectoSchemaPartitionsEditorComponent {
         return this.form.controls['rows'] as FormArray<FormGroup>;
     }
 
-    /** The trio button's source pick — deliberately NOT a form control, it is a launcher, not state. */
+    /** The launcher's source pick — deliberately NOT a form control, it is a launcher, not state. */
     readonly dateSource = signal('');
+    /** The launcher's grain: how deep the date directories nest. Day is the historical default. */
+    readonly grain = signal<'year' | 'month' | 'day'>('day');
     /** Bumped on any structural change so computed warnings re-derive (FormArray is not a signal). */
     private readonly version = signal(0);
 
@@ -178,6 +209,13 @@ export class InspectoSchemaPartitionsEditorComponent {
             this.version.update((v) => v + 1);
             // A freshly seeded grid is pristine: the host has applied nothing yet.
             this.form.markAsPristine();
+        });
+        // Smart pre-pick: exactly ONE date-typed field is an unambiguous suggestion — offer it
+        // pre-selected. Two or more is the operator's call (guessing which date is THE event time is
+        // how wrong bounds happen), and the pick never overrides one they already made.
+        effect(() => {
+            const dates = this.dateFieldNames();
+            if (dates.length === 1 && !this.dateSource()) this.dateSource.set(dates[0]);
         });
     }
 
@@ -217,13 +255,18 @@ export class InspectoSchemaPartitionsEditorComponent {
         this.emitChanged();
     }
 
-    /** The standard scheme in one click: year/month/day, all cut from the picked date field. */
-    addDateTrio(): void {
+    /**
+     * The date scheme in one click, at the picked grain — Year, Year+Month, or Year+Month+Day — all
+     * cut from ONE field (the single-event-time rule `eventTimeDef` rewards). A shallower grain is a
+     * real choice, not a shortcut: monthly directories for a low-volume feed are 12 healthy files a
+     * year instead of 365 tiny ones.
+     */
+    addDateGrain(): void {
         const src = this.dateSource();
         if (!src) return;
         this.pushRow({ column: 'year', source: src, type: 'DATE_YEAR' });
-        this.pushRow({ column: 'month', source: src, type: 'DATE_MONTH' });
-        this.pushRow({ column: 'day', source: src, type: 'DATE_DAY' });
+        if (this.grain() !== 'year') this.pushRow({ column: 'month', source: src, type: 'DATE_MONTH' });
+        if (this.grain() === 'day') this.pushRow({ column: 'day', source: src, type: 'DATE_DAY' });
         this.form.markAsDirty();
         this.emitChanged();
     }

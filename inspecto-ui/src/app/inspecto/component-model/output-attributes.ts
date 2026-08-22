@@ -40,7 +40,7 @@ export const OUTPUT_ATTRIBUTES: AttributeSpec[] = [
         label: 'Source filename column',
         type: 'identifier',
         tier: 'advanced',
-        placeholder: 'src_file',
-        help: 'Adds a column of this name carrying each row’s source file. Blank = no column (lineage stays in the ledger only).',
+        placeholder: 'file_name',
+        help: 'Adds a column of this name carrying each row’s source file. New pipelines default to file_name; blank = no column (lineage stays in the ledger only).',
     },
 ];

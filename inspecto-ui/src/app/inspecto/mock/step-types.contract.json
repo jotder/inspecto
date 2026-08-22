@@ -352,8 +352,8 @@
     "label" : "Source filename column",
     "type" : "identifier",
     "tier" : "advanced",
-    "help" : "Adds a column of this name carrying each row’s source file. Blank = no column (lineage stays in the ledger only).",
-    "placeholder" : "src_file"
+    "help" : "Adds a column of this name carrying each row’s source file. New pipelines default to file_name; blank = no column (lineage stays in the ledger only).",
+    "placeholder" : "file_name"
   }, {
     "key" : "batch__max_files",
     "label" : "Max files per consignment",

@@ -125,8 +125,8 @@ public final class NodeAttributes {
             NodeAttribute.of("compression", "Compression", "string", "optional").placeholder("snappy")
                     .help("Codec for the output (e.g. snappy / zstd / gzip); blank = format default."),
             NodeAttribute.of("filename_column", "Source filename column", "identifier", "advanced")
-                    .placeholder("src_file")
-                    .help("Adds a column of this name carrying each row’s source file. Blank = no column (lineage stays in the ledger only)."));
+                    .placeholder("file_name")
+                    .help("Adds a column of this name carrying each row’s source file. New pipelines default to file_name; blank = no column (lineage stays in the ledger only)."));
 
     /**
      * {@code sink.persistent} = the destination ({@code database}) plus the shared {@code output:} block.

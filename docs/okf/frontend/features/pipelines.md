@@ -1113,3 +1113,22 @@ the pane owns the schema toon (`authorsSchema()`).
   for a scheme with no single event time (`eventTimeDef`), and the write itself is legal.
 - A stored `source` the schema no longer carries stays listed in that row's choices rather than
   silently blanking — visible and fixable beats vanished.
+
+### Second pass (operator asks, 2026-08-22 evening)
+
+- **Lineage ON by default for NEW pipelines**: `pipelineScaffold()` (the one choke point both create
+  surfaces use) seeds `output.filename_column: file_name`. Still optional — clearing the field
+  removes it — and existing pipelines are untouched: an ENGINE-side default would silently grow
+  every existing store's output by a column, so the default is a scaffold fact, never an engine one.
+  The engine's collision check refuses a load where a declared column shadows the name.
+- **The lineage column shows in the Column metadata list** too, as a read-only line after the rows —
+  it IS a column of the written output, but stamped at write time, so description/unit/
+  classification have no schema row to ride.
+- **Smart partitioning launcher**: a date-field select (date-typed schema fields suggested first,
+  pre-picked when exactly ONE exists — two or more stays the operator's call, since guessing which
+  date is THE event time is how wrong bounds happen) plus a grain select — Year / Year + Month /
+  Year + Month + Day — expanding to rows that stay individually editable. A shallower grain is a
+  real choice: monthly directories on a low-volume feed are 12 healthy files a year, not 365 tiny
+  ones. ⚠ Native `<select>` in an `@for`: bind `[selected]` per option, never `[value]` on the
+  select — the value property lands before the options materialise and silently selects the first
+  entry (found driving the preview).

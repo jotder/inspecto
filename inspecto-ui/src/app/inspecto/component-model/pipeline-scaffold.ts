@@ -96,6 +96,13 @@ export function pipelineScaffold(
             threads: 1,
             duplicate_check: { enabled: true, marker_extension: '.processed' },
         },
+        // Source-file lineage ON by default for NEW pipelines (operator ask 2026-08-22): every
+        // output row carries which file it came from, as `file_name`. Optional — clearing the field
+        // on the Files & metadata tab removes it. Existing pipelines are untouched (an engine-side
+        // default would silently grow every existing store's output by a column). The engine fails
+        // the load if a declared schema column collides with this name, so the default can never
+        // silently shadow real data.
+        output: { filename_column: 'file_name' },
     };
     if (opts.description?.trim()) config['description'] = opts.description.trim();
     if (opts.reference) config['produces'] = 'reference';
