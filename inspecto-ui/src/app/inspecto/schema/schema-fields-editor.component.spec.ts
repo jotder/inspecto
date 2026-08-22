@@ -156,25 +156,40 @@ describe('InspectoSchemaFieldsEditorComponent', () => {
      * WIDER than this grid's. Narrowing is what makes that retirement safe.
      */
     describe('narrowToSchemaType', () => {
-        it('keeps the four types the grid offers', () => {
-            expect(narrowToSchemaType('VARCHAR')).toBe('VARCHAR');
-            expect(narrowToSchemaType('DOUBLE')).toBe('DOUBLE');
-            expect(narrowToSchemaType('DATE')).toBe('DATE');
-            expect(narrowToSchemaType('TIMESTAMP')).toBe('TIMESTAMP');
+        it('keeps every type the grid offers, verbatim', () => {
+            for (const t of ['VARCHAR', 'DOUBLE', 'DATE', 'TIMESTAMP', 'BOOLEAN', 'INTEGER', 'HUGEINT', 'UUID']) {
+                expect(narrowToSchemaType(t)).toBe(t);
+            }
         });
 
-        it('narrows BIGINT to DOUBLE — the engine has no integer cast, only a DOUBLE one', () => {
-            expect(narrowToSchemaType('BIGINT')).toBe('DOUBLE');
+        /**
+         * 🔴 Was `BIGINT → DOUBLE`: honest while `TransformCompiler.direct()` cast only DOUBLE, but
+         * LOSSY above 2^53 — exactly the range long numeric identifiers live in. The engine casts
+         * every DuckDB scalar type since 2026-08-22, so the inferred type is kept.
+         */
+        it('keeps BIGINT rather than collapsing it into DOUBLE (precision loss above 2^53)', () => {
+            expect(narrowToSchemaType('BIGINT')).toBe('BIGINT');
         });
 
-        it('falls back to VARCHAR for anything else, BOOLEAN included', () => {
-            expect(narrowToSchemaType('BOOLEAN')).toBe('VARCHAR');
-            expect(narrowToSchemaType('DECIMAL(10,2)')).toBe('VARCHAR');
+        it('keeps a parameterised DECIMAL, normalising its spelling', () => {
+            expect(narrowToSchemaType('DECIMAL(10,2)')).toBe('DECIMAL(10,2)');
+            expect(narrowToSchemaType('decimal( 18 , 4 )')).toBe('DECIMAL(18,4)');
+            // A bare DECIMAL has no precision to keep — land on the default the cell then exposes.
+            expect(narrowToSchemaType('DECIMAL')).toBe('DECIMAL(18,2)');
+        });
+
+        /**
+         * ⚠ Still VARCHAR, but for a NEW reason: the engine now REFUSES an unknown type at config
+         * load, so passing a server quirk through would author a config that cannot load.
+         */
+        it('falls back to VARCHAR for a type the engine does not honour', () => {
+            expect(narrowToSchemaType('STRUCT(a INT)')).toBe('VARCHAR');
+            expect(narrowToSchemaType('JSON')).toBe('VARCHAR');
             expect(narrowToSchemaType('')).toBe('VARCHAR');
         });
 
         it('is case- and whitespace-insensitive, as server payloads are not guaranteed tidy', () => {
-            expect(narrowToSchemaType('  bigint ')).toBe('DOUBLE');
+            expect(narrowToSchemaType('  bigint ')).toBe('BIGINT');
             expect(narrowToSchemaType('timestamp')).toBe('TIMESTAMP');
         });
     });

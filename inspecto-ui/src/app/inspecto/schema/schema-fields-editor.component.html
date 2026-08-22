@@ -138,6 +138,30 @@
                                     [svgIcon]="typeIcon($safeNavigationMigration(e.group.get('type')?.value))"
                                 ></mat-icon>
                             </button>
+                            <!-- DECIMAL is the one parameterised type: precision/scale are edited in
+                                 place, clamped to DuckDB's 1‥38 / 0‥p on every change, so the value
+                                 written is always one the engine's fail-closed gate accepts. -->
+                            @if (isDecimal(e.group) && !autoTypes()) {
+                                <input
+                                    class="w-10 bg-transparent text-center text-xs"
+                                    type="number"
+                                    min="1"
+                                    [max]="decimalMaxPrecision"
+                                    [value]="decimalPrecision(e.group)"
+                                    [attr.aria-label]="'Decimal precision for ' + typeName(e.group)"
+                                    (change)="setDecimal(e.group, $any($event.target).value, decimalScale(e.group))"
+                                />
+                                <span class="text-secondary text-xs" aria-hidden="true">,</span>
+                                <input
+                                    class="w-10 bg-transparent text-center text-xs"
+                                    type="number"
+                                    min="0"
+                                    [max]="decimalPrecision(e.group)"
+                                    [value]="decimalScale(e.group)"
+                                    [attr.aria-label]="'Decimal scale for ' + typeName(e.group)"
+                                    (change)="setDecimal(e.group, decimalPrecision(e.group), $any($event.target).value)"
+                                />
+                            }
                         </span>
                     </td>
                     <td class="py-1 pr-2">

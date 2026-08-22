@@ -88,6 +88,37 @@ mapping's job).
 > redundant here — by design. Read-time typing is only worth exposing for `read_json` (where types
 > are structural) and for performance edge cases.
 
+### 2.1 The honoured `raw.fields[].type` vocabulary (2026-08-22)
+
+`SchemaFieldTypes` (`inspecto-etl`) is the **one** authority on which declared field types the engine
+produces and the SQL each compiles to. Three sites used to carry their own copy of a three-type list
+— `TransformCompiler.direct` (the cast switch), `TransformCompiler.dateExpr` (date-vs-else), and
+`DataTransformer.coercedSourceColumn` (cast-failure measurability) — and all three now delegate.
+
+**Honoured** (every DuckDB scalar type reachable by `TRY_CAST` from text): `VARCHAR`, `BOOLEAN`,
+`TINYINT`/`SMALLINT`/`INTEGER`/`BIGINT`/`HUGEINT` and their `U…` unsigned twins, `FLOAT`, `DOUBLE`,
+`DECIMAL(p,s)` (precision 1‥38, scale 0‥p), `DATE`, `TIME`, `TIMESTAMP`, `TIMESTAMPTZ`, `UUID`,
+`BLOB`.
+
+**Refused, fail closed** — anything else, at config load (`Identifiers.validateSchema`). Nested
+`LIST`/`STRUCT`/`MAP`/`UNION` (a parsed text token cannot become one), `JSON` (extension-dependent,
+and this deployment does not statically link DuckDB extensions), `INTERVAL`/`BIT`/`ENUM` (no sane
+text form off a feed).
+
+🔴 **Why fail closed.** Before this, the cast switch had a `default` branch that emitted the column
+**uncast**, and nothing validated the declared type — so `type: BIGINT` silently produced a VARCHAR
+store, surfacing only when something downstream tried arithmetic on it. A typo is now a load error.
+An **absent or blank** type stays legal and still means `VARCHAR`.
+
+Two consequences worth knowing:
+- `DATE`/`TIMESTAMP`/`TIMESTAMPTZ` parse through the pipeline's `date_formats`/`timestamp_formats`
+  after a `CAST(… AS VARCHAR)` (load-bearing: an already-typed column from the plugin lane has to
+  reach `TRY_STRPTIME` as text). Everything else is a plain `TRY_CAST`, keeping the "bad value ⇒
+  NULL, never a failed batch" contract.
+- A config that declared `INTEGER` before this change produced text and now produces a real
+  `INTEGER`, so its output Parquet schema changes on the next write — the declaration finally being
+  honoured, but it can trip the schema BACKWARD gate.
+
 ---
 
 ## 3. Corrected & extended DuckDB `read_csv` parameter reference

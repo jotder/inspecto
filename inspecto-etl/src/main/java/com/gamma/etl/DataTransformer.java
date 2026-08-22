@@ -219,11 +219,11 @@ public final class DataTransformer {
         String type = rule.get("transformType");
         String norm = type == null ? "" : type.trim().toUpperCase();
         if (norm.isEmpty() || norm.equals("DIRECT")) {
-            String declared = fieldTypes.getOrDefault(source, "VARCHAR");
-            return switch (declared) {
-                case "TIMESTAMP", "DATE", "DOUBLE" -> source;
-                default -> null;      // VARCHAR (and anything unrecognised) is emitted verbatim
-            };
+            // Measurable ⇔ the declared type actually coerces. This was a hardcoded
+            // {TIMESTAMP,DATE,DOUBLE} list, so every newly honoured type (BIGINT, DECIMAL, …) would
+            // have cast — and silently nulled bad values — WITHOUT the failure audit counting them.
+            String declared = fieldTypes.getOrDefault(source, SchemaFieldTypes.VARCHAR);
+            return SchemaFieldTypes.coerces(declared) ? source : null;
         }
         if (norm.equals("CONCAT_DT") || norm.equals("FILENAME_DATE")) return source.split("\\|", 2)[0];
         return null;                  // EXPR — see countCastFailures

@@ -98,20 +98,12 @@ public final class TransformCompiler {
     private static String direct(String source, String target, Map<String, String> fieldTypes,
                                  String sourceTable, PipelineConfig.CsvSettings csv) {
         String col  = "\"" + sourceTable + "\".\"" + source + '"';
-        String type = fieldTypes.getOrDefault(source, "VARCHAR");
-        StringBuilder sb = new StringBuilder();
-        switch (type) {
-            // Cast to VARCHAR first: no-op for raw VARCHAR (CSV path); converts an
-            // already-typed DATE/TIMESTAMP (plugin path) to an ISO string so
-            // TRY_STRPTIME always receives a string argument.
-            case "TIMESTAMP" -> SqlBuilder.appendCoalesce(sb,
-                    "CAST(" + col + " AS VARCHAR)", csv.tsFormats(), "TIMESTAMP");
-            case "DATE"      -> SqlBuilder.appendCoalesce(sb,
-                    "CAST(" + col + " AS VARCHAR)", csv.dateFormats(), "DATE");
-            case "DOUBLE"    -> sb.append("TRY_CAST(").append(col).append(" AS DOUBLE)");
-            default          -> sb.append(col);
-        }
-        return sb.toString();
+        // The honoured vocabulary and the SQL each type compiles to live in ONE place
+        // (SchemaFieldTypes) — this was a four-branch switch whose `default` emitted the column
+        // UNCAST, so a declared BIGINT silently produced text. Unhonoured types are now refused at
+        // config load, so every type reaching here casts.
+        String type = fieldTypes.getOrDefault(source, SchemaFieldTypes.VARCHAR);
+        return SchemaFieldTypes.castSql(col, type, csv.dateFormats(), csv.tsFormats());
     }
 
     /**
@@ -209,8 +201,10 @@ public final class TransformCompiler {
     private static String dateExpr(PartitionDef pd, String sourceTable,
                                    Map<String, String> fieldTypes, PipelineConfig.CsvSettings csv) {
         String col         = "\"" + sourceTable + "\".\"" + pd.source() + "\"";
-        String srcType     = fieldTypes.getOrDefault(pd.source(), "VARCHAR");
-        String castType    = "TIMESTAMP".equals(srcType) ? "TIMESTAMP" : "DATE";
+        String srcType     = SchemaFieldTypes.normalize(fieldTypes.getOrDefault(pd.source(), SchemaFieldTypes.VARCHAR));
+        // A TIMESTAMPTZ source carries a time component exactly like TIMESTAMP, so it must parse
+        // with timestamp_formats too — a date-only parse would NULL every row into the sentinel.
+        String castType    = ("TIMESTAMP".equals(srcType) || "TIMESTAMPTZ".equals(srcType)) ? "TIMESTAMP" : "DATE";
         String varcharExpr = "CAST(" + col + " AS VARCHAR)";
         return SqlBuilder.buildCastExpr(varcharExpr, castType, csv.dateFormats(), csv.tsFormats());
     }

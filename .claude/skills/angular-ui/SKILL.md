@@ -170,7 +170,14 @@ src/app/
   `<pipeline>_parser.csv`) — Save-as-template is gone from both parse surfaces; unknown option keys
   are LISTED, never applied. The columns table (`inspecto/schema/`) is ordered ①include ②# ③icon-only
   type menu ④name ⑤synonym (unique across synonyms ∪ names), with `[autoTypes]` disabling the menu in
-  Auto mode.
+  Auto mode. **Field types (2026-08-22):** `SCHEMA_TYPES` mirrors the engine's
+  `SchemaFieldTypes.names()` — 20 DuckDB scalar types, `DECIMAL(p,s)` authored by precision/scale
+  inputs the Type cell reveals (clamped 1‥38 / 0‥p so an out-of-range value never reaches the
+  engine's gate). ⚠ **The two lists MUST stay identical**: the engine now REFUSES an unhonoured type
+  at config load, so offering one here authors a config that cannot load — and the old four-entry
+  list existed precisely because the engine's cast switch silently stored TEXT for anything else.
+  `narrowToSchemaType` no longer collapses `BIGINT`→`DOUBLE` (lossy above 2⁵³); icons/hints and the
+  type filter key on `baseSchemaType()`, so every `DECIMAL(p,s)` shares one entry.
   **Since 2026-08-21 (canvas-UX S4/S5):** the parse loop is host-legible — with `sampleMode: 'host'`
   the editor HIDES its own Test parse button (the host renders **Parse sample** in the shared
   `<inspecto-sample-panel>`'s chip row via its `parseLabel`/`(parse)` inputs, beside the state it

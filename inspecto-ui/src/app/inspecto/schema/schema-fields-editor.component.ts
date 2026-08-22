@@ -10,37 +10,116 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 
-/** The four types `TransformCompiler.direct()` actually TRY_CASTs — everything else is stored as
- *  text (honesty guard: no type offered here implies rigor the engine does not apply). */
-export const SCHEMA_TYPES = ['VARCHAR', 'DOUBLE', 'DATE', 'TIMESTAMP'] as const;
+/**
+ * The DuckDB scalar types the engine honours — the mirror of `SchemaFieldTypes.names()` (Java).
+ *
+ * <p>⚠ **This list and the engine's must stay identical.** It used to be four entries, because
+ * `TransformCompiler.direct()`'s `default` branch emitted a column UNCAST — so a fifth option here
+ * would have silently stored text. The engine now casts every type below and REFUSES anything else
+ * at config load (operator decision 2026-08-22, fail closed), which is what makes offering them
+ * honest. Nested (`LIST`/`STRUCT`/`MAP`), `JSON` and `INTERVAL` are excluded on both sides: a parsed
+ * text token cannot become one.
+ *
+ * <p>`DECIMAL` is the one parameterised entry — picking it authors `DECIMAL(p,s)` via the precision
+ * and scale inputs the Type cell reveals.
+ */
+export const SCHEMA_TYPES = [
+    'VARCHAR',
+    'BOOLEAN',
+    'TINYINT',
+    'SMALLINT',
+    'INTEGER',
+    'BIGINT',
+    'HUGEINT',
+    'UTINYINT',
+    'USMALLINT',
+    'UINTEGER',
+    'UBIGINT',
+    'FLOAT',
+    'DOUBLE',
+    'DECIMAL',
+    'DATE',
+    'TIME',
+    'TIMESTAMP',
+    'TIMESTAMPTZ',
+    'UUID',
+    'BLOB',
+] as const;
+
+/** DuckDB's DECIMAL limits — precision 1‥38, scale 0‥precision. Clamped, never merely validated. */
+export const DECIMAL_MAX_PRECISION = 38;
+/** What picking `DECIMAL` from the menu authors before the operator adjusts it. */
+export const DECIMAL_DEFAULT = 'DECIMAL(18,2)';
+
+/** `DECIMAL(18,2)` → `DECIMAL`; every other type is its own base. Lets one icon/hint/filter entry
+ *  serve every parameterisation. */
+export function baseSchemaType(type: string | null | undefined): string {
+    const t = (type ?? '').trim().toUpperCase();
+    const paren = t.indexOf('(');
+    return paren > 0 ? t.slice(0, paren) : t;
+}
+
+/** Precision/scale of a `DECIMAL(p,s)`, or the defaults for anything else. */
+export function decimalParts(type: string | null | undefined): { precision: number; scale: number } {
+    const m = /^DECIMAL\(\s*(\d+)\s*,\s*(\d+)\s*\)$/.exec((type ?? '').trim().toUpperCase());
+    return m ? { precision: Number(m[1]), scale: Number(m[2]) } : { precision: 18, scale: 2 };
+}
+
+/** Build a valid `DECIMAL(p,s)`, clamping both into DuckDB's range so an out-of-range value can
+ *  never reach the engine's fail-closed gate. */
+export function decimalType(precision: number, scale: number): string {
+    const p = Math.min(Math.max(Math.trunc(precision) || 1, 1), DECIMAL_MAX_PRECISION);
+    const s = Math.min(Math.max(Math.trunc(scale) || 0, 0), p);
+    return `DECIMAL(${p},${s})`;
+}
 
 /** Data-format icon + plain-words hint per type — the Type cell renders these so a 500-column
- *  table scans visually. Only the four honest types exist, so the map is closed. */
+ *  table scans visually. Keyed by BASE type, so every `DECIMAL(p,s)` shares one entry. */
 export const TYPE_META: Record<string, { icon: string; hint: string }> = {
     VARCHAR: { icon: 'heroicons_outline:bars-3-bottom-left', hint: 'Text' },
+    BOOLEAN: { icon: 'heroicons_outline:check-circle', hint: 'True / false' },
+    TINYINT: { icon: 'heroicons_outline:hashtag', hint: 'Whole number (8-bit)' },
+    SMALLINT: { icon: 'heroicons_outline:hashtag', hint: 'Whole number (16-bit)' },
+    INTEGER: { icon: 'heroicons_outline:hashtag', hint: 'Whole number (32-bit)' },
+    BIGINT: { icon: 'heroicons_outline:hashtag', hint: 'Whole number (64-bit)' },
+    HUGEINT: { icon: 'heroicons_outline:hashtag', hint: 'Whole number (128-bit)' },
+    UTINYINT: { icon: 'heroicons_outline:hashtag', hint: 'Whole number, unsigned (8-bit)' },
+    USMALLINT: { icon: 'heroicons_outline:hashtag', hint: 'Whole number, unsigned (16-bit)' },
+    UINTEGER: { icon: 'heroicons_outline:hashtag', hint: 'Whole number, unsigned (32-bit)' },
+    UBIGINT: { icon: 'heroicons_outline:hashtag', hint: 'Whole number, unsigned (64-bit)' },
+    FLOAT: { icon: 'heroicons_outline:hashtag', hint: 'Number (single precision)' },
     DOUBLE: { icon: 'heroicons_outline:hashtag', hint: 'Number (floating point)' },
+    DECIMAL: { icon: 'heroicons_outline:banknotes', hint: 'Exact decimal — money, rates' },
     DATE: { icon: 'heroicons_outline:calendar', hint: 'Date' },
+    TIME: { icon: 'heroicons_outline:clock', hint: 'Time of day' },
     TIMESTAMP: { icon: 'heroicons_outline:clock', hint: 'Date & time' },
+    TIMESTAMPTZ: { icon: 'heroicons_outline:globe-alt', hint: 'Date & time with zone' },
+    UUID: { icon: 'heroicons_outline:finger-print', hint: 'UUID' },
+    BLOB: { icon: 'heroicons_outline:cube', hint: 'Raw bytes' },
 };
 
 const IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 /**
- * A server-inferred type (`SchemaSuggest`) narrowed to the four this grid offers.
+ * A server-inferred type (`SchemaSuggest`) mapped onto the grid's vocabulary.
  *
- * <p>The server votes over a WIDER vocabulary than the grid does — it can return `BIGINT` and
- * `BOOLEAN`, which {@link SCHEMA_TYPES} deliberately omits because `TransformCompiler.direct()` casts
- * only TIMESTAMP / DATE / DOUBLE and passes everything else through untouched. Offering `BIGINT` would
- * imply an integer coercion the engine never performs, so it narrows to `DOUBLE` (the honest numeric
- * cast) and `BOOLEAN` to `VARCHAR` (stored as text).
+ * <p>Since 2026-08-22 the grid offers every type the engine casts, so an inferred type is normally
+ * kept VERBATIM. 🔴 It used to collapse `BIGINT` → `DOUBLE` — honest while the engine cast only
+ * DOUBLE, but lossy above 2⁵³, which is exactly the range long numeric identifiers live in. That
+ * narrowing is gone.
  *
- * <p>This is the seam D4's "retire the client `suggestTypes()`" actually needed: the client fork's
- * whole vocabulary WAS these four, so deleting it without narrowing would have put unselectable types
- * into the grid.
+ * <p>An unrecognised type still falls back to `VARCHAR` rather than being passed through: the engine
+ * now REFUSES an unknown type at load, so passing one through would turn a server quirk into a
+ * config that will not load.
  */
 export function narrowToSchemaType(serverType: string): string {
     const t = (serverType ?? '').trim().toUpperCase();
-    if (t === 'BIGINT') return 'DOUBLE';
+    if (!t) return 'VARCHAR';
+    const base = baseSchemaType(t);
+    if (base === 'DECIMAL') {
+        const { precision, scale } = decimalParts(t);
+        return t === 'DECIMAL' ? DECIMAL_DEFAULT : decimalType(precision, scale);
+    }
     return (SCHEMA_TYPES as readonly string[]).includes(t) ? t : 'VARCHAR';
 }
 
@@ -135,6 +214,7 @@ export class InspectoSchemaFieldsEditorComponent {
 
     readonly types = SCHEMA_TYPES;
     protected readonly typeMeta = TYPE_META;
+    protected readonly decimalMaxPrecision = DECIMAL_MAX_PRECISION;
 
     readonly form: FormGroup = this.fb.group({ fields: this.fb.array<FormGroup>([]) });
     get fieldRows(): FormArray<FormGroup> {
@@ -146,8 +226,9 @@ export class InspectoSchemaFieldsEditorComponent {
     /** Why {@link validate} last refused, or `null`. The host renders it. */
     readonly problem = signal<string | null>(null);
 
+    /** Keyed by BASE type, so `DECIMAL(18,2)` and `DECIMAL(38,10)` share one glyph. */
     typeIcon(t: string | null | undefined): string {
-        return (TYPE_META[t ?? ''] ?? TYPE_META['VARCHAR']).icon;
+        return (TYPE_META[baseSchemaType(t)] ?? TYPE_META['VARCHAR']).icon;
     }
 
     // ── View window over the FormArray ──────────────────────────────────────────
@@ -188,7 +269,8 @@ export class InspectoSchemaFieldsEditorComponent {
                         .toUpperCase()
                         .includes(q),
             );
-        if (tf !== 'all') entries = entries.filter(({ v }) => v.type === tf);
+        // Compare BASE types so the DECIMAL filter matches every DECIMAL(p,s), not one spelling.
+        if (tf !== 'all') entries = entries.filter(({ v }) => baseSchemaType(v.type) === tf);
         if (key === 'source') return dir === 1 ? entries : [...entries].reverse();
         return [...entries].sort((a, b) => {
             const av = String(a.v[key] ?? '');
@@ -278,16 +360,39 @@ export class InspectoSchemaFieldsEditorComponent {
         this.fieldRows.push(g);
     }
 
-    /** Pick a type from the icon menu (§4.3 col ③). */
+    /** Pick a type from the icon menu (§4.3 col ③). DECIMAL needs parameters, so it lands on the
+     *  default and the Type cell reveals precision/scale inputs for that row. */
     setType(group: FormGroup, type: string): void {
         const c = group.get('type');
-        c?.setValue(type);
+        c?.setValue(type === 'DECIMAL' ? DECIMAL_DEFAULT : type);
         c?.markAsDirty();
         this.form.markAsDirty();
     }
 
     typeName(group: FormGroup): string {
         return String(group.get('type')?.value ?? 'VARCHAR');
+    }
+
+    /** Whether this row's type is a `DECIMAL(p,s)` — the one type with parameters to edit. */
+    isDecimal(group: FormGroup): boolean {
+        return baseSchemaType(this.typeName(group)) === 'DECIMAL';
+    }
+
+    decimalPrecision(group: FormGroup): number {
+        return decimalParts(this.typeName(group)).precision;
+    }
+
+    decimalScale(group: FormGroup): number {
+        return decimalParts(this.typeName(group)).scale;
+    }
+
+    /** Re-author `DECIMAL(p,s)` from the inputs, clamped into DuckDB's range (precision 1‥38, scale
+     *  0‥precision) so an out-of-range value never reaches the engine's fail-closed gate. */
+    setDecimal(group: FormGroup, precision: number | string, scale: number | string): void {
+        const c = group.get('type');
+        c?.setValue(decimalType(Number(precision), Number(scale)));
+        c?.markAsDirty();
+        this.form.markAsDirty();
     }
 
     private syncIncludedNames(): void {

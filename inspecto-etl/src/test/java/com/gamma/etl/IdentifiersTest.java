@@ -79,4 +79,46 @@ class IdentifiersTest {
         // No raw/mapping/partitions — nothing to validate, should not throw.
         Identifiers.validateSchema(Map.of(), "seg");
     }
+
+    /**
+     * 🔴 Fail closed on a field type the engine cannot produce (operator decision 2026-08-22).
+     * Before this, an unrecognised type fell through {@code TransformCompiler.direct}'s default and
+     * the column was written as TEXT — silently. The error has to name the field and the vocabulary,
+     * because the whole point is that the operator finds out at load instead of at analysis time.
+     */
+    @Test
+    void validateSchemaRefusesAnUnsupportedFieldType() {
+        Map<String, Object> schema = Map.of(
+                "raw", Map.of("fields", List.of(
+                        Map.of("name", "AMT", "selector", "0", "type", "STRUCT(a INT)"))));
+        var e = assertThrows(IllegalArgumentException.class,
+                () -> Identifiers.validateSchema(schema, "my_schema"));
+        assertTrue(e.getMessage().contains("AMT"), "names the offending field: " + e.getMessage());
+        assertTrue(e.getMessage().contains("STRUCT(a INT)"), e.getMessage());
+        assertTrue(e.getMessage().contains("BIGINT"), "lists what IS supported: " + e.getMessage());
+    }
+
+    /** Every DuckDB scalar type the engine now casts loads cleanly, DECIMAL(p,s) included. */
+    @Test
+    void validateSchemaAcceptsTheWholeHonouredVocabulary() {
+        for (String type : List.of("VARCHAR", "BIGINT", "INTEGER", "DECIMAL(18,2)", "BOOLEAN",
+                "TIMESTAMPTZ", "UUID", "HUGEINT")) {
+            Identifiers.validateSchema(
+                    Map.of("raw", Map.of("fields", List.of(Map.of("name", "COL", "selector", "0", "type", type)))),
+                    "seg");
+        }
+    }
+
+    /**
+     * An absent or blank type stays legal and means VARCHAR — pre-existing schemas omit it, and
+     * failing them closed would be a migration nobody asked for.
+     */
+    @Test
+    void validateSchemaAcceptsAnAbsentOrBlankFieldType() {
+        Identifiers.validateSchema(
+                Map.of("raw", Map.of("fields", List.of(Map.of("name", "COL", "selector", "0")))), "seg");
+        Identifiers.validateSchema(
+                Map.of("raw", Map.of("fields", List.of(Map.of("name", "COL", "selector", "0", "type", "  ")))),
+                "seg");
+    }
 }

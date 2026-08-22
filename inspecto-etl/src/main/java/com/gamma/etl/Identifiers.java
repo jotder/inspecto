@@ -44,6 +44,29 @@ public final class Identifiers {
     }
 
     /**
+     * Refuse a {@code raw.fields[].type} the engine cannot actually produce (operator decision,
+     * 2026-08-22: <b>fail closed</b>).
+     *
+     * <p>Until then an unrecognised type fell through {@code TransformCompiler.direct}'s
+     * {@code default} branch and the column was written as <b>text</b> — no error, no warning. A
+     * schema declaring {@code BIGINT} produced a VARCHAR store, and the loss surfaced only when
+     * something downstream tried to do arithmetic on it. A typo is now a load error, and the honoured
+     * vocabulary is {@link SchemaFieldTypes}'.
+     *
+     * <p>An absent/blank type stays legal and means {@code VARCHAR} — that has always been the
+     * meaning of omitting it, and pre-existing schemas rely on it.
+     */
+    static void validateFieldType(String type, String fieldName, String origin) {
+        if (type == null || type.isBlank()) return;
+        if (!SchemaFieldTypes.isHonored(type))
+            throw new IllegalArgumentException(
+                    "Schema field type at " + origin + ".raw.fields[" + fieldName + "].type is not supported: '"
+                    + type + "'. Supported: " + String.join(", ", SchemaFieldTypes.names())
+                    + " (DECIMAL takes precision 1-38 and scale 0-precision, e.g. DECIMAL(18,2)). "
+                    + "Nested (LIST/STRUCT/MAP), JSON and INTERVAL are not supported for a parsed field.");
+    }
+
+    /**
      * Validate every name a schema config exposes to SQL: {@code raw.fields[].name},
      * {@code mapping.rules[].targetColumn}, and {@code partitions[].column / source}.
      * Called from {@link PipelineConfig#load} for the single-schema, multi-schema,
@@ -60,8 +83,10 @@ public final class Identifiers {
             Object rawFields = rawSection.get("fields");
             if (rawFields instanceof List<?> fieldsList) {
                 for (Object f : fieldsList) {
-                    if (f instanceof Map<?, ?> fm)
+                    if (f instanceof Map<?, ?> fm) {
                         validate((String) fm.get("name"), origin + ".raw.fields[].name");
+                        validateFieldType((String) fm.get("type"), (String) fm.get("name"), origin);
+                    }
                 }
             }
         }

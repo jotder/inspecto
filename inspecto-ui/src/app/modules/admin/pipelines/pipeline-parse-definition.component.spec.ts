@@ -1194,8 +1194,9 @@ describe('PipelineParseDefinitionComponent', () => {
             p.onPreviewed(typedPreview);
             fixture.detectChanges();
 
-            // BIGINT narrows to DOUBLE — the grid's honest vocabulary.
-            expect(p.schemaSeed().map((r) => r.type)).toEqual(['DOUBLE', 'DATE', 'VARCHAR']);
+            // BIGINT is KEPT since 2026-08-22 — the engine casts every DuckDB scalar type, so
+            // collapsing it into DOUBLE (lossy above 2^53) is no longer honest, just lossy.
+            expect(p.schemaSeed().map((r) => r.type)).toEqual(['BIGINT', 'DATE', 'VARCHAR']);
         });
 
         it('seeds VARCHAR when the server serves no columnTypes (old server, byte-identical)', async () => {
@@ -1219,7 +1220,7 @@ describe('PipelineParseDefinitionComponent', () => {
             const raw = schemaWrites[0].config['raw'] as Record<string, unknown>;
             expect(raw['types']).toBe('auto');
             const fields = raw['fields'] as { name: string; type: string; synonym?: string }[];
-            expect(fields.map((f) => f.type)).toEqual(['DOUBLE', 'DATE', 'VARCHAR']);
+            expect(fields.map((f) => f.type)).toEqual(['BIGINT', 'DATE', 'VARCHAR']);
             expect('synonym' in fields[0]).toBe(false);
         });
 
@@ -1231,7 +1232,7 @@ describe('PipelineParseDefinitionComponent', () => {
             expect(p.schemaSeed().map((r) => r.type)).toEqual(['VARCHAR', 'VARCHAR', 'VARCHAR']);
 
             p.applySuggestedTypes();
-            expect(p.schemaSeed().map((r) => r.type)).toEqual(['DOUBLE', 'DATE', 'VARCHAR']);
+            expect(p.schemaSeed().map((r) => r.type)).toEqual(['BIGINT', 'DATE', 'VARCHAR']);
         });
 
         it('a hydrated schema without the raw.types marker loads as Declared', async () => {
