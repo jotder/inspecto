@@ -1,11 +1,13 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
-import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormArray, FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { InspectoOptionPickerComponent, PickerOption } from '../components/option-picker.component';
 
 /** One `partitions[]` entry of the schema toon — the engine's `PartitionDef` verbatim. */
 export interface SchemaPartitionRow {
@@ -50,6 +52,7 @@ const DATE_TYPES = new Set(['DATE_YEAR', 'DATE_MONTH', 'DATE_DAY']);
         MatInputModule,
         MatSelectModule,
         MatTooltipModule,
+        InspectoOptionPickerComponent,
     ],
     template: `
         @if (partitionRows.length) {
@@ -75,29 +78,31 @@ const DATE_TYPES = new Set(['DATE_YEAR', 'DATE_MONTH', 'DATE_DAY']);
                                 />
                             </td>
                             <td class="py-1 pr-2">
-                                <select
-                                    class="w-full bg-transparent text-sm"
-                                    formControlName="source"
-                                    [attr.aria-label]="'Partition source field'"
-                                    (change)="emitChanged()"
-                                >
-                                    <option value="" disabled>pick a field…</option>
-                                    @for (f of sourceChoices(g); track f) {
-                                        <option [value]="f">{{ f }}</option>
-                                    }
-                                </select>
+                                <mat-form-field class="w-full" subscriptSizing="dynamic">
+                                    <mat-select
+                                        formControlName="source"
+                                        aria-label="Partition source field"
+                                        placeholder="pick a field…"
+                                        (selectionChange)="emitChanged()"
+                                    >
+                                        @for (f of sourceChoices(g); track f) {
+                                            <mat-option [value]="f">{{ f }}</mat-option>
+                                        }
+                                    </mat-select>
+                                </mat-form-field>
                             </td>
                             <td class="py-1 pr-2">
-                                <select
-                                    class="w-full bg-transparent text-sm"
-                                    formControlName="type"
-                                    [attr.aria-label]="'Partition derivation type'"
-                                    (change)="emitChanged()"
-                                >
-                                    @for (t of types; track t) {
-                                        <option [value]="t">{{ t }}</option>
-                                    }
-                                </select>
+                                <mat-form-field class="w-full" subscriptSizing="dynamic">
+                                    <mat-select
+                                        formControlName="type"
+                                        aria-label="Partition derivation type"
+                                        (selectionChange)="emitChanged()"
+                                    >
+                                        @for (t of types; track t) {
+                                            <mat-option [value]="t">{{ t }}</mat-option>
+                                        }
+                                    </mat-select>
+                                </mat-form-field>
                             </td>
                             <td class="py-1 text-right">
                                 <button
@@ -126,35 +131,27 @@ const DATE_TYPES = new Set(['DATE_YEAR', 'DATE_MONTH', 'DATE_DAY']);
             </p>
         }
         <div class="mt-2 flex flex-wrap items-center gap-2">
-            <!-- Smart date partitioning (operator ask 2026-08-22): the field select SUGGESTS —
+            <!-- Smart date partitioning (operator ask 2026-08-22): the field picker SUGGESTS —
                  date-typed schema fields first (pre-picked when there is exactly one obvious
-                 choice), everything else after, because a date can legitimately live in a VARCHAR
-                 column the strptime chain parses. The grain expands to rows, which stay editable. -->
-            <!-- ⚠ [selected] per option, never [value] on the select: the select's value property is
-                 assigned before @for materialises the options, so the binding silently lands on the
-                 first option instead of the picked one (found driving the preview). -->
-            <select
-                class="bg-transparent text-sm"
-                aria-label="Date field for the date partitions"
-                (change)="dateSource.set($any($event.target).value)"
-            >
-                <option value="" disabled [selected]="!dateSource()">date field…</option>
-                @for (f of dateFieldNames(); track f) {
-                    <option [value]="f" [selected]="f === dateSource()">{{ f }} (date-typed)</option>
-                }
-                @for (f of nonDateFieldNames(); track f) {
-                    <option [value]="f" [selected]="f === dateSource()">{{ f }}</option>
-                }
-            </select>
-            <select
-                class="bg-transparent text-sm"
-                aria-label="Date partition grain"
-                (change)="grain.set($any($event.target).value)"
-            >
-                <option value="year" [selected]="grain() === 'year'">Year</option>
-                <option value="month" [selected]="grain() === 'month'">Year + Month</option>
-                <option value="day" [selected]="grain() === 'day'">Year + Month + Day</option>
-            </select>
+                 choice, and hinted "date-typed" in the popup), everything else after, because a
+                 date can legitimately live in a VARCHAR column the strptime chain parses. The
+                 grain expands to rows, which stay editable. Both are the design-system
+                 <inspecto-option-picker> (operator ask 2026-08-23 — a native select here was the
+                 one raw dropdown on the tab); the launcher state stays SIGNALS (the spec's and
+                 addDateGrain's API), mirrored into the two FormControls the CVA binds. -->
+            <inspecto-option-picker
+                class="block min-w-40"
+                label="Date field"
+                placeholder="pick…"
+                [formControl]="dateSourceCtrl"
+                [options]="dateFieldOptions()"
+            />
+            <inspecto-option-picker
+                class="block"
+                label="Grain"
+                [formControl]="grainCtrl"
+                [options]="grainOptions"
+            />
             <button
                 mat-stroked-button
                 type="button"
@@ -194,10 +191,24 @@ export class InspectoSchemaPartitionsEditorComponent {
         return this.form.controls['rows'] as FormArray<FormGroup>;
     }
 
-    /** The launcher's source pick — deliberately NOT a form control, it is a launcher, not state. */
+    /** The launcher's source pick — a signal, because it is a launcher, not saved state. */
     readonly dateSource = signal('');
     /** The launcher's grain: how deep the date directories nest. Day is the historical default. */
     readonly grain = signal<'year' | 'month' | 'day'>('day');
+    /** The CVA bindings for the two pickers — mirrors of the signals above, never read directly. */
+    readonly dateSourceCtrl = new FormControl('', { nonNullable: true });
+    readonly grainCtrl = new FormControl<'year' | 'month' | 'day'>('day', { nonNullable: true });
+
+    /** Date-typed suggestions first (hinted in the popup), the rest of the schema after. */
+    readonly dateFieldOptions = computed<PickerOption[]>(() => [
+        ...this.dateFieldNames().map((f) => ({ value: f, label: f, hint: 'date-typed' })),
+        ...this.nonDateFieldNames().map((f) => ({ value: f, label: f })),
+    ]);
+    readonly grainOptions: PickerOption[] = [
+        { value: 'year', label: 'Year' },
+        { value: 'month', label: 'Year + Month' },
+        { value: 'day', label: 'Year + Month + Day' },
+    ];
     /** Bumped on any structural change so computed warnings re-derive (FormArray is not a signal). */
     private readonly version = signal(0);
 
@@ -216,6 +227,18 @@ export class InspectoSchemaPartitionsEditorComponent {
         effect(() => {
             const dates = this.dateFieldNames();
             if (dates.length === 1 && !this.dateSource()) this.dateSource.set(dates[0]);
+        });
+        // Signal ↔ control mirror: the signals stay the API (the spec and addDateGrain read them),
+        // the controls are only the pickers' CVA binding. Guarded so neither side loops.
+        this.dateSourceCtrl.valueChanges.pipe(takeUntilDestroyed()).subscribe((v) => this.dateSource.set(v));
+        this.grainCtrl.valueChanges.pipe(takeUntilDestroyed()).subscribe((v) => this.grain.set(v));
+        effect(() => {
+            const v = this.dateSource();
+            if (this.dateSourceCtrl.value !== v) this.dateSourceCtrl.setValue(v, { emitEvent: false });
+        });
+        effect(() => {
+            const v = this.grain();
+            if (this.grainCtrl.value !== v) this.grainCtrl.setValue(v, { emitEvent: false });
         });
     }
 
