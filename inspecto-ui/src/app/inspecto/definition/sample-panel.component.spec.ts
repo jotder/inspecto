@@ -1,4 +1,4 @@
-import { TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
@@ -69,6 +69,33 @@ describe('InspectoSamplePanelComponent', () => {
      * S4 — the parse verb belongs beside the chips whose state it changes. The panel owns the sample,
      * never a parser, so the button exists only when a host supplies the label and takes the output.
      */
+    /**
+     * The schema-creation entry points are ONE icon row (operator ask 2026-08-22), identical whether
+     * or not a sample is captured — so a builder never hunts for "the other way in". Asserted by
+     * aria-label because the buttons are icon-only: the label IS the affordance's name here.
+     */
+    describe('the entry-point icon row', () => {
+        function labels(fixture: ComponentFixture<InspectoSamplePanelComponent>): string[] {
+            return Array.from(fixture.nativeElement.querySelectorAll('button[aria-label]')).map((b) =>
+                (b as HTMLElement).getAttribute('aria-label'),
+            ) as string[];
+        }
+
+        it('offers upload and paste in the empty state, and gains replace/clear once captured', () => {
+            const { fixture, state } = create();
+            expect(labels(fixture)).toEqual(['Upload a sample file', 'Paste sample text']);
+
+            state.captureSample('s.csv', 'a,b\n1,2\n');
+            fixture.detectChanges();
+            expect(labels(fixture)).toEqual([
+                'Replace the sample file',
+                'Paste sample text',
+                'Clear the sample',
+                'Collapse the raw preview',
+            ]);
+        });
+    });
+
     describe('the host-supplied parse action (S4)', () => {
         it('is absent until a host labels it', () => {
             const { fixture, state } = create();

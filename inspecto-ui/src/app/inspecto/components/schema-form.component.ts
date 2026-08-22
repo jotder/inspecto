@@ -7,7 +7,6 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import {
@@ -21,6 +20,7 @@ import {
     listPatternViolation,
 } from '../component-model';
 import { ChipComponent } from './chip.component';
+import { InspectoOptionPickerComponent } from './option-picker.component';
 import { InspectoTokenPickerComponent } from './token-picker.component';
 
 /**
@@ -45,13 +45,13 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
         NgTemplateOutlet,
         ReactiveFormsModule,
         ChipComponent,
+        InspectoOptionPickerComponent,
         InspectoTokenPickerComponent,
         MatAutocompleteModule,
         MatButtonModule,
         MatFormFieldModule,
         MatIconModule,
         MatInputModule,
-        MatSelectModule,
         MatSlideToggleModule,
         MatTooltipModule,
     ],
@@ -144,19 +144,25 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
                                 >{{ spec.label }}</mat-slide-toggle
                             >
                         }
+                        <!--
+                            A single choice is asked in a POPUP, not a dropdown (operator ask
+                            2026-08-22): the shared picker gives every option a full-length label and
+                            a filter box once the list is long, which a dropdown overlay cannot. It is
+                            a ControlValueAccessor, so formControlName binds exactly as mat-select
+                            did — and it renders its own label and error, which is why there is no
+                            mat-form-field around it (see the component's own note).
+                            (no backticks in this comment: it lives inside a template literal)
+                        -->
                         @case ('select') {
-                            <mat-form-field class="w-full" subscriptSizing="dynamic">
-                                <mat-label>{{ spec.label }}</mat-label>
-                                <mat-select [formControlName]="spec.key" [attr.cdkFocusInitial]="first ? '' : null">
-                                    @for (opt of spec.options ?? []; track opt.value) {
-                                        <mat-option [value]="opt.value">{{ opt.label }}</mat-option>
-                                    }
-                                </mat-select>
-                                @if (spec.help) {
-                                    <mat-hint>{{ spec.help }}</mat-hint>
-                                }
-                                <mat-error>{{ spec.label }} is required</mat-error>
-                            </mat-form-field>
+                            <inspecto-option-picker
+                                class="block w-full py-1"
+                                [formControlName]="spec.key"
+                                [label]="spec.label"
+                                [options]="spec.options ?? []"
+                                [help]="spec.help ?? ''"
+                                [required]="!!spec.required"
+                                [attr.cdkFocusInitial]="first ? '' : null"
+                            />
                         }
                         @case ('autocomplete') {
                             <mat-form-field class="w-full" subscriptSizing="dynamic">

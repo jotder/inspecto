@@ -11,18 +11,18 @@ import {
     untracked,
     ViewChild,
 } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Observable, forkJoin, of, throwError } from 'rxjs';
 import { catchError, map, tap } from 'rxjs/operators';
 import {
     AuthoredNode,
-    ComponentDef,
     ConfigService,
     ParserDef,
     ParserPreview,
@@ -33,6 +33,7 @@ import {
     apiErrorMessage,
 } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { flattenBlock, nestKeys } from 'app/inspecto/component-model';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
@@ -52,9 +53,7 @@ import {
 import {
     GrammarEditorComponent,
     ParsingFrontend,
-    grammarContentAsParsingBlock,
     grammarCsvFilename,
-    grammarSeedsFrontend,
     grammarToCsv,
     parseGrammarCsv,
     parsingAttributesFor,
@@ -139,16 +138,18 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        NgTemplateOutlet,
+        FormsModule,
         MatButtonModule,
         MatButtonToggleModule,
         MatFormFieldModule,
         MatIconModule,
         MatInputModule,
-        MatSelectModule,
         MatTooltipModule,
         ChipComponent,
         GrammarEditorComponent,
         InspectoAlertComponent,
+        InspectoOptionPickerComponent,
         InspectoSamplePanelComponent,
         InspectoSegmentsEditorComponent,
         InspectoSchemaFieldsEditorComponent,
@@ -175,27 +176,26 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                     parseLabel="Parse sample"
                     [parseDisabled]="!thread.sample()"
                     (parse)="parseSample()"
-                />
+                >
+                    <ng-container sampleActions>
+                        <ng-container [ngTemplateOutlet]="csvActions" />
+                    </ng-container>
+                </inspecto-sample-panel>
             </div>
         }
         <!-- Name/Description live on the canvas inspector's rename affordance now, not here: this
              pane defines the Grammar, and the node's display identity is a graph concern. -->
         <div class="space-y-1">
-            <div class="mb-1 mt-2 flex items-center gap-2">
-                <span class="text-xs font-semibold uppercase opacity-70">Grammar</span>
-                @if (seedableTemplates().length) {
-                    <mat-form-field class="w-56" subscriptSizing="dynamic">
-                        <mat-label>Start from a template</mat-label>
-                        <mat-select [value]="pickedTemplate()" (selectionChange)="applyTemplate($event.value)">
-                            @for (t of seedableTemplates(); track t.name) {
-                                <mat-option [value]="t.name">{{ t.name }}</mat-option>
-                            }
-                        </mat-select>
-                    </mat-form-field>
-                }
-                <!-- CSV export/import replaced "Save as template…" (U4): the file IS the portable
-                     template — options AND the columns table, Excel-editable, diff-friendly. -->
-                <span class="ml-auto"></span>
+            <!--
+                CSV export/import replaced "Save as template…" (U4): the file IS the portable
+                template — options AND the columns table, Excel-editable, diff-friendly. Since the
+                2026-08-22 operator ask the "Start from a stored Grammar" picker is gone too, so the
+                three remaining ways to seed this surface (upload a sample · paste sample text ·
+                import a Grammar CSV) are ONE icon row, projected into the sample panel above.
+                Declared as a template because the sample panel is only mounted when the host keeps a
+                thread — without one the icons render in this row instead, rather than vanishing.
+            -->
+            <ng-template #csvActions>
                 @if (csvCapable()) {
                     <button
                         mat-icon-button
@@ -204,7 +204,7 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                         matTooltip="Import a Grammar CSV — known options and columns repopulate this surface"
                         (click)="csvInput.click()"
                     >
-                        <mat-icon class="icon-size-5" svgIcon="heroicons_outline:arrow-up-tray"></mat-icon>
+                        <mat-icon class="icon-size-5" svgIcon="heroicons_outline:document-arrow-up"></mat-icon>
                     </button>
                     <input
                         #csvInput
@@ -221,8 +221,15 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                         matTooltip="Export the whole property set as <pipeline>_parser.csv"
                         (click)="exportCsv()"
                     >
-                        <mat-icon class="icon-size-5" svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
+                        <mat-icon class="icon-size-5" svgIcon="heroicons_outline:document-arrow-down"></mat-icon>
                     </button>
+                }
+            </ng-template>
+            <div class="mb-1 mt-2 flex items-center gap-2">
+                <span class="text-xs font-semibold uppercase opacity-70">Grammar</span>
+                @if (!sample()) {
+                    <span class="ml-auto"></span>
+                    <ng-container [ngTemplateOutlet]="csvActions" />
                 }
             </div>
             @if (importWarning(); as warn) {
@@ -238,17 +245,14 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                 every preview-only plugin).
             -->
             @if (frontend() === 'plugin') {
-                <mat-form-field class="mb-2 w-full" subscriptSizing="dynamic">
-                    <mat-label>Parser plugin</mat-label>
-                    <mat-select [value]="plugin()?.id ?? null" (selectionChange)="pickPlugin($event.value)">
-                        @for (p of pluginChoices(); track p.id) {
-                            <mat-option [value]="p.id">{{ p.label }}</mat-option>
-                        }
-                    </mat-select>
-                    @if (!pluginChoices().length) {
-                        <mat-hint>No ingestable plugin is deployed on this server.</mat-hint>
-                    }
-                </mat-form-field>
+                <inspecto-option-picker
+                    class="mb-2 block w-full"
+                    label="Parser plugin"
+                    [options]="pluginOptions()"
+                    [ngModel]="plugin()?.id ?? null"
+                    (ngModelChange)="pickPlugin($event)"
+                    [help]="pluginChoices().length ? '' : 'No ingestable plugin is deployed on this server.'"
+                />
             }
             <inspecto-grammar-editor
                 [initial]="seedBlock()"
@@ -388,8 +392,8 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                             @if (filenameColumnTarget()?.value; as filenameCol) {
                                 <p class="text-secondary m-0 mt-2 text-xs">
                                     <span class="font-mono">{{ filenameCol }}</span> is also written to
-                                    {{ filenameColumnTarget()!.target }}'s output — a source-filename lineage
-                                    column set on the Files & metadata tab, not one of the columns above.
+                                    {{ filenameColumnTarget()!.target }}'s output — a source-filename lineage column set
+                                    on the Files & metadata tab, not one of the columns above.
                                 </p>
                             }
                             <!--
@@ -465,8 +469,8 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                                 <p class="text-warn m-0 mt-1 text-xs" role="alert">{{ err }}</p>
                             }
                             <p class="text-secondary m-0 mt-1 text-xs">
-                                Adds a column of this name to {{ t.target }}'s output, carrying each row's source
-                                file. Blank = no column (lineage stays in the ledger only).
+                                Adds a column of this name to {{ t.target }}'s output, carrying each row's source file.
+                                Blank = no column (lineage stays in the ledger only).
                             </p>
                         </div>
                     }
@@ -498,8 +502,8 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                                 class="text-secondary m-0 mt-1 border-t pt-1 text-xs"
                                 style="border-color: var(--gamma-border)"
                             >
-                                <span class="font-mono">{{ filenameCol }}</span> — each row's source file
-                                (lineage, stamped at write; configured above, not a parsed column).
+                                <span class="font-mono">{{ filenameCol }}</span> — each row's source file (lineage,
+                                stamped at write; configured above, not a parsed column).
                             </p>
                         }
                     }
@@ -517,17 +521,12 @@ export class PipelineParseDefinitionComponent {
     readonly node = input.required<AuthoredNode>();
 
     /**
-     * The format this node's type means — the editor is locked to it and only templates naming it are
-     * offered. Derived from the node type rather than passed in, so the host cannot desync the two.
+     * The format this node's type means — the editor is locked to it. Derived from the node type
+     * rather than passed in, so the host cannot desync the two.
      */
     readonly frontend = computed<ParsingFrontend | 'asn1' | 'plugin'>(
         () => PARSE_NODE_FRONTENDS[this.node().type] ?? 'delimited',
     );
-    /**
-     * Stored Grammar components offered as starting points. Passed IN rather than fetched: the pane
-     * stays pure (P2 — `[node]` in, outputs out, no injected state) and the host already lists them.
-     */
-    readonly templates = input<ComponentDef[]>([]);
 
     /**
      * The pipeline this node belongs to — only used to name the segment schema toons, by the SAME
@@ -587,7 +586,8 @@ export class PipelineParseDefinitionComponent {
     @ViewChild(InspectoSegmentsEditorComponent) private segmentsEditor?: InspectoSegmentsEditorComponent;
     @ViewChild(InspectoSchemaFieldsEditorComponent) private schemaGrid?: InspectoSchemaFieldsEditorComponent;
     @ViewChild(InspectoSchemaMetadataGridComponent) private metaGrid?: InspectoSchemaMetadataGridComponent;
-    @ViewChild(InspectoSchemaPartitionsEditorComponent) private partitionsEditor?: InspectoSchemaPartitionsEditorComponent;
+    @ViewChild(InspectoSchemaPartitionsEditorComponent)
+    private partitionsEditor?: InspectoSchemaPartitionsEditorComponent;
 
     /** The stored `partitions[]` of this node's schema toon — seeded by {@link loadSavedSchema}. */
     readonly partitionSeed = signal<SchemaPartitionRow[]>([]);
@@ -643,6 +643,11 @@ export class PipelineParseDefinitionComponent {
         const dedicated = new Set<string>(Object.values(PARSE_NODE_FRONTENDS));
         return (this.servedPlugins() ?? []).filter((p) => p.ingestable && p.ingesterClass && !dedicated.has(p.id));
     });
+
+    /** The same choices in the shared picker's shape — the served label reads better as a hint. */
+    readonly pluginOptions = computed<PickerOption[]>(() =>
+        this.pluginChoices().map((p) => ({ value: p.id, label: p.label ?? p.id })),
+    );
 
     /** The operator's manual pick, feeding the shared editor's `[type]`. Rehydration on load goes
      *  through `[configuredIngester]` instead, so the two paths never race each other. */
@@ -888,20 +893,11 @@ export class PipelineParseDefinitionComponent {
         return p && typeof p === 'object' && !Array.isArray(p) ? { ...(p as Record<string, unknown>) } : {};
     });
 
-    /** The template the operator started from, if any — its block replaces the node's until Apply. */
-    readonly pickedTemplate = signal<string | null>(null);
+    /** A seed that replaces the node's own block until Apply — set by a Grammar CSV import. */
     private readonly templateBlock = signal<Record<string, unknown> | null>(null);
 
-    /** What the editor is seeded from: a picked template's copy, else the node's own block. */
+    /** What the editor is seeded from: an imported copy, else the node's own block. */
     readonly seedBlock = computed<Record<string, unknown>>(() => this.templateBlock() ?? this.parsingBlock());
-
-    /**
-     * Only Grammars that can seed THIS node's format. A component naming another frontend would author
-     * a block the save path refuses with `PARSER_FRONTEND_MISMATCH`, so it is not offered at all.
-     */
-    readonly seedableTemplates = computed<ComponentDef[]>(() =>
-        this.templates().filter((t) => grammarSeedsFrontend(t.content ?? {}, this.frontend())),
-    );
 
     private lastDirty = false;
     /**
@@ -949,9 +945,8 @@ export class PipelineParseDefinitionComponent {
     /** The one-shot seed body — see the effect above for why it must not be tracked. */
     private seedFromNode(n: AuthoredNode): void {
         {
-            // A different node (or a Discard-driven re-seed) makes any template pick stale — the
-            // seed must fall back to the node's own block, or the previous node's template lingers.
-            this.pickedTemplate.set(null);
+            // A different node (or a Discard-driven re-seed) makes any imported seed stale — the
+            // seed must fall back to the node's own block, or the previous node's copy lingers.
             this.templateBlock.set(null);
             this.templateDirty = false;
             // A manual plugin pick is the same kind of stale state — the FQCN carried on THIS node
@@ -1109,7 +1104,9 @@ export class PipelineParseDefinitionComponent {
                         ? partitions.map((p) => ({
                               column: String(p['column'] ?? ''),
                               source: String(p['source'] ?? ''),
-                              type: String(p['type'] ?? 'VARCHAR').toUpperCase().replace('-', '_'),
+                              type: String(p['type'] ?? 'VARCHAR')
+                                  .toUpperCase()
+                                  .replace('-', '_'),
                           }))
                         : legacyKey
                           ? // The legacy `partitionKey:` spelling — surfaced as the trio the engine
@@ -1182,23 +1179,6 @@ export class PipelineParseDefinitionComponent {
     @HostListener('input')
     @HostListener('click')
     onInteraction(): void {
-        this.emitDirty();
-    }
-
-    /**
-     * Start from a stored Grammar: its content is COPIED into the editor. No binding is created and
-     * the template is never written back — this node owns the copy from here on.
-     *
-     * ⚠ The content is normalised first: a legacy flat component (`{delimiter: '|'}`) matches no
-     * `delimited__*` spec key, so seeding it raw shows the form's DEFAULTS and silently loses the
-     * stored settings.
-     */
-    applyTemplate(name: string): void {
-        const t = this.seedableTemplates().find((x) => x.name === name);
-        if (!t) return;
-        this.pickedTemplate.set(name);
-        this.templateBlock.set(grammarContentAsParsingBlock(t.content ?? {}));
-        this.templateDirty = true;
         this.emitDirty();
     }
 

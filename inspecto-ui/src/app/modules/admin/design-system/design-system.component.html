@@ -257,7 +257,14 @@
                 the protocol to see the Host field appear and disappear. Prefer this over a hand-built form whenever the
                 fields are plain config attributes. <strong>As of date</strong> carries a <code>[tokens]</code> picker:
                 choosing one replaces the field's <em>whole</em> value, and <code>[tokenSyntax]</code> exempts it from
-                the field's date <code>pattern</code>.
+                the field's date <code>pattern</code>. A <code>type: 'select'</code> attribute renders the shared
+                <code>&lt;inspecto-option-picker&gt;</code> — a single choice is asked in a <strong>popup</strong>, not
+                a dropdown, so every option gets a full-length label, an optional hint, and a filter box once the list
+                is long. Its trigger is a <strong>compact property row</strong>: label and current value share one
+                line and the value carries a small chevron as the selectability hint — no boxed control below the
+                label, so dense option sheets stay short. Reach for the picker directly (it is a
+                <code>ControlValueAccessor</code>) instead of a <code>mat-select</code>; table-cell and toolbar
+                filters stay dropdowns.
             </p>
             <div class="bg-card max-w-140 rounded-2xl p-6 shadow">
                 <inspecto-schema-form
@@ -282,13 +289,13 @@
             </div>
             <p class="text-secondary mb-4 text-sm">
                 <code>&lt;inspecto-schema-fields-editor&gt;</code> is the shared <code>raw.fields[]</code> grid —
-                include / <code>#</code> sequence / <strong>icon-only type menu</strong> / Name / Synonym — with
-                search, filter, sort and paging that keep a 500-column feed usable. In <strong>Auto</strong> types
-                mode the icon menu locks (inferred types are the sniffer's; switch to Declared to override).
-                <code>&lt;inspecto-schema-metadata-grid&gt;</code> is a second view over the <em>same</em> rows
-                signal, annotating description / unit / classification (Catalog-facing, never read by the ETL) —
-                the host merges its values onto the columns table's rows by selector at submit. Both are pure:
-                seed <code>[rows]</code> from a signal, read <code>value()</code> on submit.
+                include / <code>#</code> sequence / <strong>icon-only type menu</strong> / Name / Synonym — with search,
+                filter, sort and paging that keep a 500-column feed usable. In <strong>Auto</strong> types mode the icon
+                menu locks (inferred types are the sniffer's; switch to Declared to override).
+                <code>&lt;inspecto-schema-metadata-grid&gt;</code> is a second view over the <em>same</em> rows signal,
+                annotating description / unit / classification (Catalog-facing, never read by the ETL) — the host merges
+                its values onto the columns table's rows by selector at submit. Both are pure: seed
+                <code>[rows]</code> from a signal, read <code>value()</code> on submit.
             </p>
             <div class="bg-card rounded-2xl p-6 shadow">
                 <mat-button-toggle-group
@@ -316,13 +323,12 @@
             </div>
             <p class="text-secondary mb-2 text-sm">
                 A spec set naming ≥ 2 distinct <code>tab</code>s makes <code>&lt;inspecto-grammar-editor&gt;</code>
-                render a tab group — one schema-form per tab, count badges for values set away from default, a warn
-                dot on an invalid tab. The editor itself needs a served parser catalog, so (like
-                <code>&lt;inspecto-collector-config&gt;</code>) it is documented here as a snippet rather than
-                mounted — the live surface is any delimited Parse step in the Pipelines editor. ⚠ The R9 rule: tab
-                panels live <em>outside</em> the mat-tab bodies, <code>[hidden]</code>-toggled, because MatTab
-                instantiates body content on first activation and unvisited tabs would silently drop their values
-                on save.
+                render a tab group — one schema-form per tab, count badges for values set away from default, a warn dot
+                on an invalid tab. The editor itself needs a served parser catalog, so (like
+                <code>&lt;inspecto-collector-config&gt;</code>) it is documented here as a snippet rather than mounted —
+                the live surface is any delimited Parse step in the Pipelines editor. ⚠ The R9 rule: tab panels live
+                <em>outside</em> the mat-tab bodies, <code>[hidden]</code>-toggled, because MatTab instantiates body
+                content on first activation and unvisited tabs would silently drop their values on save.
             </p>
             <pre
                 class="bg-default text-secondary overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"

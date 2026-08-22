@@ -52,6 +52,20 @@ describe('InspectoSchemaFormComponent', () => {
         return fixture;
     }
 
+    /**
+     * A single choice is asked in a POPUP, not a dropdown (operator ask 2026-08-22). Pinned because
+     * every other spec here drives the form through `patchValue`, so nothing else would notice the
+     * control type changing under it — the value contract is unaffected either way.
+     */
+    it('renders a select as the shared popup picker showing the option label', () => {
+        const fixture = create();
+        expect(fixture.nativeElement.querySelector('mat-select')).toBeNull();
+        const picker = fixture.nativeElement.querySelector('inspecto-option-picker');
+        expect(picker).toBeTruthy();
+        expect(picker.textContent).toContain('Enrich'); // the default's LABEL, not 'enrich'
+        expect(fixture.componentInstance.value()['type']).toBe('enrich');
+    });
+
     it('shows required tier; collapses optional; hides advanced behind the gear', () => {
         const fixture = create();
         const text = (fixture.nativeElement as HTMLElement).textContent ?? '';

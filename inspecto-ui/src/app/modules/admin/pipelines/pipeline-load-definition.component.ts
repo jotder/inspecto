@@ -61,8 +61,8 @@ interface RuleRow {
  *
  * <p><b>Where the fields come from.</b> ⛔ Not from the sample: the rules map FROM the schema the Parse
  * drawer authored, so the host passes that node's `schema_file` in as read-only context and this pane
- * reads the field list off it — the same "context in, one rebuilt node out" shape the Parse pane uses
- * for `[templates]`. Operator decision, 2026-08-16.
+ * reads the field list off it — the same "context in, one rebuilt node out" shape the Parse pane uses.
+ * Operator decision, 2026-08-16.
  *
  * <p><b>The sample is for TESTING only (B1).</b> `[sample]` is the tab's thread; *Test mapping* posts
  * the rules being edited over the rows the Parse drawer already parsed and renders the mapped output —

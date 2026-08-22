@@ -9,13 +9,13 @@ import {
     inject,
     signal,
 } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { AuthoredNode } from 'app/inspecto/api';
+import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 import {
     categoryColor,
     categoryLabel,
@@ -37,7 +37,15 @@ import {
 @Component({
     selector: 'app-pipeline-inspector',
     standalone: true,
-    imports: [MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, MatSelectModule, ReactiveFormsModule],
+    imports: [
+        MatButtonModule,
+        MatFormFieldModule,
+        MatIconModule,
+        MatInputModule,
+        FormsModule,
+        ReactiveFormsModule,
+        InspectoOptionPickerComponent,
+    ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         @if (node) {
@@ -147,26 +155,22 @@ import {
             }
         } @else if (selectedEdgeId) {
             <h3 class="mb-2 text-sm font-semibold">Connection</h3>
-            <mat-form-field class="w-full" subscriptSizing="dynamic">
-                <mat-label>Relationship</mat-label>
-                <mat-select
-                    [value]="selectedEdgeRel"
-                    [disabled]="readOnly"
-                    (selectionChange)="edgeRelChange.emit($event.value)"
-                >
-                    @for (r of candidateRels; track r) {
-                        <mat-option [value]="r">{{ r }}</mat-option>
-                    }
-                </mat-select>
-            </mat-form-field>
+            <inspecto-option-picker
+                class="block w-full"
+                label="Relationship"
+                [options]="relOptions()"
+                [disabled]="readOnly"
+                [ngModel]="selectedEdgeRel"
+                (ngModelChange)="edgeRelChange.emit($event)"
+            />
             <p class="mt-1 text-xs opacity-60">The source's output this connection carries.</p>
         } @else {
             <p class="text-sm opacity-70">
                 @if (readOnly) {
                     Click a Step or edge to inspect it. Authoring is read-only in the Business lens.
                 } @else {
-                    Drag a Step from the palette onto the canvas. Click a Step to edit its configuration
-                    right here. <b>Delete selected</b> removes the selected item.
+                    Drag a Step from the palette onto the canvas. Click a Step to edit its configuration right here.
+                    <b>Delete selected</b> removes the selected item.
                 }
             </p>
         }
@@ -185,6 +189,11 @@ export class PipelineInspectorComponent implements OnChanges {
     @Input() selectedEdgeId: string | null = null;
     @Input() selectedEdgeRel: string | null = null;
     @Input() candidateRels: string[] = [];
+
+    /** The relationship names in the shared picker's shape — a rel is its own label. */
+    relOptions(): PickerOption[] {
+        return this.candidateRels.map((r) => ({ value: r, label: r }));
+    }
     /** Business lens: hide every authoring action (Configure/relabel). */
     @Input() readOnly = false;
     /**

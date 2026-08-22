@@ -168,7 +168,12 @@ src/app/
   spec defaults — a default materializes into every `value()` and mutates faithful copies of stored
   grammars. The portable template is the **Grammar CSV** (`inspecto/grammar/grammar-csv.ts`,
   `<pipeline>_parser.csv`) — Save-as-template is gone from both parse surfaces; unknown option keys
-  are LISTED, never applied. The columns table (`inspecto/schema/`) is ordered ①include ②# ③icon-only
+  are LISTED, never applied. **Since 2026-08-22 the "Start from a stored Grammar" picker is gone too**
+  (operator ask), leaving exactly THREE ways to seed the surface — upload a sample file · paste sample
+  text · import a Grammar CSV — rendered as ONE icon row: the panel owns the first two and the host
+  projects the CSV pair through the sample panel's `[sampleActions]` slot. ⚠ The panel is only mounted
+  when the host keeps a thread, so the CSV pair is declared as an `ng-template` and falls back to the
+  Grammar row without one — never inline it twice. The columns table (`inspecto/schema/`) is ordered ①include ②# ③icon-only
   type menu ④name ⑤synonym (unique across synonyms ∪ names), with `[autoTypes]` disabling the menu in
   Auto mode. **Field types (2026-08-22):** `SCHEMA_TYPES` mirrors the engine's
   `SchemaFieldTypes.names()` — 20 DuckDB scalar types, `DECIMAL(p,s)` authored by precision/scale
@@ -286,6 +291,28 @@ src/app/
   projections, `ReconExecService`) — those call `sampleDatasetRows` deliberately, after the server call
   failed. ⚠ `DatasetResultService.run` takes rows as a **thunk** for the same reason: its live branch
   never reads them.
+- **Asking for ONE choice → `<inspecto-option-picker>`** (`inspecto/components/option-picker.component.ts`,
+  operator ask 2026-08-22). ⛔ **`mat-select` is no longer the way to ask for a single choice.** The picker
+  is a `ControlValueAccessor`, so `formControlName` / `[ngModel]` bind exactly as `mat-select` did, but the
+  choices open in a **dialog**: full-length labels, an optional per-option `hint`, and a filter box once
+  there are ≥8 options. `schema-form`'s `type: 'select'` renders it, so **every schema-driven form in the
+  app already asks this way** — a spec set needs no change. ⚠ It renders its **own label and error line**
+  and must NOT be wrapped in a `mat-form-field`: a form field derives error state from an `NgControl` on
+  its projected input, so a `<mat-error>` beside it could never fire (the same trap `type: 'list'` hit).
+  The error is an explicit `role="alert"` line — **assert the rendered element**, never that a getter
+  returned the string. ⚠ Two behaviours are load-bearing: a **dismissed** popup writes nothing (a Cancel
+  that nulled the control would destroy a stored value), and a value matching **no offered option is shown
+  verbatim** rather than as unset (a stored config can name a choice this deployment no longer serves, and
+  blanking it invites an accidental overwrite). ⛔ Don't build the trigger from a `mat-*-button` — Material
+  lays out button content internally, so a full-width trigger came out with the chevron at the far left and
+  the value jammed against the right edge. **The trigger is a compact PROPERTY ROW (operator ask 2026-08-23):**
+  label and current value share ONE line — the value (or its `Select` placeholder) plus a small chevron IS the
+  borderless trigger; no boxed control below the label, so dense option sheets (the Grammar 4-tab form) stay short.
+  Don't reintroduce a bordered full-width trigger; the spec pins the borderless one-row class contract.
+  **Still dropdowns, deliberately:** table-cell and grid-toolbar
+  selects (the mapping-rules rows, the columns table's type filter and page size) — a modal per cell is
+  worse than the dropdown it replaces. The remaining ~130 hand-rolled `mat-select`s outside those two
+  categories are an unswept follow-up, not a decision against the picker.
 - **Tabular surfaces → `<inspecto-data-table [tier]>`** (`app/inspecto/data-table`), the consolidation of
   every ag-Grid host. Tiers: **mini** (grid) · **standard** (+ icon-only toolbar: column chooser · search ·
   CSV export) · **pro** (+ an **icon-toggled CodeMirror SQL editor — hidden by default** — that runs real SQL

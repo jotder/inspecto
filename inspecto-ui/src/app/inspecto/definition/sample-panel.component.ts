@@ -86,9 +86,50 @@ const RAW_PREVIEW_LINES = 40;
                             <span class="ml-1">{{ parseLabel() }}</span>
                         </button>
                     }
-                    <button mat-stroked-button type="button" (click)="fileInput.click()">Replace</button>
-                    <button mat-stroked-button type="button" (click)="pasting.set(!pasting())">Paste text</button>
-                    <button mat-stroked-button type="button" (click)="clear()">Clear</button>
+                } @else {
+                    <span class="text-secondary text-sm">
+                        Capture one representative sample — it follows you through the definition, so every test shows
+                        <em>your</em> data.
+                    </span>
+                    <span class="flex-1"></span>
+                }
+
+                <!--
+                    The schema-creation entry points, as ONE icon row (operator ask 2026-08-22): the
+                    two the panel owns (upload a sample file / paste sample text) sit beside whatever
+                    the host projects — the Grammar CSV import/export on the parse pane — so every way
+                    a builder can seed this surface is in one place instead of two. Icon-only and
+                    identical in both states, which is why it lives outside the branch above.
+                -->
+                <button
+                    mat-icon-button
+                    type="button"
+                    (click)="fileInput.click()"
+                    [attr.aria-label]="state().sample() ? 'Replace the sample file' : 'Upload a sample file'"
+                    [matTooltip]="state().sample() ? 'Replace the sample file' : 'Upload a sample file'"
+                >
+                    <mat-icon class="icon-size-5" svgIcon="heroicons_outline:arrow-up-tray"></mat-icon>
+                </button>
+                <button
+                    mat-icon-button
+                    type="button"
+                    (click)="pasting.set(!pasting())"
+                    aria-label="Paste sample text"
+                    matTooltip="Paste sample text"
+                >
+                    <mat-icon class="icon-size-5" svgIcon="heroicons_outline:clipboard"></mat-icon>
+                </button>
+                <ng-content select="[sampleActions]" />
+                @if (state().sample()) {
+                    <button
+                        mat-icon-button
+                        type="button"
+                        (click)="clear()"
+                        aria-label="Clear the sample"
+                        matTooltip="Clear the sample"
+                    >
+                        <mat-icon class="icon-size-5" svgIcon="heroicons_outline:x-mark"></mat-icon>
+                    </button>
                     <button
                         mat-icon-button
                         type="button"
@@ -101,17 +142,6 @@ const RAW_PREVIEW_LINES = 40;
                             [svgIcon]="expanded() ? 'heroicons_outline:chevron-up' : 'heroicons_outline:chevron-down'"
                         ></mat-icon>
                     </button>
-                } @else {
-                    <span class="text-secondary text-sm">
-                        Capture one representative sample — it follows you through the definition, so every test shows
-                        <em>your</em> data.
-                    </span>
-                    <span class="flex-1"></span>
-                    <button mat-flat-button color="primary" type="button" (click)="fileInput.click()">
-                        <mat-icon svgIcon="heroicons_outline:arrow-up-tray" class="icon-size-4"></mat-icon>
-                        <span class="ml-1">Choose file</span>
-                    </button>
-                    <button mat-stroked-button type="button" (click)="pasting.set(!pasting())">Paste text</button>
                 }
             </div>
 

@@ -5,7 +5,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { delay } from 'rxjs/operators';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AuthoredNode, ComponentDef, ConfigService, ParsersService, SpacesService } from 'app/inspecto/api';
+import { AuthoredNode, ConfigService, ParsersService, SpacesService } from 'app/inspecto/api';
 import { ToastrService } from 'ngx-toastr';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
@@ -26,7 +26,6 @@ import { PipelineParseDefinitionComponent } from './pipeline-parse-definition.co
     template: `
         <app-pipeline-parse-definition
             [node]="node"
-            [templates]="templates"
             [pipelineName]="pipelineName"
             [sample]="sample"
             [filenameColumnTarget]="filenameColumnTarget"
@@ -38,7 +37,6 @@ import { PipelineParseDefinitionComponent } from './pipeline-parse-definition.co
 })
 class HostComponent {
     node: AuthoredNode = delimitedNode();
-    templates: ComponentDef[] = [];
     pipelineName = '';
     /** The tab's sample thread — null in most specs, exactly as a host that keeps none. */
     sample: DefinitionStateService | null = null;
@@ -196,7 +194,6 @@ let confirmAnswer = true;
  */
 async function create(
     node: AuthoredNode = delimitedNode(),
-    templates: ComponentDef[] = [],
     served: unknown[] = [],
     servedDelayMs = 0,
     sample: DefinitionStateService | null = null,
@@ -275,7 +272,6 @@ async function create(
     await TestBed.compileComponents();
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.node = node;
-    fixture.componentInstance.templates = templates;
     fixture.componentInstance.sample = sample;
     fixture.componentInstance.pipelineName = pipelineName;
     fixture.detectChanges();
@@ -314,7 +310,7 @@ describe('PipelineParseDefinitionComponent', () => {
         it('renders the strip and hands the editor the thread’s sample', async () => {
             const thread = new DefinitionStateService();
             thread.captureSample('cdr.csv', 'a|b\n1|2\n');
-            const fixture = await create(delimitedNode(), [], [], 0, thread);
+            const fixture = await create(delimitedNode(), [], 0, thread);
 
             expect(fixture.nativeElement.querySelector('inspecto-sample-panel')).not.toBeNull();
             expect(fixture.nativeElement.textContent).toContain('cdr.csv');
@@ -325,7 +321,7 @@ describe('PipelineParseDefinitionComponent', () => {
         it('mirrors a table Test parse into the thread', async () => {
             const thread = new DefinitionStateService();
             thread.captureSample('cdr.csv', 'a|b\n1|2\n');
-            const fixture = await create(delimitedNode(), [], [], 0, thread);
+            const fixture = await create(delimitedNode(), [], 0, thread);
             const parsers = TestBed.inject(ParsersService) as unknown as { preview: ReturnType<typeof vi.fn> };
             parsers.preview.mockReturnValue(
                 of({ kind: 'table', columns: ['a', 'b'], rows: [{ a: '1' }], rowCount: 1, rejectedRows: 0 }),
@@ -343,7 +339,7 @@ describe('PipelineParseDefinitionComponent', () => {
         it('records a failed Test parse, clearing the stale parsed result', async () => {
             const thread = new DefinitionStateService();
             thread.captureSample('cdr.csv', 'a|b\n');
-            const fixture = await create(delimitedNode(), [], [], 0, thread);
+            const fixture = await create(delimitedNode(), [], 0, thread);
             thread.parsePreview.set({ frontend: 'delimited', columns: ['a'], rowCount: 1, rows: [], rejectedRows: 0 });
             const parsers = TestBed.inject(ParsersService) as unknown as { preview: ReturnType<typeof vi.fn> };
             parsers.preview.mockReturnValue(throwError(() => new Error('nope')));
@@ -362,7 +358,7 @@ describe('PipelineParseDefinitionComponent', () => {
         it('marks the derived columns stale when a re-test fails, and clears it on the next success', async () => {
             const thread = new DefinitionStateService();
             thread.captureSample('cdr.csv', 'a|b\n1|2\n');
-            const fixture = await create(delimitedNode(), [], [], 0, thread);
+            const fixture = await create(delimitedNode(), [], 0, thread);
             fixture.componentInstance.pipelineName = 'cdr'; // owns `cdr_schema.toon`, so the block renders
             fixture.detectChanges();
             const parsers = TestBed.inject(ParsersService) as unknown as { preview: ReturnType<typeof vi.fn> };
@@ -387,7 +383,7 @@ describe('PipelineParseDefinitionComponent', () => {
         it('leaves the thread untouched for a tree preview', async () => {
             const thread = new DefinitionStateService();
             thread.captureSample('cdr.ber', 'x');
-            const fixture = await create(delimitedNode(), [], [], 0, thread);
+            const fixture = await create(delimitedNode(), [], 0, thread);
             const parsers = TestBed.inject(ParsersService) as unknown as { preview: ReturnType<typeof vi.fn> };
             parsers.preview.mockReturnValue(of({ kind: 'tree', nodes: [] }));
             editor(fixture).test();
@@ -517,7 +513,7 @@ describe('PipelineParseDefinitionComponent', () => {
      */
     describe('the ASN.1 subtype (parser.asn1)', () => {
         it('locks the editor to the served asn1 type', async () => {
-            const fixture = await create(asn1Node(), [], [ASN1_DEF]);
+            const fixture = await create(asn1Node(), [ASN1_DEF]);
             expect(pane(fixture).frontend()).toBe('asn1');
             expect(editor(fixture).pluginDef()?.id).toBe('asn1');
             expect(editor(fixture).lockType).toBe(true);
@@ -529,14 +525,14 @@ describe('PipelineParseDefinitionComponent', () => {
          * rather than carried verbatim, and the emitted paths are the ones just written.
          */
         it('re-hydrates the saved segment’s COLUMNS, not just its key', async () => {
-            const fixture = await create(asn1Node(), [], [ASN1_DEF]);
+            const fixture = await create(asn1Node(), [ASN1_DEF]);
             expect(pane(fixture).initialSegments()).toEqual([
                 { key: 'Record', columns: [{ name: 'IMSI', selector: 'imsi', type: 'VARCHAR' }] },
             ]);
         });
 
         it('Apply writes one schema toon per segment, THEN emits a block referencing them', async () => {
-            const fixture = await create(asn1Node(), [], [ASN1_DEF]);
+            const fixture = await create(asn1Node(), [ASN1_DEF]);
             fixture.componentInstance.pipelineName = 'asn1_cdr';
             fixture.detectChanges();
             editor(fixture).schemaForm!.form.patchValue({ asn1__root_type: 'CallEventRecord' });
@@ -561,7 +557,7 @@ describe('PipelineParseDefinitionComponent', () => {
         it('applies NOTHING when the segment-schema write fails', async () => {
             schemaWriteFails = true;
             try {
-                const fixture = await create(asn1Node(), [], [ASN1_DEF]);
+                const fixture = await create(asn1Node(), [ASN1_DEF]);
                 pane(fixture).submit();
 
                 expect(fixture.componentInstance.applied).toBeUndefined();
@@ -578,7 +574,7 @@ describe('PipelineParseDefinitionComponent', () => {
         it('refuses to Apply a keys-only segment whose saved schema is missing', async () => {
             savedSchemaMissing = true;
             try {
-                const fixture = await create(asn1Node(), [], [ASN1_DEF]);
+                const fixture = await create(asn1Node(), [ASN1_DEF]);
                 pane(fixture).submit();
 
                 expect(schemaWrites).toHaveLength(0);
@@ -591,13 +587,13 @@ describe('PipelineParseDefinitionComponent', () => {
 
         /** Segments are only meaningful for a parser that can actually load — and only for asn1 here. */
         it('offers the segments editor for an ingestable ASN.1 node, never for a built-in format', async () => {
-            const fixture = await create(asn1Node(), [], [ASN1_DEF]);
+            const fixture = await create(asn1Node(), [ASN1_DEF]);
             expect(pane(fixture).authorsSegments()).toBe(true);
             expect(fixture.nativeElement.querySelector('inspecto-segments-editor')).not.toBeNull();
         });
 
         it('does not offer segments on a delimited node', async () => {
-            const fixture = await create(delimitedNode(), [], [ASN1_DEF]);
+            const fixture = await create(delimitedNode(), [ASN1_DEF]);
             expect(pane(fixture).authorsSegments()).toBe(false);
             expect(fixture.nativeElement.querySelector('inspecto-segments-editor')).toBeNull();
         });
@@ -610,7 +606,7 @@ describe('PipelineParseDefinitionComponent', () => {
          * here to reproduce the production ordering.
          */
         it('keeps the stored grammar when the served catalog arrives AFTER the seed', async () => {
-            const fixture = await create(asn1Node(), [], [ASN1_DEF], 10);
+            const fixture = await create(asn1Node(), [ASN1_DEF], 10);
             await new Promise((r) => setTimeout(r, 30));
             fixture.detectChanges();
 
@@ -624,7 +620,7 @@ describe('PipelineParseDefinitionComponent', () => {
          * from the form would write an EMPTY grammar over a deployed one and report success.
          */
         it('refuses to Apply when the served asn1 parser is absent, rather than emptying the block', async () => {
-            const fixture = await create(asn1Node(), [], []);
+            const fixture = await create(asn1Node(), []);
 
             pane(fixture).submit();
 
@@ -641,13 +637,13 @@ describe('PipelineParseDefinitionComponent', () => {
      */
     describe('the generic custom-plugin subtype (parser.plugin)', () => {
         it('offers only ingestable plugins, excluding ones with their own dedicated type', async () => {
-            const fixture = await create(pluginNode(), [], [ACME_DEF, ASN1_DEF]);
+            const fixture = await create(pluginNode(), [ACME_DEF, ASN1_DEF]);
             const p = pane(fixture);
             expect(p.pluginChoices().map((x) => x.id)).toEqual(['acme_feed']);
         });
 
         it('rehydrates the saved ingester on load without marking the pane dirty', async () => {
-            const fixture = await create(pluginNode(), [], [ACME_DEF], 5);
+            const fixture = await create(pluginNode(), [ACME_DEF], 5);
             await new Promise((r) => setTimeout(r, 10));
             fixture.detectChanges();
 
@@ -656,7 +652,7 @@ describe('PipelineParseDefinitionComponent', () => {
         });
 
         it('offers the segments editor for an ingestable plugin, and authors them on Apply', async () => {
-            const fixture = await create(pluginNode(), [], [ACME_DEF]);
+            const fixture = await create(pluginNode(), [ACME_DEF]);
             expect(pane(fixture).authorsSegments()).toBe(true);
         });
 
@@ -666,7 +662,7 @@ describe('PipelineParseDefinitionComponent', () => {
          * is emitted, only after which the ingester + ingester_config from the schema form land in it.
          */
         it('Apply writes segment schemas then assembles ingester + ingester_config from the served schema', async () => {
-            const fixture = await create(pluginNode(), [], [ACME_DEF]);
+            const fixture = await create(pluginNode(), [ACME_DEF]);
             editor(fixture).schemaForm!.form.patchValue({ ingester_config__mode: 'lenient' });
             fixture.detectChanges();
             const segments = segmentsEditor(fixture);
@@ -688,7 +684,7 @@ describe('PipelineParseDefinitionComponent', () => {
          * not just a jar that failed to deploy. Applying must refuse rather than write a hollow block.
          */
         it('refuses to Apply when no plugin has been picked or rehydrated', async () => {
-            const fixture = await create(pluginNode(), [], []);
+            const fixture = await create(pluginNode(), []);
 
             pane(fixture).submit();
 
@@ -731,120 +727,20 @@ describe('PipelineParseDefinitionComponent', () => {
 
         /** Segments are the ASN.1 load path; a built-in frontend has none to author. */
         it('offers no segments editor on a text/regex node', async () => {
-            const fixture = await create(textRegexNode(), [], [ASN1_DEF]);
+            const fixture = await create(textRegexNode(), [ASN1_DEF]);
             expect(pane(fixture).authorsSegments()).toBe(false);
         });
     });
 
-    describe('start from a template (S2)', () => {
-        const TEMPLATES = [
-            {
-                name: 'pipe_delimited',
-                ref: 'grammar/pipe_delimited',
-                type: 'grammar',
-                content: { delimiter: '|', has_header: false },
-            },
-            {
-                name: 'nested_tsv',
-                ref: 'grammar/nested_tsv',
-                type: 'grammar',
-                content: { frontend: 'delimited', delimited: { delimiter: '\t' } },
-            },
-            {
-                name: 'invoice_xml',
-                ref: 'grammar/invoice_xml',
-                type: 'grammar',
-                content: { parser_type: 'xml', record_xpath: '//x' },
-            },
-            {
-                name: 'mainframe_fixed',
-                ref: 'grammar/mainframe_fixed',
-                type: 'grammar',
-                content: { frontend: 'fixedwidth' },
-            },
-        ] as unknown as ComponentDef[];
-
-        /** A component naming another frontend could only author a PARSER_FRONTEND_MISMATCH block. */
-        it('offers only delimited-compatible templates', async () => {
-            const fixture = await create(delimitedNode(), TEMPLATES);
-            expect(
-                pane(fixture)
-                    .seedableTemplates()
-                    .map((t) => t.name),
-            ).toEqual(['pipe_delimited', 'nested_tsv']);
+    /** The editor is locked to the format the node's TYPE means — never a picker.
+     *  ⚠ One `create()` per test: `TestBed.configureTestingModule` throws once instantiated. */
+    describe('the locked frontend', () => {
+        it('derives it from a delimited node type', async () => {
+            expect(pane(await create(delimitedNode())).frontend()).toBe('delimited');
         });
 
-        /**
-         * The mirror image (P3b): the same pane on a fixed-width node offers the DISJOINT set. Note
-         * `pipe_delimited` — an undeclared legacy flat component — is offered to delimited but NOT
-         * here: undeclared means the engine's implicit default, and seeding a slice table from a
-         * `{delimiter: '|'}` map would invent a Grammar the operator never wrote.
-         */
-        it('offers only fixed-width-compatible templates on a fixed-width node', async () => {
-            const fixture = await create(fixedWidthNode(), TEMPLATES);
-            expect(
-                pane(fixture)
-                    .seedableTemplates()
-                    .map((t) => t.name),
-            ).toEqual(['mainframe_fixed']);
-        });
-
-        /** The editor is locked to the format the node's TYPE means — never a picker.
-         *  ⚠ One `create()` per test: `TestBed.configureTestingModule` throws once instantiated. */
-        it('derives the locked frontend from a delimited node type', async () => {
-            expect(pane(await create(delimitedNode(), TEMPLATES)).frontend()).toBe('delimited');
-        });
-
-        it('derives the locked frontend from a fixed-width node type', async () => {
-            expect(pane(await create(fixedWidthNode(), TEMPLATES)).frontend()).toBe('fixedwidth');
-        });
-
-        /**
-         * ⚠ The regression this slice exists to prevent: a LEGACY FLAT component's keys sit at top
-         * level, match no `delimited__*` spec key, and seed the form's DEFAULTS — so picking
-         * `pipe_delimited` used to silently yield `delimiter: ','`. Probed before the fix.
-         */
-        it('copies a legacy flat template without losing its stored settings', async () => {
-            const fixture = await create(delimitedNode(), TEMPLATES);
-            pane(fixture).applyTemplate('pipe_delimited');
-            fixture.detectChanges();
-
-            expect(editor(fixture).value()['delimited']).toEqual({ delimiter: '|', has_header: false });
-        });
-
-        it('copies an already-nested template unchanged', async () => {
-            const fixture = await create(delimitedNode(), TEMPLATES);
-            pane(fixture).applyTemplate('nested_tsv');
-            fixture.detectChanges();
-
-            expect((editor(fixture).value()['delimited'] as Record<string, unknown>)['delimiter']).toBe('\t');
-        });
-
-        /**
-         * Re-seeding `[initial]` marks the editor PRISTINE, so the pick must be tracked by the pane —
-         * otherwise a real change leaves Apply disabled.
-         */
-        it('reports dirty after a pick, and Applies the copy inline with no binding', async () => {
-            const fixture = await create(delimitedNode(), TEMPLATES);
-            pane(fixture).applyTemplate('pipe_delimited');
-            fixture.detectChanges();
-            expect(fixture.componentInstance.dirty).toBe(true);
-
-            pane(fixture).submit();
-            fixture.detectChanges();
-
-            const applied = fixture.componentInstance.applied!;
-            expect(applied.use).toBeUndefined(); // a copy, never a binding
-            expect((applied.config!['parsing'] as Record<string, unknown>)['delimited']).toEqual({
-                delimiter: '|',
-                has_header: false,
-            });
-            expect(fixture.componentInstance.dirty).toBe(false);
-        });
-
-        it('hides the picker when no delimited template exists', async () => {
-            const fixture = await create(delimitedNode(), [TEMPLATES[2]]);
-            expect(fixture.nativeElement.querySelector('mat-select')).toBeNull();
+        it('derives it from a fixed-width node type', async () => {
+            expect(pane(await create(fixedWidthNode())).frontend()).toBe('fixedwidth');
         });
     });
 
@@ -1265,6 +1161,26 @@ describe('PipelineParseDefinitionComponent', () => {
             };
         }
 
+        /**
+         * The entry points are ONE icon row (operator ask 2026-08-22): the Grammar CSV pair is
+         * projected INTO the sample panel, beside upload/paste, instead of sitting in a second row.
+         * With no thread the panel is not mounted at all, so the same pair renders in the Grammar
+         * row rather than vanishing — which is why it is declared as a template, not inlined twice.
+         */
+        it('projects the CSV pair into the sample panel’s icon row', async () => {
+            const fixture = await create(csvNode(), [], 0, new DefinitionStateService());
+            const panel = fixture.nativeElement.querySelector('inspecto-sample-panel');
+            expect(panel.querySelector('button[aria-label="Import Grammar from CSV"]')).toBeTruthy();
+            expect(panel.querySelector('button[aria-label="Export Grammar as CSV"]')).toBeTruthy();
+        });
+
+        /** ⚠ One `create()` per test — `TestBed.configureTestingModule` throws once instantiated. */
+        it('falls back to the Grammar row when the host keeps no thread', async () => {
+            const fixture = await create(csvNode());
+            expect(fixture.nativeElement.querySelector('inspecto-sample-panel')).toBeNull();
+            expect(fixture.nativeElement.querySelector('button[aria-label="Import Grammar from CSV"]')).toBeTruthy();
+        });
+
         it('refuses a format-mismatched file outright', async () => {
             const fixture = await create(csvNode());
             await pane(fixture).importCsvText('section,key,attr,value\nmeta,format,,json\n');
@@ -1329,7 +1245,7 @@ describe('PipelineParseDefinitionComponent', () => {
             ];
             try {
                 // pipelineName 'cdr' owns delimitedNode()'s cdr_schema.toon, so the saved schema loads.
-                const fixture = await create(delimitedNode(), [], [], 0, null, 'cdr');
+                const fixture = await create(delimitedNode(), [], 0, null, 'cdr');
                 expect(pane(fixture).partitionSeed()).toEqual([
                     { column: 'year', source: 'TXN_DATE', type: 'DATE_YEAR' },
                     { column: 'month', source: 'TXN_DATE', type: 'DATE_MONTH' },
@@ -1351,7 +1267,7 @@ describe('PipelineParseDefinitionComponent', () => {
         it('surfaces a legacy partitionKey as the trio the engine synthesises from it', async () => {
             savedLegacyPartitionKey = 'TXN_DATE';
             try {
-                const fixture = await create(delimitedNode(), [], [], 0, null, 'cdr');
+                const fixture = await create(delimitedNode(), [], 0, null, 'cdr');
                 expect(pane(fixture).partitionSeed()).toEqual([
                     { column: 'year', source: 'TXN_DATE', type: 'DATE_YEAR' },
                     { column: 'month', source: 'TXN_DATE', type: 'DATE_MONTH' },
@@ -1367,7 +1283,7 @@ describe('PipelineParseDefinitionComponent', () => {
             // top-level key a hand-authored schema toon carries must survive an Apply round-trip.
             savedForeignKeys = { retention_days: 30, x_future: { nested: true } };
             try {
-                const fixture = await create(delimitedNode(), [], [], 0, null, 'cdr');
+                const fixture = await create(delimitedNode(), [], 0, null, 'cdr');
                 pane(fixture).submit();
                 fixture.detectChanges();
                 expect(schemaWrites).toHaveLength(1);
@@ -1382,7 +1298,7 @@ describe('PipelineParseDefinitionComponent', () => {
             savedForeignKeys = { keep: 'me' };
             savedLegacyPartitionKey = 'TXN_DATE';
             try {
-                const fixture = await create(delimitedNode(), [], [], 0, null, 'cdr');
+                const fixture = await create(delimitedNode(), [], 0, null, 'cdr');
                 pane(fixture).submit();
                 fixture.detectChanges();
                 expect(schemaWrites).toHaveLength(1);
@@ -1403,7 +1319,7 @@ describe('PipelineParseDefinitionComponent', () => {
         });
 
         it('writes NO partitions key when none are configured (flat store stays flat)', async () => {
-            const fixture = await create(delimitedNode(), [], [], 0, null, 'cdr');
+            const fixture = await create(delimitedNode(), [], 0, null, 'cdr');
             pane(fixture).submit();
             fixture.detectChanges();
             expect(schemaWrites).toHaveLength(1);
@@ -1501,7 +1417,11 @@ describe('PipelineParseDefinitionComponent', () => {
             // …and in the Column metadata list too (operator ask 2026-08-22), read-only.
             expect(text).toContain('stamped at write');
             // Read-only: never one of the editable schema rows.
-            expect(pane(fixture).schemaSeed().map((r) => r.name)).not.toContain('src_file');
+            expect(
+                pane(fixture)
+                    .schemaSeed()
+                    .map((r) => r.name),
+            ).not.toContain('src_file');
         });
     });
 });
