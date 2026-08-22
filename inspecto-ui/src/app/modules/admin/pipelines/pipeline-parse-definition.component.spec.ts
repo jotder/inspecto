@@ -181,6 +181,9 @@ let schemaWriteFails = false;
 /** Arms the schema BACKWARD save-gate's 422 (BUILDER-1b), which the pane must offer to override. */
 let schemaBackwardRefusal = false;
 let savedSchemaMissing = false;
+/** What the saved schema toon carries beside `raw` — the partitions round-trip fixtures. */
+let savedPartitions: Record<string, unknown>[] | null = null;
+let savedLegacyPartitionKey: string | null = null;
 /** S4/D7: what the destructive re-derive confirm answers. */
 let confirmAnswer = true;
 
@@ -195,6 +198,9 @@ async function create(
     served: unknown[] = [],
     servedDelayMs = 0,
     sample: DefinitionStateService | null = null,
+    // ⚠ Must be set BEFORE the first detectChanges to matter for loadSavedSchema — the seed effect
+    // tracks only the node input, so assigning it afterwards affects rendering, never the load.
+    pipelineName = '',
 ) {
     schemaWrites.length = 0;
     TestBed.configureTestingModule({
@@ -245,6 +251,8 @@ async function create(
                                           name: 'record',
                                           fields: [{ name: 'IMSI', selector: 'imsi', type: 'VARCHAR' }],
                                       },
+                                      ...(savedPartitions ? { partitions: savedPartitions } : {}),
+                                      ...(savedLegacyPartitionKey ? { partitionKey: savedLegacyPartitionKey } : {}),
                                   },
                               }),
                 },
@@ -266,6 +274,7 @@ async function create(
     fixture.componentInstance.node = node;
     fixture.componentInstance.templates = templates;
     fixture.componentInstance.sample = sample;
+    fixture.componentInstance.pipelineName = pipelineName;
     fixture.detectChanges();
     return fixture;
 }
@@ -1303,6 +1312,62 @@ describe('PipelineParseDefinitionComponent', () => {
     });
 
     /**
+     * Partitioning (operator ask 2026-08-22) — the schema toon's `partitions[]`, read → edited →
+     * rewritten through the SAME schema write. 🔴 The read half is the data-loss fix: the draft used
+     * to carry `raw`+`mapping` only, so `overwrite: true` silently DROPPED a hand-authored
+     * partitions[] on every Apply.
+     */
+    describe('partitions round-trip', () => {
+        it('reads the stored partitions[] back and carries them through the schema write', async () => {
+            savedPartitions = [
+                { column: 'year', source: 'TXN_DATE', type: 'DATE_YEAR' },
+                { column: 'month', source: 'TXN_DATE', type: 'DATE_MONTH' },
+            ];
+            try {
+                // pipelineName 'cdr' owns delimitedNode()'s cdr_schema.toon, so the saved schema loads.
+                const fixture = await create(delimitedNode(), [], [], 0, null, 'cdr');
+                expect(pane(fixture).partitionSeed()).toEqual([
+                    { column: 'year', source: 'TXN_DATE', type: 'DATE_YEAR' },
+                    { column: 'month', source: 'TXN_DATE', type: 'DATE_MONTH' },
+                ]);
+                fixture.detectChanges();
+
+                pane(fixture).submit();
+                fixture.detectChanges();
+                expect(schemaWrites).toHaveLength(1);
+                expect(schemaWrites[0].config['partitions']).toEqual([
+                    { column: 'year', source: 'TXN_DATE', type: 'DATE_YEAR' },
+                    { column: 'month', source: 'TXN_DATE', type: 'DATE_MONTH' },
+                ]);
+            } finally {
+                savedPartitions = null;
+            }
+        });
+
+        it('surfaces a legacy partitionKey as the trio the engine synthesises from it', async () => {
+            savedLegacyPartitionKey = 'TXN_DATE';
+            try {
+                const fixture = await create(delimitedNode(), [], [], 0, null, 'cdr');
+                expect(pane(fixture).partitionSeed()).toEqual([
+                    { column: 'year', source: 'TXN_DATE', type: 'DATE_YEAR' },
+                    { column: 'month', source: 'TXN_DATE', type: 'DATE_MONTH' },
+                    { column: 'day', source: 'TXN_DATE', type: 'DATE_DAY' },
+                ]);
+            } finally {
+                savedLegacyPartitionKey = null;
+            }
+        });
+
+        it('writes NO partitions key when none are configured (flat store stays flat)', async () => {
+            const fixture = await create(delimitedNode(), [], [], 0, null, 'cdr');
+            pane(fixture).submit();
+            fixture.detectChanges();
+            expect(schemaWrites).toHaveLength(1);
+            expect('partitions' in schemaWrites[0].config).toBe(false);
+        });
+    });
+
+    /**
      * The cross-node lineage field (operator ask 2026-08-22): `output.filename_column` lives on the
      * SINK node, not this one, so the pane only renders it when the HOST hands in a target — never
      * derives or guesses one itself (P2 stays pure).
@@ -1364,6 +1429,33 @@ describe('PipelineParseDefinitionComponent', () => {
             fixture.detectChanges();
             expect(fixture.componentInstance.filenameColumnChange).toBe('src_file');
             expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeNull();
+        });
+
+        /**
+         * Operator ask 2026-08-22: a configured lineage column is real in the WRITTEN rows but never
+         * went through this parse — it is stamped at write time — so the Types tab's schema list must
+         * say so, read-only, or a reader of the output schema has no way to know the extra column
+         * exists. Never a fake schemaSeed row: that would risk being mistaken for an authored column.
+         */
+        it('notes the lineage column on the Types tab schema list, only when one is configured', async () => {
+            // ⚠ The default delimitedNode() names a schema_file this editor does not own
+            // (foreignSchema ⇒ authorsSchema() false ⇒ the whole Types-tab schema block —
+            // note included — never renders). The fresh-drop node is the authoring case.
+            const node = delimitedNode();
+            delete (node.config as Record<string, unknown>)['schema_file'];
+            const fixture = await create(node);
+            pane(fixture).schemaSeed.set([{ include: true, name: 'MSISDN', selector: '0', type: 'VARCHAR' }]);
+            fixture.detectChanges();
+            expect(fixture.nativeElement.textContent).not.toContain('lineage column');
+
+            fixture.componentInstance.filenameColumnTarget = { value: 'src_file', target: 'Warehouse' };
+            fixture.detectChanges();
+            const text = fixture.nativeElement.textContent as string;
+            expect(text).toContain('src_file');
+            expect(text).toContain('lineage column');
+            expect(text).toContain('Warehouse');
+            // Read-only: never one of the editable schema rows.
+            expect(pane(fixture).schemaSeed().map((r) => r.name)).not.toContain('src_file');
         });
     });
 });

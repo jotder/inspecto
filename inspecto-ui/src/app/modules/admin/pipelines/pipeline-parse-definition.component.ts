@@ -42,7 +42,9 @@ import { InspectoSamplePanelComponent } from 'app/inspecto/definition/sample-pan
 import {
     InspectoSchemaFieldsEditorComponent,
     InspectoSchemaMetadataGridComponent,
+    InspectoSchemaPartitionsEditorComponent,
     SchemaFieldRow,
+    SchemaPartitionRow,
     deriveSelector,
     narrowToSchemaType,
     sanitizeIdentifier,
@@ -151,6 +153,7 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
         InspectoSegmentsEditorComponent,
         InspectoSchemaFieldsEditorComponent,
         InspectoSchemaMetadataGridComponent,
+        InspectoSchemaPartitionsEditorComponent,
     ],
     template: `
         <!--
@@ -376,6 +379,20 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                                 "
                             />
                             <!--
+                                Operator ask 2026-08-22: the lineage column is real in the WRITTEN rows but
+                                is not one of the parsed columns above (it never went through this schema —
+                                it is stamped at write time), so a reader of the schema would have no way to
+                                know it exists. Read-only: this is not an editable schemaSeed row, so it can
+                                never be mistaken for an authored column or land in the saved schema.
+                            -->
+                            @if (filenameColumnTarget()?.value; as filenameCol) {
+                                <p class="text-secondary m-0 mt-2 text-xs">
+                                    <span class="font-mono">{{ filenameCol }}</span> is also written to
+                                    {{ filenameColumnTarget()!.target }}'s output — a source-filename lineage
+                                    column set on the Files & metadata tab, not one of the columns above.
+                                </p>
+                            }
+                            <!--
                                 BUILDER-1b. One pipeline has ONE output schema (pipeline_schema), and a save
                                 that drops or narrows columns is refused by the BACKWARD gate. Changing a
                                 pipeline's parse format legitimately does exactly that, so without this the
@@ -432,7 +449,9 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                     -->
                     @if (filenameColumnTarget(); as t) {
                         <div class="mb-3">
-                            <span class="text-xs font-semibold uppercase opacity-70">Source filename column</span>
+                            <span class="text-xs font-semibold uppercase opacity-70"
+                                >Source filename column (optional)</span
+                            >
                             <mat-form-field class="mt-1 w-full" subscriptSizing="dynamic">
                                 <input
                                     matInput
@@ -451,7 +470,21 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                             </p>
                         </div>
                     }
+                    <!--
+                        Partitioning (operator ask 2026-08-22): the schema toon's partitions[] — how the
+                        written output is cut into Hive directories, derived from the schema's own
+                        fields. Rendered only where this pane owns the schema toon, because the rows
+                        travel through the SAME write as the fields (and reading them back is what
+                        stops that write from dropping a hand-authored block, as it silently did).
+                    -->
                     @if (authorsSchema() && schemaSeed().length) {
+                        <div class="mb-1 mt-3 flex items-center gap-2">
+                            <span class="text-xs font-semibold uppercase opacity-70">Partitioning</span>
+                        </div>
+                        <inspecto-schema-partitions-editor
+                            [initial]="partitionSeed()"
+                            [fieldNames]="schemaFieldNames()"
+                        />
                         <div class="mb-1 mt-3 flex items-center gap-2">
                             <span class="text-xs font-semibold uppercase opacity-70">Column metadata</span>
                         </div>
@@ -541,6 +574,16 @@ export class PipelineParseDefinitionComponent {
     @ViewChild(InspectoSegmentsEditorComponent) private segmentsEditor?: InspectoSegmentsEditorComponent;
     @ViewChild(InspectoSchemaFieldsEditorComponent) private schemaGrid?: InspectoSchemaFieldsEditorComponent;
     @ViewChild(InspectoSchemaMetadataGridComponent) private metaGrid?: InspectoSchemaMetadataGridComponent;
+    @ViewChild(InspectoSchemaPartitionsEditorComponent) private partitionsEditor?: InspectoSchemaPartitionsEditorComponent;
+
+    /** The stored `partitions[]` of this node's schema toon — seeded by {@link loadSavedSchema}. */
+    readonly partitionSeed = signal<SchemaPartitionRow[]>([]);
+    /** What a partition may derive from: the schema's INCLUDED field names. */
+    readonly schemaFieldNames = computed(() =>
+        this.schemaSeed()
+            .filter((r) => r.include)
+            .map((r) => r.name),
+    );
 
     // ── segments (asn1 / plugin) ─────────────────────────────────────────────────
 
@@ -890,6 +933,7 @@ export class PipelineParseDefinitionComponent {
             this.pickedPluginId.set(null);
             this.initialSegments.set([]);
             this.schemaSeed.set([]);
+            this.partitionSeed.set([]);
             this.schemaHydrated.set(false);
             this.schemaDrift.set(null);
             this.previewTable.set(null);
@@ -1016,6 +1060,31 @@ export class PipelineParseDefinitionComponent {
                 // §4.4: the mode is the schema's own `raw.types` marker; a schema without one predates
                 // the marker and loads as Declared — its stored types are the operator's.
                 this.typesMode.set(raw['types'] === 'auto' ? 'auto' : 'declared');
+                // The stored `partitions[]` (top-level, sibling of raw) — until 2026-08-22 the draft
+                // this pane writes silently DROPPED it, hand-authored-only as it was. Read → edit →
+                // rewrite is the round-trip that closes that hole.
+                const partitions = Array.isArray(r.config?.['partitions'])
+                    ? (r.config!['partitions'] as Record<string, unknown>[])
+                    : [];
+                const legacyKey = String(r.config?.['partitionKey'] ?? '').trim();
+                this.partitionSeed.set(
+                    partitions.length
+                        ? partitions.map((p) => ({
+                              column: String(p['column'] ?? ''),
+                              source: String(p['source'] ?? ''),
+                              type: String(p['type'] ?? 'VARCHAR').toUpperCase().replace('-', '_'),
+                          }))
+                        : legacyKey
+                          ? // The legacy `partitionKey:` spelling — surfaced as the trio the engine
+                            // synthesises from it (PartitionDef.fromSchema case 2), so a rewrite
+                            // carries the same semantics forward in the current spelling.
+                            [
+                                { column: 'year', source: legacyKey, type: 'DATE_YEAR' },
+                                { column: 'month', source: legacyKey, type: 'DATE_MONTH' },
+                                { column: 'day', source: legacyKey, type: 'DATE_DAY' },
+                            ]
+                          : [],
+                );
                 this.schemaHydrated.set(true);
             },
             // A 404 is ordinary: the node names a schema whose file was never written. Deriving from
@@ -1104,7 +1173,8 @@ export class PipelineParseDefinitionComponent {
             (this.editor?.isDirty() ?? false) ||
             (this.segmentsEditor?.isDirty() ?? false) ||
             (this.schemaGrid?.form.dirty ?? false) ||
-            (this.metaGrid?.form.dirty ?? false);
+            (this.metaGrid?.form.dirty ?? false) ||
+            (this.partitionsEditor?.form.dirty ?? false);
         if (dirty === this.lastDirty) return;
         this.lastDirty = dirty;
         this.dirtyChange.emit(dirty);
@@ -1321,9 +1391,17 @@ export class PipelineParseDefinitionComponent {
             this.editor?.error.set(grid.problem() ?? 'Fix the output schema before applying.');
             return;
         }
+        if (this.partitionsEditor && !this.partitionsEditor.validate()) {
+            this.editor?.error.set('Every partition segment needs a name (a valid identifier) and a source field.');
+            return;
+        }
+        // The rows travel through this SAME write — before 2026-08-22 the draft carried raw+mapping
+        // only, so overwrite:true silently DROPPED a hand-authored partitions[] on every Apply.
+        const partitions = this.partitionsEditor?.value() ?? this.partitionSeed();
         const fields = this.withMetadata(grid.value());
         const name = this.schemaName();
         const draft = {
+            ...(partitions.length ? { partitions } : {}),
             raw: {
                 name,
                 format: 'CSV',
@@ -1356,6 +1434,7 @@ export class PipelineParseDefinitionComponent {
                     this.writing.set(false);
                     grid.markPristine();
                     this.metaGrid?.markPristine();
+                    this.partitionsEditor?.markPristine();
                     this.applyWith(this.parsingValue(), portableConfigRef(name));
                 },
                 error: (e) => {

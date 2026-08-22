@@ -1086,3 +1086,30 @@ cross-node field:
   precedent the canvas rename affordance set for cross-node identity edits, so a config change here
   gets the ordinary treatment (dirty, invalidated test outcome, canvas status refresh) rather than a
   hand-rolled partial one.
+- **Second-pass correction, same day**: the field's label now reads "(optional)" explicitly (it was
+  already functionally optional — blank clears the key — but said so only in the hint text below
+  it), and the Types tab's schema list gets a read-only note naming the lineage column when one is
+  configured — it is a real column in the WRITTEN rows but never went through this parse (stamped at
+  write time), so a reader of the output schema had no way to know it exists. Never a fake
+  `schemaSeed` row: that would risk being written back as an authored column on the next Apply.
+
+### Partitioning UI: the schema toon's `partitions[]` (2026-08-22)
+
+`<inspecto-schema-partitions-editor>` (`inspecto/schema/`) is the first UI over the long-shipped
+`PartitionDef` model: each row derives one output Hive-directory segment (`{column, source, type}`)
+from a schema field, with the engine's own type vocabulary (`VARCHAR`/`INTEGER`/`DOUBLE`/
+`DATE_YEAR`/`DATE_MONTH`/`DATE_DAY`). Rendered on the Parse pane's Files & metadata tab, only where
+the pane owns the schema toon (`authorsSchema()`).
+
+- 🔴 **The read half is a data-loss fix**: `partitions[]` lives top-level in the schema toon, and
+  the pane's schema write (`{raw, mapping}` + `overwrite: true`) silently DROPPED a hand-authored
+  block on every Apply — hand-authoring having been the ONLY way to author one. The pane now reads
+  it back (`loadSavedSchema`), seeds the editor, and carries the rows through the same write.
+- A legacy `partitionKey:` loads as the year/month/day trio the engine synthesises from it
+  (`PartitionDef.fromSchema` case 2), so a rewrite carries the same semantics in the current
+  spelling.
+- The date trio is ONE click (pick a field → year/month/day rows appended, each still editable);
+  mixed date sources WARN but never block — the engine deliberately degrades catalog bounds to none
+  for a scheme with no single event time (`eventTimeDef`), and the write itself is legal.
+- A stored `source` the schema no longer carries stays listed in that row's choices rather than
+  silently blanking — visible and fixable beats vanished.
