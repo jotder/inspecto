@@ -56,7 +56,7 @@ export const CONNECTION_TYPES: ConnTypeDef[] = [
                 control: 'select',
                 target: 'option',
                 default: 'postgres',
-                options: ['postgres', 'mysql', 'oracle', 'sqlserver', 'duckdb'],
+                options: ['postgres', 'oracle', 'duckdb', 'mysql', 'sqlserver'],
             },
             { key: 'host', label: 'Host', control: 'text', target: 'host', required: true },
             { key: 'port', label: 'Port', control: 'number', target: 'port', default: 5432 },

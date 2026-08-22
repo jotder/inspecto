@@ -23,21 +23,21 @@ export type ParsingFrontend = 'delimited' | 'fixedwidth' | 'json' | 'text_regex'
  * before. Order here is the tab order.
  */
 export const GRAMMAR_TABS: { id: string; label: string }[] = [
-    { id: 'dialect', label: 'Dialect / parsing' },
-    { id: 'types', label: 'Types & columns' },
-    { id: 'robustness', label: 'Robustness / error handling' },
-    { id: 'files', label: 'Files & metadata' },
+    { id: 'dialect', label: 'Dialect' },
+    { id: 'types', label: 'Types' },
+    { id: 'robustness', label: 'Robustness' },
+    { id: 'files', label: 'Files & MetaData' },
 ];
 
 /** Exactly one character — the dialect chars the engine validates fail-closed at load. */
 const SINGLE_CHAR = '[\\s\\S]';
 
 export const PARSING_FRONTENDS: { id: ParsingFrontend; label: string; hint: string }[] = [
-    { id: 'delimited', label: 'Delimited', hint: 'CSV / TSV / pipe — one record per line, split by a delimiter' },
+    { id: 'delimited', label: 'Delimited', hint: 'CSV/TSV/Pipe — one record per line, split by a delimiter'},
     { id: 'fixedwidth', label: 'Fixed width', hint: 'Positional slices carved from each line' },
     { id: 'json', label: 'JSON', hint: 'NDJSON (one object per line) or a JSON array document' },
     { id: 'text_regex', label: 'Text / regex', hint: 'Named capture groups over matching lines' },
-    { id: 'xlsx', label: 'Excel', hint: 'An .xlsx workbook sheet, read natively (DuckDB read_xlsx)' },
+    { id: 'xlsx', label: 'Excel', hint: 'An .xlsx workbook sheet, read natively' }, //(DuckDB read_xlsx)
 ];
 
 /**

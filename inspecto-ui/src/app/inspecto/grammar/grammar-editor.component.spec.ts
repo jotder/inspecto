@@ -274,7 +274,7 @@ describe('GrammarEditorComponent', () => {
         );
         expect(labels).toHaveLength(4);
         expect(labels[0]).toContain('Dialect');
-        expect(labels[1]).toContain('Column Types');
+        expect(labels[1]).toContain('Types');
         expect(labels[2]).toContain('Robustness');
         expect(labels[3]).toContain('Files & MetaData');
     });
@@ -289,7 +289,7 @@ describe('GrammarEditorComponent', () => {
         );
         expect(labels).toHaveLength(4);
         expect(labels[0]).toContain('Sheet & range');
-        expect(labels[1]).toContain('Types & columns');
+        expect(labels[1]).toContain('Types');
         expect(labels[2]).toContain('Robustness');
         expect(labels[3]).toContain('Files & MetaData');
         // The seeded sheet survives value() from tab 1 (the R9 mounted-panels rule, xlsx edition).

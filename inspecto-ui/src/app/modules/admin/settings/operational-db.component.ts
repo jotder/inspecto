@@ -50,8 +50,7 @@ import {
             <header>
                 <h1 class="text-2xl font-semibold">Operational database</h1>
                 <p class="text-secondary mt-1 text-sm">
-                    Where this deployment keeps its transactional stores. Business data is never here — it stays
-                    Parquet, read through DuckDB.
+                    Where this deployment keeps its transactional stores. Business data is never here — it stays Parquet.
                 </p>
             </header>
 

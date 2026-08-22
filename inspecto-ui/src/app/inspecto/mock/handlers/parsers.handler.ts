@@ -220,7 +220,7 @@ const CATALOG: ParserDef[] = [
     },
     {
         id: 'xlsx',
-        label: 'MS Excel — read_xlsx over a workbook (DuckDB excel extension)',
+        label: 'MS Excel — read_xlsx over a workbook ', // (DuckDB excel extension)
         hierarchical: false,
         ingestable: true,
         grammarSchema: [

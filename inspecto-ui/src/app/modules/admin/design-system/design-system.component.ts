@@ -340,8 +340,8 @@ export class DesignSystemComponent {
 // ≥2 distinct tabs in a spec set ⇒ <inspecto-grammar-editor> renders a mat-tab-group,
 // one <inspecto-schema-form> per tab; any other spec set renders flat, byte-identical.
 const SPECS: AttributeSpec[] = [
-  { key: 'delimited__delimiter', label: 'Delimiter', tab: 'Dialect / parsing', ... },
-  { key: 'delimited__strict_mode', label: 'Strict', tab: 'Robustness / error handling', ... },
+  { key: 'delimited__delimiter', label: 'Delimiter', tab: 'Dialect/Parsing', ... },
+  { key: 'delimited__strict_mode', label: 'Strict', tab: 'Robustness/error handling', ... },
 ];
 // ⚠ R9: the tab PANELS live OUTSIDE the mat-tab bodies, [hidden]-toggled — MatTab
 // instantiates body content on FIRST ACTIVATION, so a form inside a body is invisible

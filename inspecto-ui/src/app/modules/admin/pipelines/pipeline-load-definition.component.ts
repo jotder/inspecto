@@ -218,7 +218,7 @@ interface RuleRow {
                                                 matInput
                                                 formControlName="sourceExpression"
                                                 aria-label="Source expression"
-                                                matTooltip="A per-row DuckDB scalar expression, emitted verbatim — you own any explicit cast, e.g. TRY_CAST(amt AS DOUBLE) / 100."
+                                                matTooltip="A per-row scalar expression, emitted verbatim — you own any explicit cast, e.g. TRY_CAST(amt AS DOUBLE) / 100."
                                             />
                                         </mat-form-field>
                                     }
@@ -231,7 +231,7 @@ interface RuleRow {
                     </tbody>
                 </table>
                 <p class="text-secondary m-0 mt-2 text-xs">
-                    An expression is passed to DuckDB verbatim over VARCHAR source columns — cast explicitly (<code
+                    An expression is passed verbatim over VARCHAR source columns — cast explicitly (<code
                         >TRY_CAST(amt AS DOUBLE) * 2</code
                     >), or the run refuses it.
                 </p>
