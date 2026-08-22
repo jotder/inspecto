@@ -646,6 +646,8 @@
                                             [templates]="grammarTemplates()"
                                             [pipelineName]="selectedId() ?? ''"
                                             [sample]="sampleThread()"
+                                            [filenameColumnTarget]="filenameColumnTarget()"
+                                            (filenameColumnChange)="onSinkFilenameColumnChange($event)"
                                             (applied)="onDefinitionApplied($event)"
                                             (dirtyChange)="definitionDirty.set($event)"
                                         />

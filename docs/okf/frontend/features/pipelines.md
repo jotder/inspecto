@@ -1064,3 +1064,25 @@ Explicit operator ask, superseding the second-pass reversal above (this call has
   node, committed on blur via the existing `rename` output — a no-op blur emits nothing, so tabbing
   through never dirties the pipeline. The pencil round-trip survives only in the non-compact
   summary (custody nodes).
+
+### Cross-node field on the Parse pane: `output.filename_column` (2026-08-22)
+
+The Parse pane's Files & metadata tab now also sets `output.filename_column` (source-file lineage,
+shipped end-to-end since the delimited-grammar plan's B4) — a field that genuinely lives on a
+**different** node (the SINK) than the one this pane edits. The pattern, reusable for any future
+cross-node field:
+
+- The HOST resolves the target, sharing the SAME "exactly one sink declares `database`" guard
+  `enrichmentHost` already uses (factored into `primaryOutputSink()`) — never a second derivation of
+  "the output" that could drift from the first. `null` (ambiguous, or no sink yet) ⇒ the pane
+  renders nothing; it never guesses.
+- The pane stays pure: `[filenameColumnTarget]` in, `(filenameColumnChange)` out, rendered in the
+  `[tabFiles]` slot it already owned (D1(b)'s column-metadata grid). Inline identifier validation
+  (the same `/^[A-Za-z][A-Za-z0-9_-]*$/` `schema-form` uses) with an explicit `role="alert"`
+  paragraph — **never `<mat-error>`**: this input carries no `NgControl`, so a `mat-form-field`
+  never enters an error state for it (the same trap D7's `list` type hit).
+- The HOST's commit (`onSinkFilenameColumnChange`) bypasses the open pane's own Apply/Discard and
+  writes straight through the existing private `applyNodePatch` — the same immediate-write
+  precedent the canvas rename affordance set for cross-node identity edits, so a config change here
+  gets the ordinary treatment (dirty, invalidated test outcome, canvas status refresh) rather than a
+  hand-rolled partial one.

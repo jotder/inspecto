@@ -1621,15 +1621,54 @@ export class PipelineEditorComponent implements OnInit {
     enrichmentHost(): EnrichmentHostPipeline | undefined {
         const id = this.selectedId();
         if (!id) return undefined;
-        const stores = (this.model()?.nodes ?? []).filter(
-            (n) => this.typeCategory(n.type) === 'SINK' && typeof n.config?.['database'] === 'string',
-        );
-        const only = stores.length === 1 ? stores[0].config! : null;
+        const only = this.primaryOutputSink()?.config ?? null;
         return {
             pipelineId: id,
             inputDatabase: only ? String(only['database']) : undefined,
             inputFormat: only && typeof only['format'] === 'string' ? only['format'] : undefined,
         };
+    }
+
+    /**
+     * The pipeline's single unambiguous output SINK, or `null` when there is none or more than one —
+     * the same guard {@link enrichmentHost} already applied, factored out so
+     * {@link filenameColumnTarget} can share it rather than re-deriving a second "the output" rule
+     * that could quietly drift from the first.
+     */
+    private primaryOutputSink(): AuthoredNode | null {
+        const stores = (this.model()?.nodes ?? []).filter(
+            (n) => this.typeCategory(n.type) === 'SINK' && typeof n.config?.['database'] === 'string',
+        );
+        return stores.length === 1 ? stores[0] : null;
+    }
+
+    /**
+     * The Parse pane's cross-node field (operator ask 2026-08-22): `output.filename_column` lives on
+     * the SINK node, so this names it from here — `null` when {@link primaryOutputSink} is ambiguous,
+     * in which case the pane renders nothing rather than guess which sink the operator meant.
+     */
+    filenameColumnTarget(): { value: string; target: string } | null {
+        const sink = this.primaryOutputSink();
+        if (!sink) return null;
+        return { value: String(sink.config?.['filename_column'] ?? ''), target: sink.name || sink.id };
+    }
+
+    /**
+     * Commit from the Parse pane's filename-column field straight onto the sink node — bypassing this
+     * drawer's own Apply/Discard, the same immediate-write precedent {@link renameNode} set for
+     * cross-node identity edits. Routed through the existing {@link applyNodePatch} so a config change
+     * here gets the same treatment any other config edit does (dirty, invalidated test outcome, canvas
+     * status refresh) rather than a hand-rolled partial update.
+     */
+    onSinkFilenameColumnChange(value: string | null): void {
+        const sink = this.primaryOutputSink();
+        if (!sink || !this.canAuthor()) return;
+        const current = String(sink.config?.['filename_column'] ?? '') || null;
+        if (value === current) return;
+        const cfg = { ...(sink.config ?? {}) };
+        if (value) cfg['filename_column'] = value;
+        else delete cfg['filename_column'];
+        this.applyNodePatch({ ...sink, config: cfg });
     }
 
     // ── definition drawer lifecycle (definition-surface P1) ────────────────────────────────────────

@@ -15,6 +15,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Observable, forkJoin, of, throwError } from 'rxjs';
@@ -140,6 +141,7 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
         MatButtonToggleModule,
         MatFormFieldModule,
         MatIconModule,
+        MatInputModule,
         MatSelectModule,
         MatTooltipModule,
         ChipComponent,
@@ -422,6 +424,33 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                     owner.
                 -->
                 <div tabFiles>
+                    <!--
+                        Source-filename lineage (operator ask 2026-08-22): output.filename_column
+                        lives on the SINK node, not this one — [filenameColumnTarget] is null whenever
+                        the host cannot name a single sink unambiguously, so the field simply does not
+                        render rather than guess. A blank commit clears the column.
+                    -->
+                    @if (filenameColumnTarget(); as t) {
+                        <div class="mb-3">
+                            <span class="text-xs font-semibold uppercase opacity-70">Source filename column</span>
+                            <mat-form-field class="mt-1 w-full" subscriptSizing="dynamic">
+                                <input
+                                    matInput
+                                    [value]="t.value"
+                                    placeholder="src_file"
+                                    aria-label="Source filename column"
+                                    (change)="onFilenameColumnBlur($any($event.target).value)"
+                                />
+                            </mat-form-field>
+                            @if (filenameColumnError(); as err) {
+                                <p class="text-warn m-0 mt-1 text-xs" role="alert">{{ err }}</p>
+                            }
+                            <p class="text-secondary m-0 mt-1 text-xs">
+                                Adds a column of this name to {{ t.target }}'s output, carrying each row's source
+                                file. Blank = no column (lineage stays in the ledger only).
+                            </p>
+                        </div>
+                    }
                     @if (authorsSchema() && schemaSeed().length) {
                         <div class="mb-1 mt-3 flex items-center gap-2">
                             <span class="text-xs font-semibold uppercase opacity-70">Column metadata</span>
@@ -472,6 +501,39 @@ export class PipelineParseDefinitionComponent {
     readonly applied = output<AuthoredNode>();
     /** Whether the pane holds edits since creation / the last successful submit. */
     readonly dirtyChange = output<boolean>();
+
+    /**
+     * The pipeline's single qualifying output SINK, offered here so `output.filename_column` (source-
+     * file lineage) can be set from the parse side (operator ask, 2026-08-22) — the field genuinely
+     * lives on a DIFFERENT node than this pane edits, so the host resolves it the same way
+     * `enrichmentHost` resolves the Stage-1 output: only when exactly one sink declares `database`.
+     * `null` ⇒ ambiguous or no sink yet ⇒ the field does not render (a host passes nothing when the
+     * fact is ambiguous, per the enrichment-wiring rule — never guess which sink the operator meant).
+     */
+    readonly filenameColumnTarget = input<{ value: string; target: string } | null>(null);
+    /** Commits straight to the SINK node, bypassing this pane's own Apply/Discard — the same
+     *  immediate-write precedent the canvas rename affordance already set for cross-node identity. */
+    readonly filenameColumnChange = output<string | null>();
+    /** Set only while the last edit failed the identifier pattern — cleared on a valid or blank commit. */
+    readonly filenameColumnError = signal<string | null>(null);
+
+    /** Commit (on blur): blank clears the column, an invalid identifier is refused with an inline error
+     *  (never `<mat-error>` — this input carries no `NgControl`, so a mat-form-field never enters an
+     *  error state for it; the schema-form `list`-type fix set the precedent). */
+    onFilenameColumnBlur(raw: string): void {
+        const value = raw.trim();
+        if (!value) {
+            this.filenameColumnError.set(null);
+            this.filenameColumnChange.emit(null);
+            return;
+        }
+        if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(value)) {
+            this.filenameColumnError.set('Must start with a letter — letters, digits, _ and - only.');
+            return;
+        }
+        this.filenameColumnError.set(null);
+        this.filenameColumnChange.emit(value);
+    }
     // U4: the `saveAsTemplate` output is gone — the Grammar CSV is the portable template now
     // (grammar templates are created in the Components registry; "Start from a template" stays).
 

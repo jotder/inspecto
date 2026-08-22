@@ -29,6 +29,8 @@ import { PipelineParseDefinitionComponent } from './pipeline-parse-definition.co
             [templates]="templates"
             [pipelineName]="pipelineName"
             [sample]="sample"
+            [filenameColumnTarget]="filenameColumnTarget"
+            (filenameColumnChange)="filenameColumnChange = $event"
             (applied)="applied = $event"
             (dirtyChange)="dirty = $event"
         />
@@ -40,6 +42,9 @@ class HostComponent {
     pipelineName = '';
     /** The tab's sample thread — null in most specs, exactly as a host that keeps none. */
     sample: DefinitionStateService | null = null;
+    /** null = the host's cross-node lineage field is not offered (ambiguous/no sink) — most specs. */
+    filenameColumnTarget: { value: string; target: string } | null = null;
+    filenameColumnChange?: string | null;
     applied?: AuthoredNode;
     dirty = false;
 }
@@ -1295,5 +1300,70 @@ describe('PipelineParseDefinitionComponent', () => {
     it('has no a11y violations', async () => {
         const fixture = await create();
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    /**
+     * The cross-node lineage field (operator ask 2026-08-22): `output.filename_column` lives on the
+     * SINK node, not this one, so the pane only renders it when the HOST hands in a target — never
+     * derives or guesses one itself (P2 stays pure).
+     */
+    describe('filenameColumnTarget (Files & metadata tab)', () => {
+        it('renders nothing when the host has no target (ambiguous/no sink)', async () => {
+            const fixture = await create();
+            expect(fixture.nativeElement.textContent).not.toContain('Source filename column');
+        });
+
+        it('renders the field seeded from the host target, on the Files & metadata tab', async () => {
+            const fixture = await create();
+            fixture.componentInstance.filenameColumnTarget = { value: 'src_file', target: 'Warehouse' };
+            fixture.detectChanges();
+            const input = fixture.nativeElement.querySelector(
+                'input[aria-label="Source filename column"]',
+            ) as HTMLInputElement;
+            expect(input.value).toBe('src_file');
+            expect(fixture.nativeElement.textContent).toContain('Warehouse');
+        });
+
+        it('emits null on a blank commit (clears the column)', async () => {
+            const fixture = await create();
+            fixture.componentInstance.filenameColumnTarget = { value: 'src_file', target: 'Warehouse' };
+            fixture.detectChanges();
+            const input = fixture.nativeElement.querySelector(
+                'input[aria-label="Source filename column"]',
+            ) as HTMLInputElement;
+            input.value = '';
+            input.dispatchEvent(new Event('change'));
+            fixture.detectChanges();
+            expect(fixture.componentInstance.filenameColumnChange).toBeNull();
+        });
+
+        it('refuses an invalid identifier with an inline alert, and emits nothing for it', async () => {
+            const fixture = await create();
+            fixture.componentInstance.filenameColumnTarget = { value: '', target: 'Warehouse' };
+            fixture.detectChanges();
+            const input = fixture.nativeElement.querySelector(
+                'input[aria-label="Source filename column"]',
+            ) as HTMLInputElement;
+            input.value = '0_bad_start';
+            input.dispatchEvent(new Event('change'));
+            fixture.detectChanges();
+            expect(fixture.componentInstance.filenameColumnChange).toBeUndefined();
+            const alert = fixture.nativeElement.querySelector('[role="alert"]');
+            expect(alert?.textContent).toContain('Must start with a letter');
+        });
+
+        it('emits the trimmed valid identifier and clears any prior error', async () => {
+            const fixture = await create();
+            fixture.componentInstance.filenameColumnTarget = { value: '', target: 'Warehouse' };
+            fixture.detectChanges();
+            const input = fixture.nativeElement.querySelector(
+                'input[aria-label="Source filename column"]',
+            ) as HTMLInputElement;
+            input.value = ' src_file ';
+            input.dispatchEvent(new Event('change'));
+            fixture.detectChanges();
+            expect(fixture.componentInstance.filenameColumnChange).toBe('src_file');
+            expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeNull();
+        });
     });
 });

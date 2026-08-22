@@ -1060,6 +1060,81 @@ describe('PipelineEditorComponent', () => {
         });
 
         /**
+         * `filenameColumnTarget`/`onSinkFilenameColumnChange` (operator ask 2026-08-22): the Parse
+         * pane's Files & metadata tab sets `output.filename_column`, which lives on the SINK node —
+         * shares `enrichmentHost`'s "exactly one sink declares `database`" guard rather than a second
+         * derivation of "the output" that could drift from the first.
+         */
+        describe('filenameColumnTarget / onSinkFilenameColumnChange (cross-node lineage field)', () => {
+            // `typeCategory('sink.persistent')` only resolves to 'SINK' once `load()`'s nodeTypes()
+            // fetch lands — the same setup the enrichment-host-context tests above need.
+            const SINK_TYPE = [
+                {
+                    type: 'sink.persistent',
+                    category: 'SINK',
+                    label: 'Store',
+                    description: '',
+                    accepts: ['data'],
+                    emits: [],
+                    emitsNamedRoutes: false,
+                    lowerable: true,
+                },
+            ];
+
+            it('names the single sink and its current value', () => {
+                api.nodeTypes.mockReturnValue(of(SINK_TYPE));
+                const c = make();
+                c.model.set({
+                    name: 'demo',
+                    active: false,
+                    nodes: [{ id: 'out', name: 'Warehouse', type: 'sink.persistent', config: { database: 'd/db', filename_column: 'src_file' } }],
+                    edges: [],
+                });
+                expect(c.filenameColumnTarget()).toEqual({ value: 'src_file', target: 'Warehouse' });
+            });
+
+            it('is null when there is no single sink (none, or more than one)', () => {
+                api.nodeTypes.mockReturnValue(of(SINK_TYPE));
+                const c = make();
+                expect(c.filenameColumnTarget()).toBeNull(); // no model yet
+
+                c.model.set({
+                    name: 'demo',
+                    active: false,
+                    nodes: [
+                        { id: 'a', type: 'sink.persistent', config: { database: 'a/db' } },
+                        { id: 'b', type: 'sink.persistent', config: { database: 'b/db' } },
+                    ],
+                    edges: [],
+                });
+                expect(c.filenameColumnTarget()).toBeNull();
+            });
+
+            it('patches the sink node, dirties the model, and no-ops on an unchanged value', () => {
+                api.nodeTypes.mockReturnValue(of(SINK_TYPE));
+                const c = make();
+                c.model.set({
+                    name: 'demo',
+                    active: false,
+                    nodes: [{ id: 'out', type: 'sink.persistent', config: { database: 'd/db' } }],
+                    edges: [],
+                });
+
+                c.onSinkFilenameColumnChange('src_file');
+                expect(c.model()!.nodes[0].config).toEqual({ database: 'd/db', filename_column: 'src_file' });
+                expect(c.dirty()).toBe(true);
+
+                c.dirty.set(false);
+                c.onSinkFilenameColumnChange('src_file'); // unchanged ⇒ no-op, stays clean
+                expect(c.dirty()).toBe(false);
+
+                c.onSinkFilenameColumnChange(null); // blank clears the key entirely (not `''`)
+                expect(c.model()!.nodes[0].config).toEqual({ database: 'd/db' });
+                expect(c.dirty()).toBe(true);
+            });
+        });
+
+        /**
          * S4 — a parse pane's options render as TABS, and at the dock's 300px default the labels
          * truncated to "Dialect | Typ…" with scroll arrows while the schema toolbar stacked. The host
          * asks the dock for room. ⚠ Transient: nothing is persisted, so the operator's stored width
