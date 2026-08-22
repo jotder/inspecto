@@ -578,6 +578,12 @@ export class PipelineParseDefinitionComponent {
 
     /** The stored `partitions[]` of this node's schema toon — seeded by {@link loadSavedSchema}. */
     readonly partitionSeed = signal<SchemaPartitionRow[]>([]);
+    /**
+     * Every top-level key of the stored schema toon this pane does NOT model, carried verbatim
+     * through the rewrite. The write is a whole-file overwrite, so any key not re-emitted is
+     * destroyed — the partitions[] data-loss lesson, generalised to unknown/future keys.
+     */
+    private schemaExtras: Record<string, unknown> = {};
     /** What a partition may derive from: the schema's INCLUDED field names. */
     readonly schemaFieldNames = computed(() =>
         this.schemaSeed()
@@ -1037,12 +1043,23 @@ export class PipelineParseDefinitionComponent {
      * `schema_file` is reported and left alone (the Onboarding stage's rule, ported).
      */
     private loadSavedSchema(): void {
+        this.schemaExtras = {}; // a re-seed must not carry a previous node's stored keys
         if (!this.authorsSchema() || !this.existingSchemaFile()) return;
         this.schemaLoading.set(true);
         this.configApi.read('schema', this.schemaName()).subscribe({
             next: (r) => {
                 this.schemaLoading.set(false);
                 const raw = (r.config?.['raw'] ?? {}) as Record<string, unknown>;
+                // Retain the unmodeled top-level keys BEFORE any early return, so a later Apply
+                // (whose write replaces the whole file) carries them verbatim. `partitionKey` is
+                // modeled too: it is migrated into partitions[] below, so re-emitting it verbatim
+                // would resurrect the legacy spelling beside the current one.
+                const extras = { ...(r.config ?? {}) } as Record<string, unknown>;
+                delete extras['raw'];
+                delete extras['mapping'];
+                delete extras['partitions'];
+                delete extras['partitionKey'];
+                this.schemaExtras = extras;
                 const fields = Array.isArray(raw['fields']) ? (raw['fields'] as Record<string, unknown>[]) : [];
                 if (!fields.length) return;
                 this.schemaSeed.set(
@@ -1401,6 +1418,8 @@ export class PipelineParseDefinitionComponent {
         const fields = this.withMetadata(grid.value());
         const name = this.schemaName();
         const draft = {
+            // Unmodeled stored keys ride along first, so every modeled key below wins.
+            ...this.schemaExtras,
             ...(partitions.length ? { partitions } : {}),
             raw: {
                 name,

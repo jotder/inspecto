@@ -184,6 +184,8 @@ let savedSchemaMissing = false;
 /** What the saved schema toon carries beside `raw` — the partitions round-trip fixtures. */
 let savedPartitions: Record<string, unknown>[] | null = null;
 let savedLegacyPartitionKey: string | null = null;
+/** Foreign top-level keys the stored schema toon carries — the unmodeled-key round-trip fixture. */
+let savedForeignKeys: Record<string, unknown> | null = null;
 /** S4/D7: what the destructive re-derive confirm answers. */
 let confirmAnswer = true;
 
@@ -253,6 +255,7 @@ async function create(
                                       },
                                       ...(savedPartitions ? { partitions: savedPartitions } : {}),
                                       ...(savedLegacyPartitionKey ? { partitionKey: savedLegacyPartitionKey } : {}),
+                                      ...(savedForeignKeys ?? {}),
                                   },
                               }),
                 },
@@ -1354,6 +1357,46 @@ describe('PipelineParseDefinitionComponent', () => {
                     { column: 'day', source: 'TXN_DATE', type: 'DATE_DAY' },
                 ]);
             } finally {
+                savedLegacyPartitionKey = null;
+            }
+        });
+
+        it('carries a foreign top-level key of the stored schema verbatim through the write', async () => {
+            // The same data-loss class partitions[] suffered, generalised: an unknown/future
+            // top-level key a hand-authored schema toon carries must survive an Apply round-trip.
+            savedForeignKeys = { retention_days: 30, x_future: { nested: true } };
+            try {
+                const fixture = await create(delimitedNode(), [], [], 0, null, 'cdr');
+                pane(fixture).submit();
+                fixture.detectChanges();
+                expect(schemaWrites).toHaveLength(1);
+                expect(schemaWrites[0].config['retention_days']).toBe(30);
+                expect(schemaWrites[0].config['x_future']).toEqual({ nested: true });
+            } finally {
+                savedForeignKeys = null;
+            }
+        });
+
+        it('modeled keys win over a stored duplicate (a stale stored raw cannot shadow the edit)', async () => {
+            savedForeignKeys = { keep: 'me' };
+            savedLegacyPartitionKey = 'TXN_DATE';
+            try {
+                const fixture = await create(delimitedNode(), [], [], 0, null, 'cdr');
+                pane(fixture).submit();
+                fixture.detectChanges();
+                expect(schemaWrites).toHaveLength(1);
+                const config = schemaWrites[0].config;
+                expect(config['keep']).toBe('me');
+                // partitionKey is modeled — migrated into partitions[] — so re-emitting it verbatim
+                // would resurrect the legacy spelling beside the current one.
+                expect('partitionKey' in config).toBe(false);
+                expect(config['partitions']).toEqual([
+                    { column: 'year', source: 'TXN_DATE', type: 'DATE_YEAR' },
+                    { column: 'month', source: 'TXN_DATE', type: 'DATE_MONTH' },
+                    { column: 'day', source: 'TXN_DATE', type: 'DATE_DAY' },
+                ]);
+            } finally {
+                savedForeignKeys = null;
                 savedLegacyPartitionKey = null;
             }
         });
