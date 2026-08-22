@@ -184,10 +184,13 @@ src/app/
   **Step icons:** `typeHeroIcon(type, category)` (`pipelines/pipeline-graph.ts`) is the ONE glyph
   vocabulary for palette/step-cards/insert-menu — one icon per Step TYPE, tinted by `categoryColor`
   (the glyph identifies, the color groups); category-glyph fallback for served/unknown types. In the
-  Pipelines editor, selection shows a SLIM summary and **Configure** (or double-click) opens the
-  definition pane (operator call 2026-08-21 second pass — an earlier same-day selection-opens-config
-  was explicitly reversed; a pane that is ALREADY open still follows the selection). The inspector's
-  `compact` mode is the identity strip inside the drawer. Unmodelled node-config keys are edited by
+  Pipelines editor, **selecting a Step opens its configuration pane directly** (operator ask
+  2026-08-22 — the THIRD flip of this call: opened 2026-08-21, reversed to Configure-first the same
+  day, re-flipped the next; confirm with the operator before changing it again). The slim summary
+  renders only where the pane cannot serve: the read-only lens and dialog-custody parse nodes. The
+  inspector's `compact` mode is the identity strip inside the drawer, and since the re-flip it
+  carries **Name + Description as always-visible fields committed on blur** (no pencil there) — the
+  ONE rename path for definition-pane nodes, on every Step kind. Unmodelled node-config keys are edited by
   `pipelines/pipeline-extra-config.component` — the ACTUAL key as label, a control per stored value
   TYPE (boolean select / validated number / validated-JSON textarea / text), typed round-trip through
   `buildConfiguredNode({extras})`, untouched entries emitted as their ORIGINAL value reference; ⛔ no

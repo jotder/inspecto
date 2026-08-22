@@ -1101,11 +1101,10 @@ describe('PipelineEditorComponent', () => {
             });
 
             /**
-             * 2026-08-21 second pass: selection shows the slim SUMMARY; the pane opens on Configure
-             * (or double-click, or a palette add). Selecting even an unconfigured Step no longer
-             * auto-opens anything.
+             * 2026-08-22 third flip (operator ask): selecting a Step opens its CONFIGURATION directly
+             * — even an unconfigured one, whose pane is exactly where it gets configured.
              */
-            it('selecting an UNCONFIGURED Step shows the summary, not the pane', async () => {
+            it('selecting an UNCONFIGURED Step opens its config pane directly', async () => {
                 const c = make();
                 c.select('demo');
                 c.addFromPalette('transform.filter');
@@ -1113,19 +1112,15 @@ describe('PipelineEditorComponent', () => {
                 c.closeDefinition();
                 c.onNodeSelected(fresh.id);
                 await Promise.resolve();
-                expect(c.definitionNode()).toBeNull();
-                expect(c.inspectorSummaryNode()?.id).toBe(fresh.id);
+                expect(c.definitionNode()?.id).toBe(fresh.id);
             });
 
-            /** 2026-08-21 second pass: selecting a CONFIGURED Step shows the slim summary too. */
-            it('selecting a configured Step shows the summary; Configure opens the pane', async () => {
+            /** 2026-08-22 third flip: a configured Step's selection opens its pane too. */
+            it('selecting a configured Step opens its config pane directly', async () => {
                 const c = make();
                 c.select('demo');
                 c.onNodeSelected('flt'); // transform.filter, config: {where: …}
                 await Promise.resolve();
-                expect(c.definitionNode()).toBeNull();
-                expect(c.inspectorSummaryNode()?.id).toBe('flt');
-                c.openNodeConfig(c.selectedNode()!); // the Configure button's path
                 expect(c.definitionNode()?.id).toBe('flt');
             });
 
@@ -1622,6 +1617,26 @@ describe('PipelineEditorComponent', () => {
         c.renameSelected({ name: '', description: '' });
         expect(c.model()!.nodes.find((n) => n.id === node.id)!.name).toBeUndefined();
         expect(canvasOf(c).updateNodeLabel).toHaveBeenCalledWith(node.id, node.id);
+    });
+
+    /**
+     * 2026-08-22, found driving the preview: the drawer strip's identity fields commit with the
+     * node the DRAWER renders, which is not always the selection (stage chip / recipe insert open
+     * a pane without selecting). Routing that through the selection was a silent no-op.
+     */
+    it('renameNode patches the DRAWER node even when a different node is selected', () => {
+        const c = make();
+        c.model.set(structuredClone(FLOW));
+        const [first, second] = c.model()!.nodes;
+        c.selectedNode.set(first);
+        c.definitionNode.set(second);
+
+        c.renameNode(second, { name: 'Drawer node', description: '' });
+
+        expect(c.model()!.nodes.find((n) => n.id === second.id)!.name).toBe('Drawer node');
+        expect(c.definitionNode()!.name).toBe('Drawer node');
+        expect(c.selectedNode()!.name, 'the unrelated selection is untouched').toBe(first.name);
+        expect(c.dirty()).toBe(true);
     });
 
     it('save PUTs the model and clears the dirty flag', () => {

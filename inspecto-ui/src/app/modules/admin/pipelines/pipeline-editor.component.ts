@@ -1539,16 +1539,16 @@ export class PipelineEditorComponent implements OnInit {
     }
 
     /**
-     * S3's follow rule, RE-SCOPED by the operator 2026-08-21 (second pass): selection shows the slim
-     * summary; the config pane opens on **Configure** (or double-click, or a palette add). The ONE
-     * selection-driven open that stays is re-targeting a pane that is ALREADY open — clicking Step B
-     * while A's pane shows would otherwise silently keep rendering A (the original S3 bug). A DIRTY
-     * pane keeps `openDefinition`'s confirm; declining leaves the previous pane in place.
+     * S3's follow rule, RE-SCOPED AGAIN by the operator 2026-08-22 (third flip — see the memory trail):
+     * selecting a Step opens its CONFIGURATION directly in the Properties dock; the slim summary
+     * renders only where the pane cannot serve (read-only lens, dialog-custody parse nodes). A DIRTY
+     * pane keeps `openDefinition`'s confirm; declining leaves the previous pane in place. Identity
+     * (Name/Description) lives as fields inside the pane's identity strip, so nothing is lost by
+     * skipping the summary.
      */
     private async followSelectionIntoDefinition(node: AuthoredNode): Promise<void> {
         if (!this.canAuthor() || !this.isDrawerKind(node)) return;
-        const open = this.definitionNode();
-        if (!open || open.id === node.id) return;
+        if (this.definitionNode()?.id === node.id) return;
         await this.openDefinition(node);
     }
 
@@ -1561,9 +1561,10 @@ export class PipelineEditorComponent implements OnInit {
     }
 
     /**
-     * The node the INSPECTOR SUMMARY should render, or null for the idle hint. Selection shows the
-     * slim summary again (operator, 2026-08-21 second pass) — the config pane opens on Configure.
-     * The template prefers `definitionNode()`, so this only decides what shows when NO pane is open.
+     * The node the INSPECTOR SUMMARY should render, or null for the idle hint. Since the 2026-08-22
+     * re-flip, selection opens the config pane directly, so the summary only shows where the pane
+     * cannot serve: the read-only lens and dialog-custody parse nodes. The template prefers
+     * `definitionNode()`, so this only decides what shows when NO pane is open.
      */
     readonly inspectorSummaryNode = computed<AuthoredNode | null>(() => this.selectedNode());
 
@@ -2041,14 +2042,23 @@ export class PipelineEditorComponent implements OnInit {
      * must not invalidate the node's test outcome the way a config edit does.
      */
     renameSelected(v: { name: string; description: string }): void {
-        const n = this.selectedNode();
+        this.renameNode(this.selectedNode(), v);
+    }
+
+    /**
+     * Identity edit for a NAMED node — the drawer strip's Name/Description fields commit here with
+     * the node THEY render ({@link definitionNode}), which is not always the selection (a pane can
+     * be opened by a stage chip or a recipe insert without selecting). Routing the drawer's commit
+     * through the selection made it a silent no-op exactly then — found driving the preview
+     * 2026-08-22. ⚠ The MODEL node is what gets patched: the drawer's draft may be the S5 re-typed
+     * presentation, so only identity moves onto the draft.
+     */
+    renameNode(node: AuthoredNode | null, v: { name: string; description: string }): void {
+        const n = node && this.model()?.nodes.find((x) => x.id === node.id);
         if (!n || !this.canAuthor()) return;
         const updated: AuthoredNode = { ...n, name: v.name || undefined, description: v.description || undefined };
         this.model.update((m) => (m ? applyNodePatchInModel(m, updated) : m));
-        this.selectedNode.set(updated);
-        // The rename pencil lives INSIDE the drawer now, so the open draft must reflect it too — the
-        // drawer header binds the draft's name. The draft keeps its own type/config (it may be the
-        // S5 re-typed presentation), only identity moves.
+        if (this.selectedNode()?.id === updated.id) this.selectedNode.set(updated);
         this.definitionNode.update((d) =>
             d && d.id === updated.id ? { ...d, name: updated.name, description: updated.description } : d,
         );

@@ -1035,7 +1035,8 @@ Driving the shipped result produced four refinements, one of them a reversal:
   the read-only lens, which has no pane) — and **Configure** (or double-click, or a palette add)
   opens the definition pane. The one selection-driven open that survives is re-targeting an
   ALREADY-open pane (the stale-drawer fix). ⚠ Do not re-generalize this without asking; it has now
-  flipped twice in one day.
+  flipped twice in one day. **RE-FLIPPED 2026-08-22 (third flip, explicit operator ask)** — see the
+  next section; this row is history, not the current behavior.
 - **Dry-run lives in the "More pipeline actions" menu**, and that menu moved OUTSIDE the author gate
   (Dry-run is a read the Business lens keeps) with the author verbs gated item-by-item.
 - **One import/export trigger**: the transfer menu grew a `[transferExtras]` content-projection slot;
@@ -1047,3 +1048,19 @@ Driving the shipped result produced four refinements, one of them a reversal:
   (typed), and the untouched-verbatim rule (route `branches` survives an apply byte-identical) lives
   in the editor, which emits the ORIGINAL value reference for pristine entries. Keys are not
   editable; adding one is offered only where the type has no schema — the schema is the vocabulary.
+
+### Third flip: selection-is-configuration again, identity on the page (2026-08-22)
+
+Explicit operator ask, superseding the second-pass reversal above (this call has now flipped
+**three times** — 21st on, 21st off, 22nd on; do not change it again without the operator):
+
+- **Selecting a Step opens its configuration pane directly** in the Properties dock, for every
+  drawer-served kind (`followSelectionIntoDefinition` opens on any selection, not just when a pane
+  is already open). A DIRTY pane still confirms before following; declining leaves it in place. The
+  slim summary survives only where the pane cannot serve: the read-only lens and dialog-custody
+  parse nodes (auto-popping a modal on selection stays obnoxious).
+- **Name + Description are fields ON the config page**: the inspector's `compact` identity strip
+  (rendered above all four definition panes) shows them as always-visible inputs seeded from the
+  node, committed on blur via the existing `rename` output — a no-op blur emits nothing, so tabbing
+  through never dirties the pipeline. The pencil round-trip survives only in the non-compact
+  summary (custody nodes).

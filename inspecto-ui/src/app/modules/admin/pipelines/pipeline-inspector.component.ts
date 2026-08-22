@@ -66,7 +66,21 @@ import {
                 </p>
             }
 
-            @if (renaming()) {
+            @if (compact && !readOnly) {
+                <!-- Identity fields ON the config page (operator ask 2026-08-22): Name/Description are
+                     always-visible fields above every definition pane, committed on blur — the pencil
+                     round-trip survives only in the (rare) non-compact summary. -->
+                <form [formGroup]="renameForm" class="mb-2 space-y-1">
+                    <mat-form-field class="w-full" subscriptSizing="dynamic">
+                        <mat-label>Name</mat-label>
+                        <input matInput formControlName="name" [placeholder]="node.id" (change)="commitIdentity()" />
+                    </mat-form-field>
+                    <mat-form-field class="w-full" subscriptSizing="dynamic">
+                        <mat-label>Description</mat-label>
+                        <input matInput formControlName="description" (change)="commitIdentity()" />
+                    </mat-form-field>
+                </form>
+            } @else if (renaming()) {
                 <form [formGroup]="renameForm" (ngSubmit)="commitRename()" class="mb-2 space-y-1">
                     <mat-form-field class="w-full" subscriptSizing="dynamic">
                         <mat-label>Name</mat-label>
@@ -151,9 +165,8 @@ import {
                 @if (readOnly) {
                     Click a Step or edge to inspect it. Authoring is read-only in the Business lens.
                 } @else {
-                    Drag a Step from the palette onto the canvas. Click a Step to select it, then
-                    <b>Configure</b> (or double-click) to edit its attributes right here. <b>Delete selected</b> removes
-                    the selected item.
+                    Drag a Step from the palette onto the canvas. Click a Step to edit its configuration
+                    right here. <b>Delete selected</b> removes the selected item.
                 }
             </p>
         }
@@ -176,10 +189,11 @@ export class PipelineInspectorComponent implements OnChanges {
     @Input() readOnly = false;
     /**
      * Compact strip mode — rendered INSIDE the definition drawer, above the config pane, since a
-     * selected Step now opens its configuration directly (operator ask, 2026-08-21) and the full
-     * summary panel would duplicate what the drawer header and the pane already show. Keeps only
-     * what the pane does not carry: the status chip, the last-run overlay, the description, and the
-     * rename pencil (the ONE rename path for definition-pane nodes).
+     * selected Step opens its configuration directly (operator ask, re-flipped 2026-08-22) and the
+     * full summary panel would duplicate what the drawer header and the pane already show. Keeps
+     * what the pane does not carry: the status chip, the last-run overlay, and the Step's identity —
+     * Name/Description as always-visible fields, committed on blur (the ONE rename path for
+     * definition-pane nodes).
      */
     @Input() compact = false;
 
@@ -201,8 +215,30 @@ export class PipelineInspectorComponent implements OnChanges {
 
     ngOnChanges(changes: SimpleChanges): void {
         // A different selection makes any in-progress rename stale — never carry one node's draft
-        // onto another node.
-        if (changes['node']) this.renaming.set(false);
+        // onto another node. In compact mode the fields are always live, so reseed them instead.
+        if (changes['node']) {
+            this.renaming.set(false);
+            if (this.compact && this.node) {
+                this.renameForm.setValue({
+                    name: this.node.name ?? '',
+                    description: this.node.description ?? '',
+                });
+            }
+        }
+    }
+
+    /**
+     * Compact-mode commit (on blur): emit only when the trimmed values actually differ from the
+     * node's, so tabbing through the fields never patches the model or dirties the pipeline.
+     */
+    commitIdentity(): void {
+        const n = this.node;
+        if (!n) return;
+        const v = this.renameForm.getRawValue();
+        const name = (v.name ?? '').trim();
+        const description = (v.description ?? '').trim();
+        if (name === (n.name ?? '') && description === (n.description ?? '')) return;
+        this.rename.emit({ name, description });
     }
 
     startRename(): void {

@@ -606,7 +606,7 @@
                                         [status]="statusOf(dn)"
                                         [lastRun]="nodeLastRun(dn)"
                                         [readOnly]="!canAuthor()"
-                                        (rename)="renameSelected($event)"
+                                        (rename)="renameNode(dn, $event)"
                                     />
                                     @if (dn.type === 'acquisition') {
                                         <app-pipeline-collection-definition

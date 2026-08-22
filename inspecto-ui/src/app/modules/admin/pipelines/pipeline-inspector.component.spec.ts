@@ -181,16 +181,31 @@ describe('PipelineInspectorComponent', () => {
             expect(t).toContain('Configured'); // the status chip stays
         });
 
-        it('keeps the rename pencil, and it still round-trips the form', () => {
-            const { fixture, c } = create({ node: NODE, status: 'configured', category: 'PARSE', compact: true });
+        /**
+         * 2026-08-22 (operator ask): identity lives ON the config page — Name/Description are
+         * always-visible fields seeded from the node, committed on blur. No pencil round-trip.
+         */
+        it('renders Name/Description as live fields seeded from the node, committing trimmed edits', () => {
+            // ⚠ setInput, not the Object.assign helper — the seed runs in ngOnChanges, which only
+            // template/setInput input writes fire (exactly how the editor binds [node]).
+            const { fixture, c } = create({ status: 'configured', category: 'PARSE' });
+            fixture.componentRef.setInput('compact', true);
+            fixture.componentRef.setInput('node', NODE);
+            fixture.detectChanges();
             const el = fixture.nativeElement as HTMLElement;
             const rename = vi.fn();
             c.rename.subscribe(rename);
-            (el.querySelector('[aria-label="Rename Step"]') as HTMLButtonElement).click();
+            expect(el.querySelector('[aria-label="Rename Step"]')).toBeNull(); // the pencil is gone here
+            expect(c.renameForm.getRawValue()).toEqual({ name: 'Parse CSV', description: '' });
+            c.renameForm.setValue({ name: '  CDR parse ', description: ' the daily feed ' });
+            c.commitIdentity();
+            expect(rename).toHaveBeenCalledWith({ name: 'CDR parse', description: 'the daily feed' });
+
+            // a blur with nothing further changed emits no second rename (no phantom dirty)
+            fixture.componentRef.setInput('node', { ...NODE, name: 'CDR parse', description: 'the daily feed' });
             fixture.detectChanges();
-            c.renameForm.setValue({ name: 'CDR parse', description: '' });
-            c.commitRename();
-            expect(rename).toHaveBeenCalledWith({ name: 'CDR parse', description: '' });
+            c.commitIdentity();
+            expect(rename).toHaveBeenCalledTimes(1);
         });
     });
 
