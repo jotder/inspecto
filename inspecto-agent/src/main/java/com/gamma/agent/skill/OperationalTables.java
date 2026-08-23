@@ -42,7 +42,7 @@ final class OperationalTables {
 
     static final List<String> FILES = List.of(
             "start_time", "end_time", "filename", "status", "parsed_rows", "error_rows",
-            "output_paths", "output_sizes_bytes", "duration_ms", "error", "consignment_id");
+            "output_paths", "output_sizes_bytes", "duration_ms", "error", "consignment_id", "origin");
 
     static final List<String> LINEAGE = List.of(
             "consignment_id", "src_id", "input_file", "output_file", "partition", "row_count");

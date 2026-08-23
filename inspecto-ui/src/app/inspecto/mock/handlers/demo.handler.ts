@@ -407,6 +407,9 @@ function files(pipeline: string): Record<string, string>[] {
             duration_ms: String(40_000 + ((i * 173) % 9000)),
             error: quarantined ? 'column count mismatch: expected 12, found 14' : '',
             consignment_id: `${pipeline}-b${1000 + (i % 10)}`,
+            // The unpack stage stamps the archive/compressed original a member came out of; blank
+            // for a file that arrived as itself, which is most of them.
+            origin: i % 5 === 0 ? `${pipeline}_${20260601 + i}.tar.gz` : '',
         };
     });
 }
@@ -446,6 +449,7 @@ function problemFiles(url: string): unknown {
                 error: f['error'] ?? '',
                 consignmentId: f['consignment_id'] ?? '',
                 time: f['end_time'] ?? '',
+                origin: f['origin'] ?? '',
             });
         }
     }

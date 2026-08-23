@@ -53,6 +53,7 @@ const PROBLEMS: ProblemFilesPage = {
             error: 'could not read',
             consignmentId: '',
             time: '2026-06-30 03:00:00',
+            origin: 'nightly.tar.gz',   // came out of an archive — what the operator dropped
         },
         {
             pipeline: 'cdr_ingest',
@@ -64,6 +65,7 @@ const PROBLEMS: ProblemFilesPage = {
             error: '',
             consignmentId: 'c-1',
             time: '2026-06-30 02:00:00',
+            origin: '',                 // arrived as itself
         },
     ],
     total: 5,
@@ -165,6 +167,16 @@ describe('ProcessingStatusComponent', () => {
             expect(fmt({ value: -1 })).toBe('');
             expect(fmt({ value: 0 })).toBe('0');
             expect(fmt({ value: 1234 })).toBe('1,234');
+        });
+
+        /** Origin names the archive a member came out of, and reads as an em dash when it is absent. */
+        it('renders the origin archive, and an em dash when the file arrived as itself', () => {
+            const fixture = create();
+            fixture.detectChanges();
+            const col = fixture.componentInstance.problemColumnDefs.find((c) => c.field === 'origin')!;
+            const fmt = col.valueFormatter as (p: { value: string }) => string;
+            expect(fmt({ value: 'nightly.tar.gz' })).toBe('nightly.tar.gz');
+            expect(fmt({ value: '' })).toBe('—');
         });
 
         /** The rejected-rows drill-down is only offered where rows were actually rejected. */

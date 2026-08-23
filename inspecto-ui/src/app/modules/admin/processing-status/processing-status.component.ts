@@ -135,6 +135,15 @@ export class ProcessingStatusComponent implements OnInit {
                 statusBadgeHtml(p.value === 'FULL' ? 'FAILED' : p.value === 'PARTIAL' ? 'WARNING' : 'UNKNOWN'),
         },
         { field: 'filename', headerName: 'File', flex: 1 },
+        {
+            // What the operator actually DROPPED, when that differs from the file that was parsed:
+            // an unpack-expanded member names its archive/compressed original here. Blank — an em
+            // dash, not the filename repeated — for the ordinary case where they are the same file.
+            field: 'origin',
+            headerName: 'From archive',
+            width: 170,
+            valueFormatter: (p) => p.value || '—',
+        },
         { field: 'status', headerName: 'Status', width: 200 },
         { field: 'parsedRows', headerName: 'Parsed rows', width: 130, valueFormatter: blankIfUnknown },
         { field: 'errorRows', headerName: 'Rejected rows', width: 140, valueFormatter: blankIfUnknown },

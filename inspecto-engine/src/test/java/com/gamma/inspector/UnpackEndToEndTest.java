@@ -10,6 +10,7 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -32,6 +33,9 @@ import static org.junit.jupiter.api.Assertions.*;
 class UnpackEndToEndTest {
 
     private static final String ROWS = "ID,AMT,EVENT_DATE\nr1,1.0,2020-04-03\nr2,2.0,2020-04-03\n";
+
+    /** Batch caps that keep several members in ONE consignment (the default is max_files: 1). */
+    private static final String BATCH_10 = "  batch:\n    max_files: 10\n    max_bytes: 268435456\n";
 
     @Test
     void bz2IngestsNativelyWithOriginalBackupMarkerAndCleanTemp(@TempDir Path dir) throws Exception {
@@ -154,6 +158,38 @@ class UnpackEndToEndTest {
         // …and the failed file is NOT marked processed (it never landed; it must stay auditable).
         assertFalse(Files.exists(Path.of(cfg.dirs().markers()).resolve("bad.csv.processed")));
         assertTrue(Files.exists(Path.of(cfg.dirs().markers()).resolve("good.csv.processed")));
+    }
+
+    /**
+     * 🔴 The `origin` ledger column: an unpack-expanded member records the archive/compressed
+     * original it came OUT of, so a cross-pipeline problem-files view can say what the operator
+     * actually dropped. Pinned end-to-end because the capture point is subtle — `writeAudit` runs
+     * AFTER `commit`, whose `UnpackStage.cleanup` consumes the origin mapping, so resolving origin at
+     * row-write time reads blank for every expanded file. It is captured on MemberAudit at ingest.
+     */
+    @Test
+    void theStatusLedgerRecordsTheArchiveAMemberCameOutOf(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = load(dir, BATCH_10);
+        Path inbox = Files.createDirectories(Path.of(cfg.dirs().poll()));
+        zip(inbox.resolve("bundle.zip"), new String[] {"a.csv"},
+                new String[] {"ID,AMT,EVENT_DATE\nz1,1.0,2020-04-03\n"});
+        // A plain file in the same batch, to prove origin is blank when the file IS what arrived.
+        Files.writeString(inbox.resolve("plain.csv"), "ID,AMT,EVENT_DATE\np1,1.0,2020-04-03\n");
+
+        CollectorProcessor.run(cfg);
+
+        Path statusCsv;
+        try (Stream<Path> w = Files.walk(Path.of(cfg.dirs().statusFilePath()).getParent())) {
+            statusCsv = w.filter(p -> p.getFileName().toString().contains("_status_")).findFirst().orElseThrow();
+        }
+        List<String> lines = Files.readAllLines(statusCsv);
+        assertTrue(lines.get(0).endsWith(",origin"), "the column is appended last: " + lines.get(0));
+
+        String member = lines.stream().filter(l -> l.contains("00001_a.csv")).findFirst().orElseThrow();
+        assertTrue(member.endsWith(",bundle.zip"),
+                "the expanded member names its archive: " + member);
+        String plain = lines.stream().filter(l -> l.contains("plain.csv")).findFirst().orElseThrow();
+        assertTrue(plain.endsWith(","), "a file that arrived as itself has a BLANK origin: " + plain);
     }
 
     // ── helpers ────────────────────────────────────────────────────────────────

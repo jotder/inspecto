@@ -271,7 +271,11 @@ final class RunRoutes implements RouteModule {
                     rows.add(problemRow(pipeline, f.getOrDefault("filename", ""),
                             fullFail ? "FULL" : "PARTIAL", status,
                             f.get("parsed_rows"), f.get("error_rows"),
-                            f.getOrDefault("error", ""), f.get("consignment_id"), time));
+                            f.getOrDefault("error", ""), f.get("consignment_id"), time,
+                            // The archive/compressed original this member came out of; blank for an
+                            // ordinary file, and absent entirely from ledgers written before the
+                            // column existed (readers parse by header NAME, so that is a blank too).
+                            f.getOrDefault("origin", "")));
                 }
                 for (Map<String, String> q : api.service().statusStore().quarantine(cfg)) {
                     String file = q.getOrDefault("file", "");
@@ -279,14 +283,14 @@ final class RunRoutes implements RouteModule {
                     full++;
                     pipelinesWithProblems.add(pipeline);
                     rows.add(problemRow(pipeline, file, "FULL", "QUARANTINED",
-                            null, null, q.getOrDefault("reason", ""), null, ""));
+                            null, null, q.getOrDefault("reason", ""), null, "", ""));
                 }
             } catch (Exception ledgerUnreadable) {
                 // Honesty rule: an unreadable ledger is a WARNING row, never a silent absence.
                 warnings++;
                 pipelinesWithProblems.add(pipeline);
                 rows.add(problemRow(pipeline, "", "WARNING", "LEDGER_UNREADABLE", null, null,
-                        errMsg(ledgerUnreadable), null, ""));
+                        errMsg(ledgerUnreadable), null, "", ""));
             }
         }
 
@@ -309,7 +313,8 @@ final class RunRoutes implements RouteModule {
 
     private static Map<String, Object> problemRow(String pipeline, String filename, String verdict,
                                                   String status, String parsedRows, String errorRows,
-                                                  String error, String consignmentId, String time) {
+                                                  String error, String consignmentId, String time,
+                                                  String origin) {
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("pipeline", pipeline);
         r.put("filename", filename);
@@ -320,6 +325,7 @@ final class RunRoutes implements RouteModule {
         r.put("error", error);
         r.put("consignmentId", consignmentId == null ? "" : consignmentId);
         r.put("time", time);
+        r.put("origin", origin == null ? "" : origin);
         return r;
     }
 

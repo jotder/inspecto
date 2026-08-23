@@ -42,7 +42,7 @@ public final class BatchAuditWriter {
                             String commitLogPath) {
         this.status = statusPath == null ? null : new CsvLedger<>(statusPath,
                 "start_time,end_time,filename,status,parsed_rows,error_rows," +
-                        "output_paths,output_sizes_bytes,duration_ms,error,consignment_id",
+                        "output_paths,output_sizes_bytes,duration_ms,error,consignment_id,origin",
                 BatchAuditWriter::statusLine);
         this.batches = batchesPath == null ? null : new CsvLedger<>(batchesPath,
                 "consignment_id,pipeline,schema_name,output_table,start_time,end_time,status," +
@@ -78,9 +78,25 @@ public final class BatchAuditWriter {
     }
 
     /** One member-file audit row. */
+    /**
+     * One per-file audit row. {@code origin} names the inbox file this member came OUT of — the
+     * archive or compressed original the operator dropped — and is BLANK for the ordinary case where
+     * the member IS that file. Appended last on purpose: readers parse this ledger by header name
+     * ({@code Csv.readInto}), so an older ledger file simply carries no such key.
+     */
     public record FileRow(String startTime, String endTime, String filename, String status,
                           long parsedRows, long errorRows, List<String> outputPaths,
-                          List<Long> outputSizes, long durationMs, String error, String batchId) {}
+                          List<Long> outputSizes, long durationMs, String error, String batchId,
+                          String origin) {
+
+        /** The pre-unpack arity — an expansion-unaware caller records no origin. */
+        public FileRow(String startTime, String endTime, String filename, String status,
+                       long parsedRows, long errorRows, List<String> outputPaths,
+                       List<Long> outputSizes, long durationMs, String error, String batchId) {
+            this(startTime, endTime, filename, status, parsedRows, errorRows, outputPaths,
+                    outputSizes, durationMs, error, batchId, "");
+        }
+    }
 
     /**
      * One batch-summary audit row. {@code castFailures} counts values a declared type coercion
@@ -152,10 +168,11 @@ public final class BatchAuditWriter {
         String paths = String.join(";", f.outputPaths()).replace('"', '\'');
         String sizes = f.outputSizes().stream().map(String::valueOf)
                 .collect(Collectors.joining(";"));
-        return String.format("%s,%s,%s,%s,%d,%d,\"%s\",\"%s\",%d,\"%s\",%s",
+        return String.format("%s,%s,%s,%s,%d,%d,\"%s\",\"%s\",%d,\"%s\",%s,%s",
                 f.startTime(), f.endTime(), f.filename(), f.status(),
                 f.parsedRows(), f.errorRows(), paths, sizes, f.durationMs(),
-                CsvLedger.q(f.error()), f.batchId());
+                CsvLedger.q(f.error()), f.batchId(),
+                f.origin() == null ? "" : f.origin());
     }
 
     private static String batchLine(BatchRow b) {

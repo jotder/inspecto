@@ -485,7 +485,8 @@ public final class BatchProcessor {
                     ma.start().format(DuckDbUtil.DT_FMT), end.format(DuckDbUtil.DT_FMT),
                     ma.filename(), ma.status(), ma.parsedRows(), ma.errorRows(),
                     paths, Collections.nCopies(paths.size(), 0L),
-                    Duration.between(ma.start(), end).toMillis(), ma.error(), batch.batchId()));
+                    Duration.between(ma.start(), end).toMillis(), ma.error(), batch.batchId(),
+                    ma.origin()));
         }
 
         long totalOutputRows  = lineage.stream().mapToLong(LineageRow::rowCount).sum();

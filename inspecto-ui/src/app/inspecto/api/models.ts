@@ -92,6 +92,8 @@ export interface ProblemFile {
     error: string;
     consignmentId: string;
     time: string;
+    /** The archive/compressed original this file came OUT of; blank when the file IS what arrived. */
+    origin: string;
 }
 
 /** The bounded page + PRE-limit summary counts (the cards stay honest when the list is cut). */
