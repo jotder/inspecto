@@ -30,6 +30,13 @@ public final class LogicalNames {
     /**
      * Proposed §6 Q4 default. {@code .zip} is here as a compression suffix too (legacy inline
      * single-entry zips), stripped by rule 1 via {@link #LEGACY_SUFFIXES}.
+     *
+     * <p>⚠ RESTRICTION (BACKLOG §4 "Unpack stage — open items" (6)): the plan specified a published
+     * {@code processing.unpack.data_extensions} key so a deployment could tune or empty this list.
+     * Until that ships this is a CONSTANT, so the collision posture is fixed: two plain files whose
+     * names differ only by extension ARE one logical file — though only once a *compressed* spelling
+     * of that name has been processed, because {@link #involvesCompression} scopes where the alias is
+     * written. Publish the key before widening this list.
      */
     static final List<String> DATA_EXTENSIONS =
             List.of(".csv", ".tsv", ".txt", ".json", ".jsonl", ".ndjson", ".xml");

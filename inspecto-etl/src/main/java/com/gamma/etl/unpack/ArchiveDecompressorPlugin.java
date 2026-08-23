@@ -5,6 +5,8 @@ import org.apache.commons.compress.archivers.ArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.zip.ZipArchiveInputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -35,6 +37,8 @@ import java.util.Locale;
  * is the class of bug that writes outside the workspace.
  */
 public abstract class ArchiveDecompressorPlugin implements DecompressorPlugin {
+
+    private static final Logger log = LoggerFactory.getLogger(ArchiveDecompressorPlugin.class);
 
     private final String id;
     private final List<String> suffixes;
@@ -72,7 +76,18 @@ public abstract class ArchiveDecompressorPlugin implements DecompressorPlugin {
             ArchiveEntry e;
             while ((e = in.getNextEntry()) != null) {
                 if (e.isDirectory()) continue;
-                if (!in.canReadEntryData(e)) continue;          // encrypted/unsupported member
+                // 🔴 KNOWN GAP (BACKLOG §4 "Unpack stage — open items" (4)): an encrypted or
+                // unsupported-method member is skipped SILENTLY, so an encrypted zip can expand to
+                // fewer members and still look like a clean success. Only an all-unreadable archive
+                // fails, via the "no readable entries" throw below. Reporting skips properly needs
+                // the run-level unpack ledger, which is blocked on the plan's §6 Q1 — until then this
+                // WARNs so the skip is at least visible in the log.
+                if (!in.canReadEntryData(e)) {
+                    log.warn("[UNPACK] {}: skipping unreadable member '{}' of {} (encrypted or "
+                            + "unsupported method) — it will NOT appear in the expansion",
+                            id, e.getName(), source.getFileName());
+                    continue;
+                }
                 if (++index > limits.maxEntries())
                     throw new IOException(id + ": archive exceeds max_entries ("
                             + limits.maxEntries() + "): " + source.getFileName());

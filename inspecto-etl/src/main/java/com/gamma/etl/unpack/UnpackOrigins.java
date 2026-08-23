@@ -17,6 +17,12 @@ import java.util.concurrent.ConcurrentHashMap;
  * consulted by the finalize/quarantine paths in the same process and cycle, removed when the mapping
  * is consumed. A crash loses the map — and loses nothing with it: no marker/backup happened, the
  * original is still in the inbox, the next cycle re-expands to a fresh temp dir.
+ *
+ * <p>⚠ RESTRICTION (BACKLOG §4 "Unpack stage — open items" (9)): entries are removed ONLY by
+ * {@link #consume} — i.e. by the finalize or quarantine path. A batch that fails at COMMIT runs
+ * neither, so its mappings stay behind: a slow leak in a long-running poller, and {@link #totalFor}
+ * keeps reporting archive semantics for that original. Bounded in practice (one entry per expanded
+ * file per failed batch) but it is unbounded in principle — a per-run sweep is the fix.
  */
 public final class UnpackOrigins {
 

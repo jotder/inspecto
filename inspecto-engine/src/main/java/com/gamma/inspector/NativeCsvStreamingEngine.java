@@ -115,6 +115,8 @@ final class NativeCsvStreamingEngine {
                 continue;
             }
 
+            // 🔴 Same known gap as CsvBatchStrategy's srcIdToFile put — an expanded member
+            // records its index-prefixed TEMP name (BACKLOG §4, unpack open item (3)).
             srcIdToFile.put(m.srcId(), m.file().getName());
             survivors.add(m);
             memberViews.add(view);

@@ -380,16 +380,38 @@ and needs **no** consignment change at all.
 
 ## 6. Open — needs the operator
 
+> Each question now records **what the shipped code does while it is unanswered**, so the default is
+> visible rather than implied. The full open-items list, with every workaround and its restriction,
+> is the two `BACKLOG.md` §4 rows added 2026-08-23 ("Unpack stage — open items", "Delimited
+> error-handling knobs — open items"). Two of those are worth pulling forward because they are
+> honesty gaps rather than missing features:
+>
+> - 🔴 **Lineage records the internal member name.** `srcIdToFile` is `m.file().getName()`, so
+>   `output.filename_column` holds the index-prefixed temp name (`00001_a.csv`) for an archive
+>   member — an implementation detail leaking into DATA. Worth fixing whichever way Q2 lands.
+> - 🔴 **An unreadable archive member is silently skipped** (`!canReadEntryData` ⇒ `continue`), so an
+>   encrypted zip can expand to fewer members and still look like a clean success. Only an
+>   all-unreadable archive fails.
+
 1. **Archive status vocabulary** (§2.2): are `UNPACKED` / `UNPACKED_PARTIAL` / `UNREADABLE` / `EMPTY`
-   the right four, and on `UNPACKED_PARTIAL` should the Consignment still commit (current default) or
-   fail whole?
-2. **Lineage grain.** `output.filename_column` currently records the parsed file. For an entry it
-   should be the **entry** name (finest grain, and the Archive link lives in the ledger) — confirm,
-   because the alternative (archive name) loses which entry a row came from.
-3. **Phase 4 appetite.** Recording failures in the manifest is the one change touching the crash-safe
-   commit contract. It is required for "end status against each source file", but Phases 1–3 ship
-   real value without it — split, or land together?
+   the right four, and on `UNPACKED_PARTIAL` should the Consignment still commit or fail whole?
+   **Today, unanswered:** no archive-level status exists at all. A partial archive **commits and is
+   marked**, its bad member quarantined as `<archive>!<entry>` — today's per-file semantics, and the
+   container leaves the inbox so it is not retried. The verdict is only inferrable by joining the
+   members' manifest rows. Answering this unblocks the run-level `unpack` ledger.
+2. **Lineage grain.** For an entry this should be the **entry** name (finest grain; the Archive link
+   lives in the ledger) — confirm, because the alternative (archive name) loses which entry a row
+   came from. **Today, unanswered:** it records the raw expansion filename, which for an archive
+   member is the index-prefixed `00001_a.csv` and for a stream is the decompressed `feed.csv`. The
+   prefix leak is a defect on any answer.
+3. ~~**Phase 4 appetite.**~~ **RESOLVED by building it** (2026-08-23): failures are recorded in the
+   manifest, crash-safe order untouched, branch-aware path unchanged. What remains of the
+   "end status against each source file" ask is the run-level ledger under Q1.
 4. **The data-extension allow-list default** (§2.3 rule 2). Proposed:
    `.csv .tsv .txt .json .jsonl .ndjson .xml`. Confirm, and confirm the collision posture: under
    "ignore extensions", `report.csv` and `report.json` in one directory ARE one logical file (dropped
-   as duplicate, loudly) unless the deployment empties the list.
+   as duplicate, loudly) unless the deployment empties the list. **Today, unanswered:** that list
+   ships as a CONSTANT in `LogicalNames`, not the published `processing.unpack.data_extensions` key
+   the plan specified — so the posture is fixed and a deployment cannot opt out. Narrowed by scope,
+   though: the alias is only ever WRITTEN for compression-involved names, so two plain files collide
+   only once a compressed spelling of that logical name has been processed.

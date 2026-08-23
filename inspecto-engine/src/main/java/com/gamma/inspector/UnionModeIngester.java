@@ -99,6 +99,8 @@ final class UnionModeIngester {
                     }
 
                     survivors.add(m);
+                    // 🔴 Same known gap as CsvBatchStrategy's srcIdToFile put — an expanded
+                    // member records its index-prefixed TEMP name (BACKLOG §4, item (3)).
                     srcIdToFile.put(m.srcId(), m.file().getName());
                     totalInputRows += memberParsed;
                     memberAudits.add(MemberAudit.accepted(m, memberParsed, memberErrors, mStart));
