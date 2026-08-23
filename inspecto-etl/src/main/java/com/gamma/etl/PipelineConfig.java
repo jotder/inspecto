@@ -113,7 +113,81 @@ public final class PipelineConfig {
                               List<String> nullStrings,
                               List<String> includePrefixes, List<String> includeRegex,
                               List<String> excludePrefixes, List<String> excludeRegex,
-                              int filterTargetColumn, String where) {
+                              int filterTargetColumn, String where,
+                              Boolean ignoreErrors, Boolean nullPadding, Rejects rejects) {
+
+        /**
+         * The pre-robustness arity, kept so callers built before the error-handling knobs existed still
+         * compile — same contract as {@link Output}'s pre-B4 overload. Every knob {@code null} means
+         * "engine default", which is exactly what those callers used to get.
+         */
+        public CsvSettings(String delimiter, String quote, String escape, String comment,
+                           int skipHeaderLines, int skipJunkLines,
+                           int skipTailLines, int skipTailCols, boolean hasHeader,
+                           String engine, List<String> dateFormats, List<String> tsFormats,
+                           String encoding, String inputCompression, Boolean strictMode,
+                           List<String> nullStrings,
+                           List<String> includePrefixes, List<String> includeRegex,
+                           List<String> excludePrefixes, List<String> excludeRegex,
+                           int filterTargetColumn, String where) {
+            this(delimiter, quote, escape, comment, skipHeaderLines, skipJunkLines,
+                    skipTailLines, skipTailCols, hasHeader, engine, dateFormats, tsFormats,
+                    encoding, inputCompression, strictMode, nullStrings,
+                    includePrefixes, includeRegex, excludePrefixes, excludeRegex,
+                    filterTargetColumn, where, null, null, Rejects.DEFAULTS);
+        }
+
+        /** Never null — an absent {@code rejects} block reads as {@link Rejects#DEFAULTS}. */
+        public Rejects rejects() {
+            return rejects == null ? Rejects.DEFAULTS : rejects;
+        }
+
+        /**
+         * Reject capture: DuckDB's {@code store_rejects} plus the table names and per-file cap it
+         * writes under. Every field is nullable = "leave the engine's own default", so an existing
+         * config emits byte-identical SQL.
+         *
+         * <p>⚠ {@link #table} and {@link #scan} are interpolated as SQL <em>identifiers</em> when the
+         * reject rows are drained, which a bound parameter cannot express — so
+         * {@link #isLegalName} is the fail-closed gate, applied at config load
+         * ({@code PipelineConfigParser}), not here. Never widen it.
+         */
+        @PublicApi(since = "2.0.0")
+        public record Rejects(Boolean store, String table, String scan, Integer limit) {
+
+            /** All-default: store as the engine already did, under DuckDB's own table names. */
+            public static final Rejects DEFAULTS = new Rejects(null, null, null, null);
+
+            /** DuckDB's own reject table names, used whenever the config names none. */
+            public static final String DEFAULT_TABLE = "reject_errors";
+            public static final String DEFAULT_SCAN = "reject_scans";
+
+            /** The errors table to read drained rejects from — the configured name, else DuckDB's. */
+            public String tableOrDefault() {
+                return table == null || table.isBlank() ? DEFAULT_TABLE : table;
+            }
+
+            /** The scans table to join against — the configured name, else DuckDB's. */
+            public String scanOrDefault() {
+                return scan == null || scan.isBlank() ? DEFAULT_SCAN : scan;
+            }
+
+            /**
+             * A bare SQL identifier: letters, digits and underscore, not starting with a digit. The
+             * drain path interpolates these names directly, so anything else is refused at load
+             * rather than reaching a statement.
+             */
+            public static boolean isLegalName(String name) {
+                if (name == null || name.isBlank()) return true;   // absent = use the default
+                if (name.length() > 128) return false;
+                if (!Character.isLetter(name.charAt(0)) && name.charAt(0) != '_') return false;
+                for (int i = 1; i < name.length(); i++) {
+                    char ch = name.charAt(i);
+                    if (!Character.isLetterOrDigit(ch) && ch != '_') return false;
+                }
+                return true;
+            }
+        }
 
         /** Whether any of the <em>pre-parse</em> row-filter lists is non-empty. */
         public boolean hasRowFilters() {
@@ -287,6 +361,38 @@ public final class PipelineConfig {
                 throw new IllegalArgumentException("processing.intake.max_files_per_cycle must be >= 0 (0 = unbounded)");
             if (minFilesPerCycle != null && minFilesPerCycle < 1)
                 throw new IllegalArgumentException("processing.intake.min_files_per_cycle must be >= 1");
+        }
+    }
+
+    /**
+     * The Collector's unpack stage ({@code processing.unpack}) — pluggable decompression of inbox
+     * files before the Consignment is planned. Null when the block is absent, which means
+     * {@link #defaults()}: the stage is ON (it only acts on files a plugin claims AND the chosen
+     * engine lane cannot read itself, so an inbox of plain CSV is untouched either way).
+     *
+     * <p>Every cap is fail-closed and enforced DURING expansion — a decompressor is a bomb vector by
+     * construction, so a breach fails the expansion whole and the original takes the normal failure
+     * path. {@code threads} bounds the stage's OWN pool: unpack runs before batch planning, so
+     * borrowing the batch semaphore would serialize it behind ingest for no reason.
+     */
+    @PublicApi(since = "4.0.0")
+    public record Unpack(boolean enabled, int maxEntries, long maxEntryBytes, long maxTotalBytes,
+                         double maxRatio, int depth, int threads) {
+
+        public Unpack {
+            if (maxEntries < 1)    throw new IllegalArgumentException("processing.unpack.max_entries must be >= 1");
+            if (maxEntryBytes < 1) throw new IllegalArgumentException("processing.unpack.max_entry_bytes must be >= 1");
+            if (maxTotalBytes < 1) throw new IllegalArgumentException("processing.unpack.max_total_bytes must be >= 1");
+            if (maxRatio < 0)      throw new IllegalArgumentException("processing.unpack.max_ratio must be >= 0 (0 = no ratio check)");
+            if (depth != 1)        throw new IllegalArgumentException(
+                    "processing.unpack.depth must be 1 — nested archives are not expanded (a zip-of-zips is a "
+                    + "bomb vector; recursion is a deliberate future opt-in, see the unpack-stage plan)");
+            if (threads < 1)       throw new IllegalArgumentException("processing.unpack.threads must be >= 1");
+        }
+
+        /** The absent-block posture: on, with the shipped caps, single-threaded expansion. */
+        public static Unpack defaults() {
+            return new Unpack(true, 10_000, 8L << 30, 32L << 30, 10_000d, 1, 1);
         }
     }
 
@@ -856,6 +962,7 @@ public final class PipelineConfig {
     private final DuckDbSettings duckdb;
     private final Chunking       chunking;
     private final Intake         intake;
+    private final Unpack         unpack;
     private final FixedWidth     fixedWidth;
     private final Json           json;
     private final Xlsx           xlsx;
@@ -1004,6 +1111,8 @@ public final class PipelineConfig {
     public Chunking       chunking() { return chunking; }
     /** Per-pipeline intake admission-control override, or {@code null} = inherit the {@code -D} globals. */
     public Intake         intake()   { return intake; }
+    /** Never null — an absent {@code processing.unpack} block reads as {@link Unpack#defaults()}. */
+    public Unpack         unpack()   { return unpack == null ? Unpack.defaults() : unpack; }
     /** Fixed-width frontend config, or {@code null} for the default delimited frontend. */
     public FixedWidth     fixedWidth() { return fixedWidth; }
     /** JSON/NDJSON frontend config, or {@code null} unless {@code frontend: json}. */
@@ -1085,7 +1194,9 @@ public final class PipelineConfig {
                 Collections.unmodifiableList(b.includeRegex),
                 Collections.unmodifiableList(b.excludePrefixes),
                 Collections.unmodifiableList(b.excludeRegex),
-                b.filterTargetColumn, b.rowWhere);
+                b.filterTargetColumn, b.rowWhere,
+                b.ignoreErrors, b.nullPadding,
+                new CsvSettings.Rejects(b.storeRejects, b.rejectsTable, b.rejectsScan, b.rejectsLimit));
         this.output = new Output(b.outputFormat, b.compression, b.duckLakeCfg, b.filenameColumn);
         this.sinks = resolveSinks(b.sinks, this.output, b.databaseDir);
         this.steps = resolveSteps(b.steps, b.rowWhere, b.join, b.dedup, b.summarize, b.route);
@@ -1098,6 +1209,7 @@ public final class PipelineConfig {
         this.duckdb   = new DuckDbSettings(b.duckMemoryLimit, b.duckTempDirectory, b.duckMaxTempSize);
         this.chunking = new Chunking(b.chunkMaxFileBytes, b.chunkTargetBytes);
         this.intake = b.intake;
+        this.unpack = b.unpack;
         this.fixedWidth = b.fixedWidth;
         this.json = b.json;
         this.xlsx = b.xlsx;
@@ -1176,6 +1288,7 @@ public final class PipelineConfig {
         this.duckdb = src.duckdb;
         this.chunking = src.chunking;
         this.intake = src.intake;
+        this.unpack = src.unpack;
         this.fixedWidth = src.fixedWidth;
         this.json = src.json;
         this.xlsx = src.xlsx;
@@ -1500,6 +1613,7 @@ public final class PipelineConfig {
         long   chunkMaxFileBytes = 8_589_934_592L;
         long   chunkTargetBytes  = 0;
         Intake intake            = null;   // absent block = inherit the -Dingest.* globals whole
+        Unpack unpack            = null;   // absent block = Unpack.defaults() (stage on, shipped caps)
         String batchesFilePath;
         String lineageFilePath;
         String manifestsDir;
@@ -1529,6 +1643,14 @@ public final class PipelineConfig {
         List<String> excludeRegex    = new ArrayList<>();
         int          filterTargetColumn = 0;
         String       rowWhere;          // post-parse SQL predicate (csv_settings.where); null ⇒ no filter
+        // Error handling. Every one is null ⇒ "leave the engine's own default", so a config that
+        // declares none emits the exact same read_csv SQL as before these knobs existed.
+        Boolean      ignoreErrors;
+        Boolean      nullPadding;
+        Boolean      storeRejects;
+        String       rejectsTable;
+        String       rejectsScan;
+        Integer      rejectsLimit;
         String       filenameColumn;    // output.filename_column (B4); null ⇒ no lineage column in rows
         FixedWidth   fixedWidth;          // null ⇒ delimited frontend (the default)
         Json         json;                // null unless frontend: json

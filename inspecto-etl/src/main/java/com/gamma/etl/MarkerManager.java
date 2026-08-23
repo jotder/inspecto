@@ -39,7 +39,18 @@ public final class MarkerManager {
      */
     public static boolean isAlreadyProcessed(java.io.File file, PipelineConfig cfg) {
         if (!cfg.processing().duplicateCheckEnabled()) return false;
-        return Files.exists(getMarkerPath(file, cfg));
+        if (Files.exists(getMarkerPath(file, cfg))) return true;
+        // Extension-insensitive identity (unpack-stage plan §2.3): the same logical file may be
+        // re-delivered under a different compression form (feed.csv.gz after feed.csv.bz2). The
+        // LOGICAL alias marker written beside every primary marker catches that — loudly, with both
+        // spellings, never silent.
+        Path alias = getLogicalMarkerPath(file, cfg);
+        if (alias != null && Files.exists(alias)) {
+            log.info("[MARKER] Skipping {} — its logical name was already processed under another "
+                    + "spelling (alias marker {})", file.getName(), alias.getFileName());
+            return true;
+        }
+        return false;
     }
 
     // ── marker creation ───────────────────────────────────────────────────────
@@ -56,6 +67,21 @@ public final class MarkerManager {
         Path marker = getMarkerPath(file, cfg);
         Files.createDirectories(marker.getParent());
         Files.createFile(marker);
+        // The logical ALIAS beside the primary (§2.3) — WRITTEN only for compression-involved names
+        // (the operator's "for such cases": plain feed.csv never writes one, so plain-only inboxes
+        // keep today's behaviour byte-for-byte), and deliberately tolerant of already-exists: two
+        // spellings of one logical name legitimately share it. The atomic same-file race guard stays
+        // where it always was, on the PRIMARY createFile above (the pinned contract of
+        // FinalizeSourceConcurrencyTest — exactly one loser, on that line).
+        if (!com.gamma.etl.unpack.LogicalNames.involvesCompression(file.getName())) return;
+        Path alias = getLogicalMarkerPath(file, cfg);
+        if (alias != null && !alias.equals(marker)) {
+            try {
+                Files.createFile(alias);
+            } catch (FileAlreadyExistsException ignored) {
+                // another spelling of this logical name got here first — fine by design
+            }
+        }
     }
 
     // ── marker path ───────────────────────────────────────────────────────────
@@ -74,6 +100,22 @@ public final class MarkerManager {
         Path base = Paths.get(cfg.dirs().markers()).toAbsolutePath();
         if (rel.getParent() != null) base = base.resolve(rel.getParent());
         return base.resolve(rel.getFileName().toString() + cfg.processing().markerExtension());
+    }
+
+    /**
+     * The extension-insensitive ALIAS marker (unpack-stage plan §2.3): the file's poll-relative path
+     * through {@link com.gamma.etl.unpack.LogicalNames#logicalName}, suffixed
+     * {@code .logical<markerExtension>}. Null when the logical form IS the verbatim form (nothing to
+     * alias) — the caller then relies on the primary marker alone.
+     */
+    static Path getLogicalMarkerPath(java.io.File file, PipelineConfig cfg) {
+        Path poll     = Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
+        Path filePath = file.toPath().toAbsolutePath().normalize();
+        String rel     = poll.relativize(filePath).toString().replace('\\', '/');
+        String logical = com.gamma.etl.unpack.LogicalNames.logicalName(rel);
+        if (logical.equals(rel)) return null;
+        return Paths.get(cfg.dirs().markers()).toAbsolutePath()
+                .resolve(logical + ".logical" + cfg.processing().markerExtension());
     }
 
     // ── stale marker cleanup ──────────────────────────────────────────────────

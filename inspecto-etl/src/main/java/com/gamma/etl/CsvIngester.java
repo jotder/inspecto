@@ -339,10 +339,12 @@ public final class CsvIngester {
     }
 
     private static final java.util.regex.Pattern COMPRESS_SUFFIX =
-            java.util.regex.Pattern.compile("\\.(gz|bz2|zip)$", java.util.regex.Pattern.CASE_INSENSITIVE);
+            java.util.regex.Pattern.compile("\\.(gz|bz2|zip|z)$", java.util.regex.Pattern.CASE_INSENSITIVE);
     private static final java.util.regex.Pattern EXT_SUFFIX = java.util.regex.Pattern.compile("\\.[^.]+$");
 
-    /** Strips a compression suffix ({@code .gz}/{@code .bz2}/{@code .zip}) then the remaining extension. */
+    /** Strips a compression suffix ({@code .gz}/{@code .bz2}/{@code .zip}/{@code .Z}) then the remaining
+     *  extension — {@code .Z} added with the unpack stage so an expanded file's errors CSV pairs with its
+     *  original's quarantine move. */
     public static String stripExtensions(String fileName) {
         return EXT_SUFFIX.matcher(COMPRESS_SUFFIX.matcher(fileName).replaceAll(""))
                 .replaceAll("");

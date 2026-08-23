@@ -109,6 +109,13 @@ public class CollectorProcessor {
             return;
         }
 
+        // ── unpack stage (Collector-level, unpack-stage plan §2.0) ───────────────
+        // Expand compressed candidates the chosen engine lane cannot read itself BEFORE the planner
+        // freezes the list — every expanded file is an ordinary member from birth, so the EL below
+        // stays untouched. Expansion failures fall through as the ORIGINAL file, which the engine
+        // then quarantines with a per-file audit row exactly as today.
+        candidates = com.gamma.etl.unpack.UnpackStage.expand(cfg, candidates);
+
         // ── plan batches ─────────────────────────────────────────────────────────
         ConsignmentPlanner.SchemaResolver resolver = (cfg.schemas().selector() != null)
                 ? cfg.schemas().selector()::select
@@ -438,7 +445,18 @@ public class CollectorProcessor {
             } catch (java.io.IOException vanished) {
                 continue;   // file disappeared between discovery and the dedup check — drop it
             }
-            LedgerEntry prior = ledger.find(src.id(), rf.relativePath()).orElse(null);
+            // Extension-insensitive identity (unpack-stage plan §2.3): look up the LOGICAL key first
+            // (feed.csv.bz2 and feed.csv.gz are one file), then the verbatim key — the migration
+            // fallback that keeps every pre-existing row honoured, so switching keys never re-ingests
+            // the backlog. The checksum still decides DUPLICATE vs CHANGED, so a logical hit against
+            // genuinely different bytes reprocesses — the safe direction.
+            String logical = com.gamma.etl.unpack.LogicalNames.logicalName(rf.relativePath());
+            LedgerEntry prior = ledger.find(src.id(), logical)
+                    .or(() -> ledger.find(src.id(), rf.relativePath())).orElse(null);
+            boolean viaAlias = prior != null && !prior.relativePath().equals(rf.relativePath());
+            if (viaAlias)
+                log.info("[DEDUP] {} matches previously processed '{}' under its logical name '{}'",
+                        rf.relativePath(), prior.name(), logical);
 
             // CHECKSUM hashes only on the run path; countPending falls back to a cheap metadata approximation.
             String cs = null;

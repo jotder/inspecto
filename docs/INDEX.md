@@ -75,6 +75,14 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- `superpower/unpack-stage-plan.md` — **IN FLIGHT 2026-08-23: BUILT end to end** (Phases 1, 1b, 2, 3, 4 + the shipped halves of 5/6; reactor 3547/0/0/5, uncommitted). Stream (.gz/.bz2/.Z) and archive (.zip/.tar/.tar.gz) expansion at the Collector before consignments are planned; bomb caps; extension-insensitive duplicate identity; `processing.unpack.*` config; parallel expansion; FAILED members now recorded in the manifest. Remaining by decision: the run-level `unpack` ledger + `logical_name`/`origin` ledger columns and the UI half — all want §6 Q1's archive-status vocabulary settled first. Pluggable
+  decompression (ServiceLoader `DecompressorPlugin`) expanding archives/compressed inputs into
+  ordinary candidates at `CollectorProcessor` BEFORE `ConsignmentPlanner.plan` — never mutating a
+  Consignment; Archive verdict = a Run-level `unpack` ledger; per-file end status via recording
+  non-survivors in the manifest (Phase 4); Collector-level placement + original↔actual filename
+  tracking + extension-insensitive duplicate identity (`logicalName`, §2.3) confirmed by operator
+  refinement same day. §6 holds four operator questions (Archive status vocabulary · lineage grain ·
+  Phase-4 appetite · data-extension allow-list/collision posture).
 - ~~`superpower/canvas-ux-compaction-plan.md`~~ — **COMPLETE and ARCHIVED 2026-08-21**
   (`archived-documents/plans-archive/canvas-ux-compaction-plan.md`). S0–S6 all shipped the same day
   the operator answered D1–D9: the maximize-clipped-Apply P0 fixed as an overlay; the selection

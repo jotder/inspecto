@@ -128,12 +128,50 @@ public final class ConfigSpecs {
                         "Lines starting with this single character are skipped; blank = no comment handling."),
                 FieldSpec.of("processing.csv_settings.encoding", "Encoding", FieldType.STRING,
                         "Source charset for the native reader (e.g. utf-8, latin-1, utf-16); blank = utf-8."),
-                FieldSpec.of("processing.csv_settings.compression", "Input compression", FieldType.STRING,
-                        "read_csv input compression (auto/gzip/zstd/none); blank = auto-detect by extension."),
+                FieldSpec.enumField("processing.csv_settings.compression", "Input compression",
+                        List.of("auto", "gzip", "zstd", "none"), "auto",
+                        "read_csv input compression; blank = auto-detect by extension. Refused fail-closed "
+                                + "outside this set — archives and other forms (.zip/.tar/.Z/.bz2) are expanded "
+                                + "by the collector's unpack stage by extension, no setting needed."),
                 FieldSpec.of("processing.csv_settings.strict_mode", "Strict mode", FieldType.BOOL,
                         "DuckDB strict_mode; blank = DuckDB default (true). false tolerates quote/column drift."),
                 FieldSpec.of("processing.csv_settings.null_strings", "Null strings", FieldType.LIST,
                         "Literal text values read as SQL NULL (read_csv nullstr), e.g. ['', 'NULL', 'NaN']."),
+                FieldSpec.withDefault("processing.unpack.enabled", "Unpack compressed inputs", FieldType.BOOL, true,
+                        "Expand compressed/archived inbox files (.gz/.bz2/.Z/.zip/.tar/.tar.gz) at the "
+                                + "collector, before consignments are planned. Only acts on files a decompressor "
+                                + "claims AND the parse engine cannot read itself, so a plain inbox is untouched."),
+                FieldSpec.withDefault("processing.unpack.max_entries", "Max archive entries", FieldType.INT, 10000,
+                        "Fail-closed cap on member files one archive may expand to."),
+                FieldSpec.withDefault("processing.unpack.max_entry_bytes", "Max bytes per expanded file",
+                        FieldType.INT, 8L << 30,
+                        "Fail-closed cap on the decompressed size of any single output file."),
+                FieldSpec.withDefault("processing.unpack.max_total_bytes", "Max bytes per source",
+                        FieldType.INT, 32L << 30,
+                        "Fail-closed cap on total decompressed bytes one source may expand to."),
+                FieldSpec.withDefault("processing.unpack.max_ratio", "Max decompression ratio",
+                        FieldType.INT, 10000,
+                        "Fail-closed output/input ratio cap — the classic decompression-bomb tell; 0 disables it."),
+                FieldSpec.withDefault("processing.unpack.threads", "Unpack threads", FieldType.INT, 1,
+                        "Archives expanded concurrently (one archive per worker). Pure file I/O, no database "
+                                + "connection — but it adds to the same core budget as processing.threads."),
+                FieldSpec.of("processing.csv_settings.ignore_errors", "Skip unparseable rows", FieldType.BOOL,
+                        "blank = true (the long-standing behaviour): a row read_csv cannot parse is dropped "
+                                + "instead of failing the run. false makes the batch fail on the first bad row."),
+                FieldSpec.of("processing.csv_settings.null_padding", "Pad short rows with NULLs", FieldType.BOOL,
+                        "blank = the frontend default (false for delimited, true for the line-reader "
+                                + "frontends). true keeps a row that ran out of columns, NULL-filling the rest."),
+                FieldSpec.of("processing.csv_settings.store_rejects", "Capture rejected rows", FieldType.BOOL,
+                        "blank = true: rejected rows are captured and drained to errors/<base>_errors.csv. "
+                                + "false skips capture entirely — reject rows carry raw source data."),
+                FieldSpec.of("processing.csv_settings.rejects_table", "Rejects table", FieldType.STRING,
+                        "Name of the per-row reject table read_csv writes; blank = reject_errors. Must be a "
+                                + "bare identifier."),
+                FieldSpec.of("processing.csv_settings.rejects_scan", "Rejects scan table", FieldType.STRING,
+                        "Name of the per-file reject scan table; blank = reject_scans. Must be a bare "
+                                + "identifier."),
+                FieldSpec.of("processing.csv_settings.rejects_limit", "Rejects limit", FieldType.INT,
+                        "Max rejected rows stored per file; blank or 0 = unlimited."),
                 FieldSpec.of("processing.csv_settings.include_prefixes", "Include prefixes", FieldType.LIST,
                         "Row allow-list: keep rows whose filter_target_column starts with any of these."),
                 FieldSpec.of("processing.csv_settings.include_regex", "Include regex", FieldType.LIST,

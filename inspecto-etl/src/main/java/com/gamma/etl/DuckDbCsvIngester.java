@@ -248,10 +248,8 @@ public final class DuckDbCsvIngester {
                 + ", skip=" + skipLines
                 + readOptions(cfg)
                 + dialectOptions(cfg)
-                + ", ignore_errors=true"
-                + ", null_padding=false"
-                + ", auto_detect=false"
-                + ", store_rejects=true)";
+                + errorOptions(cfg, false)
+                + ", auto_detect=false)";
 
         return new ReadSpec(proj.toString(), readCsv);
     }
@@ -297,10 +295,8 @@ public final class DuckDbCsvIngester {
                 + ", header=false"
                 + ", skip=" + skipLines
                 + readOptions(cfg)
-                + ", ignore_errors=true"
-                + ", null_padding=true"
-                + ", auto_detect=false"
-                + ", store_rejects=true)"
+                + errorOptions(cfg, true)
+                + ", auto_detect=false)"
                 + " WHERE length(\"line\") >= " + fw.minRecordLength() + ") AS fw";
 
         return new ReadSpec(proj.toString(), readCsv);
@@ -392,10 +388,8 @@ public final class DuckDbCsvIngester {
                     + ", header=false"
                     + ", skip=" + skipLines
                     + readOptions(cfg)
-                    + ", ignore_errors=true"
-                    + ", null_padding=true"
-                    + ", auto_detect=false"
-                    + ", store_rejects=true)"
+                    + errorOptions(cfg, true)
+                    + ", auto_detect=false)"
                     + " WHERE json_valid(\"line\")) AS js";
             return new ReadSpec(proj.toString(), readCsv);
         }
@@ -600,10 +594,8 @@ public final class DuckDbCsvIngester {
                 + ", header=false"
                 + ", skip=" + skipLines
                 + readOptions(cfg)
-                + ", ignore_errors=true"
-                + ", null_padding=true"
-                + ", auto_detect=false"
-                + ", store_rejects=true)"
+                + errorOptions(cfg, true)
+                + ", auto_detect=false)"
                 + " WHERE regexp_matches(\"line\", '" + pat + "')) AS tr";
 
         return new ReadSpec(proj, readCsv);
@@ -690,6 +682,10 @@ public final class DuckDbCsvIngester {
      * file produced no rejects (returns {@code 0}).
      */
     public static long drainRejects(Connection conn, File file, PipelineConfig cfg) {
+        // store_rejects: false is a deliberate choice (reject rows carry raw source data), so there is
+        // nothing to drain — query nothing rather than relying on the missing-table path to swallow it.
+        Boolean store = cfg.csv().rejects().store();
+        if (store != null && !store.booleanValue()) return 0L;
         return writeRejects(conn, file, file.getAbsolutePath().replace("\\", "/"), cfg);
     }
 
@@ -704,9 +700,14 @@ public final class DuckDbCsvIngester {
      */
     private static long writeRejects(Connection conn, File file, String filePath,
                                      PipelineConfig cfg) {
+        // ⚠ The names must be the CONFIGURED ones: `rejects_table`/`rejects_scan` rename the tables
+        // read_csv writes, so reading the DuckDB defaults here would drain nothing and silently
+        // report every renamed run as having zero rejects. Interpolated as identifiers — which is
+        // why `Rejects.isLegalName` gates them at config load.
+        PipelineConfig.CsvSettings.Rejects rj = cfg.csv().rejects();
         String sql =
                 "SELECT e.line, e.column_name, e.error_type, e.csv_line " +
-                "FROM reject_errors e JOIN reject_scans s USING (scan_id) " +
+                "FROM \"" + rj.tableOrDefault() + "\" e JOIN \"" + rj.scanOrDefault() + "\" s USING (scan_id) " +
                 "WHERE s.file_path = '" + escapeSql(filePath) + "' ORDER BY e.line";
 
         Path errorFilePath = ParserSpec.errorFile(file, cfg);
@@ -736,7 +737,7 @@ public final class DuckDbCsvIngester {
             // Anything else (disk full writing the error CSV, a reject_scans/reject_errors schema change
             // after a DuckDB upgrade) means rows WERE dropped by read_csv and we could not drain them;
             // reporting that at debug made a real failure indistinguishable from a clean file.
-            if (isMissingRejectTable(e)) {
+            if (isMissingRejectTable(e, rj)) {
                 log.debug("No reject_errors for {} ({})", file.getName(), e.getMessage());
             } else {
                 log.warn("Could not drain rejected rows for {} — the reject count below is NOT reliable: {}",
@@ -752,12 +753,16 @@ public final class DuckDbCsvIngester {
      * Is this the benign "the reject tables were never created on this connection" case, as opposed to a
      * genuine failure to drain rejects that really existed? DuckDB reports the former as a Catalog Error.
      */
-    private static boolean isMissingRejectTable(Exception e) {
+    private static boolean isMissingRejectTable(Exception e, PipelineConfig.CsvSettings.Rejects rj) {
         String m = e.getMessage();
         if (m == null) return false;
         String s = m.toLowerCase(java.util.Locale.ROOT);
-        return s.contains("catalog error")
-                || (s.contains("does not exist") && (s.contains("reject_errors") || s.contains("reject_scans")));
+        // The names are configurable, so match the ones actually queried — not just DuckDB's defaults,
+        // or a renamed reject table's absence would be reported as a real drain failure.
+        boolean namesMissing = s.contains("does not exist")
+                && (s.contains(rj.tableOrDefault().toLowerCase(java.util.Locale.ROOT))
+                    || s.contains(rj.scanOrDefault().toLowerCase(java.util.Locale.ROOT)));
+        return s.contains("catalog error") || namesMissing;
     }
 
     private static String nz(String s) { return s == null ? "" : s; }
@@ -786,6 +791,44 @@ public final class DuckDbCsvIngester {
         }
         if (c.strictMode() != null)
             sb.append(", strict_mode=").append(c.strictMode().booleanValue());
+        return sb.toString();
+    }
+
+    /**
+     * The error-handling {@code read_csv} parameters: {@code ignore_errors}, {@code null_padding},
+     * {@code store_rejects} and the reject table names / per-file cap.
+     *
+     * <p><b>Why the caller passes {@code nullPaddingDefault}.</b> These were literals for years, and
+     * the literal DIFFERED by frontend — {@code null_padding=false} on the delimited path,
+     * {@code true} on every line-reader path (fixed-width / json-lines / text-regex), where a short
+     * final line is normal and padding it is the whole point. A single default here would silently
+     * change how one of the two families parses, so the frontend's own former literal is the default
+     * and the config only overrides it.
+     *
+     * <p>⚠ These are emitted HERE and nowhere else. Appending any of them at a call site as well
+     * would hand {@code read_csv} the same named parameter twice, which DuckDB rejects outright.
+     */
+    private static String errorOptions(PipelineConfig cfg, boolean nullPaddingDefault) {
+        PipelineConfig.CsvSettings c = cfg.csv();
+        PipelineConfig.CsvSettings.Rejects r = c.rejects();
+        StringBuilder sb = new StringBuilder();
+        // Unset keeps the long-standing behaviour: skip unparseable rows rather than failing the run.
+        boolean ignore = c.ignoreErrors() == null || c.ignoreErrors().booleanValue();
+        boolean pad    = c.nullPadding()  == null ? nullPaddingDefault : c.nullPadding().booleanValue();
+        boolean store  = r.store()        == null || r.store().booleanValue();
+        sb.append(", ignore_errors=").append(ignore);
+        sb.append(", null_padding=").append(pad);
+        sb.append(", store_rejects=").append(store);
+        // The names/cap only mean anything while rejects are being stored; emitting them with
+        // store_rejects=false is what DuckDB itself refuses ("cannot be set without store_rejects").
+        if (store) {
+            if (r.table() != null && !r.table().isBlank())
+                sb.append(", rejects_table='").append(escapeSql(r.table())).append('\'');
+            if (r.scan() != null && !r.scan().isBlank())
+                sb.append(", rejects_scan='").append(escapeSql(r.scan())).append('\'');
+            if (r.limit() != null)
+                sb.append(", rejects_limit=").append(r.limit().intValue());
+        }
         return sb.toString();
     }
 

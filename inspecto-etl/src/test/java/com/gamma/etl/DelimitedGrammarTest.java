@@ -270,6 +270,125 @@ class DelimitedGrammarTest {
                 "no resolvable data row → fall back to Java");
     }
 
+    // ── error handling: ignore_errors / null_padding / store_rejects / rejects_* ──
+
+    /** Row "B" is one column short — the case every knob below changes the handling of. */
+    private static final String SHORT_ROW_CSV = """
+            MARKER,ID,VAL
+            A,1,x
+            B,2
+            C,3,z
+            """;
+
+    /**
+     * The delimited default: a short row has the wrong column count and is DROPPED
+     * ({@code null_padding=false}), which is the behaviour that was hardcoded before these knobs
+     * existed. Pinned so a change to the default is a visible test failure, not a silent one.
+     */
+    @Test
+    void shortRowIsDroppedByDefault(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = load(dir, "eh_def", CSV_DUCKDB);
+        assertEquals(List.of("A", "C"), markers(dir, cfg, "eh_def.csv", SHORT_ROW_CSV, true));
+    }
+
+    /** {@code null_padding: true} keeps the short row instead, NULL-filling the missing column. */
+    @Test
+    void nullPaddingKeepsShortRow(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = load(dir, "eh_pad", CSV_DUCKDB + "    null_padding: true\n");
+        File csv = write(dir, "eh_pad.csv", SHORT_ROW_CSV);
+        try (Connection conn = open()) {
+            DuckDbCsvIngester.ingest(csv, conn, cfg.schemas().single(), cfg, "raw_f0");
+            assertEquals(List.of("A", "B", "C"), column(conn, "raw_f0", "MARKER"),
+                    "the short row is padded and kept");
+            List<String> vals = column(conn, "raw_f0", "VAL");
+            assertTrue(vals.contains(null), "its missing trailing column reads as SQL NULL, got " + vals);
+        }
+    }
+
+    /**
+     * {@code ignore_errors: false} is the fail-loudly choice: the bad row is no longer skipped, so
+     * the ingest raises instead of quietly producing a short table.
+     */
+    @Test
+    void ignoreErrorsFalseFailsTheIngest(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = load(dir, "eh_strict", CSV_DUCKDB + "    ignore_errors: false\n");
+        File csv = write(dir, "eh_strict.csv", SHORT_ROW_CSV);
+        try (Connection conn = open()) {
+            assertThrows(Exception.class,
+                    () -> DuckDbCsvIngester.ingest(csv, conn, cfg.schemas().single(), cfg, "raw_f0"),
+                    "a row that cannot be parsed must fail the batch, not be dropped");
+        }
+    }
+
+    /**
+     * 🔴 The load-bearing one. Renaming the reject tables changes where {@code read_csv} writes the
+     * rejects, so the drain has to read the CONFIGURED names — reading DuckDB's defaults would find
+     * nothing and report a file full of rejects as clean.
+     */
+    @Test
+    void renamedRejectTablesAreStillDrained(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = load(dir, "eh_named", CSV_DUCKDB
+                + "    rejects_table: my_bad_rows\n"
+                + "    rejects_scan: my_bad_scans\n");
+        File csv = write(dir, "eh_named.csv", SHORT_ROW_CSV);
+        try (Connection conn = open()) {
+            DuckDbCsvIngester.ingest(csv, conn, cfg.schemas().single(), cfg, "raw_f0");
+            assertEquals(1L, DuckDbCsvIngester.drainRejects(conn, csv, cfg),
+                    "the one short row is drained from the renamed reject tables");
+        }
+    }
+
+    /** {@code store_rejects: false} captures nothing, so there is nothing to drain. */
+    @Test
+    void storeRejectsFalseDrainsNothing(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = load(dir, "eh_nostore", CSV_DUCKDB + "    store_rejects: false\n");
+        File csv = write(dir, "eh_nostore.csv", SHORT_ROW_CSV);
+        try (Connection conn = open()) {
+            DuckDbCsvIngester.ingest(csv, conn, cfg.schemas().single(), cfg, "raw_f0");
+            assertEquals(0L, DuckDbCsvIngester.drainRejects(conn, csv, cfg));
+            // The row is still dropped — capture and skipping are independent knobs.
+            assertEquals(List.of("A", "C"), column(conn, "raw_f0", "MARKER"));
+        }
+    }
+
+    /**
+     * FAIL CLOSED: the reject table names are interpolated as SQL identifiers by the drain, so a name
+     * that is not a bare identifier is refused at config load rather than reaching a statement.
+     */
+    @Test
+    void illegalRejectTableNameIsRefused(@TempDir Path dir) {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> load(dir, "eh_inj", CSV_DUCKDB + "    rejects_table: \"x\\\"; DROP TABLE t; --\"\n"));
+        assertTrue(e.getMessage().contains("rejects_table"), e.getMessage());
+    }
+
+    @Test
+    void negativeRejectsLimitIsRefused(@TempDir Path dir) {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> load(dir, "eh_neg", CSV_DUCKDB + "    rejects_limit: -1\n"));
+        assertTrue(e.getMessage().contains("rejects_limit"), e.getMessage());
+    }
+
+    /** Undeclared knobs stay null, so an existing grammar is byte-identical through a load. */
+    @Test
+    void undeclaredErrorKnobsStayUnset(@TempDir Path dir) throws Exception {
+        PipelineConfig.CsvSettings c = load(dir, "eh_unset", CSV_DUCKDB).csv();
+        assertNull(c.ignoreErrors(), "unset ⇒ engine default");
+        assertNull(c.nullPadding());
+        assertNull(c.rejects().store());
+        assertNull(c.rejects().table());
+        assertNull(c.rejects().limit());
+        assertEquals("reject_errors", c.rejects().tableOrDefault());
+        assertEquals("reject_scans", c.rejects().scanOrDefault());
+    }
+
+    /** The shared csv_settings preamble for the error-handling cases — native path, header on. */
+    private static final String CSV_DUCKDB =
+            "  csv_settings:\n"
+          + "    delimiter: \",\"\n"
+          + "    engine: duckdb\n"
+          + "    has_header: true\n";
+
     // ── helpers ────────────────────────────────────────────────────────────────
 
     /** Ingest {@code content} through the native or Java path and return the MARKER column. */

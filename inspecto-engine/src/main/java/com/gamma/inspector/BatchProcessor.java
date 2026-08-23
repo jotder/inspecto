@@ -68,7 +68,7 @@ public final class BatchProcessor {
         if ("SUCCESS".equals(status)) {
             try {
                 commit(batch, cfg, outcome.survivors(), outcome.outputs(), outcome.lineage(),
-                        outcome.bounds());
+                        outcome.bounds(), outcome.memberAudits());
             } catch (Exception e) {
                 // Output was written, but a side effect (backup/manifest/markers) failed. Demote
                 // to FAILED so the batch stays visible to audit/lineage/recovery instead of
@@ -111,14 +111,14 @@ public final class BatchProcessor {
 
     private static void commit(Batch batch, PipelineConfig cfg, List<Batch.Member> survivors,
                                List<PartitionOutput> outputs, List<LineageRow> lineage,
-                               Map<String, EventTimeBounds> bounds)
+                               Map<String, EventTimeBounds> bounds, List<MemberAudit> audits)
             throws IOException {
         // lineage is persisted by writeAudit (from the outcome); it is passed on here too because it is the
         // only place a per-output-file row count exists (§11.3). The durable side effects —
         // register → manifest → backup → markers LAST → ledger / watermark — live in finalizeSource, which
         // the branch-aware graph path (BatchGraphRunner's SourceFinalizer) reuses once every sink branch is
         // committed (Stage A), so both drivers share this one crash-ordered sequence.
-        finalizeSource(batch, cfg, survivors, outputs, lineage, bounds);
+        finalizeSource(batch, cfg, survivors, outputs, lineage, bounds, audits);
     }
 
     /**
@@ -143,6 +143,27 @@ public final class BatchProcessor {
     static void finalizeSource(Batch batch, PipelineConfig cfg, List<Batch.Member> survivors,
                                List<PartitionOutput> outputs, List<LineageRow> lineage,
                                Map<String, EventTimeBounds> bounds) throws IOException {
+        finalizeSource(batch, cfg, survivors, outputs, lineage, bounds, List.of());
+    }
+
+    /**
+     * As above, plus the per-member audits so the manifest can record the batch's FAILED members
+     * alongside its survivors (unpack-stage plan Phase 4 — "the end status must be against each
+     * source file", operator 2026-08-23).
+     *
+     * <p>Before this, only survivors became {@code MemberEntry} rows: a file that could not be parsed
+     * existed in the audit CSV and the quarantine tree but was <b>absent from the manifest</b>, which
+     * is the authoritative per-Consignment record. The branch-aware graph path
+     * ({@code BatchGraphRunner.SourceFinalizer}) uses the no-audits overload and is unchanged.
+     *
+     * <p>⚠ The crash-safe ORDER is untouched — register → manifest → backup → markers LAST. A failed
+     * member gets a manifest row and no backup/marker (it was moved to quarantine by the strategy,
+     * and its file must not be marked processed), so nothing about recovery changes.
+     */
+    static void finalizeSource(Batch batch, PipelineConfig cfg, List<Batch.Member> survivors,
+                               List<PartitionOutput> outputs, List<LineageRow> lineage,
+                               Map<String, EventTimeBounds> bounds,
+                               List<MemberAudit> audits) throws IOException {
 
         // ── ordering rationale ────────────────────────────────────────────────
         // Markers signal "already processed; skip on next poll." If a crash leaves
@@ -186,12 +207,23 @@ public final class BatchProcessor {
         List<BatchManifest.MemberEntry> memberEntries = new ArrayList<>();
         List<String> markerPaths = new ArrayList<>();
         for (Batch.Member m : survivors) {
-            Path filePath = m.file().toPath().toAbsolutePath().normalize();
+            // ⚠ Every poll-relative computation below runs against the ORIGINAL inbox file
+            // (unpack-stage plan §2.0): an unpack-expanded member lives in dirs.temp, and
+            // poll.relativize on it walks out of the root (../..) — a marker outside the markers
+            // tree and a nonsense backup path. The manifest keeps BOTH names: `filename` is the
+            // actual parsed file, `originalRelPath`/backup/marker are the original's.
+            File srcFile  = com.gamma.etl.unpack.UnpackOrigins.originalOr(m.file());
+            Path filePath = srcFile.toPath().toAbsolutePath().normalize();
             String rel    = poll.relativize(filePath).toString().replace('\\', '/');
+            // An ARCHIVE member is addressed JAR-style, archive!entry, so it stays traceable to both
+            // its container and itself with no manifest schema change. A 1→1 stream expansion keeps
+            // the plain original path — there is only one file to name.
+            if (com.gamma.etl.unpack.UnpackOrigins.totalFor(srcFile) > 1)
+                rel = rel + "!" + m.file().getName();
             String backupPath = backup != null
                     ? backup.resolve(poll.relativize(filePath)).toString() : "";
             if (writeMarkers)
-                markerPaths.add(MarkerManager.getMarkerPath(m.file(), cfg).toString());
+                markerPaths.add(MarkerManager.getMarkerPath(srcFile, cfg).toString());
             if (ledgerRecord) {
                 try {
                     // CHECKSUM mode: reuse the hash computed during the run-path dedup (stashed by
@@ -205,7 +237,13 @@ public final class BatchProcessor {
                     // whenever the listing carried them, whatever the mode, so a later switch to etag dedup
                     // starts from a populated ledger.
                     AcquisitionLedgers.Listing listing = AcquisitionLedgers.takeListing(filePath);
-                    ledgerEntries.add(new LedgerEntry(sourceId, rel, m.file().getName(),
+                    // Compression-involved files record under their LOGICAL key (§2.3) so a
+                    // re-delivery in another compression form finds them; plain files keep the
+                    // verbatim key — a plain-only inbox is byte-for-byte unchanged. `name` keeps the
+                    // actual spelling either way, which is what the alias-hit log line reports.
+                    String ledgerKey = com.gamma.etl.unpack.LogicalNames.involvesCompression(srcFile.getName())
+                            ? com.gamma.etl.unpack.LogicalNames.logicalName(rel) : rel;
+                    ledgerEntries.add(new LedgerEntry(sourceId, ledgerKey, srcFile.getName(),
                             Files.size(filePath), checksum,
                             listing != null ? listing.etag() : null, listing != null ? listing.version() : null,
                             Files.getLastModifiedTime(filePath).toMillis(),
@@ -214,6 +252,32 @@ public final class BatchProcessor {
             }
             memberEntries.add(new BatchManifest.MemberEntry(
                     m.file().getName(), m.srcId(), rel, backupPath, "SUCCESS"));
+        }
+
+        // Phase 4 — the batch's FAILED members join its survivors in the manifest, so the
+        // authoritative per-Consignment record answers "what happened to this source file?" for every
+        // file, not only the ones that worked. Keyed off the audits (the strategies' own verdicts), and
+        // matched to members by srcId so the entry carries the same identity the survivors' rows do.
+        // No backup and no marker for these: the strategy already moved the file to quarantine, and
+        // marking it processed would hide a file that never landed.
+        java.util.Set<Integer> survivorIds = new java.util.HashSet<>();
+        for (Batch.Member m : survivors) survivorIds.add(m.srcId());
+        for (MemberAudit a : audits) {
+            if ("SUCCESS".equals(a.status()) || survivorIds.contains(a.srcId())) continue;
+            Batch.Member failed = batch.members().stream()
+                    .filter(m -> m.srcId() == a.srcId()).findFirst().orElse(null);
+            String rel = a.filename();
+            if (failed != null) {
+                File src = com.gamma.etl.unpack.UnpackOrigins.originalOr(failed.file());
+                Path fp  = src.toPath().toAbsolutePath().normalize();
+                if (fp.startsWith(poll)) {
+                    rel = poll.relativize(fp).toString().replace('\\', '/');
+                    if (com.gamma.etl.unpack.UnpackOrigins.totalFor(src) > 1)
+                        rel = rel + "!" + failed.file().getName();
+                }
+            }
+            memberEntries.add(new BatchManifest.MemberEntry(
+                    a.filename(), a.srcId(), rel, "", a.status()));
         }
 
         // §3.4.3 — the schema fingerprint that wrote this Consignment, pinned in the manifest and the output
@@ -248,8 +312,12 @@ public final class BatchProcessor {
         }
 
         // Backup BEFORE markers — see ordering rationale at top of method.
+        // ⚠ An EXPANDED member is skipped here and handled in the deferred block at the end of this
+        // method: its original may still have members in other batches, and backing it up (or
+        // marking it) now would strand them.
         if (backup != null) {
             for (Batch.Member m : survivors) {
+                if (com.gamma.etl.unpack.UnpackOrigins.isExpanded(m.file())) continue;
                 try {
                     backupFile(m.file(), cfg);
                 } catch (NoSuchFileException vanished) {
@@ -270,7 +338,10 @@ public final class BatchProcessor {
         // Markers LAST — created only after every other side-effect is durable (PATH-mode dedup only;
         // content-based mode uses the ledger below — see writeMarkers above).
         if (writeMarkers) {
-            for (Batch.Member m : survivors) MarkerManager.createMarkerFile(m.file(), cfg);
+            for (Batch.Member m : survivors) {
+                if (com.gamma.etl.unpack.UnpackOrigins.isExpanded(m.file())) continue;   // deferred, below
+                MarkerManager.createMarkerFile(m.file(), cfg);
+            }
             recordStages(stageSourceId, batchIdForStages, survivors, cfg, FileStage.MARKED);
         }
 
@@ -297,6 +368,31 @@ public final class BatchProcessor {
         }
         if (!watermarked.isEmpty())
             recordStages(stageSourceId, batchIdForStages, watermarked, cfg, FileStage.WATERMARK_ADVANCED);
+
+        // Unpack scratch LAST of all — the expanded temp copies (and their origin mappings) are only
+        // released once every side effect above is durable; a crash before this line just leaves temp
+        // files the stage's 24h sweep reclaims.
+        //
+        // cleanup() returns the ORIGINAL only for the LAST of its expansions (atomically, so exactly
+        // one batch wins even across threads) — that is when the original's own backup and marker
+        // run, in the same backup→marker order as above. Until then the original stays in the inbox:
+        // if a sibling member's batch fails, no marker exists and the next cycle re-expands it whole,
+        // which the OVERWRITE_OR_IGNORE outputs make idempotent.
+        for (Batch.Member m : survivors) {
+            File original = com.gamma.etl.unpack.UnpackStage.cleanup(m.file());
+            if (original == null) continue;
+            if (backup != null) {
+                try {
+                    backupFile(original, cfg);
+                } catch (NoSuchFileException vanished) {
+                    log.warn("Batch {} unpack source {} vanished before backup; skipping its backup",
+                            batch.batchId(), original.getName());
+                }
+            }
+            if (writeMarkers) MarkerManager.createMarkerFile(original, cfg);
+            log.info("[UNPACK] source complete: {} ({} member(s) ingested)",
+                    original.getName(), survivors.size());
+        }
     }
 
     /**

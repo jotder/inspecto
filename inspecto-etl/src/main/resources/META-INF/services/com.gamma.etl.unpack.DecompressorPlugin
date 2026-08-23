@@ -1,0 +1,10 @@
+# Decompressors built into inspecto-etl — resolved by Decompressors.forFile (suffix + magic).
+# ⚠ ORDER MATTERS: the resolver is a first-match linear scan, so .tar.gz must be offered before
+# .gz — a "feed.tar.gz" matches BOTH (gzip magic, and .gz is a suffix of .tar.gz), and expanding it
+# as a stream would yield one undifferentiated tar blob instead of its member files.
+com.gamma.etl.unpack.ArchiveDecompressorPlugin$TarGz
+com.gamma.etl.unpack.ArchiveDecompressorPlugin$Zip
+com.gamma.etl.unpack.ArchiveDecompressorPlugin$Tar
+com.gamma.etl.unpack.BuiltinDecompressors$Gzip
+com.gamma.etl.unpack.BuiltinDecompressors$Bzip2
+com.gamma.etl.unpack.BuiltinDecompressors$LzwZ

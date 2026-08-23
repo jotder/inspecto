@@ -241,6 +241,23 @@ final class PipelineConfigParser {
                     boolOrNull(intake.get("adaptive"), "processing.intake.adaptive"));
         }
 
+        // ── unpack stage (Collector-level decompression, additive, optional) ──
+        // Unlike `intake` above, an absent KEY here takes the shipped default rather than a global:
+        // these are safety caps, so every one always has a concrete value (Unpack.defaults()).
+        Map<String, Object> unpack = (Map<String, Object>) proc.get("unpack");
+        if (unpack != null) {
+            PipelineConfig.Unpack d = PipelineConfig.Unpack.defaults();
+            b.unpack = new PipelineConfig.Unpack(
+                    unpack.get("enabled") == null
+                            ? d.enabled() : Boolean.parseBoolean(String.valueOf(unpack.get("enabled"))),
+                    intOr(unpack.get("max_entries"), d.maxEntries(), "processing.unpack.max_entries"),
+                    longOr(unpack.get("max_entry_bytes"), d.maxEntryBytes(), "processing.unpack.max_entry_bytes"),
+                    longOr(unpack.get("max_total_bytes"), d.maxTotalBytes(), "processing.unpack.max_total_bytes"),
+                    doubleOr(unpack.get("max_ratio"), d.maxRatio(), "processing.unpack.max_ratio"),
+                    intOr(unpack.get("depth"), d.depth(), "processing.unpack.depth"),
+                    intOr(unpack.get("threads"), d.threads(), "processing.unpack.threads"));
+        }
+
         // ── duplicate check ───────────────────────────────────────────────────
         Map<String, Object> dup = (Map<String, Object>) proc.get("duplicate_check");
         if (dup != null) {
@@ -359,6 +376,16 @@ final class PipelineConfigParser {
             // 4.1 additive: native read_csv pass-throughs + row filters
             b.encoding         = blankToNull(csv.get("encoding"));
             b.inputCompression = blankToNull(csv.get("compression"));
+            // FAIL CLOSED (unpack-stage plan Phase 1 step 4): this value is passed VERBATIM into
+            // read_csv, so an unsupported one used to load fine and then quarantine every file at
+            // run time. Archives/exotic forms are the Collector's unpack stage, not a reader flag.
+            if (b.inputCompression != null
+                    && !java.util.List.of("auto", "gzip", "zstd", "none")
+                            .contains(b.inputCompression.toLowerCase(java.util.Locale.ROOT)))
+                throw new IllegalArgumentException("csv_settings.compression must be one of "
+                        + "auto|gzip|zstd|none (got: " + b.inputCompression + "). Archives and other "
+                        + "compressed forms (.zip, .tar, .Z, .bz2) are expanded by the collector's "
+                        + "unpack stage by extension — no compression setting is needed for them.");
             b.strictMode       = parseBoolOrNull(csv.get("strict_mode"));
             b.nullStrings      = strList(csv.get("null_strings"));
             b.includePrefixes  = strList(csv.get("include_prefixes"));
@@ -370,6 +397,27 @@ final class PipelineConfigParser {
             // a different moment from the include_*/exclude_* lists above, which match one raw
             // physical column inside read_csv. See PipelineConfig.CsvSettings.
             b.rowWhere         = blankToNull(csv.get("where"));
+            // Error handling. Each stays null when undeclared, so read_csv keeps emitting exactly
+            // what it emitted before these were configurable (see DuckDbCsvIngester.errorOptions).
+            b.ignoreErrors     = parseBoolOrNull(csv.get("ignore_errors"));
+            b.nullPadding      = parseBoolOrNull(csv.get("null_padding"));
+            b.storeRejects     = parseBoolOrNull(csv.get("store_rejects"));
+            b.rejectsTable     = blankToNull(csv.get("rejects_table"));
+            b.rejectsScan      = blankToNull(csv.get("rejects_scan"));
+            b.rejectsLimit     = parseIntOrNull(csv.get("rejects_limit"));
+            // FAIL CLOSED: these two names are interpolated as SQL identifiers by the reject drain,
+            // which no bound parameter can express — so a name that is not a bare identifier is
+            // refused here rather than reaching a statement.
+            for (String[] named : new String[][] { { "rejects_table", b.rejectsTable },
+                                                   { "rejects_scan",  b.rejectsScan } }) {
+                if (!PipelineConfig.CsvSettings.Rejects.isLegalName(named[1]))
+                    throw new IllegalArgumentException("csv_settings." + named[0] + " must be a bare "
+                            + "identifier (letters, digits, underscore; not starting with a digit): "
+                            + named[1]);
+            }
+            if (b.rejectsLimit != null && b.rejectsLimit < 0)
+                throw new IllegalArgumentException(
+                        "csv_settings.rejects_limit must be >= 0 (0 = unlimited): " + b.rejectsLimit);
             // 4.1 additive: fixed-width frontend (null unless frontend: fixedwidth)
             b.fixedWidth       = parseFixedWidth(csv);
             // 4.8 additive: json / text_regex frontends (null unless selected)
@@ -998,6 +1046,34 @@ final class PipelineConfigParser {
 
     /** Parse an optional int; {@code null}/blank ⇒ {@code null} (unset). Garbage is a named load error,
      *  never a silent fallback — a mistyped threshold must not quietly mean "inherit the global". */
+    /** {@code intOrNull} with a concrete fallback — for keys that always hold a value (unpack caps). */
+    private static int intOr(Object v, int fallback, String where) {
+        Integer parsed = intOrNull(v, where);
+        return parsed != null ? parsed : fallback;
+    }
+
+    private static long longOr(Object v, long fallback, String where) {
+        if (v == null) return fallback;
+        String s = String.valueOf(v).trim();
+        if (s.isEmpty()) return fallback;
+        try {
+            return Long.parseLong(s);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(where + " must be an integer, got: " + s);
+        }
+    }
+
+    private static double doubleOr(Object v, double fallback, String where) {
+        if (v == null) return fallback;
+        String s = String.valueOf(v).trim();
+        if (s.isEmpty()) return fallback;
+        try {
+            return Double.parseDouble(s);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(where + " must be a number, got: " + s);
+        }
+    }
+
     private static Integer intOrNull(Object v, String where) {
         if (v == null) return null;
         String s = String.valueOf(v).trim();
@@ -1119,6 +1195,21 @@ final class PipelineConfigParser {
         if (v == null) return null;
         String s = String.valueOf(v).trim();
         return s.isEmpty() ? null : Boolean.valueOf(Boolean.parseBoolean(s));
+    }
+
+    /**
+     * Parse a tri-state integer: {@code null}/blank ⇒ {@code null} (unset). A non-numeric value is
+     * refused rather than silently read as 0 — a mistyped cap is a config error, not "unlimited".
+     */
+    private static Integer parseIntOrNull(Object v) {
+        if (v == null) return null;
+        String s = String.valueOf(v).trim();
+        if (s.isEmpty()) return null;
+        try {
+            return Integer.valueOf(s);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("expected an integer, got: " + s, e);
+        }
     }
 
     /**
