@@ -411,6 +411,57 @@ function files(pipeline: string): Record<string, string>[] {
     });
 }
 
+/**
+ * `GET /status/problem-files` — the cross-pipeline, file-grain rollup. DERIVED from `files()` above
+ * rather than invented, so the mock cannot disagree with the per-pipeline ledger the same offline
+ * session shows in Run Detail (mock-never-more-lenient): FULL = a non-SUCCESS status, PARTIAL =
+ * SUCCESS with `error_rows > 0`, clean files omitted, newest first, `total` the TRUE count with the
+ * summary counts computed PRE-limit exactly as the route does.
+ */
+function problemFiles(url: string): unknown {
+    const q = new URLSearchParams(url.includes('?') ? url.slice(url.indexOf('?') + 1) : '');
+    const limit = Math.min(Number(q.get('limit') ?? 1000) || 1000, 5000);
+    const since = q.get('since') ?? '';
+
+    const rows: Record<string, unknown>[] = [];
+    let fullCount = 0;
+    let partialCount = 0;
+    const withProblems = new Set<string>();
+    for (const pipeline of PIPELINES) {
+        for (const f of files(pipeline)) {
+            const errorRows = Number(f['error_rows'] ?? '0');
+            const full = f['status'] !== 'SUCCESS';
+            if (!full && errorRows <= 0) continue;
+            if (since && f['end_time'] && f['end_time'] < since) continue;
+            if (full) fullCount++;
+            else partialCount++;
+            withProblems.add(pipeline);
+            rows.push({
+                pipeline,
+                filename: f['filename'],
+                verdict: full ? 'FULL' : 'PARTIAL',
+                status: f['status'],
+                parsedRows: Number(f['parsed_rows'] ?? '-1'),
+                errorRows,
+                error: f['error'] ?? '',
+                consignmentId: f['consignment_id'] ?? '',
+                time: f['end_time'] ?? '',
+            });
+        }
+    }
+    rows.sort((a, b) => String(b['time']).localeCompare(String(a['time'])));
+    const total = rows.length;
+    return {
+        rows: rows.slice(0, limit),
+        total,
+        truncated: total > limit,
+        fullCount,
+        partialCount,
+        warningCount: 0,
+        pipelinesWithProblems: withProblems.size,
+    };
+}
+
 function lineage(pipeline: string): Record<string, string>[] {
     return Array.from({ length: 15 }, (_, i) => ({
         consignment_id: `${pipeline}-b${1000 + i}`,
@@ -783,6 +834,9 @@ const CONFIG_SPECS: Record<string, unknown> = {
 const HEALTH = /\/health$/;
 const READY_RE = /\/ready$/;
 const STATUS = /\/status$/;
+// ⚠ Must be tested BEFORE STATUS: /status/problem-files does not end in /status, but keeping the
+// pair adjacent is what stops a future `/status/...` route from being shadowed by a loose regex.
+const PROBLEM_FILES = /\/status\/problem-files(\?|$)/;
 const REPORT = /\/report$/;
 const METRICS = /\/metrics$/;
 const METRICS_ACQ = /\/metrics\/acquisition$/;
@@ -832,6 +886,7 @@ export function demoHandler(flags: MockFlags): MockHandler {
         // ── health / status / report ──
         if (method === 'GET' && HEALTH.test(url)) return json({ status: 'UP' });
         if (method === 'GET' && READY_RE.test(url)) return json(READY);
+        if (method === 'GET' && PROBLEM_FILES.test(url)) return json(problemFiles(url));
         if (method === 'GET' && STATUS.test(url)) return json(STATUS_REPORT);
         if (method === 'GET' && REPORT.test(url)) return json(SERVICE_REPORT);
         if (method === 'GET' && METRICS.test(url) && !METRICS_ACQ.test(url)) return json(METRICS_TEXT);

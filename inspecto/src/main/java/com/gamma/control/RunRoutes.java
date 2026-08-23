@@ -92,6 +92,11 @@ final class RunRoutes implements RouteModule {
         // ── v2.8.0: aggregated reports (status snapshot + batch-audit rollup) ──
         // v2.10.0: ?from=&to= scope the rollup to a date range (inclusive; date or datetime).
         api.get("/status", (e, m) -> api.service().reports().statusReport());
+        // Cross-pipeline problem files (2026-08-23, operator-requested): every pipeline's WHOLE
+        // failures (quarantined) and PARTIAL failures (ingested with error_rows > 0) in one bounded,
+        // newest-first list — the file-grain companion to /status's pipeline-grain rollup, so an
+        // operator with 100s of pipelines stops drilling into each Run Detail to find the bad ones.
+        api.get("/status/problem-files", (e, m) -> problemFiles(api, e));
         api.get("/report", (e, m) -> api.service().reports().serviceReport(window(e)));
         api.get("/runs/([^/]+)/report", (e, m) -> {
             cfg(api, m);   // 404 if no such pipeline
@@ -206,6 +211,141 @@ final class RunRoutes implements RouteModule {
                     .map(p -> WriteGates.jail(qRoot, p, "errors file"))
                     .findFirst().orElse(null);
         }
+    }
+
+    // ── GET /status/problem-files ─────────────────────────────────────────────
+
+    /** A diagnostic read, not an export — the default page and the cap it may be raised to. */
+    private static final int PROBLEM_FILES_DEFAULT_LIMIT = 1000;
+    private static final int PROBLEM_FILES_MAX_LIMIT = 5000;
+
+    /**
+     * {@code GET /status/problem-files?limit=&since=} — one row per problem file across EVERY loaded
+     * pipeline, newest first:
+     *
+     * <ul>
+     *   <li><b>FULL</b> — the file never landed: a {@code QUARANTINED_*} status-ledger row, or a
+     *       quarantine-tree entry for a file rejected before any batch existed (corrupt download,
+     *       empty). The two overlap for most quarantined files, so tree entries are added only for
+     *       files the status ledger does not already carry — one row per problem, not two.</li>
+     *   <li><b>PARTIAL</b> — the file ingested with rejected rows ({@code SUCCESS} +
+     *       {@code error_rows > 0}). Drill-down to the rows themselves is the existing
+     *       {@code GET /runs/{name}/errors?file=}.</li>
+     * </ul>
+     *
+     * <p>Aggregation walks the loaded configs through the {@link com.gamma.etl.StatusStore} seam —
+     * the same per-poll iteration {@code AlertService} already does, so the cost is precedented; the
+     * response is bounded ({@code ?limit=}, capped) with {@code truncated} reporting the TRUE total.
+     * The summary counts are computed over EVERYTHING, pre-limit, so the cards stay honest when the
+     * list is cut. ⚠ A pipeline whose ledger cannot be read surfaces as a {@code WARNING} row —
+     * silence looking like health is the failure mode this route exists to kill.
+     *
+     * <p>{@code ?since=} is an inclusive lower bound compared lexicographically against the ledger's
+     * {@code end_time} ({@code yyyy-MM-dd HH:mm:ss}), so both {@code 2026-08-20} and
+     * {@code 2026-08-20 06:00:00} work. Quarantine-tree rows carry no timestamp and are always
+     * included — absence of evidence must not hide a quarantined file from a windowed view.
+     */
+    private Object problemFiles(ApiContext api, HttpExchange e) {
+        int limit = clampLimit(ApiContext.query(e, "limit"));
+        String since = ApiContext.query(e, "since");
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        int full = 0, partial = 0, warnings = 0;
+        java.util.Set<String> pipelinesWithProblems = new java.util.TreeSet<>();
+
+        for (PipelineConfig cfg : api.service().loadedPipelines()) {
+            String pipeline = cfg.identity().pipelineName();
+            try {
+                java.util.Set<String> seen = new java.util.HashSet<>();
+                for (Map<String, String> f : api.service().statusStore().files(cfg)) {
+                    String status = f.getOrDefault("status", "");
+                    long errorRows = parseLongOr(f.get("error_rows"), 0);
+                    boolean fullFail = !"SUCCESS".equals(status);
+                    if (!fullFail && errorRows <= 0) continue;
+                    String time = f.getOrDefault("end_time", "");
+                    if (since != null && !since.isBlank() && !time.isBlank() && time.compareTo(since) < 0)
+                        continue;
+                    seen.add(f.getOrDefault("filename", ""));
+                    if (fullFail) full++; else partial++;
+                    pipelinesWithProblems.add(pipeline);
+                    rows.add(problemRow(pipeline, f.getOrDefault("filename", ""),
+                            fullFail ? "FULL" : "PARTIAL", status,
+                            f.get("parsed_rows"), f.get("error_rows"),
+                            f.getOrDefault("error", ""), f.get("consignment_id"), time));
+                }
+                for (Map<String, String> q : api.service().statusStore().quarantine(cfg)) {
+                    String file = q.getOrDefault("file", "");
+                    if (seen.contains(file)) continue;   // the status ledger's row is richer
+                    full++;
+                    pipelinesWithProblems.add(pipeline);
+                    rows.add(problemRow(pipeline, file, "FULL", "QUARANTINED",
+                            null, null, q.getOrDefault("reason", ""), null, ""));
+                }
+            } catch (Exception ledgerUnreadable) {
+                // Honesty rule: an unreadable ledger is a WARNING row, never a silent absence.
+                warnings++;
+                pipelinesWithProblems.add(pipeline);
+                rows.add(problemRow(pipeline, "", "WARNING", "LEDGER_UNREADABLE", null, null,
+                        errMsg(ledgerUnreadable), null, ""));
+            }
+        }
+
+        // Newest first; the untimed quarantine-tree rows sink to the end rather than faking recency.
+        rows.sort((a, b) -> String.valueOf(b.get("time")).compareTo(String.valueOf(a.get("time"))));
+        int total = rows.size();
+        boolean truncated = total > limit;
+        if (truncated) rows = new ArrayList<>(rows.subList(0, limit));
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("rows", rows);
+        out.put("total", total);
+        out.put("truncated", truncated);
+        out.put("fullCount", full);
+        out.put("partialCount", partial);
+        out.put("warningCount", warnings);
+        out.put("pipelinesWithProblems", pipelinesWithProblems.size());
+        return out;
+    }
+
+    private static Map<String, Object> problemRow(String pipeline, String filename, String verdict,
+                                                  String status, String parsedRows, String errorRows,
+                                                  String error, String consignmentId, String time) {
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("pipeline", pipeline);
+        r.put("filename", filename);
+        r.put("verdict", verdict);
+        r.put("status", status);
+        r.put("parsedRows", parseLongOr(parsedRows, -1));   // -1 = not carried, rendered blank
+        r.put("errorRows", parseLongOr(errorRows, -1));
+        r.put("error", error);
+        r.put("consignmentId", consignmentId == null ? "" : consignmentId);
+        r.put("time", time);
+        return r;
+    }
+
+    private static int clampLimit(String raw) {
+        if (raw == null || raw.isBlank()) return PROBLEM_FILES_DEFAULT_LIMIT;
+        try {
+            int v = Integer.parseInt(raw.trim());
+            if (v < 1) throw new ApiException(400, "?limit= must be >= 1");
+            return Math.min(v, PROBLEM_FILES_MAX_LIMIT);
+        } catch (NumberFormatException nfe) {
+            throw new ApiException(400, "?limit= must be an integer");
+        }
+    }
+
+    private static long parseLongOr(String s, long fallback) {
+        if (s == null || s.isBlank()) return fallback;
+        try {
+            return Long.parseLong(s.trim());
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
+    }
+
+    private static String errMsg(Exception e) {
+        String m = e.getMessage();
+        return m == null || m.isBlank() ? e.getClass().getSimpleName() : m;
     }
 
     private PipelineConfig cfg(ApiContext api, Matcher m) {

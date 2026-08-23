@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
 import { AiStatusDialog } from 'app/inspecto/ai-assist/ai-status.dialog';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
-import { ReportsService, RunStatus, StatusReport } from 'app/inspecto/api';
+import { ProblemFilesPage, ReportsService, RunStatus, StatusReport } from 'app/inspecto/api';
 import { ProcessingStatusComponent } from './processing-status.component';
 
 const PIPELINES: RunStatus[] = [
@@ -40,13 +40,57 @@ const REPORT: StatusReport = {
     pipelines: PIPELINES,
 };
 
-function create(report: StatusReport | null = REPORT, dialogOpen?: (...args: unknown[]) => unknown) {
+/** A page with one FULL, one PARTIAL, and the not-carried (-1) counts the route emits. */
+const PROBLEMS: ProblemFilesPage = {
+    rows: [
+        {
+            pipeline: 'billing_daily',
+            filename: 'bad.csv',
+            verdict: 'FULL',
+            status: 'QUARANTINED_UNREADABLE',
+            parsedRows: -1,
+            errorRows: -1,
+            error: 'could not read',
+            consignmentId: '',
+            time: '2026-06-30 03:00:00',
+        },
+        {
+            pipeline: 'cdr_ingest',
+            filename: 'partial.csv',
+            verdict: 'PARTIAL',
+            status: 'SUCCESS',
+            parsedRows: 90,
+            errorRows: 10,
+            error: '',
+            consignmentId: 'c-1',
+            time: '2026-06-30 02:00:00',
+        },
+    ],
+    total: 5,
+    truncated: true,
+    fullCount: 1,
+    partialCount: 4,
+    warningCount: 0,
+    pipelinesWithProblems: 2,
+};
+
+function create(
+    report: StatusReport | null = REPORT,
+    dialogOpen?: (...args: unknown[]) => unknown,
+    problems: ProblemFilesPage | null = PROBLEMS,
+) {
     TestBed.configureTestingModule({
         imports: [ProcessingStatusComponent],
         providers: [
             provideNoopAnimations(),
             provideRouter([]),
-            { provide: ReportsService, useValue: { status: () => (report ? of(report) : of()) } },
+            {
+                provide: ReportsService,
+                useValue: {
+                    status: () => (report ? of(report) : of()),
+                    problemFiles: () => (problems ? of(problems) : of()),
+                },
+            },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
         ],
     });
@@ -80,5 +124,64 @@ describe('ProcessingStatusComponent', () => {
         await fixture.whenStable();
         fixture.detectChanges();
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    describe('the Problem files tab (cross-pipeline, file grain)', () => {
+        /** Lazy by design: opening this page for the pipeline rollup must not pay for the walk. */
+        it('does not fetch until the tab is revealed, and fetches once', () => {
+            const fixture = create();
+            fixture.detectChanges();
+            const c = fixture.componentInstance;
+            expect(c.problems()).toBeNull();
+
+            c.onTabChange(1);
+            expect(c.problems()?.rows).toHaveLength(2);
+
+            // Re-revealing does not refetch — only the explicit refresh does.
+            c.problems.set(null);
+            c.onTabChange(0);
+            expect(c.problems()).toBeNull();
+        });
+
+        it('summarises PRE-limit counts, not the page', () => {
+            const fixture = create();
+            fixture.detectChanges();
+            fixture.componentInstance.onTabChange(1);
+            // 2 rows shown, but the cards describe all 5 problems.
+            expect(fixture.componentInstance.problemCards().map((x) => x.value)).toEqual(['2', '1', '4', '0']);
+            expect(fixture.componentInstance.problems()?.total).toBe(5);
+        });
+
+        /**
+         * 🔴 `-1` means "not carried by the source row" and must render BLANK — a 0 would claim a
+         * quarantined file parsed zero rows AND rejected zero rows, i.e. that nothing went wrong.
+         */
+        it('renders not-carried row counts blank, never 0', () => {
+            const fixture = create();
+            fixture.detectChanges();
+            const cols = fixture.componentInstance.problemColumnDefs;
+            const parsed = cols.find((c) => c.field === 'parsedRows')!;
+            const fmt = parsed.valueFormatter as (p: { value: number }) => string;
+            expect(fmt({ value: -1 })).toBe('');
+            expect(fmt({ value: 0 })).toBe('0');
+            expect(fmt({ value: 1234 })).toBe('1,234');
+        });
+
+        /** The rejected-rows drill-down is only offered where rows were actually rejected. */
+        it('offers the rejected-rows action only for files that rejected rows', () => {
+            const fixture = create();
+            fixture.detectChanges();
+            const action = fixture.componentInstance.problemRowActions[0];
+            expect(action.visible!(PROBLEMS.rows[1])).toBe(true); // errorRows 10
+            expect(action.visible!(PROBLEMS.rows[0])).toBe(false); // errorRows -1
+        });
+
+        it('survives a failed fetch without stale rows or cards', () => {
+            const fixture = create(REPORT, undefined, null);
+            fixture.detectChanges();
+            fixture.componentInstance.onTabChange(1);
+            expect(fixture.componentInstance.problems()).toBeNull();
+            expect(fixture.componentInstance.problemCards()).toEqual([]);
+        });
     });
 });

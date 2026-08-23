@@ -138,6 +138,56 @@ describe('demoHandler', () => {
         expect(status.pipelineCount).toBe(5);
     });
 
+    /**
+     * `GET /status/problem-files` — the mock must be NO MORE LENIENT than the route: same verdict
+     * rule (FULL = non-SUCCESS, PARTIAL = SUCCESS with rejected rows, clean files omitted), same
+     * key names, newest-first, and PRE-limit summary counts. Derived from the same `files()` fixture
+     * Run Detail shows, so the two offline views cannot disagree.
+     */
+    it('serves cross-pipeline problem files, derived from the per-pipeline ledger', () => {
+        const store = seededStore();
+        type Page = {
+            rows: { pipeline: string; filename: string; verdict: string; errorRows: number; time: string }[];
+            total: number;
+            truncated: boolean;
+            fullCount: number;
+            partialCount: number;
+            warningCount: number;
+            pipelinesWithProblems: number;
+        };
+        const page = handler(req('GET', '/api/status/problem-files'), store)?.body as Page;
+
+        expect(page.rows.length).toBeGreaterThan(0);
+        expect(Object.keys(page.rows[0])).toEqual([
+            'pipeline',
+            'filename',
+            'verdict',
+            'status',
+            'parsedRows',
+            'errorRows',
+            'error',
+            'consignmentId',
+            'time',
+        ]);
+        // Every row is a real problem, and clean files never appear.
+        expect(page.rows.every((r) => r.verdict === 'FULL' || r.verdict === 'PARTIAL')).toBe(true);
+        expect(page.rows.every((r) => r.verdict === 'FULL' || r.errorRows > 0)).toBe(true);
+        expect(page.fullCount + page.partialCount).toBe(page.total);
+        // It spans pipelines — the whole point of the route.
+        expect(new Set(page.rows.map((r) => r.pipeline)).size).toBeGreaterThan(1);
+        expect(page.pipelinesWithProblems).toBeGreaterThan(1);
+        // Newest first.
+        const times = page.rows.map((r) => r.time);
+        expect([...times].sort().reverse()).toEqual(times);
+
+        // ?limit= bounds the page while total/counts stay pre-limit.
+        const one = handler(req('GET', '/api/status/problem-files?limit=1'), store)?.body as Page;
+        expect(one.rows).toHaveLength(1);
+        expect(one.truncated).toBe(true);
+        expect(one.total).toBe(page.total);
+        expect(one.fullCount).toBe(page.fullCount);
+    });
+
     it('round-trips notification reads and deletes through the store', () => {
         const store = seededStore();
         const unread = (): number =>

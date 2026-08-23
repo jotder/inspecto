@@ -74,6 +74,37 @@ export interface RunStatus {
     lastBatchTime?: string;
 }
 
+/**
+ * One problem file from `GET /status/problem-files` — the cross-pipeline, file-grain rollup.
+ * `verdict`: FULL = the file never landed (quarantined); PARTIAL = it ingested with rejected rows;
+ * WARNING = that pipeline's ledger could not be read (an unreadable ledger is reported, never
+ * silently absent — silence looking like health is what this view exists to prevent).
+ * ⚠ `parsedRows`/`errorRows` are `-1` for "not carried by the source row" and must render BLANK,
+ * never 0 — the same not-measured convention `cast_failures` uses.
+ */
+export interface ProblemFile {
+    pipeline: string;
+    filename: string;
+    verdict: 'FULL' | 'PARTIAL' | 'WARNING';
+    status: string;
+    parsedRows: number;
+    errorRows: number;
+    error: string;
+    consignmentId: string;
+    time: string;
+}
+
+/** The bounded page + PRE-limit summary counts (the cards stay honest when the list is cut). */
+export interface ProblemFilesPage {
+    rows: ProblemFile[];
+    total: number;
+    truncated: boolean;
+    fullCount: number;
+    partialCount: number;
+    warningCount: number;
+    pipelinesWithProblems: number;
+}
+
 export interface StatusReport {
     generatedAt: string;
     pipelineCount: number;

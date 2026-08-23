@@ -10,7 +10,12 @@
             </div>
         </div>
         <div class="mt-4 flex items-center gap-3 sm:mt-0">
-            <button mat-icon-button (click)="load()" matTooltip="Refresh" aria-label="Refresh">
+            <button
+                mat-icon-button
+                (click)="tab() === 'problems' ? loadProblems() : load()"
+                matTooltip="Refresh"
+                aria-label="Refresh"
+            >
                 <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
             </button>
         </div>
@@ -18,29 +23,75 @@
 
     <!-- Main -->
     <div class="flex flex-auto flex-col p-6 sm:p-10">
-        @if (cards().length) {
-            <div class="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-                @for (c of cards(); track c.label) {
-                    <div class="bg-card flex flex-col rounded-2xl p-4 shadow">
-                        <div class="text-secondary text-sm">{{ c.label }}</div>
-                        <div class="mt-1 text-2xl font-extrabold tracking-tight">{{ c.value }}</div>
-                    </div>
-                }
-            </div>
-        }
+        <!--
+            Two grains of the same question: WHICH PIPELINES are healthy (tab 1, GET /status) and
+            WHICH FILES went wrong across all of them (tab 2, GET /status/problem-files). The second
+            is fetched lazily on first reveal — an operator opening this page for the pipeline rollup
+            should not pay for an all-pipeline ledger walk.
+        -->
+        <mat-tab-group class="mb-6" (selectedIndexChange)="onTabChange($event)">
+            <mat-tab label="Pipelines"></mat-tab>
+            <mat-tab label="Problem files"></mat-tab>
+        </mat-tab-group>
 
-        <inspecto-data-table
-            stateKey="processing-status"
-            tier="standard"
-            sourceName="processing-status"
-            exportName="processing-status"
-            [rows]="report()?.pipelines ?? []"
-            [columns]="columnDefs"
-            [rowActions]="rowActions"
-            [pinActions]="true"
-            [loading]="loading()"
-            noRowsTitle="No pipelines found"
-            noRowsHint="No pipeline status is available yet."
-        />
+        @if (tab() === 'pipelines') {
+            @if (cards().length) {
+                <div class="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                    @for (c of cards(); track c.label) {
+                        <div class="bg-card flex flex-col rounded-2xl p-4 shadow">
+                            <div class="text-secondary text-sm">{{ c.label }}</div>
+                            <div class="mt-1 text-2xl font-extrabold tracking-tight">{{ c.value }}</div>
+                        </div>
+                    }
+                </div>
+            }
+
+            <inspecto-data-table
+                stateKey="processing-status"
+                tier="standard"
+                sourceName="processing-status"
+                exportName="processing-status"
+                [rows]="report()?.pipelines ?? []"
+                [columns]="columnDefs"
+                [rowActions]="rowActions"
+                [pinActions]="true"
+                [loading]="loading()"
+                noRowsTitle="No pipelines found"
+                noRowsHint="No pipeline status is available yet."
+            />
+        } @else {
+            @if (problemCards().length) {
+                <div class="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                    @for (c of problemCards(); track c.label) {
+                        <div class="bg-card flex flex-col rounded-2xl p-4 shadow">
+                            <div class="text-secondary text-sm">{{ c.label }}</div>
+                            <div class="mt-1 text-2xl font-extrabold tracking-tight">{{ c.value }}</div>
+                        </div>
+                    }
+                </div>
+            }
+
+            <!-- The list is bounded server-side; say so rather than implying it is everything. -->
+            @if (problems()?.truncated) {
+                <inspecto-alert class="mb-4 block" variant="info" title="Showing the newest problems">
+                    {{ problems()!.rows.length | number }} of {{ problems()!.total | number }} problem files are
+                    shown. Narrow the range or fix the loudest pipelines first.
+                </inspecto-alert>
+            }
+
+            <inspecto-data-table
+                stateKey="processing-status-problems"
+                tier="standard"
+                sourceName="problem-files"
+                exportName="problem-files"
+                [rows]="problems()?.rows ?? []"
+                [columns]="problemColumnDefs"
+                [rowActions]="problemRowActions"
+                [pinActions]="true"
+                [loading]="problemsLoading()"
+                noRowsTitle="No problem files"
+                noRowsHint="Every file every pipeline processed either landed cleanly or has not run yet."
+            />
+        }
     </div>
 </div>
