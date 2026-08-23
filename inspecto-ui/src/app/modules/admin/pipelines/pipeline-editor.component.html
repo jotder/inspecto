@@ -48,25 +48,21 @@
                 </button>
             }
 
-            <!-- The more-actions menu sits OUTSIDE the author gate since Dry-run moved into it
-                 (operator ask, 2026-08-21): a rehearsal is a READ the Business lens keeps, so the
-                 author verbs gate item-by-item instead of gating the trigger. -->
-            <button
-                mat-icon-button
-                [matMenuTriggerFor]="pipelineMenu"
-                [disabled]="!selectedId()"
-                matTooltip="More pipeline actions"
-                aria-label="More pipeline actions"
-            >
-                <mat-icon svgIcon="heroicons_outline:ellipsis-vertical"></mat-icon>
-            </button>
-            <mat-menu #pipelineMenu="matMenu">
-                <!-- Dry-run moved off the toolbar's prime row (operator ask): rehearse the pipeline
-                     over sample rows in the bottom dock. -->
-                <button mat-menu-item (click)="toggleDryRun()">
-                    <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>
-                    <span>Dry-run&hellip;</span>
+            <!-- Dry-run left this menu for the toolbar (2026-08-23), so everything remaining is an
+                 author verb and the TRIGGER is gated again — a Business-lens ⋮ opening an empty menu
+                 is an affordance that can only disappoint. -->
+            @if (canAuthor()) {
+                <button
+                    mat-icon-button
+                    [matMenuTriggerFor]="pipelineMenu"
+                    [disabled]="!selectedId()"
+                    matTooltip="More pipeline actions"
+                    aria-label="More pipeline actions"
+                >
+                    <mat-icon svgIcon="heroicons_outline:ellipsis-vertical"></mat-icon>
                 </button>
+            }
+            <mat-menu #pipelineMenu="matMenu">
                 @if (canAuthor()) {
                     <button mat-menu-item (click)="renamePipeline()">
                         <mat-icon svgIcon="heroicons_outline:pencil"></mat-icon>
@@ -141,6 +137,19 @@
                 aria-label="Validate"
             >
                 <mat-icon svgIcon="heroicons_outline:shield-check"></mat-icon>
+            </button>
+            <!-- Dry-run is BACK on the toolbar (operator ask 2026-08-23, reversing 2026-08-21's move
+                 into the ⋮ menu — the second placement flip; confirm with the operator before moving it
+                 again). One rendering only: the ⋮ menu item was removed with this, not kept alongside.
+                 Still outside the author gate — a rehearsal is a READ the Business lens keeps. -->
+            <button
+                mat-icon-button
+                [disabled]="!selectedId()"
+                (click)="toggleDryRun()"
+                matTooltip="Dry-run"
+                aria-label="Dry-run the pipeline over sample rows"
+            >
+                <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>
             </button>
             <!-- A template is refused by every run path server-side, so Activate is not offered at all:
                  an affordance that can only fail is worse than none. Clearing `template: true` promotes it. -->

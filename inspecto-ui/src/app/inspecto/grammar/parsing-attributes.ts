@@ -33,7 +33,7 @@ export const GRAMMAR_TABS: { id: string; label: string }[] = [
 const SINGLE_CHAR = '[\\s\\S]';
 
 export const PARSING_FRONTENDS: { id: ParsingFrontend; label: string; hint: string }[] = [
-    { id: 'delimited', label: 'Delimited', hint: 'CSV/TSV/Pipe — one record per line, split by a delimiter'},
+    { id: 'delimited', label: 'Delimited', hint: 'CSV/TSV/Pipe — one record per line, split by a delimiter' },
     { id: 'fixedwidth', label: 'Fixed width', hint: 'Positional slices carved from each line' },
     { id: 'json', label: 'JSON', hint: 'NDJSON (one object per line) or a JSON array document' },
     { id: 'text_regex', label: 'Text / regex', hint: 'Named capture groups over matching lines' },
@@ -196,16 +196,81 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     tab: 'robustness',
                 },
                 {
+                    // ⚠ Still NO `default` — the standing rule (a spec default materializes into
+                    // every value() and would mutate faithful copies of stored grammars). Auto is
+                    // shown as the selected choice by giving it the BLANK value: an unset engine key
+                    // already means auto to the parser, and the editor drops a blank whose default is
+                    // blank, so picking it writes nothing. Do not "fix" this into default: 'auto'.
                     key: 'delimited__engine',
                     label: 'Parse engine',
                     type: 'select',
                     tier: 'optional',
-                    help: 'Blank = auto.',
+                    help: 'Auto picks the native reader for clean configs and the Java parser otherwise.',
                     options: [
-                        { value: 'auto', label: 'Auto — native for clean configs' },
+                        { value: '', label: 'Auto — native for clean configs' },
                         { value: 'duckdb', label: 'DuckDB — native vectorized reader' },
                         { value: 'java', label: 'Java — fallback for messy files' },
                     ],
+                    tab: 'robustness',
+                },
+                // Error handling (2026-08-23). Every one is tri-state: blank leaves the engine's own
+                // default, which is what every existing config already gets — so adding these to a
+                // stored grammar changes nothing until the author sets one.
+                {
+                    // ⚠ Tri-state by the same mechanism as strict_mode above: no `default`, so the
+                    // control initialises to null and nothing is written until the author touches it.
+                    // The cost is that the toggle READS off while the engine default is ON, so the
+                    // help text has to say so — the toggle alone would claim the opposite of the
+                    // truth. (Inverting the label is not available: the spec key IS the config key,
+                    // so there is nowhere to negate the value.)
+                    key: 'delimited__ignore_errors',
+                    label: 'Skip unparseable rows',
+                    type: 'boolean',
+                    tier: 'optional',
+                    help: 'Engine default is ON — a row the reader cannot parse is dropped and captured as a reject. Turn this on and off to write it explicitly; off fails the batch on the first bad row.',
+                    tab: 'robustness',
+                },
+                {
+                    key: 'delimited__null_padding',
+                    label: 'Pad short rows with NULLs',
+                    type: 'boolean',
+                    tier: 'optional',
+                    help: 'Keep a row that ran out of columns, NULL-filling the rest, instead of rejecting it. Off for delimited by default.',
+                    tab: 'robustness',
+                },
+                {
+                    key: 'delimited__store_rejects',
+                    label: 'Capture rejected rows',
+                    type: 'boolean',
+                    tier: 'optional',
+                    help: 'Engine default is ON — rejected rows are drained to errors/<base>_errors.csv. Off skips capture entirely, which matters because reject rows carry raw source data.',
+                    tab: 'robustness',
+                },
+                {
+                    key: 'delimited__rejects_table',
+                    label: 'Rejects table',
+                    type: 'string',
+                    tier: 'advanced',
+                    placeholder: 'reject_errors',
+                    help: 'Per-row reject table name. Blank = reject_errors. Letters, digits and underscore only.',
+                    tab: 'robustness',
+                },
+                {
+                    key: 'delimited__rejects_scan',
+                    label: 'Rejects scan table',
+                    type: 'string',
+                    tier: 'advanced',
+                    placeholder: 'reject_scans',
+                    help: 'Per-file reject scan table name. Blank = reject_scans. Letters, digits and underscore only.',
+                    tab: 'robustness',
+                },
+                {
+                    key: 'delimited__rejects_limit',
+                    label: 'Rejects limit',
+                    type: 'number',
+                    tier: 'advanced',
+                    min: 0,
+                    help: 'Max rejected rows stored per file. Blank or 0 = unlimited.',
                     tab: 'robustness',
                 },
                 {
@@ -270,7 +335,7 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                         { value: 'zstd', label: 'zstd' },
                         { value: 'none', label: 'None' },
                     ],
-                    help: 'Decompressed inline at read.',
+                    help: 'Decompressed inline at read. Archives (.zip, .tar, .Z) are not read inline — unpack them into the inbox first (BACKLOG §4 tracks native support).',
                     tab: 'files',
                 },
             ];

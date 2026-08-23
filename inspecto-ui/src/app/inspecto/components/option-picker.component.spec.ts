@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
@@ -14,9 +14,16 @@ const OPTIONS: PickerOption[] = [
     { value: 'fixedwidth', label: 'Fixed width' },
 ];
 
-/** Host so `formControlName` binds through the CVA, which is the whole point of the component. */
+/**
+ * Host so `formControlName` binds through the CVA, which is the whole point of the component.
+ *
+ * <p>⚠ `Eager` on purpose: under Angular 22 an unspecified strategy is OnPush, so a test that mutates
+ * a host field AFTER the first `detectChanges` (the blank-option case below) would never re-render and
+ * the spec would fail while the real screen is correct.
+ */
 @Component({
     standalone: true,
+    changeDetection: ChangeDetectionStrategy.Eager,
     imports: [ReactiveFormsModule, InspectoOptionPickerComponent],
     template: `
         <inspecto-option-picker [formControl]="control" label="Format" [options]="options" [required]="true" />
@@ -61,6 +68,21 @@ describe('InspectoOptionPickerComponent', () => {
     it('shows an unknown stored value verbatim rather than as unset', () => {
         const { fixture } = create('avro_v3');
         expect(trigger(fixture).textContent).toContain('avro_v3');
+        expect(trigger(fixture).textContent).not.toContain('Select');
+    });
+
+    /**
+     * 🔴 An option whose value is BLANK is a real, named choice — the idiom for "the engine default,
+     * written as no key at all" (the Grammar editor's Parse engine ▸ Auto). Falling through to the
+     * placeholder there showed "Select" on a field that was in fact set to Auto, which is the reason
+     * this case is pinned: the value is indistinguishable from unset, only the option list says
+     * otherwise.
+     */
+    it('shows a blank-valued option’s label instead of the placeholder', () => {
+        const { fixture } = create(null);
+        fixture.componentInstance.options = [{ value: '', label: 'Auto — engine default' }, ...OPTIONS];
+        fixture.detectChanges();
+        expect(trigger(fixture).textContent).toContain('Auto — engine default');
         expect(trigger(fixture).textContent).not.toContain('Select');
     });
 

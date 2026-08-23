@@ -199,14 +199,21 @@ export class InspectoOptionPickerComponent implements ControlValueAccessor {
     readonly errorId = `${this.uid}-error`;
 
     /**
-     * A value with no matching option is shown VERBATIM, never as "Choose…" — a stored config can name
-     * a choice this deployment no longer offers, and blanking it in the trigger would read as unset
+     * A value with no matching option is shown VERBATIM, never as the placeholder — a stored config can
+     * name a choice this deployment no longer offers, and blanking it in the trigger would read as unset
      * and invite an accidental overwrite.
+     *
+     * <p>⚠ A BLANK value is only "unset" when no option claims it. An offered option whose value is
+     * `''` is a real, named choice — the idiom for "this field's default, written as nothing" (the
+     * Grammar editor drops a blank whose spec default is blank, so choosing it authors no key). Falling
+     * through to the placeholder there showed "Select" on a field that was in fact set to Auto.
      */
     readonly display = computed(() => {
         const v = this.value();
+        const named = this.options().find((o) => o.value === (v ?? ''));
+        if (named) return named.label;
         if (v === null || v === '') return this.placeholder();
-        return this.options().find((o) => o.value === v)?.label ?? v;
+        return v;
     });
 
     readonly invalid = computed(() => this.required() && this.touched() && !this.value());
@@ -219,7 +226,9 @@ export class InspectoOptionPickerComponent implements ControlValueAccessor {
         this.onTouched();
         this.dialog
             .open(OptionPickerDialog, {
-                data: { title: this.label(), options: this.options(), current: this.value() },
+                // A null value and a blank-valued option are the SAME choice (see `display`), so the
+                // popup must tick that option rather than showing nothing as selected.
+                data: { title: this.label(), options: this.options(), current: this.value() ?? '' },
                 autoFocus: true,
                 restoreFocus: true,
             })
