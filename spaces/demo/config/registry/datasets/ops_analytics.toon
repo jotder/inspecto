@@ -1,0 +1,3 @@
+name: ops_analytics
+physicalRef: ops_analytics
+description: Operational-object analytics samples (one row per type/axis/key per run)

@@ -1,0 +1,3 @@
+name: maintenance_backups
+physicalRef: maintenance_backups
+description: "System Maintenance backup catalog (one row per backup, MNT-10)"
