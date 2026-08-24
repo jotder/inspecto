@@ -6,6 +6,7 @@ import {
     CatalogIndex,
     deriveDefaultAccessCatalog,
     filterNavByAccess,
+    filterNavByLens,
     indexCatalog,
     resolveGrant,
 } from './access-catalog';
@@ -38,10 +39,15 @@ export class AccessStateService {
         });
     }
 
-    /** Sidebar items minus the ones the current lens's profile denies (identity when none saved). */
+    /**
+     * Sidebar for the current lens: the lens-default scope first (finding #10 — a focused subset per
+     * lens even with no profiles), then the saved Access Profile denies on top (identity when none).
+     */
     filterNav(items: GammaNavigationItem[]): GammaNavigationItem[] {
-        const grants = this.grantsByLens()[this.lens.currentLens()];
-        return grants ? filterNavByAccess(items, grants, this.idx) : items;
+        const lens = this.lens.currentLens();
+        const scoped = filterNavByLens(items, lens);
+        const grants = this.grantsByLens()[lens];
+        return grants ? filterNavByAccess(scoped, grants, this.idx) : scoped;
     }
 
     private apply(profiles: AccessProfile[]): void {

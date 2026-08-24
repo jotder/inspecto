@@ -83,6 +83,19 @@ body.dark {
     height: 100vh !important;
 }
 
+/* Responsive dialogs: the fixed pixel widths (420–1100px) opened via MatDialog overflow phones and
+ * small tablets. Cap every overlay pane at 96vw below the md breakpoint — wider-than-viewport dialogs
+ * shrink to fit instead of clipping off-screen; larger screens keep their designed sizes. */
+@media (max-width: 767.98px) {
+    .cdk-overlay-pane.mat-mdc-dialog-container,
+    .mat-mdc-dialog-container.cdk-overlay-pane {
+        max-width: 96vw !important;
+    }
+    .mat-mdc-dialog-surface {
+        max-width: 96vw;
+    }
+}
+
 /* Resizable dialogs (`[inspectoDialogResize]`, inspecto/components/dialog-resize.directive.ts).
  * The always-on class makes the surface a flex column (a <form> between surface and content rides
  * along); `inspecto-dialog-sized` is added once the user drags/maximizes, dropping Material's 65vh

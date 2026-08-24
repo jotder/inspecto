@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
@@ -26,12 +26,13 @@ const OPTIONS: PickerOption[] = [
     changeDetection: ChangeDetectionStrategy.Eager,
     imports: [ReactiveFormsModule, InspectoOptionPickerComponent],
     template: `
-        <inspecto-option-picker [formControl]="control" label="Format" [options]="options" [required]="true" />
+        <inspecto-option-picker [formControl]="control" label="Format" [options]="options()" [required]="true" />
     `,
 })
 class HostComponent {
     control = new FormControl<string | null>('json', Validators.required);
-    options = OPTIONS;
+    // Zoneless CD: signal so the mutated-options test marks the host dirty (no NG0100 on verify).
+    options = signal(OPTIONS);
 }
 
 /** What the popup returned, per test — `undefined` is a dismissal. */
@@ -80,7 +81,7 @@ describe('InspectoOptionPickerComponent', () => {
      */
     it('shows a blank-valued option’s label instead of the placeholder', () => {
         const { fixture } = create(null);
-        fixture.componentInstance.options = [{ value: '', label: 'Auto — engine default' }, ...OPTIONS];
+        fixture.componentInstance.options.set([{ value: '', label: 'Auto — engine default' }, ...OPTIONS]);
         fixture.detectChanges();
         expect(trigger(fixture).textContent).toContain('Auto — engine default');
         expect(trigger(fixture).textContent).not.toContain('Select');

@@ -60,9 +60,13 @@ async function create() {
     });
     const fixture = TestBed.createComponent(ReconBoardComponent);
     fixture.detectChanges(); // ngOnInit — load + auto-run
-    await fixture.whenStable(); // the async exec.run
+    const c = fixture.componentInstance;
+    // Zoneless CD: run()'s promise chain is pure microtasks, which whenStable() (pending-task
+    // based) cannot see — it may resolve before the result lands. Poll for it instead, then
+    // commit the rendered board.
+    await vi.waitFor(() => expect(c.result()).not.toBeNull());
     fixture.detectChanges();
-    return { fixture, c: fixture.componentInstance, navigate, save };
+    return { fixture, c, navigate, save };
 }
 
 describe('ReconBoardComponent', () => {

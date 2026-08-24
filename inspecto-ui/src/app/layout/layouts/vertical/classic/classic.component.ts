@@ -65,7 +65,7 @@ export class ClassicLayoutComponent implements OnInit, OnDestroy {
     isScreenSmall: boolean;
     navigation: Navigation;
     /** Navigation actually rendered in the sidebar — the full tree, or flattened search results. */
-    displayedNavigation: GammaNavigationItem[] = [];
+    readonly displayedNavigation = signal<GammaNavigationItem[]>([]);
     /** Sidebar menu search query (client-side filter of the nav tree). */
     navSearchQuery = '';
     private _unsubscribeAll: Subject<any> = new Subject<any>();
@@ -245,7 +245,7 @@ export class ClassicLayoutComponent implements OnInit, OnDestroy {
      * Navigate to the first search result (Enter key), then clear the search.
      */
     goToFirstResult(): void {
-        const first = this.displayedNavigation[0];
+        const first = this.displayedNavigation()[0];
 
         if (this.navSearchActive && first?.link) {
             this._router.navigateByUrl(first.link);
@@ -255,12 +255,15 @@ export class ClassicLayoutComponent implements OnInit, OnDestroy {
 
     /**
      * Recompute the rendered navigation: flattened search results while filtering, otherwise the
-     * full tree. A new array reference is assigned so the OnPush vertical-navigation re-renders.
+     * full tree. Written into a signal so the zoneless shell re-renders the OnPush
+     * vertical-navigation on every change (lens switch, access profile, search).
      *
      * @private
      */
     private _applyNavSearch(): void {
         const full = this._accessState.filterNav(this.navigation?.default ?? []);
-        this.displayedNavigation = this.navSearchActive ? flattenNavForSearch(full, this.navSearchQuery) : full;
+        this.displayedNavigation.set(
+            this.navSearchActive ? flattenNavForSearch(full, this.navSearchQuery) : full,
+        );
     }
 }

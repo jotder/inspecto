@@ -8,6 +8,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { FmtWhenPipe } from 'app/inspecto/format';
 import { DashboardShareLink, DashboardsService } from './dashboards.service';
 
 export interface ShareDashboardData {
@@ -32,6 +33,7 @@ export interface ShareDashboardData {
         MatInputModule,
         MatProgressSpinnerModule,
         InspectoAlertComponent,
+        FmtWhenPipe,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -61,7 +63,7 @@ export interface ShareDashboardData {
                         <mat-icon svgIcon="heroicons_outline:clipboard-document"></mat-icon>
                     </button>
                 </mat-form-field>
-                <div class="text-secondary text-xs">Expires {{ expires(l) }}.</div>
+                <div class="text-secondary text-xs">Expires {{ l.expiresAt | fmtWhen }}.</div>
             }
         </mat-dialog-content>
         <mat-dialog-actions align="end">
@@ -104,11 +106,6 @@ export class ShareDashboardDialog {
                 }
             },
         });
-    }
-
-    expires(l: DashboardShareLink): string {
-        const d = new Date(l.expiresAt);
-        return isNaN(d.getTime()) ? l.expiresAt : d.toLocaleString();
     }
 
     selectAll(ev: Event): void {

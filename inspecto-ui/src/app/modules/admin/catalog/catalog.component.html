@@ -32,14 +32,20 @@
         </mat-tab-group>
 
         @if (loading()) {
-            <div class="mt-6 flex items-center gap-3">
-                <mat-progress-spinner diameter="24" mode="indeterminate"></mat-progress-spinner>
-                <span class="text-secondary">Loading…</span>
-            </div>
+            <inspecto-skeleton class="mt-6 block" [lines]="4" height="3rem" />
+        } @else if (loadError()) {
+            <inspecto-empty-state
+                class="mt-6 block"
+                icon="heroicons_outline:exclamation-triangle"
+                title="Couldn't load the catalog"
+                message="Something went wrong reaching the server. Check your connection and try again."
+                actionLabel="Retry"
+                (action)="loadTab()"
+            />
         }
 
         <!-- Tables -->
-        @if (activeTab === 'tables' && !loading()) {
+        @if (activeTab === 'tables' && !loading() && !loadError()) {
             <inspecto-data-table
                 class="mt-6"
                 tier="standard"
@@ -55,7 +61,7 @@
         }
 
         <!-- Streams -->
-        @if (activeTab === 'streams' && !loading()) {
+        @if (activeTab === 'streams' && !loading() && !loadError()) {
             <inspecto-data-table
                 class="mt-6"
                 tier="standard"
@@ -72,7 +78,7 @@
         }
 
         <!-- References -->
-        @if (activeTab === 'references' && !loading()) {
+        @if (activeTab === 'references' && !loading() && !loadError()) {
             <inspecto-data-table
                 class="mt-6"
                 tier="standard"
@@ -89,7 +95,7 @@
         }
 
         <!-- KPIs -->
-        @if (activeTab === 'kpis' && !loading()) {
+        @if (activeTab === 'kpis' && !loading() && !loadError()) {
             <inspecto-data-table
                 class="mt-6"
                 tier="standard"

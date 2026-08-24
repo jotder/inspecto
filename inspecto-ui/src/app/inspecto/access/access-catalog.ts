@@ -1,6 +1,7 @@
 import { GammaNavigationItem } from '@gamma/components/navigation';
 import { defaultNavigation } from 'app/core/navigation/navigation-data';
 import { AccessGrant, AccessNode } from '../api/access.service';
+import type { Lens } from '../api/lens.service';
 
 /**
  * Access Catalog derivation + grant resolution (framework-free — design
@@ -188,3 +189,128 @@ export function filterNavByAccess(
     };
     return items.map(keep).filter((i): i is GammaNavigationItem => i !== null);
 }
+
+/**
+ * Per-lens DEFAULT sidebar scope (frontend-review finding #10): each lens shows only the groups/panes
+ * it exists for, so switching lenses focuses the nav even when no Access Profile was ever saved.
+ * This is presentation-only pruning — ids are never deleted or renamed (the catalog derives from this
+ * same tree), and a saved Access Profile still denies further on top. Anything not listed here stays
+ * visible in every lens; group entries prune their children independently of the group itself.
+ *
+ *   business → read/consume surfaces: KPIs & reports, alerts/incidents triage, dashboards, data browsing.
+ *   builder  → authoring surfaces: workbench + studio + catalog + requirements (the default lens keeps everything).
+ *   ops      → run-the-platform surfaces: operations monitoring, run operation, system maintenance.
+ */
+export const LENS_NAV_SCOPE: Record<Lens, string[]> = {
+    business: [
+        'business-group',
+        'kpi-reports',
+        'requirements',
+        'operations-group',
+        'alerts',
+        'incidents',
+        'cases',
+        'platform-group',
+        'studio-group',
+        'studio-dashboards',
+        'studio-viz-library',
+        'catalog-group',
+        'catalog',
+        'studio-datasets',
+        'data-browser',
+        'assist',
+    ],
+    builder: [
+        'business-group',
+        'requirements',
+        'reconciliation',
+        'operations-group',
+        'alerts',
+        'incidents',
+        'approvals',
+        'learning',
+        'tags',
+        'platform-group',
+        'workbench-group',
+        'pipelines',
+        'runs',
+        'jobs',
+        'expectations',
+        'decision-rules',
+        'components',
+        'enrichment',
+        'collectors',
+        'studio-group',
+        'studio-queries',
+        'studio-viz-library',
+        'studio-dashboards',
+        'studio-templates',
+        'studio-link-analysis',
+        'menus',
+        'studio-geo-map',
+        'catalog-group',
+        'catalog',
+        'catalog-onboard',
+        'studio-datasets',
+        'data-browser',
+        'settings',
+        'assist',
+    ],
+    ops: [
+        'operations-group',
+        'op-overview',
+        'processing-status',
+        'events',
+        'audit',
+        'diagnoses',
+        'alerts',
+        'incidents',
+        'approvals',
+        'autonomy',
+        'learning',
+        'cases',
+        'tags',
+        'platform-group',
+        'workbench-group',
+        'runs',
+        'jobs',
+        'expectations',
+        'collectors',
+        'catalog-group',
+        'catalog',
+        'studio-datasets',
+        'system-maintenance-group',
+        'maintenance-overview',
+        'assist',
+    ],
+};
+
+/**
+ * The lens-default counterpart of {@link filterNavByAccess}: keeps only the subtrees whose id is
+ * scoped to `lens` (or unscoped, i.e. not mentioned anywhere). A parent kept while ALL its children
+ * are pruned is dropped too, so empty groups never render. Unknown/custom ids always stay.
+ */
+export function filterNavByLens(items: GammaNavigationItem[], lens: Lens): GammaNavigationItem[] {
+    const scope = SCOPE_BY_LENS[lens];
+    const keep = (item: GammaNavigationItem): GammaNavigationItem | null => {
+        const inScope = !item.id || !ALL_SCOPED_IDS.has(item.id) || scope.has(item.id);
+        if (!inScope) return null;
+        if (!item.children?.length) return item;
+        const children = item.children.map(keep).filter((c): c is GammaNavigationItem => c !== null);
+        if (!children.length && item.children.length) return null; // group with nothing left inside
+        return { ...item, children };
+    };
+    return items.map(keep).filter((i): i is GammaNavigationItem => i !== null);
+}
+
+/** Membership sets built once at module load — `filterNavByLens` runs per nav item on every lens
+ * switch, access-profile load and nav-search keystroke, so neither is rebuilt or linearly scanned. */
+const SCOPE_BY_LENS: Record<Lens, ReadonlySet<string>> = {
+    business: new Set(LENS_NAV_SCOPE.business),
+    builder: new Set(LENS_NAV_SCOPE.builder),
+    ops: new Set(LENS_NAV_SCOPE.ops),
+};
+
+/** Every id any lens names — the complement defines "unscoped" (visible everywhere). */
+const ALL_SCOPED_IDS: ReadonlySet<string> = new Set(Object.values(LENS_NAV_SCOPE).flat());
+

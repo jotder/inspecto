@@ -10,6 +10,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, ImportPreview, SpacesService } from 'app/inspecto/api';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 
 /** Rejects a value (case-insensitive, trimmed) already present in `taken` → `{ duplicate: true }`. */
 function uniqueNameValidator(taken: string[]): ValidatorFn {
@@ -158,7 +160,7 @@ export interface ImportBundleData {
             }
         </mat-dialog-content>
         <mat-dialog-actions align="end">
-            <button type="button" mat-button mat-dialog-close [disabled]="busy()">Cancel</button>
+            <button type="button" mat-button (click)="requestClose()" [disabled]="busy()">Cancel</button>
             @if (isImport) {
                 <button type="button" mat-flat-button color="primary" [disabled]="!canImport()" (click)="doImport()">
                     Import
@@ -182,6 +184,14 @@ export class ImportBundleDialog {
     private toastr = inject(ToastrService);
     private ref = inject(MatDialogRef<ImportBundleDialog, boolean>);
     readonly data = inject<ImportBundleData>(MAT_DIALOG_DATA);
+    private confirm = inject(InspectoConfirmService);
+
+    /** Guarded close: Esc / backdrop / Cancel confirm before discarding the picked file / id. */
+    readonly requestClose = guardDirtyClose(
+        this.ref,
+        () => !!this.file || this.newId.dirty || this.overwrite.value,
+        this.confirm,
+    );
 
     readonly isImport = !!this.data.spaceId;
     readonly newId = new FormControl('', {

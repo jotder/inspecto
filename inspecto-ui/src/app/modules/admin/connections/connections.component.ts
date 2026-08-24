@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -14,6 +14,8 @@ import {
     LensService,
 } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
+import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { ConnectionFormDialog, ConnectionFormResult } from 'app/inspecto/connections/connection-form.dialog';
@@ -34,6 +36,8 @@ import { ConnectionFormDialog, ConnectionFormResult } from 'app/inspecto/connect
         MatTooltipModule,
         RouterLink,
         InspectoAlertComponent,
+        InspectoEmptyStateComponent,
+        InspectoSkeletonComponent,
         StatusBadgeComponent,
     ],
     templateUrl: './connections.component.html',
@@ -117,12 +121,14 @@ export class ConnectionsComponent implements OnInit {
         this.filterText.set((ev.target as HTMLInputElement).value);
     }
 
-    /** Connections matching the current filter (all when the filter is blank). */
-    get visibleConnections(): ConnectionProfile[] {
+    /** Connections matching the current filter (all when the filter is blank). `computed` rather than
+     * a getter — the template reads it from three places, and the per-connection match joins every
+     * option key/value into a string, so a getter would redo that scan on each read. */
+    readonly visibleConnections = computed<ConnectionProfile[]>(() => {
         const q = this.filterText().trim().toLowerCase();
         if (!q) return this.connections();
         return this.connections().filter((c) => this.matchesFilter(c, q));
-    }
+    });
 
     private matchesFilter(c: ConnectionProfile, q: string): boolean {
         const opts = Object.entries(c.options ?? {}).flatMap(([k, v]) => [k, v]);

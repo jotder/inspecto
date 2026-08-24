@@ -4,6 +4,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 
 /** Reprocess-batch prompt — returns the entered batch id, or undefined on cancel. */
 @Component({
@@ -34,7 +36,7 @@ import { MatInputModule } from '@angular/material/input';
             </mat-form-field>
         </mat-dialog-content>
         <mat-dialog-actions align="end">
-            <button mat-button mat-dialog-close>Cancel</button>
+            <button mat-button (click)="requestClose()">Cancel</button>
             <button mat-flat-button color="primary" (click)="submit()">Reprocess</button>
         </mat-dialog-actions>
     `,
@@ -42,6 +44,11 @@ import { MatInputModule } from '@angular/material/input';
 export class ReprocessDialog {
     readonly data = inject<{ pipeline: string }>(MAT_DIALOG_DATA);
     readonly ref = inject(MatDialogRef<ReprocessDialog, string>);
+    private confirm = inject(InspectoConfirmService);
+
+    /** Guarded close: Esc / backdrop / Cancel confirm before discarding input. */
+    readonly requestClose = guardDirtyClose(this.ref, () => this.batchId.dirty, this.confirm);
+
     readonly batchId = new FormControl('', {
         nonNullable: true,
         validators: Validators.required,

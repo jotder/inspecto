@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, expect, it, vi } from 'vitest';
@@ -10,15 +10,21 @@ import { ChipComponent } from './chip.component';
     imports: [ChipComponent],
     changeDetection: ChangeDetectionStrategy.Eager,
     template: `
-        <inspecto-chip [variant]="variant" [tone]="tone" [removable]="removable" (removed)="onRemoved()"
+        <inspecto-chip
+            [variant]="variant()"
+            [tone]="tone()"
+            [removable]="removable()"
+            (removed)="onRemoved()"
             >label</inspecto-chip
         >
     `,
 })
 class HostComponent {
-    variant: 'outline' | 'soft' = 'outline';
-    tone: 'neutral' | 'primary' = 'neutral';
-    removable = false;
+    // Zoneless CD: plain-field mutations don't mark the OnPush host dirty, so the verify sweep
+    // would trip NG0100 on stale stored bindings. Signals keep the harness honest.
+    variant = signal<'outline' | 'soft'>('outline');
+    tone = signal<'neutral' | 'primary'>('neutral');
+    removable = signal(false);
     onRemoved = vi.fn();
 }
 
@@ -43,8 +49,8 @@ describe('ChipComponent', () => {
 
     it('uses the primary tint for the soft primary variant', () => {
         const fixture = create();
-        fixture.componentInstance.variant = 'soft';
-        fixture.componentInstance.tone = 'primary';
+        fixture.componentInstance.variant.set('soft');
+        fixture.componentInstance.tone.set('primary');
         fixture.detectChanges();
         const pill = fixture.nativeElement.querySelector('inspecto-chip > span') as HTMLElement;
         expect(pill.className).toContain('bg-primary-100');
@@ -54,7 +60,7 @@ describe('ChipComponent', () => {
     it('shows no remove button unless removable, then emits (removed) on click', () => {
         const fixture = create();
         expect(fixture.nativeElement.querySelector('button')).toBeNull();
-        fixture.componentInstance.removable = true;
+        fixture.componentInstance.removable.set(true);
         fixture.detectChanges();
         const btn = fixture.nativeElement.querySelector('button') as HTMLButtonElement;
         expect(btn).not.toBeNull();
@@ -64,7 +70,7 @@ describe('ChipComponent', () => {
 
     it('has no a11y violations (removable)', async () => {
         const fixture = create();
-        fixture.componentInstance.removable = true;
+        fixture.componentInstance.removable.set(true);
         fixture.detectChanges();
         await expectNoA11yViolations(fixture.nativeElement);
     });

@@ -103,6 +103,29 @@ describe('CatalogComponent', () => {
         expect(DIALOG.open).not.toHaveBeenCalled();
     });
 
+    it('a failed load defers ?onboard= to the error state’s Retry instead of opening the dialog blind', () => {
+        // Deliberate: the deep link is consumed only once REAL rows are in. Raising the dialog off the
+        // error branch (as it once did) would arm the inline duplicate guard with an empty name list —
+        // exactly the late-409 that guard exists to prevent. `pendingOnboard` is cleared only by
+        // runPendingOnboard(), so it survives the failure and Retry still honours the link.
+        let attempt = 0;
+        const fixture = create(
+            { streams: () => (attempt++ === 0 ? throwError(() => ({ status: 500 })) : of([STREAM])) },
+            { onboard: 'stream' },
+            ['canAuthorWorkbench'],
+        );
+        const c = fixture.componentInstance;
+        expect(c.loadError()).toBe(true);
+        expect(DIALOG.open).not.toHaveBeenCalled();
+        fixture.detectChanges();
+        expect(fixture.nativeElement.textContent).toContain("Couldn't load the catalog");
+
+        c.loadTab(); // the error state's Retry action
+        expect(c.loadError()).toBe(false);
+        expect(DIALOG.open).toHaveBeenCalledTimes(1);
+        expect(DIALOG.open.mock.calls[0][1]).toMatchObject({ data: { kind: 'stream', existingNames: ['orders'] } });
+    });
+
     it('loads the Streams tab on init (data origins are the default tab)', () => {
         const c = create({ streams: () => of([STREAM]) }).componentInstance;
         expect(c.activeTab).toBe('streams');

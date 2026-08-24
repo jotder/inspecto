@@ -6,7 +6,7 @@
     class="dark bg-gray-900 print:hidden"
     [mode]="isScreenSmall ? 'over' : 'side'"
     [name]="'mainNavigation'"
-    [navigation]="displayedNavigation"
+    [navigation]="displayedNavigation()"
     [opened]="!isScreenSmall"
 >
     <!-- Navigation header hook -->
@@ -53,7 +53,7 @@
                     </button>
                 }
             </div>
-            @if (navSearchActive && displayedNavigation.length === 0) {
+            @if (navSearchActive && displayedNavigation().length === 0) {
                 <p class="mt-2 text-sm text-gray-400">No matching menus.</p>
             }
         </div>

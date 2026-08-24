@@ -87,12 +87,14 @@ describe('AlertsComponent', () => {
         expect(fixture.componentInstance.evaluating()).toBe(false);
     });
 
-    it('degrades to an empty grid + plain failure toast when the load fails', async () => {
+    it('surfaces an inline error state (not a toast) when the load fails', async () => {
         const { fixture, toastr } = await create({ recent: () => throwError(() => ({ status: 500 })) });
         const c = fixture.componentInstance;
         expect(c.alerts()).toEqual([]);
         expect(c.loading()).toBe(false);
-        expect(toastr.error).toHaveBeenCalledWith('Failed to load alerts');
+        expect(c.loadError()).toBe(true);
+        expect(toastr.error).not.toHaveBeenCalled();
+        expect(fixture.nativeElement.textContent).toContain("Couldn't load alerts");
     });
 
     it('authoring is capability-gated: rule actions and New rule vanish for the read-only lens', async () => {

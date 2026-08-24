@@ -8,6 +8,9 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, NotesService, ObjectNote } from 'app/inspecto/api';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
+import { FmtWhenPipe } from 'app/inspecto/format';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 
 export interface LinkAnalysisCommentsData {
     id: string;
@@ -31,6 +34,7 @@ export interface LinkAnalysisCommentsData {
         MatInputModule,
         MatProgressSpinnerModule,
         InspectoEmptyStateComponent,
+        FmtWhenPipe,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -61,7 +65,7 @@ export interface LinkAnalysisCommentsData {
                     @for (c of comments(); track c.id) {
                         <div class="bg-card rounded-lg border p-4">
                             <div class="text-secondary mb-1 text-sm">
-                                {{ c.author || 'unknown' }} · {{ savedAt(c) }}
+                                {{ c.author || 'unknown' }} · {{ c.createdAt | fmtWhen }}
                             </div>
                             <div class="whitespace-pre-wrap">{{ c.body }}</div>
                         </div>
@@ -70,7 +74,7 @@ export interface LinkAnalysisCommentsData {
             }
         </mat-dialog-content>
         <mat-dialog-actions align="end">
-            <button mat-button mat-dialog-close>Close</button>
+            <button mat-button (click)="requestClose()">Close</button>
         </mat-dialog-actions>
     `,
 })
@@ -79,6 +83,10 @@ export class LinkAnalysisCommentsDialog {
     private notes = inject(NotesService);
     private toastr = inject(ToastrService);
     private ref = inject(MatDialogRef<LinkAnalysisCommentsDialog>);
+    private confirm = inject(InspectoConfirmService);
+
+    /** Guarded close: Esc / backdrop / Close confirm before discarding an unsent comment. */
+    readonly requestClose = guardDirtyClose(this.ref, () => this.commentControl.dirty, this.confirm);
 
     private static readonly TARGET_KIND = 'link-analysis-view';
 
@@ -103,11 +111,6 @@ export class LinkAnalysisCommentsDialog {
                 this.toastr.error(apiErrorMessage(e, 'Could not load comments.'));
             },
         });
-    }
-
-    savedAt(c: ObjectNote): string {
-        if (!c.createdAt) return '—';
-        return new Date(c.createdAt).toLocaleString();
     }
 
     addComment(): void {

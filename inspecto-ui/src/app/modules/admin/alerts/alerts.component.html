@@ -22,19 +22,29 @@
 
     <!-- Fired alerts grid -->
     <div class="mt-4 flex-auto">
-        <inspecto-data-table
-            tier="pro"
-            sourceName="alerts"
-            exportName="alerts"
-            stateKey="alerts-fired"
-            [rows]="alerts()"
-            [columns]="columnDefs"
-            [rowActions]="firedActions"
-            [pinActions]="true"
-            [loading]="loading()"
-            noRowsTitle="No alerts fired"
-            noRowsHint="Breaches of the armed alert rules will appear here."
-        />
+        @if (loadError()) {
+            <inspecto-empty-state
+                icon="heroicons_outline:exclamation-triangle"
+                title="Couldn't load alerts"
+                message="Something went wrong reaching the server. Check your connection and try again."
+                actionLabel="Retry"
+                (action)="load()"
+            />
+        } @else {
+            <inspecto-data-table
+                tier="pro"
+                sourceName="alerts"
+                exportName="alerts"
+                stateKey="alerts-fired"
+                [rows]="alerts()"
+                [columns]="columnDefs"
+                [rowActions]="firedActions"
+                [pinActions]="true"
+                [loading]="loading()"
+                noRowsTitle="No alerts fired"
+                noRowsHint="Breaches of the armed alert rules will appear here."
+            />
+        }
     </div>
 
     <!-- Armed rules: the authoring section (audit C3) -->

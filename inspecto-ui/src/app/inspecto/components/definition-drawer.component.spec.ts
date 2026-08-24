@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, expect, it, vi } from 'vitest';
@@ -13,9 +13,9 @@ import { DefinitionDrawerComponent } from './definition-drawer.component';
     changeDetection: ChangeDetectionStrategy.Eager,
     template: `
         <inspecto-definition-drawer
-            [title]="title"
+            [title]="title()"
             [kindLabel]="kind"
-            [dirty]="dirty"
+            [dirty]="dirty()"
             (apply)="applied = applied + 1"
             (discard)="discarded = discarded + 1"
             (closed)="closedCount = closedCount + 1"
@@ -26,9 +26,10 @@ import { DefinitionDrawerComponent } from './definition-drawer.component';
     `,
 })
 class HostComponent {
-    title = 'sftp inbox';
+    // Zoneless CD: signals so post-first-CD mutations mark the host dirty (no NG0100 on verify).
+    title = signal('sftp inbox');
     kind = 'Collector';
-    dirty = false;
+    dirty = signal(false);
     applied = 0;
     discarded = 0;
     closedCount = 0;
@@ -73,7 +74,7 @@ describe('DefinitionDrawerComponent', () => {
         expect(button(fixture, 'Apply').disabled).toBe(true);
         expect(button(fixture, 'Discard').disabled).toBe(true);
 
-        fixture.componentInstance.dirty = true;
+        fixture.componentInstance.dirty.set(true);
         fixture.detectChanges();
         expect(fixture.nativeElement.textContent).toContain('unapplied');
         expect(button(fixture, 'Apply').disabled).toBe(false);
@@ -82,7 +83,7 @@ describe('DefinitionDrawerComponent', () => {
 
     it('emits apply and discard from the footer', async () => {
         const { fixture } = await create();
-        fixture.componentInstance.dirty = true;
+        fixture.componentInstance.dirty.set(true);
         fixture.detectChanges();
         button(fixture, 'Apply').click();
         button(fixture, 'Discard').click();
@@ -100,7 +101,7 @@ describe('DefinitionDrawerComponent', () => {
 
     it('guards a dirty close behind the destructive confirm — refusal keeps it open', async () => {
         const { fixture, confirm } = await create(false);
-        fixture.componentInstance.dirty = true;
+        fixture.componentInstance.dirty.set(true);
         fixture.detectChanges();
         (fixture.nativeElement.querySelector('button[aria-label^="Close"]') as HTMLButtonElement).click();
         await fixture.whenStable();
@@ -110,7 +111,7 @@ describe('DefinitionDrawerComponent', () => {
 
     it('closes a dirty drawer once the discard is confirmed', async () => {
         const { fixture, confirm } = await create(true);
-        fixture.componentInstance.dirty = true;
+        fixture.componentInstance.dirty.set(true);
         fixture.detectChanges();
         (fixture.nativeElement.querySelector('button[aria-label^="Close"]') as HTMLButtonElement).click();
         await fixture.whenStable();

@@ -6,7 +6,6 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTabsModule } from '@angular/material/tabs';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -23,6 +22,7 @@ import {
 } from 'app/inspecto/api';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
+import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
 import { InspectoRowAction, fmtDateTime } from 'app/inspecto/grid';
 import { OnboardingCreateDialog, OnboardingCreateResult } from './onboarding/onboarding-create.dialog';
@@ -56,11 +56,11 @@ type CatTab = 'tables' | 'streams' | 'references' | 'kpis' | 'graph' | 'usage' |
         MatFormFieldModule,
         MatIconModule,
         MatInputModule,
-        MatProgressSpinnerModule,
         MatSelectModule,
         MatTabsModule,
         DataTableComponent,
         InspectoEmptyStateComponent,
+        InspectoSkeletonComponent,
         GraphViewComponent,
         RegistryComponent,
         SharingComponent,
@@ -99,6 +99,7 @@ export class CatalogComponent implements OnInit {
     }
 
     readonly loading = signal(false);
+    readonly loadError = signal(false);
     readonly nodes = signal<MetadataNode[]>([]);
     readonly streams = signal<MetadataNode[]>([]);
     readonly references = signal<MetadataNode[]>([]);
@@ -242,6 +243,7 @@ export class CatalogComponent implements OnInit {
     }
 
     loadTab(): void {
+        this.loadError.set(false);
         if (this.activeTab === 'tables') {
             this.loading.set(true);
             this.api.tables().subscribe({
@@ -251,6 +253,7 @@ export class CatalogComponent implements OnInit {
                 },
                 error: () => {
                     this.nodes.set([]);
+                    this.loadError.set(true);
                     this.loading.set(false);
                 },
             });
@@ -264,8 +267,8 @@ export class CatalogComponent implements OnInit {
                 },
                 error: () => {
                     this.streams.set([]);
+                    this.loadError.set(true);
                     this.loading.set(false);
-                    this.runPendingOnboard();
                 },
             });
         } else if (this.activeTab === 'references') {
@@ -278,8 +281,8 @@ export class CatalogComponent implements OnInit {
                 },
                 error: () => {
                     this.references.set([]);
+                    this.loadError.set(true);
                     this.loading.set(false);
-                    this.runPendingOnboard();
                 },
             });
         } else if (this.activeTab === 'kpis') {
@@ -291,6 +294,7 @@ export class CatalogComponent implements OnInit {
                 },
                 error: () => {
                     this.kpis.set([]);
+                    this.loadError.set(true);
                     this.loading.set(false);
                 },
             });
@@ -299,6 +303,7 @@ export class CatalogComponent implements OnInit {
 
     runGraph(): void {
         this.loading.set(true);
+        this.loadError.set(false);
         this.api
             .graph({
                 from: this.graphFrom.trim() || undefined,
@@ -315,6 +320,7 @@ export class CatalogComponent implements OnInit {
                 },
                 error: () => {
                     this.setGraph(null);
+                    this.loadError.set(true);
                     this.loading.set(false);
                 },
             });

@@ -9,6 +9,8 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage } from 'app/inspecto/api';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 // Direct file imports (NOT the `app/inspecto/query` barrel) — see the note in `rule-types.ts`.
 import { QueryModel } from '../query/query-types';
 import { SqlParam } from '../query/query-sql';
@@ -87,7 +89,7 @@ export interface RuleSaveData {
             >
         </mat-dialog-content>
         <mat-dialog-actions align="end">
-            <button type="button" mat-button mat-dialog-close>Cancel</button>
+            <button type="button" mat-button (click)="requestClose()">Cancel</button>
             <button type="button" mat-flat-button color="primary" (click)="save()" [disabled]="saving()">
                 @if (saving()) {
                     <mat-spinner diameter="16" class="mr-2"></mat-spinner>
@@ -102,7 +104,11 @@ export class RuleSaveDialog {
     private rules = inject(RulesService);
     private toastr = inject(ToastrService);
     private ref = inject(MatDialogRef<RuleSaveDialog, RuleTemplate>);
+    private confirm = inject(InspectoConfirmService);
     readonly data = inject<RuleSaveData>(MAT_DIALOG_DATA);
+
+    /** Guarded close: Esc / backdrop / Cancel confirm before discarding a dirty form. */
+    readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
 
     readonly saving = signal(false);
     readonly form = this.fb.group({

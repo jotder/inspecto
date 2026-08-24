@@ -17,7 +17,7 @@ const SESSION_PATHS = ['/auth/exchange', '/auth/refresh', '/auth/logout'];
  * <p><b>No-op on Personal / offline.</b> When {@link SessionService.authMode} isn't `'oidc'` this
  * passes every request straight through — the auth-free core stays byte-for-byte unchanged. In offline
  * mock mode the {@link mockApiInterceptor} short-circuits before this runs, so it never engages there
- * either. Only attaches to same-origin ControlApi calls (`/api…`), never to assets/i18n.
+ * either. Only attaches to same-origin ControlApi calls (`/api…`), never to static assets.
  */
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
     const session = inject(SessionService);

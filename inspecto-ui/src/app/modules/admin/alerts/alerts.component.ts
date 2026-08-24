@@ -10,6 +10,7 @@ import { AlertRule, AlertsService, apiErrorMessage, FiredAlert, LensService } fr
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
+import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { fmtDateTime, InspectoRowAction } from 'app/inspecto/grid';
 import { AlertRuleFormData, AlertRuleFormDialog, AlertRuleFormResult } from './alert-rule-form.dialog';
 import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
@@ -27,6 +28,7 @@ import { AiStatusData, AiStatusDialog } from 'app/inspecto/ai-assist/ai-status.d
     imports: [
         AiExplainComponent,
         FormsModule,
+        InspectoEmptyStateComponent,
         MatButtonModule,
         MatIconModule,
         MatProgressSpinnerModule,
@@ -46,6 +48,7 @@ export class AlertsComponent implements OnInit {
     readonly alerts = signal<FiredAlert[]>([]);
     readonly rules = signal<AlertRule[]>([]);
     readonly loading = signal(false);
+    readonly loadError = signal(false);
     readonly evaluating = signal(false);
 
     readonly columnDefs: ColDef<FiredAlert>[] = [
@@ -144,16 +147,18 @@ export class AlertsComponent implements OnInit {
 
     load(): void {
         this.loading.set(true);
+        this.loadError.set(false);
         this.api.recent(100).subscribe({
             next: (a) => {
                 this.alerts.set(a);
                 this.loading.set(false);
             },
             error: () => {
-                // Unreachable-backend messaging is the connectivity banner's job (§8) — plain failure toast only.
+                // Unreachable-backend messaging is the connectivity banner's job (§8) — surface an
+                // inline error state with retry rather than a transient toast.
                 this.alerts.set([]);
+                this.loadError.set(true);
                 this.loading.set(false);
-                this.toastr.error('Failed to load alerts');
             },
         });
         this.api.rules().subscribe({

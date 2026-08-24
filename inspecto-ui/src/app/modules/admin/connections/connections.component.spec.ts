@@ -44,9 +44,9 @@ describe('ConnectionsComponent', () => {
     it('filters by id/connector/host', () => {
         const c = create().componentInstance;
         c.filterText.set('edge');
-        expect(c.visibleConnections).toEqual([CONN]);
+        expect(c.visibleConnections()).toEqual([CONN]);
         c.filterText.set('nope');
-        expect(c.visibleConnections).toEqual([]);
+        expect(c.visibleConnections()).toEqual([]);
     });
 
     it('shows New/Edit/Delete in the default (Builder) lens', () => {

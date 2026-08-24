@@ -1,16 +1,18 @@
 import { provideHttpClient, withInterceptors, withXhr } from '@angular/common/http';
-import { ApplicationConfig, inject, isDevMode, provideAppInitializer, provideZoneChangeDetection } from '@angular/core';
+import {
+    ApplicationConfig,
+    inject,
+    provideAppInitializer,
+    provideZonelessChangeDetection,
+} from '@angular/core';
 import { LuxonDateAdapter } from '@angular/material-luxon-adapter';
 import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { provideRouter, withComponentInputBinding, withInMemoryScrolling } from '@angular/router';
 import { provideGamma } from '@gamma';
-import { TranslocoService, provideTransloco } from '@jsverse/transloco';
 import { appRoutes } from 'app/app.routes';
 import { provideIcons } from 'app/core/icons/icons.provider';
 import { provideToastr } from 'ngx-toastr';
-import { firstValueFrom } from 'rxjs';
-import { TranslocoHttpLoader } from './core/transloco/transloco.http-loader';
 import { errorInterceptor as inspectoErrorInterceptor } from './inspecto/api/error.interceptor';
 import { spaceInterceptor } from './inspecto/api/space.interceptor';
 import { authInterceptor } from './inspecto/api/auth.interceptor';
@@ -20,8 +22,10 @@ import { mockApiInterceptor } from './inspecto/mock';
 
 export const appConfig: ApplicationConfig = {
     providers: [
-        // Zone.js change detection (explicit opt-in for Angular 21)
-        provideZoneChangeDetection({ eventCoalescing: true }),
+        // Zoneless change detection (Angular 21 default): signals + `markForCheck`-free async pipes
+        // schedule CD; zone.js is no longer loaded (removed from build polyfills). Timer/Rx callbacks
+        // that mutate view state must write signals or call ChangeDetectorRef explicitly.
+        provideZonelessChangeDetection(),
 
         // Main HttpClient. The Personal/core edition is auth-free; the Standard edition adds OIDC via
         // the authInterceptor (W6d), which is a no-op unless SessionService.authMode === 'oidc'. Order:
@@ -71,33 +75,6 @@ export const appConfig: ApplicationConfig = {
             },
         },
 
-        // Transloco Config
-        provideTransloco({
-            config: {
-                availableLangs: [
-                    {
-                        id: 'en',
-                        label: 'English',
-                    },
-                    {
-                        id: 'tr',
-                        label: 'Turkish',
-                    },
-                ],
-                defaultLang: 'en',
-                fallbackLang: 'en',
-                reRenderOnLangChange: true,
-                prodMode: !isDevMode(),
-            },
-            loader: TranslocoHttpLoader,
-        }),
-        provideAppInitializer(() => {
-            const translocoService = inject(TranslocoService);
-            const defaultLang = translocoService.getDefaultLang();
-            translocoService.setActiveLang(defaultLang);
-
-            return firstValueFrom(translocoService.load(defaultLang));
-        }),
         // Read GET /bootstrap once to learn the edition's authMode and (under OIDC) resume a session
         // from the refresh cookie, before routing runs. Never rejects — a Personal/offline backend just
         // reports authMode:'none' and this is a no-op, so the auth-free boot path is unchanged (W6d).

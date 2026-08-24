@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, OnInit, inject, input, signal } fro
 import { PublicMeasure, PublicQueryBody, ShareService, SharedDashboard, apiErrorMessage } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
+import { fmtWhen } from 'app/inspecto/format';
 import { VizRenderComponent } from 'app/inspecto/viz/viz-render.component';
 // Side-effect import: registers the built-in VizPlugins. Essential here — /share/:token is a guest,
 // shell-less route, so nothing else has loaded the registry when a share link is opened directly.
@@ -102,7 +103,7 @@ export class ShareViewerComponent implements OnInit {
     private render(shared: SharedDashboard): void {
         const content = shared.dashboard.content as { name?: string; tiles?: { widgetId: string; span?: number }[] };
         this.name.set(content.name || shared.dashboard.id);
-        this.expiresAt.set(new Date(shared.expiresAt).toLocaleString());
+        this.expiresAt.set(fmtWhen(shared.expiresAt));
         const widgets = new Map(shared.widgets.map((w) => [w.id, w.content as unknown as EmbedWidget]));
 
         const vms: TileVm[] = (content.tiles ?? []).map((tile) => {

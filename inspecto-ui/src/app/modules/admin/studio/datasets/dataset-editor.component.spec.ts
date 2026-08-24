@@ -55,7 +55,9 @@ describe('DatasetEditorComponent', () => {
     it('starts in create mode on the space‘s first real store, with columns inferred from its page', async () => {
         const fixture = create();
         fixture.detectChanges();
-        await fixture.whenStable();
+        // Zoneless CD: the store list + default pick resolve via promise microtasks that
+        // whenStable() cannot see — poll for the default source, then assert.
+        await vi.waitFor(() => expect(fixture.componentInstance.form.controls.sourceName.value).toBe('cdr'));
         const c = fixture.componentInstance;
         expect(c.editing()).toBe(false);
         expect(c.isVirtual()).toBe(true);
@@ -92,7 +94,8 @@ describe('DatasetEditorComponent', () => {
         const save = vi.fn((d: Dataset) => of(d));
         const fixture = create(save);
         fixture.detectChanges();
-        await fixture.whenStable(); // the store list lands before the default source is picked
+        // Zoneless CD: wait for the store list to land before the default source is picked.
+        await vi.waitFor(() => expect(fixture.componentInstance.sourceNames().length).toBeGreaterThan(0));
         const nav = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
         fixture.componentInstance.form.controls.name.setValue('cdr_view');
         fixture.componentInstance.save();
@@ -157,8 +160,10 @@ describe('DatasetEditorComponent', () => {
         );
         fixture.componentInstance.id = 'orders_feed';
         fixture.detectChanges();
-        await fixture.whenStable();
+        // Zoneless CD: the seeded dataset + merged store list land on promise microtasks that
+        // whenStable() cannot see — poll for the merged picker, then assert.
         const c = fixture.componentInstance;
+        await vi.waitFor(() => expect(c.sourceNames()).toContain('orders_feed'));
         expect(c.sourceNames()).toContain('orders_feed');
         // And it says WHY there is no preview, in the store's own words — not a generic hint.
         expect(c.previewProblem()).toBe('no store "orders_feed"');

@@ -5,6 +5,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, ComponentsService, ComponentType, ComponentVersion } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { FmtWhenPipe } from 'app/inspecto/format';
 import { InspectoEmptyStateComponent } from './empty-state.component';
 
 export interface ComponentHistoryData {
@@ -22,7 +23,7 @@ export interface ComponentHistoryData {
  */
 @Component({
     standalone: true,
-    imports: [MatButtonModule, MatDialogModule, MatProgressSpinnerModule, InspectoEmptyStateComponent],
+    imports: [MatButtonModule, MatDialogModule, MatProgressSpinnerModule, InspectoEmptyStateComponent, FmtWhenPipe],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Version history</h2>
@@ -55,7 +56,7 @@ export interface ComponentHistoryData {
                         @for (v of versions(); track v.version) {
                             <tr class="border-t border-gray-200 dark:border-gray-700">
                                 <td class="py-1.5 pr-3">v{{ v.version }}</td>
-                                <td class="py-1.5 pr-3">{{ savedAt(v) }}</td>
+                                <td class="py-1.5 pr-3">{{ v.savedAt | fmtWhen }}</td>
                                 <td class="py-1.5 pr-3 font-mono text-xs">{{ v.contentHash.slice(0, 12) }}</td>
                                 <td class="py-1.5 text-right">
                                     <button mat-stroked-button [disabled]="restoring()" (click)="restore(v)">
@@ -96,12 +97,6 @@ export class ComponentHistoryDialog {
                 this.toastr.error(apiErrorMessage(e, 'Could not load version history.'));
             },
         });
-    }
-
-    savedAt(v: ComponentVersion): string {
-        if (!v.savedAt) return '—';
-        const d = new Date(v.savedAt);
-        return isNaN(d.getTime()) ? v.savedAt : d.toLocaleString();
     }
 
     async restore(v: ComponentVersion): Promise<void> {

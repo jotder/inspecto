@@ -44,17 +44,26 @@
         </inspecto-alert>
     }
 
-    @if (!loading() && connections().length === 0) {
+    @if (loading()) {
+        <inspecto-skeleton class="mt-6 block" [lines]="4" height="5rem" />
+    } @else if (connections().length === 0) {
         <div class="text-secondary mt-8">
             No connection profiles loaded. Author a <code>*_connection.toon</code> next to your pipeline configs — a
             <code>connection</code> block with <code>id</code>, <code>connector</code>, <code>host</code>,
             <code>port</code>, … and <code>$&#123;ENV:…&#125;</code> credential references.
         </div>
+    } @else if (visibleConnections().length === 0) {
+        <inspecto-empty-state
+            class="mt-6 block"
+            icon="heroicons_outline:magnifying-glass"
+            title="No matches"
+            [message]="'No connection profiles match “' + filterText() + '”.'"
+        />
     }
 
     <!-- Profiles -->
     <div class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        @for (c of visibleConnections; track c.id) {
+        @for (c of visibleConnections(); track c.id) {
             <div class="bg-card flex flex-col rounded-2xl p-5 shadow">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div class="min-w-0">
@@ -142,8 +151,4 @@
             </div>
         }
     </div>
-
-    @if (connections().length && visibleConnections.length === 0) {
-        <div class="text-secondary mt-8">No connections match “{{ filterText() }}”.</div>
-    }
 </div>

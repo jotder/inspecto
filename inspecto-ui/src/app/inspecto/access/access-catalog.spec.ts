@@ -7,7 +7,9 @@ import {
     deriveAccessCatalog,
     deriveDefaultAccessCatalog,
     filterNavByAccess,
+    filterNavByLens,
     indexCatalog,
+    LENS_NAV_SCOPE,
     resolveGrant,
 } from './access-catalog';
 
@@ -103,5 +105,31 @@ describe('filterNavByAccess', () => {
 
         const denyGroup = filterNavByAccess(NAV, { 'workbench-group': 'deny' }, idx);
         expect(denyGroup.map((i) => i.id)).toEqual(['custom-menus-divider', 'settings']);
+    });
+});
+
+describe('filterNavByLens (lens-default nav scope)', () => {
+    it('keeps only ids in the lens scope plus unscoped ones; prunes empty parents', () => {
+        const scoped = filterNavByLens(NAV, 'ops');
+        // ops names `runs` but not `pipelines`/`settings` → both go; workbench-group keeps runs
+        expect(scoped.map((i) => i.id)).toEqual(['custom-menus-divider', 'workbench-group']);
+        expect(scoped[1].children!.map((c) => c.id)).toEqual(['runs']);
+    });
+
+    it('drops a group once ALL its children are out of scope', () => {
+        const nav: GammaNavigationItem[] = [
+            { id: 'g', title: 'Group', type: 'collapsable', children: [{ id: 'kpi-reports', title: 'KPIs', type: 'basic', link: '/kpi-reports' }] },
+        ];
+        // kpi-reports is business/builder-only; ops has no use for the group at all
+        expect(filterNavByLens(nav, 'ops')).toEqual([]);
+    });
+
+    it('every lens scope id exists in the real platform navigation', () => {
+        const idx = indexCatalog(deriveDefaultAccessCatalog());
+        for (const lensId of ['business', 'builder', 'ops'] as const) {
+            for (const id of LENS_NAV_SCOPE[lensId]) {
+                expect(idx.byId.has(id), `${lensId}:${id}`).toBe(true);
+            }
+        }
     });
 });

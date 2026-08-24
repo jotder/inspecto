@@ -9,6 +9,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { uniqueNameValidator } from 'app/inspecto/investigation/unique-name';
 import { HEROICONS_OUTLINE_IDS, heroiconOutline } from 'app/inspecto/menu/heroicons-outline-ids';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 
 /** A small curated set of menu icons surfaced first (nicer labels); the picker also searches the full set. */
 export const MENU_ICON_CHOICES: { value: string; label: string }[] = [
@@ -106,7 +108,7 @@ export interface MenuNodeDialogResult {
                 </mat-form-field>
             </mat-dialog-content>
             <mat-dialog-actions align="end">
-                <button mat-button type="button" (click)="ref.close()">Cancel</button>
+                <button mat-button type="button" (click)="requestClose()">Cancel</button>
                 <button mat-flat-button color="primary" type="submit">Save</button>
             </mat-dialog-actions>
         </form>
@@ -116,6 +118,10 @@ export class MenuNodeDialog {
     readonly data = inject<MenuNodeDialogData>(MAT_DIALOG_DATA);
     readonly ref = inject<MatDialogRef<MenuNodeDialog, MenuNodeDialogResult>>(MatDialogRef);
     private fb = inject(FormBuilder);
+    private confirm = inject(InspectoConfirmService);
+
+    /** Guarded close: Esc / backdrop / Cancel confirm before discarding a dirty form. */
+    readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
 
     private static readonly VALID_ICONS = new Set(ALL_ICON_OPTIONS.map((o) => o.value));
 

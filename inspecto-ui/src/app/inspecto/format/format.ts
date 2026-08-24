@@ -1,9 +1,11 @@
 /**
  * Pure, framework-agnostic display formatters shared across the app — the P4 consolidation of helpers that
  * were duplicated inline in several components. Templates use the thin pipes in `pipes.ts`; TS call sites import
- * these directly. No Angular imports (vitest-pure, like `query/`). Only formatters with ≥2 real call sites live
- * here (adoption-plan STOP).
+ * these directly. Only Luxon (`DateTime`) is imported besides Angular-free stdlib (still vitest-pure, like
+ * `query/`). Only formatters with ≥2 real call sites live here (adoption-plan STOP).
  */
+
+import { DateTime } from 'luxon';
 
 /** A date-time for grids / detail views — epoch millis or ISO string → locale string ('' for empty/falsy). */
 export function fmtDateTime(value: unknown): string {
@@ -34,3 +36,35 @@ export function fmtBytes(n: number): string {
 export function fmtPercent(ratio: number): string {
     return (ratio * 100).toFixed(1) + '%';
 }
+
+/**
+ * A "when did this happen" stamp for activity feeds / comments / history lists — relative within ±24h
+ * ("3m ago", "in 2h"), absolute locale date-time beyond that (falls back to {@link fmtDateTime}'s
+ * contract: '' for falsy, raw string back when unparseable).
+ */
+export function fmtWhen(value: unknown, now: Date = new Date()): string {
+    if (!value) return '';
+    const dt =
+        value instanceof Date
+            ? DateTime.fromJSDate(value)
+            : typeof value === 'number'
+              ? DateTime.fromMillis(value)
+              : /^\d+$/.test(String(value))
+                ? DateTime.fromMillis(Number(value))
+                : DateTime.fromISO(String(value));
+    if (!dt.isValid) return String(value);
+    const ref = DateTime.fromJSDate(now);
+    const diffMs = dt.diff(ref, 'milliseconds').milliseconds;
+    const gap = Math.abs(diffMs);
+    if (gap < DAY_MS) {
+        // The single largest whole unit (h, else m) that fits the gap — sub-minute reads as "1m".
+        const [amount, unit] = gap >= HOUR_MS ? [gap / HOUR_MS, 'h'] : [gap / MINUTE_MS, 'm'];
+        const rounded = Math.max(1, Math.floor(amount));
+        return diffMs < 0 ? `${rounded}${unit} ago` : `in ${rounded}${unit}`;
+    }
+    return dt.toLocaleString();
+}
+
+const MINUTE_MS = 60 * 1000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;

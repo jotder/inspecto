@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
@@ -25,10 +25,10 @@ import { PipelineParseDefinitionComponent } from './pipeline-parse-definition.co
     changeDetection: ChangeDetectionStrategy.Eager,
     template: `
         <app-pipeline-parse-definition
-            [node]="node"
-            [pipelineName]="pipelineName"
+            [node]="node()"
+            [pipelineName]="pipelineName()"
             [sample]="sample"
-            [filenameColumnTarget]="filenameColumnTarget"
+            [filenameColumnTarget]="filenameColumnTarget()"
             (filenameColumnChange)="filenameColumnChange = $event"
             (applied)="applied = $event"
             (dirtyChange)="dirty = $event"
@@ -36,12 +36,14 @@ import { PipelineParseDefinitionComponent } from './pipeline-parse-definition.co
     `,
 })
 class HostComponent {
-    node: AuthoredNode = delimitedNode();
-    pipelineName = '';
+    // Zoneless CD: inputs mutated after the first detectChanges are signals, so the host is
+    // marked dirty and the harness verify sweep never compares against stale bindings (NG0100).
+    node = signal<AuthoredNode>(delimitedNode());
+    pipelineName = signal('');
     /** The tab's sample thread — null in most specs, exactly as a host that keeps none. */
     sample: DefinitionStateService | null = null;
     /** null = the host's cross-node lineage field is not offered (ambiguous/no sink) — most specs. */
-    filenameColumnTarget: { value: string; target: string } | null = null;
+    filenameColumnTarget = signal<{ value: string; target: string } | null>(null);
     filenameColumnChange?: string | null;
     applied?: AuthoredNode;
     dirty = false;
@@ -271,9 +273,9 @@ async function create(
     });
     await TestBed.compileComponents();
     const fixture = TestBed.createComponent(HostComponent);
-    fixture.componentInstance.node = node;
+    fixture.componentInstance.node.set(node);
     fixture.componentInstance.sample = sample;
-    fixture.componentInstance.pipelineName = pipelineName;
+    fixture.componentInstance.pipelineName.set(pipelineName);
     fixture.detectChanges();
     return fixture;
 }
@@ -359,7 +361,7 @@ describe('PipelineParseDefinitionComponent', () => {
             const thread = new DefinitionStateService();
             thread.captureSample('cdr.csv', 'a|b\n1|2\n');
             const fixture = await create(delimitedNode(), [], 0, thread);
-            fixture.componentInstance.pipelineName = 'cdr'; // owns `cdr_schema.toon`, so the block renders
+            fixture.componentInstance.pipelineName.set('cdr'); // owns `cdr_schema.toon`, so the block renders
             fixture.detectChanges();
             const parsers = TestBed.inject(ParsersService) as unknown as { preview: ReturnType<typeof vi.fn> };
             const table = { kind: 'table', columns: ['a', 'b'], rows: [{ a: '1' }], rowCount: 1, rejectedRows: 0 };
@@ -533,7 +535,7 @@ describe('PipelineParseDefinitionComponent', () => {
 
         it('Apply writes one schema toon per segment, THEN emits a block referencing them', async () => {
             const fixture = await create(asn1Node(), [ASN1_DEF]);
-            fixture.componentInstance.pipelineName = 'asn1_cdr';
+            fixture.componentInstance.pipelineName.set('asn1_cdr');
             fixture.detectChanges();
             editor(fixture).schemaForm!.form.patchValue({ asn1__root_type: 'CallEventRecord' });
             fixture.detectChanges();
@@ -1133,8 +1135,8 @@ describe('PipelineParseDefinitionComponent', () => {
 
         it('a hydrated schema without the raw.types marker loads as Declared', async () => {
             const fixture = await create();
-            fixture.componentInstance.pipelineName = 'cdr';
-            fixture.componentInstance.node = delimitedNode(); // new identity → the pane re-loads
+            fixture.componentInstance.pipelineName.set('cdr');
+            fixture.componentInstance.node.set(delimitedNode()); // new identity → the pane re-loads
             fixture.detectChanges();
 
             expect(pane(fixture).typesMode()).toBe('declared');
@@ -1340,7 +1342,7 @@ describe('PipelineParseDefinitionComponent', () => {
 
         it('renders the field seeded from the host target, on the Files & metadata tab', async () => {
             const fixture = await create();
-            fixture.componentInstance.filenameColumnTarget = { value: 'src_file', target: 'Warehouse' };
+            fixture.componentInstance.filenameColumnTarget.set({ value: 'src_file', target: 'Warehouse' });
             fixture.detectChanges();
             const input = fixture.nativeElement.querySelector(
                 'input[aria-label="Source filename column"]',
@@ -1351,7 +1353,7 @@ describe('PipelineParseDefinitionComponent', () => {
 
         it('emits null on a blank commit (clears the column)', async () => {
             const fixture = await create();
-            fixture.componentInstance.filenameColumnTarget = { value: 'src_file', target: 'Warehouse' };
+            fixture.componentInstance.filenameColumnTarget.set({ value: 'src_file', target: 'Warehouse' });
             fixture.detectChanges();
             const input = fixture.nativeElement.querySelector(
                 'input[aria-label="Source filename column"]',
@@ -1364,7 +1366,7 @@ describe('PipelineParseDefinitionComponent', () => {
 
         it('refuses an invalid identifier with an inline alert, and emits nothing for it', async () => {
             const fixture = await create();
-            fixture.componentInstance.filenameColumnTarget = { value: '', target: 'Warehouse' };
+            fixture.componentInstance.filenameColumnTarget.set({ value: '', target: 'Warehouse' });
             fixture.detectChanges();
             const input = fixture.nativeElement.querySelector(
                 'input[aria-label="Source filename column"]',
@@ -1379,7 +1381,7 @@ describe('PipelineParseDefinitionComponent', () => {
 
         it('emits the trimmed valid identifier and clears any prior error', async () => {
             const fixture = await create();
-            fixture.componentInstance.filenameColumnTarget = { value: '', target: 'Warehouse' };
+            fixture.componentInstance.filenameColumnTarget.set({ value: '', target: 'Warehouse' });
             fixture.detectChanges();
             const input = fixture.nativeElement.querySelector(
                 'input[aria-label="Source filename column"]',
@@ -1408,7 +1410,7 @@ describe('PipelineParseDefinitionComponent', () => {
             fixture.detectChanges();
             expect(fixture.nativeElement.textContent).not.toContain('lineage column');
 
-            fixture.componentInstance.filenameColumnTarget = { value: 'src_file', target: 'Warehouse' };
+            fixture.componentInstance.filenameColumnTarget.set({ value: 'src_file', target: 'Warehouse' });
             fixture.detectChanges();
             const text = fixture.nativeElement.textContent as string;
             expect(text).toContain('src_file');

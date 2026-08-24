@@ -20,12 +20,15 @@
                         "outputPath": "dist/gamma",
                         "index": "src/index.html",
                         "browser": "src/main.ts",
-                        "polyfills": [
-                            "zone.js"
-                        ],
+                        "polyfills": [],
                         "tsConfig": "tsconfig.app.json",
                         "inlineStyleLanguage": "scss",
-                        "allowedCommonJsDependencies": ["alasql"],
+                        "allowedCommonJsDependencies": [
+                            "alasql",
+                            "html2canvas",
+                            "svg-path-parser",
+                            "color-string"
+                        ],
                         "assets": [
                             "src/assets",
                             {
