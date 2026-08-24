@@ -4,10 +4,10 @@
 <!-- Navigation -->
 <gamma-vertical-navigation
     class="dark bg-gray-900 print:hidden"
-    [mode]="isScreenSmall ? 'over' : 'side'"
+    [mode]="isScreenSmall() ? 'over' : 'side'"
     [name]="'mainNavigation'"
     [navigation]="displayedNavigation()"
-    [opened]="!isScreenSmall"
+    [opened]="!isScreenSmall()"
 >
     <!-- Navigation header hook -->
     <ng-container gammaVerticalNavigationContentHeader>

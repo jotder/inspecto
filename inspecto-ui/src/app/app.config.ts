@@ -1,10 +1,5 @@
 import { provideHttpClient, withInterceptors, withXhr } from '@angular/common/http';
-import {
-    ApplicationConfig,
-    inject,
-    provideAppInitializer,
-    provideZonelessChangeDetection,
-} from '@angular/core';
+import { ApplicationConfig, inject, provideAppInitializer, provideZoneChangeDetection } from '@angular/core';
 import { LuxonDateAdapter } from '@angular/material-luxon-adapter';
 import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
@@ -22,10 +17,11 @@ import { mockApiInterceptor } from './inspecto/mock';
 
 export const appConfig: ApplicationConfig = {
     providers: [
-        // Zoneless change detection (Angular 21 default): signals + `markForCheck`-free async pipes
-        // schedule CD; zone.js is no longer loaded (removed from build polyfills). Timer/Rx callbacks
-        // that mutate view state must write signals or call ChangeDetectorRef explicitly.
-        provideZonelessChangeDetection(),
+        // Zone.js change detection (explicit opt-in for Angular 21). The zoneless flip was reverted:
+        // it shipped without a component-by-component audit and froze eight surfaces whose state is a
+        // plain field written from an async callback (sidebar, Connections Test, Spaces expand, …).
+        // Re-attempt it only alongside that audit — see docs/BACKLOG.md.
+        provideZoneChangeDetection({ eventCoalescing: true }),
 
         // Main HttpClient. The Personal/core edition is auth-free; the Standard edition adds OIDC via
         // the authInterceptor (W6d), which is a no-op unless SessionService.authMode === 'oidc'. Order:

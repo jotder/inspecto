@@ -103,9 +103,11 @@ export class ObjectDetailComponent implements OnInit {
         { id: 'comments', label: 'Comments' },
         { id: 'attachments', label: 'Attachments' },
     ];
-    selectedIndex = 0;
+    /** Signal, not a plain field: applyRca() sets it from a subscribe callback to jump to Comments,
+     * which zonelessly never re-rendered the tab group. Two-way `[(selectedIndex)]` writes signals. */
+    readonly selectedIndex = signal(0);
     get activeTab(): TabKey {
-        return this.tabs[this.selectedIndex].id;
+        return this.tabs[this.selectedIndex()].id;
     }
 
     readonly comments = signal<ObjectNote[]>([]);
@@ -357,7 +359,7 @@ export class ObjectDetailComponent implements OnInit {
         this.api.applyRca(this.id(), { sections }).subscribe({
             next: () => {
                 this.toastr.success('RCA skeleton added to comments');
-                this.selectedIndex = this.tabs.findIndex((t) => t.id === 'comments');
+                this.selectedIndex.set(this.tabs.findIndex((t) => t.id === 'comments'));
                 this.loadComments();
             },
             error: (e) => this.toastr.error(apiErrorMessage(e, 'Could not apply RCA')),

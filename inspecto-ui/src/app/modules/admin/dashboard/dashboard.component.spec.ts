@@ -82,7 +82,7 @@ describe('DashboardComponent', () => {
 
     it('hides the acquisition summary when the metrics call 404s', () => {
         const c = create().componentInstance;
-        expect(c.acqCards).toEqual([]);
+        expect(c.acqCards()).toEqual([]);
     });
 
     it('degrades gracefully and toasts when every core call fails', () => {

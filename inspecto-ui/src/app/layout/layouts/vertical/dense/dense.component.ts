@@ -37,8 +37,11 @@ import { Subject, takeUntil } from 'rxjs';
     ],
 })
 export class DenseLayoutComponent implements OnInit, OnDestroy {
-    isScreenSmall: boolean;
-    navigation: Navigation;
+    /** Signals, not plain fields: both are written from async subscriptions (media watcher /
+     * navigation$) which mark no view dirty zonelessly. As a field, `navigation` left the whole
+     * sidebar tree rendering empty until an unrelated change happened to tick CD. */
+    readonly isScreenSmall = signal(false);
+    readonly navigation = signal<Navigation | null>(null);
     readonly navigationAppearance = signal<'default' | 'dense'>('dense');
     /** Active-space branding — the dense header shows the logo only. */
     protected readonly branding = inject(BrandingService);
@@ -78,7 +81,7 @@ export class DenseLayoutComponent implements OnInit, OnDestroy {
         this._navigationService.navigation$
             .pipe(takeUntil(this._unsubscribeAll))
             .subscribe((navigation: Navigation) => {
-                this.navigation = navigation;
+                this.navigation.set(navigation);
             });
 
         // Subscribe to media changes
@@ -86,10 +89,10 @@ export class DenseLayoutComponent implements OnInit, OnDestroy {
             .pipe(takeUntil(this._unsubscribeAll))
             .subscribe(({ matchingAliases }) => {
                 // Check if the screen is small
-                this.isScreenSmall = !matchingAliases.includes('md');
+                this.isScreenSmall.set(!matchingAliases.includes('md'));
 
                 // Change the navigation appearance
-                this.navigationAppearance.set(this.isScreenSmall ? 'default' : 'dense');
+                this.navigationAppearance.set(this.isScreenSmall() ? 'default' : 'dense');
             });
     }
 

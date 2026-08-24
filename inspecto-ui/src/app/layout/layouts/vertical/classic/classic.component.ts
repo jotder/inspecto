@@ -62,7 +62,10 @@ import { Subject, takeUntil } from 'rxjs';
     ],
 })
 export class ClassicLayoutComponent implements OnInit, OnDestroy {
-    isScreenSmall: boolean;
+    /** Signal, not a plain field: it is written from the async `onMediaChange$` subscription, which
+     * zonelessly marks no view dirty — as a field the sidebar's `[opened]`/`[mode]` bindings never
+     * re-evaluated, so the nav stayed collapsed after a resize until some unrelated click ticked CD. */
+    readonly isScreenSmall = signal(false);
     navigation: Navigation;
     /** Navigation actually rendered in the sidebar — the full tree, or flattened search results. */
     readonly displayedNavigation = signal<GammaNavigationItem[]>([]);
@@ -144,7 +147,7 @@ export class ClassicLayoutComponent implements OnInit, OnDestroy {
             .pipe(takeUntil(this._unsubscribeAll))
             .subscribe(({ matchingAliases }) => {
                 // Check if the screen is small
-                this.isScreenSmall = !matchingAliases.includes('md');
+                this.isScreenSmall.set(!matchingAliases.includes('md'));
             });
     }
 

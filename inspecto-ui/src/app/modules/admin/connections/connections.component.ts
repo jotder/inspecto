@@ -54,8 +54,12 @@ export class ConnectionsComponent implements OnInit {
 
     readonly connections = signal<ConnectionProfile[]>([]);
     readonly loading = signal(false);
-    testing: Record<string, boolean> = {};
-    results: Record<string, ConnectionTestResult> = {};
+    /** Signals, not plain Records: both are written from the `test()` subscribe callback, which marks
+     * no view dirty zonelessly — as fields the button stayed disabled forever and the health badge
+     * never left "Untested", even though the request had come back. Replaced wholesale so the
+     * signal actually notifies (mutating a held object would not). */
+    readonly testing = signal<Record<string, boolean>>({});
+    readonly results = signal<Record<string, ConnectionTestResult>>({});
     /** Flipped true once a mutate (create/update/delete) returns 503 — hides the mutate actions. */
     readonly writesDisabled = signal(false);
     /** Free-text filter over id / connector / host / database / base path / username / options. */
@@ -81,11 +85,11 @@ export class ConnectionsComponent implements OnInit {
     }
 
     test(id: string): void {
-        this.testing[id] = true;
+        this.testing.update((t) => ({ ...t, [id]: true }));
         this.api.test(id).subscribe({
             next: (r) => {
-                this.testing[id] = false;
-                this.results[id] = r;
+                this.testing.update((t) => ({ ...t, [id]: false }));
+                this.results.update((rs) => ({ ...rs, [id]: r }));
                 if (r.reachable) {
                     this.toastr.success(`${id}: reachable${r.latencyMs != null ? ` (${r.latencyMs} ms)` : ''}`);
                 } else {
@@ -93,7 +97,7 @@ export class ConnectionsComponent implements OnInit {
                 }
             },
             error: (e) => {
-                this.testing[id] = false;
+                this.testing.update((t) => ({ ...t, [id]: false }));
                 this.toastr.warning(apiErrorMessage(e, `Test failed for ${id}`));
             },
         });
@@ -141,12 +145,12 @@ export class ConnectionsComponent implements OnInit {
 
     /** Status token (drives the card health chip) from the last test result, or UNTESTED. */
     healthValue(c: ConnectionProfile): string {
-        const r = this.results[c.id];
+        const r = this.results()[c.id];
         return r ? (r.reachable ? 'REACHABLE' : 'UNREACHABLE') : 'UNTESTED';
     }
 
     healthLabel(c: ConnectionProfile): string {
-        const r = this.results[c.id];
+        const r = this.results()[c.id];
         return r ? (r.reachable ? 'Reachable' : 'Unreachable') : 'Untested';
     }
 

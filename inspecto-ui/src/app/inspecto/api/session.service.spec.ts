@@ -16,7 +16,18 @@ describe('SessionService (W6d edition switch)', () => {
     beforeEach(() => {
         sessionStorage.clear();
         TestBed.configureTestingModule({
-            providers: [SessionService, provideHttpClient(withXhr()), provideHttpClientTesting(), provideRouter([])],
+            providers: [
+                SessionService,
+                provideHttpClient(withXhr()),
+                provideHttpClientTesting(),
+                // logout() and the mock sign-in fire `router.navigate(...)` without awaiting it. An empty
+                // route table rejects those with NG04002, which zone.js used to swallow — zoneless, they
+                // escape as unhandled rejections and fail the run. Register what the service navigates to.
+                provideRouter([
+                    { path: 'sign-in', loadChildren: () => Promise.resolve([]) },
+                    { path: 'auth/callback', loadChildren: () => Promise.resolve([]) },
+                ]),
+            ],
         });
         svc = TestBed.inject(SessionService);
         httpMock = TestBed.inject(HttpTestingController);

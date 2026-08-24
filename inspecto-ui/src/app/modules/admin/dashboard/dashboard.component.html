@@ -80,7 +80,7 @@
             </div>
         }
 
-        @if (acqCards.length) {
+        @if (acqCards().length) {
             <!-- Data acquisition summary -->
             <div class="bg-card rounded-2xl p-6 shadow">
                 <div class="mb-4 flex items-center justify-between">
@@ -90,7 +90,7 @@
                     >
                 </div>
                 <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                    @for (c of acqCards; track c.label) {
+                    @for (c of acqCards(); track c.label) {
                         <div>
                             <div class="text-secondary text-sm">{{ c.label }}</div>
                             <div class="mt-1 text-2xl font-bold tracking-tight">{{ c.value }}</div>

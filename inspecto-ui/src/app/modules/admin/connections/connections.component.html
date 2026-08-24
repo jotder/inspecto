@@ -81,8 +81,8 @@
                         }
                     </div>
                     <div class="flex flex-wrap items-center gap-1">
-                        <button mat-flat-button color="primary" (click)="test(c.id)" [disabled]="testing[c.id]">
-                            @if (testing[c.id]) {
+                        <button mat-flat-button color="primary" (click)="test(c.id)" [disabled]="testing()[c.id]">
+                            @if (testing()[c.id]) {
                                 <mat-spinner diameter="16" class="mr-2"></mat-spinner>
                             }
                             Test
@@ -134,7 +134,7 @@
                 </div>
 
                 <!-- Test result -->
-                @if (results[c.id]; as r) {
+                @if (results()[c.id]; as r) {
                     <inspecto-alert
                         class="mt-4 block"
                         [variant]="r.reachable ? 'success' : 'error'"

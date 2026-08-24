@@ -45,8 +45,11 @@ export class SpacesComponent implements OnInit {
     readonly loading = signal(false);
     /** Per-space data-source expansion state + lazily-loaded ids. */
     expanded: Record<string, boolean> = {};
-    dataSources: Record<string, string[]> = {};
-    dsLoading: Record<string, boolean> = {};
+    /** Signals, not plain Records: both are written from the dataSources() subscribe callback,
+     * which marks no view dirty zonelessly — the expand spinner span forever. Replaced wholesale
+     * so the signal notifies (mutating a held object would not). */
+    readonly dataSources = signal<Record<string, string[]>>({});
+    readonly dsLoading = signal<Record<string, boolean>>({});
 
     ngOnInit(): void {
         this.reload();
@@ -159,20 +162,20 @@ export class SpacesComponent implements OnInit {
 
     toggleDataSources(s: Space): void {
         this.expanded[s.id] = !this.expanded[s.id];
-        if (this.expanded[s.id] && this.dataSources[s.id] === undefined) this.loadDataSources(s.id);
+        if (this.expanded[s.id] && this.dataSources()[s.id] === undefined) this.loadDataSources(s.id);
     }
 
     private loadDataSources(id: string, force = false): void {
-        if (this.dsLoading[id]) return;
-        if (!force && this.dataSources[id] !== undefined) return;
-        this.dsLoading[id] = true;
+        if (this.dsLoading()[id]) return;
+        if (!force && this.dataSources()[id] !== undefined) return;
+        this.dsLoading.update((l) => ({ ...l, [id]: true }));
         this.spaces.dataSources(id).subscribe({
             next: (ds) => {
-                this.dataSources[id] = ds;
-                this.dsLoading[id] = false;
+                this.dataSources.update((d) => ({ ...d, [id]: ds }));
+                this.dsLoading.update((l) => ({ ...l, [id]: false }));
             },
             error: (e) => {
-                this.dsLoading[id] = false;
+                this.dsLoading.update((l) => ({ ...l, [id]: false }));
                 this.toastr.warning(apiErrorMessage(e, `Could not load data sources for "${id}".`));
             },
         });

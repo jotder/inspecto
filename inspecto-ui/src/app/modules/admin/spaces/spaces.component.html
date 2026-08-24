@@ -156,11 +156,11 @@
                     @if (expanded[s.id]) {
                         <div class="mt-4 border-t pt-3">
                             <div class="text-secondary mb-2 text-sm font-medium">Data sources</div>
-                            @if (dsLoading[s.id]) {
+                            @if (dsLoading()[s.id]) {
                                 <div class="flex items-center gap-2 text-sm">
                                     <mat-spinner diameter="16"></mat-spinner> Loading…
                                 </div>
-                            } @else if ((dataSources[s.id]?.length ?? 0) === 0) {
+                            } @else if ((dataSources()[s.id]?.length ?? 0) === 0) {
                                 <inspecto-empty-state
                                     icon="heroicons_outline:circle-stack"
                                     title="No data sources"
@@ -168,7 +168,7 @@
                                 ></inspecto-empty-state>
                             } @else {
                                 <div class="flex flex-col gap-1">
-                                    @for (ds of dataSources[s.id]; track ds) {
+                                    @for (ds of dataSources()[s.id]; track ds) {
                                         <div
                                             class="flex items-center justify-between rounded bg-gray-100 px-2 py-1 text-sm dark:bg-gray-700"
                                         >

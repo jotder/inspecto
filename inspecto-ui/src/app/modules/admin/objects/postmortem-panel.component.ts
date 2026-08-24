@@ -91,7 +91,10 @@ export class PostmortemPanelComponent {
     /** The object changed on the server (postmortem saved) — the shell reloads. */
     readonly changed = output<void>();
 
-    saving = false;
+    /** Signal, not a plain field: it is cleared inside the save subscribe callbacks. Zonelessly the
+     * `changed.emit()` alongside marks the PARENT dirty, never this OnPush child — as a field the
+     * Save button stayed disabled forever after a successful save. */
+    readonly saving = signal(false);
 
     readonly form = this.fb.group({
         commander: [''],
@@ -296,16 +299,16 @@ export class PostmortemPanelComponent {
             causeAnalysis: (v.causeAnalysis as { why: string }[]).map((w) => w.why),
             actions: (v.actions as PostmortemAction[]).filter((a) => a.text),
         };
-        this.saving = true;
+        this.saving.set(true);
         this.api.update(this.object().id, { attributes: { postmortem: JSON.stringify(p) } }).subscribe({
             next: () => {
-                this.saving = false;
+                this.saving.set(false);
                 this.form.markAsPristine();
                 this.toastr.success('Postmortem saved');
                 this.changed.emit();
             },
             error: (e) => {
-                this.saving = false;
+                this.saving.set(false);
                 this.toastr.error(apiErrorMessage(e, 'Save failed'));
             },
         });
@@ -322,7 +325,7 @@ export class PostmortemPanelComponent {
             .map((t) => t.trim())
             .filter(Boolean)
             .join(',');
-        this.saving = true;
+        this.saving.set(true);
         this.api
             .update(this.object().id, {
                 attributes: {
@@ -337,14 +340,14 @@ export class PostmortemPanelComponent {
             })
             .subscribe({
                 next: () => {
-                    this.saving = false;
+                    this.saving.set(false);
                     this.teamForm.markAsPristine();
                     schema?.form.markAsPristine(); // the values are already in place — just clear dirtiness
                     this.toastr.success('Findings saved');
                     this.changed.emit();
                 },
                 error: (e) => {
-                    this.saving = false;
+                    this.saving.set(false);
                     this.toastr.error(apiErrorMessage(e, 'Save failed'));
                 },
             });

@@ -33,11 +33,13 @@ describe('TemplateGalleryComponent', () => {
     }) {
         const toastr = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() };
         const dialog = { open: vi.fn(() => ({ afterClosed: () => of(over.dialogResult) })) };
-        const router = { navigate: vi.fn() };
         TestBed.configureTestingModule({
             imports: [TemplateGalleryComponent],
             providers: [
-                provideRouter([]),
+                // applyTemplate() fires `router.navigate(['/studio/dashboards', id])` without awaiting it.
+                // An empty route table rejects that with NG04002 — swallowed under zone.js, but an unhandled
+                // rejection (and a red run) once zoneless. Register the route it actually navigates to.
+                provideRouter([{ path: 'studio/dashboards/:id', loadChildren: () => Promise.resolve([]) }]),
                 provideNoopAnimations(),
                 {
                     provide: BiTemplatesService,
@@ -51,10 +53,9 @@ describe('TemplateGalleryComponent', () => {
                 { provide: ToastrService, useValue: toastr },
             ],
         });
-        // Router is provided via provideRouter; override navigate spy through the component after create.
         const fixture = TestBed.createComponent(TemplateGalleryComponent);
         fixture.detectChanges();
-        return { fixture, toastr, dialog, router };
+        return { fixture, toastr, dialog };
     }
 
     it('lists templates as cards with a component summary (and passes axe)', async () => {

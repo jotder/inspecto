@@ -115,7 +115,7 @@
                     <button
                         mat-flat-button
                         color="primary"
-                        [disabled]="saving || !findingsDirty"
+                        [disabled]="saving() || !findingsDirty"
                         (click)="saveFindings()"
                     >
                         Save findings
@@ -289,7 +289,7 @@
                 </section>
 
                 <div class="flex justify-end">
-                    <button mat-flat-button color="primary" [disabled]="saving || form.pristine" (click)="save()">
+                    <button mat-flat-button color="primary" [disabled]="saving() || form.pristine" (click)="save()">
                         Save postmortem
                     </button>
                 </div>

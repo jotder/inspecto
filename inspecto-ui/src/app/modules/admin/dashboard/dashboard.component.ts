@@ -74,7 +74,9 @@ export class DashboardComponent implements OnInit {
     readonly outcomeData = signal<ChartData | null>(null);
 
     /** Compact acquisition KPIs (empty when the deployment has no acquisition activity). */
-    acqCards: { label: string; value: string }[] = [];
+    /** Signal, not a plain field: written from its OWN independent subscribe, which touches no other
+     * signal — zonelessly the acquisition row was a race that usually never rendered. */
+    readonly acqCards = signal<{ label: string; value: string }[]>([]);
     /** Newest few events for the activity feed (GET /events/search?limit=8). */
     readonly recentEvents = signal<EventRow[]>([]);
 
@@ -157,7 +159,7 @@ export class DashboardComponent implements OnInit {
         // deployment without these engines) degrades gracefully rather than breaking the dashboard.
         this.acqApi.get().subscribe({
             next: (m) => this.buildAcq(m),
-            error: () => (this.acqCards = []),
+            error: () => this.acqCards.set([]),
         });
         this.eventsApi.search({ limit: 8 }).subscribe({
             next: (e) => this.recentEvents.set(e),
@@ -179,15 +181,15 @@ export class DashboardComponent implements OnInit {
         const failed = this.total(m, 'inspecto_downloads_failed_total');
         const bytes = this.total(m, 'inspecto_bytes_transferred_total');
         if (discovered + downloaded + failed + bytes === 0) {
-            this.acqCards = []; // no acquisition activity — hide the row
+            this.acqCards.set([]); // no acquisition activity — hide the row
             return;
         }
-        this.acqCards = [
+        this.acqCards.set([
             { label: 'Files discovered', value: fmtInt(discovered) },
             { label: 'Files downloaded', value: fmtInt(downloaded) },
             { label: 'Downloads failed', value: fmtInt(failed) },
             { label: 'Bytes transferred', value: fmtBytes(bytes) },
-        ];
+        ]);
     }
 
     /** Short clock time for the activity feed. */

@@ -90,7 +90,9 @@ export class EventsComponent implements OnInit, OnDestroy {
 
     // ── filter toolbar ─────────────────────────────────────────────────────────
     fLevel = '';
-    fType = '';
+    /** Signal, not a plain field: openDetail()'s afterClosed() callback pivots it by type, which
+     * zonelessly left the <mat-select> showing the OLD value while the list filtered by the new. */
+    readonly fType = signal('');
     fPipeline = '';
     fq = '';
     fLimit = 100;
@@ -172,7 +174,7 @@ export class EventsComponent implements OnInit, OnDestroy {
     private buildFilter(): EventFilter {
         return {
             level: this.fLevel || undefined,
-            type: this.fType || undefined,
+            type: this.fType() || undefined,
             pipeline: this.fPipeline.trim() || undefined,
             correlationId: this.fCorrelation() || undefined,
             q: this.fq.trim() || undefined,
@@ -219,7 +221,7 @@ export class EventsComponent implements OnInit, OnDestroy {
 
     resetFilters(): void {
         this.fLevel = '';
-        this.fType = '';
+        this.fType.set('');
         this.fPipeline = '';
         this.fq = '';
         this.fLimit = 100;
@@ -252,7 +254,7 @@ export class EventsComponent implements OnInit, OnDestroy {
             .subscribe((d?: EventDrilldown) => {
                 if (!d) return;
                 if (d.correlationId) this.fCorrelation.set(d.correlationId);
-                if (d.type) this.fType = d.type;
+                if (d.type) this.fType.set(d.type);
                 this.load();
             });
     }
@@ -287,7 +289,7 @@ export class EventsComponent implements OnInit, OnDestroy {
         if (!v) return;
         const f = v.filters ?? {};
         this.fLevel = f['level'] ?? '';
-        this.fType = f['type'] ?? '';
+        this.fType.set(f['type'] ?? '');
         this.fPipeline = f['pipeline'] ?? '';
         this.fCorrelation.set(f['correlationId'] ?? '');
         this.fq = f['q'] ?? '';
