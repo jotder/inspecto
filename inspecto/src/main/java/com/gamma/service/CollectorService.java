@@ -385,6 +385,13 @@ public final class CollectorService implements AutoCloseable {
         // the teardown double-close (JobService + unregister) is free.
         com.gamma.pipeline.exec.DbProvenanceStore provenanceStore = ServiceStores.openProvenanceStore(root);
         com.gamma.pipeline.exec.ProvenanceStores.register(spaceId, provenanceStore);
+        // Server-mode fleet factor for the oversubscription warning (scheduler-system-config S5):
+        // ConfigValidator sits below the engine, so the broker's live system Consignment cap is
+        // handed to it as a supplier. Idempotent across spaces — the broker is process-wide, so
+        // every CollectorService installs the same fact. The CLI orchestrator never runs this ctor
+        // and keeps its -Dsources.max check.
+        com.gamma.etl.ConfigValidator.fleetConsignmentCap(
+                () -> com.gamma.inspector.ConcurrencyBroker.shared().systemCap());
         this.registry          = new CopyOnWriteArrayList<>(registry);
         this.pollSeconds       = Math.max(1, pollSeconds);
         this.maxConcurrentRuns = Math.max(1, maxConcurrentRuns);

@@ -9,8 +9,16 @@
 > per-pipeline `intake__*` + `priority` on the sink node (lift/lower + mock mirror + name-contract
 > rows). Tests: ConcurrencyBrokerTest (5 Part-B gates) · PipelineConfigPriorityTest ·
 > ControlApiSchedulerSettingsTest · regenerated NodeAttributes/StepTypes contracts.
-> **Still open:** S5 (the oversubscription validator still reads `-Dsources.max` — the etl module
-> cannot see the broker; needs a control-plane-side check or a published property), the poll-cadence
+> **S5 CLOSED 2026-08-25 (same day):** `ConfigValidator.fleetConsignmentCap(IntSupplier)` — the etl
+> module takes the fleet factor as an installed supplier (it sits below the engine, so it cannot read
+> the broker; a supplier keeps the check live against a hot-tuned cap without inverting the
+> dependency). `CollectorService`'s ctor installs `ConcurrencyBroker.shared()::systemCap`; the CLI
+> installs nothing and keeps its `-Dsources.max` check. New warning: `cap × duckdb_threads > cores`
+> (the cap counts Consignments fleet-wide, so `threads` does not multiply beyond it; auto
+> `duckdb_threads=0` is excluded — it divides cores per pipeline and cannot be summed from one
+> config). Pinned by `ConfigValidatorTest.oversubscriptionWarningUsesTheInstalledFleetConsignmentCap`
+> including the silent-when-uninstalled arm.
+> **Still open:** the poll-cadence
 > hot-apply (`poll_seconds` still boot-only; the two `ScheduledFuture`s are still discarded),
 > `IntakeGovernor` *globals* through the settings doc (per-pipeline overrides are UI-editable, the
 > `-Dingest.*` fleet defaults are not), ingest `runPermits` retirement (left in place, now redundant

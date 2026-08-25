@@ -98,6 +98,34 @@ class ConfigValidatorTest {
         }
     }
 
+    /** S5 (scheduler-system-config plan): in server mode the fleet factor is the broker's system
+     *  Consignment cap, handed in as a supplier — the warning must fire at a cap the CLI's
+     *  {@code -Dsources.max} never set, and must stay silent when no cap is installed. */
+    @Test
+    void oversubscriptionWarningUsesTheInstalledFleetConsignmentCap(@TempDir Path dir) throws Exception {
+        Path schema = writeMinimalSchema(dir);
+        Path pipeline = dir.resolve("pipeline.toon");
+        Files.writeString(pipeline, basePipeline(dir, schema.toString().replace("\\", "/"))
+                .replace("threads: 1", "threads: 1\n  duckdb_threads: 64"));
+        PipelineConfig cfg = PipelineConfig.load(pipeline.toString());
+
+        // No supplier installed (the CLI / default posture): the fleet-cap warning must not fire.
+        ConfigValidator.fleetConsignmentCap(null);
+        assertTrue(ConfigValidator.validate(cfg).stream().noneMatch(w -> w.contains("scheduler cap")),
+                "No fleet cap installed — the S5 warning must stay silent");
+
+        // Server posture: the hosting service installs the broker's live cap. 64 duckdb threads per
+        // consignment × a cap of 1024 always exceeds any test host's cores.
+        ConfigValidator.fleetConsignmentCap(() -> 1024);
+        try {
+            List<String> warnings = ConfigValidator.validate(cfg);
+            assertTrue(warnings.stream().anyMatch(w -> w.contains("scheduler cap 1024") && w.contains("oversubscribe")),
+                    "Expected the fleet-cap oversubscription warning. Got: " + warnings);
+        } finally {
+            ConfigValidator.fleetConsignmentCap(null);
+        }
+    }
+
     @Test
     void warnsAutoDuckdbThreadsBlindSpotUnderMultiSource(@TempDir Path dir) throws Exception {
         // duckdb_threads unset → 0 (auto). The auto cap (cores ÷ threads) ignores sources.max,

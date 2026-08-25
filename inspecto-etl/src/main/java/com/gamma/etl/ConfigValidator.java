@@ -20,8 +20,10 @@ import java.util.List;
  *   <li>Marker retention shorter than 1 day on a non-trivial pipeline.</li>
  *   <li>{@code threads} set to a value that's inconsistent with batch caps.</li>
  *   <li>CPU oversubscription — {@code sources.max × threads × duckdb_threads}
- *       exceeding the core count (explicit cap), or the auto cap's multi-source
- *       blind spot ({@code duckdb_threads=0} ignores {@code sources.max}).</li>
+ *       exceeding the core count (explicit cap), the auto cap's multi-source
+ *       blind spot ({@code duckdb_threads=0} ignores {@code sources.max}), or in
+ *       server mode the installed fleet Consignment cap × {@code duckdb_threads}
+ *       exceeding cores ({@link #fleetConsignmentCap}).</li>
  *   <li>Plugin path with an empty {@code ingester_config} where a known-binary
  *       ingester class lives.</li>
  * </ul>
@@ -32,6 +34,20 @@ import java.util.List;
 public final class ConfigValidator {
 
     private static final Logger log = LoggerFactory.getLogger(ConfigValidator.class);
+
+    /**
+     * The fleet-wide concurrent-Consignment cap in force, or {@code 0} when none applies — installed
+     * by the hosting service at boot (scheduler-system-config plan S5). This module sits below the
+     * engine, so it cannot read {@code ConcurrencyBroker} directly; a supplier keeps the check live
+     * against a hot-tuned cap without inverting the dependency. The CLI orchestrator does not install
+     * one — its fleet factor stays {@code -Dsources.max}, checked separately below.
+     */
+    private static volatile java.util.function.IntSupplier fleetConsignmentCap = () -> 0;
+
+    /** Install (or, with {@code null}, reset) the server-mode fleet cap supplier. */
+    public static void fleetConsignmentCap(java.util.function.IntSupplier supplier) {
+        fleetConsignmentCap = (supplier != null) ? supplier : () -> 0;
+    }
 
     private ConfigValidator() {}
 
@@ -115,6 +131,21 @@ public final class ConfigValidator {
                     "cap (cores ÷ threads) ignores sources.max, so " + srcFactor + " concurrent sources × " +
                     cfg.processing().threads() + " batch(es) can still oversubscribe the CPU. Set " +
                     "processing.duckdb_threads ≈ " + suggested + " (cores ÷ (sources.max × threads)) or lower sources.max.");
+        }
+
+        // (c) Server-mode fleet pressure (scheduler-system-config plan S5): with the broker's
+        // system Consignment cap in force, the fleet's worker ceiling is cap × duckdb_threads —
+        // the cap counts CONSIGNMENTS across every space and pipeline, so threads does not
+        // multiply beyond it. Only meaningful with an explicit positive duckdb_threads (the auto
+        // default divides cores per pipeline and cannot be summed across the fleet from here).
+        int fleetCap = fleetConsignmentCap.getAsInt();
+        if (fleetCap > 0 && cfg.processing().duckdbThreads() > 0
+                && fleetCap * cfg.processing().duckdbThreads() > cores) {
+            warn(warnings, "scheduler cap " + fleetCap + " × processing.duckdb_threads("
+                    + cfg.processing().duckdbThreads() + ") = " + (fleetCap * cfg.processing().duckdbThreads())
+                    + " exceeds available cores (" + cores + ") — the fleet can oversubscribe the CPU. "
+                    + "Lower the server-wide Consignment cap (Settings ▸ Scheduler) or duckdb_threads "
+                    + "so the product is ≈ cores.");
         }
 
         // Native DuckDB CSV engine forced on a config that strips phantom trailing
