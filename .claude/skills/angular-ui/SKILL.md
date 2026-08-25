@@ -551,6 +551,13 @@ src/app/
 - **Global `errorInterceptor`:** **`status 0`** → `ConnectivityService.reportUnreachable()` (drives the
   persistent banner) — **do not** add a per-screen "unreachable" toast. Any success → `reportReachable()`.
   **`503` is per-screen** (e.g. assist disabled), NOT backend-down. (No 401 handling — the app is auth-free.)
+  ⚠ **A 503 from an optional-module route is an EXPECTED deployment state, never an error toast** —
+  latch it into an explained in-place `<inspecto-alert>` (reference: the Approvals Inbox, fixed
+  2026-08-26 after shipping as a red "Failed to load approvals" toast that taught operators something
+  was broken when nothing was); only OTHER failures toast, via `apiErrorMessage`. When the explained
+  state replaces a grid, use `@if/@else` — **an empty ag-grid left mounted (`[class.hidden]`) fails
+  axe `aria-required-children`** (gate-caught on that same fix); keep-mounted is only for surfaces a
+  ViewChild must survive (the R9 tab-panel rule).
 - **Shell layout:** `layout.component` is a flex **column**; the `<inspecto-connectivity-banner>` is its first
   child and is `display:contents` (consumes no space when hidden, stacks full-width on top when shown). Don't
   give layout-level siblings a growing `flex` or they'll steal width from the content column.
