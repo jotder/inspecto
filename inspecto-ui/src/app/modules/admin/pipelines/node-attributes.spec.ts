@@ -107,12 +107,16 @@ describe('node-attributes', () => {
      */
     it('authors the collector block from the SAME shared table Onboarding uses, plus the marker keys', () => {
         const acq = nodeAttributesFor('acquisition')!;
+        // Shared block + the borrowed marker keys + the trigger cadence keys (top-level `trigger:`
+        // map, borrowed like the marker keys — NOT part of the collector block).
         const shared = [...COLLECTOR_ATTRIBUTES, ...MARKER_DEDUP_ATTRIBUTES];
-        expect(acq).toHaveLength(shared.length);
+        expect(acq).toHaveLength(shared.length + 2);
         shared.forEach((spec, i) => expect(acq[i]).toBe(spec));
-        // ⚠ and the marker keys stay OUT of the block table itself — Onboarding's Collection stage
-        // renders that one whole, and these four are not `collector:` keys.
+        expect(acq.slice(shared.length).map((s) => s.key)).toEqual(['trigger__every', 'trigger__cron']);
+        // ⚠ and the marker + trigger keys stay OUT of the block table itself — Onboarding's Collection
+        // stage renders that one whole, and these are not `collector:` keys.
         expect(COLLECTOR_ATTRIBUTES.map((s) => s.key)).not.toContain('duplicate_check');
+        expect(COLLECTOR_ATTRIBUTES.map((s) => s.key)).not.toContain('trigger__every');
     });
 
     /**

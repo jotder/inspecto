@@ -119,6 +119,26 @@ export const COLLECTOR_ATTRIBUTES: AttributeSpec[] = [
         tier: 'advanced',
         help: 'Target directory when "After success" is Move.',
     },
+    // Fetch concurrency (collector.fetch.*, RemoteAcquisitionHandler): within-pipeline download
+    // parallelism — each worker gets its own connector session from a bounded pool. Fleet-level
+    // acquisition concurrency stays -Dacquire.maxConcurrent.
+    {
+        key: 'fetch__parallel_fetch',
+        label: 'Parallel downloads',
+        type: 'number',
+        tier: 'advanced',
+        min: 1,
+        max: 64,
+        help: "Remote Collectors only — a local inbox has nothing to download (files are pushed in by the producer). Files this pipeline downloads concurrently in one acquisition, each on its own connector session. Blank = 1 (sequential). The next acquisition starts on the following acquire tick, so fetching stays continuous.",
+    },
+    {
+        key: 'fetch__rate_limit',
+        label: 'Download rate limit',
+        type: 'string',
+        tier: 'advanced',
+        placeholder: '10MB/s',
+        help: "Remote Collectors only. Cap this pipeline's download bandwidth — a rate like 512KB/s, 10MB/s, or a bare number (bytes/s). Blank = unlimited.",
+    },
 ];
 
 /**

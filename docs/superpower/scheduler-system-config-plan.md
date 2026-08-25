@@ -28,6 +28,22 @@
 > default (a cap-only PUT destroying a stored cadence was caught in review before it shipped, and
 > the same wipe existed in the mock). UI: two cadence fields on Settings ▸ Scheduler (blank =
 > inherit); mock mirrors merge/clear/bounds atomically.
+> **Intake globals CLOSED 2026-08-25 (same day):** `IntakeGovernor.setGlobalPolicy` (volatile policy;
+> a CHANGED policy clears every learned cap — the `configure()` rule at fleet grain; per-pipeline
+> overrides re-resolve against the new globals on their next cycle). Persisted as optional
+> `intake_*` keys in the SYSTEM `scheduler.toon`, merged per key on `PUT /system/scheduler`
+> (explicit `null` = clear + live revert to `-Dingest.*`), served with stored + effective values +
+> `intakeSource`; three fields on Settings ▸ Scheduler (adaptive = option-picker with the
+> blank-valued "Inherit" choice); mock mirrors bounds/merge/clear atomically.
+> **Per-pipeline cadence + fetch parallelism EXPOSED 2026-08-25 (operator ask):** both engine
+> capabilities already existed — `trigger: {every|cron}` (T13, `PipelineScheduler.dueThisTick`; the
+> space poll tick is the resolution floor) and `collector.fetch.parallel_fetch` (bounded
+> connector-session pool in `RemoteAcquisitionHandler`, default 1 = sequential; acquisition is
+> already continuous — its own timer, per-pipeline guard, fetch overlaps ingest). What was missing
+> was the authoring surface: `trigger__every`/`trigger__cron` (a new `NodeAttributes.TRIGGER` list
+> on the acquisition node — NOT collector-block keys) and `fetch__parallel_fetch`/`fetch__rate_limit`
+> (in the shared collector table, both sides), contracts regenerated, four new
+> `NodeConfigNameContractTest` rows prove each key lands on the engine field that reads it.
 > **Still open:**
 > `IntakeGovernor` *globals* through the settings doc (per-pipeline overrides are UI-editable, the
 > `-Dingest.*` fleet defaults are not), ingest `runPermits` retirement (left in place, now redundant

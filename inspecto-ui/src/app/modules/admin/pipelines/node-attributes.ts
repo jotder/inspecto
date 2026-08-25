@@ -82,11 +82,35 @@ import {
 // authors, so it is the shared `OUTPUT_ATTRIBUTES` (component-model) — W4a collapsed the local
 // `SINK_ATTRIBUTES` fork exactly as U-D collapsed the collector one. All three sink kinds write
 // the same block — the kind is the materialisation behaviour, not a different config shape.
+// The entry-node schedule (`trigger:`, T13 — PipelineTrigger): per-pipeline cadence, gated per tick
+// by PipelineScheduler.dueThisTick. NOT part of the `collector:` block — the trigger: map is a
+// top-level config section the acquisition node borrows (like the marker keys). Cron wins when both
+// are stated; the space's poll tick is the resolution floor for `every`. Unspecced sub-keys
+// (`type`, `coalesce`, `on`, `from`) survive a save untouched.
+const TRIGGER_ATTRIBUTES: AttributeSpec[] = [
+    {
+        key: 'trigger__every',
+        label: 'Run every',
+        type: 'string',
+        tier: 'optional',
+        placeholder: '30s',
+        help: "This pipeline's own poll cadence — 30s, 5m, 2h, 1d, or a bare number of seconds. Blank = every tick of the space's poll interval. The space poll interval is the resolution floor: a 30s pipeline needs the space tick at 30s or less.",
+    },
+    {
+        key: 'trigger__cron',
+        label: 'Run on a cron schedule',
+        type: 'string',
+        tier: 'optional',
+        placeholder: '0 0 2 * * *',
+        help: "Calendar cadence in the operations time zone (e.g. daily at 02:00). When both are stated, cron wins over 'Run every'.",
+    },
+];
+
 const NODE_ATTRIBUTES: Record<string, AttributeSpec[]> = {
     // The acquisition NODE's spec = the `collector:` block it authors + the marker-dedup keys it
     // borrows from `processing:`/`dirs:` (P5-a). Onboarding's Collection stage keeps the block table
     // alone — see MARKER_DEDUP_ATTRIBUTES for why the two are not merged.
-    acquisition: [...COLLECTOR_ATTRIBUTES, ...MARKER_DEDUP_ATTRIBUTES],
+    acquisition: [...COLLECTOR_ATTRIBUTES, ...MARKER_DEDUP_ATTRIBUTES, ...TRIGGER_ATTRIBUTES],
     // The persistent sink adds its destination to the shared output block: `database` is the one key
     // `PipelineEditable.lower` HARD-requires on the primary sink (`NO_PERSISTENT_SINK` refuses the save
     // without it), so it must be askable up front — but `required: false`, because a quarantine sink is

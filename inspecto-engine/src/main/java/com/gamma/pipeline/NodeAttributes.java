@@ -71,7 +71,17 @@ public final class NodeAttributes {
             NodeAttribute.of("stability__window", "Stability window", "string", "advanced").placeholder("5s")
                     .help("Wait for a file to stop growing before collecting it."),
             NodeAttribute.of("post_action__archive_path", "Archive path", "string", "advanced")
-                    .help("Target directory when \"After success\" is Move."));
+                    .help("Target directory when \"After success\" is Move."),
+            // Fetch concurrency (collector.fetch.*, RemoteAcquisitionHandler): how many files ONE
+            // pipeline's acquisition downloads at once — each worker gets its own connector session
+            // from a bounded pool, so this also sizes the remote-session pool. Fleet-level
+            // acquisition concurrency stays -Dacquire.maxConcurrent; this is within-pipeline.
+            NodeAttribute.of("fetch__parallel_fetch", "Parallel downloads", "number", "advanced")
+                    .min(1).max(64)
+                    .help("Remote Collectors only — a local inbox has nothing to download (files are pushed in by the producer). Files this pipeline downloads concurrently in one acquisition, each on its own connector session. Blank = 1 (sequential). The next acquisition starts on the following acquire tick, so fetching stays continuous."),
+            NodeAttribute.of("fetch__rate_limit", "Download rate limit", "string", "advanced")
+                    .placeholder("10MB/s")
+                    .help("Remote Collectors only. Cap this pipeline's download bandwidth — a rate like 512KB/s, 10MB/s, or a bare number (bytes/s). Blank = unlimited."));
 
     /**
      * Marker dedup (file-grain, → {@code processing.duplicate_check} + {@code dirs.markers}) — the
@@ -90,6 +100,23 @@ public final class NodeAttributes {
      * detail key were the switch, clearing "retention" in the form would silently disable dedup on the
      * next save. Defaults mirror the parser's ({@code PipelineConfigParser}: {@code .processed} / 90).
      */
+    /**
+     * The entry-node schedule ({@code trigger:}, T13 — {@code PipelineTrigger}): each pipeline runs
+     * on its OWN cadence, gated per tick by {@code PipelineScheduler.dueThisTick}. Like the marker
+     * keys, these are NOT part of the {@code collector:} block — the {@code trigger:} map is a
+     * top-level config section the acquisition node borrows (lift {@code PipelineEditable:426},
+     * lower {@code :649}). Cron wins when both are stated ({@code PipelineTrigger.of}); the space's
+     * poll tick is the resolution floor for {@code every}. Sub-keys with no spec here
+     * ({@code type}, {@code coalesce}, {@code on}, {@code from}) survive a save untouched.
+     */
+    public static final List<NodeAttribute> TRIGGER = List.of(
+            NodeAttribute.of("trigger__every", "Run every", "string", "optional")
+                    .placeholder("30s")
+                    .help("This pipeline's own poll cadence — 30s, 5m, 2h, 1d, or a bare number of seconds. Blank = every tick of the space's poll interval. The space poll interval is the resolution floor: a 30s pipeline needs the space tick at 30s or less."),
+            NodeAttribute.of("trigger__cron", "Run on a cron schedule", "string", "optional")
+                    .placeholder("0 0 2 * * *")
+                    .help("Calendar cadence in the operations time zone (e.g. daily at 02:00). When both are stated, cron wins over 'Run every'."));
+
     public static final List<NodeAttribute> MARKER_DEDUP = List.of(
             // ⚠ tier `required` + required(false) — the always-visible-but-optional idiom. As `optional`
             // the switch sat behind the form's disclosure, so the drawer's Duplicate handling group
@@ -110,7 +137,7 @@ public final class NodeAttributes {
     /** The {@code acquisition} node's published spec: the {@code collector:} block it authors, plus
      *  the marker-dedup keys it borrows from {@code processing:}/{@code dirs:}. */
     public static final List<NodeAttribute> ACQUISITION =
-            Stream.concat(COLLECTOR.stream(), MARKER_DEDUP.stream()).toList();
+            Stream.concat(Stream.concat(COLLECTOR.stream(), MARKER_DEDUP.stream()), TRIGGER.stream()).toList();
 
     /**
      * The {@code output:} block, shared by all three sink kinds and Onboarding's Dataset & Go-live stage —
@@ -253,7 +280,7 @@ public final class NodeAttributes {
     private static final Map<String, List<NodeAttribute>> BY_TYPE = byType();
 
     private static Map<String, List<NodeAttribute>> byType() {
-        for (List<NodeAttribute> table : List.of(COLLECTOR, MARKER_DEDUP, OUTPUT, SINK_PERSISTENT,
+        for (List<NodeAttribute> table : List.of(COLLECTOR, TRIGGER, MARKER_DEDUP, OUTPUT, SINK_PERSISTENT,
                 TRANSFORM_FILTER, TRANSFORM_ROUTE, TRANSFORM_DEDUP, TRANSFORM_SUMMARIZE, TRANSFORM_JOIN))
             for (NodeAttribute a : table) a.validate();   // whole-spec checks, once the builders are done
         Map<String, List<NodeAttribute>> m = new LinkedHashMap<>();

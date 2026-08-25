@@ -129,6 +129,21 @@
     "tier" : "advanced",
     "help" : "Target directory when \"After success\" is Move."
   }, {
+    "key" : "fetch__parallel_fetch",
+    "label" : "Parallel downloads",
+    "type" : "number",
+    "tier" : "advanced",
+    "min" : 1.0,
+    "max" : 64.0,
+    "help" : "Remote Collectors only — a local inbox has nothing to download (files are pushed in by the producer). Files this pipeline downloads concurrently in one acquisition, each on its own connector session. Blank = 1 (sequential). The next acquisition starts on the following acquire tick, so fetching stays continuous."
+  }, {
+    "key" : "fetch__rate_limit",
+    "label" : "Download rate limit",
+    "type" : "string",
+    "tier" : "advanced",
+    "help" : "Remote Collectors only. Cap this pipeline's download bandwidth — a rate like 512KB/s, 10MB/s, or a bare number (bytes/s). Blank = unlimited.",
+    "placeholder" : "10MB/s"
+  }, {
     "key" : "duplicate_check",
     "label" : "Marker dedup",
     "type" : "boolean",
@@ -156,6 +171,20 @@
     "type" : "string",
     "tier" : "advanced",
     "help" : "Where marker files land (dirs.markers); blank = the space convention."
+  }, {
+    "key" : "trigger__every",
+    "label" : "Run every",
+    "type" : "string",
+    "tier" : "optional",
+    "help" : "This pipeline's own poll cadence — 30s, 5m, 2h, 1d, or a bare number of seconds. Blank = every tick of the space's poll interval. The space poll interval is the resolution floor: a 30s pipeline needs the space tick at 30s or less.",
+    "placeholder" : "30s"
+  }, {
+    "key" : "trigger__cron",
+    "label" : "Run on a cron schedule",
+    "type" : "string",
+    "tier" : "optional",
+    "help" : "Calendar cadence in the operations time zone (e.g. daily at 02:00). When both are stated, cron wins over 'Run every'.",
+    "placeholder" : "0 0 2 * * *"
   } ]
 }, {
   "verb" : "parse",

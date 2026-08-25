@@ -69,6 +69,17 @@ class NodeConfigNameContractTest {
                         c -> c.collector().excludes(), List.of("*.tmp")),
                 new Contract("acquisition", "discovery", "discovery", "watch",
                         c -> c.collector().discovery(), "watch"),
+                // ── Fetch concurrency + per-pipeline cadence (scheduler plan follow-on). The fetch
+                // keys ride the collector: block; trigger__* nests to the top-level trigger: map the
+                // T13 loop gate reads (PipelineTrigger.of via PipelineScheduler.dueThisTick).
+                new Contract("acquisition", "fetch__parallel_fetch", "fetch.parallel_fetch", 3,
+                        c -> c.collector().fetch().parallelFetch(), 3),
+                new Contract("acquisition", "fetch__rate_limit", "fetch.rate_limit", "2MB/s",
+                        c -> c.collector().fetch().rateLimitBytesPerSec(), 2L * 1024 * 1024),
+                new Contract("acquisition", "trigger__every", "trigger.every", "30s",
+                        c -> PipelineTrigger.of(c.triggerConfig()).everyMs(), 30_000L),
+                new Contract("acquisition", "trigger__cron", "trigger.cron", "0 0 2 * * *",
+                        c -> PipelineTrigger.of(c.triggerConfig()).cron(), "0 0 2 * * *"),
                 new Contract("acquisition", "recursive_depth", "recursive_depth", 7,
                         c -> c.collector().recursiveDepth(), 7),
                 new Contract("acquisition", "guarantee", "guarantee", "EXACTLY_ONCE",
