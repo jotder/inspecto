@@ -198,6 +198,32 @@ class ControlApiSchedulerSettingsTest {
         }
     }
 
+    /** S8: the live block reports free slots and the governor's throttle state. An untouched fleet
+     *  must report an EMPTY throttled list — "nothing to see" is the useful answer, not a wall of
+     *  rows saying normal. */
+    @Test
+    void liveBlockReportsFreeSlotsAndAnEmptyThrottleListOnAnUntouchedFleet(@TempDir Path root) throws Exception {
+        ConcurrencyBroker.use(null);
+        com.gamma.acquire.IntakeGovernor.use(null);
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+
+            // Unbounded ⇒ free slots is null, never a fake 0 (which reads as "wedged").
+            JsonNode live = json(send(c.port, "GET", "/system/scheduler", null)).get("live");
+            assertTrue(live.get("system_free").isNull(), "unbounded must report null, not 0");
+            assertEquals(0, live.get("throttled").get("total").asInt());
+            assertFalse(live.get("throttled").get("truncated").asBoolean());
+
+            // Bounded ⇒ a real count of what is available right now.
+            assertEquals(200, send(c.port, "PUT", "/system/scheduler",
+                    "{\"maxConcurrentConsignments\":16}").statusCode());
+            live = json(send(c.port, "GET", "/system/scheduler", null)).get("live");
+            assertEquals(16, live.get("system_free").asInt(), "nothing in flight ⇒ every slot free");
+        } finally {
+            com.gamma.acquire.IntakeGovernor.use(null);
+        }
+    }
+
     @Test
     void configuredFilesInstallAtBootWithoutAnyRequest(@TempDir Path root) throws Exception {
         // Seed both documents on disk, then boot: caps + intake globals must be live before any HTTP call.

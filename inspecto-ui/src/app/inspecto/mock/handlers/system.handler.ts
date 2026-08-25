@@ -86,8 +86,13 @@ export function systemHandler(flags: MockFlags): MockHandler {
                     live: {
                         system_cap: systemCap ?? 0,
                         system_in_flight: 0,
+                        // Unbounded ⇒ null, never a fake 0 (mirrors ConcurrencyBroker.snapshot).
+                        system_free: systemCap != null && systemCap > 0 ? systemCap : null,
                         space_in_flight: {},
                         pipelines: {},
+                        // Offline there is no governor, so the honest answer is "nothing throttled" —
+                        // never invented activity.
+                        throttled: { pipelines: [], total: 0, truncated: false },
                     },
                 };
             };

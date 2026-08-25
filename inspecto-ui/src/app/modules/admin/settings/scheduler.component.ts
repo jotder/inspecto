@@ -81,7 +81,9 @@ import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/compon
                         </div>
                         <p class="text-secondary text-sm">
                             The ceiling every space draws from. {{ view()!.live.system_in_flight }} Consignment(s)
-                            executing right now.
+                            executing right now@if (view()!.live.system_free !== null) {<span
+                                >, {{ view()!.live.system_free }} slot(s) free</span
+                            >}.
                         </p>
                         <div class="flex flex-wrap items-start gap-3">
                             <mat-form-field class="w-60" subscriptSizing="dynamic">
@@ -201,6 +203,33 @@ import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/compon
                         </ul>
                     </section>
                 }
+
+                @if (throttled().length) {
+                    <section class="flex flex-col gap-2">
+                        <h2 class="text-lg font-medium">Throttled by intake control</h2>
+                        <p class="text-secondary text-sm">
+                            These pipelines are admitting fewer files per cycle than their cap allows, because
+                            recent runs overran the poll interval. They recover automatically once runs fit again.
+                        </p>
+                        <ul class="flex flex-col gap-1">
+                            @for (t of throttled(); track t.pipeline) {
+                                <li class="text-sm">
+                                    <span class="font-mono">{{ t.pipeline }}</span>
+                                    <span class="text-secondary">
+                                        — admitting {{ t.cap }} of {{ t.baseCap }} files/cycle (floor
+                                        {{ t.floor }})</span
+                                    >
+                                </li>
+                            }
+                        </ul>
+                        @if (view()!.live.throttled.truncated) {
+                            <p class="text-secondary text-xs">
+                                Showing {{ throttled().length }} of {{ view()!.live.throttled.total }} throttled
+                                pipelines.
+                            </p>
+                        }
+                    </section>
+                }
             }
         </div>
     `,
@@ -216,6 +245,9 @@ export class SchedulerSettingsComponent implements OnInit {
     readonly loadError = signal('The scheduler routes did not answer.');
     readonly view = signal<SchedulerView | null>(null);
     readonly canOperate = computed(() => this.lens.canOperateRuns());
+
+    /** Pipelines the intake governor has throttled below their base cap (S8). */
+    readonly throttled = computed(() => this.view()?.live?.throttled?.pipelines ?? []);
 
     /** Pipelines with anything executing or queued, for the live-occupancy list. */
     readonly busyPipelines = computed(() => {

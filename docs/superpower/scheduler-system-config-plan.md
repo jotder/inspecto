@@ -45,11 +45,18 @@
 > (in the shared collector table, both sides), contracts regenerated, four new
 > `NodeConfigNameContractTest` rows prove each key lands on the engine field that reads it.
 > **Still open:**
-> `IntakeGovernor` *globals* through the settings doc (per-pipeline overrides are UI-editable, the
-> `-Dingest.*` fleet defaults are not), ingest `runPermits` retirement (left in place, now redundant
-> above the broker), S8 queued-state pane (the broker snapshot is served on `GET /system/scheduler`
-> and rendered in Settings ▸ Scheduler; a dedicated ops view remains open), and §7 Q2 (PUT
-> journalling — current PUTs log at INFO only).
+> ~~ingest `runPermits` retirement~~ (**REFUTED 2026-08-25 — it guards the pre-broker preparation
+> phase; see Part B §B3**), and §7 Q2 (PUT journalling — current PUTs log at INFO only).
+>
+> **S8 CLOSED 2026-08-25:** `snapshot()` gained `system_free` (**null when unbounded — a fake 0 reads
+> as "wedged"**), and `GET /system/scheduler`'s live block gained `throttled` — the pipelines the
+> IntakeGovernor has admitted BELOW their base cap, joined in the route (the broker cannot see the
+> governor). Only actually-throttled rows are listed, so an untouched fleet answers "nothing", and
+> the list is hard-capped at 50 with the true total + `truncated` beside it. Rendered on Settings ▸
+> Scheduler with the recovery explained ("they recover automatically once runs fit again"). The
+> remaining S8 idea — a *dedicated* ops pane rather than a Settings section — is deliberately NOT
+> done: the state is three short lists, and a pane that duplicates them would be a second home for
+> one fact.
 > **Goal:** move the fleet-level ingest concurrency controls off JVM system properties onto a
 > persisted, UI-editable system configuration that applies **without a server restart**, so an
 > operator can tune a live host instead of editing a launch script and bouncing the service.
@@ -293,7 +300,7 @@ broker = instantaneous slots).
 | Existing | Fate |
 |---|---|
 | Per-run `Semaphore(processing.threads)` (`CollectorProcessor:148`) | **Replaced** by the broker's pipeline tier (same value, same meaning) |
-| `PipelineScheduler.runPermits` (ingest run grain) | **Retired as the primary budget** — a second competing budget at a different grain is exactly the confusion §3 forbids. Keep the field defaulting to effectively-unbounded for one release as a safety valve; remove after Part B soaks. |
+| `PipelineScheduler.runPermits` (ingest run grain) | ⛔ **KEEP — this row's "retire it" claim was REFUTED by the code, 2026-08-25.** It is not a redundant second budget: it is the **only** bound on the poll cycle's *preparation* phase, all of which runs BEFORE any broker permit is taken (`CollectorProcessor.ingest:100-127`) — `MarkerManager.cleanupStaleMarkers`, `collect()` discovery, **checksum dedup that reads whole files** (`ledgerFilter:466`, `Checksums.of`), **archive expansion that writes to temp and is itself virtual-thread parallel** (`UnpackStage.expand:111`), and the planner's per-file `length()`. Retiring it would let N pipelines hash and unpack simultaneously with nothing bounding the disk I/O. The two budgets govern **different phases**, not the same fact twice. |
 | `acquirePermits` (network fetch) | **Untouched** — acquisition is a different resource (B3b) and stays run-grain |
 | `IntakeGovernor` | **Untouched, complementary** — admission per cycle vs execution slots |
 

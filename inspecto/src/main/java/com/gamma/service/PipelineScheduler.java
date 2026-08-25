@@ -120,8 +120,18 @@ final class PipelineScheduler {
     private final ZoneId triggerZone = OperationsZone.resolve();
     /** Epoch the scheduler started — the cron "last fire" baseline before a pipeline has ever run. */
     private final long serviceStartMs = System.currentTimeMillis();
-    /** The {@code maxConcurrentRuns} budget, held for the scheduler's lifetime rather than minted per cycle —
-     *  see class doc. A dispatched run acquires one permit for the duration of its own ingest. */
+    /**
+     * The {@code maxConcurrentRuns} budget, held for the scheduler's lifetime rather than minted per cycle —
+     * see class doc. A dispatched run acquires one permit for the duration of its own ingest.
+     *
+     * <p>⛔ <b>Not superseded by {@code ConcurrencyBroker}, despite governing the same lane.</b> The broker
+     * admits <em>Consignment execution</em>; this budget is the only bound on everything a cycle does
+     * <em>before</em> the first broker permit is taken ({@code CollectorProcessor.ingest}): the stale-marker
+     * sweep, discovery, <b>checksum dedup that reads whole files</b>, <b>archive expansion that writes to
+     * temp and is itself virtual-thread parallel</b>, and the planner's per-file {@code length()}. Removing
+     * it would let every pipeline hash and unpack at once with nothing bounding the disk I/O. The two
+     * budgets govern different <em>phases</em> of a run, not the same fact twice.
+     */
     private final Semaphore runPermits;
     /** Runs currently executing across <em>all</em> in-flight cycles, mirrored to {@code inspecto_active_runs}. */
     private final AtomicInteger activeRuns = new AtomicInteger();

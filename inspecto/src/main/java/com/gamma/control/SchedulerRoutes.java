@@ -9,7 +9,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -51,6 +53,8 @@ final class SchedulerRoutes implements RouteModule {
      *  (someone writing bytes or millis into a slot count). */
     private static final int MAX_CAP = 100_000;
     private static final String PROP = "scheduler.max.consignments";
+    /** Hard cap on the throttled-pipeline diagnostic list; the true total is reported alongside. */
+    private static final int MAX_THROTTLED_ROWS = 50;
 
     @Override
     public void register(ApiContext api) {
@@ -123,8 +127,49 @@ final class SchedulerRoutes implements RouteModule {
         m.put("system", system);
         m.put("space", spaceShape(api));
         m.put("cores", Runtime.getRuntime().availableProcessors());
-        m.put("live", ConcurrencyBroker.shared().snapshot());
+        Map<String, Object> occupancy = ConcurrencyBroker.shared().snapshot();
+        occupancy.put("throttled", throttledPipelines(api));
+        m.put("live", occupancy);
         return m;
+    }
+
+    /**
+     * S8 — which pipelines the {@link IntakeGovernor} has throttled, and to what cap. A throttled
+     * pipeline is otherwise invisible outside the logs: it keeps running, just admitting fewer files
+     * per cycle, so an operator watching throughput drop has nothing to look at. Only pipelines
+     * actually BELOW their base cap are listed, so an untouched fleet reports an empty list rather
+     * than a wall of "normal".
+     *
+     * <p>Bounded by construction (one row per registered pipeline, capped) with the true total
+     * reported — a diagnostic read must not become an unbounded export.
+     */
+    private static Map<String, Object> throttledPipelines(ApiContext api) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        List<Map<String, Object>> rows = new ArrayList<>();
+        int total = 0;
+        try {
+            IntakeGovernor gov = IntakeGovernor.shared();
+            for (var p : api.service().pipelines()) {
+                IntakeGovernor.Policy policy = gov.policyFor(p.name());
+                if (!policy.active()) continue;                       // admission control off for it
+                int cap = gov.capFor(p.name());
+                if (cap >= policy.baseCap()) continue;                // at its ceiling — not throttled
+                total++;
+                if (rows.size() >= MAX_THROTTLED_ROWS) continue;
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("pipeline", p.name());
+                row.put("cap", cap);
+                row.put("baseCap", policy.baseCap());
+                row.put("floor", policy.effectiveMinCap());
+                rows.add(row);
+            }
+        } catch (RuntimeException noService) {
+            // no space bound (fresh hosted deployment) — nothing to report, never a 500
+        }
+        out.put("pipelines", rows);
+        out.put("total", total);
+        out.put("truncated", total > rows.size());
+        return out;
     }
 
     private Object writeSystem(ApiContext api, Map<String, Object> body) throws IOException {

@@ -15,8 +15,14 @@ const VIEW: SchedulerView = {
     live: {
         system_cap: 16,
         system_in_flight: 2,
+        system_free: 14,
         space_in_flight: { default: 2 },
         pipelines: { cdr_ingest: { space: 'default', in_flight: 2, waiting: 5, priority: 3 } },
+        throttled: {
+            pipelines: [{ pipeline: 'noisy_feed', cap: 250, baseCap: 1000, floor: 50 }],
+            total: 1,
+            truncated: false,
+        },
     },
 };
 
@@ -56,6 +62,11 @@ describe('SchedulerSettingsComponent', () => {
         expect(el.textContent).toContain("This space's cap");
         expect(el.textContent).toContain('cdr_ingest');      // live occupancy row
         expect(el.textContent).toContain('priority 3');
+        expect(el.textContent).toContain('14 slot(s) free');
+        // S8: a throttled pipeline is visible with the cap it is actually admitting at.
+        expect(el.textContent).toContain('Throttled by intake control');
+        expect(el.textContent).toContain('noisy_feed');
+        expect(el.textContent).toContain('admitting 250 of 1000 files/cycle');
         const inputs = Array.from(el.querySelectorAll('input[type="number"]'));
         // system cap · intake max · intake floor · space cap · poll cadence · acquire cadence
         expect(inputs).toHaveLength(6);

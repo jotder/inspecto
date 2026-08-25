@@ -47,8 +47,17 @@ export interface SchedulerView {
     live: {
         system_cap: number;
         system_in_flight: number;
+        /** Free execution slots right now; `null` when the tier is unbounded (never a fake 0). */
+        system_free: number | null;
         space_in_flight: Record<string, number>;
         pipelines: Record<string, { space: string; in_flight: number; waiting: number; priority: number }>;
+        /** Pipelines the IntakeGovernor has throttled below their base cap (S8) — bounded list plus
+         *  the true total, so a large fleet cannot turn a diagnostic read into an export. */
+        throttled: {
+            pipelines: { pipeline: string; cap: number; baseCap: number; floor: number }[];
+            total: number;
+            truncated: boolean;
+        };
     };
 }
 
