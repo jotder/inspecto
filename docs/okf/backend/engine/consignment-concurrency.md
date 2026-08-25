@@ -115,6 +115,25 @@ ownership of one fact is what the 2026-08-15 operational-db decision forbids —
 `-D` default. ⚠ A cap-only PUT that rewrote the whole document would silently destroy a stored
 cadence — caught in review, and the same wipe existed in the offline mock.
 
+**Every change is journalled** (operator decision 2026-08-26). The generic `AuditTrail` already
+classifies these PUTs and records who / when / from where / status; what a path-classified audit row
+cannot carry is *what the numbers became*, which is the half an incident review actually asks for. So
+a `SCHEDULER_SETTINGS_CHANGED` event carries the **deltas** — one attribute per changed key rendered
+`"<old> -> <new>"`, plus `tier` and `scope` — alongside the actor. Three rules, each pinned by a test:
+
+- **Only an actual change is journalled.** A re-save of identical settings emits nothing; a trail that
+  logs unchanged re-saves teaches an investigator to skim past it.
+- **Only the keys that moved appear** in the delta, so the entry reads as the change it was.
+- **An unset value renders `inherit`, not `null`** — that is what it means, and the trail is read by
+  people.
+
+⚠ It emits to **`api.service().eventLog()`** (the bound space's log), not `EventLog.current()`: a
+hosted space has its own `EventLog`, while `current()` routes by the thread's space MDC and falls
+back to global — so a bare `/system/scheduler` call would file the entry in a log the operator's
+`/events` view never reads. That mis-filing is exactly what the first version did, and the test
+caught it. Same seam `PipelineRoutes` uses for `PIPELINE_RENAMED`. Journalling is best-effort: a
+settings change that succeeded must never fail on its own audit entry.
+
 ## 6. Two mechanisms, two questions — `IntakeGovernor` vs the broker
 
 They compose; neither replaces the other.

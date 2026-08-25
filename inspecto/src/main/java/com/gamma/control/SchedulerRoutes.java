@@ -1,8 +1,11 @@
 package com.gamma.control;
 
 import com.gamma.acquire.IntakeGovernor;
+import com.gamma.event.Event;
 import com.gamma.event.EventLog;
+import com.gamma.event.EventType;
 import com.gamma.inspector.ConcurrencyBroker;
+import com.sun.net.httpserver.HttpExchange;
 import com.gamma.service.SpaceContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,10 +63,10 @@ final class SchedulerRoutes implements RouteModule {
     public void register(ApiContext api) {
         api.get("/system/scheduler", (e, m) -> ETags.respond(e, systemShape(api)));
         api.put("/system/scheduler", ApiContext.withCapability("canOperateRuns",
-                (e, m) -> writeSystem(api, api.body(e))));
+                (e, m) -> writeSystem(api, e, api.body(e))));
         api.get("/settings/scheduler", (e, m) -> ETags.respond(e, spaceShape(api)));
         api.put("/settings/scheduler", ApiContext.withCapability("canOperateRuns",
-                (e, m) -> writeSpace(api, api.body(e))));
+                (e, m) -> writeSpace(api, e, api.body(e))));
         installAtBoot(api);
     }
 
@@ -172,7 +175,7 @@ final class SchedulerRoutes implements RouteModule {
         return out;
     }
 
-    private Object writeSystem(ApiContext api, Map<String, Object> body) throws IOException {
+    private Object writeSystem(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         requireBoundWriteRoot(api);
         int cap = requireCap(body);
         Path doc = systemDocPath(api);
@@ -192,6 +195,7 @@ final class SchedulerRoutes implements RouteModule {
         next.write(doc);
         ConcurrencyBroker.shared().setSystemCap(cap);
         IntakeGovernor.shared().setGlobalPolicy(effectiveIntake(next));
+        journal(api, ex, "server-wide", null, stored, next);
         log.info("Server-wide scheduler settings applied: cap={} intake={}/{}/{}", cap, inMax, inMin, inAdaptive);
         return systemShape(api);
     }
@@ -205,6 +209,69 @@ final class SchedulerRoutes implements RouteModule {
                 ss.intakeMaxFilesPerCycle() != null ? ss.intakeMaxFilesPerCycle() : props.baseCap(),
                 ss.intakeMinFilesPerCycle() != null ? ss.intakeMinFilesPerCycle() : props.minCap(),
                 ss.intakeAdaptive() != null ? ss.intakeAdaptive() : props.adaptive());
+    }
+
+    // ── journalling (BACKLOG §4 (a), operator decision 2026-08-26) ────────────────
+
+    /**
+     * Journal a scheduler change into the event store — <b>only when a value actually changed</b>, so
+     * a re-save of identical settings does not pollute the one log an investigator trusts.
+     *
+     * <p>The generic {@link AuditTrail} already records who/when/from-where/status for the request.
+     * What a path-classified audit row cannot carry is <em>what the numbers became</em>, which is
+     * precisely the question an incident review asks about a live concurrency change ("at 14:32
+     * someone dropped the server cap from 16 to 2"). So this is a domain event carrying the deltas —
+     * the {@code PIPELINE_RENAMED} precedent — not a second copy of the audit row.
+     *
+     * <p>Best-effort by construction: journalling must never fail the write that succeeded.
+     */
+    private static void journal(ApiContext api, HttpExchange ex, String tier, String scope,
+                                SchedulerSettings before, SchedulerSettings after) {
+        try {
+            Map<String, String> changes = diff(before, after);
+            if (changes.isEmpty()) return;
+            String actor = ApiContext.actor(ex);
+            var b = Event.builder(EventType.SCHEDULER_SETTINGS_CHANGED)
+                    .source(SchedulerRoutes.class.getName())
+                    .message(actor + " changed " + tier + " scheduler settings"
+                            + (scope == null ? "" : " for space '" + scope + "'") + ": "
+                            + String.join(", ", changes.entrySet().stream()
+                                    .map(e -> e.getKey() + " " + e.getValue()).toList()))
+                    .actor(actor).actorType(ApiContext.actorType(ex))
+                    .attr("tier", tier);
+            if (scope != null) b.attr("scope", scope);
+            changes.forEach(b::attr);
+            // The BOUND SPACE's log, not EventLog.current(): a hosted space has its own EventLog
+            // instance, while current() routes by the thread's space MDC and falls back to global —
+            // so a bare /system/scheduler call would file the entry in a log the operator's /events
+            // view never reads. Same seam PipelineRoutes uses for PIPELINE_RENAMED.
+            api.service().eventLog().emit(b);
+        } catch (RuntimeException ignore) {
+            // best effort — a settings change that succeeded must not fail on its own journal entry
+        }
+    }
+
+    /** Changed keys only, each rendered {@code "<old> -> <new>"}. An unset value reads as
+     *  {@code inherit} rather than {@code null} — that is what it means, and the trail is read by
+     *  people. */
+    private static Map<String, String> diff(SchedulerSettings before, SchedulerSettings after) {
+        Map<String, String> out = new LinkedHashMap<>();
+        record Field(String name, Object before, Object after) {}
+        for (Field f : List.of(
+                new Field("max_concurrent_consignments", before.maxConcurrentConsignments(), after.maxConcurrentConsignments()),
+                new Field("poll_seconds", before.pollSeconds(), after.pollSeconds()),
+                new Field("acquire_poll_seconds", before.acquirePollSeconds(), after.acquirePollSeconds()),
+                new Field("intake_max_files_per_cycle", before.intakeMaxFilesPerCycle(), after.intakeMaxFilesPerCycle()),
+                new Field("intake_min_files_per_cycle", before.intakeMinFilesPerCycle(), after.intakeMinFilesPerCycle()),
+                new Field("intake_adaptive", before.intakeAdaptive(), after.intakeAdaptive()))) {
+            if (java.util.Objects.equals(f.before(), f.after())) continue;
+            out.put(f.name(), render(f.before()) + " -> " + render(f.after()));
+        }
+        return out;
+    }
+
+    private static String render(Object v) {
+        return v == null ? "inherit" : String.valueOf(v);
     }
 
     /** A stated optional int field: {@code null} = clear; otherwise an int with the given floor
@@ -281,7 +348,7 @@ final class SchedulerRoutes implements RouteModule {
         return m;
     }
 
-    private Object writeSpace(ApiContext api, Map<String, Object> body) throws IOException {
+    private Object writeSpace(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         Path root = requireBoundWriteRoot(api);
         Path doc = root.resolve(SchedulerSettings.FILE);
         int cap = requireCap(body);
@@ -293,13 +360,15 @@ final class SchedulerRoutes implements RouteModule {
                 ? optCadence(body, "pollSeconds") : stored.pollSeconds();
         Integer acquire = body.containsKey("acquirePollSeconds")
                 ? optCadence(body, "acquirePollSeconds") : stored.acquirePollSeconds();
-        new SchedulerSettings(cap, poll, acquire).write(doc);
+        SchedulerSettings next = new SchedulerSettings(cap, poll, acquire);
+        next.write(doc);
         ConcurrencyBroker.shared().setSpaceCap(EventLog.currentSpaceId(), cap);
         if (body.containsKey("pollSeconds"))
             api.service().reschedulePoll(poll != null ? poll : Long.getLong("service.poll.seconds", 60L));
         if (body.containsKey("acquirePollSeconds"))
             api.service().rescheduleAcquire(acquire != null ? acquire
                     : Long.getLong("acquire.pollSeconds", api.service().pollSeconds()));
+        journal(api, ex, "space", EventLog.currentSpaceId(), stored, next);
         log.info("Space '{}' scheduler settings applied: cap={} poll={}s acquire={}s",
                 EventLog.currentSpaceId(), cap, poll, acquire);
         return spaceShape(api);

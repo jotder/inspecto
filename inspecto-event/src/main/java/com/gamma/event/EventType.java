@@ -46,6 +46,13 @@ public final class EventType {
     /** A pipeline's identity migrated to a new id (full rename, not a display-name-only {@code label}).
      *  {@code oldId}/{@code newId} attributes carry both ids; {@link Event#pipeline()} is the new id. */
     public static final String PIPELINE_RENAMED    = "PIPELINE_RENAMED";
+    /** A live scheduler setting was changed through {@code PUT /system/scheduler} or
+     *  {@code /settings/scheduler} — Consignment caps, poll cadences, or the intake globals. Emitted
+     *  ONLY when a value actually changed, with one {@code <key>} attribute per change carrying
+     *  {@code "<old> -> <new>"} and the {@code tier}/{@code scope} it applied to. The generic audit
+     *  trail already records who/when/status for the request; this records WHAT the numbers became,
+     *  which is the half an incident review needs and a path-classified audit row cannot carry. */
+    public static final String SCHEDULER_SETTINGS_CHANGED = "SCHEDULER_SETTINGS_CHANGED";
 
     // ── batch / ingest facts (the headline operational signal) ──────────────────────
     public static final String BATCH_COMMITTED  = "BATCH_COMMITTED";

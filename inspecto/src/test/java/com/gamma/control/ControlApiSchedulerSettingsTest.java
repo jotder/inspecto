@@ -1,9 +1,14 @@
 package com.gamma.control;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.gamma.event.Event;
+import com.gamma.event.EventQuery;
+import com.gamma.event.EventType;
 import com.gamma.inspector.ConcurrencyBroker;
 import com.gamma.metrics.MetricRegistry;
 import com.gamma.service.SpaceManager;
+
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -222,6 +227,65 @@ class ControlApiSchedulerSettingsTest {
         } finally {
             com.gamma.acquire.IntakeGovernor.use(null);
         }
+    }
+
+    /**
+     * BACKLOG §4 (a), operator decision 2026-08-26: a scheduler change is journalled with its DELTAS.
+     * The generic audit trail already records who/when/status; this event carries what the numbers
+     * became. ⚠ A no-op PUT must journal NOTHING — a trail that logs unchanged re-saves teaches an
+     * investigator to skim past it.
+     */
+    @Test
+    void aChangedSettingIsJournalledWithItsDeltaAndANoOpIsNot(@TempDir Path root) throws Exception {
+        ConcurrencyBroker.use(null);
+        com.gamma.acquire.IntakeGovernor.use(null);
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+
+            assertEquals(200, send(c.port, "PUT", "/system/scheduler",
+                    "{\"maxConcurrentConsignments\":16,\"intakeMaxFilesPerCycle\":500}").statusCode());
+            Event first = latestSchedulerEvent(c);
+            assertNotNull(first, "a changed setting must be journalled");
+            assertEquals("0 -> 16", first.attributes().get("max_concurrent_consignments"));
+            assertEquals("inherit -> 500", first.attributes().get("intake_max_files_per_cycle"),
+                        "an unset old value must read as 'inherit', not 'null'");
+            assertEquals("server-wide", first.attributes().get("tier"));
+
+            // Re-saving the SAME values changes nothing, so it must add no entry.
+            int before = schedulerEvents(c).size();
+            assertEquals(200, send(c.port, "PUT", "/system/scheduler",
+                    "{\"maxConcurrentConsignments\":16,\"intakeMaxFilesPerCycle\":500}").statusCode());
+            assertEquals(before, schedulerEvents(c).size(), "a no-op PUT must not be journalled");
+
+            // A partial change journals ONLY the key that moved.
+            assertEquals(200, send(c.port, "PUT", "/system/scheduler",
+                    "{\"maxConcurrentConsignments\":8}").statusCode());
+            Event partial = latestSchedulerEvent(c);
+            assertEquals("16 -> 8", partial.attributes().get("max_concurrent_consignments"));
+            assertNull(partial.attributes().get("intake_max_files_per_cycle"),
+                    "an unchanged key must not appear in the delta");
+
+            // The space tier journals its own scope.
+            assertEquals(200, send(c.port, "PUT", "/spaces/acme/settings/scheduler",
+                    "{\"maxConcurrentConsignments\":4,\"pollSeconds\":7}").statusCode());
+            Event spaceEvent = latestSchedulerEvent(c);
+            assertEquals("space", spaceEvent.attributes().get("tier"));
+            assertEquals("acme", spaceEvent.attributes().get("scope"));
+            assertEquals("inherit -> 7", spaceEvent.attributes().get("poll_seconds"));
+        } finally {
+            com.gamma.acquire.IntakeGovernor.use(null);
+        }
+    }
+
+    private static List<Event> schedulerEvents(Ctx c) {
+        return c.spaces().current().service().events().query(EventQuery.recent(EventQuery.MAX_LIMIT))
+                .stream().filter(e -> EventType.SCHEDULER_SETTINGS_CHANGED.equals(e.type())).toList();
+    }
+
+    /** Newest scheduler event, or null — the store answers newest-first. */
+    private static Event latestSchedulerEvent(Ctx c) {
+        List<Event> all = schedulerEvents(c);
+        return all.isEmpty() ? null : all.get(0);
     }
 
     @Test
