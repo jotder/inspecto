@@ -75,6 +75,19 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- `superpower/scheduler-system-config-plan.md` — **PROPOSED 2026-08-25, not started.** Move the
+  fleet-level ingest concurrency controls (`-Dservice.max.runs`, `-Dacquire.maxConcurrent`,
+  `-Dingest.maxFilesPerCycle`, the two poll cadences) off JVM properties onto a persisted,
+  UI-editable system configuration that hot-applies without a restart. Operator decisions
+  2026-08-25: **process-wide** ceiling (today's budget is per-space while `IntakeGovernor` is
+  already process-wide), and the per-pipeline `processing.intake.*` overrides ship in the same
+  slice. Carries a verified fix for `ConfigValidator`'s oversubscription warning, which reads the
+  CLI's `-Dsources.max` and is therefore silent in server mode. Two open operator questions (§7):
+  the absent-file default, and whether a PUT is journalled.
+- `superpower/backend-hardening-plan.md` — **PROPOSED 2026-08-25, not started.** Non-breaking backend
+  hardening spec from the 2026-08-24 review (4 findings withdrawn/corrected after source verification):
+  SpaceMigrator + printStackTrace → slf4j, warn-log the best-effort DDL drops, serve openapi-v1.json at
+  runtime, paging-adoption policy note, optional Dockerfile. Safest-first order, per-item rollback.
 - `superpower/unpack-stage-plan.md` — **IN FLIGHT 2026-08-23: BUILT end to end** (Phases 1, 1b, 2, 3, 4 + the shipped halves of 5/6; reactor 3547/0/0/5, uncommitted). Stream (.gz/.bz2/.Z) and archive (.zip/.tar/.tar.gz) expansion at the Collector before consignments are planned; bomb caps; extension-insensitive duplicate identity; `processing.unpack.*` config; parallel expansion; FAILED members now recorded in the manifest. Remaining by decision: the run-level `unpack` ledger + `logical_name`/`origin` ledger columns and the UI half — all want §6 Q1's archive-status vocabulary settled first. Pluggable
   decompression (ServiceLoader `DecompressorPlugin`) expanding archives/compressed inputs into
   ordinary candidates at `CollectorProcessor` BEFORE `ConsignmentPlanner.plan` — never mutating a
