@@ -86,5 +86,10 @@ WSO2-style gateway + external IAM can front it later without reshaping routes. D
   unflushed buffer in `ParquetEventStore`). Note `/events` pages the **full retained history**, not just
   the live-tail ring the pre-v1 view served. Tests:
   `ControlApiJobsPageTest` · `ControlApiEventsPageTest` (incl. a shared-timestamp id-tiebreak resume).
+  **Adoption policy:** new list endpoints over an *unbounded* table MUST use `Cursor.encode/decode`
+  keyset paging; a bounded/in-memory list MAY use `ApiContext.paged` (limit/offset slice) instead.
+  Existing endpoints keep their current behavior — `RunRoutes`' `paged()` migrates only if a caller
+  reports truncation pain (demand-driven, tracked in BACKLOG), and the `/runs/runs/{id}`
+  Location-header quirk stays until a v2 of the API (renaming would break every stored client link).
 * **Multi-space** — the space segment sits **after** the version: `/api/v1/spaces/{id}/…`
   (see [multi-space](multi-space.md)).

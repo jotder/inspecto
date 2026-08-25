@@ -7,6 +7,9 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Prepares the ETL inbox from raw {@code .tar.gz} delivery archives.
  *
@@ -38,6 +41,8 @@ import java.util.stream.Stream;
  * matching the style of {@link TarExtractor} and {@link IntegratedProcessor}.
  */
 public class TarInboxPreparer {
+
+    private static final Logger log = LoggerFactory.getLogger(TarInboxPreparer.class);
 
     // ── instance state ────────────────────────────────────────────────────────
 
@@ -165,7 +170,7 @@ public class TarInboxPreparer {
 
         } catch (Exception e) {
             System.err.printf("[ERR] Failed processing %s: %s%n", archiveName, e.getMessage());
-            e.printStackTrace();
+            log.error("unhandled exception", e);
         }
     }
 
@@ -272,7 +277,7 @@ public class TarInboxPreparer {
         try {
             new TarInboxPreparer(rem.get(0), dry).run();
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("unhandled exception", e);
         }
     }
 }

@@ -5,7 +5,12 @@ import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class BerDecoder extends ASNReader implements Serializable {
+
+    private static final Logger log = LoggerFactory.getLogger(BerDecoder.class);
 
     BufferedInputStream in;
     Deque<Integer> stack;
@@ -24,7 +29,7 @@ public class BerDecoder extends ASNReader implements Serializable {
         try {
             size = in.available();
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("unhandled exception", e);
         }
         stack.push(0);
         stack.push(size);
@@ -220,7 +225,7 @@ public class BerDecoder extends ASNReader implements Serializable {
         try {
             size = in.available();
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("unhandled exception", e);
         }
         stack.push(size);
     }
@@ -332,7 +337,7 @@ public class BerDecoder extends ASNReader implements Serializable {
             try {
                 in.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                log.error("unhandled exception", e);
             }
             in = null;
         }
@@ -380,7 +385,7 @@ public class BerDecoder extends ASNReader implements Serializable {
             try {
                 tValue = calculateAppNumber(appArr, i);
             } catch (Exception e) {
-                e.printStackTrace();
+                log.error("unhandled exception", e);
             }
         }
         Tag result = new Tag(TagClass.fromValue(tClass), tValue, true, tConstructed);
@@ -421,7 +426,7 @@ public class BerDecoder extends ASNReader implements Serializable {
             try {
                 tValue = calculateAppNumber(appArr, i);
             } catch (Exception e) {
-                e.printStackTrace();
+                log.error("unhandled exception", e);
             }
         }
 
@@ -550,7 +555,7 @@ public class BerDecoder extends ASNReader implements Serializable {
                     return false;
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                log.error("unhandled exception", e);
                 return true;
             }
         } else if (p == 0) // end of record for definite Length encoding

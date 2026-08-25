@@ -10,7 +10,12 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class ASNStreamReader {
+
+    private static final Logger log = LoggerFactory.getLogger(ASNStreamReader.class);
 
     private final ByteSource source;
     Map<String, Object> fileStruct;
@@ -47,7 +52,7 @@ public class ASNStreamReader {
             recordCount++;
             return record;
         } catch (IOException | InvocationTargetException | IllegalAccessException e) {
-            e.printStackTrace();
+            log.error("unhandled exception", e);
         }
 //        System.out.println("Pos-" + Long.toHexString(source.position()));
         return null;
@@ -83,13 +88,13 @@ public class ASNStreamReader {
                         list.add(m);
                         record.put(tagName, list);
                     } catch (InvocationTargetException | IllegalAccessException e) {
-                        e.printStackTrace();
+                        log.error("unhandled exception", e);
                     }
                 } else {
                     try {
                         getDecodedRecord(child, tag, map);
                     } catch (InvocationTargetException | IllegalAccessException e) {
-                        e.printStackTrace();
+                        log.error("unhandled exception", e);
                     }
                     record.put(tagName, map);
                 }
@@ -131,7 +136,7 @@ public class ASNStreamReader {
         try {
             length = readLength();
         } catch (IOException e) {
-            e.printStackTrace();
+            log.error("unhandled exception", e);
         }
         TLVNode node = new TLVNode(tag, length.getLength());
         node.setStartOffset(startOffset);
@@ -143,7 +148,7 @@ public class ASNStreamReader {
                 try {
                     parseIndefinite(node);
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    log.error("unhandled exception", e);
                 }
                 indefiniteDepth--;
 
@@ -151,7 +156,7 @@ public class ASNStreamReader {
                 try {
                     parseConstructed(node, length.getLength());
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    log.error("unhandled exception", e);
                 }
             }
 

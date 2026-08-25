@@ -200,7 +200,7 @@ public class Transformer {
             else result.put(key, value);
 
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("unhandled exception", e);
         }
 
         return result;
@@ -491,13 +491,13 @@ public class Transformer {
 //            System.out.println("Expected params:");
             for (Class<?> c : paramTypes)
                 System.out.println("  " + c);
-            e.printStackTrace();
+            logger.error("unhandled exception", e);
         } catch (InvocationTargetException e) {
 //            System.out.println("!error invoking method: " + methodName);
-            e.printStackTrace();
+            logger.error("unhandled exception", e);
         } catch (IllegalAccessException e) {
 //            System.out.println("!error invoking method: " + methodName);
-            e.printStackTrace();
+            logger.error("unhandled exception", e);
         } catch (Exception e) {
 //            System.out.println("!error invoking method: " + methodName);
 //            e.printStackTrace();

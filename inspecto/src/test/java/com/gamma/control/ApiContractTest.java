@@ -61,6 +61,33 @@ class ApiContractTest {
         return JSON.readTree(docsApi().resolve("openapi-v1.json").toFile());
     }
 
+    // ── doc ↔ live serving (HARD-4) ─────────────────────────────────────────────
+
+    /**
+     * The runtime {@code GET /api/v1/openapi.json} must serve the contract byte-for-byte —
+     * a consumer that validates against the served document sees exactly what the repo tests.
+     * Skipped when the docs tree is absent from the checkout (deploy-only environments).
+     */
+    @Test
+    void serverServesTheContractByteForByte(@TempDir Path cfg) throws Exception {
+        if (!Files.isRegularFile(docsApi().resolve("openapi-v1.json"))) {
+            return;   // no contract on disk → nothing to compare against
+        }
+        Path pipe = PipelineConfigBatchTest.writePipeline(cfg, "");
+        System.clearProperty("assist.write.root");
+        try (CollectorService svc = new CollectorService(List.of(pipe), 3600, 1);
+             ControlApi api = new ControlApi(svc, 0)) {
+            api.start();
+            int port = api.port();
+            HttpResponse<byte[]> res = client.send(
+                    HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/openapi.json")).build(),
+                    BodyHandlers.ofByteArray());
+            assertEquals(200, res.statusCode());
+            assertArrayEquals(Files.readAllBytes(docsApi().resolve("openapi-v1.json")), res.body(),
+                    "served /api/v1/openapi.json must be byte-equal to docs/api/openapi-v1.json");
+        }
+    }
+
     // ── doc ↔ code ───────────────────────────────────────────────────────────────
 
     @Test

@@ -383,6 +383,18 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         get("/metrics", (e, m) ->
                 respondText(e, com.gamma.metrics.MetricRegistry.global().scrape()));
 
+        // The API contract itself (HARD-4): byte-equal to docs/api/openapi-v1.json at build time.
+        // Auth-gated like the rest of /api/v1; loaded lazily on first request so tests and CLI runs
+        // without a docs/ checkout still boot. Patterns are registered version-free — normalizePath
+        // has already stripped the /api/v1 prefix by dispatch time.
+        get("/openapi.json", (e, m) -> {
+            byte[] doc = openApiContract();
+            e.getResponseHeaders().set("Content-Type", "application/json");
+            e.sendResponseHeaders(200, doc.length);
+            e.getResponseBody().write(doc);
+            return HANDLED;
+        });
+
         // Feature route modules extracted from this class (see RouteModule); each owns its own routes + docs.
         for (RouteModule module : List.of(
                 new BootstrapRoutes(), new AuthRoutes(),
@@ -757,6 +769,38 @@ public final class ControlApi implements AutoCloseable, ApiContext {
     /** Write {@code text} with an explicit {@code Content-Type} (e.g. {@code text/csv}); returns {@link #HANDLED}. */
     private Object respondText(HttpExchange ex, String text, String contentType) throws IOException {
         return ApiContext.respondText(ex, text, contentType);
+    }
+
+    /** The served API contract (HARD-4), loaded once from the first resolvable source. */
+    private volatile byte[] openApiDoc;
+
+    private byte[] openApiContract() throws IOException {
+        byte[] doc = openApiDoc;
+        if (doc == null) {
+            synchronized (this) {
+                if (openApiDoc == null) {
+                    openApiDoc = Files.readAllBytes(resolveOpenApiDoc());
+                }
+                doc = openApiDoc;
+            }
+        }
+        return doc;
+    }
+
+    /** Locate {@code docs/api/openapi-v1.json}: working dir → repo root → module dir; null when absent. */
+    static Path locateOpenApiDoc() {
+        for (Path base : List.of(Path.of(""), Path.of(".."), Path.of(".").toAbsolutePath().getParent(),
+                                  Path.of("inspecto").toAbsolutePath())) {
+            Path p = base.resolve("docs").resolve("api").resolve("openapi-v1.json");
+            if (Files.isRegularFile(p)) return p;
+        }
+        return null;
+    }
+
+    private Path resolveOpenApiDoc() throws IOException {
+        Path p = locateOpenApiDoc();
+        if (p != null) return p.toAbsolutePath();
+        throw new IOException("docs/api/openapi-v1.json not found — run from the repo or deploy it next to the jar");
     }
 
     // ── CORS + static SPA (v4.1.0) ────────────────────────────────────────────────

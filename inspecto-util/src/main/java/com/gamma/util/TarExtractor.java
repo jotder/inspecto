@@ -14,6 +14,9 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Java 23 Program to extract tar/tar.gz files found in 'unknown' directories.
  * Supports Dry-Run mode.
@@ -22,6 +25,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * for parallel task submission.
  */
 public class TarExtractor {
+
+    private static final Logger log = LoggerFactory.getLogger(TarExtractor.class);
 
     private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ISO_INSTANT;
 
@@ -213,6 +218,6 @@ public class TarExtractor {
             String b = rem.size() > 0 ? rem.get(0) : ".";
             String t = rem.size() > 1 ? rem.get(1) : "./temp";
             new TarExtractor(b, t, dry).run();
-        } catch (Exception e) { e.printStackTrace(); }
+        } catch (Exception e) { log.error("unhandled exception", e); }
     }
 }

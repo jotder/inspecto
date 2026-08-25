@@ -11,6 +11,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Integrated Processor for Java 23.
  * Supports Dry-Run mode.
@@ -19,6 +22,8 @@ import java.util.regex.Pattern;
  * for parallel task submission.
  */
 public class IntegratedProcessor {
+
+    private static final Logger log = LoggerFactory.getLogger(IntegratedProcessor.class);
 
     /** CBS CDR adjustment delivery pattern (group 1 = YYYYMMDD). The single definition —
      *  {@link FileMoverByDate} shares it rather than keeping its own copy. */
@@ -183,7 +188,7 @@ public class IntegratedProcessor {
         try {
             new IntegratedProcessor(rem.get(0), rem.get(1), rem.get(2), dry).run();
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("unhandled exception", e);
         }
     }
 }

@@ -14,6 +14,9 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * One-shot migration of the pre-spaces <b>flat</b> layout into a {@code spaces/<id>/} directory the multi-space
  * runtime discovers — the required path off the retired single-tenant mode (there is no flat fallback).
@@ -52,6 +55,8 @@ public final class SpaceMigrator {
             "inspecto-ops.db", "inspecto-ops-links.db", "inspecto-ops-notes.db",
             "inspecto-status.db", "inspecto-acquisition.db");
 
+    private static final Logger log = LoggerFactory.getLogger(SpaceMigrator.class);
+
     private SpaceMigrator() {}
 
     /** A single relocation: {@code from → to}, labelled for the printed plan. */
@@ -88,9 +93,9 @@ public final class SpaceMigrator {
         Path base = spacesRoot.resolve(SpaceId.of(id).value());
         List<Step> steps = plan(workingDir, configDir, spacesRoot, id);
 
-        System.out.printf("Migrating flat layout → %s  (%s)%n", base, dryRun ? "DRY RUN" : "apply");
-        if (steps.isEmpty()) System.out.println("  (nothing to relocate — already migrated, or no flat artifacts found)");
-        for (Step s : steps) System.out.printf("  %-22s %s → %s%n", s.what(), s.from(), s.to());
+        log.info("Migrating flat layout → {}  ({})", base, dryRun ? "DRY RUN" : "apply");
+        if (steps.isEmpty()) log.info("  (nothing to relocate — already migrated, or no flat artifacts found)");
+        for (Step s : steps) log.info("  {} {} → {}", String.format("%-22s", s.what()), s.from(), s.to());
 
         if (!dryRun) {
             Files.createDirectories(base);
@@ -98,11 +103,10 @@ public final class SpaceMigrator {
             Path manifest = base.resolve("space.toon");
             if (!Files.exists(manifest)) {
                 new SpaceContext.SpaceManifest(id, "", Instant.now().toString()).write(manifest);
-                System.out.println("  wrote " + manifest);
+                log.info("  wrote {}", manifest);
             }
         }
-        System.out.printf("Launch with:  java -Dspaces.root=%s -cp inspecto.jar com.gamma.control.ControlApi%n",
-                spacesRoot);
+        log.info("Launch with:  java -Dspaces.root={} -cp inspecto.jar com.gamma.control.ControlApi", spacesRoot);
         return steps;
     }
 

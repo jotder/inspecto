@@ -109,7 +109,6 @@ class TagReader implements TLReader {
                     } catch (InvocationTargetException | IllegalAccessException e) {
                         logger.error("Error decoding value for tag: {}", tagName, e);
                     } catch (Exception e) {
-                        e.printStackTrace();
                         logger.error("An unexpected error occurred during decoding of tag: {}", tagName, e);
                     }
                 }

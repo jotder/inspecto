@@ -5,7 +5,12 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.util.stream.Stream;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class CSVConf extends DataDef {
+    private static final Logger logger = LoggerFactory.getLogger(CSVConf.class);
+
     public CSVConf(String dataDefFile) throws IOException {
         super(dataDefFile, 24);
     }
@@ -43,7 +48,7 @@ public class CSVConf extends DataDef {
                         }
                     });
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Failed to build tag definition map", e);
         }
     }
 }

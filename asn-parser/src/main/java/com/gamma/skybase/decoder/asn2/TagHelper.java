@@ -3,7 +3,12 @@ package com.gamma.skybase.decoder.asn2;
 import java.lang.reflect.Method;
 import java.util.*;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class TagHelper {
+
+    private static final Logger log = LoggerFactory.getLogger(TagHelper.class);
 
     static final Set<String> PRIMITIVE_TYPES = new HashSet<>(Arrays.asList(
             "INTEGER", "OCTET STRING", "OCTETSTRING", "HEX STRING", "HEXSTRING", "IA5STRING", "UTF8STRING", "PRINTABLESTRING",
@@ -68,7 +73,7 @@ public class TagHelper {
                     DECODABLE_TYPES.add(name.toUpperCase());
                     decoderCache.put(name.toUpperCase(), m);
                 } catch (NoSuchMethodException e) {
-                    e.printStackTrace();
+                    log.error("unhandled exception", e);
                 }
             }
         }

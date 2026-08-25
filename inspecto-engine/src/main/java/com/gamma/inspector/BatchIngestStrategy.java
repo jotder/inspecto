@@ -12,6 +12,8 @@ import com.gamma.etl.PartitionOutput;
 import com.gamma.etl.PartitionWriter;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.util.DuckDbUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -38,6 +40,8 @@ import java.util.Map;
  */
 interface BatchIngestStrategy {
 
+    Logger log = LoggerFactory.getLogger(BatchIngestStrategy.class);
+
     /**
      * Ingest, transform, and write {@code batch}. Never throws: ingest failures are
      * captured into the returned outcome as {@code status = "FAILED"} so the batch
@@ -47,18 +51,22 @@ interface BatchIngestStrategy {
 
     // ── shared helpers ──────────────────────────────────────────────────────────
 
-    /** Best-effort {@code DROP TABLE IF EXISTS}, swallowing any error. */
+    /** Best-effort {@code DROP TABLE IF EXISTS} — logs a warning on failure, never throws. */
     static void dropTable(Connection conn, String table) {
         try (Statement st = conn.createStatement()) {
             st.execute("DROP TABLE IF EXISTS \"" + table + "\"");
-        } catch (Exception ignored) { }
+        } catch (Exception e) {
+            log.warn("best-effort drop table {} failed: {}", table, msg(e));
+        }
     }
 
-    /** Best-effort {@code DROP VIEW IF EXISTS}, swallowing any error. */
+    /** Best-effort {@code DROP VIEW IF EXISTS} — logs a warning on failure, never throws. */
     static void dropView(Connection conn, String view) {
         try (Statement st = conn.createStatement()) {
             st.execute("DROP VIEW IF EXISTS \"" + view + "\"");
-        } catch (Exception ignored) { }
+        } catch (Exception e) {
+            log.warn("best-effort drop view {} failed: {}", view, msg(e));
+        }
     }
 
     /** A non-null message for an exception, falling back to its simple class name. */

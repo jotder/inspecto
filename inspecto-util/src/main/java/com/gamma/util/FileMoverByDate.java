@@ -13,11 +13,16 @@ import java.util.concurrent.Phaser;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Java 23 Program to move files based on date patterns in their names.
  * Supports Dry-Run mode.
  */
 public class FileMoverByDate {
+
+    private static final Logger log = LoggerFactory.getLogger(FileMoverByDate.class);
 
     /** Shared with {@link IntegratedProcessor} — one definition of the CBS delivery pattern. */
     private static final Pattern DATE_PATTERN = IntegratedProcessor.CBS_ADJ_DATE_PATTERN;
@@ -110,6 +115,6 @@ public class FileMoverByDate {
 
         try {
             new FileMoverByDate(source, base, dry).run();
-        } catch (Exception e) { e.printStackTrace(); }
+        } catch (Exception e) { log.error("unhandled exception", e); }
     }
 }

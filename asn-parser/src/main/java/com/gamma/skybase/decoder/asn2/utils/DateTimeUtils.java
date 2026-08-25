@@ -3,7 +3,12 @@ package com.gamma.skybase.decoder.asn2.utils;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public final class DateTimeUtils {
+
+    private static final Logger log = LoggerFactory.getLogger(DateTimeUtils.class);
 
     private DateTimeUtils() {
         // Private constructor for utility class
@@ -47,7 +52,7 @@ public final class DateTimeUtils {
             try {
                 daysToAdd = Integer.parseInt(parts[1]);
             } catch (NumberFormatException e) {
-                e.printStackTrace();
+                log.error("unhandled exception", e);
                 // Invalid number format, default to 0
             }
         }

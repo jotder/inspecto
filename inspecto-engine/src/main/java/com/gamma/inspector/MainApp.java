@@ -11,6 +11,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Main entry point for the URA pre-ETL and pipeline file-management tools.
  *
@@ -35,6 +38,8 @@ import java.util.Map;
  * </pre>
  */
 public class MainApp {
+
+    private static final Logger log = LoggerFactory.getLogger(MainApp.class);
 
     public static void main(String[] args) {
         if (args.length == 0) {
@@ -176,7 +181,7 @@ public class MainApp {
 
         } catch (Exception e) {
             System.err.println("Fatal error executing '" + command + "': " + e.getMessage());
-            e.printStackTrace();
+            log.error("unhandled exception", e);
             System.exit(1);
         }
     }

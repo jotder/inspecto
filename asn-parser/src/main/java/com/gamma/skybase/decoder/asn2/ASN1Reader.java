@@ -246,8 +246,7 @@ public class ASN1Reader implements TLReader {
         } catch (IOException e) {
             // Tag/length could not be read, so the record boundary is unknown and
             // there is no reliable way to re-sync. Stop processing the file.
-//            logger.warn("Invalid Bytes read at Offset: " + offset + "  , RecCount : " + getRecCount());
-            e.printStackTrace();
+            logger.warn("Invalid Bytes read at Offset: {} , RecCount : {}", offset, getRecCount(), e);
             streamBroken = true;
             try {
                 bis.reset(); // Reset to the start of the bad record for diagnostics
@@ -265,8 +264,7 @@ public class ASN1Reader implements TLReader {
             TagReader tr = new TagReader(tagVal, value, conf, recordOffset);
             return tr.parse(tagVal, definiteLength);
         } catch (Exception e) {
-//            logger.warn("Failed to parse record at Offset: " + recordOffset + "  , RecCount : " + getRecCount());
-            e.printStackTrace();
+            logger.error("Failed to parse record at Offset: {} , RecCount : {}", recordOffset, getRecCount(), e);
             return null;
         }
     }
