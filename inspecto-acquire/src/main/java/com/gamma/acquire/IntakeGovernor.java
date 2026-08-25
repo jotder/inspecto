@@ -96,7 +96,9 @@ public final class IntakeGovernor {
         shared = (governor != null) ? governor : new IntakeGovernor(Policy.fromSystemProperties());
     }
 
-    private final Policy policy;
+    /** The fleet-wide thresholds. Volatile, not final: hot-applied by {@link #setGlobalPolicy}
+     *  (scheduler-system-config plan — the {@code -Dingest.*} values stay the bootstrap defaults). */
+    private volatile Policy policy;
     private final Map<String, Integer> caps = new ConcurrentHashMap<>();
     /** Per-pipeline TOON overrides ({@code processing.intake}), installed via {@link #configure}. */
     private final Map<String, Policy> overrides = new ConcurrentHashMap<>();
@@ -106,9 +108,24 @@ public final class IntakeGovernor {
         this.policy = policy;
     }
 
-    /** The process-wide thresholds (the {@code -D} globals); a pipeline override never changes these. */
+    /** The process-wide thresholds in force; a pipeline override never changes these. */
     public Policy policy() {
         return policy;
+    }
+
+    /**
+     * Hot-apply new fleet-wide thresholds (`PUT /system/scheduler`; the {@code -Dingest.*} values are
+     * the bootstrap defaults these override). A <em>changed</em> policy drops every learned cap — the
+     * {@link #configure} rule at fleet grain: each cap was learned under the old thresholds and could
+     * sit above the new base or below the new floor. An unchanged policy is a no-op, so re-installs
+     * do not disturb adaptation. Per-pipeline TOON overrides are untouched here; they re-resolve
+     * against the new globals on their pipeline's next cycle ({@code CollectorProcessor.intakePolicy}),
+     * exactly as a hot-reloaded TOON edit would.
+     */
+    public void setGlobalPolicy(Policy next) {
+        if (next == null || next.equals(policy)) return;
+        policy = next;
+        caps.clear();
     }
 
     /**

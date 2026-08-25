@@ -11,6 +11,7 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { LensService, SchedulerSettingsService, SchedulerView, apiErrorMessage } from 'app/inspecto/api';
+import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 
 /**
  * Settings ▸ **Scheduler** — the hot-tunable Consignment concurrency caps (scheduler-system-config
@@ -41,6 +42,7 @@ import { LensService, SchedulerSettingsService, SchedulerView, apiErrorMessage }
         InspectoAlertComponent,
         ChipComponent,
         InspectoEmptyStateComponent,
+        InspectoOptionPickerComponent,
     ],
     template: `
         <div class="flex flex-col gap-6">
@@ -81,7 +83,7 @@ import { LensService, SchedulerSettingsService, SchedulerView, apiErrorMessage }
                             The ceiling every space draws from. {{ view()!.live.system_in_flight }} Consignment(s)
                             executing right now.
                         </p>
-                        <div class="flex items-start gap-3">
+                        <div class="flex flex-wrap items-start gap-3">
                             <mat-form-field class="w-60" subscriptSizing="dynamic">
                                 <mat-label>Max concurrent Consignments</mat-label>
                                 <input matInput type="number" formControlName="system" min="0" max="100000" />
@@ -89,6 +91,26 @@ import { LensService, SchedulerSettingsService, SchedulerView, apiErrorMessage }
                                     <mat-error>0 (unbounded) to 100000.</mat-error>
                                 }
                             </mat-form-field>
+                            <mat-form-field class="w-52" subscriptSizing="dynamic">
+                                <mat-label>Intake cap (files/cycle)</mat-label>
+                                <input matInput type="number" formControlName="intakeMax" min="0" max="10000000" />
+                                @if (form.controls.intakeMax.invalid) {
+                                    <mat-error>0 (off) or more; blank = inherit the launch default.</mat-error>
+                                }
+                            </mat-form-field>
+                            <mat-form-field class="w-52" subscriptSizing="dynamic">
+                                <mat-label>Intake cap floor</mat-label>
+                                <input matInput type="number" formControlName="intakeMin" min="1" max="10000000" />
+                                @if (form.controls.intakeMin.invalid) {
+                                    <mat-error>At least 1; blank = inherit the launch default.</mat-error>
+                                }
+                            </mat-form-field>
+                            <inspecto-option-picker
+                                class="block w-52 py-1"
+                                formControlName="intakeAdaptive"
+                                label="Adaptive intake control"
+                                [options]="ADAPTIVE_OPTIONS"
+                            />
                             <button
                                 mat-flat-button
                                 color="primary"
@@ -96,9 +118,16 @@ import { LensService, SchedulerSettingsService, SchedulerView, apiErrorMessage }
                                 class="mt-1"
                                 [disabled]="!canOperate() || saving()"
                             >
-                                Save server cap
+                                Save server settings
                             </button>
                         </div>
+                        <p class="text-secondary text-xs">
+                            The intake globals govern how many inbox files one poll cycle may admit per pipeline
+                            (fleet default; a pipeline's own intake settings override it). In force now:
+                            {{ view()!.system.effectiveIntake?.active ? (view()!.system.effectiveIntake?.maxFilesPerCycle + ' files/cycle') : 'off (unbounded)' }},
+                            floor {{ view()!.system.effectiveIntake?.minFilesPerCycle }}, adaptive
+                            {{ view()!.system.effectiveIntake?.adaptive ? 'on' : 'off' }}.
+                        </p>
                     </section>
                 </form>
 
@@ -196,8 +225,21 @@ export class SchedulerSettingsComponent implements OnInit {
             .filter((p) => p.in_flight > 0 || p.waiting > 0);
     });
 
-    readonly form = this.fb.nonNullable.group({
-        system: [0, [Validators.required, Validators.min(0), Validators.max(100_000)]],
+    /** Blank-valued option = the real, named "inherit" choice (the option-picker idiom) — never a
+     *  spec default, which would materialize into every save. */
+    readonly ADAPTIVE_OPTIONS: PickerOption[] = [
+        { value: '', label: 'Inherit launch default', hint: 'Whatever -Dingest.backpressure.adaptive says (on unless set to false).' },
+        { value: 'true', label: 'On', hint: 'Cycle overrun halves a pipeline’s admission cap; a comfortable fit restores it.' },
+        { value: 'false', label: 'Off (hard cap)', hint: 'The stated cap is pinned; overrun never adjusts it.' },
+    ];
+
+    readonly form = this.fb.group({
+        system: this.fb.nonNullable.control(0, [Validators.required, Validators.min(0), Validators.max(100_000)]),
+        // Intake globals: blank = inherit -Dingest.* (a save sends null = explicit clear; the server
+        // merges per key, so this is a deliberate revert, not a wipe).
+        intakeMax: this.fb.control<number | null>(null, [Validators.min(0), Validators.max(10_000_000)]),
+        intakeMin: this.fb.control<number | null>(null, [Validators.min(1), Validators.max(10_000_000)]),
+        intakeAdaptive: this.fb.nonNullable.control(''),
     });
     readonly spaceForm = this.fb.group({
         space: this.fb.nonNullable.control(0, [Validators.required, Validators.min(0), Validators.max(100_000)]),
@@ -217,7 +259,12 @@ export class SchedulerSettingsComponent implements OnInit {
             return;
         }
         this.saving.set(true);
-        this.api.saveSystem(this.form.getRawValue().system).subscribe({
+        const v = this.form.getRawValue();
+        this.api.saveSystem(v.system, {
+            maxFilesPerCycle: v.intakeMax ?? null,
+            minFilesPerCycle: v.intakeMin ?? null,
+            adaptive: v.intakeAdaptive === '' ? null : v.intakeAdaptive === 'true',
+        }).subscribe({
             next: (v) => {
                 this.saving.set(false);
                 this.apply(v);
@@ -266,7 +313,12 @@ export class SchedulerSettingsComponent implements OnInit {
 
     private apply(v: SchedulerView): void {
         this.view.set(v);
-        this.form.patchValue({ system: v.system.maxConcurrentConsignments });
+        this.form.patchValue({
+            system: v.system.maxConcurrentConsignments,
+            intakeMax: v.system.intakeMaxFilesPerCycle ?? null,
+            intakeMin: v.system.intakeMinFilesPerCycle ?? null,
+            intakeAdaptive: v.system.intakeAdaptive == null ? '' : String(v.system.intakeAdaptive),
+        });
         this.spaceForm.patchValue({
             space: v.space.maxConcurrentConsignments,
             poll: v.space.pollSeconds ?? null,

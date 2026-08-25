@@ -57,23 +57,28 @@ describe('SchedulerSettingsComponent', () => {
         expect(el.textContent).toContain('cdr_ingest');      // live occupancy row
         expect(el.textContent).toContain('priority 3');
         const inputs = Array.from(el.querySelectorAll('input[type="number"]'));
-        expect(inputs).toHaveLength(4); // system cap · space cap · poll cadence · acquire cadence
+        // system cap · intake max · intake floor · space cap · poll cadence · acquire cadence
+        expect(inputs).toHaveLength(6);
         await expectNoA11yViolations(el);
     });
 
     it('saves the server cap through the service and reports the hot-apply', async () => {
         const { fixture, api, toastr } = await setup();
         const c = fixture.componentInstance;
-        c.form.setValue({ system: 12 });
+        c.form.patchValue({ system: 12 });
         c.saveSystem();
-        expect(api.saveSystem).toHaveBeenCalledWith(12);
+        expect(api.saveSystem).toHaveBeenCalledWith(12, {
+            maxFilesPerCycle: null,
+            minFilesPerCycle: null,
+            adaptive: null,
+        });
         expect(toastr.success).toHaveBeenCalled();
     });
 
     it('refuses an out-of-bounds value client-side without calling the server', async () => {
         const { fixture, api } = await setup();
         const c = fixture.componentInstance;
-        c.form.setValue({ system: -1 });
+        c.form.patchValue({ system: -1 });
         c.saveSystem();
         expect(api.saveSystem).not.toHaveBeenCalled();
     });

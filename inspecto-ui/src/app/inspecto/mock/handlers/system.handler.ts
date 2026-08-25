@@ -1,7 +1,15 @@
 import { MockFlags } from '../mock-flags';
 import { json, match, MockHandler, MockRequest } from '../mock-http';
 import { MockStore } from '../mock-store';
-import { readSchedulerCap, schedulerSpaceShape, writeSchedulerCap } from './settings.handler';
+import {
+    readSchedulerCap,
+    SchedulerDoc,
+    schedulerIntakeRefusal,
+    schedulerSpaceShape,
+    SETTINGS_COLL,
+    writeSchedulerCap,
+    writeSchedulerIntake,
+} from './settings.handler';
 
 const REPORT = /\/system\/operational-db$/;
 const TEST = /\/system\/operational-db\/test$/;
@@ -50,10 +58,26 @@ export function systemHandler(flags: MockFlags): MockHandler {
         if (match(req.url, SCHEDULER)) {
             const shape = (): unknown => {
                 const systemCap = readSchedulerCap(store, req.space, 'scheduler-system');
+                const doc = store.get<SchedulerDoc>(req.space, SETTINGS_COLL, 'scheduler-system');
+                const anyIntake =
+                    doc?.intakeMaxFilesPerCycle != null ||
+                    doc?.intakeMinFilesPerCycle != null ||
+                    doc?.intakeAdaptive != null;
+                const effMax = doc?.intakeMaxFilesPerCycle ?? 0; // offline launch default: intake off
                 return {
                     system: {
                         maxConcurrentConsignments: systemCap ?? 0,
                         source: systemCap == null ? 'default' : 'file',
+                        intakeMaxFilesPerCycle: doc?.intakeMaxFilesPerCycle ?? null,
+                        intakeMinFilesPerCycle: doc?.intakeMinFilesPerCycle ?? null,
+                        intakeAdaptive: doc?.intakeAdaptive ?? null,
+                        intakeSource: anyIntake ? 'file' : 'default',
+                        effectiveIntake: {
+                            maxFilesPerCycle: effMax,
+                            minFilesPerCycle: doc?.intakeMinFilesPerCycle ?? 1,
+                            adaptive: doc?.intakeAdaptive ?? true,
+                            active: effMax > 0,
+                        },
                     },
                     // ONE space sub-shape, shared with /settings/scheduler — two hand-built copies of
                     // the same wire shape is exactly the drift that hid the effective-cadence fields.
@@ -69,8 +93,13 @@ export function systemHandler(flags: MockFlags): MockHandler {
             };
             if (req.method === 'GET') return json(shape());
             if (req.method === 'PUT') {
+                // Validate the WHOLE body before any write — the server is atomic on 422.
+                const intakeRefusal = schedulerIntakeRefusal(req.body);
+                if (intakeRefusal) return intakeRefusal;
                 const { refusal } = writeSchedulerCap(store, req.space, 'scheduler-system', req.body);
-                return refusal ?? json(shape());
+                if (refusal) return refusal;
+                writeSchedulerIntake(store, req.space, 'scheduler-system', req.body);
+                return json(shape());
             }
         }
 

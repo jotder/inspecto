@@ -154,16 +154,67 @@ class ControlApiSchedulerSettingsTest {
     }
 
     @Test
+    void intakeGlobalsRoundTripMergeAndHotApplyOntoTheGovernor(@TempDir Path root) throws Exception {
+        com.gamma.acquire.IntakeGovernor.use(null);
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+
+            // PUT the trio: persisted, and live on the running governor with no restart.
+            HttpResponse<String> put = send(c.port, "PUT", "/system/scheduler",
+                    "{\"maxConcurrentConsignments\":0,\"intakeMaxFilesPerCycle\":500,"
+                            + "\"intakeMinFilesPerCycle\":10,\"intakeAdaptive\":false}");
+            assertEquals(200, put.statusCode(), put.body());
+            JsonNode sys = json(put).get("system");
+            assertEquals("file", sys.get("intakeSource").asText());
+            assertEquals(500, sys.get("effectiveIntake").get("maxFilesPerCycle").asInt());
+            assertTrue(sys.get("effectiveIntake").get("active").asBoolean());
+            var live = com.gamma.acquire.IntakeGovernor.shared().policy();
+            assertEquals(500, live.baseCap(), "hot-apply did not reach the governor");
+            assertEquals(10, live.minCap());
+            assertFalse(live.adaptive());
+
+            // A cap-only PUT MERGES — it must not destroy the stored intake globals.
+            assertEquals(200, send(c.port, "PUT", "/system/scheduler",
+                    "{\"maxConcurrentConsignments\":4}").statusCode());
+            sys = json(send(c.port, "GET", "/system/scheduler", null)).get("system");
+            assertEquals(500, sys.get("intakeMaxFilesPerCycle").asInt(), "cap-only PUT wiped intake globals");
+
+            // Explicit null clears: back to the -Dingest.* bootstrap default (off in tests).
+            assertEquals(200, send(c.port, "PUT", "/system/scheduler",
+                    "{\"maxConcurrentConsignments\":4,\"intakeMaxFilesPerCycle\":null,"
+                            + "\"intakeMinFilesPerCycle\":null,\"intakeAdaptive\":null}").statusCode());
+            assertEquals(0, com.gamma.acquire.IntakeGovernor.shared().policy().baseCap(),
+                    "clear must revert the live governor to the bootstrap default");
+
+            // Bounds gates.
+            assertEquals(422, send(c.port, "PUT", "/system/scheduler",
+                    "{\"maxConcurrentConsignments\":0,\"intakeMaxFilesPerCycle\":-1}").statusCode());
+            assertEquals(422, send(c.port, "PUT", "/system/scheduler",
+                    "{\"maxConcurrentConsignments\":0,\"intakeMinFilesPerCycle\":0}").statusCode());
+            assertEquals(422, send(c.port, "PUT", "/system/scheduler",
+                    "{\"maxConcurrentConsignments\":0,\"intakeAdaptive\":\"maybe\"}").statusCode());
+        } finally {
+            com.gamma.acquire.IntakeGovernor.use(null);
+        }
+    }
+
+    @Test
     void configuredFilesInstallAtBootWithoutAnyRequest(@TempDir Path root) throws Exception {
-        // Seed both documents on disk, then boot: caps must be live before any HTTP call.
-        Files.writeString(root.resolve("scheduler.toon"), "max_concurrent_consignments: 5\n");
+        // Seed both documents on disk, then boot: caps + intake globals must be live before any HTTP call.
+        Files.writeString(root.resolve("scheduler.toon"),
+                "max_concurrent_consignments: 5\nintake_max_files_per_cycle: 44\n");
         Files.createDirectories(root.resolve("acme").resolve("config"));
         Files.writeString(root.resolve("acme").resolve("config").resolve("scheduler.toon"),
                 "max_concurrent_consignments: 3\n");
         ConcurrencyBroker.use(null);
+        com.gamma.acquire.IntakeGovernor.use(null);
         try (Ctx c = open(root)) {
             assertEquals(5, ConcurrencyBroker.shared().systemCap(), "system cap not installed at boot");
             assertEquals(3, ConcurrencyBroker.shared().spaceCap("acme"), "space cap not installed at boot");
+            assertEquals(44, com.gamma.acquire.IntakeGovernor.shared().policy().baseCap(),
+                    "intake globals not installed at boot");
+        } finally {
+            com.gamma.acquire.IntakeGovernor.use(null);
         }
     }
 

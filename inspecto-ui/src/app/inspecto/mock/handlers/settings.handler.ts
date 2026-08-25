@@ -41,6 +41,10 @@ export interface SchedulerDoc {
     maxConcurrentConsignments: number;
     pollSeconds?: number;
     acquirePollSeconds?: number;
+    /** System tier only: the IntakeGovernor fleet globals (absent = inherit `-Dingest.*`). */
+    intakeMaxFilesPerCycle?: number;
+    intakeMinFilesPerCycle?: number;
+    intakeAdaptive?: boolean;
 }
 
 /** The stored cap for one tier (`scheduler-system` | `scheduler-space`), or 0 when never saved. */
@@ -98,6 +102,41 @@ export function writeSchedulerCadence(store: MockStore, space: string, tier: str
     for (const key of ['pollSeconds', 'acquirePollSeconds'] as const) {
         if (!(key in b)) continue;
         if (b[key] === null) delete doc[key];
+        else doc[key] = b[key] as number;
+    }
+    store.put(space, SETTINGS_COLL, tier, doc);
+}
+
+/** The server's intake-globals bounds gate, mirrored: max ≥ 0, floor ≥ 1 (both ≤ 10,000,000),
+ *  adaptive strictly boolean; explicit `null` = clear is legal. Run BEFORE any write. */
+export function schedulerIntakeRefusal(body: unknown): ReturnType<typeof error> | null {
+    const b = (body ?? {}) as Record<string, unknown>;
+    const intBounds: [key: string, floor: number][] = [
+        ['intakeMaxFilesPerCycle', 0],
+        ['intakeMinFilesPerCycle', 1],
+    ];
+    for (const [key, floor] of intBounds) {
+        if (!(key in b) || b[key] === null) continue;
+        const raw = b[key];
+        const v = typeof raw === 'number' && Number.isInteger(raw) ? raw : Number.NaN;
+        if (Number.isNaN(v) || v < floor || v > 10_000_000)
+            return error(422, `${key} must be ${floor}..10000000, got ${String(raw)}`);
+    }
+    if ('intakeAdaptive' in b && b['intakeAdaptive'] !== null && typeof b['intakeAdaptive'] !== 'boolean')
+        return error(422, `intakeAdaptive must be true or false, got ${String(b['intakeAdaptive'])}`);
+    return null;
+}
+
+/** Apply the intake-globals merge onto the tier's stored doc (same per-key rule as the cadence).
+ *  Call {@link schedulerIntakeRefusal} first — this assumes a valid body. */
+export function writeSchedulerIntake(store: MockStore, space: string, tier: string, body: unknown): void {
+    const b = (body ?? {}) as Record<string, unknown>;
+    const doc = store.get<SchedulerDoc>(space, SETTINGS_COLL, tier);
+    if (!doc) return;
+    for (const key of ['intakeMaxFilesPerCycle', 'intakeMinFilesPerCycle', 'intakeAdaptive'] as const) {
+        if (!(key in b)) continue;
+        if (b[key] === null) delete doc[key];
+        else if (key === 'intakeAdaptive') doc[key] = b[key] as boolean;
         else doc[key] = b[key] as number;
     }
     store.put(space, SETTINGS_COLL, tier, doc);

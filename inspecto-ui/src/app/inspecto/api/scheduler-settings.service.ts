@@ -11,6 +11,20 @@ export type SchedulerSource = 'file' | 'property' | 'default';
 export interface SchedulerTier {
     maxConcurrentConsignments: number;
     source: SchedulerSource;
+    /** Server-wide tier only: the stored IntakeGovernor globals (`null` = inherit `-Dingest.*`)
+     *  and the thresholds actually in force on the running governor. */
+    intakeMaxFilesPerCycle?: number | null;
+    intakeMinFilesPerCycle?: number | null;
+    intakeAdaptive?: boolean | null;
+    intakeSource?: SchedulerSource;
+    effectiveIntake?: { maxFilesPerCycle: number; minFilesPerCycle: number; adaptive: boolean; active: boolean };
+}
+
+/** The intake-global fields of a save; each `null` CLEARS the stored value (revert to `-Dingest.*`). */
+export interface SchedulerIntakeGlobals {
+    maxFilesPerCycle: number | null;
+    minFilesPerCycle: number | null;
+    adaptive: boolean | null;
 }
 
 /** The bound space's tier (`GET|PUT /settings/scheduler`). The stored cadences are `null` when the
@@ -52,9 +66,16 @@ export class SchedulerSettingsService {
         return this.http.get<SchedulerView>(apiUrl('/system/scheduler'));
     }
 
-    /** Replace the server-wide cap (0 = unbounded); hot-applies. */
-    saveSystem(maxConcurrentConsignments: number): Observable<SchedulerView> {
-        return this.http.put<SchedulerView>(apiUrl('/system/scheduler'), { maxConcurrentConsignments });
+    /** Replace the server-wide cap (0 = unbounded) and, when given, the IntakeGovernor globals;
+     *  hot-applies. The server merges per key, so a `null` intake field is an explicit clear. */
+    saveSystem(maxConcurrentConsignments: number, intake?: SchedulerIntakeGlobals): Observable<SchedulerView> {
+        const body: Record<string, unknown> = { maxConcurrentConsignments };
+        if (intake) {
+            body['intakeMaxFilesPerCycle'] = intake.maxFilesPerCycle;
+            body['intakeMinFilesPerCycle'] = intake.minFilesPerCycle;
+            body['intakeAdaptive'] = intake.adaptive;
+        }
+        return this.http.put<SchedulerView>(apiUrl('/system/scheduler'), body);
     }
 
     /** Replace the bound space's cap (0 = unbounded) and cadences; hot-applies onto the running

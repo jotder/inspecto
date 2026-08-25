@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.acquire.IntakeGovernor;
 import com.gamma.event.EventLog;
 import com.gamma.inspector.ConcurrencyBroker;
 import com.gamma.service.SpaceContext;
@@ -68,6 +69,8 @@ final class SchedulerRoutes implements RouteModule {
         try {
             ConcurrencyBroker broker = ConcurrencyBroker.shared();
             broker.setSystemCap(effectiveSystemCap(api));
+            IntakeGovernor.shared().setGlobalPolicy(
+                    effectiveIntake(SchedulerSettings.read(systemDocPath(api))));
             if (api.spaces() != null) {
                 for (SpaceContext s : api.spaces().all()) {
                     Path cfg = s.root().config();
@@ -88,10 +91,11 @@ final class SchedulerRoutes implements RouteModule {
 
     private Object systemShape(ApiContext api) {
         Path doc = systemDocPath(api);
+        SchedulerSettings ss = SchedulerSettings.read(doc);
         Map<String, Object> m = new LinkedHashMap<>();
         Map<String, Object> system = new LinkedHashMap<>();
         if (SchedulerSettings.present(doc)) {
-            system.put("maxConcurrentConsignments", SchedulerSettings.read(doc).maxConcurrentConsignments());
+            system.put("maxConcurrentConsignments", ss.maxConcurrentConsignments());
             system.put("source", "file");
         } else if (Integer.getInteger(PROP) != null) {
             system.put("maxConcurrentConsignments", Math.max(0, Integer.getInteger(PROP)));
@@ -100,6 +104,22 @@ final class SchedulerRoutes implements RouteModule {
             system.put("maxConcurrentConsignments", 0);
             system.put("source", "default");
         }
+        // The IntakeGovernor fleet globals: stored values (null = inherit the -Dingest.* bootstrap
+        // default) plus the thresholds actually in force on the running governor.
+        system.put("intakeMaxFilesPerCycle", ss.intakeMaxFilesPerCycle());
+        system.put("intakeMinFilesPerCycle", ss.intakeMinFilesPerCycle());
+        system.put("intakeAdaptive", ss.intakeAdaptive());
+        boolean anyStored = ss.intakeMaxFilesPerCycle() != null || ss.intakeMinFilesPerCycle() != null
+                || ss.intakeAdaptive() != null;
+        system.put("intakeSource", anyStored ? "file"
+                : (System.getProperty("ingest.maxFilesPerCycle") != null ? "property" : "default"));
+        IntakeGovernor.Policy live = IntakeGovernor.shared().policy();
+        Map<String, Object> intake = new LinkedHashMap<>();
+        intake.put("maxFilesPerCycle", live.baseCap());
+        intake.put("minFilesPerCycle", live.minCap());
+        intake.put("adaptive", live.adaptive());
+        intake.put("active", live.active());
+        system.put("effectiveIntake", intake);
         m.put("system", system);
         m.put("space", spaceShape(api));
         m.put("cores", Runtime.getRuntime().availableProcessors());
@@ -114,10 +134,59 @@ final class SchedulerRoutes implements RouteModule {
         if (doc == null)
             throw new ApiException(503, "No home for the server-wide scheduler document "
                     + "(-Dsystem.config.dir, spaces root and write root all unset)");
-        new SchedulerSettings(cap).write(doc);
+        // Merge per key with the stored document (the space-tier rule): absent = preserve stored,
+        // explicit null = clear (revert to the -Dingest.* bootstrap default, live), stated = gated.
+        SchedulerSettings stored = SchedulerSettings.read(doc);
+        Integer inMax = body.containsKey("intakeMaxFilesPerCycle")
+                ? optIntField(body, "intakeMaxFilesPerCycle", 0) : stored.intakeMaxFilesPerCycle();
+        Integer inMin = body.containsKey("intakeMinFilesPerCycle")
+                ? optIntField(body, "intakeMinFilesPerCycle", 1) : stored.intakeMinFilesPerCycle();
+        Boolean inAdaptive = body.containsKey("intakeAdaptive")
+                ? optBoolField(body, "intakeAdaptive") : stored.intakeAdaptive();
+        SchedulerSettings next = new SchedulerSettings(cap, null, null, inMax, inMin, inAdaptive);
+        next.write(doc);
         ConcurrencyBroker.shared().setSystemCap(cap);
-        log.info("Server-wide Consignment cap set to {} ({})", cap, cap == 0 ? "unbounded" : "hot-applied, shrink drains");
+        IntakeGovernor.shared().setGlobalPolicy(effectiveIntake(next));
+        log.info("Server-wide scheduler settings applied: cap={} intake={}/{}/{}", cap, inMax, inMin, inAdaptive);
         return systemShape(api);
+    }
+
+    /** The IntakeGovernor thresholds a stored document implies: each stated field wins, each unset
+     *  field inherits its {@code -Dingest.*} bootstrap default — the same resolution rule as a
+     *  pipeline's own {@code processing.intake} override. */
+    private static IntakeGovernor.Policy effectiveIntake(SchedulerSettings ss) {
+        IntakeGovernor.Policy props = IntakeGovernor.Policy.fromSystemProperties();
+        return new IntakeGovernor.Policy(
+                ss.intakeMaxFilesPerCycle() != null ? ss.intakeMaxFilesPerCycle() : props.baseCap(),
+                ss.intakeMinFilesPerCycle() != null ? ss.intakeMinFilesPerCycle() : props.minCap(),
+                ss.intakeAdaptive() != null ? ss.intakeAdaptive() : props.adaptive());
+    }
+
+    /** A stated optional int field: {@code null} = clear; otherwise an int with the given floor
+     *  (and the {@link #MAX_CAP}-scaled sanity ceiling) or the write is refused. */
+    private static Integer optIntField(Map<String, Object> body, String key, int floor) {
+        Object raw = body.get(key);
+        if (raw == null) return null;
+        int v;
+        try {
+            v = Integer.parseInt(String.valueOf(raw).trim());
+        } catch (NumberFormatException e) {
+            throw new ApiException(422, key + " must be an integer, got '" + raw + "'");
+        }
+        if (v < floor || v > 10_000_000)
+            throw new ApiException(422, key + " must be " + floor + "..10000000, got " + v);
+        return v;
+    }
+
+    /** A stated optional boolean field: {@code null} = clear; otherwise strictly true/false. */
+    private static Boolean optBoolField(Map<String, Object> body, String key) {
+        Object raw = body.get(key);
+        if (raw == null) return null;
+        if (raw instanceof Boolean b) return b;
+        String s = String.valueOf(raw).trim();
+        if ("true".equalsIgnoreCase(s)) return Boolean.TRUE;
+        if ("false".equalsIgnoreCase(s)) return Boolean.FALSE;
+        throw new ApiException(422, key + " must be true or false, got '" + raw + "'");
     }
 
     /** The server-wide document home: {@code -Dsystem.config.dir} → spaces container root → sole

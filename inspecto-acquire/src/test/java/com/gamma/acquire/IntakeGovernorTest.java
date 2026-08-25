@@ -29,6 +29,24 @@ class IntakeGovernorTest {
         assertEquals(100, capped(100, 1).capFor("p"));
     }
 
+    /** Hot-applied fleet globals (scheduler-system-config plan): a CHANGED policy drops every
+     *  learned cap — each was learned under the old thresholds — while an unchanged re-install is a
+     *  no-op that leaves adaptation undisturbed. Reads through {@code policyFor} go live at once. */
+    @Test
+    void setGlobalPolicyHotAppliesAndClearsLearnedCapsOnlyOnChange() {
+        IntakeGovernor gov = capped(100, 1);
+        gov.observeCycle(List.of("p"), POLL_MS + 1, POLL_MS);
+        assertEquals(50, gov.capFor("p"), "precondition: a learned (halved) cap");
+
+        gov.setGlobalPolicy(new IntakeGovernor.Policy(100, 1, true));   // unchanged: no-op
+        assertEquals(50, gov.capFor("p"), "an equal policy must not disturb adaptation");
+
+        gov.setGlobalPolicy(new IntakeGovernor.Policy(200, 5, true));   // changed: caps reset
+        assertEquals(200, gov.capFor("p"), "learned cap must reset to the NEW base");
+        assertEquals(200, gov.policy().baseCap());
+        assertEquals(5, gov.policyFor("p").minCap(), "un-overridden pipeline reads the new globals");
+    }
+
     @Test
     void overrunHalvesTheCap() {
         IntakeGovernor gov = capped(100, 1);
