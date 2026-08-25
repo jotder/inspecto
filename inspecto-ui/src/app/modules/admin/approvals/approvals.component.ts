@@ -5,6 +5,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { ToastrService } from 'ngx-toastr';
 import { AgentApproval, apiErrorMessage, ApprovalDecision, ApprovalsService, LensService } from 'app/inspecto/api';
+import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
@@ -15,13 +16,20 @@ import { fmtDateTime, InspectoRowAction } from 'app/inspecto/grid';
  * mutating agent tool call parks in the intelligence module's inbox (`GET /agent/approvals`); the
  * operator reviews the request's dry-run `preview` and approves or declines it
  * (`POST /agent/approvals/{id}/decision`), which resumes or denies the parked tool. Deciding is
- * Ops-gated (`canOperateRuns`); every lens can read the inbox. The page degrades to an empty grid on
- * failure (module absent / act tier off) with a plain toast, mirroring the Alerts pane.
+ * Ops-gated (`canOperateRuns`); every lens can read the inbox.
+ *
+ * <p>⚠ **A 503 here is an expected state, never an error.** The route 503s when the optional
+ * `inspecto-intelligence` module is absent — and the server deliberately does NOT degrade an
+ * approvals inbox to empty, because an empty inbox reads as "nothing needs approval" when the truth
+ * is "approvals do not exist on this deployment". So a 503 latches into an explained
+ * module-unavailable panel (the `<inspecto-ai-assist>` posture); only OTHER failures toast, with the
+ * server's own message. A toast for the 503 shipped first and taught operators something was broken
+ * when nothing was (fixed 2026-08-26).
  */
 @Component({
     selector: 'app-approvals',
     standalone: true,
-    imports: [MatButtonModule, MatIconModule, MatProgressSpinnerModule, DataTableComponent],
+    imports: [MatButtonModule, MatIconModule, MatProgressSpinnerModule, DataTableComponent, InspectoAlertComponent],
     templateUrl: './approvals.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,
@@ -34,6 +42,9 @@ export class ApprovalsComponent implements OnInit {
 
     readonly approvals = signal<AgentApproval[]>([]);
     readonly loading = signal(false);
+    /** Latched by a 503 on load: the intelligence module is absent — an expected deployment state,
+     *  rendered as an explained panel rather than an error toast. */
+    readonly unavailable = signal(false);
 
     readonly columnDefs: ColDef<AgentApproval>[] = [
         {
@@ -88,14 +99,21 @@ export class ApprovalsComponent implements OnInit {
         this.api.list(100).subscribe({
             next: (a) => {
                 this.approvals.set(a);
+                this.unavailable.set(false);
                 this.loading.set(false);
             },
-            error: () => {
-                // Module-absent (503) / act-tier-off (empty) both land here as an empty inbox + toast;
-                // connectivity messaging is the banner's job, as on the Alerts pane.
+            error: (err) => {
                 this.approvals.set([]);
                 this.loading.set(false);
-                this.toastr.error('Failed to load approvals');
+                // 503 = the optional intelligence module is absent — an EXPECTED state, explained in
+                // place. Anything else is a real failure and toasts with the server's own message;
+                // connectivity (status 0) messaging stays the banner's job.
+                if (err?.status === 503) {
+                    this.unavailable.set(true);
+                } else {
+                    this.unavailable.set(false);
+                    this.toastr.error(apiErrorMessage(err, 'Failed to load approvals'));
+                }
             },
         });
     }

@@ -162,9 +162,13 @@ final class AgentRoutes implements RouteModule {
 
         // AGT-5 P3 (autonomy L2): the approvals inbox. A mutating agent tool call parks in the
         // intelligence module's ApprovalStore until an operator decides here; the decision POST resumes
-        // (approve) or denies the gated tool. Reads degrade to empty when the module is absent (no 503),
-        // mirroring /agent/cases. The decision is itself audited by ControlApi.dispatch; a secured
-        // edition prepends the approver-capability gate at the ApiContext/WriteGates seam (plan §6, L2).
+        // (approve) or denies the gated tool. Reads 503 when the module is absent (agentOr503) — and
+        // for THIS route that is correct, not a gap: an inbox that degraded to empty would read as
+        // "nothing needs approval" when the truth is "approvals do not exist here", which is the one
+        // wrong answer an approval surface can give. (This comment previously claimed degrade-to-empty;
+        // no agent route ever implemented that — corrected 2026-08-26, the UI explains the 503 instead.)
+        // The decision is itself audited by ControlApi.dispatch; a secured edition prepends the
+        // approver-capability gate at the ApiContext/WriteGates seam (plan §6, L2).
         api.get("/agent/approvals", (e, m) ->
                 Map.of("approvals", agentOr503(api).recentApprovals(ApiContext.parseIntOr(ApiContext.query(e, "limit"), 50))));
         api.get("/agent/approvals/(.+)", (e, m) ->
@@ -201,7 +205,10 @@ final class AgentRoutes implements RouteModule {
         });
 
         // AGT-5 P4 (autonomy L3): the autonomy ledger — what the ops_monitor loop did, why, and spend.
-        // Read-degrading (empty when there is no autonomy driver, no 503), mirroring /agent/approvals.
+        // 503s when the intelligence module is absent, like every other agent route (the previous
+        // "read-degrading, mirroring /agent/approvals" claim described an idiom no route implements —
+        // corrected 2026-08-26). With the module present but no autonomy driver, the ledger is
+        // genuinely empty, which IS the degrade case and needs no special casing here.
         api.get("/agent/actions", (e, m) -> Map.of("actions",
                 agentOr503(api).recentAutonomousActions(ApiContext.parseIntOr(ApiContext.query(e, "limit"), 50))));
         api.get("/agent/actions/(.+)", (e, m) ->

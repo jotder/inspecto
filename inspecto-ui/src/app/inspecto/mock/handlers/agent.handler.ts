@@ -335,11 +335,92 @@ function pipelineStatus(
     return { name, paused: false, committedBatches };
 }
 
+/** An AGT-5 P3 approval as the wire carries it (`inspecto/api/approvals.service.ts` AgentApproval). */
+interface ApprovalDoc {
+    id: string;
+    tool: string;
+    agentActor: string;
+    summary: string;
+    arguments: Record<string, unknown>;
+    preview: Record<string, unknown>;
+    status: 'PENDING' | 'APPROVED' | 'DENIED' | 'TIMED_OUT';
+    requestedAt: string;
+    decidedAt: string | null;
+    decidedBy: string | null;
+}
+
+const APPROVALS_COLL = 'agent-approvals';
+const APPROVALS_LIST = /\/agent\/approvals$/;
+const APPROVAL_BY_ID = /\/agent\/approvals\/([^/?]+)$/;
+const APPROVAL_DECISION = /\/agent\/approvals\/([^/?]+)\/decision$/;
+
+/** The server's decision vocabulary, mirrored from `AgentRoutes.parseDecision` (400 on anything else). */
+const APPROVE_WORDS = new Set(['approve', 'approved', 'yes', 'true']);
+const DECLINE_WORDS = new Set(['decline', 'declined', 'deny', 'denied', 'reject', 'rejected', 'no', 'false']);
+
+/**
+ * `/agent/approvals*` — mirrored 1:1 from `AgentRoutes` (module-present deployment): the list is
+ * `{approvals: [...]}` newest-first honoring `?limit`; unknown id → 404; a bad decision string → 400;
+ * and — the server's exact contract — deciding an ALREADY-DECIDED approval is the same 404 as an
+ * unknown one, with `decidedBy` defaulting to "operator". A fresh store answers an EMPTY inbox
+ * (never invented pending work); tests seed the 'agent-approvals' collection to exercise the pane.
+ */
+function handleApprovals(req: MockRequest, store: MockStore, space: string): ReturnType<MockHandler> {
+    const { method, url } = req;
+
+    if (method === 'GET' && APPROVALS_LIST.test(url.split('?')[0])) {
+        const limit = Number(new URLSearchParams(url.split('?')[1] ?? '').get('limit')) || 50;
+        const all = store
+            .list<ApprovalDoc>(space, APPROVALS_COLL)
+            .sort((a, b) => (a.requestedAt < b.requestedAt ? 1 : -1));
+        return json({ approvals: all.slice(0, limit) });
+    }
+
+    const decision = match(url, APPROVAL_DECISION);
+    if (method === 'POST' && decision) {
+        const id = decodeURIComponent(decision[1]);
+        const b = (req.body ?? {}) as { decision?: unknown; decidedBy?: unknown };
+        const word = typeof b.decision === 'string' ? b.decision.trim().toLowerCase() : '';
+        const approve = APPROVE_WORDS.has(word) ? true : DECLINE_WORDS.has(word) ? false : null;
+        if (approve === null) return error(400, "decision is required and must be 'approve' or 'decline'");
+        const doc = store.get<ApprovalDoc>(space, APPROVALS_COLL, id);
+        if (!doc || doc.status !== 'PENDING')
+            return error(404, `unknown or already-decided approval: '${id}'`);
+        const decidedBy =
+            typeof b.decidedBy === 'string' && b.decidedBy.trim() ? b.decidedBy.trim() : 'operator';
+        const decided: ApprovalDoc = {
+            ...doc,
+            status: approve ? 'APPROVED' : 'DENIED',
+            decidedAt: new Date().toISOString(),
+            decidedBy,
+        };
+        return json(store.put(space, APPROVALS_COLL, id, decided));
+    }
+
+    const byId = match(url, APPROVAL_BY_ID);
+    if (method === 'GET' && byId) {
+        const id = decodeURIComponent(byId[1]);
+        const doc = store.get<ApprovalDoc>(space, APPROVALS_COLL, id);
+        return doc ? json(doc) : error(404, `unknown approval: '${id}'`);
+    }
+
+    return undefined;
+}
+
 export function agentHandler(flags: MockFlags): MockHandler {
     return (req: MockRequest, store: MockStore) => {
         if (!flags.mockOps) return undefined;
-        if (req.method !== 'POST') return undefined;
         const space = req.space;
+
+        // AGT-5 P3 — the approvals inbox. Offline the mock plays "module present": the honest answer
+        // for a fresh store is an EMPTY inbox (never invented pending requests), and anything a test
+        // seeds into the 'agent-approvals' collection round-trips through the decision route. The real
+        // route 503s when inspecto-intelligence is absent — the pane's module-unavailable state is
+        // exercised in its spec, not by the mock, which models the module-present deployment.
+        const approvalsResponse = handleApprovals(req, store, space);
+        if (approvalsResponse) return approvalsResponse;
+
+        if (req.method !== 'POST') return undefined;
 
         // AGT-6a A5.1 — the derive hop. Checked FIRST, because /agent/tools/([^/?]+)$ would otherwise
         // never match this URL at all and the route would 404 offline while working against a real

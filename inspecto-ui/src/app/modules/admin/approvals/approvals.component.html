@@ -18,6 +18,17 @@
         </div>
     </div>
 
+    <!-- Module absent: an expected deployment state, explained in place — never an error toast. The
+         grid is NOT mounted behind it (@if/@else, not [class.hidden]): an empty ag-grid kept in the
+         DOM fails axe's aria-required-children, and nothing here needs the hidden-not-destroyed
+         idiom — no ViewChild reads the table. -->
+    @if (unavailable()) {
+        <inspecto-alert class="mt-4" variant="info" title="Agent approvals are not available on this deployment">
+            The approvals inbox is part of the optional intelligence module (inspecto-intelligence), which is not
+            installed here. Nothing is waiting for review and nothing is broken — deploy an edition that bundles the
+            module to enable agent approvals.
+        </inspecto-alert>
+    } @else {
     <!-- Approvals grid -->
     <div class="mt-4 flex-auto">
         <inspecto-data-table
@@ -33,4 +44,5 @@
             noRowsHint="When the agent's act tier is enabled and it proposes a mutating action, the request appears here for review."
         />
     </div>
+    }
 </div>

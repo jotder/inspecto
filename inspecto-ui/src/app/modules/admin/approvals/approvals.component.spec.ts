@@ -108,12 +108,31 @@ describe('ApprovalsComponent', () => {
         expect(c.approvals()[0].status).toBe('PENDING');
     });
 
-    it('degrades to an empty inbox + plain failure toast when the load fails', async () => {
+    /** A 503 means the optional intelligence module is absent — an EXPECTED deployment state. It must
+     *  latch the explained panel and never toast: a red toast for a state that isn't broken teaches
+     *  operators to distrust the surface (shipped that way first; fixed 2026-08-26). Assert the
+     *  RENDERED alert, not just the signal — a getter returning true proves nothing reached the screen. */
+    it('explains a 503 as module-unavailable in place, without an error toast', async () => {
         const { fixture, toastr } = await create({ list: () => throwError(() => ({ status: 503 })) });
         const c = fixture.componentInstance;
+        fixture.detectChanges();
         expect(c.approvals()).toEqual([]);
         expect(c.loading()).toBe(false);
-        expect(toastr.error).toHaveBeenCalledWith('Failed to load approvals');
+        expect(c.unavailable()).toBe(true);
+        expect(toastr.error).not.toHaveBeenCalled();
+        const el: HTMLElement = fixture.nativeElement;
+        expect(el.textContent).toContain('Agent approvals are not available on this deployment');
+        await expectNoA11yViolations(el);
+    });
+
+    it('a NON-503 load failure still toasts, with the server message when it carries one', async () => {
+        const { fixture, toastr } = await create({
+            list: () => throwError(() => ({ status: 500, error: { error: { message: 'store exploded' } } })),
+        });
+        const c = fixture.componentInstance;
+        expect(c.approvals()).toEqual([]);
+        expect(c.unavailable()).toBe(false);
+        expect(toastr.error).toHaveBeenCalled();
     });
 
     it('renders the loaded state with no a11y violations', async () => {

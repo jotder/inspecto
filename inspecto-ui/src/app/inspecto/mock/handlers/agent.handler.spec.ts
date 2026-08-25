@@ -299,3 +299,58 @@ describe('agentHandler · kpi_report_builder', () => {
         expect(call({ dataset: 'd', title: 'x', measures: [{ agg: 'sum' }] })?.status).toBe(422);
     });
 });
+
+/**
+ * AGT-5 P3 — `/agent/approvals*` offline, mirrored 1:1 from `AgentRoutes` (module-present
+ * deployment). The strictness worth pinning: a fresh store answers an EMPTY inbox (never invented
+ * pending work), a bad decision word is a 400, and — the server's exact contract — deciding an
+ * already-decided approval is the SAME 404 as an unknown one.
+ */
+describe('agentHandler · approvals inbox', () => {
+    const handler = agentHandler({ mockOps: true });
+
+    const get = (store: MockStore, url: string) => handler({ method: 'GET', url, body: null, params: {}, space: 'default' }, store);
+    const post = (store: MockStore, url: string, body: unknown) =>
+        handler({ method: 'POST', url, body, params: {}, space: 'default' }, store);
+
+    const seed = (store: MockStore, id: string, status = 'PENDING') =>
+        store.put('default', 'agent-approvals', id, {
+            id,
+            tool: 'config_write',
+            agentActor: 'agent:run-7',
+            summary: 'write pipeline x',
+            arguments: {},
+            preview: {},
+            status,
+            requestedAt: '2026-08-26T10:00:00Z',
+            decidedAt: null,
+            decidedBy: null,
+        });
+
+    it('a fresh store answers an EMPTY inbox — never invented pending work', () => {
+        expect(get(new MockStore(), '/agent/approvals')?.body).toEqual({ approvals: [] });
+    });
+
+    it('a seeded approval round-trips: list, by id, then an approve decision', () => {
+        const store = new MockStore();
+        seed(store, 'ap-1');
+        expect((get(store, '/agent/approvals?limit=10')?.body as { approvals: unknown[] }).approvals).toHaveLength(1);
+        expect((get(store, '/agent/approvals/ap-1')?.body as { status: string }).status).toBe('PENDING');
+        const decided = post(store, '/agent/approvals/ap-1/decision', { decision: 'approve' })?.body as {
+            status: string;
+            decidedBy: string;
+        };
+        expect(decided.status).toBe('APPROVED');
+        expect(decided.decidedBy).toBe('operator'); // the server's default when decidedBy is absent
+    });
+
+    it('refuses exactly what the server refuses: bad word 400, unknown 404, already-decided the SAME 404', () => {
+        const store = new MockStore();
+        seed(store, 'ap-2');
+        expect(post(store, '/agent/approvals/ap-2/decision', { decision: 'maybe' })?.status).toBe(400);
+        expect(post(store, '/agent/approvals/nope/decision', { decision: 'approve' })?.status).toBe(404);
+        post(store, '/agent/approvals/ap-2/decision', { decision: 'decline' });
+        expect(post(store, '/agent/approvals/ap-2/decision', { decision: 'approve' })?.status).toBe(404);
+        expect(get(store, '/agent/approvals/nope')?.status).toBe(404);
+    });
+});
