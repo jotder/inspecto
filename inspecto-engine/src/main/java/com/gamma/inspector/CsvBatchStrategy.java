@@ -146,13 +146,10 @@ final class CsvBatchStrategy implements BatchIngestStrategy {
                     }
                     dropTable(conn, tempTable);
 
-                    // 🔴 KNOWN GAP (BACKLOG §4 "Unpack stage — open items" (3)): for an
-                    // unpack-expanded member this is the TEMP name, so an archive member's
-                    // lineage/filename_column records the index-prefixed "00001_a.csv" —
-                    // an implementation detail leaking into DATA. Fix here (strip the
-                    // NNNNN_ prefix, or map back via UnpackOrigins) once the plan's §6 Q2
-                    // lineage grain is settled.
-                    srcIdToFile.put(m.srcId(), m.file().getName());
+                    // lineageName: the ENTRY name for an unpack-expanded archive member (never the
+                    // index-prefixed temp name — that is workspace bookkeeping, this is DATA), the
+                    // plain filename for everything else.
+                    srcIdToFile.put(m.srcId(), com.gamma.etl.unpack.UnpackOrigins.lineageName(m.file()));
                     survivors.add(m);
                     totalInputRows += ing.parsedRows();
                     memberAudits.add(MemberAudit.accepted(m, ing.parsedRows(), ing.errorRows(), mStart));

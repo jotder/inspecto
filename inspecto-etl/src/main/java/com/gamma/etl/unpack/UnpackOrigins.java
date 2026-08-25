@@ -2,6 +2,7 @@ package com.gamma.etl.unpack;
 
 import java.io.File;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -38,15 +39,75 @@ public final class UnpackOrigins {
     private static final Map<Path, java.util.concurrent.atomic.AtomicInteger> PENDING = new ConcurrentHashMap<>();
     /** Total entries the original expanded to — 1 ⇒ stream semantics, >1 ⇒ archive semantics. */
     private static final Map<Path, Integer> TOTALS = new ConcurrentHashMap<>();
+    /**
+     * The LINEAGE name behind an expanded file — the ENTRY name for an archive member (never the
+     * workspace's {@code NNNNN_}-prefixed temp name, which is an implementation detail that must not
+     * leak into {@code output.filename_column}/lineage: BACKLOG §4 "Unpack stage — open items" (3),
+     * fixed 2026-08-26). Recorded at register time by the ONE caller that knows the plugin kind.
+     */
+    private static final Map<Path, String> NAMES = new ConcurrentHashMap<>();
+    /**
+     * Entries an archive's expansion had to SKIP (encrypted / unsupported method — no readable
+     * bytes, so nothing to plan or quarantine), keyed by ORIGINAL. Drained once by
+     * {@code BatchProcessor.finalizeSource} into the first finalising batch's manifest, so a partial
+     * expansion never looks like a clean success (open item (4), honesty half). Same crash posture
+     * as the rest of this registry: a crash loses the record, the WARN log keeps the trace.
+     */
+    private static final Map<Path, List<String>> SKIPPED = new ConcurrentHashMap<>();
 
     private UnpackOrigins() {}
 
-    /** Record that {@code actual} (the expanded temp file) stands in for {@code original} (inbox). */
+    /** {@link #register(Path, File, String)} with the actual filename as the lineage name. */
     public static void register(Path actual, File original) {
+        register(actual, original, actual.getFileName().toString());
+    }
+
+    /**
+     * Record that {@code actual} (the expanded temp file) stands in for {@code original} (inbox),
+     * with {@code lineageName} as the name lineage and {@code filename_column} record for it.
+     */
+    public static void register(Path actual, File original, String lineageName) {
         Path key = original.toPath().toAbsolutePath().normalize();
         ORIGINS.put(actual.toAbsolutePath().normalize(), original);
+        NAMES.put(actual.toAbsolutePath().normalize(), lineageName);
         PENDING.computeIfAbsent(key, k -> new java.util.concurrent.atomic.AtomicInteger()).incrementAndGet();
         TOTALS.merge(key, 1, Integer::sum);
+    }
+
+    /**
+     * The name lineage should record for {@code file}: the registered lineage name for an expansion
+     * product (the archive ENTRY's own name), the plain filename for everything else.
+     *
+     * <p>⚠ FIVE call sites feed lineage a filename and every one must come through here, or the
+     * {@code NNNNN_} temp name leaks back into DATA for whichever lane is missed: the three
+     * {@code srcIdToFile} puts ({@code CsvBatchStrategy}, {@code NativeCsvStreamingEngine},
+     * {@code UnionModeIngester}) plus the two {@code DuckDbRecordSink} constructions that pass its
+     * {@code lineageName} ({@code GenerationModeIngester}, {@code UnionModeIngester} — the wrap lane
+     * names the file at construction, not per row).
+     */
+    public static String lineageName(File file) {
+        String name = NAMES.get(file.toPath().toAbsolutePath().normalize());
+        return name != null ? name : file.getName();
+    }
+
+    /** Record the entries {@code original}'s expansion skipped as unreadable (empty = no-op). */
+    public static void registerSkipped(File original, List<String> entryNames) {
+        if (entryNames.isEmpty()) return;
+        SKIPPED.merge(original.toPath().toAbsolutePath().normalize(),
+                List.copyOf(entryNames), (a, b) -> {
+                    List<String> merged = new java.util.ArrayList<>(a);
+                    merged.addAll(b);
+                    return List.copyOf(merged);
+                });
+    }
+
+    /**
+     * Drain {@code original}'s skipped-entry record — returned exactly once (atomically, so exactly
+     * one finalising batch writes the manifest rows), empty every other call.
+     */
+    public static List<String> takeSkipped(File original) {
+        List<String> skipped = SKIPPED.remove(original.toPath().toAbsolutePath().normalize());
+        return skipped != null ? skipped : List.of();
     }
 
     /** The inbox original behind {@code file}, or {@code file} itself when it was never expanded. */
@@ -73,11 +134,13 @@ public final class UnpackOrigins {
     public static File consume(File actual) {
         File original = ORIGINS.remove(actual.toPath().toAbsolutePath().normalize());
         if (original == null) return null;
+        NAMES.remove(actual.toPath().toAbsolutePath().normalize());
         Path key = original.toPath().toAbsolutePath().normalize();
         java.util.concurrent.atomic.AtomicInteger left = PENDING.get(key);
         if (left == null || left.decrementAndGet() > 0) return null;
         PENDING.remove(key);
         TOTALS.remove(key);
+        SKIPPED.remove(key);   // normally drained at first finalize; purged here when manifests are off
         return original;
     }
 }

@@ -55,4 +55,16 @@ public interface DecompressorPlugin {
      *         the ORIGINAL as the failing file
      */
     List<Path> expand(Path source, Path workDir, UnpackLimits limits) throws IOException;
+
+    /**
+     * As {@link #expand(Path, Path, UnpackLimits)}, additionally reporting the entries the plugin
+     * had to SKIP (e.g. an encrypted or unsupported-method archive member — readable metadata, no
+     * readable bytes) by adding their entry names to {@code skippedOut}. The caller records those in
+     * the batch manifest so a partial expansion never looks like a clean success. Default delegates
+     * for plugins that can never skip ({@link Kind#STREAM} is all-or-nothing by construction).
+     */
+    default List<Path> expand(Path source, Path workDir, UnpackLimits limits,
+                              List<String> skippedOut) throws IOException {
+        return expand(source, workDir, limits);
+    }
 }

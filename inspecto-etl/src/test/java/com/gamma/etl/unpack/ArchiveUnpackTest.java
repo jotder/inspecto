@@ -146,6 +146,68 @@ class ArchiveUnpackTest {
         assertTrue(e.getMessage().contains("no readable entries"), e.getMessage());
     }
 
+    // ── unreadable members (open item (4), honesty half) ───────────────────────
+
+    /** {@code entryName} is the exact reverse of the workspace's {@code <NNNNN>_} naming — and only that. */
+    @Test
+    void entryNameStripsOnlyTheOrderingPrefix() {
+        assertEquals("a.csv", ArchiveDecompressorPlugin.entryName("00001_a.csv"));
+        // an entry whose REAL name looks like a prefix keeps it — only the outer one is ours
+        assertEquals("00042_data.csv", ArchiveDecompressorPlugin.entryName("00007_00042_data.csv"));
+        assertEquals("entry", ArchiveDecompressorPlugin.entryName("000123_entry"));  // %05d widened
+        assertEquals("feed.csv", ArchiveDecompressorPlugin.entryName("feed.csv"));   // no prefix
+        assertEquals("123_x.csv", ArchiveDecompressorPlugin.entryName("123_x.csv")); // too few digits
+        assertEquals("a1cde_x.csv", ArchiveDecompressorPlugin.entryName("a1cde_x.csv")); // not digits
+    }
+
+    /**
+     * 🔴 An encrypted (or unsupported-method) member must be REPORTED, never silently dropped — an
+     * encrypted zip that expands to fewer members must not look like a clean success.
+     */
+    @Test
+    void unreadableMemberIsSkippedAndReported(@TempDir Path dir) throws Exception {
+        Path z = encryptedFirstEntryZip(dir, "mixed.zip", "locked.csv", "open.csv");
+        Path work = Files.createDirectories(dir.resolve("w"));
+        List<String> skipped = new java.util.ArrayList<>();
+        List<Path> out = new ArchiveDecompressorPlugin.Zip()
+                .expand(z, work, UnpackLimits.DEFAULTS, skipped);
+        assertEquals(List.of("locked.csv"), skipped, "the skip is reported to the caller");
+        assertEquals(List.of("00001_open.csv"),
+                out.stream().map(p -> p.getFileName().toString()).toList());
+        assertEquals(B, Files.readString(out.get(0)));
+    }
+
+    /** An ALL-unreadable archive still fails whole — that posture is unchanged. */
+    @Test
+    void allUnreadableArchiveStillFailsWhole(@TempDir Path dir) throws Exception {
+        Path z = encryptedFirstEntryZip(dir, "locked.zip", "only.csv", null);
+        IOException e = assertThrows(IOException.class, () -> new ArchiveDecompressorPlugin.Zip()
+                .expand(z, Files.createDirectories(dir.resolve("w")), UnpackLimits.DEFAULTS));
+        assertTrue(e.getMessage().contains("no readable entries"), e.getMessage());
+    }
+
+    /**
+     * End-to-end through the stage: lineage gets the ENTRY name (open item (3) — never the
+     * index-prefixed temp name), and the skipped entries are recorded against the ORIGINAL for the
+     * manifest to drain — exactly once.
+     */
+    @Test
+    void stageRecordsEntryLineageNamesAndSkippedEntries(@TempDir Path dir) throws Exception {
+        var cfg = UnpackFixtures.load(dir, "");
+        Path inbox = Path.of(cfg.dirs().poll());
+        Path z = encryptedFirstEntryZip(inbox, "mixed.zip", "locked.csv", "open.csv");
+
+        List<File> out = UnpackStage.expand(cfg, List.of(z.toFile()));
+
+        assertEquals(1, out.size());
+        assertTrue(out.get(0).getName().endsWith("_open.csv"), out.get(0).getName());
+        assertEquals("open.csv", UnpackOrigins.lineageName(out.get(0)),
+                "lineage records the ENTRY name, never the workspace temp name");
+        assertEquals(List.of("locked.csv"), UnpackOrigins.takeSkipped(z.toFile()));
+        assertEquals(List.of(), UnpackOrigins.takeSkipped(z.toFile()), "drained exactly once");
+        UnpackStage.cleanup(out.get(0));   // release the static registry for other tests
+    }
+
     // ── the refcounted origin bookkeeping ──────────────────────────────────────
 
     /**
@@ -261,6 +323,41 @@ class ArchiveUnpackTest {
     }
 
     // ── fixtures ───────────────────────────────────────────────────────────────
+
+    /**
+     * A zip whose FIRST entry carries the encryption flag ({@code lockedName}, body {@link #A}) —
+     * the streaming reader then reports {@code canReadEntryData == false} for it, exactly like a
+     * password-protected member. {@code openName} (body {@link #B}) follows as a readable entry, or
+     * pass null for an all-unreadable archive. STORED entries, so the reader can skip the locked one
+     * by its known size.
+     */
+    private static Path encryptedFirstEntryZip(Path dir, String name,
+                                               String lockedName, String openName) throws IOException {
+        Files.createDirectories(dir);
+        Path p = dir.resolve(name);
+        List<String> names  = openName != null ? List.of(lockedName, openName) : List.of(lockedName);
+        List<String> bodies = openName != null ? List.of(A, B) : List.of(A);
+        try (ZipArchiveOutputStream zos = new ZipArchiveOutputStream(Files.newOutputStream(p))) {
+            for (int i = 0; i < names.size(); i++) {
+                ZipArchiveEntry e = new ZipArchiveEntry(names.get(i));
+                byte[] b = bodies.get(i).getBytes(StandardCharsets.UTF_8);
+                e.setMethod(ZipArchiveEntry.STORED);
+                e.setSize(b.length);
+                java.util.zip.CRC32 crc = new java.util.zip.CRC32();
+                crc.update(b);
+                e.setCrc(crc.getValue());
+                zos.putArchiveEntry(e);
+                zos.write(b);
+                zos.closeArchiveEntry();
+            }
+        }
+        // Flip the encryption bit (general-purpose bit 0, 2-byte LE field at offset 6 of the local
+        // file header — the first LFH starts at byte 0) on the FIRST entry only.
+        byte[] bytes = Files.readAllBytes(p);
+        bytes[6] |= 1;
+        Files.write(p, bytes);
+        return p;
+    }
 
     private static Path zip(Path dir, String name, List<String> names, List<String> bodies) throws IOException {
         Files.createDirectories(dir);

@@ -67,6 +67,12 @@ public abstract class ArchiveDecompressorPlugin implements DecompressorPlugin {
 
     @Override
     public List<Path> expand(Path source, Path workDir, UnpackLimits limits) throws IOException {
+        return expand(source, workDir, limits, new ArrayList<>());
+    }
+
+    @Override
+    public List<Path> expand(Path source, Path workDir, UnpackLimits limits,
+                             List<String> skippedOut) throws IOException {
         List<Path> written = new ArrayList<>();
         Path inProgress = null;          // deleted on a breach too — it is a partial file by definition
         long inBytes = Files.size(source);
@@ -76,13 +82,14 @@ public abstract class ArchiveDecompressorPlugin implements DecompressorPlugin {
             ArchiveEntry e;
             while ((e = in.getNextEntry()) != null) {
                 if (e.isDirectory()) continue;
-                // 🔴 KNOWN GAP (BACKLOG §4 "Unpack stage — open items" (4)): an encrypted or
-                // unsupported-method member is skipped SILENTLY, so an encrypted zip can expand to
-                // fewer members and still look like a clean success. Only an all-unreadable archive
-                // fails, via the "no readable entries" throw below. Reporting skips properly needs
-                // the run-level unpack ledger, which is blocked on the plan's §6 Q1 — until then this
-                // WARNs so the skip is at least visible in the log.
+                // An encrypted or unsupported-method member has readable metadata but no readable
+                // bytes: skip it, and REPORT the skip via skippedOut so the caller can record it in
+                // the batch manifest (a partial expansion must never look like a clean success —
+                // BACKLOG §4 "Unpack stage — open items" (4), honesty half fixed 2026-08-26). An
+                // all-unreadable archive still fails whole, via the "no readable entries" throw
+                // below; the archive-level status vocabulary stays the plan's §6 Q1.
                 if (!in.canReadEntryData(e)) {
+                    skippedOut.add(e.getName());
                     log.warn("[UNPACK] {}: skipping unreadable member '{}' of {} (encrypted or "
                             + "unsupported method) — it will NOT appear in the expansion",
                             id, e.getName(), source.getFileName());
@@ -123,6 +130,20 @@ public abstract class ArchiveDecompressorPlugin implements DecompressorPlugin {
         if (written.isEmpty())
             throw new IOException(id + ": no readable entries in " + source.getFileName());
         return written;
+    }
+
+    /**
+     * Reverse of {@link #entryPath}: the entry name behind an expansion filename — the
+     * {@code <NNNNN>_} ordering prefix is an implementation detail of the workspace and must never
+     * leak into lineage or {@code output.filename_column} (it is DATA there). Kept beside
+     * {@code entryPath} so the two halves of the format cannot drift.
+     */
+    public static String entryName(String expansionFileName) {
+        int u = expansionFileName.indexOf('_');
+        if (u < 5 || u == expansionFileName.length() - 1) return expansionFileName;   // %05d widens past 99999
+        for (int i = 0; i < u; i++)
+            if (!Character.isDigit(expansionFileName.charAt(i))) return expansionFileName;
+        return expansionFileName.substring(u + 1);
     }
 
     /** {@code <NNNNN>_<flattened>} under {@code workDir}, asserted to stay inside it. */

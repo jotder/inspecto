@@ -69,8 +69,11 @@ final class UnionModeIngester {
                     Map<String, String> rawTables = Map.of();
                     boolean quarantined = false;
 
+                    // lineageName: see the srcIdToFile put below — the ENTRY name for an
+                    // unpack-expanded archive member, never the workspace temp name.
                     try (DuckDbRecordSink sink = new DuckDbRecordSink(
-                            conn, m.srcId(), cfg, batch.batchId(), stem, m.file().getName(),
+                            conn, m.srcId(), cfg, batch.batchId(), stem,
+                            com.gamma.etl.unpack.UnpackOrigins.lineageName(m.file()),
                             Long.MAX_VALUE, true)) {
                         try {
                             ingester.ingest(m.file(), sink, m.srcId(), cfg);
@@ -99,9 +102,9 @@ final class UnionModeIngester {
                     }
 
                     survivors.add(m);
-                    // 🔴 Same known gap as CsvBatchStrategy's srcIdToFile put — an expanded
-                    // member records its index-prefixed TEMP name (BACKLOG §4, item (3)).
-                    srcIdToFile.put(m.srcId(), m.file().getName());
+                    // lineageName: the ENTRY name for an unpack-expanded archive member, the
+                    // plain filename otherwise — the temp name is workspace bookkeeping, never DATA.
+                    srcIdToFile.put(m.srcId(), com.gamma.etl.unpack.UnpackOrigins.lineageName(m.file()));
                     totalInputRows += memberParsed;
                     memberAudits.add(MemberAudit.accepted(m, memberParsed, memberErrors, mStart));
                     for (Map.Entry<String, String> e : rawTables.entrySet())

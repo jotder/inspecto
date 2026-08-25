@@ -280,6 +280,29 @@ public final class BatchProcessor {
                     a.filename(), a.srcId(), rel, "", a.status()));
         }
 
+        // Unpack open item (4), honesty half (2026-08-26) — entries an archive's expansion had to
+        // SKIP (encrypted / unsupported method: readable metadata, no readable bytes) join the
+        // manifest too, so a partial expansion never reads as a clean success. They were never
+        // planned, so they carry no srcId (-1), no backup and no marker; the archive-LEVEL status
+        // vocabulary stays the unpack plan's §6 Q1. Drained once per original (takeSkipped is
+        // atomic), by the first of its members' batches to finalize — and only when a manifest will
+        // actually be written, so a manifests-off run keeps the record for the WARN log alone.
+        if (cfg.dirs().manifestsDir() != null) {
+            java.util.Set<File> originals = new java.util.LinkedHashSet<>();
+            for (Batch.Member m : batch.members())
+                originals.add(com.gamma.etl.unpack.UnpackOrigins.originalOr(m.file()));
+            for (File original : originals) {
+                List<String> skipped = com.gamma.etl.unpack.UnpackOrigins.takeSkipped(original);
+                if (skipped.isEmpty()) continue;
+                Path fp = original.toPath().toAbsolutePath().normalize();
+                String archiveRel = fp.startsWith(poll)
+                        ? poll.relativize(fp).toString().replace('\\', '/') : original.getName();
+                for (String entry : skipped)
+                    memberEntries.add(new BatchManifest.MemberEntry(
+                            entry, -1, archiveRel + "!" + entry, "", "SKIPPED_UNREADABLE"));
+            }
+        }
+
         // §3.4.3 — the schema fingerprint that wrote this Consignment, pinned in the manifest and the output
         // registry (data carries its schema identity). Null for schema-less drafts; readers never require it.
         String schemaFingerprint = schemaFingerprintFor(cfg, batch.schemaName());

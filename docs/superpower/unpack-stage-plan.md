@@ -383,15 +383,17 @@ and needs **no** consignment change at all.
 > Each question now records **what the shipped code does while it is unanswered**, so the default is
 > visible rather than implied. The full open-items list, with every workaround and its restriction,
 > is the two `BACKLOG.md` §4 rows added 2026-08-23 ("Unpack stage — open items", "Delimited
-> error-handling knobs — open items"). Two of those are worth pulling forward because they are
-> honesty gaps rather than missing features:
+> error-handling knobs — open items"). The two honesty gaps that were pulled forward are **both
+> FIXED 2026-08-26** (they were defects on any Q1/Q2 answer, so they did not wait):
 >
-> - 🔴 **Lineage records the internal member name.** `srcIdToFile` is `m.file().getName()`, so
->   `output.filename_column` holds the index-prefixed temp name (`00001_a.csv`) for an archive
->   member — an implementation detail leaking into DATA. Worth fixing whichever way Q2 lands.
-> - 🔴 **An unreadable archive member is silently skipped** (`!canReadEntryData` ⇒ `continue`), so an
->   encrypted zip can expand to fewer members and still look like a clean success. Only an
->   all-unreadable archive fails.
+> - ~~🔴 **Lineage records the internal member name.**~~ **FIXED** — lineage/`filename_column` now
+>   records the ENTRY name, stored at register time (`UnpackOrigins.register(..., lineageName)`;
+>   `ArchiveDecompressorPlugin.entryName` reverses `entryPath` in the same class). Q2's defect half
+>   is gone; entry grain is in force pending ratification.
+> - ~~🔴 **An unreadable archive member is silently skipped**~~ **FIXED (honesty half)** — skips are
+>   reported via `expand(..., skippedOut)` and drained once by `finalizeSource` into
+>   `SKIPPED_UNREADABLE` manifest rows (`archive!entry`, srcId -1, no backup/marker). An
+>   all-unreadable archive still fails whole; the archive-LEVEL verdict stays Q1's.
 
 1. **Archive status vocabulary** (§2.2): are `UNPACKED` / `UNPACKED_PARTIAL` / `UNREADABLE` / `EMPTY`
    the right four, and on `UNPACKED_PARTIAL` should the Consignment still commit or fail whole?
@@ -401,9 +403,10 @@ and needs **no** consignment change at all.
    members' manifest rows. Answering this unblocks the run-level `unpack` ledger.
 2. **Lineage grain.** For an entry this should be the **entry** name (finest grain; the Archive link
    lives in the ledger) — confirm, because the alternative (archive name) loses which entry a row
-   came from. **Today, unanswered:** it records the raw expansion filename, which for an archive
-   member is the index-prefixed `00001_a.csv` and for a stream is the decompressed `feed.csv`. The
-   prefix leak is a defect on any answer.
+   came from. **Today (2026-08-26):** the prefix-leak defect is FIXED — it records the **entry name**
+   for an archive member (`good.csv`, never `00001_good.csv`) and the decompressed name for a
+   stream. That is this question's own recommendation, now in force; what remains is ratifying the
+   grain (or asking for archive-name instead, which would be a deliberate information loss).
 3. ~~**Phase 4 appetite.**~~ **RESOLVED by building it** (2026-08-23): failures are recorded in the
    manifest, crash-safe order untouched, branch-aware path unchanged. What remains of the
    "end status against each source file" ask is the run-level ledger under Q1.

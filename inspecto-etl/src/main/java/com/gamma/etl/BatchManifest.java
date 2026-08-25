@@ -45,7 +45,9 @@ public final class BatchManifest {
      * @param srcId           0-based index within the batch
      * @param originalRelPath member path relative to the poll dir (for restore target)
      * @param backupPath      computed backup destination (where the source was moved)
-     * @param status          SUCCESS or a QUARANTINED_* status
+     * @param status          SUCCESS, a QUARANTINED_* status, or SKIPPED_UNREADABLE (an archive
+     *                        entry the unpack stage could not decode — encrypted / unsupported
+     *                        method — so it was never planned: srcId -1, no backup, no marker)
      */
     public record MemberEntry(String filename, int srcId, String originalRelPath,
                               String backupPath, String status) {}

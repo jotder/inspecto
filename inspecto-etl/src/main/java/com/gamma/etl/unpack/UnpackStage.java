@@ -151,13 +151,24 @@ public final class UnpackStage {
             try {
                 Path work = workRoot.resolve(String.valueOf(Math.abs(source.getAbsolutePath().hashCode())));
                 Files.createDirectories(work);
-                List<Path> out = plugin.expand(source.toPath(), work, limits);
+                List<String> skipped = new ArrayList<>();
+                List<Path> out = plugin.expand(source.toPath(), work, limits, skipped);
+                boolean archive = plugin.kind() == DecompressorPlugin.Kind.ARCHIVE;
                 List<File> files = new ArrayList<>(out.size());
                 for (Path p : out) {
-                    UnpackOrigins.register(p, source);
+                    // Lineage records the ENTRY name for an archive member — the workspace's
+                    // NNNNN_ ordering prefix is an implementation detail that must not leak into
+                    // filename_column/lineage. A stream expansion's name is already the real one.
+                    String name = p.getFileName().toString();
+                    UnpackOrigins.register(p, source,
+                            archive ? ArchiveDecompressorPlugin.entryName(name) : name);
                     log.info("[UNPACK] {} original={} actual={}", plugin.id(), source.getName(), p);
                     files.add(p.toFile());
                 }
+                // Entries the walk had to skip (encrypted / unsupported method) are recorded against
+                // the ORIGINAL; finalizeSource drains them into the manifest so a partial expansion
+                // never looks like a clean success.
+                UnpackOrigins.registerSkipped(source, skipped);
                 expanded = files;
             } catch (IOException e) {
                 // Fail-open: the original flows on and fails in the engine, where the per-file

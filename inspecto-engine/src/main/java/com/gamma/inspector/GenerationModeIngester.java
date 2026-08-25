@@ -55,8 +55,11 @@ final class GenerationModeIngester {
                             m.file().getName(), ++memberIdx, batch.members().size());
                     LocalDateTime mStart = LocalDateTime.now();
                     String stem = CsvIngester.stripExtensions(m.file().getName());
+                    // lineageName: the ENTRY name for an unpack-expanded archive member, the plain
+                    // filename otherwise — the temp name is workspace bookkeeping, never DATA.
                     try (DuckDbRecordSink sink = new DuckDbRecordSink(
-                            conn, m.srcId(), cfg, batch.batchId(), stem, m.file().getName(), flushRows)) {
+                            conn, m.srcId(), cfg, batch.batchId(), stem,
+                            com.gamma.etl.unpack.UnpackOrigins.lineageName(m.file()), flushRows)) {
                         try {
                             ingester.ingest(m.file(), sink, m.srcId(), cfg);
                             sink.finish();

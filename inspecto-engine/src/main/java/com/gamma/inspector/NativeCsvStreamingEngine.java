@@ -115,9 +115,9 @@ final class NativeCsvStreamingEngine {
                 continue;
             }
 
-            // 🔴 Same known gap as CsvBatchStrategy's srcIdToFile put — an expanded member
-            // records its index-prefixed TEMP name (BACKLOG §4, unpack open item (3)).
-            srcIdToFile.put(m.srcId(), m.file().getName());
+            // lineageName: the ENTRY name for an unpack-expanded archive member, the plain
+            // filename otherwise — the temp name is workspace bookkeeping, never DATA.
+            srcIdToFile.put(m.srcId(), com.gamma.etl.unpack.UnpackOrigins.lineageName(m.file()));
             survivors.add(m);
             memberViews.add(view);
             totalInputRows += parsed;
