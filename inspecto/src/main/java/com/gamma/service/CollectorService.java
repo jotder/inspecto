@@ -95,7 +95,15 @@ public final class CollectorService implements AutoCloseable {
      * restart. Mutated only under {@link #registryLock}; iteration is snapshot-safe.
      */
     private final List<Path> registry;
-    private final long pollSeconds;
+    /** Ingest poll cadence (seconds). Volatile, not final: hot-applied by {@link #reschedulePoll}. */
+    private volatile long pollSeconds;
+    /** Acquisition cadence (seconds); resolved at {@link #start()} ({@code -Dacquire.pollSeconds},
+     *  default = the ingest cadence), hot-applied by {@link #rescheduleAcquire}. */
+    private volatile long acquireSeconds;
+    /** The two cadence timers, held so a hot-applied cadence can cancel + re-register them —
+     *  {@code cancel(false)} lets a running tick finish (nothing is interrupted). */
+    private volatile java.util.concurrent.ScheduledFuture<?> pollTask;
+    private volatile java.util.concurrent.ScheduledFuture<?> acquireTask;
     private final int  maxConcurrentRuns;
     private final BatchEventBus bus = new BatchEventBus();
     /** Append-only operational event store (Phase 1, v4.2.0) — the durable record of "what happened",
@@ -555,6 +563,51 @@ public final class CollectorService implements AutoCloseable {
                 this.pollSeconds * 1000L, this::runPipeline, this::syncStatus);
     }
 
+    // ── hot-tunable cadence (scheduler-system-config plan: poll-cadence hot-apply) ──────────────
+
+    /** The ingest poll cadence in force (seconds). */
+    public long pollSeconds() {
+        return pollSeconds;
+    }
+
+    /** The acquisition cadence in force (seconds); {@code 0} until {@link #start()} resolves the
+     *  {@code -Dacquire.pollSeconds} default (or a hot-apply sets it earlier). */
+    public long acquirePollSeconds() {
+        return acquireSeconds;
+    }
+
+    /**
+     * Hot-apply a new ingest poll cadence (seconds, floored at 1): cancels the timer with
+     * {@code cancel(false)} — a running tick finishes, nothing is interrupted — re-registers at the
+     * new interval (first fire one full interval out, so a tuning edit never triggers an immediate
+     * cycle), and retargets the T15 governor's overrun threshold, which is defined against this
+     * budget. Called before {@link #start()} it only records the value, which start() schedules with.
+     */
+    public synchronized void reschedulePoll(long seconds) {
+        long s = Math.max(1, seconds);
+        pollSeconds = s;
+        pipelineScheduler.pollIntervalMs(s * 1000L);
+        if (pollTask != null) {
+            pollTask.cancel(false);
+            pollTask = scheduler.everySeconds("poll-all", s, s,
+                    () -> underSpace(pipelineScheduler::dispatchCycle));
+        }
+        log.info("Ingest poll cadence set to {}s{}", s, pollTask == null ? " (applies at start)" : "");
+    }
+
+    /** As {@link #reschedulePoll} for the acquisition timer (no governor retarget — overrun is an
+     *  ingest-cycle concept). */
+    public synchronized void rescheduleAcquire(long seconds) {
+        long s = Math.max(1, seconds);
+        acquireSeconds = s;
+        if (acquireTask != null) {
+            acquireTask.cancel(false);
+            acquireTask = scheduler.everySeconds("acquire-all", s, s,
+                    () -> underSpace(pipelineScheduler::dispatchAcquireCycle));
+        }
+        log.info("Acquisition cadence set to {}s{}", s, acquireTask == null ? " (applies at start)" : "");
+    }
+
     /** The operator's persisted {@link com.gamma.notify.ChannelConfig} channel destinations for this space
      *  (admin CRUD), read live from {@code <write-root>/registry} — this space's config dir, else the global
      *  {@code -Dassist.write.root} (the same root the channel routes write to). Best-effort: no write root, an
@@ -916,12 +969,15 @@ public final class CollectorService implements AutoCloseable {
         // Dispatch-and-return: the tick selects due pipelines and hands each to triggerWorkers, so a slow
         // pipeline cannot delay the next tick for the others. runAllOnce (POST /trigger, tests) keeps the
         // blocking path — same runs, awaited. See PipelineScheduler's "Two cycle entry points, one body".
-        scheduler.everySeconds("poll-all", 0, pollSeconds, () -> underSpace(pipelineScheduler::dispatchCycle));
+        pollTask = scheduler.everySeconds("poll-all", 0, pollSeconds,
+                () -> underSpace(pipelineScheduler::dispatchCycle));
         // B3b: acquisition runs on its own timer, independent of the ingest cycle above, so a slow remote
         // fetch never delays ingest of already-landed files. No-op for a local-only registry (nothing to
-        // acquire). -Dacquire.pollSeconds overrides the cadence; defaults to the ingest poll interval.
-        long acquireSeconds = Long.getLong("acquire.pollSeconds", pollSeconds);
-        scheduler.everySeconds("acquire-all", 0, acquireSeconds, () -> underSpace(pipelineScheduler::dispatchAcquireCycle));
+        // acquire). -Dacquire.pollSeconds overrides the cadence; defaults to the ingest poll interval —
+        // unless a hot-apply already retargeted it before start() (boot install of scheduler.toon).
+        if (acquireSeconds == 0) acquireSeconds = Long.getLong("acquire.pollSeconds", pollSeconds);
+        acquireTask = scheduler.everySeconds("acquire-all", 0, acquireSeconds,
+                () -> underSpace(pipelineScheduler::dispatchAcquireCycle));
         // ACQ-6 push discovery: filesystem events on local `source.discovery: watch` poll roots trigger an
         // immediate single-pipeline run (same runGuard as the loop above, which stays on as the backstop).
         watcher = CollectorWatcher.startFor(configRegistry.all(), name -> {

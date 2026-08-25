@@ -13,9 +13,15 @@ export interface SchedulerTier {
     source: SchedulerSource;
 }
 
-/** The bound space's tier (`GET|PUT /settings/scheduler`). */
+/** The bound space's tier (`GET|PUT /settings/scheduler`). The stored cadences are `null` when the
+ *  space inherits the launch (`-D`) defaults; the `effective*` values are what the running timers
+ *  actually use right now. */
 export interface SchedulerSpaceTier extends SchedulerTier {
     id: string | null;
+    pollSeconds?: number | null;
+    acquirePollSeconds?: number | null;
+    effectivePollSeconds?: number;
+    effectiveAcquirePollSeconds?: number;
 }
 
 /** The server-wide view (`GET /system/scheduler`): both tiers, host cores, and the live broker
@@ -51,8 +57,18 @@ export class SchedulerSettingsService {
         return this.http.put<SchedulerView>(apiUrl('/system/scheduler'), { maxConcurrentConsignments });
     }
 
-    /** Replace the bound space's cap (0 = unbounded); hot-applies. */
-    saveSpace(maxConcurrentConsignments: number): Observable<SchedulerSpaceTier> {
-        return this.http.put<SchedulerSpaceTier>(apiUrl('/settings/scheduler'), { maxConcurrentConsignments });
+    /** Replace the bound space's cap (0 = unbounded) and cadences; hot-applies onto the running
+     *  timers. A `null` cadence CLEARS the stored value — the space reverts, live, to the launch
+     *  default (the server merges: only keys present in the body change). */
+    saveSpace(
+        maxConcurrentConsignments: number,
+        pollSeconds: number | null,
+        acquirePollSeconds: number | null,
+    ): Observable<SchedulerSpaceTier> {
+        return this.http.put<SchedulerSpaceTier>(apiUrl('/settings/scheduler'), {
+            maxConcurrentConsignments,
+            pollSeconds,
+            acquirePollSeconds,
+        });
     }
 }

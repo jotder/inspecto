@@ -18,8 +18,17 @@
 > `duckdb_threads=0` is excluded — it divides cores per pipeline and cannot be summed from one
 > config). Pinned by `ConfigValidatorTest.oversubscriptionWarningUsesTheInstalledFleetConsignmentCap`
 > including the silent-when-uninstalled arm.
-> **Still open:** the poll-cadence
-> hot-apply (`poll_seconds` still boot-only; the two `ScheduledFuture`s are still discarded),
+> **Poll-cadence hot-apply CLOSED 2026-08-25 (same day):** `CollectorService` now holds both
+> `ScheduledFuture`s; `reschedulePoll`/`rescheduleAcquire` cancel-without-interrupt and re-register
+> (first fire one full interval out), and `reschedulePoll` retargets `PipelineScheduler`'s T15
+> governor threshold — the overrun budget must follow the cadence or the controller throttles
+> against a stale budget. Persisted as optional `poll_seconds`/`acquire_poll_seconds` in the SPACE
+> `scheduler.toon` (cadence is per-space; the system tier ignores them); `PUT /settings/scheduler`
+> **merges per key** — absent = preserve stored, explicit `null` = clear + revert live to the `-D`
+> default (a cap-only PUT destroying a stored cadence was caught in review before it shipped, and
+> the same wipe existed in the mock). UI: two cadence fields on Settings ▸ Scheduler (blank =
+> inherit); mock mirrors merge/clear/bounds atomically.
+> **Still open:**
 > `IntakeGovernor` *globals* through the settings doc (per-pipeline overrides are UI-editable, the
 > `-Dingest.*` fleet defaults are not), ingest `runPermits` retirement (left in place, now redundant
 > above the broker), S8 queued-state pane (the broker snapshot is served on `GET /system/scheduler`

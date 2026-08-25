@@ -57,7 +57,7 @@ describe('SchedulerSettingsComponent', () => {
         expect(el.textContent).toContain('cdr_ingest');      // live occupancy row
         expect(el.textContent).toContain('priority 3');
         const inputs = Array.from(el.querySelectorAll('input[type="number"]'));
-        expect(inputs).toHaveLength(2);
+        expect(inputs).toHaveLength(4); // system cap · space cap · poll cadence · acquire cadence
         await expectNoA11yViolations(el);
     });
 

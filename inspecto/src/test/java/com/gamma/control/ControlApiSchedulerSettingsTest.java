@@ -99,6 +99,44 @@ class ControlApiSchedulerSettingsTest {
     }
 
     @Test
+    void pollCadenceHotAppliesToTheRunningServiceAndPersists(@TempDir Path root) throws Exception {
+        ConcurrencyBroker.use(null);
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+
+            // Hot-apply: the PUT retargets the space's running timers, visible on the service itself
+            // and as the effective values in the response — no restart.
+            HttpResponse<String> put = send(c.port, "PUT", "/spaces/acme/settings/scheduler",
+                    "{\"maxConcurrentConsignments\":0,\"pollSeconds\":7,\"acquirePollSeconds\":9}");
+            assertEquals(200, put.statusCode(), put.body());
+            assertEquals(7, json(put).get("effectivePollSeconds").asInt());
+            assertEquals(9, json(put).get("effectiveAcquirePollSeconds").asInt());
+            assertEquals(7, c.spaces().space(com.gamma.service.SpaceId.of("acme")).orElseThrow()
+                    .service().pollSeconds(), "hot-apply did not reach the running service");
+
+            // A cap-only PUT must MERGE, not destroy the stored cadence (the data-loss trap).
+            assertEquals(200, send(c.port, "PUT", "/spaces/acme/settings/scheduler",
+                    "{\"maxConcurrentConsignments\":3}").statusCode());
+            JsonNode got = json(send(c.port, "GET", "/spaces/acme/settings/scheduler", null));
+            assertEquals(7, got.get("pollSeconds").asInt(), "cap-only PUT destroyed the stored cadence");
+            assertEquals(7, got.get("effectivePollSeconds").asInt());
+
+            // An EXPLICIT null clears: stored key removed, live timer reverts to the -D default (60).
+            assertEquals(200, send(c.port, "PUT", "/spaces/acme/settings/scheduler",
+                    "{\"maxConcurrentConsignments\":3,\"pollSeconds\":null}").statusCode());
+            got = json(send(c.port, "GET", "/spaces/acme/settings/scheduler", null));
+            assertTrue(got.get("pollSeconds").isNull(), "explicit null must clear the stored cadence");
+            assertEquals(60, got.get("effectivePollSeconds").asInt(), "clear must revert the live timer");
+
+            // Bounds gate.
+            assertEquals(422, send(c.port, "PUT", "/spaces/acme/settings/scheduler",
+                    "{\"maxConcurrentConsignments\":0,\"pollSeconds\":0}").statusCode());
+            assertEquals(422, send(c.port, "PUT", "/spaces/acme/settings/scheduler",
+                    "{\"maxConcurrentConsignments\":0,\"pollSeconds\":\"fast\"}").statusCode());
+        }
+    }
+
+    @Test
     void boundsGateRefusesBadValuesWith422(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
             // Gate order: with NO space bound, the write gate fires first — 503, never a 500.

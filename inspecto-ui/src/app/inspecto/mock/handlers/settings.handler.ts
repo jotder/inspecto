@@ -34,10 +34,13 @@ const SCHEDULER = /\/settings\/scheduler$/;
 /** The server's bounds gate for a scheduler cap — mirrored verbatim (a mock must never be more lenient). */
 export const SCHEDULER_MAX_CAP = 100_000;
 
-/** Per-tier scheduler cap document; `0` = unbounded, matching `ConcurrencyBroker.UNBOUNDED`. */
+/** Per-tier scheduler document; cap `0` = unbounded, matching `ConcurrencyBroker.UNBOUNDED`.
+ *  Cadences (space tier only) are absent when the space inherits the launch defaults. */
 export interface SchedulerDoc {
     id: string;
     maxConcurrentConsignments: number;
+    pollSeconds?: number;
+    acquirePollSeconds?: number;
 }
 
 /** The stored cap for one tier (`scheduler-system` | `scheduler-space`), or 0 when never saved. */
@@ -60,17 +63,59 @@ export function writeSchedulerCap(
         return { refusal: error(422, 'maxConcurrentConsignments is required (0 = unbounded)'), cap: 0 };
     if (cap < 0 || cap > SCHEDULER_MAX_CAP)
         return { refusal: error(422, `maxConcurrentConsignments must be 0..${SCHEDULER_MAX_CAP}, got ${cap}`), cap: 0 };
-    store.put(space, SETTINGS_COLL, tier, { id: tier, maxConcurrentConsignments: cap } satisfies SchedulerDoc);
+    // MERGE with the stored doc — a cap-only PUT must not destroy a stored cadence (the server merges
+    // per key; a mock that wipes rehearses the data-loss the backend refuses to commit).
+    const existing = store.get<SchedulerDoc>(space, SETTINGS_COLL, tier);
+    store.put(space, SETTINGS_COLL, tier, {
+        ...existing,
+        id: tier,
+        maxConcurrentConsignments: cap,
+    } satisfies SchedulerDoc);
     return { refusal: null, cap };
 }
 
-/** The `/settings/scheduler` wire shape (the bound space's tier). */
+/** The server's cadence bounds gate, mirrored: a STATED cadence must be an int in 1..86400 (explicit
+ *  `null` = clear is legal). Run this BEFORE any write — the server validates the whole body before
+ *  persisting anything, and a mock that half-commits is more lenient than the backend. */
+export function schedulerCadenceRefusal(body: unknown): ReturnType<typeof error> | null {
+    const b = (body ?? {}) as Record<string, unknown>;
+    for (const key of ['pollSeconds', 'acquirePollSeconds'] as const) {
+        if (!(key in b) || b[key] === null) continue;
+        const raw = b[key];
+        const v = typeof raw === 'number' && Number.isInteger(raw) ? raw : Number.NaN;
+        if (Number.isNaN(v) || v < 1 || v > 86_400)
+            return error(422, `${key} must be 1..86400 seconds, got ${String(raw)}`);
+    }
+    return null;
+}
+
+/** Apply the cadence merge (key absent = preserve; explicit `null` = clear; stated = set) onto the
+ *  tier's stored doc. Call {@link schedulerCadenceRefusal} first — this assumes a valid body. */
+export function writeSchedulerCadence(store: MockStore, space: string, tier: string, body: unknown): void {
+    const b = (body ?? {}) as Record<string, unknown>;
+    const doc = store.get<SchedulerDoc>(space, SETTINGS_COLL, tier);
+    if (!doc) return;
+    for (const key of ['pollSeconds', 'acquirePollSeconds'] as const) {
+        if (!(key in b)) continue;
+        if (b[key] === null) delete doc[key];
+        else doc[key] = b[key] as number;
+    }
+    store.put(space, SETTINGS_COLL, tier, doc);
+}
+
+/** The `/settings/scheduler` wire shape (the bound space's tier). Offline the launch default is 60s,
+ *  so the effective cadences are stored-or-60 — mirroring the server's inherit semantics. */
 export function schedulerSpaceShape(store: MockStore, space: string): Record<string, unknown> {
-    const cap = readSchedulerCap(store, space, 'scheduler-space');
+    const doc = store.get<SchedulerDoc>(space, SETTINGS_COLL, 'scheduler-space');
+    const effPoll = doc?.pollSeconds ?? 60;
     return {
         id: space,
-        maxConcurrentConsignments: cap ?? 0,
-        source: cap == null ? 'default' : 'file',
+        effectivePollSeconds: effPoll,
+        effectiveAcquirePollSeconds: doc?.acquirePollSeconds ?? effPoll,
+        maxConcurrentConsignments: doc?.maxConcurrentConsignments ?? 0,
+        pollSeconds: doc?.pollSeconds ?? null,
+        acquirePollSeconds: doc?.acquirePollSeconds ?? null,
+        source: doc == null ? 'default' : 'file',
     };
 }
 
@@ -118,8 +163,13 @@ export function settingsHandler(flags: MockFlags): MockHandler {
             return json(schedulerSpaceShape(store, space));
         }
         if (method === 'PUT' && SCHEDULER.test(url)) {
+            // Validate the WHOLE body before any write — the server is atomic on 422.
+            const cadenceRefusal = schedulerCadenceRefusal(req.body);
+            if (cadenceRefusal) return cadenceRefusal;
             const { refusal } = writeSchedulerCap(store, space, 'scheduler-space', req.body);
-            return refusal ?? json(schedulerSpaceShape(store, space));
+            if (refusal) return refusal;
+            writeSchedulerCadence(store, space, 'scheduler-space', req.body);
+            return json(schedulerSpaceShape(store, space));
         }
 
         return undefined;

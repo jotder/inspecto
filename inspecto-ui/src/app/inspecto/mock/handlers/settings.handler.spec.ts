@@ -59,4 +59,56 @@ describe('settingsHandler', () => {
         const res = settingsHandler({ mockStudio: false } as MockFlags)(req('GET', '/settings/geo'), new MockStore());
         expect(res).toBeUndefined();
     });
+
+    // ── /settings/scheduler — the server's contract, mirrored strictly ─────────────────────────
+
+    it('scheduler: defaults before any save, then a cap+cadence PUT round-trips', () => {
+        const store = new MockStore();
+        const handle = settingsHandler(flags);
+        expect(handle(req('GET', '/settings/scheduler'), store)?.body).toMatchObject({
+            maxConcurrentConsignments: 0,
+            pollSeconds: null,
+            effectivePollSeconds: 60,
+            source: 'default',
+        });
+        handle(req('PUT', '/settings/scheduler', { maxConcurrentConsignments: 12, pollSeconds: 7 }), store);
+        expect(handle(req('GET', '/settings/scheduler'), store)?.body).toMatchObject({
+            maxConcurrentConsignments: 12,
+            pollSeconds: 7,
+            effectivePollSeconds: 7,
+            effectiveAcquirePollSeconds: 7,
+            source: 'file',
+        });
+    });
+
+    it('scheduler: a cap-only PUT merges — it must not destroy a stored cadence', () => {
+        const store = new MockStore();
+        const handle = settingsHandler(flags);
+        handle(req('PUT', '/settings/scheduler', { maxConcurrentConsignments: 12, pollSeconds: 7 }), store);
+        handle(req('PUT', '/settings/scheduler', { maxConcurrentConsignments: 3 }), store);
+        expect(handle(req('GET', '/settings/scheduler'), store)?.body).toMatchObject({
+            maxConcurrentConsignments: 3,
+            pollSeconds: 7,
+        });
+        // Explicit null CLEARS: back to inherit (effective 60).
+        handle(req('PUT', '/settings/scheduler', { maxConcurrentConsignments: 3, pollSeconds: null }), store);
+        expect(handle(req('GET', '/settings/scheduler'), store)?.body).toMatchObject({
+            pollSeconds: null,
+            effectivePollSeconds: 60,
+        });
+    });
+
+    it('scheduler: refuses out-of-bounds values with 422, exactly like the server', () => {
+        const store = new MockStore();
+        const handle = settingsHandler(flags);
+        expect(handle(req('PUT', '/settings/scheduler', {}), store)?.status).toBe(422);
+        expect(handle(req('PUT', '/settings/scheduler', { maxConcurrentConsignments: -1 }), store)?.status).toBe(422);
+        expect(
+            handle(req('PUT', '/settings/scheduler', { maxConcurrentConsignments: 1, pollSeconds: 0 }), store)?.status,
+        ).toBe(422);
+        expect(
+            handle(req('PUT', '/settings/scheduler', { maxConcurrentConsignments: 1, pollSeconds: 'fast' }), store)
+                ?.status,
+        ).toBe(422);
+    });
 });

@@ -18,8 +18,10 @@ import java.util.Map;
  *   GET /system/scheduler     server-wide cap (value + provenance), the bound space's cap,
  *                             host cores, and the broker's live occupancy snapshot
  *   PUT /system/scheduler     replace the server-wide cap (write-root gated, canOperateRuns)
- *   GET /settings/scheduler   the bound space's cap (value + provenance)
- *   PUT /settings/scheduler   replace the bound space's cap (same gates)
+ *   GET /settings/scheduler   the bound space's cap + cadences (stored values, provenance, and the
+ *                             effective cadences on the running timers)
+ *   PUT /settings/scheduler   replace the bound space's cap and optionally its poll/acquire cadence
+ *                             (absent cadence = keep inheriting the -D bootstrap default)
  * </pre>
  *
  * <p><b>Hot-apply.</b> A PUT persists the document and immediately installs the cap on
@@ -73,6 +75,8 @@ final class SchedulerRoutes implements RouteModule {
                     SchedulerSettings ss = SchedulerSettings.read(cfg.resolve(SchedulerSettings.FILE));
                     if (ss.maxConcurrentConsignments() > 0)
                         broker.setSpaceCap(s.id().value(), ss.maxConcurrentConsignments());
+                    if (ss.pollSeconds() != null) s.service().reschedulePoll(ss.pollSeconds());
+                    if (ss.acquirePollSeconds() != null) s.service().rescheduleAcquire(ss.acquirePollSeconds());
                 }
             }
         } catch (RuntimeException e) {
@@ -143,8 +147,18 @@ final class SchedulerRoutes implements RouteModule {
         Path doc = root == null ? null : root.resolve(SchedulerSettings.FILE);
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", spaceId);
+        // The cadences in force on this space's running timers (hot-applied; -D-seeded when unstated).
+        try {
+            m.put("effectivePollSeconds", api.service().pollSeconds());
+            m.put("effectiveAcquirePollSeconds", api.service().acquirePollSeconds());
+        } catch (RuntimeException noService) {
+            // no space bound (fresh hosted deployment) — cadence has no meaning yet
+        }
         if (SchedulerSettings.present(doc)) {
-            m.put("maxConcurrentConsignments", SchedulerSettings.read(doc).maxConcurrentConsignments());
+            SchedulerSettings ss = SchedulerSettings.read(doc);
+            m.put("maxConcurrentConsignments", ss.maxConcurrentConsignments());
+            m.put("pollSeconds", ss.pollSeconds());
+            m.put("acquirePollSeconds", ss.acquirePollSeconds());
             m.put("source", "file");
         } else {
             m.put("maxConcurrentConsignments", 0);
@@ -155,11 +169,42 @@ final class SchedulerRoutes implements RouteModule {
 
     private Object writeSpace(ApiContext api, Map<String, Object> body) throws IOException {
         Path root = requireBoundWriteRoot(api);
+        Path doc = root.resolve(SchedulerSettings.FILE);
         int cap = requireCap(body);
-        new SchedulerSettings(cap).write(root.resolve(SchedulerSettings.FILE));
+        // Merge with the stored document — a cap-only PUT must not destroy a stored cadence.
+        // Key ABSENT = preserve what is stored; key explicitly null = clear it (revert to the -D
+        // bootstrap default, live); key stated = bounds-gated new value.
+        SchedulerSettings stored = SchedulerSettings.read(doc);
+        Integer poll = body.containsKey("pollSeconds")
+                ? optCadence(body, "pollSeconds") : stored.pollSeconds();
+        Integer acquire = body.containsKey("acquirePollSeconds")
+                ? optCadence(body, "acquirePollSeconds") : stored.acquirePollSeconds();
+        new SchedulerSettings(cap, poll, acquire).write(doc);
         ConcurrencyBroker.shared().setSpaceCap(EventLog.currentSpaceId(), cap);
-        log.info("Space '{}' Consignment cap set to {}", EventLog.currentSpaceId(), cap);
+        if (body.containsKey("pollSeconds"))
+            api.service().reschedulePoll(poll != null ? poll : Long.getLong("service.poll.seconds", 60L));
+        if (body.containsKey("acquirePollSeconds"))
+            api.service().rescheduleAcquire(acquire != null ? acquire
+                    : Long.getLong("acquire.pollSeconds", api.service().pollSeconds()));
+        log.info("Space '{}' scheduler settings applied: cap={} poll={}s acquire={}s",
+                EventLog.currentSpaceId(), cap, poll, acquire);
         return spaceShape(api);
+    }
+
+    /** A stated cadence field: {@code null} = clear (revert to the {@code -D} bootstrap default);
+     *  otherwise an int in 1..86400 or the write is refused. */
+    private static Integer optCadence(Map<String, Object> body, String key) {
+        Object raw = body.get(key);
+        if (raw == null) return null;
+        int v;
+        try {
+            v = Integer.parseInt(String.valueOf(raw).trim());
+        } catch (NumberFormatException e) {
+            throw new ApiException(422, key + " must be an integer number of seconds, got '" + raw + "'");
+        }
+        if (v < 1 || v > 86_400)
+            throw new ApiException(422, key + " must be 1..86400 seconds, got " + v);
+        return v;
     }
 
     /** The bound space's write root, or {@code null} when writes are disabled OR no space is bound —

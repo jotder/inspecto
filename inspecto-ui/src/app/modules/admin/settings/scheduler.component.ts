@@ -110,14 +110,30 @@ import { LensService, SchedulerSettingsService, SchedulerView, apiErrorMessage }
                         </div>
                         <p class="text-secondary text-sm">
                             An optional tighter bound for the active space ({{ view()!.space.id || 'default' }}) inside
-                            the server-wide ceiling.
+                            the server-wide ceiling — and the space's poll cadences. Blank cadence = inherit the launch
+                            default (currently {{ view()!.space.effectivePollSeconds ?? 60 }}s poll /
+                            {{ view()!.space.effectiveAcquirePollSeconds ?? 60 }}s acquire).
                         </p>
-                        <div class="flex items-start gap-3">
+                        <div class="flex flex-wrap items-start gap-3">
                             <mat-form-field class="w-60" subscriptSizing="dynamic">
                                 <mat-label>Max concurrent Consignments</mat-label>
                                 <input matInput type="number" formControlName="space" min="0" max="100000" />
                                 @if (spaceForm.controls.space.invalid) {
                                     <mat-error>0 (unbounded) to 100000.</mat-error>
+                                }
+                            </mat-form-field>
+                            <mat-form-field class="w-52" subscriptSizing="dynamic">
+                                <mat-label>Poll interval (seconds)</mat-label>
+                                <input matInput type="number" formControlName="poll" min="1" max="86400" />
+                                @if (spaceForm.controls.poll.invalid) {
+                                    <mat-error>1 to 86400 seconds, or blank to inherit.</mat-error>
+                                }
+                            </mat-form-field>
+                            <mat-form-field class="w-52" subscriptSizing="dynamic">
+                                <mat-label>Acquire interval (seconds)</mat-label>
+                                <input matInput type="number" formControlName="acquire" min="1" max="86400" />
+                                @if (spaceForm.controls.acquire.invalid) {
+                                    <mat-error>1 to 86400 seconds, or blank to inherit.</mat-error>
                                 }
                             </mat-form-field>
                             <button
@@ -127,7 +143,7 @@ import { LensService, SchedulerSettingsService, SchedulerView, apiErrorMessage }
                                 class="mt-1"
                                 [disabled]="!canOperate() || saving()"
                             >
-                                Save space cap
+                                Save space settings
                             </button>
                         </div>
                     </section>
@@ -183,8 +199,12 @@ export class SchedulerSettingsComponent implements OnInit {
     readonly form = this.fb.nonNullable.group({
         system: [0, [Validators.required, Validators.min(0), Validators.max(100_000)]],
     });
-    readonly spaceForm = this.fb.nonNullable.group({
-        space: [0, [Validators.required, Validators.min(0), Validators.max(100_000)]],
+    readonly spaceForm = this.fb.group({
+        space: this.fb.nonNullable.control(0, [Validators.required, Validators.min(0), Validators.max(100_000)]),
+        // Cadences are nullable: blank = inherit the launch default (a save sends null, which CLEARS
+        // any stored value — the server merges per key, so this is an explicit revert, not a wipe).
+        poll: this.fb.control<number | null>(null, [Validators.min(1), Validators.max(86_400)]),
+        acquire: this.fb.control<number | null>(null, [Validators.min(1), Validators.max(86_400)]),
     });
 
     ngOnInit(): void {
@@ -216,7 +236,8 @@ export class SchedulerSettingsComponent implements OnInit {
             return;
         }
         this.saving.set(true);
-        this.api.saveSpace(this.spaceForm.getRawValue().space).subscribe({
+        const v = this.spaceForm.getRawValue();
+        this.api.saveSpace(v.space, v.poll ?? null, v.acquire ?? null).subscribe({
             next: () => {
                 this.saving.set(false);
                 this.refresh();
@@ -246,6 +267,10 @@ export class SchedulerSettingsComponent implements OnInit {
     private apply(v: SchedulerView): void {
         this.view.set(v);
         this.form.patchValue({ system: v.system.maxConcurrentConsignments });
-        this.spaceForm.patchValue({ space: v.space.maxConcurrentConsignments });
+        this.spaceForm.patchValue({
+            space: v.space.maxConcurrentConsignments,
+            poll: v.space.pollSeconds ?? null,
+            acquire: v.space.acquirePollSeconds ?? null,
+        });
     }
 }

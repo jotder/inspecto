@@ -98,9 +98,11 @@ final class PipelineScheduler {
     private final ReentrantLock registryLock;
     private final BatchEventBus bus;
     private final ExecutorService triggerWorkers;
-    /** The scheduler's fixed poll delay (ms) — the budget one cycle is expected to fit inside, and so the
-     *  overrun threshold the T15 admission controller adjusts against ({@link #governCycle}). */
-    private final long pollIntervalMs;
+    /** The scheduler's poll delay (ms) — the budget one cycle is expected to fit inside, and so the
+     *  overrun threshold the T15 admission controller adjusts against ({@link #governCycle}). Volatile:
+     *  a hot-applied cadence change ({@code PUT /settings/scheduler}) retargets the governor's threshold
+     *  along with the timer, or the controller would throttle against a budget no longer in force. */
+    private volatile long pollIntervalMs;
     /** Run one registered pipeline by name (stays on {@link CollectorService}; claims the same run guard). */
     private final Consumer<String> runPipeline;
     /** Project the on-disk audit into the DB status store, if DB-backed (stays on {@link CollectorService}). */
@@ -340,6 +342,11 @@ final class PipelineScheduler {
         gov.observeCycle(List.of(id), runMillis, pollIntervalMs);
         reg.setGauge("inspecto_intake_cap", "Files one poll cycle may admit (T15 admission control)",
                 Map.of("pipeline", id), gov.capFor(id));
+    }
+
+    /** Retarget the governor's overrun threshold when the poll cadence is hot-applied (see the field doc). */
+    void pollIntervalMs(long ms) {
+        this.pollIntervalMs = Math.max(1000, ms);
     }
 
     /**

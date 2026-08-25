@@ -1,7 +1,7 @@
 import { MockFlags } from '../mock-flags';
 import { json, match, MockHandler, MockRequest } from '../mock-http';
 import { MockStore } from '../mock-store';
-import { readSchedulerCap, writeSchedulerCap } from './settings.handler';
+import { readSchedulerCap, schedulerSpaceShape, writeSchedulerCap } from './settings.handler';
 
 const REPORT = /\/system\/operational-db$/;
 const TEST = /\/system\/operational-db\/test$/;
@@ -50,17 +50,14 @@ export function systemHandler(flags: MockFlags): MockHandler {
         if (match(req.url, SCHEDULER)) {
             const shape = (): unknown => {
                 const systemCap = readSchedulerCap(store, req.space, 'scheduler-system');
-                const spaceCap = readSchedulerCap(store, req.space, 'scheduler-space');
                 return {
                     system: {
                         maxConcurrentConsignments: systemCap ?? 0,
                         source: systemCap == null ? 'default' : 'file',
                     },
-                    space: {
-                        id: req.space,
-                        maxConcurrentConsignments: spaceCap ?? 0,
-                        source: spaceCap == null ? 'default' : 'file',
-                    },
+                    // ONE space sub-shape, shared with /settings/scheduler — two hand-built copies of
+                    // the same wire shape is exactly the drift that hid the effective-cadence fields.
+                    space: schedulerSpaceShape(store, req.space),
                     cores: 8,
                     live: {
                         system_cap: systemCap ?? 0,
