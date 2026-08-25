@@ -253,6 +253,13 @@ java -cp inspecto.jar com.gamma.inspector.MultiCollectorProcessor spaces/ucc/con
 
 Collectors run on a virtual-thread executor bounded by `-Dsources.max` (default: all resolved collectors in parallel). Each collector is isolated — one collector failing (bad config or batch failures) is logged and counted but never aborts the others; the process exits non-zero if any collector failed. A failed collector does not stop the rest.
 
+> ⚠ **The rest of this section describes the CLI orchestrator (`MultiCollectorProcessor`).** In
+> **server mode** the fleet factor is not `-Dsources.max` but the broker's system Consignment cap —
+> see [Consignment concurrency](../engine/consignment-concurrency.md) for the four-layer model
+> (per-Pipeline / per-space / per-server + priority), all of it hot-tunable from Settings ▸ Scheduler
+> since 2026-08-25. The oversubscription warning reads the installed fleet cap there; the arithmetic
+> becomes `cap × duckdb_threads ≈ cores`.
+
 **Three multiplying caps.** Total worker pressure ≈ `sources.max × processing.threads × processing.duckdb_threads`. The auto-derive for `duckdb_threads=0` only divides cores among one source's `threads` — it does **not** know about `sources.max`. When running many sources in one JVM, set `duckdb_threads` explicitly (or lower `sources.max`/`threads`) so the three-way product ≈ cores — e.g. on 16 cores: `sources.max=4`, `threads=2`, `duckdb_threads=2`. When `-Dsources.max > 1` is set, the config validator surfaces this at startup: it factors `sources.max` into the explicit-oversubscription check, and for the auto default (`duckdb_threads=0`) it warns that the auto cap ignores `sources.max` and suggests a concrete value (`cores ÷ (sources.max × threads)`).
 
 ### Service mode — always-on host (`CollectorService`)

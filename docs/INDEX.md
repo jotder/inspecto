@@ -75,23 +75,16 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
-- `superpower/scheduler-system-config-plan.md` — **BUILT 2026-08-25 (first slice; see the plan header
-  for the open remainder: S5 validator, cadence hot-apply, intake globals, runPermits retirement,
-  PUT journalling).** Move the
-  fleet-level ingest concurrency controls (`-Dservice.max.runs`, `-Dacquire.maxConcurrent`,
-  `-Dingest.maxFilesPerCycle`, the two poll cadences) off JVM properties onto a persisted,
-  UI-editable system configuration that hot-applies without a restart. Operator decisions
-  2026-08-25: **process-wide** ceiling (today's budget is per-space while `IntakeGovernor` is
-  already process-wide), and the per-pipeline `processing.intake.*` overrides ship in the same
-  slice. Carries a verified fix for `ConfigValidator`'s oversubscription warning, which reads the
-  CLI's `-Dsources.max` and is therefore silent in server mode. Two open operator questions (§7):
-  the absent-file default, and whether a PUT is journalled. **Part B added 2026-08-25** (operator
-  commission, supersedes the priority non-goal): consignment-grain concurrency hierarchy — a
-  process-wide `ConcurrencyBroker` (pipeline ≤ `processing.threads` · space · system caps, one
-  monitor, per-pipeline FIFO queues) with **stride-scheduled weighted grants** from a new
-  `processing.priority: 1..3` (shares, never precedence — low priority provably never starves);
-  replaces the run-local per-run semaphore at `CollectorProcessor:148`, retires ingest
-  `runPermits`, refuses the global-priority-queue design.
+- ~~`superpower/scheduler-system-config-plan.md`~~ — **COMPLETE and ARCHIVED 2026-08-25**
+  (`archived-documents/plans-archive/scheduler-system-config-plan.md`). Shipped in six commits
+  (`1b872515` → `275bf764`): the `ConcurrencyBroker` four-layer hierarchy (per-Pipeline / per-space /
+  per-server caps + a 1–3 priority share that cannot starve), `scheduler.toon` + `/system/scheduler`
+  and `/settings/scheduler` with provenance and hot-apply, the Settings ▸ Scheduler page, cadence and
+  intake globals live-tunable, per-Pipeline `trigger:` cadence and remote fetch parallelism made
+  first-class, and S8 free-slot/throttle visibility. 🔴 The plan's own "retire `runPermits`" row was
+  **refuted by the code** — it guards the pre-broker phase. As-built:
+  [`okf/backend/engine/consignment-concurrency.md`](okf/backend/engine/consignment-concurrency.md);
+  two operator decisions moved to `BACKLOG.md` §4.
 - `superpower/backend-hardening-plan.md` — **PROPOSED 2026-08-25, not started.** Non-breaking backend
   hardening spec from the 2026-08-24 review (4 findings withdrawn/corrected after source verification):
   SpaceMigrator + printStackTrace → slf4j, warn-log the best-effort DDL drops, serve openapi-v1.json at
