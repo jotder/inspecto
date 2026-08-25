@@ -96,6 +96,10 @@ public record NodeAttribute(String key, String label, String type, String tier, 
         return new NodeAttribute(key, label, type, tier, required, defaultValue, options, min, max, help, placeholder);
     }
 
+    NodeAttribute max(double max) {
+        return new NodeAttribute(key, label, type, tier, required, defaultValue, options, min, max, help, placeholder);
+    }
+
     /** {@code value, label, value, label, …} — the option list, kept inline so a table stays one line per key. */
     NodeAttribute options(String... valueLabelPairs) {
         if (valueLabelPairs.length % 2 != 0) throw new IllegalArgumentException("options need value,label pairs");

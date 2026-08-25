@@ -75,7 +75,9 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
-- `superpower/scheduler-system-config-plan.md` — **PROPOSED 2026-08-25, not started.** Move the
+- `superpower/scheduler-system-config-plan.md` — **BUILT 2026-08-25 (first slice; see the plan header
+  for the open remainder: S5 validator, cadence hot-apply, intake globals, runPermits retirement,
+  PUT journalling).** Move the
   fleet-level ingest concurrency controls (`-Dservice.max.runs`, `-Dacquire.maxConcurrent`,
   `-Dingest.maxFilesPerCycle`, the two poll cadences) off JVM properties onto a persisted,
   UI-editable system configuration that hot-applies without a restart. Operator decisions
@@ -83,7 +85,13 @@ former root reference docs** (each index lists them):
   already process-wide), and the per-pipeline `processing.intake.*` overrides ship in the same
   slice. Carries a verified fix for `ConfigValidator`'s oversubscription warning, which reads the
   CLI's `-Dsources.max` and is therefore silent in server mode. Two open operator questions (§7):
-  the absent-file default, and whether a PUT is journalled.
+  the absent-file default, and whether a PUT is journalled. **Part B added 2026-08-25** (operator
+  commission, supersedes the priority non-goal): consignment-grain concurrency hierarchy — a
+  process-wide `ConcurrencyBroker` (pipeline ≤ `processing.threads` · space · system caps, one
+  monitor, per-pipeline FIFO queues) with **stride-scheduled weighted grants** from a new
+  `processing.priority: 1..3` (shares, never precedence — low priority provably never starves);
+  replaces the run-local per-run semaphore at `CollectorProcessor:148`, retires ingest
+  `runPermits`, refuses the global-priority-queue design.
 - `superpower/backend-hardening-plan.md` — **PROPOSED 2026-08-25, not started.** Non-breaking backend
   hardening spec from the 2026-08-24 review (4 findings withdrawn/corrected after source verification):
   SpaceMigrator + printStackTrace → slf4j, warn-log the best-effort DDL drops, serve openapi-v1.json at

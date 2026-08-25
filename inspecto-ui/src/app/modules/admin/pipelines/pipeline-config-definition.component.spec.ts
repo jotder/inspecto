@@ -334,6 +334,10 @@ describe('PipelineConfigDefinitionComponent', () => {
             'batch__max_files',
             'batch__max_bytes',
             'batch__order',
+            'priority',
+            'intake__max_files_per_cycle',
+            'intake__min_files_per_cycle',
+            'intake__adaptive',
         ]);
     });
 

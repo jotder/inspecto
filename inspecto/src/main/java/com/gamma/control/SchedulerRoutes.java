@@ -1,0 +1,200 @@
+package com.gamma.control;
+
+import com.gamma.event.EventLog;
+import com.gamma.inspector.ConcurrencyBroker;
+import com.gamma.service.SpaceContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/**
+ * Consignment-concurrency settings — the hot-tunable tiers of the scheduler-system-config plan
+ * (Part B), served live and persisted as {@code scheduler.toon}:
+ * <pre>
+ *   GET /system/scheduler     server-wide cap (value + provenance), the bound space's cap,
+ *                             host cores, and the broker's live occupancy snapshot
+ *   PUT /system/scheduler     replace the server-wide cap (write-root gated, canOperateRuns)
+ *   GET /settings/scheduler   the bound space's cap (value + provenance)
+ *   PUT /settings/scheduler   replace the bound space's cap (same gates)
+ * </pre>
+ *
+ * <p><b>Hot-apply.</b> A PUT persists the document and immediately installs the cap on
+ * {@link ConcurrencyBroker#shared()} — no restart. A shrink <b>drains</b>: in-flight Consignments
+ * finish and the new ceiling gates the next admissions. {@link #register} also installs both tiers
+ * at boot, so a configured file takes effect without any request.
+ *
+ * <p><b>Precedence (the plan's §3 rule).</b> The file is the source of truth when present;
+ * {@code -Dscheduler.max.consignments} is a bootstrap default consulted only when the server-wide
+ * file is absent; absent both, the tier is unbounded (0) — today's behaviour. The GET reports each
+ * value's provenance ({@code file} | {@code property} | {@code default}) so two declarations can
+ * never leave the operator guessing which won. ⛔ No key served here may also be read from {@code -D}
+ * at use time — split ownership of one fact is what the 2026-08-15 operational-db decision forbids.
+ *
+ * <p><b>Gates.</b> PUTs are {@code canOperateRuns} — tuning a live scheduler is runtime operation,
+ * not workbench authoring — plus the standard write-root 503 and a 422 bound on the value. No
+ * caller-supplied paths (fixed filename at resolved homes), so there is no path jail to apply.
+ * The server-wide document home is {@code -Dsystem.config.dir}, else the spaces container root
+ * (hosted mode), else the sole space's write root — in single-tenant mode the space <i>is</i> the
+ * process. Reads carry no write gate.
+ */
+final class SchedulerRoutes implements RouteModule {
+
+    private static final Logger log = LoggerFactory.getLogger(SchedulerRoutes.class);
+    /** Sanity ceiling for a cap value — far above any real host, small enough to catch unit mistakes
+     *  (someone writing bytes or millis into a slot count). */
+    private static final int MAX_CAP = 100_000;
+    private static final String PROP = "scheduler.max.consignments";
+
+    @Override
+    public void register(ApiContext api) {
+        api.get("/system/scheduler", (e, m) -> ETags.respond(e, systemShape(api)));
+        api.put("/system/scheduler", ApiContext.withCapability("canOperateRuns",
+                (e, m) -> writeSystem(api, api.body(e))));
+        api.get("/settings/scheduler", (e, m) -> ETags.respond(e, spaceShape(api)));
+        api.put("/settings/scheduler", ApiContext.withCapability("canOperateRuns",
+                (e, m) -> writeSpace(api, api.body(e))));
+        installAtBoot(api);
+    }
+
+    // ── boot install: a configured file must take effect without any request ──────
+
+    private void installAtBoot(ApiContext api) {
+        try {
+            ConcurrencyBroker broker = ConcurrencyBroker.shared();
+            broker.setSystemCap(effectiveSystemCap(api));
+            if (api.spaces() != null) {
+                for (SpaceContext s : api.spaces().all()) {
+                    Path cfg = s.root().config();
+                    if (cfg == null) continue;
+                    SchedulerSettings ss = SchedulerSettings.read(cfg.resolve(SchedulerSettings.FILE));
+                    if (ss.maxConcurrentConsignments() > 0)
+                        broker.setSpaceCap(s.id().value(), ss.maxConcurrentConsignments());
+                }
+            }
+        } catch (RuntimeException e) {
+            log.warn("Scheduler settings boot install skipped: {}", e.getMessage());
+        }
+    }
+
+    // ── server-wide tier ──────────────────────────────────────────────────────────
+
+    private Object systemShape(ApiContext api) {
+        Path doc = systemDocPath(api);
+        Map<String, Object> m = new LinkedHashMap<>();
+        Map<String, Object> system = new LinkedHashMap<>();
+        if (SchedulerSettings.present(doc)) {
+            system.put("maxConcurrentConsignments", SchedulerSettings.read(doc).maxConcurrentConsignments());
+            system.put("source", "file");
+        } else if (Integer.getInteger(PROP) != null) {
+            system.put("maxConcurrentConsignments", Math.max(0, Integer.getInteger(PROP)));
+            system.put("source", "property");
+        } else {
+            system.put("maxConcurrentConsignments", 0);
+            system.put("source", "default");
+        }
+        m.put("system", system);
+        m.put("space", spaceShape(api));
+        m.put("cores", Runtime.getRuntime().availableProcessors());
+        m.put("live", ConcurrencyBroker.shared().snapshot());
+        return m;
+    }
+
+    private Object writeSystem(ApiContext api, Map<String, Object> body) throws IOException {
+        requireBoundWriteRoot(api);
+        int cap = requireCap(body);
+        Path doc = systemDocPath(api);
+        if (doc == null)
+            throw new ApiException(503, "No home for the server-wide scheduler document "
+                    + "(-Dsystem.config.dir, spaces root and write root all unset)");
+        new SchedulerSettings(cap).write(doc);
+        ConcurrencyBroker.shared().setSystemCap(cap);
+        log.info("Server-wide Consignment cap set to {} ({})", cap, cap == 0 ? "unbounded" : "hot-applied, shrink drains");
+        return systemShape(api);
+    }
+
+    /** The server-wide document home: {@code -Dsystem.config.dir} → spaces container root → sole
+     *  space's write root; {@code null} when none is available. */
+    private static Path systemDocPath(ApiContext api) {
+        String dir = System.getProperty("system.config.dir");
+        if (dir != null && !dir.isBlank()) return Path.of(dir).resolve(SchedulerSettings.FILE);
+        Path container = api.spaces() != null ? api.spaces().containerRoot() : null;
+        if (container != null) return container.resolve(SchedulerSettings.FILE);
+        Path wr = api.writeRoot();
+        return wr == null ? null : wr.resolve(SchedulerSettings.FILE);
+    }
+
+    /** The effective server-wide cap under the §3 precedence: file → property → 0 (unbounded). */
+    private static int effectiveSystemCap(ApiContext api) {
+        Path doc = systemDocPath(api);
+        if (SchedulerSettings.present(doc)) return SchedulerSettings.read(doc).maxConcurrentConsignments();
+        Integer prop = Integer.getInteger(PROP);
+        return prop == null ? 0 : Math.max(0, prop);
+    }
+
+    // ── per-space tier (the bound space, via the standard /spaces/{id}/… seam) ────
+
+    private Object spaceShape(ApiContext api) {
+        String spaceId = EventLog.currentSpaceId();
+        Path root = boundWriteRoot(api);
+        Path doc = root == null ? null : root.resolve(SchedulerSettings.FILE);
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", spaceId);
+        if (SchedulerSettings.present(doc)) {
+            m.put("maxConcurrentConsignments", SchedulerSettings.read(doc).maxConcurrentConsignments());
+            m.put("source", "file");
+        } else {
+            m.put("maxConcurrentConsignments", 0);
+            m.put("source", "default");
+        }
+        return m;
+    }
+
+    private Object writeSpace(ApiContext api, Map<String, Object> body) throws IOException {
+        Path root = requireBoundWriteRoot(api);
+        int cap = requireCap(body);
+        new SchedulerSettings(cap).write(root.resolve(SchedulerSettings.FILE));
+        ConcurrencyBroker.shared().setSpaceCap(EventLog.currentSpaceId(), cap);
+        log.info("Space '{}' Consignment cap set to {}", EventLog.currentSpaceId(), cap);
+        return spaceShape(api);
+    }
+
+    /** The bound space's write root, or {@code null} when writes are disabled OR no space is bound —
+     *  a fresh hosted deployment with zero spaces must degrade to defaults, never 500
+     *  ({@code SpaceManager.current()} throws {@code IllegalStateException} on an empty manager). */
+    private static Path boundWriteRoot(ApiContext api) {
+        try {
+            return api.writeRoot();
+        } catch (IllegalStateException noSpaces) {
+            return null;
+        }
+    }
+
+    /** Gate 1 for the PUTs: {@link WriteGates#requireWriteRoot} semantics, with "no space bound"
+     *  reading as writes-disabled (503) rather than a 500. */
+    private static Path requireBoundWriteRoot(ApiContext api) {
+        Path root = boundWriteRoot(api);
+        if (root == null)
+            throw new ApiException(503, ErrorCodes.CONTROL_PLANE_READ_ONLY,
+                    "scheduler settings write disabled: no writable space is bound");
+        return root;
+    }
+
+    /** The one payload field, bounds-gated: an int in {@code 0..100000} (0 = unbounded). */
+    private static int requireCap(Map<String, Object> body) {
+        Object raw = body.get("maxConcurrentConsignments");
+        if (raw == null) throw new ApiException(422, "maxConcurrentConsignments is required (0 = unbounded)");
+        int cap;
+        try {
+            cap = Integer.parseInt(String.valueOf(raw).trim());
+        } catch (NumberFormatException e) {
+            throw new ApiException(422, "maxConcurrentConsignments must be an integer, got '" + raw + "'");
+        }
+        if (cap < 0 || cap > MAX_CAP)
+            throw new ApiException(422, "maxConcurrentConsignments must be 0.." + MAX_CAP + ", got " + cap);
+        return cap;
+    }
+}

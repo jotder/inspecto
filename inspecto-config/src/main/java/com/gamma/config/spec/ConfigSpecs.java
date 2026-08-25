@@ -188,6 +188,10 @@ public final class ConfigSpecs {
                                 + "regexes over one raw column before parsing. NULL rows are dropped."),
                 FieldSpec.withDefault("processing.batch.max_files", "Batch max files", FieldType.INT, 1,
                         "Files packed into one batch; raise above 1 for intra-batch parallelism."),
+                FieldSpec.withDefault("processing.priority", "Priority", FieldType.INT, 1,
+                        "Share weight (1-3) for this pipeline's Consignments when execution slots are "
+                                + "contended: 3 gets ~3x the throughput share of 1. Shares, never "
+                                + "precedence - a priority-1 pipeline always keeps making progress."),
                 FieldSpec.of("processing.duckdb.temp_directory", "DuckDB scratch dir", FieldType.FILEPATH,
                         "Directory for the per-batch temp DB and DuckDB spill; defaults to dirs.temp (never the system /tmp). Point at the roomiest disk for very large files."),
                 FieldSpec.of("processing.duckdb.memory_limit", "DuckDB memory limit", FieldType.STRING,

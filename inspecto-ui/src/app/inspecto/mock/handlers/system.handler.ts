@@ -1,8 +1,11 @@
 import { MockFlags } from '../mock-flags';
 import { json, match, MockHandler, MockRequest } from '../mock-http';
+import { MockStore } from '../mock-store';
+import { readSchedulerCap, writeSchedulerCap } from './settings.handler';
 
 const REPORT = /\/system\/operational-db$/;
 const TEST = /\/system\/operational-db\/test$/;
+const SCHEDULER = /\/system\/scheduler$/;
 
 /** The ten families, in the backend roster's order (`OperationalDb.Family`). */
 const FAMILIES: [string, string, string, string, string | null, string | null][] = [
@@ -38,8 +41,41 @@ const FAMILIES: [string, string, string, string, string | null, string | null][]
  * `*.backend` default — which is the honest offline answer, not an invented Postgres estate.
  */
 export function systemHandler(flags: MockFlags): MockHandler {
-    return (req: MockRequest) => {
+    return (req: MockRequest, store: MockStore) => {
         if (!flags.mockOps) return undefined;
+
+        // Consignment-concurrency (scheduler-system-config plan Part B): the server-wide tier plus
+        // the bound space's tier and a live-occupancy snapshot. Offline there is no broker, so the
+        // honest snapshot is an idle one — never invented activity.
+        if (match(req.url, SCHEDULER)) {
+            const shape = (): unknown => {
+                const systemCap = readSchedulerCap(store, req.space, 'scheduler-system');
+                const spaceCap = readSchedulerCap(store, req.space, 'scheduler-space');
+                return {
+                    system: {
+                        maxConcurrentConsignments: systemCap ?? 0,
+                        source: systemCap == null ? 'default' : 'file',
+                    },
+                    space: {
+                        id: req.space,
+                        maxConcurrentConsignments: spaceCap ?? 0,
+                        source: spaceCap == null ? 'default' : 'file',
+                    },
+                    cores: 8,
+                    live: {
+                        system_cap: systemCap ?? 0,
+                        system_in_flight: 0,
+                        space_in_flight: {},
+                        pipelines: {},
+                    },
+                };
+            };
+            if (req.method === 'GET') return json(shape());
+            if (req.method === 'PUT') {
+                const { refusal } = writeSchedulerCap(store, req.space, 'scheduler-system', req.body);
+                return refusal ?? json(shape());
+            }
+        }
 
         if (req.method === 'GET' && match(req.url, REPORT)) {
             return json({

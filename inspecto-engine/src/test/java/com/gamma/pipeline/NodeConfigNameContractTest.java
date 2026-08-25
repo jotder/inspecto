@@ -115,7 +115,17 @@ class NodeConfigNameContractTest {
                 new Contract("sink.persistent", "batch__max_files", "batch.max_files", 500,
                         c -> c.processing().batchMaxFiles(), 500),
                 new Contract("sink.persistent", "batch__max_bytes", "batch.max_bytes", 268_435_456L,
-                        c -> c.processing().batchMaxBytes(), 268_435_456L));
+                        c -> c.processing().batchMaxBytes(), 268_435_456L),
+
+                // ── Concurrency (scheduler-system-config plan Part B). priority is SINK_PROC_OWNED
+                // (flat, like threads); the intake__* keys nest to processing.intake:, read by the
+                // IntakeGovernor via PipelineConfig.intake().
+                new Contract("sink.persistent", "priority", "priority", 3,
+                        c -> c.processing().priority(), 3),
+                new Contract("sink.persistent", "intake__max_files_per_cycle", "intake.max_files_per_cycle", 250,
+                        c -> c.intake().maxFilesPerCycle(), 250),
+                new Contract("sink.persistent", "intake__min_files_per_cycle", "intake.min_files_per_cycle", 7,
+                        c -> c.intake().minFilesPerCycle(), 7));
     }
 
     /**

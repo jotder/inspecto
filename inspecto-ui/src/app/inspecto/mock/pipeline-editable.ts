@@ -396,7 +396,7 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
     if (dirs['database'] != null) sinkCfg['database'] = dirs['database'];
     if (dirs['backup'] != null) sinkCfg['backup'] = dirs['backup'];
     if (dirs['temp'] != null) sinkCfg['temp'] = dirs['temp'];
-    for (const k of ['threads', 'duckdb_threads']) {
+    for (const k of ['threads', 'duckdb_threads', 'priority']) {
         if (processing[k] != null) sinkCfg[k] = processing[k];
     }
     // Consignment grouping: the nested processing.batch map, owned wholesale. A file carrying only
@@ -409,6 +409,8 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
         if (processing['batch_max_bytes'] != null) batch['max_bytes'] = processing['batch_max_bytes'];
         if (Object.keys(batch).length) sinkCfg['batch'] = batch;
     }
+    // Intake admission control: the nested processing.intake map, owned wholesale like batch.
+    if (processing['intake'] != null) sinkCfg['intake'] = processing['intake'];
     const store = String(config['name'] ?? 'out');
     sinkCfg['store'] = store;
     const sinkDefs: { id: string; name: string; cfg: Cfg }[] = [{ id: 'sink', name: store, cfg: sinkCfg }];
@@ -757,12 +759,14 @@ export function lowerGraph(
         setOrDel(dirs, 'database', primarySink.config?.['database']);
         setOrDel(dirs, 'backup', primarySink.config?.['backup']);
         setOrDel(dirs, 'temp', primarySink.config?.['temp']);
-        for (const k of ['threads', 'duckdb_threads']) setOrDel(processing, k, primarySink.config?.[k]);
+        for (const k of ['threads', 'duckdb_threads', 'priority']) setOrDel(processing, k, primarySink.config?.[k]);
         // Consignment grouping lowers as the nested processing.batch: map the parser reads; the flat
         // spellings go unconditionally (read by nothing — G3).
         setOrDel(processing, 'batch', primarySink.config?.['batch']);
         delete processing['batch_max_files'];
         delete processing['batch_max_bytes'];
+        // Intake admission control lowers as the nested processing.intake: map the parser reads.
+        setOrDel(processing, 'intake', primarySink.config?.['intake']);
     }
     // Multi-destination: emit a plural sinks: list of the distinct destinations (the single output:/
     // dirs.database above stays the shorthand). One destination => no sinks: block (verbatim round-trip).

@@ -133,6 +133,41 @@ const NODE_ATTRIBUTES: Record<string, AttributeSpec[]> = {
             ],
             help: 'How inbox files are ordered before packing. Arrival (file time) is the default; name order is the opt-in for feeds whose stamps are unreliable — a copy resets mtime.',
         },
+        // Concurrency (scheduler-system-config plan Part B): priority is a flat processing key
+        // (SINK_PROC_OWNED, like threads); intake__* nests to the node's `intake` map, which lowers
+        // to the processing.intake: block the IntakeGovernor reads.
+        {
+            key: 'priority',
+            label: 'Priority',
+            type: 'number',
+            tier: 'advanced',
+            min: 1,
+            max: 3,
+            help: "Share weight (1-3) for this pipeline's consignments when execution slots are contended: 3 gets ~3x the throughput share of 1. Shares, never precedence — a priority-1 pipeline always keeps making progress. Blank = 1.",
+        },
+        {
+            key: 'intake__max_files_per_cycle',
+            label: 'Intake cap (files/cycle)',
+            type: 'number',
+            tier: 'advanced',
+            min: 0,
+            help: "This pipeline's admission cap, overriding the -Dingest.maxFilesPerCycle global; 0 = explicitly unbounded (exempts this pipeline from a fleet-wide cap). Blank = inherit the global.",
+        },
+        {
+            key: 'intake__min_files_per_cycle',
+            label: 'Intake cap floor',
+            type: 'number',
+            tier: 'advanced',
+            min: 1,
+            help: "Floor the adaptive controller may halve this pipeline's cap down to. Blank = inherit -Dingest.minFilesPerCycle.",
+        },
+        {
+            key: 'intake__adaptive',
+            label: 'Adaptive intake control',
+            type: 'boolean',
+            tier: 'advanced',
+            help: "Whether cycle overrun adjusts this pipeline's cap; off pins it at the stated cap. Blank = inherit -Dingest.backpressure.adaptive.",
+        },
     ],
     'sink.materialized': OUTPUT_ATTRIBUTES,
     'sink.view': OUTPUT_ATTRIBUTES,

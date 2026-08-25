@@ -1,6 +1,22 @@
 # Scheduler system configuration — from `-D` flags to a hot-tunable UI surface
 
-> **Status:** PROPOSED 2026-08-25, not started.
+> **Status: BUILT 2026-08-25 (first slice, uncommitted)** — the consignment-grain core shipped in one
+> pass: `ConcurrencyBroker` (Part B) replaces the run-local per-run semaphore at
+> `CollectorProcessor.ingest`; `processing.priority` (1..3, parse-refused out of range) end-to-end
+> (parser → FieldSpec → safety bound → NodeAttributes/contract JSONs → pipeline editor);
+> `scheduler.toon` at both tiers with `GET/PUT /system/scheduler` + `/settings/scheduler`
+> (provenance-reporting, canOperateRuns, hot-apply, boot install); Settings ▸ Scheduler UI section;
+> per-pipeline `intake__*` + `priority` on the sink node (lift/lower + mock mirror + name-contract
+> rows). Tests: ConcurrencyBrokerTest (5 Part-B gates) · PipelineConfigPriorityTest ·
+> ControlApiSchedulerSettingsTest · regenerated NodeAttributes/StepTypes contracts.
+> **Still open:** S5 (the oversubscription validator still reads `-Dsources.max` — the etl module
+> cannot see the broker; needs a control-plane-side check or a published property), the poll-cadence
+> hot-apply (`poll_seconds` still boot-only; the two `ScheduledFuture`s are still discarded),
+> `IntakeGovernor` *globals* through the settings doc (per-pipeline overrides are UI-editable, the
+> `-Dingest.*` fleet defaults are not), ingest `runPermits` retirement (left in place, now redundant
+> above the broker), S8 queued-state pane (the broker snapshot is served on `GET /system/scheduler`
+> and rendered in Settings ▸ Scheduler; a dedicated ops view remains open), and §7 Q2 (PUT
+> journalling — current PUTs log at INFO only).
 > **Goal:** move the fleet-level ingest concurrency controls off JVM system properties onto a
 > persisted, UI-editable system configuration that applies **without a server restart**, so an
 > operator can tune a live host instead of editing a launch script and bouncing the service.
@@ -147,12 +163,11 @@ throttled pipeline is currently invisible outside the logs.
 
 ## 6. Explicit non-goals
 
-- ⛔ **Priority / weighting / fair queueing.** The semaphore is non-fair (`new Semaphore(n)`, no
-  fairness flag), so ordering under contention is arbitrary and a pipeline can barge. At 16-of-100
-  that is a real starvation risk — but changing it is a *fairness contract* change deserving its own
-  grounding pass, not a rider on a config slice.
-- ⛔ **Per-space shares or reservations.** Deferred with the process-wide decision (§2.1); revisit
-  only if multi-tenant hosts need isolation guarantees rather than a shared ceiling.
+- ~~⛔ Priority / weighting / fair queueing~~ — **SUPERSEDED 2026-08-25 by Part B below**, which is
+  the grounding pass this line asked for. The starvation risk it named is solved structurally
+  (weighted shares, not precedence), not by a fairness flag on the semaphore.
+- ~~⛔ Per-space shares or reservations~~ — **partially superseded**: Part B introduces a per-space
+  *hard cap* (a tier in the broker). Per-space *weights/reservations* stay out of scope.
 - ⛔ **Making `-Doperational-db` or other restart-only infrastructure writable.** The 2026-08-15
   decision stands on its own grounds and is untouched by this plan.
 
@@ -167,3 +182,117 @@ throttled pipeline is currently invisible outside the logs.
    impression.
 2. **Should a `PUT` be journalled?** Every other write surface in this product leaves an audit trail,
    and a live concurrency change is exactly what an incident review asks about later.
+
+---
+
+# Part B — Consignment-grain hierarchy + priority (amendment 2026-08-25)
+
+> Commissioned by the operator the same day, superseding §6's priority non-goal. Requirements:
+> **R1** ≤ N concurrent consignments per Pipeline (pipeline config, e.g. 3) · **R2** ≤ N per space
+> (space config, e.g. 12) · **R3** ≤ N per server (system config, e.g. 16) · **R4** a Pipeline
+> priority 1–3 giving its Consignments a larger share of processing — **with a hard constraint that
+> low-priority Pipelines are never starved**.
+
+## B0. The grain decision (the reading everything hangs on)
+
+**A permit counts a Consignment being processed, not a Pipeline with a run open.**
+
+- R1 at "3 per pipeline" forces consignment grain at tier 1, and mixed grains would make 3/12/16
+  incomparable numbers drawn from different units.
+- The operator's constraint is host I/O and CPU; the unit of heavy work is a Consignment being
+  parsed/transformed/written. A run that is planning, or parked waiting for a grant, costs ~nothing.
+- **The execution point is already permit-shaped.** Inside one run, every planned Consignment is
+  submitted up front to a virtual-thread executor and parks on `permits.acquire()` bounded by
+  `cfg.processing().threads()` (`CollectorProcessor:147-149`). Part B replaces that *run-local*
+  semaphore with a *shared* broker — it does not create a new execution model.
+
+Consequently **R1 is already shipped**: `processing.threads` *is* the per-pipeline concurrent-
+consignment cap (per-run, and `PipelineRunGuard` guarantees one run per pipeline, so per-run =
+per-pipeline). It keeps its name for now (a rename is a GLOSSARY §13 decision); its FieldSpec help
+text should say what it means: "max concurrent Consignments of this Pipeline."
+
+## B1. Refused alternatives (with reasons — don't re-propose)
+
+- ⛔ **A global priority-ordered Consignment queue.** Strict priority ordering is exactly the
+  starvation trap the operator named: a priority-3 Pipeline with a 100k-file backlog occupies the
+  head forever. It also reorders Consignments *within* a Pipeline — breaking mtime arrival ordering
+  (operator decision 2026-08-12, `ConsignmentPlanner.Order`) — and fights the run-scoped
+  ledger/manifest/audit structure for no gain.
+- ⛔ **A separate consignment-generation service.** Planning stays in the poll cycle
+  (`ConsignmentPlanner.plan` per run). Nothing about R1–R4 needs planning moved; only *admission to
+  execution* becomes shared.
+- ⛔ **Three nested semaphores** (pipeline → space → system). Nested blocking acquisition across
+  tiers is a deadlock/ordering hazard, gives no global view for a fairness decision, and
+  `Semaphore` fairness is FIFO-per-semaphore, not weighted-across-pipelines.
+
+## B2. The `ConcurrencyBroker`
+
+A process-wide singleton (the `IntakeGovernor.shared()`/`.use()` idiom — static volatile + test
+escape hatch). One monitor lock guarding:
+
+- **Three counter tiers**: in-flight per pipeline / per space / process total, with limits
+  `pipelineCap(id)` (= `processing.threads`), `spaceCap(spaceId)`, `systemCap`.
+- **Per-pipeline FIFO wait queues** — within-pipeline arrival order preserved by construction.
+- **Stride scheduling** for grants: each pipeline carries `stride = K / priority` and an
+  accumulated `pass`. When any slot frees, the *eligible* pipeline (queue non-empty ∧ under all
+  three caps) with the lowest `pass` is granted; its `pass += stride`. Priority 3 receives ~3× the
+  throughput share of priority 1 under saturation, and priority 1 **provably keeps a non-zero
+  share** — weights are shares, never precedence. Deterministic (unlike lottery), so the ratio is
+  unit-testable. New/idle pipelines join at `max(minPass)` so a returning pipeline cannot burst on
+  banked credit.
+
+Worker contract: `broker.admit(pipelineId, spaceId, priority)` parks the virtual thread (cheap);
+`broker.release(...)` in `finally`. The call site is the existing `permits.acquire()` /
+`release()` pair in `CollectorProcessor.ingest` — a surgical swap. `PipelineTestRun` (scratch dry
+runs) bypasses the broker; the T job lane (`JobService`, enrichment) is out of scope, as today.
+
+Hot-apply: caps are volatile fields (`setSystemCap`/`setSpaceCap` — shrink drains by attrition,
+§4's rule); priorities are installed idempotently per cycle from `PipelineConfig`, exactly the
+`IntakeGovernor.configure` pattern (a *changed* priority resets that pipeline's `pass` to
+`max(minPass)`; unchanged is a no-op).
+
+Bounded submission: "all consignments submitted up front" is safe because the IntakeGovernor caps
+files admitted per cycle — the two mechanisms compose (governor = backlog fairness across time,
+broker = instantaneous slots).
+
+## B3. What happens to the existing budgets
+
+| Existing | Fate |
+|---|---|
+| Per-run `Semaphore(processing.threads)` (`CollectorProcessor:148`) | **Replaced** by the broker's pipeline tier (same value, same meaning) |
+| `PipelineScheduler.runPermits` (ingest run grain) | **Retired as the primary budget** — a second competing budget at a different grain is exactly the confusion §3 forbids. Keep the field defaulting to effectively-unbounded for one release as a safety valve; remove after Part B soaks. |
+| `acquirePermits` (network fetch) | **Untouched** — acquisition is a different resource (B3b) and stays run-grain |
+| `IntakeGovernor` | **Untouched, complementary** — admission per cycle vs execution slots |
+
+S1 of Part A is **restated**: `RunBudget` at run grain is superseded — the process-wide singleton
+to build is the broker, and Part A's S2–S4 config/route/hot-apply work targets its caps. S5's
+arithmetic becomes `system_cap × duckdb_threads ≈ cores`.
+
+## B4. Config surface
+
+| Key | Where | Values | Notes |
+|---|---|---|---|
+| `processing.threads` | pipeline TOON (exists) | ≥1 | R1; help text updated |
+| `processing.priority` | pipeline TOON (**new**) | 1–3, default 1 | FieldSpec + ConfigSafetyValidator bound + `node-attributes.ts` entry beside `batch__*` |
+| `max_concurrent_consignments` | per-space `scheduler.toon` (**new**) | ≥1, absent = unbounded | R2 |
+| `max_concurrent_consignments` | system `scheduler.toon` (Part A S2) | ≥1, absent = §7 Q1 default | R3 |
+
+Cross-field sanity (warn, not reject): a pipeline cap above its space cap is legal but inert —
+`ConfigValidator` should say so.
+
+## B5. Verification gates
+
+1. **Share ratio**: 2 saturated pipelines at priority 3 vs 1 → completed-consignment ratio ≈ 3:1
+   (tolerance), and the priority-1 pipeline's throughput **> 0 at all times** (the starvation pin).
+2. **Within-pipeline FIFO**: grant order per pipeline = submission order.
+3. **Caps hold jointly**: in-flight never exceeds pipeline/space/system limits, across 2 spaces.
+4. **Hot shrink drains**: in-flight completes, next admissions honour the new cap, no restart.
+5. **Hot priority change**: takes effect on the next grant; `pass` reset rule holds.
+6. **No banked credit**: an idle-then-returning pipeline gets its share, not a burst.
+
+## B6. Part B open questions
+
+1. **Default `spaceCap` when a space's `scheduler.toon` is absent** — unbounded (system cap alone
+   governs) is the least-surprise default; confirm.
+2. **Should priority also weight *acquisition*?** Part B scopes priority to ingest execution slots;
+   the fetch lane keeps plain FIFO. Revisit only if remote-fetch contention shows up in practice.

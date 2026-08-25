@@ -341,7 +341,7 @@ public final class PipelineEditable {
      * {@code batch_max_files}/{@code batch_max_bytes} spellings were write-only (G3,
      * {@code consignment-chain-plan.md}) and lower removes them.
      */
-    private static final Set<String> SINK_PROC_OWNED = Set.of("threads", "duckdb_threads");
+    private static final Set<String> SINK_PROC_OWNED = Set.of("threads", "duckdb_threads", "priority");
 
     /** The sinks[]-entry keys the graph models (and therefore owns) — everything else in a
      *  pre-existing entry is preserved verbatim through a save, per lower()'s contract. */
@@ -482,6 +482,9 @@ public final class PipelineEditable {
                     putIfPresent(batch, "max_bytes", processing.get("batch_max_bytes"));
                     if (!batch.isEmpty()) c.put("batch", batch);
                 }
+                // Intake admission control: the nested processing.intake map, owned wholesale like
+                // batch (its keys surface as the intake__* specs). No legacy flat spellings to heal.
+                if (processing.get("intake") instanceof Map<?, ?> in) c.put("intake", in);
             }
         } else {
             // filter / map: the lifted config is already plain (derived views; lower ignores map,
@@ -790,6 +793,8 @@ public final class PipelineEditable {
             replaceOrRemove(processing, "batch", primarySink.cfg("batch"));
             processing.remove("batch_max_files");
             processing.remove("batch_max_bytes");
+            // Intake admission control lowers as the nested processing.intake: map the parser reads.
+            replaceOrRemove(processing, "intake", primarySink.cfg("intake"));
         }
         // Multi-destination: emit a plural sinks: list of the distinct destinations (the single output:/
         // dirs.database above stays the shorthand + parser fallback, consistent with the first destination).

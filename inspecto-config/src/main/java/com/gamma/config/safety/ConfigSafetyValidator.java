@@ -114,6 +114,7 @@ public final class ConfigSafetyValidator {
         checkIntBound(raw, "processing.threads", 1, p.maxThreads(), out);
         checkIntBound(raw, "processing.duckdb_threads", -1, p.maxThreads(), out);
         checkIntBound(raw, "processing.batch.max_files", 1, p.maxBatchFiles(), out);
+        checkIntBound(raw, "processing.priority", 1, 3, out);
 
         Object maxBytes = RawConfig.at(raw, "processing.batch.max_bytes");
         if (maxBytes != null) {

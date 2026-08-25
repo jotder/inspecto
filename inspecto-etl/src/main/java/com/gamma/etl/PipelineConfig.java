@@ -69,7 +69,8 @@ public final class PipelineConfig {
     public record Processing(int threads, int duckdbThreads, String filePattern,
                              int batchMaxFiles, long batchMaxBytes, String batchOrder,
                              boolean duplicateCheckEnabled, String markerExtension,
-                             int retentionDays, long largeFileBytes, long flushRecords) {}
+                             int retentionDays, long largeFileBytes, long flushRecords,
+                             int priority) {}
 
     /**
      * Delimited-text parse settings. {@code engine} is {@code "auto"}/{@code "duckdb"}/
@@ -1182,7 +1183,8 @@ public final class PipelineConfig {
                 b.batchesFilePath, b.lineageFilePath, b.manifestsDir, b.commitLogPath);
         this.processing = new Processing(b.threads, b.duckdbThreads, b.filePattern,
                 b.batchMaxFiles, b.batchMaxBytes, b.batchOrder, b.duplicateCheckEnabled,
-                b.markerExtension, b.retentionDays, b.largeFileBytes, b.flushRecords);
+                b.markerExtension, b.retentionDays, b.largeFileBytes, b.flushRecords,
+                b.priority);
         this.csv = new CsvSettings(b.delimiter, b.quote, b.escape, b.comment,
                 b.skipHeaderLines, b.skipJunkLines,
                 b.skipTailLines, b.skipTailCols, b.hasHeader, b.csvEngine,
@@ -1602,6 +1604,7 @@ public final class PipelineConfig {
         int    batchMaxFiles   = 1;
         long   batchMaxBytes   = Long.MAX_VALUE;
         String batchOrder      = "mtime";         // ConsignmentPlanner.Order — arrival order (operator 2026-08-12); name = opt-in
+        int    priority        = 1;               // ConcurrencyBroker share weight 1..3 (Part B); 1 = baseline
         long   largeFileBytes  = 268_435_456L;   // 256 MB: streaming plugin generation-mode threshold
         long   flushRecords    = 5_000_000L;      // streaming plugin generation row budget
         String duckMemoryLimit;

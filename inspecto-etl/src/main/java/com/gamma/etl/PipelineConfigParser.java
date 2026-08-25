@@ -186,6 +186,12 @@ final class PipelineConfigParser {
         b.threads       = toInt(proc.getOrDefault("threads", 4));
         b.duckdbThreads = toInt(proc.getOrDefault("duckdb_threads", 0));
         b.filePattern   = opt(proc, "file_pattern", "glob:**/*.{csv,csv.gz}");
+        // ConcurrencyBroker share weight (Part B). Out-of-range refuses at parse time — a
+        // silently-clamped knob is the G3 failure mode, same posture as batch.order below.
+        b.priority      = toInt(proc.getOrDefault("priority", 1));
+        if (b.priority < 1 || b.priority > 3)
+            throw new IllegalArgumentException(
+                    "processing.priority must be 1..3, got " + b.priority);
 
         // ── batch caps ──────────────────────────────────────────────────────────
         Map<String, Object> batch = (Map<String, Object>) proc.get("batch");

@@ -15,6 +15,7 @@ import { MapSettingsComponent } from 'app/modules/admin/map-settings/map-setting
 import { ModelSettingsComponent } from 'app/modules/admin/model-settings/model-settings.component';
 import { NotificationCenterComponent } from 'app/modules/admin/notification-center/notification-center.component';
 import { OperationalDbComponent } from './operational-db.component';
+import { SchedulerSettingsComponent } from './scheduler.component';
 import { SpacesComponent } from 'app/modules/admin/spaces/spaces.component';
 import { TransferComponent } from 'app/modules/admin/transfer/transfer.component';
 
@@ -70,6 +71,13 @@ export class SettingsComponent {
             icon: 'heroicons_outline:circle-stack',
             description: 'Where transactional stores live, and whether a connection works.',
             component: OperationalDbComponent,
+        },
+        {
+            id: 'scheduler',
+            title: 'Scheduler',
+            icon: 'heroicons_outline:queue-list',
+            description: 'Live Consignment concurrency caps — server-wide and per space.',
+            component: SchedulerSettingsComponent,
         },
         {
             id: 'spaces',

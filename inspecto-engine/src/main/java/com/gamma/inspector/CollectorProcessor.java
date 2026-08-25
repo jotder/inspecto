@@ -139,14 +139,17 @@ public class CollectorProcessor {
         // the ambient EventLog.current(), a no-op when no space log is installed (e.g. one-shot CLI).
         audit.setTerminalBatchSink(com.gamma.signal.PipelineBatchSignal::emit);
 
-        // Virtual threads + a Semaphore: a batch blocked on file I/O or DuckDB parks
-        // its carrier cheaply instead of pinning a platform thread, but the semaphore
-        // bounds how many batches do heavy work at once to cfg.processing().threads(). That gives us
-        // the preferred model — virtual-thread concurrency with a controllable cap that
-        // protects against I/O pressure and CPU oversubscription. Every batch is
-        // submitted up front; all but `permits` of them simply park on acquire().
+        // Virtual threads + the shared ConcurrencyBroker: a batch blocked on file I/O or DuckDB parks
+        // its carrier cheaply instead of pinning a platform thread, while the broker bounds how many
+        // batches do heavy work at once — cfg.processing().threads() per pipeline, plus the space and
+        // system Consignment caps when configured (scheduler-system-config plan Part B; with no caps
+        // configured this is exactly the old run-local Semaphore(threads)). Every batch is submitted
+        // up front; all but the granted ones simply park on admit().
         int maxConcurrent  = Math.max(1, cfg.processing().threads());
-        Semaphore permits  = new Semaphore(maxConcurrent);
+        ConcurrencyBroker broker = ConcurrencyBroker.shared();
+        String spaceId     = com.gamma.event.EventLog.currentSpaceId();
+        String pipelineId  = cfg.identity().pipelineName();
+        int priority       = cfg.processing().priority();
         int failedBatches  = 0;
 
         // Propagate the caller's space (MDC) onto each batch worker: the commit listener (the service's event-bus
@@ -159,11 +162,9 @@ public class CollectorProcessor {
                 futures.add(executor.submit(() -> {
                     if (mdc != null) MDC.setContextMap(mdc);
                     try {
-                        permits.acquire();
-                        try {
+                        try (ConcurrencyBroker.Permit permit =
+                                     broker.admit(spaceId, pipelineId, maxConcurrent, priority)) {
                             BatchProcessor.process(b, cfg, audit);
-                        } finally {
-                            permits.release();
                         }
                     } finally {
                         MDC.clear();
