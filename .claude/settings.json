@@ -1,4 +1,12 @@
 {
+  "alwaysThinkingEnabled": true,
+  "effortLevel": "high",
+  "modelLimits": {
+    "stealth/ox-alpha": {
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000
+    }
+  },
   "enabledPlugins": {
     "apollo@inline": false,
     "brand-voice@inline": false,

@@ -122,11 +122,15 @@ shift gets the identical environment.
 ## Model & effort routing (token economy)
 
 - **Delegate, don't read raw:** broad code searches → `Explore` (pass `model: "haiku"` for pure
-  locating) or `backend-explorer`; builds/tests → `verify-runner`. Never parse full Maven/npm logs
-  in the main thread.
+  locating) or `backend-explorer` / `frontend-explorer`; builds/tests → `verify-runner`. Never parse
+  full Maven/npm logs in the main thread.
+- **Parallel forks:** independent research questions = multiple forks/agents launched in a single
+  message, one per question — not sequential searches.
 - Reserve the strongest model + extended thinking ("think hard") for architecture and design
   decisions; routine edits and mechanical refactors don't need it.
 - Big specs/docs go into `docs/` files and are referenced by path — never pasted inline into prompts.
+- **Verification gate:** non-trivial changes (3+ file edits, backend/API or infra changes) get a
+  `verification` subagent PASS before reporting done — own checks and self-reports don't substitute.
 
 ## graphify
 
