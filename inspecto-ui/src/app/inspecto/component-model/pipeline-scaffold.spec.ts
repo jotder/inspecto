@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { derivedPipelineId, pipelineId, pipelineScaffold } from './pipeline-scaffold';
+import { derivedPipelineId, pipelineId, pipelineScaffold, spaceBase } from './pipeline-scaffold';
 
 const SPEC_PATTERN = /^[a-z0-9][a-z0-9_]*$/;
 
@@ -22,6 +22,40 @@ describe('pipelineScaffold', () => {
         expect(pipelineScaffold('9lives')['id']).toBe('9lives');
         expect(pipelineScaffold('_leading')['id']).toBe('p__leading');
         expect(pipelineScaffold('has.dot')['id']).toBe('has_dot');
+    });
+
+    // 2026-08-25: the Pipelines editor's "New pipeline" scaffolded bare `data/<name>/...` dirs. The
+    // server resolves dirs.* CWD-relative and jails them under the per-space roots, so EVERY one of
+    // the nine landed outside and the write was refused with nine ERROR findings — that surface could
+    // never create a pipeline. Pin that every derived dir sits under the active space.
+    it('scopes every derived dir to the active space', () => {
+        const dirs = pipelineScaffold('orders', { space: 'default' })['dirs'] as Record<string, string>;
+        const keys = ['poll', 'database', 'backup', 'temp', 'errors', 'quarantine', 'markers', 'status_dir', 'log_dir'];
+        expect(Object.keys(dirs).sort()).toEqual([...keys].sort());
+        for (const k of keys) {
+            expect(dirs[k], k).toMatch(/^spaces\/default\//);
+        }
+        expect(dirs['poll']).toBe('spaces/default/data/inbox/orders');
+        expect(dirs['database']).toBe('spaces/default/data/orders/database');
+        expect(dirs['status_dir']).toBe('spaces/default/data/orders/status');
+    });
+
+    // An explicit database (Onboarding lets the operator type one) still governs the siblings.
+    it('derives the siblings off an explicit space-qualified database', () => {
+        const dirs = pipelineScaffold('orders', {
+            space: 'demo',
+            database: 'spaces/demo/data/custom/database',
+        })['dirs'] as Record<string, string>;
+        expect(dirs['database']).toBe('spaces/demo/data/custom/database');
+        // `pipelineHome` strips only the conventional `/database` leaf, so the siblings hang off it.
+        expect(dirs['backup']).toBe('spaces/demo/data/custom/backup');
+        expect(dirs['status_dir']).toBe('spaces/demo/data/custom/status');
+    });
+
+    it('spaceBase falls back to the un-prefixed namespace', () => {
+        expect(spaceBase('default')).toBe('spaces/default');
+        expect(spaceBase(null)).toBe('.');
+        expect(spaceBase(undefined)).toBe('.');
     });
 
     it('leaves the parser fallback derivation unnarrowed', () => {

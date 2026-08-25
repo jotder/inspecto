@@ -46,6 +46,24 @@ export function configPipelineId(config: Record<string, unknown>, fallback: stri
 }
 
 /**
+ * The path base a space's data directories hang off: `spaces/<id>` for a named space, `.` for the
+ * un-prefixed default namespace.
+ *
+ * ⚠ Load-bearing, not cosmetic. `ConfigSafetyValidator` resolves every `dirs.*` value **CWD-relative**
+ * (its own words: "config values are CWD-relative") and jails the result under the allowed roots, which
+ * are the per-space directories. So a bare `data/<name>` resolves next to the server's working directory
+ * — outside every root — and the write is refused with nine ERROR findings before a byte is written.
+ * Every committed pipeline on disk is space-qualified for exactly this reason.
+ *
+ * The one place that knows the convention: it was hand-copied into the Onboarding dialog, and the
+ * Pipelines editor's "New pipeline" had no copy at all, which is why that surface could never create
+ * a pipeline (2026-08-25).
+ */
+export function spaceBase(spaceId: string | null | undefined): string {
+    return spaceId ? `spaces/${spaceId}` : '.';
+}
+
+/**
  * The **home directory** a pipeline's dirs hang off: its `database` less the conventional `/database`
  * leaf, or `data/<name>` when nothing declares one. The one place that knows the convention — a second
  * copy would let a branch store land outside the pipeline home, and that path is load-bearing (a route
@@ -66,9 +84,17 @@ export function storeDirs(home: string): { database: string; backup: string; tem
 
 export function pipelineScaffold(
     name: string,
-    opts: { poll?: string; database?: string; description?: string; reference?: boolean } = {},
+    opts: {
+        poll?: string;
+        database?: string;
+        description?: string;
+        reference?: boolean;
+        /** Active space id; scopes the derived dirs so the write clears the path jail. See {@link spaceBase}. */
+        space?: string | null;
+    } = {},
 ): Record<string, unknown> {
-    const home = pipelineHome(name, opts.database);
+    const base = spaceBase(opts.space);
+    const home = pipelineHome(name, opts.database || `${base}/data/${name}/database`);
     const config: Record<string, unknown> = {
         name,
         // Stamp identity at CREATION so `name` is a display label from day one: a later relabel is then
@@ -82,8 +108,8 @@ export function pipelineScaffold(
         id: pipelineId(name),
         active: false,
         dirs: {
-            poll: opts.poll || `data/inbox/${name}`,
-            database: opts.database || `data/${name}/database`,
+            poll: opts.poll || `${base}/data/inbox/${name}`,
+            database: opts.database || `${base}/data/${name}/database`,
             backup: `${home}/backup`,
             temp: `${home}/temp`,
             errors: `${home}/errors`,

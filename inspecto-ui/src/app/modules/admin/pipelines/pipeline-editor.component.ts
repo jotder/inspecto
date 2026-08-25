@@ -39,6 +39,7 @@ import {
     LensService,
     apiErrorMessage,
     datasetManualHint,
+    SpacesService,
 } from 'app/inspecto/api';
 import {
     type AttributeSpec,
@@ -204,6 +205,7 @@ export class PipelineEditorComponent implements OnInit {
     private components = inject(ComponentsService);
     private datasets = inject(DatasetRegistrationService);
     private iconMapApi = inject(IconMapService);
+    private spaces = inject(SpacesService);
     private fb = inject(FormBuilder);
     private toast = inject(ToastrService);
     private confirm = inject(InspectoConfirmService);
@@ -1043,7 +1045,9 @@ export class PipelineEditorComponent implements OnInit {
         const id = pipelineId(name);
         // W5: a new pipeline IS a canonical draft — write the space-convention scaffold (inactive,
         // with the parser-required dirs) and register it, then load its lifted graph.
-        this.configApi.write('pipeline', pipelineScaffold(name)).subscribe({
+        this.configApi
+            .write('pipeline', pipelineScaffold(name, { space: this.spaces.currentSpaceId() }))
+            .subscribe({
             next: (written) => {
                 this.configApi.registerPipeline(written.path).subscribe({
                     next: () => {

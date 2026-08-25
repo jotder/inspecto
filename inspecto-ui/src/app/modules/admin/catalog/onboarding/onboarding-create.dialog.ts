@@ -9,7 +9,7 @@ import { MatInputModule } from '@angular/material/input';
 import { ToastrService } from 'ngx-toastr';
 import { ConfigService, SpacesService, apiErrorMessage } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
-import { configPipelineId, pipelineScaffold } from 'app/inspecto/component-model';
+import { configPipelineId, pipelineScaffold, spaceBase } from 'app/inspecto/component-model';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { StreamBundle, parseStreamBundle, planStreamImport } from 'app/inspecto/transfer/stream-bundle';
@@ -274,7 +274,7 @@ export class OnboardingCreateDialog {
             const slug = String(name ?? '').trim();
             this.nameValue.set(slug);
             if (!slug) return;
-            const base = this.spaces.currentSpaceId() ? `spaces/${this.spaces.currentSpaceId()}` : '.';
+            const base = spaceBase(this.spaces.currentSpaceId());
             if (this.form.controls.poll.pristine)
                 this.form.controls.poll.setValue(`${base}/data/inbox/${slug}`, { emitEvent: false });
             if (this.form.controls.database.pristine)
