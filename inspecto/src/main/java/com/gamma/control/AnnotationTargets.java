@@ -67,14 +67,4 @@ final class AnnotationTargets {
         }
     }
 
-    /** Map the engine's fail-closed signals onto the house statuses: unknown kind 400, absent target 404. */
-    static <T> T mapErrors(java.util.function.Supplier<T> body) {
-        try {
-            return body.get();
-        } catch (NoSuchElementException notFound) {
-            throw new ApiException(404, notFound.getMessage());
-        } catch (IllegalArgumentException bad) {
-            throw new ApiException(400, bad.getMessage());
-        }
-    }
 }

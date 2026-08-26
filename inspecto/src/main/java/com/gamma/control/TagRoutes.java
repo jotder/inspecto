@@ -96,7 +96,7 @@ final class TagRoutes implements RouteModule {
      */
     private Object targetsOf(ApiContext api, com.sun.net.httpserver.HttpExchange ex, String name) {
         WidgetTags.backfillOnce(api, n -> ensureTag(api, n));   // a widget must be findable here too
-        return AnnotationTargets.mapErrors(() -> api.service().tagAssignments().forTag(name).stream()
+        return RouteErrors.mapErrors(() -> api.service().tagAssignments().forTag(name).stream()
                 .filter(a -> AnnotationTargets.visible(api, ex, a.targetKind(), a.targetId()))
                 .map(com.gamma.ops.tag.TagAssignment::toMap)
                 .toList());
@@ -106,7 +106,7 @@ final class TagRoutes implements RouteModule {
     private Object tagsOn(ApiContext api, com.sun.net.httpserver.HttpExchange ex,
                           String targetKind, String targetId) {
         WidgetTags.backfillOnce(api, n -> ensureTag(api, n));
-        return AnnotationTargets.mapErrors(() -> {
+        return RouteErrors.mapErrors(() -> {
             requireVisibleTarget(api, ex, targetKind, targetId);
             return Map.of("targetKind", targetKind, "targetId", targetId,
                     "tags", api.service().tagAssignments().tagsOf(targetKind, targetId));
@@ -122,7 +122,7 @@ final class TagRoutes implements RouteModule {
                           String targetKind, String targetId, Map<String, Object> body) {
         String tag = ApiContext.str(body, "tag");
         if (tag == null) throw new ApiException(400, "body must include 'tag'");
-        return AnnotationTargets.mapErrors(() -> {
+        return RouteErrors.mapErrors(() -> {
             requireVisibleTarget(api, ex, targetKind, targetId);
             if (api.service().objects().tag(tag).isEmpty())
                 throw new ApiException(404, "no tag named '" + tag + "' — create it via POST /tags first");
@@ -152,7 +152,7 @@ final class TagRoutes implements RouteModule {
     /** {@code DELETE /tags/assignments/{targetKind}/{targetId}/{tag}} — remove one label; idempotent. */
     private Object unassign(ApiContext api, com.sun.net.httpserver.HttpExchange ex,
                             String targetKind, String targetId, String tag) {
-        return AnnotationTargets.mapErrors(() -> {
+        return RouteErrors.mapErrors(() -> {
             requireVisibleTarget(api, ex, targetKind, targetId);
             boolean removed;
             if (com.gamma.ops.AnnotationKinds.OBJECT.equals(targetKind)) {

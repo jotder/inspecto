@@ -329,13 +329,7 @@ final class ComponentRoutes implements RouteModule {
             throw new ApiException(422, "component '" + id + "' is not a transform ('type: transform.*' required)");
 
         PipelineNode node = new PipelineNode(id, type, c.content(), null);
-        try {
-            return ComponentPreview.transform(node, ApiContext.sampleRows(body));
-        } catch (IllegalArgumentException e) {
-            throw new ApiException(400, e.getMessage());
-        } catch (java.sql.SQLException | IOException e) {
-            throw new ApiException(422, "preview failed: " + e.getMessage());
-        }
+        return RouteErrors.mapPreviewErrors(() -> ComponentPreview.transform(node, ApiContext.sampleRows(body)));
     }
 
     /**
@@ -345,13 +339,7 @@ final class ComponentRoutes implements RouteModule {
      */
     private Object previewGrammar(ApiContext api, com.sun.net.httpserver.HttpExchange ex, String id, Map<String, Object> body) {
         ComponentRegistry.Component c = requireComponent(api, ex, "grammar", id);
-        try {
-            return ComponentPreview.grammar(c.content(), sampleText(body));
-        } catch (IllegalArgumentException e) {
-            throw new ApiException(400, e.getMessage());
-        } catch (java.sql.SQLException | IOException e) {
-            throw new ApiException(422, "preview failed: " + e.getMessage());
-        }
+        return RouteErrors.mapPreviewErrors(() -> ComponentPreview.grammar(c.content(), sampleText(body)));
     }
 
     /**
@@ -387,25 +375,13 @@ final class ComponentRoutes implements RouteModule {
         String type = ApiContext.str(config, "type");
         if (type == null || !type.startsWith("transform."))
             throw new ApiException(422, "inline config is not a transform ('type: transform.*' required)");
-        try {
-            return ComponentPreview.transform(new PipelineNode(INLINE_ID, type, config, null),
-                    ApiContext.sampleRows(body));
-        } catch (IllegalArgumentException e) {
-            throw new ApiException(400, e.getMessage());
-        } catch (java.sql.SQLException | IOException e) {
-            throw new ApiException(422, "preview failed: " + e.getMessage());
-        }
+        return RouteErrors.mapPreviewErrors(() -> ComponentPreview.transform(
+                new PipelineNode(INLINE_ID, type, config, null), ApiContext.sampleRows(body)));
     }
 
     private Object previewInlineGrammar(Map<String, Object> body) {
         Map<String, Object> config = requireInlineConfig(body);
-        try {
-            return ComponentPreview.grammar(config, sampleText(body));
-        } catch (IllegalArgumentException e) {
-            throw new ApiException(400, e.getMessage());
-        } catch (java.sql.SQLException | IOException e) {
-            throw new ApiException(422, "preview failed: " + e.getMessage());
-        }
+        return RouteErrors.mapPreviewErrors(() -> ComponentPreview.grammar(config, sampleText(body)));
     }
 
     private Object previewInlineSink(Map<String, Object> body) {

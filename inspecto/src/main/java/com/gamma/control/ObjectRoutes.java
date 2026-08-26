@@ -473,20 +473,14 @@ final class ObjectRoutes implements RouteModule {
         List<String> sources = stringList(body.get("sources"));
         if (sources.isEmpty()) throw new ApiException(400, "body must include non-empty 'sources'");
         for (String source : sources) requireVisible(api, ex, source);
-        try {
+        return RouteErrors.mapCaseErrors(() -> {
             var result = api.service().objects().mergeCases(survivorId, sources, ApiContext.str(body, "actor"));
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("survivor", result.survivor().toMap());
             out.put("merged", result.merged());
             out.put("membersMoved", result.membersMoved());
             return out;
-        } catch (java.util.NoSuchElementException notFound) {
-            throw new ApiException(404, notFound.getMessage());
-        } catch (IllegalStateException illegal) {
-            throw new ApiException(422, illegal.getMessage());
-        } catch (IllegalArgumentException bad) {
-            throw new ApiException(400, bad.getMessage());
-        }
+        });
     }
 
     /**
@@ -501,20 +495,14 @@ final class ObjectRoutes implements RouteModule {
         if (title == null || title.isBlank()) throw new ApiException(400, "body must include 'title'");
         if (members.isEmpty()) throw new ApiException(400, "body must include non-empty 'members'");
         for (String member : members) requireVisible(api, ex, member);
-        try {
+        return RouteErrors.mapCaseErrors(() -> {
             var result = api.service().objects().splitCase(caseId, title, members,
                     ApiContext.str(body, "assignee"), ApiContext.str(body, "queue"), ApiContext.str(body, "actor"));
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("case", result.part().toMap());
             out.put("membersMoved", result.membersMoved());
             return out;
-        } catch (java.util.NoSuchElementException notFound) {
-            throw new ApiException(404, notFound.getMessage());
-        } catch (IllegalStateException illegal) {
-            throw new ApiException(422, illegal.getMessage());
-        } catch (IllegalArgumentException bad) {
-            throw new ApiException(400, bad.getMessage());
-        }
+        });
     }
 
     /** The body value as a trimmed, non-empty string list (a JSON array of ids). */
@@ -635,15 +623,8 @@ final class ObjectRoutes implements RouteModule {
         String queue = ApiContext.str(body, "queue");
         if (assignee == null && queue == null)
             throw new ApiException(400, "body must include 'assignee' or 'queue'");
-        try {
-            return api.service().objects().assign(id, assignee, queue, ApiContext.str(body, "actor")).toMap();
-        } catch (java.util.NoSuchElementException notFound) {
-            throw new ApiException(404, notFound.getMessage());
-        } catch (IllegalStateException illegal) {
-            throw new ApiException(422, illegal.getMessage());
-        } catch (IllegalArgumentException bad) {
-            throw new ApiException(400, bad.getMessage());
-        }
+        return RouteErrors.mapCaseErrors(
+                () -> api.service().objects().assign(id, assignee, queue, ApiContext.str(body, "actor")).toMap());
     }
 
     /**

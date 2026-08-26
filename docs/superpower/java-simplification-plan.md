@@ -163,6 +163,15 @@ round-trip changes byte-for-byte on the shipped examples (`ShippedExamplesRoundT
 
 ### S5 — Codec/validator seam (one shape, five classes)
 
+> **STATUS: CLOSED as SKIP (grounded 2026-08-27), per this slice's own rule.** Measurement found
+> the "five classes, one shape" premise wrong: `PipelineCodec` is a pure graph↔map mapper LAYERED ON
+> `ConfigCodec` (map↔TOON) — composition, not duplication (`ConfigCodec.toToon(PipelineCodec.toMap(g))`
+> in `PipelineStore:53,66,82` and PipelineRoutes). The validators check disjoint concerns (graph
+> DAG/wiring vs path-jail/bounds/allowlists) with independent result types; the shared ERROR/WARNING
+> vocabulary already lives in one `Severity` enum (`config/spec/Severity.java`). Genuinely duplicated
+> code ≈ 0 lines; no call site would use a common interface polymorphically. Do not rebuild this idea
+> without new evidence.
+
 Introduce a minimal common interface pair (e.g. `Codec<T>` / `Validator` with a shared
 `Violation` result type) adopted by `ConfigCodec`/`ConfigSafetyValidator` and
 `PipelineCodec`/`PipelineValidator`; move genuinely shared encode/decode/violation-formatting
@@ -172,6 +181,23 @@ shows the shared surface is under ~50 lines — an interface for its own sake is
 CLAUDE.md §2 bans.
 
 ### S6 — God-class decomposition (imperative → dispatch tables)
+
+> **STATUS: grounded 2026-08-27 — per-class verdicts.**
+> **`MaintenanceJob` SPLIT (in progress):** ~14 independent tasks behind one `task` switch
+> (`:163-192`); six already extracted (`StorageTrendTask`, `BackupTask`, `MetadataValidateTask`,
+> `PartitionCompactor`, `ReferenceCompactor`, `MaterializeTask`) — finish the pattern: one
+> package-private task class per in-file task, `MaintenanceJob` shrinks to the dispatcher; no
+> registration/SPI change; `MaintenanceLibraryTest` (1067 lines) passes unmodified.
+> **`PipelineConfigParser` LEAVE:** the dispatch-chain hypothesis was WRONG — it is sequential
+> section parsing (one method per section) over one authored shape; the only kind-switch is a
+> validator that stores `(kind, config)` verbatim. Multiple parse fallbacks are pinned to operator
+> decisions (id-over-name, active/template default-off, steps-vs-legacy mutual exclusion,
+> list-arity refusal, `raw.get` for description). A registry would add indirection for nothing.
+> **`JobService` LEAVE:** a genuinely multi-responsibility job-host façade; the only separable
+> cluster is the ~300-line run-execution engine (`:880-1177` → a possible `JobRunExecutor`) —
+> extract ONLY if someone actually needs it; everything else reaches across the whole class.
+> **`PipelineConfig` (1716): not yet grounded** — same authored-config heartland as its parser;
+> ground before touching, expect LEAVE-shaped findings.
 
 Per class, ground first, then:
 - `PipelineConfigParser` (1616) / `PipelineConfig` (1716): if grounding confirms

@@ -52,7 +52,7 @@ final class NoteRoutes implements RouteModule {
 
     /** {@code GET /notes/{targetKind}/{targetId}[/comments|/attachments]} — a target's notes, newest-first. */
     private Object notesOf(ApiContext api, HttpExchange ex, String targetKind, String targetId, NoteKind kind) {
-        return AnnotationTargets.mapErrors(() -> notes(api, ex).notesOf(targetKind, targetId, kind).stream()
+        return RouteErrors.mapErrors(() -> notes(api, ex).notesOf(targetKind, targetId, kind).stream()
                 .map(ObjectNote::toMap).toList());
     }
 
@@ -61,7 +61,7 @@ final class NoteRoutes implements RouteModule {
                               Map<String, Object> body) {
         String text = ApiContext.str(body, "body");
         if (text == null) throw new ApiException(400, "body must include 'body'");
-        return AnnotationTargets.mapErrors(() -> notes(api, ex)
+        return RouteErrors.mapErrors(() -> notes(api, ex)
                 .comment(targetKind, targetId, ApiContext.str(body, "author"), text).toMap());
     }
 
@@ -74,7 +74,7 @@ final class NoteRoutes implements RouteModule {
         String name = ApiContext.str(body, "name");
         String uri = ApiContext.str(body, "uri");
         if (name == null || uri == null) throw new ApiException(400, "body must include 'name' and 'uri'");
-        return AnnotationTargets.mapErrors(() -> notes(api, ex).attach(targetKind, targetId, ApiContext.str(body, "author"),
+        return RouteErrors.mapErrors(() -> notes(api, ex).attach(targetKind, targetId, ApiContext.str(body, "author"),
                 name, ApiContext.str(body, "contentType"), uri, ApiContext.str(body, "caption")).toMap());
     }
 
