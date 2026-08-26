@@ -54,6 +54,7 @@ const PROBLEMS: ProblemFilesPage = {
             consignmentId: '',
             time: '2026-06-30 03:00:00',
             origin: 'nightly.tar.gz',   // came out of an archive — what the operator dropped
+            logicalName: 'nightly',     // …and the identity a re-delivery would group to
         },
         {
             pipeline: 'cdr_ingest',
@@ -66,6 +67,7 @@ const PROBLEMS: ProblemFilesPage = {
             consignmentId: 'c-1',
             time: '2026-06-30 02:00:00',
             origin: '',                 // arrived as itself
+            logicalName: 'partial',     // …but still has an identity: its own name, extension stripped
         },
     ],
     total: 5,

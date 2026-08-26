@@ -94,6 +94,12 @@ export interface ProblemFile {
     time: string;
     /** The archive/compressed original this file came OUT of; blank when the file IS what arrived. */
     origin: string;
+    /**
+     * The inbox file's extension-insensitive IDENTITY — `cdr.csv.gz`, `cdr.Z` and bare `cdr` are ONE
+     * logical file, so a re-delivery groups to its earlier spelling. Unlike `origin` (a display
+     * basename) it is poll-relative and IS a key. Blank on ledgers written before the column existed.
+     */
+    logicalName: string;
 }
 
 /** The bounded page + PRE-limit summary counts (the cards stay honest when the list is cut). */

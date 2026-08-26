@@ -138,6 +138,34 @@ class ControlApiProblemFilesTest {
         }
     }
 
+    /**
+     * The two unpack identity columns surface on a problem row: {@code origin} (the archive the
+     * member came OUT of — a display basename) and {@code logicalName} (that inbox file's
+     * extension-insensitive IDENTITY, poll-relative, so a re-delivery under another compression
+     * spelling groups to it). ⚠ Every OTHER test in this class writes a ledger with neither column,
+     * which is the pre-column tolerance half — an absent column reads blank, never a shifted value.
+     */
+    @Test
+    void aProblemRowCarriesTheArchiveAndTheLogicalIdentity(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root, "alpha")) {
+            // ⚠ "status_dir", matching the ledger() helper — a ledger under "status" is written
+            // where nothing reads it and the route then honestly returns [] (see open()'s note).
+            Path statusDir = root.resolve("s1").resolve("alpha").resolve("status_dir");
+            Files.createDirectories(statusDir);
+            Files.writeString(statusDir.resolve("alpha_status_20260820_010000.csv"),
+                    FILES_HEADER + ",origin,logical_name\n"
+                            + "2026-08-20 03:00:00,2026-08-20 03:00:00,00001_a.csv,QUARANTINED_MISMATCH,"
+                            + "0,0,,,10,boom,c-1,bundle.zip,\"east/bundle\"\n",
+                    StandardCharsets.UTF_8);
+
+            JsonNode row = data(c.port, "/spaces/s1/status/problem-files").get("rows").get(0);
+            assertEquals("bundle.zip", row.get("origin").asText(),
+                    "the operator sees what they actually DROPPED");
+            assertEquals("east/bundle", row.get("logicalName").asText(),
+                    "…and the key a re-delivery under another spelling would group to");
+        }
+    }
+
     /** 🔴 The whole point of the route: ONE call covers every pipeline. */
     @Test
     void aggregatesAcrossPipelines(@TempDir Path root) throws Exception {

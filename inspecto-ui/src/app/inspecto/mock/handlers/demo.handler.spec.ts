@@ -77,9 +77,12 @@ describe('demoHandler', () => {
             'duration_ms',
             'error',
             'consignment_id',
-            // Appended by the unpack stage: the archive/compressed original a member came out of.
-            // Readers parse this ledger by header NAME, so appending cannot break older files.
+            // Appended by the unpack stage: the archive/compressed original a member came out of,
+            // then that inbox file's extension-insensitive IDENTITY (cdr.csv.gz / cdr.Z / bare cdr
+            // are ONE logical file). Readers parse this ledger by header NAME, so appending cannot
+            // break older files — an absent column reads blank, never a shifted value.
             'origin',
+            'logical_name',
         ]);
         // per-file status is SUCCESS or QUARANTINED_* — there is no per-file FAILED (MemberAudit)
         const statuses = new Set(rows.map((r) => r['status']));
@@ -172,6 +175,7 @@ describe('demoHandler', () => {
             'consignmentId',
             'time',
             'origin',
+            'logicalName',
         ]);
         // Every row is a real problem, and clean files never appear.
         expect(page.rows.every((r) => r.verdict === 'FULL' || r.verdict === 'PARTIAL')).toBe(true);

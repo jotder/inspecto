@@ -275,7 +275,7 @@ final class RunRoutes implements RouteModule {
                             // The archive/compressed original this member came out of; blank for an
                             // ordinary file, and absent entirely from ledgers written before the
                             // column existed (readers parse by header NAME, so that is a blank too).
-                            f.getOrDefault("origin", "")));
+                            f.getOrDefault("origin", ""), f.getOrDefault("logical_name", "")));
                 }
                 for (Map<String, String> q : api.service().statusStore().quarantine(cfg)) {
                     String file = q.getOrDefault("file", "");
@@ -283,14 +283,14 @@ final class RunRoutes implements RouteModule {
                     full++;
                     pipelinesWithProblems.add(pipeline);
                     rows.add(problemRow(pipeline, file, "FULL", "QUARANTINED",
-                            null, null, q.getOrDefault("reason", ""), null, "", ""));
+                            null, null, q.getOrDefault("reason", ""), null, "", "", ""));
                 }
             } catch (Exception ledgerUnreadable) {
                 // Honesty rule: an unreadable ledger is a WARNING row, never a silent absence.
                 warnings++;
                 pipelinesWithProblems.add(pipeline);
                 rows.add(problemRow(pipeline, "", "WARNING", "LEDGER_UNREADABLE", null, null,
-                        errMsg(ledgerUnreadable), null, "", ""));
+                        errMsg(ledgerUnreadable), null, "", "", ""));
             }
         }
 
@@ -314,7 +314,7 @@ final class RunRoutes implements RouteModule {
     private static Map<String, Object> problemRow(String pipeline, String filename, String verdict,
                                                   String status, String parsedRows, String errorRows,
                                                   String error, String consignmentId, String time,
-                                                  String origin) {
+                                                  String origin, String logicalName) {
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("pipeline", pipeline);
         r.put("filename", filename);
@@ -326,6 +326,11 @@ final class RunRoutes implements RouteModule {
         r.put("consignmentId", consignmentId == null ? "" : consignmentId);
         r.put("time", time);
         r.put("origin", origin == null ? "" : origin);
+        // The inbox file's extension-insensitive IDENTITY: cdr.csv.gz, cdr.Z and bare cdr are ONE
+        // logical file, so a re-delivery groups to its earlier spelling instead of reading the alias
+        // hit out of the dedup log. Unlike `origin` (a display basename) it is poll-relative and IS a
+        // key. Blank on ledgers written before the column existed — readers parse by header name.
+        r.put("logicalName", logicalName == null ? "" : logicalName);
         return r;
     }
 

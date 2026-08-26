@@ -410,6 +410,9 @@ function files(pipeline: string): Record<string, string>[] {
             // The unpack stage stamps the archive/compressed original a member came out of; blank
             // for a file that arrived as itself, which is most of them.
             origin: i % 5 === 0 ? `${pipeline}_${20260601 + i}.tar.gz` : '',
+            // The same inbox file's extension-insensitive identity (the data extension stripped) —
+            // what a report groups a re-delivery on. Mirrors LogicalNames' rule for these fixtures.
+            logical_name: i % 5 === 0 ? `${pipeline}_${20260601 + i}` : `${pipeline}_${20260601 + i}`,
         };
     });
 }
@@ -450,6 +453,7 @@ function problemFiles(url: string): unknown {
                 consignmentId: f['consignment_id'] ?? '',
                 time: f['end_time'] ?? '',
                 origin: f['origin'] ?? '',
+                logicalName: f['logical_name'] ?? '',
             });
         }
     }

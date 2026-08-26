@@ -144,6 +144,17 @@ export class ProcessingStatusComponent implements OnInit {
             width: 170,
             valueFormatter: (p) => p.value || '—',
         },
+        {
+            // The inbox file's extension-insensitive IDENTITY — cdr.csv.gz, cdr.Z and bare cdr are
+            // ONE logical file. Hidden by default (it repeats the filename for the ordinary case);
+            // the operator enables it from the column menu to GROUP a re-delivery to the earlier
+            // spelling it was deduped against. Blank on ledgers written before the column existed.
+            field: 'logicalName',
+            headerName: 'Logical name',
+            width: 170,
+            hide: true,
+            valueFormatter: (p) => p.value || '—',
+        },
         { field: 'status', headerName: 'Status', width: 200 },
         { field: 'parsedRows', headerName: 'Parsed rows', width: 130, valueFormatter: blankIfUnknown },
         { field: 'errorRows', headerName: 'Rejected rows', width: 140, valueFormatter: blankIfUnknown },
