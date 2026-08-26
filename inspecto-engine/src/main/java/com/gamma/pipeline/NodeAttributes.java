@@ -134,10 +134,50 @@ public final class NodeAttributes {
             NodeAttribute.of("markers_dir", "Markers directory", "string", "advanced")
                     .help("Where marker files land (dirs.markers); blank = the space convention."));
 
+    /**
+     * The unpack stage ({@code processing.unpack:}, unpack-stage plan Phase 6) — compressed/archived
+     * inbox files expanded at the Collector before Consignments are planned. Like {@link #MARKER_DEDUP}
+     * these keys are BORROWED from {@code processing:} (the node carries the nested {@code unpack} map
+     * wholesale, like the sink's {@code intake}), and kept out of {@link #COLLECTOR} for the same
+     * reason: Onboarding's Collection stage renders that list whole.
+     *
+     * <p>⚠ {@code depth} is deliberately NOT published: {@code PipelineConfig.Unpack} refuses any value
+     * but 1 by name (nested archives are a non-feature), so offering it would author a config that
+     * cannot load. Defaults mirror {@code Unpack.defaults()} — stated in help text, never as spec
+     * {@code defaultValue}s, so an untouched form writes no {@code unpack:} block at all.
+     */
+    public static final List<NodeAttribute> UNPACK = List.of(
+            // Same always-visible-but-optional idiom as `duplicate_check`: the switch is the point of
+            // the group; the caps below it stay advanced.
+            NodeAttribute.of("unpack__enabled", "Unpack compressed inputs", "boolean", "required").required(false)
+                    .help("Expand compressed/archived inbox files (.gz/.bz2/.Z/.zip/.tar/.tar.gz) at the "
+                            + "collector, before consignments are planned. Blank = on."),
+            NodeAttribute.of("unpack__max_entries", "Max archive entries", "number", "advanced").min(1)
+                    .placeholder("10000")
+                    .help("Fail-closed cap on entries one archive may expand to. Blank = 10000."),
+            NodeAttribute.of("unpack__max_entry_bytes", "Max bytes per expanded file", "number", "advanced").min(1)
+                    .help("Fail-closed cap on the decompressed size of any single output file. Blank = 8 GiB."),
+            NodeAttribute.of("unpack__max_total_bytes", "Max bytes per source", "number", "advanced").min(1)
+                    .help("Fail-closed cap on total decompressed bytes one source may expand to. Blank = 32 GiB."),
+            NodeAttribute.of("unpack__max_ratio", "Max decompression ratio", "number", "advanced").min(0)
+                    .placeholder("10000")
+                    .help("Fail-closed output/input ratio cap — the decompression-bomb tell; 0 disables it. "
+                            + "Blank = 10000."),
+            NodeAttribute.of("unpack__threads", "Unpack threads", "number", "advanced").min(1)
+                    .help("Archives expanded concurrently (one archive per worker). Pure file I/O, but it "
+                            + "adds to the same core budget as processing.threads. Blank = 1."),
+            NodeAttribute.of("unpack__data_extensions", "Data extensions", "list", "advanced")
+                    .help("Extensions treated as the DATA suffix for extension-insensitive duplicate "
+                            + "identity — cdr.csv.gz, cdr.Z and bare cdr are one logical file. ⚠ Two files "
+                            + "differing only by an extension on this list are one logical file too; narrow "
+                            + "the list rather than expecting both. Clearing the field reverts to the "
+                            + "default; the explicit empty-list opt-out (data_extensions[0]:) is authored "
+                            + "in the pipeline file. Blank = .csv .tsv .txt .json .jsonl .ndjson .xml"));
+
     /** The {@code acquisition} node's published spec: the {@code collector:} block it authors, plus
-     *  the marker-dedup keys it borrows from {@code processing:}/{@code dirs:}. */
+     *  the marker-dedup + unpack keys it borrows from {@code processing:}/{@code dirs:}. */
     public static final List<NodeAttribute> ACQUISITION =
-            Stream.concat(Stream.concat(COLLECTOR.stream(), MARKER_DEDUP.stream()), TRIGGER.stream()).toList();
+            Stream.of(COLLECTOR, MARKER_DEDUP, UNPACK, TRIGGER).flatMap(List::stream).toList();
 
     /**
      * The {@code output:} block, shared by all three sink kinds and Onboarding's Dataset & Go-live stage —

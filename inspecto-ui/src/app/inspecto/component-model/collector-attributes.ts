@@ -129,7 +129,7 @@ export const COLLECTOR_ATTRIBUTES: AttributeSpec[] = [
         tier: 'advanced',
         min: 1,
         max: 64,
-        help: "Remote Collectors only — a local inbox has nothing to download (files are pushed in by the producer). Files this pipeline downloads concurrently in one acquisition, each on its own connector session. Blank = 1 (sequential). The next acquisition starts on the following acquire tick, so fetching stays continuous.",
+        help: 'Remote Collectors only — a local inbox has nothing to download (files are pushed in by the producer). Files this pipeline downloads concurrently in one acquisition, each on its own connector session. Blank = 1 (sequential). The next acquisition starts on the following acquire tick, so fetching stays continuous.',
     },
     {
         key: 'fetch__rate_limit',
@@ -190,6 +190,79 @@ export const MARKER_DEDUP_ATTRIBUTES: AttributeSpec[] = [
         type: 'string',
         tier: 'advanced',
         help: 'Where marker files land (dirs.markers); blank = the space convention.',
+    },
+];
+
+/**
+ * The unpack stage (`processing.unpack:`, unpack-stage plan Phase 6) — compressed/archived inbox
+ * files expanded at the Collector before Consignments are planned. Like {@link MARKER_DEDUP_ATTRIBUTES}
+ * these keys are BORROWED from `processing:` (the node carries the nested `unpack` map wholesale,
+ * `unpack__*` nesting through `nestKeys`) and are deliberately NOT part of {@link COLLECTOR_ATTRIBUTES}
+ * for the same reason: Onboarding's Collection stage renders that table whole.
+ *
+ * ⚠ `depth` is deliberately NOT offered: the engine refuses any value but 1 by name (nested archives
+ * are a non-feature), so offering it would author a config that cannot load. Defaults are stated in
+ * help text, never as spec `default`s, so an untouched form writes no `unpack:` block at all.
+ */
+export const UNPACK_ATTRIBUTES: AttributeSpec[] = [
+    {
+        key: 'unpack__enabled',
+        label: 'Unpack compressed inputs',
+        type: 'boolean',
+        // Same always-visible-but-optional idiom as `duplicate_check` above: the switch is the point
+        // of the group; the caps below it stay advanced.
+        tier: 'required',
+        required: false,
+        help: 'Expand compressed/archived inbox files (.gz/.bz2/.Z/.zip/.tar/.tar.gz) at the collector, before consignments are planned. Blank = on.',
+    },
+    {
+        key: 'unpack__max_entries',
+        label: 'Max archive entries',
+        type: 'number',
+        tier: 'advanced',
+        min: 1,
+        placeholder: '10000',
+        help: 'Fail-closed cap on entries one archive may expand to. Blank = 10000.',
+    },
+    {
+        key: 'unpack__max_entry_bytes',
+        label: 'Max bytes per expanded file',
+        type: 'number',
+        tier: 'advanced',
+        min: 1,
+        help: 'Fail-closed cap on the decompressed size of any single output file. Blank = 8 GiB.',
+    },
+    {
+        key: 'unpack__max_total_bytes',
+        label: 'Max bytes per source',
+        type: 'number',
+        tier: 'advanced',
+        min: 1,
+        help: 'Fail-closed cap on total decompressed bytes one source may expand to. Blank = 32 GiB.',
+    },
+    {
+        key: 'unpack__max_ratio',
+        label: 'Max decompression ratio',
+        type: 'number',
+        tier: 'advanced',
+        min: 0,
+        placeholder: '10000',
+        help: 'Fail-closed output/input ratio cap — the decompression-bomb tell; 0 disables it. Blank = 10000.',
+    },
+    {
+        key: 'unpack__threads',
+        label: 'Unpack threads',
+        type: 'number',
+        tier: 'advanced',
+        min: 1,
+        help: 'Archives expanded concurrently (one archive per worker). Pure file I/O, but it adds to the same core budget as processing.threads. Blank = 1.',
+    },
+    {
+        key: 'unpack__data_extensions',
+        label: 'Data extensions',
+        type: 'list',
+        tier: 'advanced',
+        help: 'Extensions treated as the DATA suffix for extension-insensitive duplicate identity — cdr.csv.gz, cdr.Z and bare cdr are one logical file. ⚠ Two files differing only by an extension on this list are one logical file too; narrow the list rather than expecting both. Clearing the field reverts to the default; the explicit empty-list opt-out (data_extensions[0]:) is authored in the pipeline file. Blank = .csv .tsv .txt .json .jsonl .ndjson .xml',
     },
 ];
 

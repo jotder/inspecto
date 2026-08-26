@@ -82,9 +82,9 @@ class NodeAttributesContractTest {
         assertTrue(acq.contains("duplicate_check"));        // marker dedup (P5-a fold)
         assertTrue(acq.contains("markers_dir"));
         assertEquals(
-                Stream.concat(Stream.concat(NodeAttributes.COLLECTOR.stream(), NodeAttributes.MARKER_DEDUP.stream()),
-                                NodeAttributes.TRIGGER.stream())
-                        .map(NodeAttribute::key).toList(),
+                Stream.of(NodeAttributes.COLLECTOR, NodeAttributes.MARKER_DEDUP, NodeAttributes.UNPACK,
+                                NodeAttributes.TRIGGER)
+                        .flatMap(List::stream).map(NodeAttribute::key).toList(),
                 acq);
         // …and the marker + trigger keys are NOT in the collector-block table itself — folding them in
         // would give Onboarding's Collection stage fields it would write to a block nothing reads them in.

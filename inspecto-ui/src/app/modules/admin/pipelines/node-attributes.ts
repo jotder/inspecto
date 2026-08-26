@@ -2,6 +2,7 @@ import {
     type AttributeSpec,
     COLLECTOR_ATTRIBUTES,
     MARKER_DEDUP_ATTRIBUTES,
+    UNPACK_ATTRIBUTES,
     OUTPUT_ATTRIBUTES,
 } from 'app/inspecto/component-model';
 
@@ -110,7 +111,7 @@ const NODE_ATTRIBUTES: Record<string, AttributeSpec[]> = {
     // The acquisition NODE's spec = the `collector:` block it authors + the marker-dedup keys it
     // borrows from `processing:`/`dirs:` (P5-a). Onboarding's Collection stage keeps the block table
     // alone — see MARKER_DEDUP_ATTRIBUTES for why the two are not merged.
-    acquisition: [...COLLECTOR_ATTRIBUTES, ...MARKER_DEDUP_ATTRIBUTES, ...TRIGGER_ATTRIBUTES],
+    acquisition: [...COLLECTOR_ATTRIBUTES, ...MARKER_DEDUP_ATTRIBUTES, ...UNPACK_ATTRIBUTES, ...TRIGGER_ATTRIBUTES],
     // The persistent sink adds its destination to the shared output block: `database` is the one key
     // `PipelineEditable.lower` HARD-requires on the primary sink (`NO_PERSISTENT_SINK` refuses the save
     // without it), so it must be askable up front — but `required: false`, because a quarantine sink is

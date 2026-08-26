@@ -230,9 +230,10 @@ Each phase is independently shippable and independently verifiable.
 > `processing.unpack.data_extensions` published — completing step 17 — and step 19's docs. Pushed as
 > `fe6e1d7e` → `6730cd66` → `e9750e20`; reactor **3603/0/0/5**, exit 0.
 >
-> **What is left (2026-08-26 pm): the ledger READ surface ✅, step 14's member-status enum ✅ and the
-> member→Entry sweep ✅ all SHIPPED — remaining: the `logical_name` status-ledger column and
-> Phase 6's UI half (collector pane + Run Detail origin column). All tracked in `BACKLOG.md` §4.**
+> **What is left (2026-08-26 pm): the ledger READ surface ✅, step 14's member-status enum ✅, the
+> member→Entry sweep ✅ and Phase 6's UI half ✅ are all SHIPPED. The ONLY item still open is the
+> `logical_name` status-ledger column (BACKLOG §4 unpack item 2) — so this plan is one row from
+> archivable.**
 > ⛔ **Archive this plan only once Phase 6 lands** — the as-built already lives in
 > [`okf/backend/engine/unpack-stage.md`](../okf/backend/engine/unpack-stage.md), which is what to read
 > for behaviour; this file survives only for its unbuilt Phase-6 detail.
@@ -394,8 +395,16 @@ and needs **no** consignment change at all.
 ### Phase 6 — Surfaces
 17. ~~`ConfigSpecs` publication for every `processing.unpack.*` key.~~ **✅ COMPLETE 2026-08-26** — the
     last unpublished key, `data_extensions`, shipped with §6 Q4.
-18. UI: unpack settings on the shared `<inspecto-collector-config>`; Run Detail ▸ Files showing the
-    Archive → entry relation via `origin`. Mock handlers must be **no more lenient than the server**.
+18. ~~UI: unpack settings…~~ **✅ SHIPPED 2026-08-26.** ⚠ Deviation from the letter of this step: the
+    settings are **NOT** on the shared `<inspecto-collector-config>` — that component authors the
+    `collector:` block and is rendered whole by Onboarding's Collection stage, so folding borrowed
+    `processing:` keys in would give that stage fields it would write where nothing reads them. They
+    render as their own **Unpack** group in the collector pane, exactly the precedent marker dedup
+    set. Run Detail's Files tab needed no change: it has no explicit `columnDefs`, so `autoColumns`
+    already surfaces the `origin` the ledger has carried since 2026-08-23 (the polished
+    "From archive" treatment stays on Processing Status ▸ Problem files). The mock is not more
+    lenient — it serves the SAME regenerated `node-attributes.contract.json` the server is
+    byte-compared against.
 19. ~~Docs: new OKF concept + GLOSSARY entries.~~ **✅ DONE 2026-08-26** — `okf/backend/engine/unpack-stage.md`
     written and indexed; **Archive**, **Entry** and **Unpack** are in GLOSSARY §5 with an
     Entry-≠-Member row in §11's *Resolved collisions*. **The code sweep landed 2026-08-26**

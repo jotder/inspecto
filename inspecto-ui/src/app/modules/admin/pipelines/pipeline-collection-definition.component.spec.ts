@@ -128,7 +128,8 @@ describe('PipelineCollectionDefinitionComponent', () => {
             config: { include: ['*.csv'], duplicate_check: true, marker_extension: '.processed' },
         });
         const forms = fixture.debugElement.queryAll(By.directive(InspectoSchemaFormComponent));
-        expect(forms.length).toBe(2); // [0] = inside the collector surface, [1] = the dedup group
+        // [0] = inside the collector surface, [1] = the dedup group, [2] = the unpack group
+        expect(forms.length).toBe(3);
         const dedupForm = forms[1].componentInstance as InspectoSchemaFormComponent;
         expect(dedupForm.form.getRawValue()['marker_extension']).toBe('.processed');
 
@@ -139,6 +140,48 @@ describe('PipelineCollectionDefinitionComponent', () => {
         expect(config['duplicate_check']).toBe(true);
         expect(config['retention_days']).toBe(45);
         expect(config['include']).toEqual(['*.csv']); // the collector surface's values survive the merge
+    });
+
+    /**
+     * Unpack (Phase 6) is homed here the same borrowed way marker dedup is: its own group, never
+     * folded into the shared collector surface, and its `unpack__*` keys nest to the node's `unpack`
+     * map — which PipelineEditable lowers wholesale to `processing.unpack:` (pinned engine-side by
+     * NodeConfigNameContractTest).
+     */
+    it('renders the unpack group outside the collector surface, and nests its keys under `unpack`', async () => {
+        const fixture = await create({
+            id: 'acq',
+            type: 'acquisition',
+            config: { include: ['*.csv'], unpack: { max_entries: 500 } },
+        });
+        const p = pane(fixture);
+        expect(p.unpackSpecs().map((s) => s.key)).toEqual([
+            'unpack__enabled',
+            'unpack__max_entries',
+            'unpack__max_entry_bytes',
+            'unpack__max_total_bytes',
+            'unpack__max_ratio',
+            'unpack__threads',
+            'unpack__data_extensions',
+        ]);
+        // ⛔ `depth` is never offered — the engine refuses any value but 1 by name.
+        expect(p.unpackSpecs().map((s) => s.key)).not.toContain('unpack__depth');
+        // the collector surface authors the `collector:` block and only that block
+        const collectorKeys = p.collectorSpecs().map((s) => s.key);
+        for (const k of p.unpackSpecs().map((s) => s.key)) expect(collectorKeys).not.toContain(k);
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain('Unpack');
+
+        // it seeds from the stored nested map, and a change round-trips back into it
+        const forms = fixture.debugElement.queryAll(By.directive(InspectoSchemaFormComponent));
+        const unpackForm = forms[2].componentInstance as InspectoSchemaFormComponent;
+        expect(unpackForm.form.getRawValue()['unpack__max_entries']).toBe(500);
+
+        unpackForm.form.patchValue({ unpack__threads: 4 });
+        p.submit();
+
+        const config = fixture.componentInstance.applied!.config as Record<string, unknown>;
+        expect(config['unpack']).toEqual({ max_entries: 500, threads: 4 });
+        expect(config['include']).toEqual(['*.csv']); // the other surfaces' values survive the merge
     });
 
     it('applies an acquisition Connection onto use:, never into config', async () => {

@@ -100,6 +100,25 @@ class NodeConfigNameContractTest {
                 new Contract("acquisition", "duplicate__on_change", "duplicate.on_change",
                         "skip", c -> c.collector().duplicate().onChange(), "skip"),
 
+                // ── the unpack stage (Phase 6) — borrowed like marker dedup: unpack__* nests to the
+                // node's `unpack` map, which lowers wholesale to the processing.unpack: block the
+                // parser reads (PipelineEditable carries the map like the sink's intake). `depth` is
+                // deliberately unpublished — the record refuses any value but 1.
+                new Contract("acquisition", "unpack__enabled", "unpack.enabled", false,
+                        c -> c.unpack().enabled(), false),
+                new Contract("acquisition", "unpack__max_entries", "unpack.max_entries", 250,
+                        c -> c.unpack().maxEntries(), 250),
+                new Contract("acquisition", "unpack__max_entry_bytes", "unpack.max_entry_bytes", 1048576,
+                        c -> c.unpack().maxEntryBytes(), 1_048_576L),
+                new Contract("acquisition", "unpack__max_total_bytes", "unpack.max_total_bytes", 2097152,
+                        c -> c.unpack().maxTotalBytes(), 2_097_152L),
+                new Contract("acquisition", "unpack__max_ratio", "unpack.max_ratio", 500,
+                        c -> c.unpack().maxRatio(), 500d),
+                new Contract("acquisition", "unpack__threads", "unpack.threads", 2,
+                        c -> c.unpack().threads(), 2),
+                new Contract("acquisition", "unpack__data_extensions", "unpack.data_extensions",
+                        List.of(".csv", ".psv"), c -> c.unpack().dataExtensions(), List.of(".csv", ".psv")),
+
                 // ── transform.dedup — the record-grain dedup Step (ELT amendment P2 lowering) ────
                 new Contract("transform.dedup", "keys", "keys", List.of("EVENT_DATE"),
                         c -> c.dedup().keys(), List.of("EVENT_DATE")),

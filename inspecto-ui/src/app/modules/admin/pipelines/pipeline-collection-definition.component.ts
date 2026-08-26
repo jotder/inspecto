@@ -17,7 +17,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { AuthoredNode } from 'app/inspecto/api';
 import { CollectorConfigComponent } from 'app/inspecto/collector/collector-config.component';
-import { AttributeSpec, MARKER_DEDUP_ATTRIBUTES } from 'app/inspecto/component-model';
+import { AttributeSpec, MARKER_DEDUP_ATTRIBUTES, UNPACK_ATTRIBUTES } from 'app/inspecto/component-model';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { buildConfiguredNode, splitNodeConfig } from './node-config-build';
 import { PipelineExtraConfigComponent } from './pipeline-extra-config.component';
@@ -79,6 +79,22 @@ import { nodeAttributesFor } from './node-attributes';
                 />
             }
 
+            <!--
+                Unpack — compressed/archived inbox files expanded before Consignments are planned
+                (unpack-stage plan Phase 6). Its own group for the same reason as Duplicate handling:
+                these keys land in processing.unpack, not the collector block, and an empty served
+                list hides the group.
+            -->
+            @if (unpackSpecs().length) {
+                <div class="mb-1 mt-3 text-xs font-semibold uppercase opacity-70">Unpack</div>
+                <inspecto-schema-form
+                    #unpack
+                    [specs]="unpackSpecs()"
+                    [initial]="split().schemaInitial"
+                    (submitted)="submit()"
+                />
+            }
+
             <!-- Additional config: keys OUTSIDE the schema, each with its ACTUAL key and a control
                  matching the stored value's TYPE (2026-08-21 — the generic Key/Value grid is gone).
                  No add here: the collector's vocabulary is its schema. -->
@@ -127,6 +143,7 @@ export class PipelineCollectionDefinitionComponent {
     @ViewChild(CollectorConfigComponent) private collector?: CollectorConfigComponent;
     @ViewChild(PipelineExtraConfigComponent) private extraConfig?: PipelineExtraConfigComponent;
     @ViewChild('dedup') private dedup?: InspectoSchemaFormComponent;
+    @ViewChild('unpack') private unpack?: InspectoSchemaFormComponent;
 
     readonly specs = computed<AttributeSpec[]>(() => this.attributes() ?? nodeAttributesFor(this.node().type) ?? []);
     /**
@@ -135,11 +152,20 @@ export class PipelineCollectionDefinitionComponent {
      * only the block it names, and the drawer shows the Guarantees as their own group.
      */
     private static readonly DEDUP_KEYS = MARKER_DEDUP_ATTRIBUTES.map((a) => a.key);
+    /** Same split for the unpack group — borrowed processing.unpack keys, never the collector block's. */
+    private static readonly UNPACK_KEYS = UNPACK_ATTRIBUTES.map((a) => a.key);
     readonly collectorSpecs = computed(() =>
-        this.specs().filter((s) => !PipelineCollectionDefinitionComponent.DEDUP_KEYS.includes(s.key)),
+        this.specs().filter(
+            (s) =>
+                !PipelineCollectionDefinitionComponent.DEDUP_KEYS.includes(s.key) &&
+                !PipelineCollectionDefinitionComponent.UNPACK_KEYS.includes(s.key),
+        ),
     );
     readonly dedupSpecs = computed(() =>
         this.specs().filter((s) => PipelineCollectionDefinitionComponent.DEDUP_KEYS.includes(s.key)),
+    );
+    readonly unpackSpecs = computed(() =>
+        this.specs().filter((s) => PipelineCollectionDefinitionComponent.UNPACK_KEYS.includes(s.key)),
     );
     /** The node's stored `connector`, so the shared component can grandfather a hand-authored one. */
     readonly storedConnector = computed(() => String(this.node().config?.['connector'] ?? ''));
@@ -177,7 +203,8 @@ export class PipelineCollectionDefinitionComponent {
         const dirty =
             (this.extraConfig?.isDirty() ?? false) ||
             (this.collector?.isDirty() ?? false) ||
-            (this.dedup?.isDirty() ?? false);
+            (this.dedup?.isDirty() ?? false) ||
+            (this.unpack?.isDirty() ?? false);
         if (dirty === this.lastDirty) return;
         this.lastDirty = dirty;
         this.dirtyChange.emit(dirty);
@@ -191,16 +218,21 @@ export class PipelineCollectionDefinitionComponent {
     submit(): void {
         if (this.collector && !this.collector.validate()) return;
         if (this.dedup && !this.dedup.validate()) return;
+        if (this.unpack && !this.unpack.validate()) return;
         if (this.extraConfig && !this.extraConfig.validate()) return;
         const connector = this.collector?.resolveConnector() ?? null;
         if (!connector) return;
-        // Two schema surfaces, one node: the collector block's values plus the dedup group's. Merged
+        // Three schema surfaces, one node: the collector block's values plus the dedup and unpack groups'. Merged
         // against the FULL spec list, so buildConfiguredNode still sees every specced key and none of
         // them leaks into the free-form rows.
         const node = buildConfiguredNode({
             node: this.node(),
             specs: this.specs(),
-            formValues: { ...(this.collector?.value() ?? {}), ...(this.dedup?.value() ?? {}) },
+            formValues: {
+                ...(this.collector?.value() ?? {}),
+                ...(this.dedup?.value() ?? {}),
+                ...(this.unpack?.value() ?? {}),
+            },
             extras: this.extraConfig?.value() ?? {},
             name: this.node().name,
             description: this.node().description,
@@ -210,6 +242,7 @@ export class PipelineCollectionDefinitionComponent {
         this.extraConfig?.markPristine();
         this.collector?.markPristine();
         this.dedup?.form.markAsPristine();
+        this.unpack?.form.markAsPristine();
         this.emitDirty();
         this.applied.emit(node);
     }

@@ -142,7 +142,7 @@ public final class ConfigSpecs {
                                 + "collector, before consignments are planned. Only acts on files a decompressor "
                                 + "claims AND the parse engine cannot read itself, so a plain inbox is untouched."),
                 FieldSpec.withDefault("processing.unpack.max_entries", "Max archive entries", FieldType.INT, 10000,
-                        "Fail-closed cap on member files one archive may expand to."),
+                        "Fail-closed cap on entries one archive may expand to."),
                 FieldSpec.withDefault("processing.unpack.max_entry_bytes", "Max bytes per expanded file",
                         FieldType.INT, 8L << 30,
                         "Fail-closed cap on the decompressed size of any single output file."),

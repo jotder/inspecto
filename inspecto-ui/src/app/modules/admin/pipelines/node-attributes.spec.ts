@@ -5,6 +5,7 @@ import {
     isRequired,
     MARKER_DEDUP_ATTRIBUTES,
     OUTPUT_ATTRIBUTES,
+    UNPACK_ATTRIBUTES,
 } from 'app/inspecto/component-model';
 import NODE_ATTRIBUTE_CONTRACT from 'app/inspecto/mock/node-attributes.contract.json';
 import { nodeAttributesFor, speccedNodeTypes } from './node-attributes';
@@ -109,7 +110,7 @@ describe('node-attributes', () => {
         const acq = nodeAttributesFor('acquisition')!;
         // Shared block + the borrowed marker keys + the trigger cadence keys (top-level `trigger:`
         // map, borrowed like the marker keys — NOT part of the collector block).
-        const shared = [...COLLECTOR_ATTRIBUTES, ...MARKER_DEDUP_ATTRIBUTES];
+        const shared = [...COLLECTOR_ATTRIBUTES, ...MARKER_DEDUP_ATTRIBUTES, ...UNPACK_ATTRIBUTES];
         expect(acq).toHaveLength(shared.length + 2);
         shared.forEach((spec, i) => expect(acq[i]).toBe(spec));
         expect(acq.slice(shared.length).map((s) => s.key)).toEqual(['trigger__every', 'trigger__cron']);

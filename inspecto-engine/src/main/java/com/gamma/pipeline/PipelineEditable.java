@@ -193,7 +193,7 @@ public final class PipelineEditable {
      * reads it. The marker-dedup four joined 2026-08-04's fingerprint fold in P5-a.
      */
     private static final Set<String> ACQ_FOREIGN_KEYS = Set.of(
-            "poll", "trigger", "file_pattern",
+            "poll", "trigger", "file_pattern", "unpack",
             "duplicate_check", "marker_extension", "retention_days", "markers_dir");
 
     /**
@@ -435,6 +435,9 @@ public final class PipelineEditable {
                 putIfPresent(c, "retention_days", dc.get("retention_days"));
                 putIfPresent(c, "markers_dir", dirs.get("markers"));
             }
+            // Unpack stage: the nested processing.unpack map, owned wholesale like the sink's intake
+            // (its keys surface as the unpack__* specs). No legacy flat spellings to heal.
+            if (processing.get("unpack") instanceof Map<?, ?> up) c.put("unpack", up);
         } else if (isParserType(t)) {
             for (String k : PARSER_OWNED) putIfPresent(c, k, processing.get(k));
             // The unified top-level parsing: block is parser-owned too, carried VERBATIM under its own
@@ -648,6 +651,8 @@ public final class PipelineEditable {
             replaceOrRemove(dirs, "poll", acq.cfg("poll"));
             replaceOrRemove(out, "trigger", acq.cfg("trigger"));
             replaceOrRemove(processing, "file_pattern", acq.cfg("file_pattern"));
+            // Unpack lowers back as the nested processing.unpack: map the parser reads.
+            replaceOrRemove(processing, "unpack", acq.cfg("unpack"));
         }
         overlayOwned(collector, "gap_detection", gap == null ? null : gapSection(gap), strict);
 
