@@ -21,6 +21,16 @@
 //   - `token`-suffixed keys. `tokenEndpoint`/`tokenUrl` are URLs, and after D15 they are REQUIRED
 //     config — flagging them would fire on correct deployments.
 //
+// TWO MODES, and the second exists because the first hands out a FALSE GREEN:
+//   - default — tracked files as they stand. Catches the incident's shape: a secret living in HEAD.
+//   - `--range <git-log-args…>` — the ADDED lines of every commit in a push range. A credential
+//     committed and then moved to an env var one commit later never reaches HEAD, so the default
+//     mode reports clean while the objects carrying the value go out with the push. That is the
+//     likelier accident, because it is what happens when the author NOTICES: the careful response
+//     (fix it in the next commit) is precisely the one the tree scan blesses. `.githooks/pre-push`
+//     runs both.
+// Both modes judge a line through the same `scanLine()`; keep it that way.
+//
 // Zero dependencies (pure Node). Run via `node tools/check-secrets.mjs`; wired into CI (ci.yml).
 // Escape hatch: append `secret-allow` in a comment on the offending line for a justified exception.
 //
@@ -87,6 +97,14 @@ const PLACEHOLDER = [
     /^\*+$/,                                  // ****
     /^x+$/i,                                  // xxxx
     /^(?:TODO|FIXME)/i,
+    // A history-rewrite redaction marker: `***REMOVED***` (BFG), `<REDACTED>`, and the marker the
+    // 2026-07-26 `--replace-text` purge left in this repo's own rewritten commits. Matched by SHAPE
+    // rather than by one literal, so a future purge with a different marker is covered too. Only
+    // --range mode ever meets these (they live in history, not at HEAD), and without this rule a
+    // range scan fires on every push whose range touches the rewrite — i.e. it would be noise from
+    // day one, which is how a guard gets switched off. A real credential does not contain the word
+    // REDACTED, nor is it free of lowercase.
+    /^[^a-z]*\b(?:REDACTED|REMOVED|PURGED|SCRUBBED)\b[^a-z]*$/,
 ];
 
 // Real credentials are long. Below this, the false-positive rate dwarfs the signal.
@@ -139,35 +157,127 @@ function* trackedFiles() {
     }
 }
 
-const violations = [];
-for (const file of trackedFiles()) {
-    const rel = toPosix(relative(repoRoot, file));
-    if (SKIP_FILES.has(rel) || SKIP_FILES.has(rel.slice(rel.lastIndexOf('/') + 1))) continue;
-    // walk() skips these by never descending; the tracked-file list has to filter them by path.
-    if (rel.split('/').slice(0, -1).some((seg) => SKIP_DIRS.has(seg))) continue;
-    const dot = rel.lastIndexOf('.');
-    if (dot < 0 || !EXTS.has(rel.slice(dot))) continue;
-
-    let lines;
-    try {
-        lines = readFileSync(file, 'utf8').split(/\r?\n/);
-    } catch {
-        continue;
+// THE one place a line is judged. Both modes call it, so the tree scan and the range scan can never
+// drift into guarding by different rules — a divergence here is the same failure as two branches
+// with two copies of this file.
+function scanLine(text) {
+    if (text.includes('secret-allow')) return null;
+    for (const re of [QUOTED, URL_PARAM]) {
+        const m = text.match(re);
+        if (!m) continue;
+        const key = m[1];
+        const value = re === QUOTED ? m[3] : m[2];
+        if (INDIRECT_KEY.test(key)) continue;
+        if (isPlaceholder(value) || value.length < MIN_SECRET_LEN) continue;
+        return { key, len: value.length };
     }
+    return null;
+}
 
-    lines.forEach((line, i) => {
-        if (line.includes('secret-allow')) return;
-        for (const re of [QUOTED, URL_PARAM]) {
-            const m = line.match(re);
-            if (!m) continue;
-            const key = m[1];
-            const value = re === QUOTED ? m[3] : m[2];
-            if (INDIRECT_KEY.test(key)) continue;
-            if (isPlaceholder(value) || value.length < MIN_SECRET_LEN) continue;
-            violations.push({ rel, line: i + 1, key, len: value.length });
-            break;
+// A path worth opening at all: right extension, not under a skipped directory, not this file.
+function scannablePath(rel) {
+    if (SKIP_FILES.has(rel) || SKIP_FILES.has(rel.slice(rel.lastIndexOf('/') + 1))) return false;
+    // walk() skips these by never descending; the tracked-file list has to filter them by path.
+    if (rel.split('/').slice(0, -1).some((seg) => SKIP_DIRS.has(seg))) return false;
+    const dot = rel.lastIndexOf('.');
+    return dot >= 0 && EXTS.has(rel.slice(dot));
+}
+
+// DEFAULT MODE — tracked files as they stand. Catches the incident's own shape: a secret living in
+// HEAD.
+function scanWorkingTree() {
+    const found = [];
+    for (const file of trackedFiles()) {
+        const rel = toPosix(relative(repoRoot, file));
+        if (!scannablePath(rel)) continue;
+        let lines;
+        try {
+            lines = readFileSync(file, 'utf8').split(/\r?\n/);
+        } catch {
+            continue;
         }
-    });
+        lines.forEach((line, i) => {
+            const hit = scanLine(line);
+            if (hit) found.push({ rel, line: i + 1, ...hit });
+        });
+    }
+    return found;
+}
+
+// --range MODE — the ADDED lines of every commit in a push range.
+//
+// WHY: the tree scan sees a secret only if it SURVIVES to HEAD. A credential committed and then
+// moved to an env var one commit later is invisible to it — and that is the likelier accident,
+// because it is exactly what happens when the author notices their own mistake. The objects still
+// travel in the push, so the disclosure is identical; the difference is that the tree scan hands
+// back a green light, which is worse than no check at all.
+//
+// Returns null (not []) when the range cannot be read, so the caller can refuse rather than assume.
+function scanRange(gitArgs) {
+    let out;
+    try {
+        out = execFileSync('git', ['-C', repoRoot, 'log', '--no-color', '--no-renames', '-p',
+            '--unified=0', '--format=@@C@@%H%x09%s', ...gitArgs],
+            { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] });
+    } catch {
+        return null;
+    }
+    const found = [];
+    let sha = null, subject = null, rel = null;
+    for (const line of out.split('\n')) {
+        if (line.startsWith('@@C@@')) {
+            const parts = line.slice(5).split('\t');
+            sha = parts[0];
+            subject = parts.slice(1).join('\t');
+            rel = null;
+            continue;
+        }
+        // `+++ b/<path>` opens a file's hunks; `+++ /dev/null` means a deletion — nothing added.
+        if (line.startsWith('+++ b/')) { rel = line.slice(6).trim(); continue; }
+        if (line.startsWith('+++ ')) { rel = null; continue; }
+        if (!line.startsWith('+')) continue;
+        if (!rel || !scannablePath(rel)) continue;
+        const hit = scanLine(line.slice(1));
+        if (hit) found.push({ rel, sha, subject, ...hit });
+    }
+    return found;
+}
+
+const rangeMode = process.argv[2] === '--range';
+const violations = rangeMode ? scanRange(process.argv.slice(3)) : scanWorkingTree();
+
+if (violations === null) {
+    console.error('\n✖ Committed-secret guard: could not read the push range.');
+    console.error('  Refusing to vouch for a range this guard could not open — push again once');
+    console.error('  the range is readable, or state the exception deliberately.');
+    process.exit(1);
+}
+
+if (violations.length && rangeMode) {
+    console.error(`\n✖ Committed-secret guard: ${violations.length} probable secret(s) INSIDE THE PUSH RANGE\n`);
+    let lastSha = null;
+    for (const v of violations) {
+        if (v.sha !== lastSha) {
+            console.error(`  ${v.sha.slice(0, 8)}  ${v.subject}`);
+            lastSha = v.sha;
+        }
+        // Never echo the value — CI logs are themselves a disclosure surface.
+        console.error(`      ${v.rel}  ${v.key} = <${v.len} chars, not shown>`);
+    }
+    console.error(`
+These values are NOT in your working tree — they were added and then changed or removed by a later
+commit in this same push. That is why the file looks clean and this guard still refuses.
+
+⚠ Editing the file does not help. The credential is in the COMMIT OBJECTS you are about to publish,
+and a push is not reversible: once the objects reach a public remote, deletion remediates nothing.
+
+Rewrite the range before pushing — \`git rebase -i\` to amend the introducing commit, or
+\`git filter-repo --replace-text\` for a wider sweep — then push again.
+
+If the value was ALREADY pushed, rotate it at the issuer. See docs/BACKLOG.md §5 (SEC-INCIDENT-1),
+whose five OAuth secrets are the reason this check exists.
+`);
+    process.exit(1);
 }
 
 if (violations.length) {
@@ -191,4 +301,6 @@ See docs/BACKLOG.md §5 (SEC-INCIDENT-1).
     process.exit(1);
 }
 
-console.log('✓ Committed-secret guard: no probable secrets in committed source or config.');
+console.log(rangeMode
+    ? '✓ Committed-secret guard: no probable secrets introduced anywhere in the push range.'
+    : '✓ Committed-secret guard: no probable secrets in committed source or config.');

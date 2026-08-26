@@ -768,9 +768,21 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 > security backport to an EOL line; it must not also disable the secrets check). Falsified both ways: a
 > planted `clientSecret` in the incident's exact shape blocks the push, and still blocks with the
 > override set. Missing `node` warns rather than blocks — a hook that fails every push gets
-> `core.hooksPath` unset, and then no layer runs locally at all. ⚠ **Limit:** it scans tracked files as
-> they stand, not every commit in the push range, so a secret added and removed *within* the pushed
-> commits is still published unseen. Layers documented in `BRANCHING.md` §8.
+> `core.hooksPath` unset, and then no layer runs locally at all. Layers documented in `BRANCHING.md` §8.
+>
+> **✅ The push-range hole is CLOSED (2026-08-26).** The stated limit above — "scans tracked files as
+> they stand, not every commit in the push range" — was the last way a credential reached a public
+> remote with nothing objecting, and the *likelier* one: a secret committed and then moved to an env
+> var a commit later never reaches HEAD, so the tree scan returned **green** while the objects still
+> travelled in the push. The careful response (fix it in the next commit) was exactly the one the
+> guard blessed. `check-secrets.mjs` gained a `--range` mode scanning the added lines of every commit
+> in the range; `.githooks/pre-push` now captures the ref list once and runs both passes, still above
+> the override. Both judge a line through the same `scanLine()` — one rule set, not two.
+> Verified end-to-end against a real remote: add-then-remove **blocks** (incrementally and on a new
+> branch), a clean push, a branch deletion and a tag push all pass, and rewriting the range clears it.
+> ⚠ A range scan meets the 2026-07-26 rewrite's redaction markers, which `PLACEHOLDER` did not cover —
+> without a shape rule for them the guard would have fired 26 false positives on day one. Full history
+> (1753 commits) now scans clean in ~8s; a normal push range is sub-second.
 >
 > **✅ Reintroduction guard SHIPPED** (2026-07-25): `tools/check-secrets.mjs`, wired into `ci.yml` beside
 > the vocabulary guard (~1s, pure Node). Flags a secret-ish key assigned a ≥16-char literal; ignores
