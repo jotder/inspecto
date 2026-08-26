@@ -102,9 +102,13 @@ class PipelineLiftTest {
                 String.valueOf(g.node(sinkIds.get(1)).orElseThrow().cfg("database")));
         assertEquals(Set.of("out_hot", "out_cold"), dbs, "each sink keeps its own destination database");
 
-        // this is precisely what the shipped-but-dormant engagement predicate engages on (two data-fed
-        // sinks off the map, quarantine excluded — proven above by the two data edges)
-        assertTrue(BatchGraphRunner.engages(g), "a multi-destination graph needs the branch executor");
+        // Refined 2026-08-26 (arming plan S1): this pin used to assert engages == true, written when
+        // "a 2-destination config is liftable but not yet runnable" — STALE since sinks: shipped
+        // (2026-08-02) as FLAT-path fan-out in writeAndTrace. Two plain-data-fed sinks are N
+        // destinations of ONE branch; diverting them to the runner would drop writeAndTrace's
+        // reference-versioning and decision rules. Only a second route:<key> relation is a second branch.
+        assertFalse(BatchGraphRunner.engages(g),
+                "multi-destination is flat-path fan-out (one branch, N destinations) — never the runner");
     }
 
     @Test

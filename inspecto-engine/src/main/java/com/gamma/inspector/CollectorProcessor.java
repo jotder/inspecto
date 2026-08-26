@@ -116,6 +116,21 @@ public class CollectorProcessor {
         // then quarantines with a per-file audit row exactly as today.
         candidates = com.gamma.etl.unpack.UnpackStage.expand(cfg, candidates);
 
+        // ── branch-aware engagement (arming plan S1 — observe-only) ─────────────
+        // An authored route: block lifts to a graph with >1 data-fed sink. Engagement is computed
+        // OFF THE LIFTED GRAPH (Stage A's rule: the predicate reads topology, never a flag) and
+        // logged beside its inputs, so the lift and the predicate can be proven to agree with the
+        // authored intent BEFORE S2 wires BatchGraphRunner in. prepare() still refuses an active
+        // route: pipeline, so this fires only for one-shot runs of an inactive config.
+        if (cfg.routeConfig() != null) {
+            com.gamma.pipeline.PipelineGraph lifted = com.gamma.pipeline.PipelineLift.lift(cfg);
+            long sinkCount = com.gamma.pipeline.exec.BatchGraphRunner.dataFedSinkCount(lifted);
+            log.info("route: authored on '{}' — lifted graph has {} data-fed sink(s), branch-aware executor {} "
+                            + "(S1 observe-only: batches below still take the flat path)",
+                    cfg.identity().pipelineName(), sinkCount,
+                    com.gamma.pipeline.exec.BatchGraphRunner.engages(lifted) ? "WOULD ENGAGE" : "would not engage");
+        }
+
         // ── plan batches ─────────────────────────────────────────────────────────
         ConsignmentPlanner.SchemaResolver resolver = (cfg.schemas().selector() != null)
                 ? cfg.schemas().selector()::select

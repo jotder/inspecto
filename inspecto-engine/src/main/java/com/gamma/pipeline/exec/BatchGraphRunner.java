@@ -78,24 +78,40 @@ public final class BatchGraphRunner {
 
     /**
      * <b>Stage A engagement predicate.</b> Whether {@code g} needs this branch-aware runner instead of the
-     * flat single-output write path: it fans one batch across <b>more than one data-fed sink branch</b>.
+     * flat single-output write path: it fans one batch across <b>more than one data-fed sink BRANCH</b>.
      * This is deliberately {@code false} for every legacy single-sink {@code *_pipeline.toon} — a
      * single-schema lift produces one data sink plus a quarantine sink wired only by the {@code unmatched}
      * control edge, and {@link #dataFedSinkCount} excludes the latter (exactly as {@link PipelineExecutor}
      * does — a control edge carries no relation produced from a seed, so the executor never commits it as a
-     * branch). So the flat path stays byte-for-byte until a genuinely multi-sink config can be authored (the
-     * deferred {@code sinks:} config-format, BACKLOG §6).
+     * branch).
+     *
+     * <p>⚠ A branch is NOT a sink node (refined 2026-08-26, arming plan S1 — the original node count
+     * was refuted by its own falsification test): a plain {@code sinks[2]} fan-out lifts to TWO
+     * persistent-sink nodes each on a plain {@code data} edge, but that is N destinations of ONE
+     * branch — it shipped 2026-08-02 as flat-path fan-out in {@code writeAndTrace} and must never
+     * divert here. What makes a second <em>branch</em> is a second {@code route:<key>} relation:
+     * exactly what {@link PipelineExecutor} commits as a branch. So the count is
+     * <em>distinct route keys feeding sinks, plus one for the trunk if any sink is plain-data-fed</em>.
      */
     public static boolean engages(PipelineGraph g) {
         return dataFedSinkCount(g) > 1;
     }
 
-    /** Count of {@code SINK}-category nodes reached by at least one {@code data} or {@code route:*} edge. */
-    static long dataFedSinkCount(PipelineGraph g) {
-        return g.nodes().stream()
-                .filter(n -> PipelineNodeTypes.isCategory(n.type(), NodeCategory.SINK))
-                .filter(n -> g.edgesTo(n.id()).stream()
-                        .anyMatch(e -> PipelineRel.DATA.equals(e.rel()) || PipelineRel.isRoute(e.rel())))
-                .count();
+    /**
+     * Count of data-fed sink <b>branches</b>: distinct {@code route:*} relations reaching a
+     * {@code SINK}-category node, plus one for the trunk when any sink is reached by a plain
+     * {@code data} edge. (N plain-data-fed sinks are one branch with N destinations — see
+     * {@link #engages}.)
+     */
+    public static long dataFedSinkCount(PipelineGraph g) {
+        java.util.Set<String> branches = new java.util.HashSet<>();
+        for (var n : g.nodes()) {
+            if (!PipelineNodeTypes.isCategory(n.type(), NodeCategory.SINK)) continue;
+            for (var e : g.edgesTo(n.id())) {
+                if (PipelineRel.isRoute(e.rel())) branches.add(e.rel());
+                else if (PipelineRel.DATA.equals(e.rel())) branches.add(PipelineRel.DATA);
+            }
+        }
+        return branches.size();
     }
 }
