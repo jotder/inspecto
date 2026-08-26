@@ -24,11 +24,12 @@
 // Zero dependencies (pure Node). Run via `node tools/check-secrets.mjs`; wired into CI (ci.yml).
 // Escape hatch: append `secret-allow` in a comment on the offending line for a justified exception.
 //
-// NOTE ON BRANCHES: this guard now runs on BOTH `master` and `4.x`. It was master-only until
-// 2026-07-25 because `4.x` carried the live values in its own environments/*.ts; PKCE P0+P1
-// (`481a68d5`, `89cb3cce`, `8c3a7654`) removed `appClientSecret` from `4.x` entirely, so the guard
-// is green there and was brought forward. Keep the two copies IDENTICAL — a divergence means one
-// branch is guarded by weaker rules than the other, which is exactly how the incident recurs.
+// NOTE ON BRANCHES: `master` is the ONLY line this guard runs on, and there is no second copy to
+// keep in sync. It was master-only until 2026-07-25, then brought forward to `4.x` as well once
+// PKCE P0+P1 (`481a68d5`, `89cb3cce`, `8c3a7654`) removed `appClientSecret` from that branch; `4.x`
+// was deleted 2026-08-17 (BRANCHING.md §0-A). If a maintenance branch is ever cut again, copy this
+// guard to it VERBATIM — a divergence means one branch is guarded by weaker rules than the other,
+// which is exactly how the incident recurs.
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -46,9 +47,13 @@ const SKIP_DIRS = new Set([
     'graphify-out', 'worktrees', 'archived-documents', 'coverage',
 ]);
 
+// `.md` is here because a rotation runbook or an incident plan is exactly where someone pastes a
+// live credential into a worked example — the same class as SEC-INCIDENT-1's five OAuth secrets,
+// and nothing else in the local loop or CI would see it. It costs no noise: only ASSIGNMENT syntax
+// matches, so prose naming a leaked key stays clean, and the whole tracked doc corpus is green.
 const EXTS = new Set([
     '.ts', '.js', '.mjs', '.cjs', '.java', '.json', '.yml', '.yaml',
-    '.toon', '.properties', '.xml', '.ps1', '.sh', '.bat', '.env',
+    '.toon', '.properties', '.xml', '.ps1', '.sh', '.bat', '.env', '.md',
 ]);
 
 const SKIP_FILES = new Set(['package-lock.json', 'tools/check-secrets.mjs']);
