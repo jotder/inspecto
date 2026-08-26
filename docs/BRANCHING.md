@@ -208,10 +208,23 @@ body. Agents must not set this flag on their own — they must ask.
 | Layer | What | Scope | Bypass |
 |---|---|---|---|
 | **1. Claude Code hook** | `.claude/hooks/pre-tool-git-release-guard.sh` — injects the commit/push checklist and blocks commit/push/tag on retired lines | Claude Code agents on this machine (`.claude/` is gitignored — local only) | `UCC_RELEASE_GUARD_DISABLE=1` |
-| **2. git `pre-push` hook** | `.githooks/pre-push` — blocks pushes whose target ref is a retired line; prints the merge-forward reminder | Any human/agent using plain git, once `core.hooksPath` is set | `--no-verify` or `UCC_RELEASE_GUARD_DISABLE=1` |
+| **2. git `pre-push` hook** | `.githooks/pre-push` — blocks pushes whose target ref is a retired line; **also runs the committed-secret guard** (`tools/check-secrets.mjs`) and blocks on a hit; prints the merge-forward reminder | Any human/agent using plain git, once `core.hooksPath` is set | `--no-verify` or `UCC_RELEASE_GUARD_DISABLE=1` — but the **secret** check runs BEFORE that override and is not switched off by it (see below) |
 | **3. CI** | `.github/workflows/branch-policy.yml` — rejects retired branches; lints Conventional Commits on PRs | Everyone; runs server-side | none (this is the backstop) |
 
 **Activate layer 2 once per clone:** `git config core.hooksPath .githooks`
+
+⚠ **The committed-secret guard is the one check for which CI is NOT an adequate backstop.** CI runs
+*after* the push, and against a public remote the disclosure is complete the moment the objects
+land — which is exactly how SEC-INCIDENT-1 happened (pushed 2026-06-12, spotted six weeks later).
+So the guard runs at layer 2 as well, deliberately **above** the `UCC_RELEASE_GUARD_DISABLE` early
+exit: that override exists so a human can push a security backport to an EOL line, and the moment
+you most want a secrets check is a hurried security push. `--no-verify` still skips the whole hook —
+that is git, not policy. A machine without `node` gets a loud WARNING rather than a blocked push,
+because a hook that fails every push gets `core.hooksPath` unset entirely, and then nothing runs.
+
+⚠ **Known limit:** the guard scans tracked files **as they stand**, not every commit in the push
+range. A secret introduced and then removed within the pushed commits is still in the objects being
+published and this hook will not see it — rewrite that history before pushing.
 
 **Pom version consistency** is enforced implicitly by the Maven reactor build in
 `.github/workflows/ci.yml`: a partial/mismatched version bump across modules fails the build (a child's

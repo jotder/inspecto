@@ -734,6 +734,17 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 > - Pre-rewrite backup bundle: `C:/sandbox/ucc-prerewrite-backup-20260726-203545.bundle` (all refs).
 >   ⚠ **It contains the secrets — delete it once the incident is closed.**
 >
+> **✅ The guard now runs PRE-PUSH too (2026-08-26).** It had been CI-only, and CI fires *after* the
+> push — against a public remote the disclosure is already complete when the build turns red, which is
+> literally this incident's mechanism. `.githooks/pre-push` now runs `tools/check-secrets.mjs` and
+> blocks on a hit, **above** the `UCC_RELEASE_GUARD_DISABLE` early exit (that override is for pushing a
+> security backport to an EOL line; it must not also disable the secrets check). Falsified both ways: a
+> planted `clientSecret` in the incident's exact shape blocks the push, and still blocks with the
+> override set. Missing `node` warns rather than blocks — a hook that fails every push gets
+> `core.hooksPath` unset, and then no layer runs locally at all. ⚠ **Limit:** it scans tracked files as
+> they stand, not every commit in the push range, so a secret added and removed *within* the pushed
+> commits is still published unseen. Layers documented in `BRANCHING.md` §8.
+>
 > **✅ Reintroduction guard SHIPPED** (2026-07-25): `tools/check-secrets.mjs`, wired into `ci.yml` beside
 > the vocabulary guard (~1s, pure Node). Flags a secret-ish key assigned a ≥16-char literal; ignores
 > `${ENV:…}`/`%VAR%`/`process.env`, placeholders, `*Ref`/`*File`/`*Name` indirection keys, `token`-suffixed

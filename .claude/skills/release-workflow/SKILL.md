@@ -13,7 +13,9 @@ description: >
 
 Canonical policy: [docs/BRANCHING.md](../../docs/BRANCHING.md). This skill is the operational
 checklist. Enforced by three layers: a Claude Code hook (agent reminder), `.githooks/pre-push`
-(local block), and CI `.github/workflows/branch-policy.yml` (un-bypassable backstop).
+(local block — **also runs the committed-secret guard**, above the release override, because CI
+catches a leaked secret only after it is already public), and CI
+`.github/workflows/branch-policy.yml` (un-bypassable backstop).
 **One-time per clone:** `git config core.hooksPath .githooks`.
 
 ## CURRENT STATE (2026-08-17) — apply this before the checklist below
