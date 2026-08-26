@@ -196,19 +196,19 @@ formats, write a `StreamingFileIngester` plugin instead of a schema; see [Plugin
 
 ## 3. Run a pipeline
 
-From the **repository root**, the bundled sample scripts run a pipeline end-to-end:
+From the **repository root**, run any pipeline config end-to-end:
 
 ```powershell
-run-voucher.bat          # Windows — runs spaces/ucc/config/voucher/voucher_pipeline.toon
+java --enable-native-access=ALL-UNNAMED ^
+     -jar inspecto/target/inspecto-processor-<version>.jar <pipeline.toon>
 ```
 
-On Linux/Mac run the `java -jar` line below directly — the `.sh` wrappers were removed 2026-08-26.
+A working sample: `spaces/ucc/config/voucher/voucher_pipeline.toon`.
 
-Or run any pipeline config directly (the scripts just wrap this):
-
-```powershell
-java -jar inspecto/target/inspecto-processor-<version>.jar config/<source>/<source>_pipeline.toon
-```
+> The `run-voucher` / `run-adjustment` `.sh` and `.bat` wrappers were removed 2026-08-26. They were
+> thin wrappers around exactly the line above, and three of the four had gone stale — pointing at
+> config paths that no longer existed, so they could only fail. `--enable-native-access=ALL-UNNAMED`
+> is required (DuckDB JNI) and is easy to lose when copying the shorter form.
 
 > The deploy bundle produced by `package.ps1` ships a generic `run.sh <adapter>` /
 > `run.bat <adapter>` that resolves `config/<adapter>/*_pipeline.toon` automatically.

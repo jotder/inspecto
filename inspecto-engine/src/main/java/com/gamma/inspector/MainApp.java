@@ -244,9 +244,12 @@ public class MainApp {
         System.out.println("                              from a representative sample CSV.");
         System.out.println();
         System.out.println("ETL pipeline (runs the CollectorProcessor on a pipeline config, not via ura):");
-        System.out.println("  run-adjustment.sh | run-adjustment.bat   Polls inbox, processes adjustment CSVs to Parquet.");
-        System.out.println("  run-voucher.sh    | run-voucher.bat      Polls inbox, processes voucher CSVs to Parquet.");
-        System.out.println("  java -jar inspecto-processor-<version>.jar <pipeline.toon>   (direct form)");
+        // The four run-*.sh/.bat wrappers this used to advertise were removed 2026-08-26. Two of them
+        // named config paths that no longer existed, so the help was pointing operators at commands that
+        // could only fail. The direct form is what the wrappers wrapped.
+        System.out.println("  java -jar inspecto-processor-<version>.jar <pipeline.toon>");
+        System.out.println("      e.g. spaces/ucc/config/voucher/voucher_pipeline.toon — polls the");
+        System.out.println("      configured inbox and processes matching CSVs to Parquet.");
         System.out.println();
         System.out.println("Legacy / low-level commands:");
         System.out.println("  move-by-date                    Move files matching pattern into YYYYMMDD sub-folders.");

@@ -32,7 +32,7 @@ JVM flag required at every launch: `--enable-native-access=ALL-UNNAMED` (DuckDB 
 # One-shot ETL pipeline
 java --enable-native-access=ALL-UNNAMED -jar inspecto\target\inspecto-processor-*.jar `
      inspecto\config\voucher\voucher_unknown_pipeline.toon
-# convenience wrapper (sandbox root, Windows only):  run-voucher.bat
+# (the run-*.sh / run-*.bat wrappers were removed 2026-08-26 — this IS the wrapped command)
 
 # Long-running control plane + operator UI (ControlApi, default :8080)
 $env:CONTROL_TOKEN="secret"; .\inspecto-deploy\serve.bat   # then http://localhost:8080/
