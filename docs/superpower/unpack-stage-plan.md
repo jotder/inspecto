@@ -223,10 +223,21 @@ Each phase is independently shippable and independently verifiable.
 > each source file". Crash-safe order is untouched (register → manifest → backup → markers LAST); a
 > failed member gets a row and **no** backup/marker, because it went to quarantine and must not read
 > as processed. The branch-aware graph path uses the no-audits overload and is unchanged.
-> **Deferred by decision, not oversight:** the run-level `unpack` ledger and the additive
-> `logical_name`/`origin` ledger columns (§2.2/step 4d) — those are new ledger surfaces with the
-> five-mirrors hazard, and they want §6 Q1's vocabulary settled first. Phase 6's UI half (collector
-> pane + Run Detail origin column) is also not built.
+> **Status 2026-08-26 — §6 is FULLY DRAINED and the ledger SHIPPED.** All four operator questions are
+> answered (Q1 vocabulary + partial-commits · Q2 entry grain · Q3 resolved by building · Q4
+> allow-list + published key + WARN on a dropped file), and with them: the run-level `unpack` ledger
+> (`UnpackLedger`/`UnpackStatus`), the two honesty fixes (entry-name lineage, reported skips),
+> `processing.unpack.data_extensions` published — completing step 17 — and step 19's docs. Pushed as
+> `fe6e1d7e` → `6730cd66` → `e9750e20`; reactor **3603/0/0/5**, exit 0.
+>
+> **What is left, and it is all Phase 6 surface work — no decision gates the plan any more:**
+> the ledger has **no READ surface** (an `OperationalTables` `unpack` table + a `StatusStore` reader;
+> it must REFERENCE `UnpackLedger.COLUMNS`, never restate them) · the `logical_name` status-ledger
+> column · Phase 6's UI half (collector pane + Run Detail origin column) · and step 14's member-status
+> enum, now FIVE bare literals rather than four. All tracked in `BACKLOG.md` §4.
+> ⛔ **Archive this plan only once Phase 6 lands** — the as-built already lives in
+> [`okf/backend/engine/unpack-stage.md`](../okf/backend/engine/unpack-stage.md), which is what to read
+> for behaviour; this file survives only for its unbuilt Phase-6 detail.
 > ⚠ **Verification trap worth keeping:** a verify agent reported this run as PASS at the PREVIOUS
 > total (3542) off a stale log — the new tests showed their old counts (11/3 instead of 15/4). The
 > totals matching the previous baseline *exactly* while new tests were added is the tell; re-run and
@@ -379,12 +390,16 @@ and needs **no** consignment change at all.
     concurrently and produces byte-identical output to the sequential run.
 
 ### Phase 6 — Surfaces
-17. `ConfigSpecs` publication for every `processing.unpack.*` key (house rule: server-published).
+17. ~~`ConfigSpecs` publication for every `processing.unpack.*` key.~~ **✅ COMPLETE 2026-08-26** — the
+    last unpublished key, `data_extensions`, shipped with §6 Q4.
 18. UI: unpack settings on the shared `<inspecto-collector-config>`; Run Detail ▸ Files showing the
     Archive → entry relation via `origin`. Mock handlers must be **no more lenient than the server**.
-19. Docs: new OKF concept `okf/backend/engine/unpack-stage.md`; GLOSSARY entries for **Archive**,
-    **Entry**, **Unpack** — ⚠ `Batch.Member` already means "a file in a Consignment", so an inner
-    file is an **Entry**, never a "member"; update `docs/INDEX.md` and the GLOSSARY §13 touchpoints.
+19. ~~Docs: new OKF concept + GLOSSARY entries.~~ **✅ DONE 2026-08-26** — `okf/backend/engine/unpack-stage.md`
+    written and indexed; **Archive**, **Entry** and **Unpack** are in GLOSSARY §5 with an
+    Entry-≠-Member row in §11's *Resolved collisions*. ⚠ The code has NOT been swept: ~21 "member"
+    occurrences remain across `com.gamma.etl.unpack` (one an operator-facing WARN string) — filed as
+    BACKLOG §4 unpack item (13). ⛔ That sweep must not touch `Batch.Member`, `MemberAudit` or
+    `MemberEntry`, which are correctly named for Consignment members.
 
 ## 5. Deliberately out of scope
 

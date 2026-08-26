@@ -386,6 +386,28 @@ defines *when*, not *what*.
 *(Was `Run ⊇ Batch ⊇ File` until 2026-08-03; see the Consignment entry in §2 and the §13 row. Identity is
 `(consignment_id, run_id)` — the run is the attempt, so a reprocess is a new Run over the same Consignment.)*
 
+**Archive** *(added 2026-08-26; as-built in `okf/backend/engine/unpack-stage.md`)* — A **container file** the
+operator drops in the inbox that holds many inner files: `.zip`, `.tar`, `.tar.gz`. Expanded by the **Unpack**
+stage at the Collector *before* Consignments are planned, so its contents become ordinary Files from birth. An
+Archive is **not** a Consignment and can outlive one (500 entries at `batch.max_files: 100` plans five), which
+is why its verdict is a **Run**-level fact — one row per Archive per Run in the `unpack` ledger — never a
+manifest member row. Its four verdicts are `UNPACKED` / `UNPACKED_PARTIAL` / `UNREADABLE` / `EMPTY`;
+⛔ `UNPACKED_PARTIAL` is **reporting, never a gate** — the Consignment still commits.
+
+**Entry** *(added 2026-08-26)* — **One inner file of an Archive.** ⛔ **Never call it a "member".**
+`Batch.Member` already means "a file in a Consignment", and an Entry only *becomes* a Member after the Unpack
+stage materializes it — using one word for both makes the container↔content boundary unsayable. An Entry is
+addressed JAR-style as `archive!entry` in the manifest and quarantine tree, and lineage records its **entry
+name** (`good.csv`), never the workspace's index-prefixed temp spelling (`00001_good.csv`), which is
+bookkeeping and must not reach DATA. *(⚠ Engine code and log text still say "member" for Entries in places —
+pre-existing drift, tracked in `BACKLOG.md` §4; the canon here is Entry.)*
+
+**Unpack** *(added 2026-08-26)* — The **Collector-level stage** that expands compressed and archived inbox
+candidates into plain files before `ConsignmentPlanner` freezes the candidate list. Covers 1→1 **stream**
+kinds (`.gz`/`.bz2`/`.Z`) and 1→N **Archive** kinds. ⛔ Not a parser and not a Parser Plugin: Unpack produces
+*files*, the wrap-SPI produces *records* — an unpacked Entry may itself go on to a `StreamingFileIngester`.
+⛔ Not "decompression" as a bare word either, since that names only the stream half.
+
 **Expression** *(added 2026-08-07)* — A `$`-token an author writes in place of a literal value, **resolved at
 fire time** against the Run's context: `$today` · `$run.actor` · `$signal.<path>` · `$day(-1)` ·
 `$upstream(<job>).artifact(<name>).<attr>`. The vocabulary is an **open registry** (`ExpressionProvider` /
@@ -721,6 +743,10 @@ non-map stacking concepts.
   graph. The asset graph keeps the name **Lineage**.
 - **`EVENT_TABLE / TRANSFORMED_TABLE / REFERENCE_TABLE`** (lineage NodeKinds) → **Table / Derived Table /
   Reference Dataset** per §1's data-plane vocabulary.
+- **Archive inner file → `Entry`, never `Member`** *(2026-08-26)*. `Batch.Member` is a file in a *Consignment*;
+  an **Entry** is a file inside an *Archive*, and it only becomes a Member once Unpack materializes it. One
+  word for both would make the container↔content boundary unsayable — which is exactly the boundary the
+  `archive!entry` address and the Run-level Archive verdict exist to express.
 
 ---
 
