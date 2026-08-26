@@ -123,6 +123,19 @@ interface BatchIngestStrategy {
         List<PipelineConfig.Sink> sinks = cfg.sinks();
         boolean fanOut = sinks.size() > 1;
 
+        // ── branch-aware divert (arming plan S2) ──────────────────────────────
+        // An authored route: whose lifted graph engages takes the graph path from HERE — the one
+        // choke point every ingest lane already funnels through, holding the live connection and
+        // the materialised table. Everything downstream of the returned Written (commit /
+        // finalizeSource / writeAudit / events / provenance) is the SAME code as the flat path —
+        // that is the whole parity argument, so do not "improve" this into an earlier divert.
+        if (cfg.routeConfig() != null) {
+            com.gamma.pipeline.PipelineGraph lifted = com.gamma.pipeline.PipelineLift.lift(cfg);
+            if (com.gamma.pipeline.exec.BatchGraphRunner.engages(lifted))
+                return graphWriteAndTrace(conn, table, partCols, cfg, dbDir, baseName, batchId,
+                        srcIdToFile, lifted);
+        }
+
         DecisionRuleApplier.Result applied = DecisionRuleApplier.apply(
                 conn, table, cfg, dbDir, baseName, partCols, batchId, srcIdToFile);
         if (fanOut && !applied.outputs().isEmpty())
@@ -186,6 +199,63 @@ interface BatchIngestStrategy {
             }
         }
         return new Written(outputs, lineage, bounds);
+    }
+
+    /**
+     * The branch-aware write (arming plan S2, Option B): drive the {@code route -> sinks} subgraph of
+     * {@code lifted} over the already-materialised {@code table} through {@link BatchGraphRunner},
+     * committing each branch through the durable {@link com.gamma.pipeline.exec.BranchCommitLog} and
+     * writing it to its paired {@code sinks[]} destination via {@link IngestSinkWriter}.
+     *
+     * <p><b>Finalisation stays with {@code BatchProcessor.commit}</b> — the runner's
+     * once-after-all-branches hook is a no-op here, deliberately: this method returns the flat
+     * {@code Written} shape into {@link IngestOutcome}, and the caller's commit/audit tail then runs
+     * the REAL {@code finalizeSource} (manifest, backup, markers LAST, ledger, watermark) plus
+     * {@code writeAudit} (ledgers, BatchEvent, signals) — the same code, not a mirror. The runner's
+     * own finalizer cannot be that body: it fires inside the strategy, before the batch outcome
+     * exists, and the plan's Option-B constraint is a shared seam, never a second caller.
+     *
+     * <p>Refusals mirror the flat path's: decision-rule routing combined with route branches would
+     * run rule side effects against rows a branch may then re-route — refused by name, exactly as
+     * the flat path refuses rule-routing + fan-out.
+     */
+    private static Written graphWriteAndTrace(Connection conn, String table, List<String> partCols,
+                                              PipelineConfig cfg, String dbDir, String baseName,
+                                              String batchId, Map<Integer, String> srcIdToFile,
+                                              com.gamma.pipeline.PipelineGraph lifted) throws Exception {
+        DecisionRuleApplier.Result applied = DecisionRuleApplier.apply(
+                conn, table, cfg, dbDir, baseName, partCols, batchId, srcIdToFile);
+        if (!applied.outputs().isEmpty())
+            throw new IllegalStateException("decision-rule routing writes to a single destination; combining "
+                    + "it with a route: pipeline's branches is not supported");
+        if (cfg.producesReference() && cfg.reference().load().versionedStore())
+            throw new IllegalStateException("a versioned reference store cannot be written per route branch — "
+                    + "one version history is ill-defined across branches (same rule as sinks:>1 at prepare())");
+
+        // Seed the node whose data relation IS the materialised table: the route node's upstream
+        // (the map/transform node for this batch's schema). Seeding there means the executor never
+        // re-runs parse/map — it walks route -> sinks only.
+        com.gamma.pipeline.PipelineNode route = lifted.nodes().stream()
+                .filter(n -> "transform.route".equals(n.type())).findFirst()
+                .orElseThrow(() -> new IllegalStateException(
+                        "engaged graph carries no transform.route node — engagement and lift disagree"));
+        String seedNodeId = lifted.edgesTo(route.id()).stream()
+                .filter(e -> com.gamma.pipeline.PipelineRel.DATA.equals(e.rel()))
+                .map(com.gamma.pipeline.PipelineEdge::from).findFirst()
+                .orElseThrow(() -> new IllegalStateException(
+                        "route node '" + route.id() + "' has no inbound data edge to seed"));
+
+        IngestSinkWriter writer = new IngestSinkWriter(
+                conn, cfg, partCols, dbDir, baseName, batchId, srcIdToFile);
+        java.nio.file.Path commitLog = java.nio.file.Paths.get(
+                cfg.dirs().temp(), "branch_commit_" + batchId + ".log");
+        java.nio.file.Files.createDirectories(commitLog.getParent());
+        com.gamma.pipeline.exec.BatchGraphRunner.run(
+                new com.gamma.pipeline.exec.BatchGraphRunner.Input(
+                        conn, lifted, seedNodeId, table, batchId, dbDir, baseName, commitLog),
+                writer,
+                () -> { /* finalisation is BatchProcessor.commit's, once the outcome returns */ });
+        return new Written(writer.outputs(), writer.lineage(), writer.bounds());
     }
 
     // ⚠ applyRecordDedup lived here and was deleted 2026-08-11 with the move of record dedup to Stage-2.

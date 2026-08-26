@@ -68,12 +68,26 @@ public final class BatchGraphRunner {
     public static Result run(Input in, SourceFinalizer finalizer) throws Exception {
         PartitionSinkWriter writer =
                 new PartitionSinkWriter(in.conn(), in.dataDir(), in.baseName(), in.batchId());
+        PipelineExecutor.ExecResult exec = run(in, writer, () -> finalizer.finalizeSource(writer.outputs()));
+        return new Result(exec, writer.outputs(), writer.totalRows());
+    }
+
+    /**
+     * As {@link #run(Input, SourceFinalizer)}, but with a caller-supplied {@link PipelineExecutor.SinkWriter}
+     * (arming plan S2): the ingest path writes each route branch to its paired {@code sinks[]} destination —
+     * with the destination's own format/compression/{@code filename_column} and per-branch lineage — which
+     * the flow-job-shaped {@link PartitionSinkWriter} (one {@code dataDir/store} root, no lineage) cannot
+     * express. The runnable/finalize contract is identical: every sink branch commits through the durable
+     * {@link BranchCommitLog}, and {@code onAllBranchesDurable} runs exactly once after the last of them.
+     */
+    public static PipelineExecutor.ExecResult run(Input in, PipelineExecutor.SinkWriter writer,
+                                                  BranchCommitCoordinator.SourceFinalize onAllBranchesDurable)
+            throws Exception {
         BranchCommitCoordinator coordinator =
                 new BranchCommitCoordinator(new BranchCommitLog(in.branchCommitLog().toString()));
-        PipelineExecutor.ExecResult exec = PipelineExecutor.execute(
+        return PipelineExecutor.execute(
                 in.conn(), in.graph(), in.seedNodeId(), in.seedTable(), in.batchId(),
-                coordinator, writer, () -> finalizer.finalizeSource(writer.outputs()));
-        return new Result(exec, writer.outputs(), writer.totalRows());
+                coordinator, writer, onAllBranchesDurable);
     }
 
     /**

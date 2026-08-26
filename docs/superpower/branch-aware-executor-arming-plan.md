@@ -149,7 +149,25 @@ stale boolean pin now asserts the refined invariant with the rationale inline. N
 `BatchGraphRunnerLiftEngagementTest` (route engages / plain fan-out does not, both from REAL
 loaded `.toon` fixtures).
 
-**S2 — wire `BatchGraphRunner` at `BatchProcessor` level, audit through the SHARED seam.**
+**S2 — ✅ SHIPPED 2026-08-26** (inspecto-engine 1373/0/0/0; `RouteIngestEndToEndTest` proves a
+route pipeline end-to-end on the real `CollectorProcessor.run`: E→emea, A+X→apac via `default:`,
+per-branch lineage in the ledger, backup + status/batches ledgers written by the UNCHANGED flat
+tail). **One premise corrected while grounding:** "at `BatchProcessor` level" is physically
+impossible — the connection and the materialised table are strategy-scoped (they die with
+`ingest`'s try-with-resources) — so the runner is invoked at the `writeAndTrace` choke point,
+which every ingest lane already funnels through. Option B's SUBSTANCE is intact: the executing
+machinery is `BatchGraphRunner.run` (new `SinkWriter` overload) + `BranchCommitCoordinator` over a
+durable per-batch `BranchCommitLog` under `dirs.temp`. The runner's once-after-all-branches hook is
+a deliberate no-op: the method returns the flat `Written` shape into `IngestOutcome`, so
+`commit`/`finalizeSource`/`writeAudit` (parity rows 1-5, 7-17) are the SAME code — the shared seam
+the operator's Option-B constraint demanded, with zero mirrors. **Second finding:**
+`PartitionSinkWriter` is flow-job-shaped (one `dataDir/store` root, no `database`, no lineage, no
+`filename_column`, self-registers §11.3) — the ingest path got its own `IngestSinkWriter`
+(com.gamma.inspector): destination-rooted writes matched by the branch's `database` (the SAME join
+key the lift pairs with), per-branch `LineageCollector` + bounds, and NO registration here —
+`finalizeSource` registers from the returned lineage exactly as the flat path does (row 6 resolved
+as same-code, not skip-flag). Original slice text (for provenance):
+wire `BatchGraphRunner` at `BatchProcessor` level, audit through the SHARED seam.
 Engaged path (post-materialisation): refuse decision-rules+route combo by name → build
 `BatchGraphRunner.Input` (graph from S1's lift, seed = the materialised table, fresh
 `BranchCommitLog` under the run's temp dir) → `BatchGraphRunner.run(input, finalizeSource-overload)`
