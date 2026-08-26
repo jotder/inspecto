@@ -71,7 +71,7 @@ public final class PipelineTestRun {
 
     private PipelineTestRun() {}
 
-    /** Per-input-file outcome. {@code status} is {@code SUCCESS} or a {@code QUARANTINED_*} reason. */
+    /** Per-input-file outcome. {@code status} is a {@link com.gamma.etl.MemberStatus} constant name. */
     public record FileResult(String filename, String status, long parsedRows, long errorRows, String error) {}
 
     /**
@@ -139,7 +139,7 @@ public final class PipelineTestRun {
             // mirrored here, and this comment is where you will find out why.
 
             for (MemberAudit m : outcome.memberAudits())
-                files.add(new FileResult(m.filename(), m.status(), m.parsedRows(), m.errorRows(), m.error()));
+                files.add(new FileResult(m.filename(), m.status().name(), m.parsedRows(), m.errorRows(), m.error()));
             outputs.addAll(outcome.outputs());
             inputRows += outcome.totalInputRows();
             written += outcome.lineage().stream().mapToLong(LineageRow::rowCount).sum();

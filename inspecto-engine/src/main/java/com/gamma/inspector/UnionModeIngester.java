@@ -82,7 +82,7 @@ final class UnionModeIngester {
                             throw e;   // framework/schema fault → fail the batch
                         } catch (Exception e) {
                             QuarantineManager.quarantine(m.file(), "unreadable", false, cfg);
-                            memberAudits.add(MemberAudit.rejected(m, "QUARANTINED_UNREADABLE", msg(e), mStart));
+                            memberAudits.add(MemberAudit.rejected(m, MemberStatus.QUARANTINED_UNREADABLE, msg(e), mStart));
                             quarantined = true;
                         }
                         if (!quarantined) {
@@ -95,7 +95,7 @@ final class UnionModeIngester {
 
                     if (memberParsed == 0) {
                         QuarantineManager.quarantine(m.file(), "field_mismatch", memberErrors > 0, cfg);
-                        memberAudits.add(MemberAudit.rejected(m, "QUARANTINED_MISMATCH",
+                        memberAudits.add(MemberAudit.rejected(m, MemberStatus.QUARANTINED_MISMATCH,
                                 "0 valid rows across all segments", mStart));
                         for (String t : rawTables.values()) dropTable(conn, t);
                         continue;

@@ -45,9 +45,10 @@ public final class BatchManifest {
      * @param srcId           0-based index within the batch
      * @param originalRelPath member path relative to the poll dir (for restore target)
      * @param backupPath      computed backup destination (where the source was moved)
-     * @param status          SUCCESS, a QUARANTINED_* status, or SKIPPED_UNREADABLE (an archive
-     *                        entry the unpack stage could not decode — encrypted / unsupported
-     *                        method — so it was never planned: srcId -1, no backup, no marker)
+     * @param status          a {@link MemberStatus} constant's {@code name()} — the wire form is the
+     *                        constant name, verbatim. Kept as a {@code String} rather than the enum
+     *                        so Gson keeps reading a manifest whose status this build does not know
+     *                        (an enum component would silently deserialize to {@code null}).
      */
     public record MemberEntry(String filename, int srcId, String originalRelPath,
                               String backupPath, String status) {}

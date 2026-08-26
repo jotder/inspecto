@@ -160,7 +160,7 @@ class StreamingPluginBatchStrategyTest {
 
         assertEquals("EMPTY", out.status());
         assertEquals(1, out.memberAudits().size());
-        assertEquals("QUARANTINED_MISMATCH", out.memberAudits().get(0).status());
+        assertEquals(com.gamma.etl.MemberStatus.QUARANTINED_MISMATCH, out.memberAudits().get(0).status());
     }
 
     @Test
@@ -172,7 +172,7 @@ class StreamingPluginBatchStrategyTest {
         IngestOutcome out = new StreamingPluginBatchStrategy().ingest(batch, cfg);
 
         assertEquals("EMPTY", out.status());
-        assertEquals("QUARANTINED_UNREADABLE", out.memberAudits().get(0).status());
+        assertEquals(com.gamma.etl.MemberStatus.QUARANTINED_UNREADABLE, out.memberAudits().get(0).status());
     }
 
     @Test
@@ -193,7 +193,7 @@ class StreamingPluginBatchStrategyTest {
         IngestOutcome out = new StreamingPluginBatchStrategy(2).ingest(batch, cfg);
 
         assertEquals("EMPTY", out.status());
-        assertEquals("QUARANTINED_UNREADABLE", out.memberAudits().get(0).status());
+        assertEquals(com.gamma.etl.MemberStatus.QUARANTINED_UNREADABLE, out.memberAudits().get(0).status());
         assertTrue(out.outputs().isEmpty(), "a quarantined member contributes no outputs");
 
         List<Path> orphans;

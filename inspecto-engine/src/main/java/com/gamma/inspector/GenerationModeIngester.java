@@ -68,7 +68,7 @@ final class GenerationModeIngester {
                         } catch (Exception e) {
                             discardRevealed(sink, m);
                             QuarantineManager.quarantine(m.file(), "unreadable", false, cfg);
-                            memberAudits.add(MemberAudit.rejected(m, "QUARANTINED_UNREADABLE", msg(e), mStart));
+                            memberAudits.add(MemberAudit.rejected(m, MemberStatus.QUARANTINED_UNREADABLE, msg(e), mStart));
                             continue;
                         }
 
@@ -77,7 +77,7 @@ final class GenerationModeIngester {
                         if (memberParsed == 0) {
                             discardRevealed(sink, m);
                             QuarantineManager.quarantine(m.file(), "field_mismatch", memberErrors > 0, cfg);
-                            memberAudits.add(MemberAudit.rejected(m, "QUARANTINED_MISMATCH",
+                            memberAudits.add(MemberAudit.rejected(m, MemberStatus.QUARANTINED_MISMATCH,
                                     "0 valid rows across all segments", mStart));
                             continue;
                         }

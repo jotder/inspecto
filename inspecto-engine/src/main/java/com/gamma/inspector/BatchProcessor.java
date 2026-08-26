@@ -251,7 +251,8 @@ public final class BatchProcessor {
                 } catch (IOException ignore) { /* vanished pre-backup — skip recording this member */ }
             }
             memberEntries.add(new BatchManifest.MemberEntry(
-                    m.file().getName(), m.srcId(), rel, backupPath, "SUCCESS"));
+                    m.file().getName(), m.srcId(), rel, backupPath,
+                    com.gamma.etl.MemberStatus.SUCCESS.name()));
         }
 
         // Phase 4 — the batch's FAILED members join its survivors in the manifest, so the
@@ -263,7 +264,7 @@ public final class BatchProcessor {
         java.util.Set<Integer> survivorIds = new java.util.HashSet<>();
         for (Batch.Member m : survivors) survivorIds.add(m.srcId());
         for (MemberAudit a : audits) {
-            if ("SUCCESS".equals(a.status()) || survivorIds.contains(a.srcId())) continue;
+            if (a.status() == com.gamma.etl.MemberStatus.SUCCESS || survivorIds.contains(a.srcId())) continue;
             Batch.Member failed = batch.members().stream()
                     .filter(m -> m.srcId() == a.srcId()).findFirst().orElse(null);
             String rel = a.filename();
@@ -277,7 +278,7 @@ public final class BatchProcessor {
                 }
             }
             memberEntries.add(new BatchManifest.MemberEntry(
-                    a.filename(), a.srcId(), rel, "", a.status()));
+                    a.filename(), a.srcId(), rel, "", a.status().name()));
         }
 
         // Unpack open item (4), honesty half (2026-08-26) — entries an archive's expansion had to
@@ -299,7 +300,8 @@ public final class BatchProcessor {
                         ? poll.relativize(fp).toString().replace('\\', '/') : original.getName();
                 for (String entry : skipped)
                     memberEntries.add(new BatchManifest.MemberEntry(
-                            entry, -1, archiveRel + "!" + entry, "", "SKIPPED_UNREADABLE"));
+                            entry, -1, archiveRel + "!" + entry, "",
+                            com.gamma.etl.MemberStatus.SKIPPED_UNREADABLE.name()));
             }
         }
 
@@ -501,19 +503,19 @@ public final class BatchProcessor {
         List<BatchAuditWriter.FileRow> fileRows = new ArrayList<>();
         int rejected = 0;
         for (MemberAudit ma : outcome.memberAudits()) {
-            if (!ma.status().equals("SUCCESS")) rejected++;
+            if (ma.status() != com.gamma.etl.MemberStatus.SUCCESS) rejected++;
             // Roll this entry's outcome up to the ARCHIVE it came out of, for the run-level unpack
             // ledger (§2.2). Keyed on the origin PATH captured at ingest time, never the basename —
             // two same-named archives in different inbox subdirectories are two archives.
             if (ma.originPath() != null)
                 com.gamma.etl.unpack.UnpackLedger.entryOutcome(
                         cfg.identity().runTimestamp(), ma.originPath(), batch.batchId(),
-                        "SUCCESS".equals(ma.status()));
+                        ma.status() == com.gamma.etl.MemberStatus.SUCCESS);
             List<String> paths = new ArrayList<>(
                     outBySrc.getOrDefault(ma.srcId(), new LinkedHashSet<>()));
             fileRows.add(new BatchAuditWriter.FileRow(
                     ma.start().format(DuckDbUtil.DT_FMT), end.format(DuckDbUtil.DT_FMT),
-                    ma.filename(), ma.status(), ma.parsedRows(), ma.errorRows(),
+                    ma.filename(), ma.status().name(), ma.parsedRows(), ma.errorRows(),
                     paths, Collections.nCopies(paths.size(), 0L),
                     Duration.between(ma.start(), end).toMillis(), ma.error(), batch.batchId(),
                     ma.origin()));

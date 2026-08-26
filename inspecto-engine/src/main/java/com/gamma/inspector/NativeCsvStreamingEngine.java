@@ -92,7 +92,7 @@ final class NativeCsvStreamingEngine {
                 parsed = countRows(conn, view);   // drives read_csv (store_rejects fires here)
             } catch (Exception e) {
                 QuarantineManager.quarantine(m.file(), "unreadable", false, cfg);
-                memberAudits.add(MemberAudit.rejected(m, "QUARANTINED_UNREADABLE", msg(e), mStart));
+                memberAudits.add(MemberAudit.rejected(m, MemberStatus.QUARANTINED_UNREADABLE, msg(e), mStart));
                 dropView(conn, view);
                 continue;
             }
@@ -102,14 +102,14 @@ final class NativeCsvStreamingEngine {
             if (parsed == 0 && rejects > 0) {
                 QuarantineManager.quarantine(m.file(), "field_mismatch", true, cfg);
                 String reason = String.format("0 valid rows; %d row(s) rejected (field mismatch)", rejects);
-                memberAudits.add(MemberAudit.rejected(m, "QUARANTINED_MISMATCH", reason, mStart));
+                memberAudits.add(MemberAudit.rejected(m, MemberStatus.QUARANTINED_MISMATCH, reason, mStart));
                 dropView(conn, view);
                 continue;
             }
             if (parsed == 0) {   // readable but zero rows (empty/header-only): quarantine under `empty`
                                  // so it leaves the inbox (an EMPTY batch never backs up/marks → would loop).
                 QuarantineManager.quarantine(m.file(), QuarantineManager.REASON_EMPTY, false, cfg);
-                memberAudits.add(MemberAudit.rejected(m, "QUARANTINED_EMPTY",
+                memberAudits.add(MemberAudit.rejected(m, MemberStatus.QUARANTINED_EMPTY,
                         "0 valid rows (empty/header-only file)", mStart));
                 dropView(conn, view);
                 continue;
@@ -184,7 +184,7 @@ final class NativeCsvStreamingEngine {
         } catch (Exception e) {
             // read_csv failure (unreadable/undecodable) surfaces when the CTAS drives it.
             QuarantineManager.quarantine(m.file(), "unreadable", false, cfg);
-            return empty(batch, batchStart, MemberAudit.rejected(m, "QUARANTINED_UNREADABLE", msg(e), mStart));
+            return empty(batch, batchStart, MemberAudit.rejected(m, MemberStatus.QUARANTINED_UNREADABLE, msg(e), mStart));
         }
         return finishSingle(batch, m, cfg, batchStart, mStart, s.parsed(), s.rejects(),
                 s.outputs(), s.lineage(), s.bounds(), s.castFailures());
@@ -291,13 +291,13 @@ final class NativeCsvStreamingEngine {
         if (parsed == 0 && rejects > 0) {
             QuarantineManager.quarantine(m.file(), "field_mismatch", true, cfg);
             String reason = String.format("0 valid rows; %d row(s) rejected (field mismatch)", rejects);
-            return empty(batch, batchStart, MemberAudit.rejected(m, "QUARANTINED_MISMATCH", reason, mStart));
+            return empty(batch, batchStart, MemberAudit.rejected(m, MemberStatus.QUARANTINED_MISMATCH, reason, mStart));
         }
         if (parsed == 0) {
             // Readable but zero rows (empty/header-only): quarantine under `empty` so it leaves the
             // inbox — an EMPTY batch never backs up/marks, so otherwise the poll loop reprocesses it forever.
             QuarantineManager.quarantine(m.file(), QuarantineManager.REASON_EMPTY, false, cfg);
-            return empty(batch, batchStart, MemberAudit.rejected(m, "QUARANTINED_EMPTY",
+            return empty(batch, batchStart, MemberAudit.rejected(m, MemberStatus.QUARANTINED_EMPTY,
                     "0 valid rows (empty/header-only file)", mStart));
         }
 

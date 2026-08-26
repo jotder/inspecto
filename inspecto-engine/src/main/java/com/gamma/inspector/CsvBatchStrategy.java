@@ -107,7 +107,7 @@ final class CsvBatchStrategy implements BatchIngestStrategy {
                         ing = CsvIngester.ingest(m.file(), conn, m.selection().schema(), cfg, tempTable);
                     } catch (IOException e) {
                         QuarantineManager.quarantine(m.file(), "unreadable", false, cfg);
-                        memberAudits.add(MemberAudit.rejected(m, "QUARANTINED_UNREADABLE", msg(e), mStart));
+                        memberAudits.add(MemberAudit.rejected(m, MemberStatus.QUARANTINED_UNREADABLE, msg(e), mStart));
                         dropTable(conn, tempTable);
                         continue;
                     }
@@ -119,7 +119,7 @@ final class CsvBatchStrategy implements BatchIngestStrategy {
                         String reason = ing.errorRows() > 0
                                 ? String.format("0 valid rows; %d row(s) rejected (field mismatch)", ing.errorRows())
                                 : String.format("0 valid rows; %d content line(s) failed column-count", ing.junkCandidateRows());
-                        memberAudits.add(MemberAudit.rejected(m, "QUARANTINED_MISMATCH", reason, mStart));
+                        memberAudits.add(MemberAudit.rejected(m, MemberStatus.QUARANTINED_MISMATCH, reason, mStart));
                         dropTable(conn, tempTable);
                         continue;
                     }
@@ -129,7 +129,7 @@ final class CsvBatchStrategy implements BatchIngestStrategy {
                         // `empty` so the file leaves the inbox. An EMPTY batch never backs up or marks,
                         // so leaving it would have the poll loop rediscover and reprocess it forever.
                         QuarantineManager.quarantine(m.file(), QuarantineManager.REASON_EMPTY, false, cfg);
-                        memberAudits.add(MemberAudit.rejected(m, "QUARANTINED_EMPTY",
+                        memberAudits.add(MemberAudit.rejected(m, MemberStatus.QUARANTINED_EMPTY,
                                 "0 valid rows (empty/header-only file)", mStart));
                         dropTable(conn, tempTable);
                         continue;
