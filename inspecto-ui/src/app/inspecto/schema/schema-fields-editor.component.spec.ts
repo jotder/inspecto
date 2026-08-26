@@ -201,7 +201,7 @@ describe('InspectoSchemaFieldsEditorComponent', () => {
         const headers = Array.from(fixture.nativeElement.querySelectorAll('thead th')).map((h) =>
             (h as HTMLElement).textContent?.trim(),
         );
-        // Header ① is the master checkbox (no text); no Source column for positional frontends.
+        // Header ① is the master checkbox (no text); no Selector column for positional frontends.
         expect(headers).toHaveLength(5);
         expect(headers[1]).toContain('#');
         expect(headers[2]).toContain('Type');
@@ -209,7 +209,7 @@ describe('InspectoSchemaFieldsEditorComponent', () => {
         expect(headers[4]).toContain('Synonym');
     });
 
-    it('shows the Source column only for name-based frontends', async () => {
+    it('shows the Selector column only for name-based frontends', async () => {
         const { fixture } = await create(rows(2));
         fixture.componentRef.setInput('nameBasedSelectors', true);
         fixture.detectChanges();
@@ -217,7 +217,7 @@ describe('InspectoSchemaFieldsEditorComponent', () => {
             (h as HTMLElement).textContent?.trim(),
         );
         expect(headers).toHaveLength(6);
-        expect(headers[5]).toContain('Source');
+        expect(headers[5]).toContain('Selector');
     });
 
     it('replaces the type dropdown with an icon-only menu button, labelled and operable', async () => {

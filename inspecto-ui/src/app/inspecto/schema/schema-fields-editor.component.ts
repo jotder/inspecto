@@ -207,8 +207,8 @@ export class InspectoSchemaFieldsEditorComponent {
 
     /**
      * Name-based frontends (json / text_regex) address parsed columns by key/group NAME, so the
-     * `#` column shows the row's position and a separate read-only Source column shows the
-     * selector. Positional frontends (delimited / fixedwidth) leave this false: `#` IS the source.
+     * `#` column shows the row's position and a separate read-only Selector column shows the
+     * selector. Positional frontends (delimited / fixedwidth) leave this false: `#` IS the selector.
      */
     readonly nameBasedSelectors = input(false);
 

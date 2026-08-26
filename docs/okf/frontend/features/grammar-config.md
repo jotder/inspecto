@@ -44,8 +44,9 @@ What else the redesign shipped, all §-referenced to the plan (in `superpower/` 
 - **Columns table ①–⑤** (`<inspecto-schema-fields-editor>`): include / `#` sequence / **icon-only
   type menu** (mat-menu over the four honest `SCHEMA_TYPES`; no classic dropdown) / Name /
   **Synonym** — a new optional identifier, unique across synonyms ∪ names (D3), persisted as the
-  additive `raw.fields[].synonym` (B3, ETL-ignored, Catalog-read). A read-only Source column appears
-  only for name-based frontends (`[nameBasedSelectors]`).
+  additive `raw.fields[].synonym` (B3, ETL-ignored, Catalog-read). A read-only **Selector** column
+  appears only for name-based frontends (`[nameBasedSelectors]`), rendering `raw.fields[].selector`
+  verbatim — the column is named for the canonical key it shows.
 - **Data types Auto/Declared** (§4.4): previews return additive `columnTypes` from a server-side
   `auto_detect` sniff (B2, delimited only); Auto (the default for new steps, D2) seeds the icons
   read-only and the save snapshots the inferred set — declared = inferred by construction; Declared

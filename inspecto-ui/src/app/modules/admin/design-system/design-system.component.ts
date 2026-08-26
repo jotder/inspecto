@@ -329,7 +329,7 @@ export class DesignSystemComponent {
 <inspecto-schema-fields-editor
   [rows]="schemaSeed()"
   [autoTypes]="typesMode() === 'auto'"     // Auto: type icons render read-only
-  [nameBasedSelectors]="frontend() === 'json'" />  // json/text_regex: a Source column appears
+  [nameBasedSelectors]="frontend() === 'json'" />  // json/text_regex: a Selector column appears
 // on submit: if (!grid.validate()) return;  const fields = grid.value();
 
 <!-- the column-metadata grid (D1(b)) — description/unit/classification, Catalog-facing -->

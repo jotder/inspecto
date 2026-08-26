@@ -101,14 +101,11 @@ const DOC_ALLOW = {
     // designed, rather than two exemptions quietly outliving the debt they described.
     'docs/okf/frontend/features/link-analysis.md::source-acquisition-entity':
         'Different concept: link-analysis "Sources" are `GraphSource` renderer feeds, not acquisition entities.',
-    'docs/okf/frontend/features/grammar-config.md::source-acquisition-entity':
-        'Different concept: the schema-fields editor\'s read-only "Source" column shows a parsed field\'s '
-        + '`raw.fields[].selector` (its tooltip reads "Parsed source: <selector>"), i.e. where a value sits '
-        + 'INSIDE a record — not an acquisition entity, and not a data origin (Stream/Reference) either. '
-        + '⚠ The doc is accurate; the ambiguity is in the UI HEADER it describes. Renaming that column to '
-        + '"Selector" — which is exactly what the cell renders and the canonical config key — would retire '
-        + 'this entry and remove a reserved word from user-facing text. Left as an operator call because it '
-        + 'is a visible label change (pinned by schema-fields-editor.component.spec.ts:220).',
+    // A `grammar-config.md::source-acquisition-entity` entry lived here for one commit (2026-08-26). It is
+    // gone because the OPERATOR TOOK THE RENAME instead of the exemption: the schema-fields editor's column
+    // is headed **Selector** now — exactly the `raw.fields[].selector` it renders — so the doc describing it
+    // no longer uses a reserved word and needs no allowance. Preferred outcome: an exemption records that a
+    // banned word is tolerated somewhere, and every one of them is a small ongoing cost.
     'docs/okf/backend/integrations.md::source-acquisition-entity':
         'Sanctioned sense: "Remote Sources" are data origins (Stream/Reference axis, GLOSSARY §3), not collection tasks.',
     'docs/okf/backend/log.md::bare-flow':

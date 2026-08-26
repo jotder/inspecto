@@ -33,8 +33,10 @@
 <div>
     <!-- Column order per the delimited-grammar-properties plan §4.3:
          ① include ② sequence (# — the selector verbatim for positional frontends) ③ type as an
-         ICON-ONLY button opening a menu ④ name ⑤ synonym (unique, D3) — plus a read-only Source
-         column only for name-based frontends, where the selector is a key/group name, not ②. -->
+         ICON-ONLY button opening a menu ④ name ⑤ synonym (unique, D3) — plus a read-only Selector
+         column only for name-based frontends, where the selector is a key/group name, not ②.
+         (Headed "Source" until 2026-08-26: it renders `raw.fields[].selector` verbatim, so the
+         canonical key is the honest label, and GLOSSARY reserves "Source".) -->
     <table class="w-full border-collapse">
         <thead>
             <tr class="text-secondary text-left text-xs font-semibold uppercase tracking-wider">
@@ -93,7 +95,7 @@
                 </th>
                 <th scope="col" class="pb-1">Synonym</th>
                 @if (nameBasedSelectors()) {
-                    <th scope="col" class="w-24 pb-1">Source</th>
+                    <th scope="col" class="w-24 pb-1">Selector</th>
                 }
             </tr>
         </thead>
@@ -189,7 +191,7 @@
                             <span
                                 class="text-secondary block max-w-24 truncate text-xs"
                                 [matTooltip]="
-                                    'Parsed source: ' + $safeNavigationMigration(e.group.get('selector')?.value)
+                                    'Selector: ' + $safeNavigationMigration(e.group.get('selector')?.value)
                                 "
                                 >{{ e.group.get('selector')?.value }}</span
                             >
