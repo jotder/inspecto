@@ -353,8 +353,11 @@ public final class RecipeCompiler {
      * sub-chain; <b>v1 restriction:</b> a branch's steps must be exactly one {@code sink} (mid-branch
      * transforms land with the branch-aware executor). Compiles to a {@code transform.route} node
      * (RowShaper's shape: {@code mode} / {@code branches:[{key,where}]} / top-level {@code default})
-     * plus one sink node per branch fed by a {@code route:<key>} edge. Arming stays gated:
-     * {@code PipelineConfig.prepare()} refuses an active pipeline carrying {@code route:}.
+     * plus one sink node per branch fed by a {@code route:<key>} edge. Armed as of the
+     * branch-aware-executor arming plan S3 (2026-08-26): an active {@code route:} pipeline
+     * EXECUTES, subject to {@code prepare()}'s fail-closed validations — chiefly that a branch
+     * is marked {@code default: true} (an armed route with no default is refused, because an
+     * unmatched row would be silently dropped) and every branch's sink pairs by database.
      */
     private static void route(String id, Map<String, Object> cfg, List<PipelineNode> nodes,
                               List<PipelineNode> branchSinks, List<PipelineEdge> routeEdges,

@@ -38,7 +38,7 @@ export const LOWERABLE = new Set([
     'transform.map',
     'sink.persistent',
     'enrichment',
-    'transform.route', // route: block — authoring-only until the executor lands (mirrors backend S3)
+    'transform.route', // route: block — ARMED 2026-08-26 (branch-aware executor live; arming validated at engine load, not save — same as the server)
     'transform.dedup', // record-grain dedup → processing.dedup (ELT P2)
     'transform.summarize', // group-by rollup → processing.summarize (ELT P3), authoring-only
     'transform.join', // reference join → processing.join (ELT P3 S2), authoring-only

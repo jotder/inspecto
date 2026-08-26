@@ -85,6 +85,13 @@ former root reference docs** (each index lists them):
   **refuted by the code** — it guards the pre-broker phase. As-built:
   [`okf/backend/engine/consignment-concurrency.md`](okf/backend/engine/consignment-concurrency.md);
   two operator decisions moved to `BACKLOG.md` §4.
+- ~~`superpower/branch-aware-executor-arming-plan.md`~~ — **COMPLETE + ARCHIVED 2026-08-26 (late).**
+  The largest open pipeline-graph piece (design §13 R3) closed in one day: `route:` pipelines ARM
+  and execute on the ingest path via `BatchGraphRunner` at the `writeAndTrace` choke point, with
+  output parity by shared code (the flat commit/audit tail is the SAME code, zero mirrors). Full
+  enterprise reactor **3615/0/0/5** — the new baseline. As-built:
+  [`okf/backend/engine/branch-aware-ingest.md`](okf/backend/engine/branch-aware-ingest.md);
+  provenance: `archived-documents/plans-archive/branch-aware-executor-arming-plan.md`.
 - ~~`superpower/backend-hardening-plan.md`~~ — **COMPLETE + ARCHIVED 2026-08-26** (items 1–5 shipped
   `38c7a32d` 2026-08-25; optional item 6 → BACKLOG §6 PKG-3, trigger-gated). As-built facts distilled
   into [`okf/backend/control-plane/api-v1.md`](okf/backend/control-plane/api-v1.md); provenance in

@@ -1598,7 +1598,24 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     gate per the `DecisionRoutes` `/simulate` precedent. ⚠ **The difficulty is suppressing the ingest
     path's side effects (ledgers, inbox consumption, `dirs.database` writes, events), not reading the
     files** — a test run that mutates production state is worse than no feature.
-- **Branch-aware executor — run what the graph editor can now author** (surfaced 2026-08-01 by
+- ✅ **Branch-aware executor — CLOSED 2026-08-26** (`b3a8bd40` → `23b9265d`, full enterprise reactor
+  **3615/0/0/5** = the new baseline). `route:` pipelines ARM and execute on the poll-driven ingest
+  path: `BatchGraphRunner` wired at the `writeAndTrace` choke point (the connection and the
+  materialised table are strategy-scoped, so no higher divert exists), `IngestSinkWriter` writes
+  each branch to its database-paired `sinks[]` destination with per-branch lineage, and the flat
+  commit/audit tail runs UNCHANGED — parity by shared code, zero mirrors. `prepare()`'s blanket
+  refusal became fail-closed arming validations (default: required · branch↔sink database pairing,
+  distinct · clone refused · multi-schema refused). 🔴 Two premises refuted en route: `stageTwo` was
+  the WRONG lift (`lift(cfg)` is the ingest one), and the engagement predicate counted sink NODES —
+  a plain `sinks[2]` fan-out engaged wrongly; it now counts BRANCHES (distinct `route:*` rels + a
+  plain-data trunk), and this row's own "sinks: does not create >1 data-fed sink node" claim was
+  false. As-built: [`okf/backend/engine/branch-aware-ingest.md`](okf/backend/engine/branch-aware-ingest.md).
+  **Residuals (build on demand):** `mode: clone` arming (needs B9/D8 partial-commit UX) ·
+  multi-schema + route · mid-branch transforms in the recipe route verb · a save-time arming
+  pre-check in the editor (arming validates at engine load on both server and mock — UX polish).
+  Still genuinely unimplemented anywhere: `adapter`, `alert`, `event`; still refused at lowering:
+  `transform.select/derive/validate/split/merge` as flat homes, `sink.materialized/view` on ingest.
+  Original row (provenance): **Branch-aware executor — run what the graph editor can now author** (surfaced 2026-08-01 by
   unification W5). W5 made the graph editor *author* the canonical `*_pipeline.toon` for the
   single-source subset, refusing everything else with `UNSUPPORTED_NODE`. **11 of the 20
   `BuiltinNodeType`s are still refused at lowering** and stay grandfathered `*_flow.toon`,
