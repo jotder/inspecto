@@ -117,6 +117,24 @@ knob is either file-sourced (with `-D` as its absent-file default) or it stays `
 ownership of one fact is what the 2026-08-15 operational-db decision forbids — and is why
 `/system/operational-db` correctly still has no PUT while `/system/scheduler` does.
 
+**A validation grammar is served, never mirrored.** The DuckDB memory-limit grammar the PUT gates on —
+an absolute size (`2GB`) or a proportion of host RAM (`80%`, operator ask 2026-08-26) — is
+published by the same GET as `duckdbMemoryLimitPattern` (`SchedulerRoutes.MEMORY_LIMIT_PATTERN`), and
+the form installs it — the UI holds **no regex of its own**. Before this the grammar lived in two
+hand-maintained copies that were identical when measured and unpinned, i.e. a drift where the form
+accepts what the server refuses. ⚠ One string can only serve both sides if it stays **portable**: no
+inline `(?i)` (the browser compiles it with `new RegExp(p, 'i')`, and JS has no inline-flag construct
+— it throws) and **explicitly anchored**, because `String.matches` anchors implicitly while
+`RegExp.test` does not — unanchored, the form would accept `2GB of RAM`. Both properties are pinned by
+a test, since neither is visible at the call site. ⚠ A **semantic bound must live inside the pattern**,
+not beside it: the percentage form is bounded `1..100` within the grammar, because a separate server-side
+range check would let the form accept a `500%` the PUT refuses — reintroducing the very drift this
+replaces. An absent or uncompilable pattern degrades to
+blank-only validation and lets the 422 speak; a client-side fallback guess would just be the mirroring
+again. ⚠ The offline mock keeps the one legitimate copy (it *stands in for* the server, so it must gate
+identically) — and it had **no resource-pair gate at all** until this landed, accepting `"lots"` where
+the server 422s.
+
 **A PUT merges per key**: absent = preserve stored, explicit `null` = clear and revert live to the
 `-D` default. ⚠ A cap-only PUT that rewrote the whole document would silently destroy a stored
 cadence — caught in review, and the same wipe existed in the offline mock.

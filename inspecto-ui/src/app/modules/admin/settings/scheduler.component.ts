@@ -160,9 +160,12 @@ import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/compon
                         <div class="flex flex-wrap items-start gap-3">
                             <mat-form-field class="w-60" subscriptSizing="dynamic">
                                 <mat-label>Memory limit per Run</mat-label>
-                                <input matInput formControlName="memoryLimit" placeholder="2GB" />
+                                <input matInput formControlName="memoryLimit" placeholder="2GB or 80%" />
                                 @if (form.controls.memoryLimit.invalid) {
-                                    <mat-error>A size like 2GB or 512MB; blank = inherit the launch default.</mat-error>
+                                    <mat-error
+                                        >A size like 2GB or 512MB, or 1–100% of host RAM like 80%; blank = inherit the
+                                        launch default.</mat-error
+                                    >
                                 }
                             </mat-form-field>
                             <mat-form-field class="w-60" subscriptSizing="dynamic">
@@ -184,7 +187,8 @@ import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/compon
                         <p class="text-secondary text-xs">
                             Do not tighten the memory limit below 1GB. Below roughly that, DuckDB's grouping and
                             de-duplication steps fail outright rather than spilling to disk, which turns working
-                            jobs into failing ones.
+                            jobs into failing ones. A percentage resolves against this host's RAM, so check what it
+                            works out to before using one on a small machine.
                         </p>
                     </section>
                 </form>
@@ -342,14 +346,10 @@ export class SchedulerSettingsComponent implements OnInit {
         // measured FAILURE point (blocking operators HARD-FAIL with OOM instead of spilling), ~1GB the
         // advisory floor shown to the operator, 2GB the shipped default (~2.2x the highest observed
         // peak). A tighter value turns working jobs into failing ones.
-        // Surrounding whitespace is tolerated and trimmed on save — a pasted " 2GB " is a typo the form
-        // should absorb, not refuse (the value sent to the server is always trimmed). ⚠ The size group is
-        // OPTIONAL so an all-whitespace value stays valid: Validators.pattern only skips a truly empty
-        // string, so clearing the box by selecting-and-spacing it would otherwise be a validation error
-        // rather than the "inherit the launch default" it means.
-        memoryLimit: this.fb.control<string | null>(null, [
-            Validators.pattern(/^\s*(\d+(\.\d+)?\s*(B|K|KB|KiB|M|MB|MiB|G|GB|GiB|T|TB|TiB))?\s*$/i),
-        ]),
+        // ⚠ The shape check is NOT declared here: the grammar is the SERVER's, served in the GET as
+        // `duckdbMemoryLimitPattern` and installed by applyMemoryGrammar() — two hand-mirrored regexes
+        // were a drift waiting to happen, where the form accepts what the PUT 422s.
+        memoryLimit: this.fb.control<string | null>(null),
         jobRuns: this.fb.control<number | null>(null, [Validators.min(0), Validators.max(100_000)]),
     });
     readonly spaceForm = this.fb.group({
@@ -426,8 +426,37 @@ export class SchedulerSettingsComponent implements OnInit {
         });
     }
 
+    /**
+     * Install the memory-limit shape check from the grammar the server served, so the form refuses
+     * exactly what the PUT would refuse. Blank stays valid in every case — it means "inherit the
+     * launch default", and an all-whitespace box is a cleared box, not a malformed size.
+     *
+     * <p>Degrades on purpose: an absent pattern (older backend) or an uncompilable one leaves only the
+     * blank rule, and the server's 422 — surfaced by the existing error toast — remains the gate. A
+     * client-side guess would be the hand-mirroring this replaced.
+     */
+    private applyMemoryGrammar(pattern: string | undefined): void {
+        const control = this.form.controls.memoryLimit;
+        let grammar: RegExp | null = null;
+        if (pattern) {
+            try {
+                // The served pattern is anchored and flagless by contract; the `i` flag is ours to add.
+                grammar = new RegExp(pattern, 'i');
+            } catch {
+                grammar = null; // never break the form over a pattern we could not compile
+            }
+        }
+        control.setValidators((c) => {
+            const raw = typeof c.value === 'string' ? c.value.trim() : c.value;
+            if (raw === null || raw === undefined || raw === '') return null;
+            return !grammar || grammar.test(String(raw)) ? null : { pattern: true };
+        });
+        control.updateValueAndValidity({ emitEvent: false });
+    }
+
     private apply(v: SchedulerView): void {
         this.view.set(v);
+        this.applyMemoryGrammar(v.system.duckdbMemoryLimitPattern);
         this.form.patchValue({
             // Seed the cap only from a STORED value (source `file`) — pre-filling the effective
             // `property`/`default` value would make the next Save write it into scheduler.toon and

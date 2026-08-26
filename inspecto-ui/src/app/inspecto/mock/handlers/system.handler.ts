@@ -3,12 +3,16 @@ import { json, match, MockHandler, MockRequest } from '../mock-http';
 import { MockStore } from '../mock-store';
 import {
     readSchedulerCap,
+    SCHEDULER_DEFAULT_JOB_RUNS,
+    SCHEDULER_MEMORY_LIMIT_PATTERN,
     SchedulerDoc,
     schedulerIntakeRefusal,
+    schedulerResourceRefusal,
     schedulerSpaceShape,
     SETTINGS_COLL,
     writeSchedulerCap,
     writeSchedulerIntake,
+    writeSchedulerResources,
 } from './settings.handler';
 
 const REPORT = /\/system\/operational-db$/;
@@ -72,6 +76,14 @@ export function systemHandler(flags: MockFlags): MockHandler {
                         intakeMinFilesPerCycle: doc?.intakeMinFilesPerCycle ?? null,
                         intakeAdaptive: doc?.intakeAdaptive ?? null,
                         intakeSource: anyIntake ? 'file' : 'default',
+                        // D11's resource pair. Offline there is no -D flag, so provenance is file-or-
+                        // default; the Run bound ships ON, so `default` still reports a bound in force.
+                        duckdbMemoryLimit: doc?.duckdbMemoryLimit ?? null,
+                        duckdbMemoryLimitSource: doc?.duckdbMemoryLimit != null ? 'file' : 'default',
+                        // Served so the form validates with the server's grammar, not a mirrored regex.
+                        duckdbMemoryLimitPattern: SCHEDULER_MEMORY_LIMIT_PATTERN,
+                        maxConcurrentJobRuns: doc?.maxConcurrentJobRuns ?? SCHEDULER_DEFAULT_JOB_RUNS,
+                        maxConcurrentJobRunsSource: doc?.maxConcurrentJobRuns != null ? 'file' : 'default',
                         effectiveIntake: {
                             maxFilesPerCycle: effMax,
                             minFilesPerCycle: doc?.intakeMinFilesPerCycle ?? 1,
@@ -101,9 +113,12 @@ export function systemHandler(flags: MockFlags): MockHandler {
                 // Validate the WHOLE body before any write — the server is atomic on 422.
                 const intakeRefusal = schedulerIntakeRefusal(req.body);
                 if (intakeRefusal) return intakeRefusal;
+                const resourceRefusal = schedulerResourceRefusal(req.body);
+                if (resourceRefusal) return resourceRefusal;
                 const { refusal } = writeSchedulerCap(store, req.space, 'scheduler-system', req.body);
                 if (refusal) return refusal;
                 writeSchedulerIntake(store, req.space, 'scheduler-system', req.body);
+                writeSchedulerResources(store, req.space, 'scheduler-system', req.body);
                 return json(shape());
             }
         }

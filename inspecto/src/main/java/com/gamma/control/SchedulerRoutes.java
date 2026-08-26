@@ -133,6 +133,9 @@ final class SchedulerRoutes implements RouteModule {
                 : (propMem != null && !propMem.isBlank() ? propMem : null));
         system.put("duckdbMemoryLimitSource", storedMem != null ? "file"
                 : (propMem != null && !propMem.isBlank() ? "property" : "default"));
+        // The grammar the PUT gates on, so the form refuses exactly what the server would refuse
+        // rather than mirroring the regex by hand (see MEMORY_LIMIT_PATTERN).
+        system.put("duckdbMemoryLimitPattern", MEMORY_LIMIT_PATTERN);
         Integer storedRuns = ss.maxConcurrentJobRuns();
         Integer propRuns = Integer.getInteger("jobs.maxConcurrentRuns");
         system.put("maxConcurrentJobRuns", storedRuns != null ? storedRuns
@@ -254,14 +257,42 @@ final class SchedulerRoutes implements RouteModule {
             s.service().jobService().ifPresent(j -> j.setMaxConcurrentRuns(effective));
     }
 
-    /** A DuckDB size string ({@code 2GB}, {@code 512MB}, {@code 1.5GiB}) — or a 422. Empty/null clears the
-     *  stored value, reverting to the {@code -D} bootstrap default. */
+    /**
+     * The DuckDB size grammar this route gates on, <b>published in the GET</b> as
+     * {@code duckdbMemoryLimitPattern} so the UI validates against the same grammar the PUT enforces
+     * instead of a hand-mirrored copy. Two hand-maintained copies of one grammar were identical when
+     * measured and unpinned — a drift waiting to happen, where the form accepts what the server 422s.
+     *
+     * <p>Two forms, both DuckDB's own: an <b>absolute size</b> ({@code 2GB}, {@code 512MB},
+     * {@code 1.5GiB}) and a <b>proportion of host RAM</b> ({@code 80%} — operator ask 2026-08-26).
+     * The percentage is bounded {@code 1..100} <i>inside the pattern</i>, deliberately: the bound has to
+     * travel with the grammar, or the form would accept a {@code 500%} the PUT then refuses and the
+     * single-gate property this whole design buys would be gone. Over-100% is refused because
+     * over-committing RAM is the exact failure D11's cap exists to prevent, and {@code 0%} is meaningless.
+     *
+     * <p>⚠ <b>Portable by contract</b>, because a browser compiles this string with
+     * {@code new RegExp(pattern, 'i')}: it carries <b>no inline {@code (?i)} flag</b> (JavaScript has
+     * none — the flag is applied by the consumer) and is <b>explicitly anchored</b> ({@code String.matches}
+     * anchors implicitly, {@code RegExp.test} does not). Keep both properties on any edit, or the two
+     * sides silently stop agreeing on the same strings. Pinned by
+     * {@code memoryLimitPatternIsPortableToJavaScript}.
+     */
+    static final String MEMORY_LIMIT_PATTERN =
+            "^(\\d+(\\.\\d+)?\\s*(B|K|KB|KIB|M|MB|MIB|G|GB|GIB|T|TB|TIB)|([1-9][0-9]?(\\.\\d+)?|100)%)$";
+
+    private static final java.util.regex.Pattern MEMORY_LIMIT =
+            java.util.regex.Pattern.compile(MEMORY_LIMIT_PATTERN, java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    /** A DuckDB size string ({@code 2GB}, {@code 512MB}, {@code 1.5GiB}) or a proportion of host RAM
+     *  ({@code 80%}) — or a 422. Empty/null clears the stored value, reverting to the {@code -D}
+     *  bootstrap default. */
     private static String requireMemoryLimit(Map<String, Object> body) {
         Object raw = body.get("duckdbMemoryLimit");
         if (raw == null || raw.toString().isBlank()) return null;
         String v = raw.toString().trim();
-        if (!v.matches("(?i)\\d+(\\.\\d+)?\\s*(B|K|KB|KIB|M|MB|MIB|G|GB|GIB|T|TB|TIB)"))
-            throw new ApiException(422, "duckdbMemoryLimit must be a DuckDB size string, e.g. 2GB");
+        if (!MEMORY_LIMIT.matcher(v).matches())
+            throw new ApiException(422, "duckdbMemoryLimit must be a DuckDB size string (e.g. 2GB) "
+                    + "or a percentage of host RAM in 1..100% (e.g. 80%)");
         return v;
     }
 

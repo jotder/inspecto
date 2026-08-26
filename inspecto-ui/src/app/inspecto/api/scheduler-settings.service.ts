@@ -26,6 +26,11 @@ export interface SchedulerTier {
      *  always carries a value, because the bound now ships on. */
     duckdbMemoryLimit?: string | null;
     duckdbMemoryLimitSource?: SchedulerSource;
+    /** The DuckDB size grammar the PUT gates on, served so the form validates against the SAME grammar
+     *  the server enforces instead of a hand-mirrored copy. Compile it with the `i` flag — it is
+     *  anchored and carries no inline flag, because JavaScript has none. Absent on an older backend,
+     *  in which case the client skips the shape check and lets the server's 422 speak. */
+    duckdbMemoryLimitPattern?: string;
     maxConcurrentJobRuns?: number;
     maxConcurrentJobRunsSource?: SchedulerSource;
 }

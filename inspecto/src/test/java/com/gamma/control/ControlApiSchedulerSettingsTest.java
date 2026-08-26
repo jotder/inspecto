@@ -444,6 +444,46 @@ class ControlApiSchedulerSettingsTest {
         }
     }
 
+    /**
+     * The size grammar is now PUBLISHED (`duckdbMemoryLimitPattern`) so the UI validates with the same
+     * pattern the PUT gates on instead of a hand-mirrored regex. Two copies of one grammar were
+     * identical when measured and unpinned — a drift where the form accepts what the server refuses.
+     *
+     * <p>⚠ The contract that makes one string serve both sides is <b>portability</b>: the browser does
+     * {@code new RegExp(pattern, 'i')}, so the pattern must carry no inline {@code (?i)} (JavaScript has
+     * no such construct — it throws) and must be explicitly anchored ({@code String.matches} anchors
+     * implicitly, {@code RegExp.test} does not, so an unanchored pattern would make the form accept
+     * {@code "2GB of RAM"}). Both properties are asserted here because neither is visible at the call site.
+     */
+    @Test
+    void memoryLimitPatternIsPortableToJavaScript(@TempDir Path root) throws Exception {
+        String p = SchedulerRoutes.MEMORY_LIMIT_PATTERN;
+        assertFalse(p.contains("(?i)"), "an inline flag makes new RegExp() throw in the browser");
+        assertFalse(p.contains("(?"), "no inline groups/flags — keep the pattern portable");
+        assertTrue(p.startsWith("^") && p.endsWith("$"),
+                "RegExp.test is unanchored, so an unanchored pattern would accept trailing junk");
+
+        // It is genuinely the gate: the served pattern accepts exactly what the PUT accepts.
+        java.util.regex.Pattern re = java.util.regex.Pattern.compile(p, java.util.regex.Pattern.CASE_INSENSITIVE);
+        for (String ok : List.of("2GB", "512MB", "1.5GiB", "800 MB", "1024b", "2gb",
+                // DuckDB's proportional form (operator ask 2026-08-26), bounded 1..100 by the pattern.
+                "80%", "1%", "100%", "99.9%"))
+            assertTrue(re.matcher(ok).matches(), ok + " must be accepted");
+        for (String bad : List.of("lots", "2GB of RAM", "-1GB", "GB", "",
+                // The percentage bound travels WITH the grammar, so the form refuses these too — an
+                // over-100% limit over-commits RAM, the exact failure D11's cap exists to prevent.
+                "0%", "101%", "500%", "100.5%", "%", "80 %"))
+            assertFalse(re.matcher(bad).matches(), bad + " must be refused");
+
+        // And it is actually served, so the form can install it.
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            JsonNode sys = json(send(c.port, "GET", "/system/scheduler", null)).get("system");
+            assertEquals(p, sys.get("duckdbMemoryLimitPattern").asText(),
+                    "the GET must publish the grammar the PUT gates on");
+        }
+    }
+
     @Test
     void storedResourceCapsInstallAtBoot(@TempDir Path root) throws Exception {
         Files.writeString(root.resolve("scheduler.toon"),

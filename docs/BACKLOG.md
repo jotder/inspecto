@@ -2170,10 +2170,26 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   scoped: the cap is nullable end-to-end, merged per `body.containsKey` on BOTH tiers, provenance keyed on
   the stored value not file presence, the UI seeds only from `source === 'file'`; the pinned `PUT {}` → 422
   test consciously revised to a 200 no-op asserted to seize nothing (regression tests pin the exact
-  memory-limit-only and cadence-only gestures on both tiers). (b) the memory-size grammar lives in two hand-mirrored regexes (server
-  `requireMemoryLimit`, UI validator) — identical today, verified character-wise, but unpinned; the guard
-  is serving the pattern in the GET (`duckdbMemoryLimitPattern`) and having the UI use it. (c) neither
-  side accepts DuckDB's `80%` proportional form — deliberate for now, revisit only on ask. The measurement that unblocked it is kept below,
+  memory-limit-only and cadence-only gestures on both tiers). (b) ✅ **SHIPPED 2026-08-26** — the memory-size grammar was two hand-mirrored regexes (server
+  `requireMemoryLimit`, UI validator), identical when measured but unpinned; the server now owns it as
+  `SchedulerRoutes.MEMORY_LIMIT_PATTERN` and **publishes it in the GET as `duckdbMemoryLimitPattern`**,
+  and the form installs that served grammar (it carries **no regex of its own**). ⚠ The contract that
+  lets one string serve both sides is **portability**, pinned by
+  `memoryLimitPatternIsPortableToJavaScript`: **no inline `(?i)`** (the browser does
+  `new RegExp(p, 'i')` and JS has no such construct — it throws) and **explicitly anchored**
+  (`String.matches` anchors implicitly, `RegExp.test` does not, so an unanchored pattern would let the
+  form accept `2GB of RAM`). Absent/uncompilable pattern ⇒ blank-only validation and the server's 422
+  stays the gate — never a client-side guess. 🔴 The same sweep found the offline mock had **no
+  resource-pair handling at all**: it accepted `"lots"` where the server 422s and served neither value,
+  so Resource caps was half-dead offline and green-lit a refused body — the mock now mirrors both gates
+  and serves the pattern. (c) ✅ **SHIPPED 2026-08-26** (operator ask) — DuckDB's **proportional form is now accepted**
+  (`80%`), which was a one-constant change precisely because (b) landed first. ⚠ The percentage is bounded
+  **1..100 inside the pattern, not as a separate range check**: the bound has to travel with the served
+  grammar or the form would accept a `500%` the PUT refuses, destroying the single-gate property (b) buys.
+  Over-100% is refused because over-committing RAM is the exact failure this cap exists to prevent, and
+  `0%` is meaningless. The value is a **pass-through** to `SET memory_limit='…'` (nothing parses it into
+  bytes — verified), so no arithmetic breaks; the UI advisory now warns that a percentage resolves against
+  host RAM and can land under the ~1GB floor on a small machine. The measurement that unblocked it is kept below,
   because the *numbers* are the reason `2GB` may not be tightened. ⚠ **Still open, deliberately:** thread/
   core scaling was never measured (DuckDB sizes per-thread buffers, so a much larger box may want more than
   2 GiB), nor were non-CSV frontends — so `2GB` is defensible for hardware like the measured host, not as a

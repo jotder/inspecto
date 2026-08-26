@@ -15,6 +15,9 @@ const VIEW: SchedulerView = {
         // BACKLOG D11's pair, in the on-by-default state: a bound is in force with nothing stored.
         duckdbMemoryLimit: null,
         duckdbMemoryLimitSource: 'default',
+        // The size grammar is the SERVER's, served in the GET — the form has no regex of its own, so a
+        // fixture that omitted this would (correctly) have no shape check at all.
+        duckdbMemoryLimitPattern: '^(\\d+(\\.\\d+)?\\s*(B|K|KB|KIB|M|MB|MIB|G|GB|GIB|T|TB|TIB)|([1-9][0-9]?(\\.\\d+)?|100)%)$',
         maxConcurrentJobRuns: 4,
         maxConcurrentJobRunsSource: 'default',
     },
@@ -251,6 +254,53 @@ describe('SchedulerSettingsComponent', () => {
         c.saveSystem();
         expect(api.saveSystem).not.toHaveBeenCalled();
         expect(c.form.controls.memoryLimit.invalid).toBe(true);
+    });
+
+    it('validates the memory limit with the grammar the SERVER served, not a mirrored regex', async () => {
+        const { fixture } = await setup();
+        const c = fixture.componentInstance;
+        const limit = c.form.controls.memoryLimit;
+        // Accepted by the server's grammar — including the whitespace and lower-case forms it allows, and
+        // DuckDB's proportional form (operator ask 2026-08-26).
+        for (const ok of ['2GB', '512MB', '1.5GiB', '800 MB', '2gb', '  2GB  ', '80%', '1%', '100%', '  80%  ']) {
+            limit.setValue(ok);
+            expect(limit.valid, ok).toBe(true);
+        }
+        // Refused by it. '2GB of RAM' is the one anchoring buys: an unanchored pattern would accept it.
+        // '500%' is the one the in-grammar 1..100 bound buys — without it the form would accept a value
+        // the PUT refuses, which is exactly the drift serving the pattern eliminates.
+        for (const bad of ['lots', '2GB of RAM', '-1GB', 'GB', '0%', '101%', '500%']) {
+            limit.setValue(bad);
+            expect(limit.invalid, bad).toBe(true);
+        }
+        // Blank always stays valid — it means "inherit the launch default", and an all-whitespace box is
+        // a cleared box, not a malformed size.
+        for (const blank of [null, '', '   ']) {
+            limit.setValue(blank);
+            expect(limit.valid, JSON.stringify(blank)).toBe(true);
+        }
+    });
+
+    it('degrades to no client-side shape check when the backend serves no grammar', async () => {
+        // An older backend (or one that stops serving the key) must not break the form: the server's 422
+        // is still the gate, and a client-side guess would be the hand-mirroring this replaced.
+        const { fixture, api } = await setup({
+            view: { ...VIEW, system: { ...VIEW.system, duckdbMemoryLimitPattern: undefined } },
+        });
+        const c = fixture.componentInstance;
+        c.form.patchValue({ memoryLimit: 'lots' });
+        expect(c.form.controls.memoryLimit.valid).toBe(true);
+        c.saveSystem();
+        expect(api.saveSystem).toHaveBeenCalled(); // let the server refuse it
+    });
+
+    it('survives an uncompilable served pattern instead of throwing', async () => {
+        const { fixture } = await setup({
+            view: { ...VIEW, system: { ...VIEW.system, duckdbMemoryLimitPattern: '([unclosed' } },
+        });
+        const c = fixture.componentInstance;
+        c.form.patchValue({ memoryLimit: '2GB' });
+        expect(c.form.controls.memoryLimit.valid).toBe(true);
     });
 
     it('keeps the resource-caps section accessible', async () => {
