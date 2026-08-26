@@ -98,11 +98,31 @@ describe('settingsHandler', () => {
         });
     });
 
+    it('scheduler: a cadence-only PUT does not seize the cap — provenance follows the key, not the doc', () => {
+        // The provenance-seizure defect (fixed 2026-08-26): the cap is no longer required, and a save
+        // that never mentions it must not write it — the tier stays `default`.
+        const store = new MockStore();
+        const handle = settingsHandler(flags);
+        const put = handle(req('PUT', '/settings/scheduler', { pollSeconds: 7 }), store);
+        expect(put?.status).toBe(200);
+        expect(put?.body).toMatchObject({ maxConcurrentConsignments: 0, pollSeconds: 7, source: 'default' });
+        // An explicit null CLEARS a stored cap, handing the tier back to `default`.
+        handle(req('PUT', '/settings/scheduler', { maxConcurrentConsignments: 3 }), store);
+        handle(req('PUT', '/settings/scheduler', { maxConcurrentConsignments: null }), store);
+        expect(handle(req('GET', '/settings/scheduler'), store)?.body).toMatchObject({
+            maxConcurrentConsignments: 0,
+            pollSeconds: 7,
+            source: 'default',
+        });
+    });
+
     it('scheduler: refuses out-of-bounds values with 422, exactly like the server', () => {
         const store = new MockStore();
         const handle = settingsHandler(flags);
-        expect(handle(req('PUT', '/settings/scheduler', {}), store)?.status).toBe(422);
         expect(handle(req('PUT', '/settings/scheduler', { maxConcurrentConsignments: -1 }), store)?.status).toBe(422);
+        expect(handle(req('PUT', '/settings/scheduler', { maxConcurrentConsignments: 'lots' }), store)?.status).toBe(
+            422,
+        );
         expect(
             handle(req('PUT', '/settings/scheduler', { maxConcurrentConsignments: 1, pollSeconds: 0 }), store)?.status,
         ).toBe(422);

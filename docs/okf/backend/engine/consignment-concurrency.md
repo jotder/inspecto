@@ -101,10 +101,16 @@ no-op, so the per-cycle re-install does not disturb adaptation.
 
 ## 5. Precedence and provenance (the "two declarations" rule)
 
-`scheduler.toon` is the source of truth when present; the `-D` flag is a **bootstrap default consulted
-only when the file is absent**. `GET /system/scheduler` reports, per key, the effective value **and**
-its `source` (`file` | `property` | `default`), so two declarations can never leave an operator
-guessing which won.
+A **stored key** in `scheduler.toon` is the source of truth; the `-D` flag is a **bootstrap default
+consulted only while that key is absent**. Provenance follows the **key, never file presence**
+(fixed 2026-08-26): a document storing only the intake globals or the resource pair leaves the cap
+owned by `-Dscheduler.max.consignments` — before the fix, saving *anything* on the form wrote the
+effective cap into the file and silently seized its provenance to `file` forever, so the next
+deploy's changed flag did nothing. The cap is now nullable end-to-end (absent key = inherit, stated
+`0` = unbounded), the UI seeds it only from `source === 'file'`, and an explicit `null` in a PUT
+hands ownership back to the flag, live. `GET /system/scheduler` reports, per key, the effective
+value **and** its `source` (`file` | `property` | `default`), so two declarations can never leave an
+operator guessing which won.
 
 ⛔ **No key may be writable through the settings document and also read from `-D` at use time.** A
 knob is either file-sourced (with `-D` as its absent-file default) or it stays `-D`-only. Split

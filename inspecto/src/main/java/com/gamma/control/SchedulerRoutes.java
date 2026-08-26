@@ -35,10 +35,12 @@ import java.util.Map;
  * finish and the new ceiling gates the next admissions. {@link #register} also installs both tiers
  * at boot, so a configured file takes effect without any request.
  *
- * <p><b>Precedence (the plan's §3 rule).</b> The file is the source of truth when present;
- * {@code -Dscheduler.max.consignments} is a bootstrap default consulted only when the server-wide
- * file is absent; absent both, the tier is unbounded (0) — today's behaviour. The GET reports each
- * value's provenance ({@code file} | {@code property} | {@code default}) so two declarations can
+ * <p><b>Precedence (the plan's §3 rule, per key).</b> A <i>stored</i> cap is the source of truth;
+ * {@code -Dscheduler.max.consignments} is a bootstrap default consulted only while no cap is stored;
+ * absent both, the tier is unbounded (0) — today's behaviour. Provenance follows the KEY, never the
+ * file: a document that stores only the intake globals or the resource pair leaves the cap's
+ * ownership with the flag, so a save that never mentioned the cap cannot seize it. The GET reports
+ * each value's provenance ({@code file} | {@code property} | {@code default}) so two declarations can
  * never leave the operator guessing which won. ⛔ No key served here may also be read from {@code -D}
  * at use time — split ownership of one fact is what the 2026-08-15 operational-db decision forbids.
  *
@@ -84,7 +86,7 @@ final class SchedulerRoutes implements RouteModule {
                     Path cfg = s.root().config();
                     if (cfg == null) continue;
                     SchedulerSettings ss = SchedulerSettings.read(cfg.resolve(SchedulerSettings.FILE));
-                    if (ss.maxConcurrentConsignments() > 0)
+                    if (ss.maxConcurrentConsignments() != null && ss.maxConcurrentConsignments() > 0)
                         broker.setSpaceCap(s.id().value(), ss.maxConcurrentConsignments());
                     if (ss.pollSeconds() != null) s.service().reschedulePoll(ss.pollSeconds());
                     if (ss.acquirePollSeconds() != null) s.service().rescheduleAcquire(ss.acquirePollSeconds());
@@ -102,7 +104,9 @@ final class SchedulerRoutes implements RouteModule {
         SchedulerSettings ss = SchedulerSettings.read(doc);
         Map<String, Object> m = new LinkedHashMap<>();
         Map<String, Object> system = new LinkedHashMap<>();
-        if (SchedulerSettings.present(doc)) {
+        // Effective value for display, provenance keyed on the STORED value — never on file presence,
+        // or a document holding only the intake globals / resource pair would seize the cap for `file`.
+        if (ss.maxConcurrentConsignments() != null) {
             system.put("maxConcurrentConsignments", ss.maxConcurrentConsignments());
             system.put("source", "file");
         } else if (Integer.getInteger(PROP) != null) {
@@ -192,14 +196,17 @@ final class SchedulerRoutes implements RouteModule {
 
     private Object writeSystem(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         requireBoundWriteRoot(api);
-        int cap = requireCap(body);
         Path doc = systemDocPath(api);
         if (doc == null)
             throw new ApiException(503, "No home for the server-wide scheduler document "
                     + "(-Dsystem.config.dir, spaces root and write root all unset)");
-        // Merge per key with the stored document (the space-tier rule): absent = preserve stored,
-        // explicit null = clear (revert to the -Dingest.* bootstrap default, live), stated = gated.
+        // Merge per key with the stored document — the cap included: absent = preserve stored,
+        // explicit null = clear (revert to the -D bootstrap default, live), stated = gated. A save
+        // that never mentioned the cap must not write it, or its provenance flips to `file` and the
+        // next deploy's changed -Dscheduler.max.consignments silently does nothing.
         SchedulerSettings stored = SchedulerSettings.read(doc);
+        Integer cap = body.containsKey("maxConcurrentConsignments")
+                ? optCap(body) : stored.maxConcurrentConsignments();
         Integer inMax = body.containsKey("intakeMaxFilesPerCycle")
                 ? optIntField(body, "intakeMaxFilesPerCycle", 0) : stored.intakeMaxFilesPerCycle();
         Integer inMin = body.containsKey("intakeMinFilesPerCycle")
@@ -212,7 +219,8 @@ final class SchedulerRoutes implements RouteModule {
                 ? optIntField(body, "maxConcurrentJobRuns", 0) : stored.maxConcurrentJobRuns();
         SchedulerSettings next = new SchedulerSettings(cap, null, null, inMax, inMin, inAdaptive, mem, jobRuns);
         next.write(doc);
-        ConcurrencyBroker.shared().setSystemCap(cap);
+        // Hot-apply the EFFECTIVE cap (stored → -D → unbounded): a cleared cap reverts, live, to the flag.
+        ConcurrencyBroker.shared().setSystemCap(effectiveSystemCap(api));
         IntakeGovernor.shared().setGlobalPolicy(effectiveIntake(next));
         installResourceCaps(api, next);
         journal(api, ex, "server-wide", null, stored, next);
@@ -369,10 +377,11 @@ final class SchedulerRoutes implements RouteModule {
         return wr == null ? null : wr.resolve(SchedulerSettings.FILE);
     }
 
-    /** The effective server-wide cap under the §3 precedence: file → property → 0 (unbounded). */
+    /** The effective server-wide cap under the §3 precedence: stored cap → property → 0 (unbounded).
+     *  Keyed on the stored VALUE, not file presence — a document without the key inherits the flag. */
     private static int effectiveSystemCap(ApiContext api) {
-        Path doc = systemDocPath(api);
-        if (SchedulerSettings.present(doc)) return SchedulerSettings.read(doc).maxConcurrentConsignments();
+        Integer stored = SchedulerSettings.read(systemDocPath(api)).maxConcurrentConsignments();
+        if (stored != null) return stored;
         Integer prop = Integer.getInteger(PROP);
         return prop == null ? 0 : Math.max(0, prop);
     }
@@ -392,34 +401,34 @@ final class SchedulerRoutes implements RouteModule {
         } catch (RuntimeException noService) {
             // no space bound (fresh hosted deployment) — cadence has no meaning yet
         }
-        if (SchedulerSettings.present(doc)) {
-            SchedulerSettings ss = SchedulerSettings.read(doc);
-            m.put("maxConcurrentConsignments", ss.maxConcurrentConsignments());
-            m.put("pollSeconds", ss.pollSeconds());
-            m.put("acquirePollSeconds", ss.acquirePollSeconds());
-            m.put("source", "file");
-        } else {
-            m.put("maxConcurrentConsignments", 0);
-            m.put("source", "default");
-        }
+        // Effective cap for display; provenance keyed on the STORED value, never file presence — a
+        // document storing only a cadence must not flip the cap's ownership to `file`.
+        SchedulerSettings ss = SchedulerSettings.read(doc);
+        m.put("maxConcurrentConsignments", ss.maxConcurrentConsignments() != null ? ss.maxConcurrentConsignments() : 0);
+        m.put("pollSeconds", ss.pollSeconds());
+        m.put("acquirePollSeconds", ss.acquirePollSeconds());
+        m.put("source", ss.maxConcurrentConsignments() != null ? "file" : "default");
         return m;
     }
 
     private Object writeSpace(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         Path root = requireBoundWriteRoot(api);
         Path doc = root.resolve(SchedulerSettings.FILE);
-        int cap = requireCap(body);
-        // Merge with the stored document — a cap-only PUT must not destroy a stored cadence.
+        // Merge with the stored document — the cap included: a cap-only PUT must not destroy a stored
+        // cadence, and a cadence-only PUT must not write a cap it never mentioned (provenance seizure).
         // Key ABSENT = preserve what is stored; key explicitly null = clear it (revert to the -D
         // bootstrap default, live); key stated = bounds-gated new value.
         SchedulerSettings stored = SchedulerSettings.read(doc);
+        Integer cap = body.containsKey("maxConcurrentConsignments")
+                ? optCap(body) : stored.maxConcurrentConsignments();
         Integer poll = body.containsKey("pollSeconds")
                 ? optCadence(body, "pollSeconds") : stored.pollSeconds();
         Integer acquire = body.containsKey("acquirePollSeconds")
                 ? optCadence(body, "acquirePollSeconds") : stored.acquirePollSeconds();
         SchedulerSettings next = new SchedulerSettings(cap, poll, acquire);
         next.write(doc);
-        ConcurrencyBroker.shared().setSpaceCap(EventLog.currentSpaceId(), cap);
+        // The space tier has no -D fallback: a cleared cap reverts, live, to unbounded.
+        ConcurrencyBroker.shared().setSpaceCap(EventLog.currentSpaceId(), cap != null ? cap : 0);
         if (body.containsKey("pollSeconds"))
             api.service().reschedulePoll(poll != null ? poll : Long.getLong("service.poll.seconds", 60L));
         if (body.containsKey("acquirePollSeconds"))
@@ -468,10 +477,11 @@ final class SchedulerRoutes implements RouteModule {
         return root;
     }
 
-    /** The one payload field, bounds-gated: an int in {@code 0..100000} (0 = unbounded). */
-    private static int requireCap(Map<String, Object> body) {
+    /** A stated cap field: {@code null} = clear (revert to the {@code -D} bootstrap default, live);
+     *  otherwise an int in {@code 0..100000} (0 = unbounded) or the write is refused. */
+    private static Integer optCap(Map<String, Object> body) {
         Object raw = body.get("maxConcurrentConsignments");
-        if (raw == null) throw new ApiException(422, "maxConcurrentConsignments is required (0 = unbounded)");
+        if (raw == null) return null;
         int cap;
         try {
             cap = Integer.parseInt(String.valueOf(raw).trim());

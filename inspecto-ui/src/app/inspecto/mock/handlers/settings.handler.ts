@@ -34,11 +34,11 @@ const SCHEDULER = /\/settings\/scheduler$/;
 /** The server's bounds gate for a scheduler cap — mirrored verbatim (a mock must never be more lenient). */
 export const SCHEDULER_MAX_CAP = 100_000;
 
-/** Per-tier scheduler document; cap `0` = unbounded, matching `ConcurrencyBroker.UNBOUNDED`.
- *  Cadences (space tier only) are absent when the space inherits the launch defaults. */
+/** Per-tier scheduler document; every key — the cap included — is absent when it inherits the launch
+ *  default. A stated cap of `0` = unbounded, matching `ConcurrencyBroker.UNBOUNDED`. */
 export interface SchedulerDoc {
     id: string;
-    maxConcurrentConsignments: number;
+    maxConcurrentConsignments?: number;
     pollSeconds?: number;
     acquirePollSeconds?: number;
     /** System tier only: the IntakeGovernor fleet globals (absent = inherit `-Dingest.*`). */
@@ -47,35 +47,40 @@ export interface SchedulerDoc {
     intakeAdaptive?: boolean;
 }
 
-/** The stored cap for one tier (`scheduler-system` | `scheduler-space`), or 0 when never saved. */
+/** The stored cap for one tier (`scheduler-system` | `scheduler-space`), or null when none is stored —
+ *  a doc holding only other keys (cadences, intake) still answers null, so provenance follows the KEY. */
 export function readSchedulerCap(store: MockStore, space: string, tier: string): number | null {
-    const doc = store.get<SchedulerDoc>(space, SETTINGS_COLL, tier);
-    return doc ? doc.maxConcurrentConsignments : null;
+    return store.get<SchedulerDoc>(space, SETTINGS_COLL, tier)?.maxConcurrentConsignments ?? null;
 }
 
-/** Validate + store one tier's cap; returns the refusal response or null when accepted. The real PUT
- *  422s on a missing, non-integer, negative, or over-cap value — all four mirrored here. */
+/** Merge one tier's cap (the server's per-key rule: key absent = preserve stored, explicit `null` =
+ *  clear, stated = bounds-gated); returns the refusal response or null when accepted. The real PUT
+ *  422s on a non-integer, negative, or over-cap value — all mirrored here. A save that never mentions
+ *  the cap must not write it (the provenance-seizure defect, fixed 2026-08-26). */
 export function writeSchedulerCap(
     store: MockStore,
     space: string,
     tier: string,
     body: unknown,
-): { refusal: ReturnType<typeof error> | null; cap: number } {
-    const raw = (body as Record<string, unknown> | null)?.['maxConcurrentConsignments'];
-    const cap = typeof raw === 'number' && Number.isInteger(raw) ? raw : Number.NaN;
-    if (Number.isNaN(cap))
-        return { refusal: error(422, 'maxConcurrentConsignments is required (0 = unbounded)'), cap: 0 };
-    if (cap < 0 || cap > SCHEDULER_MAX_CAP)
-        return { refusal: error(422, `maxConcurrentConsignments must be 0..${SCHEDULER_MAX_CAP}, got ${cap}`), cap: 0 };
-    // MERGE with the stored doc — a cap-only PUT must not destroy a stored cadence (the server merges
-    // per key; a mock that wipes rehearses the data-loss the backend refuses to commit).
+): { refusal: ReturnType<typeof error> | null } {
+    const b = (body ?? {}) as Record<string, unknown>;
     const existing = store.get<SchedulerDoc>(space, SETTINGS_COLL, tier);
-    store.put(space, SETTINGS_COLL, tier, {
-        ...existing,
-        id: tier,
-        maxConcurrentConsignments: cap,
-    } satisfies SchedulerDoc);
-    return { refusal: null, cap };
+    const doc: SchedulerDoc = { ...existing, id: tier };
+    if ('maxConcurrentConsignments' in b) {
+        const raw = b['maxConcurrentConsignments'];
+        if (raw === null) {
+            delete doc.maxConcurrentConsignments;
+        } else {
+            const cap = typeof raw === 'number' && Number.isInteger(raw) ? raw : Number.NaN;
+            if (Number.isNaN(cap))
+                return { refusal: error(422, `maxConcurrentConsignments must be an integer, got '${String(raw)}'`) };
+            if (cap < 0 || cap > SCHEDULER_MAX_CAP)
+                return { refusal: error(422, `maxConcurrentConsignments must be 0..${SCHEDULER_MAX_CAP}, got ${cap}`) };
+            doc.maxConcurrentConsignments = cap;
+        }
+    }
+    store.put(space, SETTINGS_COLL, tier, doc);
+    return { refusal: null };
 }
 
 /** The server's cadence bounds gate, mirrored: a STATED cadence must be an int in 1..86400 (explicit
@@ -154,7 +159,8 @@ export function schedulerSpaceShape(store: MockStore, space: string): Record<str
         maxConcurrentConsignments: doc?.maxConcurrentConsignments ?? 0,
         pollSeconds: doc?.pollSeconds ?? null,
         acquirePollSeconds: doc?.acquirePollSeconds ?? null,
-        source: doc == null ? 'default' : 'file',
+        // Provenance follows the cap KEY, never doc presence — a cadence-only doc leaves the cap default.
+        source: doc?.maxConcurrentConsignments != null ? 'file' : 'default',
     };
 }
 

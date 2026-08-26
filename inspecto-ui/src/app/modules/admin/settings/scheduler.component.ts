@@ -88,9 +88,16 @@ import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/compon
                         <div class="flex flex-wrap items-start gap-3">
                             <mat-form-field class="w-60" subscriptSizing="dynamic">
                                 <mat-label>Max concurrent Consignments</mat-label>
-                                <input matInput type="number" formControlName="system" min="0" max="100000" />
+                                <input
+                                    matInput
+                                    type="number"
+                                    formControlName="system"
+                                    min="0"
+                                    max="100000"
+                                    [placeholder]="'' + view()!.system.maxConcurrentConsignments"
+                                />
                                 @if (form.controls.system.invalid) {
-                                    <mat-error>0 (unbounded) to 100000.</mat-error>
+                                    <mat-error>0 (unbounded) to 100000; blank = inherit the launch default.</mat-error>
                                 }
                             </mat-form-field>
                             <mat-form-field class="w-52" subscriptSizing="dynamic">
@@ -197,9 +204,16 @@ import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/compon
                         <div class="flex flex-wrap items-start gap-3">
                             <mat-form-field class="w-60" subscriptSizing="dynamic">
                                 <mat-label>Max concurrent Consignments</mat-label>
-                                <input matInput type="number" formControlName="space" min="0" max="100000" />
+                                <input
+                                    matInput
+                                    type="number"
+                                    formControlName="space"
+                                    min="0"
+                                    max="100000"
+                                    [placeholder]="'' + view()!.space.maxConcurrentConsignments"
+                                />
                                 @if (spaceForm.controls.space.invalid) {
-                                    <mat-error>0 (unbounded) to 100000.</mat-error>
+                                    <mat-error>0 (unbounded) to 100000; blank = no space-tier cap.</mat-error>
                                 }
                             </mat-form-field>
                             <mat-form-field class="w-52" subscriptSizing="dynamic">
@@ -315,7 +329,9 @@ export class SchedulerSettingsComponent implements OnInit {
     ];
 
     readonly form = this.fb.group({
-        system: this.fb.nonNullable.control(0, [Validators.required, Validators.min(0), Validators.max(100_000)]),
+        // Nullable, like every inheritable key: blank = inherit the -D launch default (a save sends
+        // null = explicit clear; the server merges per key). Seeded only from a STORED value — see apply().
+        system: this.fb.control<number | null>(null, [Validators.min(0), Validators.max(100_000)]),
         // Intake globals: blank = inherit -Dingest.* (a save sends null = explicit clear; the server
         // merges per key, so this is a deliberate revert, not a wipe).
         intakeMax: this.fb.control<number | null>(null, [Validators.min(0), Validators.max(10_000_000)]),
@@ -337,7 +353,8 @@ export class SchedulerSettingsComponent implements OnInit {
         jobRuns: this.fb.control<number | null>(null, [Validators.min(0), Validators.max(100_000)]),
     });
     readonly spaceForm = this.fb.group({
-        space: this.fb.nonNullable.control(0, [Validators.required, Validators.min(0), Validators.max(100_000)]),
+        // Nullable like the cadences: blank = no space-tier cap stored (the server-wide ceiling applies).
+        space: this.fb.control<number | null>(null, [Validators.min(0), Validators.max(100_000)]),
         // Cadences are nullable: blank = inherit the launch default (a save sends null, which CLEARS
         // any stored value — the server merges per key, so this is an explicit revert, not a wipe).
         poll: this.fb.control<number | null>(null, [Validators.min(1), Validators.max(86_400)]),
@@ -355,7 +372,7 @@ export class SchedulerSettingsComponent implements OnInit {
         }
         this.saving.set(true);
         const v = this.form.getRawValue();
-        this.api.saveSystem(v.system, {
+        this.api.saveSystem(v.system ?? null, {
             maxFilesPerCycle: v.intakeMax ?? null,
             minFilesPerCycle: v.intakeMin ?? null,
             adaptive: v.intakeAdaptive === '' ? null : v.intakeAdaptive === 'true',
@@ -382,7 +399,7 @@ export class SchedulerSettingsComponent implements OnInit {
         }
         this.saving.set(true);
         const v = this.spaceForm.getRawValue();
-        this.api.saveSpace(v.space, v.poll ?? null, v.acquire ?? null).subscribe({
+        this.api.saveSpace(v.space ?? null, v.poll ?? null, v.acquire ?? null).subscribe({
             next: () => {
                 this.saving.set(false);
                 this.refresh();
@@ -412,7 +429,10 @@ export class SchedulerSettingsComponent implements OnInit {
     private apply(v: SchedulerView): void {
         this.view.set(v);
         this.form.patchValue({
-            system: v.system.maxConcurrentConsignments,
+            // Seed the cap only from a STORED value (source `file`) — pre-filling the effective
+            // `property`/`default` value would make the next Save write it into scheduler.toon and
+            // silently take ownership away from the -D flag (the provenance-seizure defect).
+            system: v.system.source === 'file' ? v.system.maxConcurrentConsignments : null,
             intakeMax: v.system.intakeMaxFilesPerCycle ?? null,
             intakeMin: v.system.intakeMinFilesPerCycle ?? null,
             intakeAdaptive: v.system.intakeAdaptive == null ? '' : String(v.system.intakeAdaptive),
@@ -423,7 +443,7 @@ export class SchedulerSettingsComponent implements OnInit {
             jobRuns: v.system.maxConcurrentJobRunsSource === 'file' ? (v.system.maxConcurrentJobRuns ?? null) : null,
         });
         this.spaceForm.patchValue({
-            space: v.space.maxConcurrentConsignments,
+            space: v.space.source === 'file' ? v.space.maxConcurrentConsignments : null,
             poll: v.space.pollSeconds ?? null,
             acquire: v.space.acquirePollSeconds ?? null,
         });

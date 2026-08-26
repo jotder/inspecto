@@ -14,36 +14,38 @@ import java.util.Map;
 /**
  * One tier of the Consignment concurrency hierarchy (scheduler-system-config plan Part B), persisted
  * as {@code scheduler.toon} — at the spaces container root (or {@code -Dsystem.config.dir}) for the
- * <b>server-wide</b> cap, and in a space's config tree for that <b>space's</b> cap. {@code 0} means
- * unbounded ({@code ConcurrencyBroker.UNBOUNDED}); a missing or unreadable file reads as {@link #EMPTY}
- * (the {@code BrandingSettings} posture — settings never fail a boot).
+ * <b>server-wide</b> cap, and in a space's config tree for that <b>space's</b> cap. The cap is
+ * {@code null} when nothing is stored — "inherit the {@code -D} bootstrap default" — and {@code 0}
+ * when explicitly unbounded ({@code ConcurrencyBroker.UNBOUNDED}); the two must stay distinguishable
+ * or a save that never mentioned the cap seizes its provenance from the flag. A missing or unreadable
+ * file reads as {@link #EMPTY} (the {@code BrandingSettings} posture — settings never fail a boot).
  *
  * <p>Like {@code branding.toon}, the filename is deliberately not a {@code *_pipeline.toon}-style
  * suffix, so recursive config discovery never mistakes it for a runnable config.
  */
-record SchedulerSettings(int maxConcurrentConsignments, Integer pollSeconds, Integer acquirePollSeconds,
+record SchedulerSettings(Integer maxConcurrentConsignments, Integer pollSeconds, Integer acquirePollSeconds,
                          Integer intakeMaxFilesPerCycle, Integer intakeMinFilesPerCycle, Boolean intakeAdaptive,
                          String duckdbMemoryLimit, Integer maxConcurrentJobRuns) {
 
     static final String FILE = "scheduler.toon";
-    static final SchedulerSettings EMPTY = new SchedulerSettings(0);
+    static final SchedulerSettings EMPTY = new SchedulerSettings(null);
 
     /** Cap-only settings. Cadence is a per-space concern; the intake globals a server-wide one. */
-    SchedulerSettings(int maxConcurrentConsignments) {
+    SchedulerSettings(Integer maxConcurrentConsignments) {
         this(maxConcurrentConsignments, null, null, null, null, null, null, null);
     }
 
     /** Space-tier settings (cap + cadences; the intake globals never live in a space document). */
-    SchedulerSettings(int maxConcurrentConsignments, Integer pollSeconds, Integer acquirePollSeconds) {
+    SchedulerSettings(Integer maxConcurrentConsignments, Integer pollSeconds, Integer acquirePollSeconds) {
         this(maxConcurrentConsignments, pollSeconds, acquirePollSeconds, null, null, null, null, null);
     }
 
-    /** Write to {@code scheduler.toon} at {@code path} (canonical TOON, crash-safe). Cadence keys are
-     *  written only when stated — an absent key means "inherit the {@code -D} bootstrap default", and
-     *  that must stay distinguishable from any stated value. */
+    /** Write to {@code scheduler.toon} at {@code path} (canonical TOON, crash-safe). Every key —
+     *  the cap included — is written only when stated: an absent key means "inherit the {@code -D}
+     *  bootstrap default", and that must stay distinguishable from any stated value. */
     void write(Path path) throws IOException {
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("max_concurrent_consignments", maxConcurrentConsignments);
+        if (maxConcurrentConsignments != null) m.put("max_concurrent_consignments", maxConcurrentConsignments);
         if (pollSeconds != null) m.put("poll_seconds", pollSeconds);
         if (acquirePollSeconds != null) m.put("acquire_poll_seconds", acquirePollSeconds);
         if (intakeMaxFilesPerCycle != null) m.put("intake_max_files_per_cycle", intakeMaxFilesPerCycle);
@@ -62,9 +64,8 @@ record SchedulerSettings(int maxConcurrentConsignments, Integer pollSeconds, Int
         if (path == null || !Files.exists(path)) return EMPTY;
         try {
             Map<String, Object> m = ToonHelper.load(path.toString());
-            int v = Integer.parseInt(ToonHelper.opt(m, "max_concurrent_consignments", "0").trim());
             String mem = ToonHelper.opt(m, "duckdb_memory_limit", "").trim();
-            return new SchedulerSettings(Math.max(0, v),
+            return new SchedulerSettings(optInt(m, "max_concurrent_consignments", 0),
                     optInt(m, "poll_seconds", 1), optInt(m, "acquire_poll_seconds", 1),
                     optInt(m, "intake_max_files_per_cycle", 0), optInt(m, "intake_min_files_per_cycle", 1),
                     optBool(m, "intake_adaptive"),
@@ -90,10 +91,5 @@ record SchedulerSettings(int maxConcurrentConsignments, Integer pollSeconds, Int
         if ("true".equalsIgnoreCase(raw)) return Boolean.TRUE;
         if ("false".equalsIgnoreCase(raw)) return Boolean.FALSE;
         return null;
-    }
-
-    /** Whether the file exists at all — provenance for the settings routes (file vs default). */
-    static boolean present(Path path) {
-        return path != null && Files.exists(path);
     }
 }

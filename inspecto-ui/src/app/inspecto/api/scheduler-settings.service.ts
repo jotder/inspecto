@@ -7,7 +7,9 @@ import { apiUrl } from './api-base';
  *  declarations (file vs `-D` bootstrap default) can never leave the operator guessing which won. */
 export type SchedulerSource = 'file' | 'property' | 'default';
 
-/** One tier of the Consignment concurrency hierarchy. `0` = unbounded. */
+/** One tier of the Consignment concurrency hierarchy. `maxConcurrentConsignments` is the EFFECTIVE
+ *  value (stored → `-D` flag → 0 = unbounded); `source` is the cap's own provenance, keyed on the
+ *  stored value — a document storing only other keys leaves the cap owned by the flag. */
 export interface SchedulerTier {
     maxConcurrentConsignments: number;
     source: SchedulerSource;
@@ -91,10 +93,10 @@ export class SchedulerSettingsService {
         return this.http.get<SchedulerView>(apiUrl('/system/scheduler'));
     }
 
-    /** Replace the server-wide cap (0 = unbounded) and, when given, the IntakeGovernor globals;
-     *  hot-applies. The server merges per key, so a `null` intake field is an explicit clear. */
+    /** Save the server-wide tier; hot-applies. The server merges per key, so every `null` — the cap
+     *  included — is an explicit clear (revert to the `-D` bootstrap default), never an omission. */
     saveSystem(
-        maxConcurrentConsignments: number,
+        maxConcurrentConsignments: number | null,
         intake?: SchedulerIntakeGlobals,
         resources?: SchedulerResourceCaps,
     ): Observable<SchedulerView> {
@@ -111,11 +113,10 @@ export class SchedulerSettingsService {
         return this.http.put<SchedulerView>(apiUrl('/system/scheduler'), body);
     }
 
-    /** Replace the bound space's cap (0 = unbounded) and cadences; hot-applies onto the running
-     *  timers. A `null` cadence CLEARS the stored value — the space reverts, live, to the launch
-     *  default (the server merges: only keys present in the body change). */
+    /** Save the bound space's tier; hot-applies onto the running timers. A `null` — cap or cadence —
+     *  CLEARS the stored value, reverting live to the launch default (the server merges per key). */
     saveSpace(
-        maxConcurrentConsignments: number,
+        maxConcurrentConsignments: number | null,
         pollSeconds: number | null,
         acquirePollSeconds: number | null,
     ): Observable<SchedulerSpaceTier> {

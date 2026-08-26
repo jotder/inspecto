@@ -33,6 +33,8 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class ControlApiSchedulerSettingsTest {
 
+    private static final String PROP_CAP = "scheduler.max.consignments";
+
     private final HttpClient client = HttpClient.newHttpClient();
 
     @AfterEach
@@ -148,13 +150,85 @@ class ControlApiSchedulerSettingsTest {
             assertEquals(503, send(c.port, "PUT", "/system/scheduler",
                     "{\"maxConcurrentConsignments\":1}").statusCode());
             assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
-            assertEquals(422, send(c.port, "PUT", "/system/scheduler", "{}").statusCode());
+            // Pin revised 2026-08-26 (provenance-seizure fix): the cap is no longer required — the PUT
+            // merges per key, so an empty body is a valid no-op that stores nothing and seizes nothing.
+            HttpResponse<String> empty = send(c.port, "PUT", "/system/scheduler", "{}");
+            assertEquals(200, empty.statusCode(), empty.body());
+            assertEquals("default", json(empty).get("system").get("source").asText(),
+                    "an empty save must not take ownership of the cap");
             assertEquals(422, send(c.port, "PUT", "/system/scheduler",
                     "{\"maxConcurrentConsignments\":-1}").statusCode());
             assertEquals(422, send(c.port, "PUT", "/system/scheduler",
                     "{\"maxConcurrentConsignments\":\"lots\"}").statusCode());
             assertEquals(422, send(c.port, "PUT", "/system/scheduler",
                     "{\"maxConcurrentConsignments\":8589934592}").statusCode());
+        }
+    }
+
+    /**
+     * The provenance-seizure defect (found 2026-08-26 shipping D11): an install running with
+     * {@code -Dscheduler.max.consignments} and nothing stored, where an operator opens Settings only
+     * to set the DuckDB memory limit and hits Save. The old contract required the cap in every body
+     * and always wrote it, so that save silently flipped the cap's provenance to {@code file} forever
+     * — the next deploy's changed flag did nothing. Now the PUT merges per key: a save that never
+     * mentioned the cap leaves its ownership with the flag, and an explicit null hands it back.
+     */
+    @Test
+    void aCapLessSaveMustNotSeizeTheCapsProvenanceFromTheFlag(@TempDir Path root) throws Exception {
+        ConcurrencyBroker.use(null);
+        System.setProperty(PROP_CAP, "16");
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+
+            // The flag owns the cap: effective 16, provenance `property`, live on the broker at boot.
+            JsonNode sys = json(send(c.port, "GET", "/system/scheduler", null)).get("system");
+            assertEquals("property", sys.get("source").asText());
+            assertEquals(16, sys.get("maxConcurrentConsignments").asInt());
+            assertEquals(16, ConcurrencyBroker.shared().systemCap());
+
+            // The defect's exact gesture: save ONLY the memory limit. The cap must stay the flag's.
+            HttpResponse<String> put = send(c.port, "PUT", "/system/scheduler",
+                    "{\"duckdbMemoryLimit\":\"2GB\"}");
+            assertEquals(200, put.statusCode(), put.body());
+            sys = json(put).get("system");
+            assertEquals("property", sys.get("source").asText(),
+                    "a memory-limit-only save seized the cap's provenance from the -D flag");
+            assertEquals(16, sys.get("maxConcurrentConsignments").asInt());
+            assertFalse(Files.readString(root.resolve("scheduler.toon")).contains("max_concurrent_consignments"),
+                    "the cap was written into the file by a save that never mentioned it");
+            assertEquals(16, ConcurrencyBroker.shared().systemCap(), "the live cap must stay the flag's");
+
+            // A stated cap takes ownership; an explicit null hands it back to the flag, live.
+            assertEquals(200, send(c.port, "PUT", "/system/scheduler",
+                    "{\"maxConcurrentConsignments\":8}").statusCode());
+            assertEquals(8, ConcurrencyBroker.shared().systemCap());
+            HttpResponse<String> cleared = send(c.port, "PUT", "/system/scheduler",
+                    "{\"maxConcurrentConsignments\":null}");
+            assertEquals(200, cleared.statusCode(), cleared.body());
+            assertEquals("property", json(cleared).get("system").get("source").asText(),
+                    "an explicit null must revert ownership to the -D flag");
+            assertEquals(16, ConcurrencyBroker.shared().systemCap(), "the clear must hot-apply the flag's cap");
+        } finally {
+            System.clearProperty(PROP_CAP);
+            com.gamma.util.DuckDbUtil.installMemoryLimit(null);
+        }
+    }
+
+    /** The space tier has no flag, but the same seizure applies: a cadence-only save must not write
+     *  a cap it never mentioned. */
+    @Test
+    void aCadenceOnlySpaceSaveMustNotWriteTheCap(@TempDir Path root) throws Exception {
+        ConcurrencyBroker.use(null);
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            HttpResponse<String> put = send(c.port, "PUT", "/spaces/acme/settings/scheduler",
+                    "{\"pollSeconds\":7}");
+            assertEquals(200, put.statusCode(), put.body());
+            assertEquals("default", json(put).get("source").asText(),
+                    "a cadence-only save must not take ownership of the cap");
+            assertFalse(Files.readString(root.resolve("acme").resolve("config").resolve("scheduler.toon"))
+                    .contains("max_concurrent_consignments"));
+            assertEquals(7, json(put).get("effectivePollSeconds").asInt());
         }
     }
 
@@ -246,7 +320,8 @@ class ControlApiSchedulerSettingsTest {
                     "{\"maxConcurrentConsignments\":16,\"intakeMaxFilesPerCycle\":500}").statusCode());
             Event first = latestSchedulerEvent(c);
             assertNotNull(first, "a changed setting must be journalled");
-            assertEquals("0 -> 16", first.attributes().get("max_concurrent_consignments"));
+            assertEquals("inherit -> 16", first.attributes().get("max_concurrent_consignments"),
+                    "an unstored cap reads as 'inherit', not 0 — nothing owned the key before this save");
             assertEquals("inherit -> 500", first.attributes().get("intake_max_files_per_cycle"),
                         "an unset old value must read as 'inherit', not 'null'");
             assertEquals("server-wide", first.attributes().get("tier"));

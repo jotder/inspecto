@@ -45,7 +45,7 @@ describe('SchedulerSettingsComponent', () => {
             // component's (correct) re-seed from the response look like a bug.
             saveSystem: vi.fn(
                 (
-                    cap: number,
+                    cap: number | null,
                     _intake?: unknown,
                     resources?: { duckdbMemoryLimit: string | null; maxConcurrentJobRuns: number | null },
                 ) =>
@@ -156,6 +156,29 @@ describe('SchedulerSettingsComponent', () => {
         // An operator must be able to tell "a cap is in force but nothing was configured" apart from
         // "no cap at all" — the second is what this pane used to imply.
         expect(el.textContent).toContain('DuckDB’s own default');
+    });
+
+    it('does not seed the cap from an inherited value, so a resource-only save cannot seize its provenance', async () => {
+        // The provenance-seizure defect (fixed 2026-08-26): -Dscheduler.max.consignments=16 in force,
+        // nothing stored. An operator saving ONLY the memory limit must not write the cap into the file.
+        const { fixture, api } = await setup({
+            view: { ...VIEW, system: { ...VIEW.system, maxConcurrentConsignments: 16, source: 'property' } },
+        });
+        const c = fixture.componentInstance;
+        expect(c.form.controls.system.value).toBeNull();
+        // …but the effective value + provenance still render for the operator.
+        expect(fixture.nativeElement.textContent).toContain('property');
+        c.form.patchValue({ memoryLimit: '2GB' });
+        c.saveSystem();
+        expect(api.saveSystem).toHaveBeenCalledWith(null, expect.anything(), {
+            duckdbMemoryLimit: '2GB',
+            maxConcurrentJobRuns: null,
+        });
+    });
+
+    it('does not seed the space cap from an inherited value either', async () => {
+        const { fixture } = await setup(); // VIEW.space is source 'default'
+        expect(fixture.componentInstance.spaceForm.controls.space.value).toBeNull();
     });
 
     it('does not seed the inputs from an inherited value, so a save cannot silently claim ownership', async () => {
