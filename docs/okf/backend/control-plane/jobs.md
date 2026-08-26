@@ -41,8 +41,19 @@ virtual thread. `runJob()` uses `runner.runExclusiveOrSkip(name, …)` for a non
 already in flight records `SKIPPED`); different jobs run in parallel. On startup, `catchUpMissedFires()`
 replays a single missed cron fire for `catch_up: true` jobs from the durable `jobs_runs.csv` ledger.
 
-**Total-concurrency bound (opt-in).** By default different jobs run unbounded on the virtual-thread pool.
-Setting `-Djobs.maxConcurrentRuns=N` (default `0` = unbounded) installs a `Semaphore(N)` (`runPermits`)
+**Total-concurrency bound (ON by default since 2026-08-26 — BACKLOG D11).** The bound now ships at **4**
+(`JobService.DEFAULT_MAX_CONCURRENT_RUNS`), as the other half of the DuckDB `memory_limit=2GB` default:
+total memory exposure is `memory_limit` x concurrent Runs, so an unbounded Run count makes any
+per-instance cap meaningless. **It is owned by the server configuration** — `scheduler.toon` →
+`GET/PUT /system/scheduler`, installed via `JobService.setMaxConcurrentRuns` at boot and on a PUT — and
+`-Djobs.maxConcurrentRuns` is a *bootstrap default* consulted only when nothing is stored (⛔ a key served
+by the settings tier must not also be read from `-D` at use time; see `SchedulerRoutes`). `0` still means
+unbounded, and the bound is **hot-resizable**: a shrink drains (in-flight Runs finish, the new ceiling
+gates the next admissions), and crossing back from unbounded re-seeds the permit count rather than
+trusting one that unbounded Runs never took from. ⚠ `JobService` is **per space**, so in hosted
+multi-space mode the worst case is the bound times the space count; in single-tenant mode (the default)
+it is the process-wide bound D11's arithmetic assumes.
+A bound of `N` installs a `Semaphore(N)` (`runPermits`)
 acquired/released **on the worker thread inside** `submitRun`/`submitAdhocRun`, never on the caller — so a
 full pool *queues* fired Runs rather than blocking the cron/event/manual dispatch thread. This is the
 per-job-service analogue of the batch-ingest `maxConcurrentRuns` semaphore in

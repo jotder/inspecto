@@ -157,13 +157,54 @@ public final class JobService implements AutoCloseable {
     private final RunArtifactStore runArtifactStore;
     /** Cap on Run Log entries per run (overflow summarized) — {@code -Djobs.runlog.maxEntries}, default 10 000. */
     private final int runLogMax = Integer.getInteger("jobs.runlog.maxEntries", 10_000);
-    /** Total concurrent in-flight Runs across all jobs — {@code -Djobs.maxConcurrentRuns}, default 0 (unbounded,
-     *  preserving prior behavior). {@code null} permits ⇒ no bound; a fired Run then queues on {@link #runPermits}
-     *  once the cap is reached rather than running immediately (root enabler for an eventual on-by-default
-     *  DuckDB memory cap — see docs/BACKLOG.md §5). */
-    private final int maxConcurrentRuns = Integer.getInteger("jobs.maxConcurrentRuns", 0);
-    private final java.util.concurrent.Semaphore runPermits =
-            maxConcurrentRuns > 0 ? new java.util.concurrent.Semaphore(maxConcurrentRuns) : null;
+    /** The on-by-default total-concurrency bound (BACKLOG D11, measured 2026-07-27). Half of the pair:
+     *  {@code memory_limit=2GB} x {@code 4} ⇒ <=8 GiB worst case, instead of DuckDB's ~80%-of-RAM
+     *  <i>per instance</i> times an unbounded run count. */
+    public static final int DEFAULT_MAX_CONCURRENT_RUNS = 4;
+    /** Total concurrent in-flight Runs across all jobs. Owned by the server configuration
+     *  ({@code scheduler.toon} → {@code GET/PUT /system/scheduler}), which calls {@link #setMaxConcurrentRuns}
+     *  at boot and on a PUT; {@code -Djobs.maxConcurrentRuns} is the bootstrap default consulted only when
+     *  nothing is installed. {@code 0} = unbounded. A fired Run beyond the ceiling <b>queues</b> on
+     *  {@link #runPermits} rather than being rejected. */
+    private final RunPermits runPermits =
+            new RunPermits(Integer.getInteger("jobs.maxConcurrentRuns", DEFAULT_MAX_CONCURRENT_RUNS));
+
+    /**
+     * Install the total-concurrency bound; {@code 0} = unbounded. A shrink <b>drains</b> — in-flight Runs
+     * finish and the new ceiling gates the next admissions — mirroring {@code ConcurrencyBroker.setSystemCap}.
+     */
+    public void setMaxConcurrentRuns(int max) {
+        runPermits.setCap(max);
+    }
+
+    /** The bound in force ({@code 0} = unbounded) — for a settings GET. */
+    public int maxConcurrentRuns() {
+        return runPermits.cap();
+    }
+
+    /**
+     * Hot-resizable run bound. {@code cap == 0} means unbounded and {@link #acquireRunPermit} skips the
+     * semaphore entirely, so the permit count is only meaningful while bounded — crossing back from
+     * unbounded therefore re-seeds it ({@code drainPermits} + {@code release}) rather than trusting a
+     * count that in-flight unbounded Runs never took from. A shrink may drive permits negative, which is
+     * exactly the drain: no new admission until enough in-flight Runs release.
+     */
+    private static final class RunPermits extends java.util.concurrent.Semaphore {
+        private int cap;
+        RunPermits(int cap) {
+            super(Math.max(0, cap));
+            this.cap = Math.max(0, cap);
+        }
+        synchronized void setCap(int next) {
+            int n = Math.max(0, next);
+            if (n == cap) return;
+            if (n == 0) { cap = 0; return; }
+            if (cap == 0) { drainPermits(); release(n); cap = n; return; }
+            if (n > cap) release(n - cap); else reducePermits(cap - n);
+            cap = n;
+        }
+        synchronized int cap() { return cap; }
+    }
     /** This space's event ledger — the on-signal Trigger source (P1c). Set by the host ({@code CollectorService});
      *  {@code null} (e.g. the bare-{@code JobService} test constructors) disables on-signal dispatch. */
     private volatile EventLog eventLog;
@@ -862,11 +903,11 @@ public final class JobService implements AutoCloseable {
         });
     }
 
-    /** Blocks the worker thread (never the caller) until a slot is free under {@code -Djobs.maxConcurrentRuns};
-     *  a no-op ({@code true}) when unbounded. {@code false} means the wait was interrupted (e.g. shutdown) —
-     *  the caller must skip the run without releasing. */
+    /** Blocks the worker thread (never the caller) until a slot is free under the installed bound
+     *  ({@link #setMaxConcurrentRuns}); a no-op ({@code true}) when unbounded. {@code false} means the wait
+     *  was interrupted (e.g. shutdown) — the caller must skip the run without releasing. */
     private boolean acquireRunPermit() {
-        if (runPermits == null) return true;
+        if (runPermits.cap() == 0) return true;
         try {
             runPermits.acquire();
             return true;
@@ -877,12 +918,12 @@ public final class JobService implements AutoCloseable {
     }
 
     private void releaseRunPermit() {
-        if (runPermits != null) runPermits.release();
+        if (runPermits.cap() != 0) runPermits.release();
     }
 
     /** Test-visibility peek at the concurrency bound: -1 when unbounded, else free permits right now. */
     int availableRunPermits() {
-        return runPermits == null ? -1 : runPermits.availablePermits();
+        return runPermits.cap() == 0 ? -1 : runPermits.availablePermits();
     }
 
     /** As {@link #submitRun(String, String, String, String, int, Firing)} but for an ad-hoc run

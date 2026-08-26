@@ -18,6 +18,22 @@ export interface SchedulerTier {
     intakeAdaptive?: boolean | null;
     intakeSource?: SchedulerSource;
     effectiveIntake?: { maxFilesPerCycle: number; minFilesPerCycle: number; adaptive: boolean; active: boolean };
+    /** Server-wide tier only — the resource pair (BACKLOG D11). `duckdbMemoryLimit` is a DuckDB size
+     *  string (`2GB`) or `null` when nothing is stored and no `-D` flag is set, in which case DuckDB's
+     *  own ~80%-of-RAM-per-instance default applies. `maxConcurrentJobRuns` is `0` for unbounded and
+     *  always carries a value, because the bound now ships on. */
+    duckdbMemoryLimit?: string | null;
+    duckdbMemoryLimitSource?: SchedulerSource;
+    maxConcurrentJobRuns?: number;
+    maxConcurrentJobRunsSource?: SchedulerSource;
+}
+
+/** The resource-pair fields of a save. `null` CLEARS the stored value (reverting to the `-D` bootstrap
+ *  default); the two are saved together because either alone leaves total exposure unbounded — total
+ *  = `memoryLimit` x concurrent runs. */
+export interface SchedulerResourceCaps {
+    duckdbMemoryLimit: string | null;
+    maxConcurrentJobRuns: number | null;
 }
 
 /** The intake-global fields of a save; each `null` CLEARS the stored value (revert to `-Dingest.*`). */
@@ -77,12 +93,20 @@ export class SchedulerSettingsService {
 
     /** Replace the server-wide cap (0 = unbounded) and, when given, the IntakeGovernor globals;
      *  hot-applies. The server merges per key, so a `null` intake field is an explicit clear. */
-    saveSystem(maxConcurrentConsignments: number, intake?: SchedulerIntakeGlobals): Observable<SchedulerView> {
+    saveSystem(
+        maxConcurrentConsignments: number,
+        intake?: SchedulerIntakeGlobals,
+        resources?: SchedulerResourceCaps,
+    ): Observable<SchedulerView> {
         const body: Record<string, unknown> = { maxConcurrentConsignments };
         if (intake) {
             body['intakeMaxFilesPerCycle'] = intake.maxFilesPerCycle;
             body['intakeMinFilesPerCycle'] = intake.minFilesPerCycle;
             body['intakeAdaptive'] = intake.adaptive;
+        }
+        if (resources) {
+            body['duckdbMemoryLimit'] = resources.duckdbMemoryLimit;
+            body['maxConcurrentJobRuns'] = resources.maxConcurrentJobRuns;
         }
         return this.http.put<SchedulerView>(apiUrl('/system/scheduler'), body);
     }

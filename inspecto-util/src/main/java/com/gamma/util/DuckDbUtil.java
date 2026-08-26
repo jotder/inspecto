@@ -178,6 +178,43 @@ public final class DuckDbUtil {
         return notBlank(p) ? p : null;
     }
 
+    /** The server-configured {@code memory_limit} (BACKLOG D11), installed from {@code scheduler.toon}
+     *  at boot / on a settings PUT; {@code null} until installed. */
+    private static volatile String installedMemoryLimit;
+
+    /**
+     * Install the server-wide {@code memory_limit} owned by the settings document
+     * ({@code scheduler.toon} → {@code GET/PUT /system/scheduler}). {@code null}/blank clears it, so the
+     * {@code -D} bootstrap default applies again.
+     *
+     * <p>⛔ This exists so a served key is <b>not</b> also read from {@code -D} at use time — split
+     * ownership of one fact is what the 2026-08-15 operational-db decision forbids
+     * ({@code SchedulerRoutes}). {@link #memoryLimit} is the single use-time resolver.
+     */
+    public static void installMemoryLimit(String value) {
+        installedMemoryLimit = notBlank(value) ? value.trim() : null;
+    }
+
+    /** The installed server-wide {@code memory_limit}, or {@code null} — for a settings GET's provenance. */
+    public static String installedMemoryLimit() {
+        return installedMemoryLimit;
+    }
+
+    /**
+     * Resolve the effective {@code memory_limit} for a connection, in the precedence the settings tier
+     * documents: the per-pipeline {@code configured} value wins (narrower scope), else the server
+     * configuration's installed value ({@code file}), else {@code -Dprocessing.duckdb.memory_limit}
+     * ({@code property}, a bootstrap default consulted only when nothing is installed), else {@code null}
+     * ⇒ DuckDB's own default.
+     */
+    public static String memoryLimit(String configured) {
+        if (notBlank(configured)) return configured;
+        String installed = installedMemoryLimit;
+        if (notBlank(installed)) return installed;
+        String p = System.getProperty(PROP_MEMORY_LIMIT);
+        return notBlank(p) ? p : null;
+    }
+
     /**
      * Apply the global {@code -Dprocessing.duckdb.*} caps (memory_limit, spill {@code temp_directory},
      * spill-size cap, and worker {@code threads}) to a scratch connection that has no per-pipeline
@@ -186,10 +223,14 @@ public final class DuckDbUtil {
      * the batch-ingest path caps its own connections. Every property is opt-in: unset ⇒ no {@code SET}/
      * {@code PRAGMA} is issued ⇒ DuckDB keeps its own defaults, so behaviour is unchanged unless an
      * operator sets the flags (one knob then caps all three paths).
+     *
+     * <p>{@code memory_limit} resolves through {@link #memoryLimit} so the server configuration's
+     * installed value (BACKLOG D11) wins over the {@code -D} bootstrap default. ⚠ Preview / dry-run
+     * connections deliberately do NOT call this — they run over bounded samples and D11 exempts them.
      */
     public static void applyGlobalDuckDbSettings(Connection conn) throws SQLException {
         applyDuckDbSettings(conn,
-                System.getProperty(PROP_MEMORY_LIMIT),
+                memoryLimit(null),
                 System.getProperty(PROP_TEMP_DIRECTORY),
                 System.getProperty(PROP_MAX_TEMP_DIRECTORY_SIZE));
         applyWorkerThreads(conn, Integer.getInteger(PROP_THREADS, 0));

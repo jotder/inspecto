@@ -75,6 +75,12 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- [`superpower/d11-resource-caps-plan.md`](superpower/d11-resource-caps-plan.md) — **SHIPPED 2026-08-26**,
+  awaiting the operator's confirmation before it is distilled + archived. Ships BACKLOG **D11**: the measured
+  resource pair `memory_limit=2GB` + `maxConcurrentRuns=4`, both on by default and both owned by the server
+  configuration (`scheduler.toon` → `GET/PUT /system/scheduler`, UI at Settings ▸ Scheduler ▸ Resource caps).
+  As-built facts belong in [`okf/backend/engine/duckdb.md`](okf/backend/engine/duckdb.md) +
+  [`okf/backend/control-plane/jobs.md`](okf/backend/control-plane/jobs.md), both already updated.
 - ~~`superpower/scheduler-system-config-plan.md`~~ — **COMPLETE and ARCHIVED 2026-08-25**
   (`archived-documents/plans-archive/scheduler-system-config-plan.md`). Shipped in six commits
   (`1b872515` → `275bf764`): the `ConcurrencyBroker` four-layer hierarchy (per-Pipeline / per-space /

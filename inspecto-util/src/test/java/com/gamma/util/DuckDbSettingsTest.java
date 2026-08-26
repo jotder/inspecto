@@ -180,6 +180,54 @@ class DuckDbSettingsTest {
         assertEquals(0, DuckDbUtil.effectiveWorkerThreads(-1, 1, 8));
     }
 
+    // ── BACKLOG D11: who owns memory_limit at use time ───────────────────────────────
+    // ⛔ SchedulerRoutes' rule: a key served by the settings tier must NOT also be read from -D at use
+    // time. memoryLimit() is that single resolver — file (installed) > property > DuckDB default — and
+    // a narrower per-pipeline value still wins over both.
+
+    @Test
+    void installedMemoryLimitWinsOverTheJvmProperty() {
+        String prior = System.getProperty(DuckDbUtil.PROP_MEMORY_LIMIT);
+        try {
+            System.setProperty(DuckDbUtil.PROP_MEMORY_LIMIT, "512MB");
+            DuckDbUtil.installMemoryLimit("2GB");
+            assertEquals("2GB", DuckDbUtil.memoryLimit(null),
+                    "the server configuration's stored value is the owner; -D is only a bootstrap default");
+            assertEquals("2GB", DuckDbUtil.installedMemoryLimit());
+        } finally {
+            DuckDbUtil.installMemoryLimit(null);
+            restore(DuckDbUtil.PROP_MEMORY_LIMIT, prior);
+        }
+    }
+
+    @Test
+    void perPipelineMemoryLimitWinsOverTheInstalledDefault() {
+        try {
+            DuckDbUtil.installMemoryLimit("2GB");
+            assertEquals("256MB", DuckDbUtil.memoryLimit("256MB"),
+                    "a per-pipeline value is the narrower scope and still wins");
+        } finally {
+            DuckDbUtil.installMemoryLimit(null);
+        }
+    }
+
+    @Test
+    void clearingTheInstalledMemoryLimitRevertsToTheProperty() {
+        String prior = System.getProperty(DuckDbUtil.PROP_MEMORY_LIMIT);
+        try {
+            System.setProperty(DuckDbUtil.PROP_MEMORY_LIMIT, "512MB");
+            DuckDbUtil.installMemoryLimit("2GB");
+            DuckDbUtil.installMemoryLimit("   ");
+            assertNull(DuckDbUtil.installedMemoryLimit(), "blank clears rather than storing whitespace");
+            assertEquals("512MB", DuckDbUtil.memoryLimit(null));
+            System.clearProperty(DuckDbUtil.PROP_MEMORY_LIMIT);
+            assertNull(DuckDbUtil.memoryLimit(null), "neither set → DuckDB's own default is left alone");
+        } finally {
+            DuckDbUtil.installMemoryLimit(null);
+            restore(DuckDbUtil.PROP_MEMORY_LIMIT, prior);
+        }
+    }
+
     private static String currentSetting(Connection conn, String key) throws Exception {
         try (Statement st = conn.createStatement();
              ResultSet rs = st.executeQuery("SELECT current_setting('" + key + "')")) {

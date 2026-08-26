@@ -200,11 +200,47 @@ class JobServiceTest {
     // ── concurrency bound (-Djobs.maxConcurrentRuns) ──────────────────────────────────
 
     @Test
-    void concurrencyBoundIsUnboundedByDefault(@TempDir Path dir) throws Exception {
+    void concurrencyBoundDefaultsToFour(@TempDir Path dir) throws Exception {
+        // BACKLOG D11 (measured 2026-07-27): the bound now ships ON at 4, as the other half of
+        // memory_limit=2GB — an unbounded run count makes any per-instance memory cap meaningless.
         JobConfig hb = maintenance("hb", null, null, Map.of("task", "heartbeat"));
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(List.of(hb), new BatchEventBus(), s, null, dir.resolve("audit").toString())) {
-            assertEquals(-1, js.availableRunPermits(), "no -Djobs.maxConcurrentRuns set → unbounded");
+            assertEquals(JobService.DEFAULT_MAX_CONCURRENT_RUNS, js.availableRunPermits(),
+                "no -Djobs.maxConcurrentRuns set → the on-by-default bound, not unbounded");
+            assertEquals(4, js.maxConcurrentRuns(), "the D11 default is 4");
+        }
+    }
+
+    @Test
+    void concurrencyBoundOfZeroIsStillUnbounded(@TempDir Path dir) throws Exception {
+        // Unbounded must stay REACHABLE after D11 flipped the default — an operator who deliberately
+        // wants no ceiling sets 0, and -1 (not a permit count) is how that reads back.
+        System.setProperty("jobs.maxConcurrentRuns", "0");
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(), new BatchEventBus(), s, null, dir.resolve("audit").toString())) {
+            assertEquals(-1, js.availableRunPermits(), "0 → unbounded");
+            assertEquals(0, js.maxConcurrentRuns());
+        } finally {
+            System.clearProperty("jobs.maxConcurrentRuns");
+        }
+    }
+
+    @Test
+    void concurrencyBoundIsHotResizableAndDrainsOnShrink(@TempDir Path dir) throws Exception {
+        // The settings PUT installs a new ceiling live (no restart), mirroring ConcurrencyBroker.setSystemCap.
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(), new BatchEventBus(), s, null, dir.resolve("audit").toString())) {
+            assertEquals(4, js.availableRunPermits());
+            js.setMaxConcurrentRuns(8);
+            assertEquals(8, js.availableRunPermits(), "a grow adds permits");
+            js.setMaxConcurrentRuns(2);
+            assertEquals(2, js.availableRunPermits(), "a shrink removes them");
+            js.setMaxConcurrentRuns(0);
+            assertEquals(-1, js.availableRunPermits(), "0 installs unbounded");
+            js.setMaxConcurrentRuns(3);
+            assertEquals(3, js.availableRunPermits(),
+                "crossing back from unbounded re-seeds the count rather than trusting a stale one");
         }
     }
 

@@ -22,19 +22,20 @@ import java.util.Map;
  * suffix, so recursive config discovery never mistakes it for a runnable config.
  */
 record SchedulerSettings(int maxConcurrentConsignments, Integer pollSeconds, Integer acquirePollSeconds,
-                         Integer intakeMaxFilesPerCycle, Integer intakeMinFilesPerCycle, Boolean intakeAdaptive) {
+                         Integer intakeMaxFilesPerCycle, Integer intakeMinFilesPerCycle, Boolean intakeAdaptive,
+                         String duckdbMemoryLimit, Integer maxConcurrentJobRuns) {
 
     static final String FILE = "scheduler.toon";
     static final SchedulerSettings EMPTY = new SchedulerSettings(0);
 
     /** Cap-only settings. Cadence is a per-space concern; the intake globals a server-wide one. */
     SchedulerSettings(int maxConcurrentConsignments) {
-        this(maxConcurrentConsignments, null, null, null, null, null);
+        this(maxConcurrentConsignments, null, null, null, null, null, null, null);
     }
 
     /** Space-tier settings (cap + cadences; the intake globals never live in a space document). */
     SchedulerSettings(int maxConcurrentConsignments, Integer pollSeconds, Integer acquirePollSeconds) {
-        this(maxConcurrentConsignments, pollSeconds, acquirePollSeconds, null, null, null);
+        this(maxConcurrentConsignments, pollSeconds, acquirePollSeconds, null, null, null, null, null);
     }
 
     /** Write to {@code scheduler.toon} at {@code path} (canonical TOON, crash-safe). Cadence keys are
@@ -48,6 +49,11 @@ record SchedulerSettings(int maxConcurrentConsignments, Integer pollSeconds, Int
         if (intakeMaxFilesPerCycle != null) m.put("intake_max_files_per_cycle", intakeMaxFilesPerCycle);
         if (intakeMinFilesPerCycle != null) m.put("intake_min_files_per_cycle", intakeMinFilesPerCycle);
         if (intakeAdaptive != null) m.put("intake_adaptive", intakeAdaptive);
+        // BACKLOG D11's resource pair. Written only when stated, so "inherit the -D bootstrap default"
+        // stays distinguishable from a stated value — the provenance the settings GET reports.
+        if (duckdbMemoryLimit != null && !duckdbMemoryLimit.isBlank())
+            m.put("duckdb_memory_limit", duckdbMemoryLimit.trim());
+        if (maxConcurrentJobRuns != null) m.put("max_concurrent_job_runs", maxConcurrentJobRuns);
         AtomicFiles.write(path, JToon.encode(m).getBytes(StandardCharsets.UTF_8), ".scheduler-");
     }
 
@@ -57,10 +63,12 @@ record SchedulerSettings(int maxConcurrentConsignments, Integer pollSeconds, Int
         try {
             Map<String, Object> m = ToonHelper.load(path.toString());
             int v = Integer.parseInt(ToonHelper.opt(m, "max_concurrent_consignments", "0").trim());
+            String mem = ToonHelper.opt(m, "duckdb_memory_limit", "").trim();
             return new SchedulerSettings(Math.max(0, v),
                     optInt(m, "poll_seconds", 1), optInt(m, "acquire_poll_seconds", 1),
                     optInt(m, "intake_max_files_per_cycle", 0), optInt(m, "intake_min_files_per_cycle", 1),
-                    optBool(m, "intake_adaptive"));
+                    optBool(m, "intake_adaptive"),
+                    mem.isBlank() ? null : mem, optInt(m, "max_concurrent_job_runs", 0));
         } catch (Exception e) {
             return EMPTY;
         }

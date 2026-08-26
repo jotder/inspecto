@@ -34,8 +34,19 @@ The engine embeds DuckDB natively (requires the `--enable-native-access=ALL-UNNA
   multi-tenant boxes to prevent overcommit, and pair with `temp_directory` so an over-limit query spills to
   disk instead of OOM-ing. (Preview / dry-run connections — `ComponentPreview`, `PipelineDryRun`, enrichment
   `preview` — run over bounded samples and are deliberately left uncapped.)
-* **Defaults DECIDED 2026-07-25 (BACKLOG D11 + D12).** D12 has shipped; **D11 was not implemented** (operator
-  call, same day).
+* **D11 SHIPPED 2026-08-26 — the pair is `memory_limit=2GB` + `maxConcurrentRuns=4`, both on by default and
+  both owned by the server configuration.** They are surfaced in the UI at **Settings ▸ Scheduler ▸ Resource
+  caps**, persisted in `scheduler.toon`, and served with provenance (`file` | `property` | `default`) by
+  `GET/PUT /system/scheduler`. Ownership moved deliberately: `DuckDbUtil.memoryLimit(configured)` is now the
+  single use-time resolver — per-pipeline value > installed server value > `-Dprocessing.duckdb.memory_limit`
+  (a bootstrap default only) > DuckDB's own default — because ⛔ a key served by the settings tier must not
+  also be read from `-D` at use time (`SchedulerRoutes`, the 2026-08-15 operational-db decision).
+  `JobService.setMaxConcurrentRuns` is the matching seam. ⚠ Preview / dry-run connections remain
+  **uncapped** and must stay so: only `EnrichmentEngine`, `PipelineJobRunner` (via
+  `applyGlobalDuckDbSettings`) and `BatchIngestStrategy` (per-config path) resolve a limit.
+  `max_temp_directory_size` still gets **no** default — none is defensible without the volume size.
+* **Defaults DECIDED 2026-07-25 (BACKLOG D11 + D12).** D12 shipped that day; **D11 was declined that day**
+  and stayed unimplemented until 2026-08-26 (history below).
   * **D12 — chunking is ON by default** (SHIPPED): `processing.chunking.max_file_bytes` now defaults to
     **8 GiB** (`8589934592`) instead of `0`. The threshold exists for *pathological* single files, so it was
     set far above any routine input — normal workloads never change shape, and only a genuinely outsized file

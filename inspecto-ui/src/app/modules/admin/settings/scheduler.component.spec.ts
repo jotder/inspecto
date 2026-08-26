@@ -9,7 +9,15 @@ import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { SchedulerSettingsComponent } from './scheduler.component';
 
 const VIEW: SchedulerView = {
-    system: { maxConcurrentConsignments: 16, source: 'file' },
+    system: {
+        maxConcurrentConsignments: 16,
+        source: 'file',
+        // BACKLOG D11's pair, in the on-by-default state: a bound is in force with nothing stored.
+        duckdbMemoryLimit: null,
+        duckdbMemoryLimitSource: 'default',
+        maxConcurrentJobRuns: 4,
+        maxConcurrentJobRunsSource: 'default',
+    },
     space: { id: 'default', maxConcurrentConsignments: 0, source: 'default' },
     cores: 8,
     live: {
@@ -32,8 +40,31 @@ describe('SchedulerSettingsComponent', () => {
             view: vi.fn(() =>
                 opts?.fail ? throwError(() => ({ status: 503 })) : of(opts?.view ?? VIEW),
             ),
-            saveSystem: vi.fn((cap: number) =>
-                of({ ...VIEW, system: { maxConcurrentConsignments: cap, source: 'file' as const } }),
+            // The real PUT answers with systemShape() — the values it just stored, with their provenance
+            // flipped to `file`. Echo that here: a mock that dropped the saved fields would make the
+            // component's (correct) re-seed from the response look like a bug.
+            saveSystem: vi.fn(
+                (
+                    cap: number,
+                    _intake?: unknown,
+                    resources?: { duckdbMemoryLimit: string | null; maxConcurrentJobRuns: number | null },
+                ) =>
+                    of({
+                        ...VIEW,
+                        system: {
+                            ...VIEW.system,
+                            maxConcurrentConsignments: cap,
+                            source: 'file' as const,
+                            duckdbMemoryLimit: resources?.duckdbMemoryLimit ?? null,
+                            duckdbMemoryLimitSource: (resources?.duckdbMemoryLimit
+                                ? 'file'
+                                : 'default') as SchedulerView['system']['duckdbMemoryLimitSource'],
+                            maxConcurrentJobRuns: resources?.maxConcurrentJobRuns ?? 4,
+                            maxConcurrentJobRunsSource: (resources?.maxConcurrentJobRuns != null
+                                ? 'file'
+                                : 'default') as SchedulerView['system']['maxConcurrentJobRunsSource'],
+                        },
+                    }),
             ),
             saveSpace: vi.fn(() => of(VIEW.space)),
         };
@@ -68,8 +99,9 @@ describe('SchedulerSettingsComponent', () => {
         expect(el.textContent).toContain('noisy_feed');
         expect(el.textContent).toContain('admitting 250 of 1000 files/cycle');
         const inputs = Array.from(el.querySelectorAll('input[type="number"]'));
-        // system cap · intake max · intake floor · space cap · poll cadence · acquire cadence
-        expect(inputs).toHaveLength(6);
+        // system cap · intake max · intake floor · max concurrent Runs · space cap · poll cadence ·
+        // acquire cadence. (The memory limit is a text input — a size string, not a number.)
+        expect(inputs).toHaveLength(7);
         await expectNoA11yViolations(el);
     });
 
@@ -78,11 +110,17 @@ describe('SchedulerSettingsComponent', () => {
         const c = fixture.componentInstance;
         c.form.patchValue({ system: 12 });
         c.saveSystem();
-        expect(api.saveSystem).toHaveBeenCalledWith(12, {
-            maxFilesPerCycle: null,
-            minFilesPerCycle: null,
-            adaptive: null,
-        });
+        expect(api.saveSystem).toHaveBeenCalledWith(
+            12,
+            {
+                maxFilesPerCycle: null,
+                minFilesPerCycle: null,
+                adaptive: null,
+            },
+            // The resource pair travels with every server-wide save; nulls are an explicit "keep
+            // inheriting the launch default", not an omission.
+            { duckdbMemoryLimit: null, maxConcurrentJobRuns: null },
+        );
         expect(toastr.success).toHaveBeenCalled();
     });
 
@@ -106,5 +144,94 @@ describe('SchedulerSettingsComponent', () => {
     it('degrades to an empty state when the routes do not answer', async () => {
         const { fixture } = await setup({ fail: true });
         expect(fixture.nativeElement.textContent).toContain('Scheduler state unavailable');
+    });
+
+    // ── BACKLOG D11: the resource pair ───────────────────────────────────────────────
+
+    it('shows the on-by-default resource caps and names DuckDB’s default when nothing is stored', async () => {
+        const { fixture } = await setup();
+        const el: HTMLElement = fixture.nativeElement;
+        expect(el.textContent).toContain('Resource caps');
+        expect(el.textContent).toContain('4');
+        // An operator must be able to tell "a cap is in force but nothing was configured" apart from
+        // "no cap at all" — the second is what this pane used to imply.
+        expect(el.textContent).toContain('DuckDB’s own default');
+    });
+
+    it('does not seed the inputs from an inherited value, so a save cannot silently claim ownership', async () => {
+        // Served as `property` (a -D flag is set). If the box were pre-filled, the next Save would write
+        // that value into scheduler.toon and take ownership away from the flag without the operator
+        // ever typing it.
+        const { fixture } = await setup({
+            view: {
+                ...VIEW,
+                system: {
+                    ...VIEW.system,
+                    duckdbMemoryLimit: '512MB',
+                    duckdbMemoryLimitSource: 'property',
+                    maxConcurrentJobRuns: 6,
+                    maxConcurrentJobRunsSource: 'property',
+                },
+            },
+        });
+        const c = fixture.componentInstance;
+        expect(c.form.controls.memoryLimit.value).toBeNull();
+        expect(c.form.controls.jobRuns.value).toBeNull();
+        // …but the effective value is still reported on screen, with its provenance.
+        expect(fixture.nativeElement.textContent).toContain('512MB');
+        expect(fixture.nativeElement.textContent).toContain('property');
+    });
+
+    it('seeds the inputs from a stored value so an edit starts from what is in force', async () => {
+        const { fixture } = await setup({
+            view: {
+                ...VIEW,
+                system: {
+                    ...VIEW.system,
+                    duckdbMemoryLimit: '2GB',
+                    duckdbMemoryLimitSource: 'file',
+                    maxConcurrentJobRuns: 4,
+                    maxConcurrentJobRunsSource: 'file',
+                },
+            },
+        });
+        const c = fixture.componentInstance;
+        expect(c.form.controls.memoryLimit.value).toBe('2GB');
+        expect(c.form.controls.jobRuns.value).toBe(4);
+    });
+
+    it('sends the trimmed pair, and a blank memory limit as an explicit null', async () => {
+        const { fixture, api } = await setup();
+        const c = fixture.componentInstance;
+        c.form.patchValue({ system: 8, memoryLimit: '  2GB  ', jobRuns: 4 });
+        c.saveSystem();
+        expect(api.saveSystem).toHaveBeenCalledWith(8, expect.anything(), {
+            duckdbMemoryLimit: '2GB',
+            maxConcurrentJobRuns: 4,
+        });
+
+        // The save re-seeded the form from the response, so the Run bound is still 4 here — clearing the
+        // memory limit must not silently drop the other half of the pair.
+        api.saveSystem.mockClear();
+        c.form.patchValue({ memoryLimit: '   ' });
+        c.saveSystem();
+        expect(api.saveSystem).toHaveBeenCalledWith(8, expect.anything(), {
+            duckdbMemoryLimit: null,
+            maxConcurrentJobRuns: 4,
+        });
+    });
+
+    it('refuses a malformed size string client-side without calling the server', async () => {
+        const { fixture, api } = await setup();
+        const c = fixture.componentInstance;
+        c.form.patchValue({ memoryLimit: 'lots' });
+        c.saveSystem();
+        expect(api.saveSystem).not.toHaveBeenCalled();
+        expect(c.form.controls.memoryLimit.invalid).toBe(true);
+    });
+
+    it('keeps the resource-caps section accessible', async () => {
+        const { fixture } = await setup();
+        await expectNoA11yViolations(fixture.nativeElement);
     });
 });

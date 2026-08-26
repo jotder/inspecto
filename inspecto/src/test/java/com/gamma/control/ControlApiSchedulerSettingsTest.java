@@ -308,6 +308,65 @@ class ControlApiSchedulerSettingsTest {
         }
     }
 
+    // ── BACKLOG D11: the resource pair, served with provenance ───────────────────────
+
+    @Test
+    void resourceCapsRoundTripWithProvenanceAndHotApply(@TempDir Path root) throws Exception {
+        ConcurrencyBroker.use(null);
+        String priorMem = System.getProperty(com.gamma.util.DuckDbUtil.PROP_MEMORY_LIMIT);
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+
+            // Before any save: the on-by-default pair, reported as `default` — an operator must be able
+            // to see that a cap is in force even though nothing was configured.
+            JsonNode sys = json(send(c.port, "GET", "/system/scheduler", null)).get("system");
+            assertEquals("default", sys.get("maxConcurrentJobRunsSource").asText());
+            assertEquals(4, sys.get("maxConcurrentJobRuns").asInt(), "D11's default bound");
+            assertEquals("default", sys.get("duckdbMemoryLimitSource").asText());
+            assertTrue(sys.get("duckdbMemoryLimit").isNull(),
+                    "no stored value and no -D → null, so the UI shows DuckDB's own default");
+
+            // PUT the pair; both persist and the memory_limit becomes the use-time owner.
+            HttpResponse<String> put = send(c.port, "PUT", "/system/scheduler",
+                    "{\"maxConcurrentConsignments\":8,\"duckdbMemoryLimit\":\"2GB\",\"maxConcurrentJobRuns\":4}");
+            assertEquals(200, put.statusCode(), put.body());
+            JsonNode saved = json(put).get("system");
+            assertEquals("file", saved.get("duckdbMemoryLimitSource").asText());
+            assertEquals("2GB", saved.get("duckdbMemoryLimit").asText());
+            assertEquals("file", saved.get("maxConcurrentJobRunsSource").asText());
+            assertEquals("2GB", com.gamma.util.DuckDbUtil.memoryLimit(null), "hot-apply failed");
+            assertTrue(Files.readString(root.resolve("scheduler.toon")).contains("duckdb_memory_limit"),
+                    "the pair was not persisted");
+
+            // A -D flag is only a bootstrap default: it must NOT override a stored file value.
+            System.setProperty(com.gamma.util.DuckDbUtil.PROP_MEMORY_LIMIT, "512MB");
+            assertEquals("file", json(send(c.port, "GET", "/system/scheduler", null))
+                    .get("system").get("duckdbMemoryLimitSource").asText(),
+                    "a -D flag must not take ownership back from the stored document");
+
+            // A nonsense size string is a 422, not a value DuckDB will choke on at run time.
+            assertEquals(422, send(c.port, "PUT", "/system/scheduler",
+                    "{\"maxConcurrentConsignments\":8,\"duckdbMemoryLimit\":\"lots\"}").statusCode());
+        } finally {
+            com.gamma.util.DuckDbUtil.installMemoryLimit(null);
+            if (priorMem == null) System.clearProperty(com.gamma.util.DuckDbUtil.PROP_MEMORY_LIMIT);
+            else System.setProperty(com.gamma.util.DuckDbUtil.PROP_MEMORY_LIMIT, priorMem);
+        }
+    }
+
+    @Test
+    void storedResourceCapsInstallAtBoot(@TempDir Path root) throws Exception {
+        Files.writeString(root.resolve("scheduler.toon"),
+                "max_concurrent_consignments: 5\nduckdb_memory_limit: 2GB\nmax_concurrent_job_runs: 4\n");
+        ConcurrencyBroker.use(null);
+        try (Ctx c = open(root)) {
+            assertEquals("2GB", com.gamma.util.DuckDbUtil.memoryLimit(null),
+                    "a configured memory_limit must take effect without any request");
+        } finally {
+            com.gamma.util.DuckDbUtil.installMemoryLimit(null);
+        }
+    }
+
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));

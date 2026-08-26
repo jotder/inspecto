@@ -131,6 +131,49 @@ import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/compon
                             {{ view()!.system.effectiveIntake?.adaptive ? 'on' : 'off' }}.
                         </p>
                     </section>
+
+                    <section class="flex flex-col gap-2">
+                        <div class="flex items-center gap-3">
+                            <h2 class="text-lg font-medium">Resource caps</h2>
+                            <inspecto-chip variant="soft" tone="neutral">{{
+                                view()!.system.duckdbMemoryLimitSource
+                            }}</inspecto-chip>
+                        </div>
+                        <p class="text-secondary text-sm">
+                            These two work as a pair: total memory at risk is the per-instance limit times the
+                            number of Runs allowed at once. Capping one without the other leaves the product
+                            unbounded.
+                        </p>
+                        <div class="flex flex-wrap items-start gap-3">
+                            <mat-form-field class="w-60" subscriptSizing="dynamic">
+                                <mat-label>Memory limit per Run</mat-label>
+                                <input matInput formControlName="memoryLimit" placeholder="2GB" />
+                                @if (form.controls.memoryLimit.invalid) {
+                                    <mat-error>A size like 2GB or 512MB; blank = inherit the launch default.</mat-error>
+                                }
+                            </mat-form-field>
+                            <mat-form-field class="w-60" subscriptSizing="dynamic">
+                                <mat-label>Max concurrent Runs</mat-label>
+                                <input matInput type="number" formControlName="jobRuns" min="0" max="100000" />
+                                @if (form.controls.jobRuns.invalid) {
+                                    <mat-error>0 (unbounded) to 100000; blank = inherit the launch default.</mat-error>
+                                }
+                            </mat-form-field>
+                        </div>
+                        <p class="text-secondary text-xs">
+                            In force now:
+                            {{ view()!.system.duckdbMemoryLimit ?? 'DuckDB’s own default (~80% of RAM per Run)' }}
+                            ({{ view()!.system.duckdbMemoryLimitSource }}),
+                            {{ view()!.system.maxConcurrentJobRuns === 0 ? 'unbounded' : view()!.system.maxConcurrentJobRuns }}
+                            concurrent Run(s) ({{ view()!.system.maxConcurrentJobRunsSource }}). A Run beyond the
+                            ceiling queues; it is not rejected.
+                        </p>
+                        <p class="text-secondary text-xs">
+                            Do not tighten the memory limit below 1GB. Below roughly that, DuckDB's grouping and
+                            de-duplication steps fail outright rather than spilling to disk, which turns working
+                            jobs into failing ones.
+                        </p>
+                    </section>
                 </form>
 
                 <form [formGroup]="spaceForm" class="flex max-w-160 flex-col gap-6" (ngSubmit)="saveSpace()">
@@ -272,6 +315,19 @@ export class SchedulerSettingsComponent implements OnInit {
         intakeMax: this.fb.control<number | null>(null, [Validators.min(0), Validators.max(10_000_000)]),
         intakeMin: this.fb.control<number | null>(null, [Validators.min(1), Validators.max(10_000_000)]),
         intakeAdaptive: this.fb.nonNullable.control(''),
+        // The resource pair (BACKLOG D11). Blank memory limit = inherit the -D bootstrap default, then
+        // DuckDB's own ~80%-of-RAM-per-instance default. ⚠ The 512MB floor is measured, not arbitrary:
+        // below ~1GB DuckDB's blocking operators HARD-FAIL with OOM instead of spilling, so a tighter
+        // value turns working jobs into failing ones.
+        // Surrounding whitespace is tolerated and trimmed on save — a pasted " 2GB " is a typo the form
+        // should absorb, not refuse (the value sent to the server is always trimmed). ⚠ The size group is
+        // OPTIONAL so an all-whitespace value stays valid: Validators.pattern only skips a truly empty
+        // string, so clearing the box by selecting-and-spacing it would otherwise be a validation error
+        // rather than the "inherit the launch default" it means.
+        memoryLimit: this.fb.control<string | null>(null, [
+            Validators.pattern(/^\s*(\d+(\.\d+)?\s*(B|K|KB|KiB|M|MB|MiB|G|GB|GiB|T|TB|TiB))?\s*$/i),
+        ]),
+        jobRuns: this.fb.control<number | null>(null, [Validators.min(0), Validators.max(100_000)]),
     });
     readonly spaceForm = this.fb.group({
         space: this.fb.nonNullable.control(0, [Validators.required, Validators.min(0), Validators.max(100_000)]),
@@ -296,6 +352,9 @@ export class SchedulerSettingsComponent implements OnInit {
             maxFilesPerCycle: v.intakeMax ?? null,
             minFilesPerCycle: v.intakeMin ?? null,
             adaptive: v.intakeAdaptive === '' ? null : v.intakeAdaptive === 'true',
+        }, {
+            duckdbMemoryLimit: v.memoryLimit?.trim() ? v.memoryLimit.trim() : null,
+            maxConcurrentJobRuns: v.jobRuns ?? null,
         }).subscribe({
             next: (v) => {
                 this.saving.set(false);
@@ -350,6 +409,11 @@ export class SchedulerSettingsComponent implements OnInit {
             intakeMax: v.system.intakeMaxFilesPerCycle ?? null,
             intakeMin: v.system.intakeMinFilesPerCycle ?? null,
             intakeAdaptive: v.system.intakeAdaptive == null ? '' : String(v.system.intakeAdaptive),
+            // Seed the boxes only from a STORED value: showing the served `default`/`property` value as
+            // if it were typed would turn the next save into an accidental write of the inherited value
+            // into the file, silently taking ownership away from the -D flag.
+            memoryLimit: v.system.duckdbMemoryLimitSource === 'file' ? (v.system.duckdbMemoryLimit ?? null) : null,
+            jobRuns: v.system.maxConcurrentJobRunsSource === 'file' ? (v.system.maxConcurrentJobRuns ?? null) : null,
         });
         this.spaceForm.patchValue({
             space: v.space.maxConcurrentConsignments,

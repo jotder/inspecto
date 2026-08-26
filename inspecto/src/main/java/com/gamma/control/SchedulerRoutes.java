@@ -76,8 +76,9 @@ final class SchedulerRoutes implements RouteModule {
         try {
             ConcurrencyBroker broker = ConcurrencyBroker.shared();
             broker.setSystemCap(effectiveSystemCap(api));
-            IntakeGovernor.shared().setGlobalPolicy(
-                    effectiveIntake(SchedulerSettings.read(systemDocPath(api))));
+            SchedulerSettings sys = SchedulerSettings.read(systemDocPath(api));
+            IntakeGovernor.shared().setGlobalPolicy(effectiveIntake(sys));
+            installResourceCaps(api, sys);
             if (api.spaces() != null) {
                 for (SpaceContext s : api.spaces().all()) {
                     Path cfg = s.root().config();
@@ -120,6 +121,20 @@ final class SchedulerRoutes implements RouteModule {
                 || ss.intakeAdaptive() != null;
         system.put("intakeSource", anyStored ? "file"
                 : (System.getProperty("ingest.maxFilesPerCycle") != null ? "property" : "default"));
+        // BACKLOG D11's resource pair, with the same provenance contract as the cap above: a stored file
+        // value wins, else the -D bootstrap default, else the built-in default that now ships on.
+        String storedMem = ss.duckdbMemoryLimit();
+        String propMem = System.getProperty(com.gamma.util.DuckDbUtil.PROP_MEMORY_LIMIT);
+        system.put("duckdbMemoryLimit", storedMem != null ? storedMem
+                : (propMem != null && !propMem.isBlank() ? propMem : null));
+        system.put("duckdbMemoryLimitSource", storedMem != null ? "file"
+                : (propMem != null && !propMem.isBlank() ? "property" : "default"));
+        Integer storedRuns = ss.maxConcurrentJobRuns();
+        Integer propRuns = Integer.getInteger("jobs.maxConcurrentRuns");
+        system.put("maxConcurrentJobRuns", storedRuns != null ? storedRuns
+                : (propRuns != null ? propRuns : com.gamma.job.JobService.DEFAULT_MAX_CONCURRENT_RUNS));
+        system.put("maxConcurrentJobRunsSource", storedRuns != null ? "file"
+                : (propRuns != null ? "property" : "default"));
         IntakeGovernor.Policy live = IntakeGovernor.shared().policy();
         Map<String, Object> intake = new LinkedHashMap<>();
         intake.put("maxFilesPerCycle", live.baseCap());
@@ -191,13 +206,48 @@ final class SchedulerRoutes implements RouteModule {
                 ? optIntField(body, "intakeMinFilesPerCycle", 1) : stored.intakeMinFilesPerCycle();
         Boolean inAdaptive = body.containsKey("intakeAdaptive")
                 ? optBoolField(body, "intakeAdaptive") : stored.intakeAdaptive();
-        SchedulerSettings next = new SchedulerSettings(cap, null, null, inMax, inMin, inAdaptive);
+        String mem = body.containsKey("duckdbMemoryLimit")
+                ? requireMemoryLimit(body) : stored.duckdbMemoryLimit();
+        Integer jobRuns = body.containsKey("maxConcurrentJobRuns")
+                ? optIntField(body, "maxConcurrentJobRuns", 0) : stored.maxConcurrentJobRuns();
+        SchedulerSettings next = new SchedulerSettings(cap, null, null, inMax, inMin, inAdaptive, mem, jobRuns);
         next.write(doc);
         ConcurrencyBroker.shared().setSystemCap(cap);
         IntakeGovernor.shared().setGlobalPolicy(effectiveIntake(next));
+        installResourceCaps(api, next);
         journal(api, ex, "server-wide", null, stored, next);
-        log.info("Server-wide scheduler settings applied: cap={} intake={}/{}/{}", cap, inMax, inMin, inAdaptive);
+        log.info("Server-wide scheduler settings applied: cap={} intake={}/{}/{} memory_limit={} jobRuns={}",
+                cap, inMax, inMin, inAdaptive, mem, jobRuns);
         return systemShape(api);
+    }
+
+    /**
+     * Install BACKLOG D11's resource pair from a stored document: the DuckDB {@code memory_limit} every
+     * config-less scratch connection resolves through ({@link com.gamma.util.DuckDbUtil#memoryLimit}), and
+     * the Job-Run concurrency bound. A stated value wins; {@code null} leaves the {@code -D} bootstrap
+     * default in force.
+     *
+     * <p>⚠ The Run bound is <b>per space's Job engine</b>, because {@code JobService} is per space. In
+     * single-tenant mode (one space per process — the default) that IS the process-wide bound D11's
+     * arithmetic assumes; in hosted multi-space mode the worst case is the bound times the space count.
+     * A cross-space shared pool would need its own broker tier and is deliberately not built here.
+     */
+    private static void installResourceCaps(ApiContext api, SchedulerSettings ss) {
+        com.gamma.util.DuckDbUtil.installMemoryLimit(ss.duckdbMemoryLimit());
+        if (ss.maxConcurrentJobRuns() == null || api.spaces() == null) return;
+        for (SpaceContext s : api.spaces().all())
+            s.service().jobService().ifPresent(j -> j.setMaxConcurrentRuns(ss.maxConcurrentJobRuns()));
+    }
+
+    /** A DuckDB size string ({@code 2GB}, {@code 512MB}, {@code 1.5GiB}) — or a 422. Empty/null clears the
+     *  stored value, reverting to the {@code -D} bootstrap default. */
+    private static String requireMemoryLimit(Map<String, Object> body) {
+        Object raw = body.get("duckdbMemoryLimit");
+        if (raw == null || raw.toString().isBlank()) return null;
+        String v = raw.toString().trim();
+        if (!v.matches("(?i)\\d+(\\.\\d+)?\\s*(B|K|KB|KIB|M|MB|MIB|G|GB|GIB|T|TB|TIB)"))
+            throw new ApiException(422, "duckdbMemoryLimit must be a DuckDB size string, e.g. 2GB");
+        return v;
     }
 
     /** The IntakeGovernor thresholds a stored document implies: each stated field wins, each unset
