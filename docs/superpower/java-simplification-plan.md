@@ -109,6 +109,19 @@ Create two small utility homes and sweep the duplicated private-static family in
 
 ### S2 — Generic `SpiLoader` (ServiceLoader unification; the generics case)
 
+> **STATUS: grounded 2026-08-26 — the broad premise was REFUTED, the narrow one shipped.**
+> Reading every site showed the "collect-all" loops (`Parsers`, `Decompressors`,
+> `PipelineNodeTypes`, `MetadataGraphService`, `DeliveryStatusRoutes`, `ConsignmentProcessJobType`,
+> `JobPackManager`) each carry *semantic* per-element logic — id validation, built-in override
+> layering, best-suffix match, `configured()` filter, find-by-id, same-classloader filter. A generic
+> `SpiLoader.all()` would have replaced ~3 lines in one file. NOT built; those sites stay as they are.
+> What WAS triplicated verbatim (cache + first-wins scan + `forTest` seam) is the control-plane
+> edition-seam trio — now one generic `com.gamma.control.SpiSlot<T>` with `Authenticators` /
+> `AccessDeciders` / `TokenRelays` as thin typed facades (the facade names are the documented seam
+> and stay). `SpiSlotTest` pins empty-caches / override / null-re-arms. `CollectorService`'s inline
+> `findFirst()` sites were left: that file carries another shift's uncommitted changes, and it
+> already has its own `OptionalAgentSlot<T>` abstraction with a different (register/init) lifecycle.
+
 One small class in `inspecto-util`:
 `SpiLoader.first(Class<T>): Optional<T>` (cached), `SpiLoader.all(Class<T>): List<T>`,
 plus an explicit-classloader overload for the `JobPackManager` case. Port the ~10 duplicated
