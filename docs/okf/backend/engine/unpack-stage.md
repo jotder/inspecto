@@ -3,7 +3,7 @@
 > **As-built.** The Collector-level stage that expands compressed/archived inbox files into plain
 > files *before* Consignments are planned, and the run-level ledger that reports what became of each
 > Archive. Shipped `d6cd55b7` (2026-08-23); honesty fixes `fe6e1d7e` and the ledger 2026-08-26.
-> Plan: [`superpower/unpack-stage-plan.md`](../../../superpower/unpack-stage-plan.md).
+> Plan (archived, complete): [`archived-documents/plans-archive/unpack-stage-plan.md`](../../../archived-documents/plans-archive/unpack-stage-plan.md).
 > Related: [`ingestion.md`](ingestion.md) · [`consignment-status-flow.md`](consignment-status-flow.md) ·
 > [`ingest-wrap-spi.md`](ingest-wrap-spi.md) · [`parser-plugins.md`](parser-plugins.md)
 
@@ -117,8 +117,25 @@ lookup reads blank for every expanded file.
 **Only ARCHIVE kinds get a row.** A 1→1 stream expansion has no entries to roll up and its outcome is
 fully described by its single file's own status row; a row here would double-report it.
 
-**Open:** nothing READS the ledger yet. The next step is an `unpack` table in `OperationalTables` plus
-a `StatusStore` reader — and it must **reference `UnpackLedger.COLUMNS`**, never restate them.
+**Read surface (2026-08-26):** `StatusStore.unpack(cfg)` — a `default` returning empty, so every
+pre-existing `@PublicApi` implementer (incl. the anonymous test stores) keeps compiling — backed by
+`FileStatusStore` (globs `<pipeline>_unpack_*.csv`) and `DbStatusStore` (projects into
+`inspecto_status_unpack`, carried through sync/delete/rename/browse). `OperationalTables.UNPACK`
+**references `UnpackLedger.COLUMNS`** rather than restating them, and `unpack` joined `STAGE1_NAMES`
+so report-sql can query it.
+
+### The per-file status ledger's `logical_name` column (2026-08-26)
+
+Beside `origin` (§ above), the per-file `_status_*.csv` ledger carries `logical_name`: the SAME inbox
+file's extension-insensitive **identity** (§6 below) — poll-relative, so unlike `origin`'s display
+basename it IS a key. This is what a report groups on to unite a re-delivery with an earlier
+compression spelling, rather than reading the alias hit out of the dedup log.
+
+⚠ **For an expanded ARCHIVE this is the archive's identity, shared by every one of its entries** — one
+delivery, one identity — never the entry's own name (that is what lineage records, through
+`UnpackOrigins.lineageName`). ⚠ Computed from `MemberAudit.originPath()`, captured at INGEST time —
+the identical trap `origin` already documents: a late lookup after `commit` reads blank. Appended
+last (after `origin`) and QUOTED — a poll-relative identity may carry a comma.
 
 ## 6. Extension-insensitive identity, and why the collision is not a bug
 

@@ -89,7 +89,12 @@ former root reference docs** (each index lists them):
   `38c7a32d` 2026-08-25; optional item 6 → BACKLOG §6 PKG-3, trigger-gated). As-built facts distilled
   into [`okf/backend/control-plane/api-v1.md`](okf/backend/control-plane/api-v1.md); provenance in
   `archived-documents/plans-archive/backend-hardening-plan.md`.
-- `superpower/unpack-stage-plan.md` — **IN FLIGHT; as-built now lives in [`okf/backend/engine/unpack-stage.md`](okf/backend/engine/unpack-stage.md)** (added 2026-08-26 — read the OKF concept, not this plan, for how the stage behaves). Stream (.gz/.bz2/.Z) and archive (.zip/.tar/.tar.gz) expansion at the Collector before consignments are planned; bomb caps; extension-insensitive duplicate identity; `processing.unpack.*` config; parallel expansion; FAILED members recorded in the manifest. **2026-08-26: §6 Q1 + Q2 ANSWERED and the run-level `unpack` ledger SHIPPED** — `UnpackStatus` (⛔ `UNPACKED_PARTIAL` commits: reporting, never a gate) + `<pipeline>_unpack_<ts>.csv` with columns declared ONCE. **§6 Q4 also ANSWERED 2026-08-26** — the seven-extension default confirmed, `processing.unpack.data_extensions` published (empty = opt out), and the marker-mode alias drop raised to WARN. **2026-08-26 pm: the ledger READ surface (`StatusStore.unpack` + `OperationalTables` referencing `UnpackLedger.COLUMNS`), the `MemberStatus` enum (step 14) and the member→Entry sweep (item 13) all SHIPPED.** Remaining: `logical_name` and the UI half (Phase 6) — **§6 is fully drained**. Pluggable
+- ~~`superpower/unpack-stage-plan.md`~~ — **COMPLETE + ARCHIVED 2026-08-26 evening.** Every phase and
+  every §6 question shipped; the `logical_name` status-ledger column (step 4d) and Phase 6's UI half
+  were the last two rows and both landed 2026-08-26. As-built lives in
+  [`okf/backend/engine/unpack-stage.md`](okf/backend/engine/unpack-stage.md) — read that, not the
+  archived plan, for how the stage behaves. Provenance:
+  `archived-documents/plans-archive/unpack-stage-plan.md`. Pluggable
   decompression (ServiceLoader `DecompressorPlugin`) expanding archives/compressed inputs into
   ordinary candidates at `CollectorProcessor` BEFORE `ConsignmentPlanner.plan` — never mutating a
   Consignment; Archive verdict = a Run-level `unpack` ledger; per-file end status via recording

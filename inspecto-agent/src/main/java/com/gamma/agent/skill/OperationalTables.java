@@ -42,7 +42,10 @@ final class OperationalTables {
 
     static final List<String> FILES = List.of(
             "start_time", "end_time", "filename", "status", "parsed_rows", "error_rows",
-            "output_paths", "output_sizes_bytes", "duration_ms", "error", "consignment_id", "origin");
+            "output_paths", "output_sizes_bytes", "duration_ms", "error", "consignment_id", "origin",
+            // The inbox file's extension-insensitive identity — what a report GROUPs on to unite a
+            // re-delivery with its earlier compression spelling (BatchAuditWriter.FileRow).
+            "logical_name");
 
     static final List<String> LINEAGE = List.of(
             "consignment_id", "src_id", "input_file", "output_file", "partition", "row_count");

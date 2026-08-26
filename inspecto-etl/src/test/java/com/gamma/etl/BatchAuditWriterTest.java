@@ -50,6 +50,78 @@ class BatchAuditWriterTest {
     }
 
     /**
+     * Unpack plan step 4d: the additive {@code logical_name} column round-trips, and the two
+     * shorter arities keep writing a blank for it — the compatibility that lets a caller which
+     * never resolved an identity (and every pre-unpack caller) go on constructing a row.
+     *
+     * <p>⚠ It is QUOTED in the codec: a logical name keeps its poll-relative path, and a path may
+     * carry a comma — unquoted, one such name would shift every later column by one on read.
+     */
+    @Test
+    void logicalNameIsTheLastColumnAndRoundTrips(@TempDir Path dir) throws Exception {
+        String statusCsv = dir.resolve("p_status_TS.csv").toString();
+        BatchAuditWriter w = new BatchAuditWriter(statusCsv,
+                dir.resolve("p_batches_TS.csv").toString(), dir.resolve("p_lineage_TS.csv").toString());
+
+        var rows = List.of(
+                // full arity: an expanded entry carries its ARCHIVE's origin and identity
+                new BatchAuditWriter.FileRow("t0", "t1", "00001_a.csv", "SUCCESS", 2, 0,
+                        List.of(), List.of(), 10, "", "B1", "data.zip", "east/data"),
+                // a comma in the identity must not shift the columns
+                new BatchAuditWriter.FileRow("t0", "t1", "b.csv", "SUCCESS", 1, 0,
+                        List.of(), List.of(), 10, "", "B1", "", "od,d/name"),
+                // origin-only arity → blank identity
+                new BatchAuditWriter.FileRow("t0", "t1", "c.csv", "SUCCESS", 1, 0,
+                        List.of(), List.of(), 10, "", "B1", "c.csv.gz"),
+                // pre-unpack arity → both blank
+                new BatchAuditWriter.FileRow("t0", "t1", "d.csv", "SUCCESS", 1, 0,
+                        List.of(), List.of(), 10, "", "B1"));
+        w.flush(new BatchAuditWriter.BatchRow("B1", "p", "s", "", "t0", "t1", "SUCCESS",
+                4, 0, 5, 5, 1, 1L, 20, ""), rows, List.of());
+
+        List<String> lines = Files.readAllLines(Path.of(statusCsv));
+        assertTrue(lines.get(0).endsWith(",origin,logical_name"),
+                "appended last, after origin: " + lines.get(0));
+
+        // the reader parses by header NAME, so this is the shape every consumer sees
+        List<java.util.Map<String, String>> read = new java.util.ArrayList<>();
+        com.gamma.util.Csv.readInto(Path.of(statusCsv), read);
+        assertEquals(4, read.size());
+        assertEquals("east/data", read.get(0).get("logical_name"));
+        assertEquals("data.zip", read.get(0).get("origin"));
+        // the comma survived quoting AND did not displace the neighbouring column
+        assertEquals("od,d/name", read.get(1).get("logical_name"));
+        assertEquals("b.csv", read.get(1).get("filename"));
+        assertEquals("", read.get(2).get("logical_name"), "origin-only arity writes a blank identity");
+        assertEquals("c.csv.gz", read.get(2).get("origin"));
+        assertEquals("", read.get(3).get("logical_name"), "pre-unpack arity writes both blank");
+        assertEquals("", read.get(3).get("origin"));
+    }
+
+    /**
+     * The other half of "additive": a ledger written BEFORE the column existed still parses, and
+     * simply carries no such key — never a null-shifted row. This is the guarantee that lets the
+     * column be appended at all.
+     */
+    @Test
+    void aLedgerWrittenBeforeTheColumnStillParses(@TempDir Path dir) throws Exception {
+        Path old = dir.resolve("p_status_OLD.csv");
+        Files.writeString(old,
+                "start_time,end_time,filename,status,parsed_rows,error_rows,output_paths,"
+                        + "output_sizes_bytes,duration_ms,error,consignment_id\n"
+                        + "t0,t1,a.csv,SUCCESS,2,0,\"\",\"\",10,\"\",B1\n");
+
+        List<java.util.Map<String, String>> read = new java.util.ArrayList<>();
+        com.gamma.util.Csv.readInto(old, read);
+
+        assertEquals(1, read.size());
+        assertEquals("a.csv", read.get(0).get("filename"));
+        assertEquals("B1", read.get(0).get("consignment_id"), "the pre-existing columns still line up");
+        assertNull(read.get(0).get("logical_name"), "an absent column is absent, never a shifted value");
+        assertNull(read.get(0).get("origin"));
+    }
+
+    /**
      * E4 (delimited-grammar-properties plan Part II): the finalization-concurrency pin. The class
      * documents that {@code flush} is {@code synchronized} so "each batch's rows are written
      * contiguously even when multiple batches finish concurrently" — this converts that structural

@@ -42,7 +42,7 @@ public final class BatchAuditWriter {
                             String commitLogPath) {
         this.status = statusPath == null ? null : new CsvLedger<>(statusPath,
                 "start_time,end_time,filename,status,parsed_rows,error_rows," +
-                        "output_paths,output_sizes_bytes,duration_ms,error,consignment_id,origin",
+                        "output_paths,output_sizes_bytes,duration_ms,error,consignment_id,origin,logical_name",
                 BatchAuditWriter::statusLine);
         this.batches = batchesPath == null ? null : new CsvLedger<>(batchesPath,
                 "consignment_id,pipeline,schema_name,output_table,start_time,end_time,status," +
@@ -79,22 +79,44 @@ public final class BatchAuditWriter {
 
     /** One member-file audit row. */
     /**
-     * One per-file audit row. {@code origin} names the inbox file this member came OUT of — the
-     * archive or compressed original the operator dropped — and is BLANK for the ordinary case where
-     * the member IS that file. Appended last on purpose: readers parse this ledger by header name
+     * One per-file audit row.
+     *
+     * <p>{@code origin} names the inbox file this member came OUT of — the archive or compressed
+     * original the operator dropped — and is BLANK for the ordinary case where the member IS that
+     * file. It is a DISPLAY basename, deliberately not a key: {@code in/east/data.zip} and
+     * {@code in/west/data.zip} share one.
+     *
+     * <p>{@code logicalName} is that same inbox file's <b>extension-insensitive identity</b>
+     * ({@code LogicalNames}) — poll-relative, so it IS a key, and it is the identity the duplicate
+     * check actually ledgers on. That is the point of the column: {@code cdr.csv.gz},
+     * {@code cdr.Z} and bare {@code cdr} are one logical file, so a report can group a re-delivery
+     * to its earlier spelling instead of reading the alias hit out of the dedup log. ⚠ For an
+     * expanded ARCHIVE this is the ARCHIVE's identity, shared by all of its entries — one delivery,
+     * one identity — not the entry's own name.
+     *
+     * <p>Both are appended last on purpose: readers parse this ledger by header name
      * ({@code Csv.readInto}), so an older ledger file simply carries no such key.
      */
     public record FileRow(String startTime, String endTime, String filename, String status,
                           long parsedRows, long errorRows, List<String> outputPaths,
                           List<Long> outputSizes, long durationMs, String error, String batchId,
-                          String origin) {
+                          String origin, String logicalName) {
 
-        /** The pre-unpack arity — an expansion-unaware caller records no origin. */
+        /** The pre-unpack arity — an expansion-unaware caller records neither origin nor identity. */
         public FileRow(String startTime, String endTime, String filename, String status,
                        long parsedRows, long errorRows, List<String> outputPaths,
                        List<Long> outputSizes, long durationMs, String error, String batchId) {
             this(startTime, endTime, filename, status, parsedRows, errorRows, outputPaths,
-                    outputSizes, durationMs, error, batchId, "");
+                    outputSizes, durationMs, error, batchId, "", "");
+        }
+
+        /** The origin-only arity — a caller that resolved the origin but not its logical identity. */
+        public FileRow(String startTime, String endTime, String filename, String status,
+                       long parsedRows, long errorRows, List<String> outputPaths,
+                       List<Long> outputSizes, long durationMs, String error, String batchId,
+                       String origin) {
+            this(startTime, endTime, filename, status, parsedRows, errorRows, outputPaths,
+                    outputSizes, durationMs, error, batchId, origin, "");
         }
     }
 
@@ -168,11 +190,13 @@ public final class BatchAuditWriter {
         String paths = String.join(";", f.outputPaths()).replace('"', '\'');
         String sizes = f.outputSizes().stream().map(String::valueOf)
                 .collect(Collectors.joining(";"));
-        return String.format("%s,%s,%s,%s,%d,%d,\"%s\",\"%s\",%d,\"%s\",%s,%s",
+        return String.format("%s,%s,%s,%s,%d,%d,\"%s\",\"%s\",%d,\"%s\",%s,%s,\"%s\"",
                 f.startTime(), f.endTime(), f.filename(), f.status(),
                 f.parsedRows(), f.errorRows(), paths, sizes, f.durationMs(),
                 CsvLedger.q(f.error()), f.batchId(),
-                f.origin() == null ? "" : f.origin());
+                f.origin() == null ? "" : f.origin(),
+                // Quoted: a logical name keeps its poll-relative path, and a path may carry a comma.
+                CsvLedger.q(f.logicalName() == null ? "" : f.logicalName()));
     }
 
     private static String batchLine(BatchRow b) {

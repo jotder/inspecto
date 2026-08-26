@@ -467,6 +467,33 @@ public final class BatchProcessor {
         return null;
     }
 
+    /**
+     * The {@code logical_name} audit column (unpack plan step 4d): the extension-insensitive identity
+     * of the INBOX file this row's data arrived in.
+     *
+     * <p>⚠ Resolved from {@link MemberAudit#originPath()}, captured at INGEST time — never by asking
+     * {@code UnpackOrigins} here. {@code writeAudit} runs AFTER {@code commit}, whose
+     * {@code UnpackStage.cleanup} consumes the origin mapping, so a late lookup reads blank for every
+     * expanded file: the same trap {@code MemberAudit.origin} already documents.
+     *
+     * <p>⚠ For an expansion product this is the ARCHIVE's identity, deliberately shared by all of its
+     * entries: one delivery, one identity, and it is what the duplicate check ledgers on
+     * ({@code ledgerKey} in {@code finalizeSource}). It is NOT the entry's own name — that is what
+     * lineage records, through {@code UnpackOrigins.lineageName}.
+     *
+     * <p>Blank rather than a guess when the file lies outside the poll root (no relative path to take
+     * an identity from) — a blank groups with nothing, an invented key groups with the wrong thing.
+     */
+    private static String logicalNameOf(MemberAudit ma, Map<Integer, File> memberFiles, PipelineConfig cfg) {
+        File inbox = ma.originPath() != null ? ma.originPath() : memberFiles.get(ma.srcId());
+        if (inbox == null) return "";
+        Path poll = Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
+        Path file = inbox.toPath().toAbsolutePath().normalize();
+        if (!file.startsWith(poll)) return "";
+        String rel = poll.relativize(file).toString().replace('\\', '/');
+        return com.gamma.etl.unpack.LogicalNames.logicalName(rel, cfg);
+    }
+
     private static String rawName(Map<String, Object> schema) {
         Object raw = schema == null ? null : schema.get("raw");
         if (raw instanceof Map<?, ?> m && m.get("name") != null) return m.get("name").toString();
@@ -500,6 +527,11 @@ public final class BatchProcessor {
         for (LineageRow r : lineage)
             outBySrc.computeIfAbsent(r.srcId(), k -> new LinkedHashSet<>()).add(r.outputFile());
 
+        // srcId -> the member's own file, for the rows that are NOT expansion products. Pure path
+        // arithmetic below, so it does not matter that commit has already moved these to backup.
+        Map<Integer, File> memberFiles = new HashMap<>();
+        for (Batch.Member m : batch.members()) memberFiles.put(m.srcId(), m.file());
+
         List<BatchAuditWriter.FileRow> fileRows = new ArrayList<>();
         int rejected = 0;
         for (MemberAudit ma : outcome.memberAudits()) {
@@ -518,7 +550,7 @@ public final class BatchProcessor {
                     ma.filename(), ma.status().name(), ma.parsedRows(), ma.errorRows(),
                     paths, Collections.nCopies(paths.size(), 0L),
                     Duration.between(ma.start(), end).toMillis(), ma.error(), batch.batchId(),
-                    ma.origin()));
+                    ma.origin(), logicalNameOf(ma, memberFiles, cfg)));
         }
 
         long totalOutputRows  = lineage.stream().mapToLong(LineageRow::rowCount).sum();

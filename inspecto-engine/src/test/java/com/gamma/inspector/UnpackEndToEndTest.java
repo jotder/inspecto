@@ -166,6 +166,11 @@ class UnpackEndToEndTest {
      * actually dropped. Pinned end-to-end because the capture point is subtle — `writeAudit` runs
      * AFTER `commit`, whose `UnpackStage.cleanup` consumes the origin mapping, so resolving origin at
      * row-write time reads blank for every expanded file. It is captured on MemberAudit at ingest.
+     *
+     * <p>Extended for step 4d: the `logical_name` column beside it — the same inbox file's
+     * extension-insensitive IDENTITY (poll-relative, so it is a key, unlike `origin`'s display
+     * basename). ⚠ For an expanded entry that is the ARCHIVE's identity, shared by every entry of
+     * the delivery, NOT the entry's own name.
      */
     @Test
     void theStatusLedgerRecordsTheArchiveAMemberCameOutOf(@TempDir Path dir) throws Exception {
@@ -183,13 +188,23 @@ class UnpackEndToEndTest {
             statusCsv = w.filter(p -> p.getFileName().toString().contains("_status_")).findFirst().orElseThrow();
         }
         List<String> lines = Files.readAllLines(statusCsv);
-        assertTrue(lines.get(0).endsWith(",origin"), "the column is appended last: " + lines.get(0));
+        assertTrue(lines.get(0).endsWith(",origin,logical_name"),
+                "both columns are appended last, identity after origin: " + lines.get(0));
 
-        String member = lines.stream().filter(l -> l.contains("00001_a.csv")).findFirst().orElseThrow();
-        assertTrue(member.endsWith(",bundle.zip"),
-                "the expanded member names its archive: " + member);
-        String plain = lines.stream().filter(l -> l.contains("plain.csv")).findFirst().orElseThrow();
-        assertTrue(plain.endsWith(","), "a file that arrived as itself has a BLANK origin: " + plain);
+        // Read by header NAME — the shape every consumer actually sees.
+        List<java.util.Map<String, String>> rows = new java.util.ArrayList<>();
+        com.gamma.util.Csv.readInto(statusCsv, rows);
+        java.util.Map<String, String> member = rows.stream()
+                .filter(r -> "00001_a.csv".equals(r.get("filename"))).findFirst().orElseThrow();
+        assertEquals("bundle.zip", member.get("origin"), "the expanded member names its archive");
+        assertEquals("bundle", member.get("logical_name"),
+                "…and carries the ARCHIVE's identity — the .zip stripped, shared by every entry");
+
+        java.util.Map<String, String> plain = rows.stream()
+                .filter(r -> "plain.csv".equals(r.get("filename"))).findFirst().orElseThrow();
+        assertEquals("", plain.get("origin"), "a file that arrived as itself has a BLANK origin");
+        assertEquals("plain", plain.get("logical_name"),
+                "…but still has an identity: its own name, with the data extension stripped");
     }
 
     // ── helpers ────────────────────────────────────────────────────────────────

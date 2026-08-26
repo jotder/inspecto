@@ -230,10 +230,9 @@ Each phase is independently shippable and independently verifiable.
 > `processing.unpack.data_extensions` published — completing step 17 — and step 19's docs. Pushed as
 > `fe6e1d7e` → `6730cd66` → `e9750e20`; reactor **3603/0/0/5**, exit 0.
 >
-> **What is left (2026-08-26 pm): the ledger READ surface ✅, step 14's member-status enum ✅, the
-> member→Entry sweep ✅ and Phase 6's UI half ✅ are all SHIPPED. The ONLY item still open is the
-> `logical_name` status-ledger column (BACKLOG §4 unpack item 2) — so this plan is one row from
-> archivable.**
+> **2026-08-26 pm: EVERY item in Phase 6 and step 4d is now SHIPPED — the plan has nothing left
+> unbuilt.** The as-built lives in `okf/backend/engine/unpack-stage.md`; this file survives only
+> for the historical Phase narrative and can now be archived.
 > ⛔ **Archive this plan only once Phase 6 lands** — the as-built already lives in
 > [`okf/backend/engine/unpack-stage.md`](../okf/backend/engine/unpack-stage.md), which is what to read
 > for behaviour; this file survives only for its unbuilt Phase-6 detail.
@@ -314,9 +313,14 @@ and needs **no** consignment change at all.
     → *verify:* the migration fixture (old-style marker ⇒ NOT re-ingested); `x.csv.gz` after
     `x.csv` reads DUPLICATE under checksum mode with identical bytes and CHANGED with different
     bytes; the drop line names both spellings.
-4d. Additive `logical_name` column on the per-file status ledger (header-name parsed, like
-    `origin`); Run Detail ▸ Files groups on it.
-    → *verify:* an old ledger file without the column still parses; the new column round-trips.
+4d. ~~Additive `logical_name` column…~~ **✅ SHIPPED 2026-08-26.** `BatchAuditWriter.FileRow` gained
+    `logicalName` (two compat arities, so a pre-unpack or origin-only caller still constructs a row),
+    the codec appends it QUOTED after `origin` (a poll-relative identity may carry a comma),
+    `OperationalTables.FILES` carries it, and `BatchProcessor.logicalNameOf` computes it from
+    `MemberAudit.originPath()` — captured at INGEST time, the same trap `origin` already documents,
+    never resolved post-commit. ⚠ For an expanded entry this is the ARCHIVE's identity (shared by
+    every entry of the delivery), not the entry's own name — Run Detail's Files tab needs no UI change
+    (no explicit `columnDefs`, `autoColumns` surfaces it automatically, same as `origin`).
 
 ### Phase 2 — Safety limits (before any ARCHIVE support ships)
 5. `UnpackLimits`: `max_entries`, `max_entry_bytes`, `max_total_bytes`, `max_ratio`, `depth`.
