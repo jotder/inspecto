@@ -1,6 +1,7 @@
 package com.gamma.event;
 
 import java.util.Locale;
+import static com.gamma.util.Values.trimToNull;
 
 /**
  * A filter + page over the event store — the query model behind {@code GET /events/search}. Every
@@ -72,20 +73,16 @@ public record EventQuery(Long fromMs, Long toMs, EventLevel minLevel, String typ
         public Builder from(Long ms) { this.fromMs = ms; return this; }
         public Builder to(Long ms) { this.toMs = ms; return this; }
         public Builder minLevel(EventLevel l) { this.minLevel = l; return this; }
-        public Builder type(String t) { this.type = blankToNull(t); return this; }
-        public Builder pipeline(String p) { this.pipeline = blankToNull(p); return this; }
-        public Builder correlationId(String c) { this.correlationId = blankToNull(c); return this; }
-        public Builder textContains(String q) { this.textContains = blankToNull(q); return this; }
+        public Builder type(String t) { this.type = trimToNull(t); return this; }
+        public Builder pipeline(String p) { this.pipeline = trimToNull(p); return this; }
+        public Builder correlationId(String c) { this.correlationId = trimToNull(c); return this; }
+        public Builder textContains(String q) { this.textContains = trimToNull(q); return this; }
         public Builder limit(int n) { this.limit = n; return this; }
         public Builder offset(int n) { this.offset = n; return this; }
 
         public EventQuery build() {
             return new EventQuery(fromMs, toMs, minLevel, type, pipeline, correlationId,
                     textContains, limit, offset);
-        }
-
-        private static String blankToNull(String s) {
-            return (s == null || s.isBlank()) ? null : s.trim();
         }
     }
 }

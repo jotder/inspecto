@@ -4,6 +4,7 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import static com.gamma.util.Values.trimToNull;
 
 /**
  * One data-quality <b>Expectation</b> (ING-6) — the data-quality third of the Rules triad (Expectation /
@@ -60,9 +61,9 @@ public record Expectation(String name, String description, String targetType, St
         column = column == null ? null : column.trim();
         severity = severity == null ? "MAJOR" : severity.trim().toUpperCase(Locale.ROOT);
         require(SEVERITIES.contains(severity), "expectation.severity must be one of " + SEVERITIES);
-        pattern = blankToNull(pattern);
-        refDataset = blankToNull(refDataset);
-        refColumn = blankToNull(refColumn);
+        pattern = trimToNull(pattern);
+        refDataset = trimToNull(refDataset);
+        refColumn = trimToNull(refColumn);
         when = (when instanceof Map<?, ?> m && !m.isEmpty()) ? when : null;
 
         switch (kind) {
@@ -80,19 +81,19 @@ public record Expectation(String name, String description, String targetType, St
     public static Expectation fromMap(Map<String, Object> m) {
         require(m != null, "missing expectation body");
         return new Expectation(
-                str(m.get("name")),
-                str(m.get("description")),
-                str(m.get("targetType")),
-                str(m.get("target")),
-                str(m.get("column")),
-                str(m.get("kind")),
+                trimToNull(m.get("name")),
+                trimToNull(m.get("description")),
+                trimToNull(m.get("targetType")),
+                trimToNull(m.get("target")),
+                trimToNull(m.get("column")),
+                trimToNull(m.get("kind")),
                 number(m.get("min")),
                 number(m.get("max")),
-                str(m.get("pattern")),
-                str(m.get("refDataset")),
-                str(m.get("refColumn")),
+                trimToNull(m.get("pattern")),
+                trimToNull(m.get("refDataset")),
+                trimToNull(m.get("refColumn")),
                 m.get("when"),
-                str(m.get("severity")),
+                trimToNull(m.get("severity")),
                 m.get("enabled") == null || !"false".equalsIgnoreCase(String.valueOf(m.get("enabled"))));
     }
 
@@ -120,18 +121,8 @@ public record Expectation(String name, String description, String targetType, St
         if (!ok) throw new IllegalArgumentException(message);
     }
 
-    private static String str(Object v) {
-        if (v == null) return null;
-        String s = String.valueOf(v).trim();
-        return s.isEmpty() ? null : s;
-    }
-
     private static String lower(String v) {
         return v == null ? null : v.trim().toLowerCase(Locale.ROOT);
-    }
-
-    private static String blankToNull(String v) {
-        return v == null || v.isBlank() ? null : v.trim();
     }
 
     private static Double number(Object v) {

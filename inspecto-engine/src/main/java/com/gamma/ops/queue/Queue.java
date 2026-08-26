@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import static com.gamma.util.Values.trimToNull;
 
 /**
  * A first-class work queue (INC-4) — a named bucket of {@link #members()} that
@@ -77,14 +78,8 @@ public record Queue(String id, String name, String description, List<String> mem
         if (q == null) throw new IllegalArgumentException("missing 'queue' block");
         List<String> members = new ArrayList<>();
         if (q.get("members") instanceof List<?> list)
-            for (Object o : list) { String s = str(o); if (s != null) members.add(s); }
-        return new Queue(str(q.get("id")), str(q.get("name")), str(q.get("description")),
-                members, Routing.from(str(q.get("routing"))));
-    }
-
-    private static String str(Object v) {
-        if (v == null) return null;
-        String s = String.valueOf(v).trim();
-        return s.isEmpty() ? null : s;
+            for (Object o : list) { String s = trimToNull(o); if (s != null) members.add(s); }
+        return new Queue(trimToNull(q.get("id")), trimToNull(q.get("name")), trimToNull(q.get("description")),
+                members, Routing.from(trimToNull(q.get("routing"))));
     }
 }

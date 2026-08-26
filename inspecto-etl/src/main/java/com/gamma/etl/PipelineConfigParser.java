@@ -30,6 +30,7 @@ import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import static com.gamma.util.Values.trimToNull;
 
 /**
  * Decodes a pipeline {@code .toon} config map into an immutable {@link PipelineConfig}.
@@ -228,9 +229,9 @@ final class PipelineConfigParser {
         // dirs.temp at the call site so scratch lands on the data volume, never the system /tmp.
         Map<String, Object> duck = (Map<String, Object>) proc.get("duckdb");
         if (duck != null) {
-            b.duckMemoryLimit   = blankToNull(duck.get("memory_limit"));
-            b.duckTempDirectory = blankToNull(duck.get("temp_directory"));
-            b.duckMaxTempSize   = blankToNull(duck.get("max_temp_directory_size"));
+            b.duckMemoryLimit   = trimToNull(duck.get("memory_limit"));
+            b.duckTempDirectory = trimToNull(duck.get("temp_directory"));
+            b.duckMaxTempSize   = trimToNull(duck.get("max_temp_directory_size"));
         }
 
         // ── large-file auto-chunking (additive, optional; disabled by default) ──
@@ -286,7 +287,7 @@ final class PipelineConfigParser {
             List<String> keys = new ArrayList<>();
             if (recDedup.get("keys") instanceof List<?> ks)
                 for (Object k : ks) keys.add(String.valueOf(k));
-            b.dedup = new PipelineConfig.Dedup(keys, blankToNull(recDedup.get("order_by")));
+            b.dedup = new PipelineConfig.Dedup(keys, trimToNull(recDedup.get("order_by")));
         }
 
         // ── summarize (ELT amendment §2.4/Phase 3 — group-by rollup, authoring/round-trip only) ──
@@ -309,7 +310,7 @@ final class PipelineConfigParser {
                 for (Object o : os) on.add(String.valueOf(o));
             else if (recJoin.get("on") != null)
                 on.add(String.valueOf(recJoin.get("on")));   // single-key shorthand: on: k
-            b.join = new PipelineConfig.Join(blankToNull(recJoin.get("reference")), on);
+            b.join = new PipelineConfig.Join(trimToNull(recJoin.get("reference")), on);
         }
 
         // ── map (AUTHOR-1 (a) — the authored half of a transform.map node) ──
@@ -347,8 +348,8 @@ final class PipelineConfigParser {
         // `parsing.grammar` (design-of-record) wins over the legacy `processing.grammar`, consistent
         // with every other key in the block. Either may be a plain path OR a registry reference
         // (`grammar/<id>`), which is what a Grammar-bound parser node lowers to.
-        String grammarRef = parsing != null ? blankToNull(parsing.get("grammar")) : null;
-        if (grammarRef == null) grammarRef = blankToNull(proc.get("grammar"));
+        String grammarRef = parsing != null ? trimToNull(parsing.get("grammar")) : null;
+        if (grammarRef == null) grammarRef = trimToNull(proc.get("grammar"));
         Path grammarFile = grammarRef == null ? null : resolveGrammarRef(grammarRef, configDir);
         if (grammarFile != null) b.referencedFiles.add(grammarFile);
 
@@ -388,8 +389,8 @@ final class PipelineConfigParser {
             if (csv.get("timestamp_formats") instanceof List<?> tf)
                 b.tsFormats   = (List<String>) tf;
             // 4.1 additive: native read_csv pass-throughs + row filters
-            b.encoding         = blankToNull(csv.get("encoding"));
-            b.inputCompression = blankToNull(csv.get("compression"));
+            b.encoding         = trimToNull(csv.get("encoding"));
+            b.inputCompression = trimToNull(csv.get("compression"));
             // FAIL CLOSED (unpack-stage plan Phase 1 step 4): this value is passed VERBATIM into
             // read_csv, so an unsupported one used to load fine and then quarantine every file at
             // run time. Archives/exotic forms are the Collector's unpack stage, not a reader flag.
@@ -410,14 +411,14 @@ final class PipelineConfigParser {
             // post-parse SQL row predicate over the MAPPED columns (DataTransformer.materialize) —
             // a different moment from the include_*/exclude_* lists above, which match one raw
             // physical column inside read_csv. See PipelineConfig.CsvSettings.
-            b.rowWhere         = blankToNull(csv.get("where"));
+            b.rowWhere         = trimToNull(csv.get("where"));
             // Error handling. Each stays null when undeclared, so read_csv keeps emitting exactly
             // what it emitted before these were configurable (see DuckDbCsvIngester.errorOptions).
             b.ignoreErrors     = parseBoolOrNull(csv.get("ignore_errors"));
             b.nullPadding      = parseBoolOrNull(csv.get("null_padding"));
             b.storeRejects     = parseBoolOrNull(csv.get("store_rejects"));
-            b.rejectsTable     = blankToNull(csv.get("rejects_table"));
-            b.rejectsScan      = blankToNull(csv.get("rejects_scan"));
+            b.rejectsTable     = trimToNull(csv.get("rejects_table"));
+            b.rejectsScan      = trimToNull(csv.get("rejects_scan"));
             b.rejectsLimit     = parseIntOrNull(csv.get("rejects_limit"));
             // FAIL CLOSED: these two names are interpolated as SQL identifiers by the reject drain,
             // which no bound parameter can express — so a name that is not a bare identifier is
@@ -449,7 +450,7 @@ final class PipelineConfigParser {
             b.duckLakeCfg  = (Map<String, Object>) out.get("ducklake");
             // B4: source-filename lineage as an output-row column. Validated as an identifier here;
             // collision with a declared schema column is checked after the schemas load below.
-            b.filenameColumn = blankToNull(out.get("filename_column"));
+            b.filenameColumn = trimToNull(out.get("filename_column"));
             if (b.filenameColumn != null)
                 Identifiers.validate(b.filenameColumn, "output.filename_column");
         }
@@ -469,7 +470,7 @@ final class PipelineConfigParser {
                 if (db == null || db.toString().isBlank()) {
                     throw new IllegalArgumentException("each sinks[] entry requires a non-blank 'database' dir");
                 }
-                String sinkFilenameCol = blankToNull(sink.get("filename_column"));
+                String sinkFilenameCol = trimToNull(sink.get("filename_column"));
                 if (sinkFilenameCol != null)
                     Identifiers.validate(sinkFilenameCol, "sinks[].filename_column");
                 b.sinks.add(new PipelineConfig.Sink(
@@ -1163,11 +1164,6 @@ final class PipelineConfigParser {
     }
 
     /** Trim a config value to a String; {@code null}/blank ⇒ {@code null}. */
-    private static String blankToNull(Object v) {
-        if (v == null) return null;
-        String s = String.valueOf(v).trim();
-        return s.isEmpty() ? null : s;
-    }
 
     /**
      * A single-character dialect option ({@code quote}/{@code escape}/{@code comment}): empty/absent
@@ -1464,11 +1460,11 @@ final class PipelineConfigParser {
         if (!frontend.equals("xlsx") && !frontend.equals("excel")) return null;
         Map<String, Object> x = (csv.get("xlsx") instanceof Map<?, ?> xm)
                 ? (Map<String, Object>) xm : Map.of();
-        String sheet = blankToNull(x.get("sheet"));
+        String sheet = trimToNull(x.get("sheet"));
         if (x.containsKey("sheet") && sheet == null)
             throw new IllegalArgumentException("xlsx.sheet must name a sheet when present (or be omitted "
                     + "for the workbook's first sheet)");
-        String range = blankToNull(x.get("range"));
+        String range = trimToNull(x.get("range"));
         if (range != null && !XLSX_RANGE.matcher(range).matches())
             throw new IllegalArgumentException("xlsx.range must be an A1-style cell or span "
                     + "(e.g. B2 or A1:F100), got '" + range + "'");
@@ -1509,7 +1505,7 @@ final class PipelineConfigParser {
                 : recordSplitCfg.equalsIgnoreCase("blank_line") ? "\n\n"
                 : recordSplitCfg;
 
-        String pattern = blankToNull(tr.get("pattern"));
+        String pattern = trimToNull(tr.get("pattern"));
         if (pattern == null)
             throw new IllegalArgumentException("text_regex.pattern is required");
 

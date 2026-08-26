@@ -6,6 +6,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import static com.gamma.util.Values.blankToNull;
 
 /**
  * Cross-component referential-integrity rules (System Maintenance MNT-7/MNT-16), shared by the
@@ -29,10 +30,10 @@ public final class ComponentIntegrity {
         Set<String> queries = names(byType.getOrDefault("query", List.of()));
         Set<String> widgets = names(byType.getOrDefault("widget", List.of()));
         for (ComponentRegistry.Component w : byType.getOrDefault("widget", List.of())) {
-            String datasetId = str(w.content().get("datasetId"));
+            String datasetId = blankToNull(w.content().get("datasetId"));
             if (datasetId != null && !datasets.contains(datasetId))
                 findings.add("broken reference: widget '" + w.name() + "' → missing dataset '" + datasetId + "'");
-            String queryId = str(w.content().get("queryId"));
+            String queryId = blankToNull(w.content().get("queryId"));
             if (queryId != null && !queries.contains(queryId))
                 findings.add("broken reference: widget '" + w.name() + "' → missing query '" + queryId + "'");
         }
@@ -40,7 +41,7 @@ public final class ComponentIntegrity {
             if (!(d.content().get("tiles") instanceof List<?> tiles)) continue;
             for (Object t : tiles) {
                 if (!(t instanceof Map<?, ?> tile)) continue;
-                String widgetId = str(tile.get("widgetId"));
+                String widgetId = blankToNull(tile.get("widgetId"));
                 if (widgetId != null && !widgets.contains(widgetId))
                     findings.add("broken reference: dashboard '" + d.name() + "' tile → missing widget '" + widgetId + "'");
             }
@@ -51,8 +52,8 @@ public final class ComponentIntegrity {
             if (r.content().get("datasets") instanceof List<?> ds) {
                 for (Object o : ds) if (o != null) sides.add(o.toString());
             } else {
-                String left = str(r.content().get("leftDataset"));
-                String right = str(r.content().get("rightDataset"));
+                String left = blankToNull(r.content().get("leftDataset"));
+                String right = blankToNull(r.content().get("rightDataset"));
                 if (left != null) sides.add(left);
                 if (right != null) sides.add(right);
             }
@@ -85,7 +86,7 @@ public final class ComponentIntegrity {
             for (ComponentRegistry.Component c : byType.getOrDefault(type, List.of())) {
                 String targetType = String.valueOf(c.content().getOrDefault("targetType", "pipeline"));
                 if (!"pipeline".equalsIgnoreCase(targetType)) continue;
-                String target = str(c.content().get("target"));
+                String target = blankToNull(c.content().get("target"));
                 if (target != null && !ids.contains(target.trim().toLowerCase()))
                     findings.add("broken reference: " + type + " '" + c.name() + "' → missing pipeline '"
                             + target.trim() + "'");
@@ -115,9 +116,5 @@ public final class ComponentIntegrity {
         Set<String> out = new HashSet<>();
         for (ComponentRegistry.Component c : list) out.add(c.name());
         return out;
-    }
-
-    private static String str(Object o) {
-        return o == null || String.valueOf(o).isBlank() ? null : String.valueOf(o);
     }
 }

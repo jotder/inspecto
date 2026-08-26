@@ -14,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import static com.gamma.util.Values.blankToNull;
 
 /**
  * Read side of the signal ledger (job-framework §8.1, R6): query the shared {@link EventStore} for
@@ -163,9 +164,5 @@ public final class Signals {
             if (s.causationId() == null) return false;
         }
         return false;
-    }
-
-    private static String blankToNull(String s) {
-        return s == null || s.isBlank() ? null : s;
     }
 }

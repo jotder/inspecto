@@ -15,6 +15,7 @@ import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import static com.gamma.util.Values.trimOrEmpty;
 
 /**
  * XML as a {@link ParserPlugin} — the reference custom-Java parser, registered via
@@ -71,7 +72,7 @@ public final class XmlParserPlugin implements ParserPlugin {
         if (sample == null || sample.length == 0)
             throw new IllegalArgumentException("sample content is required");
         Map<String, Object> xml = sub(grammar, "xml");
-        String recordPath = str(xml.get("record_element"));
+        String recordPath = trimOrEmpty(xml.get("record_element"));
         int maxRecords = clampRecords(xml.get("max_records"));
 
         List<ParseResult.Node> records = new ArrayList<>();
@@ -150,7 +151,7 @@ public final class XmlParserPlugin implements ParserPlugin {
         f.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
         f.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "");
         f.setProperty(XMLInputFactory.IS_NAMESPACE_AWARE, bool(xml.get("namespace_aware")));
-        String enc = str(xml.get("encoding"));
+        String enc = trimOrEmpty(xml.get("encoding"));
         ByteArrayInputStream in = new ByteArrayInputStream(sample);
         return enc.isEmpty() ? f.createXMLStreamReader(in) : f.createXMLStreamReader(in, enc);
     }
@@ -231,10 +232,6 @@ public final class XmlParserPlugin implements ParserPlugin {
     private static Map<String, Object> sub(Map<String, Object> grammar, String key) {
         Object v = grammar == null ? null : grammar.get(key);
         return v instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
-    }
-
-    private static String str(Object v) {
-        return v == null ? "" : String.valueOf(v).trim();
     }
 
     private static boolean bool(Object v) {

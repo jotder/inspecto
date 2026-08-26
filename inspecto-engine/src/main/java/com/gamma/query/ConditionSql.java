@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.StringJoiner;
+import static com.gamma.util.Values.strOrEmpty;
 
 /**
  * Renders the structured condition tree authored in the UI (the {@code query-types.ts} shape that
@@ -73,11 +74,11 @@ public final class ConditionSql {
     }
 
     private static boolean isComplete(Map<?, ?> c) {
-        String field = str(c.get("field"));
-        String operator = str(c.get("operator"));
+        String field = strOrEmpty(c.get("field"));
+        String operator = strOrEmpty(c.get("operator"));
         if (field.isEmpty() || operator.isEmpty()) return false;
         if (operator.equals("isNull") || operator.equals("isNotNull")) return true;
-        if (operator.equals("between")) return !str(c.get("value")).isEmpty() && !str(c.get("value2")).isEmpty();
+        if (operator.equals("between")) return !strOrEmpty(c.get("value")).isEmpty() && !strOrEmpty(c.get("value2")).isEmpty();
         Object v = c.get("value");
         return v != null && !String.valueOf(v).isEmpty();
     }
@@ -85,10 +86,10 @@ public final class ConditionSql {
     // ── one leaf ─────────────────────────────────────────────────────────────────
 
     private static String condition(Map<?, ?> c) {
-        String f = ident(str(c.get("field")));
-        String operator = str(c.get("operator"));
-        String value = str(c.get("value"));
-        String value2 = str(c.get("value2"));
+        String f = ident(strOrEmpty(c.get("field")));
+        String operator = strOrEmpty(c.get("operator"));
+        String value = strOrEmpty(c.get("value"));
+        String value2 = strOrEmpty(c.get("value2"));
         return switch (operator) {
             // ConditionTree treats null and '' alike for the null checks
             case "isNull" -> "(" + f + " IS NULL OR CAST(" + f + " AS VARCHAR) = '')";
@@ -182,9 +183,5 @@ public final class ConditionSql {
 
     private static String lit(String v) {
         return "'" + v.replace("'", "''") + "'";
-    }
-
-    private static String str(Object v) {
-        return v == null ? "" : String.valueOf(v);
     }
 }

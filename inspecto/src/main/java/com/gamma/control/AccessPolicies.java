@@ -20,6 +20,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import static com.gamma.util.Values.trimOrEmpty;
 
 /**
  * Access Policies — authorable allow/deny statements over subject/resource/environment attributes
@@ -140,9 +141,9 @@ public final class AccessPolicies {
         for (Object o : raw) {
             if (!(o instanceof Map<?, ?> policy))
                 throw new ApiException(422, "every policy must be an object {name, effect, target?, when?}");
-            String name = WriteGates.safeName(str(policy.get("name")).toLowerCase(Locale.ROOT), "policy name");
+            String name = WriteGates.safeName(trimOrEmpty(policy.get("name")).toLowerCase(Locale.ROOT), "policy name");
             if (!seen.add(name)) throw new ApiException(422, "duplicate policy '" + name + "'");
-            String effect = str(policy.get("effect"));
+            String effect = trimOrEmpty(policy.get("effect"));
             if (!EFFECTS.contains(effect))
                 throw new ApiException(422, "policy '" + name + "': effect must be one of " + EFFECTS);
             Set<String> actions = Set.of();
@@ -159,7 +160,7 @@ public final class AccessPolicies {
                 resourceKinds = targetValues(name, "resourceKinds",
                         target.containsKey("resourceKinds") ? target.get("resourceKinds") : target.get("resource_kinds"));
             }
-            String when = str(policy.get("when"));
+            String when = trimOrEmpty(policy.get("when"));
             if (when.length() > MAX_CONDITION_LENGTH)
                 throw new ApiException(422, "policy '" + name + "': 'when' is too long (max "
                         + MAX_CONDITION_LENGTH + " chars)");
@@ -186,7 +187,7 @@ public final class AccessPolicies {
             throw new ApiException(422, "policy '" + policy + "': too many " + field + " (max " + MAX_TARGET_VALUES + ")");
         Set<String> out = new LinkedHashSet<>();
         for (Object v : values) {
-            String value = str(v).toLowerCase(Locale.ROOT);
+            String value = trimOrEmpty(v).toLowerCase(Locale.ROOT);
             if (value.isBlank()) throw new ApiException(422, "policy '" + policy + "': blank " + field + " entry");
             out.add(value);
         }
@@ -213,9 +214,5 @@ public final class AccessPolicies {
         }).toList();
         AtomicFiles.write(configRoot.resolve(FILE),
                 JToon.encode(Map.of("policies", rows)).getBytes(StandardCharsets.UTF_8), ".access-policies-");
-    }
-
-    private static String str(Object v) {
-        return v == null ? "" : String.valueOf(v).trim();
     }
 }

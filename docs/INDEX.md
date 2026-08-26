@@ -75,6 +75,11 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- [`superpower/java-simplification-plan.md`](superpower/java-simplification-plan.md) — **PLAN, grounded
+  2026-08-26, not started.** Intra-module Java simplification in 6 slices (+1 operator-gated): shared
+  helper consolidation into `inspecto-util`, a generic `SpiLoader`, route-module convergence, typed
+  access over `Map<String,Object>`, codec/validator seam, god-class decomposition. Excludes AI modules;
+  the module map itself is settled and untouched.
 - [`superpower/mid-branch-transforms-design.md`](superpower/mid-branch-transforms-design.md) — **DESIGN
   ONLY, not scheduled** (2026-08-26). The last branch-aware-executor residual that is genuinely unbuilt:
   letting a `route:` branch carry its own `steps:` sub-chain. Records the four decisions it needs and the
@@ -352,7 +357,8 @@ former root reference docs** (each index lists them):
   timezone-governs-scheduling, D8 authorable `reference:` block, the agent-tool `flow` argument, bare-word
   `flow` identifiers) are in [`BACKLOG.md`](BACKLOG.md). What it left behind, all still live:
   the four-pass vocabulary guard (`tools/check-vocabulary.mjs` — docs, TOON keys, knowledge trees, Java/TS
-  identifiers), `NodeConfigNameContractTest` (a declared key must reach its engine field), and
+  identifiers **and, since 2026-08-26, the operator-visible MESSAGES** — a 4xx body, a Signal message, an
+  attribute description or a template label), `NodeConfigNameContractTest` (a declared key must reach its engine field), and
   `NodeAttributesContractTest` + the committed `node-attributes.contract.json` (the server publishes the node
   cfg vocabulary; client and server are byte-compared).
 

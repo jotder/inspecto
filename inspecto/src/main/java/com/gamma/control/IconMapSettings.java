@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import static com.gamma.util.Values.trimToNull;
 
 /**
  * Per-space configurable processor-icon map — keyed by a processor <em>type</em> string ({@code parser.dsv})
@@ -43,8 +44,8 @@ record IconMapSettings(Map<String, Rule> rules) {
             Map<String, Rule> rules = new LinkedHashMap<>();
             for (Map.Entry<String, Object> e : m.entrySet()) {
                 if (!(e.getValue() instanceof Map<?, ?> sub)) continue;
-                String glyph = str(((Map<String, Object>) sub).get("glyph"));
-                String color = str(((Map<String, Object>) sub).get("color"));
+                String glyph = trimToNull(((Map<String, Object>) sub).get("glyph"));
+                String color = trimToNull(((Map<String, Object>) sub).get("color"));
                 if (glyph != null && color != null) rules.put(e.getKey(), new Rule(glyph, color));
             }
             return new IconMapSettings(rules);
@@ -63,11 +64,5 @@ record IconMapSettings(Map<String, Rule> rules) {
             m.put(key, sub);
         });
         return m;
-    }
-
-    private static String str(Object v) {
-        if (v == null) return null;
-        String s = v.toString().trim();
-        return s.isEmpty() ? null : s;
     }
 }

@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import static com.gamma.util.Values.trimToNull;
 
 /**
  * A root-cause-analysis template — an ordered list of named sections an investigator fills in, the
@@ -46,10 +47,10 @@ public record RcaTemplate(String name, List<String> sections) {
     /** Parse + validate from a decoded {@code rca { … }} map (or the request body of {@code POST …/rca}). */
     public static RcaTemplate fromMap(Map<String, Object> rca) {
         if (rca == null) throw new IllegalArgumentException("missing 'rca' block");
-        String name = str(rca.get("name"));
+        String name = trimToNull(rca.get("name"));
         List<String> sections = new ArrayList<>();
         Object secs = rca.get("sections");
-        if (secs instanceof List<?> list) for (Object o : list) { String v = str(o); if (v != null) sections.add(v); }
+        if (secs instanceof List<?> list) for (Object o : list) { String v = trimToNull(o); if (v != null) sections.add(v); }
         return new RcaTemplate(name, sections);
     }
 
@@ -59,11 +60,5 @@ public record RcaTemplate(String name, List<String> sections) {
         m.put("name", name);
         m.put("sections", sections);
         return m;
-    }
-
-    private static String str(Object v) {
-        if (v == null) return null;
-        String s = String.valueOf(v).trim();
-        return s.isEmpty() ? null : s;
     }
 }

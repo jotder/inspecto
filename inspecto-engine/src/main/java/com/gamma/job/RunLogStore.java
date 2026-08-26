@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
+import static com.gamma.util.Values.fileSafe;
 
 /**
  * Append-only JSONL persistence for {@link RunLog} entries (P0, {@code docs/job-framework-design.md}
@@ -32,7 +33,7 @@ final class RunLogStore {
     void append(RunLogEntry entry) {
         try {
             Files.createDirectories(dir);
-            Files.writeString(dir.resolve(safe(entry.runId()) + ".jsonl"),
+            Files.writeString(dir.resolve(fileSafe(entry.runId()) + ".jsonl"),
                     JSON.writeValueAsString(entry) + "\n",
                     StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         } catch (IOException | RuntimeException e) {
@@ -42,7 +43,7 @@ final class RunLogStore {
 
     /** All entries for one run in write order; empty if the run logged nothing. */
     List<RunLogEntry> read(String runId) {
-        Path f = dir.resolve(safe(runId) + ".jsonl");
+        Path f = dir.resolve(fileSafe(runId) + ".jsonl");
         if (!Files.isRegularFile(f)) return List.of();
         List<RunLogEntry> out = new ArrayList<>();
         try {
@@ -53,9 +54,5 @@ final class RunLogStore {
             throw new UncheckedIOException("run-log read failed for " + runId, e);
         }
         return out;
-    }
-
-    private static String safe(String runId) {
-        return runId == null ? "_" : runId.replaceAll("[^A-Za-z0-9_.-]", "_");
     }
 }

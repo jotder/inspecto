@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import static com.gamma.util.Values.blankToNull;
 
 /**
  * Per-space UI branding — the sidebar logo (an inline {@code data:} URL), the caption beneath it, and the
@@ -45,9 +46,5 @@ record BrandingSettings(String logoDataUrl, String caption, String footerText) {
         } catch (Exception e) {
             return EMPTY;
         }
-    }
-
-    private static String blankToNull(String s) {
-        return (s == null || s.isBlank()) ? null : s;
     }
 }

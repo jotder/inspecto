@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import static com.gamma.util.Values.str;
 
 /**
  * <b>The recipe compiler (ELT amendment Phase 2, §2.1/§4):</b> compiles the linear authoring shape —
@@ -435,9 +436,5 @@ public final class RecipeCompiler {
         String s = v.toString().trim();
         if (s.startsWith(plural)) s = singular + s.substring(plural.length());
         cfg.put(key, s);
-    }
-
-    private static String str(Object v) {
-        return v == null ? null : v.toString();
     }
 }

@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
+import static com.gamma.util.Values.blankToNull;
 
 /**
  * The {@code metadata_validate} maintenance task (System Maintenance MNT-7): a read-only
@@ -88,7 +89,7 @@ final class MetadataValidateTask {
         if (dataDir == null || dataDir.isBlank() || !Files.isDirectory(Path.of(dataDir))) return;
         Path root = Path.of(dataDir).toAbsolutePath().normalize();
         for (ComponentRegistry.Component d : datasets) {
-            String ref = str(d.content().get("physicalRef"));
+            String ref = blankToNull(d.content().get("physicalRef"));
             if (ref == null) continue;
             Path resolved = root.resolve(ref.replace('\\', '/')).normalize();
             if (!resolved.startsWith(root)) {
@@ -119,12 +120,12 @@ final class MetadataValidateTask {
                     .filter(f -> !f.startsWith(writeRoot.resolve("registry"))).toList()) {
                 try {
                     Map<String, Object> raw = ConfigCodec.toMap(Files.readString(p));
-                    String explicit = str(raw.get("id"));
+                    String explicit = blankToNull(raw.get("id"));
                     if (explicit != null) {
                         ids.add(explicit.trim());
                         continue;
                     }
-                    String name = str(raw.get("name"));
+                    String name = blankToNull(raw.get("name"));
                     if (name != null) ids.add(name.trim().toLowerCase().replace(' ', '_'));
                 } catch (Exception ignored) {
                     // malformed pipeline file — its own registration path reports that, not this audit
@@ -148,7 +149,7 @@ final class MetadataValidateTask {
                 try {
                     Map<String, Object> raw = ConfigCodec.toMap(Files.readString(p));
                     if (raw.get("triggers") instanceof Map<?, ?> t) {
-                        String on = str(t.get("on_pipeline"));
+                        String on = blankToNull(t.get("on_pipeline"));
                         if (on != null && !ids.contains(on.trim().toLowerCase()))
                             findings.add("broken reference: enrichment '" + name
                                     + "' → missing pipeline '" + on.trim() + "' (triggers.on_pipeline)");
@@ -156,7 +157,7 @@ final class MetadataValidateTask {
                     if (raw.get("references") instanceof Map<?, ?> refs) {
                         for (Map.Entry<?, ?> e : refs.entrySet()) {
                             if (!(e.getValue() instanceof Map<?, ?> rv)) continue;
-                            String ref = str(rv.get("ref"));
+                            String ref = blankToNull(rv.get("ref"));
                             if (ref != null && !ids.contains(ref.trim().toLowerCase()))
                                 findings.add("broken reference: enrichment '" + name
                                         + "' → missing pipeline '" + ref.trim()
@@ -170,9 +171,5 @@ final class MetadataValidateTask {
         } catch (IOException ignored) {
             // unwalkable write root — nothing to scan
         }
-    }
-
-    private static String str(Object o) {
-        return o == null || String.valueOf(o).isBlank() ? null : String.valueOf(o);
     }
 }

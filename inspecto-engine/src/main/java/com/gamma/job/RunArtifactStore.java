@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
+import static com.gamma.util.Values.fileSafe;
 
 /**
  * Append-only JSONL persistence for {@link RunArtifact}s (R7, {@code docs/job-framework-design.md} §10):
@@ -42,7 +43,7 @@ final class RunArtifactStore {
     void append(RunArtifact artifact) {
         try {
             Files.createDirectories(dir);
-            Files.writeString(dir.resolve(safe(artifact.runId()) + ".jsonl"),
+            Files.writeString(dir.resolve(fileSafe(artifact.runId()) + ".jsonl"),
                     JSON.writeValueAsString(artifact) + "\n",
                     StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         } catch (IOException | RuntimeException e) {
@@ -52,7 +53,7 @@ final class RunArtifactStore {
 
     /** All artifacts for one run in write order; empty if the run recorded none. */
     List<RunArtifact> read(String runId) {
-        Path f = dir.resolve(safe(runId) + ".jsonl");
+        Path f = dir.resolve(fileSafe(runId) + ".jsonl");
         if (!Files.isRegularFile(f)) return List.of();
         List<RunArtifact> out = new ArrayList<>();
         try {
@@ -63,9 +64,5 @@ final class RunArtifactStore {
             throw new UncheckedIOException("run-artifact read failed for " + runId, e);
         }
         return out;
-    }
-
-    private static String safe(String runId) {
-        return runId == null ? "_" : runId.replaceAll("[^A-Za-z0-9_.-]", "_");
     }
 }

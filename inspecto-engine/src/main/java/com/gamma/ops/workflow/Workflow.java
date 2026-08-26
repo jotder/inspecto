@@ -17,6 +17,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import static com.gamma.util.Values.trimToNull;
 
 /**
  * A config-driven state machine for an {@link ObjectType} — the "Workflow Engine" of the Operational
@@ -210,13 +211,13 @@ public record Workflow(ObjectType objectType, String initialState, Set<Transitio
     @SuppressWarnings("unchecked")
     public static Workflow fromMap(Map<String, Object> wf) {
         if (wf == null) throw new IllegalArgumentException("missing 'workflow' block");
-        ObjectType type = ObjectType.of(str(wf.getOrDefault("object_type", wf.get("objectType"))));
+        ObjectType type = ObjectType.of(trimToNull(wf.getOrDefault("object_type", wf.get("objectType"))));
         if (type == null) throw new IllegalArgumentException("workflow.object_type is required");
-        String initial = str(wf.getOrDefault("initial", wf.get("initial_state")));
+        String initial = trimToNull(wf.getOrDefault("initial", wf.get("initial_state")));
 
         Set<String> terminal = new LinkedHashSet<>();
         Object term = wf.getOrDefault("terminal", wf.get("terminal_states"));
-        if (term instanceof List<?> list) for (Object s : list) if (str(s) != null) terminal.add(str(s));
+        if (term instanceof List<?> list) for (Object s : list) if (trimToNull(s) != null) terminal.add(trimToNull(s));
 
         Set<Transition> transitions = new LinkedHashSet<>();
         Object trs = wf.get("transitions");
@@ -224,7 +225,7 @@ public record Workflow(ObjectType objectType, String initialState, Set<Transitio
             for (Object o : list) {
                 if (o instanceof Map<?, ?> tm) {
                     Map<String, Object> t = (Map<String, Object>) tm;
-                    transitions.add(new Transition(str(t.get("from")), str(t.get("to")), str(t.get("action"))));
+                    transitions.add(new Transition(trimToNull(t.get("from")), trimToNull(t.get("to")), trimToNull(t.get("action"))));
                 }
             }
         }
@@ -234,11 +235,5 @@ public record Workflow(ObjectType objectType, String initialState, Set<Transitio
 
     private static String norm(String s) {
         return (s == null || s.isBlank()) ? null : s.trim().toUpperCase(Locale.ROOT);
-    }
-
-    private static String str(Object v) {
-        if (v == null) return null;
-        String s = String.valueOf(v).trim();
-        return s.isEmpty() ? null : s;
     }
 }

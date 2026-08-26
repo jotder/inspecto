@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import static com.gamma.util.Values.trimOrEmpty;
 
 /**
  * Lens access configuration routes ({@code /access/*} — {@code docs/superpower/lens-access-config-design.md},
@@ -240,15 +241,15 @@ final class AccessRoutes implements RouteModule {
     private static Map<String, Object> validNode(Object nodeObj, Set<String> seen) {
         if (!(nodeObj instanceof Map<?, ?> node))
             throw new ApiException(422, "every catalog node must be an object");
-        String id = WriteGates.safeName(str(node.get("id")), "catalog node id");
+        String id = WriteGates.safeName(trimOrEmpty(node.get("id")), "catalog node id");
         if (!seen.add(id)) throw new ApiException(422, "duplicate catalog node id '" + id + "'");
-        String label = str(node.get("label"));
+        String label = trimOrEmpty(node.get("label"));
         if (label.isBlank()) throw new ApiException(422, "catalog node '" + id + "' requires a 'label'");
-        String kind = str(node.get("kind"));
+        String kind = trimOrEmpty(node.get("kind"));
         if (!NODE_KINDS.contains(kind))
             throw new ApiException(422, "catalog node '" + id + "' has unknown kind '" + kind
                     + "' (expected one of " + NODE_KINDS + ")");
-        String capability = str(node.get("capability"));
+        String capability = trimOrEmpty(node.get("capability"));
         if ("action".equals(kind) && capability.isBlank())
             throw new ApiException(422, "action node '" + id + "' requires a 'capability'");
         if (!capability.isBlank() && !Roles.KNOWN_CAPABILITIES.contains(capability))
@@ -259,8 +260,8 @@ final class AccessRoutes implements RouteModule {
         out.put("label", label.trim());
         out.put("kind", kind);
         if (!capability.isBlank()) out.put("capability", capability.trim());
-        if (!str(node.get("icon")).isBlank()) out.put("icon", str(node.get("icon")).trim());
-        if (!str(node.get("link")).isBlank()) out.put("link", str(node.get("link")).trim());
+        if (!trimOrEmpty(node.get("icon")).isBlank()) out.put("icon", trimOrEmpty(node.get("icon")).trim());
+        if (!trimOrEmpty(node.get("link")).isBlank()) out.put("link", trimOrEmpty(node.get("link")).trim());
         Object children = node.get("children");
         if (children != null) out.put("children", validNodes(children, seen));
         return out;
@@ -280,10 +281,10 @@ final class AccessRoutes implements RouteModule {
     private Object saveProfile(ApiContext api, String id, Map<String, Object> body) throws IOException {
         ComponentStore store = writeStore(api);
         String safeId = WriteGates.safeName(id, "access profile id");
-        String subjectType = str(body.get("subjectType"));
+        String subjectType = trimOrEmpty(body.get("subjectType"));
         if (!SUBJECT_TYPES.contains(subjectType))
             throw new ApiException(422, "access profile requires subjectType " + SUBJECT_TYPES);
-        String subjectId = str(body.get("subjectId"));
+        String subjectId = trimOrEmpty(body.get("subjectId"));
         if (subjectId.isBlank()) throw new ApiException(422, "access profile requires a 'subjectId'");
         if (!safeId.equals(subjectType + "-" + subjectId))
             throw new ApiException(422, "access profile id '" + safeId
@@ -291,7 +292,7 @@ final class AccessRoutes implements RouteModule {
         Map<String, Object> doc = new LinkedHashMap<>();
         doc.put("subjectType", subjectType);
         doc.put("subjectId", subjectId);
-        doc.put("label", str(body.get("label")).isBlank() ? subjectId : str(body.get("label")).trim());
+        doc.put("label", trimOrEmpty(body.get("label")).isBlank() ? subjectId : trimOrEmpty(body.get("label")).trim());
         doc.put("grants", validGrants(body.get("grants")));
         return write(store, PROFILE_TYPE, safeId, doc);
     }
@@ -312,8 +313,8 @@ final class AccessRoutes implements RouteModule {
             throw new ApiException(422, "access profile 'grants' must be an object of nodeId -> allow|deny");
         Map<String, Object> out = new LinkedHashMap<>();
         for (Map.Entry<?, ?> g : grants.entrySet()) {
-            String nodeId = str(g.getKey());
-            String value = str(g.getValue());
+            String nodeId = trimOrEmpty(g.getKey());
+            String value = trimOrEmpty(g.getValue());
             if (nodeId.isBlank()) throw new ApiException(422, "grant with a blank node id");
             if (!GRANT_VALUES.contains(value))
                 throw new ApiException(422, "grant '" + nodeId + "' has value '" + value
@@ -342,9 +343,5 @@ final class AccessRoutes implements RouteModule {
         } catch (IllegalArgumentException e) {
             throw new ApiException(422, e.getMessage());
         }
-    }
-
-    private static String str(Object v) {
-        return v == null ? "" : String.valueOf(v).trim();
     }
 }

@@ -5,6 +5,7 @@ import com.gamma.api.PublicApi;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import static com.gamma.util.Values.str;
 
 /**
  * <b>T32 Phase C — the durable definition of a logical {@code sink.view} store.</b> A {@code sink.view}
@@ -53,6 +54,4 @@ public record ViewDefinition(String store, String flow, List<String> sourceStore
                 str(m.get("store")), pipeline, sources,
                 str(m.get("derived_sql")), str(m.get("defined_at")));
     }
-
-    private static String str(Object o) { return o == null ? null : o.toString(); }
 }

@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import static com.gamma.util.Values.strOrEmpty;
 
 /**
  * <b>The Pipeline Document generator (ELT amendment §5.1, Phase 5 / UI plan S6a):</b> renders a
@@ -62,8 +63,8 @@ public final class PipelineDocument {
     public static String render(String id, Map<String, Object> recipe,
                                 Map<String, Map<String, Object>> components, String fingerprint) {
         StringBuilder md = new StringBuilder();
-        String title = str(id).isEmpty() ? str(recipe.get("name")) : str(id);
-        String configured = str(recipe.get("name"));
+        String title = strOrEmpty(id).isEmpty() ? strOrEmpty(recipe.get("name")) : strOrEmpty(id);
+        String configured = strOrEmpty(recipe.get("name"));
 
         md.append("# Pipeline: ").append(title.isEmpty() ? "(unnamed)" : title).append("\n\n");
 
@@ -164,27 +165,27 @@ public final class PipelineDocument {
      */
     private static void fieldTable(StringBuilder md, Map<String, Object> cfg,
                                    Map<String, Map<String, Object>> components) {
-        List<Map<String, Object>> rules = rows(components.get(str(cfg.get("mapping"))), "rules");
-        List<Map<String, Object>> fields = schemaFields(components.get(str(cfg.get("schema"))));
+        List<Map<String, Object>> rules = rows(components.get(strOrEmpty(cfg.get("mapping"))), "rules");
+        List<Map<String, Object>> fields = schemaFields(components.get(strOrEmpty(cfg.get("schema"))));
         if (rules.isEmpty() && fields.isEmpty()) return;
 
         Map<String, Map<String, Object>> byName = new LinkedHashMap<>();
-        for (Map<String, Object> f : fields) byName.put(str(f.get("name")), f);
+        for (Map<String, Object> f : fields) byName.put(strOrEmpty(f.get("name")), f);
 
         md.append("| Target | Source | Kind | Type | Unit | Description | Classification |\n")
           .append("|---|---|---|---|---|---|---|\n");
 
         Set<String> seen = new java.util.LinkedHashSet<>();
         for (Map<String, Object> r : rules) {
-            String target = str(r.get("targetColumn"));
+            String target = strOrEmpty(r.get("targetColumn"));
             seen.add(target);
             Map<String, Object> f = byName.getOrDefault(target, Map.of());
-            fieldRow(md, target, str(r.get("sourceExpression")),
-                    str(r.get("transformType")).isEmpty() ? "DIRECT" : str(r.get("transformType")), f);
+            fieldRow(md, target, strOrEmpty(r.get("sourceExpression")),
+                    strOrEmpty(r.get("transformType")).isEmpty() ? "DIRECT" : strOrEmpty(r.get("transformType")), f);
         }
         for (Map<String, Object> f : fields) {
-            String n = str(f.get("name"));
-            if (!seen.contains(n)) fieldRow(md, n, str(f.get("selector")), "", f);
+            String n = strOrEmpty(f.get("name"));
+            if (!seen.contains(n)) fieldRow(md, n, strOrEmpty(f.get("selector")), "", f);
         }
         md.append("\n");
     }
@@ -192,17 +193,17 @@ public final class PipelineDocument {
     private static void fieldRow(StringBuilder md, String target, String source, String kind,
                                  Map<String, Object> field) {
         md.append("| ").append(cell(target)).append(" | ").append(cell(source)).append(" | ")
-          .append(cell(kind)).append(" | ").append(cell(str(field.get("type")))).append(" | ")
-          .append(cell(str(field.get("unit")))).append(" | ")
-          .append(cell(str(field.get("description")))).append(" | ")
-          .append(cell(str(field.get("classification")))).append(" |\n");
+          .append(cell(kind)).append(" | ").append(cell(strOrEmpty(field.get("type")))).append(" | ")
+          .append(cell(strOrEmpty(field.get("unit")))).append(" | ")
+          .append(cell(strOrEmpty(field.get("description")))).append(" | ")
+          .append(cell(strOrEmpty(field.get("classification")))).append(" |\n");
     }
 
     /** §5.1's route branch table: name, condition, mode, destination chain. */
     private static void branchTable(StringBuilder md, Map<String, Object> cfg) {
         Map<String, Object> branches = branches(cfg);
         if (branches.isEmpty()) return;
-        String mode = str(cfg.get("mode"));
+        String mode = strOrEmpty(cfg.get("mode"));
         md.append("| Branch | Condition | Mode | Default | Destination |\n|---|---|---|---|---|\n");
         for (Map.Entry<String, Object> e : branches.entrySet()) {
             Map<String, Object> b = asMap(e.getValue());
@@ -308,10 +309,6 @@ public final class PipelineDocument {
 
     private static String code(String s) {
         return s == null || s.isEmpty() ? "" : "`" + s + "`";
-    }
-
-    private static String str(Object o) {
-        return o == null ? "" : String.valueOf(o);
     }
 
     @SuppressWarnings("unchecked")

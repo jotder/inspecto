@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import static com.gamma.util.Values.putIfPresent;
 
 /**
  * <b>The read-side converter (ELT amendment Phase 2 S4, §6 step 1):</b> projects a decoded canonical
@@ -307,9 +308,5 @@ public final class RecipeConverter {
         if (v instanceof Map<?, ?> m)
             for (Map.Entry<?, ?> e : m.entrySet()) copy.put(String.valueOf(e.getKey()), e.getValue());
         return copy;
-    }
-
-    private static void putIfPresent(Map<String, Object> m, String key, Object v) {
-        if (v != null) m.put(key, v);
     }
 }

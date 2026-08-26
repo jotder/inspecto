@@ -13,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import static com.gamma.util.Values.putIfPresent;
 
 /**
  * Compile-back: recovers, from a lifted {@link PipelineGraph}, the execution inputs the existing engine
@@ -355,9 +356,5 @@ public final class PipelineCompiler {
         }
         m.put("fields", fields);
         return m;
-    }
-
-    private static void putIfPresent(Map<String, Object> m, String key, Object v) {
-        if (v != null) m.put(key, v);
     }
 }

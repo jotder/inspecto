@@ -21,6 +21,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
+import static com.gamma.util.Values.intOr;
 
 /**
  * Raw table browser — a per-space "database client" over the space's data
@@ -317,18 +318,6 @@ final class DbBrowserRoutes implements RouteModule {
 
     private static int clampLimit(int l) {
         return Math.max(1, Math.min(MAX_LIMIT, l));
-    }
-
-    private static int intOr(Object v, int def) {
-        if (v instanceof Number n) return n.intValue();
-        if (v != null) {
-            try {
-                return Integer.parseInt(v.toString().trim());
-            } catch (NumberFormatException ignored) {
-                // fall through
-            }
-        }
-        return def;
     }
 
     private static String orDefault(String v, String def) {

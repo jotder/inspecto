@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import static com.gamma.util.Values.blankToNull;
 
 /**
  * Per-space geo/map settings — today just the self-hosted tile-server URL the Geo Map studio points
@@ -40,9 +41,5 @@ record GeoSettings(String tileServerUrl) {
         } catch (Exception e) {
             return EMPTY;
         }
-    }
-
-    private static String blankToNull(String s) {
-        return (s == null || s.isBlank()) ? null : s;
     }
 }

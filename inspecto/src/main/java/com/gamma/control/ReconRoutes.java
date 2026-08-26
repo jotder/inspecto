@@ -15,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import static com.gamma.util.Values.intOr;
 
 /**
  * Reconciliation execution (DAT-7; design {@code docs/superpower/reconciliation-board-design.md}) —
@@ -203,17 +204,5 @@ final class ReconRoutes implements RouteModule {
 
     private static int clamp(int l) {
         return Math.max(1, Math.min(MAX_LIMIT, l));
-    }
-
-    private static int intOr(Object v, int def) {
-        if (v instanceof Number n) return n.intValue();
-        if (v != null) {
-            try {
-                return Integer.parseInt(v.toString().trim());
-            } catch (NumberFormatException ignored) {
-                // fall through to default
-            }
-        }
-        return def;
     }
 }

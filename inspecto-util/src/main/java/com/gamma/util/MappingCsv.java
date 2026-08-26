@@ -12,6 +12,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import static com.gamma.util.Values.strOrEmpty;
 
 /**
  * The Mapping CSV component format (ELT final amendment §3.2, Phase 1): a flat table of mapping
@@ -86,15 +87,11 @@ public final class MappingCsv {
     public static String encode(List<? extends Map<String, ?>> rules) {
         StringBuilder sb = new StringBuilder("targetColumn,sourceExpression,transformType\n");
         for (Map<String, ?> rule : rules) {
-            sb.append(quote(str(rule.get("targetColumn")))).append(',')
-              .append(quote(str(rule.get("sourceExpression")))).append(',')
-              .append(quote(str(rule.get("transformType")))).append('\n');
+            sb.append(quote(strOrEmpty(rule.get("targetColumn")))).append(',')
+              .append(quote(strOrEmpty(rule.get("sourceExpression")))).append(',')
+              .append(quote(strOrEmpty(rule.get("transformType")))).append('\n');
         }
         return sb.toString();
-    }
-
-    private static String str(Object v) {
-        return v == null ? "" : String.valueOf(v);
     }
 
     private static int headerIndex(List<String> header, String canonical, String alias) {

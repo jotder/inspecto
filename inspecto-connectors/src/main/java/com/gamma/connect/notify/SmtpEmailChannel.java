@@ -10,6 +10,7 @@ import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
 import java.util.Date;
 import java.util.Properties;
+import static com.gamma.util.Values.trimToNull;
 
 /**
  * SMTP email delivery channel — sends each notification as a plain-text mail. Lives in the connectors
@@ -62,16 +63,14 @@ public final class SmtpEmailChannel implements NotificationChannel {
     }
 
     SmtpEmailChannel(String host, int port, String from, String to, String user, String pass, boolean starttls) {
-        this.host = blankToNull(host);
+        this.host = trimToNull(host);
         this.port = port;
-        this.from = blankToNull(from) != null ? from.trim() : "inspecto@" + (this.host == null ? "localhost" : this.host);
-        this.to = blankToNull(to);
-        this.user = blankToNull(user);
-        this.pass = blankToNull(pass);
+        this.from = trimToNull(from) != null ? from.trim() : "inspecto@" + (this.host == null ? "localhost" : this.host);
+        this.to = trimToNull(to);
+        this.user = trimToNull(user);
+        this.pass = trimToNull(pass);
         this.starttls = starttls;
     }
-
-    private static String blankToNull(String s) { return s == null || s.isBlank() ? null : s.trim(); }
 
     /**
      * A {@link MimeMessage} that keeps a {@code Message-ID} we set ourselves (D8 correlation).

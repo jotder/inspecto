@@ -1,6 +1,7 @@
 package com.gamma.ops;
 
 import java.util.Locale;
+import static com.gamma.util.Values.trimToNull;
 
 /**
  * A filter + page over the {@link ObjectStore} — the query model behind {@code GET /objects}. Every
@@ -112,12 +113,12 @@ public record ObjectQuery(ObjectType objectType, String status, String severity,
         private boolean oldestFirst = false;
 
         public Builder objectType(ObjectType t) { this.objectType = t; return this; }
-        public Builder status(String s) { this.status = blankToNull(s); return this; }
-        public Builder severity(String s) { this.severity = blankToNull(s); return this; }
-        public Builder assignee(String s) { this.assignee = blankToNull(s); return this; }
-        public Builder owner(String s) { this.owner = blankToNull(s); return this; }
-        public Builder correlationId(String c) { this.correlationId = blankToNull(c); return this; }
-        public Builder textContains(String q) { this.textContains = blankToNull(q); return this; }
+        public Builder status(String s) { this.status = trimToNull(s); return this; }
+        public Builder severity(String s) { this.severity = trimToNull(s); return this; }
+        public Builder assignee(String s) { this.assignee = trimToNull(s); return this; }
+        public Builder owner(String s) { this.owner = trimToNull(s); return this; }
+        public Builder correlationId(String c) { this.correlationId = trimToNull(c); return this; }
+        public Builder textContains(String q) { this.textContains = trimToNull(q); return this; }
         public Builder limit(int n) { this.limit = n; return this; }
         public Builder offset(int n) { this.offset = n; return this; }
         public Builder closedBefore(long epochMillis) { this.closedBefore = epochMillis; return this; }
@@ -126,10 +127,6 @@ public record ObjectQuery(ObjectType objectType, String status, String severity,
         public ObjectQuery build() {
             return new ObjectQuery(objectType, status, severity, assignee, owner, correlationId,
                     textContains, limit, offset, closedBefore, oldestFirst);
-        }
-
-        private static String blankToNull(String s) {
-            return (s == null || s.isBlank()) ? null : s.trim();
         }
     }
 }

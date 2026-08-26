@@ -19,6 +19,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import static com.gamma.util.Values.trimOrEmpty;
 
 /**
  * Role definitions — the role → capabilities/data-scopes table behind every authenticated grant
@@ -213,7 +214,7 @@ public final class Roles {
         for (Object o : raw) {
             if (!(o instanceof Map<?, ?> role))
                 throw new ApiException(422, "every role must be an object {name, capabilities, dataScopes?}");
-            String name = WriteGates.safeName(str(role.get("name")).toLowerCase(Locale.ROOT), "role name");
+            String name = WriteGates.safeName(trimOrEmpty(role.get("name")).toLowerCase(Locale.ROOT), "role name");
             if (out.containsKey(name)) throw new ApiException(422, "duplicate role '" + name + "'");
             out.put(name, new Def(capabilities(name, role.get("capabilities")),
                     dataScopes(name, role.containsKey("dataScopes") ? role.get("dataScopes") : role.get("data_scopes"))));
@@ -227,7 +228,7 @@ public final class Roles {
             throw new ApiException(422, "role '" + role + "': 'capabilities' must be a list");
         Set<String> out = new LinkedHashSet<>();
         for (Object c : caps) {
-            String cap = str(c);
+            String cap = trimOrEmpty(c);
             if (!KNOWN_CAPABILITIES.contains(cap))
                 throw new ApiException(422, "role '" + role + "': unknown capability '" + cap
                         + "' (expected one of " + KNOWN_CAPABILITIES + ")");
@@ -251,7 +252,7 @@ public final class Roles {
             throw new ApiException(422, "too many attributeClaims (max " + MAX_ATTRIBUTE_CLAIMS + ")");
         Set<String> out = new LinkedHashSet<>();
         for (Object c : claims) {
-            String claim = str(c);
+            String claim = trimOrEmpty(c);
             if (claim.isBlank()) throw new ApiException(422, "blank attribute claim name");
             out.add(claim);
         }
@@ -266,7 +267,7 @@ public final class Roles {
             throw new ApiException(422, "role '" + role + "': too many dataScopes (max " + MAX_SCOPES + ")");
         Set<String> out = new LinkedHashSet<>();
         for (Object s : scopes) {
-            String scope = str(s).toLowerCase(Locale.ROOT);
+            String scope = trimOrEmpty(s).toLowerCase(Locale.ROOT);
             if (scope.isBlank())
                 throw new ApiException(422, "role '" + role + "': blank data scope");
             out.add(scope);
@@ -292,9 +293,5 @@ public final class Roles {
             doc.put("identity", Map.of("attribute_claims", List.copyOf(attributeClaims)));
         AtomicFiles.write(configRoot.resolve(FILE),
                 JToon.encode(doc).getBytes(StandardCharsets.UTF_8), ".roles-");
-    }
-
-    private static String str(Object v) {
-        return v == null ? "" : String.valueOf(v).trim();
     }
 }

@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import static com.gamma.util.Values.putIfPresent;
 
 /**
  * The <b>editable</b> lift/lower pair (W5, plan U-A): the graph editor's round-trip over the
@@ -1073,9 +1074,5 @@ public final class PipelineEditable {
             return copy;
         }
         return v;
-    }
-
-    private static void putIfPresent(Map<String, Object> m, String key, Object v) {
-        if (v != null) m.put(key, v);
     }
 }

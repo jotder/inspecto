@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import static com.gamma.util.Values.trimOrEmpty;
 
 /**
  * ASN.1 as a {@link ParserPlugin}, over the {@code asn-facade} module's public bytes-to-records
@@ -104,9 +105,9 @@ public final class Asn1ParserPlugin implements ParserPlugin {
         if (sample == null || sample.length == 0)
             throw new IllegalArgumentException("sample content is required");
         Map<String, Object> asn1 = sub(grammar, "asn1");
-        String grammarText = str(asn1.get("grammar"));
-        String rootType = str(asn1.get("root_type"));
-        Strictness strictness = strictness(str(asn1.get("strictness")));
+        String grammarText = trimOrEmpty(asn1.get("grammar"));
+        String rootType = trimOrEmpty(asn1.get("root_type"));
+        Strictness strictness = strictness(trimOrEmpty(asn1.get("strictness")));
         Framing framing = framing(asn1);
         int maxRecords = clampRecords(asn1.get("max_records"));
 
@@ -280,9 +281,5 @@ public final class Asn1ParserPlugin implements ParserPlugin {
     private static Map<String, Object> sub(Map<String, Object> grammar, String key) {
         Object v = grammar == null ? null : grammar.get(key);
         return v instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
-    }
-
-    private static String str(Object v) {
-        return v == null ? "" : String.valueOf(v).trim();
     }
 }

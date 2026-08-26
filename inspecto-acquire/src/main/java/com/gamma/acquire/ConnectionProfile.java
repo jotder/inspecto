@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TreeMap;
+import static com.gamma.util.Values.trimToNull;
 
 /**
  * A reusable remote-system connection profile (Data Acquisition — connection profiles). One profile describes
@@ -109,19 +110,19 @@ public record ConnectionProfile(String id, String connector, String host, int po
         Tunnel tunnel = null;
         if (c.get("tunnel") instanceof Map<?, ?> t) {
             Map<String, Object> tm = (Map<String, Object>) t;
-            String th = str(tm.get("host"));
-            if (th != null) tunnel = new Tunnel(th, toInt(tm.get("port")), str(tm.get("username")), str(tm.get("password")));
+            String th = trimToNull(tm.get("host"));
+            if (th != null) tunnel = new Tunnel(th, toInt(tm.get("port")), trimToNull(tm.get("username")), trimToNull(tm.get("password")));
         }
         Proxy proxy = null;
         if (c.get("proxy") instanceof Map<?, ?> pr) {
             Map<String, Object> pm = (Map<String, Object>) pr;
-            String ph = str(pm.get("host"));
-            if (ph != null) proxy = new Proxy(str(pm.get("type")), ph, toInt(pm.get("port")),
-                    str(pm.get("username")), str(pm.get("password")));
+            String ph = trimToNull(pm.get("host"));
+            if (ph != null) proxy = new Proxy(trimToNull(pm.get("type")), ph, toInt(pm.get("port")),
+                    trimToNull(pm.get("username")), trimToNull(pm.get("password")));
         }
-        return new ConnectionProfile(str(c.get("id")), str(c.get("connector")), str(c.get("host")),
-                toInt(c.get("port")), str(c.get("database")), basePath(c),
-                str(c.get("username")), str(c.get("password")), options, tunnel, proxy);
+        return new ConnectionProfile(trimToNull(c.get("id")), trimToNull(c.get("connector")), trimToNull(c.get("host")),
+                toInt(c.get("port")), trimToNull(c.get("database")), basePath(c),
+                trimToNull(c.get("username")), trimToNull(c.get("password")), options, tunnel, proxy);
     }
 
     /**
@@ -131,8 +132,8 @@ public record ConnectionProfile(String id, String connector, String host, int po
      * {@code toMap()} → {@code fromMap()} round-trip silently dropped the path.
      */
     private static String basePath(Map<String, Object> c) {
-        String snake = str(c.get("base_path"));
-        return snake != null ? snake : str(c.get("basePath"));
+        String snake = trimToNull(c.get("base_path"));
+        return snake != null ? snake : trimToNull(c.get("basePath"));
     }
 
     /** JSON-ready, <b>secret-masked</b> view (stable key order) for the {@code /connections} API + UI. */
@@ -237,12 +238,6 @@ public record ConnectionProfile(String id, String connector, String host, int po
         if (key == null) return false;
         String k = key.toLowerCase();
         return k.contains("pass") || k.contains("secret") || k.contains("token") || k.contains("key");
-    }
-
-    private static String str(Object v) {
-        if (v == null) return null;
-        String s = String.valueOf(v).trim();
-        return s.isEmpty() ? null : s;
     }
 
     private static int toInt(Object v) {

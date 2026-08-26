@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import static com.gamma.util.Values.strOrEmpty;
 
 /**
  * The semantic / domain layer for a set of data sources, loaded from a {@code *_meta.toon}.
@@ -93,14 +94,14 @@ public record SemanticModel(String name,
     /** Load a {@code *_meta.toon} into a {@code SemanticModel}. */
     public static SemanticModel load(String path) throws IOException {
         Map<String, Object> raw = ToonHelper.load(path);
-        String name = str(raw.getOrDefault("name", ""));
+        String name = strOrEmpty(raw.getOrDefault("name", ""));
 
         Map<String, TableMeta> tables = new LinkedHashMap<>();
         if (raw.get("tables") instanceof Map<?, ?> tm) {
             for (Map.Entry<?, ?> e : tm.entrySet()) {
                 String ref = String.valueOf(e.getKey());
                 if (e.getValue() instanceof Map<?, ?> v) {
-                    tables.put(ref, new TableMeta(ref, str(v.get("description")), str(v.get("grain"))));
+                    tables.put(ref, new TableMeta(ref, strOrEmpty(v.get("description")), strOrEmpty(v.get("grain"))));
                 }
             }
         }
@@ -111,7 +112,7 @@ public record SemanticModel(String name,
                 String kname = String.valueOf(e.getKey());
                 Identifiers.validate(kname, "kpis.<name>");
                 if (e.getValue() instanceof Map<?, ?> v) {
-                    kpis.put(kname, new KpiMeta(kname, str(v.get("definition")), str(v.get("grain")),
+                    kpis.put(kname, new KpiMeta(kname, strOrEmpty(v.get("definition")), strOrEmpty(v.get("grain")),
                             strList(v.get("inputs")), strList(v.get("join_keys"))));
                 }
             }
@@ -123,24 +124,20 @@ public record SemanticModel(String name,
                 String rname = String.valueOf(e.getKey());
                 Identifiers.validate(rname, "reports.<name>");
                 if (e.getValue() instanceof Map<?, ?> v) {
-                    reports.put(rname, new ReportMeta(rname, str(v.get("description")), strList(v.get("uses"))));
+                    reports.put(rname, new ReportMeta(rname, strOrEmpty(v.get("description")), strList(v.get("uses"))));
                 }
             }
         }
 
         DomainNotes domain = DomainNotes.EMPTY;
         if (raw.get("domain") instanceof Map<?, ?> dm) {
-            domain = new DomainNotes(str(dm.get("currency")), str(dm.get("timezone")), strList(dm.get("notes")));
+            domain = new DomainNotes(strOrEmpty(dm.get("currency")), strOrEmpty(dm.get("timezone")), strList(dm.get("notes")));
         }
 
         return new SemanticModel(name, tables, kpis, reports, domain);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────────
-
-    private static String str(Object o) {
-        return o == null ? "" : o.toString();
-    }
 
     /** Parse a JToon list (or comma-separated scalar) into a trimmed, non-blank string list. */
     private static List<String> strList(Object v) {

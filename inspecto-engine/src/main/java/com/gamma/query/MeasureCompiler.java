@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
+import static com.gamma.util.Values.trimToNull;
 
 /**
  * Compiles a headless BI query spec (BI-7) — dataset + measures + dimensions + filters — into one guarded
@@ -58,15 +59,15 @@ public final class MeasureCompiler {
 
     /** Parse the {@code POST /bi/query} body into a validated {@link Spec}. */
     public static Spec parse(Map<String, Object> body, int defaultLimit, int maxLimit) {
-        String dataset = str(body.get("dataset"));
+        String dataset = trimToNull(body.get("dataset"));
         if (dataset == null) throw new IllegalArgumentException("body must include 'dataset'");
 
         List<Measure> measures = new ArrayList<>();
         if (body.get("measures") instanceof List<?> ms)
             for (Object o : ms)
                 if (o instanceof Map<?, ?> m) {
-                    String agg = str(m.get("agg"));
-                    String field = str(m.get("field"));
+                    String agg = trimToNull(m.get("agg"));
+                    String field = trimToNull(m.get("field"));
                     if (agg == null || !AGGS.contains(agg))
                         throw new IllegalArgumentException("unknown aggregation '" + agg + "' (one of " + AGGS + ")");
                     if (!"count".equals(agg)) safeIdent(field, "measure field");
@@ -75,7 +76,7 @@ public final class MeasureCompiler {
 
         List<String> groupBy = new ArrayList<>();
         if (body.get("groupBy") instanceof List<?> gs)
-            for (Object g : gs) groupBy.add(safeIdent(str(g), "groupBy column"));
+            for (Object g : gs) groupBy.add(safeIdent(trimToNull(g), "groupBy column"));
 
         if (measures.isEmpty() && groupBy.isEmpty())
             throw new IllegalArgumentException("spec needs at least one measure or groupBy column");
@@ -83,8 +84,8 @@ public final class MeasureCompiler {
         Map<String, String> grains = new LinkedHashMap<>();
         if (body.get("grains") instanceof Map<?, ?> gm)
             for (Map.Entry<?, ?> e : gm.entrySet()) {
-                String field = safeIdent(str(e.getKey()), "grain column");
-                String grain = str(e.getValue());
+                String field = safeIdent(trimToNull(e.getKey()), "grain column");
+                String grain = trimToNull(e.getValue());
                 if (grain == null || !GRAINS.contains(grain))
                     throw new IllegalArgumentException("unknown time grain '" + grain + "' (one of " + GRAINS + ")");
                 // A grain on a column that is not grouped would silently do nothing — refuse instead.
@@ -97,15 +98,15 @@ public final class MeasureCompiler {
         if (body.get("filters") instanceof List<?> fs)
             for (Object o : fs)
                 if (o instanceof Map<?, ?> f)
-                    filters.add(new Filter(safeIdent(str(f.get("field")), "filter field"),
-                            str(f.get("op")), f.get("value")));
+                    filters.add(new Filter(safeIdent(trimToNull(f.get("field")), "filter field"),
+                            trimToNull(f.get("op")), f.get("value")));
 
         List<Sort> orderBy = new ArrayList<>();
         if (body.get("orderBy") instanceof List<?> os)
             for (Object o : os)
                 if (o instanceof Map<?, ?> s)
-                    orderBy.add(new Sort(safeIdent(str(s.get("field")), "orderBy field"),
-                            "desc".equalsIgnoreCase(str(s.get("dir")))));
+                    orderBy.add(new Sort(safeIdent(trimToNull(s.get("field")), "orderBy field"),
+                            "desc".equalsIgnoreCase(trimToNull(s.get("dir")))));
 
         int limit = body.get("limit") instanceof Number n ? n.intValue() : defaultLimit;
         return new Spec(dataset, measures, groupBy, grains, filters, orderBy,
@@ -182,7 +183,7 @@ public final class MeasureCompiler {
             case ">=", "gte" -> col + " >= " + literal(f.value());
             case "<", "lt" -> col + " < " + literal(f.value());
             case "<=", "lte" -> col + " <= " + literal(f.value());
-            case "like" -> col + " LIKE " + literal(str(f.value()));
+            case "like" -> col + " LIKE " + literal(trimToNull(f.value()));
             case "isNull" -> col + " IS NULL";
             case "notNull" -> col + " IS NOT NULL";
             case "in" -> {
@@ -211,11 +212,5 @@ public final class MeasureCompiler {
 
     private static String q(String ident) {
         return "\"" + ident.replace("\"", "\"\"") + "\"";
-    }
-
-    private static String str(Object v) {
-        if (v == null) return null;
-        String s = v.toString().trim();
-        return s.isEmpty() ? null : s;
     }
 }

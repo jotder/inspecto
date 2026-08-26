@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import static com.gamma.util.Values.strOrEmpty;
 
 /**
  * The lazy operational overlay for the metadata graph, projected from the audit stores the
@@ -90,7 +91,7 @@ public final class CatalogOverlay implements MetadataGraphService.OverlaySource 
         }
 
         String eventType = node.kind() == NodeKind.TABLE
-                ? str(node.attrs().get("eventType")) : "";
+                ? strOrEmpty(node.attrs().get("eventType")) : "";
         List<String> lineage = distinctPartitions(statusStore.lineage(cfg, null), eventType);
 
         return new OperationalOverlay(status, endTime, outRows, outBytes,
@@ -159,9 +160,5 @@ public final class CatalogOverlay implements MetadataGraphService.OverlaySource 
         } catch (NumberFormatException e) {
             return 0;
         }
-    }
-
-    private static String str(Object o) {
-        return o == null ? "" : o.toString();
     }
 }

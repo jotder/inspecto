@@ -8,6 +8,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import static com.gamma.util.Values.trimOrEmpty;
 
 /**
  * Component sharing RBAC (R3, {@code docs/superpower/rbac-abac-plan.md} §3): decides a request's
@@ -122,7 +123,7 @@ public final class ComponentAccess {
 
     private static int level(HttpExchange ex, Map<String, Object> content) {
         if (!(ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject s)) return OWN;  // Personal: fail-open
-        String owner = str(content.get(OWNER));
+        String owner = trimOrEmpty(content.get(OWNER));
         boolean ownerMatch = !owner.isEmpty() && owner.equals(s.id());
         boolean admin = s.capabilities().contains(Roles.CAN_CONFIGURE_ACCESS);
         if (!content.containsKey(SHARES)) return ownerMatch || admin ? OWN : EDIT;  // unrestricted
@@ -132,11 +133,11 @@ public final class ComponentAccess {
         if (content.get(SHARES) instanceof List<?> shares) {
             for (Object o : shares) {
                 if (!(o instanceof Map<?, ?> share)) continue;   // malformed entry grants nothing
-                String subjectType = str(share.get("subjectType"));
-                String subjectId = str(share.get("subjectId"));
+                String subjectType = trimOrEmpty(share.get("subjectType"));
+                String subjectId = trimOrEmpty(share.get("subjectId"));
                 boolean match = ("user".equals(subjectType) && subjectId.equals(s.id()))
                         || ("role".equals(subjectType) && held.contains(subjectId.toLowerCase(Locale.ROOT)));
-                if (match) best = Math.max(best, "edit".equals(str(share.get("access"))) ? EDIT : VIEW);
+                if (match) best = Math.max(best, "edit".equals(trimOrEmpty(share.get("access"))) ? EDIT : VIEW);
             }
         }
         return best;
@@ -147,7 +148,7 @@ public final class ComponentAccess {
     private static boolean ownsEnvelope(HttpExchange ex, Map<String, Object> current) {
         if (!(ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject s)) return true;
         if (s.capabilities().contains(Roles.CAN_CONFIGURE_ACCESS)) return true;
-        String owner = str(current.get(OWNER));
+        String owner = trimOrEmpty(current.get(OWNER));
         return owner.isEmpty() || owner.equals(s.id());
     }
 
@@ -164,7 +165,7 @@ public final class ComponentAccess {
 
     /** Validate the sharing envelope inside {@code content}; throws {@link ApiException} 422. */
     static void validate(Map<String, Object> content) {
-        if (content.containsKey(OWNER) && str(content.get(OWNER)).isEmpty())
+        if (content.containsKey(OWNER) && trimOrEmpty(content.get(OWNER)).isEmpty())
             throw new ApiException(422, "'owner' must be a non-blank subject id");
         if (!content.containsKey(SHARES)) return;
         if (!(content.get(SHARES) instanceof List<?> shares))
@@ -174,18 +175,14 @@ public final class ComponentAccess {
         for (Object o : shares) {
             if (!(o instanceof Map<?, ?> share))
                 throw new ApiException(422, "every share must be an object {subjectType, subjectId, access}");
-            String subjectType = str(share.get("subjectType"));
+            String subjectType = trimOrEmpty(share.get("subjectType"));
             if (!"role".equals(subjectType) && !"user".equals(subjectType))
                 throw new ApiException(422, "share 'subjectType' must be 'role' or 'user', got '" + subjectType + "'");
-            if (str(share.get("subjectId")).isEmpty())
+            if (trimOrEmpty(share.get("subjectId")).isEmpty())
                 throw new ApiException(422, "share 'subjectId' is required");
-            String access = str(share.get("access"));
+            String access = trimOrEmpty(share.get("access"));
             if (!"view".equals(access) && !"edit".equals(access))
                 throw new ApiException(422, "share 'access' must be 'view' or 'edit', got '" + access + "'");
         }
-    }
-
-    private static String str(Object v) {
-        return v == null ? "" : String.valueOf(v).trim();
     }
 }

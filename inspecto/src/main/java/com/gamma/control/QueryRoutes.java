@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import static com.gamma.util.Values.intOr;
 
 /**
  * Query execution ({@code POST /queries/{id}/run}; W4, design §6.2) — the "Query &amp; Results" bounded
@@ -188,17 +189,5 @@ final class QueryRoutes implements RouteModule {
     private static String mapStr(Map<?, ?> m, String key) {
         Object v = m.get(key);
         return v == null || v.toString().isBlank() ? null : v.toString().trim();
-    }
-
-    private static int intOr(Object v, int def) {
-        if (v instanceof Number n) return n.intValue();
-        if (v != null) {
-            try {
-                return Integer.parseInt(v.toString().trim());
-            } catch (NumberFormatException ignored) {
-                // fall through to default
-            }
-        }
-        return def;
     }
 }

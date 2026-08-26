@@ -9,6 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import static com.gamma.util.Values.strOrEmpty;
 
 /**
  * Pure, dependency-free evaluator for the structured condition tree authored in the UI — a faithful
@@ -103,18 +104,18 @@ public final class ConditionTree {
     /** A leaf contributes to the predicate only once it has enough input to evaluate (port of
      *  {@code isComplete}). */
     private static boolean isComplete(Map<String, Object> c) {
-        String field = str(c.get("field"));
-        String operator = str(c.get("operator"));
+        String field = strOrEmpty(c.get("field"));
+        String operator = strOrEmpty(c.get("operator"));
         if (field.isEmpty() || operator.isEmpty()) return false;
         if (operator.equals("isNull") || operator.equals("isNotNull")) return true;
-        if (operator.equals("between")) return !str(c.get("value")).isEmpty() && !str(c.get("value2")).isEmpty();
+        if (operator.equals("between")) return !strOrEmpty(c.get("value")).isEmpty() && !strOrEmpty(c.get("value2")).isEmpty();
         Object v = c.get("value");
         return v != null && !String.valueOf(v).isEmpty();
     }
 
     private static boolean matchCondition(Map<String, Object> c, Map<String, Object> row, Map<String, ColType> types) {
-        String field = str(c.get("field"));
-        String operator = str(c.get("operator"));
+        String field = strOrEmpty(c.get("field"));
+        String operator = strOrEmpty(c.get("operator"));
         Object raw = row.get(field);
         ColType t = types.getOrDefault(field, ColType.STRING);
 
@@ -123,8 +124,8 @@ public final class ConditionTree {
         if (raw == null) return false;
 
         String s = String.valueOf(raw).toLowerCase(Locale.ROOT);
-        String value = str(c.get("value"));
-        String value2 = str(c.get("value2"));
+        String value = strOrEmpty(c.get("value"));
+        String value2 = strOrEmpty(c.get("value2"));
         return switch (operator) {
             case "contains" -> s.contains(value.toLowerCase(Locale.ROOT));
             case "startsWith" -> s.startsWith(value.toLowerCase(Locale.ROOT));
@@ -225,9 +226,5 @@ public final class ConditionTree {
             return ColType.STRING;
         }
         return ColType.STRING;
-    }
-
-    private static String str(Object v) {
-        return v == null ? "" : String.valueOf(v);
     }
 }
