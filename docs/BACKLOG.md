@@ -1364,7 +1364,24 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   actually run on Windows. Remaining under this heading: the *other* non-`PathJail` sites (static
   serving, archive targets, store `fileFor` helpers) still skip the symlink re-check — untidy, not
   decided; schedule by value. ⚠ Nothing pins any of the ~15 — the existing tests (`PathJailTest`,
-  `ConfigSafetyValidatorTest`, `JobPathContainmentTest`) cover only the unified five. |
+  `ConfigSafetyValidatorTest`, `JobPathContainmentTest`) cover only the unified five.
+  **→ GROUNDED 2026-08-26, and the answer is DO NOT BUILD IT: the symlink residual is unreachable at
+  every named site.** Read before scheduling this by value again — the reading is the whole deliverable:
+  · the three store `fileFor` helpers resolve a `SAFE_ID` (letters, digits, `.`, `_`, `-` — **no
+  separator of any kind**), so the target is always a DIRECT CHILD of an already-normalised root and
+  `startsWith` holds by construction; the only escape needs a symlink *inside* the config root, i.e. an
+  actor who can already write there. Same posture, and same honest severity, as the `DataRef` shape rule
+  whose containment branch is unreachable by design.
+  · `ControlApi.serveStatic:830` absolutises **and** normalises `uiDir` at construction (`:243`), so both
+  sides are compared in one frame; a symlink under `-Dui.dir` is operator-placed build output. ⚠ Routing it
+  through `PathJail.contains` would **refuse a legitimate deployment** that symlinks `assets/` onto a
+  shared volume — that is a posture change needing an operator call, not a cleanup.
+  · the archive sites create **no symlink from an archive entry**: `TarUtil.extractTar` sends a symlink
+  entry down the regular-file branch (`Files.newOutputStream`, zero-length data ⇒ an empty FILE), and
+  `BundleImporter.writeConfig` only ever writes bytes. So the attacker-controlled input — an uploaded
+  bundle, the one path that would have made this urgent — cannot plant the link the hole needs.
+  ⇒ What is left is genuinely untidy-only. If it is ever picked up, the value is in the missing **pins**,
+  not in the code. |
   `okf/backend/config/config-safety.md`
   - **Tier 1 (silent-success) SHIPPED 2026-08-14.** `MetadataValidateTask` now emits an *unsafe physical
     reference* finding instead of `continue`-ing — an escaping ref is a **worse** finding than a merely

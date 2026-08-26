@@ -119,6 +119,18 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
 
+- 🔴 **This checkout can be worked by TWO shifts at once, and a shared tree breaks builds in ways that
+  look like code defects.** Observed 2026-08-26: a second agent ran `mvn -o clean test` four minutes into
+  another shift's identical run, and its `clean` wiped `target/` mid-flight ⇒ `NoClassDefFoundError` on a
+  sibling module's class, whole real-HTTP test classes erroring at ~0.004 s each. **That shape means a
+  wiped target, not a broken change.** The same session also saw the tree go red because the other shift
+  had deleted a class (`Values`) that a third module still imported — a transient mid-refactor state, not
+  a regression. And a `git push` answered *"Everything up-to-date"* because the other shift's push had
+  already carried the commit up. **Before trusting any build or git verdict on this box: `git log
+  --oneline -1` (your `HEAD` moves when the other agent commits) and check for an `mvn` process you do
+  not own.** ⛔ Never run two Maven builds on one tree. The durable fix is a worktree per shift.
+  ⚠ A process-poll loop that greps for `mvn.cmd` **matches its own command line** and never reaches
+  zero — match the java process, or exclude the shell wrapper.
 - **The two repo guards are NOT in the local build loop — run them before every commit.** Neither the
   Maven reactor nor `ng test` runs `node tools/check-secrets.mjs` or `node tools/check-vocabulary.mjs`,
   so a violation is invisible until CI. On 2026-08-26 **`master` was found sitting RED** on the
