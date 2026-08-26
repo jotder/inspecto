@@ -134,7 +134,7 @@ public final class PipelineValidator {
         Set<String> ids = checkNodeIdentity(g, issues);
 
         if (g.nodes().isEmpty()) {
-            issues.add(new Issue(Severity.WARNING, EMPTY_GRAPH, "Flow '" + g.name() + "' has no nodes."));
+            issues.add(new Issue(Severity.WARNING, EMPTY_GRAPH, "Pipeline '" + g.name() + "' has no nodes."));
             return new Result(issues);
         }
 
@@ -142,7 +142,7 @@ public final class PipelineValidator {
         detectDataCycle(g, ids, issues);
         if (g.entryNodes().isEmpty()) {
             issues.add(new Issue(Severity.ERROR, NO_ENTRY,
-                    "Flow '" + g.name() + "' has no entry node — every node has an inbound edge, so nothing triggers it."));
+                    "Pipeline '" + g.name() + "' has no entry node — every node has an inbound edge, so nothing triggers it."));
         }
         checkWiring(g, issues, registry);
         return new Result(issues);
@@ -156,7 +156,7 @@ public final class PipelineValidator {
     public static void validateOrThrow(PipelineGraph g) {
         Result r = validate(g);
         if (!r.ok()) {
-            StringBuilder sb = new StringBuilder("Invalid flow '").append(g.name()).append("':");
+            StringBuilder sb = new StringBuilder("Invalid pipeline '").append(g.name()).append("':");
             for (Issue e : r.errors()) sb.append("\n  - [").append(e.code()).append("] ").append(e.message());
             throw new IllegalArgumentException(sb.toString());
         }
@@ -186,7 +186,7 @@ public final class PipelineValidator {
                 if (ids.contains(e.to())) {
                     issues.add(new Issue(Severity.ERROR, ON_COMMIT_SAME_GRAPH,
                             "on_commit edge from '" + e.from() + "' targets node '" + e.to()
-                                    + "' in the same flow — on_commit is cross-flow only; link a downstream flow instead."));
+                                    + "' in the same pipeline — on_commit is cross-pipeline only; link a downstream pipeline instead."));
                 }
             } else if (!ids.contains(e.to())) {
                 issues.add(new Issue(Severity.ERROR, DANGLING_TO,
@@ -224,7 +224,7 @@ public final class PipelineValidator {
                 path.subList(0, path.indexOf(v)).clear();   // trim to the cycle start
                 path.add(v);                                  // close the loop
                 issues.add(new Issue(Severity.ERROR, CYCLE,
-                        "Data-edge cycle (flows must be a DAG — §B7): " + String.join(" -> ", path)));
+                        "Data-edge cycle (pipelines must be a DAG — §B7): " + String.join(" -> ", path)));
                 return true;
             }
             if (!done.contains(v) && dfsCycle(v, adj, visiting, done, stack, issues)) return true;

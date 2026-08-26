@@ -1537,7 +1537,7 @@ public final class PipelineConfig {
         if (active && summarize != null && outputStore == null) {
             throw new IllegalStateException(
                     "processing.summarize does not execute on the linear ingest path — author a top-level "
-                            + "output_store: and run the chain at rest (pipeline_config: flow job), keep "
+                            + "output_store: and run the chain at rest (pipeline_config: pipeline job), keep "
                             + "the pipeline inactive (active: false), or remove the summarize block");
         }
         // processing.dedup joins them 2026-08-11 (operator decision): record-grain dedup is a TRANSFORM
@@ -1552,7 +1552,7 @@ public final class PipelineConfig {
             throw new IllegalStateException(
                     "processing.dedup is a Stage-2 (transform) concern and no longer executes on the "
                             + "linear ingest path — author a top-level output_store: and run it at rest "
-                            + "(pipeline_config: flow job), keep the pipeline inactive (active: false), "
+                            + "(pipeline_config: pipeline job), keep the pipeline inactive (active: false), "
                             + "or remove the dedup block");
         }
         // processing.join (Phase 3 S2) too: the executor exists (RowShaper.join, 2026-08-11), but the
@@ -1561,7 +1561,7 @@ public final class PipelineConfig {
         if (active && join != null && outputStore == null) {
             throw new IllegalStateException(
                     "processing.join does not execute on the linear ingest path — author a top-level "
-                            + "output_store: and run it at rest (pipeline_config: flow job), keep the "
+                            + "output_store: and run it at rest (pipeline_config: pipeline job), keep the "
                             + "pipeline inactive (active: false), or remove the join block");
         }
         // ⚠ An explicit steps: chain arms NOTHING today, and the three guards above cannot catch it.
@@ -1577,7 +1577,7 @@ public final class PipelineConfig {
             if (outputStore == null) {
                 throw new IllegalStateException(
                         "steps: does not execute on the linear ingest path — author a top-level "
-                                + "output_store: and run the chain at rest (pipeline_config: flow job), "
+                                + "output_store: and run the chain at rest (pipeline_config: pipeline job), "
                                 + "or keep the pipeline inactive (active: false)");
             }
             // the at-rest route (PipelineLift.stageTwo) refuses a route step — one output_store cannot

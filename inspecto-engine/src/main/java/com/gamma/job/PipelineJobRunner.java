@@ -191,14 +191,14 @@ public final class PipelineJobRunner implements Job {
         PipelineGraph g;
         if (flatPath != null) {
             if (pipelineIdOpt != null || cfg.opt("flow", null) != null)
-                throw new IllegalArgumentException("flow job '" + cfg.name()
-                        + "' carries both pipeline_config: and pipeline:/flow: — pick one graph source");
+                throw new IllegalArgumentException("pipeline job '" + cfg.name()
+                        + "' carries both pipeline_config: and pipeline:/flow: — pick one graph source");   // vocab-allow: names the two config KEYS, `pipeline:` and the legacy `flow:`
             g = com.gamma.pipeline.PipelineLift.stageTwo(com.gamma.etl.PipelineConfig.load(flatPath));
             pipelineId = g.name();
         } else {
             pipelineId = pipelineIdOpt != null ? pipelineIdOpt : cfg.require("flow");
             g = pipelineStore.get(pipelineId).orElseThrow(() -> new IllegalArgumentException(
-                    "flow job '" + cfg.name() + "' references unknown flow '" + pipelineId + "'"));
+                    "pipeline job '" + cfg.name() + "' references unknown pipeline '" + pipelineId + "'"));
         }
         // Resolve `use:` bindings before anything reads the graph. PipelineStore.get returns the graph as
         // authored — local config only — so a node that references a component (a mapping's rules, a
@@ -279,7 +279,7 @@ public final class PipelineJobRunner implements Job {
             registerViews(g, pipelineId, srcStores, dir);              // T32 Phase C — sink.view → durable definition
             recordStoreArtifacts(artifacts, g, writer.rowsByStore());
             bus.publish(new BatchEvent(cfg.name(), batchId, "SUCCESS", parts, writer.totalRows(), ms, 0));
-            log.info("[FLOWJOB] {} ran flow '{}' (source_store(s) {}): {} file(s), {} row(s) → {}",
+            log.info("[PIPELINEJOB] {} ran pipeline '{}' (source_store(s) {}): {} file(s), {} row(s) → {}",
                     cfg.name(), pipelineId, srcStores, writer.outputs().size(), writer.totalRows(),
                     PipelineStores.produced(g));
             return JobResult.ok(writer.outputs().size() + " file(s), " + writer.totalRows()
@@ -314,7 +314,7 @@ public final class PipelineJobRunner implements Job {
             try (Statement st = conn.createStatement()) {
                 st.execute("CREATE OR REPLACE VIEW \"" + view + "\" AS SELECT * FROM " + sql);
             }
-            log.info("[FLOWJOB] {} resolved reference '{}' for join", cfg.name(), reference);
+            log.info("[PIPELINEJOB] {} resolved reference '{}' for join", cfg.name(), reference);
             return view;
         };
     }
@@ -362,7 +362,7 @@ public final class PipelineJobRunner implements Job {
         for (String store : PipelineStores.produced(g)) {
             int superseded = registry.supersedeOtherRevisions(store, batchId);
             if (superseded > 0)
-                log.info("[FLOWJOB] full recompute of '{}' superseded {} file(s) from earlier revision(s) — "
+                log.info("[PIPELINEJOB] full recompute of '{}' superseded {} file(s) from earlier revision(s) — "
                         + "readers stop naming them now; the bytes go with the next retirement pass",
                         store, superseded);
         }
@@ -383,7 +383,7 @@ public final class PipelineJobRunner implements Job {
             if (!p.restsOnDisk()) continue;
             Path sink = Path.of(dir, p.store()).toAbsolutePath().normalize();
             if (!sink.startsWith(root) || root.equals(sink.getParent())) continue;
-            throw new IllegalArgumentException("flow job '" + cfg.name() + "' sink store '" + p.store()
+            throw new IllegalArgumentException("pipeline job '" + cfg.name() + "' sink store '" + p.store()
                     + "' resolves to '" + sink + "', nested inside the space data root — persistent"
                     + " stores are top-level directories under the data root (a nested store"
                     + " double-counts in recursive dataset reads); drop the data_dir override or point"
@@ -412,18 +412,18 @@ public final class PipelineJobRunner implements Job {
                         .source(PipelineJobRunner.class.getName())
                         .pipeline(pipelineId)
                         .correlationId(batchId)
-                        .message("flow '" + pipelineId + "' node '" + im.node() + "': "
+                        .message("pipeline '" + pipelineId + "' node '" + im.node() + "': "
                                 + im.recordsIn() + " in, " + im.recordsOut() + " out (" + im.kind() + ")")
                         .attr("node", im.node())
                         .attr("recordsIn", im.recordsIn())
                         .attr("recordsOut", im.recordsOut())
                         .attr("kind", im.kind())
                         .build());
-                log.warn("[FLOWJOB] conservation imbalance in flow '{}' at node '{}': {} in, {} out ({})",
+                log.warn("[PIPELINEJOB] conservation imbalance in pipeline '{}' at node '{}': {} in, {} out ({})",
                         pipelineId, im.node(), im.recordsIn(), im.recordsOut(), im.kind());
             }
         } catch (RuntimeException e) {
-            log.warn("[FLOWJOB] conservation check failed for flow '{}': {}", pipelineId, e.getMessage());
+            log.warn("[PIPELINEJOB] conservation check failed for pipeline '{}': {}", pipelineId, e.getMessage());
         }
     }
 
@@ -444,8 +444,8 @@ public final class PipelineJobRunner implements Job {
                 })
                 .toList();
         if (seeds.isEmpty())
-            throw new IllegalArgumentException("flow '" + g.name() + "' declares no '"
-                    + PipelineStores.CONFIG_SOURCE_STORE + "' — a flow job reads data at rest (§3.8)");
+            throw new IllegalArgumentException("pipeline '" + g.name() + "' declares no '"
+                    + PipelineStores.CONFIG_SOURCE_STORE + "' — a pipeline job reads data at rest (§3.8)");
         return seeds;
     }
 
@@ -466,10 +466,10 @@ public final class PipelineJobRunner implements Job {
             String derivedSql = deriveViewSql(g, p.node(), dir).orElse(null);   // single SELECT when expressible
             try {
                 views.write(new ViewDefinition(p.store(), pipelineId, srcStores, derivedSql, now));
-                log.info("[FLOWJOB] registered logical view '{}' (flow '{}', source_store(s) {}){}",
+                log.info("[PIPELINEJOB] registered logical view '{}' (pipeline '{}', source_store(s) {}){}",
                         p.store(), pipelineId, srcStores, derivedSql == null ? "" : " with derived_sql");
             } catch (Exception e) {
-                log.warn("[FLOWJOB] could not register view '{}': {}", p.store(), e.getMessage());
+                log.warn("[PIPELINEJOB] could not register view '{}': {}", p.store(), e.getMessage());
             }
         }
     }

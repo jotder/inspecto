@@ -1025,14 +1025,14 @@ public final class CollectorService implements AutoCloseable {
         List<PipelineGraph> flows = new ArrayList<>();
         for (Path p : registry) configRegistry.configForPath(p).ifPresent(c -> flows.add(PipelineLift.lift(c)));
         // T32: authored flow jobs also produce/consume stores. Include them in the topology and union their
-        // in-flight runs into the active set, so a delete that races an active flow-job reader/writer is
+        // in-flight runs into the active set, so a delete that races an active pipeline-job reader/writer is
         // flagged as a conflict — not just one racing a running pipeline.
         Set<String> active = running;
         if (pipelineStore != null) {
             try {
                 flows.addAll(pipelineStore.list());
             } catch (RuntimeException e) {
-                log.warn("Deletion fence: could not list authored flows ({}): {}",
+                log.warn("Deletion fence: could not list authored pipelines ({}): {}",
                         e.getClass().getSimpleName(), e.getMessage());
             }
             if (jobs != null && !jobs.runningPipelines().isEmpty()) {
@@ -1046,7 +1046,7 @@ public final class CollectorService implements AutoCloseable {
                     c.store(), c.activeProducers(), c.activeConsumers());
             this.eventLog.emit(Event.builder(EventType.STORE_DELETE_CONFLICT)
                     .source(CollectorService.class.getName())
-                    .message("Delete of store '" + c.store() + "' races an active flow")
+                    .message("Delete of store '" + c.store() + "' races an active pipeline")
                     .attr("store", c.store())
                     .attr("activeProducers", String.join(",", c.activeProducers()))
                     .attr("activeConsumers", String.join(",", c.activeConsumers())));

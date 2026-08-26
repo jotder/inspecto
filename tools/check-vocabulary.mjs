@@ -8,9 +8,11 @@
 //      migration.
 //   3. KNOWLEDGE TREES — `docs/okf/**` + `docs/superpower/**`, same rules as pass 1 but allowlisted per
 //      `<path>::<ruleId>` (DOC_ALLOW). Added 2026-08-04; `docs/archived-documents/**` stays excluded.
-//   4. JAVA + TS SOURCE IDENTIFIERS — the surface §3.2 said to land LAST, added 2026-08-04. Bans `flow`
-//      only where it is WELDED to another word (`flowStore`, `FLOW_CONSERVATION`), never the bare word.
-//      See SOURCE_RULES for why that restraint is what makes the pass possible at all.
+//   4. JAVA + TS SOURCE — two rules, added 2026-08-04 and 2026-08-26. `flow-identifier` bans `flow`
+//      only where it is WELDED to another word (`flowStore`, `FLOW_CONSERVATION`); `flow-message` bans
+//      the BARE word inside the text a user reads (string literals, template text), and spares a
+//      contract token by shape. See SOURCE_RULES for why each restraint is what makes its rule
+//      possible at all. Between them: an identifier and a message are covered, a comment is not.
 //
 // Makes the glossary enforceable instead of aspirational: fails the build when a user-facing doc uses a
 // ⛔ banned synonym or commits a known concept-confusion. Born from the 2026-07-07 USER_GUIDE audit, whose
@@ -255,8 +257,10 @@ const CONFIG_ALLOW = {
 //
 // A compound identifier has none of that ambiguity: nobody writes `flowStore` meaning fluid dynamics. So
 // this rule is precise where a word-level rule would be noise — and per this file's own header, a noisy
-// guard gets disabled. Bare `flow` as a standalone local, parameter or javadoc word is left to a later
-// sweep; it needs per-occurrence judgement, not a regex.
+// guard gets disabled. Bare `flow` as a standalone IDENTIFIER (a local, a parameter) is still left to a
+// later sweep; it needs per-occurrence judgement, not a regex. ⚠ That deferral used to cover the bare
+// word everywhere, which quietly left the words a user READS as the least-guarded surface in the repo -
+// closed 2026-08-26 by the `flow-message` rule below, which found 50 of them.
 //
 // Scope is `src/main/**` + the UI app, NOT test sources: test METHOD NAMES are a sentence
 // (`aFlowJobSuccessChainsADownstreamJob`), so they read as prose and carry no contract. Renaming them is
@@ -277,7 +281,111 @@ const SOURCE_RULES = [
         re: /\b(?:[Ff]low(?=[A-Z_])[A-Za-z_]*|[a-z]+Flow[A-Za-z]*|FLOW_[A-Z_]+)\b/g,
         msg: 'The authored DAG is a **Pipeline**, never a "Flow" (GLOSSARY §5). Rename the identifier. If this is the sanctioned lowercase "flow of value" sense (link-analysis max-flow) or a citation of the retired `*_flow.toon` format, put `vocab-allow` on the line or allowlist the file.',
     },
+    {
+        // The pass-4 sibling that closes its own documented hole. `flow-identifier` scans IDENTIFIERS, so a
+        // banned word sitting in a MESSAGE the operator reads — an `ApiException(404, "no authored flow …")`
+        // body, a `Signal.message(…)`, a `ConfigSpecs` attribute description, a template label — was
+        // invisible to every one of the four passes: pass 1 is curated docs, pass 3 is the doc trees, pass 2
+        // is config keys. The words a user actually SEES were the least-guarded surface in the repo.
+        //
+        // What makes the bare word tractable here (this file's header said it "needs per-occurrence
+        // judgement, not a regex" — and for identifiers it does) is that the two senses are separated by
+        // SHAPE, not by judgement: a CONTRACT is always the bare token — `cfg.opt("flow")`, the Tier-3
+        // dual-emit `m.put("flow", …)`, `query(e, "flow")`, the `flow` agent tool argument — while a MESSAGE
+        // is always a sentence. So the rule scans string literals and fires only on one carrying whitespace.
+        // That is why it needs almost no suppressions: the legacy config key, the dual-emit and the tool arg
+        // all pass untouched, and no rename is forced on a contract that outside callers depend on.
+        //
+        // `\bflows?\b` also spares the log tag `[FLOWJOB]` and the temp prefixes `flowjob_` / `.flow-`
+        // (the word is glued to the next character, so there is no trailing boundary), and `workflow` /
+        // `overflow` can never match — the leading `\b` cannot sit inside a word.
+        id: 'flow-message',
+        prepare: (raw, rel) => sentencesOnly(
+            rel.endsWith('.html') ? [templateText(raw)] : stringLiterals(raw.replace(BINDINGS_RE, '')),
+        ),
+        re: /\bflows?\b/gi,
+        msg: 'A message, label or description the operator READS must say **Pipeline**, never "flow" (GLOSSARY §5) — a 4xx body, a Signal message and an attribute description are user-facing text. Keep the word only where it is a CONTRACT (a config key, a query param, an agent tool argument); then put `vocab-allow` on the line, naming the contract, or allowlist the file.',
+    },
 ];
+
+/**
+ * The string literals on one line, concatenated — the only part of a Java/TS line a user can read.
+ *
+ * <p>Scanning literals rather than the raw line is what keeps javadoc, `//` comments and identifiers out of
+ * this rule's way without a stateful comment scanner: prose in a comment carries no quotes, and an
+ * identifier is never inside them. Both quote styles, with escapes honoured so a `\"` inside a literal does
+ * not end it early. Angular template strings are read as literals too (backticks).
+ */
+function stringLiterals(raw) {
+    const out = [];
+    for (const m of raw.matchAll(/"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|`((?:[^`\\]|\\.)*)`/g))
+        out.push(m[1] ?? m[2] ?? m[3] ?? '');
+    return out;
+}
+
+/**
+ * The sentence-shaped fragments only, newline-joined.
+ *
+ * <p>Judged PER FRAGMENT, which is the whole point. Testing the joined text instead would make
+ * `cfg.opt("pipeline", cfg.opt("flow", name))` — two contract tokens on one line — read as a sentence
+ * because the join itself supplied the whitespace, and the rule would then fire on the very shape it
+ * exists to spare. Newline-joined for the mirror reason: a space would let one fragment's tail form a
+ * word with the next one's head.
+ */
+function sentencesOnly(fragments) {
+    return fragments.filter(isSentence).join('\n');
+}
+
+/**
+ * An Angular binding's value is CODE, wherever it is written — a `.html` template or a component's inline
+ * `template:` block. Dropping those attributes before anything else is what keeps a drag-payload key like
+ * `setData('text/flow-node-type', …)` out of this rule: without it the enclosing `(dragstart)="…"`
+ * attribute reads as one long sentence-shaped literal, and the contract inside it looks like prose.
+ */
+const BINDINGS_RE = /[\[(][^\])]*[\])]\s*=\s*"[^"]*"/g;
+
+/**
+ * The reader-visible text of one template line: element text plus plain attribute values, with the
+ * template's CODE removed — `{{ interpolations }}`, bindings, `@if`/`@for`/`@case` control blocks, and the
+ * `flows()` / `.flow` expression fragments left over from a binding that spans lines.
+ *
+ * <p>Everything stripped here is an identifier, which `flow-identifier` already owns; what survives is the
+ * half no rule covered — the label in `matTooltip="…"` and the words between the tags. ⚠ Deliberately
+ * line-local and approximate: a false positive costs one `vocab-allow`, whereas a stateful template parser
+ * inside a guard is a second implementation of Angular's syntax, and it would rot.
+ */
+function templateText(raw) {
+    return raw
+        .replace(/\{\{[^}]*\}?\}?/g, '')     // interpolation (may itself span lines)
+        .replace(BINDINGS_RE, '')            // [prop]="expr" / (event)="handler()"
+        .replace(/@\w+\s*\([^)]*\)?/g, '')   // @if (…) / @for (…) / @case ('flow')
+        .replace(/\bflows?\s*\(/gi, '(')     // a call left over from a multi-line binding
+        .replace(/\.\s*flows?\b/gi, '.');    // a property access, same
+}
+
+/**
+ * The file's text with every COMMENT BODY blanked, newlines preserved so line numbers still line up.
+ *
+ * <p>Comments are why a naive literal scan misreads a file: an apostrophe pair in prose ("T17's … the
+ * flow's most recent read") looks exactly like a single-quoted literal, and a template's `<!-- … -->`
+ * explanation spans lines, so no line-local rule can tell it is inside one. Blanking the spans up front is
+ * stateful where it has to be and costs this rule nothing — a comment is developer text, which
+ * `flow-message` does not police. ⚠ Applied ONLY to the rules that ask for it via `prepare`:
+ * `flow-identifier` still reads the line as authored, so its allowlist keeps meaning what it meant.
+ */
+function maskComments(text, rel) {
+    const blockRe = rel.endsWith('.html') ? /<!--[\s\S]*?-->/g : /\/\*[\s\S]*?\*\//g;
+    return text
+        .replace(blockRe, (m) => m.replace(/[^\n]/g, ' '))   // keep the newlines, drop the words
+        .split(/\r?\n/)
+        .map((l) => (/^\s*(?:\/\/|\*)/.test(l) ? '' : l))    // a whole-line // or javadoc continuation
+        .join('\n');
+}
+
+/** True for a literal/text fragment that reads as a sentence rather than naming a contract token. */
+function isSentence(fragment) {
+    return /\s/.test(fragment);
+}
 
 // Same `<path>::<ruleId>` keying and the same self-retirement as CONFIG_ALLOW: an entry that stops
 // suppressing anything is debt that has been PAID and must be deleted.
@@ -304,6 +412,25 @@ const SOURCE_ALLOW = {
         'Tier-3 debt: calls `constrainedFlow` — see ArgumentDeriver above.',
     'inspecto-ui/src/app/modules/admin/studio/link-analysis/link-analysis-toolbox.component.ts::flow-identifier':
         'NOT a Pipeline: this is graph **max-flow** analysis (`flowFrom`/`flowTo`/`runFlow`), the sanctioned lowercase "flow of value" sense GLOSSARY permits — the same sense as the `circular-flow` motif pattern packs.',
+
+    // ── flow-message: the word survives only where it is a CONTRACT or the max-flow sense ─────────
+    // Every entry here is one of exactly two shapes — an external contract we do not get to rename
+    // unilaterally, or the mathematical "flow of value" sense GLOSSARY permits. A stale doc, a label or a
+    // 4xx body is never allowlisted: those got renamed when this rule landed.
+    'inspecto-intelligence/src/main/java/com/gamma/intelligence/pack/InspectoTools.java::flow-message':
+        'The `flow` AGENT TOOL ARGUMENT and its JSON-schema descriptions — an external contract the model is prompted against, the same Tier-3 debt as this file\'s flow-identifier entry. The messages ("flow is required and must be an object") name that argument, so renaming the prose without dual-accepting the argument would describe a key that does not exist.',
+    'inspecto-ui/src/app/inspecto/mock/handlers/agent.handler.ts::flow-message':
+        'The offline mirror of InspectoTools above — it must answer with the SERVER\'s wording for the `flow` tool argument, or the mock stops reproducing the failure the real backend gives (BACKLOG: the A2 Pipelines adoption shipped broken behind a mock more lenient than the server).',
+
+    // ── the sanctioned lowercase "flow of value" sense: link-analysis max-flow, not a Pipeline ─────
+    'inspecto-ui/src/app/modules/admin/studio/link-analysis/link-analysis-toolbox.component.ts::flow-message':
+        'User-facing labels of the max-flow/min-cut toolbox ("Flow & backbone", "No flow between the two") — the mathematical sense, same as this file\'s flow-identifier entry.',
+    'inspecto-ui/src/app/modules/admin/studio/link-analysis/link-analysis-toolbox.component.html::flow-message':
+        'The template half of the same toolbox ("Max flow / min cut", "circular flow, forwarding loops").',
+    'inspecto-ui/src/app/modules/admin/studio/link-analysis/pattern-packs.ts::flow-message':
+        'The "Circular flow" MOTIF label — a money-movement pattern, the same sanctioned sense as the `circular-flow.toon` pattern packs (which CONFIG_PATH_RULES spares by name).',
+    'inspecto-ui/src/app/inspecto/mock/seeds/seed-utils.ts::flow-message':
+        'The offline seed of that same "Circular flow" motif label.',
 };
 
 /** Committed paths matching a pathspec (repo-relative, forward slashes), or null outside a git checkout. */
@@ -445,10 +572,17 @@ for (const rel of sourceFiles ?? []) {
     } catch {
         continue; // listed by git but absent from the worktree (sparse checkout)
     }
-    text.split(/\r?\n/).forEach((raw, i) => {
+    const lines = text.split(/\r?\n/);
+    // Comment bodies are blanked ONCE per file (stateful — a block comment spans lines) and only the
+    // `prepare`-driven rules read the masked copy; see maskComments.
+    const masked = maskComments(text, rel).split(/\r?\n/);
+    lines.forEach((raw, i) => {
         if (raw.includes('vocab-allow')) return;
         for (const rule of SOURCE_RULES) {
-            for (const m of raw.match(rule.re) ?? []) {
+            // A rule may narrow WHAT it reads on the line — `flow-message` reads only the text a user can
+            // see (string literals, template text); `flow-identifier` reads the line exactly as authored.
+            const scanned = rule.prepare ? rule.prepare(masked[i] ?? raw, rel) : raw;
+            for (const m of scanned.match(rule.re) ?? []) {
                 const allow = `${rel}::${rule.id}`;
                 if (SOURCE_ALLOW[allow]) { usedSourceAllow.add(allow); continue; }
                 sourceViolations.push({ rel, line: i + 1, rule: rule.id, msg: rule.msg, hit: m, src: raw.trim() });

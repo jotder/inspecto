@@ -1463,6 +1463,43 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   verdict. A wrong profile silently swaps `~/.m2`, `~/.claude`, and git's ownership check at once, and
   every symptom it produces looks like a repo defect. `mvn -o -pl inspecto -am install -DskipTests`
   remains a valid fast path, but it is a convenience now, not a workaround.
+- ~~VOCAB-2 — the guard read IDENTIFIERS, so the words a user READS were the least-guarded surface in
+  the repo.~~ **CLOSED 2026-08-26 — new `flow-message` rule + ~50 renamed strings.** Pass 4 scanned
+  identifiers (`flowStore`, `FLOW_CONSERVATION`), pass 1 the curated docs, pass 3 the doc trees, pass 2 the
+  config keys — so a banned word sitting in a **message** was invisible to every one of them: a 404 body
+  (`no authored flow '<id>'`), a 422 (`flow validation failed`, `Invalid flow '<name>'`), the
+  conservation-imbalance **ALERT body** an operator reads in the Incidents UI, `unsafe flow id`,
+  `resolved path escapes the flows root`, the `[FLOWJOB]` log tag, a `ConfigSpecs` **attribute
+  description** rendered in the editor, and three UI labels. Same silent-exemption shape as the secrets
+  guard's `.md` hole (`4acc23be`): **audit a guard's SCOPE separately from its RULES.**
+  🔴 **The load-bearing insight is that the bare word was tractable here after all.** This file's own
+  header had deferred it — "needs per-occurrence judgement, not a regex" — and for identifiers that is
+  true. But a CONTRACT and a MESSAGE are separated by **shape, not judgement**: a contract is always the
+  bare token (`cfg.opt("flow")`, the Tier-3 dual-emit `m.put("flow", …)`, `query(e, "flow")`, the `flow`
+  agent-tool argument), while a message is always a sentence. The rule scans string literals + template
+  text and fires only on a fragment carrying **whitespace**, so the legacy config key, the dual-emit and
+  the tool arg all pass untouched and no rename is forced on a caller-facing key. `\bflows?\b` spares the
+  temp prefixes (`flowjob_`, `.flow-`) for free, and `workflow`/`overflow` can never match.
+  ⚠ **Judged PER FRAGMENT, and that is not a detail:** testing the joined literals of a line would make
+  `cfg.opt("pipeline", cfg.opt("flow", name))` read as a sentence because the *join* supplied the
+  whitespace — the rule would fire on the exact shape it exists to spare.
+  ⚠ **Three false-positive classes were fixed IN THE RULE rather than allowlisted**, because a noisy guard
+  gets switched off (this file's own warning): an apostrophe pair in prose ("T17's … the flow's most
+  recent read") looks exactly like a single-quoted literal; an Angular `<!-- … -->` explanation spans
+  lines, so no line-local rule can see it; and a `(dragstart)="…setData('text/flow-node-type', …)"`
+  binding made a contract inside it read as prose. Comment bodies are now blanked once per file (newlines
+  preserved, so line numbers still point at the offender) and binding values are dropped as the code they
+  are — 86 raw hits → 80 real ones, 6 of them noise.
+  ⚠ Falsified **both ways** before the fixes: a planted contract line (`map.put("flow", name)`) stays
+  green and a planted message (`"no such flow here"`) goes red, in a file that had no prior hit.
+  **Deliberately still open:** bare `flow` as a standalone **identifier** (a local, a parameter) and in
+  **comments** — that half genuinely needs per-occurrence judgement. `[FLOWJOB]` was renamed
+  `[PIPELINEJOB]` even though the glued form escapes both rules, because nothing outside `src/main`
+  referenced it (grepped: no doc, test or script) and half a rename reads as an oversight.
+  Verified: reactor **3643/0/0/5** (19 modules, exit 0), UI **2764 passed / 5 skipped** (exit 0), both
+  guards green. ⚠ The two mirrored FIXTURES were updated with the producers they mirror
+  (`EventObjectBridgeTest`'s imbalance message, `view-preview.dialog.spec.ts`'s mocked 422) — no test
+  asserted a changed string as a contract, which is itself why the drift survived.
 - ~~VOCAB-1 — the vocabulary guard is red on `master`, and silently under-reports.~~ **CLOSED
   2026-08-06 — both halves fixed; the guard is green and can no longer pass vacuously.**
   (a) The violation is gone: the offending table header in `job-parameter-contract-plan.md` meant *where

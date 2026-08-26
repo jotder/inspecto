@@ -113,7 +113,7 @@ export const GRAPH_LAYOUTS: readonly {
     label: string;
     tree: boolean;
 }[] = [
-    { id: 'dagre', label: 'Flow (layered)', tree: false },
+    { id: 'dagre', label: 'Layered', tree: false },
     { id: 'grid', label: 'Grid', tree: false },
     { id: 'force', label: 'Force', tree: false },
     { id: 'force-cluster', label: 'Clustering force', tree: false },

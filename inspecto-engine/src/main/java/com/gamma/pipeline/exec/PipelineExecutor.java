@@ -179,7 +179,7 @@ public final class PipelineExecutor {
         }
 
         if (sinkInputs.isEmpty())
-            throw new IllegalStateException("flow '" + g.name() + "' produced no sink branches downstream of " + seeds.keySet());
+            throw new IllegalStateException("pipeline '" + g.name() + "' produced no sink branches downstream of " + seeds.keySet());
 
         BranchCommitCoordinator.Result commit = coordinator.commit(batchId, new LinkedHashSet<>(sinkInputs.keySet()),
                 branch -> sinkWriter.write(byId.get(branch), sinkInputs.get(branch)),
@@ -304,7 +304,7 @@ public final class PipelineExecutor {
     private static Set<String> ancestorsOf(PipelineGraph g, String stopAt, Map<String, PipelineNode> byId) {
         if (stopAt == null || stopAt.isBlank()) return null;
         if (!byId.containsKey(stopAt))
-            throw new IllegalArgumentException("flow '" + g.name() + "' has no node '" + stopAt + "' to stop at");
+            throw new IllegalArgumentException("pipeline '" + g.name() + "' has no node '" + stopAt + "' to stop at");
         Map<String, List<String>> incoming = new LinkedHashMap<>();
         for (PipelineEdge e : g.edges()) {
             if (PipelineRel.ON_COMMIT.equals(e.rel())) continue;
@@ -346,7 +346,7 @@ public final class PipelineExecutor {
                 if (indegree.merge(m, -1, Integer::sum) == 0) ready.add(m);
         }
         if (order.size() != g.nodes().size())
-            throw new IllegalStateException("flow '" + g.name() + "' is not acyclic over data/route/control edges");
+            throw new IllegalStateException("pipeline '" + g.name() + "' is not acyclic over data/route/control edges");
         return order;
     }
 }

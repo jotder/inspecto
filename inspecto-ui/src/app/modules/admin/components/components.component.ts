@@ -164,7 +164,7 @@ export class ComponentsComponent implements OnInit {
                     e?.status === 503
                         ? 'Writes are disabled (no write root configured).'
                         : e?.status === 409
-                          ? `"${def.name}" is referenced by a flow and can't be deleted.`
+                          ? `"${def.name}" is referenced by a pipeline and can't be deleted.`
                           : apiErrorMessage(e, `Could not delete "${def.name}".`);
                 this.toastr.error(msg);
             },

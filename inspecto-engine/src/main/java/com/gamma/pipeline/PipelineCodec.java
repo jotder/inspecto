@@ -61,9 +61,9 @@ public final class PipelineCodec {
      */
     @SuppressWarnings("unchecked")
     public static PipelineGraph fromMap(Map<String, Object> raw) {
-        if (raw == null) throw new IllegalArgumentException("flow definition is required");
+        if (raw == null) throw new IllegalArgumentException("pipeline definition is required");
         String name = str(raw.get("name"));
-        if (name == null || name.isBlank()) throw new IllegalArgumentException("flow 'name' is required");
+        if (name == null || name.isBlank()) throw new IllegalArgumentException("pipeline 'name' is required");
         boolean active = toBool(raw.get("active"));
 
         List<PipelineNode> nodes = new ArrayList<>();

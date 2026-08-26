@@ -65,7 +65,7 @@ public final class PipelineStore {
         try {
             return Optional.of(PipelineCodec.fromMap(ToonHelper.load(file.toString())));
         } catch (Exception e) {
-            log.warn("Could not load authored flow {}: {}", file, e.getMessage());
+            log.warn("Could not load authored pipeline {}: {}", file, e.getMessage());
             return Optional.empty();
         }
     }
@@ -99,14 +99,14 @@ public final class PipelineStore {
     }
 
     private Path fileFor(String id) {
-        if (id == null) throw new IllegalArgumentException("flow id is required");
+        if (id == null) throw new IllegalArgumentException("pipeline id is required");
         String s = id.trim();
         if (s.contains("..") || !SAFE_ID.matcher(s).matches())
             throw new IllegalArgumentException(
-                    "unsafe flow id '" + id + "' (allowed: letters, digits, '.', '_', '-')");
+                    "unsafe pipeline id '" + id + "' (allowed: letters, digits, '.', '_', '-')");
         Path target = pipelinesRoot.resolve(s + TOON).normalize();
         if (!target.startsWith(pipelinesRoot))
-            throw new IllegalArgumentException("resolved path escapes the flows root");
+            throw new IllegalArgumentException("resolved path escapes the pipeline store root");
         return target;
     }
 }

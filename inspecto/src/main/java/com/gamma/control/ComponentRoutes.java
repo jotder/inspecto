@@ -237,7 +237,7 @@ final class ComponentRoutes implements RouteModule {
         ComponentAccess.requireDelete(ex, type, id, current.content());   // R3: shared ⇒ owner-only delete
         List<String> refs = PipelineReferences.referencedBy(type + "/" + id, PipelineRoutes.liftedPipelines(api.service()));
         if (!refs.isEmpty())
-            throw new ApiException(409, type + " component '" + id + "' is referenced by flow(s): "
+            throw new ApiException(409, type + " component '" + id + "' is referenced by pipeline(s): "
                     + String.join(", ", refs));
         // Deletion fence extends to the Exchange: an offered item still shared with other Spaces cannot be
         // deleted out from under its consumers (fail-closed; revoke the grant(s) first).

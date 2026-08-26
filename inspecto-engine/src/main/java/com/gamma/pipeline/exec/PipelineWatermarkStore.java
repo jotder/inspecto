@@ -40,7 +40,7 @@ public final class PipelineWatermarkStore {
             String v = Files.readString(f, StandardCharsets.UTF_8).strip();
             return v.isEmpty() ? Optional.empty() : Optional.of(v);
         } catch (IOException e) {
-            log.warn("Could not read flow watermark {}: {}", f, e.getMessage());
+            log.warn("Could not read pipeline watermark {}: {}", f, e.getMessage());
             return Optional.empty();
         }
     }

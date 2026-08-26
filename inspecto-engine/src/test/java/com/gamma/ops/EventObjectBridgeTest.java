@@ -28,7 +28,7 @@ class EventObjectBridgeTest {
     private static Event imbalance(String pipeline, String node, String kind, long in, long out) {
         return Event.builder(EventType.PIPELINE_CONSERVATION_IMBALANCE)
                 .pipeline(pipeline)
-                .message("flow '" + pipeline + "' node '" + node + "': " + in + " in, " + out + " out (" + kind + ")")
+                .message("pipeline '" + pipeline + "' node '" + node + "': " + in + " in, " + out + " out (" + kind + ")")
                 .attr("node", node)
                 .attr("kind", kind)
                 .attr("recordsIn", in)
@@ -93,7 +93,7 @@ class EventObjectBridgeTest {
 
         bridge.onEvent(Event.builder(EventType.FLOW_CONSERVATION_IMBALANCE_LEGACY)
                 .pipeline("evt_rollup")
-                .message("flow 'evt_rollup' node 'flt': 3 in, 2 out (LOSS)")
+                .message("pipeline 'evt_rollup' node 'flt': 3 in, 2 out (LOSS)")
                 .attr("node", "flt")
                 .attr("kind", "LOSS")
                 .attr("recordsIn", 3L)

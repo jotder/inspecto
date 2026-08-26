@@ -82,7 +82,7 @@ public final class EventObjectBridge {
 
         String kind = e.attributes().getOrDefault("kind", "imbalance");
         String title = ("LOSS".equals(kind) ? "Data loss" : "Record amplification")
-                + " at node " + node + (pipeline != null ? " in flow " + pipeline : "");
+                + " at node " + node + (pipeline != null ? " in pipeline " + pipeline : "");
         objects.open(ObjectType.ALERT, title, e.message(), "high", pipeline, attrs);
     }
 

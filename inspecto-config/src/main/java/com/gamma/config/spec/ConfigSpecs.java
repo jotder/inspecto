@@ -219,7 +219,7 @@ public final class ConfigSpecs {
                 // inherits its -Dingest.* global when unset — the spec deliberately declares no defaults,
                 // because "absent" must stay distinguishable from "stated" (an absent key inherits live).
                 FieldSpec.of("processing.intake.max_files_per_cycle", "Intake cap (files/cycle)", FieldType.INT,
-                        "This pipeline's admission cap, overriding -Dingest.maxFilesPerCycle; 0 = explicitly unbounded (exempts this flow from a fleet-wide cap). Unset = inherit the global."),
+                        "This pipeline's admission cap, overriding -Dingest.maxFilesPerCycle; 0 = explicitly unbounded (exempts this pipeline from a fleet-wide cap). Unset = inherit the global."),
                 FieldSpec.of("processing.intake.min_files_per_cycle", "Intake cap floor", FieldType.INT,
                         "Floor the adaptive controller may halve this pipeline's cap down to (>= 1). Unset = inherit -Dingest.minFilesPerCycle."),
                 FieldSpec.of("processing.intake.adaptive", "Adaptive intake control", FieldType.BOOL,

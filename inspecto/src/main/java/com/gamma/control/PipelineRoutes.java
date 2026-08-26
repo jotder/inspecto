@@ -291,7 +291,7 @@ final class PipelineRoutes implements RouteModule {
     private Object authoredPipeline(ApiContext api, String id) {
         Path root = pipelinesRootOrNull(api);
         PipelineGraph g = root == null ? null : new PipelineStore(root).get(id).orElse(null);
-        if (g == null) throw new ApiException(404, "no authored flow '" + id + "'");
+        if (g == null) throw new ApiException(404, "no authored pipeline '" + id + "'");
         return PipelineProjection.graph(g);
     }
 
@@ -303,7 +303,7 @@ final class PipelineRoutes implements RouteModule {
     private Object authoredPipelineRaw(ApiContext api, String id) {
         Path root = pipelinesRootOrNull(api);
         PipelineGraph g = root == null ? null : new PipelineStore(root).get(id).orElse(null);
-        if (g == null) throw new ApiException(404, "no authored flow '" + id + "'");
+        if (g == null) throw new ApiException(404, "no authored pipeline '" + id + "'");
         return PipelineCodec.toMap(g);
     }
 
@@ -1349,7 +1349,7 @@ final class PipelineRoutes implements RouteModule {
     /** {@code DELETE /pipelines/authored/{id}} — remove an authored flow; 404 if absent. */
     private Object deletePipeline(ApiContext api, String id) throws IOException {
         PipelineStore store = pipelineStore(api);
-        if (!pipelineExists(store, id)) throw new ApiException(404, "no authored flow '" + id + "'");
+        if (!pipelineExists(store, id)) throw new ApiException(404, "no authored pipeline '" + id + "'");
         boolean removed;
         try {
             removed = store.delete(id);
@@ -1384,7 +1384,7 @@ final class PipelineRoutes implements RouteModule {
         ComponentRegistry registry = api.writeRoot() == null ? null : componentRegistry(api);
         PipelineValidator.Result r = PipelineValidator.validate(g, registry);
         if (!r.ok())
-            throw new ApiException(422, "flow validation failed: " + r.errors().stream()
+            throw new ApiException(422, "pipeline validation failed: " + r.errors().stream()
                     .map(i -> i.code() + " — " + i.message()).toList());
     }
 
@@ -1418,7 +1418,7 @@ final class PipelineRoutes implements RouteModule {
             }
             // W5: the editor now edits registered pipelines too — fall back to the lifted config.
             if (g == null) g = api.service().configFor(id).map(PipelineLift::lift).orElse(null);
-            if (g == null) throw new ApiException(404, "no authored flow '" + id + "'");
+            if (g == null) throw new ApiException(404, "no authored pipeline '" + id + "'");
         }
         try {
             return PipelineDryRun.run(componentRegistry(api).effectiveGraph(g), ApiContext.sampleRows(body),
@@ -1662,7 +1662,7 @@ final class PipelineRoutes implements RouteModule {
      */
     private Object runPipeline(ApiContext api, HttpExchange e, String id) throws IOException {
         Path root = SpaceRoot.pipelinesSubdir(WriteGates.requireWriteRoot(api, "pipeline run"));
-        if (!new PipelineStore(root).exists(id)) throw new ApiException(404, "no authored flow '" + id + "'");
+        if (!new PipelineStore(root).exists(id)) throw new ApiException(404, "no authored pipeline '" + id + "'");
         String runId;
         try {
             runId = api.service().jobServiceOrCreate().triggerPipelineRun(id, ApiContext.query(e, "actor"));
@@ -1670,7 +1670,7 @@ final class PipelineRoutes implements RouteModule {
             // the service booted without a write root, so its flow store never opened — same gate as above
             throw new ApiException(503, ex.getMessage());
         }
-        log.info("[PIPELINE-RUN] ad-hoc run {} of authored flow {}", runId, id);
+        log.info("[PIPELINE-RUN] ad-hoc run {} of authored pipeline {}", runId, id);
         e.getResponseHeaders().set("Location", (ApiContext.v1(e) ? "/api/v1" : "") + "/jobs/runs/" + runId);
         return ApiContext.respondJson(e, 202, Map.of("runId", runId, "pipeline", id, "status", "running"));
     }

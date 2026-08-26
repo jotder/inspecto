@@ -150,7 +150,7 @@ public final class PipelineDryRun {
                     + "' — nothing downstream consumed it, so this run exercised nothing");
         if (!sinks.isEmpty() && sinks.stream().allMatch(s -> s.rowCount() == 0))
             return List.of("no sink received any rows — the sample was filtered or joined away before "
-                    + "reaching an output, so this run cannot tell you the flow writes what you expect");
+                    + "reaching an output, so this run cannot tell you the pipeline writes what you expect");
         return List.of();
     }
 
@@ -194,6 +194,6 @@ public final class PipelineDryRun {
             if (PipelineNodeTypes.isCategory(n.type(), NodeCategory.PARSE)) return n.id();   // any parser subtype (B6)
         }
         if (!g.entryNodes().isEmpty()) return g.entryNodes().get(0).id();
-        throw new IllegalArgumentException("flow '" + g.name() + "' has no parser or entry node to seed the sample at");
+        throw new IllegalArgumentException("pipeline '" + g.name() + "' has no parser or entry node to seed the sample at");
     }
 }

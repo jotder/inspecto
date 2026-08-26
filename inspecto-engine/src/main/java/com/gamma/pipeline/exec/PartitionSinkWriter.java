@@ -77,7 +77,7 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
     @Override
     public void write(PipelineNode sink, String inputTable) throws Exception {
         if (sink.type().endsWith(".view")) {     // logical store — no bytes; PipelineJobRunner registers its definition
-            log.info("[FLOWJOB] sink '{}' ({}) is a logical view — no bytes (definition registered by the flow job)",
+            log.info("[PIPELINEJOB] sink '{}' ({}) is a logical view — no bytes (definition registered by the pipeline job)",
                     sink.id(), sink.type());
             return;
         }
@@ -115,7 +115,7 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
             ConsignmentOutputStores.record(ConsignmentOutputs.fromPartitionCounts(
                     consignmentId, null, store, outs, rowsByPartition,
                     boundsFor(sink, inputTable, partCols), producer));
-        log.info("[FLOWJOB] sink '{}' → store '{}': {} file(s){}",
+        log.info("[PIPELINEJOB] sink '{}' → store '{}': {} file(s){}",
                 sink.id(), store, outs.size(), partCols.isEmpty() ? " (unpartitioned)" : " partitioned by " + partCols);
     }
 
@@ -164,7 +164,7 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
         } catch (Exception e) {
             // Best-effort, like every other addressing column: a store that cannot be measured records no
             // bounds rather than failing a write whose bytes have already landed.
-            log.warn("[FLOWJOB] could not measure event-time bounds over '{}' for sink '{}': {}",
+            log.warn("[PIPELINEJOB] could not measure event-time bounds over '{}' for sink '{}': {}",
                     source, sink.id(), e.getMessage());
             return Map.of();
         }

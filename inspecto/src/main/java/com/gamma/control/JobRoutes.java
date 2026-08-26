@@ -239,14 +239,14 @@ final class JobRoutes implements RouteModule {
      */
     private Object provenanceData(ApiContext api, String flow, String batch) {
         if (flow == null || flow.isBlank() || batch == null || batch.isBlank())
-            throw new ApiException(400, "both 'flow' and 'batch' query params are required");
+            throw new ApiException(400, "both 'flow' and 'batch' query params are required");   // vocab-allow: names the `flow` QUERY PARAM this route reads
         return provenanceStore(api).query(flow, batch);
     }
 
     /** {@code GET /provenance/batches?flow=&limit=} — recent runs of a flow (newest first) to pick one to inspect. */
     private Object provenanceBatches(ApiContext api, String flow, String limit) {
         if (flow == null || flow.isBlank())
-            throw new ApiException(400, "the 'flow' query param is required");
+            throw new ApiException(400, "the 'flow' query param is required");   // vocab-allow: names the `flow` QUERY PARAM this route reads
         return provenanceStore(api).batches(flow, ApiContext.parseIntOr(limit, 20));
     }
 

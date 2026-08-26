@@ -1110,7 +1110,7 @@ Actionable, phase-aligned, derived from §8 + the §13 corrections. `[ ]` = not 
   per-flow-id non-overlap → `SKIPPED` on a re-fire, durable run ledger + `GET /jobs/runs/{runId}` polling,
   `?actor=` attribution), so `GET /jobs` stays config-only while `GET /jobs/{flowId}/runs` still serves the ad-hoc
   history. Response mirrors the jobs trigger: `202 {runId, pipeline, status}` + `Location`. Gates: 503 no
-  write root · 404 missing/unsafe flow id · `canOperateRuns`. **Deliberately NOT `…/run`:** that path is the
+  write root · 404 missing/unsafe pipeline id · `canOperateRuns`. **Deliberately NOT `…/run`:** that path is the
   editor's scratch-only run-to-here contract (`POST …/run?to={nodeId}`) and must never fire a production
   run. **Registered since 2026-08-14** as a `canAuthorWorkbench` *simulate* —
   [`../engine/pipeline-test-run.md`](../engine/pipeline-test-run.md). Tests: `ControlApiPipelineRunTest` (real HTTP, every gate) +

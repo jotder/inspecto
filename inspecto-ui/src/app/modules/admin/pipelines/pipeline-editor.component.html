@@ -270,7 +270,7 @@
                     <span class="text-xs" style="color: var(--gamma-warn)">unsaved changes</span>
                 }
                 @if (lastRunBatch(); as b) {
-                    <span class="text-xs opacity-70" matTooltip="Last recorded run of this flow">
+                    <span class="text-xs opacity-70" matTooltip="Last recorded run of this pipeline">
                         last run: {{ b.totalRows.toLocaleString() }} row(s) · {{ b.runTs }}
                     </span>
                 }
