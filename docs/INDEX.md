@@ -79,12 +79,16 @@ former root reference docs** (each index lists them):
   ONLY, not scheduled** (2026-08-26). The last branch-aware-executor residual that is genuinely unbuilt:
   letting a `route:` branch carry its own `steps:` sub-chain. Records the four decisions it needs and the
   recommendation to leave the refusal in place until a pipeline needs it.
-- [`superpower/d11-resource-caps-plan.md`](superpower/d11-resource-caps-plan.md) — **SHIPPED 2026-08-26**,
-  awaiting the operator's confirmation before it is distilled + archived. Ships BACKLOG **D11**: the measured
+- ~~`superpower/d11-resource-caps-plan.md`~~ — **COMPLETE and ARCHIVED 2026-08-26**
+  (`archived-documents/plans-archive/d11-resource-caps-plan.md`). Shipped BACKLOG **D11**: the measured
   resource pair `memory_limit=2GB` + `maxConcurrentRuns=4`, both on by default and both owned by the server
   configuration (`scheduler.toon` → `GET/PUT /system/scheduler`, UI at Settings ▸ Scheduler ▸ Resource caps).
-  As-built facts belong in [`okf/backend/engine/duckdb.md`](okf/backend/engine/duckdb.md) +
-  [`okf/backend/control-plane/jobs.md`](okf/backend/control-plane/jobs.md), both already updated.
+  Six slices (`67bbf70e`), then the same-day review hardening (`8baa38ee` — the run bound's permit
+  accounting broke on a live resize) and both follow-ups: the cap's **provenance seizure** (`dbac167d`) and
+  the **served memory-limit grammar** + DuckDB's `80%` proportional form (`60ed94f6`). Nothing left open.
+  As-built facts live in [`okf/backend/engine/duckdb.md`](okf/backend/engine/duckdb.md),
+  [`okf/backend/engine/consignment-concurrency.md`](okf/backend/engine/consignment-concurrency.md) and
+  [`okf/backend/control-plane/jobs.md`](okf/backend/control-plane/jobs.md).
 - ~~`superpower/scheduler-system-config-plan.md`~~ — **COMPLETE and ARCHIVED 2026-08-25**
   (`archived-documents/plans-archive/scheduler-system-config-plan.md`). Shipped in six commits
   (`1b872515` → `275bf764`): the `ConcurrencyBroker` four-layer hierarchy (per-Pipeline / per-space /

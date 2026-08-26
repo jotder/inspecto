@@ -45,6 +45,20 @@ The engine embeds DuckDB natively (requires the `--enable-native-access=ALL-UNNA
   **uncapped** and must stay so: only `EnrichmentEngine`, `PipelineJobRunner` (via
   `applyGlobalDuckDbSettings`) and `BatchIngestStrategy` (per-config path) resolve a limit.
   `max_temp_directory_size` still gets **no** default — none is defensible without the volume size.
+  **Same-day review hardening + follow-ups, all shipped 2026-08-26:** the Run bound counts in-flight Runs
+  even while unbounded (🔴 a `Semaphore` subclass that re-derived "did this Run take a permit?" from
+  `cap()` at release ended at **7 permits under a cap of 4, permanently**), the installed bound is
+  process-global so a space created after a PUT starts on it, and clearing it REVERTS rather than freezes.
+  The **memory-limit grammar is served, not mirrored**: `SchedulerRoutes.MEMORY_LIMIT_PATTERN` is published
+  as `duckdbMemoryLimitPattern` and the UI holds no regex of its own (it had two hand-maintained copies —
+  identical when measured, unpinned). ⚠ One string can only serve both sides if it is **portable**: no
+  inline `(?i)` (the browser compiles it with `new RegExp(p, 'i')`, and JS has no such construct) and
+  **explicitly anchored** (`String.matches` anchors implicitly, `RegExp.test` does not — unanchored, the
+  form accepts `2GB of RAM`). **DuckDB's proportional form is accepted** (`80%`), bounded `1..100`
+  *inside* the pattern, because a bound that does not travel with the served grammar lets the form accept
+  a `500%` the PUT refuses. The value is a pass-through to `SET memory_limit='…'` — nothing parses it into
+  bytes, so a non-byte value breaks no arithmetic. 🔴 The offline mock had **no resource-pair gate at all**
+  (it accepted `"lots"` where the server 422s and served neither value); it now mirrors both gates.
 * **Defaults DECIDED 2026-07-25 (BACKLOG D11 + D12).** D12 shipped that day; **D11 was declined that day**
   and stayed unimplemented until 2026-08-26 (history below).
   * **D12 — chunking is ON by default** (SHIPPED): `processing.chunking.max_file_bytes` now defaults to

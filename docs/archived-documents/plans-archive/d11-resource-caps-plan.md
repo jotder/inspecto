@@ -1,6 +1,6 @@
 # D11 — ship the resource-cap pair as server configuration
 
-**Status:** SHIPPED 2026-08-26 — all six slices landed; gates green (reactor 3637/0/0/5, UI 2756/5 exit 0). Ships BACKLOG §2 **D11**, measured 2026-07-27. Distil + archive per the docs lifecycle once the operator confirms.
+**Status:** ✅ COMPLETE + ARCHIVED 2026-08-26 — all six slices, the same-day review hardening (`8baa38ee`), and both BACKLOG follow-ups (served grammar + the `80%` proportional form, `60ed94f6`) are shipped and verified. Nothing on this plan is open. Durable as-built facts live in [`okf/backend/engine/duckdb.md`](../okf/backend/engine/duckdb.md) and [`okf/backend/engine/consignment-concurrency.md`](../okf/backend/engine/consignment-concurrency.md); kept here for provenance only.
 **Decision being executed:** default `memory_limit=2GB` **+** `maxConcurrentRuns=4`, surfaced in the
 UI's server configuration next to the existing concurrency knobs — not as `-D`-only flags.
 
