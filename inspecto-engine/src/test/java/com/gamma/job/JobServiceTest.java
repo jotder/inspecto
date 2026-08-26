@@ -245,6 +245,56 @@ class JobServiceTest {
     }
 
     @Test
+    void runPermitsCountUnboundedRunsAgainstALaterCap() throws Exception {
+        // The over-grant this class shipped with (2026-08-26, fixed same day in review): Runs admitted
+        // while UNBOUNDED released permits they never took, so 0 -> 4 with three Runs in flight ended at
+        // SEVEN permits under a cap of four, permanently. The invariant now: in-flight Runs are counted
+        // even when unbounded, so admissible = cap - inFlight across every resize.
+        JobService.RunPermits p = new JobService.RunPermits(0);
+        p.acquire();
+        p.acquire();
+        p.acquire();                        // three Runs admitted unbounded — no permit taken, all counted
+        p.setCap(4);
+        assertEquals(1, p.available(), "a later cap must see Runs that were admitted unbounded");
+        p.release();
+        p.release();
+        p.release();
+        assertEquals(4, p.available(), "their releases restore exactly the cap — never exceed it");
+    }
+
+    @Test
+    void runPermitsShrinkDrainsInFlightRunsBeforeAdmitting() throws Exception {
+        JobService.RunPermits p = new JobService.RunPermits(4);
+        p.acquire();
+        p.acquire();
+        p.acquire();
+        p.setCap(2);
+        assertEquals(0, p.available(), "a shrink below in-flight admits nothing until enough Runs release");
+        p.release();
+        assertEquals(0, p.available(), "still at the ceiling (2 in flight, cap 2)");
+        p.release();
+        assertEquals(1, p.available());
+    }
+
+    @Test
+    void installedBoundIsWhatANewJobServiceConstructsWith(@TempDir Path dir) throws Exception {
+        // The settings tier installs process-globally so a space created AFTER a PUT starts on the
+        // configured bound, not the -D bootstrap default (the gap review finding #3).
+        try {
+            JobService.installMaxConcurrentRuns(1);
+            try (Scheduler s = new Scheduler();
+                 JobService js = new JobService(List.of(), new BatchEventBus(), s, null, dir.resolve("a").toString())) {
+                assertEquals(1, js.maxConcurrentRuns(), "a new instance starts on the installed bound");
+            }
+            JobService.installMaxConcurrentRuns(null);
+            assertEquals(JobService.DEFAULT_MAX_CONCURRENT_RUNS, JobService.effectiveMaxConcurrentRuns(),
+                "clearing the install reverts to the bootstrap default");
+        } finally {
+            JobService.installMaxConcurrentRuns(null);
+        }
+    }
+
+    @Test
     void concurrencyBoundSerializesRunsAcrossJobs(@TempDir Path dir) throws Exception {
         // With a bound of 1, two different jobs fired at once cannot run concurrently: the second's
         // permit acquire (on its worker thread, not the caller) waits until the first releases.

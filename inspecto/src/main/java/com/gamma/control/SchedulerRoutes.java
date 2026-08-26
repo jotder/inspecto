@@ -234,9 +234,16 @@ final class SchedulerRoutes implements RouteModule {
      */
     private static void installResourceCaps(ApiContext api, SchedulerSettings ss) {
         com.gamma.util.DuckDbUtil.installMemoryLimit(ss.duckdbMemoryLimit());
-        if (ss.maxConcurrentJobRuns() == null || api.spaces() == null) return;
+        // Both halves treat null the same way: CLEAR, revert to the -D bootstrap default. (The first
+        // cut returned early on null, so clearing the stored bound left the old value live while the
+        // GET reported the default — the settings page stated a fact that was false.) The static
+        // install also covers spaces created AFTER this call: a new JobService constructs its bound
+        // from effectiveMaxConcurrentRuns(), so it cannot silently revert to the property.
+        com.gamma.job.JobService.installMaxConcurrentRuns(ss.maxConcurrentJobRuns());
+        if (api.spaces() == null) return;
+        int effective = com.gamma.job.JobService.effectiveMaxConcurrentRuns();
         for (SpaceContext s : api.spaces().all())
-            s.service().jobService().ifPresent(j -> j.setMaxConcurrentRuns(ss.maxConcurrentJobRuns()));
+            s.service().jobService().ifPresent(j -> j.setMaxConcurrentRuns(effective));
     }
 
     /** A DuckDB size string ({@code 2GB}, {@code 512MB}, {@code 1.5GiB}) — or a 422. Empty/null clears the

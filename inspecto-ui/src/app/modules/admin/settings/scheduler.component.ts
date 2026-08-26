@@ -135,9 +135,15 @@ import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/compon
                     <section class="flex flex-col gap-2">
                         <div class="flex items-center gap-3">
                             <h2 class="text-lg font-medium">Resource caps</h2>
-                            <inspecto-chip variant="soft" tone="neutral">{{
-                                view()!.system.duckdbMemoryLimitSource
-                            }}</inspecto-chip>
+                            <!-- The two knobs have INDEPENDENT provenance (a stored memory limit beside an
+                                 inherited Run bound is a normal state), so one section chip would lie about
+                                 half the section — chip each field. -->
+                            <inspecto-chip variant="soft" tone="neutral"
+                                >memory: {{ view()!.system.duckdbMemoryLimitSource }}</inspecto-chip
+                            >
+                            <inspecto-chip variant="soft" tone="neutral"
+                                >runs: {{ view()!.system.maxConcurrentJobRunsSource }}</inspecto-chip
+                            >
                         </div>
                         <p class="text-secondary text-sm">
                             These two work as a pair: total memory at risk is the per-instance limit times the
@@ -316,9 +322,10 @@ export class SchedulerSettingsComponent implements OnInit {
         intakeMin: this.fb.control<number | null>(null, [Validators.min(1), Validators.max(10_000_000)]),
         intakeAdaptive: this.fb.nonNullable.control(''),
         // The resource pair (BACKLOG D11). Blank memory limit = inherit the -D bootstrap default, then
-        // DuckDB's own ~80%-of-RAM-per-instance default. ⚠ The 512MB floor is measured, not arbitrary:
-        // below ~1GB DuckDB's blocking operators HARD-FAIL with OOM instead of spilling, so a tighter
-        // value turns working jobs into failing ones.
+        // DuckDB's own ~80%-of-RAM-per-instance default. ⚠ Numbers, so they don't drift: 512MB is the
+        // measured FAILURE point (blocking operators HARD-FAIL with OOM instead of spilling), ~1GB the
+        // advisory floor shown to the operator, 2GB the shipped default (~2.2x the highest observed
+        // peak). A tighter value turns working jobs into failing ones.
         // Surrounding whitespace is tolerated and trimmed on save — a pasted " 2GB " is a typo the form
         // should absorb, not refuse (the value sent to the server is always trimmed). ⚠ The size group is
         // OPTIONAL so an all-whitespace value stays valid: Validators.pattern only skips a truly empty

@@ -171,6 +171,11 @@ public final class DuckDbUtil {
      * blank, the {@code -D<property>} value applies; when neither is set, {@code null} ⇒
      * {@link #applyDuckDbSettings} leaves DuckDB's own default. Lets a single {@code -Dprocessing.duckdb.*}
      * flag cap every scratch connection uniformly, with no behaviour change when the flag is unset.
+     *
+     * <p>⛔ Do NOT use this for a key the settings tier ({@code scheduler.toon}) serves — a served key
+     * must not also be read from {@code -D} at use time (split ownership; see {@code SchedulerRoutes}).
+     * {@code memory_limit} already moved to {@link #memoryLimit} for exactly that reason; a key added to
+     * the settings tier later must move the same way, not stay here.
      */
     public static String globalOr(String configured, String property) {
         if (notBlank(configured)) return configured;

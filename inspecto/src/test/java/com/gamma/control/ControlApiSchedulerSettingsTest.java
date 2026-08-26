@@ -347,8 +347,23 @@ class ControlApiSchedulerSettingsTest {
             // A nonsense size string is a 422, not a value DuckDB will choke on at run time.
             assertEquals(422, send(c.port, "PUT", "/system/scheduler",
                     "{\"maxConcurrentConsignments\":8,\"duckdbMemoryLimit\":\"lots\"}").statusCode());
+
+            // The Run bound installs process-globally so a later-created space starts on it…
+            assertEquals(4, com.gamma.job.JobService.effectiveMaxConcurrentRuns());
+            assertEquals(200, send(c.port, "PUT", "/system/scheduler",
+                    "{\"maxConcurrentConsignments\":8,\"maxConcurrentJobRuns\":1}").statusCode());
+            assertEquals(1, com.gamma.job.JobService.effectiveMaxConcurrentRuns(),
+                    "the installed bound is what a NEW JobService would construct with");
+            // …and clearing it REVERTS the live default — the first cut returned early on null, leaving
+            // the old bound in force while the GET reported `default` (review finding #2).
+            assertEquals(200, send(c.port, "PUT", "/system/scheduler",
+                    "{\"maxConcurrentConsignments\":8,\"maxConcurrentJobRuns\":null}").statusCode());
+            assertEquals(com.gamma.job.JobService.DEFAULT_MAX_CONCURRENT_RUNS,
+                    com.gamma.job.JobService.effectiveMaxConcurrentRuns(),
+                    "clearing the stored bound must revert, not freeze, the effective value");
         } finally {
             com.gamma.util.DuckDbUtil.installMemoryLimit(null);
+            com.gamma.job.JobService.installMaxConcurrentRuns(null);
             if (priorMem == null) System.clearProperty(com.gamma.util.DuckDbUtil.PROP_MEMORY_LIMIT);
             else System.setProperty(com.gamma.util.DuckDbUtil.PROP_MEMORY_LIMIT, priorMem);
         }

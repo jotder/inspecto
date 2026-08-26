@@ -2159,7 +2159,19 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   `okf/backend/engine/duckdb.md`
 - **D11 — ✅ SHIPPED 2026-08-26 (measured 2026-07-27).** The pair is live and on by default, owned by the
   server configuration and editable at **Settings ▸ Scheduler ▸ Resource caps**; see the §2 D11 row for the
-  as-built shape and the three deliberate non-goals. The measurement that unblocked it is kept below,
+  as-built shape and the three deliberate non-goals. **Same-day review hardening (also shipped):** the run
+  bound is a monitor-based counter that counts in-flight Runs **even while unbounded** (🔴 the first cut's
+  `Semaphore` subclass re-derived "did this Run take a permit?" from `cap()` at release, so `0→4` with 3
+  Runs in flight ended at **7 permits under a cap of 4, permanently**); the installed bound is
+  process-global (`JobService.installMaxConcurrentRuns`) so a space created after a PUT starts on it; and
+  clearing the stored bound now REVERTS the live value instead of freezing it. **Follow-ups, deliberately
+  deferred:** (a) 🔴 *pre-existing, not D11's*: any Save on the Scheduler pane writes
+  `max_concurrent_consignments` into the file, seizing a `-D`-sourced cap's provenance — fix = serve it
+  stored-only + merge per key, the pattern the intake globals and the D11 pair already use; touches the
+  pinned `PUT {}` → 422 test. (b) the memory-size grammar lives in two hand-mirrored regexes (server
+  `requireMemoryLimit`, UI validator) — identical today, verified character-wise, but unpinned; the guard
+  is serving the pattern in the GET (`duckdbMemoryLimitPattern`) and having the UI use it. (c) neither
+  side accepts DuckDB's `80%` proportional form — deliberate for now, revisit only on ask. The measurement that unblocked it is kept below,
   because the *numbers* are the reason `2GB` may not be tightened. ⚠ **Still open, deliberately:** thread/
   core scaling was never measured (DuckDB sizes per-thread buffers, so a much larger box may want more than
   2 GiB), nor were non-CSV frontends — so `2GB` is defensible for hardware like the measured host, not as a
