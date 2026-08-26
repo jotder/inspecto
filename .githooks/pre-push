@@ -5,10 +5,33 @@
 # Enforces:
 #   - HARD-BLOCK a push carrying a probable committed secret (SEC-INCIDENT-1).
 #   - HARD-BLOCK any push whose target ref is a RETIRED/EOL line (1.x, 2.x, 3.x).
+#   - HARD-BLOCK a push that would turn CI red on the canonical-vocabulary guard.
 #   - Prints the merge-forward reminder for supported pushes.
 #
 # Activate once per clone:   git config core.hooksPath .githooks
 # Override (humans only):    UCC_RELEASE_GUARD_DISABLE=1 git push ...   (document the exception)
+
+# ── helper: run one pure-Node repo guard ────────────────────────────────────────
+# Returns 0 when the guard is clean OR cannot run; 1 when it found violations.
+#
+# A missing `node` WARNS rather than blocks. Node is not a hard dependency of a backend-only shift,
+# and a hook that fails every push on some machines gets `core.hooksPath` unset entirely — after
+# which NO layer runs locally, which is strictly worse than skipping one guard. CI is the
+# un-bypassable backstop for both guards.
+#
+# ⚠ stdin is redirected from /dev/null: git feeds this hook the ref list on stdin, and a guard that
+# read it would silently eat the lines the retired-branch loop below depends on.
+run_guard() {
+  script=$1; label=$2; skip_note=$3
+  [ -f "$script" ] || return 0
+  if ! command -v node >/dev/null 2>&1; then
+    echo "pre-push: WARNING — node not found, $label SKIPPED." >&2
+    echo "          $skip_note" >&2
+    return 0
+  fi
+  node "$script" </dev/null || return 1
+  return 0
+}
 
 # ── committed-secret guard (SEC-INCIDENT-1) ─────────────────────────────────────
 # Deliberately ABOVE the release-guard override: UCC_RELEASE_GUARD_DISABLE exists so a human can
@@ -25,21 +48,12 @@
 # then removed within the pushed range — those values are still in the objects you are about to
 # publish. Rewrite such history before pushing; this hook will not see it.
 #
-# Node is not a hard dependency of a backend-only shift, so a missing node WARNS rather than blocks:
-# a hook that fails every push on some machines gets core.hooksPath unset entirely, and then no
-# guard runs at all. CI stays the un-bypassable backstop.
-if [ -f "tools/check-secrets.mjs" ]; then
-  if command -v node >/dev/null 2>&1; then
-    if ! node tools/check-secrets.mjs; then
-      echo "pre-push: refusing to push — the committed-secret guard failed (above)." >&2
-      echo "          A pushed secret cannot be un-pushed: fix it HERE, before it leaves." >&2
-      echo "          If it is genuinely not a secret, append 'secret-allow' on the line." >&2
-      exit 1
-    fi
-  else
-    echo "pre-push: WARNING — node not found, committed-secret guard SKIPPED." >&2
-    echo "          CI still runs it, but only after this push is already public." >&2
-  fi
+if ! run_guard tools/check-secrets.mjs "committed-secret guard" \
+     "CI still runs it, but only after this push is already public."; then
+  echo "pre-push: refusing to push — the committed-secret guard failed (above)." >&2
+  echo "          A pushed secret cannot be un-pushed: fix it HERE, before it leaves." >&2
+  echo "          If it is genuinely not a secret, append 'secret-allow' on the line." >&2
+  exit 1
 fi
 
 [ "${UCC_RELEASE_GUARD_DISABLE:-0}" = "1" ] && exit 0
@@ -66,6 +80,28 @@ while read -r local_ref local_oid remote_ref remote_oid; do
 done
 
 [ "$status" -ne 0 ] && exit 1
+
+# ── canonical-vocabulary guard (docs/GLOSSARY.md is binding) ────────────────────
+# Deliberately BELOW the UCC_RELEASE_GUARD_DISABLE override, unlike the secrets guard above. That
+# override exists so a human can push an emergency security backport to an EOL line; a vocabulary
+# nit must not stand in the way of that. The secrets check outranks the override because a leaked
+# credential is irreversible — a banned synonym is not.
+#
+# It blocks rather than warns because the only thing a violation buys you is a red CI: the same
+# script runs in ci.yml and would reject the push's build anyway. Failing here costs one amended
+# commit; failing there costs a broken master everyone else pulls.
+#
+# ⚠ This is not hypothetical. On 2026-08-26 master was found RED on this guard — two allowlist
+# entries whose debt had been paid, plus two real senses — and it had gone unnoticed because
+# nothing in the local loop runs it (the Maven reactor and `ng test` do not).
+if ! run_guard tools/check-vocabulary.mjs "vocabulary guard" \
+     "CI still runs it — an unnoticed violation there is a red master."; then
+  echo "pre-push: refusing to push — the canonical-vocabulary guard failed (above)." >&2
+  echo "          docs/GLOSSARY.md is binding; the guard names the canonical term for each hit." >&2
+  echo "          A genuinely different sense goes in DOC_ALLOW/CONFIG_ALLOW/SOURCE_ALLOW WITH a" >&2
+  echo "          reason, or 'vocab-allow' on the line — never an unexplained exemption." >&2
+  exit 1
+fi
 
 echo "pre-push: nothing is in production after 3.x — master is the only line worked on, so the" >&2
 echo "          merge-forward set is EMPTY (BRANCHING.md §0-A; 4.x was deleted 2026-08-17)." >&2

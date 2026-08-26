@@ -208,7 +208,7 @@ body. Agents must not set this flag on their own — they must ask.
 | Layer | What | Scope | Bypass |
 |---|---|---|---|
 | **1. Claude Code hook** | `.claude/hooks/pre-tool-git-release-guard.sh` — injects the commit/push checklist and blocks commit/push/tag on retired lines | Claude Code agents on this machine (`.claude/` is gitignored — local only) | `UCC_RELEASE_GUARD_DISABLE=1` |
-| **2. git `pre-push` hook** | `.githooks/pre-push` — blocks pushes whose target ref is a retired line; **also runs the committed-secret guard** (`tools/check-secrets.mjs`) and blocks on a hit; prints the merge-forward reminder | Any human/agent using plain git, once `core.hooksPath` is set | `--no-verify` or `UCC_RELEASE_GUARD_DISABLE=1` — but the **secret** check runs BEFORE that override and is not switched off by it (see below) |
+| **2. git `pre-push` hook** | `.githooks/pre-push` — blocks pushes whose target ref is a retired line; **also runs the committed-secret guard** (`tools/check-secrets.mjs`) and the **canonical-vocabulary guard** (`tools/check-vocabulary.mjs`), blocking on either | Any human/agent using plain git, once `core.hooksPath` is set | `--no-verify` or `UCC_RELEASE_GUARD_DISABLE=1` — but the **secret** check runs BEFORE that override and is not switched off by it (see below) |
 | **3. CI** | `.github/workflows/branch-policy.yml` — rejects retired branches; lints Conventional Commits on PRs | Everyone; runs server-side | none (this is the backstop) |
 
 **Activate layer 2 once per clone:** `git config core.hooksPath .githooks`
@@ -225,6 +225,16 @@ because a hook that fails every push gets `core.hooksPath` unset entirely, and t
 ⚠ **Known limit:** the guard scans tracked files **as they stand**, not every commit in the push
 range. A secret introduced and then removed within the pushed commits is still in the objects being
 published and this hook will not see it — rewrite that history before pushing.
+
+**The canonical-vocabulary guard sits on the other side of that override, deliberately.** It runs
+*after* `UCC_RELEASE_GUARD_DISABLE` and after the retired-line check, because that override exists so
+a human can push an **emergency security backport** — and a banned synonym must not stand in the way
+of one. The secrets check outranks the override; a vocabulary nit does not. It still *blocks* rather
+than warns, because the only thing a violation buys you is a red CI: the same script runs in `ci.yml`
+and would fail the build anyway. Failing here costs one amended commit; failing there costs a broken
+`master` that everyone else pulls. ⚠ Not hypothetical — on 2026-08-26 `master` was found **red** on
+this guard, unnoticed because nothing in the local loop ran it (the Maven reactor and `ng test` do
+not).
 
 **Pom version consistency** is enforced implicitly by the Maven reactor build in
 `.github/workflows/ci.yml`: a partial/mismatched version bump across modules fails the build (a child's
