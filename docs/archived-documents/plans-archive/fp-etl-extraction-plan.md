@@ -11,7 +11,7 @@ which are authoritative for the reactor shape/history — this file only covers 
 
 Extract `com.gamma.etl` out of `inspecto-engine` into its own leaf module (`fp-etl` /
 `file-processor-etl`), sitting below the rest of the engine cluster, now that `etl` main-code is a
-foundation leaf (out-degree 0 within engine — see increment 1, `c76a9634`).
+foundation leaf (out-degree 0 within engine — see increment 1, `4e92fb00`).
 
 ## Blocker found (2026-07-22, this session)
 

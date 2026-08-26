@@ -71,7 +71,7 @@ mvn -o clean test -Pedition-enterprise   # superset: pulls in BOTH security and 
 ```
 
 Observed 2026-07-25: `OidcAuthenticatorTest.adminRoleGrantsOnboardConnectionsAndNotWorkbench` had been
-**failing on `master` since 7e90f53d (2026-07-24)** — that commit added `canTriageRequirements` to
+**failing on `master` since 63a556f8 (2026-07-24)** — that commit added `canTriageRequirements` to
 `admin`'s seed without updating the test's *equality* assertion, and nobody saw it because every
 default-profile run skipped the module. Two lessons: run the enterprise profile for any
 `Roles.SEED` change, and remember the reactor is **fail-fast** — a failure in `inspecto-security`

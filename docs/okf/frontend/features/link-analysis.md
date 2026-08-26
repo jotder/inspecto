@@ -96,7 +96,7 @@ distinct ([`GLOSSARY.md`](../../../GLOSSARY.md) §11): this studio works on **P3
     which buys the same feature and guarantees a third caller becomes a third special case. This aligns with
     the generic-tag direction (BACKLOG D7) — grouping and annotation should both address components uniformly.
 
-    **SHIPPED end-to-end 2026-07-25** — backend (`56ca3559`), UI half same day. As built:
+    **SHIPPED end-to-end 2026-07-25** — backend (`d703a74d`), UI half same day. As built:
     `ObjectNote` carries a **`targetKind`** — ⚠ *not* its pre-existing `kind`, which is `NoteKind`
     (COMMENT/ATTACHMENT) and an orthogonal axis; the two must never be conflated. The vocabulary is
     `AnnotationKinds` = `"object"` + `ComponentStore.WRITABLE_TYPES`, which already contains

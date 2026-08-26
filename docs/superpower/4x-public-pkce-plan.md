@@ -1,7 +1,7 @@
 # Plan — `4.x` public-PKCE auth (unblock the SEC-INCIDENT-1 rotation)
 
-**Status:** **P0 + P1 SHIPPED 2026-07-25** (`481a68d5`, `89cb3cce` on `4.x`; propagated to master as
-no-content `-s ours` merges `54443256`, `37c98c6a`). **Only P2 remains — and P2 is entirely operator
+**Status:** **P0 + P1 SHIPPED 2026-07-25** (`579632ba`, `932eff92` on `4.x`; propagated to master as
+no-content `-s ours` merges `f8e80f86`, `31daacc2`). **Only P2 remains — and P2 is entirely operator
 action** (deploy the `4.x` bundle, then rotate at the issuer). No code work is left on this plan.
 ⚠ **Do not archive this plan until rotation is confirmed** — P2 is the whole point of the exercise.
 · **Opened:** 2026-07-25 · **Branch of record:** `4.x`
@@ -18,7 +18,7 @@ rotation stays permanently deferred.
 
 This plan is therefore **the gate on the rotation**, not a cleanup nicety.
 
-## 2. What is actually on `4.x` (verified 2026-07-25 against `291c86a1`)
+## 2. What is actually on `4.x` (verified 2026-07-25 against `308f9717`)
 
 Read via `git show 4.x:<path>` — no checkout needed.
 
@@ -60,7 +60,7 @@ Read via `git show 4.x:<path>` — no checkout needed.
 
 Phased so the highest-value, lowest-risk piece can ship alone.
 
-### P0 — delete the dead confidential-client code (no design change) — ✅ SHIPPED `481a68d5`
+### P0 — delete the dead confidential-client code (no design change) — ✅ SHIPPED `579632ba`
 
 1. Remove `renewAccessToken()` and `retrieveToken()` from `app-component.service.ts`, plus the now-unused
    imports (`HttpParams`, `HttpHeaders`, `SecurityPrincipal`, `AppProperties`) they orphan.
@@ -73,7 +73,7 @@ Phased so the highest-value, lowest-risk piece can ship alone.
 **P0 alone removes the hardcoded literal from `4.x`.** It does not make rotation safe — the live path
 still uses `environment.appClientSecret` — so P1 is still required.
 
-### P1 — PKCE on the live path — ✅ SHIPPED `89cb3cce`
+### P1 — PKCE on the live path — ✅ SHIPPED `932eff92`
 
 > **As built** (all five steps below done): `pkce.ts` + `pkce.spec.ts` ported verbatim to
 > `modules/auth/`; `app-utils.redirectToAuthServer` is now **async** and persists verifier + state in
@@ -86,14 +86,14 @@ still uses `environment.appClientSecret` — so P1 is still required.
 > Verified: `npm run test:ci` 42 pass / 5 skip (incl. the ported `pkce.spec.ts`), `npm run build` clean.
 > ⚠ **Not yet verified against a live IdP** — step 7's "real login round trip" is a P2/deploy-time check.
 >
-> **⚠ P1 shipped with a login-breaking defect; `8c3a7654` fixes it. Deploy the two together.** Adding
+> **⚠ P1 shipped with a login-breaking defect; `ce49a681` fixes it. Deploy the two together.** Adding
 > `state` to the `/authorize` redirect changed the *shape of the callback URL*, and P1 did not touch the
 > callback, which read the code as `href.substring(indexOf('code=') + 5)` — everything to the end of the
 > string. With `state` echoed back, `?code=abc&state=xyz` yields the code `"abc&state=xyz"` and the token
 > exchange fails; `?state=xyz&code=abc` works. Parameter order is the IdP's choice, so P1 alone is a
 > coin flip on whether login works at all.
 >
-> `8c3a7654` parses with `URLSearchParams` (exported `authParamsFrom`, order-agnostic, tolerates hash
+> `ce49a681` parses with `URLSearchParams` (exported `authParamsFrom`, order-agnostic, tolerates hash
 > routing), **validates `state`** against the sessionStorage copy before exchanging — arming the CSRF
 > defence P1 only pretended to have — and moves `pageManager.redirectPath` before the first `await` in the
 > now-async `redirectToAuthServer` (a guard returning false can revert the address bar while we yield).
@@ -120,7 +120,7 @@ still uses `environment.appClientSecret` — so P1 is still required.
    `appClientSecret` first, then the shared `iamClientSecret`). Order matters: the new bundle must be
    live before the old secret dies.
 9. Close the BACKLOG §5 row on **confirmed rotation**. ~~Merge `tools/check-secrets.mjs` forward to
-   `4.x`~~ — **done 2026-07-25 (`27780fee`)**, once P1 emptied the live values that had kept it
+   `4.x`~~ — **done 2026-07-25 (`f1fb6f20`)**, once P1 emptied the live values that had kept it
    master-only.
 
 ## 4. Open questions — need the operator / IdP owner

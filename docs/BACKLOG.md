@@ -110,7 +110,7 @@ each row's detail stays in its own section.
    rationale lives. Several rows below changed shape as a result, and three had **wrong premises**
    corrected (D3 legacy-route framing, D7 tags-are-greenfield, D14 already-tightened) — trust §2 over
    any older phrasing you remember.
-3. **Small, concrete quick wins — DRAINED 2026-07-25.** `canOfferDatasets` → admin (D14, `2b1e7e9d`) ·
+3. **Small, concrete quick wins — DRAINED 2026-07-25.** `canOfferDatasets` → admin (D14, `aa9fb47b`) ·
    the `canCurateMenus` split (D4) · `KeycloakTokenRelay` → `OidcTokenRelay` + no derived
    `tokenEndpoint` (D15) · chunking on by default at 8 GiB (D12). **One deliberate deviation: D11's
    on-by-default `memory_limit` was NOT shipped** — operator call, see §6.
@@ -175,7 +175,7 @@ you remember the old framing, re-read those three.
 |---|---|---|
 | D1 | NFR-7 runs **in parallel — SOC 2 is not a gate**; C1 is no longer a blocking predecessor. The Type II observation window still needs CC6 controls live (they are), and external-party steps stay paced by the third party | `superpower/compliance-certifications-plan.md` §6 Q1 |
 | D2 | A bundle may carry a `connection` **reference-only, secrets stripped** — `${ENV:…}` travels, no secret value in any form (not even bundle-encrypted: bundles land in git, CI, and support tickets). **BUILT AND SHIPPED 2026-07-25** — `ConnectionProfile.toBundleMap()` strips (never masks) a literal secret, import rejects a non-reference secret-looking field, `connection` is first in `APPLY_ORDER` and stays out of `INTEGRITY_KINDS` | `okf/…/metadata-bundle.md` |
-| D3 | **Delete the legacy surface; soak criterion consciously overridden** — justified: no live deployment and the SPA was already fully v1-migrated. **BUILT AND SHIPPED 2026-07-25** (`be498f35` code+tests, `bbf569df` docs) — `/api/v1` is the only business surface, the four infra probes stay unversioned, `isInfraRoute` is now the allow-list | `okf/…/api-v1.md` |
+| D3 | **Delete the legacy surface; soak criterion consciously overridden** — justified: no live deployment and the SPA was already fully v1-migrated. **BUILT AND SHIPPED 2026-07-25** (`a2c2d983` code+tests, `dd9b50cd` docs) — `/api/v1` is the only business surface, the four infra probes stay unversioned, `isInfraRoute` is now the allow-list | `okf/…/api-v1.md` |
 | D4 | **Split `canCurateMenus`** out of `canAuthorWorkbench` — a nav change is visible to every business user and is not a build activity. **SHIPPED 2026-07-25**: granted to admin/power/super, `PUT /nav/menus` re-gated, manifest + gate landed together. **UI half completed the same day** — `LensService.canCurateMenus`, the `menus.curate` action node under Settings, and the mock seed table; no residual. ⚠ Finishing it surfaced an unrelated pre-existing lens/capability mismatch for admin-only subjects (§5) | `okf/…/auth-security.md` |
 | D5 | **Retention tier, not archive-is-terminal** — `Archived` becomes a real state but carries a retention window, and expiry is what makes an Incident purge-eligible. Needs a dry-run-first sweep + a legal-hold exemption. `ObjectStore.delete` already shipped, so the one remaining blocker is the `Archived` state itself | `okf/…/jobs.md` |
 | D6 | **✅ SHIPPED end-to-end 2026-07-26.** Configurable Findings = a **`findings-spec` ComponentStore kind** (one per `ObjectType`) served by **`GET /findings/{type}`**, rendered by `<inspecto-schema-form>`; absent one, the built-in default is today's exact shape, so unconfigured deployments are unchanged. Validation is fail-closed at authoring time (422) via a per-kind hook in `writeComponent`. ⚠ **Two premises in this row's old wording were wrong**: the workflow/TOON pattern is a **boot-time CLI-path scan** with no write root or CRUD (unusable for operator-editable config), and the `attribute-spec` renderer is the **frontend** `<inspecto-schema-form>`, **not** backend `ConfigSpecs`/`FieldSpec` (compiled-in Java, not authorable). A ComponentStore kind still adds **no endpoint** — `/components/{type}` CRUD is generic — so it satisfies the constraint while joining the `alert-rule`/`notification-rule` idiom rather than being "a third idiom". Plan archived; residuals in §6 | `okf/frontend/features/objects.md` |
@@ -186,7 +186,7 @@ you remember the old framing, re-read those three.
 | D11 | **Conservative fixed per-instance cap + spill, on by default.** ⚠ **NOT IMPLEMENTED — deliberately declined by the operator 2026-07-25** in favour of "spill routing only". No default `processing.duckdb.memory_limit` ships, so **the overcommit exposure this decision existed to close is still open**: each concurrent run still gets DuckDB's ~80%-of-RAM-per-instance default. Spill *routing* already shipped independently (`BatchIngestStrategy.scratchDir` → `dirs.temp` on the data volume), and `max_temp_directory_size` has no fixed default because none is defensible without knowing the volume size (DuckDB uses ~90% of disk). **Reopen with a measured value** — see §6 | `okf/…/duckdb.md` |
 | D12 | **Chunking on with a large threshold.** **SHIPPED 2026-07-25** at **8 GiB** (`processing.chunking.max_file_bytes`, was `0`/disabled) — far above routine inputs so normal workloads never change shape. ⚠ It was meant to land *after* D11, because a memory cap turns the failure mode into "spill" and makes a high threshold safe. D11 was declined, so **chunking is now the only bound on a pathological single file** | `okf/…/duckdb.md` |
 | D13 | **Confirmed parked** — stays gated on a real onboarding-observation session (interview #2). An engineering placeholder would bake in an arbitrary answer that is expensive to unwind once forms ship | §7 · interview #2 |
-| D14 | **Ratified with one tightening — SHIPPED 2026-07-25 (`2b1e7e9d`).** ⚠ `canConfigureAccess` + `canApproveShares` were **already** admin/super-only in `Roles.SEED`, so the "bootstrap deadlock left them over-granted" premise was unfounded. `canAuthorAlertRules`/`canRequestShares` ratified as developer/ops-tier. `canOfferDatasets` moved to admin (cross-space data exposure with no second gate) | `okf/…/auth-security.md` |
+| D14 | **Ratified with one tightening — SHIPPED 2026-07-25 (`aa9fb47b`).** ⚠ `canConfigureAccess` + `canApproveShares` were **already** admin/super-only in `Roles.SEED`, so the "bootstrap deadlock left them over-granted" premise was unfounded. `canAuthorAlertRules`/`canRequestShares` ratified as developer/ops-tier. `canOfferDatasets` moved to admin (cross-space data exposure with no second gate) | `okf/…/auth-security.md` |
 | D15 | **Withdrawn, not answered — there is no vendor of record.** The IdP/gateway is a per-client deployment choice; standards-only and configurable. Litmus test: new auth code that can't be pointed at a different compliant IdP by config alone is wrong. **Both residuals SHIPPED 2026-07-25**: `KeycloakTokenRelay` → **`OidcTokenRelay`** (incl. the `META-INF/services` entry), and the Keycloak-shaped `tokenEndpoint` default deleted. ⚠ **BREAKING for existing deployments** — `-Dauth.oidc.tokenEndpoint` is now **required** and fails fast at startup; it is no longer derived from the issuer, so a Keycloak deployment that relied on the derived path will not boot until the flag is set from the provider's `/.well-known/openid-configuration`. `X-JWT-Assertion` default kept, now documented as *a* convention | `okf/…/auth-security.md` |
 | D16 | ~~A dedicated system Space owns the domain-seeded pattern packs~~ — **OVERTURNED 2026-07-26 (operator): per-Space forking is acceptable.** The central-fix rationale (a system Space so a fix to a shipped pattern reaches every copy) was weighed and dropped; packs are ordinary per-Space `pattern-pack` components. ⚠ Two costs of the system-Space shape are recorded in the plan so it is not re-proposed blind: a `_`-sentinel dir holding `config/` passes `SpaceManager.discover`'s filter and then dies in `SpaceId.of` (a spurious `Skipping space dir` WARN every boot), and a sentinel without `config/` can't be reached through `/spaces/{id}/…` at all ⇒ a dedicated cross-space read route. **✅ SHIPPED end-to-end 2026-07-26** — the kind (2 registrations, no new endpoint or capability), 18 seed files across the three tracked spaces, and the toolbox reading `GET /components/pattern-pack` with the `PATTERN_PACKS` const as the fallback. ⚠ Load-bearing: a kind absent from `WRITABLE_TYPES` is **unreadable**, not read-only; a step's start `direction` persists as the **empty string** because TOON cannot encode `{}` in a list; `patternPacks` must be a **signal** (`OnPush`); and `spaces/uat/` is gitignored so it stays on the fallback. Plan archived | `okf/frontend/features/link-analysis.md` |
 | D17 | **Open, unscheduled** — acknowledged gap, no demand pressure, no build time committed | §7 |
@@ -684,7 +684,7 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 >
 > Five OAuth client secrets sat in `inspecto-ui/src/environments/*.ts` and were pushed to a **PUBLIC**
 > GitHub remote (`jotder/inspecto`, `isPrivate:false`) from **2026-06-12** until removed in
-> `8dd072c6` (2026-07-25) — roughly six weeks, 4 commits. **Removing them from HEAD did not remediate anything:**
+> `94d98593` (2026-07-25) — roughly six weeks, 4 commits. **Removing them from HEAD did not remediate anything:**
 > the values remain in git history, in every clone and fork, and in GitHub's caches. **Treat all five as
 > compromised and rotate at the issuer.** This row closes only when rotation is confirmed, not when the
 > code edit landed.
@@ -709,7 +709,7 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 > `git-filter-repo --replace-text` (all 5 values → `REDACTED-SEC-INCIDENT-1`): 73 occurrences replaced,
 > **0 secrets in 22 598 objects**, all 1008 commits preserved, `HEAD` tree byte-identical (zero code change),
 > `1.x`/`2.x`/`3.x` SHAs untouched (they never carried the values, so the retired-line rule stayed intact).
-> Force-pushed: `master` `bb2c486f`→`f275b6f6`, `4.x` `27780fee`→`f1fb6f20`, tags `v4.0.0-RC1` +
+> Force-pushed: `master` `f275b6f6`→`f275b6f6`, `4.x` `f1fb6f20`→`f1fb6f20`, tags `v4.0.0-RC1` +
 > `backup-pre-squash-20260725` re-pointed, and the stray `origin/claude/brave-pascal-55aae7` (which had NOT
 > been rewritten — it was deleted locally *before* the rewrite, so filter-repo never saw it) deleted.
 >
@@ -729,9 +729,22 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 >   defensible reading. Rotation is no longer gated on anything.
 > - ⚠ **Lesson for any future rewrite: enumerate ALL remote refs first** (`git ls-remote origin`), not just
 >   branches. A stray branch nearly slipped through, and `refs/pull/*` cannot be fixed client-side at all.
-> - ⚠ **~84 short SHAs across `docs/`, the skills and the memory index now dangle** — every pre-rewrite SHA
->   on the master/4.x lineage is invalid. Mapping for this shift's commits is in `SESSION_STATUS.local.md`.
-> - Pre-rewrite backup bundle: `C:/sandbox/ucc-prerewrite-backup-20260726-203545.bundle` (all refs).
+> - ~~⚠ **~84 short SHAs across `docs/`, the skills and the memory index now dangle**~~ — **REPAIRED
+>   2026-08-26.** 57 citations of 24 rewritten commits across 11 files resolve again. Method, since it is
+>   reusable and guessing a mapping would have been worse than leaving them broken: the pre-rewrite bundle
+>   was fetched into a **throwaway bare repo OUTSIDE the checkout** (metadata only, no working tree,
+>   deleted after — never into this repo's object store, which would have re-imported the secrets), each
+>   dangling short SHA resolved there to `subject + author date`, then matched to the *exact* same subject
+>   on the current lineage. ⚠ **Tree-hash matching does NOT work here** — `--replace-text` rewrote a blob
+>   in every commit whose tree still contained `environments/*.ts`, so nearly every tree changed; the one
+>   same-subject collision (three commits, same day) was disambiguated by `rev-list --count` depth.
+>   ⚠ **Two repaired hashes were TAG-OBJECT SHAs, not commits:** `BRANCHING.md` §0-A cited `v4.0.0` =
+>   `aa90a55a` and `v4.0.0-RC1` = `0f509598`, the annotated-tag objects (deleted with the tags
+>   2026-08-17). That line's reassurance that both tagged commits "remain ancestors of `master`" was TRUE
+>   but **unverifiable as written**; it now names the commits (`06e3fe66`, `8fca81d6`), each confirmed by
+>   `git merge-base --is-ancestor`. **Deliberately still dangling:** `d37eaef2..53619f13`, which the
+>   DATA-GOV-1 row documents as commits that intentionally no longer exist.
+> - Pre-rewrite backup bundle: `C:/sandbox/cgi_decoder/ucc-prerewrite-backup-20260726-203545.bundle` (all refs).
 >   ⚠ **It contains the secrets — delete it once the incident is closed.**
 >
 > **✅ The guard now runs PRE-PUSH too (2026-08-26).** It had been CI-only, and CI fires *after* the
@@ -751,8 +764,8 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 > keys (D15 made `tokenEndpoint` required config), and anything containing `EXAMPLE` (AWS's published SigV4
 > vectors). Line hatch: `secret-allow`. Verified both ways — green on the repo, and red on a synthetic
 > fixture in the incident's exact shape. ~~Master-only by design: do NOT merge it forward until the `4.x`
-> PKCE fix lands~~ — **that gate was satisfied by P1 (`89cb3cce`), and the guard now runs on `4.x` too**
-> (`27780fee`). The branch that leaked four of the five credentials is guarded against reintroducing them.
+> PKCE fix lands~~ — **that gate was satisfied by P1 (`932eff92`), and the guard now runs on `4.x` too**
+> (`f1fb6f20`). The branch that leaked four of the five credentials is guarded against reintroducing them.
 > Re-verified on `4.x` both ways: green on the branch, and exit 1 on an injected 32-char `appClientSecret`
 > in `environment.gamma.ts`. **Keep the two copies of the script identical** — a divergence means one
 > branch is guarded by weaker rules than the other.
@@ -766,23 +779,23 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 > remaining work is the non-code half (GitHub Support purge of `refs/pull/*`, refresh-grant
 > verification, bundle deletion). **Needs an operator call before anyone acts on P2.**
 >
-> **✅ `4.x` IS NOW FIXED CODE-SIDE (2026-07-25) — ROTATION IS UNBLOCKED.** P0 (`481a68d5`) removed the
-> dead confidential-client code holding the inline IAM literal; **P1 (`89cb3cce`) put the live path on
+> **✅ `4.x` IS NOW FIXED CODE-SIDE (2026-07-25) — ROTATION IS UNBLOCKED.** P0 (`579632ba`) removed the
+> dead confidential-client code holding the inline IAM literal; **P1 (`932eff92`) put the live path on
 > PKCE and removed `appClientSecret` from `4.x` entirely** — `app.properties.ts` and all four
 > `environments/*.ts`. `git grep appClientSecret` on `4.x` now returns nothing. Both propagated to master
-> as no-content `-s ours` merges (`54443256`, `37c98c6a`). **Nothing code-side blocks rotation any more;
+> as no-content `-s ours` merges (`f8e80f86`, `31daacc2`). **Nothing code-side blocks rotation any more;
 > what remains is P2 — deploy the `4.x` bundle, then rotate.** Two follow-ons this unlocked or exposed:
 >
-> - **✅ `tools/check-secrets.mjs` now runs on `4.x`** (`27780fee`) — the "would pin `4.x` CI permanently
+> - **✅ `tools/check-secrets.mjs` now runs on `4.x`** (`f1fb6f20`) — the "would pin `4.x` CI permanently
 >   red" objection died with P1. Done.
-> - **✅ Callback `state` validation — FIXED (`8c3a7654`), and it caught a worse bug.** P1 generated and
+> - **✅ Callback `state` validation — FIXED (`ce49a681`), and it caught a worse bug.** P1 generated and
 >   sent a `state` but never checked it, so the CSRF defence was not armed. Closing that exposed a
 >   **login-breaking regression P1 had introduced**: the callback read the code as
 >   `href.substring(indexOf('code=') + 5)` — everything to the end of the URL — which was correct only
 >   while `code` was the last param. Once `state` was echoed back, `?code=abc&state=xyz` parsed the code
 >   as `"abc&state=xyz"` and the token exchange fails; `?state=xyz&code=abc` still worked. **Parameter
->   order is the IdP's choice, so `89cb3cce` alone is a coin-flip login break — never deploy it without
->   `8c3a7654`.** Neither the build nor the unit suite could have caught it (nothing covered callback
+>   order is the IdP's choice, so `932eff92` alone is a coin-flip login break — never deploy it without
+>   `ce49a681`.** Neither the build nor the unit suite could have caught it (nothing covered callback
 >   parsing; no live-IdP round trip runs in CI) — now covered by 8 tests including both orderings.
 >   ⚠ **The lesson generalizes: this line of work is verified only against a compiler and jsdom.** Treat
 >   any further `4.x` auth change as unverified until it survives a real IdP.
@@ -802,7 +815,7 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 > - **The `4.x` LIVE-path fix is a design change** — a browser bundle cannot hold a confidential client
 >   secret, so re-issuing a secret that still ships in the SPA just reproduces this incident with fresh
 >   values. That path needs public PKCE (or a server-side token exchange) first.
-> - **⚠ Two corrections to the paragraph above, verified 2026-07-25 against `4.x` `291c86a1`** — full
+> - **⚠ Two corrections to the paragraph above, verified 2026-07-25 against `4.x` `308f9717`** — full
 >   detail + phased plan in [`superpower/4x-public-pkce-plan.md`](superpower/4x-public-pkce-plan.md):
 >   - **The live token exchange is `modules/auth/auth-service.ts`** (`:84-90` code→token, `:106-109`
 >     refresh, `:148` Basic header), a second near-duplicate implementation this row never mentioned.
@@ -824,7 +837,7 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 > **⚠ Stale agent worktrees keep coming back — treat this as recurring, not resolved.** The two dirs named
 > here on 2026-07-25 (`quirky-lalande-a4a696/`, `vigorous-ptolemy-911ed7/`) were deleted, but by 2026-07-26
 > `git worktree list` showed **six** under `.claude/worktrees/`, five of them agent-isolation branches
-> pinned at pre-`8dd072c6` commits and therefore holding live copies of the leaked
+> pinned at pre-`94d98593` commits and therefore holding live copies of the leaked
 > `inspecto-ui/src/environments/*.ts` (plus copies in their `.angular/` caches). One
 > (`eloquent-bose-14c91c`) is already `prunable`. **Any agent run with `isolation: "worktree"` re-creates
 > this.** Sweep with `git worktree prune` + `git worktree remove` at handoff. Deleting them never reduced
@@ -840,7 +853,7 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 > `refs/pull/*` notes as never rewritten — is at `8f30d548`, carries **0 commits not already in `master`**,
 > and holds no secret in `environments/*.ts`. ⚠ **None of this touches the actual exposure**: `refs/pull/*`
 > on the public remote still serves the literals, so severity is unchanged and rotation is still the fix.
-> ⚠ The pre-rewrite backup bundle `C:/sandbox/ucc-prerewrite-backup-20260726-203545.bundle` (16 MiB) is
+> ⚠ The pre-rewrite backup bundle `C:/sandbox/cgi_decoder/ucc-prerewrite-backup-20260726-203545.bundle` (16 MiB) is
 > **still present and still holds all five secrets in cleartext** — deliberately NOT deleted (operator call
 > 2026-07-27: it is the only pre-rewrite recovery point and the incident is still open). Delete it at
 > incident close, per the note above.
@@ -2074,7 +2087,7 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   sweep and the legal-hold exemption D5 demanded. There is still no `DELETE /objects/{id}` and hard-delete
   is still not generally supported — the retention sweep is the one caller. Original rationale, kept for
   provenance:
-  `12cf20eb` added `void delete(String)` to `com.gamma.ops.ObjectStore` (`:50`) with both impls and unit
+  `8873bc51` added `void delete(String)` to `com.gamma.ops.ObjectStore` (`:50`) with both impls and unit
   tests; it still has **no production caller and no route** — there is no `DELETE /objects/{id}`, and
   Incidents/Cases are only closed, merged, or split. Dropping it is wrong because **MNT-14's purge needs
   exactly this API** (D5 retention tier: expiry makes an archived object purge-eligible, and purge is a
@@ -2409,7 +2422,7 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 
 | Canonical | Also recorded as |
 |---|---|
-| ~~API-5 legacy sunset~~ | **RETIRED 2026-07-25** — D3 built and shipped (`be498f35`, `bbf569df`); plan and runbook both archived, as-built in `okf/…/api-v1.md`. The still-open **X-Actor full removal** (§4, §5) was always a separate client-migration-gated item and stays open |
+| ~~API-5 legacy sunset~~ | **RETIRED 2026-07-25** — D3 built and shipped (`a2c2d983`, `dd9b50cd`); plan and runbook both archived, as-built in `okf/…/api-v1.md`. The still-open **X-Actor full removal** (§4, §5) was always a separate client-migration-gated item and stays open |
 | EOI-7b eoiagent publish | agent-kernel-replacement §open-items |
 | eoiagent `DryRunProvider` | AGT-5 follow-on (§3) · AGT-6b prerequisite (§3) |
 | ~~MNT-14 archived-Incident sweep~~ | **RETIRED 2026-07-27** — shipped as the `incident_purge` maintenance task; plan archived, as-built in `okf/…/jobs.md`, residuals in §6. ⚠ Its two long-standing framings were both WRONG: the `Archived` state was never the blocker, and G4's four `JobService` hooks were never needed |

@@ -188,9 +188,9 @@ via `META-INF/services`. Personal/Standard never bundle it and behave byte-ident
   (`adminRoleGrantsOnboardConnectionsAndNotWorkbench`) — every future grant addition must update that test, and
   it must be run under **`-Pedition-enterprise`**: the default reactor omits `inspecto-security` entirely, so a
   plain `mvn -o clean test` cannot see a failure there. That gap had already left this assertion red on
-  `master` since `7e90f53d`; see `.claude/skills/build-verify/SKILL.md`.
+  `master` since `63a556f8`; see `.claude/skills/build-verify/SKILL.md`.
 - **D4 — `canCurateMenus`, split out of `canAuthorWorkbench`. SHIPPED end-to-end 2026-07-25**
-  (`c8a40a24` server, `96f8ca4f` UI). Rationale: the `pipeline-developer`/`app-developer`/`developer`/`power`
+  (`fc637b1b` server, `0c375ff5` UI). Rationale: the `pipeline-developer`/`app-developer`/`developer`/`power`
   seeds got menu curation free, conflating "may edit a pipeline" with "may change what this space's business
   users see" — a navigation change is visible to every user in the space and is not a build activity.
   As built: `Roles.java` constant + seed grant to **admin/power/super** (curation is a space-owner activity;
@@ -216,7 +216,7 @@ via `META-INF/services`. Personal/Standard never bundle it and behave byte-ident
   `ControlApiSpacesTest.authenticatedCreateSucceedsWhenNoSpaceIsHostedYet` and
   `purgingTheLastSpaceOnDiskIsRefused`.
 
-### Identity vs lens-scoped UI capabilities (`651ca48e`, 2026-07-25)
+### Identity vs lens-scoped UI capabilities (`159b7f0d`, 2026-07-25)
 
 `LensService` capabilities used to be uniformly `granted && !readOnly && allows(…)`, while `allowedLenses`
 qualifies Builder/Ops only via `canAuthorWorkbench`/`canOperateRuns`. An OIDC subject holding neither — **the

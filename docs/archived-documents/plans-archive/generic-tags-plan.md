@@ -112,7 +112,7 @@ Two findings, and both point the same way:
   runs its pipeline-reference and Exchange-consumer 409 fences and then calls `store.delete(type, id)`
   directly. There is no listener, no hook, nothing pluggable. A cascade would mean **inventing a new seam**.
 - **Object deletion is not reachable at all.** `com.gamma.ops.ObjectStore.delete(String)` exists
-  (`ObjectStore.java:50`, added by `12cf20eb` "add physical delete to the ObjectStore SPI") and is
+  (`ObjectStore.java:50`, added by `8873bc51` "add physical delete to the ObjectStore SPI") and is
   exercised by `DbObjectStoreTest` / `InMemoryObjectStoreTest` — but it has **no production caller and no
   route**. Incidents/Cases are closed, merged, or split; never hard-deleted through the API. ⚠ *This
   corrects a breadcrumb claiming `ObjectStore.delete` "shipped" — the SPI method shipped, the capability

@@ -1,9 +1,9 @@
 # Runbook — rotating the SEC-INCIDENT-1 OAuth client secrets
 
 > **Status:** rotation **NOT YET PERFORMED** as of 2026-07-25 — but **the code-side blocker is now
-> cleared**: `4.x` P0+P1 shipped (`481a68d5`, `89cb3cce`, **plus the mandatory follow-up `8c3a7654`**), so
+> cleared**: `4.x` P0+P1 shipped (`579632ba`, `932eff92`, **plus the mandatory follow-up `ce49a681`**), so
 > `4.x` no longer sends a client secret and a rotation no longer breaks a running SPA *once the new bundle
-> is deployed*. ⚠ **The bundle you deploy must include `8c3a7654`** — `89cb3cce` on its own breaks login
+> is deployed*. ⚠ **The bundle you deploy must include `ce49a681`** — `932eff92` on its own breaks login
 > depending on the IdP's callback parameter order. Check `git log --oneline 4.x` before cutting the build. Read §"The complication"
 > below with that in mind — the deploy-then-rotate ordering still applies, the design blocker does not.
 > This runbook is the execution checklist;
@@ -14,13 +14,13 @@
 ## Why this is not a simple "change the secret" job
 
 Five OAuth client secrets were public on GitHub for ~6 weeks (2026-06-12 → 2026-07-25). Removing them from
-`master` in `8dd072c6` **remediated nothing** — the values persist in git history, every clone, every fork,
+`master` in `94d98593` **remediated nothing** — the values persist in git history, every clone, every fork,
 and GitHub's caches. Rotation at the issuer is the only fix.
 
 The complication **as it stood before P1**: `4.x` authenticated with these exact values, so a naive
 rotation was a customer-visible outage at `app1.pronto.lebara.sa`, not a quiet swap.
 
-**As of `89cb3cce` that is fixed in source** — `4.x` uses PKCE and holds no `appClientSecret`. But the
+**As of `932eff92` that is fixed in source** — `4.x` uses PKCE and holds no `appClientSecret`. But the
 constraint it created still governs the *ordering*: **whatever is currently deployed at
 `app1.pronto.lebara.sa` is still the old bundle** until someone ships the new one. Rotating before that
 deploy breaks the running SPA exactly as it always would have. Deploy first, then rotate.
@@ -104,8 +104,8 @@ For each credential, in the order fixed by Step 2:
 - [ ] All five secrets rotated **and old values revoked**.
 - [ ] Step 0 log review recorded in [`../BACKLOG.md`](../BACKLOG.md) §5, including a negative result.
 - [ ] BACKLOG §5 row closed — it closes on confirmed rotation, not on a merged commit.
-- [x] ~~`tools/check-secrets.mjs` merged forward to `4.x`~~ — **done 2026-07-25** (`27780fee`). `4.x`
-      stopped holding live values in `89cb3cce` (P1), so the guard runs green there; verified it also
+- [x] ~~`tools/check-secrets.mjs` merged forward to `4.x`~~ — **done 2026-07-25** (`f1fb6f20`). `4.x`
+      stopped holding live values in `932eff92` (P1), so the guard runs green there; verified it also
       goes red on an injected secret, i.e. it is guarding, not just passing.
 - [x] ~~Orphaned worktrees deleted~~ — **done 2026-07-25**; both dirs are gone from disk and from
       `git worktree list`.

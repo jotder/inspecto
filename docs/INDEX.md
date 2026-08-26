@@ -440,7 +440,7 @@ former root reference docs** (each index lists them):
   `ConfigSpecs.enrichment()` `references:` spec).
 - [`superpower/4x-public-pkce-plan.md`](superpower/4x-public-pkce-plan.md) — **`4.x` public-PKCE auth,
   SCOPED 2026-07-25** — the gate on the SEC-INCIDENT-1 rotation (BACKLOG §5): `4.x` must stop needing a
-  client secret before the leaked secrets can be rotated. Verified against `4.x` `291c86a1`, and three
+  client secret before the leaked secrets can be rotated. Verified against `4.x` `308f9717`, and three
   findings reshape it: the live token exchange is `modules/auth/auth-service.ts` (**not** the file BACKLOG
   §5 names), the hardcoded inline secret sits in **dead** code and is deletable today with no design
   change (P0), and `master`'s `inspecto/api/pkce.ts` is a zero-import RFC 7636 impl that ports verbatim —
