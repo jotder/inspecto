@@ -22,7 +22,7 @@ public interface DecompressorPlugin {
     enum Kind {
         /** 1→1: a single compressed stream ({@code .gz}, {@code .bz2}, {@code .Z}, …). */
         STREAM,
-        /** 1→N: an archive with member entries ({@code .zip}, {@code .tar}, …). */
+        /** 1→N: an archive with entries ({@code .zip}, {@code .tar}, …). */
         ARCHIVE
     }
 
@@ -58,7 +58,7 @@ public interface DecompressorPlugin {
 
     /**
      * As {@link #expand(Path, Path, UnpackLimits)}, additionally reporting the entries the plugin
-     * had to SKIP (e.g. an encrypted or unsupported-method archive member — readable metadata, no
+     * had to SKIP (e.g. an encrypted or unsupported-method archive entry — readable metadata, no
      * readable bytes) by adding their entry names to {@code skippedOut}. The caller records those in
      * the batch manifest so a partial expansion never looks like a clean success. Default delegates
      * for plugins that can never skip ({@link Kind#STREAM} is all-or-nothing by construction).

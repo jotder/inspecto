@@ -230,11 +230,9 @@ Each phase is independently shippable and independently verifiable.
 > `processing.unpack.data_extensions` published — completing step 17 — and step 19's docs. Pushed as
 > `fe6e1d7e` → `6730cd66` → `e9750e20`; reactor **3603/0/0/5**, exit 0.
 >
-> **What is left, and it is all Phase 6 surface work — no decision gates the plan any more:**
-> the ledger has **no READ surface** (an `OperationalTables` `unpack` table + a `StatusStore` reader;
-> it must REFERENCE `UnpackLedger.COLUMNS`, never restate them) · the `logical_name` status-ledger
-> column · Phase 6's UI half (collector pane + Run Detail origin column) · and step 14's member-status
-> enum, now FIVE bare literals rather than four. All tracked in `BACKLOG.md` §4.
+> **What is left (2026-08-26 pm): the ledger READ surface ✅, step 14's member-status enum ✅ and the
+> member→Entry sweep ✅ all SHIPPED — remaining: the `logical_name` status-ledger column and
+> Phase 6's UI half (collector pane + Run Detail origin column). All tracked in `BACKLOG.md` §4.**
 > ⛔ **Archive this plan only once Phase 6 lands** — the as-built already lives in
 > [`okf/backend/engine/unpack-stage.md`](../okf/backend/engine/unpack-stage.md), which is what to read
 > for behaviour; this file survives only for its unbuilt Phase-6 detail.
@@ -360,10 +358,14 @@ and needs **no** consignment change at all.
     `UnpackLedger` + `UnpackStatus`, written to `<pipeline>_unpack_<ts>.csv`, accumulated across the
     run and flushed in `CollectorProcessor.run` after the batch futures join. ⛔ Columns declared
     ONCE (`UnpackLedger.COLUMNS`) — the anti-mirror rule this section demanded, pinned by a test.
-    **Open: no READ surface yet** (an `OperationalTables` `unpack` table + a `StatusStore` reader) —
-    that is Phase 6, and it must REFERENCE `UnpackLedger.COLUMNS` rather than restate them.
-14. ⚠ **STILL OPEN — and now more urgent than when this was written.** Promote the per-file status
-    strings to a **single enum**. There are now **FIVE** bare literals across ~6 files, not four:
+    ~~Open: no READ surface yet~~ **✅ READ SURFACE SHIPPED 2026-08-26** — `StatusStore.unpack`
+    (default-empty), both store impls, and `OperationalTables.UNPACK` = a REFERENCE to
+    `UnpackLedger.COLUMNS` (never a restated list); `unpack` joined `STAGE1_NAMES`.
+14. ~~⚠ STILL OPEN~~ **✅ SHIPPED 2026-08-26** — `com.gamma.etl.MemberStatus`, the member (per-file)
+    vocabulary in one declaration; the constant name IS the wire form (`name()` at every write site),
+    kept apart from `UnpackStatus` exactly as below. The compiler found a SIXTH bearer file the
+    grep-scoped estimate missed (`PipelineTestRun`) — the point of retyping over aliasing. Original:
+    promote the per-file status strings to a **single enum**. There are now **FIVE** bare literals across ~6 files, not four:
     `SUCCESS`, `QUARANTINED_EMPTY`, `QUARANTINED_MISMATCH`, `QUARANTINED_UNREADABLE` and
     `SKIPPED_UNREADABLE` (added 2026-08-26 by the open-item (4) fix — this section predicted exactly
     that drift and it happened anyway). ⚠ The new `UnpackStatus` enum is the ARCHIVE vocabulary and
@@ -396,10 +398,10 @@ and needs **no** consignment change at all.
     Archive → entry relation via `origin`. Mock handlers must be **no more lenient than the server**.
 19. ~~Docs: new OKF concept + GLOSSARY entries.~~ **✅ DONE 2026-08-26** — `okf/backend/engine/unpack-stage.md`
     written and indexed; **Archive**, **Entry** and **Unpack** are in GLOSSARY §5 with an
-    Entry-≠-Member row in §11's *Resolved collisions*. ⚠ The code has NOT been swept: ~21 "member"
-    occurrences remain across `com.gamma.etl.unpack` (one an operator-facing WARN string) — filed as
-    BACKLOG §4 unpack item (13). ⛔ That sweep must not touch `Batch.Member`, `MemberAudit` or
-    `MemberEntry`, which are correctly named for Consignment members.
+    Entry-≠-Member row in §11's *Resolved collisions*. **The code sweep landed 2026-08-26**
+    (BACKLOG §4 unpack item 13): `com.gamma.etl.unpack` says Entry everywhere an archive's inner
+    file is meant, incl. the operator-facing WARN; `Batch.Member`/`MemberAudit`/`MemberEntry`
+    untouched, and the three genuinely-Consignment-member sentences kept.
 
 ## 5. Deliberately out of scope
 

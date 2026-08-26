@@ -28,7 +28,7 @@ class UnpackLedgerTest {
 
     /**
      * 🔴 The WIDENED definition. The plan's original wording was "≥1 ingested, ≥1 quarantined" — a
-     * skipped (encrypted) entry is never quarantined, so an archive with one locked member and four
+     * skipped (encrypted) entry is never quarantined, so an archive with one locked entry and four
      * good ones matched NO status at all. Both shapes must be PARTIAL.
      */
     @Test

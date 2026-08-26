@@ -33,7 +33,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <h3>Lifecycle</h3>
  * Accumulated in memory across a run and flushed once at its end ({@link #flush}). ⚠ NOT written at
- * the {@code UnpackOrigins.consume()} release points, though those are where an archive's last member
+ * the {@code UnpackOrigins.consume()} release points, though those are where an archive's last entry
  * lands: a batch that fails at COMMIT runs neither the finalize nor the quarantine path, so the
  * release never fires — and those are exactly the archives an operator most needs a row for. A crash
  * loses the row, which is the same posture the rest of the unpack registry already takes.

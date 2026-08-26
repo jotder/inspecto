@@ -29,7 +29,7 @@ public final class Decompressors {
      * <p>⚠ Resolution is <b>longest-matching-suffix</b>, not first-match: {@code feed.tar.gz} is
      * claimed by both the tar.gz archive plugin and the plain gzip stream plugin (gzip magic, and
      * {@code .gz} IS a suffix of {@code .tar.gz}) — and expanding it as a stream would yield one
-     * undifferentiated tar blob instead of its member files. Ordering the services file would also
+     * undifferentiated tar blob instead of its entries. Ordering the services file would also
      * work within one jar, but ServiceLoader's order across jars is unspecified, so a dropped-in
      * plugin must not be able to reorder this by accident.
      */

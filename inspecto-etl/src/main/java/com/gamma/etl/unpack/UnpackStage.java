@@ -93,7 +93,7 @@ public final class UnpackStage {
         }
         // A format the lane decodes itself is left alone — but ONLY for stream kinds: a .zip the
         // Java lane "reads" is only ever its FIRST entry (Compression.firstEntry), so an archive
-        // must always be expanded here or its remaining members are silently dropped.
+        // must always be expanded here or its remaining entries are silently dropped.
         if (plugin == null
                 || (plugin.kind() == DecompressorPlugin.Kind.STREAM
                     && laneReadsItself(f.getName(), nativeLane)))
@@ -159,7 +159,7 @@ public final class UnpackStage {
                 List<Path> out = plugin.expand(source.toPath(), work, limits, skipped);
                 List<File> files = new ArrayList<>(out.size());
                 for (Path p : out) {
-                    // Lineage records the ENTRY name for an archive member — the workspace's
+                    // Lineage records the ENTRY name for an archive entry — the workspace's
                     // NNNNN_ ordering prefix is an implementation detail that must not leak into
                     // filename_column/lineage. A stream expansion's name is already the real one.
                     String name = p.getFileName().toString();
@@ -252,8 +252,8 @@ public final class UnpackStage {
      * @return the ORIGINAL inbox file when {@code actual} was its LAST outstanding expansion — the
      *         one moment the original's own side effects (backup, marker) may run — else null. With
      *         {@code batch.max_files: 1} (the default) an N-entry archive's members land in N
-     *         separate batches, so this is what keeps the archive in the inbox until every member
-     *         has committed: marking it earlier would strand the members still to come.
+     *         separate batches, so this is what keeps the archive in the inbox until every entry
+     *         has committed: marking it earlier would strand the entries still to come.
      */
     public static File cleanup(File actual) {
         if (!UnpackOrigins.isExpanded(actual)) return null;

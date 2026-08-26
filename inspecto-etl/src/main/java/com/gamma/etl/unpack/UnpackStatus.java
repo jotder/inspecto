@@ -9,10 +9,9 @@ package com.gamma.etl.unpack;
  * today's per-file semantics are that a bad file never blocks its batch-mates and failing whole would
  * discard 499 good ingests for one bad entry in a 500-entry archive.
  *
- * <p>⚠ Deliberately a separate vocabulary from the per-FILE status strings
- * ({@code SUCCESS}/{@code QUARANTINED_*}/{@code SKIPPED_UNREADABLE}) — those are still bare literals
- * across the engine (plan item 14 wants them promoted to their own enum). Do not conflate the two:
- * one describes a container, the other a member.
+ * <p>⚠ Deliberately a separate vocabulary from the per-FILE statuses, which since plan item 14
+ * live in {@link com.gamma.etl.MemberStatus}. Do not conflate the two: one describes a container,
+ * the other a member.
  */
 public enum UnpackStatus {
 
@@ -23,8 +22,8 @@ public enum UnpackStatus {
      * ≥1 entry ingested AND ≥1 entry not ingested — quarantined <b>or</b> skipped-unreadable.
      *
      * <p>⚠ The "or skipped" half is why this definition was WIDENED at sign-off: the plan's original
-     * wording said "≥1 quarantined", which an encrypted member never is (there are no readable bytes
-     * to move, so it gets a manifest row and nothing else). An archive with one encrypted member and
+     * wording said "≥1 quarantined", which an encrypted entry never is (there are no readable bytes
+     * to move, so it gets a manifest row and nothing else). An archive with one encrypted entry and
      * four good ones matched neither {@code UNPACKED} nor the old {@code UNPACKED_PARTIAL}.
      */
     UNPACKED_PARTIAL,

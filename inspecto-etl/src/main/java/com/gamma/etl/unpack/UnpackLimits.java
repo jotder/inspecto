@@ -9,7 +9,7 @@ package com.gamma.etl.unpack;
  * <p>Defaults are deliberately generous for legitimate data and hostile to bombs. They are constants
  * for now; the {@code processing.unpack.*} config surface is the plan's Phase 6.
  *
- * @param maxEntries    most member files one archive may expand to ({@code ARCHIVE} kinds only)
+ * @param maxEntries    most entries one archive may expand to ({@code ARCHIVE} kinds only)
  * @param maxEntryBytes most decompressed bytes any single output file may reach
  * @param maxTotalBytes most decompressed bytes one source may expand to in total
  * @param maxRatio      most output/input bytes (the classic bomb tell); ≤ 0 disables the check

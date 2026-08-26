@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * The 1→N ARCHIVE half of the unpack stage (unpack-stage plan Phase 3 + the archive half of the
  * Phase 2 caps): zip / tar / tar.gz expansion, archive-order naming, zip-slip refusal, the caps, the
  * longest-suffix resolution that keeps {@code .tar.gz} out of the plain-gzip plugin's hands, and the
- * refcounted origin bookkeeping that lets an archive's members span batches.
+ * refcounted origin bookkeeping that lets an archive's entries span batches.
  */
 class ArchiveUnpackTest {
 
@@ -35,7 +35,7 @@ class ArchiveUnpackTest {
      * 🔴 {@code feed.tar.gz} is claimed by BOTH the tar.gz plugin and the plain gzip plugin (gzip
      * magic; {@code .gz} is a suffix of {@code .tar.gz}). Longest-suffix resolution must pick the
      * archive — expanding it as a stream would yield one undifferentiated tar blob and silently lose
-     * every member but the concatenation.
+     * every entry but the concatenation.
      */
     @Test
     void tarGzResolvesToTheArchivePluginNotPlainGzip(@TempDir Path dir) throws Exception {
@@ -88,7 +88,7 @@ class ArchiveUnpackTest {
         assertEquals(A, Files.readString(out.get(0)));
     }
 
-    /** Directory members are skipped, and a nested path is FLATTENED into the workspace. */
+    /** Directory entries are skipped, and a nested path is FLATTENED into the workspace. */
     @Test
     void nestedEntryPathsAreFlattenedAndDirectoriesSkipped(@TempDir Path dir) throws Exception {
         Path z = zip(dir, "nested.zip", List.of("sub/dir/deep.csv"), List.of(A));
@@ -146,7 +146,7 @@ class ArchiveUnpackTest {
         assertTrue(e.getMessage().contains("no readable entries"), e.getMessage());
     }
 
-    // ── unreadable members (open item (4), honesty half) ───────────────────────
+    // ── unreadable entries (open item (4), honesty half) ───────────────────────
 
     /** {@code entryName} is the exact reverse of the workspace's {@code <NNNNN>_} naming — and only that. */
     @Test
@@ -161,11 +161,11 @@ class ArchiveUnpackTest {
     }
 
     /**
-     * 🔴 An encrypted (or unsupported-method) member must be REPORTED, never silently dropped — an
-     * encrypted zip that expands to fewer members must not look like a clean success.
+     * 🔴 An encrypted (or unsupported-method) entry must be REPORTED, never silently dropped — an
+     * encrypted zip that expands to fewer entries must not look like a clean success.
      */
     @Test
-    void unreadableMemberIsSkippedAndReported(@TempDir Path dir) throws Exception {
+    void unreadableEntryIsSkippedAndReported(@TempDir Path dir) throws Exception {
         Path z = encryptedFirstEntryZip(dir, "mixed.zip", "locked.csv", "open.csv");
         Path work = Files.createDirectories(dir.resolve("w"));
         List<String> skipped = new java.util.ArrayList<>();
@@ -212,12 +212,12 @@ class ArchiveUnpackTest {
 
     /**
      * 🔴 The cross-batch contract. With {@code batch.max_files: 1} (the DEFAULT) an N-entry archive's
-     * members land in N separate batches, so the archive's own backup+marker may only fire when the
-     * LAST member commits — {@link UnpackStage#cleanup} returns the original exactly once, on that
-     * last call. Marking it earlier would strand every member still to come.
+     * entries land in N separate batches, so the archive's own backup+marker may only fire when the
+     * LAST entry commits — {@link UnpackStage#cleanup} returns the original exactly once, on that
+     * last call. Marking it earlier would strand every entry still to come.
      */
     @Test
-    void originalIsReleasedOnlyByItsLastMember(@TempDir Path dir) throws Exception {
+    void originalIsReleasedOnlyByItsLastEntry(@TempDir Path dir) throws Exception {
         Path work = Files.createDirectories(dir.resolve("w"));
         File archive = dir.resolve("arch.zip").toFile();
         Files.writeString(archive.toPath(), "x");
@@ -230,10 +230,10 @@ class ArchiveUnpackTest {
         UnpackOrigins.register(e3, archive);
         assertEquals(3, UnpackOrigins.totalFor(archive), "archive semantics: total > 1");
 
-        assertNull(UnpackStage.cleanup(e1.toFile()), "first member: the archive is NOT yet done");
-        assertNull(UnpackStage.cleanup(e2.toFile()), "second member: still not done");
-        assertEquals(archive, UnpackStage.cleanup(e3.toFile()), "the LAST member releases the archive");
-        assertFalse(Files.exists(e1), "each member's scratch copy is deleted as it completes");
+        assertNull(UnpackStage.cleanup(e1.toFile()), "first entry: the archive is NOT yet done");
+        assertNull(UnpackStage.cleanup(e2.toFile()), "second entry: still not done");
+        assertEquals(archive, UnpackStage.cleanup(e3.toFile()), "the LAST entry releases the archive");
+        assertFalse(Files.exists(e1), "each entry's scratch copy is deleted as it completes");
         assertFalse(Files.exists(e3));
         // Idempotent: a repeat call reports nothing rather than releasing twice.
         assertNull(UnpackStage.cleanup(e3.toFile()));
@@ -301,10 +301,10 @@ class ArchiveUnpackTest {
         List<String> parallel   = expandNames(dir.resolve("par"), 4, names, bodies);
 
         assertEquals(4, sequential.size());
-        assertEquals(sequential, parallel, "parallel unpack must not reorder or drop members");
+        assertEquals(sequential, parallel, "parallel unpack must not reorder or drop entries");
     }
 
-    /** Expand 4 single-entry archives at the given thread count; returns the member names in order. */
+    /** Expand 4 single-entry archives at the given thread count; returns the entry names in order. */
     private static List<String> expandNames(Path root, int threads,
                                             List<String> names, List<String> bodies) throws Exception {
         var cfg = UnpackFixtures.load(root, "  unpack:\n    threads: " + threads + "\n");
@@ -327,7 +327,7 @@ class ArchiveUnpackTest {
     /**
      * A zip whose FIRST entry carries the encryption flag ({@code lockedName}, body {@link #A}) —
      * the streaming reader then reports {@code canReadEntryData == false} for it, exactly like a
-     * password-protected member. {@code openName} (body {@link #B}) follows as a readable entry, or
+     * password-protected entry. {@code openName} (body {@link #B}) follows as a readable entry, or
      * pass null for an all-unreadable archive. STORED entries, so the reader can skip the locked one
      * by its known size.
      */

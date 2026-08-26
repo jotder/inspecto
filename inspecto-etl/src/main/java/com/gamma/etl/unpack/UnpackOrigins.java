@@ -40,7 +40,7 @@ public final class UnpackOrigins {
     /** Total entries the original expanded to — 1 ⇒ stream semantics, >1 ⇒ archive semantics. */
     private static final Map<Path, Integer> TOTALS = new ConcurrentHashMap<>();
     /**
-     * The LINEAGE name behind an expanded file — the ENTRY name for an archive member (never the
+     * The LINEAGE name behind an expanded file — the ENTRY name for an archive entry (never the
      * workspace's {@code NNNNN_}-prefixed temp name, which is an implementation detail that must not
      * leak into {@code output.filename_column}/lineage: BACKLOG §4 "Unpack stage — open items" (3),
      * fixed 2026-08-26). Recorded at register time by the ONE caller that knows the plugin kind.

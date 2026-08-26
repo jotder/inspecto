@@ -20,7 +20,7 @@ import java.util.Locale;
 
 /**
  * Base for the 1→N {@link DecompressorPlugin.Kind#ARCHIVE} built-ins (unpack-stage plan Phase 3):
- * walks member entries and materializes each into {@code workDir}, enforcing every
+ * walks entries and materializes each into {@code workDir}, enforcing every
  * {@link UnpackLimits} cap DURING the walk — an archive is the classic bomb vector, so a breach
  * throws and {@link #expand} deletes everything it wrote (a partial expansion is never handed on).
  *
@@ -28,7 +28,7 @@ import java.util.Locale;
  * {@code <NNNNN>_<flattened-entry-name>}. The zero-padded index makes <b>path order == archive
  * order</b>, which matters because every entry is written in the same instant and
  * {@code ConsignmentPlanner} orders by mtime with an absolute-path tie-break — without the prefix,
- * member order would be deterministic but arbitrary. The name is flattened (separators → {@code _})
+ * entry order would be deterministic but arbitrary. The name is flattened (separators → {@code _})
  * so nested archive directories cannot recreate a tree in the workspace.
  *
  * <h3>Zip-slip</h3>
@@ -82,7 +82,7 @@ public abstract class ArchiveDecompressorPlugin implements DecompressorPlugin {
             ArchiveEntry e;
             while ((e = in.getNextEntry()) != null) {
                 if (e.isDirectory()) continue;
-                // An encrypted or unsupported-method member has readable metadata but no readable
+                // An encrypted or unsupported-method entry has readable metadata but no readable
                 // bytes: skip it, and REPORT the skip via skippedOut so the caller can record it in
                 // the batch manifest (a partial expansion must never look like a clean success —
                 // BACKLOG §4 "Unpack stage — open items" (4), honesty half fixed 2026-08-26). An
@@ -90,7 +90,7 @@ public abstract class ArchiveDecompressorPlugin implements DecompressorPlugin {
                 // below; the archive-level status vocabulary stays the plan's §6 Q1.
                 if (!in.canReadEntryData(e)) {
                     skippedOut.add(e.getName());
-                    log.warn("[UNPACK] {}: skipping unreadable member '{}' of {} (encrypted or "
+                    log.warn("[UNPACK] {}: skipping unreadable entry '{}' of {} (encrypted or "
                             + "unsupported method) — it will NOT appear in the expansion",
                             id, e.getName(), source.getFileName());
                     continue;
