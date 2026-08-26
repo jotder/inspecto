@@ -84,6 +84,16 @@ Every slice starts with its own grounding pass (the hotspot internals are inferr
 
 ### S1 — Shared helper consolidation → `inspecto-util` (mechanical, high ROI)
 
+> **STATUS: core sweep SHIPPED `d5791116` (2026-08-26)** — `com.gamma.util.Values` + 38-file sweep,
+> reactor 3651/0/0/5. Residuals deliberately left: (a) the `str(Map,key)` lookup-shaped helpers
+> (~10 files — a different family; candidate for S4's `MapView` instead), (b) `RuleTemplate.str`
+> (blankToNull semantics, no trim), (c) `ComponentPreview.intOr` (no Number branch — coercing a
+> Double would change behavior), (d) sites in files that carried another shift's uncommitted
+> changes (`PipelineCodec`, `PartitionSinkWriter`, `PipelineWatermarkStore`, `PipelineJobRunner`,
+> `EventObjectBridge`) — sweep them once the tree is clean, (e) the `quote` family (own commit,
+> semantics differ per site), (f) the control-plane `exists()` 5-copy family (control-local
+> consolidation, fits S3's error-mapper work).
+
 Create two small utility homes and sweep the duplicated private-static family into them:
 - `com.gamma.util.Values` (or extend an existing helper if grounding finds one): `str`,
   `blankToNull`, `intOr`, `exists`, `safe`, `putIfPresent`, `norm` — generic where it pays
