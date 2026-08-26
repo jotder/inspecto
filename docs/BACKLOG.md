@@ -722,11 +722,25 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 > - **The rewrite bought local/branch hygiene, NOT remediation.** Anyone can still
 >   `git fetch origin refs/pull/1/head`.
 > - **Open a GitHub Support request to purge unreachable objects + PR refs.** Until that completes, treat the
->   exposure as ONGOING, not historical.
+>   exposure as ONGOING, not historical. **A ready-to-send draft now exists:**
+>   [`ops/github-support-purge-request.md`](ops/github-support-purge-request.md) (written 2026-08-26) —
+>   review and send it from an account with owner rights, record the ticket number here, and note
+>   **explicitly which of its four asks GitHub actions**: "unreachable objects purged" is not the same as
+>   "the PR refs are gone", and only the latter closes the fetchable-secret path. Re-verify with an actual
+>   `git fetch origin refs/pull/1/head` from a clean clone — a confirmation email is a claim, the fetch is
+>   the evidence. ⛔ No secret value goes in the ticket; a support ticket is one more disclosure surface.
 > - **ROTATION IS NOW UNAVOIDABLE AND URGENT** — it was always the real fix, and the exposure is live.
 > - ⚠ **The issuer auth logs are GONE** (operator, 2026-07-26) ⇒ the "pull logs before rotating" step is moot
 >   and we can **never** establish whether the exposure was exercised. "Assume compromised" is the only
->   defensible reading. Rotation is no longer gated on anything.
+>   defensible reading. Rotation is no longer gated on anything. **The runbook was repaired to match
+>   2026-08-26** — it had kept this as a hard "Do this first" gate, so an operator opening it would have
+>   stopped at Step 0 waiting for evidence that no longer exists. Three further contradictions were fixed
+>   in the same pass: it still forbade the `git-filter-repo` rewrite **that was already executed**
+>   2026-07-26 (the constraint was reversed by operator call); it still routed the reader to `4.x`, a
+>   branch **deleted 2026-08-17** (`git log 4.x` cannot run — the PKCE commits are on `master`, verified
+>   by `merge-base --is-ancestor`); and it had no `refs/pull/*` step at all, i.e. it never told the
+>   executing operator that the exposure is **ongoing**. ⚠ A runbook is the artifact someone follows under
+>   pressure — stale steps there cost more than stale prose anywhere else in `docs/`.
 > - ⚠ **Lesson for any future rewrite: enumerate ALL remote refs first** (`git ls-remote origin`), not just
 >   branches. A stray branch nearly slipped through, and `refs/pull/*` cannot be fixed client-side at all.
 > - ~~⚠ **~84 short SHAs across `docs/`, the skills and the memory index now dangle**~~ — **REPAIRED

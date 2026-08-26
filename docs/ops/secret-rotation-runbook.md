@@ -1,11 +1,21 @@
 # Runbook — rotating the SEC-INCIDENT-1 OAuth client secrets
 
-> **Status:** rotation **NOT YET PERFORMED** as of 2026-07-25 — but **the code-side blocker is now
-> cleared**: `4.x` P0+P1 shipped (`579632ba`, `932eff92`, **plus the mandatory follow-up `ce49a681`**), so
-> `4.x` no longer sends a client secret and a rotation no longer breaks a running SPA *once the new bundle
-> is deployed*. ⚠ **The bundle you deploy must include `ce49a681`** — `932eff92` on its own breaks login
-> depending on the IdP's callback parameter order. Check `git log --oneline 4.x` before cutting the build. Read §"The complication"
-> below with that in mind — the deploy-then-rotate ordering still applies, the design blocker does not.
+> **Status (re-verified 2026-08-26):** rotation **STILL NOT PERFORMED**, and it is now **gated on
+> nothing**. The code-side blocker cleared long ago — the PKCE work (`579632ba`, `932eff92`, plus the
+> mandatory follow-up `ce49a681`) is **all on `master`**, verified by `git merge-base --is-ancestor`, so
+> no supported line sends a client secret. ⚠ **The bundle you deploy must include `ce49a681`** —
+> `932eff92` alone breaks login depending on the IdP's callback parameter order.
+>
+> ⚠ **`4.x` NO LONGER EXISTS** (deleted 2026-08-17, operator call). Every instruction below that named it
+> has been rewritten; **do not try to `git log 4.x`** — the PKCE commits are on `master` and that is the
+> line you cut a build from. Nothing was lost: 4.x carried nothing master lacks.
+>
+> 🔴 **THE EXPOSURE IS ONGOING, NOT HISTORICAL.** The 2026-07-26 history rewrite did **not** end it:
+> all five PRs merged *after* the leak commit, so every `refs/pull/N/head` still pins the old lineage and
+> still serves the secret literals — verified against the live API after the force-push. **A repo owner
+> cannot delete or rewrite `refs/pull/*`; only GitHub Support can purge them** (Step 0-B below).
+> Treat these credentials as live and public until rotation completes.
+>
 > This runbook is the execution checklist;
 > [`../BACKLOG.md`](../BACKLOG.md) §5 is the incident record and closes only on *confirmed* rotation.
 > **Operator-executed.** Every step below happens in the IdP console and in deployment infrastructure —
@@ -40,19 +50,32 @@ Client IDs are not secrets and are retained in-repo deliberately, so the issuer-
 identifiable without consulting the leaked values. **One `iamClientSecret` rotation covers every
 environment**, because the same value was reused in all of them.
 
-## Step 0 — pull the auth logs BEFORE rotating
+## Step 0 — ~~pull the auth logs BEFORE rotating~~ MOOT: the evidence is gone
 
-**Do this first. Rotation destroys the evidence.** For each client ID above, export the issuer's
-authentication/token-grant logs for **2026-06-12 → 2026-07-25** and look for:
+🔴 **This step is no longer executable and is NOT a gate. Do not wait on it.** The issuer's auth logs
+were deleted (operator, 2026-07-26) before they were exported, so the question this step existed to
+answer — *was the exposure exercised?* — **can never be answered**.
 
-- token requests from IPs outside the known deployment ranges;
-- grants at times when no deployment was active;
-- unusual user-agents, or `client_credentials` grants where the app only ever uses auth-code.
+What that changes, concretely:
 
-This is the only opportunity to learn whether the exposure was *exercised*. Record the finding (even
-"nothing anomalous") in the BACKLOG §5 row — a clean log is a materially different incident outcome from
-an unexamined one, and it is what a customer or auditor will ask for. If anything looks exercised, this
-stops being a rotation and becomes an incident response with a disclosure question attached.
+- **"Assume compromised" is the only defensible reading**, and it is the assumption the rest of this
+  runbook now runs on. There is no clean-log outcome available to report.
+- **Rotation is gated on nothing.** Previously this step blocked it; it does not.
+- A customer or auditor asking "was it used?" gets *"the logs were not retained"* — a materially worse
+  answer than a clean log, and the reason the export-before-rotating instruction existed. Preserve this
+  section rather than deleting it: the next incident's Step 0 should be run, not skipped.
+
+## Step 0-B — ask GitHub Support to purge `refs/pull/*` (do this NOW, in parallel)
+
+**This is the only remaining action that can reduce the exposure itself**, and it is independent of
+rotation — start it immediately rather than after. The force-push cleaned branches and tags; it could not
+touch pull-request refs, which a repo owner has no ability to delete. Until Support purges them,
+`git fetch origin refs/pull/1/head` still hands anyone the secrets.
+
+A ready-to-send draft is in [`github-support-purge-request.md`](github-support-purge-request.md) —
+**review it, then send it from the account that owns `jotder/inspecto`.** Record the ticket number in the
+BACKLOG §5 row so the next shift can chase it rather than re-derive it. Do not paste any secret value
+into the ticket: reference the *files and refs*, never the literals.
 
 ## Step 1 — choose the rotation mode
 
@@ -63,7 +86,8 @@ parallel client)?*
   it, verify, then revoke the old one. The exposed value dies with no service gap, and prod does not need
   to wait on the `4.x` rebuild.
 - **No → cutover rotation.** Old and new cannot coexist, so every environment needs a scheduled window,
-  and **prod must wait for the `4.x` fix to ship** (P0+P1 of the PKCE plan, then deploy, then rotate).
+  and **prod must wait for a bundle built from `master`** (which carries P0+P1 and `ce49a681`) to be
+  deployed, then rotate.
 
 The rest of this runbook branches on that answer. Do not start without it.
 
@@ -75,9 +99,12 @@ Two orderings are in tension and the right choice depends on Step 1:
 - **By availability:** prod last — it is the only environment where a mistake is customer-visible.
 
 **Overlap mode → rotate prod first** (risk order wins; there is no outage to trade against).
-**Cutover mode → rehearse on gammadev → gamma → dev/offline, and schedule prod last**, after the `4.x`
-bundle that no longer needs the secret is deployed. Rotating prod first in cutover mode means an outage of
-unknown length on a customer system while the rebuild is still unwritten — do not do it.
+**Cutover mode → rehearse on gammadev → gamma → dev/offline, and schedule prod last**, after a bundle
+that no longer needs the secret is deployed there. Rotating prod first in cutover mode means an outage of
+unknown length on a customer system — do not do it. ⚠ The rebuild is no longer "unwritten" as this step
+once warned: the fix is on `master`, so the only open variable is **what is actually deployed at
+`app1.pronto.lebara.sa`** — confirm that before choosing an ordering, rather than inferring it from the
+source line.
 
 Rotate `appClientSecret` per environment, then the shared `iamClientSecret` last: it spans every
 environment, so its blast radius is the widest and it should move only once the per-environment work is
@@ -102,7 +129,16 @@ For each credential, in the order fixed by Step 2:
 ## Step 4 — close out
 
 - [ ] All five secrets rotated **and old values revoked**.
-- [ ] Step 0 log review recorded in [`../BACKLOG.md`](../BACKLOG.md) §5, including a negative result.
+- [ ] GitHub Support purge of `refs/pull/*` requested (Step 0-B), ticket number recorded in
+      [`../BACKLOG.md`](../BACKLOG.md) §5 — and **confirmed complete**, which is a separate event from
+      requesting it.
+- [x] ~~Step 0 log review recorded, including a negative result~~ — **NOT ACHIEVABLE**: the issuer logs
+      were deleted 2026-07-26 before export. Record *that* in §5 instead; "assume compromised" is the
+      standing reading and no clean-log outcome is available.
+- [ ] Pre-rewrite backup bundle deleted —
+      `C:/sandbox/cgi_decoder/ucc-prerewrite-backup-20260726-203545.bundle` (16 MiB) still holds all five
+      values in cleartext. Deliberately retained while the incident is open, as the only pre-rewrite
+      recovery point; **delete it at close.**
 - [ ] BACKLOG §5 row closed — it closes on confirmed rotation, not on a merged commit.
 - [x] ~~`tools/check-secrets.mjs` merged forward to `4.x`~~ — **done 2026-07-25** (`f1fb6f20`). `4.x`
       stopped holding live values in `932eff92` (P1), so the guard runs green there; verified it also
@@ -112,8 +148,13 @@ For each credential, in the order fixed by Step 2:
 
 ## Standing constraints
 
-- **No `git-filter-repo` history rewrite** (operator call, 2026-07-25): it invalidates every clone and
-  breaks the shift-shared sandbox while still not purging forks or GitHub's caches. Rotation is the fix.
+- ~~**No `git-filter-repo` history rewrite** (operator call, 2026-07-25)~~ — ⚠ **REVERSED AND ALREADY
+  EXECUTED 2026-07-26.** The operator ordered the rewrite; it ran (73 occurrences replaced, 0 secrets in
+  22 598 objects, all 1008 commits preserved, `HEAD` tree byte-identical) and `master`/`4.x`/two tags were
+  force-pushed. **It bought local and branch hygiene, not remediation** — exactly as the original
+  constraint predicted about forks and caches, and worse: `refs/pull/*` still serves the literals
+  (Step 0-B). Its one lasting cost was ~24 invalidated commit hashes across `docs/`, repaired 2026-08-26.
+  **Do not run another rewrite** — there is nothing left for one to clean, and rotation is still the fix.
 - **Do not re-issue a secret that still ships inside a browser bundle.** A public SPA cannot keep a
   confidential-client secret; handing `4.x` fresh values just reproduces this incident with new numbers.
   That is what the PKCE plan exists to prevent.
