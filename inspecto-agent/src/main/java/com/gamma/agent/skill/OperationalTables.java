@@ -49,6 +49,13 @@ final class OperationalTables {
 
     static final List<String> QUARANTINE = List.of("file", "reason", "path", "size_bytes");
 
+    /**
+     * ⛔ Deliberately a REFERENCE to the ledger's single declaration, never a restated list — the
+     * batches ledger's five drifting mirrors are the pattern this ledger was built to avoid
+     * (see {@link com.gamma.etl.unpack.UnpackLedger#COLUMNS}).
+     */
+    static final List<String> UNPACK = com.gamma.etl.unpack.UnpackLedger.COLUMNS;
+
     static final List<String> ENRICH_RUNS = List.of(
             "run_id", "job", "trigger", "reason", "scope", "input_partition_count",
             "start_time", "end_time", "status", "output_partition_count", "output_file_count",
@@ -58,7 +65,7 @@ final class OperationalTables {
             "run_id", "job", "partition", "output_file", "bytes");
 
     /** The Stage-1 (pipeline) operational tables. */
-    static final List<String> STAGE1_NAMES = List.of("batches", "files", "lineage", "quarantine");
+    static final List<String> STAGE1_NAMES = List.of("batches", "files", "lineage", "quarantine", "unpack");
     /** The Stage-2 (enrichment) operational tables. */
     static final List<String> STAGE2_NAMES = List.of("enrich_runs", "enrich_lineage");
 
@@ -88,11 +95,12 @@ final class OperationalTables {
     // ── config → operational tables ──────────────────────────────────────────────────────
 
     static List<SqlOracle.TableData> stage1(StatusStore store, PipelineConfig cfg) {
-        List<SqlOracle.TableData> out = new ArrayList<>(4);
+        List<SqlOracle.TableData> out = new ArrayList<>(5);
         out.add(toTable("batches", BATCHES, store.batches(cfg)));
         out.add(toTable("files", FILES, store.files(cfg)));
         out.add(toTable("lineage", LINEAGE, store.lineage(cfg, null)));
         out.add(toTable("quarantine", QUARANTINE, store.quarantine(cfg)));
+        out.add(toTable("unpack", UNPACK, store.unpack(cfg)));
         return out;
     }
 

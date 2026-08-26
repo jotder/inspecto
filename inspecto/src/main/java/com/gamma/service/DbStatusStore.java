@@ -70,6 +70,7 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
     private static final String T_FILES      = "inspecto_status_files";
     private static final String T_LINEAGE    = "inspecto_status_lineage";
     private static final String T_QUARANTINE = "inspecto_status_quarantine";
+    private static final String T_UNPACK     = "inspecto_status_unpack";
 
     private final Connection conn;
 
@@ -77,7 +78,7 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
     @Override public String browseId() { return "status"; }
     @Override public String browseLabel() { return "Ingest Status"; }
     @Override public java.util.List<String> browseTables() {
-        return java.util.List.of(T_COMMITS, T_BATCHES, T_FILES, T_LINEAGE, T_QUARANTINE);
+        return java.util.List.of(T_COMMITS, T_BATCHES, T_FILES, T_LINEAGE, T_QUARANTINE, T_UNPACK);
     }
     @Override public Connection browseConnection() { return conn; }
 
@@ -143,6 +144,11 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
         return readRows(T_QUARANTINE, name(cfg), null);
     }
 
+    @Override
+    public List<Map<String, String>> unpack(PipelineConfig cfg) {
+        return readRows(T_UNPACK, name(cfg), null);
+    }
+
     /** Read a table's payload rows for one pipeline (ordered by seq), optionally filtered by batch_id. */
     private synchronized List<Map<String, String>> readRows(String table, String pipeline, String batchId) {
         List<Map<String, String>> out = new ArrayList<>();
@@ -181,6 +187,7 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
                 insertRows(T_LINEAGE, p, source.lineage(cfg, null), "consignment_id");
                 insertRows(T_FILES, p, source.files(cfg), null);
                 insertRows(T_QUARANTINE, p, source.quarantine(cfg), null);
+                insertRows(T_UNPACK, p, source.unpack(cfg), null);
             }
             conn.commit();
         } catch (SQLException e) {
@@ -201,7 +208,7 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
         try {
             autoCommit = conn.getAutoCommit();
             conn.setAutoCommit(false);
-            for (String t : List.of(T_COMMITS, T_BATCHES, T_FILES, T_LINEAGE, T_QUARANTINE)) {
+            for (String t : List.of(T_COMMITS, T_BATCHES, T_FILES, T_LINEAGE, T_QUARANTINE, T_UNPACK)) {
                 try (PreparedStatement ps = conn.prepareStatement(
                         "UPDATE " + t + " SET pipeline = ? WHERE pipeline = ?")) {
                     ps.setString(1, newName);
@@ -220,7 +227,7 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
     }
 
     private void deletePipeline(String pipeline) throws SQLException {
-        for (String t : List.of(T_COMMITS, T_BATCHES, T_FILES, T_LINEAGE, T_QUARANTINE)) {
+        for (String t : List.of(T_COMMITS, T_BATCHES, T_FILES, T_LINEAGE, T_QUARANTINE, T_UNPACK)) {
             try (PreparedStatement ps = conn.prepareStatement("DELETE FROM " + t + " WHERE pipeline = ?")) {
                 ps.setString(1, pipeline);
                 ps.executeUpdate();
@@ -284,6 +291,9 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
             st.execute("CREATE TABLE IF NOT EXISTS " + T_LINEAGE
                     + " (pipeline VARCHAR, batch_id VARCHAR, seq BIGINT, payload VARCHAR)");
             st.execute("CREATE TABLE IF NOT EXISTS " + T_QUARANTINE
+                    + " (pipeline VARCHAR, seq BIGINT, payload VARCHAR)");
+            // No legacy migration for this one: no ucc_status_unpack ever existed.
+            st.execute("CREATE TABLE IF NOT EXISTS " + T_UNPACK
                     + " (pipeline VARCHAR, seq BIGINT, payload VARCHAR)");
         } catch (SQLException e) {
             throw new IllegalStateException("Could not initialise status DB schema", e);

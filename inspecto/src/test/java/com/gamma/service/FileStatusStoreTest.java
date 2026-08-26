@@ -4,6 +4,7 @@ import com.gamma.etl.BatchAuditWriter;
 import com.gamma.etl.LineageRow;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.PipelineConfigBatchTest;
+import com.gamma.etl.unpack.UnpackLedger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -57,5 +58,41 @@ class FileStatusStoreTest {
         assertEquals(1, lin.size());
         assertEquals(winPath, lin.get(0).get("output_file"),
                 "lineage output_file must keep its backslashes too");
+    }
+
+    /**
+     * The unpack ledger's read surface: rows written by {@link UnpackLedger} come back through
+     * {@code StatusStore.unpack} keyed by the ledger's own {@link UnpackLedger#COLUMNS} — the
+     * single declaration the whole surface references, never restates.
+     */
+    @Test
+    void readsUnpackLedgerRowsByCanonicalColumns(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = PipelineConfig.load(
+                PipelineConfigBatchTest.writePipeline(dir, "").toString());
+
+        Path statusDir = Path.of(cfg.dirs().statusFilePath()).toAbsolutePath().getParent();
+        Files.createDirectories(statusDir);
+        String name = cfg.identity().pipelineName();   // reader globs <name>_unpack_*.csv
+
+        Path inbox = dir.resolve("in");
+        Files.createDirectories(inbox);
+        java.io.File archive = inbox.resolve("east/data.zip").toFile();
+
+        String runId = "UNPACK_READ_TEST";
+        UnpackLedger.expanded(runId, archive, "zip", 3, 1, 100, 250, false, "");
+        UnpackLedger.entryOutcome(runId, archive, "B1", true);
+        UnpackLedger.entryOutcome(runId, archive, "B2", false);
+        UnpackLedger.flush(runId,
+                statusDir.resolve(name + "_unpack_TEST.csv").toString(), inbox);
+
+        List<Map<String, String>> rows = new FileStatusStore().unpack(cfg);
+        assertEquals(1, rows.size(), "one row per archive per run");
+        Map<String, String> row = rows.get(0);
+        assertEquals(new java.util.LinkedHashSet<>(UnpackLedger.COLUMNS), row.keySet(),
+                "the read side's columns ARE the ledger's single declaration");
+        assertEquals(runId, row.get("run_id"));
+        assertEquals("east/data.zip", row.get("archive_relpath"));
+        assertEquals("UNPACKED_PARTIAL", row.get("status"),
+                "1 ingested + 1 failed + 1 skipped is a partial expansion");
     }
 }

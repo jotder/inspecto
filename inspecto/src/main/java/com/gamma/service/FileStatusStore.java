@@ -56,6 +56,11 @@ public final class FileStatusStore implements StatusStore {
     }
 
     @Override
+    public List<Map<String, String>> unpack(PipelineConfig cfg) {
+        return readRuns(cfg, "_unpack_");
+    }
+
+    @Override
     public List<Map<String, String>> quarantine(PipelineConfig cfg) {
         List<Map<String, String>> out = new ArrayList<>();
         String qd = cfg.dirs().quarantine();

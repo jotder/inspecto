@@ -78,6 +78,33 @@ class DbStatusStoreTest {
         assertEquals(file.batches(cfg).get(0), first, "row map round-trips faithfully");
     }
 
+    /**
+     * The unpack ledger rides the same projection: sync copies the file store's rows into
+     * {@code inspecto_status_unpack} and the DB read matches the file read verbatim.
+     */
+    @Test
+    void syncProjectsTheUnpackLedger(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = runOnePipeline(dir);
+        FileStatusStore file = new FileStatusStore();
+
+        // The seeded run has no archives, so write one archive's row the way the engine does.
+        Path statusDir = Path.of(cfg.dirs().statusFilePath()).toAbsolutePath().getParent();
+        String name = cfg.identity().pipelineName();
+        java.io.File archive = dir.resolve("inbox").resolve("data.zip").toFile();
+        String runId = "UNPACK_SYNC_TEST";
+        com.gamma.etl.unpack.UnpackLedger.expanded(runId, archive, "zip", 2, 0, 10, 20, false, "");
+        com.gamma.etl.unpack.UnpackLedger.entryOutcome(runId, archive, "B1", true);
+        com.gamma.etl.unpack.UnpackLedger.entryOutcome(runId, archive, "B1", true);
+        com.gamma.etl.unpack.UnpackLedger.flush(runId,
+                statusDir.resolve(name + "_unpack_TEST.csv").toString(), dir.resolve("inbox"));
+
+        db.sync(file, List.of(cfg));
+
+        assertEquals(file.unpack(cfg), db.unpack(cfg), "unpack rows project verbatim");
+        assertEquals(1, db.unpack(cfg).size());
+        assertEquals("UNPACKED", db.unpack(cfg).get(0).get("status"));
+    }
+
     @Test
     void reSyncIsIdempotent(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = runOnePipeline(dir);

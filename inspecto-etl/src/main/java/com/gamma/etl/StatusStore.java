@@ -42,4 +42,16 @@ public interface StatusStore {
 
     /** Quarantined inputs: one entry per file under the quarantine tree, with its reason. */
     List<Map<String, String>> quarantine(PipelineConfig cfg);
+
+    /**
+     * Unpack ledger rows — one per ARCHIVE per RUN ({@code <pipeline>_unpack_<ts>.csv}), across all
+     * runs of the pipeline. The column contract is {@link com.gamma.etl.unpack.UnpackLedger#COLUMNS},
+     * declared once there and never restated.
+     *
+     * <p>{@code default} rather than abstract: a store with no unpack ledger (and every pre-existing
+     * third-party implementation of this {@code @PublicApi} seam) truthfully has no rows.
+     */
+    default List<Map<String, String>> unpack(PipelineConfig cfg) {
+        return List.of();
+    }
 }
