@@ -65,8 +65,15 @@ public final class RouteArming {
             out.add("route: needs a non-empty branches list to arm");
             return out;
         }
-        // (1) clone mode stays authoring-only: a row leaving on several branches needs the
-        //     cross-branch partial-commit UX (plan B9/D8) that is deliberately unshipped.
+        // (1) clone mode stays authoring-only. ⚠ NOT for lack of engine substrate — that reason was
+        //     stale and was corrected 2026-08-26: D8 (the `(batch, branch)` commit, source finalised
+        //     only when every branch commits, idempotent sinks) SHIPPED, `BranchCommitCoordinator`
+        //     keys expectedBranches by sink NODE ID so it is already generic over case vs clone, and
+        //     `RowShaper.route` already implements clone fan-out. B9 ("no cross-branch transactional
+        //     commit") is a DELIBERATE ACCEPTED constraint, not missing work.
+        //     The real reason it stays refused: nothing SURFACES partial-commit state to an operator,
+        //     so a clone that lands 2 of 3 destinations and retries the third is invisible. Arming
+        //     this is an operator/product call about that visibility, not an engine gap.
         if ("clone".equalsIgnoreCase(String.valueOf(route.get("mode"))))
             out.add("route: mode 'clone' is authoring-only — arming runs 'case' (exclusive) branches; "
                     + "keep the pipeline inactive or switch to mode: case");
@@ -98,8 +105,16 @@ public final class RouteArming {
         if (def == null || !keys.contains(String.valueOf(def)))
             out.add("an armed route: needs default: naming one of its branch keys (" + keys + ") — "
                     + "without it a row matching no branch is silently dropped");
-        // (4) multi-schema stays authoring-only with route: arming both would run the wrong tree for
-        //     every schema but one.
+        // (4) multi-schema stays authoring-only with route:. ⛔ Do NOT lift this by "fixing the branch
+        //     count" — that was investigated 2026-08-26 and is the WRONG fix. The mechanism, grounded:
+        //     `BatchIngestStrategy.writeAndTrace` is called ONCE PER SEGMENT (see
+        //     `UnionModeIngester`'s loop, destTable = "transformed_" + segKey), while the branch-aware
+        //     divert inside it lifts `PipelineLift.lift(cfg)` — the WHOLE multi-schema graph. Arming
+        //     would therefore execute EVERY schema's route tree against EVERY segment's table.
+        //     A real fix needs a segment-scoped lift (only the current schema's subtree) — a design
+        //     change, not an unrefusal. `BatchGraphRunner.dataFedSinkCount`'s collapsing of identical
+        //     route keys across schema branches is real but harmless: it feeds `engages()` (a `> 1`
+        //     test, and any multi-schema+route count is already > 1) and one diagnostic log line.
         if (multiSchema)
             out.add("route: on a multi-schema pipeline (selector/segments) is authoring-only — arm it "
                     + "on a single-schema pipeline");

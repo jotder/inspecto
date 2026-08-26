@@ -8,15 +8,10 @@ import {
   Provider,
   importProvidersFrom,
   inject,
-  provideAppInitializer,
   provideEnvironmentInitializer,
 } from "@angular/core";
 import { MatDialogModule } from "@angular/material/dialog";
 import { MAT_FORM_FIELD_DEFAULT_OPTIONS } from "@angular/material/form-field";
-import {
-  GAMMA_MOCK_API_DEFAULT_DELAY,
-  mockApiInterceptor,
-} from "@gamma/lib/mock-api";
 import { GammaConfig } from "@gamma/services/config";
 import { GAMMA_CONFIG } from "@gamma/services/config/config.constants";
 import { GammaConfirmationService } from "@gamma/services/confirmation";
@@ -30,10 +25,6 @@ import { GammaSplashScreenService } from "@gamma/services/splash-screen";
 import { GammaUtilsService } from "@gamma/services/utils";
 
 export type GammaProviderConfig = {
-  mockApi?: {
-    delay?: number;
-    service?: any;
-  };
   gamma?: GammaConfig;
 };
 
@@ -53,10 +44,6 @@ export const provideGamma = (
       },
     },
     {
-      provide: GAMMA_MOCK_API_DEFAULT_DELAY,
-      useValue: config?.mockApi?.delay ?? 0,
-    },
-    {
       provide: GAMMA_CONFIG,
       useValue: config?.gamma ?? {},
     },
@@ -73,15 +60,9 @@ export const provideGamma = (
     provideEnvironmentInitializer(() => inject(GammaUtilsService)),
   ];
 
-  // Mock Api services
-  if (config?.mockApi?.service) {
-    providers.push(
-      provideHttpClient(withXhr(), withInterceptors([mockApiInterceptor])),
-      provideAppInitializer(() => {
-        const mockApiService = inject(config.mockApi.service);
-      }),
-    );
-  }
+  // The vendored @gamma/lib/mock-api shell was removed (BACKLOG "M4 Fuse remainder", 2026-08-26):
+  // THE mock backend is the app-owned app/inspecto/mock, wired in app.config.ts. This provider never
+  // received a mockApi config, so the branch that used it was dead.
 
   // Return the providers
   return providers;

@@ -75,6 +75,10 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- [`superpower/mid-branch-transforms-design.md`](superpower/mid-branch-transforms-design.md) — **DESIGN
+  ONLY, not scheduled** (2026-08-26). The last branch-aware-executor residual that is genuinely unbuilt:
+  letting a `route:` branch carry its own `steps:` sub-chain. Records the four decisions it needs and the
+  recommendation to leave the refusal in place until a pipeline needs it.
 - [`superpower/d11-resource-caps-plan.md`](superpower/d11-resource-caps-plan.md) — **SHIPPED 2026-08-26**,
   awaiting the operator's confirmation before it is distilled + archived. Ships BACKLOG **D11**: the measured
   resource pair `memory_limit=2GB` + `maxConcurrentRuns=4`, both on by default and both owned by the server
