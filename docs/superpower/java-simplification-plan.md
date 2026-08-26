@@ -159,6 +159,11 @@ Converge oversized `*Routes` classes on the existing lean idiom (lambda handlers
 
 ### S4 — Typed access over `Map<String,Object>` plumbing (generics + records)
 
+> **STATUS: part 1 SHIPPED `40477a16` (2026-08-27)** — Values map accessors + PipelineConfigParser
+> (16→6 suppressions) + ObjectService (2→0). Remaining: the route-class cast sites (now in the
+> split Config/Pipeline modules) can adopt castMapAt/mapAt in a follow-up pass; the records-at-seams
+> half stays per-seam and operator-visible per the lossy-round-trip caution below.
+
 Not a big-bang DTO rewrite. Two moves:
 1. A generic typed map view in `inspecto-util` (e.g. `MapView` with `str(key)`, `list(key, Class<T>)`,
    `map(key)`, `req(key, Class<T>)` throwing a uniform error) to replace ad-hoc casts — targets the
