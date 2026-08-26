@@ -238,6 +238,31 @@ export class AiAssistComponent {
         this.showUnchanged.update((v) => !v);
     }
 
+    /**
+     * A prerequisite's config as compact `key: value` rows — what will actually be CREATED, not just
+     * how many things will be.
+     *
+     * <p>A composed draft (today only `kpi_report_builder`) applies its prerequisites FIRST and
+     * non-atomically: N widget POSTs, then the dashboard. The operator was shown a bare count
+     * ("3 dependent components will be applied first"), so the one surface whose entire job is
+     * "review the STRUCTURE before applying" hid most of the structure. Reviewing a write you cannot
+     * see is not reviewing it.
+     *
+     * <p>⚠ The parent's `clean` badge already covers these — the tool pools every widget's findings
+     * with the dashboard's into ONE verdict, so an unclean widget cannot hide under a Validated
+     * parent. That is why a prerequisite carries no badge of its own: a second, always-green badge
+     * would imply a per-widget verdict nobody computed.
+     */
+    prerequisiteRows(draft: AiDraft): { label: string; rows: { key: string; value: string }[] }[] {
+        return (draft.prerequisites ?? []).map((p) => ({
+            label: p.label,
+            rows: Object.entries(p.config).map(([key, value]) => ({
+                key,
+                value: typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value),
+            })),
+        }));
+    }
+
     /** Findings are ordered worst-first so an ERROR is never hidden below a WARNING. */
     findingsOf(draft: AiDraft): AiDraft['findings'] {
         const rank = (s: string) => (s === 'ERROR' ? 0 : s === 'WARNING' ? 1 : 2);

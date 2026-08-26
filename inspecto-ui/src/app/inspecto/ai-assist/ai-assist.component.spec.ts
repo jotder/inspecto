@@ -47,7 +47,7 @@ describe('AiAssistComponent', () => {
     function create(
         options: {
             canAuthor?: boolean;
-            tool?: 'suggest_expectations' | 'component_draft' | 'query_author';
+            tool?: 'suggest_expectations' | 'component_draft' | 'query_author' | 'kpi_report_builder';
             prompting?: boolean;
         } = {},
     ) {
@@ -104,6 +104,67 @@ describe('AiAssistComponent', () => {
         expect((applied[0] as { label: string }).label).toBe('cdr_cost_usd_range');
         // Applying closes the surface — a stale draft must not linger over the pane.
         expect(fixture.componentInstance.drafts()).toBeNull();
+    });
+
+    /**
+     * A composed draft applies its prerequisites FIRST and non-atomically, so they are part of what
+     * the operator approves. The surface used to show a bare COUNT — "2 dependent components will be
+     * applied first" — which made most of the write unreviewable on the one surface whose stated job
+     * is "review the STRUCTURE, not just the rendered result, before applying".
+     */
+    it('shows WHAT each dependent component will create, not just how many', () => {
+        runTool.mockReturnValue(
+            of({
+                kind: 'dashboard',
+                id: 'revenue',
+                clean: true,
+                findings: [],
+                draft: { title: 'Revenue', tiles: [{ widgetId: 'revenue_kpi', span: 1 }] },
+                widgets: [
+                    { id: 'revenue_kpi', draft: { vizType: 'kpi', datasetId: 'orders', options: { title: 'Revenue' } } },
+                    { id: 'revenue_chart', draft: { vizType: 'bar', datasetId: 'orders' } },
+                ],
+            }),
+        );
+        const fixture = create({ tool: 'kpi_report_builder' });
+        clickRun(fixture);
+
+        const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+        expect(text).toContain('2 dependent components applied first');
+        // Each prerequisite is named AND its config is visible — the whole point.
+        expect(text).toContain('revenue_kpi');
+        expect(text).toContain('revenue_chart');
+        expect(text).toContain('kpi');
+        expect(text).toContain('orders');
+    });
+
+    /**
+     * ⚠ A prerequisite carries NO badge of its own. The tool pools every widget's findings with the
+     * dashboard's into ONE verdict, so an unclean widget cannot hide under a Validated parent — but
+     * nobody computes a PER-WIDGET verdict, and an always-green badge would invent one.
+     */
+    it('does not invent a per-prerequisite verdict', () => {
+        runTool.mockReturnValue(
+            of({
+                kind: 'dashboard',
+                id: 'revenue',
+                clean: false,
+                findings: [{ severity: 'ERROR', fieldPath: 'tiles[0].widgetId', message: 'unknown widget' }],
+                draft: { title: 'Revenue', tiles: [] },
+                widgets: [{ id: 'revenue_kpi', draft: { vizType: 'kpi', datasetId: 'orders' } }],
+            }),
+        );
+        const fixture = create({ tool: 'kpi_report_builder' });
+        clickRun(fixture);
+
+        // The pooled verdict is the honest one and it reaches the operator...
+        expect(fixture.componentInstance.activeDraft()!.clean).toBe(false);
+        const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+        expect(text).toContain('Needs attention');
+        // ...while the prerequisite is listed without a competing verdict of its own.
+        expect(fixture.componentInstance.prerequisiteRows(fixture.componentInstance.activeDraft()!))
+            .toHaveLength(1);
+        expect(text).not.toContain('Validated');
     });
 
     it('renders anchored findings and still allows Apply so the operator can finish by hand', () => {
