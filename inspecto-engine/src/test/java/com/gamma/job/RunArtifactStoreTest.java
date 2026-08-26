@@ -17,7 +17,7 @@ class RunArtifactStoreTest {
     @Test
     void recordsAndReadsBackDatasetAndFileArtifacts(@TempDir Path dir) {
         RunArtifactStore store = new RunArtifactStore(dir.toString());
-        RunContext ctx = new RunContext("r1", "default", "loader", "manual", "r1", 0,
+        RunContext ctx = new RunContext("r1", "default", "loader", "manual", "r1", null, 0,
                 Map.of(), new RunLogStore(dir.toString()), 100, store);
 
         ResultSetMeta meta = new ResultSetMeta(List.of(

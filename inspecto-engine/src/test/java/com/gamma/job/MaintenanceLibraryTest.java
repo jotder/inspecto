@@ -31,7 +31,7 @@ class MaintenanceLibraryTest {
 
     /** A real {@link RunContext} marked as a preview fire (MNT-1), audit files under {@code auditDir}. */
     private static JobContext dryCtx(Path auditDir) {
-        RunContext ctx = new RunContext("r-dry", "default", "m", "manual", "r-dry", 0, Map.of(),
+        RunContext ctx = new RunContext("r-dry", "default", "m", "manual", "r-dry", null, 0, Map.of(),
                 new RunLogStore(auditDir.toString()), 100, new RunArtifactStore(auditDir.toString()));
         ctx.dryRun(true);
         return ctx;
@@ -39,7 +39,7 @@ class MaintenanceLibraryTest {
 
     /** A real (non-dry) {@link RunContext}, audit files under {@code auditDir}. */
     private static JobContext realCtx(Path auditDir) {
-        return new RunContext("r", "default", "m", "manual", "r", 0, Map.of(),
+        return new RunContext("r", "default", "m", "manual", "r", null, 0, Map.of(),
                 new RunLogStore(auditDir.toString()), 100, new RunArtifactStore(auditDir.toString()));
     }
 

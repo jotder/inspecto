@@ -255,6 +255,9 @@ public final class AlertService {
             Signal s = new Signal(null, "alert-rule.fired", Instant.ofEpochMilli(nowMs),
                     Severity.parse(rule.severity()), Ref.of("alert-rule", rule.name()),
                     Ref.of("pipeline", display), "alert:" + rule.name() + "|" + cooldownScope,
+                    // causation = null DELIBERATELY: a rule fires on a METRIC THRESHOLD, not on a
+                    // signal, so there is no signal directly responsible — this is a causation ROOT.
+                    // ⛔ Do not "fix" this by inventing a parent; a wrong cause is worse than none.
                     null, null, null, alert.message(), payload, 1);
             EventLog.current().emit(s.toEvent());
         } catch (RuntimeException e) {

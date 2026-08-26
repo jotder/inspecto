@@ -227,7 +227,7 @@ class ReferenceCompactorTest {
         JobConfig cfg = new JobConfig("rc", JobType.MAINTENANCE, null, null, true, false,
                 Map.of("task", "reference_compact", "dir", store.toString()));
 
-        RunContext dryCtx = new RunContext("r-dry", "default", "rc", "manual", "r-dry", 0, Map.of(),
+        RunContext dryCtx = new RunContext("r-dry", "default", "rc", "manual", "r-dry", null, 0, Map.of(),
                 new RunLogStore(audit.toString()), 100, new RunArtifactStore(audit.toString()));
         dryCtx.dryRun(true);
         JobResult dry = new MaintenanceJob(cfg, dir.toString()).run(dryCtx);

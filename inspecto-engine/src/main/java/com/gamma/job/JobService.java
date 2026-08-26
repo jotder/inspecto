@@ -259,7 +259,7 @@ public final class JobService implements AutoCloseable {
         // Job Packs (P2c): load hot-deployable types BEFORE building Jobs, so a Job authored against a
         // pack type resolves at construction. Startup-scan signals no-op until the event log is wired.
         this.packs = new JobPackManager(System.getProperty("jobs.packs.dir"), registry, expressions,
-                (type, sev, payload) -> emitSignal(type, sev, null, Ref.of("job-pack", "job.packs"), payload),
+                (type, sev, payload) -> emitSignal(type, sev, null, null, Ref.of("job-pack", "job.packs"), payload),
                 this::onPackUnloaded);
         this.packs.scanAtStartup();
         for (JobConfig c : this.configs) {
@@ -637,7 +637,7 @@ public final class JobService implements AutoCloseable {
     private void fireOnCommit(String name, BatchEvent event) {
         if (!jobs.containsKey(name)) return;
         String runId = newRunId(name);
-        submitRun(runId, name, "event:" + event.pipeline(), runId, 0,
+        submitRun(runId, name, "event:" + event.pipeline(), runId, null, 0,
                 new Firing(Map.of(), commitPayload(event), false));
     }
 
@@ -665,7 +665,10 @@ public final class JobService implements AutoCloseable {
             String cid = sig.correlationId();
             Firing firing = new Firing(Map.of(), sig.payload(), false);   // §7.2 layer 2: bind: resolves $signal.<field>
             signalCoalescers.computeIfAbsent(c.name(), k -> new TriggerCoalescer())
-                    .signal(() -> submitRun(newRunId(c.name()), c.name(), "signal:" + sig.type(), cid, newDepth, firing));
+                    .signal(() -> submitRun(newRunId(c.name()), c.name(), "signal:" + sig.type(), cid,
+                            // 🔴 THE causation link: every signal this Run emits nests under the signal
+                            // that fired it. Without it /signals/tree is permanently flat.
+                            sig.signalId(), newDepth, firing));
         }
     }
 
@@ -674,7 +677,7 @@ public final class JobService implements AutoCloseable {
      *  is unchanged — the two coexist (no double-fire; different config keys). */
     private void mirrorPipelineCommit(BatchEvent be) {
         emitSignal("pipeline.commit", "SUCCESS".equals(be.status()) ? Severity.INFO : Severity.WARN,
-                be.batchId(), Ref.of("pipeline", be.pipeline()), commitPayload(be));
+                be.batchId(), null, Ref.of("pipeline", be.pipeline()), commitPayload(be));
     }
 
     /** The commit fields both event surfaces speak — {@code bind:} resolves {@code $signal.<field>}
@@ -690,13 +693,15 @@ public final class JobService implements AutoCloseable {
         return payload;
     }
 
-    /** Emit a framework signal outside a Run (mirror / chain-cut) directly to this space's ledger. */
-    private void emitSignal(String type, Severity sev, String correlationId, Ref source, Map<String, Object> payload) {
+    /** Emit a framework signal outside a Run (mirror / chain-cut) directly to this space's ledger.
+     *  {@code causationId} names the signal directly responsible ({@code null} for a mirror, which is a root). */
+    private void emitSignal(String type, Severity sev, String correlationId, String causationId,
+                            Ref source, Map<String, Object> payload) {
         EventLog el = eventLog;
         if (el == null) return;
         Map<String, Object> p = new LinkedHashMap<>(payload);
         p.putIfAbsent("chainDepth", 0);
-        el.emit(new Signal(null, type, Instant.now(), sev, source, null, correlationId, null, null, null,
+        el.emit(new Signal(null, type, Instant.now(), sev, source, null, correlationId, causationId, null, null,
                 type, p, 1).toEvent());
     }
 
@@ -704,7 +709,7 @@ public final class JobService implements AutoCloseable {
     private void cutChain(String name, Signal sig, int depth) {
         log.warn("[JOB] signal chain cut at depth {} (max {}) — not firing '{}' on '{}'",
                 depth, maxChainDepth, name, sig.type());
-        emitSignal("job.chain.cut", Severity.WARN, sig.correlationId(), Ref.of("job", name),
+        emitSignal("job.chain.cut", Severity.WARN, sig.correlationId(), sig.signalId(), Ref.of("job", name),
                 Map.of("job", name, "signalType", sig.type(), "chainDepth", depth, "maxChainDepth", maxChainDepth));
     }
 
@@ -766,7 +771,7 @@ public final class JobService implements AutoCloseable {
         if (!jobs.containsKey(name)) return Optional.empty();
         String runId = newRunId(name);
         String trigger = actor == null || actor.isBlank() ? "manual" : "manual:" + actor.trim();
-        submitRun(runId, name, trigger, runId, 0, new Firing(args == null ? Map.of() : args, Map.of(), dryRun));
+        submitRun(runId, name, trigger, runId, null, 0, new Firing(args == null ? Map.of() : args, Map.of(), dryRun));
         return Optional.of(runId);
     }
 
@@ -818,7 +823,7 @@ public final class JobService implements AutoCloseable {
 
     /** Register the run as {@code RUNNING} and execute it off the caller's thread; a fresh correlation chain. */
     private void submitRun(String runId, String name, String trigger) {
-        submitRun(runId, name, trigger, runId, 0, Firing.NONE);
+        submitRun(runId, name, trigger, runId, null, 0, Firing.NONE);
     }
 
     /**
@@ -826,8 +831,15 @@ public final class JobService implements AutoCloseable {
      * (a fresh Run uses its own runId), {@code chainDepth} is its position in a signal chain (0 for cron/manual/
      * event/catch-up; the firing signal's depth + 1 for on-signal Runs) — stamped onto every signal the Run emits.
      * {@code firing} carries this fire's dynamic parameter inputs (§7.2 layers 1–2).
+     *
+     * <p>{@code causationId} is the id of the Signal that TRIGGERED this Run, threaded on the same path as
+     * {@code correlationId} and stamped onto every signal the Run emits, so the run's facts nest under their
+     * cause in the {@code /signals/tree} forest. {@code null} for cron / manual / event / catch-up runs —
+     * those are ROOTS, caused by no signal. ⚠ Different axis from correlation: correlation groups the whole
+     * chain, causation names the ONE signal directly responsible.
      */
-    private void submitRun(String runId, String name, String trigger, String correlationId, int chainDepth, Firing firing) {
+    private void submitRun(String runId, String name, String trigger, String correlationId,
+                           String causationId, int chainDepth, Firing firing) {
         Job job = jobs.get(name);
         if (job == null) return;
         String start = LocalDateTime.now().format(TS);
@@ -840,7 +852,7 @@ public final class JobService implements AutoCloseable {
             try {
                 if (!acquireRunPermit()) return;
                 try {
-                    runJob(runId, name, trigger, start, correlationId, chainDepth, firing);
+                    runJob(runId, name, trigger, start, correlationId, causationId, chainDepth, firing);
                 } finally {
                     releaseRunPermit();
                 }
@@ -885,7 +897,7 @@ public final class JobService implements AutoCloseable {
             try {
                 if (!acquireRunPermit()) return;
                 try {
-                    runJob(job, cfg, runId, cfg.name(), trigger, start, runId, 0, Firing.NONE);
+                    runJob(job, cfg, runId, cfg.name(), trigger, start, runId, null, 0, Firing.NONE);
                 } finally {
                     releaseRunPermit();
                 }
@@ -895,10 +907,12 @@ public final class JobService implements AutoCloseable {
         });
     }
 
-    private void runJob(String runId, String name, String trigger, String start, String correlationId, int chainDepth, Firing firing) {
+    private void runJob(String runId, String name, String trigger, String start, String correlationId,
+                        String causationId, int chainDepth, Firing firing) {
         Job job = jobs.get(name);
         if (job == null) return;
-        runJob(job, configFor(name).orElse(null), runId, name, trigger, start, correlationId, chainDepth, firing);
+        runJob(job, configFor(name).orElse(null), runId, name, trigger, start, correlationId, causationId,
+                chainDepth, firing);
     }
 
     /** The run lifecycle with the {@link Job} + config carried explicitly — shared by the registered path
@@ -906,13 +920,13 @@ public final class JobService implements AutoCloseable {
      *  inert no-op) and the ad-hoc flow path ({@link #triggerPipelineRun}), whose synthetic config is never
      *  registered and so cannot be resolved by name. */
     private void runJob(Job job, JobConfig cfg, String runId, String name, String trigger, String start,
-                        String correlationId, int chainDepth, Firing firing) {
+                        String correlationId, String causationId, int chainDepth, Firing firing) {
         runner.runExclusiveOrSkip(name, () -> {
             fenceDelete(cfg);   // T25: surface a conflict if a declared delete races an active reader/writer
             String pipelineId = trackPipelineStart(job, cfg, name);   // T32: mark a flow job's stores active for the fence
             Map<String, String> params = cfg != null ? cfg.params() : Map.of();
-            RunContext ctx = new RunContext(runId, spaceId, name, trigger, correlationId, chainDepth,
-                    params, runLogStore, runLogMax, runArtifactStore);
+            RunContext ctx = new RunContext(runId, spaceId, name, trigger, correlationId, causationId,
+                    chainDepth, params, runLogStore, runLogMax, runArtifactStore);
             if (unavailableJobs.contains(name)) {
                 String reason = "job type '" + job.type() + "' unavailable: owning Job Pack was unloaded";
                 ctx.log().error("run rejected: " + reason, null);

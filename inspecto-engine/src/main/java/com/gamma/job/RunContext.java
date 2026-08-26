@@ -33,6 +33,7 @@ final class RunContext implements JobContext {
     private volatile PlatformServices services = PlatformServices.none();   // grant-filtered by the framework (S1-1)
 
     RunContext(String runId, String spaceId, String jobName, String trigger, String correlationId,
+               String causationId,
                int chainDepth, Map<String, String> config, RunLogStore store, int maxEntries,
                RunArtifactStore artifactStore) {
         this.runId     = runId;
@@ -40,7 +41,8 @@ final class RunContext implements JobContext {
         this.trigger   = TriggerInfo.parse(trigger);
         this.config    = config == null ? Map.of() : Map.copyOf(config);
         this.log       = new FileRunLog(runId, store, maxEntries);
-        this.signals   = new RunSignalEmitter(new Ref("job", jobName, "emits", "run:" + runId), correlationId, chainDepth);
+        this.signals   = new RunSignalEmitter(new Ref("job", jobName, "emits", "run:" + runId),
+                correlationId, causationId, chainDepth);
         this.artifacts = new RunArtifactRecorder(runId, jobName, artifactStore);
     }
 
@@ -88,16 +90,26 @@ final class RunContext implements JobContext {
         }
     }
 
-    /** A {@link SignalEmitter} that stamps the envelope (id/time/source/correlation + the run's
-     *  {@code chainDepth} into the payload, for loop protection) and routes to the space's ledger via MDC. */
+    /**
+     * A {@link SignalEmitter} that stamps the envelope (id/time/source/correlation/causation + the run's
+     * {@code chainDepth} into the payload, for loop protection) and routes to the space's ledger via MDC.
+     *
+     * <p>{@code causationId} is the id of the Signal that TRIGGERED this run, so every signal the run
+     * emits nests under it in {@code Signals.assembleTree} — the causation forest {@code /signals/tree}
+     * serves. It is {@code null} for a cron / manual / pipeline-event run, which is correct: that run is a
+     * ROOT, caused by no signal. ⚠ Correlation and causation are different axes — correlation groups a
+     * whole chain under one id, causation names the ONE signal directly responsible.
+     */
     private static final class RunSignalEmitter implements SignalEmitter {
         private final Ref source;
         private final String correlationId;
+        private final String causationId;
         private final int chainDepth;
 
-        RunSignalEmitter(Ref source, String correlationId, int chainDepth) {
+        RunSignalEmitter(Ref source, String correlationId, String causationId, int chainDepth) {
             this.source = source;
             this.correlationId = correlationId;
+            this.causationId = causationId;
             this.chainDepth = chainDepth;
         }
 
@@ -105,7 +117,7 @@ final class RunContext implements JobContext {
             Map<String, Object> p = new LinkedHashMap<>(payload == null ? Map.of() : payload);
             p.putIfAbsent("chainDepth", chainDepth);   // the next run in the chain is chainDepth + 1 (§8.4)
             Signal s = new Signal(null, type, Instant.now(), severity == null ? Severity.INFO : severity,
-                    source, null, correlationId, null, null, null, type, p, 1);
+                    source, null, correlationId, causationId, null, null, type, p, 1);
             EventLog.current().emit(s.toEvent());   // MDC (set by the Run) routes to the space store
         }
     }
