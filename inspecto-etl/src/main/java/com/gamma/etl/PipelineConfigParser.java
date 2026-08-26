@@ -173,6 +173,10 @@ final class PipelineConfigParser {
             b.lineageFilePath = statusParent.resolve(
                     b.pipelineName + "_lineage_" + b.runTimestamp + ".csv").toString();
             b.manifestsDir = statusParent.resolve("manifests").toString();
+            // The unpack ledger: one row per ARCHIVE per RUN (unpack-stage plan 2.2), run-timestamped
+            // like status/batches/lineage because the expansion is a run-scoped event.
+            b.unpackFilePath = statusParent.resolve(
+                    b.pipelineName + "_unpack_" + b.runTimestamp + ".csv").toString();
             // Commit log is persistent (NOT run-timestamped): a single append-only
             // ledger that accumulates committed batches across every run of this
             // pipeline — the durable source of truth for "did this batch finish".

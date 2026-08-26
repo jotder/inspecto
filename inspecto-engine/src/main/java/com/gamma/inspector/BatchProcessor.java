@@ -502,6 +502,13 @@ public final class BatchProcessor {
         int rejected = 0;
         for (MemberAudit ma : outcome.memberAudits()) {
             if (!ma.status().equals("SUCCESS")) rejected++;
+            // Roll this entry's outcome up to the ARCHIVE it came out of, for the run-level unpack
+            // ledger (§2.2). Keyed on the origin PATH captured at ingest time, never the basename —
+            // two same-named archives in different inbox subdirectories are two archives.
+            if (ma.originPath() != null)
+                com.gamma.etl.unpack.UnpackLedger.entryOutcome(
+                        cfg.identity().runTimestamp(), ma.originPath(), batch.batchId(),
+                        "SUCCESS".equals(ma.status()));
             List<String> paths = new ArrayList<>(
                     outBySrc.getOrDefault(ma.srcId(), new LinkedHashSet<>()));
             fileRows.add(new BatchAuditWriter.FileRow(

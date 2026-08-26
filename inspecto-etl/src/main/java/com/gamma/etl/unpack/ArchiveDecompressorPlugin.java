@@ -127,8 +127,12 @@ public abstract class ArchiveDecompressorPlugin implements DecompressorPlugin {
             for (Path p : written) Files.deleteIfExists(p);
             throw ex;
         }
+        // Nothing usable came out. EMPTY (zero entries in the archive) and UNREADABLE (entries
+        // existed, none decodable) are one code path here but stay DISTINCT statuses per §6 Q1, so
+        // carry the count rather than making the caller parse this message.
         if (written.isEmpty())
-            throw new IOException(id + ": no readable entries in " + source.getFileName());
+            throw new NoUsableEntriesException(
+                    id + ": no readable entries in " + source.getFileName(), skippedOut.size());
         return written;
     }
 

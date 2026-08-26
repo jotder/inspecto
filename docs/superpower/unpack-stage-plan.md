@@ -94,8 +94,14 @@ status/batches/lineage) carries one row per Archive per Run:
 
 ```
 run_id, archive_relpath, format, entries_found, entries_ingested, entries_failed,
-bytes_in, bytes_out, status, error, consignment_ids
+entries_skipped, bytes_in, bytes_out, status, error, consignment_ids
 ```
+
+⚠ **As built 2026-08-26 this list gained `entries_skipped`** — an entry the walk could not decode is
+neither ingested nor quarantined, so without its own count `found - ingested - failed` silently
+absorbs it. ⛔ **This block is prose, not the contract**: the columns are declared once in
+`UnpackLedger.COLUMNS` and the header is joined from it — if the two ever disagree, the code is
+right and this paragraph is stale.
 
 This is honest to `Run ⊇ Consignment ⊇ File`: the expansion happens once per Run, before Consignments
 are planned. Entries stay ordinary Files with per-Consignment status exactly as today, gaining one
@@ -105,14 +111,15 @@ ledger files — but the batches-ledger header has **five mirrors**
 ([`consignment-status-flow.md`](../okf/backend/engine/consignment-status-flow.md)); this new ledger
 must not repeat that pattern — one declaration, read by name.
 
-**Archive status vocabulary** (needs operator sign-off, §6):
+**Archive status vocabulary** — **SIGNED OFF by the operator 2026-08-26** (§6 Q1; `UNPACKED_PARTIAL`
+widened from the original wording, which missed the skipped-unreadable entry):
 
 | Status | Meaning |
 |---|---|
-| `UNPACKED` | every entry ingested |
-| `UNPACKED_PARTIAL` | ≥1 entry ingested, ≥1 quarantined — Archive → backup, bad entries → quarantine |
-| `UNREADABLE` | unpack itself failed (corrupt/unsupported/cap breach) — Archive → quarantine, reason `unreadable` |
-| `EMPTY` | archive opened, zero usable entries |
+| `UNPACKED` | every entry found was ingested |
+| `UNPACKED_PARTIAL` | ≥1 entry ingested **and** ≥1 not ingested — quarantined **or** skipped-unreadable. Archive → backup, bad entries → quarantine. **The Consignment COMMITS** (§6 Q1b): the verdict is reporting, never a gate |
+| `UNREADABLE` | unpack itself failed (corrupt/unsupported/cap breach), or no entry was readable — Archive → quarantine, reason `unreadable` |
+| `EMPTY` | archive opened, zero entries found. ⚠ Distinct from `UNREADABLE` by operator decision, though both are one code path today — separating them means counting entries found, not merely failing |
 
 ### 2.3 Filename identity — the extension problem (operator-added complexity)
 
@@ -337,9 +344,19 @@ and needs **no** consignment change at all.
     (`BatchProcessor.java:147-158`) untouched: manifest before backup, markers last.
     → *verify:* a batch with one good and one unreadable file yields **two** manifest entries;
     re-run the crash-order test to prove ordering is unchanged.
-13. The `unpack` ledger + the additive `origin` column on the per-file status ledger (§2.2).
-14. While in here: promote the per-file status strings to a **single enum**. Four values live as bare
-    literals across ~6 files today; adding two Archive statuses to that is how vocabularies drift.
+13. ~~The `unpack` ledger + the additive `origin` column on the per-file status ledger (§2.2).~~
+    **✅ BOTH SHIPPED** — `origin` 2026-08-23; the ledger 2026-08-26 once §6 Q1 was answered.
+    `UnpackLedger` + `UnpackStatus`, written to `<pipeline>_unpack_<ts>.csv`, accumulated across the
+    run and flushed in `CollectorProcessor.run` after the batch futures join. ⛔ Columns declared
+    ONCE (`UnpackLedger.COLUMNS`) — the anti-mirror rule this section demanded, pinned by a test.
+    **Open: no READ surface yet** (an `OperationalTables` `unpack` table + a `StatusStore` reader) —
+    that is Phase 6, and it must REFERENCE `UnpackLedger.COLUMNS` rather than restate them.
+14. ⚠ **STILL OPEN — and now more urgent than when this was written.** Promote the per-file status
+    strings to a **single enum**. There are now **FIVE** bare literals across ~6 files, not four:
+    `SUCCESS`, `QUARANTINED_EMPTY`, `QUARANTINED_MISMATCH`, `QUARANTINED_UNREADABLE` and
+    `SKIPPED_UNREADABLE` (added 2026-08-26 by the open-item (4) fix — this section predicted exactly
+    that drift and it happened anyway). ⚠ The new `UnpackStatus` enum is the ARCHIVE vocabulary and
+    is deliberately NOT this: one describes a container, the other a member. Do not merge them.
     → *verify:* one declaration, all call sites referencing it, no literal `"QUARANTINED_` left.
 15. Error reporting: the existing `errors/<base>_errors.csv` + quarantine tree already carry
     row-level evidence and need no change. An Archive-level failure reports through the new ledger's
@@ -395,18 +412,36 @@ and needs **no** consignment change at all.
 >   `SKIPPED_UNREADABLE` manifest rows (`archive!entry`, srcId -1, no backup/marker). An
 >   all-unreadable archive still fails whole; the archive-LEVEL verdict stays Q1's.
 
-1. **Archive status vocabulary** (§2.2): are `UNPACKED` / `UNPACKED_PARTIAL` / `UNREADABLE` / `EMPTY`
-   the right four, and on `UNPACKED_PARTIAL` should the Consignment still commit or fail whole?
-   **Today, unanswered:** no archive-level status exists at all. A partial archive **commits and is
-   marked**, its bad member quarantined as `<archive>!<entry>` — today's per-file semantics, and the
-   container leaves the inbox so it is not retried. The verdict is only inferrable by joining the
-   members' manifest rows. Answering this unblocks the run-level `unpack` ledger.
-2. **Lineage grain.** For an entry this should be the **entry** name (finest grain; the Archive link
-   lives in the ledger) — confirm, because the alternative (archive name) loses which entry a row
-   came from. **Today (2026-08-26):** the prefix-leak defect is FIXED — it records the **entry name**
-   for an archive member (`good.csv`, never `00001_good.csv`) and the decompressed name for a
-   stream. That is this question's own recommendation, now in force; what remains is ratifying the
-   grain (or asking for archive-name instead, which would be a deliberate information loss).
+1. ~~**Archive status vocabulary**~~ **✅ ANSWERED by the operator 2026-08-26.**
+   **(a) The four statuses stand, with `UNPACKED_PARTIAL` WIDENED.** Its §2.2 definition said "≥1
+   entry ingested, ≥1 **quarantined**" — which no longer covers every case: a skipped unreadable
+   entry (encrypted / unsupported method, fixed 2026-08-26) is never quarantined, because there are
+   no readable bytes to move. An archive with one encrypted member and four good ones matched
+   neither `UNPACKED` nor `UNPACKED_PARTIAL` as written. Binding definition:
+
+   | Status | Meaning |
+   |---|---|
+   | `UNPACKED` | every entry found was ingested |
+   | `UNPACKED_PARTIAL` | ≥1 entry ingested **and** ≥1 entry not ingested — quarantined **or** skipped-unreadable |
+   | `UNREADABLE` | unpack itself failed (corrupt / unsupported / cap breach), or no entry was readable |
+   | `EMPTY` | archive opened, zero entries found |
+
+   ⚠ `EMPTY` and `UNREADABLE` are ONE code path today — both throw `no readable entries` and the
+   original flows on to quarantine as `unreadable`. Keeping them distinct (operator's call: an
+   operator should be told "your zip is empty" vs "your zip is locked") means the expansion must
+   count entries found, not merely fail.
+
+   **(b) On `UNPACKED_PARTIAL` the Consignment COMMITS** — today's shipped behaviour and today's
+   per-file semantics (a bad file never blocks its batch-mates) are ratified, not changed. Failing
+   whole would discard 499 good ingests for one bad entry in a 500-entry archive, and a re-drive
+   would re-ingest everything. The verdict is REPORTING, never a gate.
+2. ~~**Lineage grain.**~~ **✅ ANSWERED by the operator 2026-08-26: the ENTRY name, as shipped.**
+   A row from `bundle.zip`'s `good.csv` records `good.csv` — finest grain, and the Archive link
+   lives in the ledger (and in the manifest's `archive!entry` address). Archive-name was considered
+   and refused as a deliberate information loss. No code change: the fix of 2026-08-26 already put
+   the entry grain in force, and this ratifies it. ⛔ Do not "simplify" `filename_column` to the
+   container name, and do not widen it to the composite `archive!entry` — that would bake a key
+   downstream consumers must parse into a data column.
 3. ~~**Phase 4 appetite.**~~ **RESOLVED by building it** (2026-08-23): failures are recorded in the
    manifest, crash-safe order untouched, branch-aware path unchanged. What remains of the
    "end status against each source file" ask is the run-level ledger under Q1.

@@ -183,6 +183,17 @@ public class CollectorProcessor {
                 }
             }
         }   // try-with-resources close() shuts the executor down and awaits all virtual threads
+
+        // ── the run-level unpack ledger (unpack-stage plan §2.2) ─────────────────
+        // One row per ARCHIVE for this run, written HERE — after every batch has joined, so the
+        // tallies are complete — and in a finally-shaped position so a partial-failure run still
+        // reports. ⚠ Deliberately NOT written at the UnpackOrigins.consume() release points: a batch
+        // that fails at COMMIT runs neither the finalize nor the quarantine path, so the release
+        // never fires for exactly the archives an operator most needs a row for.
+        // flush() is idempotent (it removes the run's rows), so this cannot double-report.
+        com.gamma.etl.unpack.UnpackLedger.flush(cfg.identity().runTimestamp(),
+                cfg.dirs().unpackFilePath(), Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize());
+
         if (failedBatches > 0) {
             throw new BatchProcessingException(failedBatches, batches.size());
         }

@@ -71,9 +71,11 @@ public final class UnpackStage {
         List<Plan> plans = new ArrayList<>(candidates.size());
         for (File f : candidates) plans.add(plan(f, nativeLane));
 
+        String runId = cfg.identity().runTimestamp();
         List<Plan> work = plans.stream().filter(p -> p.plugin != null).toList();
-        if (work.size() > 1 && opts.threads() > 1) expandParallel(work, workRoot, limits, opts.threads());
-        else for (Plan p : work) p.run(workRoot, limits);
+        if (work.size() > 1 && opts.threads() > 1)
+            expandParallel(work, workRoot, limits, opts.threads(), runId);
+        else for (Plan p : work) p.run(workRoot, limits, runId);
 
         List<File> out = new ArrayList<>(candidates.size());
         for (Plan p : plans) out.addAll(p.result());
@@ -105,7 +107,8 @@ public final class UnpackStage {
      * planning, so borrowing that permit would serialize it behind ingest for nothing), and the
      * logging MDC is propagated or per-space log routing breaks on the worker threads.
      */
-    private static void expandParallel(List<Plan> work, Path workRoot, UnpackLimits limits, int threads) {
+    private static void expandParallel(List<Plan> work, Path workRoot, UnpackLimits limits,
+                                       int threads, String runId) {
         Map<String, String> mdc = org.slf4j.MDC.getCopyOfContextMap();
         java.util.concurrent.Semaphore permits = new java.util.concurrent.Semaphore(threads);
         try (var pool = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
@@ -116,7 +119,7 @@ public final class UnpackStage {
                     if (mdc != null) org.slf4j.MDC.setContextMap(mdc);
                     permits.acquireUninterruptibly();
                     try {
-                        p.run(workRoot, limits);
+                        p.run(workRoot, limits, runId);
                     } finally {
                         permits.release();
                         if (prior != null) org.slf4j.MDC.setContextMap(prior); else org.slf4j.MDC.clear();
@@ -147,13 +150,13 @@ public final class UnpackStage {
             this.plugin = plugin;
         }
 
-        void run(Path workRoot, UnpackLimits limits) {
+        void run(Path workRoot, UnpackLimits limits, String runId) {
+            boolean archive = plugin.kind() == DecompressorPlugin.Kind.ARCHIVE;
+            List<String> skipped = new ArrayList<>();
             try {
                 Path work = workRoot.resolve(String.valueOf(Math.abs(source.getAbsolutePath().hashCode())));
                 Files.createDirectories(work);
-                List<String> skipped = new ArrayList<>();
                 List<Path> out = plugin.expand(source.toPath(), work, limits, skipped);
-                boolean archive = plugin.kind() == DecompressorPlugin.Kind.ARCHIVE;
                 List<File> files = new ArrayList<>(out.size());
                 for (Path p : out) {
                     // Lineage records the ENTRY name for an archive member — the workspace's
@@ -170,11 +173,29 @@ public final class UnpackStage {
                 // never looks like a clean success.
                 UnpackOrigins.registerSkipped(source, skipped);
                 expanded = files;
+
+                // The archive's run-level ledger row (§2.2). ARCHIVE kind only: a 1→1 stream
+                // expansion has no entries to roll up and its outcome is already fully described by
+                // its single file's own status row — a row here would double-report it.
+                if (archive)
+                    UnpackLedger.expanded(runId, source, plugin.id(),
+                            files.size() + skipped.size(), skipped.size(),
+                            sizeOf(source.toPath()), bytesOf(out), false, "");
             } catch (IOException e) {
                 // Fail-open: the original flows on and fails in the engine, where the per-file
                 // status/quarantine machinery reports it (see the class comment).
                 log.warn("[UNPACK] {} failed for {} — handing the original to the engine: {}",
                         plugin.id(), source.getName(), e.getMessage());
+                // ⚠ A NoUsableEntriesException is NOT an expansion failure: the archive opened
+                // cleanly and simply had nothing usable in it, which is EMPTY (zero entries) or
+                // UNREADABLE (entries existed, none decodable) — distinct statuses per §6 Q1, told
+                // apart by the count the exception carries, never by its message.
+                if (archive) {
+                    boolean noUsable = e instanceof NoUsableEntriesException;
+                    int found = noUsable ? ((NoUsableEntriesException) e).entriesFound() : skipped.size();
+                    UnpackLedger.expanded(runId, source, plugin.id(), found, skipped.size(),
+                            sizeOf(source.toPath()), 0L, !noUsable, e.getMessage());
+                }
             }
         }
 
@@ -182,6 +203,22 @@ public final class UnpackStage {
         List<File> result() {
             return expanded != null ? expanded : List.of(source);
         }
+    }
+
+    /** A file's size, or 0 when it cannot be stated — a ledger column is never worth failing a run. */
+    private static long sizeOf(Path p) {
+        try {
+            return Files.size(p);
+        } catch (IOException e) {
+            return 0L;
+        }
+    }
+
+    /** Total bytes written by an expansion. */
+    private static long bytesOf(List<Path> out) {
+        long total = 0;
+        for (Path p : out) total += sizeOf(p);
+        return total;
     }
 
     /** Whether the chosen lane already decodes this suffix itself (see class comment). */

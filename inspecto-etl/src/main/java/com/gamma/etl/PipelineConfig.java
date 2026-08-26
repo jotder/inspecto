@@ -41,13 +41,14 @@ public final class PipelineConfig {
 
     /**
      * All filesystem paths for the run. {@code statusFilePath}/{@code batchesFilePath}/
-     * {@code lineageFilePath}/{@code manifestsDir} are {@code null} when status is disabled.
+     * {@code lineageFilePath}/{@code manifestsDir}/{@code unpackFilePath} are {@code null} when
+     * status is disabled.
      */
     @PublicApi(since = "2.0.0")
     public record Dirs(String poll, String database, String backup, String temp,
                        String errors, String quarantine, String markers, String logDir,
                        String statusFilePath, String batchesFilePath, String lineageFilePath,
-                       String manifestsDir, String commitLogPath) {}
+                       String manifestsDir, String commitLogPath, String unpackFilePath) {}
 
     /**
      * Execution controls. {@code threads} caps concurrent batches (semaphore permits
@@ -1180,7 +1181,8 @@ public final class PipelineConfig {
         this.identity = new Identity(b.name, b.pipelineName, b.runTimestamp);
         this.dirs = new Dirs(b.pollDir, b.databaseDir, b.backupDir, b.tempDir, b.errorsDir,
                 b.quarantineDir, b.markersDir, b.logDir, b.statusFilePath,
-                b.batchesFilePath, b.lineageFilePath, b.manifestsDir, b.commitLogPath);
+                b.batchesFilePath, b.lineageFilePath, b.manifestsDir, b.commitLogPath,
+                b.unpackFilePath);
         this.processing = new Processing(b.threads, b.duckdbThreads, b.filePattern,
                 b.batchMaxFiles, b.batchMaxBytes, b.batchOrder, b.duplicateCheckEnabled,
                 b.markerExtension, b.retentionDays, b.largeFileBytes, b.flushRecords,
@@ -1269,7 +1271,10 @@ public final class PipelineConfig {
                 parent.resolve(pn + "_batches_" + runTimestamp + ".csv").toString(),
                 parent.resolve(pn + "_lineage_" + runTimestamp + ".csv").toString(),
                 parent.resolve("manifests").toString(),
-                d.commitLogPath());   // persistent — never run-timestamped
+                d.commitLogPath(),    // persistent — never run-timestamped
+                // The unpack ledger is a RUN fact (one row per archive per run), so it is
+                // run-timestamped like its three siblings — see UnpackLedger's class comment.
+                parent.resolve(pn + "_unpack_" + runTimestamp + ".csv").toString());
     }
 
     /**
@@ -1362,7 +1367,7 @@ public final class PipelineConfig {
                 root.resolve("quarantine").toString(),
                 null,                                    // markers: no dedup marker writes
                 root.resolve("logs").toString(),
-                null, null, null, null, null);           // status/batches/lineage/manifests/commit-log
+                null, null, null, null, null, null);     // status/batches/lineage/manifests/commit-log/unpack
         List<Sink> scratchSinks = new ArrayList<>();
         for (int i = 0; i < sinks.size(); i++) {
             Sink s = sinks.get(i);
@@ -1621,6 +1626,7 @@ public final class PipelineConfig {
         String lineageFilePath;
         String manifestsDir;
         String commitLogPath;
+        String unpackFilePath;
         boolean duplicateCheckEnabled = false;
         String  markerExtension       = ".processed";
         int     retentionDays         = 90;
