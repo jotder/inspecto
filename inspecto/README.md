@@ -200,8 +200,9 @@ From the **repository root**, the bundled sample scripts run a pipeline end-to-e
 
 ```powershell
 run-voucher.bat          # Windows — runs spaces/ucc/config/voucher/voucher_pipeline.toon
-bash run-voucher.sh      # Linux / Mac
 ```
+
+On Linux/Mac run the `java -jar` line below directly — the `.sh` wrappers were removed 2026-08-26.
 
 Or run any pipeline config directly (the scripts just wrap this):
 
