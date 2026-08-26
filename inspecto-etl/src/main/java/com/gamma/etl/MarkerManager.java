@@ -46,8 +46,13 @@ public final class MarkerManager {
         // spellings, never silent.
         Path alias = getLogicalMarkerPath(file, cfg);
         if (alias != null && Files.exists(alias)) {
-            log.info("[MARKER] Skipping {} — its logical name was already processed under another "
-                    + "spelling (alias marker {})", file.getName(), alias.getFileName());
+            // WARN, not INFO (§6 Q4c): this DROPS a file. In marker mode nothing downstream can
+            // overrule it — unlike the checksum lane, where the alias only finds a candidate and the
+            // hash still decides — so a genuinely different file that merely shares a logical name is
+            // lost here, and that must not be buried at INFO in a busy poll log.
+            log.warn("[MARKER] Skipping {} — its logical name was already processed under another "
+                    + "spelling (alias marker {}). If these are DIFFERENT files, narrow or empty "
+                    + "processing.unpack.data_extensions", file.getName(), alias.getFileName());
             return true;
         }
         return false;
@@ -112,7 +117,7 @@ public final class MarkerManager {
         Path poll     = Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
         Path filePath = file.toPath().toAbsolutePath().normalize();
         String rel     = poll.relativize(filePath).toString().replace('\\', '/');
-        String logical = com.gamma.etl.unpack.LogicalNames.logicalName(rel);
+        String logical = com.gamma.etl.unpack.LogicalNames.logicalName(rel, cfg);
         if (logical.equals(rel)) return null;
         return Paths.get(cfg.dirs().markers()).toAbsolutePath()
                 .resolve(logical + ".logical" + cfg.processing().markerExtension());

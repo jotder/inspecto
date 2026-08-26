@@ -379,9 +379,20 @@ public final class PipelineConfig {
      */
     @PublicApi(since = "4.0.0")
     public record Unpack(boolean enabled, int maxEntries, long maxEntryBytes, long maxTotalBytes,
-                         double maxRatio, int depth, int threads) {
+                         double maxRatio, int depth, int threads, List<String> dataExtensions) {
 
         public Unpack {
+            // §6 Q4: at most ONE of these is stripped from a name to form its logical key, so a
+            // deployment can narrow the list — or set it EMPTY to opt out of extension-insensitive
+            // identity altogether. Empty is therefore VALID and meaningful, never "unset".
+            dataExtensions = dataExtensions == null
+                    ? com.gamma.etl.unpack.LogicalNames.DEFAULT_DATA_EXTENSIONS
+                    : dataExtensions.stream()
+                            .map(e -> e == null ? "" : e.trim().toLowerCase(java.util.Locale.ROOT))
+                            .filter(e -> !e.isBlank())
+                            .map(e -> e.startsWith(".") ? e : "." + e)
+                            .distinct()
+                            .toList();
             if (maxEntries < 1)    throw new IllegalArgumentException("processing.unpack.max_entries must be >= 1");
             if (maxEntryBytes < 1) throw new IllegalArgumentException("processing.unpack.max_entry_bytes must be >= 1");
             if (maxTotalBytes < 1) throw new IllegalArgumentException("processing.unpack.max_total_bytes must be >= 1");
@@ -394,7 +405,9 @@ public final class PipelineConfig {
 
         /** The absent-block posture: on, with the shipped caps, single-threaded expansion. */
         public static Unpack defaults() {
-            return new Unpack(true, 10_000, 8L << 30, 32L << 30, 10_000d, 1, 1);
+            // ⛔ dataExtensions is READ from LogicalNames, never restated here — one declaration.
+            return new Unpack(true, 10_000, 8L << 30, 32L << 30, 10_000d, 1, 1,
+                    com.gamma.etl.unpack.LogicalNames.DEFAULT_DATA_EXTENSIONS);
         }
     }
 

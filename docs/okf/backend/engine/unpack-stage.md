@@ -120,7 +120,45 @@ fully described by its single file's own status row; a row here would double-rep
 **Open:** nothing READS the ledger yet. The next step is an `unpack` table in `OperationalTables` plus
 a `StatusStore` reader — and it must **reference `UnpackLedger.COLUMNS`**, never restate them.
 
-## 6. Standing traps
+## 6. Extension-insensitive identity, and why the collision is not a bug
+
+One logical file may present as `cdr_20260823.csv.gz`, `cdr_20260823.Z`, `cdr_20260823.csv` or bare
+`cdr_20260823`. `LogicalNames` derives one key for all of them: strip compression suffixes
+**iteratively** (rule 1, from the *discovered* plugin suffixes — never a hand-mirrored twin list),
+then strip **at most one** data extension (rule 2). ⛔ Never "everything after the first dot":
+`feed.2026.08.23.csv` must key as `feed.2026.08.23`. Directories stay in the key — extension-
+insensitive, never path-insensitive.
+
+🔴 **The collision is the inescapable dual of the requirement.** Those four spellings meet *only* at
+the fully-stripped tier — `cdr.csv.gz` → `cdr.csv` → `cdr`, and `cdr.Z` → `cdr`. That same strip is
+why `report.csv` and `report.json` are also one logical file. ⛔ **Do not "fix" this with a two-tier
+scheme** that matches on the compression-stripped form: it would break the operator's actual
+requirement, which is the whole reason the mechanism exists. The remedy is the allow-list, not a
+redesign.
+
+`processing.unpack.data_extensions` (published, `FieldType.LIST`, default
+`.csv .tsv .txt .json .jsonl .ndjson .xml`) is the escape hatch: narrow it, or author
+`data_extensions[0]:` for an **empty** list to opt out entirely and key on verbatim names. Empty is
+honoured as a CHOICE, never as "unset". Entries are normalised (bare / upper-case / padded → leading-
+dot lower-case). ⚠ TOON's scalar-list form is **counted** (`data_extensions[2]: "a", "b"`), not
+bracketed — a bracketed literal parses as one comma-split string, silently.
+
+⚠ **ONE permitted mirror.** `ConfigSpecs` restates the default because `inspecto-config` sits *below*
+`inspecto-etl` and cannot import `LogicalNames`; `LogicalNamesTest` pins them equal. A drifted
+published default tells an operator the engine does something it does not. ⛔ Do not add a third.
+
+**The two dedup lanes carry very different risk:**
+
+| Lane | On an alias hit | Risk |
+|---|---|---|
+| Checksum / ledger | Finds a *candidate*; the hash still decides, so different bytes ⇒ `CHANGED` ⇒ reprocessed | Harmless |
+| Marker (path) | `isAlreadyProcessed` returns true ⇒ the file is **dropped**, and nothing downstream can overrule it | 🔴 Real |
+
+Which is why the marker-mode skip logs at **WARN** and names the remedy. Exposure is scoped: the
+alias is only ever *written* for compression-involved names, so two plain files collide only after a
+compressed spelling of that logical name has been processed.
+
+## 7. Standing traps
 
 - ⚠ **The per-file status vocabulary is still five bare literals** (`SUCCESS`,
   `QUARANTINED_EMPTY`, `QUARANTINED_MISMATCH`, `QUARANTINED_UNREADABLE`, `SKIPPED_UNREADABLE`) across

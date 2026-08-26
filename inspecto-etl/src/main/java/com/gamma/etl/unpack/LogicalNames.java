@@ -28,17 +28,17 @@ import java.util.Locale;
 public final class LogicalNames {
 
     /**
-     * Proposed §6 Q4 default. {@code .zip} is here as a compression suffix too (legacy inline
-     * single-entry zips), stripped by rule 1 via {@link #LEGACY_SUFFIXES}.
+     * The §6 Q4 default, CONFIRMED by the operator 2026-08-26 and now the default of the published
+     * {@code processing.unpack.data_extensions} key — a deployment may narrow it, or set it EMPTY to
+     * opt out of extension-insensitive identity entirely (verbatim names only). {@code .zip} is not
+     * here: it is a compression suffix, stripped by rule 1 via {@link #LEGACY_SUFFIXES}.
      *
-     * <p>⚠ RESTRICTION (BACKLOG §4 "Unpack stage — open items" (6)): the plan specified a published
-     * {@code processing.unpack.data_extensions} key so a deployment could tune or empty this list.
-     * Until that ships this is a CONSTANT, so the collision posture is fixed: two plain files whose
-     * names differ only by extension ARE one logical file — though only once a *compressed* spelling
-     * of that name has been processed, because {@link #involvesCompression} scopes where the alias is
-     * written. Publish the key before widening this list.
+     * <p>⚠ This is the ONE engine-side declaration — {@code PipelineConfig.Unpack.defaults()} reads
+     * it rather than restating it. It is necessarily mirrored ONCE more, in {@code ConfigSpecs}
+     * (module {@code inspecto-config} cannot see {@code inspecto-etl}); {@code LogicalNamesTest}
+     * pins the two equal. ⛔ Do not add a third.
      */
-    static final List<String> DATA_EXTENSIONS =
+    public static final List<String> DEFAULT_DATA_EXTENSIONS =
             List.of(".csv", ".tsv", ".txt", ".json", ".jsonl", ".ndjson", ".xml");
 
     /** Suffixes the legacy inline path ({@code Compression.java}) understands but no plugin owns yet. */
@@ -46,9 +46,18 @@ public final class LogicalNames {
 
     private LogicalNames() {}
 
-    /** {@link #logicalName(String, List)} over the discovered plugin suffixes. */
+    /** {@link #logicalName(String, List)} over the discovered plugin suffixes and the DEFAULT list. */
     public static String logicalName(String relativePath) {
         return logicalName(relativePath, Decompressors.knownSuffixes());
+    }
+
+    /**
+     * The logical key under the pipeline's CONFIGURED data-extension allow-list
+     * ({@code processing.unpack.data_extensions}) — what every production call site should use, so a
+     * deployment that narrowed or emptied the list is actually honoured.
+     */
+    public static String logicalName(String relativePath, com.gamma.etl.PipelineConfig cfg) {
+        return logicalName(relativePath, Decompressors.knownSuffixes(), cfg.unpack().dataExtensions());
     }
 
     /**
@@ -75,6 +84,15 @@ public final class LogicalNames {
      * separators preserved on the directory part, name part normalized per the rules above).
      */
     public static String logicalName(String relativePath, List<String> compressionSuffixes) {
+        return logicalName(relativePath, compressionSuffixes, DEFAULT_DATA_EXTENSIONS);
+    }
+
+    /**
+     * As above, over an explicit data-extension allow-list. An EMPTY list means rule 2 is skipped
+     * entirely — the deployment's opt-out from extension-insensitive identity.
+     */
+    public static String logicalName(String relativePath, List<String> compressionSuffixes,
+                                     List<String> dataExtensions) {
         int cut = Math.max(relativePath.lastIndexOf('/'), relativePath.lastIndexOf('\\'));
         String dir  = cut >= 0 ? relativePath.substring(0, cut + 1) : "";
         String name = cut >= 0 ? relativePath.substring(cut + 1) : relativePath;
@@ -105,7 +123,7 @@ public final class LogicalNames {
 
         // rule 2 — at most one data-extension strip
         String lower = name.toLowerCase(Locale.ROOT);
-        for (String ext : DATA_EXTENSIONS) {
+        for (String ext : dataExtensions) {
             if (lower.length() > ext.length() && lower.endsWith(ext)) {
                 name = name.substring(0, name.length() - ext.length());
                 break;

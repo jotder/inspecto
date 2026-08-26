@@ -445,11 +445,19 @@ and needs **no** consignment change at all.
 3. ~~**Phase 4 appetite.**~~ **RESOLVED by building it** (2026-08-23): failures are recorded in the
    manifest, crash-safe order untouched, branch-aware path unchanged. What remains of the
    "end status against each source file" ask is the run-level ledger under Q1.
-4. **The data-extension allow-list default** (§2.3 rule 2). Proposed:
-   `.csv .tsv .txt .json .jsonl .ndjson .xml`. Confirm, and confirm the collision posture: under
-   "ignore extensions", `report.csv` and `report.json` in one directory ARE one logical file (dropped
-   as duplicate, loudly) unless the deployment empties the list. **Today, unanswered:** that list
-   ships as a CONSTANT in `LogicalNames`, not the published `processing.unpack.data_extensions` key
-   the plan specified — so the posture is fixed and a deployment cannot opt out. Narrowed by scope,
-   though: the alias is only ever WRITTEN for compression-involved names, so two plain files collide
-   only once a compressed spelling of that logical name has been processed.
+4. ~~**The data-extension allow-list default**~~ **✅ ANSWERED by the operator 2026-08-26.**
+   **(a) The seven stand:** `.csv .tsv .txt .json .jsonl .ndjson .xml`. **(b) The key is PUBLISHED** —
+   `processing.unpack.data_extensions` (`FieldType.LIST`), so a deployment may narrow it or set it
+   empty (`data_extensions[0]:`) to opt out of extension-insensitive identity entirely. **(c) The
+   marker-mode alias hit now logs at WARN**, not INFO — in that lane the skip DROPS a file and
+   nothing downstream can overrule it, unlike the checksum lane where the hash still decides.
+
+   🔴 **The collision is INHERENT, and this is the thing to understand before touching it.** Rule 2's
+   single data-extension strip is exactly what makes `cdr_20260823.csv.gz`, `cdr_20260823.Z` and bare
+   `cdr_20260823` one logical file — they meet ONLY at the fully-stripped tier. `report.csv` and
+   `report.json` colliding is the *same strip*. ⛔ A "safer" two-tier scheme matching on the
+   compression-stripped form would break the operator's own requirement; the escape hatch is the
+   list, not a redesign. Both halves are pinned in `LogicalNamesTest`.
+
+   ⚠ Exposure is still scoped: the alias is only ever WRITTEN for compression-involved names, so two
+   plain files collide only once a compressed spelling of that logical name has been processed.

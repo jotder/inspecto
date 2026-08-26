@@ -242,7 +242,7 @@ public final class BatchProcessor {
                     // verbatim key — a plain-only inbox is byte-for-byte unchanged. `name` keeps the
                     // actual spelling either way, which is what the alias-hit log line reports.
                     String ledgerKey = com.gamma.etl.unpack.LogicalNames.involvesCompression(srcFile.getName())
-                            ? com.gamma.etl.unpack.LogicalNames.logicalName(rel) : rel;
+                            ? com.gamma.etl.unpack.LogicalNames.logicalName(rel, cfg) : rel;
                     ledgerEntries.add(new LedgerEntry(sourceId, ledgerKey, srcFile.getName(),
                             Files.size(filePath), checksum,
                             listing != null ? listing.etag() : null, listing != null ? listing.version() : null,

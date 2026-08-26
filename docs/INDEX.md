@@ -89,7 +89,7 @@ former root reference docs** (each index lists them):
   hardening spec from the 2026-08-24 review (4 findings withdrawn/corrected after source verification):
   SpaceMigrator + printStackTrace → slf4j, warn-log the best-effort DDL drops, serve openapi-v1.json at
   runtime, paging-adoption policy note, optional Dockerfile. Safest-first order, per-item rollback.
-- `superpower/unpack-stage-plan.md` — **IN FLIGHT; as-built now lives in [`okf/backend/engine/unpack-stage.md`](okf/backend/engine/unpack-stage.md)** (added 2026-08-26 — read the OKF concept, not this plan, for how the stage behaves). Stream (.gz/.bz2/.Z) and archive (.zip/.tar/.tar.gz) expansion at the Collector before consignments are planned; bomb caps; extension-insensitive duplicate identity; `processing.unpack.*` config; parallel expansion; FAILED members recorded in the manifest. **2026-08-26: §6 Q1 + Q2 ANSWERED and the run-level `unpack` ledger SHIPPED** — `UnpackStatus` (⛔ `UNPACKED_PARTIAL` commits: reporting, never a gate) + `<pipeline>_unpack_<ts>.csv` with columns declared ONCE. Remaining: no READ surface for the ledger, `logical_name`, the UI half (Phase 6), and §6 Q4's data-extension allow-list. Pluggable
+- `superpower/unpack-stage-plan.md` — **IN FLIGHT; as-built now lives in [`okf/backend/engine/unpack-stage.md`](okf/backend/engine/unpack-stage.md)** (added 2026-08-26 — read the OKF concept, not this plan, for how the stage behaves). Stream (.gz/.bz2/.Z) and archive (.zip/.tar/.tar.gz) expansion at the Collector before consignments are planned; bomb caps; extension-insensitive duplicate identity; `processing.unpack.*` config; parallel expansion; FAILED members recorded in the manifest. **2026-08-26: §6 Q1 + Q2 ANSWERED and the run-level `unpack` ledger SHIPPED** — `UnpackStatus` (⛔ `UNPACKED_PARTIAL` commits: reporting, never a gate) + `<pipeline>_unpack_<ts>.csv` with columns declared ONCE. **§6 Q4 also ANSWERED 2026-08-26** — the seven-extension default confirmed, `processing.unpack.data_extensions` published (empty = opt out), and the marker-mode alias drop raised to WARN. Remaining: no READ surface for the ledger, `logical_name`, and the UI half (Phase 6) — **§6 is now fully drained**. Pluggable
   decompression (ServiceLoader `DecompressorPlugin`) expanding archives/compressed inputs into
   ordinary candidates at `CollectorProcessor` BEFORE `ConsignmentPlanner.plan` — never mutating a
   Consignment; Archive verdict = a Run-level `unpack` ledger; per-file end status via recording
@@ -97,7 +97,8 @@ former root reference docs** (each index lists them):
   tracking + extension-insensitive duplicate identity (`logicalName`, §2.3) confirmed by operator
   refinement same day. §6's four operator questions: Archive status vocabulary **ANSWERED 2026-08-26**
   · lineage grain **ANSWERED 2026-08-26 (entry name)** · Phase-4 appetite resolved by building it
-  · data-extension allow-list/collision posture **still open**.
+  · data-extension allow-list/collision posture **ANSWERED 2026-08-26**. ⛔ The `.csv`/`.json`
+  collision is INHERENT to the requirement, not a defect — narrow the list, never redesign the strip.
 - ~~`superpower/canvas-ux-compaction-plan.md`~~ — **COMPLETE and ARCHIVED 2026-08-21**
   (`archived-documents/plans-archive/canvas-ux-compaction-plan.md`). S0–S6 all shipped the same day
   the operator answered D1–D9: the maximize-clipped-Apply P0 fixed as an overlay; the selection

@@ -462,7 +462,7 @@ public class CollectorProcessor {
             // fallback that keeps every pre-existing row honoured, so switching keys never re-ingests
             // the backlog. The checksum still decides DUPLICATE vs CHANGED, so a logical hit against
             // genuinely different bytes reprocesses — the safe direction.
-            String logical = com.gamma.etl.unpack.LogicalNames.logicalName(rf.relativePath());
+            String logical = com.gamma.etl.unpack.LogicalNames.logicalName(rf.relativePath(), cfg);
             LedgerEntry prior = ledger.find(src.id(), logical)
                     .or(() -> ledger.find(src.id(), rf.relativePath())).orElse(null);
             boolean viaAlias = prior != null && !prior.relativePath().equals(rf.relativePath());

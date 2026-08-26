@@ -265,7 +265,11 @@ final class PipelineConfigParser {
                     longOr(unpack.get("max_total_bytes"), d.maxTotalBytes(), "processing.unpack.max_total_bytes"),
                     doubleOr(unpack.get("max_ratio"), d.maxRatio(), "processing.unpack.max_ratio"),
                     intOr(unpack.get("depth"), d.depth(), "processing.unpack.depth"),
-                    intOr(unpack.get("threads"), d.threads(), "processing.unpack.threads"));
+                    intOr(unpack.get("threads"), d.threads(), "processing.unpack.threads"),
+                    // Absent key = the shipped list; an explicitly EMPTY list is honoured as the
+                    // deployment opting out of extension-insensitive identity (§6 Q4).
+                    unpack.get("data_extensions") == null
+                            ? d.dataExtensions() : strList(unpack.get("data_extensions")));
         }
 
         // ── duplicate check ───────────────────────────────────────────────────

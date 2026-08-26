@@ -155,6 +155,19 @@ public final class ConfigSpecs {
                 FieldSpec.withDefault("processing.unpack.threads", "Unpack threads", FieldType.INT, 1,
                         "Archives expanded concurrently (one archive per worker). Pure file I/O, no database "
                                 + "connection — but it adds to the same core budget as processing.threads."),
+                // ⛔ MIRROR: the engine's copy is LogicalNames.DEFAULT_DATA_EXTENSIONS, which this module
+                // cannot import (inspecto-config sits BELOW inspecto-etl). LogicalNamesTest pins the two
+                // equal — update both or the published default lies about what the engine does.
+                FieldSpec.withDefault("processing.unpack.data_extensions", "Data extensions",
+                        FieldType.LIST,
+                        List.of(".csv", ".tsv", ".txt", ".json", ".jsonl", ".ndjson", ".xml"),
+                        "Extensions treated as the DATA suffix when deriving a file's extension-insensitive "
+                                + "identity — at most one is stripped, after any compression suffixes, so "
+                                + "cdr.csv.gz, cdr.Z and bare cdr are ONE logical file for duplicate checking. "
+                                + "⚠ The dual: two files whose names differ only by an extension on this list "
+                                + "(report.csv / report.json) are also one logical file, and the second is "
+                                + "skipped as a duplicate once a COMPRESSED spelling of that name has been "
+                                + "processed. Set EMPTY to opt out entirely (verbatim names only)."),
                 FieldSpec.of("processing.csv_settings.ignore_errors", "Skip unparseable rows", FieldType.BOOL,
                         "blank = true (the long-standing behaviour): a row read_csv cannot parse is dropped "
                                 + "instead of failing the run. false makes the batch fail on the first bad row."),
