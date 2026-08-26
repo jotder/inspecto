@@ -144,7 +144,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo \"{\\\"hookSpecificOutput\\\":{\\\"hookEventName\\\":\\\"PreCompact\\\",\\\"additionalContext\\\":\\\"Context is about to be compacted. Before continuing, externalize anything important not yet in the repo: update SESSION_STATUS.local.md (current objective, active work, pending items, blockers, next steps), refresh affected docs/architecture/decision records, and write durable facts to memory. Refactor/dedup knowledge rather than appending. Do not rely on conversation history surviving \\u2014 the repo is the source of truth.\\\"}}\"",
+            "command": "bash .claude/hooks/pre-compact-persist.sh",
             "statusMessage": "Reminding to persist knowledge before compaction"
           }
         ]

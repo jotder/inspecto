@@ -213,6 +213,13 @@ body. Agents must not set this flag on their own — they must ask.
 
 **Activate layer 2 once per clone:** `git config core.hooksPath .githooks`
 
+**Since 2026-08-26 this is automatic for Claude Code shifts** — `.claude/hooks/session-start-context.sh`
+sets it at the start of every session, idempotently, and says so in the session context when it had to.
+A hand step nobody is reminded of is a hand step somebody skips, and layer 2 does **nothing at all**
+without it: an unset `core.hooksPath` means no local guard runs and the only thing standing between a
+committed secret and a public remote is CI, which fires after the push. Run the command yourself in any
+clone you use outside Claude Code.
+
 ⚠ **The committed-secret guard is the one check for which CI is NOT an adequate backstop.** CI runs
 *after* the push, and against a public remote the disclosure is complete the moment the objects
 land — which is exactly how SEC-INCIDENT-1 happened (pushed 2026-06-12, spotted six weeks later).
