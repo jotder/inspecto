@@ -101,6 +101,14 @@ const DOC_ALLOW = {
     // designed, rather than two exemptions quietly outliving the debt they described.
     'docs/okf/frontend/features/link-analysis.md::source-acquisition-entity':
         'Different concept: link-analysis "Sources" are `GraphSource` renderer feeds, not acquisition entities.',
+    'docs/okf/frontend/features/grammar-config.md::source-acquisition-entity':
+        'Different concept: the schema-fields editor\'s read-only "Source" column shows a parsed field\'s '
+        + '`raw.fields[].selector` (its tooltip reads "Parsed source: <selector>"), i.e. where a value sits '
+        + 'INSIDE a record — not an acquisition entity, and not a data origin (Stream/Reference) either. '
+        + '⚠ The doc is accurate; the ambiguity is in the UI HEADER it describes. Renaming that column to '
+        + '"Selector" — which is exactly what the cell renders and the canonical config key — would retire '
+        + 'this entry and remove a reserved word from user-facing text. Left as an operator call because it '
+        + 'is a visible label change (pinned by schema-fields-editor.component.spec.ts:220).',
     'docs/okf/backend/integrations.md::source-acquisition-entity':
         'Sanctioned sense: "Remote Sources" are data origins (Stream/Reference axis, GLOSSARY §3), not collection tasks.',
     'docs/okf/backend/log.md::bare-flow':
@@ -223,12 +231,16 @@ const CONFIG_PATH_RULES = [
 const CONFIG_ALLOW = {
     'inspecto/examples/06-serve/pipeline-job/rollup_job.toon::flow-key':
         'Tier-3 debt: `flow:` in a `type: pipeline` job is verbatim legacy; renaming it breaks existing configs without a dual-read (plan §4).',
-    'spaces/demo/config/jobs/orders_rollup_job.toon::flow-key':
-        'Tier-3 debt: as above, the demo-space twin of the example job.',
     'inspecto/examples/06-serve/pipeline-job/write/flows/sales_rollup_flow.toon::authored-flow-path':
         'Tier-3 debt: grandfathered authored flow, still readable/runnable via PipelineJobRunner.',
-    'spaces/demo/config/flows/orders_rollup_flow.toon::authored-flow-path':
-        'Tier-3 debt: as above, the demo-space twin.',
+    // The two `spaces/demo/…orders_rollup…` entries were RETIRED 2026-08-26: the stale-allowlist rule named
+    // both (the job no longer carries a `flow:` key, and the flow file no longer exists), so the debt they
+    // described is paid. The self-retirement working as designed — same as the plan entries above.
+    'spaces/ucc/config/views/sites_active_view.toon::flow-key':
+        'NOT authored debt — PRODUCT-GENERATED. `ViewDefinition.toMap` writes BOTH `pipeline` (canonical) '
+        + 'and `flow` unconditionally as the Tier-3 dual-emit for consumers not yet updated, so deleting the '
+        + 'key from this file is undone the moment the product rewrites the view. `fromMap` prefers '
+        + '`pipeline`, so the key is inert on read. Retire this entry when the dual-emit ends, not before.',
 };
 
 // ── pass 4: Java + TS source identifiers (plan §3.2, the surface it said to land LAST) ────────────
