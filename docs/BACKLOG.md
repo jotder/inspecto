@@ -896,6 +896,13 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md).
 
 **Open:**
+- **PKG-3 — Dockerfile wrapping serve.sh (trigger-gated: build it only when someone actually wants a
+  containerized deployment).** The backend-hardening plan's optional item 6 (archived 2026-08-26, items
+  1–5 shipped `38c7a32d`): `inspecto-deploy/Dockerfile`, eclipse-temurin:24-jre base, COPY fat jar,
+  `ENV PORT=8080`, ENTRYPOINT `./serve.sh`, HEALTHCHECK curl `/health` (tokenless via `PUBLIC_PATHS` —
+  correct for a healthcheck). Uses existing seams only (`-Dcontrol.port`, `-Dspaces.root`, serve.sh's
+  PORT default). ⚠ Don't conflate with the jlink `-NoRuntime` bundle flavor tracked separately.
+  Detail: `archived-documents/plans-archive/backend-hardening-plan.md` item 6.
 - ✅ **PKG-2 — CLOSED 2026-08-18: `run.bat ADAPTER` resolves a pipeline for the first time.**
   The lookup was a single `for %%F in (spaces\*\config\%1\*_pipeline.toon)`, which NEVER matched —
   cmd's set-based `FOR` globs the **filename only**, so a wildcard in a *directory* component silently

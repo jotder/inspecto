@@ -43,7 +43,10 @@ WSO2-style gateway + external IAM can front it later without reshaping routes. D
   out of scope (see [auth & security](../editions/auth-security.md)).
 * **OpenAPI-first (W2)** — the contract lives at [`openapi-v1.json`](../../../api/openapi-v1.json)
   (+ canonical examples) and is **enforced** by `ApiContractTest` against `ErrorCodes.java` and the live
-  server.
+  server. **Served at runtime since 2026-08-25 (hardening item 4, `38c7a32d`):** `GET /api/v1/openapi.json`
+  returns the artifact byte-equal (asserted by `ApiContractTest`), auth-gated (deliberately NOT in
+  `PUBLIC_PATHS`), lazily loaded via working-dir → repo-root → module-dir resolution — absent file ⇒ 404
+  with a log line, never a crash.
 * **Optimistic concurrency (W3)** — Components carry a `ContentHash` (parity-pinned with the UI's
   `content-hash.ts`); reads return `ETag`, conditional reads honor `If-None-Match`, writes require
   `If-Match`. See [component registry](../components/component-registry.md). The read-side idiom is a

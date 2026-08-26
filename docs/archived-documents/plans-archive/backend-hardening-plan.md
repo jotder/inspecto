@@ -1,6 +1,8 @@
 # Backend Hardening — Implementation Plan / Spec
 
-**Status:** PROPOSED (not started) · **Origin:** backend analysis review 2026-08-24, corrected per §0
+**Status:** ✅ COMPLETE — items 1–5 shipped `38c7a32d` (2026-08-25); item 6 (Dockerfile) was OPTIONAL
+and gated on wanting containerized deployment now — moved to `BACKLOG.md` §6 as a trigger-gated row.
+Archived 2026-08-26. · **Origin:** backend analysis review 2026-08-24, corrected per §0
 **Constraint:** every change must be non-breaking — no route, payload, config key, or log-file
 consumer may observe a behavioral change except where a section explicitly promises one.
 **Verification backbone:** root `mvn test` (reactor was green 3547/0/0/5 at plan time);
