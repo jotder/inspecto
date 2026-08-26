@@ -185,7 +185,18 @@ Unmatched rows land via the graph's quarantine sink. ⚠ Branch↔sink pairing r
 `BranchCommitLog` does not re-write or re-finalise (extends `BatchGraphRunnerFinalizeTest`); a
 single-sink config never engages and is byte-for-byte untouched (flat-path regression suite).
 
-**S3 — arm + parity gate.** Lift `prepare()` :1520 refusal (route only). The parity test:
+**S3 — ✅ SHIPPED 2026-08-26** (full `-Pedition-enterprise` reactor **3615/0/0/5**, 24 modules,
+`ApiContractTest` 4/4 — the NEW baseline). The blanket `prepare()` refusal is replaced by
+fail-closed arming validations, each refusing by name the shape that would drop rows silently:
+`default:` REQUIRED and must name a branch key (mode:case labels an unmatched row NULL and the
+executor emits it on NO relation) · every branch needs a `database` matching a DISTINCT `sinks[]`
+destination (the pairing is by database; unmatched or shared = rows land nowhere) · `mode: clone`
+stays authoring-only (B9 partial-commit UX unshipped) · multi-schema (selector/segments) + route
+stays authoring-only (the divert executes exactly one route node). Six rule tests in
+`RecordDedupRouteConfigTest` + the armed `RouteIngestEndToEndTest` (active: true) are the gate.
+⚠ TOON trap re-confirmed: an UNQUOTED Windows path cell in a tuple row silently yields
+"Array length mismatch — found 0" (the drive colon); quote every path cell.
+Original slice text: Lift `prepare()` :1520 refusal (route only). The parity test:
 run the SAME input through a route fixture and assert every §0 row — manifest members, backup,
 markers-LAST ordering, all three ledgers (incl. `origin`/`logical_name`), `BatchEvent` fields,
 provenance rows, FileStages — against the flat path's shapes. An archive input through a route

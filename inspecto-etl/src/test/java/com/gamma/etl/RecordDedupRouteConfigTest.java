@@ -75,18 +75,111 @@ class RecordDedupRouteConfigTest {
         assertTrue(e.getMessage().contains("NO_SUCH_COLUMN"), e.getMessage());
     }
 
+    // ── route: ARMS as of the branch-aware-executor arming plan S3 (2026-08-26). The blanket
+    // refusal is gone; what remains fail-closed is every shape that would drop rows silently. ──
+
     @Test
-    void anActivePipelineWithRouteRefusesToArm(@TempDir Path dir) throws Exception {
+    void anArmedRouteBranchWithoutADatabaseIsRefused(@TempDir Path dir) throws Exception {
         Path p = write(dir, true, "", """
                 route:
                   mode: case
+                  default: emea
                   branches[1]{key,where}:
                     emea,"ID LIKE 'E%'"
                 """);
         IllegalStateException e = assertThrows(IllegalStateException.class,
                 () -> PipelineConfig.load(p.toString()),
-                "the linear batch path cannot execute a branch tree — arming must fail fast");
-        assertTrue(e.getMessage().contains("route"), e.getMessage());
+                "a branch with no database pairs with no sink — its rows land nowhere");
+        assertTrue(e.getMessage().contains("database"), e.getMessage());
+    }
+
+    @Test
+    void anArmedRouteBranchNamingNoSinkDestinationIsRefused(@TempDir Path dir) throws Exception {
+        Path p = write(dir, true, "", """
+                route:
+                  mode: case
+                  default: emea
+                  branches[1]{key,where,database}:
+                    emea,"ID LIKE 'E%'",/nowhere/db
+                """);
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> PipelineConfig.load(p.toString()));
+        assertTrue(e.getMessage().contains("matches no sinks"), e.getMessage());
+    }
+
+    @Test
+    void anArmedRouteWithoutADefaultIsRefused(@TempDir Path dir) throws Exception {
+        String d = dir.toString().replace('\\', '/');
+        Path p = write(dir, true, "", """
+                sinks[2]{database,format}:
+                  "%1$s/db_e",CSV
+                  "%1$s/db_a",CSV
+                route:
+                  mode: case
+                  branches[2]{key,where,database}:
+                    emea,"ID LIKE 'E%%'","%1$s/db_e"
+                    apac,"ID LIKE 'A%%'","%1$s/db_a"
+                """.formatted(d));
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> PipelineConfig.load(p.toString()),
+                "mode:case emits an unmatched row on NO relation — no default means silent row drop");
+        assertTrue(e.getMessage().contains("default"), e.getMessage());
+    }
+
+    @Test
+    void anArmedCloneRouteIsRefused(@TempDir Path dir) throws Exception {
+        String d = dir.toString().replace('\\', '/');
+        Path p = write(dir, true, "", """
+                sinks[2]{database,format}:
+                  "%1$s/db_e",CSV
+                  "%1$s/db_a",CSV
+                route:
+                  mode: clone
+                  default: emea
+                  branches[2]{key,where,database}:
+                    emea,"ID LIKE 'E%%'","%1$s/db_e"
+                    apac,"ID LIKE 'A%%'","%1$s/db_a"
+                """.formatted(d));
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> PipelineConfig.load(p.toString()));
+        assertTrue(e.getMessage().contains("clone"), e.getMessage());
+    }
+
+    @Test
+    void twoArmedBranchesSharingADatabaseAreRefused(@TempDir Path dir) throws Exception {
+        String d = dir.toString().replace('\\', '/');
+        Path p = write(dir, true, "", """
+                sinks[1]{database,format}:
+                  "%1$s/db_e",CSV
+                route:
+                  mode: case
+                  default: emea
+                  branches[2]{key,where,database}:
+                    emea,"ID LIKE 'E%%'","%1$s/db_e"
+                    apac,"ID LIKE 'A%%'","%1$s/db_e"
+                """.formatted(d));
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> PipelineConfig.load(p.toString()),
+                "the pairing is by database — two branches on one database means one never receives rows");
+        assertTrue(e.getMessage().contains("share database"), e.getMessage());
+    }
+
+    @Test
+    void aWellFormedActiveRoutePipelineNowArms(@TempDir Path dir) throws Exception {
+        String d = dir.toString().replace('\\', '/');
+        Path p = write(dir, true, "", """
+                sinks[2]{database,format}:
+                  "%1$s/db_e",CSV
+                  "%1$s/db_a",CSV
+                route:
+                  mode: case
+                  default: apac
+                  branches[2]{key,where,database}:
+                    emea,"ID LIKE 'E%%'","%1$s/db_e"
+                    apac,"ID LIKE 'A%%'","%1$s/db_a"
+                """.formatted(d));
+        PipelineConfig cfg = PipelineConfig.load(p.toString());
+        assertNotNull(cfg.routeConfig(), "an active, well-formed route: pipeline loads and arms (S3)");
     }
 
     @Test

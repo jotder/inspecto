@@ -26,9 +26,9 @@ import static org.junit.jupiter.api.Assertions.*;
  *       leaves them — proof commit/writeAudit ran unchanged after the graph write.</li>
  * </ul>
  *
- * <p>The pipeline is {@code active: false} — {@code prepare()} still refuses arming an ACTIVE route
- * pipeline until S3 — and a one-shot {@code CollectorProcessor.run} does not consult {@code active},
- * which is exactly how S2 machinery is reachable for verification while production stays refused.
+ * <p>The pipeline is {@code active: true} — S3 lifted the blanket refusal, so this is the ARMED
+ * path exactly as production runs it; {@code prepare()}'s remaining route validations (default:
+ * required, branch↔sink database pairing, case-mode only, single-schema) all hold on this fixture.
  */
 class RouteIngestEndToEndTest {
 
@@ -40,7 +40,7 @@ class RouteIngestEndToEndTest {
         Path toon = dir.resolve("route_pipeline.toon");
         Files.writeString(toon, """
             name: ROUTE_E2E
-            active: false
+            active: true
             dirs:
               poll: %1$s/inbox
               database: %1$s/db
