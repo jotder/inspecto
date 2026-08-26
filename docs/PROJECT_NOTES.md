@@ -119,6 +119,27 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
 
+- **The two repo guards are NOT in the local build loop — run them before every commit.** Neither the
+  Maven reactor nor `ng test` runs `node tools/check-secrets.mjs` or `node tools/check-vocabulary.mjs`,
+  so a violation is invisible until CI. On 2026-08-26 **`master` was found sitting RED** on the
+  vocabulary guard, unnoticed for an unknown stretch, purely because nothing local ran it. Both are now
+  wired into `.githooks/pre-push` (`aa038358`, `442e99d7`) and `core.hooksPath` is set automatically at
+  Claude Code session start — but a clone used outside Claude Code still needs
+  `git config core.hooksPath .githooks` by hand.
+  ⚠ **The two guards sit on OPPOSITE sides of `UCC_RELEASE_GUARD_DISABLE`, deliberately:** secrets
+  **above** it (a leaked credential is irreversible, and a hurried security push is exactly when you
+  want the check), vocabulary **below** it (that override exists so a human can push an emergency
+  security backport, which a banned synonym must not block). ⛔ Do not "tidy" them into one block.
+
+- **A guard, hook or reminder that never reaches anyone looks identical to one with nothing to say.**
+  Three instances, all 2026-08-26: the committed-secret guard ran only in CI, i.e. only *after* a push
+  had already made the secret public; the `PreCompact` hook emitted an invalid shape
+  (`hookSpecificOutput.additionalContext` is not valid for PreCompact) and had **never once fired**,
+  failing silently every compaction; and `route:` arming validated only at registration, so a save
+  returned `written: true` and the operator learned at the next run. ⛔ When wiring any check, ask **when
+  it fires relative to the harm** — and for a reminder, watch it fire once. Its failure text appears only
+  at the moment it runs.
+
 - **`git commit` commits the INDEX, and on this shared checkout a shift can hand you a dirty one.**
   Shifts end without committing, so `git status` may open with work *already staged* — on 2026-08-15 a
   previous shift's staged `git mv` was silently swallowed into an unrelated `docs:` commit, because

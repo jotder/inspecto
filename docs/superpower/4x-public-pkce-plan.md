@@ -1,10 +1,16 @@
 # Plan — `4.x` public-PKCE auth (unblock the SEC-INCIDENT-1 rotation)
 
-**Status:** **P0 + P1 SHIPPED 2026-07-25** (`579632ba`, `932eff92` on `4.x`; propagated to master as
-no-content `-s ours` merges `f8e80f86`, `31daacc2`). **Only P2 remains — and P2 is entirely operator
-action** (deploy the `4.x` bundle, then rotate at the issuer). No code work is left on this plan.
+**Status:** **P0 + P1 SHIPPED 2026-07-25** (`579632ba`, `932eff92`, plus the mandatory follow-up
+`ce49a681`). **Only P2 remains — and P2 is entirely operator action** (deploy a bundle carrying them,
+then rotate at the issuer). No code work is left on this plan.
 ⚠ **Do not archive this plan until rotation is confirmed** — P2 is the whole point of the exercise.
-· **Opened:** 2026-07-25 · **Branch of record:** `4.x`
+· **Opened:** 2026-07-25 · **Branch of record:** ~~`4.x`~~ → **`master`**
+
+> ⚠ **`4.x` WAS DELETED 2026-08-17** (operator call), after this plan was written. Every commit it
+> names is on `master` — verified 2026-08-26 with `git merge-base --is-ancestor`, and the SHAs above
+> are the post-rewrite ones (the 2026-07-26 history rewrite invalidated the originals). **Do not try to
+> check out `4.x` or cut a release from it.** Read every `4.x` below as "the line that carries P0+P1",
+> which is now `master`.
 **Parent item:** [`../BACKLOG.md`](../BACKLOG.md) §5 SEC-INCIDENT-1 · **Concept home on ship:**
 [`../okf/backend/editions/auth-security.md`](../okf/backend/editions/auth-security.md)
 
@@ -116,9 +122,15 @@ still uses `environment.appClientSecret` — so P1 is still required.
 
 ### P2 — coordinate the rotation
 
-8. Cut a `4.x` release containing P0+P1, deploy it, **then** rotate at the issuer (prod
-   `appClientSecret` first, then the shared `iamClientSecret`). Order matters: the new bundle must be
-   live before the old secret dies.
+8. Cut a release from **`master`** containing P0+P1 **and `ce49a681`**, deploy it, **then** rotate at
+   the issuer (prod `appClientSecret` first, then the shared `iamClientSecret`). Order matters: the new
+   bundle must be live before the old secret dies. ⚠ `ce49a681` is not optional — P1 alone breaks login
+   depending on the IdP's callback parameter order. ⚠ The open variable is **what is actually deployed
+   at `app1.pronto.lebara.sa`**, which the source line cannot tell you — confirm it before choosing a
+   rotation ordering (`../ops/secret-rotation-runbook.md` Step 2).
+   ⚠ Rotation is gated on nothing else: the "pull the auth logs first" step is MOOT (the logs were
+   deleted 2026-07-26 before export), and the `refs/pull/*` purge (Step 0-B, draft at
+   `../ops/github-support-purge-request.md`) runs in PARALLEL rather than before.
 9. Close the BACKLOG §5 row on **confirmed rotation**. ~~Merge `tools/check-secrets.mjs` forward to
    `4.x`~~ — **done 2026-07-25 (`f1fb6f20`)**, once P1 emptied the live values that had kept it
    master-only.
