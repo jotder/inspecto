@@ -1611,8 +1611,16 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   plain-data trunk), and this row's own "sinks: does not create >1 data-fed sink node" claim was
   false. As-built: [`okf/backend/engine/branch-aware-ingest.md`](okf/backend/engine/branch-aware-ingest.md).
   **Residuals (build on demand):** `mode: clone` arming (needs B9/D8 partial-commit UX) ·
-  multi-schema + route · mid-branch transforms in the recipe route verb · a save-time arming
-  pre-check in the editor (arming validates at engine load on both server and mock — UX polish).
+  multi-schema + route · mid-branch transforms in the recipe route verb.
+  ~~a save-time arming pre-check in the editor~~ — **SHIPPED 2026-08-26**, and this row's own reason
+  for deferring it ("arming validates at engine load on both server and mock — UX polish") was
+  wrong: neither `/validate` nor `/config/write` calls `prepare()`, so a save returned
+  `written: true` and the refusal surfaced only at the next run. Now `RouteArming.refusals` is the
+  single rule set — `prepare()` throws the first (registration is all-or-nothing), while
+  `ConfigRoutes.routeArmingFindings` reports them ALL at save: ERROR/422 when `active: true`,
+  WARNING naming when it bites when inactive. Wired into `/validate`, `/config/write` and
+  `/config/patch`. 12 tests; ⛔ the draft must NOT go through `PipelineConfig.fromMap` (it
+  hard-fails an unresolvable schema ref the save path keeps a WARNING).
   Still genuinely unimplemented anywhere: `adapter`, `alert`, `event`; still refused at lowering:
   `transform.select/derive/validate/split/merge` as flat homes, `sink.materialized/view` on ingest.
   Original row (provenance): **Branch-aware executor — run what the graph editor can now author** (surfaced 2026-08-01 by

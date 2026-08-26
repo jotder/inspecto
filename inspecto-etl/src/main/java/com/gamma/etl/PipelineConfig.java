@@ -1518,47 +1518,16 @@ public final class PipelineConfig {
         // Arming stays FAIL-CLOSED on every shape that would drop rows silently — the exact
         // silent-discard class this gate existed to prevent; each refusal names its fix.
         if (active && route != null) {
-            List<?> rawBranches = route.get("branches") instanceof List<?> b ? b : List.of();
-            if (rawBranches.isEmpty())
-                throw new IllegalStateException("route: needs a non-empty branches list to arm");
-            // (1) clone mode stays authoring-only: a row leaving on several branches needs the
-            //     cross-branch partial-commit UX (plan B9/D8) that is deliberately unshipped.
-            if ("clone".equalsIgnoreCase(String.valueOf(route.get("mode"))))
-                throw new IllegalStateException("route: mode 'clone' is authoring-only — arming runs "
-                        + "'case' (exclusive) branches; keep the pipeline inactive or switch to mode: case");
-            // (2) every branch names a database matching a sinks[] destination, and no two branches
-            //     share one — the lift pairs route:<key> edges to sinks BY DATABASE, so an unmatched
-            //     or duplicated database is a branch whose rows land NOWHERE.
-            java.util.Set<String> sinkDbs = new java.util.HashSet<>();
+            // The rules themselves live in RouteArming, because the SAVE path needs the same list
+            // while the operator is still authoring (ConfigRoutes.routeArmingFindings) and two
+            // copies of a rule set drift. Registration is all-or-nothing, so the first refusal
+            // throws; the save path reports the whole list instead.
+            java.util.List<String> sinkDbs = new java.util.ArrayList<>();
             for (Sink d : sinks) sinkDbs.add(d.database());
-            java.util.Set<String> seenDbs = new java.util.HashSet<>();
-            java.util.Set<String> keys = new java.util.HashSet<>();
-            for (Object b : rawBranches) {
-                if (!(b instanceof Map<?, ?> m) || m.get("key") == null || m.get("database") == null)
-                    throw new IllegalStateException("every armed route: branch needs both a key and a "
-                            + "database (the sink it pairs with) — found: " + b);
-                keys.add(String.valueOf(m.get("key")));
-                String db = String.valueOf(m.get("database"));
-                if (!sinkDbs.contains(db))
-                    throw new IllegalStateException("route: branch '" + m.get("key") + "' names database '"
-                            + db + "', which matches no sinks[] destination — its rows would land nowhere");
-                if (!seenDbs.add(db))
-                    throw new IllegalStateException("route: branches share database '" + db + "' — the "
-                            + "branch↔sink pairing is by database, so only one of them would ever receive rows");
-            }
-            // (3) default: is REQUIRED and must name a branch key. mode:case labels an unmatched row
-            //     NULL and the executor emits it on no relation — an armed route with no default
-            //     silently discards every row no branch claims.
-            Object def = route.get("default");
-            if (def == null || !keys.contains(String.valueOf(def)))
-                throw new IllegalStateException("an armed route: needs default: naming one of its branch "
-                        + "keys (" + keys + ") — without it a row matching no branch is silently dropped");
-            // (4) multi-schema stays authoring-only with route: the lift emits one route node per
-            //     schema branch and the ingest divert executes exactly one — arming both would run
-            //     the wrong tree for every schema but one.
-            if (schemas.selector() != null || (schemas.segments() != null && !schemas.segments().isEmpty()))
-                throw new IllegalStateException("route: on a multi-schema pipeline (selector/segments) is "
-                        + "authoring-only — arm it on a single-schema pipeline");
+            boolean multiSchema = schemas.selector() != null
+                    || (schemas.segments() != null && !schemas.segments().isEmpty());
+            List<String> refusals = RouteArming.refusals(route, sinkDbs, multiSchema);
+            if (!refusals.isEmpty()) throw new IllegalStateException(refusals.get(0));
         }
         // The three Stage-2 blocks below (summarize / dedup / join) arm ONLY when output_store: is
         // authored (A5-at-rest, 2026-08-11): the file itself then declares that its chain executes as

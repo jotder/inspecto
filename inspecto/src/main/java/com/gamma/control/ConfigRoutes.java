@@ -11,6 +11,7 @@ import com.gamma.config.spec.Finding;
 import com.gamma.config.spec.Severity;
 import com.gamma.etl.ConfigValidator;
 import com.gamma.etl.PipelineConfig;
+import com.gamma.etl.RouteArming;
 import com.gamma.pipeline.exec.ComponentPreview;
 import com.gamma.service.PipelineDependents;
 import com.gamma.util.AtomicFiles;
@@ -112,6 +113,9 @@ final class ConfigRoutes implements RouteModule {
         // server's CWD. Null when writes are disabled: then there is no prospective home, and the
         // CWD-only check is all that can honestly be said.
         findings.addAll(schemaFileFindings(type, draft, Severity.WARNING, api.writeRoot()));
+        // Pre-flight: a route: block that would refuse to arm. Reported here so the editor can show
+        // it while the operator is still authoring, rather than at the next run.
+        findings.addAll(routeArmingFindings(type, draft));
         // Opt-in hard-fail safety gate (R6): merged in only when the caller asks, so the default
         // /validate response is byte-for-byte unchanged for existing callers.
         boolean safety = "true".equalsIgnoreCase(String.valueOf(body.get("safety")));
@@ -144,6 +148,9 @@ final class ConfigRoutes implements RouteModule {
         // ERROR: an armed pipeline with no schema source parses nowhere. Without this the write
         // returns written:true and the config is then silently dropped from the index forever.
         findings.addAll(armedWithoutSchemaFindings(type, draft));
+        // ERROR (when active): an armed route: that cannot arm registers and then throws on every
+        // run. Same reasoning as the row above — the save is the last moment the author is present.
+        findings.addAll(routeArmingFindings(type, draft));
         // ERROR: a collector bound to a connection this space does not have cannot acquire anything —
         // it throws once per poll cycle instead. Bundle import already refuses it; a save now agrees.
         findings.addAll(unknownConnectionFindings(type, draft, api));
@@ -380,6 +387,7 @@ final class ConfigRoutes implements RouteModule {
         findings.addAll(ConfigSafetyValidator.check(type, merged, SafetyPolicy.defaultPolicy()));
         findings.addAll(schemaFileFindings(type, merged, Severity.WARNING, target.getParent()));
         findings.addAll(armedWithoutSchemaFindings(type, merged));
+        findings.addAll(routeArmingFindings(type, merged));              // a patch can break arming too
         findings.addAll(unknownConnectionFindings(type, merged, api));   // a patch can introduce one too
         if (findings.stream().anyMatch(f -> f.severity() == Severity.ERROR)) {
             return ApiContext.respondJson(ex, 422, Map.of("type", type, "written", false,
@@ -857,6 +865,45 @@ final class ConfigRoutes implements RouteModule {
                 "active: true but no schema is configured (processing.schema_file, "
                         + "processing.schemas[], or a plugin ingester) — keep the draft inactive "
                         + "until its schema is attached"));
+    }
+
+    /**
+     * A {@code route:} block that would refuse to ARM. Until now these six rules fired only at
+     * {@code PipelineConfig.prepare()} — i.e. at REGISTRATION, after the save returned
+     * {@code written:true} — so an operator authored a branch tree, saved it happily, and learned it
+     * was unarmable when the next run threw. The whole point of a fail-closed gate is that the
+     * operator can act on it; one that fires after they have moved on is a log line.
+     *
+     * <p>Severity follows what the save would actually cause, which is why it is not always an ERROR:
+     * <ul>
+     *   <li>{@code active: true} → <b>ERROR</b>. This config cannot run. Writing it produces exactly
+     *       the outcome {@code armedWithoutSchemaFindings} above exists to prevent — a pipeline that
+     *       registers and then fails, or is skipped, every cycle.</li>
+     *   <li>{@code active: false} → <b>WARNING</b>. An inactive draft is a legitimate work in
+     *       progress; {@code prepare()} does not check it either. But it is worth saying now that
+     *       activating it will refuse, rather than at the moment the operator flips the switch.</li>
+     * </ul>
+     *
+     * <p>All refusals are reported, not just the first: {@code prepare()} throws one because
+     * registration is all-or-nothing, but an author fixing a branch list wants the whole list rather
+     * than a one-at-a-time game.
+     */
+    static List<Finding> routeArmingFindings(String type, Map<String, Object> draft) {
+        if (!"pipeline".equals(type)) return List.of();
+        if (!(draft.get("route") instanceof Map<?, ?> route)) return List.of();
+        boolean active = Boolean.parseBoolean(String.valueOf(draft.getOrDefault("active", "false")));
+        Severity severity = active ? Severity.ERROR : Severity.WARNING;
+        Map<?, ?> proc    = draft.get("processing") instanceof Map<?, ?> m ? m : Map.of();
+        Map<?, ?> parsing = draft.get("parsing")    instanceof Map<?, ?> m ? m : Map.of();
+        List<Finding> out = new ArrayList<>();
+        for (String refusal : RouteArming.refusals(route,
+                RouteArming.draftSinkDatabases(draft.get("sinks")),
+                RouteArming.draftIsMultiSchema(proc, parsing))) {
+            out.add(new Finding(severity, "route", active
+                    ? refusal
+                    : refusal + " (the draft is inactive, so this refuses only once it is activated)"));
+        }
+        return out;
     }
 
     /**

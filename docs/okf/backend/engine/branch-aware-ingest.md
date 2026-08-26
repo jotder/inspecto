@@ -55,9 +55,30 @@ reference store per branch.
 ## Deliberately not built (residuals — BACKLOG §6)
 
 `mode: clone` arming · multi-schema + route · mid-branch transforms in the recipe's route verb
-(compiles refused: "a route branch compiles as exactly one sink step for now") · a save-time
-arming pre-check in the editor (arming validates at engine LOAD on both server and mock — a
-422-on-save would be UX polish, not a gap).
+(compiles refused: "a route branch compiles as exactly one sink step for now").
+
+**The save-time arming pre-check SHIPPED 2026-08-26** — and this section's reason for deferring it
+("arming validates at engine LOAD on both server and mock — a 422-on-save would be UX polish, not a
+gap") was wrong in the half that mattered. Arming did validate at load, but neither `/validate` nor
+`/config/write` calls `prepare()`, so a save returned `written: true` and the operator learned their
+branch tree was unarmable at the next run. A fail-closed gate the author never sees is a log line.
+
+## Where the arming rules live
+
+`RouteArming.refusals(route, sinkDatabases, multiSchema)` (`inspecto-etl`) is the ONE statement of
+the six rules, with two callers holding the config in two different states:
+
+| Caller | State | Behaviour |
+|---|---|---|
+| `PipelineConfig.prepare()` | parsed config, at registration | throws the FIRST refusal — registration is all-or-nothing |
+| `ConfigRoutes.routeArmingFindings` | unparsed DRAFT map, at save | reports ALL refusals as `Finding`s; `active: true` ⇒ ERROR (422, nothing written), `active: false` ⇒ WARNING naming when it will bite |
+
+⛔ Do not run the draft through `PipelineConfig.fromMap` to reuse the parsed form: `fromMap`
+hard-fails on an unresolvable schema reference, which the save path deliberately keeps a WARNING
+(the file may be created after the save, or belong to another host). `armedWithoutSchemaFindings`
+makes the same call, for the same reason, and says so in its javadoc. The rules take plain data so
+both callers can supply it from what they have — restating them over raw maps in the control plane
+would be the hand-mirrored-map drift this repo has already paid for three times.
 
 ## Traps pinned along the way
 
