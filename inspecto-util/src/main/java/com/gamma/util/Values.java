@@ -1,5 +1,7 @@
 package com.gamma.util;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -56,6 +58,59 @@ public final class Values {
     /** Puts {@code key=v} only when {@code v} is non-null. */
     public static void putIfPresent(Map<String, Object> m, String key, Object v) {
         if (v != null) m.put(key, v);
+    }
+
+    // ── typed map access ─────────────────────────────────────────────────────
+    // Two map-at variants with DIFFERENT semantics on a non-map value — pick the one that matches
+    // the site being replaced, never "the closest one" (same rule as the string helpers above):
+    //   mapAt      — instanceof-guarded semantics: non-map (or null/absent) → null.
+    //   castMapAt  — bare-cast semantics: absent → null, non-map → ClassCastException,
+    //                byte-identical to the historical `(Map<String,Object>) m.get(key)` idiom.
+
+    /** Null-tolerant nested map: null map, absent key, or a non-{@code Map} value → {@code null}. */
+    @SuppressWarnings("unchecked")
+    public static Map<String, Object> mapAt(Map<String, Object> m, String key) {
+        if (m == null) return null;
+        return m.get(key) instanceof Map<?, ?> mm ? (Map<String, Object>) mm : null;
+    }
+
+    /**
+     * Exact-preserving nested map: {@code (Map<String,Object>) m.get(key)} semantics — {@code null}
+     * when absent, {@link ClassCastException} when the value is not a map. Use for sweeping sites
+     * that are bare casts today; {@link #mapAt} only where the site already instanceof-guards.
+     */
+    @SuppressWarnings("unchecked")
+    public static Map<String, Object> castMapAt(Map<String, Object> m, String key) {
+        return (Map<String, Object>) m.get(key);
+    }
+
+    /**
+     * Exact-preserving nested list: {@code (List<Object>) m.get(key)} semantics — {@code null}
+     * when absent, {@link ClassCastException} when the value is not a list.
+     */
+    @SuppressWarnings("unchecked")
+    public static List<Object> listAt(Map<String, Object> m, String key) {
+        return (List<Object>) m.get(key);
+    }
+
+    /**
+     * A list-of-objects config value as {@code List<Map<String,Object>>} — absent ⇒ empty. Fails fast
+     * ({@link IllegalArgumentException} naming {@code where}) on anything that is not a list of maps,
+     * because the alternative is a consumer seeing a shape it silently skips.
+     */
+    @SuppressWarnings("unchecked")
+    public static List<Map<String, Object>> listOfMapsAt(Map<String, Object> m, String key, String where) {
+        Object value = m.get(key);
+        if (value == null) return List.of();
+        if (!(value instanceof List<?> list))
+            throw new IllegalArgumentException(where + " must be a list of objects");
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Object o : list) {
+            if (!(o instanceof Map<?, ?> mm))
+                throw new IllegalArgumentException(where + " entries must be objects, got: " + o);
+            out.add((Map<String, Object>) mm);
+        }
+        return out;
     }
 
     /** Filename-safe id: every char outside {@code [A-Za-z0-9._-]} becomes {@code _}; null → {@code "_"}. */

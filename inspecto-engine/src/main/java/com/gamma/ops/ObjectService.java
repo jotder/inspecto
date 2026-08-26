@@ -23,6 +23,7 @@ import com.gamma.ops.tag.Tag;
 import com.gamma.ops.tag.TagRule;
 import com.gamma.ops.workflow.Workflow;
 import com.gamma.util.JsonAttributes;
+import com.gamma.util.Values;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -1320,25 +1321,22 @@ public final class ObjectService {
      * — this is the hard gate the doc calls out as the follow-up, enforced in {@link #commit} so the
      * API can't bypass it the way a UI-only check could.
      */
-    @SuppressWarnings("unchecked")
     static List<String> incidentResolutionGaps(OperationalObject obj) {
         Map<String, Object> pm = JsonAttributes.fromPayloadJson(obj.attributes().get("postmortem"));
         List<String> gaps = new ArrayList<>();
-        if (!anyEntryNonBlank((List<Object>) pm.get("timeline"), "time", "text")) gaps.add("timeline");
-        if (!anyStringNonBlank((List<Object>) pm.get("causeAnalysis"))) gaps.add("cause analysis");
-        if (!anyEntryNonBlank((List<Object>) pm.get("actions"), "text")) gaps.add("corrective actions");
+        if (!anyEntryNonBlank(Values.listAt(pm, "timeline"), "time", "text")) gaps.add("timeline");
+        if (!anyStringNonBlank(Values.listAt(pm, "causeAnalysis"))) gaps.add("cause analysis");
+        if (!anyEntryNonBlank(Values.listAt(pm, "actions"), "text")) gaps.add("corrective actions");
         String dueAt = obj.attributes().get(ATTR_DUE_AT);
         if (dueAt == null || dueAt.isBlank()) gaps.add("SLA");
         return gaps;
     }
 
     /** True if any element of {@code list} (maps of {@code String -> Object}) has a non-blank value at any of {@code keys}. */
-    @SuppressWarnings("unchecked")
     private static boolean anyEntryNonBlank(List<Object> list, String... keys) {
         if (list == null) return false;
         for (Object item : list) {
-            if (!(item instanceof Map)) continue;
-            Map<String, Object> row = (Map<String, Object>) item;
+            if (!(item instanceof Map<?, ?> row)) continue;
             for (String key : keys) {
                 Object v = row.get(key);
                 if (v != null && !v.toString().isBlank()) return true;

@@ -30,6 +30,9 @@ import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import static com.gamma.util.Values.castMapAt;
+import static com.gamma.util.Values.listOfMapsAt;
+import static com.gamma.util.Values.mapAt;
 import static com.gamma.util.Values.trimToNull;
 
 /**
@@ -51,7 +54,6 @@ final class PipelineConfigParser {
 
     private PipelineConfigParser() {}
 
-    @SuppressWarnings("unchecked")
     static PipelineConfig parse(Map<String, Object> raw, String sourceLabel) throws IOException {
         return parse(raw, sourceLabel, null);
     }
@@ -140,7 +142,8 @@ final class PipelineConfigParser {
         // ── entry-node trigger (T13 / §3.6; absent ⇒ default poll = today's behaviour) ──
         // Carried verbatim; the live loop (CollectorService) classifies it via PipelineTrigger into
         // schedule(every/cron) / event / manual. Absent leaves the pipeline on the global poll cycle.
-        if (raw.get("trigger") instanceof Map<?, ?> trig) b.trigger = (Map<String, Object>) trig;
+        Map<String, Object> trig = mapAt(raw, "trigger");
+        if (trig != null) b.trigger = trig;
 
         // ── dirs ──────────────────────────────────────────────────────────────
         Map<String, Object> dirs = ToonHelper.requireSection(raw, "dirs");
@@ -199,7 +202,7 @@ final class PipelineConfigParser {
                     "processing.priority must be 1..3, got " + b.priority);
 
         // ── batch caps ──────────────────────────────────────────────────────────
-        Map<String, Object> batch = (Map<String, Object>) proc.get("batch");
+        Map<String, Object> batch = castMapAt(proc, "batch");
         if (batch != null) {
             b.batchMaxFiles = toInt(batch.getOrDefault("max_files", 1));
             Object mb = batch.get("max_bytes");
@@ -216,7 +219,7 @@ final class PipelineConfigParser {
         }
 
         // ── streaming plugin engine: mode threshold + generation budget (optional) ──
-        Map<String, Object> streaming = (Map<String, Object>) proc.get("streaming");
+        Map<String, Object> streaming = castMapAt(proc, "streaming");
         if (streaming != null) {
             Object lfb = streaming.get("large_file_bytes");
             if (lfb != null) b.largeFileBytes = Long.parseLong(String.valueOf(lfb));
@@ -227,7 +230,7 @@ final class PipelineConfigParser {
         // ── DuckDB engine-resource controls (additive, optional) ───────────────
         // Defaults (all absent) preserve DuckDB's own defaults; tempDirectory falls back to
         // dirs.temp at the call site so scratch lands on the data volume, never the system /tmp.
-        Map<String, Object> duck = (Map<String, Object>) proc.get("duckdb");
+        Map<String, Object> duck = castMapAt(proc, "duckdb");
         if (duck != null) {
             b.duckMemoryLimit   = trimToNull(duck.get("memory_limit"));
             b.duckTempDirectory = trimToNull(duck.get("temp_directory"));
@@ -235,7 +238,7 @@ final class PipelineConfigParser {
         }
 
         // ── large-file auto-chunking (additive, optional; disabled by default) ──
-        Map<String, Object> chunk = (Map<String, Object>) proc.get("chunking");
+        Map<String, Object> chunk = castMapAt(proc, "chunking");
         if (chunk != null) {
             b.chunkMaxFileBytes = toLong(chunk.get("max_file_bytes"));
             b.chunkTargetBytes  = toLong(chunk.get("target_chunk_bytes"));
@@ -244,7 +247,7 @@ final class PipelineConfigParser {
         // ── per-flow intake admission-control override (T15 follow-up, additive, optional) ──
         // Each key is independently optional: an absent key inherits its -Dingest.* global at the
         // IntakeGovernor call site, which is why these stay nullable rather than defaulted here.
-        Map<String, Object> intake = (Map<String, Object>) proc.get("intake");
+        Map<String, Object> intake = castMapAt(proc, "intake");
         if (intake != null) {
             b.intake = new PipelineConfig.Intake(
                     intOrNull(intake.get("max_files_per_cycle"), "processing.intake.max_files_per_cycle"),
@@ -255,7 +258,7 @@ final class PipelineConfigParser {
         // ── unpack stage (Collector-level decompression, additive, optional) ──
         // Unlike `intake` above, an absent KEY here takes the shipped default rather than a global:
         // these are safety caps, so every one always has a concrete value (Unpack.defaults()).
-        Map<String, Object> unpack = (Map<String, Object>) proc.get("unpack");
+        Map<String, Object> unpack = castMapAt(proc, "unpack");
         if (unpack != null) {
             PipelineConfig.Unpack d = PipelineConfig.Unpack.defaults();
             b.unpack = new PipelineConfig.Unpack(
@@ -274,7 +277,7 @@ final class PipelineConfigParser {
         }
 
         // ── duplicate check ───────────────────────────────────────────────────
-        Map<String, Object> dup = (Map<String, Object>) proc.get("duplicate_check");
+        Map<String, Object> dup = castMapAt(proc, "duplicate_check");
         if (dup != null) {
             b.duplicateCheckEnabled = Boolean.parseBoolean(String.valueOf(dup.get("enabled")));
             b.markerExtension       = opt(dup, "marker_extension", ".processed");
@@ -282,7 +285,7 @@ final class PipelineConfigParser {
         }
 
         // ── record-grain dedup (ELT amendment §2.4 — the dedup STEP, not file dedup) ──
-        Map<String, Object> recDedup = (Map<String, Object>) proc.get("dedup");
+        Map<String, Object> recDedup = castMapAt(proc, "dedup");
         if (recDedup != null) {
             List<String> keys = new ArrayList<>();
             if (recDedup.get("keys") instanceof List<?> ks)
@@ -291,7 +294,7 @@ final class PipelineConfigParser {
         }
 
         // ── summarize (ELT amendment §2.4/Phase 3 — group-by rollup, authoring/round-trip only) ──
-        Map<String, Object> recSummarize = (Map<String, Object>) proc.get("summarize");
+        Map<String, Object> recSummarize = castMapAt(proc, "summarize");
         if (recSummarize != null) {
             List<String> groupBy = new ArrayList<>();
             if (recSummarize.get("group_by") instanceof List<?> gs)
@@ -303,7 +306,7 @@ final class PipelineConfigParser {
         }
 
         // ── join (ELT amendment D-4/Phase 3 S2 — reference join, authoring/round-trip only) ──
-        Map<String, Object> recJoin = (Map<String, Object>) proc.get("join");
+        Map<String, Object> recJoin = castMapAt(proc, "join");
         if (recJoin != null) {
             List<String> on = new ArrayList<>();
             if (recJoin.get("on") instanceof List<?> os)
@@ -316,10 +319,10 @@ final class PipelineConfigParser {
         // ── map (AUTHOR-1 (a) — the authored half of a transform.map node) ──
         // ⛔ NOT added to the steps: exclusivity list below: a map node sits between parser and sink in
         // both spellings, so a steps: file may legitimately carry processing.map. See MapConfig's ⛔.
-        Map<String, Object> recMap = (Map<String, Object>) proc.get("map");
+        Map<String, Object> recMap = castMapAt(proc, "map");
         if (recMap != null) {
-            List<Map<String, Object>> columns = objectList(recMap.get("columns"), "processing.map.columns");
-            List<Map<String, Object>> rules   = objectList(recMap.get("rules"),   "processing.map.rules");
+            List<Map<String, Object>> columns = listOfMapsAt(recMap, "columns", "processing.map.columns");
+            List<Map<String, Object>> rules   = listOfMapsAt(recMap, "rules",   "processing.map.rules");
             if (!columns.isEmpty() || !rules.isEmpty())
                 b.mapConfig = new PipelineConfig.MapConfig(columns, rules);
         }
@@ -343,7 +346,7 @@ final class PipelineConfigParser {
         // §5): `parsing.delimited` aliases today's `processing.csv_settings`, `parsing.plugin` aliases
         // `processing.ingester`/`segments`/`ingester_config`. Absent ⇒ nothing changes (every existing
         // config parses byte-for-byte identically). Keys from `parsing:` overlay the legacy blocks.
-        Map<String, Object> parsing = (Map<String, Object>) raw.get("parsing");
+        Map<String, Object> parsing = castMapAt(raw, "parsing");
 
         // `parsing.grammar` (design-of-record) wins over the legacy `processing.grammar`, consistent
         // with every other key in the block. Either may be a plain path OR a registry reference
@@ -443,11 +446,11 @@ final class PipelineConfigParser {
         }
 
         // ── output ────────────────────────────────────────────────────────────
-        Map<String, Object> out = (Map<String, Object>) raw.get("output");
+        Map<String, Object> out = castMapAt(raw, "output");
         if (out != null) {
             b.outputFormat = String.valueOf(out.getOrDefault("format", "CSV")).toUpperCase();
             b.compression  = (String) out.get("compression");
-            b.duckLakeCfg  = (Map<String, Object>) out.get("ducklake");
+            b.duckLakeCfg  = castMapAt(out, "ducklake");
             // B4: source-filename lineage as an output-row column. Validated as an identifier here;
             // collision with a declared schema column is checked after the schemas load below.
             b.filenameColumn = trimToNull(out.get("filename_column"));
@@ -477,7 +480,7 @@ final class PipelineConfigParser {
                         db.toString(),
                         String.valueOf(sink.getOrDefault("format", "CSV")).toUpperCase(),
                         (String) sink.get("compression"),
-                        (Map<String, Object>) sink.get("ducklake"),
+                        castMapAt(sink, "ducklake"),
                         sinkFilenameCol));
             }
         }
@@ -700,7 +703,7 @@ final class PipelineConfigParser {
         // upsert/scd2 modes need a declared key, and each key column must exist in the resolved schema
         // (skipped when no schema is resolved yet, e.g. a draft). Mirrors the ConfigSpecs.pipeline()
         // enum + `reference-upsert-requires-key` CrossFieldRule (the two paths are kept in sync).
-        Map<String, Object> refBlock = (Map<String, Object>) raw.get("reference");
+        Map<String, Object> refBlock = castMapAt(raw, "reference");
         if (refBlock != null) {
             List<String> key = strList(refBlock.get("key"));
             Load load = Load.from(opt(refBlock, "load", "replace"));
@@ -750,7 +753,7 @@ final class PipelineConfigParser {
         // connector and overrides discovery (include/exclude/recursive_depth).
         b.sourceId       = b.pipelineName;
         b.sourceIncludes = new ArrayList<>(List.of(b.filePattern));
-        Map<String, Object> src = (Map<String, Object>) raw.get("collector");
+        Map<String, Object> src = castMapAt(raw, "collector");
         if (src != null) {
             b.sourceId        = opt(src, "id", b.pipelineName);
             b.collectorConnector = opt(src, "connector", "local").toLowerCase();
@@ -766,7 +769,7 @@ final class PipelineConfigParser {
             b.sourceDiscovery = opt(src, "discovery", "poll");
 
             // ── duplicate-detection / change policy (Phase C; additive, absent ⇒ PATH = today) ─────────
-            Map<String, Object> dupBlock = (Map<String, Object>) src.get("duplicate");
+            Map<String, Object> dupBlock = castMapAt(src, "duplicate");
             if (dupBlock != null) {
                 b.sourceDuplicate = new Duplicate(
                         opt(dupBlock, "mode", "path"),
@@ -775,7 +778,7 @@ final class PipelineConfigParser {
             }
 
             // ── readiness / stability (Phase B; additive sub-block, absent ⇒ DISABLED) ──────────
-            Map<String, Object> stab = (Map<String, Object>) src.get("stability");
+            Map<String, Object> stab = castMapAt(src, "stability");
             if (stab != null) {
                 long windowMs = toMillis(opt(stab, "window", "30s"));
                 int  checks   = Math.max(1, toInt(stab.getOrDefault("size_checks", 2)));
@@ -791,7 +794,7 @@ final class PipelineConfigParser {
 
             // ── collection guarantee + gap detection (Phase D; additive, absent ⇒ best-effort / off) ──
             b.sourceGuarantee = Guarantee.from(opt(src, "guarantee", null));
-            Map<String, Object> gap = (Map<String, Object>) src.get("gap_detection");
+            Map<String, Object> gap = castMapAt(src, "gap_detection");
             if (gap != null) {
                 boolean enabled = !"false".equalsIgnoreCase(
                         String.valueOf(gap.getOrDefault("enabled", "true")));
@@ -806,7 +809,7 @@ final class PipelineConfigParser {
                         + "source.duplicate.mode to metadata, checksum or etag to enforce it.", b.sourceGuarantee);
 
             // ── retrieval tuning: parallel fetch + rate limit (Phase E/F; additive, absent ⇒ sequential/unthrottled) ──
-            Map<String, Object> fetchBlock = (Map<String, Object>) src.get("fetch");
+            Map<String, Object> fetchBlock = castMapAt(src, "fetch");
             if (fetchBlock != null) {
                 b.sourceFetch = new Fetch(
                         opt(fetchBlock, "mode", "STAGE"),
@@ -816,7 +819,7 @@ final class PipelineConfigParser {
             }
 
             // ── retry / backoff (Phase F; additive, absent ⇒ a single attempt) ──────────────────
-            Map<String, Object> retryBlock = (Map<String, Object>) src.get("retry");
+            Map<String, Object> retryBlock = castMapAt(src, "retry");
             if (retryBlock != null) {
                 b.sourceRetry = new Retry(
                         toInt(retryBlock.getOrDefault("count", 0)),
@@ -826,7 +829,7 @@ final class PipelineConfigParser {
             }
 
             // ── circuit breaker (Phase F; additive, absent ⇒ never trips) ───────────────────────
-            Map<String, Object> cbBlock = (Map<String, Object>) src.get("circuit_breaker");
+            Map<String, Object> cbBlock = castMapAt(src, "circuit_breaker");
             if (cbBlock != null) {
                 b.sourceCircuitBreaker = new CircuitBreaker(true,
                         Math.max(1, toInt(cbBlock.getOrDefault("failure_threshold", 5))),
@@ -834,9 +837,9 @@ final class PipelineConfigParser {
             }
 
             // ── post-processing action (Phase F; additive, absent ⇒ RETAIN = leave the source) ──
-            Map<String, Object> paBlock = (Map<String, Object>) src.get("post_action");
+            Map<String, Object> paBlock = castMapAt(src, "post_action");
             if (paBlock != null) {
-                Map<String, Object> rawTags = (Map<String, Object>) paBlock.get("tags");
+                Map<String, Object> rawTags = castMapAt(paBlock, "tags");
                 Map<String, String> tags = new java.util.LinkedHashMap<>();
                 if (rawTags != null) rawTags.forEach((k, v) -> tags.put(k, String.valueOf(v)));
                 b.sourcePostAction = new PostActionConfig(
@@ -847,7 +850,7 @@ final class PipelineConfigParser {
             }
 
             // ── incremental discovery / high-watermark (Phase C4; additive, absent ⇒ full listing) ──
-            Map<String, Object> incBlock = (Map<String, Object>) src.get("incremental");
+            Map<String, Object> incBlock = castMapAt(src, "incremental");
             if (incBlock != null)
                 b.sourceIncremental = new Incremental(opt(incBlock, "watermark", null));
             if (b.sourceIncremental.enabled() && !b.sourceDuplicate.contentBased())
@@ -973,14 +976,13 @@ final class PipelineConfigParser {
      * <p>Sibling naming: {@code x_schema.toon → x_mapping.csv}; a schema file not following the
      * {@code _schema.toon} convention pairs with {@code <stem>_mapping.csv}.
      */
-    @SuppressWarnings("unchecked")
     private static void mergeSiblingMapping(Map<String, Object> schema, Path schemaFile, Builder b)
             throws IOException {
         Path csv = MappingCsv.siblingFor(schemaFile);
         if (!Files.exists(csv)) return;
         List<Map<String, String>> rules =
                 MappingCsv.parse(Files.readString(csv, StandardCharsets.UTF_8), csv.toString());
-        Map<String, Object> mapping = (Map<String, Object>) schema.get("mapping");
+        Map<String, Object> mapping = castMapAt(schema, "mapping");
         if (mapping == null) {
             mapping = new LinkedHashMap<>();
             schema.put("mapping", mapping);
@@ -998,7 +1000,6 @@ final class PipelineConfigParser {
      * over inline {@code mapping.rules}. Unlike the sibling (best-effort by presence), a declared
      * reference that does not resolve fails fast. Single-schema path only.
      */
-    @SuppressWarnings("unchecked")
     private static void applyMappingFile(Map<String, Object> proc, Map<String, Object> schema,
                                          Path configDir, Builder b) throws IOException {
         String ref = (String) proc.get("mapping_file");
@@ -1012,7 +1013,7 @@ final class PipelineConfigParser {
             throw new FileNotFoundException("Mapping file not found: " + ref);
         List<Map<String, String>> rules =
                 MappingCsv.parse(Files.readString(csv, StandardCharsets.UTF_8), csv.toString());
-        Map<String, Object> mapping = (Map<String, Object>) schema.get("mapping");
+        Map<String, Object> mapping = castMapAt(schema, "mapping");
         if (mapping == null) {
             mapping = new LinkedHashMap<>();
             schema.put("mapping", mapping);
@@ -1181,25 +1182,6 @@ final class PipelineConfigParser {
         return s;
     }
 
-    /**
-     * A list-of-objects config value as {@code List<Map<String,Object>>} — absent ⇒ empty. Fails fast on
-     * anything that is not a list of maps, because the alternative is the executor seeing a shape it
-     * silently skips: {@code RowShaper.columnsOf} takes any non-empty {@code List<?>} it is handed.
-     */
-    @SuppressWarnings("unchecked")
-    private static List<Map<String, Object>> objectList(Object value, String where) {
-        if (value == null) return List.of();
-        if (!(value instanceof List<?> list))
-            throw new IllegalArgumentException(where + " must be a list of objects");
-        List<Map<String, Object>> out = new ArrayList<>();
-        for (Object o : list) {
-            if (!(o instanceof Map<?, ?> m))
-                throw new IllegalArgumentException(where + " entries must be objects, got: " + o);
-            out.add((Map<String, Object>) m);
-        }
-        return out;
-    }
-
     /** Parse a tri-state boolean: {@code null}/blank ⇒ {@code null} (unset), else parsed. */
     private static Boolean parseBoolOrNull(Object v) {
         if (v == null) return null;
@@ -1226,7 +1208,6 @@ final class PipelineConfigParser {
      * Coerce a config value to a list of trimmed, non-empty strings. Accepts a JToon array
      * ({@code List}) or a comma-separated scalar; {@code null} ⇒ empty list.
      */
-    @SuppressWarnings("unchecked")
     private static List<String> strList(Object v) {
         if (v == null) return new ArrayList<>();
         List<String> out = new ArrayList<>();
@@ -1244,7 +1225,6 @@ final class PipelineConfigParser {
      * {@code SchemaProjection}) so the etl module stays dependency-free; used to check a
      * {@code reference.key} against the pipeline schema. Empty for a null/malformed schema.
      */
-    @SuppressWarnings("unchecked")
     private static Set<String> columnNamesOf(Map<String, Object> schema) {
         Set<String> cols = new LinkedHashSet<>();
         if (schema == null) return cols;
@@ -1399,12 +1379,11 @@ final class PipelineConfigParser {
      * IS one record, so there is no enclosing document for a path to walk. Accepting it silently
      * would let a config express something the reader cannot honor.
      */
-    @SuppressWarnings("unchecked")
     private static PipelineConfig.Json parseJson(Map<String, Object> csv) {
         if (!"json".equals(String.valueOf(csv.getOrDefault("frontend", "delimited")).trim().toLowerCase()))
             return null;
-        Map<String, Object> j = (csv.get("json") instanceof Map<?, ?> jm)
-                ? (Map<String, Object>) jm : Map.of();
+        Map<String, Object> jBlock = mapAt(csv, "json");
+        Map<String, Object> j = jBlock != null ? jBlock : Map.of();
         String format = opt(j, "format", "newline").trim().toLowerCase();
         if (!format.equals("newline") && !format.equals("array") && !format.equals("auto"))
             throw new IllegalArgumentException("json.format must be newline, array or auto (got '"
@@ -1454,12 +1433,11 @@ final class PipelineConfigParser {
      * because both are interpolated into the {@code read_xlsx} SQL and a key the engine cannot honor
      * must never load looking honored.
      */
-    @SuppressWarnings("unchecked")
     private static PipelineConfig.Xlsx parseXlsx(Map<String, Object> csv) {
         String frontend = String.valueOf(csv.getOrDefault("frontend", "delimited")).trim().toLowerCase();
         if (!frontend.equals("xlsx") && !frontend.equals("excel")) return null;
-        Map<String, Object> x = (csv.get("xlsx") instanceof Map<?, ?> xm)
-                ? (Map<String, Object>) xm : Map.of();
+        Map<String, Object> xBlock = mapAt(csv, "xlsx");
+        Map<String, Object> x = xBlock != null ? xBlock : Map.of();
         String sheet = trimToNull(x.get("sheet"));
         if (x.containsKey("sheet") && sheet == null)
             throw new IllegalArgumentException("xlsx.sheet must name a sheet when present (or be omitted "
@@ -1483,14 +1461,13 @@ final class PipelineConfigParser {
      * (or a literal blank-line string) and any other literal delimiter string switch to block mode,
      * where a record may span multiple physical lines.
      */
-    @SuppressWarnings("unchecked")
     private static PipelineConfig.TextRegex parseTextRegex(Map<String, Object> csv) {
         if (!"text_regex".equals(String.valueOf(csv.getOrDefault("frontend", "delimited")).trim().toLowerCase()))
             return null;
-        if (!(csv.get("text_regex") instanceof Map<?, ?> trMap))
+        Map<String, Object> tr = mapAt(csv, "text_regex");
+        if (tr == null)
             throw new IllegalArgumentException(
                     "frontend 'text_regex' requires a 'text_regex:' block with a 'pattern'");
-        Map<String, Object> tr = (Map<String, Object>) trMap;
 
         // Read raw (not via opt): a real "\n\n" is whitespace-only and must not fall back silently.
         Object rsRaw = tr.get("record_split");
@@ -1540,7 +1517,7 @@ final class PipelineConfigParser {
                                                    Map<String, Object> schema, String label) {
         if (tr == null) return;
         List<Map<String, Object>> fields = (List<Map<String, Object>>)
-                ((Map<String, Object>) schema.get("raw")).get("fields");
+                (castMapAt(schema, "raw")).get("fields");
         for (Map<String, Object> f : fields) {
             String sel = String.valueOf(f.get("selector"));
             if (!tr.groupNames().contains(sel))
@@ -1600,9 +1577,8 @@ final class PipelineConfigParser {
                 && (grammar.get("delimited") instanceof Map<?, ?> || grammar.get("plugin") instanceof Map<?, ?>);
     }
 
-    @SuppressWarnings("unchecked")
     private static Map<String, Object> resolveGrammar(Map<String, Object> proc, Map<String, Object> grammar) {
-        Map<String, Object> inline = (Map<String, Object>) proc.get("csv_settings");
+        Map<String, Object> inline = castMapAt(proc, "csv_settings");
         if (grammar == null && inline == null) return null;
         Map<String, Object> merged = new LinkedHashMap<>();
         if (grammar != null) merged.putAll(grammar);

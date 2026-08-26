@@ -133,6 +133,17 @@ loading sites (`AccessDeciders`, `Authenticators`, `TokenRelays`, `Parsers`, `De
 
 ### S3 — Route-module convergence (functional style where it shows most)
 
+> **STATUS: COMPLETE — three commits, 2026-08-27.** Grounding first showed the WriteGates chain was
+> ALREADY fully converged (nothing to do there — the audit found zero hand-rolled gate copies).
+> Shipped: `7d7718d4` (`RouteErrors` — the three repeated catch-chain shapes consolidated;
+> sites with divergent mappings deliberately kept local) · `4a6ed50a` (`PipelineRoutes` 1677 → four
+> modules + `PipelineSupport`; only observable change: rename audit events' `source` string, no
+> consumer) · `c23a89ca` (`ConfigRoutes` 10 routes → three modules + `ConfigFileSupport`;
+> `ConfigRoutes` SURVIVES as the static findings-helper home — four external callers, incl. a test,
+> use it; log category names changed). Every real-HTTP test passed unmodified through all three.
+> ⚠ Discovered en route: `CollectorServiceDispatchTest.aStalledRunDoesNotBlockTheNextTick` has a
+> timing flake (NoSuchFileException polling `.staging`) — green in isolation and on rerun.
+
 Converge oversized `*Routes` classes on the existing lean idiom (lambda handlers, shared
 `mapErrors`-style domain-error mapping, `WriteGates` for the write chain):
 1. Ground: per-class audit of `PipelineRoutes`, `ConfigRoutes`, `ObjectRoutes`, `BundleRoutes`,
@@ -183,7 +194,9 @@ CLAUDE.md §2 bans.
 ### S6 — God-class decomposition (imperative → dispatch tables)
 
 > **STATUS: grounded 2026-08-27 — per-class verdicts.**
-> **`MaintenanceJob` SPLIT (in progress):** ~14 independent tasks behind one `task` switch
+> **`MaintenanceJob` SPLIT — SHIPPED `3f2c908c` (2026-08-27):** 855 → ~190 lines, 11 new task
+> classes in the pre-existing static-run idiom; `mtime`/`olderThan` stay as MaintenanceJob statics
+> (three callers, no natural owner); zero registration/test changes. Original grounding: ~14 independent tasks behind one `task` switch
 > (`:163-192`); six already extracted (`StorageTrendTask`, `BackupTask`, `MetadataValidateTask`,
 > `PartitionCompactor`, `ReferenceCompactor`, `MaterializeTask`) — finish the pattern: one
 > package-private task class per in-file task, `MaintenanceJob` shrinks to the dispatcher; no
@@ -214,6 +227,17 @@ Per class, ground first, then:
   test files). Only S7 touches it, and only if the operator opts in.
 
 ### S7 — OPTIONAL, operator-gated: explicit composition root
+
+> **STATUS: CLOSED as LEAVE (operator approved the attempt 2026-08-27; grounding refuted it the
+> same day).** The canonical ctor (`CollectorService:367-564`) threads **15 `this`/`this::`
+> bindings through ~30 constructions** — collaborators deliberately receive the facade's own method
+> handles, several lazy-bound BEFORE their targets exist (commented at `:412-414`). A separate
+> `Wiring` class cannot be built without leaking a partially-constructed facade; the safe fallback
+> (a same-signature static factory) relocates nothing — the ctor already IS the explicit wiring
+> order. 123 test files + `ServiceBootstrap:69` construct directly, so signature changes ripple
+> widely for zero design gain. The construction-order fragility is real but is the PRICE of the
+> lazy-binding design, not an accident — a future incident in this ctor should reach for
+> per-collaborator comments, not extraction. Do not reopen without new evidence.
 
 The wiring-order fragility in `CollectorService`'s constructor (~60 positional `new`s referencing
 `this::` handles) is real, but extracting a composition-root class brushes against the closed M2
