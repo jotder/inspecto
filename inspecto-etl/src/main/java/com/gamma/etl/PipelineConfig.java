@@ -1231,11 +1231,7 @@ public final class PipelineConfig {
         this.json = b.json;
         this.xlsx = b.xlsx;
         this.textRegex = b.textRegex;
-        this.collector = new Collector(b.sourceId, b.collectorConnector, b.sourceIncludes,
-                b.sourceExcludes, b.sourceDepth, b.sourceStability, b.sourceConnection, b.sourceDuplicate,
-                b.sourceGuarantee, b.sourceGapDetection,
-                b.sourceFetch, b.sourceRetry, b.sourceCircuitBreaker, b.sourcePostAction, b.sourceIncremental,
-                b.sourceDiscovery);
+        this.collector = b.collector;
         this.statusDirToPrepare = b.statusDirToPrepare;
         this.active = b.active;
         this.template = b.template;
@@ -1685,22 +1681,7 @@ public final class PipelineConfig {
         Json         json;                // null unless frontend: json
         Xlsx         xlsx;                // null unless frontend: xlsx
         TextRegex    textRegex;           // null unless frontend: text_regex
-        String       sourceId;
-        String       collectorConnector = "local";
-        List<String> sourceIncludes  = new ArrayList<>();
-        List<String> sourceExcludes  = new ArrayList<>();
-        int          sourceDepth     = -1;
-        Stability    sourceStability = Stability.DISABLED;
-        String       sourceConnection;   // null ⇒ no connection-profile binding (local)
-        Duplicate    sourceDuplicate = Duplicate.PATH_DEFAULT;
-        Guarantee    sourceGuarantee = Guarantee.BEST_EFFORT;
-        GapDetection sourceGapDetection = GapDetection.DISABLED;
-        Fetch           sourceFetch = Fetch.DEFAULT;
-        Retry           sourceRetry = Retry.DISABLED;
-        CircuitBreaker  sourceCircuitBreaker = CircuitBreaker.DISABLED;
-        PostActionConfig sourcePostAction = PostActionConfig.RETAIN;
-        Incremental     sourceIncremental = Incremental.DISABLED;
-        String          sourceDiscovery = "poll";
+        Collector    collector;          // the parsed collector: block (parser always sets it)
         String outputFormat  = "CSV";
         String compression;
         Map<String, Object> duckLakeCfg;

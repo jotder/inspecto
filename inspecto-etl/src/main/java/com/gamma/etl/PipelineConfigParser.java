@@ -3,6 +3,7 @@ package com.gamma.etl;
 import com.gamma.config.safety.PathJail;
 import com.gamma.etl.PipelineConfig.Builder;
 import com.gamma.etl.PipelineConfig.CircuitBreaker;
+import com.gamma.etl.PipelineConfig.Collector;
 import com.gamma.etl.PipelineConfig.Duplicate;
 import com.gamma.etl.PipelineConfig.Fetch;
 import com.gamma.etl.PipelineConfig.FixedWidth;
@@ -747,123 +748,145 @@ final class PipelineConfigParser {
                             + ": processing.join on column '" + k + "' is not declared in the pipeline schema "
                             + declaredColumns);
 
-        // ── source / connector (additive; absent ⇒ implicit LOCAL reading dirs.poll) ──────────────
-        // A pipeline with no `source:` block scans the local poll dir exactly as before: the single
-        // processing.file_pattern glob, no excludes, unbounded depth. A `source:` block selects a
-        // connector and overrides discovery (include/exclude/recursive_depth).
-        b.sourceId       = b.pipelineName;
-        b.sourceIncludes = new ArrayList<>(List.of(b.filePattern));
-        Map<String, Object> src = castMapAt(raw, "collector");
-        if (src != null) {
-            b.sourceId        = opt(src, "id", b.pipelineName);
-            b.collectorConnector = opt(src, "connector", "local").toLowerCase();
-            List<String> inc  = strList(src.get("include"));
-            if (!inc.isEmpty()) b.sourceIncludes = inc;
-            b.sourceExcludes  = strList(src.get("exclude"));
-            Object depth = src.get("recursive_depth");
-            if (depth != null) b.sourceDepth = toInt(depth);
-            // Reusable connection-profile binding (resolved against the service's *_connection.toon registry;
-            // remote-connector construction from it is roadmap Phase E — the id is parsed/stored now).
-            b.sourceConnection = opt(src, "connection", null);
-            // ACQ-6 push discovery: poll (default) | watch (filesystem events on a local poll root).
-            b.sourceDiscovery = opt(src, "discovery", "poll");
-
-            // ── duplicate-detection / change policy (Phase C; additive, absent ⇒ PATH = today) ─────────
-            Map<String, Object> dupBlock = castMapAt(src, "duplicate");
-            if (dupBlock != null) {
-                b.sourceDuplicate = new Duplicate(
-                        opt(dupBlock, "mode", "path"),
-                        opt(dupBlock, "algorithm", "SHA256"),
-                        opt(dupBlock, "on_change", "reprocess"));
-            }
-
-            // ── readiness / stability (Phase B; additive sub-block, absent ⇒ DISABLED) ──────────
-            Map<String, Object> stab = castMapAt(src, "stability");
-            if (stab != null) {
-                long windowMs = toMillis(opt(stab, "window", "30s"));
-                int  checks   = Math.max(1, toInt(stab.getOrDefault("size_checks", 2)));
-                String marker = opt(stab, "ready_marker", null);
-                boolean excludeTmp = !"false".equalsIgnoreCase(
-                        String.valueOf(stab.getOrDefault("exclude_temp_files", "true")));
-                List<String> tmp = strList(stab.get("exclude_temp_patterns"));
-                b.sourceStability = new Stability(true, windowMs, checks,
-                        (marker == null || marker.isBlank()) ? null : marker.trim(),
-                        excludeTmp,
-                        tmp.isEmpty() ? Stability.DEFAULT_TEMP_PATTERNS : tmp);
-            }
-
-            // ── collection guarantee + gap detection (Phase D; additive, absent ⇒ best-effort / off) ──
-            b.sourceGuarantee = Guarantee.from(opt(src, "guarantee", null));
-            Map<String, Object> gap = castMapAt(src, "gap_detection");
-            if (gap != null) {
-                boolean enabled = !"false".equalsIgnoreCase(
-                        String.valueOf(gap.getOrDefault("enabled", "true")));
-                String seq = opt(gap, "sequence", null);
-                b.sourceGapDetection = new GapDetection(enabled, seq);
-            }
-            // A stronger-than-best-effort guarantee needs the fingerprint ledger to actually hold; without it
-            // the engine falls back to commit-log replay + markers. Say so rather than silently over-promising.
-            if (b.sourceGuarantee.requiresLedger() && !b.sourceDuplicate.contentBased())
-                log.warn("[CONFIG] source.guarantee={} needs a fingerprint ledger, but source.duplicate.mode "
-                        + "is 'path' (marker-only) — behaving as best-effort + commit-log replay. Set "
-                        + "source.duplicate.mode to metadata, checksum or etag to enforce it.", b.sourceGuarantee);
-
-            // ── retrieval tuning: parallel fetch + rate limit (Phase E/F; additive, absent ⇒ sequential/unthrottled) ──
-            Map<String, Object> fetchBlock = castMapAt(src, "fetch");
-            if (fetchBlock != null) {
-                b.sourceFetch = new Fetch(
-                        opt(fetchBlock, "mode", "STAGE"),
-                        opt(fetchBlock, "staging_dir", null),
-                        Math.max(1, toInt(fetchBlock.getOrDefault("parallel_fetch", 1))),
-                        parseRate(opt(fetchBlock, "rate_limit", null)));
-            }
-
-            // ── retry / backoff (Phase F; additive, absent ⇒ a single attempt) ──────────────────
-            Map<String, Object> retryBlock = castMapAt(src, "retry");
-            if (retryBlock != null) {
-                b.sourceRetry = new Retry(
-                        toInt(retryBlock.getOrDefault("count", 0)),
-                        opt(retryBlock, "backoff", "EXPONENTIAL"),
-                        toMillis(opt(retryBlock, "initial_delay", "1s")),
-                        toMillis(opt(retryBlock, "max_delay", "60s")));
-            }
-
-            // ── circuit breaker (Phase F; additive, absent ⇒ never trips) ───────────────────────
-            Map<String, Object> cbBlock = castMapAt(src, "circuit_breaker");
-            if (cbBlock != null) {
-                b.sourceCircuitBreaker = new CircuitBreaker(true,
-                        Math.max(1, toInt(cbBlock.getOrDefault("failure_threshold", 5))),
-                        toMillis(opt(cbBlock, "cooldown", "5m")));
-            }
-
-            // ── post-processing action (Phase F; additive, absent ⇒ RETAIN = leave the source) ──
-            Map<String, Object> paBlock = castMapAt(src, "post_action");
-            if (paBlock != null) {
-                Map<String, Object> rawTags = castMapAt(paBlock, "tags");
-                Map<String, String> tags = new java.util.LinkedHashMap<>();
-                if (rawTags != null) rawTags.forEach((k, v) -> tags.put(k, String.valueOf(v)));
-                b.sourcePostAction = new PostActionConfig(
-                        opt(paBlock, "on_success", "RETAIN"),
-                        opt(paBlock, "archive_path", null),
-                        tags,
-                        opt(paBlock, "on_unsupported", "WARN_AND_CONTINUE"));
-            }
-
-            // ── incremental discovery / high-watermark (Phase C4; additive, absent ⇒ full listing) ──
-            Map<String, Object> incBlock = castMapAt(src, "incremental");
-            if (incBlock != null)
-                b.sourceIncremental = new Incremental(opt(incBlock, "watermark", null));
-            if (b.sourceIncremental.enabled() && !b.sourceDuplicate.contentBased())
-                log.warn("[CONFIG] source.incremental.watermark is set but source.duplicate.mode is 'path' "
-                        + "(marker-only) — the watermark is derived from the fingerprint ledger, which path mode "
-                        + "does not populate, so incremental filtering will not engage. Set source.duplicate.mode "
-                        + "to metadata, checksum or etag.");
-        }
+        b.collector = parseCollector(raw, b.pipelineName, b.filePattern);
 
         log.info("[CONFIG] Status file : {}", b.statusFilePath);
         PipelineConfig cfg = new PipelineConfig(b);
         ConfigValidator.validate(cfg);  // non-fatal: logs warnings for suspicious-but-legal patterns
         return cfg;
+    }
+
+    /**
+     * Decodes the optional {@code collector:} block into the immutable {@link Collector} value.
+     *
+     * <p>Absent block ⇒ an implicit LOCAL collector that scans {@code dirs.poll} with the single
+     * {@code processing.file_pattern} glob, no excludes, unbounded depth — exactly the behaviour a
+     * pipeline had before {@code collector:} existed. Every sub-block is additive: a missing one
+     * leaves the default, which the {@link Collector} compact constructor supplies from {@code null}.
+     */
+    private static Collector parseCollector(Map<String, Object> raw, String pipelineName, String filePattern) {
+        Map<String, Object> src = castMapAt(raw, "collector");
+        if (src == null)
+            return new Collector(pipelineName, "local", new ArrayList<>(List.of(filePattern)), List.of(), -1,
+                    null, null, null, null, null, null, null, null, null, null, null);
+
+        String id             = opt(src, "id", pipelineName);
+        String connector      = opt(src, "connector", "local").toLowerCase();
+        List<String> includes = new ArrayList<>(List.of(filePattern));
+        List<String> inc      = strList(src.get("include"));
+        if (!inc.isEmpty()) includes = inc;
+        List<String> excludes = strList(src.get("exclude"));
+        int recursiveDepth    = -1;
+        Object depth = src.get("recursive_depth");
+        if (depth != null) recursiveDepth = toInt(depth);
+        // Reusable connection-profile binding (resolved against the service's *_connection.toon registry;
+        // remote-connector construction from it is roadmap Phase E — the id is parsed/stored now).
+        String connection     = opt(src, "connection", null);
+        // ACQ-6 push discovery: poll (default) | watch (filesystem events on a local poll root).
+        String discovery      = opt(src, "discovery", "poll");
+
+        // ── duplicate-detection / change policy (Phase C; additive, absent ⇒ PATH = today) ─────────
+        Duplicate duplicate = Duplicate.PATH_DEFAULT;
+        Map<String, Object> dupBlock = castMapAt(src, "duplicate");
+        if (dupBlock != null) {
+            duplicate = new Duplicate(
+                    opt(dupBlock, "mode", "path"),
+                    opt(dupBlock, "algorithm", "SHA256"),
+                    opt(dupBlock, "on_change", "reprocess"));
+        }
+
+        // ── readiness / stability (Phase B; additive sub-block, absent ⇒ DISABLED) ──────────
+        Stability stability = Stability.DISABLED;
+        Map<String, Object> stab = castMapAt(src, "stability");
+        if (stab != null) {
+            long windowMs = toMillis(opt(stab, "window", "30s"));
+            int  checks   = Math.max(1, toInt(stab.getOrDefault("size_checks", 2)));
+            String marker = opt(stab, "ready_marker", null);
+            boolean excludeTmp = !"false".equalsIgnoreCase(
+                    String.valueOf(stab.getOrDefault("exclude_temp_files", "true")));
+            List<String> tmp = strList(stab.get("exclude_temp_patterns"));
+            stability = new Stability(true, windowMs, checks,
+                    (marker == null || marker.isBlank()) ? null : marker.trim(),
+                    excludeTmp,
+                    tmp.isEmpty() ? Stability.DEFAULT_TEMP_PATTERNS : tmp);
+        }
+
+        // ── collection guarantee + gap detection (Phase D; additive, absent ⇒ best-effort / off) ──
+        Guarantee guarantee = Guarantee.from(opt(src, "guarantee", null));
+        GapDetection gapDetection = GapDetection.DISABLED;
+        Map<String, Object> gap = castMapAt(src, "gap_detection");
+        if (gap != null) {
+            boolean enabled = !"false".equalsIgnoreCase(
+                    String.valueOf(gap.getOrDefault("enabled", "true")));
+            String seq = opt(gap, "sequence", null);
+            gapDetection = new GapDetection(enabled, seq);
+        }
+        // A stronger-than-best-effort guarantee needs the fingerprint ledger to actually hold; without it
+        // the engine falls back to commit-log replay + markers. Say so rather than silently over-promising.
+        if (guarantee.requiresLedger() && !duplicate.contentBased())
+            log.warn("[CONFIG] source.guarantee={} needs a fingerprint ledger, but source.duplicate.mode "
+                    + "is 'path' (marker-only) — behaving as best-effort + commit-log replay. Set "
+                    + "source.duplicate.mode to metadata, checksum or etag to enforce it.", guarantee);
+
+        // ── retrieval tuning: parallel fetch + rate limit (Phase E/F; additive, absent ⇒ sequential/unthrottled) ──
+        Fetch fetch = Fetch.DEFAULT;
+        Map<String, Object> fetchBlock = castMapAt(src, "fetch");
+        if (fetchBlock != null) {
+            fetch = new Fetch(
+                    opt(fetchBlock, "mode", "STAGE"),
+                    opt(fetchBlock, "staging_dir", null),
+                    Math.max(1, toInt(fetchBlock.getOrDefault("parallel_fetch", 1))),
+                    parseRate(opt(fetchBlock, "rate_limit", null)));
+        }
+
+        // ── retry / backoff (Phase F; additive, absent ⇒ a single attempt) ──────────────────
+        Retry retry = Retry.DISABLED;
+        Map<String, Object> retryBlock = castMapAt(src, "retry");
+        if (retryBlock != null) {
+            retry = new Retry(
+                    toInt(retryBlock.getOrDefault("count", 0)),
+                    opt(retryBlock, "backoff", "EXPONENTIAL"),
+                    toMillis(opt(retryBlock, "initial_delay", "1s")),
+                    toMillis(opt(retryBlock, "max_delay", "60s")));
+        }
+
+        // ── circuit breaker (Phase F; additive, absent ⇒ never trips) ───────────────────────
+        CircuitBreaker circuitBreaker = CircuitBreaker.DISABLED;
+        Map<String, Object> cbBlock = castMapAt(src, "circuit_breaker");
+        if (cbBlock != null) {
+            circuitBreaker = new CircuitBreaker(true,
+                    Math.max(1, toInt(cbBlock.getOrDefault("failure_threshold", 5))),
+                    toMillis(opt(cbBlock, "cooldown", "5m")));
+        }
+
+        // ── post-processing action (Phase F; additive, absent ⇒ RETAIN = leave the source) ──
+        PostActionConfig postAction = PostActionConfig.RETAIN;
+        Map<String, Object> paBlock = castMapAt(src, "post_action");
+        if (paBlock != null) {
+            Map<String, Object> rawTags = castMapAt(paBlock, "tags");
+            Map<String, String> tags = new java.util.LinkedHashMap<>();
+            if (rawTags != null) rawTags.forEach((k, v) -> tags.put(k, String.valueOf(v)));
+            postAction = new PostActionConfig(
+                    opt(paBlock, "on_success", "RETAIN"),
+                    opt(paBlock, "archive_path", null),
+                    tags,
+                    opt(paBlock, "on_unsupported", "WARN_AND_CONTINUE"));
+        }
+
+        // ── incremental discovery / high-watermark (Phase C4; additive, absent ⇒ full listing) ──
+        Incremental incremental = Incremental.DISABLED;
+        Map<String, Object> incBlock = castMapAt(src, "incremental");
+        if (incBlock != null)
+            incremental = new Incremental(opt(incBlock, "watermark", null));
+        if (incremental.enabled() && !duplicate.contentBased())
+            log.warn("[CONFIG] source.incremental.watermark is set but source.duplicate.mode is 'path' "
+                    + "(marker-only) — the watermark is derived from the fingerprint ledger, which path mode "
+                    + "does not populate, so incremental filtering will not engage. Set source.duplicate.mode "
+                    + "to metadata, checksum or etag.");
+
+        return new Collector(id, connector, includes, excludes, recursiveDepth, stability, connection,
+                duplicate, guarantee, gapDetection, fetch, retry, circuitBreaker, postAction,
+                incremental, discovery);
     }
 
     // ── schema reference resolution ───────────────────────────────────────────
