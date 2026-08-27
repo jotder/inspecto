@@ -75,8 +75,17 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
-- [`superpower/java-simplification-plan.md`](superpower/java-simplification-plan.md) — **PLAN, grounded
-  2026-08-26, not started.** Intra-module Java simplification in 6 slices (+1 operator-gated): shared
+- [`superpower/java-architecture-plan.md`](superpower/java-architecture-plan.md) — **PLAN, grounded
+  2026-08-27, not started.** Phase 2 of the reorganization: coupling, module organization, functional
+  style, dependency reduction. ⭐ Its headline finding is that
+  [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md)'s package-layering claim is
+  **stale** — three undocumented SCCs exist (`ops`/`pipeline`, the `job ↔ consignment` tangle, and
+  `service ↔ report`/`assist.spi`/`intelligence.spi`). Phases A/C/D/E are live; B (`ObjectService`)
+  and F (`PipelineConfig`) are CLOSED as grounded LEAVEs — read their evidence before reopening.
+- ~~[`superpower/java-simplification-plan.md`](superpower/java-simplification-plan.md)~~ — **COMPLETE
+  2026-08-27**, 9 commits `d5791116`…`829fbf22`, baseline 3630 → 3657/0/0/5. Phase 1: helper
+  consolidation (`Values`, `SpiSlot`, `RouteErrors`, `SqlBuilder.quoteIdent`), the `PipelineRoutes`
+  and `ConfigRoutes` splits, `MaintenanceJob`. Originally filed as: Intra-module Java simplification in 6 slices (+1 operator-gated): shared
   helper consolidation into `inspecto-util`, a generic `SpiLoader`, route-module convergence, typed
   access over `Map<String,Object>`, codec/validator seam, god-class decomposition. Excludes AI modules;
   the module map itself is settled and untouched.
