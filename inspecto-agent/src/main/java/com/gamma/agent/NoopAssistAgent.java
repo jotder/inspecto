@@ -1,14 +1,14 @@
 package com.gamma.agent;
 
 import com.gamma.assist.spi.AssistAgent;
-import com.gamma.service.CollectorService;
+import com.gamma.service.ReadModel;
 
 /**
  * Placeholder assist-agent provider (v3.0, milestone M0).
  *
  * <p>Its only job is to prove the cross-module SPI wiring: the optional
  * {@code inspecto-agent} module implements {@link AssistAgent} (defined in core) and
- * can be wired into a running {@link CollectorService}. It intentionally does nothing else.
+ * can be wired into a running {@link ReadModel}. It intentionally does nothing else.
  *
  * <p>It is <b>not</b> registered as a {@code ServiceLoader} provider yet (no
  * {@code META-INF/services} entry), so deployments behave exactly as before — auto-discovery
@@ -18,7 +18,7 @@ import com.gamma.service.CollectorService;
  */
 public final class NoopAssistAgent implements AssistAgent {
 
-    private CollectorService service;
+    private ReadModel service;
 
     @Override
     public String name() {
@@ -26,12 +26,12 @@ public final class NoopAssistAgent implements AssistAgent {
     }
 
     @Override
-    public void init(CollectorService service) {
+    public void init(ReadModel service) {
         this.service = service;
     }
 
     /** The host service this agent was wired to, or {@code null} before {@link #init}. */
-    CollectorService boundService() {
+    ReadModel boundService() {
         return service;
     }
 }

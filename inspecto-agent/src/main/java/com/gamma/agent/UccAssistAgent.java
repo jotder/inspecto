@@ -34,7 +34,7 @@ import com.gamma.assist.AssistRequest;
 import com.gamma.assist.AssistResult;
 import com.gamma.assist.Diagnosis;
 import com.gamma.assist.spi.AssistAgent;
-import com.gamma.service.CollectorService;
+import com.gamma.service.ReadModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -113,7 +113,7 @@ public final class UccAssistAgent implements AssistAgent {
     }
 
     @Override
-    public void init(CollectorService service) {
+    public void init(ReadModel service) {
         DocRetriever docs = DocRetriever.fromDir(docsDir());
         // The orchestrator emits the per-call AgentCompleted via ctx.audit(); wrap the injected sink so
         // the familiar [ASSIST] operator log is preserved, then delegate to the embedder's sink.

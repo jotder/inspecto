@@ -11,6 +11,7 @@ import com.gamma.intelligence.AgentSessionRequest;
 import com.gamma.intelligence.AgentSessionResult;
 import com.gamma.intelligence.spi.IntelligenceAgent;
 import com.gamma.service.CollectorService;
+import com.gamma.service.ReadModel;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -631,7 +632,7 @@ class AgentRoutesTest {
                 Map.of("killSwitch", false, "classes", new java.util.LinkedHashMap<>()));
 
         @Override public String name() { return "fake-intelligence"; }
-        @Override public void init(CollectorService service) {}
+        @Override public void init(ReadModel service) {}
 
         // AGT-6a A1: a stand-in belt for POST /agent/tools/{name}. "component_draft" mirrors the real
         // tool's result shape (ok=true even when findings exist); "component_apply" stands in for the

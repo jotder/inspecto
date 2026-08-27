@@ -7,6 +7,7 @@ import com.gamma.intelligence.AgentSessionRequest;
 import com.gamma.intelligence.AgentSessionResult;
 import com.gamma.api.PublicApi;
 import com.gamma.service.CollectorService;
+import com.gamma.service.ReadModel;
 
 import java.util.List;
 import java.util.Map;
@@ -27,7 +28,9 @@ import java.util.Optional;
  *
  * <h3>Lifecycle</h3>
  * <ol>
- *   <li>{@link #init(CollectorService)} — called once, before {@link CollectorService#start()}.</li>
+ *   <li>{@link #init(ReadModel)} — called once, before {@link CollectorService#start()}. The agent
+ *       receives the read-only {@link ReadModel} slice, not the concrete service (operator
+ *       decision #1, 2026-08-27; zero mutating calls exist in any in-tree implementor).</li>
  *   <li>{@link #start()} — called after the service has started.</li>
  *   <li>{@link #close()} — called on service shutdown.</li>
  * </ol>
@@ -43,7 +46,7 @@ public interface IntelligenceAgent extends AutoCloseable {
      * {@link CollectorService#start()}. Implementations should capture only what they need and
      * return quickly; defer model/platform assembly to {@link #start()}.
      */
-    void init(CollectorService service);
+    void init(ReadModel service);
 
     /** Called after {@link CollectorService#start()}. Default no-op. */
     default void start() {}

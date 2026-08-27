@@ -5,6 +5,7 @@ import com.gamma.assist.AssistRequest;
 import com.gamma.assist.AssistResult;
 import com.gamma.assist.Diagnosis;
 import com.gamma.service.CollectorService;
+import com.gamma.service.ReadModel;
 
 import java.util.List;
 import java.util.Map;
@@ -21,10 +22,13 @@ import java.util.Map;
  *
  * <h3>Lifecycle</h3>
  * <ol>
- *   <li>{@link #init(CollectorService)} — called once, <b>before</b> {@link CollectorService#start()},
- *       so the agent can subscribe to {@link CollectorService#eventBus()} before the first poll
- *       cycle and capture the typed handles it needs ({@link CollectorService#reports()},
- *       {@code enrichmentService()}, {@code jobService()}, {@code statusStore()}).</li>
+ *   <li>{@link #init(ReadModel)} — called once, <b>before</b> {@link CollectorService#start()},
+ *       so the agent can subscribe to {@link ReadModel#eventBus()} before the first poll
+ *       cycle and capture the typed handles it needs ({@link ReadModel#reports()},
+ *       {@code enrichmentService()}, {@code jobService()}, {@code statusStore()}).
+ *       The agent receives the read-only {@link ReadModel} slice, not the concrete service
+ *       (operator decision #1, 2026-08-27): a usage census of every in-tree implementor found zero
+ *       mutating calls — the act tools write through the audited control plane, not this handle.</li>
  *   <li>{@link #start()} — called after the service has started.</li>
  *   <li>{@link #close()} — called on service shutdown.</li>
  * </ol>
@@ -47,7 +51,7 @@ public interface AssistAgent extends AutoCloseable {
      *
      * @param service the host service, for typed access to its subsystems and event bus
      */
-    void init(CollectorService service);
+    void init(ReadModel service);
 
     /** Called after {@link CollectorService#start()}. Default no-op. */
     default void start() {}

@@ -1,10 +1,15 @@
 package com.gamma.service;
 
+import com.gamma.catalog.ConfigSource;
+import com.gamma.catalog.MetadataGraphService;
 import com.gamma.etl.BatchEventBus;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.StatusStore;
+import com.gamma.event.EventLog;
 import com.gamma.event.EventStore;
 import com.gamma.job.JobService;
+import com.gamma.ops.ObjectService;
+import com.gamma.report.ReportService;
 import com.gamma.util.BrowsableStore;
 
 import java.nio.file.Path;
@@ -19,6 +24,18 @@ import java.util.Optional;
  * {@code OperationalActions}. Each compiles against a 1693-line, 60+-method class to call between one and
  * seven accessors. This interface is that union and nothing more, so a collaborator's signature states what
  * it needs, and a test can supply a fake instead of a live {@code CollectorService}.
+ *
+ * <h2>Update — the agent SPIs take this type too (operator decision #1, 2026-08-27)</h2>
+ *
+ * <p>{@code AssistAgent.init} and {@code IntelligenceAgent.init} now receive a {@code ReadModel} instead of
+ * the concrete class. A usage census of every consumer the agents hand the handle to (the three
+ * implementors, {@code InspectoPack} → {@code InspectoToolProvider} → {@code InspectoTools},
+ * {@code ContextBroker}, {@code Investigator}, {@code OperationalActions} and the action previewer) found
+ * <b>zero mutating calls</b> — the act tools write through the audited control plane, never through this
+ * handle. Five read accessors the agents use were widened onto this interface for that:
+ * {@link #catalog()}, {@link #reports()}, {@link #configSource()}, {@link #eventLog()},
+ * {@link #objects()}. All five return types were already imported by this package, so the widening adds
+ * no package edge.
  *
  * <p><b>Every member here is a pure read.</b> Nothing that registers, schedules, starts, runs, pauses or
  * closes belongs on this type — that is the distinction it exists to draw. {@code ApiContext},
@@ -73,6 +90,21 @@ public interface ReadModel {
 
     /** The in-process batch event bus. */
     BatchEventBus eventBus();
+
+    /** The operational event/audit log (read side; agents subscribe and query, never emit through this). */
+    EventLog eventLog();
+
+    /** The Catalog metadata graph. */
+    MetadataGraphService catalog();
+
+    /** The status/report roll-up service. */
+    ReportService reports();
+
+    /** Where config files came from — the Catalog's config-origin index. */
+    ConfigSource configSource();
+
+    /** The operational-object service (Incidents/Cases read surface). */
+    ObjectService objects();
 
     /** The job service, or empty when this deployment runs no jobs. */
     Optional<JobService> jobService();

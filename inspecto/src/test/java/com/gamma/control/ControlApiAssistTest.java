@@ -8,6 +8,7 @@ import com.gamma.assist.Diagnosis;
 import com.gamma.assist.spi.AssistAgent;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.service.CollectorService;
+import com.gamma.service.ReadModel;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -37,7 +38,7 @@ class ControlApiAssistTest {
     /** A minimal in-core agent: answers {@code echo}, reports {@code down} unavailable, else unsupported. */
     private static final class StubAgent implements AssistAgent {
         @Override public String name() { return "stub"; }
-        @Override public void init(CollectorService service) { /* no handles needed */ }
+        @Override public void init(ReadModel service) { /* no handles needed */ }
         @Override public AssistResult assist(AssistRequest req) {
             return switch (req.intent()) {
                 case "echo" -> AssistResult.answer("echo", "you said: " + req.userText(),

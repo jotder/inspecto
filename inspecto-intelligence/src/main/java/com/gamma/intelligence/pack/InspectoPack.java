@@ -10,7 +10,7 @@ import com.eoiagent.app.PolicyProfile;
 import com.eoiagent.app.PromptProfile;
 import com.eoiagent.app.ToolProvider;
 import com.eoiagent.core.AppId;
-import com.gamma.service.CollectorService;
+import com.gamma.service.ReadModel;
 
 import java.util.List;
 
@@ -34,9 +34,9 @@ import java.util.List;
  */
 public final class InspectoPack implements ApplicationPack {
 
-    private final CollectorService service;
+    private final ReadModel service;
 
-    public InspectoPack(CollectorService service) {
+    public InspectoPack(ReadModel service) {
         this.service = service;
     }
 

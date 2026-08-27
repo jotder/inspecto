@@ -15,7 +15,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.intelligence.investigation.Case;
 import com.gamma.intelligence.investigation.Incident;
 import com.gamma.pipeline.ComponentStore;
-import com.gamma.service.CollectorService;
+import com.gamma.service.ReadModel;
 import com.gamma.util.BrowsableStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,7 +51,7 @@ public final class Investigator {
     private final ComponentStore components;
     private final LlmGateway gateway;
 
-    public Investigator(CollectorService service, ComponentStore components,
+    public Investigator(ReadModel service, ComponentStore components,
                         Supplier<List<BrowsableStore>> browseStores, LlmGateway gateway) {
         this.tools = InspectoTools.tools(service, components, browseStores);
         this.components = components;

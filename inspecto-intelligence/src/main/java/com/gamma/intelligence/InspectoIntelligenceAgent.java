@@ -48,7 +48,7 @@ import com.gamma.intelligence.pack.InspectoPack;
 import com.gamma.intelligence.pack.Investigator;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.intelligence.spi.IntelligenceAgent;
-import com.gamma.service.CollectorService;
+import com.gamma.service.ReadModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -102,14 +102,14 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
     private final LlmGateway gatewayOverride;
     /** Whether {@link #gateway} is a real reachable model rather than the offline stub — see A5's 503. */
     private boolean modelConfigured;
-    private CollectorService service;
+    private ReadModel service;
     private InspectoPack pack;
     private AgentPlatform platform;
     private ContextBroker contextBroker;
     private LlmGateway gateway;
     private TriageQueue triage;
 
-    /** Discovered/registered via {@link CollectorService}; builds its gateway from {@link GatewayFactory}. */
+    /** Discovered/registered via {@link ReadModel}; builds its gateway from {@link GatewayFactory}. */
     public InspectoIntelligenceAgent() {
         this(null);
     }
@@ -135,7 +135,7 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
     }
 
     @Override
-    public void init(CollectorService service) {
+    public void init(ReadModel service) {
         this.service = service;
     }
 
@@ -651,11 +651,11 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
     /**
      * The read-only dry-run preview the P3 approval gate shows the operator, dispatched by tool family:
      * operational act tools ({@code job_run}/{@code pipeline_rerun}/{@code alert_ack}/
-     * {@code schedule_apply}) read live {@link CollectorService} state; {@code runbook_operator} shows
+     * {@code schedule_apply}) read live {@link ReadModel} state; {@code runbook_operator} shows
      * the full resolved plan; the component act tools diff the {@link ComponentStore}. Any other
      * (non-mutating) tool never reaches the gate, so it returns empty.
      */
-    private static Map<String, Object> previewAction(ComponentStore components, CollectorService service,
+    private static Map<String, Object> previewAction(ComponentStore components, ReadModel service,
                                                      ToolCall call) {
         return switch (call.toolName()) {
             case OperationalActions.TOOL_JOB_RUN, OperationalActions.TOOL_PIPELINE_RERUN,

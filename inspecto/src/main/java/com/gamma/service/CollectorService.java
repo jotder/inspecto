@@ -838,7 +838,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     }
 
     /**
-     * Wire an embedded {@link AssistAgent} (v3.0, M0). Calls {@link AssistAgent#init(CollectorService)}
+     * Wire an embedded {@link AssistAgent} (v3.0, M0). Calls {@link AssistAgent#init(ReadModel)}
      * immediately so the agent can subscribe to the bus and capture typed handles <em>before</em>
      * {@link #start()} schedules the first poll. Idempotent-ish: a second registration is ignored
      * with a warning (one agent per service). Normally invoked automatically by {@link #start()}
@@ -858,7 +858,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
 
     /**
      * Wire an embedded {@link IntelligenceAgent} (AGT-5, P0) — mirrors {@link #registerAgent}.
-     * Calls {@link IntelligenceAgent#init(CollectorService)} immediately, before publishing the
+     * Calls {@link IntelligenceAgent#init(ReadModel)} immediately, before publishing the
      * reference. A second registration is ignored with a warning (one agent per service).
      *
      * @param a the agent provider; {@code null} is a no-op
