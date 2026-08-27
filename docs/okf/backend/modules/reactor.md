@@ -295,16 +295,20 @@ conversion still reads `EnrichmentService`, `CollectorService`, `ReadModel`:
 |---|---|---|
 | 1 | the `CollectorService` field | removed — this is the only one a role interface touches |
 | 2 | `EnrichmentService` | an unrelated `com.gamma.service` type `ReportService` also uses |
-| 3 | **`CollectorService.PipelineView`** | `pipelines()` returns `List<PipelineView>` and **`PipelineView` is a record nested inside `CollectorService`**, so every caller writes `CollectorService.PipelineView` explicitly — regardless of the receiver's declared type |
+| 3 | ~~`CollectorService.PipelineView`~~ | ✅ **REMOVED 4.0.0** — promoted to a top-level `com.gamma.service.PipelineView` under operator decision #4. ⚠ **This dropped the HOLDER, not the EDGE:** the record still lives in `com.gamma.service`, so `ReportService` now imports `PipelineView` instead of `CollectorService` — same edge, different holder |
 
 ⭐ **Holder 3 generalises well beyond this cycle: a nested public record makes its enclosing class an
-unavoidable import for every caller of any method that returns it.** No fan-in/fan-out metric surfaces
+unavoidable import for every caller of any method that returns it.** (Confirmed by removing it: promoting
+the three records dropped `CollectorService`'s fan-in from **25 files to 16**.) No fan-in/fan-out metric surfaces
 this — the dependency is in the *return type's spelling*, not in the call graph. Check for nested
 types before predicting that an interface will cut an edge.
 
-**Cutting C3's `report` edge for real requires all three:** promote `PipelineView`/`PipelineRun` out of
-`CollectorService` into top-level records, give `EnrichmentService` a role interface, *and* the
-`ReadModel` conversion already done. That is a redesign, so under the operator's stated default it is
+**Status after 4.0.0:** the `ReadModel` conversion and the record promotion are both **done**, and the
+`report -> service` edge **still stands** — `ReportService` imports `EnrichmentService` and
+`PipelineView`, both `com.gamma.service`. ⭐ **The lesson: promoting a nested type removes the holder
+but not the edge, because the promoted type lands in the same package.** Cutting the edge needs the
+two things still outstanding: a role interface for `EnrichmentService`, and a home for the view
+records OUTSIDE `com.gamma.service`. Both are redesigns; under the operator's stated default they are
 recorded here rather than built unasked.
 
 **What Phase A did cut:** exactly one edge — `intelligence.context → service`, because `ContextBroker`

@@ -117,9 +117,20 @@ and the move is a source/binary break for external consumers. It is therefore **
 (`@PublicApi` relocation on a major bump), exactly like C1/C2 — not a free afternoon.
 
 **Realistic ceiling, in order:**
-1. **Today, ungated: ~0.** Every remaining lever is API-gated or structural. This is the honest answer.
-2. **Decision #4 granted:** fan-in 25 → **16**, and one of C3's three `report → service` holders goes
-   (`EnrichmentService` still holds it, so C3 still does not dissolve).
+1. ~~Today, ungated: ~0.~~
+2. ✅ **Decision #4 GRANTED and SHIPPED 2026-08-27** — `PipelineView`/`PipelineRun`/`InboxStatus`
+   promoted to top-level `com.gamma.service` records. **fan-in 25 → 16, exactly as predicted**
+   (9 files dropped: `DataSourceRoutes`, `PipelineListRoutes`, `RunRoutes`, `OperationalActions`,
+   `ContextBroker`, `InspectoTools`, `ReportService`, `DataSourceBundleResolver`, `MetricsService`).
+   Safe on version: master is **`4.0.0-SNAPSHOT`** and the last release is **`v3.12.0`**, so 4.0.0 *is*
+   the major bump decision #4 contemplates.
+   🔴 **But the `report → service` EDGE did not move.** The promoted records live in
+   `com.gamma.service` too, so `ReportService` swapped a `CollectorService` import for a
+   `PipelineView` import — **a different holder, the same edge** — and it still imports
+   `EnrichmentService` independently. ⭐ **Promoting a nested type removes the holder, not the edge,
+   unless the promoted type also leaves the package.** Putting the records in a neutral package was
+   considered and rejected: `EnrichmentService` holds the edge regardless, so it would have bought a
+   new package for no measured gain.
 3. **Decision #1 granted** (narrow the SPI `init`): a further ~8 agent/SPI files → fan-in ≈ **8**.
 4. **Floor ≈ 7** — the composition root plus `ApiContext`/`ControlApi`, which legitimately need the
    full surface.
@@ -260,7 +271,7 @@ refuted both halves. **`com.gamma.report` → `com.gamma.service` has three inde
 |---|---|---|---|
 | 1 | `CollectorService` (the field itself) | `ReportService.java:6,45` | removed by Phase A |
 | 2 | **`EnrichmentService`** | `ReportService.java:5`, called at `:208` | ✅ survives — an unrelated `com.gamma.service` type |
-| 3 | **`CollectorService.PipelineView`** | `ReportService.java:126,173` | ✅ survives — see below |
+| 3 | ~~`CollectorService.PipelineView`~~ | `ReportService.java:126,173` | ✅ **REMOVED 4.0.0** by the record promotion (decision #4) — but the EDGE survives, see below |
 
 Holder 3 is the decisive one and it generalises. **`pipelines()` returns `List<PipelineView>`, and
 `PipelineView` is a record nested *inside* `CollectorService`** (`CollectorService.java:257`). Every
