@@ -1,6 +1,6 @@
 # `docs/api/` — the machine-readable v1 API contract
 
-> Companion to [`../superpower/api-contract-design.md`](../superpower/api-contract-design.md) (the design)
+> Companion to [`../superpower/api-contract-design.md`](../archived-documents/plans-archive/api-contract-design.md) (the design)
 > and [`../ADVANCED_GUIDE.md`](../ADVANCED_GUIDE.md) §10 (the as-built route reference). Enforced against
 > the live server by `inspecto/src/test/java/com/gamma/control/ApiContractTest.java`.
 

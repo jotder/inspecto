@@ -51,5 +51,4 @@ built for regulated, air-gapped, and resource-constrained buyers where heavyweig
 2. **Embedded-intelligence P0 sign-off** — the design is ready; it is the next differentiating bet.
 3. **Legacy API sunset policy** — usage is now measured; sunset is a policy call, not engineering.
 
-*Deeper reading: [`../roadmap/STAKEHOLDER_OVERVIEW.md`](../roadmap/STAKEHOLDER_OVERVIEW.md) (strategy) ·
-[`../roadmap/PRESENTATION_EXEC.md`](../roadmap/PRESENTATION_EXEC.md) (12-slide deck).*
+*Deeper reading: [`../roadmap/STAKEHOLDER_OVERVIEW.md`](../roadmap/STAKEHOLDER_OVERVIEW.md) (strategy).*

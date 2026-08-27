@@ -17,16 +17,16 @@ Exploration confirms the seams already exist — the framework is mostly *unific
 - **Ingest SPI exists**: `com.gamma.etl.StreamingFileIngester` (`@PublicApi`) — plugin emits
   records; the framework owns DuckDB, transform, partitioned CSV/Parquet write (= point 1's
   "load to Tables", unchanged). But discovery is `Class.forName` on a config FQCN
-  ([UnionModeIngester.java:169](inspecto-engine/src/main/java/com/gamma/inspector/UnionModeIngester.java)),
+  ([UnionModeIngester.java:169](../../inspecto-engine/src/main/java/com/gamma/inspector/UnionModeIngester.java)),
   there is **no metadata, no config schema, no preview** (plugin preview hard-422s in
-  [ComponentPreview.java:143](inspecto-engine/src/main/java/com/gamma/pipeline/exec/ComponentPreview.java)).
+  [ComponentPreview.java:143](../../inspecto-engine/src/main/java/com/gamma/pipeline/exec/ComponentPreview.java)).
 - **ServiceLoader house pattern**: `CollectorConnectorFactory`/`CollectorConnectors`,
   `NotificationChannel`, and `PipelineNodeTypes` (builtin enum merged with ServiceLoader — the
   exact registry shape needed). Drop-in-jar classloading precedent: `JobPackManager`.
 - **Served form schema exists**: `FieldSpec` (inspecto-config) is already the dynamic-form
   contract served by `GET /config/spec/{type}` and `/bootstrap`; `GET /findings/{type}` proves the
   serve-spec→`<inspecto-schema-form>` loop end-to-end (UI mapper precedent:
-  [mail-model.ts:171](inspecto-ui/src/app/modules/admin/objects/mail-model.ts) `findingsAttributes`).
+  [mail-model.ts:171](../../inspecto-ui/src/app/modules/admin/objects/mail-model.ts) `findingsAttributes`).
 - **Tree UI exists**: `ParserPreview` union (`kind: 'table' | 'tree'`, `ParserTreeNode`) +
   shared `app-parser-tree` + the onboarding Table|Tree toggle — but the only tree source today is
   client-side JSON. The Pipelines Parser dialog's `/components/grammar/preview` is **mock-only**;
@@ -63,7 +63,7 @@ authored options; already the `grammar` component kind in the UI) — add Gramma
 - **inspecto-engine** `com.gamma.parse.Parsers` registry (PipelineNodeTypes precedent): four
   builtin adapters — `delimited`, `fixedwidth`, `json`, `text_regex` — id/label/hints from today's
   catalog, `grammarSchema()` = FieldSpec translations of
-  [parsing-attributes.ts](inspecto-ui/src/app/modules/admin/catalog/onboarding/parsing-attributes.ts)
+  [parsing-attributes.ts](../../inspecto-ui/src/app/inspecto/grammar/parsing-attributes.ts)
   keys as dotted paths (`delimited.delimiter`, …), `preview()` delegating to the existing
   `ComponentPreview` per-frontend logic (byte[]→UTF-8 text for these) — merged with
   `ServiceLoader.load(ParserPlugin)`; duplicate id ⇒ fail loud at startup.
@@ -88,7 +88,7 @@ New `ParserRoutes` (registered in `ControlApi`, + `CapabilityManifest` entries):
 - `XmlParserPlugin` in inspecto-engine, registered via `META-INF/services` (NotificationChannel
   precedent; a standalone drop-in module is the follow-on). StAX from the JDK — **no new
   dependency** — XXE-hardened like
-  [S3Connector.java:272](inspecto-connectors/src/main/java/com/gamma/acquire/connectors/S3Connector.java).
+  [S3Connector.java:272](../../inspecto-connectors/src/main/java/com/gamma/acquire/connectors/S3Connector.java).
 - Grammar: `record_element` (local name or slash-path), `namespace_aware`, `encoding`,
   `max_records`; `suggest()` proposes `record_element` from the root's repeated child.
 - `preview()` → `Tree`: element→node, attributes as `@attr` children, text as leaf values,

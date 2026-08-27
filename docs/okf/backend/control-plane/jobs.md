@@ -395,7 +395,7 @@ two-sided seam:
 | Side | Type | Who writes it |
 |---|---|---|
 | Author | [`ConsignmentProcessor`](../../../../inspecto-engine/src/main/java/com/gamma/consignment/ConsignmentProcessor.java) — `id()` + `process(ProcessorContext)` | third party, discovered by `ServiceLoader` |
-| Framework | [`ConsignmentProcessJobType`](../../../../inspecto-engine/src/main/java/com/gamma/consignment/ConsignmentProcessJobType.java) — a `JobTypeProvider` | this repo, registered in `JobService` beside the other built-ins |
+| Framework | [`ConsignmentProcessJobType`](../../../../inspecto-engine/src/main/java/com/gamma/job/ConsignmentProcessJobType.java) — a `JobTypeProvider` | this repo, registered in `JobService` beside the other built-ins |
 
 **Authors never touch `Job` or `JobContext`.** Nothing new was added to the Job framework for this: registration
 reuses the existing `JobTypeProvider` seam (a class-based provider, as `SqlTemplateJobType` already is), so

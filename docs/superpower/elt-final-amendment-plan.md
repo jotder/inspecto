@@ -527,7 +527,7 @@ sealing/completeness tier (consignment doc §8–9) unchanged and out of this pl
 | **7** | **Batch→Consignment rename (D-12)** — the §13 "save for last" row, executed as the final pre-release phase; then the MAJOR cut | rename scoped by concept (grouping-sense `batch` untouched); read-aliases verified on persisted rows; full suite green; release notes cover all 5 breaking reasons + the rename |
 
 Phases 1–3 are pure backend and de-risk everything (same shape as the graph design's own roadmap).
-The UI slices are planned separately in [`elt-amendment-ui-plan.md`](elt-amendment-ui-plan.md)
+The UI slices are planned separately in [`elt-amendment-ui-plan.md`](../archived-documents/plans-archive/elt-amendment-ui-plan.md)
 (companion, v1.0) — S1–S3 there are unblocked before any backend phase lands, because the recipe
 editor is a second projection of the existing `AuthoredPipeline` model.
 

@@ -1,8 +1,8 @@
 # Inspecto as a Living Operational System
 
 > Architecture philosophy, agreed with the product owner 2026-07-06. This is the north-star that the
-> Component metamodel ([component-model.md](component-model.md)), the metadata network
-> ([metadata-network-design.md](metadata-network-design.md)) and every rework slice serve.
+> Component metamodel ([component-model.md](../archived-documents/plans-archive/component-model.md)), the metadata network
+> ([metadata-network-design.md](../archived-documents/plans-archive/metadata-network-design.md)) and every rework slice serve.
 > Vocabulary here that is not yet in `docs/GLOSSARY.md` is **proposed** (§6) — the glossary stays
 > the binding source of truth.
 

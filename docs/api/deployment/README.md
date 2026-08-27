@@ -1,6 +1,6 @@
 # `docs/api/deployment/` — WSO2 gateway + Keycloak realm blueprints (W6)
 
-> Companion to [`../../superpower/api-contract-design.md`](../../superpower/api-contract-design.md) §8
+> Companion to [`../../superpower/api-contract-design.md`](../../archived-documents/plans-archive/api-contract-design.md) §8
 > (security architecture) and [`../../EDITIONS.md`](../../EDITIONS.md) (Standard edition assembly).
 > These are **illustrative starting points**, not a tested live deployment — this sandbox has no
 > running WSO2/Keycloak instance to verify against. Adapt hostnames, realm/API names, and throttling
@@ -18,7 +18,7 @@
   export: the `inspecto-spa` public client (Authorization Code + PKCE, no client secret — a browser
   SPA cannot keep one), a `roles` protocol mapper so an access token's role grants land in the JWT
   claim `inspecto-security`'s `RoleMapper` reads, and realm roles matching the taxonomy in
-  [`../../superpower/rbac-groundwork.md`](../../superpower/rbac-groundwork.md) §3.
+  [`../../superpower/rbac-groundwork.md`](../../archived-documents/plans-archive/rbac-groundwork.md) §3.
 
 ## How the pieces fit (§8 recap)
 

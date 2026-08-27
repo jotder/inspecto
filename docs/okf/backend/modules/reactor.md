@@ -273,7 +273,7 @@ from **`v3.11.0`**, the newest release tag that is an ancestor of `master`:
 | `pipeline/NodeAttribute` | **unmarked** | C1 edge 2's source | **absent** |
 
 **No `v4.x` or `v5.x` release has ever existed** — the `v4.0.0` / `v4.0.0-RC1` tags were deleted
-2026-08-17 because 4.0.0 never reached production ([BRANCHING](../../BRANCHING.md) §1), and `v3.12.0`
+2026-08-17 because 4.0.0 never reached production ([BRANCHING](../../../BRANCHING.md) §1), and `v3.12.0`
 is not an ancestor of `master`. Those `since` values named versions that were never cut; all of them
 were corrected to `4.0.0` in a repo-wide sweep (200 sites). Per
 [`../control-plane/api-stability.md`](../control-plane/api-stability.md) §*Release baseline*, the

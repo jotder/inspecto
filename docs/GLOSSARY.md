@@ -641,7 +641,7 @@ a suggested fix.
 ## 10. Component Metamodel (cross-cutting)
 
 > Every authored artifact above is a **Component**. The metamodel is the spine; see
-> [`archived-documents/plans-archive/COMPONENT_GRAPH.md`](archived-documents/plans-archive/COMPONENT_GRAPH.md) and [`superpower/component-model.md`](superpower/component-model.md).
+> [`archived-documents/plans-archive/COMPONENT_GRAPH.md`](archived-documents/plans-archive/COMPONENT_GRAPH.md) and [`superpower/component-model.md`](archived-documents/plans-archive/component-model.md).
 
 **Component** — A configured, named, persisted **instance**: `{ kind, name, config, parts?, wiring? }`. Atomic =
 no parts/wiring; composite = parts + a wiring strategy.
@@ -700,15 +700,15 @@ Never use Entity/Link for artifacts (Component/Part) or assets (Asset/Lineage).
 **Entity Projection** *(P3)* — The **mapping** (not a store) that folds a **Dataset**'s rows into an
 Entity/Link graph: column → source Entity, column → target Entity, optional columns → Link type/attributes.
 Built **frontend-mock-first in the Link Analysis Studio** (C5, 2026-07-04); the backend projection + schema
-relationships remain open. Design: [`superpower/link-analysis-and-graphsource.md`](superpower/link-analysis-and-graphsource.md);
-plan: [`superpower/link-analysis-studio-plan.md`](superpower/link-analysis-studio-plan.md).
+relationships remain open. Design: [`superpower/link-analysis-and-graphsource.md`](archived-documents/plans-archive/link-analysis-and-graphsource.md);
+plan: [`superpower/link-analysis-studio-plan.md`](archived-documents/plans-archive/link-analysis-studio-plan.md).
 
 **Link Analysis Studio** — The Builder-lens Studio pane (`/studio/link-analysis`) for graph investigation:
 pick a **GraphSource** + query, render via the shared G6 host, analyze (paths, neighborhood, centrality,
 communities). A saved investigation is a **Link-Analysis View** (Component kind `link-analysis-view`); when
 its source is `entity-projection` it is a **Widget** (a Graph Visualization Type bound to a Dataset).
 
-### Geo (Geo Map Analysis) *(added 2026-07-05 — plan: [`superpower/geo-map-analysis-plan.md`](superpower/geo-map-analysis-plan.md))*
+### Geo (Geo Map Analysis) *(added 2026-07-05 — plan: [`superpower/geo-map-analysis-plan.md`](archived-documents/plans-archive/geo-map-analysis-plan.md))*
 
 **Geo Map Analysis Studio** — The Builder-lens Studio pane (`/studio/geo-map`, Phase 1) for geographic
 investigation: pick a **GeoSource** + **GeoQuery**, render on the offline MapLibre host, investigate (search,

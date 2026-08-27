@@ -125,7 +125,7 @@ rows; the Job one makes a *real, destructive* action non-destructive. Do not des
   `Path.of(dataDir).resolve(name)` and open raw DuckDB. Dataset access is a filesystem convention, not an
   interface — it must exist before it can be granted to plugins.
   → *Deferred by design*: `DatasetAccess` follows the Consignment Selector
-  ([`consignment-addressing-plan.md`](../../../superpower/consignment-addressing-plan.md) §6), then joins
+  ([`consignment-addressing-plan.md`](../../../archived-documents/plans-archive/consignment-addressing-plan.md) §6), then joins
   the seam as its flagship service.
 - **No Job authors Notifications.** `NotificationStore.add(...)` exists; the only Job touching it is
   `maintenance` *pruning*. → ✔ **CLOSED by S1-3** (`NotificationAccess`, dedupe-collapse honoured;

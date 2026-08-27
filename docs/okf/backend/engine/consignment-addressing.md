@@ -225,7 +225,7 @@ Three properties are deliberate:
 ⛔ **The retired `time_range` attr is not coming back.** It yielded one opaque `"<min>..<max>"` string that
 nothing split, so it could never be bound to a predicate; it was always `null` besides. Addressing step 8 was
 closed on that basis rather than built. As-built detail:
-[`superpower/job-parameter-contract-plan.md`](../../../superpower/job-parameter-contract-plan.md) §5-B, step 17.
+[`superpower/job-parameter-contract-plan.md`](../../../archived-documents/plans-archive/job-parameter-contract-plan.md) §5-B, step 17.
 
 ## 6. Related
 

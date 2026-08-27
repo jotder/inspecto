@@ -8,7 +8,7 @@ views*. Invariants are pinned by `studio/geo-map/geo-case-studies.spec.ts`, so f
 silently defuse what a case study exists to exercise.
 
 > Studio plan (archived): [`geo-map-analysis-plan.md`](../archived-documents/plans-archive/geo-map-analysis-plan.md) · review sheet:
-> [`reviews/geo-map-studio.md`](reviews/geo-map-studio.md)
+> [`reviews/geo-map-studio.md`](../archived-documents/superpower-reviews/geo-map-studio.md)
 
 | # | Saved view | Dataset (rows) | The boundary it pushes |
 |---|---|---|---|

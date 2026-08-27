@@ -3,7 +3,7 @@
 *A configuration-driven data ingestion, processing, and operational-intelligence platform*
 
 **Audience:** business and technical stakeholders · **Status:** current as of 2026-06-19 · **Owner:** Inspecto engineering
-**Companion documents:** [ROADMAP.md](ROADMAP.md) (forward plan) · [PRESENTATION.md](PRESENTATION.md) (slide content) · [../ADVANCED_GUIDE.md](../ADVANCED_GUIDE.md) (operations source of truth) · [../EDITIONS.md](../EDITIONS.md) (packaging model)
+**Companion documents:** [ROADMAP.md](ROADMAP.md) (forward plan) · [../ADVANCED_GUIDE.md](../ADVANCED_GUIDE.md) (operations source of truth) · [../EDITIONS.md](../EDITIONS.md) (packaging model)
 
 ---
 
@@ -438,4 +438,4 @@ This overview synthesizes: the consolidated reference set (`docs/consolidated/`)
 
 ---
 
-*Maintained by Inspecto engineering. For the forward plan see [ROADMAP.md](ROADMAP.md); for the presentation see [PRESENTATION.md](PRESENTATION.md).*
+*Maintained by Inspecto engineering. For the forward plan see [ROADMAP.md](ROADMAP.md).*

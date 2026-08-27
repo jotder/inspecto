@@ -38,4 +38,4 @@ with per-column tolerances; a **Break** is `missing_left | missing_right | value
 
 As-built design (archived):
 [`reconciliation-board-design.md`](../../../archived-documents/plans-archive/reconciliation-board-design.md) ·
-review sheet: [`reviews/reconciliation.md`](../../../superpower/reviews/reconciliation.md).
+review sheet: [`reviews/reconciliation.md`](../../../archived-documents/superpower-reviews/reconciliation.md).
