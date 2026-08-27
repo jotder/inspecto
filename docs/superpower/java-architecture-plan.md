@@ -807,6 +807,22 @@ the same refuted premise from the same fan-out numbers.
    **Question: should the agent SPIs receive the narrow `ReadModel` instead of the full
    `CollectorService`?** (Payoff: `CollectorService` fan-in **16 → ~8**, against a floor of ~7.) It is
    no longer a question about the release policy.
+   ✅ **BUILD SHAPE GROUNDED 2026-08-27 (usage census of every consumer).** Traced the `service`
+   handle through all three implementors and everything they pass it to (`InspectoPack` →
+   `InspectoToolProvider` → `InspectoTools`, `ContextBroker`, `Investigator`, `OperationalActions`,
+   `previewAction`). The complete distinct surface the agent modules touch:
+   - **Already on `ReadModel` (8):** `pipelines`, `configFor`, `statusStore`, `events`, `eventBus`,
+     `jobService`, `dataRoot`, `browsableStores`.
+   - **Missing from `ReadModel` (5):** `catalog()`, `reports()`, `configSource()`, `eventLog()`,
+     `objects()` — every one an existing read-only accessor on `CollectorService`.
+   - **Mutating calls: ZERO.** No `pause`/`resume`/`runPipeline`/`runAllOnce`/`registerAgent`/lifecycle
+     call anywhere in `inspecto-agent`, `inspecto-agent-hosted` or `inspecto-intelligence`
+     (the act tools' writes go through the audited control plane, per `InspectoIntelligenceAgent`'s own
+     `componentStore()` note — its store handle is local, not the service's).
+   **So the build, if granted, is:** widen `ReadModel` by those 5 accessors (10 → 15 members, still
+   read-only), flip both `init(...)` signatures, chase the ~10 downstream types in the two agent
+   modules. `NoopAssistAgent` stores the handle and does nothing with it. No new capability moves —
+   the narrowing is honest.
    🔴 **Scope it on fan-in, NOT on cycles — measured 2026-08-27.** This plan says decision #1 cuts
    "C3's last two edges". It does not. **C3 is nine packages, not the four recorded here**
    (`{assist.spi, control, intelligence, intelligence.action, intelligence.context, intelligence.pack,
