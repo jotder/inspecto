@@ -396,7 +396,7 @@ cut C3, so **scope A and C3 together, not separately.**
 **STATUS 2026-08-27 (third pass): step 1 SHIPPED; the blocker was a false premise, not a decision; and
 BOTH C1 and C2 are now CUT** (`cf48d335`, `15205362`). Two SCCs remain in engine main sources, both
 structural: the deliberate `catalog ↔ catalog.spi` pair, and an `ops` parent/child residual the census
-never reported. As-built in [`reactor.md`](../okf/backend/modules/reactor.md).
+never reported. As-built in [`reactor.md`](../../okf/backend/modules/reactor.md).
 
 1. ✅ **`reactor.md` corrected** — a dated "Re-measured 2026-08-27" section supersedes (does not
    rewrite) the true-but-historical 2026-07-22 layering claim, with all three SCCs, their exact
@@ -423,7 +423,7 @@ never reported. As-built in [`reactor.md`](../okf/backend/modules/reactor.md).
    a plan and then refuted** — Source→Collector (GLOSSARY §13, "breaking, NO version bump"), <!-- vocab-allow: names the Source→Collector rename itself -->
    `ConsignmentProcessor` (BACKLOG §4: *"the premise came from this row and was never tested"*), and
    now Phase C. The policy is stated once in
-   [`okf/backend/control-plane/api-stability.md`](../okf/backend/control-plane/api-stability.md)
+   [`okf/backend/control-plane/api-stability.md`](../../okf/backend/control-plane/api-stability.md)
    §*Release baseline*; check the tag, not the annotation.
    - **C1 still has a second, independent path** — constant-ownership inversion (move `TYPES`/`TIERS`
      canonical values to `pipeline`, `FindingsSpec` delegates, both edges then point `ops → pipeline`).
@@ -593,7 +593,7 @@ when there is time to make it properly.
 | # | Work | Waits on | If the answer is no |
 |---|---|---|---|
 | 5 | **C1 cut via constant-ownership inversion** | ✅ **SHIPPED `15205362`** | This turned out to be the ONLY way to cut C1 — see item 6. |
-| 6 | ~~**C1 + C2 cuts via relocation**~~ | ✅ **BOTH CUT 2026-08-27** — C2 `cf48d335`, C1 `15205362`. Verified 3657/0/0/5 on each. | ⚠ **"via relocation" held for C2 and was FALSE for C1.** `AnnotationKinds`' consumers all live under `ops.*`, so relocating it re-creates the edge; C1 needed item 5's inversion. As-built + the residual `ops` SCC: [`reactor.md`](../okf/backend/modules/reactor.md). |
+| 6 | ~~**C1 + C2 cuts via relocation**~~ | ✅ **BOTH CUT 2026-08-27** — C2 `cf48d335`, C1 `15205362`. Verified 3657/0/0/5 on each. | ⚠ **"via relocation" held for C2 and was FALSE for C1.** `AnnotationKinds`' consumers all live under `ops.*`, so relocating it re-creates the edge; C1 needed item 5's inversion. As-built + the residual `ops` SCC: [`reactor.md`](../../okf/backend/modules/reactor.md). |
 | 7 | **C3's last two edges** | decision #1 (SPI narrowing) — **a design call, not a release-policy gate** | ⚠ **Corrected 2026-08-27:** C3 stays at **4 packages**. The old fallback ("shrinks 4 → 3 via Phase A") assumed Phase A cuts the `report` edge; it does not — `EnrichmentService` and (since `7eab72d4`) `PipelineView` — still `com.gamma.service` — hold it independently. If decision #1 is *no*, C3 is documented and unchanged. |
 | 8 | *(optional)* **F carve-out — `Collector` subtree** | decision #5 | Nothing depends on it; the plan's own recommendation is not to build it unprompted. |
 
@@ -852,7 +852,7 @@ the same refuted premise from the same fan-out numbers.
    intelligence.spi, report, service}`), and simulating the narrowing against the measured graph takes
    it **9 → 8** — only `assist.spi` leaves. `report ↔ service` and a `control ↔ intelligence.*` tangle
    hold the rest. The fan-in win is real; the cycle win is one package. Census:
-   [`reactor.md`](../okf/backend/modules/reactor.md) §*Whole-reactor cycle census*.
+   [`reactor.md`](../../okf/backend/modules/reactor.md) §*Whole-reactor cycle census*.
 2. **Phase C — how far to chase cycles.** C1 and C2 are worth cutting on the evidence. But if a cut
    turns out to need more than a relocation (i.e. it is a redesign), the honest default is to stop,
    record it, and leave the cycle documented. **Confirm that default.**
@@ -868,7 +868,7 @@ the same refuted premise from the same fan-out numbers.
    `@PublicApi` types MAY relocate on a major bump — and separately, none of the types in question had
    ever been released, so no grant was owed. ⛔ **Do not re-ask, and do not treat a future `@PublicApi`
    relocation as gated without checking the tag first** (see Phase C step 2 and
-   [`api-stability.md`](../okf/backend/control-plane/api-stability.md) §*Release baseline*).
+   [`api-stability.md`](../../okf/backend/control-plane/api-stability.md) §*Release baseline*).
    ⛔ Do not re-ask. The bump is **4.0.0**: master is `4.0.0-SNAPSHOT`. ⚠ **`v3.12.0` is not the last
    release on this line** — it is not an ancestor of `master`; the newest ancestor tag is `v3.11.0`.
    **Executed so far:** `PipelineView`/`PipelineRun`/`InboxStatus` promoted out of `CollectorService`

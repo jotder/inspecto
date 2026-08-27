@@ -1038,7 +1038,7 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   **vendored** code — refactoring it forks the vendored tree). Evidence in `reactor.md` §census.
   **All six SCCs are now dispositioned**; the only buyable cycle work left is decision #1's one package.
   Superseded row (kept for provenance):
-  [`superpower/java-architecture-plan.md`](superpower/java-architecture-plan.md) Track 2 item 6.
+  [`archived-documents/plans-archive/java-architecture-plan.md`](archived-documents/plans-archive/java-architecture-plan.md) Track 2 item 6.
   It was recorded as ⛔ BLOCKED on a major-version decision because every cycle-holding class is
   `@PublicApi`. **That premise is false.** All six (`ConsignmentProcessJobType`, `ProcessorContext`,
   `AnnotationKinds`, `FindingsSpec`, `ComponentStore`, `NodeAttribute`) are **absent from `v3.11.0`**,
@@ -1108,6 +1108,20 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   step 6c with `Access to the path 'runtime/bin/server/jvm.dll' is denied`, a **stale `java.exe`
   holding the file**, not a build fault. Re-run with `-NoRuntime` passed. Prove the jlink path on a box
   with no stale JVMs before trusting it.
+- ⛔ **ARCH-F-CARVEOUT — `PipelineConfig`'s `Collector` subtree extraction: RECOMMENDED LEAVE
+  (grounded 2026-08-27; carried out of the now-archived architecture plan).** Phase F (the broad
+  `PipelineConfig` split) was already closed as a LEAVE; this was its "one safe increment". Three of
+  its four justifying claims survived falsification — the subtree at `PipelineConfig:536-774` **is**
+  self-contained, `prepare()`'s arming guards never read it, and it touches zero on-disk keys. **The
+  cost claim did not:** "~93 call sites concentrated in acquisition-specific files" is really **148
+  references across 28 files in five modules** (`inspecto-engine` 11, `inspecto-connectors` 8,
+  `inspecto` **control plane** 5, `inspecto-etl` 2, `inspecto-acquire` 2), and it omitted the 8
+  sub-records that move with it (32 more refs). ⚠ It is `Collector` + **8** sub-records, not 9 —
+  `Reference` sits at `:859` in the Catalog `produces:` block, past the subtree's end at `:774`, so a
+  range run to `:880` sweeps it up. So the carve-out is **safe but not cheap**, and cheapness was the
+  whole argument. Revisit only on the plan's own stated trigger: acquisition being reworked anyway.
+  Detail: [`archived-documents/plans-archive/java-architecture-plan.md`](archived-documents/plans-archive/java-architecture-plan.md)
+  Phase F + decision #5.
 - **PKG-3 — Dockerfile wrapping serve.sh (trigger-gated: build it only when someone actually wants a
   containerized deployment).** The backend-hardening plan's optional item 6 (archived 2026-08-26, items
   1–5 shipped `38c7a32d`): `inspecto-deploy/Dockerfile`, eclipse-temurin:24-jre base, COPY fat jar,

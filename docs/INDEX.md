@@ -75,27 +75,25 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
-- [`superpower/java-architecture-plan.md`](superpower/java-architecture-plan.md) — **IN FLIGHT
-  (Phase 2 of the reorganization; Track 1 part-shipped 2026-08-27).** Coupling, module organization,
-  functional style, dependency reduction. ⭐ Headline finding:
-  [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md)'s package-layering claim was
-  **stale** — three undocumented SCCs (`ops`/`pipeline`; the `job ↔ consignment` tangle;
-  `service ↔ report`/`assist.spi`/`intelligence.spi`), now recorded there (`10b370a8`).
-  **Shipped:** C-step-1 (doc correction), E1 (`045b6d41`, stale Jackson 2 — Phase E closed),
-  D1 both batches (`260c023a`, `311a4523`, 16 loop→stream conversions).
-  **Next (Track 1, no decision needed):** D2a — `PipelineConfigParser.parse()` 801 lines → named
-  section methods, task order in the plan. Then Phase A (`ReadModel`), then D2b.
-  **~~Blocked~~ ✅ C1 + C2 BOTH CUT 2026-08-27** (`cf48d335`, `15205362`; as-built in
-  `okf/backend/modules/reactor.md`). Two SCCs remain, both structural: the deliberate
-  `catalog ↔ catalog.spi` pair and an `ops` parent/child residual the census never reported.
-  ⚠ C1 could NOT be cut by relocation as scoped — it needed decision #3's inversion, now ANSWERED.
-  **What unblocked it, 2026-08-27 (second pass):** the "every cycle-cutting class is
-  `@PublicApi`, so relocation needs a major-version decision" gate was a **false premise** — all six
-  such classes are absent from `v3.11.0` (the newest ancestor release) and no 4.x/5.x release has
-  ever existed, so nothing after 3.x has shipped and there is no API break to grant. **C1 + C2 cuts
-  are ordinary refactors and are the schedulable work in this plan.** Decisions #2/#3/#5 remain, as
-  *design* questions; #1 (SPI narrowing) shrank from a release-policy gate to a design call. See
-  `okf/backend/control-plane/api-stability.md` §*Release baseline*.
+- ~~`superpower/java-architecture-plan.md`~~ — **COMPLETE and ARCHIVED 2026-08-27** →
+  [`archived-documents/plans-archive/java-architecture-plan.md`](archived-documents/plans-archive/java-architecture-plan.md).
+  Phase 2 of the reorganization: coupling, module organization, functional style, dependency
+  reduction. **All five operator decisions are settled** (#1 built, #3 built, #4 granted,
+  #5 recommend-LEAVE, #2 moot) and **every reactor cycle is dispositioned**.
+  **As-built lives in [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md)** — the
+  cycle map, the whole-reactor census (850 files / 73 packages / six SCCs), and the LEAVE
+  rationales. Reproduce any number with `superpower/assets/pkggraph.py` + `edgeholders.py`.
+  **Shipped:** Track 1 (D2a `parse()` 801→280, Phase A `ReadModel`, D2b 4/4 LEAVE) · **C2 cut**
+  (`cf48d335`) · **C1 cut** (`15205362`) · **agent SPIs narrowed to `ReadModel`** (`c23489da`,
+  `CollectorService` fan-in **16 → 8**).
+  ⭐ **The finding worth carrying forward:** the plan's ⛔ "cycle cuts BLOCKED, relocation needs a
+  major-version decision" gate was a **false premise** — nothing after 3.x has ever been released,
+  so `@PublicApi` marks *intent to publish, not exposure*. Policy of record:
+  [`okf/backend/control-plane/api-stability.md`](okf/backend/control-plane/api-stability.md)
+  §*Release baseline*. ⚠ Two claims the plan made about its own work were wrong and are corrected
+  in place: C1 was **not** cuttable by relocation, and decision #1 cut **no** package edge.
+  **Still open, carried to [`BACKLOG.md`](BACKLOG.md) §6:** ARCH-OPS-SCC (LEAVE) ·
+  ARCH-F-CARVEOUT (LEAVE) · C3 is nine packages, not four.
   **Closed as grounded LEAVEs:** B (`ObjectService`), F (`PipelineConfig` broad split), S7
   (`CollectorService` wiring) — read their evidence before reopening.
 - ~~`superpower/java-simplification-plan.md`~~ — **COMPLETE and ARCHIVED 2026-08-27**
