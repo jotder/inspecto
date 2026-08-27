@@ -107,9 +107,7 @@ final class DeliveryStatusRoutes implements RouteModule {
         List<DeliveryReceipt> found = notificationId == null || notificationId.isBlank()
                 ? receipts.recent(ApiContext.parseIntOr(ApiContext.query(e, "limit"), 100))
                 : receipts.forNotification(notificationId);
-        List<Map<String, Object>> rows = new ArrayList<>();
-        for (DeliveryReceipt r : found) rows.add(toMap(r));
-        return Map.of("deliveries", rows);
+        return Map.of("deliveries", found.stream().map(DeliveryStatusRoutes::toMap).toList());
     }
 
     private static Map<String, Object> toMap(DeliveryReceipt r) {

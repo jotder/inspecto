@@ -168,10 +168,8 @@ final class QueryRoutes implements RouteModule {
     }
 
     private static List<String> projection(Map<String, Object> body) {
-        List<String> out = new ArrayList<>();
-        if (body.get("projection") instanceof List<?> cols)
-            for (Object c : cols) if (c != null) out.add(String.valueOf(c));
-        return out;
+        if (!(body.get("projection") instanceof List<?> cols)) return List.of();
+        return cols.stream().filter(java.util.Objects::nonNull).map(String::valueOf).toList();
     }
 
     private static List<QueryExecutor.Sort> sort(Map<String, Object> body) {

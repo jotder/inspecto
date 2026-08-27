@@ -13,7 +13,6 @@ import com.gamma.signal.Signal;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -135,8 +134,8 @@ final class DecisionRoutes implements RouteModule {
         Map<String, Object> rule = RouteErrors.existing(store(api), TYPE, "decision rule", name);
         List<Map<String, Object>> consequences = (List<Map<String, Object>>) (List<?>)
                 (rule.get("consequences") instanceof List<?> l ? l : List.of());
-        List<Map<String, Object>> executed = new ArrayList<>();
-        for (Map<String, Object> c : consequences) executed.add(executeOne(api, name, c));
+        List<Map<String, Object>> executed = consequences.stream()
+                .map(c -> executeOne(api, name, c)).toList();
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("rule", name);
         result.put("executed", executed);

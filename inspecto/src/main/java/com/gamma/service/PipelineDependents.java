@@ -15,6 +15,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -74,9 +75,8 @@ public final class PipelineDependents {
 
         /** Compact {@code kind/name} list for a 409 message — bounded by what the report already holds. */
         public String summary() {
-            List<String> parts = new ArrayList<>();
-            for (Dependent d : dependents) parts.add(d.kind() + "/" + d.name());
-            String joined = String.join(", ", parts);
+            String joined = dependents.stream()
+                    .map(d -> d.kind() + "/" + d.name()).collect(Collectors.joining(", "));
             return truncated ? joined + ", … (" + total + " total)" : joined;
         }
     }

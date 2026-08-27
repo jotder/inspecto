@@ -97,8 +97,8 @@ final class DbBrowserRoutes implements RouteModule {
     private static List<Map<String, Object>> operationalGroups(ApiContext api) {
         List<Map<String, Object>> groups = new ArrayList<>();
         for (BrowsableStore b : api.service().browsableStores()) {
-            List<Map<String, Object>> tables = new ArrayList<>();
-            for (String t : b.browseTables()) tables.add(Map.of("name", t));
+            List<Map<String, Object>> tables = b.browseTables().stream()
+                    .<Map<String, Object>>map(t -> Map.of("name", t)).toList();
             Map<String, Object> g = new LinkedHashMap<>();
             g.put("id", "ops:" + b.browseId());
             g.put("label", "Operational · " + b.browseLabel());

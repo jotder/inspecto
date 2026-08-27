@@ -51,9 +51,9 @@ final class ReconRoutes implements RouteModule {
         List<String> ids = strings(body.get("datasets"));
         if (ids.isEmpty()) throw new ApiException(422, "missing 'datasets' (the dataset ids to inventory)");
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
-        List<ReconService.Side> sides = new ArrayList<>();
-        for (String id : ids)
-            sides.add(new ReconService.Side(id, relationSql(api, store, writeRoot, id), null, null));
+        List<ReconService.Side> sides = ids.stream()
+                .map(id -> new ReconService.Side(id, relationSql(api, store, writeRoot, id), null, null))
+                .toList();
         try {
             return ReconService.columns(sides);
         } catch (SQLException e) {
@@ -187,10 +187,9 @@ final class ReconRoutes implements RouteModule {
     }
 
     private static List<String> strings(Object v) {
-        List<String> out = new ArrayList<>();
-        if (v instanceof List<?> list)
-            for (Object o : list) if (o != null && !o.toString().isBlank()) out.add(o.toString().trim());
-        return out;
+        if (!(v instanceof List<?> list)) return List.of();
+        return list.stream().filter(o -> o != null && !o.toString().isBlank())
+                .map(o -> o.toString().trim()).toList();
     }
 
     @SuppressWarnings("unchecked")

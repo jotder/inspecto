@@ -5,6 +5,7 @@ import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.query.DatasetRelation;
 import com.gamma.query.QueryExecutor;
+import com.gamma.query.ResultSetDescriptor;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -79,9 +80,8 @@ final class InvRoutes implements RouteModule {
                 String relationSql = DatasetRelation.relationSql(c.content(), api.dataRoot(), views);
                 QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(
                         c.name(), relationSql, "SELECT * FROM " + q(c.name()), 0, 0, List.of(), List.of()));
-                List<String> cols = new ArrayList<>(r.columns().size());
-                for (var col : r.columns()) cols.add(col.name());
-                columnsByDataset.put(c.name(), cols);
+                columnsByDataset.put(c.name(),
+                        r.columns().stream().map(ResultSetDescriptor.Column::name).toList());
             } catch (Exception unusable) {
                 skipped++;   // unbound dataset, bad view, etc. — degrade, don't fail the call
             }

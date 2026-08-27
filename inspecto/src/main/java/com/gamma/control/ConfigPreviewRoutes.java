@@ -265,15 +265,13 @@ final class ConfigPreviewRoutes implements RouteModule {
 
     /** The drift diff as response JSON; {@code drifted} lets a client light its indicator without counting. */
     private static Map<String, Object> driftBody(com.gamma.pipeline.exec.SchemaSuggest.Drift d) {
-        List<Map<String, Object>> added = new ArrayList<>();
-        for (com.gamma.pipeline.exec.SchemaSuggest.Field f : d.added())
-            added.add(Map.of("name", f.name(), "type", f.type()));
-        List<Map<String, Object>> missing = new ArrayList<>();
-        for (com.gamma.pipeline.exec.SchemaSuggest.Field f : d.missing())
-            missing.add(Map.of("name", f.name(), "type", f.type()));
-        List<Map<String, Object>> typeChanged = new ArrayList<>();
-        for (com.gamma.pipeline.exec.SchemaSuggest.TypeChange t : d.typeChanged())
-            typeChanged.add(Map.of("name", t.name(), "declared", t.declared(), "suggested", t.suggested()));
+        List<Map<String, Object>> added = d.added().stream()
+                .<Map<String, Object>>map(f -> Map.of("name", f.name(), "type", f.type())).toList();
+        List<Map<String, Object>> missing = d.missing().stream()
+                .<Map<String, Object>>map(f -> Map.of("name", f.name(), "type", f.type())).toList();
+        List<Map<String, Object>> typeChanged = d.typeChanged().stream()
+                .<Map<String, Object>>map(t -> Map.of("name", t.name(), "declared", t.declared(),
+                        "suggested", t.suggested())).toList();
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("drifted", !d.isEmpty());

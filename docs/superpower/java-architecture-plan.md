@@ -239,6 +239,22 @@ grep misses fully-qualified inline calls; gate on the FULL reactor, never one mo
 
 The census measured rather than guessed. Two genuinely worthwhile groups and one non-target:
 
+> **D1 STATUS (inspecto batch, 2026-08-27): 10 conversions across 8 files, reactor 3657/0/0/5.**
+> 🔴 **The census's site list was mostly WRONG — of its 8 named candidate files, only ONE actually
+> held the target shape** (and at different lines than cited). The real conversions came from a fresh
+> sweep for single-statement `add` bodies. **Treat the "~38 sites in inspecto-engine" figure as
+> equally unreliable** — re-sweep, do not work from the census list.
+> 🔴 **The mutability trap fired for real:** `ReconRoutes:176` builds `measureNames` and then mutates
+> it after the loop (`if (spec.includeRecordCount()) names.add(RECORDS)`). Converting it to
+> `.toList()` compiles clean and throws `UnsupportedOperationException` at runtime. Skipped — and
+> wrapping it in `toCollection(ArrayList::new)` would read worse than the loop it replaced.
+> Other skips, all deliberate: multi-statement `LinkedHashMap` builders (a lambda block buys no
+> readability, and JSON key order must stay `LinkedHashMap`), bodies that `throw` a 422/409/400
+> mid-loop (validation is the loop's *job*), bodies throwing checked `IOException`, `instanceof`
+> pattern variables that do not survive a `filter`→`map` split without a duplicate cast, and `Set`
+> targets. **Readability is the whole point of D1 — a site that reads worse as a stream is a skip,
+> not a conversion.**
+
 **D1 — the accumulator-loop cluster (~51 sites): cheap, safe, high readability.** `new ArrayList<>()`
 followed by a loop whose body is only `.add(...)` — a single `stream().map().toList()` expression.
 Concentrated in `inspecto` route classes (~13: `BiTemplates:67/104`, `BundleRoutes:623`,
@@ -264,9 +280,18 @@ tool first if immutability is wanted.
 
 ### Phase E — Dependency reduction
 
-**E1 — one genuinely unused dependency.** `inspecto-etl` declares `jackson-databind` with **no import
-and no `ObjectMapper`/`JsonNode` reference in main sources.** Verify no plugin/transitive need, then
-drop and prove it with the full reactor.
+**E1 — ✅ SHIPPED `045b6d41` (2026-08-27), and it was more than an unused dependency.** The
+dependency tree showed `inspecto-etl` carrying **both Jackson majors**: `jtoon:1.0.9` brings
+`tools.jackson.core:jackson-databind:3.0.4` (Jackson 3, new groupId) transitively — what JToon
+actually uses — while the module separately declared `com.fasterxml.jackson.core:jackson-databind`
+(Jackson 2) with the stale comment "for Map conversion used by JToon patterns". Neither was
+referenced by any main or test source. Removing it also drops `jackson-core` +
+`jackson-annotations` 2.x from the compile classpath. Gated on `-Pedition-enterprise` with an
+explicit check that both profile-gated modules **built** rather than skipping (3657/0/0/5).
+
+**E1 does NOT generalize — audited and closed.** Every other module declaring Jackson 2 genuinely
+uses it: `inspecto` (5 main / 103 test files), `inspecto-engine` (5/7), `inspecto-config` (2/0),
+`inspecto-event` (2/0), `inspecto-util` (1/0). ⛔ No further Jackson removals; do not re-audit.
 
 **E2 — do NOT touch the runtime-only deps.** The census correctly flagged rather than asserted:
 `duckdb_jdbc` in `inspecto-util` (`DuckDbUtil:50` loads the driver by `Class.forName`) and in
