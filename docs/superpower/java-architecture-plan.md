@@ -343,12 +343,23 @@ re-architecture. The thing that would be expensive is having built it in `etl`/`
    re-opens every accessor site plus the `Builder` (`:1598-1715`) and three constructors
    (`:1193-1332`) — each one a place a field can go missing, across 94 consumers.
 
-**The one safe increment, if anyone wants it later:** extract the **`Collector` acquisition subtree**
-(`:536-774`, `Collector` + 9 sub-records) to a standalone top-level type, leaving
-`PipelineConfig.collector()` as a delegating accessor. It is fully self-contained, has zero
-cross-references into other concerns' fields, its ~93 call sites are concentrated in
-acquisition-specific files, **`prepare()`'s arming guards never read it**, and it touches zero
-on-disk keys. Independently verifiable. ⛔ Everything else — especially `Dedup`/`Summarize`/`Join`/
+**~~The one safe increment, if anyone wants it later:~~ ⛔ MEASURED 2026-08-27 — safe, but NOT the
+cheap increment this claimed. See decision #5; the recommendation is LEAVE.** Extracting the
+**`Collector` acquisition subtree** (`:536-774`, `Collector` + **8** sub-records — not 9) to a
+standalone top-level type, leaving `PipelineConfig.collector()` as a delegating accessor. Three of the
+four claims survived falsification: it **is** fully self-contained (nothing in `:536-774` references
+another concern's type), **`prepare()`'s arming guards never read it**, and it touches zero on-disk
+keys (keys are literals; `PipelineCodec:113`'s `getSimpleName()` is an error message).
+
+🔴 **The cost claim — "its ~93 call sites are concentrated in acquisition-specific files" — is wrong in
+both halves.** Measured: **148 references across 28 files in five modules** — `inspecto-engine` 11,
+`inspecto-connectors` 8, `inspecto` **control plane** 5, `inspecto-etl` 2, `inspecto-acquire` 2. Not
+acquisition-local, and the control plane is a consumer. The figure also omitted the 8 sub-records that
+must move with it (32 further references: `Stability` 8, `Duplicate` 5, `Fetch` 5, `PostActionConfig` 3,
+`Retry` 3, `CircuitBreaker` 3, `Incremental` 3, `GapDetection` 2).
+⚠ **`Reference` is NOT part of this subtree** — it sits at `:859`, inside the Catalog `produces:`
+block, past the subtree's end at `:774`. A range run to `:880` sweeps it up and inflates the count.
+"Independently verifiable" was the one claim that fully held: every number here reproduces. ⛔ Everything else — especially `Dedup`/`Summarize`/`Join`/
 `route`/`steps`/`outputStore`/`active` — stays put: they are jointly read by `prepare()`.
 
 ⚠ `Identity` is worth knowing about: `identity()` is called ~166 times across 60 files
@@ -875,14 +886,14 @@ the same refuted premise from the same fan-out numbers.
 
    | Plan claim | Verdict |
    |---|---|
-   | "fully self-contained, zero cross-references into other concerns' fields" | ✅ **HOLDS.** Lines 536-880 reference no other concern's type — the single `Step` hit is a javadoc `<b>Step</b>`, not a compile edge |
+   | "fully self-contained, zero cross-references into other concerns' fields" | ✅ **HOLDS.** Lines **536-774** reference no other concern's type. ⚠ My first pass measured `536-880` and swept in the Catalog `produces:` block (`Reference` at `:859`); on the correct range the result is clean outright — no javadoc false hit to explain away |
    | "`prepare()`'s arming guards never read it" | ✅ **HOLDS.** No `collector` reference anywhere in `prepare()` |
    | "touches zero on-disk keys" | ✅ **HOLDS.** Keys are literals in the parser/codec; the one `getSimpleName()` in `PipelineCodec:113` is an error message, not a key |
-   | "**~93 call sites concentrated in acquisition-specific files**" | 🔴 **WRONG on both halves.** **116** references across **26 files in 5 modules** — `inspecto-engine` (10 files), `inspecto-connectors` (8), `inspecto` control plane (5), `inspecto-etl` (2), `inspecto-acquire` (1). Not concentrated in acquisition; the control plane is a consumer. **Plus 33 further external references to the 9 sub-records that move with it** (`Stability` 8, `Duplicate` 5, `Fetch` 5, `PostActionConfig` 3, `Retry` 3, `CircuitBreaker` 3, `Incremental` 3, `GapDetection` 2, `Reference` 1) — the plan never counted those at all |
+   | "**~93 call sites concentrated in acquisition-specific files**" | 🔴 **WRONG on both halves.** **148** references across **28 files in 5 modules** — `inspecto-engine` 11, `inspecto-connectors` 8, `inspecto` control plane 5, `inspecto-etl` 2, `inspecto-acquire` 2. Not acquisition-local; the control plane is a consumer. That total is `collector()`/`Collector` (116) **plus the 8 sub-records that move with it** (32). ⚠ My own first count said 9 sub-records / 33 refs — it wrongly swept in `Reference`, which belongs to the Catalog `produces:` block |
 
    ⛔ **RECOMMENDATION: NO — leave it.** The three *safety* claims hold, so the carve-out is not
    dangerous; but the *cheapness* claim is what justified calling it "the one safe increment", and it
-   does not survive. The true blast radius is ~149 references over 5 modules including the control
+   does not survive. The true blast radius is **148** references over 28 files in 5 modules including the control
    plane, for a type-level tidy that the plan's own consumer histogram (§2 of Phase F) already shows
    would shrink only 37% of consumers' surface. Phase F is CLOSED as a LEAVE; this carve-out inherits
    that verdict rather than escaping it. Revisit only if the acquisition subtree is being reworked for

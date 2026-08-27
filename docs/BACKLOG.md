@@ -1063,6 +1063,34 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   win is fan-in/testability, as scoped. The break was empty in fact: `IntelligenceAgent` never
   shipped; the released `AssistAgent.init` took `SourceService`, already changed on master via the
   Source→Collector rename. <!-- vocab-allow: names the Source→Collector rename itself -->
+- 🟡 **PKG-5 — no packaging path ships `inspecto-agent` / `inspecto-intelligence` (found 2026-08-27
+  while proving a breaking SPI change was package-safe). Needs an owner call, not a fix yet.**
+  Measured on `51fb48da` by running `inspecto/package.ps1` for Personal and Enterprise (both exit 0;
+  bundles 169.3 MB / 170.3 MB):
+  - The fat JAR carries the SPI **interfaces** (`com/gamma/assist/spi/AssistAgent.class`,
+    `com/gamma/intelligence/spi/IntelligenceAgent.class`) but **not** the implementors
+    (`NoopAssistAgent`, `UccAssistAgent`, `InspectoIntelligenceAgent`) and **no**
+    `META-INF/services` entry for either SPI.
+  - That exclusion is **deliberate and documented** — `AssistAgent:17` and `inspecto/pom.xml:18` both
+    say the optional agent lives in a sibling module so the core fat JAR "stays dependency-lean", and
+    `package.ps1:166` builds `mvn clean package -pl inspecto -am`, which builds *upstream* deps only
+    (agent/intelligence depend **on** `inspecto`, so `-am` never reaches them).
+  - 🔴 **The gap: `package.ps1` copies `inspecto-security.jar` and `inspecto-policy.jar` for
+    Standard/Enterprise but has NO step that copies an agent or intelligence jar.** So a capability
+    with 858 passing tests reaches no bundle by any path in that script. Either the deployment story
+    is "the operator drops the jar on the classpath" (then say so in
+    `okf/backend/build-run/`), or packaging is missing a step. ⛔ Do not "just add a copy step" —
+    the modules pull the heavy model-transport deps the lean-JAR decision exists to keep out, and the
+    `-NoRuntime` flavor's JDK floor differs for them (`api-stability.md` §*Current Java floor*).
+  ⚠ **Two premises corrected while measuring this.** (1) `inspecto-agent`/`inspecto-intelligence` are
+  **NOT** edition-profile-gated — they are plain default `<modules>`; the only profile-gated modules
+  are `inspecto-security`/`inspecto-policy`. (2) Consequently the `AssistAgent`/`IntelligenceAgent`
+  `init` signature change (`c23489da`) has **zero packaging exposure** — nothing that ships contains an
+  implementor to break.
+  ⚠ The **jlink embedded-runtime path is NOT proven** this session: the first Enterprise run failed at
+  step 6c with `Access to the path 'runtime/bin/server/jvm.dll' is denied`, a **stale `java.exe`
+  holding the file**, not a build fault. Re-run with `-NoRuntime` passed. Prove the jlink path on a box
+  with no stale JVMs before trusting it.
 - **PKG-3 — Dockerfile wrapping serve.sh (trigger-gated: build it only when someone actually wants a
   containerized deployment).** The backend-hardening plan's optional item 6 (archived 2026-08-26, items
   1–5 shipped `38c7a32d`): `inspecto-deploy/Dockerfile`, eclipse-temurin:24-jre base, COPY fat jar,
