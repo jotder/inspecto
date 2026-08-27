@@ -380,6 +380,71 @@ when there is time to make it properly.
 | 7 | **C3's last two edges** | decision #1 (SPI narrowing) | C3 shrinks 4 packages → 3 via Phase A and stops there. |
 | 8 | *(optional)* **F carve-out — `Collector` subtree** | decision #5 | Nothing depends on it; the plan's own recommendation is not to build it unprompted. |
 
+### Task-level breakdown of Track 1 (decided 2026-08-27)
+
+Phase-level ordering is above; this is the intermediate task sequence *within* each remaining item —
+what a shift actually picks up, and how it knows the task is done.
+
+**Universal per-task definition of done:** full reactor `-Pedition-enterprise` at **3657/0/0/5**
+exit 0 · both node guards green · **contract tests unmodified** · one commit per task.
+
+#### D2a — `PipelineConfigParser.parse()` (801 lines → named section methods)
+
+Grounded: the method carries **40 `// ── section ──` markers**. They are *not* equal work, and the
+ordering below is by **extraction cost, not line count** — a section that produces one cohesive
+value is a clean `private static X parseX(...)`; a section that scatters many locals into the final
+constructor is not, and those come last or not at all.
+
+| # | Task | Lines | Why this position |
+|---|---|---|---|
+| 1 | extract `parseCollector(...)` | `:750-869` (~119, 9 nested sub-blocks) | Biggest single win and the cleanest: the sub-blocks already map 1:1 onto the existing `Collector` record, so it returns one value. ⭐ Also de-risks the F carve-out, whose safe increment is exactly this subtree. |
+| 2 | extract `parseParsing(...)` (csv settings + unified `parsing:`) | `:340-448` (~108) | Second-largest, self-contained, feeds `CsvSettings`. |
+| 3 | extract `parseSchemas(...)` | `:618-701` (~83) | Cohesive, produces `Schemas`. |
+| 4 | extract `parseSteps(...)` | `:488-563` (~75) | ⚠ Carries the **pinned** steps-vs-legacy exclusivity refusal and the list-arity refusal — move them VERBATIM with their comments, and keep `resolveSteps`'s single choke point intact. |
+| 5 | extract `parsePluginAndSegments(...)` | `:563-618` (~55) | Cohesive. |
+| 6 | extract `parseProcessing(...)` (processing, batch caps, streaming, DuckDB, chunking, intake) | `:192-258` (~66) | Six adjacent markers, one `Processing`-shaped result. |
+| 7 | extract `parseDirs(...)` (dirs + audit/manifest paths) | `:148-192` (~44) | Produces `Dirs`. |
+| 8 | extract `parseTransformBlocks(...)` (duplicate check, dedup, summarize, join, map, route) | `:279-340` (~61) | ⚠ These are the blocks `prepare()`'s fail-closed arming reads **in combination** — extract the *parsing*, never the arming logic. |
+| 9 | **STOP and reassess** | — | After 1–8 `parse()` should be ~250 lines. Judge whether the identity/gates head (`:74-148`) is worth touching: those set many independent top-level locals, so extraction may just move noise. **A grounded "leave the head" is a valid end.** |
+
+Tasks 1–8 are **independently committable and can be done in any order** — they touch disjoint line
+ranges. Order given is best-value-first so an interrupted arc still banks the wins.
+
+#### A — `ReadModel` role interfaces
+
+| # | Task | Why this position |
+|---|---|---|
+| 1 | **Decide `ReadModel`'s package** and record the reasoning | ⚠ MUST be first. It is the only lever that lets A also cut C3's `report` edge, and six importers make it expensive to revisit. Putting it in `com.gamma.service` buys nothing structurally. |
+| 2 | Add the interface + `CollectorService implements ReadModel` | Zero-churn checkpoint: green, no behavior change, no test edits. Everything after is reversible from here. |
+| 3–8 | Convert one receiver per commit: `ReportService` → `MetricsService` → `DataSourceBundleResolver` → `ContextBroker` → `InspectoTools` → `OperationalActions` | `ReportService` first — it is the one whose conversion actually cuts a C3 edge. `ContextBroker` needs only `events()`, so it is the smallest sanity check if something looks wrong. |
+
+⛔ Not in this sequence, deliberately: the `AssistAgent`/`IntelligenceAgent` SPI `init(...)` (needs
+decision #1), `ApiContext`/`ControlApi`/`SpaceContext` (legitimately need the full surface), and the
+three pure-passthrough classes (converting them buys only signature honesty).
+
+#### D2b — the remaining giant methods
+
+One commit each, in descending value, and **each independently droppable**:
+`PipelineEditable.lower()` (336) → `FindingsSpec` ctor (323) → `ConfigSpecs.pipeline()` (280) →
+`JobRoutes.maskSecrets()` (256). ⚠ Ground each first — D2a's premise (sequential sections) came from
+grounding, and these four have not been read yet. Expect at least one to be a LEAVE.
+
+#### Closing task for the whole arc
+
+When Track 1 is done and Track 2 is answered or abandoned: **distil the as-built facts into the OKF
+concepts** (`okf/backend/modules/reactor.md` already has the cycle map; route/module structure →
+`okf/backend/control-plane/control-api.md`), move anything still open to `BACKLOG.md`, then
+`git mv` this plan to `archived-documents/plans-archive/` and update `INDEX.md` in the same commit.
+The `handoff` skill checks this.
+
+### Parallelism — what can run at once
+
+Worktree-isolated agents make several of these concurrent, but the **main tree serialises on the
+reactor gate** (two Maven builds on one tree produce phantom "package does not exist" failures).
+Practical rule: any number of tasks may be *prepared* in parallel worktrees; only one may be
+**gated and landed** at a time. D2a tasks 1–8 and Phase A tasks 3–8 are mutually independent and are
+the natural candidates for parallel preparation.
+
 ### Explicitly NOT in the sequence
 
 Phase B (`ObjectService`) and Phase F's broad split are **closed as grounded LEAVEs** — they are not
