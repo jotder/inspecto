@@ -1003,13 +1003,27 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   operator granted the same day. **Check where a type's CONSUMERS live before calling a relocation a cut.**
   🔴 **A relocated type's references are not all under `src/`** — the `RunLog` move passed a repo-source
   grep and still broke the build via a scaffold template that `ScaffoldTemplatesTest` javac-compiles.
-- **ARCH-OPS-SCC — the `ops` parent/child cycle, newly surfaced 2026-08-27, NOT started.**
-  `{ops, ops.link, ops.note, ops.tag, ops.workflow}` is still an SCC after C1: `ObjectService` is a
-  facade over its four subpackages while those subpackages import the parent's shared vocabulary
-  (`AnnotationKinds` ×8, `ObjectType` ×4, `OperationalObject` ×2). Same parent/child character as the
-  deliberate `catalog ↔ catalog.spi` pair, so it may well be a LEAVE. The cut, if wanted, is moving that
-  vocabulary into an `ops.model` subpackage (~14 sites). ⚠ It was invisible while C1 subsumed it — the
-  census's "C1 has exactly two edges" was incomplete.
+- ⛔ **ARCH-OPS-SCC — GROUNDED 2026-08-27, RECOMMENDED LEAVE (operator may overrule).**
+  `{ops, ops.link, ops.note, ops.tag, ops.workflow}` is still an SCC after C1. Measured: the only
+  parent→child file is the `ObjectService` facade; the child→parent types are `ObjectType`,
+  `AbstractJdbcStore`, `AnnotationKinds`, `OperationalObject`. **The cut is clean and available** — all
+  four are dependency-free inside `ops`, so moving them to `com.gamma.ops.model` points every edge down.
+  **Leave it anyway:** the ripple is **85 files** (`ObjectType` 62, `OperationalObject` 50) for zero
+  behavioural gain, and **the cycle cannot block anything** — every package in it is under
+  `com.gamma.ops.**`, so a future `ops` module extraction moves the whole component together. That is
+  the opposite of C1/C2, which spanned different families and genuinely defeated layering. Revisit only
+  if `ops` is actually being split. ⚠ My earlier "same character as `catalog ↔ catalog.spi`" note was
+  **wrong** — that is an SPI split by design; this is unlayered vocabulary. Right conclusion, wrong
+  reason. Evidence: [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md).
+- 🔴 **C3 IS NINE PACKAGES, NOT FOUR — and decision #1 does not cut it (measured 2026-08-27).**
+  The whole-reactor census (850 files, 73 packages, **six** SCCs — three of them never reported before)
+  puts C3 at `{assist.spi, control, intelligence, intelligence.action, intelligence.context,
+  intelligence.pack, intelligence.spi, report, service}`. Simulating decision #1 (removing
+  `assist.spi → service` and `intelligence.spi → service`) takes it **9 → 8**: only `assist.spi` leaves.
+  `report ↔ service` plus a `control ↔ intelligence.*` tangle hold the rest independently.
+  ⚠ **Decision #1's fan-in payoff (`CollectorService` 16 → ~8) is real and measured; its cycle payoff is
+  one package.** Scope it on fan-in/testability, not on C3. Two further SCCs are unassessed:
+  `{agent.kernel.agent, .observe, .retrieve, .tool}` and `{etl, etl.unpack}`.
   Superseded row (kept for provenance):
   [`superpower/java-architecture-plan.md`](superpower/java-architecture-plan.md) Track 2 item 6.
   It was recorded as ⛔ BLOCKED on a major-version decision because every cycle-holding class is

@@ -296,12 +296,62 @@ literals before scanning (so a javadoc `{@link}` is never counted as a compile e
 (the deliberate SPI pair) and the C1 residual below.
 
 🔴 **"C1 has exactly two edges" was incomplete — cutting both cross edges does NOT leave `ops` acyclic.**
-`{ops, ops.link, ops.note, ops.tag, ops.workflow}` is still an SCC on its own, and the census never
-reported it because it was hidden inside the larger component. It is a **different shape**: `ObjectService`
-is a facade over its four subpackages, and those subpackages import the parent's shared vocabulary
-(`AnnotationKinds` ×8, `ObjectType` ×4, `OperationalObject` ×2) — the same parent/child character as
-`catalog ↔ catalog.spi`. Cutting it means moving that vocabulary into an `ops.model` subpackage (~14
-sites). Out of C1's scope; **recorded, not started.**
+`{ops, ops.link, ops.note, ops.tag, ops.workflow}` is still an SCC on its own; the census never reported
+it because it was hidden inside the larger component. **Grounded 2026-08-27 — see the whole-reactor
+census below, which supersedes the earlier guess that it resembles `catalog ↔ catalog.spi`. It does
+not: that is an SPI split by design, this is vocabulary that was simply never layered, and it IS
+cleanly cuttable.**
+
+**The real edges** (comments, text blocks and string literals stripped):
+
+| Direction | Held by |
+|---|---|
+| parent → child | `ObjectService` → `link`, `note`, `queue`, `rca`, `tag`, `workflow` — the facade, and the *only* parent→child file |
+| child → parent | `ObjectType` (findings 1, link 2, tag 1, workflow 1) · `AbstractJdbcStore` (link, note, tag) · `AnnotationKinds` (note 5, tag 3) · `OperationalObject` (tag 2) |
+
+`findings`, `queue` and `rca` are **not** in the SCC — one-way only.
+
+**The cut is clean and available.** All four child→parent types are dependency-free inside `ops`:
+`ObjectType` has no `ops` deps, `AbstractJdbcStore` only `util.BrowsableStore`, `AnnotationKinds` only
+`pipeline.ComponentStore`, and `OperationalObject` only `ObjectType` (which moves with it). Moving the
+four into `com.gamma.ops.model` leaves every edge pointing down.
+
+⛔ **RECOMMENDED: LEAVE. The reason is cost and irrelevance, not impossibility.**
+- The ripple is **85 files** (`ObjectType` alone is referenced by 62, `OperationalObject` by 50) for
+  zero behavioural or capability gain.
+- **The cycle cannot block anything.** Every package in it is under `com.gamma.ops.**`, so a future
+  `ops` module extraction moves the whole component together. That is the opposite of C1/C2, which
+  spanned *different* families (`ops↔pipeline`, `consignment↔job`) and genuinely defeated layering.
+- Revisit only if `ops` is actually being split, or if a subpackage needs to be consumed without the
+  facade.
+
+🔴 **Two phantom edges found while measuring this — both javadoc-only, both would have misled the next
+analysis.** `OperationalObject`'s only reference to `workflow` is a `{@link com.gamma.ops.workflow.Workflow}`,
+and `TagRule.java:4`'s `import com.gamma.ops.ObjectService` exists **solely** to resolve a
+`{@link ObjectService#open}` — zero code usage. A comment-stripping scan is not optional here; an
+import line survives stripping even when the only thing that needed it was a comment.
+
+### Whole-reactor cycle census (2026-08-27, all main sources: 850 files, 73 packages)
+
+**Six SCCs.** Reproduce with `docs/superpower/assets/pkggraph.py` (strips comments, text blocks and string
+literals first — playbook rule 7).
+
+| # | SCC | Size | Status |
+|---|---|---|---|
+| — | `{assist.spi, control, intelligence, intelligence.action, intelligence.context, intelligence.pack, intelligence.spi, report, service}` | **9** | 🔴 **This is C3, and it is 9 packages — not the 4 the plan records** |
+| — | `{ops, ops.link, ops.note, ops.tag, ops.workflow}` | 5 | LEAVE (above) |
+| — | `{agent.kernel.agent, agent.kernel.observe, agent.kernel.retrieve, agent.kernel.tool}` | 4 | never reported before; unassessed |
+| — | `{etl, etl.unpack}` | 2 | never reported before; unassessed |
+| — | `{event, metrics}` | 2 | the documented deliberate leaf pair |
+| — | `{catalog, catalog.spi}` | 2 | the deliberate SPI pair |
+
+🔴 **Decision #1 does NOT cut C3.** The plan says its last two edges "need decision #1". Simulated by
+removing `assist.spi → service` and `intelligence.spi → service` from the measured graph: the component
+goes **9 → 8**. Only `assist.spi` leaves. The rest is held independently by `report ↔ service` and a
+`control ↔ intelligence.*` tangle (`intelligence.action → control`, `control → service`,
+`service → intelligence.spi`, `intelligence.spi → intelligence`, `intelligence → intelligence.action`).
+**Decision #1's fan-in payoff (`CollectorService` 16 → ~8) is real and measured; its cycle payoff is
+one package.** Scope it on the fan-in, not on C3.
 
 ⚠ **C1 could NOT be cut by relocation, though the plan scoped it as one.** `AnnotationKinds`' consumers
 all live under `ops.note`/`ops.tag`, so moving it into `pipeline` merely re-creates `ops.* → pipeline`

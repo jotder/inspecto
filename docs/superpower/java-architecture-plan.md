@@ -364,7 +364,7 @@ does not mention, all created by packages added after the 2026-07-22 measurement
 |---|---|---|
 | C1 | `{ops, ops.workflow, ops.tag, ops.link, ops.note, ops.findings, pipeline}` | `ops.*` all depend up on `ops`; `ops → pipeline`; `pipeline → ops.findings → ops` closes it |
 | C2 | `{catalog.spi, catalog, alert, pipeline.exec, job, consignment, enrich}` | `job ↔ consignment` (both directions), `catalog ↔ catalog.spi`, `alert → catalog`, `catalog → enrich → consignment`, `pipeline.exec → consignment` |
-| C3 | `{report, intelligence.spi, assist.spi, service}` (core) | `report`/`assist.spi`/`intelligence.spi` all import `service.CollectorService`, which imports back into all three |
+| C3 ⚠ **the real component is NINE packages — see `reactor.md` §*Whole-reactor cycle census*** | `{report, intelligence.spi, assist.spi, service}` (core only) | `report`/`assist.spi`/`intelligence.spi` all import `service.CollectorService`, which imports back into all three |
 
 **Why this is the highest-value phase:** cycles are the one form of coupling that is unambiguously
 harmful — they defeat layering, block extraction, and make change propagate unpredictably. And the
@@ -807,6 +807,13 @@ the same refuted premise from the same fan-out numbers.
    **Question: should the agent SPIs receive the narrow `ReadModel` instead of the full
    `CollectorService`?** (Payoff: `CollectorService` fan-in **16 → ~8**, against a floor of ~7.) It is
    no longer a question about the release policy.
+   🔴 **Scope it on fan-in, NOT on cycles — measured 2026-08-27.** This plan says decision #1 cuts
+   "C3's last two edges". It does not. **C3 is nine packages, not the four recorded here**
+   (`{assist.spi, control, intelligence, intelligence.action, intelligence.context, intelligence.pack,
+   intelligence.spi, report, service}`), and simulating the narrowing against the measured graph takes
+   it **9 → 8** — only `assist.spi` leaves. `report ↔ service` and a `control ↔ intelligence.*` tangle
+   hold the rest. The fan-in win is real; the cycle win is one package. Census:
+   [`reactor.md`](../okf/backend/modules/reactor.md) §*Whole-reactor cycle census*.
 2. **Phase C — how far to chase cycles.** C1 and C2 are worth cutting on the evidence. But if a cut
    turns out to need more than a relocation (i.e. it is a redesign), the honest default is to stop,
    record it, and leave the cycle documented. **Confirm that default.**
