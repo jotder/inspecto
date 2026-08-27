@@ -13,7 +13,8 @@ modular; use generics where applicable. **Exclude AI/model modules.**
 `ConfigRoutes` into seven cohesive route modules, and finished `MaintenanceJob`'s half-done split.
 
 **It did not reduce coupling, and that is measurable.** Graph nodes went 30,129 → 30,231, edges
-79,963 → 80,240, and the god-node list is the *same ten classes with slightly higher degree*.
+79,963 → 80,264, communities 1,129 → 1,116, and the god-node list is the *same ten classes with
+slightly higher degree* (measured again 2026-08-27 at `311a4523`).
 Phase 1 optimized file length, duplication, and per-file responsibility. None of those are
 connectivity. This plan targets the structural complexity Phase 1 deliberately left alone.
 
@@ -21,22 +22,35 @@ connectivity. This plan targets the structural complexity Phase 1 deliberately l
 
 **Node degree is not complexity — fan-in and fan-out mean opposite things.**
 
-| Class | fan-in | fan-out | verdict |
+| Class | fan-in (files) | fan-out (`com.gamma` types / imports) | verdict |
 |---|---|---|---|
-| `CollectorService` | 59 | **346** | knows about too much |
-| `ControlApi` | 38 | **305** | router — fan-out is its job |
-| `PipelineConfig` | 94 | **297** | one record carrying every concern |
-| `ObjectService` | **25** | **179** | does a lot, few depend on it |
-| `ApiContext` | 78 | 116 | healthy: reuse |
-| `ComponentStore` | 55 | 90 | healthy |
+| `CollectorService` | 58 | **70 / 30** | genuinely knows about too much — the only clear case |
+| `ObjectService` | 24 | **29 / 24** | high work, few dependents (but see Phase B: not separable) |
+| `JobService` | 38 | **26 / 18** | multi-purpose host facade by design |
+| `ControlApi` | 37 | 8 / 6 | router — and its real coupling is small |
+| `PipelineConfigParser` | 17 | 6 / 4 | long, but barely coupled outward |
+| `ComponentStore` | 54 | 4 / 3 | healthy: reuse |
+| `PipelineConfig` | 93 | **3 / 2** | high reuse, almost NO outward coupling |
+| `ApiContext` | 77 | 2 / 2 | healthy: reuse |
+
+🔴 **CORRECTION (2026-08-27).** An earlier version of this table reported fan-out as "distinct
+capitalized identifiers in the file" — `CollectorService` 346, `PipelineConfig` 297, `ControlApi` 305.
+**That metric is near-worthless for coupling: it counts a class's OWN nested type names.**
+`PipelineConfig` scored 297 while referencing just **3** `com.gamma` types — it is a large record full
+of its own nested records, so its outward coupling is nearly nil, and the old table's verdict ("one
+record carrying every concern → knows about too much") was simply wrong. Measure fan-out as distinct
+comment-stripped `com.gamma.*` types (imports + inline FQNs), never as identifier count. By the
+correct metric only **three** classes coupled meaningfully outward, and the ranking barely resembles
+the size ranking. This does not change Phase B/F's LEAVE verdicts — those were decided on code
+structure, not these numbers — and it strengthens the case for leaving `PipelineConfig` alone.
 
 - **High fan-in is reuse and we want it.** `PublicApi` (an annotation), `apiUrl()`,
   `apiErrorMessage()` are high-degree *because* one implementation serves many callers.
 - ⚠ **Consolidation RAISES degree.** Phase 1 turned ~60 helper copies into single nodes with ~60
   inbound edges each. Optimizing for low degree would mean re-duplicating them. Duplication and
   connectivity pull in opposite directions — never trade one for the other blindly.
-- **High fan-out is the real complexity.** A class naming 300+ distinct types is the one nobody can
-  hold in their head.
+- **High fan-out is the real complexity** — but measure it correctly (see the correction above).
+  On the proper metric the whole codebase has only three classes above 15 outward types.
 
 ## Binding principles (learned the hard way in Phase 1)
 
@@ -68,8 +82,9 @@ connectivity. This plan targets the structural complexity Phase 1 deliberately l
 
 ### Phase B — `ObjectService` decomposition — ⛔ CLOSED as LEAVE (grounded 2026-08-27)
 
-**This was the phase I recommended first, on its fan-in/fan-out profile (179 out / 25 in). Reading
-the code refuted it.** The numbers pointed at a class doing a lot that few depend on; the structure
+**This was the phase I recommended first, on its fan-in/fan-out profile. Reading the code refuted
+it** (and the profile itself was overstated — its real fan-out is 29 `com.gamma` types / 24 imports,
+not the 179 identifier-count first quoted). The numbers pointed at a class doing a lot that few depend on; the structure
 shows why that does not make it separable:
 
 1. **The shared primitives are pervasive, not incidental.** Every mutating cluster
@@ -93,7 +108,7 @@ fan-out number alone; that number is what pointed here in the first place.
 ### Phase A — `CollectorService` role interfaces — VIABLE, but the win is smaller than advertised
 
 **Verdict: BUILD, with the payoff stated honestly.** ⚠ **It does NOT move `CollectorService`'s
-fan-out of 346** — it still constructs and owns every field it always did. What it moves is
+fan-out (70 `com.gamma` types / 30 imports — the highest in the codebase)** — it still constructs and owns every field it always did. What it moves is
 **fan-in**: 6–8 satellite collaborators stop compiling against a 1693-line class. That is a real
 decoupling and testability win, not interface files for their own sake, but it is not the headline
 number anyone will expect. Say so up front to whoever picks this up.
