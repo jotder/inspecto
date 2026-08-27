@@ -66,7 +66,7 @@ public final class MetricsService {
     // ── scrape-time gauges (computed lazily on /metrics) ─────────────────────────
 
     private void collectGauges() {
-        for (CollectorService.PipelineView pv : svc.pipelines()) {
+        for (PipelineView pv : svc.pipelines()) {
             PipelineConfig cfg;
             try {
                 cfg = svc.configFor(pv.name()).orElse(null);

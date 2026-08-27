@@ -217,10 +217,6 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                     return size() > LIVE_RUN_CAP;
                 }
             });
-    /** One manual pipeline run's identity + outcome, for the W5b async-trigger poll. {@code total}/{@code failed}
-     *  are the {@link MultiCollectorProcessor.RunResult} counts once terminal; {@code -1} while {@code RUNNING}. */
-    public record PipelineRun(String runId, String pipeline, String trigger, String startedAt, String finishedAt,
-                              String status, int total, int failed, String message) {}
     /** Optional embedded assist agent (v3.0, M0): discovered via {@link ServiceLoader} at
      *  {@link #start()} or registered explicitly with {@link #registerAgent(AssistAgent)};
      *  empty when the {@code inspecto-agent} module is absent. */
@@ -253,8 +249,6 @@ public final class CollectorService implements ReadModel, AutoCloseable {
      *  by reference; the operator-trigger paths ({@link #runPipeline}) stay here and lock the same lock. */
     private final PipelineScheduler pipelineScheduler;
 
-    /** A pipeline's identity + current state, for the Control API's listing. */
-    public record PipelineView(String name, String configPath, boolean paused, int committedBatches) {}
 
     /**
      * Reject a registry in which two <em>different</em> files declare the same in-file {@code name} —
@@ -1359,26 +1353,6 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         return configSource;
     }
 
-    /**
-     * Inbox status for a pipeline (M3, file-processing visibility): how many inbox files are waiting
-     * to be processed and whether the pipeline is currently ingesting.
-     *
-     * @param pipeline name (normalised)
-     * @param inbox    absolute poll-root path the files are scanned from
-     * @param pending  files matching {@code processing.file_pattern} not yet processed (the candidate
-     *                 set a poll cycle would pick up); {@code -1} if the scan failed
-     * @param running  whether this pipeline is mid-ingest right now ("under processing")
-     * @param current  the file being ingested right now ("file index of total"); {@code null}
-     *                 when the pipeline is not mid-file (v4.1.0, per-file in-flight visibility)
-     * @param step     the chain step the current Consignment is at ("step index of total"); {@code null}
-     *                 when nothing is running (G6/S7, live step gauge — in-memory, poll-read)
-     * @param oldestInboxAgeSeconds lag: seconds since the oldest waiting inbox file was modified
-     *                 ({@code 0} when the inbox is empty); the same signal as the
-     *                 {@code inspecto_inbox_oldest_seconds} metric (pipeline-graph §3.5 / T15)
-     */
-    public record InboxStatus(String pipeline, String inbox, int pending, boolean running,
-                              IngestProgress.Snapshot current, StepProgress.Snapshot step,
-                              double oldestInboxAgeSeconds) {}
 
     /** Inbox/processing status for one registered pipeline; empty if no pipeline by that name. */
     public Optional<InboxStatus> inboxStatus(String pipelineName) {

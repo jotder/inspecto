@@ -4,6 +4,7 @@ import com.gamma.config.spec.Finding;
 import com.gamma.pipeline.PipelineGraph;
 import com.gamma.pipeline.PipelineLift;
 import com.gamma.service.CollectorService;
+import com.gamma.service.PipelineView;
 import com.gamma.service.SpaceRoot;
 
 import java.nio.file.Path;
@@ -23,7 +24,7 @@ final class PipelineSupport {
     /** Every registered pipeline lifted to a {@link PipelineGraph} (shared with the component safe-delete check). */
     static List<PipelineGraph> liftedPipelines(CollectorService service) {
         List<PipelineGraph> graphs = new ArrayList<>();
-        for (CollectorService.PipelineView pv : service.pipelines()) {
+        for (PipelineView pv : service.pipelines()) {
             service.configFor(pv.name()).ifPresent(c -> graphs.add(PipelineLift.lift(c)));
         }
         return graphs;

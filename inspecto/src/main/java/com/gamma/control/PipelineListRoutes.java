@@ -5,7 +5,7 @@ import com.gamma.pipeline.PipelineGraph;
 import com.gamma.pipeline.PipelineLift;
 import com.gamma.pipeline.PipelineProjection;
 import com.gamma.pipeline.PipelineStore;
-import com.gamma.service.CollectorService;
+import com.gamma.service.PipelineView;
 import com.gamma.service.SpaceRoot;
 
 import java.io.IOException;
@@ -42,7 +42,7 @@ final class PipelineListRoutes implements RouteModule {
     /** Lift every registered pipeline to a {@link PipelineGraph} and project a compact summary (GET /pipelines). */
     private Object pipelineSummaries(ApiContext api) {
         List<Map<String, Object>> out = new ArrayList<>();
-        for (CollectorService.PipelineView pv : api.service().pipelines()) {
+        for (PipelineView pv : api.service().pipelines()) {
             api.service().configFor(pv.name()).ifPresent(c -> {
                 Map<String, Object> s = PipelineProjection.summary(PipelineLift.lift(c));
                 // Emitted only when set, so an ordinary pipeline's payload is unchanged. Kept out of

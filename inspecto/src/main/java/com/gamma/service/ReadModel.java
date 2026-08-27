@@ -29,9 +29,7 @@ import java.util.Optional;
  *
  * ⚠ <b>It buys no package-graph improvement, and it was never able to.</b> The reason it was proposed —
  * cutting the {@code report -> service} edge of the C3 cycle — does not survive contact with the code:
- * that edge has three independent holders and this interface removes only one. {@code ReportService} also
- * imports {@code EnrichmentService}, and it iterates {@link CollectorService.PipelineView}, a record nested
- * inside {@code CollectorService} which every caller of {@link #pipelines()} spells out explicitly.
+ * that edge had three independent holders and this interface removes only one.
  *
  * <p>So the choice was between the package the read surface is already written in and a package that would
  * have to import it anyway. The only homes shared by the consumers are {@code com.gamma.etl} and
@@ -41,14 +39,25 @@ import java.util.Optional;
  * <p>⛔ Consequently: do not report this type as reducing coupling between packages. It reduces <i>fan-in on
  * a god class</i> and makes six collaborators testable. That is the whole claim.
  *
- * <p>⭐ If cutting the C3 {@code report} edge is ever actually wanted, the prerequisite is promoting
- * {@code PipelineView}/{@code PipelineRun} out of {@code CollectorService} into top-level records and giving
- * {@code EnrichmentService} a role interface of its own. Neither is done here, and neither is free.
+ * <h2>Update 4.0.0 — the nested-record holder is gone, the edge is not</h2>
+ *
+ * <p>{@link PipelineView} / {@link PipelineRun} / {@link InboxStatus} were promoted out of
+ * {@code CollectorService} into top-level records (operator decision #4: {@code @PublicApi} types may
+ * relocate on a major bump). That removed the second holder and dropped {@code CollectorService}'s fan-in
+ * from 25 files to 16 — every caller of {@link #pipelines()} used to spell
+ * {@code CollectorService.PipelineView} and so imported the concrete class no matter what type its
+ * receiver had.
+ *
+ * <p>⚠ <b>The {@code report -> service} package edge still stands.</b> The promoted records live in
+ * {@code com.gamma.service} too, so {@code ReportService} now imports {@code PipelineView} instead of
+ * {@code CollectorService} — a different holder, the same edge — and it independently imports
+ * {@code EnrichmentService}. Cutting the edge would additionally need a role interface for
+ * {@code EnrichmentService} and a home outside this package for the view records. Neither is done.
  */
 public interface ReadModel {
 
     /** Every registered pipeline's identity + current state. */
-    List<CollectorService.PipelineView> pipelines();
+    List<PipelineView> pipelines();
 
     /** The parsed config for a pipeline, or empty when no pipeline of that name is registered. */
     Optional<PipelineConfig> configFor(String pipelineName);

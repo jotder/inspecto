@@ -31,7 +31,7 @@ import com.gamma.pipeline.ViewStore;
 import com.gamma.pipeline.exec.PipelineDryRun;
 import com.gamma.query.ConditionSql;
 import com.gamma.query.DatasetRelation;
-import com.gamma.service.CollectorService;
+import com.gamma.service.PipelineView;
 import com.gamma.service.ReadModel;
 import com.gamma.signal.Severity;
 import com.gamma.signal.Signal;
@@ -162,7 +162,7 @@ final class InspectoTools {
                 false, Role.USER, Capability.READ_METADATA);
         return new FunctionTool(spec, call -> {
             String pipelineId = arg(call, "pipelineId");
-            List<CollectorService.PipelineView> views = service.pipelines();
+            List<PipelineView> views = service.pipelines();
             if (pipelineId == null || pipelineId.isBlank()) {
                 return ok(Map.of("pipelines", views.stream()
                         .map(v -> Map.of("name", v.name(), "paused", v.paused(),

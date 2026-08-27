@@ -3,7 +3,7 @@ package com.gamma.report;
 import com.gamma.api.PublicApi;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.service.EnrichmentService;
-import com.gamma.service.CollectorService;
+import com.gamma.service.PipelineView;
 import com.gamma.service.ReadModel;
 import com.gamma.etl.StatusStore;
 import com.gamma.job.ReportRunner;
@@ -124,7 +124,7 @@ public final class ReportService implements ReportRunner {
         List<PipelineStatus> rows = new ArrayList<>();
         int paused = 0;
         long committed = 0, quarantined = 0;
-        for (CollectorService.PipelineView v : service.pipelines()) {
+        for (PipelineView v : service.pipelines()) {
             PipelineConfig cfg = service.configFor(v.name()).orElse(null);
             int quarantine = 0;
             String lastId = "", lastStatus = "", lastTime = "";
@@ -171,7 +171,7 @@ public final class ReportService implements ReportRunner {
         List<BatchAuditReport> perPipeline = new ArrayList<>();
         List<Long> allDurations = new ArrayList<>();
         long batches = 0, success = 0, failed = 0, outRows = 0;
-        for (CollectorService.PipelineView v : service.pipelines()) {
+        for (PipelineView v : service.pipelines()) {
             PipelineConfig cfg = service.configFor(v.name()).orElse(null);
             if (cfg == null) continue;
             List<Map<String, String>> rows = service.statusStore().batches(cfg);

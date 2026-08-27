@@ -44,7 +44,7 @@ public final class DataSourceBundleResolver {
     /** The data-source ids (pipeline names) that resolve to a bundle in this space, sorted. */
     public List<String> dataSourceIds() {
         return service.pipelines().stream()
-                .map(CollectorService.PipelineView::name)
+                .map(PipelineView::name)
                 .sorted()
                 .toList();
     }

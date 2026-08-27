@@ -2,7 +2,7 @@ package com.gamma.intelligence.action;
 
 import com.eoiagent.core.ToolCall;
 import com.eoiagent.core.ToolResult;
-import com.gamma.service.CollectorService;
+import com.gamma.service.PipelineView;
 import com.gamma.service.ReadModel;
 
 import java.util.LinkedHashMap;
@@ -211,7 +211,7 @@ public final class OperationalActions {
         }
     }
 
-    private static Optional<CollectorService.PipelineView> pipelineView(ReadModel service, String pipeline) {
+    private static Optional<PipelineView> pipelineView(ReadModel service, String pipeline) {
         if (service == null) return Optional.empty();
         try {
             return service.pipelines().stream()
