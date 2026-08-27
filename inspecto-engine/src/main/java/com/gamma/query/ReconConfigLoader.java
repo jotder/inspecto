@@ -1,5 +1,7 @@
 package com.gamma.query;
 
+import com.gamma.util.Values;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -22,8 +24,8 @@ public final class ReconConfigLoader {
     public static ReconService.Spec buildSpec(Map<String, Object> config, Function<String, String> relationSqlFor) {
         List<String> datasets = strings(config.get("datasets"));
         if (datasets.isEmpty()) {   // v1 config compatibility: leftDataset/rightDataset
-            String left = str(config, "leftDataset");
-            String right = str(config, "rightDataset");
+            String left = Values.blankToNull(config.get("leftDataset"));
+            String right = Values.blankToNull(config.get("rightDataset"));
             if (left != null) datasets.add(left);
             if (right != null) datasets.add(right);
         }
@@ -43,9 +45,9 @@ public final class ReconConfigLoader {
                 if (o instanceof Map<?, ?> c) {
                     Map<String, Object> m = cast(c);
                     measures.add(new ReconService.Measure(
-                            str(m, "column"),
-                            orDefault(str(m, "agg"), "sum"),
-                            orDefault(str(m, "toleranceType"), "exact"),
+                            Values.blankToNull(m.get("column")),
+                            orDefault(Values.blankToNull(m.get("agg")), "sum"),
+                            orDefault(Values.blankToNull(m.get("toleranceType")), "exact"),
                             doubleOr(m.get("tolerance"), 0)));
                 }
         boolean includeRecordCount = !(config.get("includeRecordCount") instanceof Boolean b) || b;
@@ -76,11 +78,6 @@ public final class ReconConfigLoader {
     @SuppressWarnings("unchecked")
     private static Map<String, Object> cast(Map<?, ?> m) {
         return (Map<String, Object>) m;
-    }
-
-    private static String str(Map<String, Object> m, String key) {
-        Object v = m.get(key);
-        return (v == null || v.toString().isBlank()) ? null : v.toString();
     }
 
     private static String strOrNull(Object v) {

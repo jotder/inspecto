@@ -2,6 +2,8 @@ package com.gamma.pipeline;
 
 import com.gamma.api.PublicApi;
 
+import static com.gamma.util.Values.str;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -109,10 +111,6 @@ public final class PipelineCodec {
         if (v == null) return List.of();
         if (v instanceof List<?> l) return l;
         throw new IllegalArgumentException("expected a list, got " + v.getClass().getSimpleName());
-    }
-
-    private static String str(Object v) {
-        return v == null ? null : v.toString();
     }
 
     private static boolean toBool(Object v) {

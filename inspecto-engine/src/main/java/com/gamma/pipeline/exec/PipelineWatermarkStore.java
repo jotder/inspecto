@@ -1,6 +1,7 @@
 package com.gamma.pipeline.exec;
 
 import com.gamma.api.PublicApi;
+import com.gamma.util.Values;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,10 +54,6 @@ public final class PipelineWatermarkStore {
     }
 
     private Path fileFor(String flow, String store) {
-        return dir.resolve(safe(flow) + "__" + safe(store) + ".watermark");
-    }
-
-    private static String safe(String s) {
-        return s == null ? "_" : s.replaceAll("[^A-Za-z0-9._-]", "_");
+        return dir.resolve(Values.fileSafe(flow) + "__" + Values.fileSafe(store) + ".watermark");
     }
 }

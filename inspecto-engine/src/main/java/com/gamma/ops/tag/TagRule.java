@@ -4,6 +4,7 @@ import com.gamma.config.io.ConfigCodec;
 import com.gamma.ops.ObjectService;
 import com.gamma.ops.ObjectType;
 import com.gamma.ops.OperationalObject;
+import com.gamma.util.Values;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -66,8 +67,8 @@ public record TagRule(String name, String tag, Filter filter, long createdAt) {
     public static TagRule fromMap(Map<String, Object> m) {
         if (m == null) throw new IllegalArgumentException("missing 'tag_rule' block");
         Map<String, Object> f = m.get("filter") instanceof Map ? (Map<String, Object>) m.get("filter") : m;
-        Filter filter = new Filter(str(f, "type"), str(f, "q"), str(f, "status"),
-                str(f, "priority"), str(f, "severity"), str(f, "category"));
+        Filter filter = new Filter(Values.trimToNull(f.get("type")), Values.trimToNull(f.get("q")), Values.trimToNull(f.get("status")),
+                Values.trimToNull(f.get("priority")), Values.trimToNull(f.get("severity")), Values.trimToNull(f.get("category")));
         long at = 0;
         Object created = m.get("createdAt");
         if (created != null) {
@@ -77,14 +78,7 @@ public record TagRule(String name, String tag, Filter filter, long createdAt) {
                 // informational only
             }
         }
-        return new TagRule(str(m, "name"), str(m, "tag"), filter, at > 0 ? at : System.currentTimeMillis());
-    }
-
-    private static String str(Map<String, Object> m, String key) {
-        Object v = m.get(key);
-        if (v == null) return null;
-        String s = v.toString().trim();
-        return s.isEmpty() ? null : s;
+        return new TagRule(Values.trimToNull(m.get("name")), Values.trimToNull(m.get("tag")), filter, at > 0 ? at : System.currentTimeMillis());
     }
 
     /**

@@ -11,6 +11,8 @@ import com.gamma.pipeline.PipelineStores;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.gamma.util.Values.str;
+
 import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -170,8 +172,6 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
         }
     }
 
-
-    private static String str(Object o) { return o == null ? null : o.toString(); }
 
     private static String upper(Object o, String fallback) {
         return o == null || o.toString().isBlank() ? fallback : o.toString().toUpperCase();

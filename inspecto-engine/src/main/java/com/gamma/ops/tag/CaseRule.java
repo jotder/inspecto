@@ -2,6 +2,7 @@ package com.gamma.ops.tag;
 
 import com.gamma.config.io.ConfigCodec;
 import com.gamma.ops.OperationalObject;
+import com.gamma.util.Values;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -73,18 +74,11 @@ public record CaseRule(String name, String title, TagRule.Filter filter, int thr
     public static CaseRule fromMap(Map<String, Object> m) {
         if (m == null) throw new IllegalArgumentException("missing 'case_rule' block");
         Map<String, Object> f = m.get("filter") instanceof Map ? (Map<String, Object>) m.get("filter") : m;
-        TagRule.Filter filter = new TagRule.Filter(str(f, "type"), str(f, "q"), str(f, "status"),
-                str(f, "priority"), str(f, "severity"), str(f, "category"));
-        return new CaseRule(str(m, "name"), str(m, "title"), filter,
+        TagRule.Filter filter = new TagRule.Filter(Values.trimToNull(f.get("type")), Values.trimToNull(f.get("q")), Values.trimToNull(f.get("status")),
+                Values.trimToNull(f.get("priority")), Values.trimToNull(f.get("severity")), Values.trimToNull(f.get("category")));
+        return new CaseRule(Values.trimToNull(m.get("name")), Values.trimToNull(m.get("title")), filter,
                 (int) longOr(m.get("threshold"), 2), longOr(m.get("windowMinutes"), 1440),
-                str(m, "category"), str(m, "tags"), longOr(m.get("createdAt"), System.currentTimeMillis()));
-    }
-
-    private static String str(Map<String, Object> m, String key) {
-        Object v = m.get(key);
-        if (v == null) return null;
-        String s = v.toString().trim();
-        return s.isEmpty() ? null : s;
+                Values.trimToNull(m.get("category")), Values.trimToNull(m.get("tags")), longOr(m.get("createdAt"), System.currentTimeMillis()));
     }
 
     private static long longOr(Object v, long def) {

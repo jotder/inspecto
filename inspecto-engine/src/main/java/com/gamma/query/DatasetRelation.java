@@ -4,6 +4,7 @@ import com.gamma.config.safety.DataRef;
 import com.gamma.pipeline.ViewDefinition;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.sql.SqlViews;
+import com.gamma.util.Values;
 
 import java.nio.file.Path;
 import java.util.Map;
@@ -51,7 +52,7 @@ public final class DatasetRelation {
     }
 
     private static String baseRelationSql(Map<String, Object> datasetConfig, Path dataRoot, ViewStore views) {
-        String view = str(datasetConfig, "view");
+        String view = Values.trimToNull(datasetConfig == null ? null : datasetConfig.get("view"));
         if (view != null) {
             Optional<ViewDefinition> def = views == null ? Optional.empty() : views.get(view);
             String sql = def.map(ViewDefinition::derivedSql).orElse(null);
@@ -61,7 +62,7 @@ public final class DatasetRelation {
                 throw new IllegalArgumentException("view '" + view + "' has no derived SQL to query");
             return sql;
         }
-        String ref = str(datasetConfig, "physicalRef");
+        String ref = Values.trimToNull(datasetConfig == null ? null : datasetConfig.get("physicalRef"));
         if (ref != null) {
             // A shared/<owner>/<item> ref routes to the owner's Exchange snapshot (grant-checked, fail-closed)
             // instead of this space's data root — everything downstream reads it as an ordinary Parquet glob.
@@ -127,8 +128,8 @@ public final class DatasetRelation {
         String found = null;
         for (Object o : list) {
             // an entry that is not an object declares no role at all — it cannot be the temporal one
-            if (!(o instanceof Map<?, ?> c) || !"temporal".equalsIgnoreCase(str(cast(c), "role"))) continue;
-            String name = str(cast(c), "name");
+            if (!(o instanceof Map<?, ?> c) || !"temporal".equalsIgnoreCase(Values.trimToNull(cast(c).get("role")))) continue;
+            String name = Values.trimToNull(cast(c).get("name"));
             if (name == null || !SAFE_IDENT.matcher(name).matches())
                 throw new IllegalArgumentException(
                         "temporal column needs a plain-identifier 'name', got '" + name + "'");
@@ -148,8 +149,8 @@ public final class DatasetRelation {
         for (Object o : list) {
             if (!(o instanceof Map<?, ?> c))
                 throw new IllegalArgumentException("calculated entries must be {name, expr} objects");
-            String name = str(cast(c), "name");
-            String expr = str(cast(c), "expr");
+            String name = Values.trimToNull(cast(c).get("name"));
+            String expr = Values.trimToNull(cast(c).get("expr"));
             if (name == null || !SAFE_IDENT.matcher(name).matches())
                 throw new IllegalArgumentException("calculated column needs a plain-identifier 'name', got '" + name + "'");
             if (expr == null)
@@ -162,10 +163,5 @@ public final class DatasetRelation {
     @SuppressWarnings("unchecked")
     private static Map<String, Object> cast(Map<?, ?> m) {
         return (Map<String, Object>) m;
-    }
-
-    private static String str(Map<String, Object> m, String key) {
-        Object v = m == null ? null : m.get(key);
-        return v == null || v.toString().isBlank() ? null : v.toString().trim();
     }
 }

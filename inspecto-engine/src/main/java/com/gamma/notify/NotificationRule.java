@@ -2,6 +2,7 @@ package com.gamma.notify;
 
 import com.gamma.event.Event;
 import com.gamma.event.EventLevel;
+import com.gamma.util.Values;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -45,7 +46,7 @@ public record NotificationRule(String id, String eventType, EventLevel minLevel,
         String id = require(m, "id");
         String eventType = require(m, "eventType");
         String category = require(m, "category");
-        EventLevel minLevel = level(str(m, "minLevel"));
+        EventLevel minLevel = level(Values.blankToNull(m.get("minLevel")));
         String title = m.get("titleTemplate") == null ? "{{type}}" : String.valueOf(m.get("titleTemplate"));
         String body = m.get("bodyTemplate") == null ? "{{message}}" : String.valueOf(m.get("bodyTemplate"));
         String dedupe = m.get("dedupeKeyTemplate") == null ? "{{type}}:{{correlationId}}"
@@ -78,14 +79,9 @@ public record NotificationRule(String id, String eventType, EventLevel minLevel,
     }
 
     private static String require(Map<String, Object> m, String key) {
-        String v = str(m, key);
+        String v = Values.blankToNull(m.get(key));
         if (v == null) throw new IllegalArgumentException("id, eventType and category are required");
         return v;
-    }
-
-    private static String str(Map<String, Object> m, String key) {
-        Object v = m.get(key);
-        return (v == null || v.toString().isBlank()) ? null : v.toString();
     }
 
     /** Render a fresh UNREAD notification for {@code e} from this rule's templates. */

@@ -3,6 +3,7 @@ package com.gamma.pipeline;
 import com.gamma.api.PublicApi;
 import com.gamma.config.spec.Finding;
 import com.gamma.etl.TransformCompiler;
+import com.gamma.util.Values;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -51,9 +52,9 @@ public final class MappingRules {
         for (int i = 0; i < rules.size(); i++) {
             Map<String, Object> rule = rules.get(i);
             String at = "rules[" + i + "].";
-            String target = str(rule, "targetColumn");
-            String source = str(rule, "sourceExpression");
-            String type = str(rule, "transformType").toUpperCase();
+            String target = Values.trimOrEmpty(rule == null ? null : rule.get("targetColumn"));
+            String source = Values.trimOrEmpty(rule == null ? null : rule.get("sourceExpression"));
+            String type = Values.trimOrEmpty(rule == null ? null : rule.get("transformType")).toUpperCase();
 
             if (target.isEmpty()) {
                 out.add(Finding.error(at + "targetColumn", "A target column is required."));
@@ -68,7 +69,7 @@ public final class MappingRules {
             // The vocabulary is TransformCompiler's own set, not a copy. Blank means DIRECT.
             if (!type.isEmpty() && !TransformCompiler.TRANSFORM_TYPES.contains(type)) {
                 out.add(Finding.error(at + "transformType", "Unknown transform type '"
-                        + str(rule, "transformType") + "'. Valid: DIRECT (or leave blank), "
+                        + Values.trimOrEmpty(rule == null ? null : rule.get("transformType")) + "'. Valid: DIRECT (or leave blank), "
                         + String.join(", ", TransformCompiler.TRANSFORM_TYPES) + "."));
                 continue;   // the type-specific checks below cannot apply to a type we do not know
             }
@@ -97,11 +98,5 @@ public final class MappingRules {
             }
         }
         return out;
-    }
-
-    /** Trimmed string value of {@code key}, never {@code null}. */
-    private static String str(Map<String, Object> rule, String key) {
-        Object v = rule == null ? null : rule.get(key);
-        return v == null ? "" : v.toString().trim();
     }
 }

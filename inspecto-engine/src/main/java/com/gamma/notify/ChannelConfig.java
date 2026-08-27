@@ -1,5 +1,7 @@
 package com.gamma.notify;
 
+import com.gamma.util.Values;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -34,10 +36,10 @@ public record ChannelConfig(String id, String kind, String target, String descri
         String id = require(m, "id");
         String kind = require(m, "kind");
         String target = require(m, "target");
-        String description = str(m, "description");
+        String description = Values.blankToNull(m.get("description"));
         boolean enabled = !(m.get("enabled") instanceof Boolean b) || b;
         long createdAt = m.get("createdAt") instanceof Number n ? n.longValue() : defaultCreatedAt;
-        String template = str(m, "template");
+        String template = Values.blankToNull(m.get("template"));
         int digestMinutes = m.get("digestMinutes") instanceof Number n ? n.intValue() : 0;
         if (digestMinutes < 0)
             throw new IllegalArgumentException("digestMinutes must be >= 0 (0 = immediate delivery)");
@@ -71,13 +73,8 @@ public record ChannelConfig(String id, String kind, String target, String descri
     }
 
     private static String require(Map<String, Object> m, String key) {
-        String v = str(m, key);
+        String v = Values.blankToNull(m.get(key));
         if (v == null) throw new IllegalArgumentException("id, kind and target are required");
         return v;
-    }
-
-    private static String str(Map<String, Object> m, String key) {
-        Object v = m.get(key);
-        return (v == null || v.toString().isBlank()) ? null : v.toString();
     }
 }

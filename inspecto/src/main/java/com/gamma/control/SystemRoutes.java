@@ -2,6 +2,7 @@ package com.gamma.control;
 
 import com.gamma.acquire.SecretResolver;
 import com.gamma.service.OperationalDbReport;
+import com.gamma.util.Values;
 
 import java.util.Map;
 
@@ -41,7 +42,7 @@ final class SystemRoutes implements RouteModule {
     }
 
     private Object testConnection(Map<String, Object> body) {
-        String url = str(body, "url");
+        String url = Values.trimOrEmpty(body == null ? null : body.get("url"));
         if (url.isBlank())
             throw new ApiException(422, "url is required — the JDBC URL to test, e.g. "
                     + "jdbc:postgresql://host:5432/inspecto");
@@ -50,19 +51,14 @@ final class SystemRoutes implements RouteModule {
                     + String.join(" or ", OperationalDbReport.allowedSchemes())
                     + " — this endpoint opens the connection for real, so it dials nothing else");
 
-        String password = str(body, "password");
+        String password = Values.trimOrEmpty(body == null ? null : body.get("password"));
         if (!password.isBlank() && !password.startsWith("${"))
             throw new ApiException(422, "password must be a secret reference (${ENV:…}, ${KEYSTORE:…} "
                     + "or ${FILE:…}), never a literal — provision the secret, then test it");
 
         // Resolved here and held only for the length of the call; the outcome never echoes it.
-        return OperationalDbReport.test(url, emptyToNull(str(body, "user")),
+        return OperationalDbReport.test(url, emptyToNull(Values.trimOrEmpty(body == null ? null : body.get("user"))),
                 emptyToNull(SecretResolver.resolve(password)));
-    }
-
-    private static String str(Map<String, Object> body, String key) {
-        Object v = body == null ? null : body.get(key);
-        return v == null ? "" : String.valueOf(v).trim();
     }
 
     private static String emptyToNull(String s) { return s == null || s.isBlank() ? null : s; }

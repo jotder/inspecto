@@ -1,6 +1,7 @@
 package com.gamma.pipeline;
 
 import com.gamma.api.PublicApi;
+import com.gamma.util.Values;
 
 import java.util.Map;
 
@@ -77,11 +78,11 @@ public record PipelineTrigger(Kind kind, long everyMs, String cron, String on, S
     public static PipelineTrigger of(Map<String, Object> m) {
         if (m == null || m.isEmpty()) return defaultPoll();
 
-        String type = str(m, "type");
+        String type = Values.str(m.get("type"));
         long coalesce = millis(m.get("coalesce"));
 
         if (type == null || type.isBlank() || "schedule".equalsIgnoreCase(type)) {
-            String cron = str(m, "cron");
+            String cron = Values.str(m.get("cron"));
             if (cron != null && !cron.isBlank())
                 return new PipelineTrigger(Kind.SCHEDULE_CRON, 0, cron, null, null, coalesce);
             Object every = m.get("every");
@@ -90,7 +91,7 @@ public record PipelineTrigger(Kind kind, long everyMs, String cron, String on, S
             return new PipelineTrigger(Kind.DEFAULT_POLL, 0, null, null, null, coalesce);
         }
         if ("event".equalsIgnoreCase(type))
-            return new PipelineTrigger(Kind.EVENT, 0, null, str(m, "on"), str(m, "from"), coalesce);
+            return new PipelineTrigger(Kind.EVENT, 0, null, Values.str(m.get("on")), Values.str(m.get("from")), coalesce);
         if ("manual".equalsIgnoreCase(type))
             return new PipelineTrigger(Kind.MANUAL, 0, null, null, null, coalesce);
         throw new IllegalArgumentException("unknown trigger type '" + type + "'");
@@ -98,11 +99,6 @@ public record PipelineTrigger(Kind kind, long everyMs, String cron, String on, S
 
     private static PipelineTrigger defaultPoll() {
         return new PipelineTrigger(Kind.DEFAULT_POLL, 0, null, null, null, 0);
-    }
-
-    private static String str(Map<String, Object> m, String key) {
-        Object v = m.get(key);
-        return v == null ? null : v.toString();
     }
 
     /** Parse a duration ({@code 60s}/{@code 5m}/{@code 2h}/{@code 1d}; a bare number is seconds) to millis; null ⇒ 0. */

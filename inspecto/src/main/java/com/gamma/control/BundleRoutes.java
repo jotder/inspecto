@@ -108,7 +108,7 @@ final class BundleRoutes implements RouteModule {
         List<Map<String, Object>> items = new ArrayList<>();
         List<Map<String, Object>> missing = new ArrayList<>();
         for (Map<String, Object> req : requested) {
-            String kind = str(req, "kind"), id = str(req, "id");
+            String kind = ApiContext.str(req, "kind"), id = ApiContext.str(req, "id");
             BundleSource src = sourceFor(api, kind);
             Map<String, Object> raw = src == null ? null : src.get(id).orElse(null);
             if (raw == null) {
@@ -158,7 +158,7 @@ final class BundleRoutes implements RouteModule {
 
         List<Map<String, Object>> items = new ArrayList<>();
         for (Map<String, Object> item : asMapList(body.get("items"))) {
-            String kind = str(item, "kind"), id = str(item, "id");
+            String kind = ApiContext.str(item, "kind"), id = ApiContext.str(item, "id");
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("kind", kind);
             row.put("id", id);
@@ -180,14 +180,14 @@ final class BundleRoutes implements RouteModule {
 
         List<Map<String, Object>> requires = new ArrayList<>();
         for (Map<String, Object> ref : asMapList(body.get("requires"))) {
-            String kind = str(ref, "kind"), id = str(ref, "id");
+            String kind = ApiContext.str(ref, "kind"), id = ApiContext.str(ref, "id");
             Map<String, Object> row = new LinkedHashMap<>(ref);
             BundleSource src = kind != null && supported(kind) ? sourceFor(api, kind) : null;
             Map<String, Object> existing = (src == null || id == null) ? null : src.get(id).orElse(null);
             if (existing == null) {
                 row.put("status", "missing");
             } else {
-                String originHash = str(ref, "originHash");   // carried from export; absent on v1/older bundles
+                String originHash = ApiContext.str(ref, "originHash");   // carried from export; absent on v1/older bundles
                 String targetHash = "sha256:" + ContentHash.of(exportContent(kind, existing));
                 row.put("targetHash", targetHash);
                 // present-but-different only when the ref carried an origin hash to disagree with
@@ -221,7 +221,7 @@ final class BundleRoutes implements RouteModule {
 
         ComponentStore store = new ComponentStore(registry);
         List<Map<String, Object>> ordered = new ArrayList<>(asMapList(bundle.get("items")));
-        ordered.sort((a, b) -> Integer.compare(orderOf(str(a, "kind")), orderOf(str(b, "kind"))));
+        ordered.sort((a, b) -> Integer.compare(orderOf(ApiContext.str(a, "kind")), orderOf(ApiContext.str(b, "kind"))));
 
         // Gate 3 — referential integrity (System Maintenance MNT-16) → 422, fail-closed, before any
         // write: an import may not INTRODUCE broken references. Findings are computed over
@@ -236,7 +236,7 @@ final class BundleRoutes implements RouteModule {
         List<Map<String, Object>> results = new ArrayList<>();
         int imported = 0, overwritten = 0, skipped = 0, unchanged = 0, failed = 0;
         for (Map<String, Object> item : ordered) {
-            String kind = str(item, "kind"), id = str(item, "id");
+            String kind = ApiContext.str(item, "kind"), id = ApiContext.str(item, "id");
             String status;
             String message = null;
             if (!supported(kind)) {
@@ -320,7 +320,7 @@ final class BundleRoutes implements RouteModule {
             union.put(kind, new ArrayList<>(current));
         }
         for (Map<String, Object> item : items) {
-            String kind = str(item, "kind"), id = str(item, "id");
+            String kind = ApiContext.str(item, "kind"), id = ApiContext.str(item, "id");
             if (kind == null || id == null || !INTEGRITY_KINDS.contains(kind)) continue;
             if (!(item.get("content") instanceof Map<?, ?>)) continue;
             List<ComponentRegistry.Component> list = union.get(kind);
@@ -556,7 +556,7 @@ final class BundleRoutes implements RouteModule {
 
     /** Structural envelope validation (§4 step 1): format + version + a non-empty items array → 422 otherwise. */
     private static void validateEnvelope(Map<String, Object> env) {
-        if (!FORMAT.equals(str(env, "format")))
+        if (!FORMAT.equals(ApiContext.str(env, "format")))
             throw new ApiException(422, "not an Inspecto metadata bundle (format must be '" + FORMAT + "')");
         Object v = env.get("version");
         int version = v instanceof Number n ? n.intValue() : -1;
@@ -568,7 +568,7 @@ final class BundleRoutes implements RouteModule {
 
     /** Reject a request naming any kind outside the backend's supported set → 422 (the honest boundary). */
     private static void rejectUnsupported(List<Map<String, Object>> items) {
-        List<String> bad = items.stream().map(i -> str(i, "kind"))
+        List<String> bad = items.stream().map(i -> ApiContext.str(i, "kind"))
                 .filter(k -> k != null && !supported(k)).distinct().toList();
         if (!bad.isEmpty())
             throw new ApiException(422, "unsupported kind(s) " + bad + " — backend bundle covers "
@@ -623,7 +623,7 @@ final class BundleRoutes implements RouteModule {
         List<Map<String, Object>> out = new ArrayList<>();
         for (Map<String, Object> ref : refs) {
             Map<String, Object> row = new LinkedHashMap<>(ref);
-            String kind = str(ref, "kind"), id = str(ref, "id");
+            String kind = ApiContext.str(ref, "kind"), id = ApiContext.str(ref, "id");
             BundleSource src = kind != null && supported(kind) ? sourceFor(api, kind) : null;
             Map<String, Object> raw = (src == null || id == null) ? null : src.get(id).orElse(null);
             if (raw != null) row.put("originHash", "sha256:" + ContentHash.of(exportContent(kind, raw)));
@@ -642,11 +642,6 @@ final class BundleRoutes implements RouteModule {
         m.put("kind", kind);
         m.put("id", id);
         return m;
-    }
-
-    private static String str(Map<String, Object> m, String key) {
-        Object v = m.get(key);
-        return v == null || v.toString().isBlank() ? null : v.toString();
     }
 
     @SuppressWarnings("unchecked")
