@@ -84,7 +84,7 @@ import java.util.concurrent.locks.ReentrantLock;
  * {@code *_enrich.toon} (Stage-2 enrichment jobs).
  */
 @PublicApi(since = "2.2.0")
-public final class CollectorService implements AutoCloseable {
+public final class CollectorService implements ReadModel, AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(CollectorService.class);
 
