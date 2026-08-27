@@ -870,6 +870,23 @@ the same refuted premise from the same fan-out numbers.
    there is no API break to confirm.** C1/C2 relocate types absent from every release.
 5. **Phase F carve-out — build it or not.** It is genuinely optional; the plan recommends *not*
    doing it unless the acquisition subtree is being worked on anyway.
+   ✅ **GROUNDED 2026-08-27 — the four claims that justify the carve-out were falsified individually.
+   Two hold, one holds, one is WRONG, and the wrong one is the cost estimate.**
+
+   | Plan claim | Verdict |
+   |---|---|
+   | "fully self-contained, zero cross-references into other concerns' fields" | ✅ **HOLDS.** Lines 536-880 reference no other concern's type — the single `Step` hit is a javadoc `<b>Step</b>`, not a compile edge |
+   | "`prepare()`'s arming guards never read it" | ✅ **HOLDS.** No `collector` reference anywhere in `prepare()` |
+   | "touches zero on-disk keys" | ✅ **HOLDS.** Keys are literals in the parser/codec; the one `getSimpleName()` in `PipelineCodec:113` is an error message, not a key |
+   | "**~93 call sites concentrated in acquisition-specific files**" | 🔴 **WRONG on both halves.** **116** references across **26 files in 5 modules** — `inspecto-engine` (10 files), `inspecto-connectors` (8), `inspecto` control plane (5), `inspecto-etl` (2), `inspecto-acquire` (1). Not concentrated in acquisition; the control plane is a consumer. **Plus 33 further external references to the 9 sub-records that move with it** (`Stability` 8, `Duplicate` 5, `Fetch` 5, `PostActionConfig` 3, `Retry` 3, `CircuitBreaker` 3, `Incremental` 3, `GapDetection` 2, `Reference` 1) — the plan never counted those at all |
+
+   ⛔ **RECOMMENDATION: NO — leave it.** The three *safety* claims hold, so the carve-out is not
+   dangerous; but the *cheapness* claim is what justified calling it "the one safe increment", and it
+   does not survive. The true blast radius is ~149 references over 5 modules including the control
+   plane, for a type-level tidy that the plan's own consumer histogram (§2 of Phase F) already shows
+   would shrink only 37% of consumers' surface. Phase F is CLOSED as a LEAVE; this carve-out inherits
+   that verdict rather than escaping it. Revisit only if the acquisition subtree is being reworked for
+   its own reasons — exactly the trigger the plan originally named.
 
 ## Scorecard — what grounding did to this plan
 
