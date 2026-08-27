@@ -996,8 +996,21 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md).
 
 **Open:**
-- ⭐ **ARCH-C1C2 — cut the C1 and C2 package cycles by relocation. UNBLOCKED 2026-08-27 (second pass);
-  the only schedulable engineering work on the board.** Plan:
+- ✅ **ARCH-C1C2 — CLOSED 2026-08-27. Both cycles cut** (C2 `cf48d335`, C1 `15205362`; 3657/0/0/5 on
+  each). As-built + measurements: [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md).
+  ⚠ **"via relocation" held for C2 and was FALSE for C1** — `AnnotationKinds`' consumers all live under
+  `ops.*`, so relocating it re-creates the edge; C1 needed decision #3's ownership inversion, which the
+  operator granted the same day. **Check where a type's CONSUMERS live before calling a relocation a cut.**
+  🔴 **A relocated type's references are not all under `src/`** — the `RunLog` move passed a repo-source
+  grep and still broke the build via a scaffold template that `ScaffoldTemplatesTest` javac-compiles.
+- **ARCH-OPS-SCC — the `ops` parent/child cycle, newly surfaced 2026-08-27, NOT started.**
+  `{ops, ops.link, ops.note, ops.tag, ops.workflow}` is still an SCC after C1: `ObjectService` is a
+  facade over its four subpackages while those subpackages import the parent's shared vocabulary
+  (`AnnotationKinds` ×8, `ObjectType` ×4, `OperationalObject` ×2). Same parent/child character as the
+  deliberate `catalog ↔ catalog.spi` pair, so it may well be a LEAVE. The cut, if wanted, is moving that
+  vocabulary into an `ops.model` subpackage (~14 sites). ⚠ It was invisible while C1 subsumed it — the
+  census's "C1 has exactly two edges" was incomplete.
+  Superseded row (kept for provenance):
   [`superpower/java-architecture-plan.md`](superpower/java-architecture-plan.md) Track 2 item 6.
   It was recorded as ⛔ BLOCKED on a major-version decision because every cycle-holding class is
   `@PublicApi`. **That premise is false.** All six (`ConsignmentProcessJobType`, `ProcessorContext`,

@@ -85,7 +85,11 @@ former root reference docs** (each index lists them):
   D1 both batches (`260c023a`, `311a4523`, 16 loop→stream conversions).
   **Next (Track 1, no decision needed):** D2a — `PipelineConfigParser.parse()` 801 lines → named
   section methods, task order in the plan. Then Phase A (`ReadModel`), then D2b.
-  **~~Blocked~~ UNBLOCKED (Track 2), 2026-08-27 (second pass):** the "every cycle-cutting class is
+  **~~Blocked~~ ✅ C1 + C2 BOTH CUT 2026-08-27** (`cf48d335`, `15205362`; as-built in
+  `okf/backend/modules/reactor.md`). Two SCCs remain, both structural: the deliberate
+  `catalog ↔ catalog.spi` pair and an `ops` parent/child residual the census never reported.
+  ⚠ C1 could NOT be cut by relocation as scoped — it needed decision #3's inversion, now ANSWERED.
+  **What unblocked it, 2026-08-27 (second pass):** the "every cycle-cutting class is
   `@PublicApi`, so relocation needs a major-version decision" gate was a **false premise** — all six
   such classes are absent from `v3.11.0` (the newest ancestor release) and no 4.x/5.x release has
   ever existed, so nothing after 3.x has shipped and there is no API break to grant. **C1 + C2 cuts

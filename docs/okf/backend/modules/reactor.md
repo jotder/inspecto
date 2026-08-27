@@ -281,6 +281,39 @@ stability promise binds only **within a released major**, so:
 
 - **C1 and C2 are ordinary refactors.** Relocating a type that no release has ever published breaks
   no plugin author and no embedder. There is nothing to grant and nothing to bump.
+
+#### ✅ BOTH CUT 2026-08-27 — as-built
+
+Re-measured after each cut with a package-edge graph that strips comments, text blocks and string
+literals before scanning (so a javadoc `{@link}` is never counted as a compile edge):
+
+| Cycle | Before | After | How |
+|---|---|---|---|
+| **C2** (`cf48d335`) | 8 packages: `{alert, catalog, catalog.spi, consignment, enrich, job, pipeline.exec, query}` | **gone** | `ConsignmentProcessJobType` → `com.gamma.job` (both sibling `JobTypeProvider`s already lived there); `RunLog` → `com.gamma.util`, cross-module into the `inspecto-util` leaf |
+| **C1** (`15205362`) | 7 packages: `{ops, ops.findings, ops.link, ops.note, ops.tag, ops.workflow, pipeline}` | **`pipeline` and `ops.findings` both out** | `NodeAttribute` now declares `TYPES`/`TIERS`; `FindingsSpec` delegates |
+
+**Remaining SCCs in `inspecto-engine` main sources: two, both structural** — `{catalog, catalog.spi}`
+(the deliberate SPI pair) and the C1 residual below.
+
+🔴 **"C1 has exactly two edges" was incomplete — cutting both cross edges does NOT leave `ops` acyclic.**
+`{ops, ops.link, ops.note, ops.tag, ops.workflow}` is still an SCC on its own, and the census never
+reported it because it was hidden inside the larger component. It is a **different shape**: `ObjectService`
+is a facade over its four subpackages, and those subpackages import the parent's shared vocabulary
+(`AnnotationKinds` ×8, `ObjectType` ×4, `OperationalObject` ×2) — the same parent/child character as
+`catalog ↔ catalog.spi`. Cutting it means moving that vocabulary into an `ops.model` subpackage (~14
+sites). Out of C1's scope; **recorded, not started.**
+
+⚠ **C1 could NOT be cut by relocation, though the plan scoped it as one.** `AnnotationKinds`' consumers
+all live under `ops.note`/`ops.tag`, so moving it into `pipeline` merely re-creates `ops.* → pipeline`
+and the cycle survives via `pipeline → ops.findings → ops → ops.note`. That left the second edge —
+`NodeAttribute.java:8`, the *only* `pipeline → ops` reference in the package — and inverting it removes
+the whole direction. **Check where a type's CONSUMERS live before calling a relocation a cut.**
+
+🔴 **A relocated type's references are not all under `src/`.** The `RunLog` move passed a repo-source
+grep and still broke the build: `tools/templates/processor/…/__className__ProcessorTest.java` hardcoded
+the old import, and `ScaffoldTemplatesTest` javac-compiles the generated project, so it failed as a red
+build (the gitignored `packs-dev/acme.masker` copy had it too). **Grep the whole repo, not just the
+source tree.**
 - **C1's constant-ownership inversion is still on the table as a *design*** — move the `TYPES`/`TIERS`
   canonical values to `pipeline` and have `FindingsSpec` delegate, so both edges point
   `ops → pipeline`. It was previously framed as "the one API-free path"; it is now simply the
