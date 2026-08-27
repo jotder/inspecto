@@ -3,6 +3,7 @@ package com.gamma.intelligence.action;
 import com.eoiagent.core.ToolCall;
 import com.eoiagent.core.ToolResult;
 import com.gamma.service.CollectorService;
+import com.gamma.service.ReadModel;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -29,7 +30,7 @@ import java.util.Optional;
  * </ul>
  *
  * <p>The {@link #preview} the operator reviews is read-only — an action summary plus whatever live,
- * cheap-to-read state ({@link CollectorService}) helps the human decide (does the target exist, is the
+ * cheap-to-read state ({@link ReadModel}) helps the human decide (does the target exist, is the
  * pipeline paused). It never touches the mutating path.
  */
 public final class OperationalActions {
@@ -128,7 +129,7 @@ public final class OperationalActions {
     // --- preview (read-only, shown to the operator before approval) -------------------------------
 
     /** The dry-run summary the operator reviews before approving. Read-only; never mutates. */
-    public static Map<String, Object> preview(CollectorService service, ToolCall call) {
+    public static Map<String, Object> preview(ReadModel service, ToolCall call) {
         return switch (call.toolName()) {
             case TOOL_JOB_RUN -> previewJobRun(service, call);
             case TOOL_PIPELINE_RERUN -> previewPipelineRerun(service, call);
@@ -138,7 +139,7 @@ public final class OperationalActions {
         };
     }
 
-    private static Map<String, Object> previewJobRun(CollectorService service, ToolCall call) {
+    private static Map<String, Object> previewJobRun(ReadModel service, ToolCall call) {
         String job = str(call, "job");
         Map<String, Object> p = new LinkedHashMap<>();
         p.put("action", "run-job");
@@ -153,7 +154,7 @@ public final class OperationalActions {
         return p;
     }
 
-    private static Map<String, Object> previewPipelineRerun(CollectorService service, ToolCall call) {
+    private static Map<String, Object> previewPipelineRerun(ReadModel service, ToolCall call) {
         String pipeline = str(call, "pipeline");
         String batchId = str(call, "batchId");
         Map<String, Object> p = new LinkedHashMap<>();
@@ -182,7 +183,7 @@ public final class OperationalActions {
         return p;
     }
 
-    private static Map<String, Object> previewScheduleApply(CollectorService service, ToolCall call) {
+    private static Map<String, Object> previewScheduleApply(ReadModel service, ToolCall call) {
         String job = str(call, "job");
         String cron = str(call, "cron");
         Map<String, Object> p = new LinkedHashMap<>();
@@ -199,7 +200,7 @@ public final class OperationalActions {
 
     // --- read-only live-state helpers (best-effort; a lookup failure never blocks the preview) -----
 
-    private static boolean jobExists(CollectorService service, String job) {
+    private static boolean jobExists(ReadModel service, String job) {
         if (service == null) return false;
         try {
             return service.jobService()
@@ -210,7 +211,7 @@ public final class OperationalActions {
         }
     }
 
-    private static Optional<CollectorService.PipelineView> pipelineView(CollectorService service, String pipeline) {
+    private static Optional<CollectorService.PipelineView> pipelineView(ReadModel service, String pipeline) {
         if (service == null) return Optional.empty();
         try {
             return service.pipelines().stream()

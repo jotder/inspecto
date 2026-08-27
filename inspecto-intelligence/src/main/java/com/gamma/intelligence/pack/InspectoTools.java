@@ -32,6 +32,7 @@ import com.gamma.pipeline.exec.PipelineDryRun;
 import com.gamma.query.ConditionSql;
 import com.gamma.query.DatasetRelation;
 import com.gamma.service.CollectorService;
+import com.gamma.service.ReadModel;
 import com.gamma.signal.Severity;
 import com.gamma.signal.Signal;
 import com.gamma.signal.Signals;
@@ -62,7 +63,7 @@ import java.util.stream.Stream;
 /**
  * The read tool belt v1 (plan §3, L0 "read/ground"): {@code glossary_lookup} and {@code docs_search}
  * ground answers in {@code docs/} (the canonical vocabulary + product docs); {@code status_get}
- * grounds them in the live {@link CollectorService}. All read-only, evidence-producing, never throw —
+ * grounds them in the live {@link ReadModel}. All read-only, evidence-producing, never throw —
  * an expected failure (unknown term, no matches) is an {@code ok=false} {@link ToolResult}.
  *
  * <p>The AGT-5 P1 investigation tier (plan §3 "Analyze") adds four analysis tools on the same
@@ -79,7 +80,7 @@ final class InspectoTools {
     private InspectoTools() {
     }
 
-    static List<Tool> tools(CollectorService service) {
+    static List<Tool> tools(ReadModel service) {
         return tools(service, defaultComponents(), service::browsableStores);
     }
 
@@ -89,7 +90,7 @@ final class InspectoTools {
      * DB-backed browse stores. Package-private so tests can substitute seeded stores, mirroring the
      * agent's package-private test constructor.
      */
-    static List<Tool> tools(CollectorService service, ComponentStore components,
+    static List<Tool> tools(ReadModel service, ComponentStore components,
                             Supplier<List<BrowsableStore>> browseStores) {
         // P3 (L2) act tools are mutating=true. They are always registered but stay hidden and fail
         // closed unless the MUTATING_ACTIONS feature is on (opt-in AgentApprovals.enabled()); the eoiagent
@@ -154,7 +155,7 @@ final class InspectoTools {
         });
     }
 
-    private static Tool statusGet(CollectorService service) {
+    private static Tool statusGet(ReadModel service) {
         ToolSpec spec = new ToolSpec("status_get",
                 "Live pipeline status: paused state and committed-batch count, one or all pipelines",
                 "{\"type\":\"object\",\"properties\":{\"pipelineId\":{\"type\":\"string\"}}}",
@@ -183,7 +184,7 @@ final class InspectoTools {
     private static final int TIMELINE_DEFAULT_SINCE_MINUTES = 24 * 60;
     private static final int TIMELINE_FETCH_LIMIT = 500;
 
-    private static Tool signalsQuery(CollectorService service) {
+    private static Tool signalsQuery(ReadModel service) {
         ToolSpec spec = new ToolSpec("signals_query",
                 "Search the operational signal ledger: recent signals filtered by dotted type "
                         + "(exact or prefix.* glob), time window, severity floor and correlationId",
@@ -215,7 +216,7 @@ final class InspectoTools {
         });
     }
 
-    private static Tool signalTimeline(CollectorService service) {
+    private static Tool signalTimeline(ReadModel service) {
         ToolSpec spec = new ToolSpec("signal_timeline",
                 "Reconstruct the causal timeline of signals for one correlationId — use for "
                         + "'why did X fail' questions; entries carry causedBy links and citable signalIds",
@@ -274,7 +275,7 @@ final class InspectoTools {
         }
     }
 
-    private static Tool timelineBuild(CollectorService service, ComponentStore components) {
+    private static Tool timelineBuild(ReadModel service, ComponentStore components) {
         ToolSpec spec = new ToolSpec("timeline_build",
                 "Merge everything that happened in a time window — all signals, job runs and component "
                         + "config saves — into one ascending timeline; optional focus text filters entries",
@@ -323,7 +324,7 @@ final class InspectoTools {
     }
 
     /** Job runs whose start time falls in the window, as {@code job-run} entries (FAILED → error). */
-    private static void addJobRuns(CollectorService service, long sinceMs, Long untilMs,
+    private static void addJobRuns(ReadModel service, long sinceMs, Long untilMs,
                                    List<TimelineEntry> entries) {
         service.jobService().ifPresent(js -> {
             for (JobService.JobView job : js.jobs()) {
@@ -395,7 +396,7 @@ final class InspectoTools {
         }
     }
 
-    private static Tool diffBatches(CollectorService service) {
+    private static Tool diffBatches(ReadModel service) {
         ToolSpec spec = new ToolSpec("diff_batches",
                 "Compare two batch-ledger entries of one pipeline: per-batch status, row count, "
                         + "duration and start time, plus the delta between them",
@@ -829,7 +830,7 @@ final class InspectoTools {
      * ({@code {type:sql,text,datasetId}}); it never persists — {@code component_apply} is the L2 gated
      * write, exactly like {@link #componentDraft()} feeds {@link #componentApply(ControlPlaneClient)}.
      */
-    private static Tool queryAuthor(CollectorService service, ComponentStore components) {
+    private static Tool queryAuthor(ReadModel service, ComponentStore components) {
         ToolSpec spec = new ToolSpec("query_author",
                 "Author a read-only Query from a dataset ref + a structured condition tree (a 'group' with "
                         + "'items' of {field,operator,value}). The server renders trusted SQL and guards it — you "

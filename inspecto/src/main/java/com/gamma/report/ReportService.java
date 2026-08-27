@@ -4,6 +4,7 @@ import com.gamma.api.PublicApi;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.service.EnrichmentService;
 import com.gamma.service.CollectorService;
+import com.gamma.service.ReadModel;
 import com.gamma.etl.StatusStore;
 import com.gamma.job.ReportRunner;
 
@@ -42,9 +43,9 @@ public final class ReportService implements ReportRunner {
 
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    private final CollectorService service;
+    private final ReadModel service;
 
-    public ReportService(CollectorService service) {
+    public ReportService(ReadModel service) {
         this.service = service;
     }
 

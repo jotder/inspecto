@@ -24,7 +24,7 @@ import java.util.stream.Stream;
  * time, any job that targets it, and the registry components bound to it (Decision Rules targeting it,
  * Datasets reading its store — see {@link #findComponentsFor}).
  *
- * <p>Scoped to one space: parsed configs come from that space's {@link CollectorService}; the connection / job
+ * <p>Scoped to one space: parsed configs come from that space's {@link ReadModel}; the connection / job
  * files are found by scanning that space's {@code config/} tree, because they are addressed by their in-file
  * id ({@code connection.id} / {@code on_pipeline}), not by their filename. Bad / unreadable connection or job
  * files are warned-and-skipped (mirroring boot discovery) so one malformed file never breaks resolution.
@@ -33,10 +33,10 @@ public final class DataSourceBundleResolver {
 
     private static final Logger log = LoggerFactory.getLogger(DataSourceBundleResolver.class);
 
-    private final CollectorService service;
+    private final ReadModel service;
     private final Path configDir;
 
-    public DataSourceBundleResolver(CollectorService service, Path configDir) {
+    public DataSourceBundleResolver(ReadModel service, Path configDir) {
         this.service   = Objects.requireNonNull(service, "service");
         this.configDir = Objects.requireNonNull(configDir, "configDir");
     }

@@ -10,7 +10,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Map;
 
 /**
- * Wires observability (M4) onto a running {@link CollectorService}: it subscribes to the
+ * Wires observability (M4) onto a running {@link ReadModel}: it subscribes to the
  * batch-commit {@link BatchEventBus} to record throughput / latency / error metrics,
  * registers scrape-time gauge collectors (inbox lag, committed batches, quarantine
  * depth), and emits one structured JSON event log per batch (correlated by
@@ -27,10 +27,10 @@ public final class MetricsService {
     /** Dedicated logger for machine-readable batch events; route/ship separately if desired. */
     private static final Logger events = LoggerFactory.getLogger("inspecto.events");
 
-    private final CollectorService svc;
+    private final ReadModel svc;
     private final MetricRegistry reg;
 
-    public MetricsService(CollectorService svc, MetricRegistry reg) {
+    public MetricsService(ReadModel svc, MetricRegistry reg) {
         this.svc = svc;
         this.reg = reg;
     }

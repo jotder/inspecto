@@ -1,6 +1,6 @@
 package com.gamma.intelligence.context;
 
-import com.gamma.service.CollectorService;
+import com.gamma.service.ReadModel;
 import com.gamma.signal.Severity;
 import com.gamma.signal.Signal;
 import com.gamma.signal.Signals;
@@ -31,9 +31,9 @@ public final class ContextBroker {
 
     private static final Severity OVERLAY_FLOOR = Severity.WARN;
 
-    private final CollectorService service;
+    private final ReadModel service;
 
-    public ContextBroker(CollectorService service) {
+    public ContextBroker(ReadModel service) {
         this.service = service;
     }
 
