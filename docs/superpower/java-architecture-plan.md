@@ -551,8 +551,8 @@ when there is time to make it properly.
 | # | Work | Waits on | If the answer is no |
 |---|---|---|---|
 | 5 | **C1 cut via constant-ownership inversion** | decision #3 | Cycle stays documented in `reactor.md`. No further cost. |
-| 6 | **C1 + C2 cuts via relocation** | decision #4 (major-version window) | Both cycles stay documented. This is the only path for C2 — it has no API-free alternative. |
-| 7 | **C3's last two edges** | decision #1 (SPI narrowing) | ⚠ **Corrected 2026-08-27:** C3 stays at **4 packages**. The old fallback ("shrinks 4 → 3 via Phase A") assumed Phase A cuts the `report` edge; it does not — `EnrichmentService` and `CollectorService.PipelineView` hold it independently. If decision #1 is *no*, C3 is documented and unchanged. |
+| 6 | **C1 + C2 cuts via relocation** | ✅ **decision #4 GRANTED 2026-08-27 — UNBLOCKED, not yet built** | ⚠ Now the only schedulable engineering work left in this plan. This is the only path for C2 (no API-free alternative). ⚠ Confirm scope first — the grant was given while looking at the record promotion, not at C1/C2. |
+| 7 | **C3's last two edges** | decision #1 (SPI narrowing) | ⚠ **Corrected 2026-08-27:** C3 stays at **4 packages**. The old fallback ("shrinks 4 → 3 via Phase A") assumed Phase A cuts the `report` edge; it does not — `EnrichmentService` and (since `7eab72d4`) `PipelineView` — still `com.gamma.service` — hold it independently. If decision #1 is *no*, C3 is documented and unchanged. |
 | 8 | *(optional)* **F carve-out — `Collector` subtree** | decision #5 | Nothing depends on it; the plan's own recommendation is not to build it unprompted. |
 
 ### Task-level breakdown of Track 1 (decided 2026-08-27)
@@ -770,9 +770,16 @@ the same refuted premise from the same fan-out numbers.
    the `TYPES`/`TIERS` canonical values to `pipeline` and having `@PublicApi` `FindingsSpec` delegate
    (its signature is unchanged, so no break). This is a design change, not a relocation, so it is
    documented rather than built. **Question: cut C1 this way, or leave the cycle recorded?**
-4. **Phases C1/C2 by API break — may `@PublicApi` types relocate on a major bump?** Both cycles are
-   held by published classes. If a 6.0.0 is on the horizon, both become straightforward relocations;
-   if not, they stay documented. **This is the same decision as #1, and it governs most of Phase C.**
+4. ✅ **ANSWERED 2026-08-27 — GRANTED. `@PublicApi` types MAY relocate on a major bump.**
+   ⛔ Do not re-ask. The bump is **4.0.0**: master is `4.0.0-SNAPSHOT`, last release `v3.12.0`.
+   **Executed so far:** `PipelineView`/`PipelineRun`/`InboxStatus` promoted out of `CollectorService`
+   (`7eab72d4`), fan-in 25 → 16. ⚠ **This is NOT the same decision as #1** — the note that said so was
+   wrong. #1 breaks a `ServiceLoader` contract for third-party *implementors* (they must change code
+   they own); #4 relocates types callers merely *reference*. Granting one does not grant the other,
+   and #1 is still open.
+   ⚠ **The grant was given in the context of the record promotion.** It unblocks Track 2 item 6
+   (C1 + C2 relocations) by the plan's own wiring — **confirm scope with the operator before building
+   a second API break**, since that was not what they were looking at when they granted it.
 5. **Phase F carve-out — build it or not.** It is genuinely optional; the plan recommends *not*
    doing it unless the acquisition subtree is being worked on anyway.
 

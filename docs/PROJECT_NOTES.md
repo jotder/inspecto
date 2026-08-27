@@ -131,6 +131,19 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   not own.** ⛔ Never run two Maven builds on one tree. The durable fix is a worktree per shift.
   ⚠ A process-poll loop that greps for `mvn.cmd` **matches its own command line** and never reaches
   zero — match the java process, or exclude the shell wrapper.
+  ⚠ **And "no java processes" is never true on this box** — long-lived stale JVMs run for days
+  (2026-08-27: one alive since 2026-08-25). An `until [ ... -eq 0 ]` waiter never terminates and a
+  plain count reads "busy" forever. Filter on `StartTime -gt (Get-Date).AddMinutes(-N)`, or better,
+  wait on the build log's own `BUILD SUCCESS|FAILURE` marker.
+- 🔴 **`.claude/worktrees/` holds a FULL second checkout pinned to an OLD commit** (2026-08-27:
+  `sweet-ritchie-072797` at `60b7a6b9`, 1,437 `.java` files). **Any repo-wide census that walks the
+  tree double-counts and silently mixes stale sources in** — a fan-in measurement reported exactly 2×
+  on every class before it was excluded. Exclude `.claude/`, `.git/` and `target/` in every tree walk;
+  `git ls-files` / `git grep` are safe because they only see the index.
+- ⚠ **A verify agent's build log is overwritten per run, and a no-op build looks like a pass.**
+  Launching Maven via `cmd /c` from Git Bash can silently do nothing (MSYS mangles `/c`) — **exit 0
+  and an empty log**, indistinguishable from success. Always check the log's **mtime** against your
+  run's start time, and prefer `MSYS_NO_PATHCONV=1` / invoking `mvn.cmd` directly.
 - **The two repo guards are NOT in the local build loop — run them before every commit.** Neither the
   Maven reactor nor `ng test` runs `node tools/check-secrets.mjs` or `node tools/check-vocabulary.mjs`,
   so a violation is invisible until CI. On 2026-08-26 **`master` was found sitting RED** on the
