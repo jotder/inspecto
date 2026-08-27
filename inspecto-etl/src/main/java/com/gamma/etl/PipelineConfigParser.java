@@ -279,210 +279,13 @@ final class PipelineConfigParser {
 
         parseTransformBlocks(raw, proc, b);
 
-        // ── csv settings (inline csv_settings and/or external grammar file) ─────
-        // The delimited parse grammar may live inline under processing.csv_settings, in a separate
-        // reusable file referenced by processing.grammar, or both (inline keys win). resolveGrammar
-        // returns the effective map (or null when neither is present — defaults then apply).
-        // ── unified parsing: block (additive, 4.8) ────────────────────────────
-        // A top-level `parsing:` block is the design-of-record grammar (docs/parsing-options-reference.md
-        // §5): `parsing.delimited` aliases today's `processing.csv_settings`, `parsing.plugin` aliases
-        // `processing.ingester`/`segments`/`ingester_config`. Absent ⇒ nothing changes (every existing
-        // config parses byte-for-byte identically). Keys from `parsing:` overlay the legacy blocks.
-        Map<String, Object> parsing = castMapAt(raw, "parsing");
+        Grammar g = parseParsing(raw, proc, configDir, b);
 
-        // `parsing.grammar` (design-of-record) wins over the legacy `processing.grammar`, consistent
-        // with every other key in the block. Either may be a plain path OR a registry reference
-        // (`grammar/<id>`), which is what a Grammar-bound parser node lowers to.
-        String grammarRef = parsing != null ? trimToNull(parsing.get("grammar")) : null;
-        if (grammarRef == null) grammarRef = trimToNull(proc.get("grammar"));
-        Path grammarFile = grammarRef == null ? null : resolveGrammarRef(grammarRef, configDir);
-        if (grammarFile != null) b.referencedFiles.add(grammarFile);
-
-        // A referenced Grammar is either the legacy FLAT csv_settings map or — since a Grammar
-        // component is just an EXTRACTED `parsing:` block — the block itself. Extraction must be a
-        // move, not a transform, so both shapes resolve here and the inline `parsing:` still wins.
-        Map<String, Object> grammarBlock = readGrammar(grammarFile);
-        boolean blockShaped = isParsingBlock(grammarBlock);
-        Map<String, Object> csv = resolveGrammar(proc, blockShaped ? null : grammarBlock);
-        if (blockShaped) csv = mergeParsing(csv, grammarBlock);
-
-        if (parsing != null) csv = mergeParsing(csv, parsing);
-
-        String frontend = "delimited";
-        if (csv != null) {
-            frontend = frontendOf(csv);
-            // json / text_regex inputs have no CSV header; unless the author explicitly set
-            // has_header, don't skip their first record.
-            if ((frontend.equals("json") || frontend.equals("text_regex"))
-                    && !csv.containsKey("has_header"))
-                csv.put("has_header", "false");
-            b.delimiter       = opt(csv, "delimiter", ",");
-            // 5.2 additive dialect chars — validated fail-closed: a key the engine cannot honor
-            // must never load looking honored (docs/parsing-options-reference.md §5).
-            b.quote           = singleChar(csv.get("quote"),   "quote");
-            b.escape          = singleChar(csv.get("escape"),  "escape");
-            b.comment         = singleChar(csv.get("comment"), "comment");
-            b.skipHeaderLines = toInt(csv.getOrDefault("skip_header_lines", 0));
-            b.skipJunkLines   = toInt(csv.getOrDefault("skip_junk_lines",   0));
-            b.skipTailLines   = toInt(csv.getOrDefault("skip_tail_lines",   0));
-            b.skipTailCols    = toInt(csv.getOrDefault("skip_tail_columns", 0));
-            b.hasHeader       = Boolean.parseBoolean(
-                                    String.valueOf(csv.getOrDefault("has_header", "true")));
-            b.csvEngine       = String.valueOf(csv.getOrDefault("engine", "auto")).toLowerCase();
-            if (csv.get("date_formats")      instanceof List<?> df)
-                b.dateFormats = (List<String>) df;
-            if (csv.get("timestamp_formats") instanceof List<?> tf)
-                b.tsFormats   = (List<String>) tf;
-            // 4.1 additive: native read_csv pass-throughs + row filters
-            b.encoding         = trimToNull(csv.get("encoding"));
-            b.inputCompression = trimToNull(csv.get("compression"));
-            // FAIL CLOSED (unpack-stage plan Phase 1 step 4): this value is passed VERBATIM into
-            // read_csv, so an unsupported one used to load fine and then quarantine every file at
-            // run time. Archives/exotic forms are the Collector's unpack stage, not a reader flag.
-            if (b.inputCompression != null
-                    && !java.util.List.of("auto", "gzip", "zstd", "none")
-                            .contains(b.inputCompression.toLowerCase(java.util.Locale.ROOT)))
-                throw new IllegalArgumentException("csv_settings.compression must be one of "
-                        + "auto|gzip|zstd|none (got: " + b.inputCompression + "). Archives and other "
-                        + "compressed forms (.zip, .tar, .Z, .bz2) are expanded by the collector's "
-                        + "unpack stage by extension — no compression setting is needed for them.");
-            b.strictMode       = parseBoolOrNull(csv.get("strict_mode"));
-            b.nullStrings      = strList(csv.get("null_strings"));
-            b.includePrefixes  = strList(csv.get("include_prefixes"));
-            b.includeRegex     = strList(csv.get("include_regex"));
-            b.excludePrefixes  = strList(csv.get("exclude_prefixes"));
-            b.excludeRegex     = strList(csv.get("exclude_regex"));
-            b.filterTargetColumn = toInt(csv.getOrDefault("filter_target_column", 0));
-            // post-parse SQL row predicate over the MAPPED columns (DataTransformer.materialize) —
-            // a different moment from the include_*/exclude_* lists above, which match one raw
-            // physical column inside read_csv. See PipelineConfig.CsvSettings.
-            b.rowWhere         = trimToNull(csv.get("where"));
-            // Error handling. Each stays null when undeclared, so read_csv keeps emitting exactly
-            // what it emitted before these were configurable (see DuckDbCsvIngester.errorOptions).
-            b.ignoreErrors     = parseBoolOrNull(csv.get("ignore_errors"));
-            b.nullPadding      = parseBoolOrNull(csv.get("null_padding"));
-            b.storeRejects     = parseBoolOrNull(csv.get("store_rejects"));
-            b.rejectsTable     = trimToNull(csv.get("rejects_table"));
-            b.rejectsScan      = trimToNull(csv.get("rejects_scan"));
-            b.rejectsLimit     = parseIntOrNull(csv.get("rejects_limit"));
-            // FAIL CLOSED: these two names are interpolated as SQL identifiers by the reject drain,
-            // which no bound parameter can express — so a name that is not a bare identifier is
-            // refused here rather than reaching a statement.
-            for (String[] named : new String[][] { { "rejects_table", b.rejectsTable },
-                                                   { "rejects_scan",  b.rejectsScan } }) {
-                if (!PipelineConfig.CsvSettings.Rejects.isLegalName(named[1]))
-                    throw new IllegalArgumentException("csv_settings." + named[0] + " must be a bare "
-                            + "identifier (letters, digits, underscore; not starting with a digit): "
-                            + named[1]);
-            }
-            if (b.rejectsLimit != null && b.rejectsLimit < 0)
-                throw new IllegalArgumentException(
-                        "csv_settings.rejects_limit must be >= 0 (0 = unlimited): " + b.rejectsLimit);
-            // 4.1 additive: fixed-width frontend (null unless frontend: fixedwidth)
-            b.fixedWidth       = parseFixedWidth(csv);
-            // 4.8 additive: json / text_regex frontends (null unless selected)
-            b.json             = parseJson(csv);
-            b.textRegex        = parseTextRegex(csv);
-            // multiformat X1 additive: MS Excel frontend (null unless frontend: xlsx / excel)
-            b.xlsx             = parseXlsx(csv);
-        }
-
-        // ── output ────────────────────────────────────────────────────────────
-        Map<String, Object> out = castMapAt(raw, "output");
-        if (out != null) {
-            b.outputFormat = String.valueOf(out.getOrDefault("format", "CSV")).toUpperCase();
-            b.compression  = (String) out.get("compression");
-            b.duckLakeCfg  = castMapAt(out, "ducklake");
-            // B4: source-filename lineage as an output-row column. Validated as an identifier here;
-            // collision with a declared schema column is checked after the schemas load below.
-            b.filenameColumn = trimToNull(out.get("filename_column"));
-            if (b.filenameColumn != null)
-                Identifiers.validate(b.filenameColumn, "output.filename_column");
-        }
-
-        // ── sinks (plural destinations) ─────────────────────────────────────────
-        // A top-level `sinks:` list, each entry a {database, format, compression, ducklake} destination.
-        // Absent ⇒ PipelineConfig synthesises the single-`output:` one-element shorthand. More than one
-        // destination is parsed + liftable but REFUSED when loaded for execution (PipelineConfig.prepare)
-        // until the branch-aware executor is wired — see docs/superpower/sinks-config-format-plan.md.
-        if (raw.get("sinks") instanceof List<?> sinkList) {
-            for (Object entry : sinkList) {
-                if (!(entry instanceof Map<?, ?> sm)) {
-                    throw new IllegalArgumentException("each sinks[] entry must be a map with a 'database' key");
-                }
-                Map<String, Object> sink = (Map<String, Object>) sm;
-                Object db = sink.get("database");
-                if (db == null || db.toString().isBlank()) {
-                    throw new IllegalArgumentException("each sinks[] entry requires a non-blank 'database' dir");
-                }
-                String sinkFilenameCol = trimToNull(sink.get("filename_column"));
-                if (sinkFilenameCol != null)
-                    Identifiers.validate(sinkFilenameCol, "sinks[].filename_column");
-                b.sinks.add(new PipelineConfig.Sink(
-                        db.toString(),
-                        String.valueOf(sink.getOrDefault("format", "CSV")).toUpperCase(),
-                        (String) sink.get("compression"),
-                        castMapAt(sink, "ducklake"),
-                        sinkFilenameCol));
-            }
-        }
+        parseOutputAndSinks(raw, b);
 
         parseSteps(raw, b);
 
-        // ── plugin ingester + segments ────────────────────────────────────────
-        // `parsing.plugin` (frontend: plugin) is the unified alias for the legacy
-        // `processing.ingester`/`segments`/`ingester_config` triple; when present its keys win.
-        // Inline first, then the referenced Grammar's own plugin root (an extracted `parsing:` block
-        // carries it too), then the legacy processing.* triple.
-        Map<String, Object> pluginBlock =
-                (parsing != null && parsing.get("plugin") instanceof Map<?, ?> pm)
-                        ? (Map<String, Object>) pm
-                        : (blockShaped && grammarBlock.get("plugin") instanceof Map<?, ?> gm)
-                                ? (Map<String, Object>) gm : null;
-        // `frontend: asn1` (first-class, definition-surface P3c) is sugar for the plugin wiring:
-        // the asn1: block synthesizes the Asn1RecordIngester binding below, so everything downstream
-        // (segments loading, schemas, execution) is the one plugin path. An explicit plugin block
-        // alongside is a contradiction — which of the two would win is undefined, so refuse.
-        if (frontend.equals("asn1")) {
-            if (pluginBlock != null || proc.get("ingester") != null)
-                throw new IllegalArgumentException("frontend 'asn1' synthesizes its own plugin ingester — "
-                        + "remove parsing.plugin / processing.ingester, or use frontend 'plugin'");
-            pluginBlock = asn1PluginBlock(csv);
-        }
-        b.ingesterClass = pluginBlock != null && pluginBlock.get("ingester") != null
-                ? (String) pluginBlock.get("ingester") : (String) proc.get("ingester");
-        Object icfg = pluginBlock != null && pluginBlock.get("ingester_config") != null
-                ? pluginBlock.get("ingester_config") : proc.get("ingester_config");
-        if (icfg instanceof Map<?, ?> icfgMap)
-            b.ingesterConfig = (Map<String, Object>) icfgMap;
-        if (b.ingesterClass != null && !b.ingesterClass.isBlank()) {
-            Object segsRaw = pluginBlock != null && pluginBlock.get("segments") != null
-                    ? pluginBlock.get("segments") : proc.get("segments");
-            if (!(segsRaw instanceof Map<?,?> segsMap) || segsMap.isEmpty())
-                throw new IllegalArgumentException(
-                        "parsing.plugin.segments (or processing.segments) must be a non-empty map "
-                        + "when a plugin ingester is set");
-            b.segmentSchemas = new LinkedHashMap<>();
-            for (var entry : ((Map<?,?>) segsRaw).entrySet()) {
-                String key        = (String) entry.getKey();
-                String schemaPath = (String) entry.getValue();
-                Path   schemaFile = resolveSchemaRef(schemaPath, configDir);
-                b.referencedFiles.add(schemaFile);
-                if (!Files.exists(schemaFile))
-                    throw new FileNotFoundException("Segment schema not found for '" + key + "': " + schemaPath);
-                Map<String, Object> schema = (Map<String, Object>)
-                        JToon.decode(Files.readString(schemaFile, StandardCharsets.UTF_8));
-                mergeSiblingMapping(schema, schemaFile, b);
-                Identifiers.validateSchema(schema, "segment[" + key + "]");
-                declaredColumns.addAll(columnNamesOf(schema));
-                b.segmentSchemas.put(key, schema);
-            }
-            log.info("[CONFIG] Plugin ingester: {}  segments: {}",
-                    b.ingesterClass, b.segmentSchemas.keySet());
-        } else if (frontend.equals("plugin")) {
-            throw new IllegalArgumentException(
-                    "parsing.frontend 'plugin' requires parsing.plugin.ingester (or processing.ingester)");
-        }
+        parsePlugin(g, proc, configDir, declaredColumns, b);
 
         parseSchemas(raw, proc, configDir, sourceLabel, declaredColumns, b);
 
@@ -941,6 +744,283 @@ final class PipelineConfigParser {
             Map<String, Object> copy = new LinkedHashMap<>();
             for (Map.Entry<?, ?> e : routeBlock.entrySet()) copy.put(String.valueOf(e.getKey()), e.getValue());
             b.route = copy;
+        }
+    }
+
+    /**
+     * Decodes where the pipeline writes: the singular {@code output:} block (format, compression,
+     * ducklake, {@code filename_column}) and the plural top-level {@code sinks:} list.
+     *
+     * <p>Grouped as one method because they are two adjacent sections declaring the same thing at
+     * different arity, and neither shares a local with anything else in {@code parse()}.
+     *
+     * <p>⚠ {@code output.filename_column} is validated as an identifier here, but its collision with a
+     * declared schema column is checked by the caller AFTER the schemas load — that ordering is
+     * load-bearing and is why the check is not moved in here.
+     */
+    @SuppressWarnings("unchecked")
+    private static void parseOutputAndSinks(Map<String, Object> raw, Builder b) {
+        // ── output ────────────────────────────────────────────────────────────
+        Map<String, Object> out = castMapAt(raw, "output");
+        if (out != null) {
+            b.outputFormat = String.valueOf(out.getOrDefault("format", "CSV")).toUpperCase();
+            b.compression  = (String) out.get("compression");
+            b.duckLakeCfg  = castMapAt(out, "ducklake");
+            // B4: source-filename lineage as an output-row column. Validated as an identifier here;
+            // collision with a declared schema column is checked after the schemas load below.
+            b.filenameColumn = trimToNull(out.get("filename_column"));
+            if (b.filenameColumn != null)
+                Identifiers.validate(b.filenameColumn, "output.filename_column");
+        }
+
+        // ── sinks (plural destinations) ─────────────────────────────────────────
+        // A top-level `sinks:` list, each entry a {database, format, compression, ducklake} destination.
+        // Absent ⇒ PipelineConfig synthesises the single-`output:` one-element shorthand. More than one
+        // destination is parsed + liftable but REFUSED when loaded for execution (PipelineConfig.prepare)
+        // until the branch-aware executor is wired — see docs/superpower/sinks-config-format-plan.md.
+        if (raw.get("sinks") instanceof List<?> sinkList) {
+            for (Object entry : sinkList) {
+                if (!(entry instanceof Map<?, ?> sm)) {
+                    throw new IllegalArgumentException("each sinks[] entry must be a map with a 'database' key");
+                }
+                Map<String, Object> sink = (Map<String, Object>) sm;
+                Object db = sink.get("database");
+                if (db == null || db.toString().isBlank()) {
+                    throw new IllegalArgumentException("each sinks[] entry requires a non-blank 'database' dir");
+                }
+                String sinkFilenameCol = trimToNull(sink.get("filename_column"));
+                if (sinkFilenameCol != null)
+                    Identifiers.validate(sinkFilenameCol, "sinks[].filename_column");
+                b.sinks.add(new PipelineConfig.Sink(
+                        db.toString(),
+                        String.valueOf(sink.getOrDefault("format", "CSV")).toUpperCase(),
+                        (String) sink.get("compression"),
+                        castMapAt(sink, "ducklake"),
+                        sinkFilenameCol));
+            }
+        }
+    }
+
+    /**
+     * The five facts grammar resolution produces that the plugin/segments section downstream needs:
+     * the raw unified {@code parsing:} block, the referenced Grammar component's own block and whether
+     * it is block-shaped (rather than the legacy flat map), the effective settings map, and the
+     * selected frontend.
+     *
+     * <p>Exists because those five must travel together across ~50 lines of unrelated parsing. Four of
+     * them are read solely to compute the plugin block's three-way precedence, and {@code csv} is what
+     * {@code frontend: asn1} synthesizes its binding from.
+     */
+    private record Grammar(Map<String, Object> parsing, Map<String, Object> grammarBlock, boolean blockShaped,
+                           Map<String, Object> csv, String frontend) {}
+
+    /**
+     * Resolves the effective parse grammar and populates the builder's parser fields.
+     *
+     * <p>Three sources overlay in order: the legacy inline {@code processing.csv_settings}, an external
+     * {@code processing.grammar} / {@code parsing.grammar} file (a flat legacy map OR an extracted
+     * {@code parsing:} block), and the unified {@code parsing:} block, whose keys win. Populates the
+     * {@code CsvSettings} group and the four optional frontends ({@code fixedWidth} / {@code json} /
+     * {@code textRegex} / {@code xlsx}), and registers a referenced grammar file on
+     * {@code b.referencedFiles}. Absent everywhere ⇒ the builder keeps its defaults and the config
+     * parses byte-for-byte as it did before {@code parsing:} existed.
+     *
+     * <p>Returns a {@link Grammar} rather than {@code void} because this section is the one part of
+     * {@code parse()} that genuinely leaks state: five of its locals are read by the plugin/segments
+     * section further down. ⚠ The alternative — folding the two sections into a single method — would
+     * require moving the {@code output:}/{@code sinks:} parsing that sits between them, and reordering
+     * two validating sections changes which exception a doubly-invalid config reports. Not worth it.
+     */
+    @SuppressWarnings("unchecked")
+    private static Grammar parseParsing(Map<String, Object> raw, Map<String, Object> proc, Path configDir,
+                                        Builder b) throws IOException {
+        // ── csv settings (inline csv_settings and/or external grammar file) ─────
+        // The delimited parse grammar may live inline under processing.csv_settings, in a separate
+        // reusable file referenced by processing.grammar, or both (inline keys win). resolveGrammar
+        // returns the effective map (or null when neither is present — defaults then apply).
+        // ── unified parsing: block (additive, 4.8) ────────────────────────────
+        // A top-level `parsing:` block is the design-of-record grammar (docs/parsing-options-reference.md
+        // §5): `parsing.delimited` aliases today's `processing.csv_settings`, `parsing.plugin` aliases
+        // `processing.ingester`/`segments`/`ingester_config`. Absent ⇒ nothing changes (every existing
+        // config parses byte-for-byte identically). Keys from `parsing:` overlay the legacy blocks.
+        Map<String, Object> parsing = castMapAt(raw, "parsing");
+
+        // `parsing.grammar` (design-of-record) wins over the legacy `processing.grammar`, consistent
+        // with every other key in the block. Either may be a plain path OR a registry reference
+        // (`grammar/<id>`), which is what a Grammar-bound parser node lowers to.
+        String grammarRef = parsing != null ? trimToNull(parsing.get("grammar")) : null;
+        if (grammarRef == null) grammarRef = trimToNull(proc.get("grammar"));
+        Path grammarFile = grammarRef == null ? null : resolveGrammarRef(grammarRef, configDir);
+        if (grammarFile != null) b.referencedFiles.add(grammarFile);
+
+        // A referenced Grammar is either the legacy FLAT csv_settings map or — since a Grammar
+        // component is just an EXTRACTED `parsing:` block — the block itself. Extraction must be a
+        // move, not a transform, so both shapes resolve here and the inline `parsing:` still wins.
+        Map<String, Object> grammarBlock = readGrammar(grammarFile);
+        boolean blockShaped = isParsingBlock(grammarBlock);
+        Map<String, Object> csv = resolveGrammar(proc, blockShaped ? null : grammarBlock);
+        if (blockShaped) csv = mergeParsing(csv, grammarBlock);
+
+        if (parsing != null) csv = mergeParsing(csv, parsing);
+
+        String frontend = "delimited";
+        if (csv != null) {
+            frontend = frontendOf(csv);
+            // json / text_regex inputs have no CSV header; unless the author explicitly set
+            // has_header, don't skip their first record.
+            if ((frontend.equals("json") || frontend.equals("text_regex"))
+                    && !csv.containsKey("has_header"))
+                csv.put("has_header", "false");
+            b.delimiter       = opt(csv, "delimiter", ",");
+            // 5.2 additive dialect chars — validated fail-closed: a key the engine cannot honor
+            // must never load looking honored (docs/parsing-options-reference.md §5).
+            b.quote           = singleChar(csv.get("quote"),   "quote");
+            b.escape          = singleChar(csv.get("escape"),  "escape");
+            b.comment         = singleChar(csv.get("comment"), "comment");
+            b.skipHeaderLines = toInt(csv.getOrDefault("skip_header_lines", 0));
+            b.skipJunkLines   = toInt(csv.getOrDefault("skip_junk_lines",   0));
+            b.skipTailLines   = toInt(csv.getOrDefault("skip_tail_lines",   0));
+            b.skipTailCols    = toInt(csv.getOrDefault("skip_tail_columns", 0));
+            b.hasHeader       = Boolean.parseBoolean(
+                                    String.valueOf(csv.getOrDefault("has_header", "true")));
+            b.csvEngine       = String.valueOf(csv.getOrDefault("engine", "auto")).toLowerCase();
+            if (csv.get("date_formats")      instanceof List<?> df)
+                b.dateFormats = (List<String>) df;
+            if (csv.get("timestamp_formats") instanceof List<?> tf)
+                b.tsFormats   = (List<String>) tf;
+            // 4.1 additive: native read_csv pass-throughs + row filters
+            b.encoding         = trimToNull(csv.get("encoding"));
+            b.inputCompression = trimToNull(csv.get("compression"));
+            // FAIL CLOSED (unpack-stage plan Phase 1 step 4): this value is passed VERBATIM into
+            // read_csv, so an unsupported one used to load fine and then quarantine every file at
+            // run time. Archives/exotic forms are the Collector's unpack stage, not a reader flag.
+            if (b.inputCompression != null
+                    && !java.util.List.of("auto", "gzip", "zstd", "none")
+                            .contains(b.inputCompression.toLowerCase(java.util.Locale.ROOT)))
+                throw new IllegalArgumentException("csv_settings.compression must be one of "
+                        + "auto|gzip|zstd|none (got: " + b.inputCompression + "). Archives and other "
+                        + "compressed forms (.zip, .tar, .Z, .bz2) are expanded by the collector's "
+                        + "unpack stage by extension — no compression setting is needed for them.");
+            b.strictMode       = parseBoolOrNull(csv.get("strict_mode"));
+            b.nullStrings      = strList(csv.get("null_strings"));
+            b.includePrefixes  = strList(csv.get("include_prefixes"));
+            b.includeRegex     = strList(csv.get("include_regex"));
+            b.excludePrefixes  = strList(csv.get("exclude_prefixes"));
+            b.excludeRegex     = strList(csv.get("exclude_regex"));
+            b.filterTargetColumn = toInt(csv.getOrDefault("filter_target_column", 0));
+            // post-parse SQL row predicate over the MAPPED columns (DataTransformer.materialize) —
+            // a different moment from the include_*/exclude_* lists above, which match one raw
+            // physical column inside read_csv. See PipelineConfig.CsvSettings.
+            b.rowWhere         = trimToNull(csv.get("where"));
+            // Error handling. Each stays null when undeclared, so read_csv keeps emitting exactly
+            // what it emitted before these were configurable (see DuckDbCsvIngester.errorOptions).
+            b.ignoreErrors     = parseBoolOrNull(csv.get("ignore_errors"));
+            b.nullPadding      = parseBoolOrNull(csv.get("null_padding"));
+            b.storeRejects     = parseBoolOrNull(csv.get("store_rejects"));
+            b.rejectsTable     = trimToNull(csv.get("rejects_table"));
+            b.rejectsScan      = trimToNull(csv.get("rejects_scan"));
+            b.rejectsLimit     = parseIntOrNull(csv.get("rejects_limit"));
+            // FAIL CLOSED: these two names are interpolated as SQL identifiers by the reject drain,
+            // which no bound parameter can express — so a name that is not a bare identifier is
+            // refused here rather than reaching a statement.
+            for (String[] named : new String[][] { { "rejects_table", b.rejectsTable },
+                                                   { "rejects_scan",  b.rejectsScan } }) {
+                if (!PipelineConfig.CsvSettings.Rejects.isLegalName(named[1]))
+                    throw new IllegalArgumentException("csv_settings." + named[0] + " must be a bare "
+                            + "identifier (letters, digits, underscore; not starting with a digit): "
+                            + named[1]);
+            }
+            if (b.rejectsLimit != null && b.rejectsLimit < 0)
+                throw new IllegalArgumentException(
+                        "csv_settings.rejects_limit must be >= 0 (0 = unlimited): " + b.rejectsLimit);
+            // 4.1 additive: fixed-width frontend (null unless frontend: fixedwidth)
+            b.fixedWidth       = parseFixedWidth(csv);
+            // 4.8 additive: json / text_regex frontends (null unless selected)
+            b.json             = parseJson(csv);
+            b.textRegex        = parseTextRegex(csv);
+            // multiformat X1 additive: MS Excel frontend (null unless frontend: xlsx / excel)
+            b.xlsx             = parseXlsx(csv);
+        }
+        return new Grammar(parsing, grammarBlock, blockShaped, csv, frontend);
+    }
+
+    /**
+     * Wires the plugin ingester and loads its segment schemas, when the resolved grammar selects one.
+     *
+     * <p>The plugin block has a three-way precedence — inline {@code parsing.plugin}, then the
+     * referenced Grammar component's own {@code plugin} root (an extracted {@code parsing:} block
+     * carries one too), then the legacy {@code processing.ingester}/{@code segments}/
+     * {@code ingester_config} triple. {@code frontend: asn1} is sugar that synthesizes the binding from
+     * the resolved settings map instead, and refuses to coexist with an explicit plugin block.
+     *
+     * <p>Each segment schema's column names are added to {@code declaredColumns}, which the caller
+     * later checks {@code reference.key} and {@code processing.join} against.
+     *
+     * <p>⚠ Takes the whole {@link Grammar} rather than five separate parameters, and unpacks it into
+     * locals of the original names so the body below is byte-identical to what it was inside
+     * {@code parse()}. The refusals it carries are pinned; keeping the move verbatim keeps them exact.
+     */
+    @SuppressWarnings("unchecked")
+    private static void parsePlugin(Grammar g, Map<String, Object> proc, Path configDir,
+                                    Set<String> declaredColumns, Builder b) throws IOException {
+        Map<String, Object> parsing      = g.parsing();
+        Map<String, Object> grammarBlock = g.grammarBlock();
+        boolean blockShaped              = g.blockShaped();
+        Map<String, Object> csv          = g.csv();
+        String frontend                  = g.frontend();
+        // ── plugin ingester + segments ────────────────────────────────────────
+        // `parsing.plugin` (frontend: plugin) is the unified alias for the legacy
+        // `processing.ingester`/`segments`/`ingester_config` triple; when present its keys win.
+        // Inline first, then the referenced Grammar's own plugin root (an extracted `parsing:` block
+        // carries it too), then the legacy processing.* triple.
+        Map<String, Object> pluginBlock =
+                (parsing != null && parsing.get("plugin") instanceof Map<?, ?> pm)
+                        ? (Map<String, Object>) pm
+                        : (blockShaped && grammarBlock.get("plugin") instanceof Map<?, ?> gm)
+                                ? (Map<String, Object>) gm : null;
+        // `frontend: asn1` (first-class, definition-surface P3c) is sugar for the plugin wiring:
+        // the asn1: block synthesizes the Asn1RecordIngester binding below, so everything downstream
+        // (segments loading, schemas, execution) is the one plugin path. An explicit plugin block
+        // alongside is a contradiction — which of the two would win is undefined, so refuse.
+        if (frontend.equals("asn1")) {
+            if (pluginBlock != null || proc.get("ingester") != null)
+                throw new IllegalArgumentException("frontend 'asn1' synthesizes its own plugin ingester — "
+                        + "remove parsing.plugin / processing.ingester, or use frontend 'plugin'");
+            pluginBlock = asn1PluginBlock(csv);
+        }
+        b.ingesterClass = pluginBlock != null && pluginBlock.get("ingester") != null
+                ? (String) pluginBlock.get("ingester") : (String) proc.get("ingester");
+        Object icfg = pluginBlock != null && pluginBlock.get("ingester_config") != null
+                ? pluginBlock.get("ingester_config") : proc.get("ingester_config");
+        if (icfg instanceof Map<?, ?> icfgMap)
+            b.ingesterConfig = (Map<String, Object>) icfgMap;
+        if (b.ingesterClass != null && !b.ingesterClass.isBlank()) {
+            Object segsRaw = pluginBlock != null && pluginBlock.get("segments") != null
+                    ? pluginBlock.get("segments") : proc.get("segments");
+            if (!(segsRaw instanceof Map<?,?> segsMap) || segsMap.isEmpty())
+                throw new IllegalArgumentException(
+                        "parsing.plugin.segments (or processing.segments) must be a non-empty map "
+                        + "when a plugin ingester is set");
+            b.segmentSchemas = new LinkedHashMap<>();
+            for (var entry : ((Map<?,?>) segsRaw).entrySet()) {
+                String key        = (String) entry.getKey();
+                String schemaPath = (String) entry.getValue();
+                Path   schemaFile = resolveSchemaRef(schemaPath, configDir);
+                b.referencedFiles.add(schemaFile);
+                if (!Files.exists(schemaFile))
+                    throw new FileNotFoundException("Segment schema not found for '" + key + "': " + schemaPath);
+                Map<String, Object> schema = (Map<String, Object>)
+                        JToon.decode(Files.readString(schemaFile, StandardCharsets.UTF_8));
+                mergeSiblingMapping(schema, schemaFile, b);
+                Identifiers.validateSchema(schema, "segment[" + key + "]");
+                declaredColumns.addAll(columnNamesOf(schema));
+                b.segmentSchemas.put(key, schema);
+            }
+            log.info("[CONFIG] Plugin ingester: {}  segments: {}",
+                    b.ingesterClass, b.segmentSchemas.keySet());
+        } else if (frontend.equals("plugin")) {
+            throw new IllegalArgumentException(
+                    "parsing.frontend 'plugin' requires parsing.plugin.ingester (or processing.ingester)");
         }
     }
 

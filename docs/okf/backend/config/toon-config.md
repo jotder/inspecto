@@ -21,6 +21,14 @@ All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key ref
   package-private) — parses a decoded map into an immutable `PipelineConfig` (entry points
   `PipelineConfig.load(path)` / `fromMap(map)`). Pure parse, no filesystem side-effects (`prepare()` does
   those).
+  **Navigating it:** `parse()` is a sequence of `// ── section ──` blocks, one per config block, in the
+  order the file declares them. The seven largest are named methods — `parseTransformBlocks`,
+  `parseParsing`, `parseOutputAndSinks`, `parseSteps`, `parsePlugin`, `parseSchemas`, `parseCollector` —
+  leaving `parse()` itself at ~280 lines (was 801). ⚠ The split is by **state**, not size: a section became
+  a method only when it shares no locals with what follows. The head (identity/gates) and the
+  `processing`/`dirs` sections deliberately stay inline because their locals (`proc`, `dirs`) are read
+  throughout. `parseCollector` returns a `Collector`; `parseParsing` returns a private `Grammar` record
+  because five of its locals are read by `parsePlugin` further down.
   **Schema-reference resolution (W1b, 2026-07-31): config-relative first, JVM CWD second.** A relative
   `schema_file` / `schemas[].schema_file` / `parsing.plugin.segments` value is resolved against **the config
   file's own directory** if it exists and stays inside it, otherwise against the **JVM CWD** — so a bare
