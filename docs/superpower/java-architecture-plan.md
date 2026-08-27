@@ -74,6 +74,65 @@ structure, not these numbers — and it strengthens the case for leaving `Pipeli
 - **High fan-out is the real complexity** — but measure it correctly (see the correction above).
   On the proper metric the whole codebase has only three classes above 15 outward types.
 
+### Re-measured after Track 1 (2026-08-27, `311a4523` → `5db51a00`) — and the ceiling
+
+Same script both refs (`assets/fanmatrix2.py`, kept beside this plan so the numbers are reproducible), so the deltas are trustworthy. Run it against a `git archive` extract of the old ref and against the working tree.
+`fanOut plan` = the corrected metric above. `fanOut +pkg` adds **same-package** types used by simple
+name, which the plan's metric cannot see.
+
+| Class | fan-in (main) | fan-in (all) | fanOut plan | fanOut +pkg | imports |
+|---|---|---|---|---|---|
+| `CollectorService` | 25 → **25** | 148 → **148** | 70 → **70** | 83 → **84** | 30 → **30** |
+| `ObjectService` | 8 → 8 | 21 → 21 | 29 → 29 | 34 → 34 | 24 → 24 |
+| `JobService` | 12 → 13 | 21 → 22 | 26 → 26 | **65 → 65** | 18 → 18 |
+| `ControlApi` | 2 → 2 | 116 → 116 | 8 → 8 | **73 → 73** | 6 → 6 |
+| `PipelineConfigParser` | 1 → 1 | 2 → 2 | 5 → 5 | 7 → 8 | 20 → 21 |
+| `ComponentStore` | 38 → 38 | 64 → 64 | 4 → 4 | 5 → 5 | 3 → 3 |
+| `PipelineConfig` | 78 → 79 | 188 → 189 | 3 → 3 | 6 → 6 | 2 → 2 |
+| `ApiContext` | 70 → 70 | 73 → 73 | 2 → 2 | 8 → 8 | 2 → 2 |
+| `ReadModel` *(new)* | — → 7 | — → 7 | — → 6 | — → 8 | — → 6 |
+
+🔴 **Track 1 moved this matrix by essentially nothing, and `CollectorService`'s net-zero is exact, not
+approximate.** Diffing the fan-in file sets: `ContextBroker.java` **dropped**, `ReadModel.java`
+**added**. Phase A converted six collaborators and removed exactly one file from the fan-in set — then
+the interface declaring `List<CollectorService.PipelineView>` put one straight back.
+
+⚠ **The plan's fan-out metric is blind to same-package coupling, and that is where the coupling now
+is.** `ControlApi` reads 8 by the plan's metric and **73** counting the route modules it wires;
+`JobService` 26 vs **65**. The claim "only three classes above 15 outward types" is an artifact of the
+measurement, not a fact about the code.
+
+#### How far this can actually go — `CollectorService`'s 25 fan-in files, classified
+
+| Bucket | Files | Gate |
+|---|---|---|
+| references it **only for a nested type** (`PipelineView`/`PipelineRun`/`InboxStatus`) | **9** — `DataSourceRoutes`, `PipelineListRoutes`, `RunRoutes`, `OperationalActions`, `InspectoTools`, `ReportService`, `DataSourceBundleResolver`, `MetricsService`, `ReadModel` | ⛔ **decision #4** — see below |
+| mixed (nested + real) | 1 — `PipelineSupport` | same |
+| genuinely needs the class | **15** — 5 composition-root (`ServiceBootstrap`, `ServiceStores`, `SpaceBootstrap`, `SpaceContext`, `SpaceManager`), `ApiContext`/`ControlApi`, and 8 agent/SPI | SPI 8 gated on **decision #1**; the rest **irreducible** |
+
+🔴 **The obvious lever is NOT free.** Promoting the three nested records to top-level would drop
+fan-in **25 → 16** with no signature changes — but `CollectorService` is
+**`@PublicApi(since = "2.2.0")`** (`:86`), so its public nested records are published *by containment*
+and the move is a source/binary break for external consumers. It is therefore **decision #4**
+(`@PublicApi` relocation on a major bump), exactly like C1/C2 — not a free afternoon.
+
+**Realistic ceiling, in order:**
+1. **Today, ungated: ~0.** Every remaining lever is API-gated or structural. This is the honest answer.
+2. **Decision #4 granted:** fan-in 25 → **16**, and one of C3's three `report → service` holders goes
+   (`EnrichmentService` still holds it, so C3 still does not dissolve).
+3. **Decision #1 granted** (narrow the SPI `init`): a further ~8 agent/SPI files → fan-in ≈ **8**.
+4. **Floor ≈ 7** — the composition root plus `ApiContext`/`ControlApi`, which legitimately need the
+   full surface.
+5. **fan-out 70 is the one number that does not move at all** without relocating responsibilities out
+   of the class — i.e. the `CollectorService` decomposition that `BACKLOG.md` §6 closed as **won't-do**
+   ("already reads as a composition-root/facade; no god-class emergency"). Adding interfaces cannot
+   reduce it, and Phase A demonstrated that empirically.
+
+⚠ **Census hazard found while measuring:** `.claude/worktrees/` holds a **full second checkout pinned
+to an old commit** (1,437 `.java` files). Including it **doubles every tree-wide count** and mixes
+stale sources in — the first run of this table reported exactly 2× on every fan-in. Exclude
+`.claude/`, `.git/` and `target/` in any repo-wide census.
+
 ## Binding principles (learned the hard way in Phase 1)
 
 1. **Ground before planning. Five of Phase 1's seven slices were refuted by reading the code** —
