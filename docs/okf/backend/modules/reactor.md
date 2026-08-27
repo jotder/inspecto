@@ -340,8 +340,8 @@ literals first — playbook rule 7).
 |---|---|---|---|
 | — | `{assist.spi, control, intelligence, intelligence.action, intelligence.context, intelligence.pack, intelligence.spi, report, service}` | **9** | 🔴 **This is C3, and it is 9 packages — not the 4 the plan records** |
 | — | `{ops, ops.link, ops.note, ops.tag, ops.workflow}` | 5 | LEAVE (above) |
-| — | `{agent.kernel.agent, agent.kernel.observe, agent.kernel.retrieve, agent.kernel.tool}` | 4 | never reported before; unassessed |
-| — | `{etl, etl.unpack}` | 2 | never reported before; unassessed |
+| — | `{agent.kernel.agent, agent.kernel.observe, agent.kernel.retrieve, agent.kernel.tool}` | 4 | ⛔ **LEAVE** (assessed 2026-08-27, below) |
+| — | `{etl, etl.unpack}` | 2 | ⛔ **LEAVE** (assessed 2026-08-27, below) |
 | — | `{event, metrics}` | 2 | the documented deliberate leaf pair |
 | — | `{catalog, catalog.spi}` | 2 | the deliberate SPI pair |
 
@@ -352,6 +352,32 @@ goes **9 → 8**. Only `assist.spi` leaves. The rest is held independently by `r
 `service → intelligence.spi`, `intelligence.spi → intelligence`, `intelligence → intelligence.action`).
 **Decision #1's fan-in payoff (`CollectorService` 16 → ~8) is real and measured; its cycle payoff is
 one package.** Scope it on the fan-in, not on C3.
+
+#### The two previously-unreported SCCs — both assessed, both LEAVE (2026-08-27)
+
+Edge-holder detail reproduces with `docs/superpower/assets/edgeholders.py` (same stripper as
+`pkggraph.py`, so javadoc `{@link}`s are excluded).
+
+**`{etl, etl.unpack}` — LEAVE.** Both directions are real code across five files:
+`etl → unpack` = `QuarantineManager` (`UnpackOrigins.isExpanded` ×5), `MarkerManager`
+(`LogicalNames.involvesCompression`), `PipelineConfig` (`LogicalNames.DEFAULT_DATA_EXTENSIONS`);
+`unpack → etl` = `UnpackStage` (drives `DuckDbCsvIngester`), `LogicalNames` (takes a `PipelineConfig`).
+Multiple files and multiple mechanisms in each direction — cutting it is a redesign of the unpack
+subsystem's seam, not a relocation, so the decision-#2 default applies: record, don't build. And it
+cannot block anything: both packages live together in the **`inspecto-etl` leaf module**, so any future
+extraction moves the pair as one.
+
+**`{agent.kernel.agent, .observe, .retrieve, .tool}` — LEAVE, twice over.** The shape is the classic
+context-object hub (`AgentContext` in `agent` reaches into all three siblings; `Tool` takes an
+`AgentContext`; `AgentCompleted` carries an `AgentResult`) — cuttable only by redesigning the kernel's
+own API. It won't be: **`com.gamma.agent.kernel.*` is VENDORED code** (the agent-kernel replacement,
+2026-07-07 — see [`api-stability.md`](../control-plane/api-stability.md)), and refactoring a vendored
+tree forks it from its upstream for zero consumer-visible gain. All four packages sit inside
+`inspecto-agent`.
+
+**Net after this census: all six SCCs are dispositioned.** C1/C2 cut; `event↔metrics` and
+`catalog↔catalog.spi` deliberate; `ops` family, `etl` pair and `agent.kernel` assessed LEAVEs. The only
+cycle work that could still be *bought* is inside C3, and decision #1 buys exactly one package of it.
 
 ⚠ **C1 could NOT be cut by relocation, though the plan scoped it as one.** `AnnotationKinds`' consumers
 all live under `ops.note`/`ops.tag`, so moving it into `pipeline` merely re-creates `ops.* → pipeline`

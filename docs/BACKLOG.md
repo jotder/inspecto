@@ -1022,8 +1022,11 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   `assist.spi → service` and `intelligence.spi → service`) takes it **9 → 8**: only `assist.spi` leaves.
   `report ↔ service` plus a `control ↔ intelligence.*` tangle hold the rest independently.
   ⚠ **Decision #1's fan-in payoff (`CollectorService` 16 → ~8) is real and measured; its cycle payoff is
-  one package.** Scope it on fan-in/testability, not on C3. Two further SCCs are unassessed:
-  `{agent.kernel.agent, .observe, .retrieve, .tool}` and `{etl, etl.unpack}`.
+  one package.** Scope it on fan-in/testability, not on C3. The two remaining SCCs are ASSESSED 2026-08-27, both ⛔ LEAVE:
+  `{etl, etl.unpack}` (real two-way seam, 5 files — a redesign not a relocation, and both live in the
+  `inspecto-etl` leaf so it can't block extraction) and `{agent.kernel.*}` (context-object hub in
+  **vendored** code — refactoring it forks the vendored tree). Evidence in `reactor.md` §census.
+  **All six SCCs are now dispositioned**; the only buyable cycle work left is decision #1's one package.
   Superseded row (kept for provenance):
   [`superpower/java-architecture-plan.md`](superpower/java-architecture-plan.md) Track 2 item 6.
   It was recorded as ⛔ BLOCKED on a major-version decision because every cycle-holding class is
