@@ -75,7 +75,7 @@ resolving real paths would change the answer for the wrong reason.
 only "does this ref exist" and must stay that way — teaching it containment would report *"schema file
 does not resolve on the server"* about a ref that resolves fine but escapes, sending the operator after
 the wrong thing. Containment comes from `ConfigSafetyValidator`, and every pipeline gate pairs the two:
-`ConfigRoutes` validate/write/patch, `PipelineRoutes`, `RunRoutes` — and, since 2026-08-14,
+`ConfigPreviewRoutes` validate, `ConfigWriteRoutes` write/patch, the `Pipeline*Routes` modules, `RunRoutes` — and, since 2026-08-14,
 **`DataSourceRoutes` bundle import on both the commit and preview sides**, which had the existence half
 only. The consequence there was not a read escape (the loader still jails) but a *partial import*: the
 escaping ref survived the all-or-nothing gate and was refused later by `registerPipeline`, one file at a

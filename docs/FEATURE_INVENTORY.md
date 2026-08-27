@@ -120,7 +120,7 @@ Node types from `PipelineNodeTypes.catalog()`. (⚠ **Corrected 2026-08-18**: th
 ships an authored-flow example — `orders_rollup_flow.toon` was converted to the canonical at-rest shape
 (`steps:` + `output_store:` in `orders/orders_pipeline.toon`, run via the job's `pipeline_config:`), and
 the unconvertible `regional_orders_merge_flow.toon` was removed. The format stays GRANDFATHERED — readable,
-runnable and deletable, never newly written (`PipelineRoutes`). The shape now lives only in test Java strings
+runnable and deletable, never newly written (the `Pipeline*Routes` modules). The shape now lives only in test Java strings
 (`ControlApiPipelineCrudTest`, `PipelineJobRunnerTest`). `PipelineCodec` round-trips
 `nodes[id,type,name?,description?,use?,config?]` + `edges[from,rel,to]` + `name` + `active`.)
 

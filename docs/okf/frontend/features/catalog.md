@@ -33,13 +33,13 @@ origin — an enrichment trigger/by-name reference, an Expectation/Decision Rule
 `physicalRef`/`sourceName`, or (transitively) a Widget/Dashboard tile bound to that Dataset — dangled
 silently, detected only later by the read-only `metadata_validate` sweep (and even that missed most of
 the kinds, plus any `physicalRef` containing a slash). It now **409s with the dependent list unless
-`?force=true`** (`ConfigRoutes.deleteConfig` → `PipelineDependents.scan`), mirroring
+`?force=true`** (`ConfigReadRoutes.deleteConfig` → `PipelineDependents.scan`), mirroring
 `ComponentRoutes.deleteComponent`'s existing pattern. A companion read, `GET
 /config/pipeline/{name}/impact`, reports the same scan without deleting anything (the `/import/preview`
 report-only shape); the onboarding shell's discard confirm calls it first and names what would break,
 and confirming anyway resends the delete with `force`. `PipelineDependents`
 (`inspecto/src/main/java/com/gamma/service/PipelineDependents.java`) is a deliberate **non**-extraction
-of `PipelineRoutes.rewriteDependents` (that scanner reads-and-writes in one loop; this one is read-only)
+of `PipelineRenameRoutes.rewriteDependents` (that scanner reads-and-writes in one loop; this one is read-only)
 — the two key sets must be kept in sync by hand if a new binding is ever added to either.
 
 **A batch links back to the store it wrote (2026-08-14).** The batch-detail dialog

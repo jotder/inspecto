@@ -33,7 +33,9 @@ live under `<write-root>/registry/<type>/` as TOON files, addressed by `<type>/<
 * `/components/{type}/{id}/test` — preview a transform/grammar/sink over sample rows on a **throwaway**
   (the `schema` variant is gone with the kind; the equivalent cast check is `POST /config/preview/schema`)
   DuckDB connection (`ComponentPreview`), never touching production.
-* `/pipelines…` — `PipelineRoutes` (`inspecto/src/main/java/com/gamma/control/PipelineRoutes.java`): `GET /pipelines`
+* `/pipelines…` — the `Pipeline*Routes` modules (`inspecto/src/main/java/com/gamma/control/PipelineListRoutes.java`,
+  alongside `PipelineGraphRoutes`, `PipelineRenameRoutes`, `PipelineSettingsRoutes` and the shared
+  `PipelineSupport` helpers): `GET /pipelines`
   (lifted pipelines), `GET /pipelines/node-types` (the editor palette catalog), `GET /pipelines/combined` (the
   store-joined pipeline+job topology), and `/pipelines/authored/*` CRUD + `dry-run` for authored Pipelines. The
   store superimposition (`PipelineStores.superimpose`) joins consumer `source_store` names to producer `store`

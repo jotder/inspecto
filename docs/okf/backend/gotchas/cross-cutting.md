@@ -46,7 +46,7 @@ timestamp: 2026-07-16T00:00:00Z
   the engine runs. `ConfigRoutes.schemaFileFindings` is an **ERROR** gate at registration and takes a
   `configDir` for exactly this reason. **W3 (2026-08-17) closed the spurious-warning half**: `POST /config/write`
   now runs the check *after* it resolves the target path (passing `target.getParent()`), `POST /validate` passes
-  the write root as the draft's prospective home, and `PipelineRoutes`' graph-save and save-as-template both pass
+  the write root as the draft's prospective home, and `PipelineGraphRoutes`' graph-save and `PipelineSettingsRoutes`' save-as-template both pass
   their own target's parent. ⚠ The 2-arg `schemaFileFindings` overload still exists and still means "CWD only" —
   it is correct for a lowered graph or template body that is not landing anywhere, and **wrong** for anything
   whose directory is known. Prefer the 4-arg form.

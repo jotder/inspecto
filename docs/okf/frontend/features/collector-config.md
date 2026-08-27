@@ -55,7 +55,7 @@ block vs. a node's raw config plus a `use: connection/<id>` binding.
 ## One write route — `POST /config/patch`
 
 Onboarding's stage saves were a wholesale file replace after a **client-side** merge: a stale-read
-clobber race. `POST /config/patch` (`ConfigRoutes.java`) decodes the stored TOON, deep-merges the
+clobber race. `POST /config/patch` (`ConfigWriteRoutes.java`) decodes the stored TOON, deep-merges the
 posted block server-side (maps recurse, scalars/lists replace, JSON `null` **deletes** a key),
 validates the whole merged draft, and writes atomically — same response shape as `/config/write`,
 so findings routing is unchanged. Every onboarding stage got the fix from that one route.

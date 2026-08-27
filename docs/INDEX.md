@@ -290,9 +290,9 @@ former root reference docs** (each index lists them):
   durable park/drain, Phase 4 — the NiFi-style testing loop over production data). **Phase 0 DONE 2026-08-05** (GLOSSARY amended — new §5 entries, §6-A Job retirement note,
   six §13 rename rows; vocabulary guard green). **Phase 1 GROUNDED 2026-08-05** — five premise
   corrections in the plan's §8 block (no SchemaConfig class; ConfigCodec has no format registry;
-  the gate seam is `ConfigRoutes.writeConfig`; Mapping stays path-addressed in slice 1; the
+  the gate seam is `ConfigWriteRoutes.writeConfig`; Mapping stays path-addressed in slice 1; the
   fixture count was wrong). Phase 1 slices 1–3 SHIPPED 2026-08-05: sibling `_mapping.csv` dual-read;
-  split-write + BACKWARD compatibility gate at `ConfigRoutes`; `schema`/`mapping` component kinds
+  split-write + BACKWARD compatibility gate at `ConfigWriteRoutes`; `schema`/`mapping` component kinds
   with `schema/<id>` + `mapping_file` execution wiring. **Phase 2 S1–S5 SHIPPED (S1-S4 2026-08-05,
   S5 2026-08-06) — Phase 2 fully closed**: schema fingerprint pinned per Consignment (manifest +
   `consignment_outputs`); per-Step type flow (`TypeFlow` DESCRIBE-derived output schemas,

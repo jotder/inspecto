@@ -1,7 +1,7 @@
 # Pipeline identity: rename & Save-as-template
 
-**Routes:** `PipelineRoutes` — `POST /pipelines/{name}/label`, `POST /pipelines/{name}/save-as-template`,
-`POST /pipelines/{name}/rename`. Shipped 2026-08-02 (T1/T2 → T4 UI → T3 full migration); as-built for
+**Routes:** `PipelineSettingsRoutes` — `POST /pipelines/{name}/label`, `POST /pipelines/{name}/save-as-template`;
+`PipelineRenameRoutes` — `POST /pipelines/{name}/rename`. Shipped 2026-08-02 (T1/T2 → T4 UI → T3 full migration); as-built for
 `docs/archived-documents/plans-archive/pipeline-rename-and-template-plan.md`.
 
 ## The identity model
@@ -32,7 +32,7 @@ underscored, nothing else), and the **filename** (`[A-Za-z0-9][A-Za-z0-9._-]*`, 
 defects fell out of that, both now closed:
 
 - `"my-pipe"` derived an id its own spec rejects, so `pipelineScaffold` omitted the id — and because
-  `PipelineRoutes.rename` enforces the same pattern, such a pipeline was **un-renameable for life**.
+  `PipelineRenameRoutes.rename` enforces the same pattern, such a pipeline was **un-renameable for life**.
 - `"My Pipeline"` stamped a perfectly valid `my_pipeline` and was **422'd anyway**, because the filename
   came from `name` and a space is not a safe filename.
 
@@ -51,7 +51,7 @@ not "tidy" it. Migrating the legacy path is a data migration, not an edit.
 `safeName` there throws — which 422'd exactly the writes the id-keyed filename exists to enable. Caught
 by a new test, not by review.
 
-⚠ `ConfigRoutes.fileBase` does not double-suffix, so an id ending in `_pipeline` yields
+⚠ `ConfigFileSupport.fileBase` does not double-suffix, so an id ending in `_pipeline` yields
 `<id>.toon`, not `<id>_pipeline.toon`.
 
 `id` is **absent from every config written before 2026-08-02** — identity is

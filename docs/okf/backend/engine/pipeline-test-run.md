@@ -84,7 +84,7 @@ be quarantined even though nothing moved.
 ## The `to=` cutoff (2026-08-14)
 
 `PipelineExecutor.dryRun(..., stopAtNodeId)` bounds the walk; `PipelineDryRun.run` and
-`PipelineRoutes.testRun` thread `to` down to it. `null` means the whole graph, which is the only shape any
+`PipelineGraphRoutes.testRun` thread `to` down to it. `null` means the whole graph, which is the only shape any
 production caller passes.
 
 ⚠ **The bound is the ancestor closure of the target, not a prefix of `topoOrder`.** Topological order is
@@ -128,7 +128,7 @@ and when a probe leaves a test green, suspect the test, not the probe.
 
 - `inspecto-engine/…/inspector/PipelineTestRun.java` — `run`, `sampleRows`, `deleteScratch`
 - `inspecto-etl/…/etl/PipelineConfig.java` — `forScratchRun(Path)`
-- `inspecto/…/control/PipelineRoutes.java` — `testRun`, `testRunRoot`, `graphFor`, `fileList`, `runResult`
+- `inspecto/…/control/PipelineGraphRoutes.java` — `testRun`, `testRunRoot`, `graphFor`, `fileList`, `runResult`
 - `inspecto-acquire/…/acquire/LocalConnectionWorkbench.java` — `jail(Path, String)`
 - `inspecto-engine/…/pipeline/exec/PipelineExecutor.java` — `dryRun(…, stopAtNodeId)`, `ancestorsOf`
 - `inspecto-engine/…/pipeline/exec/PipelineDryRun.java` — `run(…, stopAtNodeId)`

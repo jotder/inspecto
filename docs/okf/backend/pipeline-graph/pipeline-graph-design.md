@@ -874,7 +874,7 @@ Actionable, phase-aligned, derived from §8 + the §13 corrections. `[ ]` = not 
   ref to the node's local config by design — its test even said "caller flags the dangling ref", but for a
   long time **no caller did**. Now `PipelineValidator.validate(g, ComponentRegistry)` reports
   `UNKNOWN_USE_REF` (ERROR ⇒ 422) when the kind is a real component type but the NAMED component is absent,
-  and `PipelineRoutes.validatePipeline` passes the registry it already scans for dry-run. Two decisions worth
+  and `PipelineGraphRoutes.validatePipeline` passes the registry it already scans for dry-run. Two decisions worth
   keeping: the **registry-less `validate(g)` overload is unchanged**, so `PipelineExecutor.validateOrThrow`
   and `InspectoTools` keep their behaviour and a caller that cannot see a registry does not guess; and the
   check is **skipped when the space has no write root**, because `componentRegistry()` returns an EMPTY
@@ -997,7 +997,7 @@ Actionable, phase-aligned, derived from §8 + the §13 corrections. `[ ]` = not 
   `CollectorProcessorPollTest` 6 regression) — now 44 with the per-flow override slice above.
 
 ### Phase 4 — Flow-graph API + G6 visualisation (read-first)
-- [x] **T16 (done — shipped by T31, checklist row was stale).** `GET /pipelines/{id}/graph` (`PipelineRoutes.java`,
+- [x] **T16 (done — shipped by T31, checklist row was stale).** `GET /pipelines/{id}/graph` (`PipelineGraphRoutes.java`,
   `com.gamma.pipeline.PipelineProjection.graph`) reuses the shared G6 renderer on the frontend
   (`pipelines.component.ts` → `GraphViewComponent`/`toCombinedG6Data`, same component Catalog uses).
 - [x] **T17 (done 2026-07-18 — inspector shipped by T31; live overlay closed this pass).** Node inspector panel
@@ -1299,7 +1299,7 @@ speaks the **config-file vocabulary end to end**, so nothing typed crosses the H
   🔴 **A DERIVED ref is not an unhomed one** (`PipelineEditable.DERIVED_USE`, 2026-08-15). The 08-14
   refusal was applied to every lowerable kind, which swept up **enrichment** — whose
   `use: enrichment/<name>` the editor writes onto the node itself each time it saves the companion
-  (`node-config.dialog.ts`, W4b) **and `PipelineRoutes` synthesizes on every `GET /graph/raw`** — so an
+  (`node-config.dialog.ts`, W4b) **and `PipelineGraphRoutes` synthesizes on every `GET /graph/raw`** — so an
   untouched open→save round trip was enough to hit it. Since the companion is the truth and lower has
   "nothing to lower" for
   the kind, that ref is *dropped on purpose*, exactly as `MAP_DERIVED`'s `schema`/`csv` are. For one day
@@ -1328,7 +1328,7 @@ speaks the **config-file vocabulary end to end**, so nothing typed crosses the H
   kinds would have quietly turned every blank transform 'configured' and dropped its Validate error.
   Acquisition and parser — the only two homed kinds — never open this dialog at all (a drawer and the
   Grammar editor), which is why every ref it could write was refusable by construction.
-- **Routes** ([`PipelineRoutes`](../../../../inspecto/src/main/java/com/gamma/control/PipelineRoutes.java)):
+- **Routes** ([`PipelineGraphRoutes`](../../../../inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java)):
   `GET /pipelines/{name}/graph/raw` (lift + a synthesized node per registered enrichment companion whose
   `triggers.on_pipeline` names this pipeline) and `PUT /pipelines/{name}/graph` (lower over the existing
   file, then the **same** `ConfigSpecs.pipeline()` + `ConfigSafetyValidator` gate + atomic write that
@@ -1446,7 +1446,7 @@ outside hand-editing the `.toon` file, since there is no node to put a pipeline-
 
 Rather than teach `PipelineEditable`/`PUT .../graph` about a non-node key (which would blur the "the flat
 graph editor authors topology" boundary §16 draws), this got its own dedicated pair:
-[`PipelineRoutes.pipelineSettings`/`savePipelineSettings`](../../../../inspecto/src/main/java/com/gamma/control/PipelineRoutes.java)
+[`PipelineSettingsRoutes.pipelineSettings`/`savePipelineSettings`](../../../../inspecto/src/main/java/com/gamma/control/PipelineSettingsRoutes.java)
 (`GET`/`POST /pipelines/{name}/settings`) read/write `produces`/`reference` straight off the config file,
 independent of the graph route. `savePipelineSettings` mirrors `relabel`'s gate: the full `ConfigSpecs.pipeline()`
 + `ConfigSafetyValidator` check runs, but only findings the write **itself introduces** (not ones already
@@ -1477,7 +1477,7 @@ reached the join node and `RowShaper.ReferenceResolver.NONE` refused. No new mac
 seam already existed (`PipelineExecutor.dryRun` has had a resolver overload since the join executor
 shipped); `PipelineDryRun` simply called the arity that refuses. Now `PipelineDryRun.run` takes an optional
 resolver (the two-arg entry point still passes `NONE`, so nothing starts resolving references by accident),
-and `PipelineRoutes.dryRunFlow` supplies one built on the shared `ReferenceReader` — the same resolution
+and `PipelineGraphRoutes.dryRunFlow` supplies one built on the shared `ReferenceReader` — the same resolution
 the production join executor and the Stage-2 `EnrichmentEngine` use, so a versioned reference store's
 current/as-of view cannot mean one thing in a preview and another in a real run. The view is created on the
 throwaway dry-run connection and dies with it.

@@ -155,7 +155,7 @@ a `SCHEDULER_SETTINGS_CHANGED` event carries the **deltas** — one attribute pe
 hosted space has its own `EventLog`, while `current()` routes by the thread's space MDC and falls
 back to global — so a bare `/system/scheduler` call would file the entry in a log the operator's
 `/events` view never reads. That mis-filing is exactly what the first version did, and the test
-caught it. Same seam `PipelineRoutes` uses for `PIPELINE_RENAMED`. Journalling is best-effort: a
+caught it. Same seam `PipelineRenameRoutes` uses for `PIPELINE_RENAMED`. Journalling is best-effort: a
 settings change that succeeded must never fail on its own audit entry.
 
 ## 6. Two mechanisms, two questions — `IntakeGovernor` vs the broker

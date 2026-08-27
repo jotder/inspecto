@@ -140,7 +140,7 @@ Neither is mock-gated any more. *Run to here* was ungated when its route landed;
 **replaced** rather than repointed — see below for why a repoint could not have worked.
 
 - *Run to here* — ✅ **works against a real server since 2026-08-14.**
-  `POST /pipelines/authored/{id}/run?to=` is registered (`PipelineRoutes.testRun`,
+  `POST /pipelines/authored/{id}/run?to=` is registered (`PipelineGraphRoutes.testRun`,
   `canAuthorWorkbench`) and `scratchRunAvailable` is now plain `true`. It parses the picked inbox files
   through the real ingest path into a scratch root — zero production side effects — then previews the
   graph over the parsed rows. `to=` **bounds the walk since 2026-08-14** to the ancestor closure of the

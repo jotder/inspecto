@@ -2,7 +2,7 @@
 type: Seam
 title: Onboarding authoring seams (draft lifecycle, previews, register pair)
 description: The control-plane routes the guided Stream/Reference onboarding authors against — a draft is an inactive pipeline; enrichments need explicit hot-registration.
-resource: inspecto/src/main/java/com/gamma/control/ConfigRoutes.java
+resource: inspecto/src/main/java/com/gamma/control/ConfigWriteRoutes.java
 tags: [control-plane, onboarding, config, enrichment, pipeline, reference]
 timestamp: 2026-07-16T00:00:00Z
 ---
@@ -13,7 +13,7 @@ The guided onboarding (frontend: [onboarding](../../frontend/features/onboarding
 Stage-1 configs through these seams — **a draft is just a pipeline with `active: false`** (parsed,
 indexed, catalog-visible, never executed; D3 of the design). Shipped P0–P3, 2026-07-16.
 
-## Draft lifecycle (`ConfigRoutes`)
+## Draft lifecycle (`ConfigWriteRoutes` write/patch, `ConfigReadRoutes` read/delete, `ConfigPreviewRoutes` previews)
 
 - `POST /config/write {type, config, overwrite?, subdir?}` — spec + `ConfigSafetyValidator` gate
   (ERRORs → 422), filename from the config's own identity field, **scan-suffix convention
