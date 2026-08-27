@@ -241,7 +241,7 @@ all created by packages and edges added after that measurement. Read this sectio
 |---|---|---|---|
 | **C1** | `{ops, ops.workflow, ops.tag, ops.link, ops.note, ops.findings, pipeline}` | exactly **two**: `ops/AnnotationKinds.java:3` → `pipeline.ComponentStore` (reads `WRITABLE_TYPES` to build the annotation-target vocabulary) and `pipeline/NodeAttribute.java:8` → `ops.findings.FindingsSpec` (delegates the `TYPES`/`TIERS` published enums so they cannot drift) | relocation — but see the caveat below |
 | **C2** | `{catalog.spi, catalog, alert, pipeline.exec, job, consignment, enrich}` | **one file**: `consignment/ConsignmentProcessJobType.java:4-11` `implements job.JobTypeProvider`, plus its sibling `consignment/ProcessorContext.java:4` importing `job.RunLog` for three delegate methods | relocation — exact precedent match |
-| **C3** (core, `inspecto`) | `{report, intelligence.spi, assist.spi, service}` | `report`/`assist.spi`/`intelligence.spi` all import the concrete `service.CollectorService`, which imports back into all three | partly cuttable — see below |
+| **C3** (core, `inspecto`) | `{report, intelligence.spi, assist.spi, service}` | `report`/`assist.spi`/`intelligence.spi` all import the concrete `service.CollectorService`, which imports back into all three | ⛔ **NOT cuttable by role interfaces** — corrected 2026-08-27, see below. Still 4 packages after `ReadModel` shipped. |
 
 **`consignment` postdates this document entirely** — it appears nowhere above and is C2's tangle point.
 
@@ -282,8 +282,34 @@ its FQN, which breaks every plugin author and embedder importing it. So:
   values to `pipeline` and have `FindingsSpec` delegate, so both edges point `ops → pipeline` and the
   cycle opens. That is a design change, not a relocation, so under the operator's stated default it
   is recorded here rather than built unasked.
-- **C3** is the same shape (see the Phase 2 plan): partly cuttable, with its remaining edges gated on
-  narrowing a published SPI.
+- **C3** is the same shape (see the Phase 2 plan), but ⚠ **"partly cuttable" was measured wrong — see
+  the correction below. It is NOT cuttable by role interfaces.**
+
+#### 🔴 C3's `report` edge is held THREE ways, and a role interface removes only one (2026-08-27)
+
+`ReadModel` (`com.gamma.service`) shipped, and all six `CollectorService` collaborators were narrowed
+to it. **The `report → service` edge did not move.** `ReportService`'s import block after the
+conversion still reads `EnrichmentService`, `CollectorService`, `ReadModel`:
+
+| # | Holder | Why a `ReadModel` conversion does not remove it |
+|---|---|---|
+| 1 | the `CollectorService` field | removed — this is the only one a role interface touches |
+| 2 | `EnrichmentService` | an unrelated `com.gamma.service` type `ReportService` also uses |
+| 3 | **`CollectorService.PipelineView`** | `pipelines()` returns `List<PipelineView>` and **`PipelineView` is a record nested inside `CollectorService`**, so every caller writes `CollectorService.PipelineView` explicitly — regardless of the receiver's declared type |
+
+⭐ **Holder 3 generalises well beyond this cycle: a nested public record makes its enclosing class an
+unavoidable import for every caller of any method that returns it.** No fan-in/fan-out metric surfaces
+this — the dependency is in the *return type's spelling*, not in the call graph. Check for nested
+types before predicting that an interface will cut an edge.
+
+**Cutting C3's `report` edge for real requires all three:** promote `PipelineView`/`PipelineRun` out of
+`CollectorService` into top-level records, give `EnrichmentService` a role interface, *and* the
+`ReadModel` conversion already done. That is a redesign, so under the operator's stated default it is
+recorded here rather than built unasked.
+
+**What Phase A did cut:** exactly one edge — `intelligence.context → service`, because `ContextBroker`
+needed only `events()` and so has zero remaining `CollectorService` references. C3 stays at four
+packages.
 
 ⚠ **The grep trap that nearly caused a wrong call here: 31 of the engine's 135 `@PublicApi` classes
 write the annotation fully-qualified** (`@com.gamma.api.PublicApi`), so a naive `grep "@PublicApi"`

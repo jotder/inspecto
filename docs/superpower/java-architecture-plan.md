@@ -123,11 +123,32 @@ number anyone will expect. Say so up front to whoever picks this up.
   `ConsignmentStatusAccess.over(this::loadedPipelines)` (`:423,425,428`) — hand-rolled role adapters
   that prove the idea and set the house style.
 
-**The shape:** one cohesive `ReadModel` interface (~13 read-only accessors: `pipelines`, `configFor`,
-`pathFor`, `statusStore`, `eventBus`/`eventLog`/`events`, `jobService`, `catalog`, `reports`,
-`configSource`, `objects`, `dataRoot`, `enrichmentService`) — **not** five tiny interfaces, because
-the consumers overlap heavily (`pipelines`/`configFor`/`statusStore` each appear in 4+) and none
-needs fewer than 3–5 accessors.
+**The shape:** one cohesive `ReadModel` interface — **not** five tiny interfaces, because the consumers
+overlap heavily (`pipelines`/`configFor`/`statusStore` each appear in 4+).
+
+⚠ **The member list is 10, not the ~13 guessed here** (corrected 2026-08-27 by enumerating what the six
+consumers actually call). The guess included five accessors **no consumer uses** — `catalog`, `reports`,
+`configSource`, `objects`, `eventLog` — and **omitted one that is used**, `browsableStores`
+(`InspectoTools:83`, via a `service::browsableStores` method-ref). Declaring the five unused ones would
+defeat the point: a role interface that carries members nobody calls is just the god class with fewer
+lines. The real union:
+
+| Consumer | Calls |
+|---|---|
+| `ContextBroker` | `events` |
+| `OperationalActions` | `jobService`, `pipelines` |
+| `DataSourceBundleResolver` | `pipelines`, `configFor`, `pathFor` |
+| `MetricsService` | `eventBus`, `pipelines`, `configFor`, `statusStore` |
+| `ReportService` | `pipelines`, `configFor`, `statusStore`, `enrichmentService` |
+| `InspectoTools` | `pipelines`, `events`, `jobService`, `configFor`, `statusStore`, `dataRoot`, `browsableStores` |
+
+Union = `pipelines`, `configFor`, `pathFor`, `statusStore`, `events`, `eventBus`, `jobService`,
+`enrichmentService`, `dataRoot`, `browsableStores`.
+
+⚠ Two of the six — `MetricsService` and `DataSourceBundleResolver` — are **already in
+`com.gamma.service`**, the same package as `CollectorService`. Their conversion is a pure
+signature-honesty win with no cross-package effect at all. Worth knowing before anyone counts them
+toward a decoupling claim.
 
 **Receivers to convert (6 single-file edits, one per commit):** `ReportService:45-47`,
 `MetricsService:30-33`, `DataSourceBundleResolver:36-39`, `ContextBroker:34-36` (needs only
@@ -147,13 +168,51 @@ green, no behavior change, no test edits — then convert one collaborator's fie
 `DataSourceBundleResolverTest` and `ContextBrokerTest` construct these with a real
 `CollectorService`, so they pass unmodified *only* under this approach.
 
-**⚠ Interaction with Phase C3 — read before starting.** C3 is the `{report, intelligence.spi,
-assist.spi, service}` cycle. Phase A cuts the **`report` edge only**; the two SPI edges survive
-because narrowing the SPI is excluded above. So **C3 shrinks from four packages to three, it does not
-dissolve.** For even that to work, `ReadModel` must live somewhere `service` can implement without
-re-creating the cycle — putting it in `com.gamma.service` leaves `report → service` intact and buys
-nothing structurally. **Decide `ReadModel`'s package before writing it**; that single choice
-determines whether Phase A helps Phase C at all.
+**⛔ Interaction with Phase C3 — REFUTED by grounding (2026-08-27). Phase A cuts NO package edge.**
+
+The paragraph that stood here claimed Phase A cuts C3's `report` edge, shrinking the cycle from four
+packages to three, and that `ReadModel`'s package was the lever that decided it. Reading the code
+refuted both halves. **`com.gamma.report` → `com.gamma.service` has three independent holders**, and
+`ReadModel` removes only one of them:
+
+| # | Holder | Site | Survives a `ReadModel` conversion? |
+|---|---|---|---|
+| 1 | `CollectorService` (the field itself) | `ReportService.java:6,45` | removed by Phase A |
+| 2 | **`EnrichmentService`** | `ReportService.java:5`, called at `:208` | ✅ survives — an unrelated `com.gamma.service` type |
+| 3 | **`CollectorService.PipelineView`** | `ReportService.java:126,173` | ✅ survives — see below |
+
+Holder 3 is the decisive one and it generalises. **`pipelines()` returns `List<PipelineView>`, and
+`PipelineView` is a record nested *inside* `CollectorService`** (`CollectorService.java:257`). Every
+caller spells the element type out — `for (CollectorService.PipelineView v : service.pipelines())` —
+so any file calling `pipelines()` imports `CollectorService` no matter what type the *receiver field*
+has. Five of the six conversion targets call `pipelines()`.
+
+**Consequence: `report → service` is uncuttable by Phase A, so C3 stays at four packages, not three.**
+Cutting it would additionally require promoting `PipelineView`/`PipelineRun` out of `CollectorService`
+and abstracting `EnrichmentService` — a redesign, which by decision #2's default means *stop and
+record*, not build.
+
+#### ✅ DECIDED 2026-08-27 — `ReadModel` lives in `com.gamma.service`
+
+Task 1 of the A sequence is answered, and the reasoning is *not* "it was the default":
+
+1. **The structural argument for an exotic package is void.** It existed only to cut C3's `report`
+   edge, which the table above shows cannot be cut this way.
+2. **Every alternative home is actively harmful, not merely neutral.** The read surface is expressed
+   in `com.gamma.service`'s own vocabulary — `PipelineView` (nested in `CollectorService`),
+   `Optional<EnrichmentService>`. A `ReadModel` declaring those members *must* import
+   `com.gamma.service` wherever it lives. The only packages shared by the consumers are
+   `com.gamma.etl` and `com.gamma.job` — and `service → etl` and `service → job` already exist, so
+   hosting `ReadModel` in either would **create a new cycle** to buy nothing. That is strictly worse
+   than the status quo.
+3. **What Phase A still delivers is a fan-in and testability win, and only that.** Six collaborators
+   stop compiling against a 1693-line, 60+-method class and compile against a ~13-method role; a fake
+   `ReadModel` becomes possible in tests where only a real `CollectorService` works today. That is
+   worth doing. It is not a package-graph win, and nobody should report it as one.
+
+⚠ This decision is cheap to keep and expensive to revisit only in the sense that six importers change
+— but since the package is the one they already import, a later move is a pure rename, not a
+re-architecture. The thing that would be expensive is having built it in `etl`/`job` first.
 
 ### Phase F — `PipelineConfig` per-concern split — ⛔ CLOSED as LEAVE (one optional carve-out)
 
@@ -294,12 +353,15 @@ Concentrated in `inspecto` route classes (~13: `BiTemplates:67/104`, `BundleRout
 commit. ⚠ Convert only loops that *purely* map; a loop that also filters, mutates outer state, or
 short-circuits is not the same thing.
 
-**D2 — the giant methods.** `PipelineConfigParser.parse()` is **801 lines** — the largest method in
-the backend by a wide margin. ⚠ Phase 1 already established the parser is *sequential section
-parsing*, so the fix is NOT a dispatch table: it is extracting each `// ── section ──` block into a
-named private method (`parseIntake`, `parseSinks`, …) that returns its piece. That is mechanical and
-reviewable. Next: `PipelineEditable.lower()` (336), `FindingsSpec` ctor (323), `ConfigSpecs.pipeline()`
-(280), `JobRoutes.maskSecrets()` (256).
+**D2 — the giant methods.** `PipelineConfigParser.parse()` was **801 lines** — the largest method in
+the backend by a wide margin, now **477** (D2a tasks 1/3/4/8, 2026-08-27). ⚠ Phase 1 already
+established the parser is *sequential section parsing*, so the fix is NOT a dispatch table: it is
+extracting each `// ── section ──` block into a named private method. That is mechanical and
+reviewable — **but only for the sections that do not share locals**, which is what the leak analysis
+in the D2a breakdown settles. Half the sections do; those are a LEAVE.
+⛔ The four follow-on candidates — `PipelineEditable.lower()`, `FindingsSpec` ctor,
+`ConfigSpecs.pipeline()`, `JobRoutes.maskSecrets()` — are **all closed as LEAVE** (D2b, grounded);
+two of them do not exist at the cited size. Do not re-schedule them from this paragraph.
 
 **NOT a target — the big switches.** `MaintenanceJob`'s 20-case switch is now (post-Phase-1) a pure
 dispatcher, which is the correct shape; `ControlApi:936` and `AuditTrail:140,143` are likewise
@@ -364,6 +426,12 @@ now because it has long lead time.*
 | `10b370a8` | C-step-1 — `reactor.md` corrected; three cycles + their exact edges recorded |
 | `045b6d41` | E1 — stale Jackson 2 dropped from `inspecto-etl`; **audited, does not generalize, E is closed** |
 | `260c023a` | D1 (inspecto) — 10 loops → streams; the `ReconRoutes:176` mutability trap documented |
+| `311a4523` | D1 (engine) — finishes the D1 sweep |
+| `f7fd7f53` | **D2a task 1** — `parseCollector` out of `parse()`; 16 `Builder` fields → 1 |
+| `a4f9938d` | **D2a tasks 3, 4, 8** — `parseSchemas`, `parseSteps`, `parseTransformBlocks`; `parse()` 801 → 477 |
+| *(this arc)* | **D2a tasks 2, 5 + the un-listed unblocker** — `parseOutputAndSinks`, `parseParsing`→`Grammar`, `parsePlugin`; `parse()` 477 → **280**. D2a DONE. |
+| *(this arc)* | **Phase A COMPLETE** — `ReadModel` in `com.gamma.service` + all 6 conversions; one package edge cut (`intelligence.context`), the C3 premise refuted and demonstrated |
+| *(this arc)* | **D2b CLOSED** — 4 of 4 LEAVE; two candidates did not exist at the cited size |
 
 ### The governing principle for what remains
 
@@ -374,12 +442,12 @@ Nothing in the unblocked track depends on how they are answered.
 
 ### Track 1 — proceeds immediately, no decision needed
 
-| # | Work | Why in this position |
-|---|---|---|
-| 1 | **D1 engine batch** *(in flight)* | Already running; finishes the sweep D1 started. Its fresh-sweep count also tells us whether the census's detector over-reports **systematically** — which governs how much any other census figure can be trusted. |
-| 2 | **D2a — `PipelineConfigParser.parse()` (801 lines) → named section methods** | The single largest method in the backend, and pure extraction (the "sequential sections, not a dispatch chain" finding is already grounded, so the shape is known). Do it BEFORE any `PipelineConfig` work: a readable parser is the thing you need in hand if the F carve-out is ever approved. |
-| 3 | **A — `ReadModel` + 6 collaborator conversions** | Independent of every blocked item, and the zero-churn path (`CollectorService implements ReadModel` first) makes each conversion a one-file commit. ⚠ **Decide `ReadModel`'s package as part of step 3, not later** — that choice is the only lever that lets Phase A also cut C3's `report` edge, and it cannot be revisited cheaply once six collaborators import it. |
-| 4 | **D2b — the remaining giant methods** | `PipelineEditable.lower()` (336), `FindingsSpec` ctor (323), `ConfigSpecs.pipeline()` (280), `JobRoutes.maskSecrets()` (256). Lower value than D2a and entirely independent — correct place for the tail end of the arc, or to drop if attention is needed elsewhere. |
+| # | Work | Status | Why in this position |
+|---|---|---|---|
+| 1 | **D1 engine batch** | ✅ `311a4523` | Finished the sweep D1 started. |
+| 2 | **D2a — `PipelineConfigParser.parse()` → named section methods** | ✅ **DONE — 6 of 8 shipped, 2 grounded LEAVE** | Was the single largest method in the backend: **801 → 280 lines**, seven named methods, at the plan's own "~250" stop-and-reassess target. Tasks 6/7 are LEAVEs on shared-local evidence, not deferrals. |
+| 3 | **A — `ReadModel` + 6 collaborator conversions** | ✅ **DONE — all 8 tasks** | ⚠ The old note here — that the package choice is "the only lever that lets Phase A also cut C3's `report` edge" — is **refuted**; Phase A cut exactly one package edge, and not that one. Shipped as the fan-in/testability win it actually is. |
+| 4 | ~~**D2b — the remaining giant methods**~~ | ⛔ **CLOSED — 4 of 4 LEAVE** | Two of the four did not exist at the cited size (over-reported 30–80×); the two real ones are a shared-state method and a declarative literal, neither of which is an extraction target. |
 
 **Why A comes after D2a rather than before:** both are safe, but D2a is *pure* extraction with a known
 shape, while A introduces a new published-ish type whose package placement has a consequence
@@ -392,7 +460,7 @@ when there is time to make it properly.
 |---|---|---|---|
 | 5 | **C1 cut via constant-ownership inversion** | decision #3 | Cycle stays documented in `reactor.md`. No further cost. |
 | 6 | **C1 + C2 cuts via relocation** | decision #4 (major-version window) | Both cycles stay documented. This is the only path for C2 — it has no API-free alternative. |
-| 7 | **C3's last two edges** | decision #1 (SPI narrowing) | C3 shrinks 4 packages → 3 via Phase A and stops there. |
+| 7 | **C3's last two edges** | decision #1 (SPI narrowing) | ⚠ **Corrected 2026-08-27:** C3 stays at **4 packages**. The old fallback ("shrinks 4 → 3 via Phase A") assumed Phase A cuts the `report` edge; it does not — `EnrichmentService` and `CollectorService.PipelineView` hold it independently. If decision #1 is *no*, C3 is documented and unchanged. |
 | 8 | *(optional)* **F carve-out — `Collector` subtree** | decision #5 | Nothing depends on it; the plan's own recommendation is not to build it unprompted. |
 
 ### Task-level breakdown of Track 1 (decided 2026-08-27)
@@ -410,39 +478,169 @@ ordering below is by **extraction cost, not line count** — a section that prod
 value is a clean `private static X parseX(...)`; a section that scatters many locals into the final
 constructor is not, and those come last or not at all.
 
-| # | Task | Lines | Why this position |
+| # | Task | Lines | Status / why this position |
 |---|---|---|---|
-| 1 | extract `parseCollector(...)` | `:750-869` (~119, 9 nested sub-blocks) | Biggest single win and the cleanest: the sub-blocks already map 1:1 onto the existing `Collector` record, so it returns one value. ⭐ Also de-risks the F carve-out, whose safe increment is exactly this subtree. |
-| 2 | extract `parseParsing(...)` (csv settings + unified `parsing:`) | `:340-448` (~108) | Second-largest, self-contained, feeds `CsvSettings`. |
-| 3 | extract `parseSchemas(...)` | `:618-701` (~83) | Cohesive, produces `Schemas`. |
-| 4 | extract `parseSteps(...)` | `:488-563` (~75) | ⚠ Carries the **pinned** steps-vs-legacy exclusivity refusal and the list-arity refusal — move them VERBATIM with their comments, and keep `resolveSteps`'s single choke point intact. |
-| 5 | extract `parsePluginAndSegments(...)` | `:563-618` (~55) | Cohesive. |
-| 6 | extract `parseProcessing(...)` (processing, batch caps, streaming, DuckDB, chunking, intake) | `:192-258` (~66) | Six adjacent markers, one `Processing`-shaped result. |
-| 7 | extract `parseDirs(...)` (dirs + audit/manifest paths) | `:148-192` (~44) | Produces `Dirs`. |
-| 8 | extract `parseTransformBlocks(...)` (duplicate check, dedup, summarize, join, map, route) | `:279-340` (~61) | ⚠ These are the blocks `prepare()`'s fail-closed arming reads **in combination** — extract the *parsing*, never the arming logic. |
-| 9 | **STOP and reassess** | — | After 1–8 `parse()` should be ~250 lines. Judge whether the identity/gates head (`:74-148`) is worth touching: those set many independent top-level locals, so extraction may just move noise. **A grounded "leave the head" is a valid end.** |
+| 1 | extract `parseCollector(...)` | ~119, 9 nested sub-blocks | ✅ **SHIPPED `f7fd7f53`.** Premise held: the 16 `Builder` fields mapped 1:1 onto the existing `Collector` record, so it returns one value AND the 16 fields collapsed to one. |
+| 4 | extract `parseSteps(...)` | ~75 | ✅ **SHIPPED.** Zero leaks. Both pinned refusals moved verbatim by script. |
+| 3 | extract `parseSchemas(...)` | ~83 | ✅ **SHIPPED.** Zero leaks. 6 params (`raw, proc, configDir, sourceLabel, declaredColumns, b`). |
+| 8 | extract `parseTransformBlocks(...)` (duplicate check, dedup, summarize, join, map, route) | ~61 | ✅ **SHIPPED.** All six sections leak nothing; grouped as one concern, 3 params. The arming logic stayed in `prepare()`/`PipelineLift` as required. |
+| — | extract `parseOutputAndSinks(...)` *(not in the original list)* | ~40 | ✅ **SHIPPED.** Both sections leak-free. Scheduled because it was the **unblocker**: it is what physically separated tasks 2 and 5. |
+| 2 | extract `parseParsing(...)` (csv settings + unified `parsing:`) | ~107 | ✅ **SHIPPED**, but not as described — "self-contained" was wrong. It leaks five locals, so it returns a private `Grammar` record carrying them. |
+| 5 | extract `parsePlugin(...)` | ~54 | ✅ **SHIPPED.** Takes the `Grammar` (5 params, not 9), unpacks it into locals of the original names, body byte-identical. |
+| 6 | `parseProcessing(...)` (processing, batch caps, streaming, DuckDB, chunking, intake) | ~66 | ⚠ **Not clean.** `proc` leaks to nearly every later section; `batch`, `intake`, `unpack` leak too. Not "one `Processing`-shaped result". |
+| 7 | `parseDirs(...)` (dirs + audit/manifest paths) | ~44 | ⚠ **Not clean.** `dirs` leaks forward. |
+| 6 | `parseProcessing(...)` (processing, batch caps, streaming, DuckDB, chunking, intake) | ~66 | ⛔ **LEAVE.** `proc` is read by nearly every later section; `batch`, `intake`, `unpack` leak too. Not "one `Processing`-shaped result". |
+| 7 | `parseDirs(...)` (dirs + audit/manifest paths) | ~44 | ⛔ **LEAVE.** `dirs` leaks forward. |
+| 9 | **STOP and reassess** | — | ✅ **Done. `parse()` = 801 → 280 lines**, at the "~250" target the plan set. Seven named methods; the two remaining tasks are grounded LEAVEs. **The identity/gates head was left alone**, as the plan allowed — those sections set independent top-level locals and extraction would only move noise. |
+
+**⚠ The `Lines` column no longer carries line numbers.** The originals (`:750-869` etc.) were correct
+when written and are now all wrong — task 1 alone moved everything below it. Anchor on marker text.
+
+##### The leak analysis — the tool this section actually needed
+
+The plan's per-task verdicts ("self-contained", "cohesive", "one `Processing`-shaped result") were
+eyeball judgements, and **four of eight were wrong**. What settles it mechanically: for each section,
+which locals does it *declare* that are *read after it ends*? Zero ⇒ clean extraction. The script is
+`scratchpad/leak_analysis.py`; the answer for `parse()`'s 40 sections:
+
+| Leaks | Sections |
+|---|---|
+| **none — clean** | identity, activation gate, template gate, Catalog Stream membership, Stage-2 output store, entry-node trigger, batch audit/manifest, streaming plugin engine, DuckDB resources, auto-chunking, all six transform blocks, output, sinks, steps, plugin+segments, schemas |
+| `proc` | processing |
+| `dirs` | dirs |
+| `batch` / `intake` / `unpack` / `produces` | batch caps / intake override / unpack stage / catalog product |
+| **`parsing`, `grammarBlock`, `blockShaped`, `csv`, `frontend`** | **unified `parsing:` block** |
+
+🔴 **Two traps in writing that analyzer, both of which produced a *false negative* — the dangerous
+direction:**
+1. `awk` has **no `\b` word boundary** (it means backspace). My first check for "does `csv` escape this
+   section?" used `awk '/\bcsv\b/'`, matched nothing, and read exactly like "the section is clean". It
+   cost an extraction that failed to compile on three symbols.
+2. Stripping string literals with `"(?:[^"\\]|\\.)*"` **flips quote parity on a Java text block**
+   (`"""…"""`) and swallows the real code after it. That hid *every* `b.*` read in the steps section,
+   reporting its parameter list as `(raw)` when it is `(raw, b)`. **Strip text blocks first.**
+
+The `leaks` half of the analyzer never strips strings, so it over-reports and a zero there is
+trustworthy. The `reads` half must strip, so it is the half that can lie.
+
+##### How tasks 2 and 5 got unblocked — the sequencing lesson
+
+At `parse()` = 477 lines the four remaining tasks all looked leak-blocked, and 2+5 looked like a
+"merge into one `parseGrammar`" that needed the `output:`/`sinks:` parsing moved out from between
+them. **Both readings were improved by one cheap, un-listed task.**
+
+Extracting `parseOutputAndSinks` (40 lines, both sections leak-free) was scheduled *purely as an
+unblocker*. Once it landed, tasks 2 and 5 were separated by a single call line — and the better shape
+became visible: rather than merge them and reorder that call, have `parseParsing` **return** the five
+locals that cross the seam, as a private `Grammar` record. `parsePlugin` then takes the record (5
+params, not 9) and unpacks it into locals of the original names, so its body — which carries the
+asn1-vs-plugin refusal and the non-empty-segments rule — stays **byte-identical**.
+
+⚠ I had written "⛔ do not split them behind a carrier record for internal plumbing" here, and then did
+exactly that. The reversal is the point: with `output`/`sinks` still in between, a carrier would have
+been plumbing around a problem. Once they were out, the record was the only option that **did not
+reorder two validating sections** — and reordering changes which exception a doubly-invalid config
+reports. A carrier for five values that genuinely must cross a seam is a name, not plumbing.
+
+⭐ **The generalisable bit: when several tasks are blocked, look for the cheap un-listed task that is
+*between* them.** It was not on the plan's list because the plan measured sections by size, and this
+one is small. Its value was positional, not intrinsic.
+
+##### Three ways this method's extractions went wrong, all silently
+
+Every one of these compiled, and two produced identical behaviour — so the build was never the check.
+
+1. **End marker matched inside an already-extracted method.** After a section moves, the *receiving*
+   method also contains 8-space `// ── ` markers. A whole-file search for the next marker matched one
+   of those and swept **638 lines**. Bound every marker search to `parse()`'s own line range.
+2. **End marker was the next `// ── ` section, but a CALL line sat between.** Extracting
+   `output`+`sinks` with the plugin marker as the boundary silently pulled `parseSteps(raw, b);` into
+   `parseOutputAndSinks`, which then called it as its last statement. **Order was preserved, so every
+   one of 3657 tests passed.** Only reading `parse()` back caught it.
+3. **Anchoring 2+5 on `// ── schemas ─` swallowed output, sinks and steps** (277 lines) into a method
+   named for grammar. Also compiled.
+
+**The check that catches all three:** after each extraction, print `parse()`'s remaining `// ── ` markers
+and `parseX(...)` calls and confirm the sequence still matches the original section order. That is one
+grep, and it is the only thing that found #2.
 
 Tasks 1–8 are **independently committable and can be done in any order** — they touch disjoint line
 ranges. Order given is best-value-first so an interrupted arc still banks the wins.
+
+**How to actually run these — three things learned doing task 1 (2026-08-27):**
+
+1. ⚠ **The line numbers above drift after every extraction.** Task 1 removed 112 lines from `parse()`,
+   so every later section moved. **Anchor on the `// ── <name> ──` marker text, never on a line
+   number.** The markers are stable and unique; the numbers in the table are only a size estimate.
+2. 🔴 **Move the body with a script, do not retype it.** These sections are dense with *pinned*
+   fail-closed refusals and their justifying comments (the `rejects_table` bare-identifier refusal,
+   the `compression` allow-list, the steps-vs-legacy exclusivity). A verbatim line-move cannot drift
+   them; hand-copying 100+ lines can, silently, and the tests will not all catch it.
+3. **There are two extraction shapes, and which one applies is a fact about the section, not a
+   preference.** Decide it by asking where the section's output goes:
+   - **value-producing** → `private static X parseX(...)` returning one record. Task 1 qualified: its
+     16 `Builder` fields mapped exactly 1:1 onto the existing `Collector` record, so the 16 fields
+     collapsed into one and `PipelineConfig`'s constructor lost a 5-line assembly block.
+     ⭐ This is the shape worth looking for — it shrinks `Builder` too, not just `parse()`.
+   - **builder-populating** → `private static void parseX(..., Builder b)`. Correct when the section
+     feeds several unrelated destinations. Task 2 (`parsing:`) is this shape: 32 fields across the
+     `CsvSettings` group *and* four independent frontends. Do **not** invent a carrier record to force
+     the value-producing shape — that is a speculative abstraction, and CLAUDE.md §2 forbids it.
 
 #### A — `ReadModel` role interfaces
 
 | # | Task | Why this position |
 |---|---|---|
-| 1 | **Decide `ReadModel`'s package** and record the reasoning | ⚠ MUST be first. It is the only lever that lets A also cut C3's `report` edge, and six importers make it expensive to revisit. Putting it in `com.gamma.service` buys nothing structurally. |
-| 2 | Add the interface + `CollectorService implements ReadModel` | Zero-churn checkpoint: green, no behavior change, no test edits. Everything after is reversible from here. |
-| 3–8 | Convert one receiver per commit: `ReportService` → `MetricsService` → `DataSourceBundleResolver` → `ContextBroker` → `InspectoTools` → `OperationalActions` | `ReportService` first — it is the one whose conversion actually cuts a C3 edge. `ContextBroker` needs only `events()`, so it is the smallest sanity check if something looks wrong. |
+| 1 | ~~Decide `ReadModel`'s package~~ — ✅ **DONE 2026-08-27: `com.gamma.service`** | Answered above, with the C3 premise refuted in the process. No longer blocks anything. |
+| 2 | Add the interface + `CollectorService implements ReadModel` | ✅ **SHIPPED.** Zero-churn checkpoint: compiled first time, which independently confirmed the 10-member enumeration was exactly right. |
+| 3–8 | Convert all six receivers: `ContextBroker`, `OperationalActions`, `DataSourceBundleResolver`, `MetricsService`, `ReportService`, `InspectoTools` | ✅ **SHIPPED.** ⚠ Re-ordered from the original, which led with `ReportService` "because it cuts a C3 edge" — it does not. Only the field/parameter type changed; `CollectorService.PipelineView` was left verbatim. |
+
+##### What Phase A actually bought — measured, not argued
+
+| Class | `CollectorService` refs after | What that means |
+|---|---|---|
+| **`ContextBroker`** | **0** | ⭐ The only genuine cross-package cut. It needed just `events()`, so nothing pulls the concrete class back in. |
+| `OperationalActions` | 2 | import + `CollectorService.PipelineView` |
+| `DataSourceBundleResolver` | 1 | `.PipelineView` (same package anyway) |
+| `MetricsService` | 1 | `.PipelineView` (same package anyway) |
+| `InspectoTools` | 2 | import + `.PipelineView` |
+| **`ReportService`** | **3** | import + two `.PipelineView` loops — **and it still imports `EnrichmentService`** |
+
+🔴 **`ReportService`'s import block is the receipt: `com.gamma.report` still imports `com.gamma.service`
+three ways after the conversion.** The C3 `report → service` edge is exactly where it was. This is the
+refutation from the top of Phase A, now demonstrated rather than argued — and it is what the plan
+would have shipped as a "cycle shrink" had the premise gone unchecked.
+
+**Honest scorecard for Phase A: one package edge cut (`intelligence.context → service`), five
+signatures narrowed, and six collaborators that a test can now fake.** That is a real result. It is
+not the coupling win the fan-out numbers implied.
 
 ⛔ Not in this sequence, deliberately: the `AssistAgent`/`IntelligenceAgent` SPI `init(...)` (needs
 decision #1), `ApiContext`/`ControlApi`/`SpaceContext` (legitimately need the full surface), and the
 three pure-passthrough classes (converting them buys only signature honesty).
 
-#### D2b — the remaining giant methods
+#### D2b — the remaining giant methods — ⛔ CLOSED as LEAVE, 4 of 4 (grounded 2026-08-27)
 
-One commit each, in descending value, and **each independently droppable**:
-`PipelineEditable.lower()` (336) → `FindingsSpec` ctor (323) → `ConfigSpecs.pipeline()` (280) →
-`JobRoutes.maskSecrets()` (256). ⚠ Ground each first — D2a's premise (sequential sections) came from
-grounding, and these four have not been read yet. Expect at least one to be a LEAVE.
+The instruction here was "ground each first … expect at least one to be a LEAVE." Grounding returned
+**four LEAVEs, and two of the four methods do not exist at anything like the cited size.**
+
+| Method | Cited | **Actual** | Shape | Verdict |
+|---|---|---|---|---|
+| `PipelineEditable.lower()` | 336 | **336** ✅ | ~20 locals cross section boundaries; every block reads/writes the shared `out`/`collector`/`dirs`/`output`/`processing` maps, interleaved with strict/lenient branching | **LEAVE** — splitting needs an 8–15-arg list per piece or a mutable context object. That is restructuring, not extraction, and three pinned comments (`:594`, `:770`, `:838`) are glued to the ordering of *neighbouring* blocks. |
+| `ConfigSpecs.pipeline()` | 280 | **280** ✅ | One flat `List.of(...)` of `FieldSpec` literals (~183 lines) then one of `CrossFieldRule` literals (~90), zero control flow outside self-contained predicate lambdas, ~0 crossing locals | **LEAVE** — a *declarative literal* gets longer and harder to read when chopped. Wrapping it adds two signatures and a `cores` thread-through so a reader must hold two scroll positions to reconstruct one `ConfigSpec`. |
+| `FindingsSpec` ctor | 323 | **4** 🔴 | compact record ctor, two null-normalising lines | **DOES NOT EXIST** — the *whole file* is 369 lines. |
+| `JobRoutes.maskSecrets()` | 256 | **10** 🔴 | one loop over a map | **DOES NOT EXIST** — the whole file is 422 lines. |
+
+🔴 **The two over-reports were arithmetically impossible against their own files, and that is the
+cheapest possible falsification: a 323-line method cannot live in a 369-line file.** Check a census
+figure against `wc -l` of the file before believing it — that is one command, and it would have
+killed both rows before anyone read a line of Java. This is the same detector that
+[[d1-sweep-lessons]] recorded as over-reporting 3–6×; here it over-reported **30–80×**.
+
+⚠ The two survivors are also a general lesson: **"long method" is not one shape.** `lower()` is long
+because state is shared (extraction is impossible without restructuring); `ConfigSpecs.pipeline()` is
+long because it is *data* (extraction is possible and makes it worse). Neither is the sequential-
+sections shape D2a exploited. Ask which of the three a method is before scheduling it.
 
 #### Closing task for the whole arc
 
@@ -499,3 +697,21 @@ Worth recording, because it is the most reusable lesson here:
 - **The pattern: metrics point, code decides.** Size, fan-out and naming all generated plausible
   targets that reading the code refuted. Every phase above therefore keeps its own grounding gate,
   and a LEAVE with evidence is a successful outcome.
+
+**Third round, 2026-08-27 — the plan's own TASK-level breakdown got the same treatment:**
+
+- **D2b: 4 of 4 rows closed as LEAVE**, two of them because the method *does not exist* at the cited
+  size (30–80× over-report, refutable by `wc -l` on the file).
+- **D2a: 4 of 8 task verdicts were wrong.** "Self-contained" / "cohesive" / "one `Processing`-shaped
+  result" were eyeball judgements about *state flow*, and eyeballs are bad at that. A 30-line script
+  answering "which locals declared here are read later?" settled all 40 sections at once.
+- **A: the question in task 1 was better than the reasoning behind it.** Asking "decide the package
+  first" was right; *why* it mattered was wrong, and the real answer came from a nested record
+  (`CollectorService.PipelineView`) that no fan-in/fan-out number could have surfaced.
+
+⭐ **The generalisation, and it is the one worth carrying forward:** when a plan's row rests on a claim
+about **structure** (does this state cross that seam? is that edge held by one import or three?), the
+claim is checkable *mechanically and cheaply* — and eyeball judgements about structure were wrong
+about half the time here. Write the ten-line script. But **falsify the script in both directions
+first**: two of mine returned clean false negatives (an `awk \b`, a text-block quote-parity flip),
+and a broken structural check reads *exactly* like a clean structure.
