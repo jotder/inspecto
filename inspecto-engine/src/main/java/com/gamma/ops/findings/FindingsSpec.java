@@ -2,6 +2,7 @@ package com.gamma.ops.findings;
 
 import com.gamma.api.PublicApi;
 import com.gamma.ops.ObjectType;
+import com.gamma.pipeline.NodeAttribute;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -46,13 +47,15 @@ import java.util.regex.PatternSyntaxException;
 @PublicApi(since = "4.0.0")
 public record FindingsSpec(String objectType, List<Section> sections) {
 
-    /** Renderer-supported control types — the {@code AttributeType} union in {@code attribute-spec.ts}. */
-    public static final Set<String> TYPES =
-            Set.of("string", "identifier", "number", "boolean", "select", "autocomplete", "multiline",
-                    "list");
+    /**
+     * Renderer-supported control types. Single source: {@link NodeAttribute#TYPES} — the published
+     * node-type API is where the {@code AttributeType} union is declared, and this surface delegates so the
+     * two can never drift about what {@code <inspecto-schema-form>} can draw.
+     */
+    public static final Set<String> TYPES = NodeAttribute.TYPES;
 
-    /** Disclosure tiers — {@code AttributeTier}: always visible / collapsed / behind the gear. */
-    public static final Set<String> TIERS = Set.of("required", "optional", "advanced");
+    /** Disclosure tiers. Single source: {@link NodeAttribute#TIERS}. */
+    public static final Set<String> TIERS = NodeAttribute.TIERS;
 
     /** Keys accepted on a section. Anything else is rejected rather than ignored. */
     private static final Set<String> SECTION_KEYS =

@@ -4,8 +4,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
-import com.gamma.ops.findings.FindingsSpec;
+import java.util.Set;
 
 /**
  * One config attribute of a pipeline node type — the server-side half of the UI's {@code AttributeSpec}
@@ -21,10 +20,20 @@ import com.gamma.ops.findings.FindingsSpec;
  * not exactly equal the engine's key silently no-opped. Publishing the specs closes that by construction:
  * the catalog is now the source and {@code node-attributes.ts} is its fallback.
  *
- * <p><b>The control vocabulary is deliberately NOT re-declared here.</b> {@link #TYPES} and {@link #TIERS}
- * delegate to {@link FindingsSpec}, the other server-authored spec surface, so the two can never drift into
- * disagreeing about what {@code <inspecto-schema-form>} can draw. Adding an {@code AttributeType} stays a
- * one-place change.
+ * <p><b>This type owns the control vocabulary.</b> {@link #TYPES} and {@link #TIERS} are declared here and
+ * {@code ops.findings.FindingsSpec} — the other server-authored spec surface — delegates to them, so the two
+ * can never drift into disagreeing about what {@code <inspecto-schema-form>} can draw. Adding an
+ * {@code AttributeType} stays a one-place change.
+ *
+ * <p><b>Why the ownership sits here and not there</b> (2026-08-27): the delegation used to run the other way,
+ * and that single import was the whole of the {@code pipeline -> ops} package direction — the last edge of a
+ * seven-package cycle {@code {ops, ops.findings, ops.link, ops.note, ops.tag, ops.workflow, pipeline}}.
+ * Relocating a class could not cut it: {@code AnnotationKinds}' consumers all live under {@code ops.*}, so
+ * moving it into {@code pipeline} only re-creates the edge. Inverting the constants does cut it, and this is
+ * the better of the two owners — {@code NodeAttribute} is the published node-type API served at
+ * {@code GET /pipelines/node-types}, which is the surface {@code attribute-spec.ts} mirrors. A shared home in
+ * a third package was considered and rejected: two consumers do not justify one, and the leaf module holds
+ * mechanical helpers rather than domain vocabularies. Extract one if a third consumer ever appears.
  *
  * <p>⚠ <b>{@code dependsOn} is intentionally absent.</b> No node attribute uses conditional visibility
  * today; the UI type supports it, and adding it here is a two-line change plus a {@code toMap} branch when
@@ -38,11 +47,19 @@ public record NodeAttribute(String key, String label, String type, String tier, 
                             Object defaultValue, List<Option> options, Double min, Double max,
                             String help, String placeholder) {
 
-    /** Renderer-supported control types. Single source: {@link FindingsSpec#TYPES}. */
-    public static final java.util.Set<String> TYPES = FindingsSpec.TYPES;
+    /**
+     * Renderer-supported control types — the {@code AttributeType} union in {@code attribute-spec.ts}.
+     * The single source; {@code FindingsSpec.TYPES} delegates here.
+     */
+    public static final Set<String> TYPES =
+            Set.of("string", "identifier", "number", "boolean", "select", "autocomplete", "multiline",
+                    "list");
 
-    /** Disclosure tiers. Single source: {@link FindingsSpec#TIERS}. */
-    public static final java.util.Set<String> TIERS = FindingsSpec.TIERS;
+    /**
+     * Disclosure tiers — {@code AttributeTier}: always visible / collapsed / behind the gear.
+     * The single source; {@code FindingsSpec.TIERS} delegates here.
+     */
+    public static final Set<String> TIERS = Set.of("required", "optional", "advanced");
 
     /** A {@code select} choice. */
     public record Option(String value, String label) {}
