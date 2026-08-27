@@ -18,6 +18,28 @@ slightly higher degree* (measured again 2026-08-27 at `311a4523`).
 Phase 1 optimized file length, duplication, and per-file responsibility. None of those are
 connectivity. This plan targets the structural complexity Phase 1 deliberately left alone.
 
+#### 🔴 …and that judgement was made with a metric that cannot reward decomposition (2026-08-27)
+
+Track 1 of *this* plan finished, and the graph moved the same direction: nodes **30,231 → 30,265**,
+edges **80,264 → 80,353**, `CollectorService` still the top god node. By the paragraph above, this
+arc "did not reduce coupling" either.
+
+**That reading is wrong, and the metric is why.** Extracting a 100-line block into a named method
+*necessarily* adds one node and at least one call edge. Declaring a role interface adds a node and one
+edge per implementor and per conversion. Both changes make the code more navigable and both are
+**guaranteed to move node and edge counts upward.** A metric that structurally penalises
+decomposition cannot be used to judge decomposition.
+
+The one number that did move in the expected direction is **communities: 1,116 → 1,182 (+66)** — more,
+smaller, better-separated clusters. If any single graph figure is worth watching for this class of
+work, it is that one, not raw node/edge count.
+
+⚠ Recorded prominently because the next shift will otherwise re-run the census, see counts up again,
+and conclude the arc failed — which is exactly the inference this paragraph invited. **Judge
+decomposition by what a reader must hold in their head** (`parse()` 801 → 280) **and by cycle/edge
+facts that were checked by hand** (Phase A cut `intelligence.context → service`; C3 stayed at four),
+not by the size of the graph.
+
 ## The reframe that drives every decision below
 
 **Node degree is not complexity — fan-in and fan-out mean opposite things.**
