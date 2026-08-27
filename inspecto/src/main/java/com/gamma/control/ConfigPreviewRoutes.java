@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import static com.gamma.util.Values.mapAt;
 
 /**
  * Declarative-config spec/validate/preview routes ({@code /config/spec}, {@code /validate},
@@ -67,8 +68,7 @@ final class ConfigPreviewRoutes implements RouteModule {
         }
         ConfigSpec spec = ConfigSpecs.forType(type);
         if (spec == null) throw new ApiException(404, "unknown config type: " + type);
-        @SuppressWarnings("unchecked")
-        Map<String, Object> draft = (Map<String, Object>) cfgObj;
+        Map<String, Object> draft = mapAt(body, "config");
         List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(spec, draft));
         // Pre-flight: warn when a pipeline draft's schema_file won't resolve on this server —
         // registration would otherwise fail later with an opaque error (v4.1.0).
@@ -116,8 +116,7 @@ final class ConfigPreviewRoutes implements RouteModule {
             throw new ApiException(400, "body must include 'config' (a pipeline draft map) and 'sample_text'");
         if (sample.length() > MAX_SAMPLE_CHARS)
             throw new ApiException(400, "sample_text too large (max " + MAX_SAMPLE_CHARS + " chars)");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> draft = (Map<String, Object>) cfgObj;
+        Map<String, Object> draft = mapAt(body, "config");
         PipelineConfig cfg;
         try {
             cfg = PipelineConfig.fromMap(draft);
@@ -162,8 +161,7 @@ final class ConfigPreviewRoutes implements RouteModule {
         List<Map<String, Object>> sampleRows = ApiContext.sampleRows(body);
         if (!(cfgObj instanceof Map<?, ?>) || sampleRows.isEmpty())
             throw new ApiException(400, "body must include 'config' (a schema draft map) and non-empty 'sampleRows'");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> content = (Map<String, Object>) cfgObj;
+        Map<String, Object> content = mapAt(body, "config");
         try {
             ComponentPreview.Result r = ComponentPreview.schema(content, sampleRows);
             int okCount = 0, rejectedCount = 0;
@@ -225,7 +223,6 @@ final class ConfigPreviewRoutes implements RouteModule {
      * is informational — unlike {@link com.gamma.config.safety.SchemaCompatibility} it gates nothing and
      * never emits an ERROR.
      */
-    @SuppressWarnings("unchecked")
     private Object suggestSchema(Map<String, Object> body) {
         List<Map<String, Object>> sampleRows = ApiContext.sampleRows(body);
         if (sampleRows.isEmpty())
@@ -252,9 +249,9 @@ final class ConfigPreviewRoutes implements RouteModule {
             out.put("mapping", Map.of("rules", rules));
             // B3: only when the caller posted the draft it is holding. Without one there is nothing to have
             // drifted FROM, and the response stays the pre-B3 full suggestion.
-            if (body.get("config") instanceof Map<?, ?> draft)
+            if (body.get("config") instanceof Map<?, ?>)
                 out.put("drift", driftBody(com.gamma.pipeline.exec.SchemaSuggest.drift(
-                        (Map<String, Object>) draft, inferred)));
+                        mapAt(body, "config"), inferred)));
             return out;
         } catch (IllegalArgumentException badSample) {
             throw new ApiException(422, badSample.getMessage());

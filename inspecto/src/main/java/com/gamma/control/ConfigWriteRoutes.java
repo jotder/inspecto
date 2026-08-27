@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import static com.gamma.util.Values.mapAt;
 
 /**
  * Declarative-config mutation routes ({@code /config/write}, {@code /config/patch};
@@ -54,8 +55,7 @@ final class ConfigWriteRoutes implements RouteModule {
             throw new ApiException(400, "body must include 'type' and 'config' (a draft config map)");
         ConfigSpec spec = ConfigSpecs.forType(type);
         if (spec == null) throw new ApiException(404, "unknown config type: " + type);
-        @SuppressWarnings("unchecked")
-        Map<String, Object> draft = (Map<String, Object>) cfgObj;
+        Map<String, Object> draft = mapAt(body, "config");
 
         // Gate: spec validation + the hard-fail safety check (R6). Block on ERRORs; warnings pass.
         List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(spec, draft));
@@ -209,7 +209,7 @@ final class ConfigWriteRoutes implements RouteModule {
         AtomicFiles.write(csv, text.getBytes(StandardCharsets.UTF_8), ".map-");
 
         Map<String, Object> structure = new LinkedHashMap<>(draft);
-        Map<String, Object> mappingRest = new LinkedHashMap<>((Map<String, Object>) mapping);
+        Map<String, Object> mappingRest = new LinkedHashMap<>(mapAt(draft, "mapping"));
         mappingRest.remove("rules");
         if (mappingRest.isEmpty()) structure.remove("mapping");
         else structure.put("mapping", mappingRest);
@@ -244,8 +244,7 @@ final class ConfigWriteRoutes implements RouteModule {
             throw new ApiException(400, "body must include 'type', 'name' and 'patch' (a partial config map)");
         ConfigSpec spec = ConfigSpecs.forType(type);
         if (spec == null) throw new ApiException(404, "unknown config type: " + type);
-        @SuppressWarnings("unchecked")
-        Map<String, Object> patch = (Map<String, Object>) patchObj;
+        Map<String, Object> patch = mapAt(body, "patch");
         String fileName = WriteGates.safeName(name, "config name");
 
         Path dir = writeRoot;
@@ -332,12 +331,8 @@ final class ConfigWriteRoutes implements RouteModule {
             Object pv = e.getValue();
             if (pv == null) {
                 out.remove(e.getKey());
-            } else if (pv instanceof Map<?, ?> pm && out.get(e.getKey()) instanceof Map<?, ?> bm) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> basePart = (Map<String, Object>) bm;
-                @SuppressWarnings("unchecked")
-                Map<String, Object> patchPart = (Map<String, Object>) pm;
-                out.put(e.getKey(), deepMerge(basePart, patchPart));
+            } else if (pv instanceof Map<?, ?> && out.get(e.getKey()) instanceof Map<?, ?>) {
+                out.put(e.getKey(), deepMerge(mapAt(out, e.getKey()), mapAt(patch, e.getKey())));
             } else {
                 out.put(e.getKey(), pv);
             }

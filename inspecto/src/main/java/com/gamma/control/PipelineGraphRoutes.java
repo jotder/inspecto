@@ -46,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import static com.gamma.util.Values.mapAt;
 
 /**
  * Pipeline graph, document, dry-run, run-to-here and trigger routes: the editable graph round-trip over
@@ -599,10 +600,9 @@ final class PipelineGraphRoutes implements RouteModule {
      * stored flow. Goes through the same {@link #parseAndValidateFlow} the save route uses — a draft that
      * could not be saved must not preview as if it could (400 malformed / 422 invalid, identically).
      */
-    @SuppressWarnings("unchecked")
     private PipelineGraph candidateGraph(ApiContext api, Map<String, Object> body) {
-        if (body == null || !(body.get("pipeline") instanceof Map<?, ?> candidate)) return null;
-        return parseAndValidateFlow(api, (Map<String, Object>) candidate);
+        if (body == null || !(body.get("pipeline") instanceof Map<?, ?>)) return null;
+        return parseAndValidateFlow(api, mapAt(body, "pipeline"));
     }
 
     /**

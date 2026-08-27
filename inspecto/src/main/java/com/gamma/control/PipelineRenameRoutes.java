@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
+import static com.gamma.util.Values.mapAt;
 
 /**
  * Pipeline identity-migration routes ({@code POST /pipelines/{name}/rename},
@@ -502,7 +503,6 @@ final class PipelineRenameRoutes implements RouteModule {
     }
 
     /** {@code triggers.on_pipeline} in every {@code *_enrich.toon} directly under the write root. */
-    @SuppressWarnings("unchecked")
     private int rewriteEnrichTriggers(Path writeRoot, String oldId, String newId) {
         if (!Files.isDirectory(writeRoot)) return 0;
         int count = 0;
@@ -512,7 +512,7 @@ final class PipelineRenameRoutes implements RouteModule {
                     Map<String, Object> raw = ConfigLoader.filesystem().decode(p.toString());
                     if (!(raw.get("triggers") instanceof Map<?, ?> t)
                             || !oldId.equalsIgnoreCase(String.valueOf(t.get("on_pipeline")))) continue;
-                    Map<String, Object> triggers = new LinkedHashMap<>((Map<String, Object>) t);
+                    Map<String, Object> triggers = new LinkedHashMap<>(mapAt(raw, "triggers"));
                     triggers.put("on_pipeline", newId);
                     Map<String, Object> out = new LinkedHashMap<>(raw);
                     out.put("triggers", triggers);

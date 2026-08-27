@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import static com.gamma.util.Values.mapAt;
 
 /**
  * Pipeline authoring routes over an existing config file: save-as-template (v5.4.0), display-name
@@ -291,7 +292,6 @@ final class PipelineSettingsRoutes implements RouteModule {
      * connector/discovery/post-action, {@code produces}/{@code reference}, and {@code trigger} (inert
      * while the config is a template, and the operator's intent worth preserving).
      */
-    @SuppressWarnings("unchecked")
     private static Map<String, Object> neutralizeForTemplate(Map<String, Object> src, String id,
                                                              String displayName, Path srcPath,
                                                              Path writeRoot, List<String> notes)
@@ -325,18 +325,18 @@ final class PipelineSettingsRoutes implements RouteModule {
 
         // The collector's id is the acquisition ledger's source_id; `source:` is the legacy spelling.
         String colKey = src.containsKey("collector") || !src.containsKey("source") ? "collector" : "source";
-        if (src.get(colKey) instanceof Map<?, ?> sc) {
-            Map<String, Object> col = new LinkedHashMap<>((Map<String, Object>) sc);
+        if (src.get(colKey) instanceof Map<?, ?>) {
+            Map<String, Object> col = new LinkedHashMap<>(mapAt(src, colKey));
             col.put("id", id);
             t.put(colKey, col);
         } else {
             t.put(colKey, new LinkedHashMap<>(Map.of("id", id)));
         }
 
-        if (src.get("output") instanceof Map<?, ?> so) {
-            Map<String, Object> out = new LinkedHashMap<>((Map<String, Object>) so);
-            if (out.get("ducklake") instanceof Map<?, ?> dl) {
-                Map<String, Object> lake = new LinkedHashMap<>((Map<String, Object>) dl);
+        if (src.get("output") instanceof Map<?, ?>) {
+            Map<String, Object> out = new LinkedHashMap<>(mapAt(src, "output"));
+            if (out.get("ducklake") instanceof Map<?, ?>) {
+                Map<String, Object> lake = new LinkedHashMap<>(mapAt(out, "ducklake"));
                 if (lake.containsKey("data_path")) lake.put("data_path", sandbox + "/ducklake");
                 out.put("ducklake", lake);
             }
@@ -354,11 +354,10 @@ final class PipelineSettingsRoutes implements RouteModule {
      * {@link PipelineConfig#load} uses. When it cannot be resolved or read the original value is left
      * alone (harmless: the parser reads it, never writes it) and a note explains why.
      */
-    @SuppressWarnings("unchecked")
     private static void copySchemaFile(Map<String, Object> src, Map<String, Object> t, String id,
                                        Path srcPath, Path writeRoot, List<String> notes) throws IOException {
-        if (!(src.get("processing") instanceof Map<?, ?> sp)) return;
-        Map<String, Object> processing = new LinkedHashMap<>((Map<String, Object>) sp);
+        if (!(src.get("processing") instanceof Map<?, ?>)) return;
+        Map<String, Object> processing = new LinkedHashMap<>(mapAt(src, "processing"));
         Object ref = processing.get("schema_file");
         if (ref == null || String.valueOf(ref).isBlank()) return;   // inline schemas / segments: nothing to copy
 

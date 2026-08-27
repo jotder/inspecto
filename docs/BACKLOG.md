@@ -941,13 +941,39 @@ non-blocking:**
 ## 6. Engineering / tech-debt
 
 **Open (added 2026-08-27, from the Phase-1 simplification arc — plan archived):**
-- **JAVA-SIMP-1 — route-class `Map<String,Object>` cast sites can adopt `Values.castMapAt`/`mapAt`.**
+- 🟡 **JAVA-SIMP-1 — route-class `Map<String,Object>` cast sites adopt `Values.mapAt`. NAMED SCOPE
+  DONE 2026-08-27; the row UNDER-SCOPED and the remainder is re-scoped below.**
   Phase 1 swept `PipelineConfigParser` (16 → 6 `@SuppressWarnings("unchecked")`) and `ObjectService`
   (2 → 0); the equivalent sites in the control layer were deliberately left because the route classes
-  were mid-split at the time. They now live in `ConfigPreview/Write/ReadRoutes` and
-  `PipelineList/Graph/Settings/RenameRoutes`. ⚠ Use **`castMapAt`** for bare casts (preserves
-  null-if-absent / CCE-if-wrong-type) and `mapAt` ONLY where the site already `instanceof`-guards —
-  swapping the two changes failure behavior. Small, non-blocking.
+  were mid-split at the time. ⚠ Use **`castMapAt`** for bare casts (preserves null-if-absent /
+  CCE-if-wrong-type) and `mapAt` ONLY where the site already `instanceof`-guards — swapping the two
+  changes failure behavior.
+
+  **Shipped:** the five named files that actually had sites — `ConfigPreviewRoutes` (4),
+  `ConfigWriteRoutes` (4), `PipelineSettingsRoutes` (4), `PipelineGraphRoutes` (1),
+  `PipelineRenameRoutes` (1). **14 sites → `mapAt`; `@SuppressWarnings("unchecked")` 14 → 2.**
+  ⚠ **Every site was already `instanceof`-guarded, so all 14 took `mapAt` and NONE took `castMapAt`** —
+  the reverse of the emphasis this row's warning implies. The 2 survivors
+  (`ConfigWriteRoutes.splitMapping`, `PipelineGraphRoutes.attachCompanionEnrichments`) guard **List**
+  casts, which `mapAt` does not cover.
+  ⚠ Two of the seven files the row named — `ConfigReadRoutes`, `PipelineListRoutes` — **have no such
+  sites at all.**
+
+  🔴 **Re-scoped from ground truth: 15 MORE control-layer files carry the same pattern** (~21 casts,
+  ~26 suppressions) — `AgentRoutes`, `ApiContext`, `AssistRoutes`, `BiTemplates`, `BundleRoutes`,
+  `ComponentRoutes`, `ConfigFileSupport`, `ConnectionRoutes`, `DecisionRoutes`, `EnrichmentRoutes`,
+  `ExchangeRoutes`, `IconMapSettings`, `ParserRoutes`, `ReconRoutes`, `SettingsRoutes`. The row listed
+  none of them. **It is NOT a blind sweep — two distinct shapes:**
+  1. *mechanical* — `if (m.get(k) instanceof Map<?,?> v) … (Map<String,Object>) v` → `mapAt(m, k)`
+     (e.g. `ConnectionRoutes:252,259`). Same as what shipped.
+  2. *needs judgement* — the cast is of `entry.getValue()` inside an entry-set loop
+     (`SettingsRoutes:105-106`, `IconMapSettings:47-48`); `mapAt(m, e.getKey())` fits but the outer map
+     is not always conveniently in scope, and some sites cast inline more than once.
+
+  **How the shipped batch verified suppression removal** (reuse this — it is the only real check):
+  compile with `-Dmaven.compiler.showWarnings=true` and confirm no file reports *"uses unchecked or
+  unsafe operations"*. ⚠ **Falsify it first** — temporarily delete a suppression you know is needed and
+  confirm the warning appears; a silently-ineffective lint flag looks exactly like clean code.
 - **JAVA-SIMP-2 — typed records at config seams: per-seam and operator-visible, NOT a sweep.**
   ⛔ Any record introduced on a config path must carry the unmodelled-keys remainder or stay
   read-only — this repo's recurring data-loss mode is an "obviously equivalent" restructuring
