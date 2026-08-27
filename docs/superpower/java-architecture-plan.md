@@ -319,19 +319,57 @@ and E1, not pom surgery.
 5. Each finished phase distils its as-built facts into the matching OKF concept, then this plan is
    archived per the docs lifecycle.
 
-## Recommended sequence
+## Sequence — DECIDED 2026-08-27 (supersedes the original value-per-risk ordering)
 
-Ordered by value-per-risk, not by the order the ideas were proposed:
+The first ordering was written before Phase C/D/E were grounded. Grounding shipped three items,
+closed two, and **blocked every cycle cut behind a published-API decision** — so the sequence is now
+governed by a different constraint: *what can proceed without an operator, and what must be asked
+now because it has long lead time.*
 
-| # | Work | Risk | Why here |
+### ✅ Done (this arc)
+
+| Commit | Work |
+|---|---|
+| `10b370a8` | C-step-1 — `reactor.md` corrected; three cycles + their exact edges recorded |
+| `045b6d41` | E1 — stale Jackson 2 dropped from `inspecto-etl`; **audited, does not generalize, E is closed** |
+| `260c023a` | D1 (inspecto) — 10 loops → streams; the `ReconRoutes:176` mutability trap documented |
+
+### The governing principle for what remains
+
+**Ask the decisions NOW, in parallel; do the undecidable-free work meanwhile.** The three blocked
+items all wait on operator/product calls (a major-version window, an SPI compatibility stance) that
+may take days and are not engineering questions. Serialising work behind them wastes the interval.
+Nothing in the unblocked track depends on how they are answered.
+
+### Track 1 — proceeds immediately, no decision needed
+
+| # | Work | Why in this position |
+|---|---|---|
+| 1 | **D1 engine batch** *(in flight)* | Already running; finishes the sweep D1 started. Its fresh-sweep count also tells us whether the census's detector over-reports **systematically** — which governs how much any other census figure can be trusted. |
+| 2 | **D2a — `PipelineConfigParser.parse()` (801 lines) → named section methods** | The single largest method in the backend, and pure extraction (the "sequential sections, not a dispatch chain" finding is already grounded, so the shape is known). Do it BEFORE any `PipelineConfig` work: a readable parser is the thing you need in hand if the F carve-out is ever approved. |
+| 3 | **A — `ReadModel` + 6 collaborator conversions** | Independent of every blocked item, and the zero-churn path (`CollectorService implements ReadModel` first) makes each conversion a one-file commit. ⚠ **Decide `ReadModel`'s package as part of step 3, not later** — that choice is the only lever that lets Phase A also cut C3's `report` edge, and it cannot be revisited cheaply once six collaborators import it. |
+| 4 | **D2b — the remaining giant methods** | `PipelineEditable.lower()` (336), `FindingsSpec` ctor (323), `ConfigSpecs.pipeline()` (280), `JobRoutes.maskSecrets()` (256). Lower value than D2a and entirely independent — correct place for the tail end of the arc, or to drop if attention is needed elsewhere. |
+
+**Why A comes after D2a rather than before:** both are safe, but D2a is *pure* extraction with a known
+shape, while A introduces a new published-ish type whose package placement has a consequence
+(C3). Doing the mechanical one first keeps the arc's momentum while leaving the judgment call for
+when there is time to make it properly.
+
+### Track 2 — blocked; ask now, build when answered
+
+| # | Work | Waits on | If the answer is no |
 |---|---|---|---|
-| 1 | **C-step-1: correct `reactor.md`** | none (doc) | It currently asserts a layering that no longer holds. Every future extraction decision reads it. |
-| 2 | **E1: drop `jackson-databind` from `inspecto-etl`** | low | One line, proven by the reactor. A real dependency reduction. |
-| 3 | **D1: accumulator-loop sweep** | low | ~51 mechanical sites, one module per commit. Good warm-up, immediate readability. |
-| 4 | **C2 then C1: cut the two engine cycles** | medium | The highest-value structural work. Playbook says each is likely 2–3 edges. |
-| 5 | **D2: `PipelineConfigParser.parse()` (801 lines) → named section methods** | medium | Biggest method in the backend; extraction only, no dispatch table. |
-| 6 | **A: `ReadModel` + 6 collaborator conversions** | low-medium | Real but modest; do it after C so the package choice can serve C3. |
-| 7 | *(optional)* **F-carve-out: `Collector` subtree** | medium | Only if someone wants it; nothing depends on it happening. |
+| 5 | **C1 cut via constant-ownership inversion** | decision #3 | Cycle stays documented in `reactor.md`. No further cost. |
+| 6 | **C1 + C2 cuts via relocation** | decision #4 (major-version window) | Both cycles stay documented. This is the only path for C2 — it has no API-free alternative. |
+| 7 | **C3's last two edges** | decision #1 (SPI narrowing) | C3 shrinks 4 packages → 3 via Phase A and stops there. |
+| 8 | *(optional)* **F carve-out — `Collector` subtree** | decision #5 | Nothing depends on it; the plan's own recommendation is not to build it unprompted. |
+
+### Explicitly NOT in the sequence
+
+Phase B (`ObjectService`) and Phase F's broad split are **closed as grounded LEAVEs** — they are not
+"later", they are decided. Re-opening either needs new evidence, not a free afternoon. Their
+evidence is written up in their own sections precisely so that the next person does not re-derive
+the same refuted premise from the same fan-out numbers.
 
 ## Operator decisions required
 
