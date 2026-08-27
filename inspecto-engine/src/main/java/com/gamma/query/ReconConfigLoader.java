@@ -34,10 +34,10 @@ public final class ReconConfigLoader {
 
         Map<String, Object> columnMap = mapOf(config.get("columnMap"));
         Map<String, Object> filters = mapOf(config.get("filters"));
-        List<ReconService.Side> sides = new ArrayList<>();
-        for (String dsId : datasets)
-            sides.add(new ReconService.Side(dsId, relationSqlFor.apply(dsId),
-                    stringMap(columnMap.get(dsId)), strOrNull(filters.get(dsId))));
+        List<ReconService.Side> sides = datasets.stream()
+                .map(dsId -> new ReconService.Side(dsId, relationSqlFor.apply(dsId),
+                        stringMap(columnMap.get(dsId)), strOrNull(filters.get(dsId))))
+                .toList();
 
         List<ReconService.Measure> measures = new ArrayList<>();
         if (config.get("compareColumns") instanceof List<?> cols)

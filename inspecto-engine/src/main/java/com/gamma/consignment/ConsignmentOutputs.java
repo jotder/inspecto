@@ -10,7 +10,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -330,13 +329,12 @@ public final class ConsignmentOutputs {
                                                  Map<String, EventTimeBounds> bounds, String producer) {
         if (outputs == null || outputs.isEmpty()) return List.of();
         String writtenAt = Instant.now().toString();
-        List<ConsignmentOutput> registry = new ArrayList<>(outputs.size());
-        for (PartitionOutput o : outputs)
-            registry.add(new ConsignmentOutput(consignmentId, runId, tableName, o.partition(),
-                    recordDay(o.partition(), bounds == null ? null : bounds.get(o.outputFile())),
-                    o.outputFile(), rows.applyAsLong(o), o.bytes(),
-                    writtenAt, 0, ConsignmentOutput.State.LIVE, schemaFingerprint,
-                    bounds == null ? null : bounds.get(o.outputFile()), producer));
-        return registry;
+        return outputs.stream()
+                .map(o -> new ConsignmentOutput(consignmentId, runId, tableName, o.partition(),
+                        recordDay(o.partition(), bounds == null ? null : bounds.get(o.outputFile())),
+                        o.outputFile(), rows.applyAsLong(o), o.bytes(),
+                        writtenAt, 0, ConsignmentOutput.State.LIVE, schemaFingerprint,
+                        bounds == null ? null : bounds.get(o.outputFile()), producer))
+                .toList();
     }
 }

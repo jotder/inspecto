@@ -239,6 +239,22 @@ grep misses fully-qualified inline calls; gate on the FULL reactor, never one mo
 
 The census measured rather than guessed. Two genuinely worthwhile groups and one non-target:
 
+> **D1 COMPLETE (2026-08-27) — 16 conversions total; the census's "~51 sites" was off by ~3×.**
+> Engine batch: a fresh AST-ish scan of all 317 `new ArrayList<>()` allocations in `inspecto-engine`
+> found **22 raw matches → 6 genuinely convertible sites, not the claimed ~38.** Combined with the
+> inspecto batch (10 of a claimed ~13, from files the census mostly named wrongly), **the census's
+> accumulator-loop detector over-reports by roughly 3–6×.** ⛔ Do not size any future sweep from its
+> figures — re-sweep and count.
+> **The mutability trap is common, not exotic: 6 sites hit it.** `ReconRoutes:176` (inspecto), plus
+> `AlertService:124` (adds after the loop, then `List.copyOf`), `RecipeCompiler:152` (`addAll`
+> after), `MeasureCompiler:118` (a second loop appends), `GuardedSummaryEmitter:131` (later branches
+> add, plus an early return), `ComponentPreview:589` (accumulated across six blocks). Every one would
+> have compiled and thrown `UnsupportedOperationException` at runtime.
+> ⚠ **One conversion was made and then REVERTED on readability** — `ReconService:343` (`joinChain`):
+> the enclosing `for (int s = 1; …)` variable is not effectively final, so the lambda needed an extra
+> `int side = s;` local. That reads worse than the loop it replaced, so the loop stays. This is D1's
+> stated rule working as intended.
+>
 > **D1 STATUS (inspecto batch, 2026-08-27): 10 conversions across 8 files, reactor 3657/0/0/5.**
 > 🔴 **The census's site list was mostly WRONG — of its 8 named candidate files, only ONE actually
 > held the target shape** (and at different lines than cited). The real conversions came from a fresh

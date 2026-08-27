@@ -16,6 +16,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * Dataset reconciliation execution (DAT-7; design {@code docs/superpower/reconciliation-board-design.md}).
@@ -373,11 +375,11 @@ public final class ReconService {
         if (spec.measures().isEmpty()) {
             sb.append("0 AS \"value_break\"");
         } else {
-            List<String> terms = new ArrayList<>();
-            for (int i = 0; i < spec.measures().size(); i++)
-                terms.add("COALESCE(SUM(CASE WHEN __s0.\"mr\" IS NOT NULL AND " + o + ".\"mr\" IS NOT NULL AND NOT "
-                        + within("__s0." + q("m" + i), o + "." + q("m" + i), spec.measures().get(i))
-                        + " THEN 1 ELSE 0 END), 0)");
+            List<String> terms = IntStream.range(0, spec.measures().size())
+                    .mapToObj(i -> "COALESCE(SUM(CASE WHEN __s0.\"mr\" IS NOT NULL AND " + o + ".\"mr\" IS NOT NULL AND NOT "
+                            + within("__s0." + q("m" + i), o + "." + q("m" + i), spec.measures().get(i))
+                            + " THEN 1 ELSE 0 END), 0)")
+                    .toList();
             sb.append('(').append(String.join(" + ", terms)).append(") AS \"value_break\"");
         }
         sb.append(" FROM __s0 FULL OUTER JOIN ").append(o).append(" ON ").append(keyJoin(spec, 0, other));
@@ -417,9 +419,9 @@ public final class ReconService {
               .append(o).append('.').append(q("m" + i)).append(" AS ").append(q("sb_m" + i)).append(", ");
         sb.append("__s0.").append(q("mr")).append(" AS ").append(q("sa_mr")).append(", ")
           .append(o).append('.').append(q("mr")).append(" AS ").append(q("sb_mr"));
-        List<String> broken = new ArrayList<>();
-        for (int i = 0; i < spec.measures().size(); i++)
-            broken.add("NOT " + within("__s0." + q("m" + i), o + "." + q("m" + i), spec.measures().get(i)));
+        List<String> broken = IntStream.range(0, spec.measures().size())
+                .mapToObj(i -> "NOT " + within("__s0." + q("m" + i), o + "." + q("m" + i), spec.measures().get(i)))
+                .toList();
         sb.append(" FROM __s0 JOIN ").append(o).append(" ON ").append(keyJoin(spec, 0, other))
           .append(" WHERE (").append(String.join(" OR ", broken)).append(')')
           .append(pathPredicate(spec, path, "__s0."))
@@ -452,10 +454,9 @@ public final class ReconService {
 
     /** NULL-safe key equality between two grouped sides (NULL dim values match each other). */
     private static String keyJoin(Spec spec, int left, int right) {
-        List<String> terms = new ArrayList<>();
-        for (int i = 0; i < spec.keyColumns().size(); i++)
-            terms.add("__s" + left + "." + q("k" + i) + " IS NOT DISTINCT FROM __s" + right + "." + q("k" + i));
-        return String.join(" AND ", terms);
+        return IntStream.range(0, spec.keyColumns().size())
+                .mapToObj(i -> "__s" + left + "." + q("k" + i) + " IS NOT DISTINCT FROM __s" + right + "." + q("k" + i))
+                .collect(Collectors.joining(" AND "));
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────────────
@@ -546,10 +547,9 @@ public final class ReconService {
 
     /** Stable key ordering; {@code qualifier} is empty for output aliases or a CTE prefix like {@code "__s0."}. */
     private static String orderByKeys(Spec spec, String qualifier) {
-        List<String> terms = new ArrayList<>();
-        for (int i = 0; i < spec.keyColumns().size(); i++)
-            terms.add(qualifier + q("k" + i) + " NULLS LAST");
-        return String.join(", ", terms);
+        return IntStream.range(0, spec.keyColumns().size())
+                .mapToObj(i -> qualifier + q("k" + i) + " NULLS LAST")
+                .collect(Collectors.joining(", "));
     }
 
     private static void safeIdent(String s, String what) {
