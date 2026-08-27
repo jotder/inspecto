@@ -1063,8 +1063,16 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   win is fan-in/testability, as scoped. The break was empty in fact: `IntelligenceAgent` never
   shipped; the released `AssistAgent.init` took `SourceService`, already changed on master via the
   Source→Collector rename. <!-- vocab-allow: names the Source→Collector rename itself -->
-- 🟡 **PKG-5 — no packaging path ships `inspecto-agent` / `inspecto-intelligence` (found 2026-08-27
-  while proving a breaking SPI change was package-safe). Needs an owner call, not a fix yet.**
+- ✅ **PKG-5 — CLOSED 2026-08-27 by operator decision: agent-absent is the INTENDED shipped default,
+  now documented.** The as-built lives in
+  [`okf/backend/build-run/build-test.md`](okf/backend/build-run/build-test.md)
+  §*What the bundle contains — and what it deliberately does not*: the per-edition jar table, why the
+  agent cannot arrive by accident (`-pl inspecto -am` builds upstream only; the agent modules are
+  downstream), the `mvn -o clean package -pl inspecto-agent -am` recipe for running with it, and the
+  JDK-floor warning. ⛔ **Do not "just add a `package.ps1` switch"** — the modules need a **JDK 25+**
+  runtime (class-file v69) while the `-NoRuntime` flavor documents a **Java 24+** target, so a switch
+  is a real decision, not a missing line. Re-open only if that floor is resolved.
+  Measurement kept for provenance:
   Measured on `51fb48da` by running `inspecto/package.ps1` for Personal and Enterprise (both exit 0;
   bundles 169.3 MB / 170.3 MB):
   - The fat JAR carries the SPI **interfaces** (`com/gamma/assist/spi/AssistAgent.class`,
