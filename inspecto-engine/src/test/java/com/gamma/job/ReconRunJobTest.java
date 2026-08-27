@@ -6,6 +6,7 @@ import com.gamma.util.Scheduler;
 import com.gamma.signal.Severity;
 import com.gamma.signal.SignalEmitter;
 import com.gamma.util.DuckDbUtil;
+import com.gamma.util.RunLog;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

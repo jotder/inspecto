@@ -1,6 +1,5 @@
 package com.gamma.job;
 
-import com.gamma.consignment.ConsignmentProcessJobType;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;

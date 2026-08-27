@@ -407,7 +407,7 @@ public final class JobService implements AutoCloseable {
         // consignment.process (consignment-elt plan §14.2): runs a third-party ConsignmentProcessor over one
         // committed Consignment. Its consignment_id parameter deduces from $signal.batchId, which
         // mirrorPipelineCommit populates — so an author's processor never mentions signals.
-        registry.register(new com.gamma.consignment.ConsignmentProcessJobType(dataDir));
+        registry.register(new ConsignmentProcessJobType(dataDir));
         // recon.run (DAT-7 Ops): schedule a saved Reconciliation; emits recon.run.completed with the Break
         // counts (WARNING when any break exists) — the ledger fact a future Alert Rule watches. Reads the
         // component registry from -Dassist.write.root at run time, like the maintenance/report jobs.

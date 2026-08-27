@@ -5,8 +5,8 @@ import com.gamma.consignment.ConsignmentReader;
 import com.gamma.consignment.ProcessorContext;
 import com.gamma.consignment.ProcessorResult;
 import com.gamma.consignment.SummaryEmitter;
-import com.gamma.job.RunLog;
 import com.gamma.signal.SignalEmitter;
+import com.gamma.util.RunLog;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;

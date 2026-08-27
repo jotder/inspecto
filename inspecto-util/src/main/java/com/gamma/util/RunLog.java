@@ -1,4 +1,4 @@
-package com.gamma.job;
+package com.gamma.util;
 
 /**
  * Structured per-Run logging (R5, {@code docs/job-framework-design.md} §9). Entries are persisted

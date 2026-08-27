@@ -1,6 +1,7 @@
 package com.gamma.job;
 
 import com.gamma.signal.SignalEmitter;
+import com.gamma.util.RunLog;
 
 import java.util.Map;
 

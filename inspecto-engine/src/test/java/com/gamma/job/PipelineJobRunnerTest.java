@@ -17,6 +17,7 @@ import com.gamma.pipeline.exec.ProvenanceRow;
 import com.gamma.etl.BatchEventBus;
 import com.gamma.sql.SqlViews;
 import com.gamma.util.DuckDbUtil;
+import com.gamma.util.RunLog;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

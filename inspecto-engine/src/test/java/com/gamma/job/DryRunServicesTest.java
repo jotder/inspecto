@@ -11,6 +11,7 @@ import com.gamma.ops.InMemoryObjectStore;
 import com.gamma.ops.ObjectQuery;
 import com.gamma.ops.ObjectService;
 import com.gamma.ops.ObjectType;
+import com.gamma.util.RunLog;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;

@@ -1,8 +1,8 @@
 package com.gamma.consignment;
 
 import com.gamma.api.PublicApi;
-import com.gamma.job.RunLog;
 import com.gamma.signal.SignalEmitter;
+import com.gamma.util.RunLog;
 
 import java.util.List;
 

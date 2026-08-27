@@ -2,6 +2,7 @@ package com.gamma.job;
 
 import com.gamma.notify.MailAccess;
 import com.gamma.signal.SignalEmitter;
+import com.gamma.util.RunLog;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;

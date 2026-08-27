@@ -1,16 +1,20 @@
-package com.gamma.consignment;
+package com.gamma.job;
 
 import com.gamma.api.PublicApi;
-import com.gamma.job.Job;
-import com.gamma.job.JobConfig;
-import com.gamma.job.JobContext;
-import com.gamma.job.JobResult;
-import com.gamma.job.JobTypeDescriptor;
-import com.gamma.job.JobTypeProvider;
-import com.gamma.job.ParamType;
-import com.gamma.job.ParameterDecl;
-import com.gamma.job.RunLog;
+import com.gamma.consignment.ConsignmentOutput;
+import com.gamma.consignment.ConsignmentOutputStores;
+import com.gamma.consignment.ConsignmentProcessor;
+import com.gamma.consignment.ConsignmentReader;
+import com.gamma.consignment.DbConsignmentOutputStore;
+import com.gamma.consignment.GuardedSummaryEmitter;
+import com.gamma.consignment.ProcessorContext;
+import com.gamma.consignment.ProcessorResult;
+import com.gamma.consignment.SandboxConsignmentReader;
+import com.gamma.consignment.SummaryEmitter;
+import com.gamma.consignment.SummaryRow;
+import com.gamma.consignment.SummaryWriter;
 import com.gamma.signal.SignalEmitter;
+import com.gamma.util.RunLog;
 
 import java.util.LinkedHashMap;
 import java.util.List;

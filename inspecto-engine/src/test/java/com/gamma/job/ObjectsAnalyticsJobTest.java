@@ -7,6 +7,7 @@ import com.gamma.ops.ObjectType;
 import com.gamma.query.DatasetRelation;
 import com.gamma.signal.Severity;
 import com.gamma.signal.SignalEmitter;
+import com.gamma.util.RunLog;
 import com.gamma.util.Scheduler;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

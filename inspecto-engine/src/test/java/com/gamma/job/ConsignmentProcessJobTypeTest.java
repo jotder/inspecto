@@ -1,9 +1,15 @@
-package com.gamma.consignment;
+package com.gamma.job;
 
-import com.gamma.job.CapturingJobContext;
-import com.gamma.job.Job;
-import com.gamma.job.JobConfig;
-import com.gamma.job.JobResult;
+import com.gamma.consignment.ConsignmentOutput;
+import com.gamma.consignment.ConsignmentOutputStores;
+import com.gamma.consignment.ConsignmentProcessor;
+import com.gamma.consignment.DbConsignmentOutputStore;
+import com.gamma.consignment.Measure;
+import com.gamma.consignment.ProcessorContext;
+import com.gamma.consignment.ProcessorResult;
+import com.gamma.consignment.SummaryEmitter;
+import com.gamma.consignment.SummaryRow;
+import com.gamma.consignment.SummaryWriter;
 import com.gamma.signal.Severity;
 import com.gamma.util.DuckDbUtil;
 import org.junit.jupiter.api.AfterEach;

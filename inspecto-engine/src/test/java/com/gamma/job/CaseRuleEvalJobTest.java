@@ -10,6 +10,7 @@ import com.gamma.ops.tag.CaseRule;
 import com.gamma.ops.tag.TagRule;
 import com.gamma.signal.Severity;
 import com.gamma.signal.SignalEmitter;
+import com.gamma.util.RunLog;
 import com.gamma.util.Scheduler;
 import org.junit.jupiter.api.Test;
 

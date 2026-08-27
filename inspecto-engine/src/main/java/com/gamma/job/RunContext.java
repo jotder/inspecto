@@ -5,6 +5,7 @@ import com.gamma.signal.Ref;
 import com.gamma.signal.Severity;
 import com.gamma.signal.Signal;
 import com.gamma.signal.SignalEmitter;
+import com.gamma.util.RunLog;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;

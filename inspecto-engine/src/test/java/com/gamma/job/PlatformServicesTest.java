@@ -1,5 +1,7 @@
 package com.gamma.job;
 
+import com.gamma.util.RunLog;
+
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;

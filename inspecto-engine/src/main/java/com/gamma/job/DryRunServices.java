@@ -6,6 +6,7 @@ import com.gamma.notify.Notification;
 import com.gamma.notify.NotificationAccess;
 import com.gamma.ops.IncidentAccess;
 import com.gamma.ops.OperationalObject;
+import com.gamma.util.RunLog;
 
 import java.util.List;
 import java.util.Map;
