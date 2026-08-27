@@ -64,6 +64,39 @@ the server would 403. Splitting curation into its own capability stays an open p
 `POST /queries/{id}/run` (the `com.gamma.query` catalog, W4), and async run polling
 (`GET /jobs/runs/{runId}`, `GET /runs/runs/{runId}`).
 
+## Shared route plumbing (as-built 2026-08-27)
+
+Consolidated by the Phase-1 simplification arc (plan archived at
+`archived-documents/plans-archive/java-simplification-plan.md`). These are the homes to reuse — do
+not re-introduce per-class copies:
+
+- **`RouteErrors`** — the domain-exception → status mappers, one per contract shape:
+  `mapErrors` (404/400 lookup), `mapCaseErrors` (404/422/400 case workflow),
+  `mapPreviewErrors` (400/422 preview, takes a checked-throwing `PreviewSupplier`), plus
+  `exists(store,type,id)` / `existing(store,type,label,id)` — the component-existence gate that five
+  route classes used to copy, parameterised by type constant with the 404 noun as `label` so every
+  message stays byte-identical. ⚠ Sites whose mapping genuinely differs keep their local shape.
+- **`SpiSlot<T>`** — the edition-seam lookup (first-wins `ServiceLoader`, cached, `forTest` override).
+  `Authenticators` / `AccessDeciders` / `TokenRelays` are thin typed facades over one slot each; the
+  facade *names* are the documented seam and stay. ⛔ Do NOT generalise this to the collect-all
+  ServiceLoader sites (`Parsers`, `Decompressors`, `PipelineNodeTypes`, `JobPackManager`, …) — each
+  carries semantic per-element logic (id validation, override layering, best-suffix match,
+  same-classloader filter) and was measured as not worth unifying.
+- **`WriteGates`** — the 4-gate write chain, already fully converged before that arc (28 files, 120
+  call sites; no hand-rolled duplicates exist).
+
+**Route-module granularity.** `PipelineRoutes` (1677 lines, 20 routes) became
+`PipelineListRoutes` / `PipelineGraphRoutes` / `PipelineSettingsRoutes` / `PipelineRenameRoutes`
+plus `PipelineSupport` (the three genuinely shared statics: `liftedPipelines` — also
+`ComponentRoutes`' safe-delete check — `pipelinesRootOrNull`, `findingKey`). `ConfigRoutes`' 10
+routes became `ConfigPreviewRoutes` / `ConfigWriteRoutes` / `ConfigReadRoutes` plus
+`ConfigFileSupport`. ⚠ **`ConfigRoutes` still exists** and is no longer a `RouteModule` — it is the
+static findings-helper home (`schemaFileFindings`, `armedWithoutSchemaFindings`,
+`routeArmingFindings`, `unknownConnectionFindings`, `resolves`), because `PipelineRoutes`'
+successors, `RunRoutes`, `DataSourceRoutes` and `SchemaFileFindingsTest` all call it statically.
+Registration order in `ControlApi` is preserved and load-bearing (`/config/spec/…` must register
+before the generic two-segment read).
+
 ## `/api/v1`
 
 Every business route is also dispatched under the versioned **`/api/v1`** prefix with a success/error

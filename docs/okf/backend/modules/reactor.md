@@ -27,6 +27,27 @@ Binding constraints (unchanged by the split): framework-free (JDK HttpServer, ma
 ServiceLoader SPI); **one deployable** — modularization is reactor-internal, the fat
 `inspecto.jar` is unchanged; editions are build flavors, never branches.
 
+## Shared helper homes in `inspecto-util` (as-built 2026-08-27)
+
+Phase-1 consolidation put ~60 duplicated `private static` copies into two homes. Reuse these; a new
+per-file copy is a regression:
+
+- **`com.gamma.util.Values`** — value coercion with the semantics encoded in the NAME, because the
+  historical copies differed subtly: `str` (null→null, no trim) · `strOrEmpty` · `trimOrEmpty` ·
+  `trimToNull` · `blankToNull` (no trim) · `intOr` · `putIfPresent` · `fileSafe`; plus typed map
+  access `mapAt` (instanceof-guarded → null) vs **`castMapAt`** (bare-cast semantics: absent → null,
+  non-map → `ClassCastException`) · `listAt` · `listOfMapsAt(m,key,where)`. ⚠ **Pick the method that
+  matches the site, never "the closest one"** — `ValuesTest` pins every edge.
+- **`com.gamma.util.SqlBuilder.quoteIdent`** — the DuckDB double-quote identifier escaper (four
+  private copies removed). ⛔ **Not** for CSV: `MappingCsv.quote` (RFC4180 cell quoting) and
+  `DbExportConnector.quote` (CSV header/cell quoting in `writeCsv`) are a DIFFERENT family despite
+  byte-identical bodies — the call site decides. ⛔ Also not for single-quote STRING literals
+  (`ExpectationEvaluator.literal`, `SqlViews`' pinned `'`→`''`).
+
+Deliberately left as local copies, each verified different: `PipelineJobRunner.safe` (no null-guard,
+where `fileSafe(null)` yields `"_"`), `EventObjectBridge.putIfPresent` (`Map<String,String>` AND
+excludes blanks), `RowShaper.str` (a `PipelineNode` accessor, not a map lookup).
+
 ## Version management (M1)
 
 Drift-prone shared external versions live ONCE in the parent `<dependencyManagement>`

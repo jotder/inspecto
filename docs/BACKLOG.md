@@ -940,6 +940,19 @@ non-blocking:**
 
 ## 6. Engineering / tech-debt
 
+**Open (added 2026-08-27, from the Phase-1 simplification arc — plan archived):**
+- **JAVA-SIMP-1 — route-class `Map<String,Object>` cast sites can adopt `Values.castMapAt`/`mapAt`.**
+  Phase 1 swept `PipelineConfigParser` (16 → 6 `@SuppressWarnings("unchecked")`) and `ObjectService`
+  (2 → 0); the equivalent sites in the control layer were deliberately left because the route classes
+  were mid-split at the time. They now live in `ConfigPreview/Write/ReadRoutes` and
+  `PipelineList/Graph/Settings/RenameRoutes`. ⚠ Use **`castMapAt`** for bare casts (preserves
+  null-if-absent / CCE-if-wrong-type) and `mapAt` ONLY where the site already `instanceof`-guards —
+  swapping the two changes failure behavior. Small, non-blocking.
+- **JAVA-SIMP-2 — typed records at config seams: per-seam and operator-visible, NOT a sweep.**
+  ⛔ Any record introduced on a config path must carry the unmodelled-keys remainder or stay
+  read-only — this repo's recurring data-loss mode is an "obviously equivalent" restructuring
+  dropping an unmodelled key. Do one seam at a time with a round-trip fixture, or leave it.
+
 The engineering MoSCoW (build hygiene, `CollectorService` decomposition, `agent.spi` facade,
 Fuse-leftover removal, reactor split, shutdown robustness, `@PublicApi` freezing) is **COMPLETE and
 archived**; the 16-module reactor as-built + the extraction playbook live in

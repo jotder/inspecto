@@ -75,20 +75,29 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
-- [`superpower/java-architecture-plan.md`](superpower/java-architecture-plan.md) — **PLAN, grounded
-  2026-08-27, not started.** Phase 2 of the reorganization: coupling, module organization, functional
-  style, dependency reduction. ⭐ Its headline finding is that
-  [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md)'s package-layering claim is
-  **stale** — three undocumented SCCs exist (`ops`/`pipeline`, the `job ↔ consignment` tangle, and
-  `service ↔ report`/`assist.spi`/`intelligence.spi`). Phases A/C/D/E are live; B (`ObjectService`)
-  and F (`PipelineConfig`) are CLOSED as grounded LEAVEs — read their evidence before reopening.
-- ~~[`superpower/java-simplification-plan.md`](superpower/java-simplification-plan.md)~~ — **COMPLETE
-  2026-08-27**, 9 commits `d5791116`…`829fbf22`, baseline 3630 → 3657/0/0/5. Phase 1: helper
-  consolidation (`Values`, `SpiSlot`, `RouteErrors`, `SqlBuilder.quoteIdent`), the `PipelineRoutes`
-  and `ConfigRoutes` splits, `MaintenanceJob`. Originally filed as: Intra-module Java simplification in 6 slices (+1 operator-gated): shared
-  helper consolidation into `inspecto-util`, a generic `SpiLoader`, route-module convergence, typed
-  access over `Map<String,Object>`, codec/validator seam, god-class decomposition. Excludes AI modules;
-  the module map itself is settled and untouched.
+- [`superpower/java-architecture-plan.md`](superpower/java-architecture-plan.md) — **IN FLIGHT
+  (Phase 2 of the reorganization; Track 1 part-shipped 2026-08-27).** Coupling, module organization,
+  functional style, dependency reduction. ⭐ Headline finding:
+  [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md)'s package-layering claim was
+  **stale** — three undocumented SCCs (`ops`/`pipeline`; the `job ↔ consignment` tangle;
+  `service ↔ report`/`assist.spi`/`intelligence.spi`), now recorded there (`10b370a8`).
+  **Shipped:** C-step-1 (doc correction), E1 (`045b6d41`, stale Jackson 2 — Phase E closed),
+  D1 both batches (`260c023a`, `311a4523`, 16 loop→stream conversions).
+  **Next (Track 1, no decision needed):** D2a — `PipelineConfigParser.parse()` 801 lines → named
+  section methods, task order in the plan. Then Phase A (`ReadModel`), then D2b.
+  **Blocked (Track 2):** all three cycle cuts — every cycle-cutting class is `@PublicApi`, so
+  relocation needs a major-version decision (4 operator decisions listed in the plan).
+  **Closed as grounded LEAVEs:** B (`ObjectService`), F (`PipelineConfig` broad split), S7
+  (`CollectorService` wiring) — read their evidence before reopening.
+- ~~`superpower/java-simplification-plan.md`~~ — **COMPLETE and ARCHIVED 2026-08-27**
+  (`archived-documents/plans-archive/java-simplification-plan.md`). Phase 1: ~60 duplicated helper
+  copies consolidated into `Values`/`SqlBuilder.quoteIdent`/`RouteErrors`/`SpiSlot`, `PipelineRoutes`
+  (1677 lines) and `ConfigRoutes` split into seven cohesive route modules, `MaintenanceJob` 855→190.
+  11 commits `d5791116`…`f211b455`, baseline 3630 → **3657/0/0/5**, zero behavior change. As-built
+  distilled into [`okf/backend/control-plane/control-api.md`](okf/backend/control-plane/control-api.md)
+  (route modules, `RouteErrors`, `SpiSlot`) and
+  [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md) (the `inspecto-util` helper
+  homes); residuals → `BACKLOG.md` §6 **JAVA-SIMP-1/2**.
 - [`superpower/mid-branch-transforms-design.md`](superpower/mid-branch-transforms-design.md) — **DESIGN
   ONLY, not scheduled** (2026-08-26). The last branch-aware-executor residual that is genuinely unbuilt:
   letting a `route:` branch carry its own `steps:` sub-chain. Records the four decisions it needs and the
