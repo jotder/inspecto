@@ -277,66 +277,7 @@ final class PipelineConfigParser {
                             ? d.dataExtensions() : strList(unpack.get("data_extensions")));
         }
 
-        // ── duplicate check ───────────────────────────────────────────────────
-        Map<String, Object> dup = castMapAt(proc, "duplicate_check");
-        if (dup != null) {
-            b.duplicateCheckEnabled = Boolean.parseBoolean(String.valueOf(dup.get("enabled")));
-            b.markerExtension       = opt(dup, "marker_extension", ".processed");
-            b.retentionDays         = toInt(dup.getOrDefault("retention_days", 90));
-        }
-
-        // ── record-grain dedup (ELT amendment §2.4 — the dedup STEP, not file dedup) ──
-        Map<String, Object> recDedup = castMapAt(proc, "dedup");
-        if (recDedup != null) {
-            List<String> keys = new ArrayList<>();
-            if (recDedup.get("keys") instanceof List<?> ks)
-                for (Object k : ks) keys.add(String.valueOf(k));
-            b.dedup = new PipelineConfig.Dedup(keys, trimToNull(recDedup.get("order_by")));
-        }
-
-        // ── summarize (ELT amendment §2.4/Phase 3 — group-by rollup, authoring/round-trip only) ──
-        Map<String, Object> recSummarize = castMapAt(proc, "summarize");
-        if (recSummarize != null) {
-            List<String> groupBy = new ArrayList<>();
-            if (recSummarize.get("group_by") instanceof List<?> gs)
-                for (Object g : gs) groupBy.add(String.valueOf(g));
-            List<String> measures = new ArrayList<>();
-            if (recSummarize.get("measures") instanceof List<?> ms)
-                for (Object m : ms) measures.add(String.valueOf(m));
-            b.summarize = new PipelineConfig.Summarize(groupBy, measures);
-        }
-
-        // ── join (ELT amendment D-4/Phase 3 S2 — reference join, authoring/round-trip only) ──
-        Map<String, Object> recJoin = castMapAt(proc, "join");
-        if (recJoin != null) {
-            List<String> on = new ArrayList<>();
-            if (recJoin.get("on") instanceof List<?> os)
-                for (Object o : os) on.add(String.valueOf(o));
-            else if (recJoin.get("on") != null)
-                on.add(String.valueOf(recJoin.get("on")));   // single-key shorthand: on: k
-            b.join = new PipelineConfig.Join(trimToNull(recJoin.get("reference")), on);
-        }
-
-        // ── map (AUTHOR-1 (a) — the authored half of a transform.map node) ──
-        // ⛔ NOT added to the steps: exclusivity list below: a map node sits between parser and sink in
-        // both spellings, so a steps: file may legitimately carry processing.map. See MapConfig's ⛔.
-        Map<String, Object> recMap = castMapAt(proc, "map");
-        if (recMap != null) {
-            List<Map<String, Object>> columns = listOfMapsAt(recMap, "columns", "processing.map.columns");
-            List<Map<String, Object>> rules   = listOfMapsAt(recMap, "rules",   "processing.map.rules");
-            if (!columns.isEmpty() || !rules.isEmpty())
-                b.mapConfig = new PipelineConfig.MapConfig(columns, rules);
-        }
-
-        // ── route: block (ELT amendment §2.6) — carried VERBATIM; authoring/round-trip only. ──
-        // The linear batch path cannot execute a branch tree, so arming is refused in prepare():
-        // an active pipeline with route: fails fast rather than silently landing every row in the
-        // primary sink (the same fail-safe posture as the schema-less draft rule).
-        if (raw.get("route") instanceof Map<?, ?> routeBlock) {
-            Map<String, Object> copy = new LinkedHashMap<>();
-            for (Map.Entry<?, ?> e : routeBlock.entrySet()) copy.put(String.valueOf(e.getKey()), e.getValue());
-            b.route = copy;
-        }
+        parseTransformBlocks(raw, proc, b);
 
         // ── csv settings (inline csv_settings and/or external grammar file) ─────
         // The delimited parse grammar may live inline under processing.csv_settings, in a separate
@@ -486,80 +427,7 @@ final class PipelineConfigParser {
             }
         }
 
-        // ── steps (the ordered transform chain) ─────────────────────────────────
-        // A top-level `steps:` list, each entry a single-key map of kind → that kind's own config:
-        //
-        //     steps[3]:
-        //       - dedup:
-        //           keys[1]: MSISDN
-        //           order_by: TS DESC
-        //       - summarize:
-        //           group_by[1]: RECORD_DAY
-        //           measures[1]: count
-        //       - dedup:
-        //           keys[1]: IMSI
-        //
-        // ⚠ The count is REQUIRED and the config must be an indented block. An earlier version of this
-        // comment showed `- dedup: {keys: [msisdn]}`; toon decodes that inline brace form as a plain
-        // STRING, so it reaches the entry check below and is refused. Do not reinstate it.
-        //
-        // Order is list position. A single-key map rather than a flat {kind: dedup, …} entry so `kind`
-        // never collides with a config key of the same name, and so a malformed entry is a structural
-        // error rather than a silently-ignored one.
-        //
-        // Absent ⇒ PipelineConfig projects the legacy singular blocks into the same order PipelineLift
-        // wires them. Authoring/round-trip only for now — nothing executes from `steps:` until plan
-        // slice A5 routes it, exactly the posture `sinks:` has had since it shipped.
-        // ⚠ A `steps:` written WITHOUT an element count decodes as a map, not a list — toon needs the
-        // `steps[N]:` arity — and an `instanceof List` test alone would then skip the whole block in
-        // silence, dropping every transform the author wrote. That is the exact failure mode this format
-        // exists to remove, so a non-list `steps` is refused, loudly, with the spelling that works.
-        Object rawSteps = raw.get("steps");
-        if (rawSteps != null && !(rawSteps instanceof List<?>)) {
-            throw new IllegalArgumentException("""
-                    steps: must be a LIST, and in .toon that needs an explicit element count plus a block \
-                    per entry — a bare 'steps:' decodes as a map. Write:
-                      steps[2]:
-                        - dedup:
-                            keys[1]: MSISDN
-                        - summarize:
-                            group_by[1]: RECORD_DAY
-                            measures[1]: count
-                    got: """ + rawSteps);
-        }
-        if (rawSteps instanceof List<?> stepList) {
-            for (Object entry : stepList) {
-                if (!(entry instanceof Map<?, ?> sm) || sm.size() != 1) {
-                    throw new IllegalArgumentException(
-                            "each steps[] entry must be a single-key map of kind to its config, e.g. "
-                                    + "'- dedup:' followed by an indented 'keys[1]: MSISDN' — got " + entry);
-                }
-                Map.Entry<?, ?> only = sm.entrySet().iterator().next();
-                String kind = String.valueOf(only.getKey()).trim();
-                if (!PipelineConfig.Step.KINDS.contains(kind)) {
-                    throw new IllegalArgumentException("unknown steps[] kind '" + kind + "' — expected one of "
-                            + PipelineConfig.Step.KINDS);
-                }
-                if (only.getValue() != null && !(only.getValue() instanceof Map<?, ?>)) {
-                    throw new IllegalArgumentException("steps[] entry '" + kind
-                            + "' must map to a config block, got " + only.getValue());
-                }
-                b.steps.add(new PipelineConfig.Step(kind, (Map<String, Object>) only.getValue()));
-            }
-            // Mutually exclusive with the legacy spellings: there is no non-arbitrary position at which a
-            // legacy block would join an authored sequence, and choosing one silently is the reordering
-            // this whole change exists to remove.
-            List<String> legacy = new ArrayList<>();
-            if (b.rowWhere != null && !b.rowWhere.isBlank()) legacy.add("processing.csv_settings.where");
-            if (b.join      != null) legacy.add("processing.join");
-            if (b.dedup     != null) legacy.add("processing.dedup");
-            if (b.summarize != null) legacy.add("processing.summarize");
-            if (b.route     != null) legacy.add("route");
-            if (!legacy.isEmpty()) {
-                throw new IllegalArgumentException("steps: replaces the singular transform blocks — remove "
-                        + legacy + ", or drop steps: and keep them; carrying both leaves the order undefined");
-            }
-        }
+        parseSteps(raw, b);
 
         // ── plugin ingester + segments ────────────────────────────────────────
         // `parsing.plugin` (frontend: plugin) is the unified alias for the legacy
@@ -616,88 +484,7 @@ final class PipelineConfigParser {
                     "parsing.frontend 'plugin' requires parsing.plugin.ingester (or processing.ingester)");
         }
 
-        // ── schemas ───────────────────────────────────────────────────────────
-        // Plugin ingester path: schemas already loaded into segmentSchemas above; skip.
-        List<Map<String, Object>> schemaDefs = (List<Map<String, Object>>) proc.get("schemas");
-        if (b.ingesterClass != null && !b.ingesterClass.isBlank()) {
-            // no-op — segment schemas were loaded above
-        } else if (schemaDefs != null && !schemaDefs.isEmpty()) {
-            LinkedHashMap<Integer, Map<String, Object>> byCount   = new LinkedHashMap<>();
-            LinkedHashMap<Integer, PathMatcher>         byPattern = new LinkedHashMap<>();
-            LinkedHashMap<Integer, String>              byTable   = new LinkedHashMap<>();
-
-            for (Map<String, Object> entry : schemaDefs) {
-                int    colCount    = toInt(entry.get("column_count"));
-                String schemaPath  = (String) entry.get("schema_file");
-                String table       = (String) entry.get("table");
-                String filePattern = (String) entry.get("file_pattern");
-
-                Path schemaFile = resolveSchemaRef(schemaPath, configDir);
-                b.referencedFiles.add(schemaFile);
-                if (!Files.exists(schemaFile))
-                    throw new FileNotFoundException("Schema file not found: " + schemaPath);
-                Map<String, Object> schemaCfg = (Map<String, Object>)
-                        JToon.decode(Files.readString(schemaFile, StandardCharsets.UTF_8));
-                mergeSiblingMapping(schemaCfg, schemaFile, b);
-                Identifiers.validateSchema(schemaCfg, "schemas[col=" + colCount + "]");
-                declaredColumns.addAll(columnNamesOf(schemaCfg));
-                if (table != null && !table.isBlank())
-                    Identifiers.validate(table, "schemas[col=" + colCount + "].table");
-                validateFixedWidthSelectors(b.fixedWidth, schemaCfg, "schemas[col=" + colCount + "]");
-                validateTextRegexSelectors(b.textRegex, schemaCfg, "schemas[col=" + colCount + "]");
-
-                SchemaSelector.register(byCount, byPattern, byTable,
-                        colCount, filePattern, schemaCfg, table);
-            }
-
-            b.schemaSelector = new SchemaSelector(
-                    byCount, byPattern, byTable,
-                    b.delimiter, b.skipHeaderLines);
-
-            log.info("[CONFIG] Loaded {} schema(s): col counts {}",
-                    schemaDefs.size(),
-                    byCount.keySet().stream().map(String::valueOf)
-                            .collect(java.util.stream.Collectors.joining(", ")));
-        } else {
-            // Legacy single-schema. OPTIONAL since v5.1.0: a draft (active: false) may not have
-            // chosen its schema yet — it parses, indexes and shows in the catalog, but an armed
-            // pipeline without any schema still fails fast (clear error, formerly an NPE here).
-            String schemaPath = (String) proc.get("schema_file");
-            if (schemaPath == null || schemaPath.isBlank()) {
-                if (b.active)
-                    throw new IllegalArgumentException("Config error in " + sourceLabel
-                            + ": active: true but no schema is configured (processing.schema_file, "
-                            + "processing.schemas[], or a plugin ingester) — keep a draft inactive "
-                            + "until its schema is attached");
-            } else {
-                Path schemaFile = resolveSchemaRef(schemaPath, configDir);
-                b.referencedFiles.add(schemaFile);
-                if (!Files.exists(schemaFile))
-                    throw new FileNotFoundException("Schema file not found: " + schemaPath);
-                b.singleSchema = (Map<String, Object>)
-                        JToon.decode(Files.readString(schemaFile, StandardCharsets.UTF_8));
-                mergeSiblingMapping(b.singleSchema, schemaFile, b);
-                applyMappingFile(proc, b.singleSchema, configDir, b);
-                Identifiers.validateSchema(b.singleSchema, "schema_file");
-                declaredColumns.addAll(columnNamesOf(b.singleSchema));
-                validateFixedWidthSelectors(b.fixedWidth, b.singleSchema, "schema_file");
-                validateTextRegexSelectors(b.textRegex, b.singleSchema, "schema_file");
-            }
-        }
-
-        // B4: a filename_column colliding with a declared data column would silently shadow real data
-        // in every written file — fail the load instead (checked here, once the schemas are resolved;
-        // a draft with no schema yet has nothing to collide with).
-        if (!declaredColumns.isEmpty()) {
-            List<String> lineageCols = new ArrayList<>();
-            if (b.filenameColumn != null) lineageCols.add(b.filenameColumn);
-            for (PipelineConfig.Sink s : b.sinks)
-                if (s.filenameColumn() != null) lineageCols.add(s.filenameColumn());
-            for (String col : lineageCols)
-                if (declaredColumns.contains(col))
-                    throw new IllegalArgumentException("Config error in " + sourceLabel
-                            + ": filename_column '" + col + "' collides with a declared schema column");
-        }
+        parseSchemas(raw, proc, configDir, sourceLabel, declaredColumns, b);
 
         // ── reference load semantics (Reference Phase-2; absent ⇒ full-replace = today's behaviour) ──
         // Only meaningful on a `produces: reference` pipeline; parsed regardless (inert otherwise). The
@@ -887,6 +674,274 @@ final class PipelineConfigParser {
         return new Collector(id, connector, includes, excludes, recursiveDepth, stability, connection,
                 duplicate, guarantee, gapDetection, fetch, retry, circuitBreaker, postAction,
                 incremental, discovery);
+    }
+
+    /**
+     * Decodes the optional top-level {@code steps:} list — the ordered transform chain — onto
+     * {@code b.steps}, and enforces its two pinned refusals: a non-list {@code steps} (the missing
+     * {@code [N]} arity) and mutual exclusivity with the legacy singular transform blocks.
+     *
+     * <p>⚠ Both refusals and the comments justifying them are carried VERBATIM from {@code parse()}.
+     * They exist because the silent-skip alternatives each dropped authored transforms. Do not
+     * paraphrase them, and do not relax either check without reading those comments.
+     *
+     * <p>Runs after the singular blocks are parsed, because the exclusivity check reads them off the
+     * builder ({@code b.rowWhere} / {@code join} / {@code dedup} / {@code summarize} / {@code route}).
+     */
+    @SuppressWarnings("unchecked")
+    private static void parseSteps(Map<String, Object> raw, Builder b) {
+        // ── steps (the ordered transform chain) ─────────────────────────────────
+        // A top-level `steps:` list, each entry a single-key map of kind → that kind's own config:
+        //
+        //     steps[3]:
+        //       - dedup:
+        //           keys[1]: MSISDN
+        //           order_by: TS DESC
+        //       - summarize:
+        //           group_by[1]: RECORD_DAY
+        //           measures[1]: count
+        //       - dedup:
+        //           keys[1]: IMSI
+        //
+        // ⚠ The count is REQUIRED and the config must be an indented block. An earlier version of this
+        // comment showed `- dedup: {keys: [msisdn]}`; toon decodes that inline brace form as a plain
+        // STRING, so it reaches the entry check below and is refused. Do not reinstate it.
+        //
+        // Order is list position. A single-key map rather than a flat {kind: dedup, …} entry so `kind`
+        // never collides with a config key of the same name, and so a malformed entry is a structural
+        // error rather than a silently-ignored one.
+        //
+        // Absent ⇒ PipelineConfig projects the legacy singular blocks into the same order PipelineLift
+        // wires them. Authoring/round-trip only for now — nothing executes from `steps:` until plan
+        // slice A5 routes it, exactly the posture `sinks:` has had since it shipped.
+        // ⚠ A `steps:` written WITHOUT an element count decodes as a map, not a list — toon needs the
+        // `steps[N]:` arity — and an `instanceof List` test alone would then skip the whole block in
+        // silence, dropping every transform the author wrote. That is the exact failure mode this format
+        // exists to remove, so a non-list `steps` is refused, loudly, with the spelling that works.
+        Object rawSteps = raw.get("steps");
+        if (rawSteps != null && !(rawSteps instanceof List<?>)) {
+            throw new IllegalArgumentException("""
+                    steps: must be a LIST, and in .toon that needs an explicit element count plus a block \
+                    per entry — a bare 'steps:' decodes as a map. Write:
+                      steps[2]:
+                        - dedup:
+                            keys[1]: MSISDN
+                        - summarize:
+                            group_by[1]: RECORD_DAY
+                            measures[1]: count
+                    got: """ + rawSteps);
+        }
+        if (rawSteps instanceof List<?> stepList) {
+            for (Object entry : stepList) {
+                if (!(entry instanceof Map<?, ?> sm) || sm.size() != 1) {
+                    throw new IllegalArgumentException(
+                            "each steps[] entry must be a single-key map of kind to its config, e.g. "
+                                    + "'- dedup:' followed by an indented 'keys[1]: MSISDN' — got " + entry);
+                }
+                Map.Entry<?, ?> only = sm.entrySet().iterator().next();
+                String kind = String.valueOf(only.getKey()).trim();
+                if (!PipelineConfig.Step.KINDS.contains(kind)) {
+                    throw new IllegalArgumentException("unknown steps[] kind '" + kind + "' — expected one of "
+                            + PipelineConfig.Step.KINDS);
+                }
+                if (only.getValue() != null && !(only.getValue() instanceof Map<?, ?>)) {
+                    throw new IllegalArgumentException("steps[] entry '" + kind
+                            + "' must map to a config block, got " + only.getValue());
+                }
+                b.steps.add(new PipelineConfig.Step(kind, (Map<String, Object>) only.getValue()));
+            }
+            // Mutually exclusive with the legacy spellings: there is no non-arbitrary position at which a
+            // legacy block would join an authored sequence, and choosing one silently is the reordering
+            // this whole change exists to remove.
+            List<String> legacy = new ArrayList<>();
+            if (b.rowWhere != null && !b.rowWhere.isBlank()) legacy.add("processing.csv_settings.where");
+            if (b.join      != null) legacy.add("processing.join");
+            if (b.dedup     != null) legacy.add("processing.dedup");
+            if (b.summarize != null) legacy.add("processing.summarize");
+            if (b.route     != null) legacy.add("route");
+            if (!legacy.isEmpty()) {
+                throw new IllegalArgumentException("steps: replaces the singular transform blocks — remove "
+                        + legacy + ", or drop steps: and keep them; carrying both leaves the order undefined");
+            }
+        }
+    }
+
+    /**
+     * Resolves and loads the pipeline's schema declaration — the single {@code processing.schema_file},
+     * the plural {@code schemas[]} list, or an inline {@code raw.fields[]} block — onto the builder.
+     *
+     * <p>Skipped by the caller when a plugin ingester already loaded {@code segmentSchemas}. Every
+     * loaded schema contributes its column names to {@code declaredColumns}, which the caller checks
+     * {@code reference.key} and {@code processing.join} against, and its file is registered on
+     * {@code b.referencedFiles} so a config reload notices an edit.
+     *
+     * <p>Relative references resolve config-relative first, JVM CWD second (W1b) — see
+     * {@link #resolveSchemaRef}; that is why {@code configDir} is threaded through.
+     */
+    @SuppressWarnings("unchecked")
+    private static void parseSchemas(Map<String, Object> raw, Map<String, Object> proc, Path configDir,
+                                     String sourceLabel, Set<String> declaredColumns, Builder b)
+            throws IOException {
+        // ── schemas ───────────────────────────────────────────────────────────
+        // Plugin ingester path: schemas already loaded into segmentSchemas above; skip.
+        List<Map<String, Object>> schemaDefs = (List<Map<String, Object>>) proc.get("schemas");
+        if (b.ingesterClass != null && !b.ingesterClass.isBlank()) {
+            // no-op — segment schemas were loaded above
+        } else if (schemaDefs != null && !schemaDefs.isEmpty()) {
+            LinkedHashMap<Integer, Map<String, Object>> byCount   = new LinkedHashMap<>();
+            LinkedHashMap<Integer, PathMatcher>         byPattern = new LinkedHashMap<>();
+            LinkedHashMap<Integer, String>              byTable   = new LinkedHashMap<>();
+
+            for (Map<String, Object> entry : schemaDefs) {
+                int    colCount    = toInt(entry.get("column_count"));
+                String schemaPath  = (String) entry.get("schema_file");
+                String table       = (String) entry.get("table");
+                String filePattern = (String) entry.get("file_pattern");
+
+                Path schemaFile = resolveSchemaRef(schemaPath, configDir);
+                b.referencedFiles.add(schemaFile);
+                if (!Files.exists(schemaFile))
+                    throw new FileNotFoundException("Schema file not found: " + schemaPath);
+                Map<String, Object> schemaCfg = (Map<String, Object>)
+                        JToon.decode(Files.readString(schemaFile, StandardCharsets.UTF_8));
+                mergeSiblingMapping(schemaCfg, schemaFile, b);
+                Identifiers.validateSchema(schemaCfg, "schemas[col=" + colCount + "]");
+                declaredColumns.addAll(columnNamesOf(schemaCfg));
+                if (table != null && !table.isBlank())
+                    Identifiers.validate(table, "schemas[col=" + colCount + "].table");
+                validateFixedWidthSelectors(b.fixedWidth, schemaCfg, "schemas[col=" + colCount + "]");
+                validateTextRegexSelectors(b.textRegex, schemaCfg, "schemas[col=" + colCount + "]");
+
+                SchemaSelector.register(byCount, byPattern, byTable,
+                        colCount, filePattern, schemaCfg, table);
+            }
+
+            b.schemaSelector = new SchemaSelector(
+                    byCount, byPattern, byTable,
+                    b.delimiter, b.skipHeaderLines);
+
+            log.info("[CONFIG] Loaded {} schema(s): col counts {}",
+                    schemaDefs.size(),
+                    byCount.keySet().stream().map(String::valueOf)
+                            .collect(java.util.stream.Collectors.joining(", ")));
+        } else {
+            // Legacy single-schema. OPTIONAL since v5.1.0: a draft (active: false) may not have
+            // chosen its schema yet — it parses, indexes and shows in the catalog, but an armed
+            // pipeline without any schema still fails fast (clear error, formerly an NPE here).
+            String schemaPath = (String) proc.get("schema_file");
+            if (schemaPath == null || schemaPath.isBlank()) {
+                if (b.active)
+                    throw new IllegalArgumentException("Config error in " + sourceLabel
+                            + ": active: true but no schema is configured (processing.schema_file, "
+                            + "processing.schemas[], or a plugin ingester) — keep a draft inactive "
+                            + "until its schema is attached");
+            } else {
+                Path schemaFile = resolveSchemaRef(schemaPath, configDir);
+                b.referencedFiles.add(schemaFile);
+                if (!Files.exists(schemaFile))
+                    throw new FileNotFoundException("Schema file not found: " + schemaPath);
+                b.singleSchema = (Map<String, Object>)
+                        JToon.decode(Files.readString(schemaFile, StandardCharsets.UTF_8));
+                mergeSiblingMapping(b.singleSchema, schemaFile, b);
+                applyMappingFile(proc, b.singleSchema, configDir, b);
+                Identifiers.validateSchema(b.singleSchema, "schema_file");
+                declaredColumns.addAll(columnNamesOf(b.singleSchema));
+                validateFixedWidthSelectors(b.fixedWidth, b.singleSchema, "schema_file");
+                validateTextRegexSelectors(b.textRegex, b.singleSchema, "schema_file");
+            }
+        }
+
+        // B4: a filename_column colliding with a declared data column would silently shadow real data
+        // in every written file — fail the load instead (checked here, once the schemas are resolved;
+        // a draft with no schema yet has nothing to collide with).
+        if (!declaredColumns.isEmpty()) {
+            List<String> lineageCols = new ArrayList<>();
+            if (b.filenameColumn != null) lineageCols.add(b.filenameColumn);
+            for (PipelineConfig.Sink s : b.sinks)
+                if (s.filenameColumn() != null) lineageCols.add(s.filenameColumn());
+            for (String col : lineageCols)
+                if (declaredColumns.contains(col))
+                    throw new IllegalArgumentException("Config error in " + sourceLabel
+                            + ": filename_column '" + col + "' collides with a declared schema column");
+        }
+    }
+
+    /**
+     * Decodes the six singular transform blocks onto the builder: {@code processing.duplicate_check},
+     * {@code processing.dedup}, {@code processing.summarize}, {@code processing.join},
+     * {@code processing.map} and the top-level {@code route:} block.
+     *
+     * <p>⛔ This method decodes them and nothing more. The fail-closed ARMING that reads several of
+     * these <em>in combination</em> lives in {@link PipelineConfig#prepare()} and in
+     * {@code PipelineLift}; do not migrate any of it here. A block being present is not the same fact
+     * as a block being engaged, and conflating the two is how a transform gets silently armed.
+     *
+     * <p>Grouped as one method because they are six adjacent, individually tiny sections that share
+     * exactly one concern — the authored-transform vocabulary — and no locals. The caller validates
+     * {@code join}'s columns later, once the schema has declared them.
+     */
+    @SuppressWarnings("unchecked")
+    private static void parseTransformBlocks(Map<String, Object> raw, Map<String, Object> proc, Builder b) {
+        // ── duplicate check ───────────────────────────────────────────────────
+        Map<String, Object> dup = castMapAt(proc, "duplicate_check");
+        if (dup != null) {
+            b.duplicateCheckEnabled = Boolean.parseBoolean(String.valueOf(dup.get("enabled")));
+            b.markerExtension       = opt(dup, "marker_extension", ".processed");
+            b.retentionDays         = toInt(dup.getOrDefault("retention_days", 90));
+        }
+
+        // ── record-grain dedup (ELT amendment §2.4 — the dedup STEP, not file dedup) ──
+        Map<String, Object> recDedup = castMapAt(proc, "dedup");
+        if (recDedup != null) {
+            List<String> keys = new ArrayList<>();
+            if (recDedup.get("keys") instanceof List<?> ks)
+                for (Object k : ks) keys.add(String.valueOf(k));
+            b.dedup = new PipelineConfig.Dedup(keys, trimToNull(recDedup.get("order_by")));
+        }
+
+        // ── summarize (ELT amendment §2.4/Phase 3 — group-by rollup, authoring/round-trip only) ──
+        Map<String, Object> recSummarize = castMapAt(proc, "summarize");
+        if (recSummarize != null) {
+            List<String> groupBy = new ArrayList<>();
+            if (recSummarize.get("group_by") instanceof List<?> gs)
+                for (Object g : gs) groupBy.add(String.valueOf(g));
+            List<String> measures = new ArrayList<>();
+            if (recSummarize.get("measures") instanceof List<?> ms)
+                for (Object m : ms) measures.add(String.valueOf(m));
+            b.summarize = new PipelineConfig.Summarize(groupBy, measures);
+        }
+
+        // ── join (ELT amendment D-4/Phase 3 S2 — reference join, authoring/round-trip only) ──
+        Map<String, Object> recJoin = castMapAt(proc, "join");
+        if (recJoin != null) {
+            List<String> on = new ArrayList<>();
+            if (recJoin.get("on") instanceof List<?> os)
+                for (Object o : os) on.add(String.valueOf(o));
+            else if (recJoin.get("on") != null)
+                on.add(String.valueOf(recJoin.get("on")));   // single-key shorthand: on: k
+            b.join = new PipelineConfig.Join(trimToNull(recJoin.get("reference")), on);
+        }
+
+        // ── map (AUTHOR-1 (a) — the authored half of a transform.map node) ──
+        // ⛔ NOT added to the steps: exclusivity list below: a map node sits between parser and sink in
+        // both spellings, so a steps: file may legitimately carry processing.map. See MapConfig's ⛔.
+        Map<String, Object> recMap = castMapAt(proc, "map");
+        if (recMap != null) {
+            List<Map<String, Object>> columns = listOfMapsAt(recMap, "columns", "processing.map.columns");
+            List<Map<String, Object>> rules   = listOfMapsAt(recMap, "rules",   "processing.map.rules");
+            if (!columns.isEmpty() || !rules.isEmpty())
+                b.mapConfig = new PipelineConfig.MapConfig(columns, rules);
+        }
+
+        // ── route: block (ELT amendment §2.6) — carried VERBATIM; authoring/round-trip only. ──
+        // The linear batch path cannot execute a branch tree, so arming is refused in prepare():
+        // an active pipeline with route: fails fast rather than silently landing every row in the
+        // primary sink (the same fail-safe posture as the schema-less draft rule).
+        if (raw.get("route") instanceof Map<?, ?> routeBlock) {
+            Map<String, Object> copy = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> e : routeBlock.entrySet()) copy.put(String.valueOf(e.getKey()), e.getValue());
+            b.route = copy;
+        }
     }
 
     // ── schema reference resolution ───────────────────────────────────────────
