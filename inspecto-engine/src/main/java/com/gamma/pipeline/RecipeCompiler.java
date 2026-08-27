@@ -37,7 +37,7 @@ import static com.gamma.util.Values.str;
  * deliberately NOT a guarantee key — the sink step already owns the backup dir
  * ({@code sink: {backup: …}}), and one concept gets one spelling.
  */
-@PublicApi(since = "5.1.0")
+@PublicApi(since = "4.0.0")
 public final class RecipeCompiler {
 
     private RecipeCompiler() {}

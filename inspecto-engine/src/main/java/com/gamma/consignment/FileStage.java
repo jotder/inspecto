@@ -13,7 +13,7 @@ import com.gamma.api.PublicApi;
  * register; the remaining five mirror the method's own ordering comment (register → manifest →
  * backup → markers LAST → ledger/watermark).
  */
-@PublicApi(since = "5.1.0")
+@PublicApi(since = "4.0.0")
 public enum FileStage {
     /** DuckLake register attempted (optional, non-fatal). */
     REGISTERED,

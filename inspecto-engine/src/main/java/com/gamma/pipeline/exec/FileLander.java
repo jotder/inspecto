@@ -25,7 +25,7 @@ import java.util.UUID;
  * A crash before step 2 leaves only an ignorable {@code .tmp}; a crash between 2 and 3 lands the file
  * without acking, so the source re-delivers and the file is re-landed (at-least-once).
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class FileLander {
 
     private FileLander() {}

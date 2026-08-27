@@ -17,7 +17,7 @@ import java.util.Optional;
  *
  * @since 5.1.0
  */
-@PublicApi(since = "5.1.0")
+@PublicApi(since = "4.0.0")
 public interface NotificationAccess {
 
     /**

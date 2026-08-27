@@ -27,7 +27,7 @@ import static com.gamma.util.Values.trimToNull;
  *                      newest-first
  * @since 4.3.0
  */
-@com.gamma.api.PublicApi(since = "4.3.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public record ObjectQuery(ObjectType objectType, String status, String severity, String assignee,
                           String owner, String correlationId, String textContains,
                           int limit, int offset, long closedBefore, boolean oldestFirst) {

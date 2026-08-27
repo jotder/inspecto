@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
  * the ingest engine runs, so an override would let a preview diverge from the engine that ingests
  * the real files. A provider colliding with another provider is equally a deployment error.
  */
-@PublicApi(since = "5.3.0")
+@PublicApi(since = "4.0.0")
 public final class Parsers {
 
     private static final Pattern ID = Pattern.compile("[a-z0-9][a-z0-9_]*");

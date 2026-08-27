@@ -28,7 +28,7 @@ import static com.gamma.util.Values.putIfPresent;
  * {@link #lower} — their truth is the registered {@code *_enrich.toon} companion (W4b), never a
  * mirror in the pipeline file.
  */
-@PublicApi(since = "4.7.0")
+@PublicApi(since = "4.0.0")
 public final class PipelineEditable {
 
     private PipelineEditable() {}

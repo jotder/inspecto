@@ -38,7 +38,7 @@ import java.util.function.ToLongFunction;
  * {@code <baseName>_out.<ext>}. A multi-destination fan-out writes the same partition once per destination — each
  * file genuinely holds those rows, so each registry row correctly repeats the count.
  */
-@PublicApi(since = "5.0.0")
+@PublicApi(since = "4.0.0")
 public final class ConsignmentOutputs {
 
     private ConsignmentOutputs() {}

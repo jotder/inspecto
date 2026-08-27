@@ -30,7 +30,7 @@ import java.util.Map;
  * <p>Default-off: when no backend is configured the store is absent and the {@code /jobs/metrics}
  * endpoints 404; nothing about the existing in-memory history / CSV audit changes.
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class DbJobRunStore implements AutoCloseable, com.gamma.util.BrowsableStore {
 
     private static final Logger log = LoggerFactory.getLogger(DbJobRunStore.class);

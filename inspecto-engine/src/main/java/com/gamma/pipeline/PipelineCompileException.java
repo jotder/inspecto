@@ -25,7 +25,7 @@ import java.util.List;
  * each went in the same change that let the format hold what it was refusing. A count is not what
  * should constrain a pipeline — whether a step accepts its neighbours is ({@code PipelineValidator}).
  */
-@PublicApi(since = "4.7.0")
+@PublicApi(since = "4.0.0")
 public class PipelineCompileException extends RuntimeException {
 
     /** One named reason a graph cannot lower; {@code nodeId} is null for graph-level refusals. */

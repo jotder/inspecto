@@ -15,7 +15,7 @@ import com.gamma.api.PublicApi;
  *
  * @since 4.4.0
  */
-@PublicApi(since = "4.4.0")
+@PublicApi(since = "4.0.0")
 public interface NotificationChannel {
 
     /** Stable channel id used as the preference key (e.g. {@code "email"}). */

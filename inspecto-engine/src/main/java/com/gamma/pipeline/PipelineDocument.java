@@ -31,7 +31,7 @@ import static com.gamma.util.Values.strOrEmpty;
  * a live dry-run, which is neither pure nor deterministic. They belong to the S6b import/diff loop,
  * which already needs the dry-run seam.
  */
-@PublicApi(since = "5.1.0")
+@PublicApi(since = "4.0.0")
 public final class PipelineDocument {
 
     private PipelineDocument() {}

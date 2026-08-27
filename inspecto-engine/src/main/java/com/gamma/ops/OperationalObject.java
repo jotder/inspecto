@@ -24,7 +24,7 @@ import java.util.UUID;
  *
  * @since 4.3.0
  */
-@com.gamma.api.PublicApi(since = "4.3.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public record OperationalObject(String id, ObjectType objectType, String title, String description,
                                 String status, String severity, String priority, String owner,
                                 String assignee, String correlationId, Map<String, String> attributes,

@@ -35,7 +35,7 @@ import java.util.Map;
  *
  * @since 4.4.0
  */
-@com.gamma.api.PublicApi(since = "4.4.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public final class ConfigJsonSchema {
 
     private static final ObjectMapper JSON = new ObjectMapper();

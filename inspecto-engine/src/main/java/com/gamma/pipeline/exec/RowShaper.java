@@ -58,7 +58,7 @@ import java.util.Set;
  * <p>NULL-safe partitioning: a predicate that evaluates to {@code NULL} sends the row to the negative
  * side ({@code dropped}/{@code invalid}) — i.e. {@code data} keeps {@code COALESCE(pred, FALSE)} only.
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class RowShaper {
 
     private RowShaper() {}

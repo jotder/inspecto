@@ -30,7 +30,7 @@ import java.time.ZoneId;
  * <p>⛔ Deliberately <b>no picker and no cached field</b>: resolution is a pure function of the property,
  * so a test can set it, and callers resolve once at construction (the zone is fixed for a service's life).
  */
-@PublicApi(since = "5.0.0")
+@PublicApi(since = "4.0.0")
 public final class OperationsZone {
 
     private OperationsZone() {}

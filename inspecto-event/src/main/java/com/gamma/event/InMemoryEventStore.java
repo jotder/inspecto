@@ -18,7 +18,7 @@ import java.util.List;
  *
  * @since 4.2.0
  */
-@com.gamma.api.PublicApi(since = "4.2.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public final class InMemoryEventStore implements EventStore {
 
     /** Default ring capacity — generous enough for a useful live tail, small enough to bound heap. */

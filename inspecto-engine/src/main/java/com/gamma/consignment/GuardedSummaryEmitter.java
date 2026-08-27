@@ -22,7 +22,7 @@ import java.util.regex.Pattern;
  * guardrail's tests did not change when the sink arrived. §7.4's rollup cache is still design, deliberately: it
  * is a cache that may be deleted entirely without data loss, so nothing depends on it existing.
  */
-@PublicApi(since = "5.0.0")
+@PublicApi(since = "4.0.0")
 public final class GuardedSummaryEmitter implements SummaryEmitter {
 
     /**

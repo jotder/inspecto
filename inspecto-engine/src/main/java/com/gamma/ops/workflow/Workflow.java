@@ -34,7 +34,7 @@ import static com.gamma.util.Values.trimToNull;
  *
  * @since 4.3.0
  */
-@com.gamma.api.PublicApi(since = "4.3.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public record Workflow(ObjectType objectType, String initialState, Set<Transition> transitions,
                        Set<String> terminalStates) {
 

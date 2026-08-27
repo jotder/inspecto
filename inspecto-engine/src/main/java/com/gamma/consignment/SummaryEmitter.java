@@ -14,7 +14,7 @@ import com.gamma.api.PublicApi;
  * <p>This is also why the context exposes this and <em>not</em> {@code ArtifactRecorder}: two plausible ways to
  * emit the same thing would be a one-concept-two-words violation. Summary output goes through here, full stop.
  */
-@PublicApi(since = "5.0.0")
+@PublicApi(since = "4.0.0")
 public interface SummaryEmitter {
 
     /** The reserved, mandatory measure name (§7.2): every summary row must carry a row count. */

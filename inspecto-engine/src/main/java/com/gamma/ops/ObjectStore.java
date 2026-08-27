@@ -26,7 +26,7 @@ import java.util.Optional;
  *
  * @since 4.3.0
  */
-@com.gamma.api.PublicApi(since = "4.3.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public interface ObjectStore extends AutoCloseable {
 
     /** Insert a new object and return it. Throws {@link IllegalStateException} if the id already exists. */

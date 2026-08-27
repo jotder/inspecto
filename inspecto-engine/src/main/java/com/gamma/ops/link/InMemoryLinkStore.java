@@ -10,7 +10,7 @@ import java.util.List;
  *
  * @since 4.5.0
  */
-@com.gamma.api.PublicApi(since = "4.5.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public final class InMemoryLinkStore implements LinkStore {
 
     /** Insertion-ordered; reads iterate in reverse for newest-first. Guarded by {@code this}. */

@@ -42,7 +42,7 @@ import java.util.Set;
  * list, and a reader holding this list across a recompute has a stale one rather than a consistent one.
  * Subtraction fixes <em>stale inclusion</em>. Torn multi-file reads are a separate, still-open defect (§7-A).
  */
-@PublicApi(since = "5.0.0")
+@PublicApi(since = "4.0.0")
 public final class ConsignmentSelector {
 
     private static final Logger log = LoggerFactory.getLogger(ConsignmentSelector.class);

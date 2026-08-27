@@ -41,7 +41,7 @@ import static com.gamma.util.Values.trimOrEmpty;
  * as {@link #ATTR_CONFIG_ROOT} before invoking the authenticator, so per-space role docs resolve at
  * token-validation time.
  */
-@PublicApi(since = "5.0.0")
+@PublicApi(since = "4.0.0")
 public final class Roles {
     private Roles() {}
 

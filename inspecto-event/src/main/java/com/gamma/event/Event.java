@@ -31,7 +31,7 @@ import java.util.UUID;
  *
  * @since 4.2.0
  */
-@com.gamma.api.PublicApi(since = "4.2.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public record Event(String eventId, long ts, EventLevel level, String type, String source,
                     String pipeline, String correlationId, String message,
                     Map<String, String> attributes, Map<String, Object> payload) {

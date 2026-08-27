@@ -17,7 +17,7 @@ import java.util.Set;
  *
  * <p>The registry is built once at class-load and is immutable thereafter.
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class PipelineNodeTypes {
 
     private static final Map<String, PipelineNodeType> REGISTRY = load();

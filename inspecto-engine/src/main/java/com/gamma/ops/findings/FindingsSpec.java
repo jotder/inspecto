@@ -43,7 +43,7 @@ import java.util.regex.PatternSyntaxException;
  *
  * @since 4.6.0
  */
-@PublicApi(since = "4.6.0")
+@PublicApi(since = "4.0.0")
 public record FindingsSpec(String objectType, List<Section> sections) {
 
     /** Renderer-supported control types — the {@code AttributeType} union in {@code attribute-spec.ts}. */

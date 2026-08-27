@@ -32,7 +32,7 @@ import java.util.Map;
  *
  * @since 4.9.0
  */
-@PublicApi(since = "4.9.0")
+@PublicApi(since = "4.0.0")
 public interface DeliveryStatusAdapter {
 
     /** Stable id, used as the callback URL's last segment (e.g. {@code "sendgrid"}). */

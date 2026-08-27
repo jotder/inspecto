@@ -22,7 +22,7 @@ import java.util.Map;
  * audited: unlike the coarse route-level allow it fires per surviving row, so auditing it would
  * flood the log on every list read — a deliberate scope limit (plan §4 A5).
  */
-@PublicApi(since = "5.0.0")
+@PublicApi(since = "4.0.0")
 public final class RowScope {
     private RowScope() {}
 

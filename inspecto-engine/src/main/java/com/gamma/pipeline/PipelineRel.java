@@ -16,7 +16,7 @@ import com.gamma.api.PublicApi;
  * <p>See {@code docs/flow-graph-design.md} §3.2 (edges) and §15 (the capability inventory that
  * fixed the split-relationship set).
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class PipelineRel {
 
     private PipelineRel() {}

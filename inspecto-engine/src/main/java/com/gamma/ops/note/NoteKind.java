@@ -9,7 +9,7 @@ import java.util.Locale;
  *
  * @since 4.6.0
  */
-@com.gamma.api.PublicApi(since = "4.6.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public enum NoteKind {
     /** A free-text note/comment on an object (an investigation note, a status update). */
     COMMENT,

@@ -22,7 +22,7 @@ import java.util.Optional;
  * a crash before the watermark advances re-reads the just-written increment next run, which the sink's
  * {@code OVERWRITE_OR_IGNORE} write makes idempotent.
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class PipelineWatermarkStore {
 
     private static final Logger log = LoggerFactory.getLogger(PipelineWatermarkStore.class);

@@ -36,7 +36,7 @@ import java.util.Map;
  * check runs and had no runtime of its own (folded 2026-08-04; only the marker subsystem keeps a
  * node, G2). Dead top-level keys ({@code version}/{@code search}/…) are dropped (F1).
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class PipelineLift {
 
     private PipelineLift() {}

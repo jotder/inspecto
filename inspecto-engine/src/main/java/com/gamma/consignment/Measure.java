@@ -16,7 +16,7 @@ import com.gamma.api.PublicApi;
  * @param composability how this measure combines across partial aggregates; never {@code null}.
  * @param value         the measured value.
  */
-@PublicApi(since = "5.0.0")
+@PublicApi(since = "4.0.0")
 public record Measure(String name, Composability composability, double value) {
 
     /** An additive measure — the common, always-safe case ({@code count}, {@code sum}, {@code bytes}). */

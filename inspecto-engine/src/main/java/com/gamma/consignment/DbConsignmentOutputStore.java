@@ -43,7 +43,7 @@ import java.util.Optional;
  * file is revealed, so a state flip cannot resurrect a file the registry never saw. Neither transition is
  * reversible, and neither is a substitute for the JSON manifest — see the existence/state split above.
  */
-@PublicApi(since = "5.0.0")
+@PublicApi(since = "4.0.0")
 public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.util.BrowsableStore {
 
     private static final Logger log = LoggerFactory.getLogger(DbConsignmentOutputStore.class);

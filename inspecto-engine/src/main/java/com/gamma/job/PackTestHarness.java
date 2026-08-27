@@ -54,7 +54,7 @@ import java.util.UUID;
  *
  * @since 5.1.0
  */
-@PublicApi(since = "5.1.0")
+@PublicApi(since = "4.0.0")
 public final class PackTestHarness {
 
     private final PlatformServiceRegistry platform = new PlatformServiceRegistry();

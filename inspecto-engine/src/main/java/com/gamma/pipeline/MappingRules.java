@@ -29,7 +29,7 @@ import java.util.Map;
  *
  * <p>Pure: no I/O, no clock, no DuckDB. The result is a function of the rules alone.
  */
-@PublicApi(since = "5.1.0")
+@PublicApi(since = "4.0.0")
 public final class MappingRules {
 
     private MappingRules() {}

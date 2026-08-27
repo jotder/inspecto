@@ -34,7 +34,7 @@ import java.util.Set;
  *
  * <p>Instances are immutable snapshots; {@link #scan(Path)} (re)builds one.
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class ComponentRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(ComponentRegistry.class);

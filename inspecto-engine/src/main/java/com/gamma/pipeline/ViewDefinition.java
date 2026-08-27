@@ -22,7 +22,7 @@ import static com.gamma.util.Values.str;
  *                     (the multi-statement transform chain is re-run via {@code flow} instead)
  * @param definedAt    ISO-8601 timestamp the definition was last written
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public record ViewDefinition(String store, String flow, List<String> sourceStores,
                              String derivedSql, String definedAt) {
 

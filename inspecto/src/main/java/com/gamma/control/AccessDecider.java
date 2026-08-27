@@ -21,7 +21,7 @@ import java.util.Map;
  * gate (defense in depth; a deliberate tightening of the plan's §2 combining order, where policy
  * allow preceded the capability check).
  */
-@PublicApi(since = "5.0.0")
+@PublicApi(since = "4.0.0")
 public interface AccessDecider {
 
     enum Decision { ALLOW, DENY, ABSTAIN }

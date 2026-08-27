@@ -22,7 +22,7 @@ import java.util.List;
  *
  * @since 4.6.0
  */
-@com.gamma.api.PublicApi(since = "4.6.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public interface NoteStore extends AutoCloseable {
 
     /** Append a note and return it. */

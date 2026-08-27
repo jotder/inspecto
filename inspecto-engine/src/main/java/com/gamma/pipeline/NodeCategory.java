@@ -13,7 +13,7 @@ import com.gamma.api.PublicApi;
  * pipeline topology — which sink kind a node is, or whether a source is a file collector or a stream
  * adapter, is a node-level concern, not a pipeline one (doc §3.1).
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public enum NodeCategory {
 
     /** Entry / <b>collector</b> processors that land a batch — {@code acquisition} (files), {@code adapter} (stream→file). */

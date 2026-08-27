@@ -24,7 +24,7 @@ import java.util.Set;
  * <p>A single-branch flow (one expected branch) reduces to "commit the one branch, then finalise the
  * source" — the same observable sequence as today, so the legacy path's behaviour is preserved.
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class BranchCommitCoordinator {
 
     /** Write one branch's outputs + manifest durably (idempotent — overwrite-or-ignore). */

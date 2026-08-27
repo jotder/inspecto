@@ -89,7 +89,7 @@ import java.util.function.Supplier;
  * incremental re-run via the {@code incremental_column} job param (single-source — reads only rows past the
  * stored watermark and appends). See {@code docs/flow-live-execution-plan.md}.
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class PipelineJobRunner implements Job {
 
     private static final Logger log = LoggerFactory.getLogger(PipelineJobRunner.class);

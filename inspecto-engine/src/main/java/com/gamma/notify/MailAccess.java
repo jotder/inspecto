@@ -32,7 +32,7 @@ import java.util.ServiceLoader;
  *
  * @since 5.1.0
  */
-@PublicApi(since = "5.1.0")
+@PublicApi(since = "4.0.0")
 public interface MailAccess {
 
     /**

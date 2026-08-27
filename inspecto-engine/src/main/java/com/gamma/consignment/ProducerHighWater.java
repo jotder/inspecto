@@ -23,5 +23,5 @@ import java.time.Instant;
  *                      counts as <em>in</em> horizon — staleness has to be proven, not assumed, or a producer
  *                      with an unreadable timestamp would drop out and let the watermark advance past it.
  */
-@PublicApi(since = "5.0.0")
+@PublicApi(since = "4.0.0")
 public record ProducerHighWater(String producer, String eventTimeMax, Instant lastSeen) { }

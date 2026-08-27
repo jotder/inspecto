@@ -23,7 +23,7 @@ import java.util.Set;
  * relies on. This is pure over the IR + a running-set; the live wiring ({@code CollectorService}) supplies
  * the running flows and surfaces a {@code STORE_DELETE_CONFLICT} event/alert per conflict.
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class DeletionFence {
 
     private DeletionFence() {}

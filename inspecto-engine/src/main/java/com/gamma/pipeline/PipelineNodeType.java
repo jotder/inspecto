@@ -23,7 +23,7 @@ import java.util.Set;
  * edition/plugin node types; it mirrors the proven {@code CollectorConnectorFactory} seam. Don't
  * remove it for being "unused" — implement a provider against it instead.
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public interface PipelineNodeType {
 
     /** The {@code type} value this descriptor handles, e.g. {@code "acquisition"}. */

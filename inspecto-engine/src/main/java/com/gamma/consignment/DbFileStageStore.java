@@ -29,7 +29,7 @@ import java.util.List;
  * table only adds the queryable index, exactly the existence/state split
  * {@link DbConsignmentOutputStore} documents.
  */
-@PublicApi(since = "5.1.0")
+@PublicApi(since = "4.0.0")
 public final class DbFileStageStore implements AutoCloseable, com.gamma.util.BrowsableStore {
 
     private static final Logger log = LoggerFactory.getLogger(DbFileStageStore.class);

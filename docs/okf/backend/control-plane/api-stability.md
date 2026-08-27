@@ -20,6 +20,29 @@ Within a major version, `@PublicApi` elements follow semantic versioning. The
 annotation has `CLASS` retention — visible to tooling and Javadoc, not required
 at runtime.
 
+## Release baseline — nothing after 3.x has shipped
+
+**The newest release on `master`'s ancestry is `v3.11.0`** (2026-06-03). `v3.12.0` exists as a tag but
+is **not an ancestor of `master`** (divergent lineage), and the `v4.0.0` / `v4.0.0-RC1` tags were
+**deleted 2026-08-17** with the `4.x` branch because 4.0.0 never reached production
+([BRANCHING.md](../../../BRANCHING.md) §1). Trunk is `4.0.0-SNAPSHOT`.
+
+Two consequences, and they govern every relocation and rename question on this codebase:
+
+1. **`since()` is informational, and a value above 3.x means "will become public API in 4.0.0" —
+   not "has been public API since".** Every `@PublicApi` element introduced after 3.x therefore
+   carries `since = "4.0.0"`. Values of 4.1.0 … 5.8.0 were previously written against versions that
+   never existed; they were corrected to `4.0.0` in one sweep (200 sites).
+2. **An element whose `since` is `4.0.0` has never been published in any release, so it may still be
+   moved, renamed, or changed freely** — the stability promise binds *within a released major*, and
+   4.0.0 is not released. ⛔ **`@PublicApi` alone does not make a change breaking.** Check whether the
+   element exists in the newest ancestor release before treating a relocation as an API break:
+   `git ls-tree -r --name-only v3.11.0 | grep -E '/<Class>\.java$'`.
+   This premise (`@PublicApi` ⇒ breaking ⇒ bump) has now been written down and refuted **three**
+   times — the Source→Collector rename ([GLOSSARY](../../../GLOSSARY.md) §13), the <!-- vocab-allow: names the Source→Collector rename itself -->
+   `ConsignmentProcessor` SPI widening ([BACKLOG](../../../BACKLOG.md) §4), and the architecture
+   plan's Phase C cycle cuts. It is *inherited*, not measured. Measure it.
+
 ## The public surface (2.0.0)
 
 Two audiences depend on the framework from outside:
@@ -35,7 +58,7 @@ Two audiences depend on the framework from outside:
 
 > **Removed in 3.11.0 (breaking):** the whole-file `com.gamma.etl.FileIngester` and its nested `Segment` (both since 1.3.0). The plugin SPI is unified on `StreamingFileIngester`; the framework now runs the same ingester in *union mode* (many small files → one transform/write) or *generation mode* (huge single files → bounded scratch), chosen per batch by `processing.streaming.large_file_bytes`. Port `FileIngester` plugins to `StreamingFileIngester` (see [plugins.md](../engine/plugins.md)). This is a **deliberate exception** to the within-major-version stability promise above, made to consolidate the plugin SPI before it had wide external adoption.
 
-> **Major bump 4.0.0 (the agent-module reshape):** the **core ETL `@PublicApi` surface above is unchanged** — Stage-1/Stage-2/control/embedder types and signatures carry over from 3.x untouched. The major bump was driven by two things: (1) a **runtime-floor bump for the agent modules**, and (2) the optional `inspecto-agent` module was reshaped onto shared orchestrator primitives (`SyncOrchestrator` / `Capability` / confidence-escalation / `AuditSink`), and `com.gamma.assist.AssistResult.confidence` became a numeric `double` (was a `String`). Only code driving the assist module's result type was affected.
+> **Pending major 4.0.0 — NOT YET RELEASED (the agent-module reshape):** the **core ETL `@PublicApi` surface above is unchanged** — Stage-1/Stage-2/control/embedder types and signatures carry over from 3.x untouched. The bump, when 4.0.0 ships, is driven by two things: (1) a **runtime-floor bump for the agent modules**, and (2) the optional `inspecto-agent` module was reshaped onto shared orchestrator primitives (`SyncOrchestrator` / `Capability` / confidence-escalation / `AuditSink`), and `com.gamma.assist.AssistResult.confidence` became a numeric `double` (was a `String`). Only code driving the assist module's result type was affected.
 >
 > **Current Java floor (verified 2026-07-07):** the core compiles at `maven.compiler.release=24`; the **agent modules require a JDK 25+ runtime** (their model-transport jars are class-file v69) — the bundled JDK 26 runtime satisfies both. **agent-kernel itself was replaced 2026-07-07**: its reasoning layer is vendored into `inspecto-agent` (`com.gamma.agent.kernel.*`) and the model transport is **eoiagent** (`com.eoiagent:eoiagent-core|-model`) — the assist SPI (`com.gamma.assist.spi.AssistAgent`) is unchanged. The Standard edition adds three control-plane SPIs — `com.gamma.control.Authenticator` / `Subject` / `TokenRelay` (implemented by the `inspecto-security` module) — which follow the same stability policy.
 
@@ -61,7 +84,7 @@ Two audiences depend on the framework from outside:
 | `com.gamma.job.JobService` | 2.8.0 | Registry + scheduler for config-driven jobs (cron / event / manual) hosting ingest, enrichment, report and maintenance work uniformly (backs `GET /jobs`, `/jobs/{name}/runs`, `POST /jobs/{name}/trigger`) |
 | `com.gamma.job.JobConfig` | 2.8.0 | A `*_job.toon` definition: name, `type`, `cron`, `on_pipeline`, `enabled`, type-specific params |
 
-### Agent-consumed core surface (frozen 4.0.0, M3)
+### Agent-consumed core surface (frozen for the pending 4.0.0, M3)
 
 The optional `inspecto-agent` (and `-intelligence`) modules are an L5 consumer that, per
 [architecture-layers.md](../architecture-layers.md), must touch core **only through SPI interfaces +
@@ -79,7 +102,7 @@ build against an API jar), so wrapping would duplicate data shapes for no payoff
 | `com.gamma.signal` | `Ref`, `Severity`, `Signal` |
 | `com.gamma.util` | `CronExpression` (relocated from `com.gamma.service`, WS-D §1.7) |
 | `com.gamma.service` | (`CollectorService` already public) |
-| `com.gamma.etl` / `com.gamma.enrich` / `com.gamma.job` / `com.gamma.event` / `com.gamma.report` | `BatchEvent`, `StatusStore` (StatusStore relocated from `com.gamma.service`, WS-D §1.7); `EnrichmentAuditReader`, `EnrichmentConfig`; `JobConfig`; `EventLog` (4.2.0); `ReportService.Window` |
+| `com.gamma.etl` / `com.gamma.enrich` / `com.gamma.job` / `com.gamma.event` / `com.gamma.report` | `BatchEvent`, `StatusStore` (StatusStore relocated from `com.gamma.service`, WS-D §1.7); `EnrichmentAuditReader`, `EnrichmentConfig`; `JobConfig`; `EventLog`; `ReportService.Window` |
 
 ## Explicitly internal (do not depend on)
 

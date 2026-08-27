@@ -14,7 +14,7 @@ import java.util.Objects;
  * @param rel  relationship (never blank — a blank/{@code null} value normalises to {@code data})
  * @param to   target node id
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public record PipelineEdge(String from, String rel, String to) {
 
     public PipelineEdge {

@@ -19,7 +19,7 @@ import java.util.Set;
  * granted and when it is not available in this build flavor. Optional use = {@code find()},
  * mandatory use = a {@code requires:} declaration + {@code get()}.
  */
-@PublicApi(since = "5.1.0")
+@PublicApi(since = "4.0.0")
 public interface PlatformServices {
 
     /** The granted service, or empty — absent when not granted OR not available in this build. */

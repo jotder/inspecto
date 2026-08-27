@@ -25,7 +25,7 @@ import java.util.Set;
  * <p>Pure functions over the IR — no engine, no I/O — so they unit-test without HTTP. Returned maps use
  * insertion order ({@link LinkedHashMap}) so the JSON field order is stable.
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class PipelineProjection {
 
     private PipelineProjection() {}

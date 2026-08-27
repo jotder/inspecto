@@ -50,7 +50,7 @@ import java.util.Set;
  *       unlike every other check here which is pure IR.</li>
  * </ul>
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class PipelineValidator {
 
     private PipelineValidator() {}

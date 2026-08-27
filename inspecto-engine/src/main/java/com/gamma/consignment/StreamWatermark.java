@@ -36,7 +36,7 @@ import java.util.Optional;
  * cursor</em> ({@code max(incremental_column)} per pipeline+store, no producer set, no completeness claim), and
  * {@code $job.last_success_time} is <em>wall clock</em>. Neither answers window close.
  */
-@PublicApi(since = "5.0.0")
+@PublicApi(since = "4.0.0")
 public final class StreamWatermark {
 
     private StreamWatermark() {}

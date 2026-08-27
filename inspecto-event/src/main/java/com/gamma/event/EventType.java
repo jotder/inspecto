@@ -15,7 +15,7 @@ package com.gamma.event;
  *
  * @since 4.2.0
  */
-@com.gamma.api.PublicApi(since = "4.2.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public final class EventType {
 
     private EventType() {}

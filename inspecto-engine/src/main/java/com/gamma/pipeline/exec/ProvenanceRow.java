@@ -22,6 +22,6 @@ import com.gamma.api.PublicApi;
  * @param rowCount   the number of records emitted on {@code rel}
  * @param runTs      ISO-8601 timestamp of the run
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public record ProvenanceRow(String pipelineId, String batchId, String nodeId, String rel,
                             long rowCount, String runTs) {}

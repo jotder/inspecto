@@ -22,7 +22,7 @@ import java.util.Set;
  * <p>This is the engine-side basis for the combined pipeline+job visualisation (T24): the shared store
  * is the node where two flows meet.
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class PipelineStores {
 
     /** Config key on a {@code sink} node naming the data store it writes (the producer side). */

@@ -25,7 +25,7 @@ import java.util.Locale;
  * be spliced after {@code SELECT * FROM } — not an identifier. Callers that need a named relation register
  * a view over it.
  */
-@PublicApi(since = "4.9.0")
+@PublicApi(since = "4.0.0")
 public final class ReferenceReader {
 
     private ReferenceReader() {}

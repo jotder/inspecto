@@ -28,7 +28,7 @@ import java.util.Map;
  *
  * @since 4.9.0
  */
-@com.gamma.api.PublicApi(since = "4.9.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public record TagAssignment(String tag, String targetKind, String targetId, String actor, long createdAt) {
 
     public TagAssignment {

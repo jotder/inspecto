@@ -39,7 +39,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * untouched. <b>Fail-closed:</b> an existing-but-unreadable profile contributes no allows for its
  * role; an unreadable catalog (with every role profiled) denies every known capability, loudly.
  */
-@PublicApi(since = "5.0.0")
+@PublicApi(since = "4.0.0")
 public final class AccessGrants {
     private AccessGrants() {}
 

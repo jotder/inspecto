@@ -85,8 +85,13 @@ former root reference docs** (each index lists them):
   D1 both batches (`260c023a`, `311a4523`, 16 loop→stream conversions).
   **Next (Track 1, no decision needed):** D2a — `PipelineConfigParser.parse()` 801 lines → named
   section methods, task order in the plan. Then Phase A (`ReadModel`), then D2b.
-  **Blocked (Track 2):** all three cycle cuts — every cycle-cutting class is `@PublicApi`, so
-  relocation needs a major-version decision (4 operator decisions listed in the plan).
+  **~~Blocked~~ UNBLOCKED (Track 2), 2026-08-27 (second pass):** the "every cycle-cutting class is
+  `@PublicApi`, so relocation needs a major-version decision" gate was a **false premise** — all six
+  such classes are absent from `v3.11.0` (the newest ancestor release) and no 4.x/5.x release has
+  ever existed, so nothing after 3.x has shipped and there is no API break to grant. **C1 + C2 cuts
+  are ordinary refactors and are the schedulable work in this plan.** Decisions #2/#3/#5 remain, as
+  *design* questions; #1 (SPI narrowing) shrank from a release-policy gate to a design call. See
+  `okf/backend/control-plane/api-stability.md` §*Release baseline*.
   **Closed as grounded LEAVEs:** B (`ObjectService`), F (`PipelineConfig` broad split), S7
   (`CollectorService` wiring) — read their evidence before reopening.
 - ~~`superpower/java-simplification-plan.md`~~ — **COMPLETE and ARCHIVED 2026-08-27**

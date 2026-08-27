@@ -31,7 +31,7 @@ import java.util.Optional;
  *
  * @since 4.3.0
  */
-@com.gamma.api.PublicApi(since = "4.3.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public final class DbObjectStore extends AbstractJdbcStore implements ObjectStore {
 
     private static final Logger log = LoggerFactory.getLogger(DbObjectStore.class);

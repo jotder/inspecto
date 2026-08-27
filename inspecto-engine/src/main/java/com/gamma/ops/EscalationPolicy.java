@@ -23,7 +23,7 @@ import java.util.Map;
  *
  * @since 4.9.0
  */
-@com.gamma.api.PublicApi(since = "4.9.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public record EscalationPolicy(String severity, String reassignQueue, boolean renotify) {
 
     /** Whether this policy would change anything on the incident itself (vs. only re-notifying). */

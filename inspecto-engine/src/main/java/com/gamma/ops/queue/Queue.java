@@ -24,7 +24,7 @@ import static com.gamma.util.Values.trimToNull;
  *
  * @since 4.9.0
  */
-@com.gamma.api.PublicApi(since = "4.9.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public record Queue(String id, String name, String description, List<String> members, Routing routing) {
 
     /** How {@link QueueRouter} chooses a member when an object is assigned to the queue. */

@@ -29,7 +29,7 @@ import java.util.Map;
  *                 processor does not know it. Build it with {@link EventTimeBounds#of}. Optional by design:
  *                 an absent bound degrades addressing, a wrong one corrupts it.
  */
-@PublicApi(since = "5.0.0")
+@PublicApi(since = "4.0.0")
 public record SummaryRow(String target, Map<String, String> keys, List<Measure> measures,
                          EventTimeBounds bounds) {
 

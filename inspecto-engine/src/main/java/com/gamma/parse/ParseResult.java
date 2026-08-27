@@ -15,7 +15,7 @@ import java.util.Map;
  * <p>The shapes mirror the UI's {@code ParserPreview} union verbatim ({@code kind: 'table' |
  * 'tree'}), so the control plane serializes a result without translation.
  */
-@PublicApi(since = "5.3.0")
+@PublicApi(since = "4.0.0")
 public sealed interface ParseResult permits ParseResult.Table, ParseResult.Tree {
 
     /**

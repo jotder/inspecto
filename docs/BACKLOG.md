@@ -996,6 +996,31 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md).
 
 **Open:**
+- ⭐ **ARCH-C1C2 — cut the C1 and C2 package cycles by relocation. UNBLOCKED 2026-08-27 (second pass);
+  the only schedulable engineering work on the board.** Plan:
+  [`superpower/java-architecture-plan.md`](superpower/java-architecture-plan.md) Track 2 item 6.
+  It was recorded as ⛔ BLOCKED on a major-version decision because every cycle-holding class is
+  `@PublicApi`. **That premise is false.** All six (`ConsignmentProcessJobType`, `ProcessorContext`,
+  `AnnotationKinds`, `FindingsSpec`, `ComponentStore`, `NodeAttribute`) are **absent from `v3.11.0`**,
+  the newest release tag that is an ancestor of `master` — the `consignment` / `ops` / `pipeline`
+  packages did not exist then. No `v4.x` or `v5.x` release has ever been cut (`v4.0.0` / `v4.0.0-RC1`
+  were deleted 2026-08-17, BRANCHING §1), so relocating them breaks no published FQN. **Ordinary
+  refactors, no grant owed.** C2 has no alternative path; C1 also has the constant-ownership inversion
+  (decision #3) as a competing *design*.
+  🔴 **The trap, which is worth more than the cuts: `@PublicApi` marks intent to publish, not
+  exposure.** The premise `@PublicApi ⇒ breaking ⇒ bump` has now been written into a plan and refuted
+  **three separate times** — Source→Collector (GLOSSARY §13), `ConsignmentProcessor` (§4 consignment
+  addressing row, which says in as many words that the premise *"came from this row and was never
+  tested"*), and Phase C. <!-- vocab-allow: names the Source→Collector rename itself --> Falsify it in
+  one command before scoping any relocation:
+  `git ls-tree -r --name-only v3.11.0 | grep -E '/<Class>\.java$'`. Policy of record:
+  [`okf/backend/control-plane/api-stability.md`](okf/backend/control-plane/api-stability.md)
+  §*Release baseline*.
+  ⚠ Related, now a *design* call rather than a release-policy gate: **decision #1** (narrow the
+  `AssistAgent`/`IntelligenceAgent` SPI `init(CollectorService)` → `ReadModel`, worth fan-in 16 → ~8).
+  `IntelligenceAgent` never shipped; `AssistAgent` shipped at 3.0.0 but with
+  `void init(SourceService)` — the signature **already changed** on master via the Source→Collector
+  rename, so narrowing adds zero incremental break. <!-- vocab-allow: names the Source→Collector rename itself -->
 - **PKG-3 — Dockerfile wrapping serve.sh (trigger-gated: build it only when someone actually wants a
   containerized deployment).** The backend-hardening plan's optional item 6 (archived 2026-08-26, items
   1–5 shipped `38c7a32d`): `inspecto-deploy/Dockerfile`, eclipse-temurin:24-jre base, COPY fat jar,

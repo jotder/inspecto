@@ -40,7 +40,7 @@ import java.util.Optional;
  * @see Parsers
  * @see ParseResult
  */
-@PublicApi(since = "5.3.0")
+@PublicApi(since = "4.0.0")
 public interface ParserPlugin {
 
     /** Stable catalog id ({@code [a-z0-9][a-z0-9_]*}), e.g. {@code delimited}, {@code xml}. */

@@ -27,7 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * authoritative for <em>state</em>. That split is what makes recording fail-open safe, so no caller needs a null
  * check and none should treat a missing row as proof a file does not exist.
  */
-@PublicApi(since = "5.0.0")
+@PublicApi(since = "4.0.0")
 public final class ConsignmentOutputStores {
 
     private static final Logger log = LoggerFactory.getLogger(ConsignmentOutputStores.class);

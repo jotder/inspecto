@@ -53,7 +53,7 @@ import java.util.stream.Stream;
  *
  * @since 4.2.0
  */
-@com.gamma.api.PublicApi(since = "4.2.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public final class ParquetEventStore implements EventStore {
 
     private static final Logger log = LoggerFactory.getLogger(ParquetEventStore.class);

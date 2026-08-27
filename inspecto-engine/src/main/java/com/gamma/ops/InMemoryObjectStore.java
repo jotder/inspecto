@@ -19,7 +19,7 @@ import java.util.Optional;
  *
  * @since 4.3.0
  */
-@com.gamma.api.PublicApi(since = "4.3.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public final class InMemoryObjectStore implements ObjectStore {
 
     private final Map<String, OperationalObject> byId = new LinkedHashMap<>();

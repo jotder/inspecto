@@ -53,7 +53,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * @since 4.3.0
  */
-@com.gamma.api.PublicApi(since = "4.3.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public final class ObjectService {
 
     private static final String SOURCE = ObjectService.class.getName();

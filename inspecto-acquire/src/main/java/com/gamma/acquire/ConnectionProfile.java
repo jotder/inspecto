@@ -34,7 +34,7 @@ import static com.gamma.util.Values.trimToNull;
  * {@link #toMap()} the SPA consumes uses {@code basePath}. {@link #fromMap(Map)} accepts <b>either</b>,
  * so both views round-trip losslessly.
  */
-@com.gamma.api.PublicApi(since = "4.2.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public record ConnectionProfile(String id, String connector, String host, int port, String database,
                                 String basePath, String username, String password,
                                 Map<String, String> options, Tunnel tunnel, Proxy proxy) {

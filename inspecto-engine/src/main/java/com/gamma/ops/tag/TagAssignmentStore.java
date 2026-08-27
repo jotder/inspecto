@@ -27,7 +27,7 @@ import java.util.List;
  *
  * @since 4.9.0
  */
-@com.gamma.api.PublicApi(since = "4.9.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public interface TagAssignmentStore extends AutoCloseable {
 
     /** Apply a tag. Idempotent: re-applying returns the edge already stored, unchanged. */

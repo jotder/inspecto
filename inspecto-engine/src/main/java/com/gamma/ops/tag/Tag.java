@@ -20,7 +20,7 @@ import java.util.Map;
  *
  * @since 5.0.0
  */
-@com.gamma.api.PublicApi(since = "5.0.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public record Tag(String name, long createdAt) {
 
     public Tag {

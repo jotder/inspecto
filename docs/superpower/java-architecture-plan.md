@@ -110,11 +110,15 @@ measurement, not a fact about the code.
 | mixed (nested + real) | 1 — `PipelineSupport` | same |
 | genuinely needs the class | **15** — 5 composition-root (`ServiceBootstrap`, `ServiceStores`, `SpaceBootstrap`, `SpaceContext`, `SpaceManager`), `ApiContext`/`ControlApi`, and 8 agent/SPI | SPI 8 gated on **decision #1**; the rest **irreducible** |
 
-🔴 **The obvious lever is NOT free.** Promoting the three nested records to top-level would drop
-fan-in **25 → 16** with no signature changes — but `CollectorService` is
-**`@PublicApi(since = "2.2.0")`** (`:86`), so its public nested records are published *by containment*
-and the move is a source/binary break for external consumers. It is therefore **decision #4**
-(`@PublicApi` relocation on a major bump), exactly like C1/C2 — not a free afternoon.
+🔴 **The obvious lever was thought NOT free — and the reason was wrong.** Promoting the three nested
+records to top-level drops fan-in **25 → 16** with no signature changes. It was gated as **decision #4**
+because `CollectorService` is **`@PublicApi(since = "2.2.0")`** (`:86`), so its public nested records
+looked published *by containment*.
+⚠ **CORRECTED 2026-08-27 (second pass) — the gate was never real.** `CollectorService` does **not exist
+in any release on `master`'s ancestry**: at `v3.11.0`, the newest ancestor tag, the type is
+`com.gamma.service.SourceService`, renamed 2026-07-14 as a deliberate "breaking, NO version bump"
+(GLOSSARY §13). The `since = "2.2.0"` records when the *element* became public API, not that today's
+FQN ever shipped. The promotion was correct to make, but it never needed a grant.
 
 **Realistic ceiling, in order:**
 1. ~~Today, ungated: ~0.~~
@@ -122,8 +126,12 @@ and the move is a source/binary break for external consumers. It is therefore **
    promoted to top-level `com.gamma.service` records. **fan-in 25 → 16, exactly as predicted**
    (9 files dropped: `DataSourceRoutes`, `PipelineListRoutes`, `RunRoutes`, `OperationalActions`,
    `ContextBroker`, `InspectoTools`, `ReportService`, `DataSourceBundleResolver`, `MetricsService`).
-   Safe on version: master is **`4.0.0-SNAPSHOT`** and the last release is **`v3.12.0`**, so 4.0.0 *is*
-   the major bump decision #4 contemplates.
+   Safe on version — and more safely than recorded here at the time. ⚠ **`v3.12.0` is NOT the last
+   release on this line**: it is not an ancestor of `master` (divergent lineage). The newest ancestor
+   release is **`v3.11.0`** (2026-06-03, 256 `.java` files), which contains no `com.gamma.service`,
+   `consignment`, `ops` or `pipeline` package at all. Master is `4.0.0-SNAPSHOT` and the `v4.0.0` /
+   `v4.0.0-RC1` tags were deleted 2026-08-17 (BRANCHING §1), so **nothing after 3.x has shipped** and
+   4.0.0 *is* the pending major.
    🔴 **But the `report → service` EDGE did not move.** The promoted records live in
    `com.gamma.service` too, so `ReportService` swapped a `CollectorService` import for a
    `PipelineView` import — **a different holder, the same edge** — and it still imports
@@ -372,23 +380,42 @@ importing the concrete `CollectorService` while it imports back — but the inve
 consistently. ⚠ This interacts with Phase A: role interfaces are exactly the mechanism that would
 cut C3, so **scope A and C3 together, not separately.**
 
-**STATUS 2026-08-27: step 1 SHIPPED; the cuts are BLOCKED on an operator decision.**
+**STATUS 2026-08-27 (second pass): step 1 SHIPPED; the cuts are UNBLOCKED — the blocker was a false
+premise, not a decision.**
 
 1. ✅ **`reactor.md` corrected** — a dated "Re-measured 2026-08-27" section supersedes (does not
    rewrite) the true-but-historical 2026-07-22 layering claim, with all three SCCs, their exact
    holding edges, and what is *not* a cycle (`catalog ↔ catalog.spi` is the deliberate SPI pair;
    `job → consignment` is legitimately one-way).
-2. ⛔ **C1 and C2 cuts BLOCKED — every cycle-cutting class is `@PublicApi`.** Measured after the
-   edge trace, which did not check the stability contract: `ConsignmentProcessJobType` and
-   `ProcessorContext` are `@PublicApi(5.0.0)`, `AnnotationKinds` is `@PublicApi(4.9.0)`. Relocating
-   any of them changes its FQN — a break that the stability policy permits **only on a major version
-   bump**. For C2 there is no workaround: a deprecated alias at the old FQN would still sit in
-   `consignment` and still reference `job`, so the cycle would survive it.
-   - The one API-free path is **C1 via constant-ownership inversion** (move `TYPES`/`TIERS` canonical
-     values to `pipeline`, `FindingsSpec` delegates, both edges then point `ops → pipeline`). That is
-     a design change rather than a relocation, so per the operator's stated default it is documented,
-     not built unasked. **This is now operator decision #4.**
-3. C3: partly cuttable via Phase A — see there; its last two edges need decision #1.
+2. ~~⛔ **C1 and C2 cuts BLOCKED — every cycle-cutting class is `@PublicApi`.**~~
+   ✅ **REFUTED 2026-08-27 (second pass). There is no API break, so there is nothing to grant.**
+   The blocker read the annotation and stopped there. Measured against the tags instead:
+
+   | Class | Marked | At `v3.11.0` (newest ancestor release) |
+   |---|---|---|
+   | `ConsignmentProcessJobType` | `@PublicApi(5.0.0)` | **absent** — no `com.gamma.consignment` package exists |
+   | `ProcessorContext` | `@PublicApi(5.0.0)` | **absent** — same |
+   | `AnnotationKinds` | `@PublicApi(4.9.0)` | **absent** — no `com.gamma.ops` package exists |
+   | `FindingsSpec` | `@PublicApi(4.6.0)` | **absent** — same |
+
+   **No `v4.x` or `v5.x` release has ever existed**, so a `since` of 4.6.0/4.9.0/5.0.0 named a version
+   that was never cut; all four were corrected to `4.0.0` in the repo-wide sweep. Relocating a type
+   that has never been published breaks no consumer, and the stability policy's "only on a major bump"
+   condition is satisfied by the pending 4.0.0 regardless. **C1 and C2 are ordinary refactors.**
+   ⚠ The trap this produced is worth more than the cuts: `@PublicApi` marks *intent to publish*, and
+   on a trunk that has not released its major, intent is not exposure.
+   🔴 **This is the THIRD independent time the premise `@PublicApi ⇒ breaking ⇒ bump` was written into
+   a plan and then refuted** — Source→Collector (GLOSSARY §13, "breaking, NO version bump"), <!-- vocab-allow: names the Source→Collector rename itself -->
+   `ConsignmentProcessor` (BACKLOG §4: *"the premise came from this row and was never tested"*), and
+   now Phase C. The policy is stated once in
+   [`okf/backend/control-plane/api-stability.md`](../okf/backend/control-plane/api-stability.md)
+   §*Release baseline*; check the tag, not the annotation.
+   - **C1 still has a second, independent path** — constant-ownership inversion (move `TYPES`/`TIERS`
+     canonical values to `pipeline`, `FindingsSpec` delegates, both edges then point `ops → pipeline`).
+     That is a design change rather than a relocation, so it remains **decision #3** — a question of
+     which design is better, no longer a way to dodge an API break.
+3. C3: partly cuttable via Phase A — see there; its last two edges need decision #1, whose cost is
+   **also smaller than recorded** — see that decision.
 
 🔴 **The measurement trap this phase produced, worth more than the cuts:** 31 of the engine's 135
 `@PublicApi` classes write the annotation **fully-qualified**, so `grep "@PublicApi"` under-reports
@@ -546,13 +573,13 @@ shape, while A introduces a new published-ish type whose package placement has a
 (C3). Doing the mechanical one first keeps the arc's momentum while leaving the judgment call for
 when there is time to make it properly.
 
-### Track 2 — blocked; ask now, build when answered
+### Track 2 — was "blocked; ask now, build when answered". ⚠ **Re-scoped 2026-08-27 (second pass): the version blocker was false, so items 6 and 7 are ordinary work.**
 
 | # | Work | Waits on | If the answer is no |
 |---|---|---|---|
-| 5 | **C1 cut via constant-ownership inversion** | decision #3 | Cycle stays documented in `reactor.md`. No further cost. |
-| 6 | **C1 + C2 cuts via relocation** | ✅ **decision #4 GRANTED 2026-08-27 — UNBLOCKED, not yet built** | ⚠ Now the only schedulable engineering work left in this plan. This is the only path for C2 (no API-free alternative). ⚠ Confirm scope first — the grant was given while looking at the record promotion, not at C1/C2. |
-| 7 | **C3's last two edges** | decision #1 (SPI narrowing) | ⚠ **Corrected 2026-08-27:** C3 stays at **4 packages**. The old fallback ("shrinks 4 → 3 via Phase A") assumed Phase A cuts the `report` edge; it does not — `EnrichmentService` and (since `7eab72d4`) `PipelineView` — still `com.gamma.service` — hold it independently. If decision #1 is *no*, C3 is documented and unchanged. |
+| 5 | **C1 cut via constant-ownership inversion** | decision #3 — **a design preference, no longer an API dodge** | Cycle stays documented in `reactor.md`. No further cost. Item 6 cuts C1 anyway. |
+| 6 | **C1 + C2 cuts via relocation** | ✅ **NOTHING — buildable now.** The `@PublicApi` gate was refuted (Phase C step 2): all four cycle-holding classes are absent from `v3.11.0`, and no 4.x/5.x release exists. Decision #4's grant is not even needed. | ⭐ **The schedulable engineering work in this plan.** Only path for C2. |
+| 7 | **C3's last two edges** | decision #1 (SPI narrowing) — **a design call, not a release-policy gate** | ⚠ **Corrected 2026-08-27:** C3 stays at **4 packages**. The old fallback ("shrinks 4 → 3 via Phase A") assumed Phase A cuts the `report` edge; it does not — `EnrichmentService` and (since `7eab72d4`) `PipelineView` — still `com.gamma.service` — hold it independently. If decision #1 is *no*, C3 is documented and unchanged. |
 | 8 | *(optional)* **F carve-out — `Collector` subtree** | decision #5 | Nothing depends on it; the plan's own recommendation is not to build it unprompted. |
 
 ### Task-level breakdown of Track 1 (decided 2026-08-27)
@@ -760,9 +787,24 @@ the same refuted premise from the same fan-out numbers.
 ## Operator decisions required
 
 1. **Phase A / C3 — narrowing the `AssistAgent`/`IntelligenceAgent` SPI `init(CollectorService)`.**
-   Excluded above because it breaks third-party implementors. Cutting the last two edges of the C3
-   cycle needs that break, so C3 can only be *shrunk* (4 packages → 3) without a decision here.
-   **Question: is the SPI signature frozen, or may a major version narrow it?**
+   Excluded above because it "breaks third-party implementors". Cutting the last two edges of the C3
+   cycle needs that narrowing.
+   ⚠ **RE-SCOPED 2026-08-27 (second pass) — the cost recorded here is much larger than the real one,
+   and the release-policy half of it is gone.** Measured against `v3.11.0`, the newest ancestor
+   release:
+   - `IntelligenceAgent` **does not exist there at all** — the whole `com.gamma.intelligence` package
+     postdates 3.x. Narrowing it breaks nobody.
+   - `AssistAgent` **did** ship (`@PublicApi(since = "3.0.0")`) — but its released method is
+     `void init(SourceService service)`. Today it is `void init(CollectorService service)`. **The
+     signature has ALREADY been changed since the last release**, by the Source→Collector rename taken <!-- vocab-allow: names the Source→Collector rename itself -->
+     as a deliberate "breaking, NO version bump" (GLOSSARY §13). An implementor porting from 3.11.0
+     must rewrite that method whatever we do, so narrowing it to `ReadModel` adds **zero** incremental
+     break.
+   ⛔ **The old framing — "a strictly bigger ask than #4" — does not survive this.** What remains is a
+   genuine *design* question, and it is still the operator's:
+   **Question: should the agent SPIs receive the narrow `ReadModel` instead of the full
+   `CollectorService`?** (Payoff: `CollectorService` fan-in **16 → ~8**, against a floor of ~7.) It is
+   no longer a question about the release policy.
 2. **Phase C — how far to chase cycles.** C1 and C2 are worth cutting on the evidence. But if a cut
    turns out to need more than a relocation (i.e. it is a redesign), the honest default is to stop,
    record it, and leave the cycle documented. **Confirm that default.**
@@ -770,16 +812,21 @@ the same refuted premise from the same fan-out numbers.
    the `TYPES`/`TIERS` canonical values to `pipeline` and having `@PublicApi` `FindingsSpec` delegate
    (its signature is unchanged, so no break). This is a design change, not a relocation, so it is
    documented rather than built. **Question: cut C1 this way, or leave the cycle recorded?**
-4. ✅ **ANSWERED 2026-08-27 — GRANTED. `@PublicApi` types MAY relocate on a major bump.**
-   ⛔ Do not re-ask. The bump is **4.0.0**: master is `4.0.0-SNAPSHOT`, last release `v3.12.0`.
+4. ✅ **ANSWERED 2026-08-27 — GRANTED, and subsequently found to have been UNNECESSARY.**
+   `@PublicApi` types MAY relocate on a major bump — and separately, none of the types in question had
+   ever been released, so no grant was owed. ⛔ **Do not re-ask, and do not treat a future `@PublicApi`
+   relocation as gated without checking the tag first** (see Phase C step 2 and
+   [`api-stability.md`](../okf/backend/control-plane/api-stability.md) §*Release baseline*).
+   ⛔ Do not re-ask. The bump is **4.0.0**: master is `4.0.0-SNAPSHOT`. ⚠ **`v3.12.0` is not the last
+   release on this line** — it is not an ancestor of `master`; the newest ancestor tag is `v3.11.0`.
    **Executed so far:** `PipelineView`/`PipelineRun`/`InboxStatus` promoted out of `CollectorService`
    (`7eab72d4`), fan-in 25 → 16. ⚠ **This is NOT the same decision as #1** — the note that said so was
    wrong. #1 breaks a `ServiceLoader` contract for third-party *implementors* (they must change code
    they own); #4 relocates types callers merely *reference*. Granting one does not grant the other,
    and #1 is still open.
-   ⚠ **The grant was given in the context of the record promotion.** It unblocks Track 2 item 6
-   (C1 + C2 relocations) by the plan's own wiring — **confirm scope with the operator before building
-   a second API break**, since that was not what they were looking at when they granted it.
+   ⚠ The grant was given in the context of the record promotion, and the handoff asked that Track 2
+   item 6 be scope-confirmed before building "a second API break". ✅ **That confirmation is moot:
+   there is no API break to confirm.** C1/C2 relocate types absent from every release.
 5. **Phase F carve-out — build it or not.** It is genuinely optional; the plan recommends *not*
    doing it unless the acquisition subtree is being worked on anyway.
 

@@ -27,7 +27,7 @@ import java.util.Set;
  * <p>Pure and side-effect-free so it is unit-testable directly; {@link com.gamma.job.PipelineJobRunner} feeds it the run's
  * counts and promotes each {@link Imbalance} to an event/alert.
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class ConservationCheck {
 
     /** A node whose records were not conserved. {@code kind} is {@code "LOSS"} (in &gt; out) or {@code "AMPLIFICATION"}. */

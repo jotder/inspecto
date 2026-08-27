@@ -28,7 +28,7 @@ import java.util.Map;
  * number is seconds). The {@code cron} string is carried verbatim; the loop scheduler validates it via
  * {@code CronExpression} when it arms the schedule.
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public record PipelineTrigger(Kind kind, long everyMs, String cron, String on, String from, long coalesceMs) {
 
     /** The literal trigger shape declared on the entry node. */

@@ -17,7 +17,7 @@ import java.util.TreeSet;
  *
  * @since 4.9.0
  */
-@com.gamma.api.PublicApi(since = "4.9.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public final class InMemoryTagAssignmentStore implements TagAssignmentStore {
 
     /** Insertion-ordered; reads iterate in reverse for newest-first. Guarded by {@code this}. */

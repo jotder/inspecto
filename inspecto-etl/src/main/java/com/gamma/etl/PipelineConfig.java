@@ -240,7 +240,7 @@ public final class PipelineConfig {
      * fan it out), but is refused when loaded for execution ({@link #prepare()}) until the branch-aware
      * executor is wired (Stage A step 3, see {@code docs/superpower/sinks-config-format-plan.md}).
      */
-    @PublicApi(since = "4.8.0")
+    @PublicApi(since = "4.0.0")
     public record Sink(String database, String format, String compression, Map<String, Object> duckLake,
                        String filenameColumn) {
         /** The pre-B4 shape — no filename column. */
@@ -356,7 +356,7 @@ public final class PipelineConfig {
      * <b>stated</b>; merging with the globals happens at the {@code IntakeGovernor} call site
      * ({@code CollectorProcessor}), never here — the config module does not know the runtime defaults.
      */
-    @PublicApi(since = "5.7.0")
+    @PublicApi(since = "4.0.0")
     public record Intake(Integer maxFilesPerCycle, Integer minFilesPerCycle, Boolean adaptive) {
         public Intake {
             if (maxFilesPerCycle != null && maxFilesPerCycle < 0)
@@ -429,7 +429,7 @@ public final class PipelineConfig {
      *       this record is then unused.</li>
      * </ul>
      */
-    @PublicApi(since = "4.1.0")
+    @PublicApi(since = "4.0.0")
     public record FixedWidth(boolean binary, int recordLength, Trim trim,
                              int minRecordLength, List<Slice> slices) {
         /** One positional field: {@code start} (0-based), {@code length} (chars for text, bytes for binary), optional {@code name}. */
@@ -453,7 +453,7 @@ public final class PipelineConfig {
      * @param format      {@code newline} (NDJSON, one object per line) | {@code array} | {@code auto}
      * @param recordsPath JSONPath to the record array; only {@code "$"} (the default) is supported
      */
-    @PublicApi(since = "4.8.0")
+    @PublicApi(since = "4.0.0")
     public record Json(String format, String recordsPath, int maximumObjectSize, boolean ignoreErrors) {
         /** The 4.8 shape — no reader tuning (multiformat J1 added the two knobs additively). */
         public Json(String format, String recordsPath) { this(format, recordsPath, 0, false); }
@@ -486,7 +486,7 @@ public final class PipelineConfig {
      * @param ignoreErrors   replace unrepresentable cells with NULL instead of failing (default false)
      * @param normalizeNames normalize header names to lower_snake identifiers (default false)
      */
-    @PublicApi(since = "5.8.0")
+    @PublicApi(since = "4.0.0")
     public record Xlsx(String sheet, String range, boolean header, boolean stopAtEmpty,
                        boolean ignoreErrors, boolean normalizeNames) {}
 
@@ -515,7 +515,7 @@ public final class PipelineConfig {
      *                    {@code (?P<name>...)} spelling DuckDB accepts
      * @param groupNames  the named capture groups in declaration order (⇒ DuckDB name_list order)
      */
-    @PublicApi(since = "4.8.0")
+    @PublicApi(since = "4.0.0")
     public record TextRegex(String recordSplit, String pattern, List<String> groupNames) {
         public TextRegex {
             groupNames = List.copyOf(groupNames);
@@ -532,7 +532,7 @@ public final class PipelineConfig {
      * patterns (see {@link com.gamma.acquire.DiscoveryContext}); {@code recursiveDepth} of {@code -1} is
      * unbounded.
      */
-    @PublicApi(since = "4.2.0")
+    @PublicApi(since = "4.0.0")
     public record Collector(String id, String connector, List<String> includes,
                          List<String> excludes, int recursiveDepth, Stability stability, String connection,
                          Duplicate duplicate, Guarantee guarantee, GapDetection gapDetection,
@@ -568,7 +568,7 @@ public final class PipelineConfig {
      * {@linkplain #requiresLedger() require a ledger} to hold; the engine logs a warning if a stronger guarantee
      * is declared over path-only (marker) dedup, and behaves as best-effort + commit-log replay in that case.
      */
-    @PublicApi(since = "4.2.0")
+    @PublicApi(since = "4.0.0")
     public enum Guarantee {
         /** Today's behaviour: markers + commit log, no fingerprint ledger required. */ BEST_EFFORT,
         /** Every file is processed at least once (ledger-backed; safe to re-fetch). */  AT_LEAST_ONCE,
@@ -595,7 +595,7 @@ public final class PipelineConfig {
      *
      * <p>{@link #DISABLED} (no {@code source.gap_detection:} block) ⇒ no series check (the legacy behaviour).
      */
-    @PublicApi(since = "4.2.0")
+    @PublicApi(since = "4.0.0")
     public record GapDetection(boolean enabled, String sequence) {
         /** No gap detection — the legacy behaviour. */
         public static final GapDetection DISABLED = new GapDetection(false, null);
@@ -616,7 +616,7 @@ public final class PipelineConfig {
      *
      * <p>{@link #PATH_DEFAULT} (no {@code source.duplicate:} block) reproduces today's behaviour exactly.
      */
-    @PublicApi(since = "4.2.0")
+    @PublicApi(since = "4.0.0")
     public record Duplicate(String mode, String algorithm, String onChange) {
         /** Path-keyed dedup via marker sentinels — the legacy default. */
         public static final Duplicate PATH_DEFAULT = new Duplicate("path", "SHA256", "reprocess");
@@ -647,7 +647,7 @@ public final class PipelineConfig {
      *
      * <p>{@link #DISABLED} (no {@code source.incremental:} block) ⇒ the full discovery listing (legacy behaviour).
      */
-    @PublicApi(since = "4.2.0")
+    @PublicApi(since = "4.0.0")
     public record Incremental(String watermark) {
         /** The high-watermark dimension; {@code last_modified} is the only one implemented (etag/version future). */
         public static final String LAST_MODIFIED = "last_modified";
@@ -672,7 +672,7 @@ public final class PipelineConfig {
      * <p>{@link #DISABLED} (no {@code source.stability:} block) is the legacy behaviour: a matched file is a
      * candidate immediately and nothing is stat'd for stability.
      */
-    @PublicApi(since = "4.2.0")
+    @PublicApi(since = "4.0.0")
     public record Stability(boolean enabled, long windowMillis, int sizeChecks,
                             String readyMarker, boolean excludeTempFiles, List<String> tempPatterns) {
         /** Temp / in-flight patterns excluded by default when stability gating is on (filename globs). */
@@ -695,7 +695,7 @@ public final class PipelineConfig {
      *
      * <p>{@link #DEFAULT} (no block) ⇒ sequential, unthrottled — exactly the Phase-E behaviour.
      */
-    @PublicApi(since = "4.2.0")
+    @PublicApi(since = "4.0.0")
     public record Fetch(String mode, String stagingDir, int parallelFetch, long rateLimitBytesPerSec) {
         public static final Fetch DEFAULT = new Fetch("STAGE", null, 1, 0L);
         public Fetch {
@@ -718,7 +718,7 @@ public final class PipelineConfig {
      *
      * <p>{@link #DISABLED} (no block, {@code count == 0}) ⇒ a single attempt — exactly today's behaviour.
      */
-    @PublicApi(since = "4.2.0")
+    @PublicApi(since = "4.0.0")
     public record Retry(int count, String backoff, long initialDelayMillis, long maxDelayMillis) {
         public static final Retry DISABLED = new Retry(0, "EXPONENTIAL", 1_000L, 60_000L);
         public Retry {
@@ -739,7 +739,7 @@ public final class PipelineConfig {
      *
      * <p>{@link #DISABLED} (no block) ⇒ never trips — exactly today's behaviour.
      */
-    @PublicApi(since = "4.2.0")
+    @PublicApi(since = "4.0.0")
     public record CircuitBreaker(boolean enabled, int failureThreshold, long cooldownMillis) {
         public static final CircuitBreaker DISABLED = new CircuitBreaker(false, 5, 300_000L);
         public CircuitBreaker {
@@ -758,7 +758,7 @@ public final class PipelineConfig {
      *
      * <p>{@link #RETAIN} (no block) leaves the source untouched — exactly today's behaviour.
      */
-    @PublicApi(since = "4.2.0")
+    @PublicApi(since = "4.0.0")
     public record PostActionConfig(String onSuccess, String archivePath, Map<String, String> tags,
                                    String onUnsupported) {
         public static final PostActionConfig RETAIN =
@@ -781,7 +781,7 @@ public final class PipelineConfig {
      * {@code ref:<pipeline>}) and Stage-2 enrichments may bind it by name
      * ({@code references.<name>.ref:}) instead of a raw path.
      */
-    @PublicApi(since = "5.1.0")
+    @PublicApi(since = "4.0.0")
     public enum Produces {
         /** Event/fact data origin — the default; the catalog registers a Stream. */
         STREAM,
@@ -809,7 +809,7 @@ public final class PipelineConfig {
      * and {@code SCD2} require a non-empty {@code reference.key}. The engine mechanics land in later
      * phases (P1/P2); P0 only carries and validates the config.
      */
-    @PublicApi(since = "5.2.0")
+    @PublicApi(since = "4.0.0")
     public enum Load {
         /** Full-replace — the default; rewrites the partition each run (v1 semantics). */
         REPLACE,
@@ -855,7 +855,7 @@ public final class PipelineConfig {
      * @param refreshSeconds {@code 0} = re-materialize on collect only (today); {@code >0} arms a
      *                       periodic compaction/re-materialize timer (Phase-3 — parsed/stored now)
      */
-    @PublicApi(since = "5.2.0")
+    @PublicApi(since = "4.0.0")
     public record Reference(List<String> key, Load load, int refreshSeconds) {
         /** Full-replace, no key, no refresh timer — exactly the pre-Phase-2 behaviour. */
         public static final Reference DEFAULT = new Reference(List.of(), Load.REPLACE, 0);
@@ -877,7 +877,7 @@ public final class PipelineConfig {
      * @param keys    the business-key columns (target/mapped names); never empty
      * @param orderBy optional SQL order deciding the winner per key (blank ⇒ arbitrary/first seen)
      */
-    @PublicApi(since = "5.5.0")
+    @PublicApi(since = "4.0.0")
     public record Dedup(List<String> keys, String orderBy) {
         public Dedup {
             if (keys == null || keys.isEmpty())
@@ -897,7 +897,7 @@ public final class PipelineConfig {
      * @param groupBy  the group-by columns (may be empty when every row collapses into one summary row)
      * @param measures the measure shorthand list; never empty
      */
-    @PublicApi(since = "5.6.0")
+    @PublicApi(since = "4.0.0")
     public record Summarize(List<String> groupBy, List<String> measures) {
         public Summarize {
             if (measures == null || measures.isEmpty())
@@ -927,7 +927,7 @@ public final class PipelineConfig {
      * @param columns explicit projection entries ({@code [{name, expr}]}); empty when unauthored
      * @param rules   mapping-component rules, field types undeclared; empty when unauthored
      */
-    @PublicApi(since = "5.7.0")
+    @PublicApi(since = "4.0.0")
     public record MapConfig(List<Map<String, Object>> columns, List<Map<String, Object>> rules) {
         public MapConfig {
             columns = columns == null ? List.of() : List.copyOf(columns);
@@ -952,7 +952,7 @@ public final class PipelineConfig {
      * @param reference the join source ({@code reference/<id>} or a path); never blank
      * @param on        the join-key columns (input-side names); never empty
      */
-    @PublicApi(since = "5.6.0")
+    @PublicApi(since = "4.0.0")
     public record Join(String reference, List<String> on) {
         public Join {
             if (reference == null || reference.isBlank())

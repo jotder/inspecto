@@ -28,7 +28,7 @@ import java.util.NoSuchElementException;
  *
  * @since 4.9.0
  */
-@com.gamma.api.PublicApi(since = "4.9.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public final class NoteService {
 
     private static final String SOURCE = NoteService.class.getName();

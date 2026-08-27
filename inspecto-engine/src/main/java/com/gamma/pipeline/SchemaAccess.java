@@ -20,7 +20,7 @@ import java.util.function.Supplier;
  *
  * @since 5.1.0
  */
-@PublicApi(since = "5.1.0")
+@PublicApi(since = "4.0.0")
 public interface SchemaAccess {
 
     /** The names of the schema components currently in the space's registry. */

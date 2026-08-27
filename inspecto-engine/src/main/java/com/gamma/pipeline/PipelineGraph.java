@@ -25,7 +25,7 @@ import java.util.Set;
  * @param nodes  the typed nodes (immutable copy)
  * @param edges  the directed, relationship-carrying edges (immutable copy)
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public record PipelineGraph(String name, boolean active, List<PipelineNode> nodes, List<PipelineEdge> edges) {
 
     public PipelineGraph {

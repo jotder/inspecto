@@ -26,7 +26,7 @@ import java.util.List;
  * supplies the real {@link BranchCommitCoordinator.SourceFinalize} (the re-homed {@code BatchProcessor.commit}
  * finalize body: backup → markers LAST → ledger / watermark).
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class BatchGraphRunner {
 
     private BatchGraphRunner() {}

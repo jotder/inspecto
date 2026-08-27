@@ -26,7 +26,7 @@ import java.util.Map;
  * {@link com.gamma.job.JobService} that holds it). When absent, the executor still runs with a {@code NONE}
  * collector and the {@code /provenance} endpoint 404s — nothing about the live path changes.
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.BrowsableStore {
 
     private static final Logger log = LoggerFactory.getLogger(DbProvenanceStore.class);

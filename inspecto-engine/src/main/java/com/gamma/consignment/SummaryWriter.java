@@ -46,7 +46,7 @@ import java.util.regex.Pattern;
  * this reintroduces the read pattern the section exists to fix, silently, for any target whose author forgot the
  * key. It is deliberate and recorded; prefer emitting {@code record_day} in every {@link SummaryRow}.
  */
-@PublicApi(since = "5.0.0")
+@PublicApi(since = "4.0.0")
 public final class SummaryWriter {
 
     private static final Logger log = LoggerFactory.getLogger(SummaryWriter.class);

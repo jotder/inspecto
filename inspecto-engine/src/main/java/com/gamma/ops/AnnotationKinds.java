@@ -26,7 +26,7 @@ import java.util.Set;
  *
  * @since 4.9.0
  */
-@com.gamma.api.PublicApi(since = "4.9.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public final class AnnotationKinds {
 
     private AnnotationKinds() {}

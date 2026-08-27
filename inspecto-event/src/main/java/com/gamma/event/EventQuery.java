@@ -23,7 +23,7 @@ import static com.gamma.util.Values.trimToNull;
  * @param offset        rows to skip from the newest (for paging; clamped to {@code >= 0})
  * @since 4.2.0
  */
-@com.gamma.api.PublicApi(since = "4.2.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public record EventQuery(Long fromMs, Long toMs, EventLevel minLevel, String type, String pipeline,
                          String correlationId, String textContains, int limit, int offset) {
 

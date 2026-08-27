@@ -26,7 +26,7 @@ import static com.gamma.util.Values.putIfPresent;
  * {@code active} default). Lenient compile is the converter's mode — a projection must not delete
  * the sections whose owning verb the recipe cannot speak yet.
  */
-@PublicApi(since = "5.1.0")
+@PublicApi(since = "4.0.0")
 public final class RecipeConverter {
 
     private RecipeConverter() {}

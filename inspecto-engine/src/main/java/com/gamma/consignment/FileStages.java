@@ -18,7 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * constructor registers the result. Absent by default: {@link #record} then no-ops, and the crash-safe
  * commit ordering is unchanged — see {@link DbFileStageStore}'s class doc for the fail-open contract.
  */
-@PublicApi(since = "5.1.0")
+@PublicApi(since = "4.0.0")
 public final class FileStages {
 
     private static final Logger log = LoggerFactory.getLogger(FileStages.class);

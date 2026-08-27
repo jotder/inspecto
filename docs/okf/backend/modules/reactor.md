@@ -256,32 +256,43 @@ all created by packages and edges added after that measurement. Read this sectio
   rule 7 caught it, as it caught the phantom `etl↔service` blocker before). A `//` comment at
   `pipeline/ComponentStore.java:84` mentioning `FindingsSpec` is likewise not an edge.
 
-### 🔴 All three cycles are held by `@PublicApi` classes — cutting any is a MAJOR-VERSION decision
+### ~~🔴 All three cycles are held by `@PublicApi` classes — cutting any is a MAJOR-VERSION decision~~
+### ✅ REFUTED 2026-08-27 (second pass): `@PublicApi` here marks intent to publish, not exposure
 
-This is the finding that governs Phase C, and it was missed by the cohesion/import analysis that
-produced the table above. Every class whose relocation would cut a cycle is on the published surface:
+The section below was the finding that governed Phase C. **It was wrong**, and the way it was wrong is
+the durable lesson. It read the annotation and never checked the tags. Every class it lists is absent
+from **`v3.11.0`**, the newest release tag that is an ancestor of `master`:
 
-| Class | Marker | Role in the cycle |
-|---|---|---|
-| `consignment/ConsignmentProcessJobType` | `@PublicApi(5.0.0)` | the whole of C2's reverse edge |
-| `consignment/ProcessorContext` | `@PublicApi(5.0.0)` | C2's sibling edge (`job.RunLog` delegation) |
-| `ops/AnnotationKinds` | `@PublicApi(4.9.0)` | C1 edge 1 → `pipeline.ComponentStore` |
-| `ops/findings/FindingsSpec` | `@PublicApi(4.6.0)` | C1 edge 2's target (stays put either way) |
-| `pipeline/ComponentStore` | `@PublicApi(4.3.0)` | C1 edge 1's target (stays put either way) |
-| `pipeline/NodeAttribute` | **unmarked** | C1 edge 2's source — the only free class in the set |
+| Class | Marker (then → now) | Role in the cycle | At `v3.11.0` |
+|---|---|---|---|
+| `consignment/ConsignmentProcessJobType` | `5.0.0` → **`4.0.0`** | the whole of C2's reverse edge | **absent** (no `consignment` pkg) |
+| `consignment/ProcessorContext` | `5.0.0` → **`4.0.0`** | C2's sibling edge (`job.RunLog` delegation) | **absent** |
+| `ops/AnnotationKinds` | `4.9.0` → **`4.0.0`** | C1 edge 1 → `pipeline.ComponentStore` | **absent** (no `ops` pkg) |
+| `ops/findings/FindingsSpec` | `4.6.0` → **`4.0.0`** | C1 edge 2's target (stays put either way) | **absent** |
+| `pipeline/ComponentStore` | `4.3.0` → **`4.0.0`** | C1 edge 1's target (stays put either way) | **absent** (no `pipeline` pkg) |
+| `pipeline/NodeAttribute` | **unmarked** | C1 edge 2's source | **absent** |
 
-Per [`../control-plane/api-stability.md`](../control-plane/api-stability.md), a `@PublicApi` type may
-change incompatibly **only on a major version bump, noted in release notes**. Relocating one changes
-its FQN, which breaks every plugin author and embedder importing it. So:
+**No `v4.x` or `v5.x` release has ever existed** — the `v4.0.0` / `v4.0.0-RC1` tags were deleted
+2026-08-17 because 4.0.0 never reached production ([BRANCHING](../../BRANCHING.md) §1), and `v3.12.0`
+is not an ancestor of `master`. Those `since` values named versions that were never cut; all of them
+were corrected to `4.0.0` in a repo-wide sweep (200 sites). Per
+[`../control-plane/api-stability.md`](../control-plane/api-stability.md) §*Release baseline*, the
+stability promise binds only **within a released major**, so:
 
-- **C2 is BLOCKED.** Its only cut is relocating two `@PublicApi(5.0.0)` classes. A deprecated alias
-  left behind at the old FQN does not help — the alias would still live in `consignment` and still
-  reference `job`, so the cycle survives the workaround.
-- **C1 is BLOCKED as a relocation** (`AnnotationKinds` is published). It *could* be cut without an
-  API break by **inverting the constant ownership** on edge 2 — move the `TYPES`/`TIERS` canonical
-  values to `pipeline` and have `FindingsSpec` delegate, so both edges point `ops → pipeline` and the
-  cycle opens. That is a design change, not a relocation, so under the operator's stated default it
-  is recorded here rather than built unasked.
+- **C1 and C2 are ordinary refactors.** Relocating a type that no release has ever published breaks
+  no plugin author and no embedder. There is nothing to grant and nothing to bump.
+- **C1's constant-ownership inversion is still on the table as a *design*** — move the `TYPES`/`TIERS`
+  canonical values to `pipeline` and have `FindingsSpec` delegate, so both edges point
+  `ops → pipeline`. It was previously framed as "the one API-free path"; it is now simply the
+  alternative design, competing with the relocation on merit.
+
+🔴 **The generalizable trap — check the tag, not the annotation.** `@PublicApi` records an *intention
+to publish*. On a trunk whose major has not shipped, intention is not exposure. This premise
+(`@PublicApi` ⇒ breaking ⇒ bump) has now been written into a plan and refuted **three separate
+times**: Source→Collector (GLOSSARY §13, shipped "breaking, NO version bump"), `ConsignmentProcessor` <!-- vocab-allow: names the Source→Collector rename itself -->
+(BACKLOG §4 — *"the premise came from this row and was never tested"*), and this section. Falsify it
+with one command before scoping any relocation:
+`git ls-tree -r --name-only v3.11.0 | grep -E '/<Class>\.java$'`
 - **C3** is the same shape (see the Phase 2 plan), but ⚠ **"partly cuttable" was measured wrong — see
   the correction below. It is NOT cuttable by role interfaces.**
 

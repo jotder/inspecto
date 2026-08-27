@@ -20,7 +20,7 @@ import java.sql.Statement;
  * ({@link SqlViews#storeReadRoot} — the store-layout contract), so a flow can seed directly from an
  * ingest pipeline's store by name without a {@code data_dir} override.
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class SourceStoreReader {
 
     private SourceStoreReader() {}

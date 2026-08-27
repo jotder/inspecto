@@ -25,7 +25,7 @@ import java.util.Objects;
  * @param config      node-local configuration (immutable copy; never {@code null} — empty if none)
  * @param use         registry reference {@code <type>/<name>}, or {@code null} for none
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public record PipelineNode(String id, String type, String name, String description,
                        Map<String, Object> config, String use) {
 

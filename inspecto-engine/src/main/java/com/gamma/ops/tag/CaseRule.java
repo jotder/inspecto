@@ -24,7 +24,7 @@ import java.util.Map;
  *
  * @since 5.0.0
  */
-@com.gamma.api.PublicApi(since = "5.0.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public record CaseRule(String name, String title, TagRule.Filter filter, int threshold,
                        long windowMinutes, String category, String tags, long createdAt) {
 

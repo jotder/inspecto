@@ -16,7 +16,7 @@ import java.util.Set;
  * flow still references is refused — generalising the existing {@code connectionInUse} 409 guard from
  * connections to every component type ({@code grammar}/{@code schema}/{@code transform}/{@code sink}/…).
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class PipelineReferences {
 
     private PipelineReferences() {}

@@ -27,7 +27,7 @@ import java.util.regex.Pattern;
  * stored; wiring them into the live executor is a separate concern (the legacy poll loop still runs the
  * lifted {@code *_pipeline.toon}). Pure file I/O over a root — no HTTP — so it unit-tests directly.
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class PipelineStore {
 
     private static final Logger log = LoggerFactory.getLogger(PipelineStore.class);

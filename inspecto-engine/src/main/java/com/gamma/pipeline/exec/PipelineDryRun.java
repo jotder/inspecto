@@ -26,7 +26,7 @@ import java.util.Map;
  * <p>The sample is the <b>post-parse</b> record set, so it is seeded at the flow's parser node (or, if the flow
  * has none, its entry node); the acquisition/parse stage upstream of the seed is not exercised here.
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class PipelineDryRun {
 
     private PipelineDryRun() {}

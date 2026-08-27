@@ -25,7 +25,7 @@ import java.util.List;
  *
  * @since 4.5.0
  */
-@com.gamma.api.PublicApi(since = "4.5.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public final class DbLinkStore extends com.gamma.ops.AbstractJdbcStore implements LinkStore {
 
     private static final Logger log = LoggerFactory.getLogger(DbLinkStore.class);

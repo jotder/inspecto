@@ -56,7 +56,7 @@ import com.gamma.api.PublicApi;
  *                      {@code hi}" is not answerable from the rows alone. {@code null} on write paths with no
  *                      pipeline identity in scope.
  */
-@PublicApi(since = "5.0.0")
+@PublicApi(since = "4.0.0")
 public record ConsignmentOutput(
         String consignmentId,
         String runId,

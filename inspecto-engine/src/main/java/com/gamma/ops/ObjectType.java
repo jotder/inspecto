@@ -14,7 +14,7 @@ import java.util.Locale;
  *
  * @since 4.3.0
  */
-@com.gamma.api.PublicApi(since = "4.3.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public enum ObjectType {
     ALERT, INCIDENT, CASE, TASK;
 

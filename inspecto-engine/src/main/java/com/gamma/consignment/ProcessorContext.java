@@ -31,7 +31,7 @@ import java.util.List;
  *       Until §2/§4 land, {@link #outputs()} is the addressing authority.</li>
  * </ul>
  */
-@PublicApi(since = "5.0.0")
+@PublicApi(since = "4.0.0")
 public interface ProcessorContext {
 
     /** The Consignment this run is about — resolved by the framework, never by the author. */

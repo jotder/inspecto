@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * caller scheduling the {@link #signal} after the window. The work itself ({@code run}) is injected — in
  * production it is "admit one run under the {@code ingestLock} + concurrency + lag budget".
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class TriggerCoalescer {
 
     private final AtomicBoolean pending = new AtomicBoolean(false);

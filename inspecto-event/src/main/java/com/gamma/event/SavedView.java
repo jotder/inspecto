@@ -14,7 +14,7 @@ import java.util.Map;
  * @param createdAt creation time (epoch millis)
  * @since 4.2.0
  */
-@com.gamma.api.PublicApi(since = "4.2.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public record SavedView(String name, Map<String, String> filters, long createdAt) {
 
     public SavedView {

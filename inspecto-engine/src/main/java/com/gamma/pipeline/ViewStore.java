@@ -24,7 +24,7 @@ import java.util.regex.Pattern;
  * sanitised, path-jailed, written atomically (temp + atomic move) — so the binding side (a KPI / report /
  * alert API) can discover a view and the flow that concretises it. Pure file I/O over a root; unit-tests directly.
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class ViewStore {
 
     private static final Logger log = LoggerFactory.getLogger(ViewStore.class);

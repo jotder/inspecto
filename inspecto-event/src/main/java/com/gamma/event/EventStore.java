@@ -23,7 +23,7 @@ import java.util.List;
  *
  * @since 4.2.0
  */
-@com.gamma.api.PublicApi(since = "4.2.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public interface EventStore extends AutoCloseable {
 
     /** Append one immutable event. Never blocks on durability — see {@link #flush()}. */

@@ -30,7 +30,7 @@ import java.util.StringJoiner;
  * read <b>Consignment-scoped</b>: a partition directory holds files from every Consignment that ever wrote that
  * day, so a glob would silently widen the read to other units of work. The registry knows the exact paths.
  */
-@PublicApi(since = "5.0.0")
+@PublicApi(since = "4.0.0")
 public final class SandboxConsignmentReader implements ConsignmentReader {
 
     private static final Logger log = LoggerFactory.getLogger(SandboxConsignmentReader.class);

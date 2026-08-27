@@ -23,7 +23,7 @@ import java.util.Map;
  *
  * @since 4.5.0
  */
-@com.gamma.api.PublicApi(since = "4.5.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public record ObjectLink(String fromId, ObjectType fromType, String toId, ObjectType toType,
                          String relationship, long createdAt) {
 

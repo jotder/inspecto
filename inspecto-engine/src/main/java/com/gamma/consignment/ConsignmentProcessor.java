@@ -15,7 +15,7 @@ import com.gamma.api.PublicApi;
  * <p>Implementations must be safe to invoke repeatedly: a Consignment can be reprocessed (§5.3), and a run can
  * be replayed after a crash.
  */
-@PublicApi(since = "5.0.0")
+@PublicApi(since = "4.0.0")
 public interface ConsignmentProcessor {
 
     /** The id a Job config selects this processor by. Stable — it is configuration, not a display name. */

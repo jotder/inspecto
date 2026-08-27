@@ -22,7 +22,7 @@ import static com.gamma.util.Values.trimToNull;
  *
  * @since 4.6.0
  */
-@com.gamma.api.PublicApi(since = "4.6.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public record RcaTemplate(String name, List<String> sections) {
 
     /** Canonical constructor — name required, sections trimmed and non-empty. */

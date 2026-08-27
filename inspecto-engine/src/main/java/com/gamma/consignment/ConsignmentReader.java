@@ -28,7 +28,7 @@ import java.util.Map;
  * relations stay <b>lazy views</b> over the registered output files and {@code SqlGuard} is what keeps the
  * blocked surface out. This is invariant protection, not a defence against hostile in-process code.
  */
-@PublicApi(since = "5.0.0")
+@PublicApi(since = "4.0.0")
 public interface ConsignmentReader extends AutoCloseable {
 
     /**

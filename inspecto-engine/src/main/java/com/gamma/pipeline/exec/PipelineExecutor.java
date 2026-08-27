@@ -45,7 +45,7 @@ import java.util.Set;
  * inbound edges {@code (from, rel, to)} contributes the relation {@code rel} that {@code from} produced as
  * one of this node's inputs. {@code on_commit} edges are cross-flow and excluded from the walk.
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class PipelineExecutor {
 
     private PipelineExecutor() {}

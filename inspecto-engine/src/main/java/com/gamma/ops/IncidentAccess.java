@@ -20,7 +20,7 @@ import java.util.function.Supplier;
  *
  * @since 5.1.0
  */
-@PublicApi(since = "5.1.0")
+@PublicApi(since = "4.0.0")
 public interface IncidentAccess {
 
     /**

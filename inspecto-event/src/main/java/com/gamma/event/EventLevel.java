@@ -16,7 +16,7 @@ import java.util.Locale;
  *
  * @since 4.2.0
  */
-@com.gamma.api.PublicApi(since = "4.2.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public enum EventLevel {
     TRACE, DEBUG, INFO, WARN, ERROR;
 

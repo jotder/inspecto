@@ -34,7 +34,7 @@ import java.util.Map;
  * this writer skips the byte write; the flow job registers the view's durable definition instead
  * ({@code com.gamma.job.PipelineJobRunner.registerViews} → {@link com.gamma.pipeline.ViewStore}, T32 Phase C).
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
 
     private static final Logger log = LoggerFactory.getLogger(PartitionSinkWriter.class);

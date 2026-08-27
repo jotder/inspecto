@@ -21,7 +21,7 @@ import com.gamma.api.PublicApi;
  * @param max      latest event time among the file's rows
  * @param spreadMs {@code max - min} in milliseconds; {@code 0} when every row shares one event time
  */
-@PublicApi(since = "5.0.0")
+@PublicApi(since = "4.0.0")
 public record EventTimeBounds(String min, String max, long spreadMs) {
 
     /**

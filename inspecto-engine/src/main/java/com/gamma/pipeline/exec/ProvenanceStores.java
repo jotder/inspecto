@@ -20,7 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * run; JDBC {@code close()} is idempotent, so the double call is free — the same posture as the
  * sibling registries' space-teardown double-unregister.
  */
-@PublicApi(since = "5.1.0")
+@PublicApi(since = "4.0.0")
 public final class ProvenanceStores {
 
     private static final Logger log = LoggerFactory.getLogger(ProvenanceStores.class);

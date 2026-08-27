@@ -19,7 +19,7 @@ import java.util.Map;
  * <p>Authored-flow config is plain nested maps (not the live typed {@code PipelineConfig} records the legacy
  * lift carries), so the round-trip is a straightforward map copy. Pure functions — no engine, no I/O.
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class PipelineCodec {
 
     private PipelineCodec() {}

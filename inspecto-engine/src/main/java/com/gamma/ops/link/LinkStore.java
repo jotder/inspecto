@@ -26,7 +26,7 @@ import java.util.List;
  *
  * @since 4.5.0
  */
-@com.gamma.api.PublicApi(since = "4.5.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public interface LinkStore extends AutoCloseable {
 
     /** Append a link and return it. */

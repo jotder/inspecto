@@ -34,7 +34,7 @@ import java.util.Set;
  * <p>Format (CSV, header on first creation): {@code recorded_at,batch_id,branch,phase} (a {@code SOURCE}
  * row uses {@code *} for the branch).
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class BranchCommitLog {
 
     private static final String HEADER = "recorded_at,batch_id,branch,phase\n";

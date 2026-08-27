@@ -25,7 +25,7 @@ import java.util.Map;
  *
  * @since 4.6.0
  */
-@com.gamma.api.PublicApi(since = "4.6.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public final class DbNoteStore extends com.gamma.ops.AbstractJdbcStore implements NoteStore {
 
     private static final Logger log = LoggerFactory.getLogger(DbNoteStore.class);

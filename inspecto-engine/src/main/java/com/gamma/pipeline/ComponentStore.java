@@ -34,7 +34,7 @@ import java.util.stream.Stream;
  * all agree (and a later read resolves it by {@code type/id}). Pure file I/O over a root — no HTTP — so it
  * unit-tests directly.
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class ComponentStore {
 
     /**

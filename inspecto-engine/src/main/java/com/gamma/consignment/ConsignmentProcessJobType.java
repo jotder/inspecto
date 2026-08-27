@@ -34,7 +34,7 @@ import java.util.function.Function;
  * {@code consignment_id} in config. A required parameter that resolves to nothing fails the run before any
  * author code executes.
  */
-@PublicApi(since = "5.0.0")
+@PublicApi(since = "4.0.0")
 public final class ConsignmentProcessJobType implements JobTypeProvider {
 
     /** The Job Type id — the {@code type:} string in a {@code *_job.toon}. */

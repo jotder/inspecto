@@ -26,7 +26,7 @@ import java.util.Set;
  * Sample values are seeded as {@code VARCHAR} columns (the union of the rows' keys); operator predicates cast
  * as needed, exactly as in production.
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class ComponentPreview {
 
     private ComponentPreview() {}

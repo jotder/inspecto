@@ -36,7 +36,7 @@ import java.util.function.Consumer;
  *
  * @since 4.2.0
  */
-@com.gamma.api.PublicApi(since = "4.2.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public final class EventLog {
 
     private static final EventLog GLOBAL = new EventLog();

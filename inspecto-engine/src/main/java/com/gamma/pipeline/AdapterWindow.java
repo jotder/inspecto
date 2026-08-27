@@ -15,7 +15,7 @@ import java.util.Map;
  * built independently; this models only when the current window should flush. {@code max_age} uses the
  * engine's {@code Ns}/{@code Nm}/{@code Nh}/{@code Nd} duration convention.
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public record AdapterWindow(long maxRecords, long maxBytes, long maxAgeMs) {
 
     /** Whether the current window should flush given its accumulated counts + age. */

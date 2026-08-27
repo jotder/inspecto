@@ -28,7 +28,7 @@ import java.util.Map;
  * the only caller-supplied inputs are a validated view name and a numeric row cap, so there is no SQL-injection
  * surface. (Contrast the {@code kpi-to-sql} oracle, which runs <em>untrusted</em> LLM SQL and must seal.)
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class ViewQuery {
 
     /** A bounded view result: the column order, the rows (≤ {@code cap}), and whether more rows existed. */

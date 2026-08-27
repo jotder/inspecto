@@ -28,7 +28,7 @@ import static com.gamma.util.Values.putIfPresent;
  * suite literally runs through the lifted path) needs the branch-aware executor scheduled for Phase 3
  * (doc §13 R3 / §14 T12). Until then the lossless round-trip below is the gate.
  */
-@PublicApi(since = "4.3.0")
+@PublicApi(since = "4.0.0")
 public final class PipelineCompiler {
 
     private PipelineCompiler() {}

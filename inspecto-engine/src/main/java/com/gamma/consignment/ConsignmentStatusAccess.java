@@ -37,7 +37,7 @@ import java.util.stream.Stream;
  *
  * @since 5.1.0
  */
-@PublicApi(since = "5.1.0")
+@PublicApi(since = "4.0.0")
 public interface ConsignmentStatusAccess {
 
     /** The manifest of this Consignment, searched across the loaded pipelines, or empty when unknown. */

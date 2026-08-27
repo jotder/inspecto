@@ -12,7 +12,7 @@ import com.gamma.api.PublicApi;
  * know; reusing it would force every author to pass a number that is either wrong or a placeholder — a contract
  * that lies. The adapter converts this into a {@code JobResult}, supplying the duration it actually timed.
  */
-@PublicApi(since = "5.0.0")
+@PublicApi(since = "4.0.0")
 public record ProcessorResult(String status, String message) {
 
     /** The work was done. */

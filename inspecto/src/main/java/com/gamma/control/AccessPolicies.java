@@ -40,7 +40,7 @@ import static com.gamma.util.Values.trimOrEmpty;
  * must treat that as deny-loudly, never as "no policies" (mirrors {@link Roles}' suspended grants).
  * Authoring-time violations are 422s, so an unparseable doc can only arise from on-disk edits.
  */
-@PublicApi(since = "5.0.0")
+@PublicApi(since = "4.0.0")
 public final class AccessPolicies {
     private AccessPolicies() {}
 
