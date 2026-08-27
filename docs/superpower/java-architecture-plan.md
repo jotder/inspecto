@@ -206,15 +206,30 @@ importing the concrete `CollectorService` while it imports back — but the inve
 consistently. ⚠ This interacts with Phase A: role interfaces are exactly the mechanism that would
 cut C3, so **scope A and C3 together, not separately.**
 
-**Work, in order (each its own commit, full reactor green each time):**
-1. Re-measure and write the current SCC state into `reactor.md` — the doc must stop asserting a
-   layering that no longer holds, whether or not the cycles get cut. *(Do this first; it is a doc fix
-   with no code risk and it stops the next shift trusting a stale map.)*
-2. C1: trace `pipeline → ops.findings`. If it is one or two imports, relocate the offending type to
-   its cohesive home (playbook rule 6) and the SCC fragments.
-3. C2: trace the `job ↔ consignment` back-edge. Prior cuts here were exactly this shape
-   (`PipelineJobRunner implements job.Job` living in the wrong package).
-4. C3: invert via role interfaces — see Phase A.
+**STATUS 2026-08-27: step 1 SHIPPED; the cuts are BLOCKED on an operator decision.**
+
+1. ✅ **`reactor.md` corrected** — a dated "Re-measured 2026-08-27" section supersedes (does not
+   rewrite) the true-but-historical 2026-07-22 layering claim, with all three SCCs, their exact
+   holding edges, and what is *not* a cycle (`catalog ↔ catalog.spi` is the deliberate SPI pair;
+   `job → consignment` is legitimately one-way).
+2. ⛔ **C1 and C2 cuts BLOCKED — every cycle-cutting class is `@PublicApi`.** Measured after the
+   edge trace, which did not check the stability contract: `ConsignmentProcessJobType` and
+   `ProcessorContext` are `@PublicApi(5.0.0)`, `AnnotationKinds` is `@PublicApi(4.9.0)`. Relocating
+   any of them changes its FQN — a break that the stability policy permits **only on a major version
+   bump**. For C2 there is no workaround: a deprecated alias at the old FQN would still sit in
+   `consignment` and still reference `job`, so the cycle would survive it.
+   - The one API-free path is **C1 via constant-ownership inversion** (move `TYPES`/`TIERS` canonical
+     values to `pipeline`, `FindingsSpec` delegates, both edges then point `ops → pipeline`). That is
+     a design change rather than a relocation, so per the operator's stated default it is documented,
+     not built unasked. **This is now operator decision #4.**
+3. C3: partly cuttable via Phase A — see there; its last two edges need decision #1.
+
+🔴 **The measurement trap this phase produced, worth more than the cuts:** 31 of the engine's 135
+`@PublicApi` classes write the annotation **fully-qualified**, so `grep "@PublicApi"` under-reports
+the published surface by ~23%. `AnnotationKinds` was wrongly cleared for relocation that way before a
+second check caught it. Always match `@(com\.gamma\.api\.)?PublicApi`. ⛔ **Check the stability marker
+BEFORE planning any relocation** — cohesion and import analysis will happily propose moving a
+published type.
 
 ⚠ **Playbook rules that apply and have burned this repo before:** strip comments before counting
 edges (javadoc `{@link}` is not a compile edge and once produced a phantom blocker); an import-line
@@ -302,7 +317,14 @@ Ordered by value-per-risk, not by the order the ideas were proposed:
 2. **Phase C — how far to chase cycles.** C1 and C2 are worth cutting on the evidence. But if a cut
    turns out to need more than a relocation (i.e. it is a redesign), the honest default is to stop,
    record it, and leave the cycle documented. **Confirm that default.**
-3. **Phase F carve-out — build it or not.** It is genuinely optional; the plan recommends *not*
+3. **Phase C1 — the constant-ownership inversion.** C1 can be cut without any API break by moving
+   the `TYPES`/`TIERS` canonical values to `pipeline` and having `@PublicApi` `FindingsSpec` delegate
+   (its signature is unchanged, so no break). This is a design change, not a relocation, so it is
+   documented rather than built. **Question: cut C1 this way, or leave the cycle recorded?**
+4. **Phases C1/C2 by API break — may `@PublicApi` types relocate on a major bump?** Both cycles are
+   held by published classes. If a 6.0.0 is on the horizon, both become straightforward relocations;
+   if not, they stay documented. **This is the same decision as #1, and it governs most of Phase C.**
+5. **Phase F carve-out — build it or not.** It is genuinely optional; the plan recommends *not*
    doing it unless the acquisition subtree is being worked on anyway.
 
 ## Scorecard — what grounding did to this plan

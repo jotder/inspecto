@@ -206,6 +206,82 @@ imports updated in `EnrichmentEngine`/`BatchIngestStrategy`/`SqlTemplateJob`/`Jo
 one `fp-engine` module) — a prerequisite for ever extracting `fp-query`/`fp-job`/`fp-enrich` as
 separate modules below `fp-engine`, not an extraction itself.
 
+## ⚠ Re-measured 2026-08-27 — the layering above is HISTORY, not current state
+
+Everything above this line accurately records what the 2026-07-22 work achieved. **It no longer
+describes the code.** A repo-wide census (comment-stripped imports + inline-FQN scan, playbook rules
+5 and 7 applied) found **three strongly-connected components the sections above do not mention**,
+all created by packages and edges added after that measurement. Read this section, not the
+"`pipeline` is now a clean base" line, when deciding anything about extraction.
+
+**Still true as documented:** `event ↔ metrics` — a deliberate mutually-cyclic leaf pair, unchanged.
+
+| SCC | Packages | Real edges holding it | Verdict |
+|---|---|---|---|
+| **C1** | `{ops, ops.workflow, ops.tag, ops.link, ops.note, ops.findings, pipeline}` | exactly **two**: `ops/AnnotationKinds.java:3` → `pipeline.ComponentStore` (reads `WRITABLE_TYPES` to build the annotation-target vocabulary) and `pipeline/NodeAttribute.java:8` → `ops.findings.FindingsSpec` (delegates the `TYPES`/`TIERS` published enums so they cannot drift) | relocation — but see the caveat below |
+| **C2** | `{catalog.spi, catalog, alert, pipeline.exec, job, consignment, enrich}` | **one file**: `consignment/ConsignmentProcessJobType.java:4-11` `implements job.JobTypeProvider`, plus its sibling `consignment/ProcessorContext.java:4` importing `job.RunLog` for three delegate methods | relocation — exact precedent match |
+| **C3** (core, `inspecto`) | `{report, intelligence.spi, assist.spi, service}` | `report`/`assist.spi`/`intelligence.spi` all import the concrete `service.CollectorService`, which imports back into all three | partly cuttable — see below |
+
+**`consignment` postdates this document entirely** — it appears nowhere above and is C2's tangle point.
+
+**What is NOT a cycle, and must not be "fixed":**
+- `catalog ↔ catalog.spi` is the **deliberate SPI-pair pattern**, the same accepted shape as
+  `event ↔ metrics`. Leave it.
+- `job → consignment` is wide (7 files) and **legitimately one-way** — `consignment` belongs below
+  `job`. Only the reverse edge is the problem.
+- `alert → catalog`, `catalog → enrich`, `enrich → consignment`, `pipeline.exec → consignment` are
+  all clean one-way edges. The only reverse reference found in `consignment`
+  (`DbConsignmentOutputStore.java:22`) is a `{@link}` javadoc — **not a compile edge** (playbook
+  rule 7 caught it, as it caught the phantom `etl↔service` blocker before). A `//` comment at
+  `pipeline/ComponentStore.java:84` mentioning `FindingsSpec` is likewise not an edge.
+
+### 🔴 All three cycles are held by `@PublicApi` classes — cutting any is a MAJOR-VERSION decision
+
+This is the finding that governs Phase C, and it was missed by the cohesion/import analysis that
+produced the table above. Every class whose relocation would cut a cycle is on the published surface:
+
+| Class | Marker | Role in the cycle |
+|---|---|---|
+| `consignment/ConsignmentProcessJobType` | `@PublicApi(5.0.0)` | the whole of C2's reverse edge |
+| `consignment/ProcessorContext` | `@PublicApi(5.0.0)` | C2's sibling edge (`job.RunLog` delegation) |
+| `ops/AnnotationKinds` | `@PublicApi(4.9.0)` | C1 edge 1 → `pipeline.ComponentStore` |
+| `ops/findings/FindingsSpec` | `@PublicApi(4.6.0)` | C1 edge 2's target (stays put either way) |
+| `pipeline/ComponentStore` | `@PublicApi(4.3.0)` | C1 edge 1's target (stays put either way) |
+| `pipeline/NodeAttribute` | **unmarked** | C1 edge 2's source — the only free class in the set |
+
+Per [`../control-plane/api-stability.md`](../control-plane/api-stability.md), a `@PublicApi` type may
+change incompatibly **only on a major version bump, noted in release notes**. Relocating one changes
+its FQN, which breaks every plugin author and embedder importing it. So:
+
+- **C2 is BLOCKED.** Its only cut is relocating two `@PublicApi(5.0.0)` classes. A deprecated alias
+  left behind at the old FQN does not help — the alias would still live in `consignment` and still
+  reference `job`, so the cycle survives the workaround.
+- **C1 is BLOCKED as a relocation** (`AnnotationKinds` is published). It *could* be cut without an
+  API break by **inverting the constant ownership** on edge 2 — move the `TYPES`/`TIERS` canonical
+  values to `pipeline` and have `FindingsSpec` delegate, so both edges point `ops → pipeline` and the
+  cycle opens. That is a design change, not a relocation, so under the operator's stated default it
+  is recorded here rather than built unasked.
+- **C3** is the same shape (see the Phase 2 plan): partly cuttable, with its remaining edges gated on
+  narrowing a published SPI.
+
+⚠ **The grep trap that nearly caused a wrong call here: 31 of the engine's 135 `@PublicApi` classes
+write the annotation fully-qualified** (`@com.gamma.api.PublicApi`), so a naive `grep "@PublicApi"`
+**under-reports the published surface by ~23%** and wrongly clears classes for relocation.
+`AnnotationKinds` was cleared exactly that way before the second check caught it. Always match
+`@(com\.gamma\.api\.)?PublicApi`. Same family of error as playbook rule 5 (import-anchored greps miss
+fully-qualified usage) — it applies to annotations too.
+
+**Caveat on C1's second edge — the one judgment call in the whole census.** `AnnotationKinds` has an
+obvious cohesive home beside `ComponentStore`. `NodeAttribute ↔ FindingsSpec` does not: `FindingsSpec`
+is cohesively `ops` vocabulary, while `NodeAttribute` is published pipeline-node-type API served at
+`GET /pipelines/node-types` — so neither class wants to move into the other's package, and cutting it
+means inverting the constants' ownership rather than relocating a file. **Do not treat that edge as
+mechanical.**
+
+**Test-source edges mirror the same two C1 files** (`NodeAttributesContractTest.java:128-129`,
+`ops/note/NoteCoreTest.java:98`, both inline FQNs) and add no new blockers — but note they exist, as a
+test up-import blocks extraction exactly as a main-source one does.
+
 ## `fp-etl` module extraction (WS-D increment 2, shipped 2026-07-22)
 
 Extracted `com.gamma.etl` (main + tests) out of `fp-engine` into its own leaf module below it, now
