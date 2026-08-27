@@ -255,9 +255,11 @@ toward a decoupling claim.
 `events()`), `InspectoTools` static params, `OperationalActions:131-216`.
 
 **Deliberately NOT converted:**
-- ⛔ **The `AssistAgent`/`IntelligenceAgent` SPI `init(CollectorService)`** — a published
-  `ServiceLoader` contract. Narrowing it is a **compatibility break for third-party implementors**,
-  a categorically different change from internal narrowing. Out of scope for this phase.
+- ~~⛔ **The `AssistAgent`/`IntelligenceAgent` SPI `init(CollectorService)`**~~ — **SUPERSEDED:
+  converted 2026-08-27 under operator decision #1** (see that decision — fan-in 16 → 8). The
+  "compatibility break for third-party implementors" framing was correct *in kind* but empty *in
+  fact*: `IntelligenceAgent` never shipped and the released `AssistAgent.init` took `SourceService`,
+  already changed on master. <!-- vocab-allow: names the Source→Collector rename's old type -->
 - `ApiContext`/`ControlApi` (~40 members across 50+ route files) and `SpaceContext` (`start`/`close`)
   legitimately need the mutation and lifecycle surface. Excluding them is deliberate.
 - `InspectoPack`/`InspectoToolProvider`/`Investigator` are pure passthrough and call nothing —
@@ -788,7 +790,17 @@ the same refuted premise from the same fan-out numbers.
 
 ## Operator decisions required
 
-1. **Phase A / C3 — narrowing the `AssistAgent`/`IntelligenceAgent` SPI `init(CollectorService)`.**
+1. ✅ **ANSWERED 2026-08-27 — GRANTED and BUILT. Phase A / C3 — narrowing the `AssistAgent`/`IntelligenceAgent` SPI `init(CollectorService)` → `init(ReadModel)`.**
+   Shipped as: `ReadModel` widened 10 → 15 members (`eventLog`, `catalog`, `reports`, `configSource`,
+   `objects` — all pre-existing read-only accessors, so `CollectorService implements ReadModel` was
+   already satisfied); both SPI `init` signatures flipped; the three implementors and the
+   `InspectoPack`/`InspectoToolProvider`/`Investigator` chain narrowed; two test stubs updated.
+   **Measured result: `CollectorService` fan-in 16 → 8 (`fanmatrix2.py`) — exactly the predicted floor.**
+   🔴 **Cycle payoff: ZERO, not even the simulated one package.** `ReadModel` lives in
+   `com.gamma.service`, so `assist.spi → service` survives the narrowing and C3 is byte-identical at
+   9 packages (re-measured with `pkggraph.py`). The earlier simulation modelled the edge vanishing;
+   the interface's home keeps it. The decision was correctly sold on fan-in/testability alone.
+   ⛔ Do not re-ask. Historical framing below, kept for the record:
    Excluded above because it "breaks third-party implementors". Cutting the last two edges of the C3
    cycle needs that narrowing.
    ⚠ **RE-SCOPED 2026-08-27 (second pass) — the cost recorded here is much larger than the real one,

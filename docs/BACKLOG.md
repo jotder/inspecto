@@ -978,8 +978,18 @@ non-blocking:**
   🔴 **The row's framing — "cast sites can adopt `castMapAt`/`mapAt`" — is true of about half the
   package and false of the rest.** Group C would need a NEW `Values.asMap(Object)` helper
   (~12 callers would use it). That is an API addition, not adopting an existing one, so it is **not**
-  part of this row. ⚠ If anyone builds it, note it must pick ONE of group C's two incompatible
-  behaviours on a non-map (`Map.of()` vs throw) — several group-C sites `continue`/skip instead.
+  part of this row.
+  ⛔ **`Values.asMap(Object)` CLOSED as won't-do — grounded 2026-08-27 by reading all 12 sites.**
+  The row said the callers disagree on "two incompatible behaviours"; **the truth is FIVE**, and most
+  are load-bearing: default-empty (`AgentRoutes.mapField` → `Map.of()`) · skip-in-loop
+  (`BundleRoutes:656`, `ApiContext:312`, `IconMapSettings` — a malformed entry is dropped, siblings
+  survive) · **throw with a domain message** (`ComponentRoutes:530` IAE "every entry of mapping
+  'rules' must be an object"; `SettingsRoutes:105` **ApiException 422** with the entry name) ·
+  CCE-on-internal-invariant (`BiTemplates.asMap`, 3 of `BundleRoutes.cast`'s 5 callers — built-in
+  template content, programmer error by construction) · already-`Map<?,?>`-typed
+  (`ReconRoutes.cast` — not an `asMap(Object)` candidate at all). A shared helper would flatten
+  deliberate 422 messages and skip semantics into one behaviour, or grow flags. The cast is one line
+  behind a guard each site needs anyway for its own error contract. Nothing to build.
 
   **How the shipped batch verified suppression removal** (reuse this — it is the only real check):
   compile with `-Dmaven.compiler.showWarnings=true` and confirm no file reports *"uses unchecked or
@@ -1046,11 +1056,13 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   `git ls-tree -r --name-only v3.11.0 | grep -E '/<Class>\.java$'`. Policy of record:
   [`okf/backend/control-plane/api-stability.md`](okf/backend/control-plane/api-stability.md)
   §*Release baseline*.
-  ⚠ Related, now a *design* call rather than a release-policy gate: **decision #1** (narrow the
-  `AssistAgent`/`IntelligenceAgent` SPI `init(CollectorService)` → `ReadModel`, worth fan-in 16 → ~8).
-  `IntelligenceAgent` never shipped; `AssistAgent` shipped at 3.0.0 but with
-  `void init(SourceService)` — the signature **already changed** on master via the Source→Collector
-  rename, so narrowing adds zero incremental break. <!-- vocab-allow: names the Source→Collector rename itself -->
+  ✅ Related — **decision #1 GRANTED and BUILT 2026-08-27**: both agent SPIs narrowed
+  `init(CollectorService)` → `init(ReadModel)` (`ReadModel` widened by 5 read-only accessors).
+  **`CollectorService` fan-in 16 → 8, the predicted floor.** 🔴 Cycle payoff was ZERO — `ReadModel`
+  lives in `com.gamma.service`, so `assist.spi → service` survives and C3 stays at 9 packages; the
+  win is fan-in/testability, as scoped. The break was empty in fact: `IntelligenceAgent` never
+  shipped; the released `AssistAgent.init` took `SourceService`, already changed on master via the
+  Source→Collector rename. <!-- vocab-allow: names the Source→Collector rename itself -->
 - **PKG-3 — Dockerfile wrapping serve.sh (trigger-gated: build it only when someone actually wants a
   containerized deployment).** The backend-hardening plan's optional item 6 (archived 2026-08-26, items
   1–5 shipped `38c7a32d`): `inspecto-deploy/Dockerfile`, eclipse-temurin:24-jre base, COPY fat jar,
