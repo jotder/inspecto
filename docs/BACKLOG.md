@@ -999,6 +999,16 @@ non-blocking:**
   ⛔ Any record introduced on a config path must carry the unmodelled-keys remainder or stay
   read-only — this repo's recurring data-loss mode is an "obviously equivalent" restructuring
   dropping an unmodelled key. Do one seam at a time with a round-trip fixture, or leave it.
+  **Seam #1 `ComponentStore.write` CLOSED 2026-08-28 (operator-named).** Grounding showed the TOON
+  lane was already remainder-carrying (`ComponentRegistry.Component` wraps the full map) — what the
+  seam actually needed was the round-trip *fixture* plus a **fail-closed gate on the CSV lane**:
+  `encode` kept only `rules`' 3 canonical columns while the write's return **echoed keys the file
+  never persisted** (e.g. `Investigator`'s `status:"draft"` stamp would vanish and an agent fix-draft
+  mapping went LIVE). Unknown top-level/row keys on a CSV kind now refuse (422 at the route) instead
+  of silently dropping; 3 round-trip fixtures pin TOON remainder survival (incl. through `.history/`)
+  and CSV refusal. Reactor 3660/0/0/5. **Candidate seam #2 (grounded, not started):** one node-kind
+  slice of `PipelineEditable.toMap`/`lower` — never the whole class; refuse `PipelineConfigParser`
+  outright (96-site sweep in disguise); `ConfigRoutes` is read-only, optional.
 
 The engineering MoSCoW (build hygiene, `CollectorService` decomposition, `agent.spi` facade,
 Fuse-leftover removal, reactor split, shutdown robustness, `@PublicApi` freezing) is **COMPLETE and
@@ -1122,13 +1132,6 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   whole argument. Revisit only on the plan's own stated trigger: acquisition being reworked anyway.
   Detail: [`archived-documents/plans-archive/java-architecture-plan.md`](archived-documents/plans-archive/java-architecture-plan.md)
   Phase F + decision #5.
-- **PKG-3 — Dockerfile wrapping serve.sh (trigger-gated: build it only when someone actually wants a
-  containerized deployment).** The backend-hardening plan's optional item 6 (archived 2026-08-26, items
-  1–5 shipped `38c7a32d`): `inspecto-deploy/Dockerfile`, eclipse-temurin:24-jre base, COPY fat jar,
-  `ENV PORT=8080`, ENTRYPOINT `./serve.sh`, HEALTHCHECK curl `/health` (tokenless via `PUBLIC_PATHS` —
-  correct for a healthcheck). Uses existing seams only (`-Dcontrol.port`, `-Dspaces.root`, serve.sh's
-  PORT default). ⚠ Don't conflate with the jlink `-NoRuntime` bundle flavor tracked separately.
-  Detail: `archived-documents/plans-archive/backend-hardening-plan.md` item 6.
 - ✅ **PKG-2 — CLOSED 2026-08-18: `run.bat ADAPTER` resolves a pipeline for the first time.**
   The lookup was a single `for %%F in (spaces\*\config\%1\*_pipeline.toon)`, which NEVER matched —
   cmd's set-based `FOR` globs the **filename only**, so a wildcard in a *directory* component silently

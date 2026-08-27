@@ -175,12 +175,39 @@ public final class ComponentStore {
         return new ComponentRegistry.Component(type, name, file, doc);
     }
 
-    /** TOON for regular kinds; a CSV kind serialises its {@code rules} list (identity = filename, D-3). */
+    /** Keys a CSV kind's file can represent: {@code name} is the filename stem, {@code rules} the rows. */
+    private static final Set<String> CSV_DOC_KEYS = Set.of("name", "rules");
+    /** {@link com.gamma.util.MappingCsv#encode}'s canonical columns — the only row keys a CSV row persists. */
+    private static final Set<String> CSV_ROW_KEYS = Set.of("targetColumn", "sourceExpression", "transformType");
+
+    /**
+     * TOON for regular kinds; a CSV kind serialises its {@code rules} list (identity = filename, D-3).
+     * A CSV file can carry <b>only</b> {@link #CSV_ROW_KEYS} per row and nothing beyond {@code rules} at the
+     * top level, and it cannot carry an unmodelled remainder — so unknown keys are <b>refused, never
+     * silently dropped</b> (this repo's recurring loss mode: the write used to answer with a doc echoing
+     * keys the file never persisted, e.g. an agent fix-draft's {@code status:"draft"} stamp vanishing and
+     * the draft going live).
+     */
     private static String encode(String type, String name, Map<String, Object> doc) {
         if (!ComponentRegistry.CSV_KINDS.contains(type)) return ConfigCodec.toToon(doc);
+        List<String> extraDoc = doc.keySet().stream().filter(k -> !CSV_DOC_KEYS.contains(k)).toList();
+        if (!extraDoc.isEmpty())
+            throw new IllegalArgumentException(type + " component '" + name + "' cannot persist key(s) "
+                    + extraDoc + " — a " + suffixFor(type) + " file carries only 'rules'");
         if (!(doc.get("rules") instanceof List<?> rules) || rules.isEmpty())
             throw new IllegalArgumentException(
                     type + " component '" + name + "' needs a non-empty 'rules' list");
+        for (int i = 0; i < rules.size(); i++) {
+            if (!(rules.get(i) instanceof Map<?, ?> row))
+                throw new IllegalArgumentException(
+                        type + " component '" + name + "': rules[" + i + "] must be an object");
+            List<String> extraRow = row.keySet().stream().map(String::valueOf)
+                    .filter(k -> !CSV_ROW_KEYS.contains(k)).toList();
+            if (!extraRow.isEmpty())
+                throw new IllegalArgumentException(type + " component '" + name + "': rules[" + i
+                        + "] cannot persist key(s) " + extraRow + " — a " + suffixFor(type)
+                        + " row carries only " + CSV_ROW_KEYS);
+        }
         @SuppressWarnings("unchecked")
         List<? extends Map<String, ?>> rows = (List<? extends Map<String, ?>>) rules;
         return com.gamma.util.MappingCsv.encode(rows);

@@ -148,4 +148,58 @@ class ComponentStoreTest {
         assertThrows(IllegalArgumentException.class, () -> store.write("grammar", "../escape", Map.of("x", 1)));
         assertThrows(IllegalArgumentException.class, () -> store.write("grammar", "bad/slash", Map.of("x", 1)));
     }
+
+    // ── JAVA-SIMP-2 (ComponentStore.write seam): the write→read round-trip must not lose keys ──
+
+    /** A TOON kind carries every authored key verbatim — write → read → archive → versionContent. */
+    @Test
+    void toonRoundTripPreservesUnmodelledKeys(@TempDir Path root) throws Exception {
+        ComponentStore store = new ComponentStore(root);
+        Map<String, Object> v1 = Map.of(
+                "sql", "SELECT 1",
+                "custom_note", "not in any spec",
+                "nested", Map.of("deep", List.of("a", "b")));
+        store.write("transform", "keeper", v1);
+        Map<String, Object> read = store.get("transform", "keeper").orElseThrow().content();
+        assertEquals("not in any spec", read.get("custom_note"));
+        assertEquals(Map.of("deep", List.of("a", "b")), read.get("nested"));
+
+        store.write("transform", "keeper", Map.of("sql", "SELECT 2"));   // archives v1
+        Map<String, Object> archived = store.versionContent("transform", "keeper", 1).orElseThrow();
+        assertEquals("not in any spec", archived.get("custom_note"));    // history keeps the remainder too
+        assertEquals(Map.of("deep", List.of("a", "b")), archived.get("nested"));
+    }
+
+    /** A CSV kind round-trips exactly its representable shape: {@code {name, rules[3-key rows]}}. */
+    @Test
+    void csvRoundTripIsLossless(@TempDir Path root) throws Exception {
+        ComponentStore store = new ComponentStore(root);
+        List<Map<String, String>> rules = List.of(
+                Map.of("targetColumn", "amount", "sourceExpression", "CAST(amt AS DOUBLE)", "transformType", "DIRECT"));
+        store.write("mapping", "m1", Map.of("rules", rules));
+        Map<String, Object> read = store.get("mapping", "m1").orElseThrow().content();
+        assertEquals("m1", read.get("name"));
+        assertEquals(rules, read.get("rules"));   // byte-for-byte the persisted truth, nothing echoed that wasn't
+    }
+
+    /**
+     * A CSV file cannot carry an unmodelled remainder, so unknown keys are REFUSED, never silently
+     * dropped — before this gate the write answered 200 with a doc echoing keys the file lost
+     * (e.g. an agent fix-draft's {@code status:"draft"} stamp vanishing, the draft going live).
+     */
+    @Test
+    void csvKindRefusesKeysItCannotPersist(@TempDir Path root) {
+        ComponentStore store = new ComponentStore(root);
+        List<Map<String, String>> rules =
+                List.of(Map.of("targetColumn", "a", "sourceExpression", "b", "transformType", ""));
+        IllegalArgumentException top = assertThrows(IllegalArgumentException.class,
+                () -> store.write("mapping", "m2", Map.of("rules", rules, "status", "draft")));
+        assertTrue(top.getMessage().contains("status"), top.getMessage());
+
+        IllegalArgumentException row = assertThrows(IllegalArgumentException.class,
+                () -> store.write("mapping", "m2", Map.of("rules", List.of(
+                        Map.of("targetColumn", "a", "sourceExpression", "b", "comment", "kept?")))));
+        assertTrue(row.getMessage().contains("comment"), row.getMessage());
+        assertTrue(store.get("mapping", "m2").isEmpty());   // fail closed: nothing half-written
+    }
 }
