@@ -1075,13 +1075,22 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     say the optional agent lives in a sibling module so the core fat JAR "stays dependency-lean", and
     `package.ps1:166` builds `mvn clean package -pl inspecto -am`, which builds *upstream* deps only
     (agent/intelligence depend **on** `inspecto`, so `-am` never reaches them).
-  - 🔴 **The gap: `package.ps1` copies `inspecto-security.jar` and `inspecto-policy.jar` for
-    Standard/Enterprise but has NO step that copies an agent or intelligence jar.** So a capability
-    with 858 passing tests reaches no bundle by any path in that script. Either the deployment story
-    is "the operator drops the jar on the classpath" (then say so in
-    `okf/backend/build-run/`), or packaging is missing a step. ⛔ Do not "just add a copy step" —
-    the modules pull the heavy model-transport deps the lean-JAR decision exists to keep out, and the
-    `-NoRuntime` flavor's JDK floor differs for them (`api-stability.md` §*Current Java floor*).
+  - ⚠ **NARROWED 2026-08-27 after checking the operator docs — "the bundle lacks the agent" is NOT a
+    defect.** Agent-absent is an explicitly supported, documented state: `ADVANCED_GUIDE §5.7` says
+    `/assist/*` returns **503 when the agent module is absent**, and `EDITIONS.md:30` uses this very
+    module as the *reference example* of the ServiceLoader pattern ("absent module ⇒ the no-op impl is
+    the only one found"). A bundle without it is a valid deployment, not a broken one.
+  - 🔴 **The actual gap is narrower and is a DOCS/UX one: absent is the only state `package.ps1` can
+    reach.** It copies `inspecto-security.jar` (Standard) and `inspecto-policy.jar` (Enterprise), but
+    there is no flag, edition or documented manual step that puts an agent or intelligence jar into a
+    bundle — so a capability with 858 passing tests has no delivery path at all, and no doc tells an
+    operator how to obtain one. **The decision to make:** is agent-absent-by-default permanent (then
+    document that `/assist/*` is inert in shipped bundles and how to build a jar yourself), or should
+    `package.ps1` gain an opt-in the way `-Edition` already works? ⛔ Do not "just add a copy step" —
+    the modules pull the heavy model-transport deps the lean-JAR decision exists to keep out, and their
+    JDK floor is higher than the core's (`api-stability.md` §*Current Java floor*: agent modules need a
+    **JDK 25+ runtime**, class-file v69), which the `-NoRuntime` flavor's documented "Java 24+" target
+    would not satisfy.
   ⚠ **Two premises corrected while measuring this.** (1) `inspecto-agent`/`inspecto-intelligence` are
   **NOT** edition-profile-gated — they are plain default `<modules>`; the only profile-gated modules
   are `inspecto-security`/`inspecto-policy`. (2) Consequently the `AssistAgent`/`IntelligenceAgent`
