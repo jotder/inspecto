@@ -908,6 +908,8 @@ inspecto-deploy/
   serve.bat                   ← Windows control-plane + UI launcher
   ura.sh                      ← Linux/Mac utility CLI   (java -cp ... MainApp <command> ...)
   ura.bat                     ← Windows utility CLI
+  Dockerfile                  ← container wrapper over serve.sh (PKG-3; see "Containerized deployment")
+  .dockerignore               ← keeps runtime/, *.bat and nested zips out of the image
   warehouse_setup.sql         ← pg_duckdb warehouse schema, views, and RBAC (run once on server)
   README.md
 ```
@@ -936,6 +938,29 @@ run.bat <data_source>
 CONTROL_TOKEN=secret ASSIST_TOKEN=secret bash serve.sh    # Linux/Mac → http://localhost:8080/
 set CONTROL_TOKEN=secret && serve.bat                     # Windows
 ```
+
+### Containerized deployment (PKG-3, shipped 2026-08-28)
+
+The bundle carries a `Dockerfile` + `.dockerignore` (emitted by `package.ps1` step 6b-2, like the
+launcher scripts). It wraps `serve.sh` over **existing seams only** — no configuration surface of its
+own: every serve.sh env var passes straight through `docker run -e` (PORT / SPACES_ROOT /
+CONTROL_TOKEN / ASSIST_TOKEN / CORS_ORIGIN / AUTH_OIDC_* / INSPECTO_JAVA_OPTS …).
+
+```bash
+unzip inspecto-deploy-linux.zip && cd inspecto-deploy
+docker build -t inspecto .
+docker run -p 8080:8080 -e CONTROL_TOKEN=secret -v /srv/inspecto/spaces:/app/spaces inspecto
+```
+
+As-built decisions:
+- **Base `eclipse-temurin:24-jre` supplies the JVM**; `.dockerignore` excludes `runtime/` so
+  serve.sh's `[ -x runtime/bin/java ]` preference misses and it falls back to the image `java`
+  (an embedded per-platform runtime is dead weight in a container, and the Windows one cannot run).
+- **HEALTHCHECK probes `/health` via a bash `/dev/tcp` HTTP GET, not curl** — the temurin JRE image
+  ships **no curl or wget** (verified 2026-08-28; the original plan's curl one-liner would have
+  reported unhealthy forever). `/health` is tokenless via `PUBLIC_PATHS`, correct for a healthcheck.
+- Verified end-to-end 2026-08-28: build (713 MB), run, `/health` + `/ready` 200, healthcheck
+  reaches `healthy`; the emitted file is byte-identical to the packer's here-string.
 
 **Extra JVM flags — `INSPECTO_JAVA_OPTS`** (fallback `EXTRA_JAVA_OPTS`), honored by all six launchers
 since `1768978f`. Whitespace-separated, appended **after** each script's own flags (and, in

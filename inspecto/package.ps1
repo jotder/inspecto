@@ -635,6 +635,40 @@ echo [serve.bat] ControlApi on :%PORT%  (spaces: .\%SPACES_ROOT%, edition: %EDIT
 '@
 Write-CrlfScript -Path "$bundleDir\serve.bat" -Content $serveBatContent
 
+# ── step 6b-2: Dockerfile wrapping serve.sh (PKG-3, backend-hardening plan item 6) ──────
+# Containerized deployment over EXISTING seams only: serve.sh already reads PORT/SPACES_ROOT/
+# CONTROL_TOKEN/... from the environment, so the Dockerfile adds no configuration surface of its
+# own. The base image provides java; .dockerignore excludes the embedded runtime/ so serve.sh's
+# `[ -x runtime/bin/java ]` preference misses and it falls back to the image JVM (an embedded
+# per-platform runtime inside a container would be dead weight, and the Windows one can't run).
+# HEALTHCHECK hits /health tokenless — correct, it is in ControlApi's PUBLIC_PATHS. It probes via
+# bash /dev/tcp, NOT curl: eclipse-temurin:24-jre ships no curl/wget (verified 2026-08-28 — the
+# plan's curl one-liner would have reported unhealthy forever), and bash is in the Ubuntu base.
+$dockerfileContent = @'
+# Build from an unzipped inspecto-deploy bundle:  docker build -t inspecto .
+# Run:  docker run -p 8080:8080 -e CONTROL_TOKEN=... inspecto
+# All serve.sh env vars pass straight through (-e PORT / SPACES_ROOT / ASSIST_TOKEN /
+# CORS_ORIGIN / AUTH_OIDC_* / INSPECTO_JAVA_OPTS ...). Persist data by mounting the spaces
+# root:  -v /srv/inspecto/spaces:/app/spaces
+FROM eclipse-temurin:24-jre
+WORKDIR /app
+COPY . /app
+ENV PORT=8080
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=3s --start-period=15s CMD ["bash", "-c", \
+  "exec 3<>/dev/tcp/localhost/${PORT} && printf 'GET /health HTTP/1.0\r\n\r\n' >&3 && grep -q '200' <&3"]
+ENTRYPOINT ["./serve.sh"]
+'@
+Write-LfScript -Path "$bundleDir\Dockerfile" -Content $dockerfileContent
+$dockerignoreContent = @'
+# Keep the image lean: the base image supplies the JVM (serve.sh falls back to `java` when
+# runtime/ is absent), and Windows-only launchers are dead weight in a Linux container.
+runtime/
+*.bat
+inspecto-deploy*.zip*
+'@
+Write-LfScript -Path "$bundleDir\.dockerignore" -Content $dockerignoreContent
+
 # ── step 6c: embed a trimmed Java runtime (jlink) so the bundle is self-contained ──
 # Produces bundle/runtime/ — the run/serve/ura scripts auto-prefer it over system java.
 # jlink is itself a JVM tool: the platform of the jlink *executable* need not match the platform
