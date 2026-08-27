@@ -15,7 +15,7 @@ import java.util.Optional;
  * is exactly why {@link #stamp} treats an unknown delivery id as a normal miss — a callback can legitimately
  * arrive after we have forgotten its receipt.
  *
- * @since 4.9.0
+ * @since 4.0.0
  */
 public final class InMemoryDeliveryReceiptStore implements DeliveryReceiptStore {
 

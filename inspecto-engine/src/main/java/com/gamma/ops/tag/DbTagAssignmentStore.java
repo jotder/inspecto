@@ -23,7 +23,7 @@ import java.util.List;
  * idempotent and {@link #rename} self-merging — the database enforces edge identity rather than the
  * application checking first and racing.
  *
- * @since 4.9.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public final class DbTagAssignmentStore extends com.gamma.ops.AbstractJdbcStore implements TagAssignmentStore {

@@ -22,7 +22,7 @@ import java.util.Map;
  * {@link #tags}; re-evaluation attaches new matches to the same still-open Case (marked
  * {@code attributes.raisedByRule}), so grouping is idempotent.
  *
- * @since 5.0.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public record CaseRule(String name, String title, TagRule.Filter filter, int threshold,

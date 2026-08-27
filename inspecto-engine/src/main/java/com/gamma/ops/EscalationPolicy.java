@@ -21,7 +21,7 @@ import java.util.Map;
  *   <li>{@code renotify} — emit an {@code OBJECT_ESCALATED} event (default true) so the notify chain re-alerts.</li>
  * </ul>
  *
- * @since 4.9.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public record EscalationPolicy(String severity, String reassignQueue, boolean renotify) {

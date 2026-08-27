@@ -13,7 +13,7 @@ package com.gamma.event;
  * <b>target</b> (on what), and <b>contextual environment</b> (from where). GeoIP {@code location} is
  * intentionally omitted in the auth-free core (only {@link #IP} is captured); editions resolve it.
  *
- * @since 4.4.0
+ * @since 4.0.0
  */
 public final class AuditAttrs {
 

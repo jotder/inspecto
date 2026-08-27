@@ -24,7 +24,7 @@ import java.util.Set;
  * {@code com.gamma.control.AnnotationTargets} in the control plane, because the engine stays
  * identity-agnostic. Two similar names, two genuinely different questions.
  *
- * @since 4.9.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public final class AnnotationKinds {

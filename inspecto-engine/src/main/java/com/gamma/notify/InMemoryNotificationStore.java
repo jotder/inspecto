@@ -14,7 +14,7 @@ import java.util.Optional;
  *
  * <p>Thread-safe: all access is {@code synchronized} on the map.
  *
- * @since 4.4.0
+ * @since 4.0.0
  */
 public final class InMemoryNotificationStore implements NotificationStore {
 

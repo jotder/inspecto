@@ -29,7 +29,7 @@ import java.util.UUID;
  *
  * <p>Build via {@link #builder(String)} (ergonomic, optional fields) or {@link #log} (the capture path).
  *
- * @since 4.2.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public record Event(String eventId, long ts, EventLevel level, String type, String source,

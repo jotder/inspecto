@@ -14,7 +14,7 @@ import java.util.Locale;
  * record a {@code DEBUG} event when it deliberately wants to (the threshold only gates <em>automatic</em>
  * log capture, never an explicit {@link EventLog#emit}).
  *
- * @since 4.2.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public enum EventLevel {

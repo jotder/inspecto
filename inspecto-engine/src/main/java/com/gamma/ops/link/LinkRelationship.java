@@ -11,7 +11,7 @@ package com.gamma.ops.link;
  * it; an {@code ALERT} is {@link #CAUSED_BY} the originating event (lightweight today via
  * {@code correlationId}). {@link #RELATED_TO} is the generic fallback.
  *
- * @since 4.5.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public final class LinkRelationship {

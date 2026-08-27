@@ -18,7 +18,7 @@ import java.util.Map;
  * via {@code POST /tags} (which persists the same file under the write root). Applied manually or by a
  * {@link TagRule}.
  *
- * @since 5.0.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public record Tag(String name, long createdAt) {

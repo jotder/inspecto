@@ -8,7 +8,7 @@ import java.util.Optional;
  * records with real state transitions (a receipt gains statuses over its life), thread-safe because
  * receipts are written from the event dispatcher and stamped from HTTP callback threads.
  *
- * @since 4.9.0
+ * @since 4.0.0
  */
 public interface DeliveryReceiptStore extends AutoCloseable {
 

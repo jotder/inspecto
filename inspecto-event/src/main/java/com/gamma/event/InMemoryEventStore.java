@@ -16,7 +16,7 @@ import java.util.List;
  * {@code ParquetEventStore}'s job). Thread-safe: all access is synchronized on the deque (event
  * volume is modest and a {@code synchronized} block keeps append + paged query trivially correct).
  *
- * @since 4.2.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public final class InMemoryEventStore implements EventStore {

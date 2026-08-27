@@ -51,7 +51,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * moves throw {@link IllegalStateException}; an unknown id throws {@link NoSuchElementException} — the
  * Control API maps these to 422 / 404.
  *
- * @since 4.3.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public final class ObjectService {

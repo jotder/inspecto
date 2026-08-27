@@ -8,7 +8,7 @@ import java.util.List;
  * {@link com.gamma.event.InMemoryEventStore}). Append-only; reads return newest-first. All access is
  * guarded on the instance monitor (low-volume traffic), so it is safe to share across threads.
  *
- * @since 4.5.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public final class InMemoryLinkStore implements LinkStore {

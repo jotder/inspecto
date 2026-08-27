@@ -10,7 +10,7 @@ import java.util.List;
  * Append-only; reads return newest-first, filtered by object (and optionally kind). Guarded on the
  * instance monitor, so it is safe to share across threads.
  *
- * @since 4.6.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public final class InMemoryNoteStore implements NoteStore {

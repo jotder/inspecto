@@ -22,7 +22,7 @@ import java.util.List;
  * because every subclass keeps its DDL in static constants, and would break silently for the first one
  * that does not. Each subclass calls its own {@code initSchema()} as its last constructor act instead.
  *
- * @since 5.2.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public abstract class AbstractJdbcStore implements BrowsableStore {

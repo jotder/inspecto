@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
  * {@link Map}s; an unresolved or {@code null} variable renders as the empty string (copy never leaks a
  * raw {@code {{token}}} to the user). Deliberately tiny — no new templating dependency.
  *
- * @since 4.4.0
+ * @since 4.0.0
  */
 public final class NotificationTemplate {
 

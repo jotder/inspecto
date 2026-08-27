@@ -10,7 +10,7 @@ import java.util.Optional;
  * same interface. Queues are configuration (authored as {@code *_queue.toon}), so the lean default holds
  * them in memory and re-loads them from config at boot; only the round-robin cursor is genuine runtime state.
  *
- * @since 4.9.0
+ * @since 4.0.0
  */
 public interface QueueStore {
 

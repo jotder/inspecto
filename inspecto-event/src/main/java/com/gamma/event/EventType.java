@@ -13,7 +13,7 @@ package com.gamma.event;
  *       structure (they carry typed {@link Event#attributes()} and a {@link Event#correlationId()}).</li>
  * </ul>
  *
- * @since 4.2.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public final class EventType {

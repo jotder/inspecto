@@ -22,7 +22,7 @@ import java.util.UUID;
  * <p>The record itself is immutable; a lifecycle change produces a new instance via {@link #withStatus}
  * / {@link #withAssignee}, and {@link ObjectStore#update} persists it.
  *
- * @since 4.3.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public record OperationalObject(String id, ObjectType objectType, String title, String description,

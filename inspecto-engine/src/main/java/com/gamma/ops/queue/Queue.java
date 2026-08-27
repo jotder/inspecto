@@ -22,7 +22,7 @@ import static com.gamma.util.Values.trimToNull;
  * the {@link com.gamma.ops.ObjectService} at bootstrap, exactly like {@code *_rca.toon} templates; may also
  * be created/updated at runtime via {@code POST /queues}.
  *
- * @since 4.9.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public record Queue(String id, String name, String description, List<String> members, Routing routing) {

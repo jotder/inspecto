@@ -51,7 +51,7 @@ import java.util.stream.Stream;
  * the {@code read_parquet} queries, so every public method is {@code synchronized}. Event volume is
  * modest relative to ingest, and flushes are batched, so the single lock is not a bottleneck.
  *
- * @since 4.2.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public final class ParquetEventStore implements EventStore {

@@ -18,7 +18,7 @@ import java.util.function.Supplier;
  * Under a dry run the framework substitutes a recording stand-in: {@link #openIncident} logs the
  * would-be Incident to the RunLog and opens nothing, returning empty.
  *
- * @since 5.1.0
+ * @since 4.0.0
  */
 @PublicApi(since = "4.0.0")
 public interface IncidentAccess {

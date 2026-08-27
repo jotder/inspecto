@@ -15,7 +15,7 @@ import java.util.Optional;
  *       security triggers yet), but enforced now so an edition that adds them inherits the guarantee.</li>
  * </ul>
  *
- * @since 4.4.0
+ * @since 4.0.0
  */
 public enum NotificationCategory {
 

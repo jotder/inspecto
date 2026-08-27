@@ -12,7 +12,7 @@ import java.util.Locale;
  * (Phase 3), {@link #CASE} (Phase 4) and {@link #TASK} share the same table and machinery, so later
  * phases add lifecycle/links, not storage.
  *
- * @since 4.3.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public enum ObjectType {

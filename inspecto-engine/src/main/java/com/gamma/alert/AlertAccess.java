@@ -27,7 +27,7 @@ import java.util.function.Supplier;
  * therefore substitutes a recording stand-in that logs the would-be evaluation and returns empty,
  * and a consumer must report that nothing was checked rather than "nothing breached".
  *
- * @since 5.1.0
+ * @since 4.0.0
  */
 @PublicApi(since = "4.0.0")
 public interface AlertAccess {

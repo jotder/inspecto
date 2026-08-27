@@ -21,7 +21,7 @@ import static com.gamma.util.Values.trimToNull;
  *                      or {@code null}
  * @param limit         maximum rows to return (clamped to {@code [1, }{@value #MAX_LIMIT}{@code ]})
  * @param offset        rows to skip from the newest (for paging; clamped to {@code >= 0})
- * @since 4.2.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public record EventQuery(Long fromMs, Long toMs, EventLevel minLevel, String type, String pipeline,

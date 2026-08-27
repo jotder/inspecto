@@ -23,7 +23,7 @@ import java.util.Map;
  * @param bodyTemplate      {@code {{var}}} template for the detail line
  * @param dedupeKeyTemplate {@code {{var}}} template for the collapse key (repeat suppression)
  * @param enabled           {@code false} disables the rule without deleting it
- * @since 4.4.0
+ * @since 4.0.0
  */
 public record NotificationRule(String id, String eventType, EventLevel minLevel, String category,
                                String titleTemplate, String bodyTemplate, String dedupeKeyTemplate,

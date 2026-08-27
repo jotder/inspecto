@@ -42,7 +42,7 @@ import java.util.Map;
  * <p>Correlation uses the {@code smtp-id} SendGrid echoes back, which carries the {@code Message-ID} we
  * set outbound — we never capture a provider-side id.
  *
- * @since 4.9.0
+ * @since 4.0.0
  */
 public final class SendGridDeliveryStatusAdapter implements DeliveryStatusAdapter {
 

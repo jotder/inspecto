@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  *
  * <p>Thread-safe: the maps are concurrent and the cursor advance is atomic.
  *
- * @since 4.9.0
+ * @since 4.0.0
  */
 public final class InMemoryQueueStore implements QueueStore {
 

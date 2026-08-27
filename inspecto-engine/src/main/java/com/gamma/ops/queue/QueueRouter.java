@@ -9,7 +9,7 @@ import java.util.function.ToIntFunction;
  * {@link Queue.Routing} strategy. Pure aside from the persistent round-robin cursor it advances through
  * the {@link QueueStore}; the caller supplies the load function used by {@link Queue.Routing#LEAST_LOADED}.
  *
- * @since 4.9.0
+ * @since 4.0.0
  */
 public final class QueueRouter {
 

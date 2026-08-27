@@ -26,7 +26,7 @@ import java.util.NoSuchElementException;
  * the pre-D10 object path did. Authorization is <b>not</b> here: it stays at the HTTP edge, where the
  * caller-facing rules live (the engine is identity-agnostic).
  *
- * @since 4.9.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public final class NoteService {

@@ -15,7 +15,7 @@ import java.util.TreeSet;
  * DB store is what a large deployment uses. Two indexes would have to be kept consistent through
  * {@link #rename} and {@link #removeTag} for no measured gain.
  *
- * @since 4.9.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public final class InMemoryTagAssignmentStore implements TagAssignmentStore {

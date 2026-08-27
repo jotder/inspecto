@@ -30,7 +30,7 @@ import java.util.ServiceLoader;
  * (small) fidelity loss against §9's declaration, kept deliberately: the alternative is widening a
  * {@code @PublicApi} SPI for one caller. Recorded in {@code docs/BACKLOG.md}.
  *
- * @since 5.1.0
+ * @since 4.0.0
  */
 @PublicApi(since = "4.0.0")
 public interface MailAccess {

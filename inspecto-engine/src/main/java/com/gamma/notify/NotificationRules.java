@@ -19,7 +19,7 @@ import java.util.function.Supplier;
  * checks those <b>ahead of</b> the built-ins, so an authored rule for an already-covered event type
  * effectively overrides the built-in's copy/routing without deleting it from this class.
  *
- * @since 4.4.0
+ * @since 4.0.0
  */
 public final class NotificationRules {
 

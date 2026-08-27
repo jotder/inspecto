@@ -17,7 +17,7 @@ import java.util.Optional;
  *
  * <p>Thread-safe: all access is {@code synchronized} on the map.
  *
- * @since 4.3.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public final class InMemoryObjectStore implements ObjectStore {

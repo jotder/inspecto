@@ -29,7 +29,7 @@ import java.util.UUID;
  * <p>Like an {@link com.gamma.event.Event} and an {@link com.gamma.ops.link.ObjectLink}, a note is an
  * immutable, append-only fact: created and read, never mutated.
  *
- * @since 4.6.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public record ObjectNote(String id, String objectId, String targetKind, NoteKind kind, String author,

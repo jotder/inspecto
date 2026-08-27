@@ -29,7 +29,7 @@ import java.util.UUID;
  * @param digest          {@code true} when this receipt covers a <b>digest</b> delivery batching several
  *                        notifications into one message. This is the one place the per-delivery model is
  *                        lossy: a bounce tells us the digest bounced, not which notification was in it.
- * @since 4.9.0
+ * @since 4.0.0
  */
 public record DeliveryReceipt(String deliveryId, String notificationId, String channelConfigId,
                               String target, long sentAt, Map<DeliveryStatus, Long> statusAt,

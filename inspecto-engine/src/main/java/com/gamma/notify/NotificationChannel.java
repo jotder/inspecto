@@ -13,7 +13,7 @@ import com.gamma.api.PublicApi;
  * {@link NotificationCategory#critical() critical} categories which always deliver. Implementations must
  * tolerate being called from a virtual-thread worker and must not block the engine.
  *
- * @since 4.4.0
+ * @since 4.0.0
  */
 @PublicApi(since = "4.0.0")
 public interface NotificationChannel {
@@ -46,7 +46,7 @@ public interface NotificationChannel {
      * nothing else. That is the honest degrade, and it is why the receipt is written regardless — a
      * receipt with no callback reads as "sent, never confirmed" rather than going missing.
      *
-     * @since 4.9.0
+     * @since 4.0.0
      */
     default void deliver(Notification n, String target, String deliveryId) throws Exception {
         deliver(n, target);

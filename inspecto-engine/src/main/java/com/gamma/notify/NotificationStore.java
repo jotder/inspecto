@@ -19,7 +19,7 @@ import java.util.Optional;
  *       (a virtual-thread worker) and mutated from HTTP request threads.</li>
  * </ul>
  *
- * @since 4.4.0
+ * @since 4.0.0
  */
 public interface NotificationStore extends AutoCloseable {
 

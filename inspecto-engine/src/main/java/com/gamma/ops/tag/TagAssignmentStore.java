@@ -25,7 +25,7 @@ import java.util.List;
  *   <li>Implementations must be thread-safe.</li>
  * </ul>
  *
- * @since 4.9.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public interface TagAssignmentStore extends AutoCloseable {
@@ -66,7 +66,7 @@ public interface TagAssignmentStore extends AutoCloseable {
      *
      * <p>Scoped to the {@code (targetKind, targetId)} pair, never the id alone.
      *
-     * @since 4.10.0 widened in a MAJOR release rather than added as a throwing {@code default} — see
+     * @since 4.0.0 widened in a MAJOR release rather than added as a throwing {@code default} — see
      *        {@link com.gamma.ops.note.NoteStore#deleteForTarget}.
      */
     int removeAllForTarget(String targetKind, String targetId);

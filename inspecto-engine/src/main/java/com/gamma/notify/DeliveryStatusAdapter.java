@@ -30,7 +30,7 @@ import java.util.Map;
  *       than guessing or dropping it.</li>
  * </ul>
  *
- * @since 4.9.0
+ * @since 4.0.0
  */
 @PublicApi(since = "4.0.0")
 public interface DeliveryStatusAdapter {

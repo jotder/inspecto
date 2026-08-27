@@ -21,7 +21,7 @@ import java.util.List;
  *       appender, the bus).</li>
  * </ul>
  *
- * @since 4.2.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public interface EventStore extends AutoCloseable {
@@ -43,7 +43,7 @@ public interface EventStore extends AutoCloseable {
      * page from {@link #query(EventQuery)} bounded by {@link EventQuery#MAX_LIMIT}; the bundled stores
      * override it with exact implementations (ring walk / SQL keyset predicate).
      *
-     * @since 5.1.0
+     * @since 4.0.0
      */
     default List<Event> page(int limit, Long afterTs, String afterId) {
         return query(EventQuery.recent(EventQuery.MAX_LIMIT)).stream()
@@ -58,7 +58,7 @@ public interface EventStore extends AutoCloseable {
      * default counts through {@link #query(EventQuery)} and is therefore capped at
      * {@link EventQuery#MAX_LIMIT}; the bundled stores override it with exact counts.
      *
-     * @since 5.1.0
+     * @since 4.0.0
      */
     default long count() {
         return query(EventQuery.recent(EventQuery.MAX_LIMIT)).size();

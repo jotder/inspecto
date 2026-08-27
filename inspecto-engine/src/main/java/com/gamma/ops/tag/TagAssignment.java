@@ -26,7 +26,7 @@ import java.util.Map;
  * <p>Identity is the triple {@code (tag, targetKind, targetId)} — assigning the same tag twice is the
  * same edge, not a second one, which is what makes {@link TagAssignmentStore#add} idempotent.
  *
- * @since 4.9.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public record TagAssignment(String tag, String targetKind, String targetId, String actor, long createdAt) {

@@ -32,7 +32,7 @@ import static com.gamma.util.Values.trimToNull;
  *
  * <p>States are normalised to upper-case, actions to lower-case, so matching is case-insensitive.
  *
- * @since 4.3.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public record Workflow(ObjectType objectType, String initialState, Set<Transition> transitions,

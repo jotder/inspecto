@@ -22,7 +22,7 @@ import java.util.regex.Pattern;
  * and returns the same {@code String} reference when there is nothing to redact, and {@link #scrub(Event)}
  * rebuilds the record only when a field actually changed. Never throws.
  *
- * @since 4.4.0
+ * @since 4.0.0
  */
 public final class SecretScrubber {
 

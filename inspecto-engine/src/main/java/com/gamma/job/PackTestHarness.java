@@ -52,7 +52,7 @@ import java.util.UUID;
  * re-implementing their semantics — is the only way the harness can be trusted as a proxy for a
  * real Run.
  *
- * @since 5.1.0
+ * @since 4.0.0
  */
 @PublicApi(since = "4.0.0")
 public final class PackTestHarness {

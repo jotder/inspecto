@@ -30,7 +30,7 @@ import java.util.function.Supplier;
  * <p>Live {@link #addListener listeners} are invoked after a notification is stored — the seam the SSE
  * endpoint uses to push it to connected clients.
  *
- * @since 4.4.0
+ * @since 4.0.0
  */
 public final class NotificationService implements NotificationAccess, AutoCloseable {
 
@@ -112,7 +112,7 @@ public final class NotificationService implements NotificationAccess, AutoClosea
      * constructors already exist. {@code null} — the default — means no receipts are written and delivery
      * behaves exactly as before.
      *
-     * @since 4.9.0
+     * @since 4.0.0
      */
     public void deliveryReceipts(DeliveryReceiptStore receipts) {
         this.receipts = receipts;

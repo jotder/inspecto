@@ -33,7 +33,7 @@ import java.util.Map;
  *       JSON Schema meaning and are not projected.</li>
  * </ul>
  *
- * @since 4.4.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public final class ConfigJsonSchema {

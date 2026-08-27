@@ -5,7 +5,7 @@ package com.gamma.notify;
  * mutable record: it starts {@link #UNREAD}, is dimmed to {@link #READ} when the user views it, and is
  * removed from the active feed (the user's "delete") by moving to {@link #ARCHIVED}.
  *
- * @since 4.4.0
+ * @since 4.0.0
  */
 public enum NotificationState {
     /** New and highlighted; counts toward the unread badge. */

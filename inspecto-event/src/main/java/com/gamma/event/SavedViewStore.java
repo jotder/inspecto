@@ -20,7 +20,7 @@ import java.util.Map;
  * <p>When constructed with a {@code null} file the store is purely in-memory (no side effects) — the
  * default for tests and for the lean fat-JAR until {@code -Devents.views.file} is set.
  *
- * @since 4.2.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public final class SavedViewStore {

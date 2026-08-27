@@ -23,7 +23,7 @@ import java.util.Map;
  * dependency), or a {@code jdbc:postgresql://…} URL for a distributed deployment. All access is
  * serialised on a single shared {@link Connection}; {@link #close()} closes it.
  *
- * @since 4.6.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public final class DbNoteStore extends com.gamma.ops.AbstractJdbcStore implements NoteStore {

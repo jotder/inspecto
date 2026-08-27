@@ -35,7 +35,7 @@ import java.util.stream.Stream;
  * <h3>Dry-run contract (plan §3.4)</h3>
  * Read-only — unaffected by a dry run; the real service is handed through unchanged.
  *
- * @since 5.1.0
+ * @since 4.0.0
  */
 @PublicApi(since = "4.0.0")
 public interface ConsignmentStatusAccess {

@@ -24,7 +24,7 @@ import java.util.Map;
  * and recurse. A per-thread {@code inside} flag short-circuits the nested call, so a store is free to
  * log normally. {@link EventLog#emit} additionally swallows all failures.
  *
- * @since 4.2.0
+ * @since 4.0.0
  */
 public final class EventStoreAppender extends AppenderBase<ILoggingEvent> {
 

@@ -34,7 +34,7 @@ import java.util.function.Consumer;
  * here would recurse through the appender. All failures are swallowed (an observability sink must
  * never break the thing it observes). The appender additionally guards against re-entrancy.
  *
- * @since 4.2.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public final class EventLog {

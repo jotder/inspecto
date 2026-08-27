@@ -39,7 +39,7 @@ import java.util.Map;
  * one of {@code delivered} / {@code bounce_hard} / {@code bounce_soft} / {@code complaint}. Anything else
  * is recorded {@link DeliveryStatus#UNKNOWN} with its raw payload.
  *
- * @since 4.9.0
+ * @since 4.0.0
  */
 public final class HmacDeliveryStatusAdapter implements DeliveryStatusAdapter {
 

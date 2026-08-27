@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>In-memory, like the other lean-default stores; durable persistence (TOON/file) is a follow-on.
  *
- * @since 4.4.0
+ * @since 4.0.0
  */
 public final class NotificationPreferences {
 

@@ -20,7 +20,7 @@ import java.util.List;
  *   <li>Implementations must be thread-safe.</li>
  * </ul>
  *
- * @since 4.6.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public interface NoteStore extends AutoCloseable {
@@ -46,7 +46,7 @@ public interface NoteStore extends AutoCloseable {
      *
      * <p>Scoped to the {@code (targetKind, targetId)} pair like every read here, never the id alone.
      *
-     * @since 4.10.0 widened in a MAJOR release rather than added as a throwing {@code default}: a default
+     * @since 4.0.0 widened in a MAJOR release rather than added as a throwing {@code default}: a default
      *        that silently did nothing would orphan rows, which is the exact failure this method prevents.
      */
     int deleteForTarget(String targetKind, String targetId);

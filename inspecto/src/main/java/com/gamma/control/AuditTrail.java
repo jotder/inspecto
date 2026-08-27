@@ -24,7 +24,7 @@ import com.sun.net.httpserver.HttpExchange;
  * </ul>
  * Auth-gated events (login/MFA/password, true 401/403) are out of scope until the security module lands.
  *
- * @since 4.4.0
+ * @since 4.0.0
  */
 final class AuditTrail {
 

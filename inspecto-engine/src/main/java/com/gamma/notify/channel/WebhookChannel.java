@@ -27,7 +27,7 @@ import java.time.Duration;
  * {@link com.gamma.notify.NotificationService}); there is no retry — notifications are best-effort and
  * the in-app feed remains the durable record.
  *
- * @since 4.5.0
+ * @since 4.0.0
  */
 public final class WebhookChannel implements NotificationChannel {
 

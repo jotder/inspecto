@@ -91,7 +91,7 @@ public interface AssistAgent extends AutoCloseable {
      * <p>Additive default: an agent without configurable model routing reports
      * {@code {"supported": false}} and the settings screen disables itself.
      *
-     * @since 4.1.0
+     * @since 4.0.0
      */
     default Map<String, Object> settings() {
         return Map.of("supported", false);
@@ -102,7 +102,7 @@ public interface AssistAgent extends AutoCloseable {
      * and re-route live. Backs {@code POST /assist/settings} (scope {@code assist.write}).
      * Implementations signal a bad request with {@link IllegalArgumentException} (mapped to 400).
      *
-     * @since 4.1.0
+     * @since 4.0.0
      */
     default Map<String, Object> updateSettings(Map<String, Object> changes) {
         return Map.of("supported", false);
@@ -112,7 +112,7 @@ public interface AssistAgent extends AutoCloseable {
      * Verify the configured providers with a minimal round-trip per model tier (v4.1) and report
      * per-tier {@code ok}/{@code latencyMs}/{@code error}. Backs {@code POST /assist/settings/test}.
      *
-     * @since 4.1.0
+     * @since 4.0.0
      */
     default Map<String, Object> testSettings() {
         return Map.of("supported", false);
@@ -125,7 +125,7 @@ public interface AssistAgent extends AutoCloseable {
      *
      * <p>Additive default: an agent without metrics reports {@code {"supported": false}}.
      *
-     * @since 4.1.0
+     * @since 4.0.0
      */
     default Map<String, Object> metrics() {
         return Map.of("supported", false);

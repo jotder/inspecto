@@ -41,7 +41,7 @@ import java.util.regex.PatternSyntaxException;
  * {@link IllegalArgumentException} (→ 422) for anything the renderer could not draw, including unknown
  * keys — a typo'd {@code tier} silently defaulting is how a required field becomes invisible.
  *
- * @since 4.6.0
+ * @since 4.0.0
  */
 @PublicApi(since = "4.0.0")
 public record FindingsSpec(String objectType, List<Section> sections) {

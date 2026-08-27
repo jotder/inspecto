@@ -7,7 +7,7 @@ import java.util.Locale;
  * Intelligence Platform (Phase 4 follow-up). One append-only notes table serves both kinds, keyed by
  * this discriminator (mirroring how one object table serves every {@link com.gamma.ops.ObjectType}).
  *
- * @since 4.6.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public enum NoteKind {

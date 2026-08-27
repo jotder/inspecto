@@ -23,7 +23,7 @@ import java.util.List;
  * just grows and ages out with its objects. All access is serialised on a single shared
  * {@link Connection} (low-volume; a JDBC connection is not thread-safe); {@link #close()} closes it.
  *
- * @since 4.5.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public final class DbLinkStore extends com.gamma.ops.AbstractJdbcStore implements LinkStore {

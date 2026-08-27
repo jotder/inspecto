@@ -25,7 +25,7 @@ import static com.gamma.util.Values.trimToNull;
  *                      closed", so a reopened object must never satisfy a cutoff (MNT-14 G1).
  * @param oldestFirst   {@code true} to order oldest-first by {@code createdAt} instead of the default
  *                      newest-first
- * @since 4.3.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public record ObjectQuery(ObjectType objectType, String status, String severity, String assignee,

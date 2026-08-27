@@ -24,7 +24,7 @@ import java.util.List;
  *   <li>Implementations must be thread-safe.</li>
  * </ul>
  *
- * @since 4.5.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public interface LinkStore extends AutoCloseable {
@@ -52,7 +52,7 @@ public interface LinkStore extends AutoCloseable {
      * <p>⚠ Both ends is the point: an edge whose <em>other</em> end is being purged would otherwise be
      * left dangling, pointing at an id that no longer resolves.
      *
-     * @since 4.10.0 widened in a MAJOR release rather than added as a throwing {@code default} — see
+     * @since 4.0.0 widened in a MAJOR release rather than added as a throwing {@code default} — see
      *        {@link com.gamma.ops.note.NoteStore#deleteForTarget}.
      */
     int removeAllIncident(String objectId);

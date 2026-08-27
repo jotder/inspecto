@@ -24,7 +24,7 @@ import java.util.UUID;
  * @param state      lifecycle state
  * @param dedupeKey  key collapsing repeat notifications of the same kind (rate-limit / digest seam)
  * @param readAt     epoch millis the user read it, or {@code null} while unread
- * @since 4.4.0
+ * @since 4.0.0
  */
 public record Notification(String id, long ts, String category, String sourceType, String sourceId,
                            String title, String body, NotificationState state, String dedupeKey,

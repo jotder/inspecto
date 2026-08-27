@@ -23,7 +23,7 @@ import java.util.Map;
  * runtime via {@code POST /tags/rules} (which persists the same file under the write root). A rule must set
  * at least one criterion — an unconstrained rule would tag everything.
  *
- * @since 5.0.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public record TagRule(String name, String tag, Filter filter, long createdAt) {

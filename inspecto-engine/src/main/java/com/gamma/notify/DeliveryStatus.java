@@ -12,7 +12,7 @@ package com.gamma.notify;
  * rather than dropped silently or guessed at — a new provider event type must never look like a
  * delivery success.
  *
- * @since 4.9.0
+ * @since 4.0.0
  */
 public enum DeliveryStatus {
 

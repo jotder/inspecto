@@ -9,7 +9,7 @@ import java.util.regex.Pattern;
  * pulling our own correlation id back out of a provider payload, and the replay window every adapter
  * must enforce.
  *
- * @since 4.9.0
+ * @since 4.0.0
  */
 final class DeliveryIds {
 

@@ -21,7 +21,7 @@ import java.util.Map;
  * (see {@link LinkRelationship}) so matching is case-insensitive; the endpoints carry their
  * {@link ObjectType} so a rendered graph needs no extra lookup.
  *
- * @since 4.5.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public record ObjectLink(String fromId, ObjectType fromType, String toId, ObjectType toType,

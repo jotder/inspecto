@@ -15,7 +15,7 @@ import java.util.Optional;
  * Under a dry run the framework substitutes a recording stand-in: {@link #notify} logs the
  * would-be notification to the RunLog and stores nothing, returning empty.
  *
- * @since 5.1.0
+ * @since 4.0.0
  */
 @PublicApi(since = "4.0.0")
 public interface NotificationAccess {

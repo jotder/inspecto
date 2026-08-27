@@ -12,7 +12,7 @@ import java.util.Map;
  * @param name      unique view name (operator-chosen)
  * @param filters   search-param key→value map (only the set keys are present)
  * @param createdAt creation time (epoch millis)
- * @since 4.2.0
+ * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
 public record SavedView(String name, Map<String, String> filters, long createdAt) {

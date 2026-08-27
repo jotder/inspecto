@@ -13,7 +13,7 @@ import java.util.function.LongSupplier;
  * read-then-recur cycle). Default: at most {@value #DEFAULT_MAX_PER_HOUR} identical notifications per
  * hour. Cheap, in-memory, and time-injectable for tests.
  *
- * @since 4.4.0
+ * @since 4.0.0
  */
 final class NotificationRateLimiter {
 

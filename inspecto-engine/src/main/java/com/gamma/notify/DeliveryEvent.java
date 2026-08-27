@@ -10,7 +10,7 @@ package com.gamma.notify;
  * @param ts          when the provider says the event happened, epoch millis
  * @param providerRaw the raw provider payload for this event, kept only to make a
  *                    {@link DeliveryStatus#UNKNOWN} diagnosable; {@code null} for a classified event
- * @since 4.9.0
+ * @since 4.0.0
  */
 public record DeliveryEvent(String deliveryId, DeliveryStatus status, long ts, String providerRaw) {
 
