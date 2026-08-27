@@ -1,6 +1,12 @@
 # Seed the default space inboxes from the pristine samples (the poll dirs are consumed by the engine)
-# and pre-create every directory the subscriber + events + cdr + gwlog pipelines expect
-# (all dirs.* must exist on disk).
+# and pre-create every directory the pipelines expect -- PipelineConfig.prepare() creates only the
+# status dir, so every other dirs.* entry must exist on disk before a run.
+#
+# The format-example pack (csv/fixedwidth/excel/json) is the set of pipelines this space actually
+# ships; each has one sample beside this script.
+# NOTE: the subscriber / events / cdr / gwlog arms below seed pipelines RETIRED 2026-08-20
+# (FEATURE_INVENTORY.md 2). They are left in place because their sample corpora are still
+# committed; retiring the arms and the corpora together is an operator call.
 $ErrorActionPreference = 'Stop'
 $data = Split-Path -Parent $PSScriptRoot
 foreach ($d in 'inbox/subscriber','subscriber/database','subscriber/backup','subscriber/temp','subscriber/errors',
@@ -18,4 +24,13 @@ foreach ($f in 'subscriber','events','cdr','gwlog') {
   Copy-Item -Path (Join-Path $PSScriptRoot "$f/*") -Destination (Join-Path $data "inbox/$f") -Force
 }
 Copy-Item -Path (Join-Path $PSScriptRoot 'ref/*') -Destination (Join-Path $data 'ref') -Force
-Write-Host "Seeded subscriber + events + cdr + gwlog inboxes + ref/ - restart the server or wait for the next poll cycle."
+
+# The format-example pack: one pipeline per DuckDB-native parser frontend.
+foreach ($f in 'csv_example','fixedwidth_example','excel_example','json_example') {
+  New-Item -ItemType Directory -Force -Path (Join-Path $data "inbox/$f") | Out-Null
+  foreach ($sub in 'database','backup','temp','errors','quarantine','markers','status','logs') {
+    New-Item -ItemType Directory -Force -Path (Join-Path $data "$f/$sub") | Out-Null
+  }
+  Copy-Item -Path (Join-Path $PSScriptRoot "$f/*") -Destination (Join-Path $data "inbox/$f") -Force
+}
+Write-Host "Seeded csv/fixedwidth/excel/json example inboxes (+ the retired subscriber/events/cdr/gwlog corpora) + ref/ - restart the server or wait for the next poll cycle."

@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 # Seed the default space inboxes from the pristine samples (the poll dirs are consumed by the engine)
-# and pre-create every directory the subscriber + events + cdr + gwlog pipelines expect
-# (all dirs.* must exist on disk).
+# and pre-create every directory the pipelines expect -- PipelineConfig.prepare() creates only the
+# status dir, so every other dirs.* entry must exist on disk before a run.
+#
+# The format-example pack (csv/fixedwidth/excel/json) is the set of pipelines this space actually
+# ships; each has one sample beside this script.
+# NOTE: the subscriber / events / cdr / gwlog arms below seed pipelines RETIRED 2026-08-20
+# (FEATURE_INVENTORY.md 2). They are left in place because their sample corpora are still
+# committed; retiring the arms and the corpora together is an operator call.
 set -euo pipefail
 cd "$(dirname "$0")"
 for d in inbox/subscriber subscriber/database subscriber/backup subscriber/temp subscriber/errors \
@@ -20,4 +26,13 @@ cp events/* ../inbox/events/
 cp cdr/* ../inbox/cdr/
 cp gwlog/* ../inbox/gwlog/
 cp ref/* ../ref/
-echo "Seeded subscriber + events + cdr + gwlog inboxes + ref/ - restart the server or wait for the next poll cycle."
+
+# The format-example pack: one pipeline per DuckDB-native parser frontend.
+for f in csv_example fixedwidth_example excel_example json_example; do
+  mkdir -p "../inbox/$f"
+  for sub in database backup temp errors quarantine markers status logs; do
+    mkdir -p "../$f/$sub"
+  done
+  cp "$f"/* "../inbox/$f/"
+done
+echo "Seeded csv/fixedwidth/excel/json example inboxes (+ the retired subscriber/events/cdr/gwlog corpora) + ref/ - restart the server or wait for the next poll cycle."
