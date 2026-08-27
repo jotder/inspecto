@@ -1385,8 +1385,15 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   implementations and unified them onto `PathJail`; nobody counted the adjacent families. ⛔ **The fix is
   NOT "put the other fifteen on `PathJail`"** — they are four genuinely different problems and only one
   is "a local path under a local root":
-  **(a) local-path-under-root** → `PathJail`. `ComponentStore:315` / `PipelineStore:109` / `ViewStore:95`
-  are **byte-identical copies** of one another, so that is three→one for free. Others here:
+  **(a) local-path-under-root** → `PathJail`. `ComponentStore` / `PipelineStore` / `ViewStore`
+  ~~are **byte-identical copies** of one another, so that is three→one for free~~ ⚠ **re-grounded
+  2026-08-27: "byte-identical" is OVERSTATED and the line numbers have drifted** (now `:327`, `:107`,
+  `:106`). The *shape* is identical — `root.resolve(x).normalize()` then
+  `if (!target.startsWith(root)) throw new IllegalArgumentException(...)` — but each throws its **own
+  message** ("registry root" / "pipeline store root" / "views root"). So it is not a free dedup: a
+  shared helper must take a label, or it flattens three deliberate per-store error contracts into one.
+  **Same trap that closed `Values.asMap` as a won't-do.** With PATH-2's ranked bugs all CLOSED, this is
+  cosmetic — 3 sites × 2 lines — so it is a **LEAVE** unless someone is in these files anyway. Others here:
   `DbBrowserRoutes:176` (caller-supplied `?table=`, then interpolated into a `read_parquet` glob),
   `ControlApi.serveStatic:747` (`-Dui.dir`; a symlink inside the built SPA dir would serve through it),
   `RemoteAcquisitionHandler.contained:226` (⚠ its Javadoc claims it "mirrors" `WriteGates` and
