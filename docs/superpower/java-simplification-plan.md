@@ -15,9 +15,24 @@ dependencies; keep it modular; use generics where applicable. **Exclude AI/model
   means consolidating our hand-rolled plumbing, never adding a framework.
 - One deployable (fat `inspecto.jar`); editions are build flavors.
 - Behavior-preserving only: every slice gates on the full reactor `mvn -o clean test` matching the
-  baseline (currently 3630/0/0/5 enterprise) + UI suite where touched.
+  baseline (3630/0/0/5 enterprise when this plan opened; **3657/0/0/5 as of `40477a16`**) + UI
+  suite where touched.
 
-## Grounding (to be filled from exploration agents)
+## Outcome (2026-08-27) — plan DRAINED
+
+Seven slices: **four shipped, three closed by grounding.** Commits `d5791116` (S1 helpers) ·
+`97d8a6c6` (S2 `SpiSlot`) · `7d7718d4` + `4a6ed50a` + `c23a89ca` (S3 route convergence + the two
+splits) · `3f2c908c` (S6 `MaintenanceJob`) · `40477a16` (S4 typed map access). Test baseline moved
+**3630 → 3657, always 0 failures / 0 errors**, full enterprise reactor at every step, every
+real-HTTP contract test unmodified throughout.
+
+**The durable lesson: five of seven slices shrank or closed once grounded.** S2's broad
+`SpiLoader`, S5 entirely, S6's parser + `JobService` arms, and S7 were all refuted by reading the
+code — the premises came from size and naming, which lie. Each refutation is recorded in its slice
+below with the evidence, so the ideas are not rebuilt from the same wrong hypothesis. Residual
+work is listed per slice; it is small, optional, and none of it is blocking.
+
+## Grounding (from exploration agents, 2026-08-26)
 
 ### Module & dependency inventory (grounded 2026-08-26)
 
@@ -84,6 +99,24 @@ Every slice starts with its own grounding pass (the hotspot internals are inferr
 
 ### S1 — Shared helper consolidation → `inspecto-util` (mechanical, high ROI)
 
+> **RESIDUAL SWEEP SHIPPED `704f0481` + `f211b455` (2026-08-27)** — 24 files, −123 net lines,
+> reactor 3657/0/0/5. 🔴 `DbExportConnector.quote` was in the sweep list and was REFUSED by the
+> implementing agent, correctly: its *body* matches the SQL identifier quoter but its *usage* is CSV
+> header/cell quoting in `writeCsv`, so it belongs to the excluded `MappingCsv.quote` family.
+> Swapping it would have coupled a CSV writer to a DuckDB escaper. **The call site decides the
+> family, not the body** — the third time this exact trap appeared in this plan.
+> Original grounding follows. SWEEPING:
+> (d) three of the five ex-blocked engine files (`PipelineCodec.str`, `PartitionSinkWriter.str`,
+> `PipelineWatermarkStore.safe` — byte-identical) · (e) the `quote` family — five SQL-identifier
+> escapers are identical, consolidating to `SqlBuilder.quoteIdent` · (f) the control-plane
+> `exists()` five-pack — only the TYPE constant differs, plus its adjacent `existing()` twin ·
+> (a) the `str(Map,key)` lookups resolve into four sub-groups mapping onto existing `Values`
+> methods. STAYING LEFT, with reasons: `PipelineJobRunner.safe` (no null-guard — `fileSafe(null)`
+> returns `"_"`, this NPEs) · `EventObjectBridge.putIfPresent` (`Map<String,String>` AND excludes
+> blanks) · `RowShaper.str` (a `PipelineNode` accessor, not a map lookup) · `MappingCsv.quote`
+> (RFC4180 CSV, not SQL) · `ExpectationEvaluator.literal` and `SqlViews`' `'`→`''` (single-quote
+> STRING escaping, pinned by a recorded decision — ⛔ never merged into the identifier family).
+>
 > **STATUS: core sweep SHIPPED `d5791116` (2026-08-26)** — `com.gamma.util.Values` + 38-file sweep,
 > reactor 3651/0/0/5. Residuals deliberately left: (a) the `str(Map,key)` lookup-shaped helpers
 > (~10 files — a different family; candidate for S4's `MapView` instead), (b) `RuleTemplate.str`
