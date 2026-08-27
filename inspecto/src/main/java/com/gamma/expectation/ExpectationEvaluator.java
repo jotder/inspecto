@@ -4,6 +4,8 @@ import com.gamma.config.safety.DataRef;
 import com.gamma.sql.SqlSandbox;
 import com.gamma.sql.SqlSandboxPolicy;
 
+import static com.gamma.util.SqlBuilder.quoteIdent;
+
 import java.io.IOException;
 import java.nio.file.Path;
 import java.sql.ResultSet;
@@ -63,14 +65,14 @@ public final class ExpectationEvaluator {
     }
 
     private static String columnPredicate(Expectation exp, Path dataRoot) {
-        String col = quote(ident(exp.column()));
+        String col = quoteIdent(ident(exp.column()));
         return switch (exp.kind()) {
             case "non_null" -> col + " IS NULL";
             case "range" -> rangePredicate(exp, col);
             case "regex" -> col + " IS NOT NULL AND NOT regexp_matches(CAST(" + col + " AS VARCHAR), "
                     + literal(exp.pattern()) + ")";
             case "referential" -> col + " IS NOT NULL AND CAST(" + col + " AS VARCHAR) NOT IN (SELECT CAST("
-                    + quote(ident(exp.refColumn())) + " AS VARCHAR) FROM "
+                    + quoteIdent(ident(exp.refColumn())) + " AS VARCHAR) FROM "
                     + parquetGlob(dataRoot, exp.refDataset()) + ")";
             default -> throw new IllegalArgumentException("unsupported expectation kind '" + exp.kind() + "'");
         };
@@ -108,10 +110,6 @@ public final class ExpectationEvaluator {
         if (col == null || !SAFE_IDENT.matcher(col).matches())
             throw new IllegalArgumentException("unsafe column identifier '" + col + "'");
         return col;
-    }
-
-    private static String quote(String ident) {
-        return "\"" + ident.replace("\"", "\"\"") + "\"";
     }
 
     private static String literal(String s) {

@@ -1,6 +1,5 @@
 package com.gamma.control;
 
-import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 
 import java.io.IOException;
@@ -75,7 +74,7 @@ final class RequirementRoutes implements RouteModule {
         if (title == null) throw new ApiException(422, "requirement 'title' is required");
         String kind = ApiContext.str(body, "kind");
         if (kind == null || !KINDS.contains(kind.toLowerCase())) throw new ApiException(422, "requirement 'kind' must be one of " + KINDS);
-        if (exists(store, id))
+        if (RouteErrors.exists(store, TYPE, id))
             throw new ApiException(409, "requirement '" + id + "' already exists");
 
         Map<String, Object> content = new LinkedHashMap<>();
@@ -105,7 +104,7 @@ final class RequirementRoutes implements RouteModule {
 
     private Object decide(ApiContext api, String id, Map<String, Object> body) throws IOException {
         ComponentStore store = store(api);
-        Map<String, Object> content = existing(store, id);
+        Map<String, Object> content = RouteErrors.existing(store, TYPE, "requirement", id);
         if (!"submitted".equals(content.get("status")))
             throw new ApiException(409, "requirement '" + id + "' is not awaiting a decision (status "
                     + content.get("status") + ")");
@@ -119,7 +118,7 @@ final class RequirementRoutes implements RouteModule {
 
     private Object deliver(ApiContext api, String id, Map<String, Object> body) throws IOException {
         ComponentStore store = store(api);
-        Map<String, Object> content = existing(store, id);
+        Map<String, Object> content = RouteErrors.existing(store, TYPE, "requirement", id);
         if (!"accepted".equals(content.get("status")))
             throw new ApiException(409, "only an accepted requirement can be delivered (status "
                     + content.get("status") + ")");
@@ -141,25 +140,6 @@ final class RequirementRoutes implements RouteModule {
 
     private ComponentStore store(ApiContext api) {
         return new ComponentStore(WriteGates.requireWriteRoot(api, "requirement").resolve("registry"));
-    }
-
-    /** {@code store.exists}, mapping an unsafe id (e.g. containing {@code ..}) to 422 rather than
-     *  letting {@link IllegalArgumentException} escape to the generic 500 handler. */
-    private static boolean exists(ComponentStore store, String id) {
-        try {
-            return store.exists(TYPE, id);
-        } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
-        }
-    }
-
-    private static Map<String, Object> existing(ComponentStore store, String id) {
-        try {
-            return store.get(TYPE, id).map(ComponentRegistry.Component::content)
-                    .orElseThrow(() -> new ApiException(404, "requirement '" + id + "' not found"));
-        } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
-        }
     }
 
     private static Object write(ComponentStore store, String id, Map<String, Object> content) throws IOException {

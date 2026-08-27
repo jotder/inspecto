@@ -5,6 +5,8 @@ import com.gamma.util.DuckDbUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.gamma.util.SqlBuilder.quoteIdent;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -183,7 +185,7 @@ public final class ReferenceCompactor {
         try {
             // 2. Write this dir's slice, minus the row-number helper and the path-encoded partition
             //    columns (hive partition values live in the directory name, never in the file).
-            String exclude = "__refc_rn" + partCols.stream().map(c -> ", " + quote(c)).reduce("", String::concat);
+            String exclude = "__refc_rn" + partCols.stream().map(c -> ", " + quoteIdent(c)).reduce("", String::concat);
             long rows;
             try (Statement st = conn.createStatement()) {
                 st.execute("COPY (SELECT * EXCLUDE (" + exclude + ") FROM __retained WHERE " + where
@@ -225,7 +227,7 @@ public final class ReferenceCompactor {
             String col = s.substring(0, eq), val = s.substring(eq + 1);
             partCols.add(col);
             if (!where.isEmpty()) where.append(" AND ");
-            where.append(quote(col)).append(" = '").append(val.replace("'", "''")).append('\'');
+            where.append(quoteIdent(col)).append(" = '").append(val.replace("'", "''")).append('\'');
         }
         return where.isEmpty() ? "TRUE" : where.toString();
     }
@@ -315,7 +317,4 @@ public final class ReferenceCompactor {
         return p.toAbsolutePath().toString().replace('\\', '/').replace("'", "''");
     }
 
-    private static String quote(String ident) {
-        return "\"" + ident.replace("\"", "\"\"") + "\"";
-    }
 }

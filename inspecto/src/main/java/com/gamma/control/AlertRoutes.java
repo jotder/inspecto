@@ -2,7 +2,6 @@ package com.gamma.control;
 
 import com.gamma.alert.AlertRule;
 import com.gamma.alert.AlertService;
-import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.sun.net.httpserver.HttpExchange;
 
@@ -61,7 +60,7 @@ final class AlertRoutes implements RouteModule {
     private Object create(ApiContext api, Map<String, Object> body) throws IOException {
         ComponentStore store = store(api);
         AlertRule rule = parse(body);                                   // 422 on an invalid rule
-        if (exists(store, rule.name()))
+        if (RouteErrors.exists(store, TYPE, rule.name()))
             throw new ApiException(409, "alert rule '" + rule.name() + "' already exists (use PUT to update)");
         Map<String, Object> content = write(store, rule.name(), rule.toMap());
         alerts(api).upsert(rule);                                       // arm in the running engine
@@ -70,7 +69,7 @@ final class AlertRoutes implements RouteModule {
 
     private Object update(ApiContext api, String name, Map<String, Object> body) throws IOException {
         ComponentStore store = store(api);
-        existing(store, name);   // 404 if absent
+        RouteErrors.existing(store, TYPE, "alert rule", name);   // 404 if absent
         // The name is the storage key — immutable on update. Bind it from the path, not the body, so a
         // stale/edited body name can never fork the component or the in-memory rule.
         Map<String, Object> patched = new java.util.LinkedHashMap<>(body);
@@ -83,7 +82,7 @@ final class AlertRoutes implements RouteModule {
 
     private Object delete(ApiContext api, String name) throws IOException {
         ComponentStore store = store(api);
-        existing(store, name);   // 404 if absent
+        RouteErrors.existing(store, TYPE, "alert rule", name);   // 404 if absent
         store.delete(TYPE, name);
         alerts(api).remove(name);
         return Map.of("deleted", name);
@@ -108,25 +107,6 @@ final class AlertRoutes implements RouteModule {
 
     private ComponentStore store(ApiContext api) {
         return new ComponentStore(WriteGates.requireWriteRoot(api, "alert rule write").resolve("registry"));
-    }
-
-    /** {@code store.exists}, mapping an unsafe name (e.g. containing {@code ..}) to 422 rather than
-     *  letting {@link IllegalArgumentException} escape to the generic 500 handler. */
-    private static boolean exists(ComponentStore store, String name) {
-        try {
-            return store.exists(TYPE, name);
-        } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
-        }
-    }
-
-    private static Map<String, Object> existing(ComponentStore store, String name) {
-        try {
-            return store.get(TYPE, name).map(ComponentRegistry.Component::content)
-                    .orElseThrow(() -> new ApiException(404, "alert rule '" + name + "' not found"));
-        } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
-        }
     }
 
     private static Map<String, Object> write(ComponentStore store, String name, Map<String, Object> content)

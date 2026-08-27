@@ -4,6 +4,8 @@ import com.gamma.api.PublicApi;
 import com.gamma.config.spec.Finding;
 import com.gamma.util.JdbcRows;
 
+import static com.gamma.util.SqlBuilder.quoteIdent;
+
 import java.io.IOException;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -167,7 +169,7 @@ public final class SqlOracle {
             // Layer 2a (trusted, file access on): materialise each path-backed input as a typed table.
             try (Statement st = sb.statement()) {
                 for (ViewSpec v : req.views()) {
-                    st.execute("CREATE TABLE " + quote(v.name()) + " AS SELECT * FROM "
+                    st.execute("CREATE TABLE " + quoteIdent(v.name()) + " AS SELECT * FROM "
                             + SqlViews.reader(v.format(), v.pathOrGlob(), v.hive())
                             + " LIMIT " + inputCap);
                 }
@@ -220,10 +222,10 @@ public final class SqlOracle {
             List<String> cols = t.columns();
             if (cols.isEmpty()) continue;
 
-            StringBuilder ddl = new StringBuilder("CREATE TABLE ").append(quote(t.name())).append(" (");
+            StringBuilder ddl = new StringBuilder("CREATE TABLE ").append(quoteIdent(t.name())).append(" (");
             for (int i = 0; i < cols.size(); i++) {
                 if (i > 0) ddl.append(", ");
-                ddl.append(quote(cols.get(i))).append(" VARCHAR");
+                ddl.append(quoteIdent(cols.get(i))).append(" VARCHAR");
             }
             ddl.append(")");
             try (Statement st = sb.statement()) {
@@ -234,7 +236,7 @@ public final class SqlOracle {
 
             StringBuilder placeholders = new StringBuilder();
             for (int i = 0; i < cols.size(); i++) placeholders.append(i == 0 ? "?" : ", ?");
-            String insert = "INSERT INTO " + quote(t.name()) + " VALUES (" + placeholders + ")";
+            String insert = "INSERT INTO " + quoteIdent(t.name()) + " VALUES (" + placeholders + ")";
             try (PreparedStatement ps = sb.connection().prepareStatement(insert)) {
                 int n = 0;
                 for (List<String> row : t.rows()) {
@@ -254,8 +256,4 @@ public final class SqlOracle {
         return s.endsWith(";") ? s.substring(0, s.length() - 1).trim() : s;
     }
 
-    /** Quote a table name for DuckDB, escaping embedded double quotes. */
-    private static String quote(String name) {
-        return "\"" + name.replace("\"", "\"\"") + "\"";
-    }
 }

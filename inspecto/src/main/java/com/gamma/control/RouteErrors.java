@@ -1,7 +1,11 @@
 package com.gamma.control;
 
+import com.gamma.pipeline.ComponentRegistry;
+import com.gamma.pipeline.ComponentStore;
+
 import java.io.IOException;
 import java.sql.SQLException;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.function.Supplier;
 
@@ -48,6 +52,26 @@ final class RouteErrors {
             throw new ApiException(400, e.getMessage());
         } catch (SQLException | IOException e) {
             throw new ApiException(422, "preview failed: " + e.getMessage());
+        }
+    }
+
+    /** {@code store.exists} for {@code type}, mapping an unsafe id (e.g. containing {@code ..}) to 422
+     *  rather than letting {@link IllegalArgumentException} escape to the generic 500 handler. */
+    static boolean exists(ComponentStore store, String type, String id) {
+        try {
+            return store.exists(type, id);
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(422, e.getMessage());
+        }
+    }
+
+    /** The stored content for {@code type}/{@code id} — absent → 404 naming {@code label}, unsafe id → 422. */
+    static Map<String, Object> existing(ComponentStore store, String type, String label, String id) {
+        try {
+            return store.get(type, id).map(ComponentRegistry.Component::content)
+                    .orElseThrow(() -> new ApiException(404, label + " '" + id + "' not found"));
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(422, e.getMessage());
         }
     }
 

@@ -110,7 +110,7 @@ final class NotificationRoutes implements RouteModule {
     private static Object createChannel(ApiContext api, Map<String, Object> body) throws IOException {
         ComponentStore store = channelStore(api);
         ChannelConfig ch = parse(body, System.currentTimeMillis());
-        if (exists(store, ch.id()))
+        if (RouteErrors.exists(store, CHANNEL_TYPE, ch.id()))
             throw new ApiException(409, "channel '" + ch.id() + "' already exists (use PUT to update)");
         return write(store, ch.id(), ch.toMap());
     }
@@ -118,7 +118,7 @@ final class NotificationRoutes implements RouteModule {
     /** {@code PUT /notifications/channels/{id}} — replace; 404 unknown. The id + createdAt are immutable. */
     private static Object updateChannel(ApiContext api, String id, Map<String, Object> body) throws IOException {
         ComponentStore store = channelStore(api);
-        Map<String, Object> existing = existing(store, id);
+        Map<String, Object> existing = RouteErrors.existing(store, CHANNEL_TYPE, "channel", id);
         long createdAt = existing.get("createdAt") instanceof Number n ? n.longValue() : System.currentTimeMillis();
         Map<String, Object> patched = new LinkedHashMap<>(existing);
         patched.putAll(body);
@@ -130,7 +130,7 @@ final class NotificationRoutes implements RouteModule {
     /** {@code DELETE /notifications/channels/{id}} — 404 unknown, else {@code {deleted:id}}. */
     private static Object deleteChannel(ApiContext api, String id) throws IOException {
         ComponentStore store = channelStore(api);
-        existing(store, id);
+        RouteErrors.existing(store, CHANNEL_TYPE, "channel", id);
         store.delete(CHANNEL_TYPE, id);
         return Map.of("deleted", id);
     }
@@ -142,24 +142,6 @@ final class NotificationRoutes implements RouteModule {
     private static ChannelConfig parse(Map<String, Object> body, long defaultCreatedAt) {
         try {
             return ChannelConfig.fromMap(body, defaultCreatedAt);
-        } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
-        }
-    }
-
-    /** {@code store.exists}, mapping an unsafe id (e.g. containing {@code ..}) to 422, not a generic 500. */
-    private static boolean exists(ComponentStore store, String id) {
-        try {
-            return store.exists(CHANNEL_TYPE, id);
-        } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
-        }
-    }
-
-    private static Map<String, Object> existing(ComponentStore store, String id) {
-        try {
-            return store.get(CHANNEL_TYPE, id).map(ComponentRegistry.Component::content)
-                    .orElseThrow(() -> new ApiException(404, "channel '" + id + "' not found"));
         } catch (IllegalArgumentException e) {
             throw new ApiException(422, e.getMessage());
         }

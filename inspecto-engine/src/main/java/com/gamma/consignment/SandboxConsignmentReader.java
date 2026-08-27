@@ -10,6 +10,8 @@ import com.gamma.util.JdbcRows;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.gamma.util.SqlBuilder.quoteIdent;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.ResultSet;
@@ -68,7 +70,7 @@ public final class SandboxConsignmentReader implements ConsignmentReader {
             // on why this sandbox is deliberately never sealed.
             try (Statement st = sandbox.statement()) {
                 for (Map.Entry<String, List<ConsignmentOutput>> e : byTable.entrySet())
-                    st.execute("CREATE VIEW " + quote(e.getKey()) + " AS " + readerSql(e.getValue()));
+                    st.execute("CREATE VIEW " + quoteIdent(e.getKey()) + " AS " + readerSql(e.getValue()));
             }
             return new SandboxConsignmentReader(sandbox, List.copyOf(byTable.keySet()));
         } catch (Exception e) {
@@ -126,10 +128,6 @@ public final class SandboxConsignmentReader implements ConsignmentReader {
     /** Format from the revealed file's extension — the registry stores the path, not the format. */
     private static String format(String path) {
         return path.toLowerCase(java.util.Locale.ROOT).endsWith(".parquet") ? "PARQUET" : "CSV";
-    }
-
-    private static String quote(String identifier) {
-        return "\"" + identifier.replace("\"", "\"\"") + "\"";
     }
 
     private static String stripTrailingSemicolon(String sql) {

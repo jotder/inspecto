@@ -14,6 +14,11 @@ public final class SqlBuilder {
 
     private SqlBuilder() {}
 
+    /** Quote an identifier for DuckDB, escaping embedded double quotes. */
+    public static String quoteIdent(String ident) {
+        return "\"" + ident.replace("\"", "\"\"") + "\"";
+    }
+
     /**
      * Append a {@code COALESCE(TRY_STRPTIME(col, fmt1), ...)::TYPE} expression to {@code sb}.
      *

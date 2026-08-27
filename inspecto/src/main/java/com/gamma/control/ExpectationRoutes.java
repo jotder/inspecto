@@ -76,7 +76,7 @@ final class ExpectationRoutes implements RouteModule {
     private Object create(ApiContext api, Map<String, Object> body) throws IOException {
         ComponentStore store = store(api);
         Expectation exp = parse(body);
-        if (exists(store, exp.name()))
+        if (RouteErrors.exists(store, TYPE, exp.name()))
             throw new ApiException(409, "expectation '" + exp.name() + "' already exists (use PUT to update)");
         long now = System.currentTimeMillis();
         Map<String, Object> content = exp.toMap();
@@ -88,7 +88,7 @@ final class ExpectationRoutes implements RouteModule {
 
     private Object update(ApiContext api, String name, Map<String, Object> body) throws IOException {
         ComponentStore store = store(api);
-        Map<String, Object> prev = existing(store, name);
+        Map<String, Object> prev = RouteErrors.existing(store, TYPE, "expectation", name);
         Expectation exp = parse(body);
         Map<String, Object> content = exp.toMap();
         content.put("lastResult", prev.get("lastResult"));                       // preserve last evaluation
@@ -99,7 +99,7 @@ final class ExpectationRoutes implements RouteModule {
 
     private Object delete(ApiContext api, String name) throws IOException {
         ComponentStore store = store(api);
-        existing(store, name);   // 404 if absent
+        RouteErrors.existing(store, TYPE, "expectation", name);   // 404 if absent
         store.delete(TYPE, name);
         return Map.of("deleted", name);
     }
@@ -122,7 +122,7 @@ final class ExpectationRoutes implements RouteModule {
 
     private Object evaluateOne(ApiContext api, String name) throws IOException {
         ComponentStore store = store(api);
-        return runAndPersist(api, store, existing(store, name));
+        return runAndPersist(api, store, RouteErrors.existing(store, TYPE, "expectation", name));
     }
 
     /** Evaluate one expectation, persist its result, fire the failure consequence chain, return the updated content. */
@@ -213,25 +213,6 @@ final class ExpectationRoutes implements RouteModule {
     private static Expectation parse(Map<String, Object> body) {
         try {
             return Expectation.fromMap(body);
-        } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
-        }
-    }
-
-    /** {@code store.exists}, mapping an unsafe name (e.g. containing {@code ..}) to 422 rather than
-     *  letting {@link IllegalArgumentException} escape to the generic 500 handler. */
-    private static boolean exists(ComponentStore store, String name) {
-        try {
-            return store.exists(TYPE, name);
-        } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
-        }
-    }
-
-    private static Map<String, Object> existing(ComponentStore store, String name) {
-        try {
-            return store.get(TYPE, name).map(ComponentRegistry.Component::content)
-                    .orElseThrow(() -> new ApiException(404, "expectation '" + name + "' not found"));
         } catch (IllegalArgumentException e) {
             throw new ApiException(422, e.getMessage());
         }

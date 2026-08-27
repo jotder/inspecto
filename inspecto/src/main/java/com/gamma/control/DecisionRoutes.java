@@ -81,7 +81,7 @@ final class DecisionRoutes implements RouteModule {
         ComponentStore store = store(api);
         Map<String, Object> rule = normalize(body);
         String name = requireName(rule);
-        if (exists(store, name))
+        if (RouteErrors.exists(store, TYPE, name))
             throw new ApiException(409, "decision rule '" + name + "' already exists (use PUT to update)");
         long now = System.currentTimeMillis();
         rule.put("lastSimulation", null);
@@ -92,7 +92,7 @@ final class DecisionRoutes implements RouteModule {
 
     private Object update(ApiContext api, String name, Map<String, Object> body) throws IOException {
         ComponentStore store = store(api);
-        Map<String, Object> prev = existing(store, name);
+        Map<String, Object> prev = RouteErrors.existing(store, TYPE, "decision rule", name);
         Map<String, Object> rule = normalize(body);
         rule.put("name", name);
         rule.put("lastSimulation", prev.get("lastSimulation"));
@@ -103,7 +103,7 @@ final class DecisionRoutes implements RouteModule {
 
     private Object delete(ApiContext api, String name) throws IOException {
         ComponentStore store = store(api);
-        existing(store, name);   // 404 if absent
+        RouteErrors.existing(store, TYPE, "decision rule", name);   // 404 if absent
         store.delete(TYPE, name);
         return Map.of("deleted", name);
     }
@@ -115,7 +115,7 @@ final class DecisionRoutes implements RouteModule {
      *  No sample ⇒ {@code 0/0}. Not an authoring edit (MET-5 parity — no version archived). */
     private Object simulate(ApiContext api, String name, Map<String, Object> body) throws IOException {
         ComponentStore store = store(api);
-        Map<String, Object> rule = existing(store, name);
+        Map<String, Object> rule = RouteErrors.existing(store, TYPE, "decision rule", name);
         List<Map<String, Object>> sample = ApiContext.sampleRows(body);
         Map<String, Object> sim = new LinkedHashMap<>();
         sim.put("matched", ConditionTree.matched(rule.get("when"), sample));
@@ -132,7 +132,7 @@ final class DecisionRoutes implements RouteModule {
      *  per-action mapping); never side-effects the rule's stored content. */
     @SuppressWarnings("unchecked")
     private Object apply(ApiContext api, String name) throws IOException {
-        Map<String, Object> rule = existing(store(api), name);
+        Map<String, Object> rule = RouteErrors.existing(store(api), TYPE, "decision rule", name);
         List<Map<String, Object>> consequences = (List<Map<String, Object>>) (List<?>)
                 (rule.get("consequences") instanceof List<?> l ? l : List.of());
         List<Map<String, Object>> executed = new ArrayList<>();
@@ -329,25 +329,6 @@ final class DecisionRoutes implements RouteModule {
         rule.put("priority", priority instanceof Number num ? num.intValue() : 100);
         rule.put("enabled", !"false".equalsIgnoreCase(String.valueOf(rule.getOrDefault("enabled", true))));
         return rule;
-    }
-
-    /** {@code store.exists}, mapping an unsafe name (e.g. containing {@code ..}) to 422 rather than
-     *  letting {@link IllegalArgumentException} escape to the generic 500 handler. */
-    private static boolean exists(ComponentStore store, String name) {
-        try {
-            return store.exists(TYPE, name);
-        } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
-        }
-    }
-
-    private static Map<String, Object> existing(ComponentStore store, String name) {
-        try {
-            return store.get(TYPE, name).map(ComponentRegistry.Component::content)
-                    .orElseThrow(() -> new ApiException(404, "decision rule '" + name + "' not found"));
-        } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
-        }
     }
 
     private static Object write(ComponentStore store, String name, Map<String, Object> content) throws IOException {
