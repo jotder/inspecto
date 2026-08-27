@@ -10,6 +10,7 @@ import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import static com.gamma.util.Values.mapAt;
 
 /**
  * Parser-catalog routes (v5.3.0): the self-describing {@link ParserPlugin} registry served to
@@ -91,12 +92,11 @@ final class ParserRoutes implements RouteModule {
         return bytes;
     }
 
-    @SuppressWarnings("unchecked")
     private static Map<String, Object> grammarOf(Map<String, Object> body) {
         Object g = body.get("grammar");
         if (g == null) return Map.of();
         if (!(g instanceof Map<?, ?>)) throw new ApiException(400, "'grammar' must be a map of options");
-        return (Map<String, Object>) g;
+        return mapAt(body, "grammar");
     }
 
     /** Serialize a {@link ParseResult} to the UI's {@code ParserPreview} union — nulls omitted. */

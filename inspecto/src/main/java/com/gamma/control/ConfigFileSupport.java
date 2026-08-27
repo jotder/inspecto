@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import static com.gamma.util.Values.mapAt;
 
 /**
  * On-disk resolution shared by the config write/read/delete routes ({@link ConfigWriteRoutes},
@@ -52,9 +53,7 @@ final class ConfigFileSupport {
         if (!Files.exists(csv)) return;
         List<Map<String, String>> rules =
                 MappingCsv.parse(Files.readString(csv, StandardCharsets.UTF_8), csv.toString());
-        @SuppressWarnings("unchecked")
-        Map<String, Object> mapping = config.get("mapping") instanceof Map<?, ?> m
-                ? (Map<String, Object>) m : null;
+        Map<String, Object> mapping = mapAt(config, "mapping");
         if (mapping == null) {
             mapping = new LinkedHashMap<>();
             config.put("mapping", mapping);

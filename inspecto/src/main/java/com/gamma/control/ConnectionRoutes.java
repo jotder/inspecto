@@ -19,6 +19,7 @@ import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import static com.gamma.util.Values.mapAt;
 
 /**
  * Connection-profile CRUD + reachability test ({@code /connections*}). Extracted verbatim from
@@ -227,7 +228,6 @@ final class ConnectionRoutes implements RouteModule {
      * values ({@code ***}) are replaced with the stored reference from {@code existing} so an unchanged secret is
      * never clobbered; secrets must otherwise be {@code ${ENV:…}} references (never raw values).
      */
-    @SuppressWarnings("unchecked")
     private ConnectionProfile connectionFromBody(String id, Map<String, Object> body, ConnectionProfile existing) {
         Map<String, Object> c = new LinkedHashMap<>();
         c.put("id", id);
@@ -249,15 +249,15 @@ final class ConnectionRoutes implements RouteModule {
             });
             c.put("options", merged);
         }
-        if (body.get("tunnel") instanceof Map<?, ?> t) {
-            Map<String, Object> tun = new LinkedHashMap<>((Map<String, Object>) t);
+        if (body.get("tunnel") instanceof Map<?, ?>) {
+            Map<String, Object> tun = new LinkedHashMap<>(mapAt(body, "tunnel"));
             String priorPw = (existing != null && existing.tunnel() != null) ? existing.tunnel().password() : null;
             Object pw = tun.get("password");
             tun.put("password", keepSecret(pw == null ? null : String.valueOf(pw), priorPw));
             c.put("tunnel", tun);
         }
-        if (body.get("proxy") instanceof Map<?, ?> pr) {
-            Map<String, Object> px = new LinkedHashMap<>((Map<String, Object>) pr);
+        if (body.get("proxy") instanceof Map<?, ?>) {
+            Map<String, Object> px = new LinkedHashMap<>(mapAt(body, "proxy"));
             String priorPw = (existing != null && existing.proxy() != null) ? existing.proxy().password() : null;
             Object pw = px.get("password");
             px.put("password", keepSecret(pw == null ? null : String.valueOf(pw), priorPw));

@@ -20,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
+import static com.gamma.util.Values.mapAt;
 
 /**
  * Stage-2 enrichment routes ({@code /enrichment*}, v2.9.0): the per-job run audit, output lineage,
@@ -136,8 +137,7 @@ final class EnrichmentRoutes implements RouteModule {
         List<Map<String, Object>> sampleRows = ApiContext.sampleRows(body);
         if (!(cfgObj instanceof Map<?, ?>) || sampleRows.isEmpty())
             throw new ApiException(400, "body must include 'config' (an enrichment draft map) and non-empty 'sampleRows'");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> configMap = (Map<String, Object>) cfgObj;
+        Map<String, Object> configMap = mapAt(body, "config");
         EnrichmentConfig cfg;
         try {
             cfg = EnrichmentConfig.fromMap(configMap, null);   // inline transform; no file I/O

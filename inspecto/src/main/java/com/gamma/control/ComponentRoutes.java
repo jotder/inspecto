@@ -23,6 +23,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import static com.gamma.util.Values.mapAt;
 
 /**
  * Component registry CRUD + scratch preview/test ({@code /components*}, T19/T18, §7.1):
@@ -397,12 +398,11 @@ final class ComponentRoutes implements RouteModule {
     private static final String INLINE_ID = "(inline)";
 
     /** The {@code config} object every inline preview requires, or the standard 400. */
-    @SuppressWarnings("unchecked")
     private static Map<String, Object> requireInlineConfig(Map<String, Object> body) {
         Object cfg = body.get("config");
         if (!(cfg instanceof Map<?, ?>))
             throw new ApiException(400, "body must include 'config' (the node config object to preview)");
-        return (Map<String, Object>) cfg;
+        return mapAt(body, "config");
     }
 
     /** Load a component by {@code type}/{@code id} or fail with the standard 400/404 (shared by the preview handlers). */

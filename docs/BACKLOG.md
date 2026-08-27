@@ -941,8 +941,12 @@ non-blocking:**
 ## 6. Engineering / tech-debt
 
 **Open (added 2026-08-27, from the Phase-1 simplification arc — plan archived):**
-- 🟡 **JAVA-SIMP-1 — route-class `Map<String,Object>` cast sites adopt `Values.mapAt`. NAMED SCOPE
-  DONE 2026-08-27; the row UNDER-SCOPED and the remainder is re-scoped below.**
+- ✅ **JAVA-SIMP-1 — CLOSED 2026-08-27: route-class map casts adopt `Values.mapAt`.**
+  **20 sites converted across 10 files; `@SuppressWarnings("unchecked")` 22 → 5** (measured, not
+  tallied by hand). Of the 5 left, 2 guard **List** casts (`ConfigWriteRoutes.splitMapping`,
+  `PipelineGraphRoutes.attachCompanionEnrichments`) and 3 are pre-existing in `ComponentRoutes` on
+  casts this change never touched. The rest of the package is a grounded LEAVE (groups B and C
+  below), not remaining work.
   Phase 1 swept `PipelineConfigParser` (16 → 6 `@SuppressWarnings("unchecked")`) and `ObjectService`
   (2 → 0); the equivalent sites in the control layer were deliberately left because the route classes
   were mid-split at the time. ⚠ Use **`castMapAt`** for bare casts (preserves null-if-absent /
@@ -959,16 +963,23 @@ non-blocking:**
   ⚠ Two of the seven files the row named — `ConfigReadRoutes`, `PipelineListRoutes` — **have no such
   sites at all.**
 
-  🔴 **Re-scoped from ground truth: 15 MORE control-layer files carry the same pattern** (~21 casts,
-  ~26 suppressions) — `AgentRoutes`, `ApiContext`, `AssistRoutes`, `BiTemplates`, `BundleRoutes`,
-  `ComponentRoutes`, `ConfigFileSupport`, `ConnectionRoutes`, `DecisionRoutes`, `EnrichmentRoutes`,
-  `ExchangeRoutes`, `IconMapSettings`, `ParserRoutes`, `ReconRoutes`, `SettingsRoutes`. The row listed
-  none of them. **It is NOT a blind sweep — two distinct shapes:**
-  1. *mechanical* — `if (m.get(k) instanceof Map<?,?> v) … (Map<String,Object>) v` → `mapAt(m, k)`
-     (e.g. `ConnectionRoutes:252,259`). Same as what shipped.
-  2. *needs judgement* — the cast is of `entry.getValue()` inside an entry-set loop
-     (`SettingsRoutes:105-106`, `IconMapSettings:47-48`); `mapAt(m, e.getKey())` fits but the outer map
-     is not always conveniently in scope, and some sites cast inline more than once.
+  **Then swept the other 15 control-layer files the row never named** — `AgentRoutes`, `ApiContext`,
+  `AssistRoutes`, `BiTemplates`, `BundleRoutes`, `ComponentRoutes`, `ConfigFileSupport`,
+  `ConnectionRoutes`, `DecisionRoutes`, `EnrichmentRoutes`, `ExchangeRoutes`, `IconMapSettings`,
+  `ParserRoutes`, `ReconRoutes`, `SettingsRoutes` (~21 more casts). **Six more sites shipped; the
+  other ~15 are a LEAVE, and the reason matters:**
+
+  | Group | Sites | Verdict |
+  |---|---|---|
+  | **A — `mapAt(m, key)` is an exact drop-in** | `ConnectionRoutes` ×2, `ConfigFileSupport`, `ComponentRoutes.requireInlineConfig`, `EnrichmentRoutes`, `ParserRoutes.grammarOf` | ✅ **SHIPPED.** `ConfigFileSupport:56` was literally `mapAt`'s own body written longhand. |
+  | **B — keyed, but defaults to `Map.of()` not `null`** | `AssistRoutes:82`, `DecisionRoutes:276`, `ExchangeRoutes:144` | ⛔ **LEAVE.** `mapAt` returns **null** where these return an empty map — callers would NPE. This is exactly the semantic swap this row's own ⚠ warns about, in a third variant the warning does not name. |
+  | **C — no map+key pair exists at all** | ~12 sites: `AgentRoutes:312`, `BiTemplates:156,169`, `BundleRoutes:649,656`, `ApiContext:312`, `ComponentRoutes:530`, `ReconRoutes:197`, `IconMapSettings:47-48`, `SettingsRoutes:105-106` | ⛔ **LEAVE.** The cast is of an `Object`/`Map<?,?>` **parameter** or of a **List element** in a loop. `mapAt` takes `(map, key)`; there is no key. `Values` offers **no applicable helper**. |
+
+  🔴 **The row's framing — "cast sites can adopt `castMapAt`/`mapAt`" — is true of about half the
+  package and false of the rest.** Group C would need a NEW `Values.asMap(Object)` helper
+  (~12 callers would use it). That is an API addition, not adopting an existing one, so it is **not**
+  part of this row. ⚠ If anyone builds it, note it must pick ONE of group C's two incompatible
+  behaviours on a non-map (`Map.of()` vs throw) — several group-C sites `continue`/skip instead.
 
   **How the shipped batch verified suppression removal** (reuse this — it is the only real check):
   compile with `-Dmaven.compiler.showWarnings=true` and confirm no file reports *"uses unchecked or
