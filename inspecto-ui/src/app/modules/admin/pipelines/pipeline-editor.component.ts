@@ -2111,8 +2111,16 @@ export class PipelineEditorComponent implements OnInit {
 
     /**
      * Whether `node` may be switched off (Phase 4 S4 / D-13). The engine parks at exactly one shape —
-     * a sink STRICTLY inside an armed `route:` subtree — so the test here is structural over the graph
-     * on screen: a sink Step with an inbound edge from a `transform.route` Step. Deliberately NOT a
+     * a sink fed by a route BRANCH — so the test here is structural over the graph on screen: a sink
+     * Step whose inbound edge from a `transform.route` Step carries a `route:<key>` relation.
+     *
+     * ⚠ The RELATION is the whole test, not just the source node. A destination no branch names (the
+     * primary at `dirs.database`, in a config that also declares branches) hangs off the route node
+     * too — but by a plain `data` edge, because the lift pairs branches to sinks BY DATABASE and finds
+     * no key for it. Keying on "inbound from the route node" alone therefore offered the switch on a
+     * Step whose disable `StepDisableArming` refuses; found driving the preview, 2026-08-29.
+     *
+     * Deliberately NOT a
      * mirror of `StepDisableArming.parkableSinkIds`' `sink__d<i>` id grammar, which is a lift-time
      * spelling this model never sees; the save gate remains the authority and its refusals surface
      * through the PUT's `refusals[]`.
@@ -2126,7 +2134,7 @@ export class PipelineEditorComponent implements OnInit {
         if (this.typeCategory(node.type) !== 'SINK' && !node.type.startsWith('sink.')) return false;
         const routeIds = new Set(m.nodes.filter((n) => n.type === 'transform.route').map((n) => n.id));
         if (!routeIds.size) return false;
-        return m.edges.some((e) => e.to === node.id && routeIds.has(e.from));
+        return m.edges.some((e) => e.to === node.id && routeIds.has(e.from) && e.rel?.startsWith('route:'));
     }
 
     /**

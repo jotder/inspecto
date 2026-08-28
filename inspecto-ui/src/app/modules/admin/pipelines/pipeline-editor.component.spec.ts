@@ -1481,11 +1481,15 @@ describe('PipelineEditorComponent', () => {
                     { id: 'route', type: 'transform.route', config: { mode: 'case' } },
                     { id: 'emea', type: 'sink.persistent', config: { database: '/db/emea' } },
                     { id: 'apac', type: 'sink.persistent', config: { database: '/db/apac' } },
+                    { id: 'trunk', type: 'sink.persistent', config: { database: '/db' } },
                 ],
                 edges: [
                     { from: 'map', rel: 'data', to: 'route' },
-                    { from: 'route', rel: 'data', to: 'emea' },
-                    { from: 'route', rel: 'data', to: 'apac' },
+                    { from: 'route', rel: 'route:emea', to: 'emea' },
+                    { from: 'route', rel: 'route:apac', to: 'apac' },
+                    // The primary destination no branch names: fed by the route node, but by a PLAIN
+                    // data edge — the engine will not arm a disable on it.
+                    { from: 'route', rel: 'data', to: 'trunk' },
                 ],
             };
 
@@ -1493,6 +1497,9 @@ describe('PipelineEditorComponent', () => {
                 const c = make();
                 c.model.set(structuredClone(routed));
                 expect(c.parkableNode({ id: 'apac', type: 'sink.persistent' })).toBe(true);
+                // ⚠ Fed by the route node, but by a plain data edge — no branch names it, so the
+                // engine refuses a disable there and the switch must not be offered.
+                expect(c.parkableNode({ id: 'trunk', type: 'sink.persistent' })).toBe(false);
                 expect(c.parkableNode({ id: 'route', type: 'transform.route' })).toBe(false);
                 expect(c.parkableNode({ id: 'map', type: 'transform.map' })).toBe(false);
                 expect(c.parkableNode(null)).toBe(false);

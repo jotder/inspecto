@@ -540,6 +540,50 @@ export function seedDefaultSpace(store: MockStore, space: string): void {
         registered: true,
     } satisfies StoredPipelineConfig);
 
+    // A ROUTE pipeline (PARK-1(c), 2026-08-29). Without one in the seed, the per-Step switch of
+    // Phase 4 S4d cannot be exercised offline at all: the switch is offered only on a sink fed by a
+    // route Step, so the preview had nothing to select. Two branches with distinct destinations —
+    // the exact shape `StepDisableArming` arms, so switching a branch sink off here is the same
+    // authoring act the engine parks on.
+    store.put(space, PIPELINE_CONFIGS_COLL, 'cdr_route_demo', {
+        id: 'cdr_route_demo',
+        path: 'cdr_route_demo_pipeline.toon',
+        config: {
+            name: 'cdr_route_demo',
+            active: true,
+            description: 'Split CDRs by region — the route: shape the per-Step switch needs.',
+            dirs: {
+                poll: 'data/inbox/cdr_route_demo',
+                database: 'data/cdr_route_demo/database',
+                backup: 'data/cdr_route_demo/backup',
+                temp: 'data/cdr_route_demo/temp',
+                status_dir: 'data/cdr_route_demo/status',
+            },
+            output: { format: 'PARQUET' },
+            collector: { connector: 'local', include: ['glob:**/*.csv'] },
+            // ⚠ The FIRST entry is the primary at `dirs.database` — the convention every real
+            // multi-destination config follows, and the one the lift keys "the primary is already
+            // lifted" on. It also makes this fixture prove the narrow rule: the per-Step switch is
+            // offered on the two BRANCH sinks and not on the trunk.
+            sinks: [
+                { database: 'data/cdr_route_demo/database', format: 'PARQUET' },
+                { database: 'data/cdr_route_demo/emea', format: 'PARQUET' },
+                { database: 'data/cdr_route_demo/apac', format: 'PARQUET' },
+            ],
+            route: {
+                mode: 'case',
+                default: 'apac',
+                branches: [
+                    { key: 'emea', where: "msisdn LIKE '44%'", database: 'data/cdr_route_demo/emea' },
+                    { key: 'apac', where: "msisdn LIKE '61%'", database: 'data/cdr_route_demo/apac' },
+                ],
+            },
+            processing: { threads: 1, schema_file: 'cdr_ingest_schema.toon' },
+            parsing: { frontend: 'delimited', delimited: { delimiter: ',', has_header: true } },
+        },
+        registered: true,
+    } satisfies StoredPipelineConfig);
+
     // The node names `cdr_ingest_schema.toon`, so the companion must EXIST or the demo's saved-schema
     // half (load → edit → re-derive, the operator's case 2) can never be demonstrated offline — the
     // pane's read 404s and honestly derives from the next parse instead. Columns match the CSV the

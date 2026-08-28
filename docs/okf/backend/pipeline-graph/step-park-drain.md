@@ -132,8 +132,13 @@ concurrent poll or a crash inside that window re-ingests the file — the same i
 ## The surfaces
 
 - **Authoring** — the Step switch in the definition drawer's identity strip, offered only where the engine
-  can park. The UI decides that **structurally**: a sink Step with an inbound edge from a `transform.route`
-  Step (never the lift's `sink__d<i>` spelling, which the editable model never sees). Switching on **deletes**
+  can park. The UI decides that **structurally**: a sink Step whose inbound edge from the `transform.route`
+  Step carries a **`route:<key>`** relation (never the lift's `sink__d<i>` spelling, which the editable
+  model never sees). ⚠ The RELATION is the whole test. A destination no branch names — the primary at
+  `dirs.database`, in a config that also declares branches — hangs off the route node too, but by a plain
+  `data` edge, because both lifts pair branches to sinks BY DATABASE and find no key for it. The first cut
+  keyed on "inbound from the route node" and so offered the switch on a Step whose disable
+  `StepDisableArming` refuses; only driving a real routed pipeline in the preview surfaced it. Switching on **deletes**
   the `enabled` key rather than writing `enabled: true`, so the lower derives an empty list. A switched-off
   Step reads `disabled` on the canvas — pause glyph + icon + label, never colour alone — computed **first**,
   because an author's explicit decision outranks every derived status, and it raises an `info` finding in
