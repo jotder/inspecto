@@ -1132,6 +1132,19 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   whole argument. Revisit only on the plan's own stated trigger: acquisition being reworked anyway.
   Detail: [`archived-documents/plans-archive/java-architecture-plan.md`](archived-documents/plans-archive/java-architecture-plan.md)
   Phase F + decision #5.
+- **PKG-6 — the bundle's one-shot `run.sh`/`run.bat` cannot run the shipped format-example pipelines
+  (found 2026-08-28 during the C6 probe).** `run.sh csv_example` on a fresh bundle dies at
+  `PathJail.requireUnderAny`: *"no allowed roots configured for 'schema_file'"* — the one-shot
+  `CollectorProcessor` path has no `-Dassist.safety.roots`, and `csv_example` (like the whole
+  format-example pack) uses a `schema_file:` ref. The PKG-2 parity check (7/7) never caught it
+  because voucher/payments/orders/sites predate schema refs. Workaround verified:
+  `INSPECTO_JAVA_OPTS="-Dassist.safety.roots=spaces" ./run.sh csv_example` → SUCCESS.
+  **The fix wants a posture decision, not just a launcher edit**: defaulting
+  `-Dassist.safety.roots=spaces` inside run.sh/run.bat is safe-looking (the bundle's own tree) but
+  it widens a fail-closed jail by default — the exact class path-containment (PATH-2) warned about.
+  Decide: (a) launcher default to `spaces` (matches serve's effective posture), (b) document the
+  env var in run-script usage + examples README only, or (c) teach `CollectorProcessor` to derive
+  the root from the pipeline path the way the server derives `DiscoveredRoots`.
 - ✅ **PKG-2 — CLOSED 2026-08-18: `run.bat ADAPTER` resolves a pipeline for the first time.**
   The lookup was a single `for %%F in (spaces\*\config\%1\*_pipeline.toon)`, which NEVER matched —
   cmd's set-based `FOR` globs the **filename only**, so a wildcard in a *directory* component silently
@@ -2723,13 +2736,21 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 - **C4 BOM — moot.** The precondition (artifacts consumed outside this reactor) doesn't exist — we
   ship a fat JAR, not a library, and M1 gave shared version hygiene via parent
   `dependencyManagement`. Reopen only if an external consumer appears.
-- **C6 DuckDB cross-run connection reuse — trigger-gated on profiling evidence that doesn't exist.**
-  Code already opens ONE connection per run against a fresh unique temp scratch DB. Cross-*run* reuse
-  is a genuinely risky re-architecture (per-run scratch DBs are deliberately ephemeral/isolated, JDBC
-  connections aren't thread-safe, jobs run concurrently). Read-only sharing was investigated
-  2026-07-22 and does **not** apply (ephemeral instances over immutable Parquet globs, each connection
-  issues scratch DDL so `READ_ONLY` can't be used as-is). If read-path open cost ever shows up, the
-  cheap fix is switching `SqlSandbox` from a temp *file* to `:memory:` — not connection sharing.
+- ⛔ **C6 DuckDB cross-run connection reuse — CLOSED 2026-08-28: the gating profiling evidence was
+  produced and REFUTES the premise.** Measured (DuckDB 1.5.2.1, this dev box, JDK 26): a warm
+  open + scratch DDL + close against a fresh temp-file DB is **24 ms** (min 23 / max 27, n=20);
+  `:memory:` is 15 ms — the whole file-vs-memory delta is **9 ms/open**. The one-time 361 ms is
+  driver/native-lib init, **per JVM, not per connection** — reuse can't recover it and the
+  long-running server pays it once. Against a real end-to-end run (csv_example, SUCCESS, 3 parquet
+  outputs, 1.1 s wall *including* JVM start), per-run open cost is a low single-digit % of even the
+  most trivial run, and `maxConcurrentRuns=4` bounds it at ~0.1 s/cycle process-wide. The risky
+  re-architecture (per-run scratch DBs are deliberately ephemeral/isolated, JDBC connections aren't
+  thread-safe, jobs run concurrently) buys nothing measurable; even the cheap `SqlSandbox`
+  temp-file→`:memory:` swap saves 9 ms/query — noise under HTTP latency. Reopen only against a
+  profile showing connection-open time as a material fraction of a real workload.
+  ⚠ Probe note for reproduction: a bare bundle `run.sh` fails at `PathJail.requireUnderAny`
+  ("no allowed roots configured for 'schema_file'") — a one-shot run needs
+  `INSPECTO_JAVA_OPTS="-Dassist.safety.roots=spaces"`; the serve path sets its roots itself.
 - The intra-module `ops↔ops.link/workflow` and `catalog↔catalog.spi` cycles are same-family, **not**
   reactor-split blockers.
 
