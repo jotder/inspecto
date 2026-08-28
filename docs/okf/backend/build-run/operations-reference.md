@@ -977,6 +977,23 @@ INSPECTO_JAVA_OPTS="-Xmx8g" bash run.sh <data_source>                           
 discarded — before `560e9f13` this was the only thing an operator would think to try, and a BUNDLE-1
 diagnostic run once reported "no errors" purely because the flag never reached the JVM.
 
+**`run.sh`/`run.bat` declare the path-jail root themselves (PKG-6, 2026-08-28).** The one-shot
+`CollectorProcessor` runs no space discovery — unlike `serve`, where `SpaceManager` registers each
+space base with `DiscoveredRoots` before loading configs — so `-Dassist.safety.roots` is its *only*
+root source, and a pipeline carrying a `schema_file:`/`mapping_file:` ref used to die on a fresh
+bundle with *"no allowed roots configured for 'schema_file'"* (the whole format-example pack:
+`csv_example`, …). The launchers now pass `-Dassist.safety.roots=<the space dir of the pipeline they
+resolved>` — bash strips at `/config/`, cmd reuses its `for /d` loop variable — so exactly the ONE
+space an invocation runs out of is allowed, never the whole `spaces/` tree.
+
+- An operator `INSPECTO_JAVA_OPTS="-Dassist.safety.roots=…"` still **wins**: it is appended after,
+  and a later `-D` of the same key overrides an earlier one.
+- ⚠ **`ura.sh`/`ura.bat` are NOT covered** — they *receive* the pipeline path as a pass-through arg
+  rather than resolving it, so there is nothing to derive from; pass the env var for a `ura` command
+  that needs a schema ref.
+- The posture rule this follows (and why the engine CLI deliberately does *not* run discovery) is in
+  [Config safety](../config/config-safety.md).
+
 **Reading the control-plane log: a cancelled asset fetch is DEBUG, not an error** (`994d21ca`). A
 browser aborts its in-flight requests on every reload or navigation, and the static write then fails
 with a platform socket message (*"An established connection was aborted by the software in your host

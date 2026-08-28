@@ -1143,19 +1143,37 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   whole argument. Revisit only on the plan's own stated trigger: acquisition being reworked anyway.
   Detail: [`archived-documents/plans-archive/java-architecture-plan.md`](archived-documents/plans-archive/java-architecture-plan.md)
   Phase F + decision #5.
-- **PKG-6 — the bundle's one-shot `run.sh`/`run.bat` cannot run the shipped format-example pipelines
-  (found 2026-08-28 during the C6 probe).** `run.sh csv_example` on a fresh bundle dies at
+- ✅ **PKG-6 — CLOSED 2026-08-28: the bundle's one-shot `run.sh`/`run.bat` can run the shipped
+  format-example pipelines.** `run.sh csv_example` on a fresh bundle died at
   `PathJail.requireUnderAny`: *"no allowed roots configured for 'schema_file'"* — the one-shot
   `CollectorProcessor` path has no `-Dassist.safety.roots`, and `csv_example` (like the whole
   format-example pack) uses a `schema_file:` ref. The PKG-2 parity check (7/7) never caught it
-  because voucher/payments/orders/sites predate schema refs. Workaround verified:
-  `INSPECTO_JAVA_OPTS="-Dassist.safety.roots=spaces" ./run.sh csv_example` → SUCCESS.
-  **The fix wants a posture decision, not just a launcher edit**: defaulting
-  `-Dassist.safety.roots=spaces` inside run.sh/run.bat is safe-looking (the bundle's own tree) but
-  it widens a fail-closed jail by default — the exact class path-containment (PATH-2) warned about.
-  Decide: (a) launcher default to `spaces` (matches serve's effective posture), (b) document the
-  env var in run-script usage + examples README only, or (c) teach `CollectorProcessor` to derive
-  the root from the pipeline path the way the server derives `DiscoveredRoots`.
+  because voucher/payments/orders/sites predate schema refs.
+  **Operator posture call (2026-08-28): the launcher declares the root it already resolved.**
+  run.sh/run.bat now pass `-Dassist.safety.roots=<the SPACE dir of the pipeline they looked up>` —
+  in bash by stripping at `/config/` (`${PIPELINE%%/config/*}`, falling back to `dirname`), in cmd
+  from the existing `for /d` loop variable, so neither does string surgery it can get wrong. Scoped
+  to the ONE space per invocation, never the whole `spaces/` tree: *"configuring the roots is a
+  deployment step"* ([`okf/backend/config/config-safety.md`](okf/backend/config/config-safety.md))
+  and the deployment already knows which space it picked. An operator
+  `INSPECTO_JAVA_OPTS=-Dassist.safety.roots=…` still wins — EXTRA_OPTS is appended after, and a
+  later `-D` of the same key overrides an earlier one.
+  🔴 **Option (c) was REFUSED by grounding, not by preference:** `config-safety.md` records that the
+  engine CLI / job-runner entry points (`MainApp`, `CollectorProcessor`, `EnrichmentProcessor`, the
+  job tasks) run **no** discovery *by construction* — so "derive roots like the server" would have
+  reversed a deliberate PATH-2 tier-3 decision, and `DiscoveredRootsTest` pins the empty-means-empty
+  fail-closed invariant this preserves. Option (a) was declined as wider than any invocation needs.
+  **Verified on a real packaged bundle** (`pwsh -File inspecto\package.ps1 -Edition Enterprise
+  -NoUi -NoRuntime`): `./run.sh csv_example` exit 0 (the failing case) · `./run.sh voucher` exit 0
+  in a different space, 3 schemas loaded · the env-var override exit 0 · `.\run.bat csv_example`
+  exit 0.
+  ⚠ **`ura.sh`/`ura.bat` share the root cause and are deliberately NOT changed** — they invoke
+  `MainApp` and *receive* the pipeline path as a pass-through arg at a variable position rather than
+  resolving it, so there is nothing to derive from; the env var remains their answer. Worth its own
+  row only if an operator actually hits it.
+  ⚠ Two shell gotchas re-confirmed while testing: `package.ps1` needs **pwsh 7**, and `cmd /c` from
+  Git Bash silently no-ops here (MSYS mangles `/c`) — use `cmd //c`, and `.\run.bat` never bare
+  (`NoDefaultCurrentDirectoryInExePath=1`).
 - ✅ **PKG-2 — CLOSED 2026-08-18: `run.bat ADAPTER` resolves a pipeline for the first time.**
   The lookup was a single `for %%F in (spaces\*\config\%1\*_pipeline.toon)`, which NEVER matched —
   cmd's set-based `FOR` globs the **filename only**, so a wildcard in a *directory* component silently

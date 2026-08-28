@@ -115,6 +115,16 @@ Now both halves derive, and the declared list goes back to meaning only what it 
   registers nothing, by construction (it never touches `DiscoveredRoots`). Likewise the engine CLI and
   job-runner entry points (`MainApp`, `CollectorProcessor`, `EnrichmentProcessor`, the job tasks) never
   run discovery, so for them the set is empty and the property remains their only source — unchanged.
+  ⚠ **This is a decision, not a gap — and it was re-affirmed 2026-08-28** (PKG-6). A fresh bundle's
+  `run.sh csv_example` died here (*"no allowed roots configured for 'schema_file'"*) because the
+  one-shot CLI has no roots and the format-example pack uses `schema_file:` refs. The tempting fix —
+  teach `CollectorProcessor` to derive roots the way the server does — would have reversed this
+  sentence, so it was **refused**; `DiscoveredRootsTest`'s empty-means-empty invariant stands.
+  **The launcher declares the root instead**, which is this section's own model: configuring roots is
+  a deployment step, and `run.sh`/`run.bat` already resolve the pipeline path, so they pass
+  `-Dassist.safety.roots=<that pipeline's space dir>` — the ONE space per invocation, never the whole
+  `spaces/` tree, with an operator-supplied value still overriding it. See
+  [Operations reference](../build-run/operations-reference.md).
 - ⚠ **The registry is process-global static.** A test that registers must `DiscoveredRoots.clear()` in
   a finally — a leaked base flips containment verdicts in unrelated tests. And an assertion about a
   discovered root must inspect `allowedRoots()` **content**, not run a jail check: surefire's

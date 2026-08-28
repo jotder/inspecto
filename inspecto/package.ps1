@@ -373,12 +373,22 @@ if [ -z "$PIPELINE" ]; then
     exit 1
 fi
 echo "[run.sh] Using pipeline: $PIPELINE"
+# Path-jail roots (PKG-6). The one-shot CollectorProcessor runs no space discovery -- unlike serve,
+# where SpaceManager registers each space base with DiscoveredRoots before loading configs -- so for
+# it `-Dassist.safety.roots` is the ONLY source, and a pipeline carrying a `schema_file:`/
+# `mapping_file:` ref died with "no allowed roots configured" on a fresh bundle. Declare exactly the
+# SPACE this invocation resolved (the dir holding the config/ subtree -- SpaceManager's own rule),
+# never the whole spaces/ tree: configuring roots is a deployment step, and the deployment already
+# knows which space it picked. An operator-supplied -Dassist.safety.roots still wins, because
+# EXTRA_OPTS is appended after this and a later -D of the same key overrides an earlier one.
+SPACE_DIR="${PIPELINE%%/config/*}"
+[ "$SPACE_DIR" = "$PIPELINE" ] && SPACE_DIR="$(dirname "$PIPELINE")"
 JAVA="java"; [ -x "runtime/bin/java" ] && JAVA="runtime/bin/java"
 # Extra JVM flags from the operator, same contract as serve.sh: INSPECTO_JAVA_OPTS (fallback
 # EXTRA_JAVA_OPTS), whitespace-separated, appended AFTER the mandatory
 # --enable-native-access=ALL-UNNAMED and BEFORE -jar (a JVM flag after it would be parsed as a
 # program argument). Not read from JAVA_OPTS: that name is assigned, so it is silently discarded.
-JAVA_OPTS=(--enable-native-access=ALL-UNNAMED)
+JAVA_OPTS=(--enable-native-access=ALL-UNNAMED "-Dassist.safety.roots=${SPACE_DIR}")
 # DuckDB excel extension (multiformat X1, frontend: xlsx) — auto-detect the bundled per-platform
 # binary, exactly like the runtime/ auto-detect above; a networked deployment without it still
 # falls back to INSTALL inside ExcelExtension.
@@ -412,9 +422,14 @@ rem NEVER matched -- cmd's set-based FOR globs the FILENAME only, so a wildcard 
 rem component silently finds nothing. `for /d` DOES glob directories, so enumerate the spaces first
 rem and leave only the filename wildcard to the inner FOR. First match wins, as in run.sh.
 set "PIPELINE="
+set "SPACE_DIR="
 for /d %%S in (spaces\*) do (
     for %%F in ("%%S\config\%1\*_pipeline.toon") do (
-        if not defined PIPELINE if exist "%%~F" set "PIPELINE=%%~F"
+        if not defined PIPELINE if exist "%%~F" (
+            set "PIPELINE=%%~F"
+            rem The space dir comes free from the outer loop -- no string surgery on the path.
+            set "SPACE_DIR=%%S"
+        )
     )
 )
 if not defined PIPELINE (
@@ -429,6 +444,15 @@ rem EXTRA_JAVA_OPTS), appended AFTER the mandatory --enable-native-access=ALL-UN
 rem -jar (a JVM flag after it would be parsed as a program argument). Not read from JAVA_OPTS:
 rem that name is assigned, so it is silently discarded.
 set "OPTS=--enable-native-access=ALL-UNNAMED"
+rem Path-jail roots (PKG-6). The one-shot CollectorProcessor runs no space discovery -- unlike
+rem serve, where SpaceManager registers each space base with DiscoveredRoots before loading
+rem configs -- so for it -Dassist.safety.roots is the ONLY source, and a pipeline carrying a
+rem schema_file:/mapping_file: ref died with "no allowed roots configured" on a fresh bundle.
+rem Declare exactly the SPACE this invocation resolved (the dir holding the config\ subtree --
+rem SpaceManager's own rule), never the whole spaces\ tree. An operator-supplied
+rem -Dassist.safety.roots still wins: EXTRA_OPTS is appended after this and a later -D of the
+rem same key overrides an earlier one.
+set "OPTS=%OPTS% -Dassist.safety.roots=%SPACE_DIR%"
 rem DuckDB excel extension (multiformat X1, frontend: xlsx) - auto-detect the bundled
 rem per-platform binary; a networked deployment without it still falls back to INSTALL
 rem inside ExcelExtension.
