@@ -71,10 +71,16 @@ former root reference docs** (each index lists them):
   mapping table** (SOC 2 TSC ↔ ISO 27001 Annex A ↔ NIST 800-53 → implementing file/route/gate →
   evidence → responsibility) — the ISO SoA and the FedRAMP customer-responsibility matrix are
   **exports of it**, never separate documents; its §4 is the consolidated gap list (G1–G10). Plus
-  [`evidence/`](../compliance/evidence/) — the C3 auditor runbooks:
-  [`release-verification.md`](../compliance/evidence/release-verification.md) (`.sha256`/`.asc`) and
-  [`audit-log-extraction.md`](../compliance/evidence/audit-log-extraction.md) (⛔ JSON only — the CSV
-  export drops every audit attribute, AUDIT-CSV-1). Scanned by the vocabulary guard. Plan:
+  [`evidence/`](../compliance/evidence/) — the C3/C4 auditor runbooks:
+  [`release-verification.md`](../compliance/evidence/release-verification.md) (`.sha256`/`.asc`),
+  [`audit-log-extraction.md`](../compliance/evidence/audit-log-extraction.md) (CSV and JSON are both
+  audit-complete since AUDIT-CSV-1 was fixed 2026-08-28),
+  [`access-review.md`](../compliance/evidence/access-review.md) (G8 — role-level grants + the
+  `/access/*` JSON; subject→role is IdP-owned by design),
+  [`retention-configuration.md`](../compliance/evidence/retention-configuration.md) (G5 — the seven
+  prune tasks; 🔴 the event store, AUDIT events included, has NO retention) and
+  [`rto-rpo-statement.md`](../compliance/evidence/rto-rpo-statement.md) (G6 — targets are
+  operator-fill; the drill table is the evidence). Scanned by the vocabulary guard. Plan:
   [`superpower/compliance-certifications-plan.md`](superpower/compliance-certifications-plan.md).
 
 ## Stakeholder set (audience-targeted)

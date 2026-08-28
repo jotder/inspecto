@@ -1029,7 +1029,8 @@ legacy lane's dedup/filter/quarantine counts and extend the provenance substrate
 `recordsIn/recordsOut/diverted` edge grain; conservation gate green over a fixture · **P4 S4**
 per-Step `enabled:` park/drain (D-13) — flip executor bypass to halt-at-boundary, manifest
 `parked_at` accretion, drain on re-enable, recipe compiles per-Step `enabled:`; gated by the S2
-stage progression (per §2.7 cost 3).
+stage progression (per §2.7 cost 3). **IN FLIGHT 2026-08-28: S4-pre/S4a/S4b shipped, S4c/S4d remain
+— [`elt-s4-park-drain-plan.md`](elt-s4-park-drain-plan.md).**
 
 **P4 S1 SHIPPED 2026-08-06** — the Guarantees fold: `RecipeCompiler` compiles a top-level
 `guarantees:` map ({`file_dedup`, `gap_watch`, `markers`, `quarantine`, `retention`}) onto the live
@@ -1137,7 +1138,17 @@ a drain/resume scheduler that re-enters `PipelineExecutor` from the parked bound
 real production call site in the first place, since none of the above matters while nothing runs
 it. This is new design across four different subsystems, not a slicing choice — left for the
 operator to schedule explicitly, per the same posture as the deferred Phase 3 S3 (Dataset-write
-Signal). **Phase 4 status: S1/S2/S3 shipped; S4 deferred (documented gap above).**
+Signal). ~~**Phase 4 status: S1/S2/S3 shipped; S4 deferred (documented gap above).**~~
+
+> 🔴 **SUPERSEDED 2026-08-28 — the spike's three reasons are ALL now stale, and S4 is IN FLIGHT.**
+> Read this and the "RE-GROUNDED" subsection below, never the 2026-08-10 findings alone. Reason (2)
+> died when the executor armed in production (2026-08-26); reason (1)'s park semantics and reason
+> (3)'s flat-file home were BUILT by the slices below. **Phase 4 status: S1/S2/S3 shipped; S4-pre +
+> S4a + S4b SHIPPED 2026-08-28 (`cb12032d`, `9873ebfe`, `575c9912`); S4c (drain) and S4d (canvas
+> toggle) remain** — slice plan, refusals and as-built facts:
+> [`elt-s4-park-drain-plan.md`](elt-s4-park-drain-plan.md). The flat-file home is
+> `processing.disabled_steps` (one id list, lift-overlaid, lower-derived); park writes the manifest's
+> `parkedAt`/`parkedTables` with the rows durable as Parquet under the park home.
 
 #### The branch-aware lane is BLOCKED on output parity, not merely unscheduled (grounded 2026-08-10)
 
