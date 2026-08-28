@@ -122,6 +122,7 @@ final class CapabilityManifest {
             new Entry("POST", "/runs/([^/]+)/pause", Roles.CAN_OPERATE_RUNS),
             new Entry("POST", "/runs/([^/]+)/resume", Roles.CAN_OPERATE_RUNS),
             new Entry("POST", "/runs/([^/]+)/reprocess", Roles.CAN_OPERATE_RUNS),
+            new Entry("POST", "/runs/([^/]+)/drain", Roles.CAN_OPERATE_RUNS),
             new Entry("POST", "/trigger", Roles.CAN_OPERATE_RUNS),
             // SettingsRoutes
             new Entry("PUT", "/settings/branding", Roles.CAN_AUTHOR_WORKBENCH),

@@ -421,4 +421,35 @@ class ControlApiTest {
             assertEquals(batchId, json(r).get("batchId").asText());
         }
     }
+
+    /**
+     * Phase 4 S4c — {@code POST /runs/{name}/drain}'s gates, over real HTTP. The happy path needs a
+     * PARKED Consignment (a route: pipeline with a disabled branch sink) and is pinned end to end by
+     * {@code RouteIngestEndToEndTest}; what belongs here is that every way of asking wrongly is
+     * answered by the right status, with the refusal reason intact.
+     */
+    @Test
+    void drainRefusesUnknownPipelinesMissingBatchesAndUnparkedConsignments(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            assertEquals(404, send(c.port, "POST", "/runs/no_such_pipeline/drain",
+                    "{\"batchId\":\"b1\"}").statusCode(), "unknown pipeline");
+
+            assertEquals(400, send(c.port, "POST", "/runs/" + c.name + "/drain", "{}").statusCode(),
+                    "a drain must name its batch");
+
+            assertEquals(404, send(c.port, "POST", "/runs/" + c.name + "/drain",
+                    "{\"batchId\":\"nope_0001\"}").statusCode(), "no manifest for that batch");
+
+            // A committed (never parked) batch: a state conflict, and the reason survives to the client.
+            HttpResponse<String> triggered = send(c.port, "POST", "/runs/" + c.name + "/trigger", null);
+            assertEquals(202, triggered.statusCode(), triggered.body());
+            assertEquals("SUCCESS", awaitRun(c.port, "/runs/runs/" + json(triggered).get("runId").asText()));
+            String batchId = json(send(c.port, "GET", "/runs/" + c.name + "/commits", null)).get(0).asText();
+
+            HttpResponse<String> r = send(c.port, "POST", "/runs/" + c.name + "/drain",
+                    "{\"batchId\":\"" + batchId + "\"}");
+            assertEquals(409, r.statusCode(), r.body());
+            assertTrue(r.body().contains("not a PARKED Consignment"), r.body());
+        }
+    }
 }

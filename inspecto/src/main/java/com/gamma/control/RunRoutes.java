@@ -7,6 +7,7 @@ import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.config.spec.Finding;
 import com.gamma.config.spec.Severity;
 import com.gamma.etl.PipelineConfig;
+import com.gamma.inspector.DrainCommand;
 import com.gamma.inspector.ReprocessCommand;
 import com.gamma.report.ReportService;
 import com.gamma.service.CollectorService;
@@ -87,6 +88,31 @@ final class RunRoutes implements RouteModule {
             if (batchId == null) throw new ApiException(400, "body must include 'batchId'");
             ReprocessCommand.run(path.toString(), batchId);
             return Map.of("pipeline", ApiContext.name(m), "batchId", batchId, "status", "reprocessed");
+        }));
+
+        // Phase 4 S4c (D-13): complete a Consignment that PARKED at a disabled route-branch sink.
+        // Deliberately explicit — re-enabling the step is a CONFIG save and must not start batch work
+        // as a side effect; the save surfaces the parked batch ids, the operator drains them here.
+        api.post("/runs/([^/]+)/drain", ApiContext.withCapability("canOperateRuns", (e, m) -> {
+            var path = api.service().pathFor(ApiContext.name(m)).orElseThrow(() -> notFound(ApiContext.name(m)));
+            if (api.service().isTemplate(ApiContext.name(m)))   // a template has no parked batches anyway
+                throw new ApiException(409, "pipeline '" + ApiContext.name(m) + "' is a template and is not runnable");
+            String batchId = ApiContext.str(api.body(e), "batchId");
+            if (batchId == null) throw new ApiException(400, "body must include 'batchId'");
+            DrainCommand.Result r;
+            try {
+                r = DrainCommand.run(path.toString(), batchId);
+            } catch (IOException noManifest) {
+                // The only IOException DrainCommand lets out is "no manifest for this batch" — every
+                // state refusal is an IllegalStateException below.
+                throw new ApiException(404, noManifest.getMessage());
+            } catch (IllegalStateException refused) {
+                // Every DrainCommand refusal is a state conflict (not parked / still disabled / park
+                // table gone), never a malformed request — 409, with the reason verbatim.
+                throw new ApiException(409, refused.getMessage());
+            }
+            return Map.of("pipeline", ApiContext.name(m), "batchId", batchId, "status", "drained",
+                    "branches", r.drainedBranches(), "outputFiles", r.outputFiles(), "rows", r.rows());
         }));
 
         api.post("/trigger", ApiContext.withCapability("canOperateRuns", (e, m) -> api.service().runAllOnce()));

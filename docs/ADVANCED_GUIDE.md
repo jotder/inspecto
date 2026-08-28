@@ -458,6 +458,9 @@ infra probes: `/health`, `/ready`, `/metrics`, `/metrics/acquisition`.
   *(async: **202 + {runId} + Location**)*,
   `GET /runs/runs/{runId}` *(poll a run — RUNNING then terminal; 404 once evicted)*,
   `POST /runs/{n}/pause|resume|reprocess`,
+  `POST /runs/{n}/drain` *(complete a Consignment PARKED at a disabled route branch — body `{batchId}`;
+  409 with the reason when it is not parked, the step is still in `processing.disabled_steps`, or a park
+  table is gone)*,
   `GET /runs/{n}/commits|batches|files|lineage|quarantine|pending|report`, `POST /trigger` (all).
 - **Status/report:** `GET /status`, `GET /report`.
 - **Jobs:** `GET /jobs`, `GET /jobs/metrics|runs|failures`, `GET /jobs/{n}/runs`, `POST /jobs/{n}/trigger`

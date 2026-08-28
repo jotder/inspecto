@@ -227,6 +227,141 @@ class RouteIngestEndToEndTest {
         assertEquals(1, dataLines(dir.resolve("db_emea")).size(), "no re-ingest on the next cycle");
     }
 
+    /**
+     * Phase 4 S4c — park → re-enable → drain, end to end on the real ingest path. What this pins:
+     * <ul>
+     *   <li><b>Output parity:</b> after the drain the two destinations together hold exactly the rows a
+     *       run with nothing disabled would have written — the park is a pause, not a loss.</li>
+     *   <li><b>One commit tail for the whole batch:</b> the manifest lists BOTH branches' outputs (the
+     *       already-committed one came back from the park sidecar), the original is in BACKUP (not the
+     *       park home), and the batches ledger gains its SUCCESS row.</li>
+     *   <li><b>The park artefacts are consumed:</b> park table, sidecar and the branch commit log are
+     *       gone, and a second drain refuses because the batch is no longer parked.</li>
+     * </ul>
+     */
+    @Test
+    void reEnablingTheStepAndDrainingCompletesTheParkedConsignment(@TempDir Path dir) throws Exception {
+        Path toon = dir.resolve("park_pipeline.toon");
+        Files.writeString(toon, parkFixture(dir, true));
+
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+        Path inbox = Files.createDirectories(Path.of(cfg.dirs().poll()));
+        Files.writeString(inbox.resolve("feed.csv"),
+                "ID,AMT,EVENT_DATE\nE1,1.0,2020-04-03\nA2,2.0,2020-04-03\nX3,3.0,2020-04-03\n");
+        CollectorProcessor.run(cfg);
+
+        String batchId = parkedBatchId(dir);
+        // Refusal: the step is still disabled — config is the truth about that, never the manifest.
+        IllegalStateException stillOff = assertThrows(IllegalStateException.class,
+                () -> DrainCommand.run(toon.toString(), batchId));
+        assertTrue(stillOff.getMessage().contains("still listed in processing.disabled_steps"),
+                stillOff.getMessage());
+
+        // The operator re-enables the step, then drains.
+        Files.writeString(toon, parkFixture(dir, false));
+        DrainCommand.Result r = DrainCommand.run(toon.toString(), batchId);
+        assertEquals(List.of("sink__d1"), r.drainedBranches());
+
+        // Output parity: E1 on the emea branch, A2 + X3 (via default:) on the apac branch — every input row.
+        assertEquals(1, dataLines(dir.resolve("db_emea")).size(), "emea keeps the row it committed at park");
+        assertEquals(2, dataLines(dir.resolve("db_apac")).size(), "the drained branch wrote its rows");
+
+        // One commit tail for the WHOLE batch: both branches' outputs in the manifest, no parked state left.
+        String mf = Files.readString(manifestOf(dir, batchId));
+        assertFalse(mf.contains("\"parkedAt\""), "the parked record is superseded by the commit manifest");
+        assertTrue(mf.contains("db_emea") && mf.contains("db_apac"),
+                "the manifest lists BOTH branches' outputs — the pre-park ones came from the sidecar: " + mf);
+        assertTrue(mf.contains("\"SUCCESS\""), mf);
+
+        // The original completed the normal sequence: out of the park home, into backup.
+        Path parkHome = dir.resolve("backup").resolve("parked");
+        assertTrue(Files.exists(dir.resolve("backup").resolve("feed.csv")), "original backed up as committed");
+        assertFalse(Files.exists(parkHome.resolve("feed.csv")), "original left the park home");
+        assertFalse(Files.exists(inbox.resolve("feed.csv")), "and did not stay in the inbox");
+
+        // The park artefacts and the resume record are consumed.
+        try (Stream<Path> w = Files.walk(parkHome)) {
+            assertTrue(w.noneMatch(p -> p.getFileName().toString().endsWith(".parquet")
+                            || p.getFileName().toString().endsWith("__pending.json")),
+                    "park table and sidecar deleted once the batch is whole");
+        }
+        try (Stream<Path> w = Files.walk(dir.resolve("temp"))) {
+            assertTrue(w.noneMatch(p -> p.getFileName().toString().startsWith("branch_commit_")),
+                    "the commit log is deleted — a fully committed batch never replays");
+        }
+        try (Stream<Path> w = Files.walk(Path.of(cfg.dirs().statusFilePath()).getParent())) {
+            Path batches = w.filter(p -> p.getFileName().toString().contains("_batches_"))
+                    .findFirst().orElseThrow();
+            assertTrue(Files.readString(batches).contains("SUCCESS"), "the drain writes its terminal audit row");
+        }
+
+        // Draining twice is refused, not half-repeated.
+        IllegalStateException again = assertThrows(IllegalStateException.class,
+                () -> DrainCommand.run(toon.toString(), batchId));
+        assertTrue(again.getMessage().contains("not a PARKED Consignment"), again.getMessage());
+
+        // And the drained batch does not come back on the next poll.
+        CollectorProcessor.run(cfg);
+        assertEquals(3, dataLines(dir.resolve("db_emea")).size() + dataLines(dir.resolve("db_apac")).size(),
+                "no re-ingest after the drain");
+    }
+
+    /** The park fixture of {@link #aDisabledBranchSinkParksTheConsignment}, with the disable toggleable. */
+    private static String parkFixture(Path dir, boolean disabled) throws Exception {
+        String d = dir.toString().replace("\\", "/");
+        Path schema = dir.resolve("mini_schema.toon");
+        if (!Files.exists(schema))
+            Files.writeString(schema, com.gamma.etl.PipelineConfigBatchTest.miniSchema());
+        return """
+            name: PARK_E2E
+            active: true
+            dirs:
+              poll: %1$s/inbox
+              database: %1$s/db
+              backup: %1$s/backup
+              temp: %1$s/temp
+              quarantine: %1$s/quarantine
+              markers: %1$s/markers
+              status_dir: %1$s/status
+            output:
+              format: CSV
+            sinks[2]{database,format}:
+              "%1$s/db_emea",CSV
+              "%1$s/db_apac",CSV
+            route:
+              mode: case
+              default: apac
+              branches[2]{key,where,database}:
+                emea,"ID LIKE 'E%%'","%1$s/db_emea"
+                apac,"ID LIKE 'A%%'","%1$s/db_apac"
+            processing:
+              threads: 1
+              schema_file: "%2$s"
+            %3$s  csv_settings:
+                delimiter: ","
+                skip_header_lines: 0
+                date_formats[1]: "%%Y-%%m-%%d"
+                timestamp_formats[1]: "%%Y-%%m-%%d"
+            """.formatted(d, schema.toString().replace("\\", "/"),
+                    disabled ? "  disabled_steps[1]: sink__d1\n" : "");
+    }
+
+    private static Path manifestOf(Path dir, String batchId) throws Exception {
+        try (Stream<Path> w = Files.walk(dir.resolve("status"))) {
+            return w.filter(p -> p.getFileName().toString().equals(batchId + ".json"))
+                    .findFirst().orElseThrow(() -> new AssertionError("manifest missing for " + batchId));
+        }
+    }
+
+    private static String parkedBatchId(Path dir) throws Exception {
+        try (Stream<Path> w = Files.walk(dir.resolve("status"))) {
+            String name = w.filter(p -> p.getFileName().toString().endsWith(".json"))
+                    .findFirst().orElseThrow(() -> new AssertionError("parked manifest missing"))
+                    .getFileName().toString();
+            return name.substring(0, name.length() - ".json".length());
+        }
+    }
+
     /** All non-header data lines across every output file under {@code root}, sorted. */
     private static List<String> dataLines(Path root) throws Exception {
         try (Stream<Path> w = Files.walk(root)) {

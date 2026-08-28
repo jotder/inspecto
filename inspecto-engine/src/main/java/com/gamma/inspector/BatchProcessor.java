@@ -72,7 +72,8 @@ public final class BatchProcessor {
             Map<String, java.nio.file.Path> parked = ParkedBranches.drain(batch.batchId());
             if (!parked.isEmpty()) {
                 try {
-                    parkSource(batch, cfg, outcome.survivors(), parked);
+                    parkSource(batch, cfg, outcome.survivors(), parked,
+                            outcome.outputs(), outcome.lineage(), outcome.bounds());
                     status = "PARKED";
                 } catch (Exception e) {
                     status = "FAILED";
@@ -159,10 +160,18 @@ public final class BatchProcessor {
      *       {@code batch.max_files: 1} splits an archive across batches, so moving the shared
      *       original would strand its sibling batches; that original re-expands next cycle, which is
      *       the crash posture (idempotent, wasteful, honest).</li>
+     *   <li><b>S4c</b> — writes the {@link com.gamma.etl.ParkedCommit} sidecar: the already-committed
+     *       branches' outputs / lineage / event-time bounds. They exist only in this JVM's memory
+     *       (the branch commit log records branch ids alone), and the drain needs them to run the
+     *       real {@code finalizeSource} for the WHOLE batch. Without this the register, the
+     *       manifest's outputs and the §11.3 registration would silently lose every branch that
+     *       committed before the park.</li>
      * </ol>
      */
     private static void parkSource(Batch batch, PipelineConfig cfg, List<Batch.Member> survivors,
-                                   Map<String, java.nio.file.Path> parked) throws IOException {
+                                   Map<String, java.nio.file.Path> parked,
+                                   List<PartitionOutput> outputs, List<LineageRow> lineage,
+                                   Map<String, EventTimeBounds> bounds) throws IOException {
         Path poll = Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
         Path parkHome = Paths.get(cfg.dirs().backup(), "parked");
         Files.createDirectories(parkHome);
@@ -202,6 +211,12 @@ public final class BatchProcessor {
             manifest.parkedTables = tables;
             ManifestStore.write(cfg.dirs().manifestsDir(), manifest);
         }
+        Map<String, com.gamma.etl.ParkedCommit.Bounds> wireBounds = new LinkedHashMap<>();
+        bounds.forEach((file, b) -> wireBounds.put(file,
+                new com.gamma.etl.ParkedCommit.Bounds(b.min(), b.max(), b.spreadMs())));
+        com.gamma.etl.ParkedCommit.write(parkHome,
+                new com.gamma.etl.ParkedCommit(batch.batchId(), outputs, lineage, wireBounds));
+
         recordStages(cfg.collector().id(), batch.batchId(), survivors, cfg,
                 com.gamma.consignment.FileStage.PARKED);
         log.info("Batch {} PARKED at {} — park tables under {}, originals in the park home; "
