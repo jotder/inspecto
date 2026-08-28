@@ -289,8 +289,8 @@ parsing:
 plugin — §6.3), `json` (`read_ndjson`/`read_json`, selectors = top-level JSON keys — §6.4), and
 `text_regex` (`read_csv` 1-col + `regexp_extract` named groups, selectors = group names — §6.5),
 and `asn1` (synthesized `Asn1RecordIngester` binding, grammar inline — P3c).
-Not yet implemented within them: `text_regex.record_split`
-`"\n\n"` (blank-line block records, e.g. LDIF entries). `quote`/`escape`/`comment` are `[LIVE]`
+`text_regex.record_split` is `[LIVE]` too (`blank_line` or any literal delimiter — shipped, see
+§6.6; verified in code 2026-08-28). `quote`/`escape`/`comment` are `[LIVE]`
 since 5.2 (single-char, validated fail-closed at load, honored by both engines).
 ⚠ **An unknown `delimited.*` key is NOT rejected at load** — `mergeParsing` flattens the block with
 no key allow-list, so an unread key is carried but silently ignored. Only an unknown
@@ -434,7 +434,7 @@ DuckDB has no core XML reader. For flat, one-element-per-line XML, `text_regex` 
 `regexp_extract` works. For real nested XML, write a `StreamingFileIngester` around a StAX/SAX
 streaming parser and `emit()` per element — streaming (not DOM) keeps memory bounded on large files.
 
-### 6.6 LDIF `[PROPOSED via text_regex]` — needs `record_split: "\n\n"`, not yet implemented
+### 6.6 LDIF `[LIVE via text_regex]` — `record_split: "\n\n"` (or `blank_line`) is shipped
 LDIF = blank-line-separated entries; within an entry, `attr: value` lines (and `attr:: base64`).
 ```yaml
 parsing:
@@ -516,8 +516,10 @@ Smallest-to-largest, each independently shippable and behavior-preserving for ex
    for nesting. No new dependency.
 4. **`text_regex` frontend** — ✅ **shipped** (line records). `read_csv`(1-col, the streaming form
    §6.3 uses) + `regexp_extract` with named groups; selectors are group names; covers flat XML and
-   `attr: value` logs. Blank-line block records (`record_split: "\n\n"`, LDIF entries) are NOT yet
-   implemented — rejected at load; escalate to `[PLUGIN]` (also for folding/base64).
+   `attr: value` logs. Blank-line block records are ✅ **shipped too** (`record_split: blank_line`
+   or any literal delimiter — `PipelineConfigParser` → `TextRegex.recordSplit()` →
+   `DuckDbCsvIngester.buildTextRegexBlockReadSpec`); escalate to `[PLUGIN]` only for
+   folding/base64-heavy LDIF.
 5. **Adopt the unified `parsing:` block** — ✅ **shipped.** `csv_settings` = `parsing.delimited`,
    `processing.ingester`/`segments` = `parsing.plugin`; existing toons keep working unchanged.
 
