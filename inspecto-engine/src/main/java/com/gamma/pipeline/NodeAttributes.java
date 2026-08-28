@@ -47,6 +47,13 @@ public final class NodeAttributes {
     public static final List<NodeAttribute> COLLECTOR = List.of(
             NodeAttribute.of("connection", "Connection", "autocomplete", "required").required(false)
                     .help("Saved Connection profile — it carries the connector type (SFTP, Azure Blob, Kafka, Database)."),
+            // The dataset entry (ELT P3 S3c-2 / UI-S7): `connector: dataset` + this id. Like `connection`
+            // it is mode-owned — the shared collector surface shows exactly one of the two, and the
+            // connector itself stays derived (dataset mode ⇒ `dataset`), never asked.
+            NodeAttribute.of("dataset", "Dataset", "autocomplete", "required").required(false)
+                    .help("Consume another Pipeline's Dataset: each acquire cycle copies its new parquet "
+                            + "snapshots into this pipeline's inbox (the producer's files are never deleted). "
+                            + "Dataset entry only — leave blank for file feeds."),
             NodeAttribute.of("include", "Include patterns", "string", "optional")
                     .placeholder("*.csv, orders_*.txt")
                     .help("Glob/regex discovery patterns; comma-separate multiple. Blank = the pipeline file pattern."),
@@ -115,7 +122,27 @@ public final class NodeAttributes {
                     .help("This pipeline's own poll cadence — 30s, 5m, 2h, 1d, or a bare number of seconds. Blank = every tick of the space's poll interval. The space poll interval is the resolution floor: a 30s pipeline needs the space tick at 30s or less."),
             NodeAttribute.of("trigger__cron", "Run on a cron schedule", "string", "optional")
                     .placeholder("0 0 2 * * *")
-                    .help("Calendar cadence in the operations time zone (e.g. daily at 02:00). When both are stated, cron wins over 'Run every'."));
+                    .help("Calendar cadence in the operations time zone (e.g. daily at 02:00). When both are stated, cron wins over 'Run every'."),
+            // The event-trigger half (ELT P3 S3b / UI-S7): `{type: event, on: dataset, from: …}`.
+            // `type` stays derived — the save writes `event` when `on` is picked (node-config-build),
+            // because `on:` under a schedule type is config the trigger parser silently ignores.
+            // `on: commit` (upstream Pipeline commit) stays authorable via Additional config only.
+            NodeAttribute.of("trigger__on", "Run when", "select", "optional")
+                    .options("", "Poll / schedule (the default)",
+                            "dataset", "A Dataset is written")
+                    .help("Event trigger: run when the watched source publishes, instead of on a cadence. "
+                            + "'A Dataset is written' pairs naturally with a dataset-entry collector — the "
+                            + "write Signal supplies the latency, the acquire cycle does the copy."),
+            NodeAttribute.of("trigger__from", "Dataset to watch", "autocomplete", "optional").required(true)
+                    .dependsOn("trigger__on", "dataset")
+                    .placeholder("datasets/orders_rollup")
+                    .help("The Dataset whose writes fire this pipeline — datasets/<id> (a bare id works too). "
+                            + "Usually the same Dataset the collector consumes."),
+            NodeAttribute.of("trigger__coalesce", "Coalesce window", "string", "advanced")
+                    .dependsOn("trigger__on", "dataset")
+                    .placeholder("30s")
+                    .help("Debounce a burst of writes into one admitted run — 30s, 5m, or a bare number of "
+                            + "seconds. Blank = run per write."));
 
     public static final List<NodeAttribute> MARKER_DEDUP = List.of(
             // ⚠ tier `required` + required(false) — the always-visible-but-optional idiom. As `optional`

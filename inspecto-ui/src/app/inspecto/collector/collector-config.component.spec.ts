@@ -4,7 +4,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
-import { ConnectionsService } from 'app/inspecto/api';
+import { ComponentsService, ConnectionsService } from 'app/inspecto/api';
 import { COLLECTOR_ATTRIBUTES } from 'app/inspecto/component-model';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { CollectorConfigComponent } from './collector-config.component';
@@ -30,6 +30,8 @@ function create(
             },
             { provide: MatDialog, useValue: { open: () => ({ afterClosed: () => of(undefined) }) } },
             { provide: ToastrService, useValue: TOASTR },
+            // The dataset pickers' loaders inject this eagerly at construction.
+            { provide: ComponentsService, useValue: { list: () => of([{ name: 'orders_rollup' }]) } },
         ],
     });
     const fixture = TestBed.createComponent(CollectorConfigComponent);
@@ -92,6 +94,35 @@ describe('CollectorConfigComponent', () => {
         const c = toConnectionMode(create());
         expect(c.resolveConnector()).toBeNull();
         expect(c.error()).toContain('Pick a Connection');
+    });
+
+    // ── the dataset entry (UI-S7) ────────────────────────────────────────────────
+
+    it('opens in Dataset mode for a stored dataset entry and asks only the Dataset there', () => {
+        const c = create({ dataset: 'orders_rollup' }, 'dataset').componentInstance;
+        expect(c.mode()).toBe('dataset');
+        expect(c.visibleSpecs().some((s) => s.key === 'dataset')).toBe(true);
+        expect(c.visibleSpecs().some((s) => s.key === 'connection')).toBe(false);
+        // post-action is FORCED to Retain by the dataset connector — offering the knob would author
+        // config the engine silently ignores.
+        expect(c.visibleSpecs().some((s) => s.key.startsWith('post_action__'))).toBe(false);
+        expect(c.resolveConnector()).toBe('dataset');
+        expect(c.error()).toBeNull();
+    });
+
+    it('never offers the dataset field outside Dataset mode', () => {
+        const fixture = create();
+        expect(fixture.componentInstance.visibleSpecs().some((s) => s.key === 'dataset')).toBe(false);
+        const conn = toConnectionMode(fixture);
+        expect(conn.visibleSpecs().some((s) => s.key === 'dataset')).toBe(false);
+    });
+
+    it('refuses Dataset mode with no Dataset picked — the engine pair gate, moved up front', () => {
+        const fixture = create();
+        fixture.componentInstance.setMode('dataset');
+        fixture.detectChanges();
+        expect(fixture.componentInstance.resolveConnector()).toBeNull();
+        expect(fixture.componentInstance.error()).toContain('Pick the Dataset');
     });
 
     it('grandfathers a hand-authored non-local connector rather than destroying it', () => {

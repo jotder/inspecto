@@ -109,6 +109,57 @@ describe('splitNodeConfig / buildConfiguredNode round-trip', () => {
             expect(built.config!['connector']).toBe('sftp'); // derived, written last
         });
 
+        /** The event-trigger derivation (UI-S7): `type` is derived from `on`, never asked. */
+        it('picking an event on writes type: event; clearing it takes the derived type back out', () => {
+            const specs = [
+                spec('trigger__on'),
+                spec('trigger__from'),
+                spec('trigger__coalesce'),
+                spec('trigger__every'),
+            ];
+            const n = node({}, { type: 'acquisition' });
+            const built = buildConfiguredNode({
+                node: n,
+                specs,
+                formValues: { trigger__on: 'dataset', trigger__from: 'datasets/orders_rollup' },
+                extras: {},
+                isAcquisition: true,
+                connector: 'dataset',
+            });
+            expect(built.config!['trigger']).toEqual({
+                on: 'dataset',
+                from: 'datasets/orders_rollup',
+                type: 'event',
+            });
+
+            // Clearing `on` on the stored node: the modeled trigger leaves are form-authoritative, so
+            // the root-granularity merge must not resurrect them — and the derived type goes with them.
+            const stored = node(built.config!, { type: 'acquisition' });
+            const cleared = buildConfiguredNode({
+                node: stored,
+                specs,
+                formValues: { trigger__on: '', trigger__from: '', trigger__every: '5m' },
+                extras: {},
+                isAcquisition: true,
+                connector: 'local',
+            });
+            expect(cleared.config!['trigger']).toEqual({ every: '5m' });
+        });
+
+        it('leaves an authored non-event trigger type alone', () => {
+            const specs = [spec('trigger__on'), spec('trigger__every')];
+            const n = node({ trigger: { type: 'manual' } }, { type: 'acquisition' });
+            const built = buildConfiguredNode({
+                node: n,
+                specs,
+                formValues: { trigger__every: '5m', trigger__on: '' },
+                extras: {},
+                isAcquisition: true,
+                connector: 'local',
+            });
+            expect(built.config!['trigger']).toEqual({ type: 'manual', every: '5m' });
+        });
+
         it('clearing the Connection clears the binding', () => {
             const n = node({}, { use: 'connection/prod_sftp', type: 'acquisition' });
             const built = buildConfiguredNode({

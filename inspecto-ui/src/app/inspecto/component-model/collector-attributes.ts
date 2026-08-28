@@ -26,6 +26,17 @@ export const COLLECTOR_ATTRIBUTES: AttributeSpec[] = [
         required: false,
         help: 'Saved Connection profile — it carries the connector type (SFTP, Azure Blob, Kafka, Database).',
     },
+    // The dataset entry (ELT P3 S3c-2 / UI-S7): `connector: dataset` + this id. Like `connection` it
+    // is mode-owned — the shared collector surface shows exactly one of the two, and the connector
+    // itself stays derived (dataset mode ⇒ `dataset`), never asked.
+    {
+        key: 'dataset',
+        label: 'Dataset',
+        type: 'autocomplete',
+        tier: 'required',
+        required: false,
+        help: "Consume another Pipeline's Dataset: each acquire cycle copies its new parquet snapshots into this pipeline's inbox (the producer's files are never deleted). Dataset entry only — leave blank for file feeds.",
+    },
     {
         key: 'include',
         label: 'Include patterns',

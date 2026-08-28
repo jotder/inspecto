@@ -13,6 +13,13 @@
     "required" : false,
     "help" : "Saved Connection profile — it carries the connector type (SFTP, Azure Blob, Kafka, Database)."
   }, {
+    "key" : "dataset",
+    "label" : "Dataset",
+    "type" : "autocomplete",
+    "tier" : "required",
+    "required" : false,
+    "help" : "Consume another Pipeline's Dataset: each acquire cycle copies its new parquet snapshots into this pipeline's inbox (the producer's files are never deleted). Dataset entry only — leave blank for file feeds."
+  }, {
     "key" : "include",
     "label" : "Include patterns",
     "type" : "string",
@@ -235,6 +242,42 @@
     "tier" : "optional",
     "help" : "Calendar cadence in the operations time zone (e.g. daily at 02:00). When both are stated, cron wins over 'Run every'.",
     "placeholder" : "0 0 2 * * *"
+  }, {
+    "key" : "trigger__on",
+    "label" : "Run when",
+    "type" : "select",
+    "tier" : "optional",
+    "options" : [ {
+      "value" : "",
+      "label" : "Poll / schedule (the default)"
+    }, {
+      "value" : "dataset",
+      "label" : "A Dataset is written"
+    } ],
+    "help" : "Event trigger: run when the watched source publishes, instead of on a cadence. 'A Dataset is written' pairs naturally with a dataset-entry collector — the write Signal supplies the latency, the acquire cycle does the copy."
+  }, {
+    "key" : "trigger__from",
+    "label" : "Dataset to watch",
+    "type" : "autocomplete",
+    "tier" : "optional",
+    "required" : true,
+    "dependsOn" : {
+      "key" : "trigger__on",
+      "equals" : "dataset"
+    },
+    "help" : "The Dataset whose writes fire this pipeline — datasets/<id> (a bare id works too). Usually the same Dataset the collector consumes.",
+    "placeholder" : "datasets/orders_rollup"
+  }, {
+    "key" : "trigger__coalesce",
+    "label" : "Coalesce window",
+    "type" : "string",
+    "tier" : "advanced",
+    "dependsOn" : {
+      "key" : "trigger__on",
+      "equals" : "dataset"
+    },
+    "help" : "Debounce a burst of writes into one admitted run — 30s, 5m, or a bare number of seconds. Blank = run per write.",
+    "placeholder" : "30s"
   } ]
 }, {
   "verb" : "parse",

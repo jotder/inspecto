@@ -231,6 +231,46 @@ class NodeConfigNameContractTest {
     }
 
     /**
+     * The dataset entry + its trigger (ELT P3 S3b/S3c-2, authored by UI-S7). One bespoke test rather
+     * than {@link #contracts()} rows because the engine's gates are PAIRED: {@code collector.dataset}
+     * without {@code connector: dataset} is refused at parse (fail-closed both ways,
+     * {@code PipelineConfigParser}), and {@code trigger.on}/{@code from} are read only under
+     * {@code type: event} — so each key alone can never reach its engine field.
+     */
+    @Test
+    void theDatasetEntryPairAndItsTriggerReachTheEngine(@TempDir Path dir) throws Exception {
+        Path toon = writeFixture(dir);
+        Map<String, Object> raw = decode(toon);
+        PipelineGraph g = liftEditable(toon);
+
+        List<PipelineNode> nodes = new ArrayList<>();
+        for (PipelineNode n : g.nodes()) {
+            if (!"acquisition".equals(n.type())) { nodes.add(n); continue; }
+            Map<String, Object> cfg = new LinkedHashMap<>(n.config());
+            put(cfg, "connector", "dataset");
+            put(cfg, "dataset", "orders_rollup");
+            put(cfg, "trigger.type", "event");
+            put(cfg, "trigger.on", "dataset");
+            put(cfg, "trigger.from", "datasets/orders_rollup");
+            put(cfg, "trigger.coalesce", "30s");
+            nodes.add(new PipelineNode(n.id(), n.type(), n.name(), n.description(), cfg, n.use()));
+        }
+        Map<String, Object> lowered = PipelineEditable.lower(
+                new PipelineGraph(g.name(), g.active(), nodes, g.edges()), raw, true);
+
+        Path saved = dir.resolve("saved_pipeline.toon");
+        Files.writeString(saved, ConfigCodec.toToon(lowered));
+        PipelineConfig reparsed = PipelineConfig.load(saved.toString());
+
+        assertEquals("dataset", reparsed.collector().connector());
+        assertEquals("orders_rollup", reparsed.collector().dataset());
+        PipelineTrigger t = PipelineTrigger.of(reparsed.triggerConfig());
+        assertEquals("dataset", t.on());
+        assertEquals("datasets/orders_rollup", t.from());
+        assertTrue(t.coalesces(), "coalesce must survive to the trigger");
+    }
+
+    /**
      * The declared-but-unreachable case, pinned rather than fixed. {@code transform.route},
      * {@code sink.materialized} and {@code sink.view} have attribute tables, but the flat config has no
      * home for them — {@code PipelineEditable.lower} refuses them with {@code UNSUPPORTED_NODE} and the

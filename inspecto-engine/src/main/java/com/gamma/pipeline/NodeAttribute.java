@@ -35,17 +35,18 @@ import java.util.Set;
  * a third package was considered and rejected: two consumers do not justify one, and the leaf module holds
  * mechanical helpers rather than domain vocabularies. Extract one if a third consumer ever appears.
  *
- * <p>⚠ <b>{@code dependsOn} is intentionally absent.</b> No node attribute uses conditional visibility
- * today; the UI type supports it, and adding it here is a two-line change plus a {@code toMap} branch when
- * a node actually needs one. Modelling it unused would be speculative surface with no test to hold it
- * honest.
+ * <p>{@code dependsOn} carries only the {@code equals} form (UI-S7, the first attribute to need one —
+ * {@code trigger__from} shows only while {@code trigger__on} is {@code dataset}); the TS side also
+ * speaks {@code notEquals}, which stays unmodelled here until a node needs it. A hidden attribute is
+ * also not validated ({@code attribute-spec.ts}'s {@code visibleSpecs}), so {@code required(true)} +
+ * {@code dependsOn} means required-when-visible.
  *
  * <p>{@code required} is boxed so "unset" stays distinguishable from {@code false} — the renderer derives
  * it from {@code tier} when unset, and collapsing that would silently make optional fields mandatory.
  */
 public record NodeAttribute(String key, String label, String type, String tier, Boolean required,
                             Object defaultValue, List<Option> options, Double min, Double max,
-                            String help, String placeholder) {
+                            String help, String placeholder, DependsOn dependsOn) {
 
     /**
      * Renderer-supported control types — the {@code AttributeType} union in {@code attribute-spec.ts}.
@@ -63,6 +64,9 @@ public record NodeAttribute(String key, String label, String type, String tier, 
 
     /** A {@code select} choice. */
     public record Option(String value, String label) {}
+
+    /** Conditional visibility: show (and validate) only while attribute {@code key} equals {@code value}. */
+    public record DependsOn(String key, Object value) {}
 
     /**
      * Fail-fast on a spec the renderer could not draw. These tables are compiled in rather than authored,
@@ -89,32 +93,38 @@ public record NodeAttribute(String key, String label, String type, String tier, 
     // ── terse builders, so the tables below read as data rather than constructor noise ──────────
 
     static NodeAttribute of(String key, String label, String type, String tier) {
-        return new NodeAttribute(key, label, type, tier, null, null, List.of(), null, null, null, null);
+        return new NodeAttribute(key, label, type, tier, null, null, List.of(), null, null, null, null, null);
     }
 
     NodeAttribute help(String help) {
-        return new NodeAttribute(key, label, type, tier, required, defaultValue, options, min, max, help, placeholder);
+        return new NodeAttribute(key, label, type, tier, required, defaultValue, options, min, max, help, placeholder, dependsOn);
     }
 
     NodeAttribute placeholder(String placeholder) {
-        return new NodeAttribute(key, label, type, tier, required, defaultValue, options, min, max, help, placeholder);
+        return new NodeAttribute(key, label, type, tier, required, defaultValue, options, min, max, help, placeholder, dependsOn);
     }
 
     /** Explicitly decouple validation from visibility (an always-visible but optional field). */
     NodeAttribute required(boolean required) {
-        return new NodeAttribute(key, label, type, tier, required, defaultValue, options, min, max, help, placeholder);
+        return new NodeAttribute(key, label, type, tier, required, defaultValue, options, min, max, help, placeholder, dependsOn);
     }
 
     NodeAttribute defaultValue(Object defaultValue) {
-        return new NodeAttribute(key, label, type, tier, required, defaultValue, options, min, max, help, placeholder);
+        return new NodeAttribute(key, label, type, tier, required, defaultValue, options, min, max, help, placeholder, dependsOn);
     }
 
     NodeAttribute min(double min) {
-        return new NodeAttribute(key, label, type, tier, required, defaultValue, options, min, max, help, placeholder);
+        return new NodeAttribute(key, label, type, tier, required, defaultValue, options, min, max, help, placeholder, dependsOn);
     }
 
     NodeAttribute max(double max) {
-        return new NodeAttribute(key, label, type, tier, required, defaultValue, options, min, max, help, placeholder);
+        return new NodeAttribute(key, label, type, tier, required, defaultValue, options, min, max, help, placeholder, dependsOn);
+    }
+
+    /** Show (and validate) only while attribute {@code key} holds {@code equalsValue} — see the class doc. */
+    NodeAttribute dependsOn(String key, Object equalsValue) {
+        return new NodeAttribute(this.key, label, type, tier, required, defaultValue, options, min, max, help,
+                placeholder, new DependsOn(key, equalsValue));
     }
 
     /** {@code value, label, value, label, …} — the option list, kept inline so a table stays one line per key. */
@@ -123,7 +133,7 @@ public record NodeAttribute(String key, String label, String type, String tier, 
         List<Option> opts = new ArrayList<>();
         for (int i = 0; i < valueLabelPairs.length; i += 2)
             opts.add(new Option(valueLabelPairs[i], valueLabelPairs[i + 1]));
-        return new NodeAttribute(key, label, type, tier, required, defaultValue, opts, min, max, help, placeholder);
+        return new NodeAttribute(key, label, type, tier, required, defaultValue, opts, min, max, help, placeholder, dependsOn);
     }
 
     /**
@@ -153,6 +163,13 @@ public record NodeAttribute(String key, String label, String type, String tier, 
         }
         if (min != null) m.put("min", min);
         if (max != null) m.put("max", max);
+        if (dependsOn != null) {
+            // LinkedHashMap for the same reason as options: the contract JSON is byte-compared.
+            Map<String, Object> dep = new LinkedHashMap<>();
+            dep.put("key", dependsOn.key());
+            dep.put("equals", dependsOn.value());
+            m.put("dependsOn", dep);
+        }
         if (help != null) m.put("help", help);
         if (placeholder != null) m.put("placeholder", placeholder);
         return m;

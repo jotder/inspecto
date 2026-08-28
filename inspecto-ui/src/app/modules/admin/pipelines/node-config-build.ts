@@ -115,6 +115,26 @@ export function buildConfiguredNode(input: BuildConfiguredNodeInput): AuthoredNo
         for (const [root, val] of Object.entries(nestKeys(flat))) {
             config[root] = plain(val) && plain(prior[root]) ? mergeBlock(prior[root], val) : val;
         }
+        // The event-trigger derivation (UI-S7): `trigger.on`/`from`/`coalesce` are MODELED leaves, so
+        // the form value is authoritative — a blank means CLEARED, where the root-granularity merge
+        // above would resurrect the stored value forever. `type` stays derived, never asked: `on:`
+        // under a schedule type is config `PipelineTrigger.of` silently ignores, so picking an event
+        // `on` writes `type: event` and clearing it takes the derived type back out (an authored
+        // non-event type is left alone).
+        if (specs.some((s) => s.key === 'trigger__on')) {
+            const trig = config['trigger'];
+            if (plain(trig)) {
+                const blank = (v: unknown): boolean => v === undefined || v === null || v === '';
+                for (const leaf of ['on', 'from', 'coalesce'] as const) {
+                    if (blank(formValues[`trigger__${leaf}`])) delete trig[leaf];
+                }
+                const on = String(trig['on'] ?? '').trim();
+                const type = String(trig['type'] ?? '').trim();
+                if (on && !type) trig['type'] = 'event';
+                else if (!on && type.toLowerCase() === 'event') delete trig['type'];
+                if (!Object.keys(trig).length) delete config['trigger'];
+            }
+        }
     }
     // Extras apply LAST and literally — they keep overriding the schema as the free-form rows always
     // did. They arrive TYPED from the additional-config editor, which emits the original value

@@ -111,9 +111,15 @@ describe('node-attributes', () => {
         // Shared block + the borrowed marker keys + the trigger cadence keys (top-level `trigger:`
         // map, borrowed like the marker keys — NOT part of the collector block).
         const shared = [...COLLECTOR_ATTRIBUTES, ...MARKER_DEDUP_ATTRIBUTES, ...UNPACK_ATTRIBUTES];
-        expect(acq).toHaveLength(shared.length + 2);
+        expect(acq).toHaveLength(shared.length + 5);
         shared.forEach((spec, i) => expect(acq[i]).toBe(spec));
-        expect(acq.slice(shared.length).map((s) => s.key)).toEqual(['trigger__every', 'trigger__cron']);
+        expect(acq.slice(shared.length).map((s) => s.key)).toEqual([
+            'trigger__every',
+            'trigger__cron',
+            'trigger__on',
+            'trigger__from',
+            'trigger__coalesce',
+        ]);
         // ⚠ and the marker + trigger keys stay OUT of the block table itself — Onboarding's Collection
         // stage renders that one whole, and these are not `collector:` keys.
         expect(COLLECTOR_ATTRIBUTES.map((s) => s.key)).not.toContain('duplicate_check');

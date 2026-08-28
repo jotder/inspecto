@@ -11,11 +11,15 @@ import { apiErrorMessage, ConnectionTestResult, ConnectionsService, LensService 
 import { AttributeSpec } from 'app/inspecto/component-model';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
-import { connectionOptionLoader } from 'app/inspecto/components/entity-option-loaders';
+import {
+    connectionOptionLoader,
+    datasetOptionLoader,
+    datasetRefOptionLoader,
+} from 'app/inspecto/components/entity-option-loaders';
 import { ConnectionFormDialog, ConnectionFormResult } from 'app/inspecto/connections/connection-form.dialog';
 
-/** Collect from the pipeline's local inbox, or through a saved Connection. */
-export type CollectorMode = 'local' | 'connection';
+/** Collect from the pipeline's local inbox, through a saved Connection, or from a Dataset (UI-S7). */
+export type CollectorMode = 'local' | 'connection' | 'dataset';
 
 /**
  * **The** collector-config surface (collector-config unification, 2026-08-04): the where-do-files-come-from
@@ -59,6 +63,12 @@ export type CollectorMode = 'local' | 'connection';
                         matTooltip="Collect through a saved Connection (SFTP, Azure Blob, Kafka, Database)"
                     >
                         Connection
+                    </mat-button-toggle>
+                    <mat-button-toggle
+                        value="dataset"
+                        matTooltip="Consume another Pipeline's Dataset — its parquet snapshots feed this pipeline's inbox"
+                    >
+                        Dataset
                     </mat-button-toggle>
                 </mat-button-toggle-group>
             </div>
@@ -105,6 +115,12 @@ export type CollectorMode = 'local' | 'connection';
                         }
                     </inspecto-alert>
                 }
+            } @else if (mode() === 'dataset') {
+                <p class="text-secondary m-0 text-sm">
+                    Each acquire cycle copies the Dataset's new parquet snapshots into this pipeline's inbox — the
+                    producer's files are never deleted, whatever the post-action says. Pair it with the
+                    <em>Run when — A Dataset is written</em> trigger for event latency.
+                </p>
             } @else {
                 <p class="text-secondary m-0 text-sm">
                     Files are read from the pipeline's inbox folder (the space's <code>dirs.poll</code> convention).
@@ -125,7 +141,11 @@ export class CollectorConfigComponent {
 
     @ViewChild('sf') schemaForm!: InspectoSchemaFormComponent;
 
-    readonly optionLoaders = { connection: connectionOptionLoader() };
+    readonly optionLoaders = {
+        connection: connectionOptionLoader(),
+        dataset: datasetOptionLoader(),
+        trigger__from: datasetRefOptionLoader(),
+    };
 
     /** The collector table to render — the WHOLE shared one, `connection` included (filtered in local mode). */
     @Input({ required: true }) set specs(specs: AttributeSpec[]) {
@@ -169,10 +189,22 @@ export class CollectorConfigComponent {
     /** Mode switched since load — dirty even before a field is touched. */
     private readonly modeTouched = signal(false);
 
-    /** `connection` is a Connection-mode question only; local collection never asks it. */
-    readonly visibleSpecs = computed(() =>
-        this.mode() === 'connection' ? this.allSpecs() : this.allSpecs().filter((a) => a.key !== 'connection'),
-    );
+    /**
+     * `connection` is a Connection-mode question only and `dataset` a Dataset-mode one; the other
+     * modes never ask them. Dataset mode also hides the `post_action__*` keys — the dataset connector
+     * FORCES post-action to Retain (a consumer never deletes a producer's snapshots), so offering the
+     * knob would author config the engine silently ignores.
+     */
+    readonly visibleSpecs = computed(() => {
+        const m = this.mode();
+        return this.allSpecs().filter((a) =>
+            m === 'connection'
+                ? a.key !== 'dataset'
+                : m === 'dataset'
+                  ? a.key !== 'connection' && !a.key.startsWith('post_action__')
+                  : a.key !== 'connection' && a.key !== 'dataset',
+        );
+    });
 
     /** Saved Connection profiles — the lookup that derives the picked Connection's connector. */
     readonly profiles = signal<{ id: string; connector: string }[]>([]);
@@ -208,6 +240,10 @@ export class CollectorConfigComponent {
     private deriveMode(): void {
         if (this.modeTouched()) return;
         const stored = this.stored();
+        if (stored === 'dataset' || this.seed()['dataset']) {
+            this.mode.set('dataset');
+            return;
+        }
         this.mode.set(this.seed()['connection'] || (stored && stored !== 'local') ? 'connection' : 'local');
     }
 
@@ -275,6 +311,14 @@ export class CollectorConfigComponent {
     resolveConnector(): string | null {
         this.error.set(null);
         if (this.mode() === 'local') return 'local';
+        if (this.mode() === 'dataset') {
+            // Fail-closed like the engine's own pair gate (PipelineConfigParser): a dataset-entry
+            // collector with no Dataset is the state that would refuse to load at run time.
+            const dataset = String((this.schemaForm?.value() ?? {})['dataset'] ?? '').trim();
+            if (dataset) return 'dataset';
+            this.error.set('Pick the Dataset to consume — or switch to Local inbox.');
+            return null;
+        }
         const id = this.connectionId();
         if (id) {
             const known = this.profiles().find((p) => p.id === id)?.connector;

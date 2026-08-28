@@ -42,6 +42,15 @@ export function datasetOptionLoader(): AttributeOptionLoader {
     return async () => toOptions((await firstValueFrom(components.list('dataset'))).map((d) => d.name));
 }
 
+/** Datasets in the plural `datasets/<id>` ref form the `on: dataset` trigger's `from:` speaks. */
+export function datasetRefOptionLoader(): AttributeOptionLoader {
+    const components = inject(ComponentsService);
+    return async () =>
+        (await firstValueFrom(components.list('dataset')))
+            .map((d) => ({ value: `datasets/${d.name}`, label: `datasets/${d.name}` }))
+            .sort((a, b) => a.value.localeCompare(b.value));
+}
+
 /**
  * Columns of the store a sibling field names (expectation `column` follows `target`, `refColumn`
  * follows `refDataset`) — a 1-row `/db/table` probe of that store's records, labelled with the

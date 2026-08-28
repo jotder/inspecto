@@ -105,6 +105,40 @@ const TRIGGER_ATTRIBUTES: AttributeSpec[] = [
         placeholder: '0 0 2 * * *',
         help: "Calendar cadence in the operations time zone (e.g. daily at 02:00). When both are stated, cron wins over 'Run every'.",
     },
+    // The event-trigger half (ELT P3 S3b / UI-S7): `{type: event, on: dataset, from: …}`. `type`
+    // stays derived — buildConfiguredNode writes `event` when `on` is picked, because `on:` under a
+    // schedule type is config the trigger parser silently ignores. `on: commit` (upstream Pipeline
+    // commit) stays authorable via Additional config only.
+    {
+        key: 'trigger__on',
+        label: 'Run when',
+        type: 'select',
+        tier: 'optional',
+        options: [
+            { value: '', label: 'Poll / schedule (the default)' },
+            { value: 'dataset', label: 'A Dataset is written' },
+        ],
+        help: "Event trigger: run when the watched source publishes, instead of on a cadence. 'A Dataset is written' pairs naturally with a dataset-entry collector — the write Signal supplies the latency, the acquire cycle does the copy.",
+    },
+    {
+        key: 'trigger__from',
+        label: 'Dataset to watch',
+        type: 'autocomplete',
+        tier: 'optional',
+        required: true,
+        dependsOn: { key: 'trigger__on', equals: 'dataset' },
+        placeholder: 'datasets/orders_rollup',
+        help: 'The Dataset whose writes fire this pipeline — datasets/<id> (a bare id works too). Usually the same Dataset the collector consumes.',
+    },
+    {
+        key: 'trigger__coalesce',
+        label: 'Coalesce window',
+        type: 'string',
+        tier: 'advanced',
+        dependsOn: { key: 'trigger__on', equals: 'dataset' },
+        placeholder: '30s',
+        help: 'Debounce a burst of writes into one admitted run — 30s, 5m, or a bare number of seconds. Blank = run per write.',
+    },
 ];
 
 const NODE_ATTRIBUTES: Record<string, AttributeSpec[]> = {
