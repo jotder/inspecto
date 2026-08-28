@@ -1755,20 +1755,24 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   `GEMINI_API_KEY` (not set here), so don't read a node-count drop after a code-only update as loss.
   Optional cleanups it reported, neither blocking: `pip install "graphifyy[sql]"` for the 2 skipped
   `.sql` files, and 97 `.json` files that yield zero nodes (upstream #1666).
-- **UI-S7 — table-entry `collect` authoring UNBLOCKED 2026-08-28 (S3 fully landed); the summarize
-  half shipped 2026-08-06.** The ELT-amendment UI plan's S7 split in two on grounding. The
-  **summarize** half shipped as measure-grammar validation (contract-pinned to
-  `MeasureCompiler.AGGS`; see the plan's "S7 SPLIT" section) and fixed a latent defect where a
-  `type: 'list'` field's `<mat-error>` could never fire, making every list error — `required`
-  included — invisible.
-  The **table-entry** half's two blockers are both gone: Phase 3 S3a–S3d shipped the `dataset.write`
-  Signal, the `on: dataset` trigger, the dataset-entry `collect` (`collect: {dataset:
-  datasets/<id>}` → the `dataset` connector scheme) and the converter/parity close-out — and the
-  S3c file-shaped amendment made the parse-time `dirs.poll` requirement moot (a dataset-entry
-  pipeline keeps its own inbox; the draft loads fine). The UI work is now buildable: the
-  pipeline-editor authoring surface for the dataset-entry collect + `on: dataset` trigger.
-  Two deliberate non-goals recorded there: a structured per-measure builder (drift risk
-  against the string grammar) and `group_by` entry validation (same shape, easy follow-up).
+- ~~**UI-S7**~~ **FULLY CLOSED 2026-08-28** (`ef2a33bf`) — both halves shipped. The **summarize**
+  half shipped 2026-08-06 as measure-grammar validation (contract-pinned to `MeasureCompiler.AGGS`;
+  see the archived UI plan's "S7 SPLIT" section) and fixed a latent defect where a `type: 'list'`
+  field's `<mat-error>` could never fire, making every list error — `required` included — invisible.
+  The **table-entry** half's three recorded blockers all dissolved with Phase 3 S3a–S3d, and it
+  shipped as: a third mode on the shared `<inspecto-collector-config>` (**Local inbox | Connection |
+  Dataset**) writing `collector.dataset` with the connector still DERIVED (`dataset` mode ⇒
+  `dataset`, never asked) and failing closed when no Dataset is picked — the engine's own pair gate
+  (`PipelineConfigParser`), moved up front; plus the trigger keys `trigger__on`/`__from`/
+  `__coalesce`, where **`type: event` is derived** from a picked `on` and withdrawn when cleared
+  (`on:` under a schedule type is config `PipelineTrigger.of` silently ignores).
+  ⚠ Two things worth carrying: **`NodeAttribute` gained `dependsOn`** (the `equals` form —
+  `trigger__from` is the first served attribute needing conditional visibility, and a hidden
+  attribute is also not validated), and **the node vocabulary feeds TWO committed contracts** —
+  `node-attributes.contract.json` AND `step-types.contract.json`; regenerating only the first
+  leaves `StepTypesContractTest` red. Deliberately NOT built (unchanged non-goals): a structured
+  per-measure builder (drift risk against the string grammar), and `on: commit` authoring, which
+  stays an Additional-config key rather than a second event vocabulary in the form.
 - **Build → Test → Run authoring journey — FULLY CLOSED.** G1–G5 shipped 2026-08-02, Step 5 (the real
   test run) shipped 2026-08-14; the plan of record is **archived**, and the durable as-built is
   [`okf/backend/engine/pipeline-test-run.md`](okf/backend/engine/pipeline-test-run.md).

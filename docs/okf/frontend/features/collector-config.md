@@ -27,11 +27,12 @@ table, asserted by object identity on both sides so a forked copy fails the suit
 
 ## One component — `<inspecto-collector-config>`
 
-`inspecto/collector/collector-config.component.ts`: local-inbox/Connection toggle, the schema form,
-Test connection, create-a-Connection in place (shared [ConnectionFormDialog](connections.md)), and
-the derived-connector readout. **No write path** — hosts read `value()` / `resolveConnector()` and
-persist through their own route, because the two persisted shapes genuinely differ: a `collector:`
-block vs. a node's raw config plus a `use: connection/<id>` binding.
+`inspecto/collector/collector-config.component.ts`: the **Local inbox | Connection | Dataset** mode
+toggle, the schema form, Test connection, create-a-Connection in place (shared
+[ConnectionFormDialog](connections.md)), and the derived-connector readout. **No write path** —
+hosts read `value()` / `resolveConnector()` and persist through their own route, because the two
+persisted shapes genuinely differ: a `collector:` block vs. a node's raw config plus a
+`use: connection/<id>` binding.
 
 - ⚠ **`connector` is never asked, always derived** (local ⇒ `local`, else the picked Connection's own
   type). `CollectorConnectors.forConfig` dispatches on `collector.connector` while handing that
@@ -51,6 +52,37 @@ block vs. a node's raw config plus a `use: connection/<id>` binding.
 - ⚠ **A host swapping the spec list at runtime must carry the live values across the swap.**
   Reassigning `<inspecto-schema-form>`'s `specs` rebuilds every control from its declared default,
   so the mode toggle silently wiped the form until this component started re-seeding.
+
+## Dataset mode — consuming another Pipeline's output (UI-S7, 2026-08-28)
+
+The third mode authors the **dataset entry** the engine shipped in ELT Phase 3 S3c-2: `collector:
+{connector: dataset, dataset: <id>}`, resolved to the producer's snapshot dir fresh at every acquire
+cycle by the `dataset` connector scheme, which copies new parquet snapshots into this pipeline's
+inbox. See [Pipelines](pipelines.md) and `okf/backend/engine/`'s S3 concepts.
+
+- The mode owns its field the same way Connection does: `dataset` is asked **only** in Dataset mode,
+  `connection` only in Connection mode, and `connector` stays **derived** (Dataset mode ⇒ `dataset`).
+- ⚠ **`post_action__*` is hidden in Dataset mode.** The dataset connector **forces RETAIN** — a
+  consumer must never delete or move a producer's snapshots, whatever its config says — so offering
+  the knob would author config the engine silently ignores (the written-but-never-read shape).
+- Resolve **fails closed** with no Dataset picked, which is the engine's own paired gate
+  (`PipelineConfigParser` refuses `dataset` without `connector: dataset` and vice versa) moved up
+  front, rather than discovered at run time.
+
+### The trigger half
+
+The entry node also carries `trigger__on` / `trigger__from` / `trigger__coalesce`, authoring
+`{type: event, on: dataset, from: datasets/<id>, coalesce: …}` — the S3b trigger the `dataset.write`
+Signal fires. Two rules:
+
+- ⚠ **`trigger.type` is DERIVED, never asked**: picking an event `on` writes `type: event`, and
+  clearing it withdraws the derived type. `PipelineTrigger.of` only reads `on`/`from` under
+  `type: event`, so an `on:` under a schedule type is config nothing reads.
+- ⚠ **The modeled trigger leaves are form-authoritative.** `buildConfiguredNode`'s deep merge is
+  root-granular, so without deleting a blanked leaf explicitly a cleared `on`/`from` would be
+  resurrected from the stored value on every save.
+- `on: commit` (an upstream Pipeline commit) is deliberately **not** in the form — it stays an
+  Additional-config key rather than a second event vocabulary to keep in step.
 
 ## One write route — `POST /config/patch`
 

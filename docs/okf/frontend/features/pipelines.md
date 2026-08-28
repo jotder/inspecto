@@ -426,6 +426,11 @@ Four things to know before touching it:
   `node-attributes.spec.ts` on the TS side. Regenerate only deliberately
   (`mvn … -Dnode.attributes.write=true`), and when it fails decide *which* side is wrong first: regenerating
   makes the test pass by moving the goalposts.
+- ⚠ **The node vocabulary feeds TWO committed contracts, not one** (learned UI-S7, 2026-08-28). The same
+  `NodeAttributes` tables also compose the served **step** catalog, byte-compared to
+  `inspecto/mock/step-types.contract.json` by `StepTypesContractTest` (regen flag
+  `-Dstep.types.write=true`). Adding an attribute and regenerating only `node-attributes.contract.json`
+  leaves the second test red — and it fails in a *different* module run than the one you just made pass.
 - **The mock serves that same file**, so the offline preview cannot drive node forms from a different table
   than production.
 
