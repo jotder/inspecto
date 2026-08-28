@@ -148,4 +148,41 @@ class CollectorServiceTriggerTest {
             assertTrue(outputCount(dir.resolve("down")) >= 1, "the downstream's committed run produced output");
         }
     }
+
+    /**
+     * ELT Phase 3 S3b: a {@code dataset.write} Signal drives a {@code {type: event, on: dataset,
+     * from: datasets/<id>}} flow — and ONLY that Signal does. The fence half matters as much as the
+     * firing half: {@code triggerMatches}' suffix rule cannot tell {@code datasets/orders_rollup} from
+     * a PIPELINE named {@code orders_rollup} committing, so without the {@code on: dataset} fence in
+     * {@code onUpstreamCommit} the trigger would fire on both namespaces.
+     */
+    @Test
+    void datasetTriggerFiresOnDatasetWriteAndNotOnALikeNamedPipelineCommit(@TempDir Path dir) throws Exception {
+        // an upstream PIPELINE whose name equals the dataset id — the namespace-collision decoy
+        Path decoy = pipeline(dir.resolve("decoy"), "orders_rollup", "trigger:\n  type: manual\n");
+        Path down = pipeline(dir.resolve("down"), "ds_down",
+                "trigger:\n  type: event\n  on: dataset\n  from: datasets/orders_rollup\n");
+        try (CollectorService svc = new CollectorService(List.of(decoy, down), 3600, 2)) {
+            CountDownLatch downCommitted = new CountDownLatch(1);
+            svc.eventBus().subscribe(e -> {
+                if ("ds_down".equalsIgnoreCase(e.pipeline()) && "SUCCESS".equalsIgnoreCase(e.status())) {
+                    downCommitted.countDown();
+                }
+            });
+            svc.start();   // wires both the bus subscriber and the S3b dataset.write ledger subscriber
+
+            assertEquals(0, svc.runAllOnce().total(), "neither flow is loop-driven (manual + event)");
+
+            // the decoy pipeline commits — same suffix as the dataset ref, wrong namespace: no fire
+            svc.runPipeline("orders_rollup").orElseThrow();
+            assertFalse(downCommitted.await(2, TimeUnit.SECONDS),
+                    "a pipeline commit must never fire an on:dataset trigger (namespace fence)");
+
+            // the real thing: a dataset.write Signal on this space's ledger
+            com.gamma.signal.DatasetWriteSignal.emit("orders_rollup", 7, "materialize:test");
+            assertTrue(downCommitted.await(10, TimeUnit.SECONDS),
+                    "the dataset-triggered flow ran when its Dataset was written");
+            assertTrue(outputCount(dir.resolve("down")) >= 1, "the triggered run produced output");
+        }
+    }
 }

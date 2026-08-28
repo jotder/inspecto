@@ -960,6 +960,17 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // flow's coalescer (off the publishing thread, see triggerWorkers). Subscribed before the first
         // poll cycle so no commit is missed; flows with no event trigger ignore every event.
         bus.subscribe(pipelineScheduler::onUpstreamCommit);
+        // S3b — drive dataset-triggered flows: a dataset.write Signal on this space's ledger signals
+        // every {type: event, on: dataset, from: datasets/<id>} flow's coalescer. The subscriber runs
+        // on the emitting thread; onDatasetWrite hands the run to triggerWorkers, same as the bus path.
+        eventLog.addSubscriber(e -> {
+            java.util.Map<String, String> attrs = e.attributes();
+            if (attrs == null
+                    || !com.gamma.signal.DatasetWriteSignal.TYPE.equals(attrs.get(com.gamma.signal.Signal.ATTR_TYPE)))
+                return;
+            Object dataset = e.payload() == null ? null : e.payload().get("dataset");
+            if (dataset != null) underSpace(() -> pipelineScheduler.onDatasetWrite(dataset.toString()));
+        });
         // Dispatch-and-return: the tick selects due pipelines and hands each to triggerWorkers, so a slow
         // pipeline cannot delay the next tick for the others. runAllOnce (POST /trigger, tests) keeps the
         // blocking path — same runs, awaited. See PipelineScheduler's "Two cycle entry points, one body".

@@ -904,8 +904,16 @@ posture — ambient `EventLog.current()`, never breaks the write it announces), 
 post-`record` in `ConsignmentProcessJobType.persistSummaries` (one signal per distinct
 `tableName`, rows summed). `DatasetWriteSignal.TYPE` is the constant S3b's scheduler
 subscription matches on. `DatasetWriteSignalTest` (2 tests: queryable payload + subject ref;
-`-1` rows / absent producer never put a null in the payload). Reactor 3663/0/0/5. · **S3b** trigger form (`PipelineTrigger` + scheduler
-subscription + coalesce) · **S3c** parser loosening + `collect: {dataset:}` config shape + the
+`-1` rows / absent producer never put a null in the payload). Reactor 3663/0/0/5. · **S3b ✅ SHIPPED 2026-08-28** — the trigger form. ⚠ `PipelineTrigger`
+needed NO change (its `on`/`from` were already generic); the work was scheduler-side:
+`PipelineScheduler.onDatasetWrite` (exact sibling of `onUpstreamCommit` — same off-thread
+coalescer hand-off) matches `{type: event, on: dataset, from: datasets/<id>}`, wired via the
+space `EventLog` subscriber in `CollectorService.start()`. 🔴 A namespace FENCE was required in
+`onUpstreamCommit`: `triggerMatches`' suffix rule cannot tell `datasets/orders_rollup` from a
+PIPELINE named `orders_rollup` committing, so `on: dataset` triggers are now skipped there —
+pinned by `datasetTriggerFiresOnDatasetWriteAndNotOnALikeNamedPipelineCommit` (a decoy pipeline
+commit must NOT fire; the Signal must, end-to-end through a real CollectorService).
+Reactor 3664/0/0/5. · **S3c** parser loosening + `collect: {dataset:}` config shape + the
 `TableCollectRunner` + watermark ledger (the big slice — config without this runner would be
 fictional, per the spike) · **S3d** recipe verb + converter projection + the deferred execution
 half of the P3 S4 parity gate (enrich/materialize as recipes, identical outputs).

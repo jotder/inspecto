@@ -414,7 +414,35 @@ final class PipelineScheduler {
             if (id.equals(event.pipeline())) continue;                       // self-loop guard
             PipelineTrigger t = PipelineTrigger.of(cfg.triggerConfig());
             if (t.scheduler() != PipelineTrigger.Scheduler.EVENT) continue;
+            // S3b fence: an `on: dataset` trigger listens to dataset.write only. Without this, a
+            // `from: datasets/orders` would ALSO fire on a pipeline named `orders` committing —
+            // triggerMatches' suffix rule cannot tell the two namespaces apart on its own.
+            if ("dataset".equalsIgnoreCase(t.on())) continue;
             if (!triggerMatches(t.from(), event.pipeline())) continue;
+            TriggerCoalescer coalescer = eventCoalescers.computeIfAbsent(id, k -> new TriggerCoalescer());
+            triggerWorkers.submit(() -> coalescer.signal(() -> runPipeline.accept(id)));
+        }
+    }
+
+    /**
+     * Signal listener (ELT Phase 3 S3b): a {@code dataset.write} Signal triggers every event-triggered
+     * flow declaring {@code {type: event, on: dataset, from: datasets/<id>}} for that Dataset. The exact
+     * sibling of {@link #onUpstreamCommit} — same off-thread hand-off (the EventLog subscriber delivers
+     * on the emitting thread, which may hold a pipeline claim), same per-flow coalescing — over the
+     * Dataset namespace instead of the pipeline one. No self-loop guard is needed: the producer is a
+     * Dataset write (a job/materialize), never the triggered pipeline's own commit.
+     */
+    void onDatasetWrite(String dataset) {
+        if (dataset == null || dataset.isBlank()) return;
+        for (Path p : registry) {
+            PipelineConfig cfg = configRegistry.configForPath(p).orElse(null);
+            if (cfg == null) continue;
+            String id = cfg.identity().pipelineName();
+            if (paused.contains(id) || !cfg.active()) continue;
+            PipelineTrigger t = PipelineTrigger.of(cfg.triggerConfig());
+            if (t.scheduler() != PipelineTrigger.Scheduler.EVENT) continue;
+            if (!"dataset".equalsIgnoreCase(t.on())) continue;
+            if (!triggerMatches(t.from(), dataset)) continue;   // tolerates a datasets/<id> prefix
             TriggerCoalescer coalescer = eventCoalescers.computeIfAbsent(id, k -> new TriggerCoalescer());
             triggerWorkers.submit(() -> coalescer.signal(() -> runPipeline.accept(id)));
         }
