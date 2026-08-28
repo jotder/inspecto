@@ -247,8 +247,8 @@ interface BatchIngestStrategy {
 
         IngestSinkWriter writer = new IngestSinkWriter(
                 conn, cfg, partCols, dbDir, baseName, batchId, srcIdToFile);
-        java.nio.file.Path commitLog = java.nio.file.Paths.get(
-                cfg.dirs().temp(), "branch_commit_" + batchId + ".log");
+        java.nio.file.Path commitLog =
+                com.gamma.pipeline.exec.BranchCommitLog.pathFor(cfg.dirs().temp(), batchId);
         java.nio.file.Files.createDirectories(commitLog.getParent());
         com.gamma.pipeline.exec.BatchGraphRunner.run(
                 new com.gamma.pipeline.exec.BatchGraphRunner.Input(

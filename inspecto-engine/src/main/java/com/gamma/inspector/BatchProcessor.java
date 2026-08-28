@@ -119,6 +119,13 @@ public final class BatchProcessor {
         // the branch-aware graph path (BatchGraphRunner's SourceFinalizer) reuses once every sink branch is
         // committed (Stage A), so both drivers share this one crash-ordered sequence.
         finalizeSource(batch, cfg, survivors, outputs, lineage, bounds, audits);
+
+        // S4-pre (elt-s4-park-drain-plan): the per-batch branch commit log has served its purpose once
+        // the source is finalised — a fully committed batch never replays. A FAILED batch keeps its
+        // log: it IS the durable partial-commit record BranchCommitCoordinator resumes from. Absent
+        // for flat-lane batches, so deleteIfExists is the right verb.
+        java.nio.file.Files.deleteIfExists(
+                com.gamma.pipeline.exec.BranchCommitLog.pathFor(cfg.dirs().temp(), batch.batchId()));
     }
 
     /**

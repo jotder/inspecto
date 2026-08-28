@@ -111,6 +111,14 @@ class RouteIngestEndToEndTest {
         String lineage = Files.readString(lineageCsv);
         assertTrue(lineage.contains("db_emea") && lineage.contains("db_apac"),
                 "per-branch lineage reached the ledger: " + lineage);
+
+        // S4-pre housekeeping: a fully committed batch's branch commit log is deleted by commit()'s
+        // tail (a committed batch never replays). Retention on failure is structural — a failed batch
+        // never reaches commit(), so its log survives as the partial-commit record.
+        try (Stream<Path> w = Files.walk(dir.resolve("temp"))) {
+            assertTrue(w.noneMatch(p -> p.getFileName().toString().startsWith("branch_commit_")),
+                    "no branch_commit_*.log left in temp after a successful commit");
+        }
     }
 
     /** All non-header data lines across every output file under {@code root}, sorted. */

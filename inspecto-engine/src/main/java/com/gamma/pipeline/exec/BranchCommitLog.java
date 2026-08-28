@@ -43,6 +43,16 @@ public final class BranchCommitLog {
 
     private final Path file;
 
+    /**
+     * The one place the per-batch log's location is spelled: {@code <tempDir>/branch_commit_<batchId>.log}.
+     * Used by the graph lane to create it and by {@code BatchProcessor.commit}'s tail to delete it once
+     * the batch is fully committed (a committed batch never replays; a FAILED batch keeps its log — it
+     * IS the durable partial-commit record the coordinator resumes from).
+     */
+    public static Path pathFor(String tempDir, String batchId) {
+        return Paths.get(tempDir, "branch_commit_" + batchId + ".log");
+    }
+
     public BranchCommitLog(String path) {
         this.file = Paths.get(path);
         try {
