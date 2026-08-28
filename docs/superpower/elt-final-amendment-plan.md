@@ -1167,6 +1167,46 @@ reference versioning get graph-node equivalents or whether the gap is accepted �
 question, not a slice. ⛔ Do not "just wire `engages()`": the scalar half of `Input` is trivial, which
 makes this look far smaller than it is.
 
+#### Parity scope, RE-GROUNDED 2026-08-28 — the three findings above are now largely STALE
+
+The branch-aware executor **shipped and armed in production 2026-08-26** (`route:` pipelines divert
+inside `BatchIngestStrategy.writeAndTrace:132-137` → `graphWriteAndTrace`), which resolves or
+reframes each 2026-08-10 finding. Read this section INSTEAD of re-deriving from the three above:
+
+1. **The map-node `csv` gap is MOOT for the shipped lane.** Production seeds the executor **at the
+   route node's upstream data edge** (`graphWriteAndTrace:235-246`, comment: *"the executor never
+   re-runs parse/map — it walks route → sinks only"*), so the map node is never executed at rest and
+   `withMappingContext` rightly stays dry-run-only. It becomes a real prerequisite ONLY if the lane
+   is ever extended to execute parse/map at rest — in that change, move the rewrite into
+   `PipelineLift` itself, not a second copy.
+2. **`branchCommitLog` HAS a durable home**: `dirs.temp()/branch_commit_<batchId>.log`
+   (`graphWriteAndTrace:250-252`), fsync-per-record (`BranchCommitLog`). The one remainder is
+   **growth**: nothing deletes the per-batch files (verified — no delete anywhere in the class or
+   its callers). Zero-code housekeeping exists today: a `cleanup` maintenance job on `dirs.temp`
+   with `glob: branch_commit_*.log` + `retention_days`. A delete-on-successful-commit in
+   `BatchProcessor.commit`'s tail is the code option (small) if temp growth ever matters.
+3. **Dedup parity is SHIPPED and BETTER than legacy** (2026-08-11 operator decision): legacy
+   in-line dedup was deleted; `processing.dedup` lifts to a `transform.dedup` node and
+   `RowShaper.dedup` emits losers as an inspectable `duplicate` relation (legacy only logged a
+   count). Not a gap. (Side note of record: `EventType.DEDUP_RECORDS_DROPPED` currently has no
+   emitter — kept deliberately for the Stage-2 executor.)
+4. **Decision-Rule routing and reference-versioning are LOUD REFUSALS, not silent divergence**:
+   `graphWriteAndTrace:226-233` runs `DecisionRuleApplier` pre-graph and throws when rule-routed
+   outputs combine with route branches (mirroring the flat path's rule-routing+fan-out refusal),
+   and throws on a versioned reference store per branch (*"one version history is ill-defined
+   across branches"* — the same rule as `sinks:>1` at prepare()). Graph equivalents would be
+   LARGE (a rule node carrying quarantine side effects + per-rule tagging; a stateful versioning
+   node whose cross-branch semantics are ill-defined — plausibly a permanent refusal, not a
+   feature).
+
+**The decision this leaves for the operator is therefore NARROW:** accept the two refusals in (4)
+as permanent posture (recommended — they fail loudly by name, exactly like the flat lane's own
+refusals, and no demand case exists for either combination), or scope the large node designs. On
+accept: Phase 4 S4 and Phase 6 UNBLOCK with two small preconditions — the commit-log housekeeping
+row (2) and, for Phase 6's legacy-lane deletion specifically, an output-parity test comparing the
+two lanes' outputs on a non-route pipeline (the divert only engages `route:` configs today, so
+Phase 6 additionally needs the lane to carry non-route pipelines — THAT extension re-opens (1)).
+
 ---
 
 ## 9. Decisions of record (ALL RESOLVED 2026-08-05 — operator took the recommended option on each)
