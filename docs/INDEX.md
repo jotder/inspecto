@@ -75,6 +75,10 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- [`superpower/parser-field-tiers-interview-plan.md`](superpower/parser-field-tiers-interview-plan.md) —
+  **READY TO RUN 2026-08-28**: the D13 observation-session kit (protocol, per-lane capture sheets,
+  the grounded field inventory, and the pre-agreed analysis rule). D13 stays parked until the
+  session is scheduled with a real onboarding user; the kit removes the preparation excuse.
 - ~~`superpower/java-architecture-plan.md`~~ — **COMPLETE and ARCHIVED 2026-08-27** →
   [`archived-documents/plans-archive/java-architecture-plan.md`](archived-documents/plans-archive/java-architecture-plan.md).
   Phase 2 of the reorganization: coupling, module organization, functional style, dependency
