@@ -1,8 +1,10 @@
 package com.gamma.control;
 
+import com.gamma.event.AuditAttrs;
 import com.gamma.event.Event;
 import com.gamma.event.EventLevel;
 import com.gamma.event.EventQuery;
+import com.gamma.event.EventType;
 import com.gamma.event.SavedView;
 import com.gamma.util.OperationsZone;
 import com.sun.net.httpserver.HttpExchange;
@@ -129,22 +131,37 @@ final class EventRoutes implements RouteModule {
                 .orElseThrow(() -> new ApiException(404, "no event with id '" + id + "'"));
     }
 
-    /** {@code GET /events/export} — {@code ?format=csv} streams CSV; otherwise returns the JSON list. */
+    /**
+     * {@code GET /events/export} — {@code ?format=csv} streams CSV; otherwise returns the JSON list.
+     * An export filtered to {@code type=AUDIT} or {@code type=ACCESS_DENIED} gets the audit-shaped CSV:
+     * the base seven columns plus one column per {@link AuditAttrs} key (AUDIT-CSV-1 / compliance G10 —
+     * the plain projection silently dropped actor/action/target/ip/policy, so an audit CSV looked
+     * complete while omitting everything the audit records). Unfiltered exports keep the base shape;
+     * JSON always carries {@code attributes} whole.
+     */
     private Object exportEvents(ApiContext api, HttpExchange ex) throws IOException {
         List<Event> rows = api.service().events().query(eventQuery(ex, EventQuery.MAX_LIMIT));
         if ("csv".equalsIgnoreCase(ApiContext.query(ex, "format"))) {
-            return ApiContext.respondText(ex, eventsCsv(rows), "text/csv; charset=utf-8");
+            String type = ApiContext.query(ex, "type");
+            List<String> attributeColumns =
+                    EventType.AUDIT.equalsIgnoreCase(type) || EventType.ACCESS_DENIED.equalsIgnoreCase(type)
+                            ? AuditAttrs.ALL : List.of();
+            return ApiContext.respondText(ex, eventsCsv(rows, attributeColumns), "text/csv; charset=utf-8");
         }
         return toMaps(rows);
     }
 
-    private static String eventsCsv(List<Event> rows) {
-        StringBuilder sb = new StringBuilder("timestamp,level,type,source,pipeline,correlationId,message\n");
+    private static String eventsCsv(List<Event> rows, List<String> attributeColumns) {
+        StringBuilder sb = new StringBuilder("timestamp,level,type,source,pipeline,correlationId,message");
+        for (String col : attributeColumns) sb.append(',').append(csv(col));
+        sb.append('\n');
         for (Event e : rows) {
             sb.append(csv(e.timestamp())).append(',').append(csv(e.level().name())).append(',')
               .append(csv(e.type())).append(',').append(csv(e.source())).append(',')
               .append(csv(e.pipeline())).append(',').append(csv(e.correlationId())).append(',')
-              .append(csv(e.message())).append('\n');
+              .append(csv(e.message()));
+            for (String col : attributeColumns) sb.append(',').append(csv(e.attributes().get(col)));
+            sb.append('\n');
         }
         return sb.toString();
     }

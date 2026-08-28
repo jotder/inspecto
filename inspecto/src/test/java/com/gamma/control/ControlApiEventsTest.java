@@ -81,6 +81,24 @@ class ControlApiEventsTest {
             assertTrue(csv.headers().firstValue("Content-Type").orElse("").startsWith("text/csv"));
             assertTrue(csv.body().startsWith("timestamp,level,type,source,pipeline,correlationId,message"));
             assertTrue(csv.body().contains("BATCH_COMMITTED"), "exported row present");
+            assertEquals("timestamp,level,type,source,pipeline,correlationId,message",
+                    csv.body().lines().findFirst().orElse(""),
+                    "a non-audit export keeps the base 7-column shape");
+
+            // audit-shaped CSV (AUDIT-CSV-1 / compliance G10): type=AUDIT appends one column per
+            // AuditAttrs key, derived from AuditAttrs.ALL — the plain projection silently dropped
+            // actor/action/target/ip/policy. The POST trigger above is an audited mutation, so the
+            // store already holds a real AUDIT row carrying the default actor.
+            HttpResponse<String> auditCsv = send(c.port, "GET", "/events/export?format=csv&type=AUDIT", null);
+            assertEquals(200, auditCsv.statusCode());
+            assertEquals("timestamp,level,type,source,pipeline,correlationId,message,"
+                            + String.join(",", com.gamma.event.AuditAttrs.ALL),
+                    auditCsv.body().lines().findFirst().orElse(""),
+                    "audit-shaped header derives its columns from AuditAttrs.ALL");
+            assertTrue(auditCsv.body().contains("appUser"),
+                    "the actor attribute reaches the CSV (auth-free core default identity)");
+            assertTrue(auditCsv.body().contains("pipeline.triggered"),
+                    "the action attribute reaches the CSV (classify maps /runs to pipeline)");
         }
     }
 

@@ -57,4 +57,14 @@ public final class AuditAttrs {
     /** The name of the Access Policy that matched the decision ({@code access.denied}/{@code access.granted}),
      *  or a marker like {@code <policies-unreadable>} for a fail-closed deny. */
     public static final String POLICY = "policy";
+
+    /**
+     * Every audit attribute key above, in projection/column order — the ONE list consumers (e.g. the
+     * {@code /events/export} audit-shaped CSV) derive their columns from instead of hand-listing keys.
+     * Pinned against the constants by reflection in {@code AuditAttrsTest} so a new key cannot be added
+     * without landing here too.
+     */
+    public static final java.util.List<String> ALL = java.util.List.of(
+            ACTOR, ACTOR_TYPE, ACTION, ACTION_CATEGORY, TARGET_TYPE, TARGET_ID,
+            IP, USER_AGENT, HTTP_METHOD, HTTP_PATH, HTTP_STATUS, ABAC_ACTION, POLICY);
 }

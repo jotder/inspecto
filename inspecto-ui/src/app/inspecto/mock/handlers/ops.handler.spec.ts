@@ -128,6 +128,28 @@ describe('opsHandler', () => {
         expect(lines.slice(1).every((l) => l.includes('ERROR'))).toBe(true);
     });
 
+    it('a type=AUDIT CSV export is audit-shaped — the backend AuditAttrs.ALL columns, byte-identical', () => {
+        // Mirrors EventRoutes.eventsCsv (AUDIT-CSV-1 / compliance G10): the header below is pinned
+        // verbatim against the Java AuditAttrs.ALL order — the mock must never be more lenient OR
+        // differently shaped than the server.
+        const store = seededStore();
+        const csv = handler(req('GET', '/api/events/export', null, { type: 'AUDIT', format: 'csv' }), store)
+            ?.body as string;
+        const lines = csv.split('\n');
+        expect(lines[0]).toBe(
+            'timestamp,level,type,source,pipeline,correlationId,message,' +
+                'actor,actor_type,action,action_category,target_type,target_id,' +
+                'ip,user_agent,http_method,http_path,http_status,abac_action,policy',
+        );
+        // The seeded AUDIT rows carry actor/action attributes — they must reach the CSV cells.
+        expect(lines.length).toBeGreaterThan(1);
+        expect(lines.slice(1).some((l) => l.split(',')[7] !== '')).toBe(true);
+        // A non-audit filtered export keeps the base 7-column shape.
+        const plain = handler(req('GET', '/api/events/export', null, { level: 'ERROR', format: 'csv' }), store)
+            ?.body as string;
+        expect(plain.split('\n')[0]).toBe('timestamp,level,type,source,pipeline,correlationId,message');
+    });
+
     it('a manual evaluation sweep computes real ledger math per rule — no fabricated breach', () => {
         const store = seededStore();
         const before = (handler(req('GET', '/api/alerts'), store)?.body as FiredAlert[]).length;

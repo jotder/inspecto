@@ -44,21 +44,24 @@ Beyond the common Event fields (`eventId`, `ts`, `timestamp`, `level`, `type`, `
 | `http_method`, `http_path`, `http_status` | the request itself |
 | `abac_action`, `policy` | the authorization decision and the policy that matched |
 
-## 3. 🔴 Extract as JSON — the CSV export drops every audit attribute
+## 3. CSV and JSON are both audit-complete — ✅ FIXED 2026-08-28 (was AUDIT-CSV-1 / G10)
 
-`GET /events/export?format=csv` emits exactly seven columns:
+`GET /events/export?format=csv&type=AUDIT` (and `type=ACCESS_DENIED`) now emits the audit-shaped
+CSV: the seven base columns plus one column per §2 attribute key, in the order declared by
+`AuditAttrs.ALL` (the projection derives its columns from that one list; a reflection test pins the
+list against the constants so a new key cannot miss the export):
 
 ```
-timestamp,level,type,source,pipeline,correlationId,message
+timestamp,level,type,source,pipeline,correlationId,message,actor,actor_type,action,action_category,target_type,target_id,ip,user_agent,http_method,http_path,http_status,abac_action,policy
 ```
 
-**None of the audit attributes in §2 are in it** — no actor, no action, no target, no IP, no
-policy. The CSV shape exists for operational triage of the event feed, and it predates the audit
-trail riding the same stream.
+An **unfiltered** CSV export keeps the seven-column operational-triage shape — attributes of mixed
+event types are not projected. For the audit trail, filter to `type=AUDIT` (CSV or JSON both carry
+the attributes); JSON additionally carries `payload`.
 
-⛔ **Never hand an auditor a CSV export of `type=AUDIT` and call it the audit log.** It will look
-complete — right row count, right timestamps — while omitting every field the audit exists to
-record. Use the JSON form, which carries `attributes` whole (`Event.toMap`).
+*History:* before 2026-08-28 the CSV silently dropped every audit attribute — an audit CSV looked
+complete (right row count, right timestamps) while omitting everything the audit records. Filed as
+AUDIT-CSV-1 / matrix G10; fixed by the audit-shaped projection in `EventRoutes.eventsCsv`.
 
 ## 4. The extraction
 

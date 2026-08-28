@@ -193,7 +193,7 @@ export function opsHandler(flags: MockFlags): MockHandler {
             return json(filterEvents(projectEvents(store, space), req.params));
         }
         if (method === 'GET' && EVENTS_EXPORT.test(url)) {
-            return json(eventsCsv(filterEvents(projectEvents(store, space), req.params)));
+            return json(eventsCsv(filterEvents(projectEvents(store, space), req.params), req.params['type']));
         }
         if (method === 'GET' && EVENTS_VIEWS.test(url)) return json(store.list(space, EVENT_VIEWS_COLL));
         if (method === 'POST' && EVENTS_VIEWS.test(url)) {
@@ -1369,14 +1369,31 @@ export function filterEvents(rows: EventRow[], params: Record<string, string>): 
     return pageSlice(out, params);
 }
 
-/** Matching events as CSV text (GET /events/export) — same column order as the real exporter. */
-export function eventsCsv(rows: EventRow[]): string {
+/**
+ * Mirrors the backend's `AuditAttrs.ALL` (AuditAttrs.java) — the audit-shaped CSV column order.
+ * Keep byte-identical to the Java list; the header is pinned in ops.handler.spec.ts.
+ */
+const AUDIT_ATTR_COLUMNS = [
+    'actor', 'actor_type', 'action', 'action_category', 'target_type', 'target_id',
+    'ip', 'user_agent', 'http_method', 'http_path', 'http_status', 'abac_action', 'policy',
+];
+
+/**
+ * Matching events as CSV text (GET /events/export) — same column order as the real exporter.
+ * Like `EventRoutes.eventsCsv`, a `type=AUDIT`/`type=ACCESS_DENIED` export appends one column per
+ * audit attribute key (AUDIT-CSV-1 / compliance G10); other exports keep the base seven columns.
+ */
+export function eventsCsv(rows: EventRow[], type?: string): string {
     const cols: (keyof EventRow)[] = ['timestamp', 'level', 'type', 'source', 'pipeline', 'correlationId', 'message'];
+    const auditCols = type && ['AUDIT', 'ACCESS_DENIED'].includes(type.toUpperCase()) ? AUDIT_ATTR_COLUMNS : [];
     const esc = (v: unknown): string => {
         const s = v == null ? '' : String(v);
         return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
     };
-    return [cols.join(','), ...rows.map((r) => cols.map((c) => esc(r[c])).join(','))].join('\n');
+    return [
+        [...cols, ...auditCols].join(','),
+        ...rows.map((r) => [...cols.map((c) => esc(r[c])), ...auditCols.map((c) => esc(r.attributes?.[c]))].join(',')),
+    ].join('\n');
 }
 
 /** Deterministic per-job run history — generated, not stored (read-only reporting rows). */
