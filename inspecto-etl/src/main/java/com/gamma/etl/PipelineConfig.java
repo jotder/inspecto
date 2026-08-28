@@ -560,6 +560,7 @@ public final class PipelineConfig {
     @PublicApi(since = "4.0.0")
     public record Collector(String id, String connector, List<String> includes,
                          List<String> excludes, int recursiveDepth, Stability stability, String connection,
+                         String dataset,
                          Duplicate duplicate, Guarantee guarantee, GapDetection gapDetection,
                          Fetch fetch, Retry retry, CircuitBreaker circuitBreaker, PostActionConfig postAction,
                          Incremental incremental, String discovery) {
@@ -583,6 +584,10 @@ public final class PipelineConfig {
         /** A reusable connection-profile id this source binds to ({@code source.connection}), or {@code null}
          *  for the local filesystem. Resolved against the service's {@code *_connection.toon} registry. */
         public boolean hasConnection() { return connection != null && !connection.isBlank(); }
+
+        /** The Dataset this source consumes ({@code source.dataset}, ELT P3 S3c-2 — set with
+         *  {@code connector: dataset}), or {@code null} for every file-shaped source. */
+        public boolean hasDataset() { return dataset != null && !dataset.isBlank(); }
     }
 
     /**

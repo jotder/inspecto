@@ -108,7 +108,7 @@ public final class RecipeCompiler {
                 continue;
             }
             switch (verb) {
-                case "collect" -> nodes.add(collect(id, cfg, recipe.get("trigger")));
+                case "collect" -> nodes.add(collect(id, cfg, recipe.get("trigger"), refusals));
                 case "parse" -> {
                     parser = parse(id, cfg);
                     nodes.add(parser);
@@ -241,10 +241,35 @@ public final class RecipeCompiler {
 
     /** {@code collect} → acquisition node; {@code connection:} rides {@code use:}, {@code files:} is
      *  the file pattern, and the recipe's top-level {@code trigger:} travels on this node (the entry
-     *  Step carries the schedule — §2.7). */
-    private static PipelineNode collect(String id, Map<String, Object> cfg, Object trigger) {
+     *  Step carries the schedule — §2.7).
+     *
+     *  <p><b>Dataset entry (ELT P3 S3c-2):</b> {@code collect: {dataset: <id>}} consumes another
+     *  store's parquet snapshots — it compiles to {@code connector: dataset} + the (prefix-stripped)
+     *  id, resolved to a physical dir fresh at every acquire cycle by the {@code dataset} connector
+     *  scheme, never baked into config here. Contradictory with {@code connection:} (one entry, one
+     *  source) — that refuses with a named code, never a silent pick. ⚠ Other unknown keys stay the
+     *  verbatim pass-through they have always been: {@code RecipeConverter} legitimately round-trips
+     *  collector-block keys through {@code collect:}, so a blanket unknown-key refusal here would
+     *  break every existing recipe round-trip (the AUTHOR-1 regression shape). */
+    private static PipelineNode collect(String id, Map<String, Object> cfg, Object trigger,
+                                        List<PipelineCompileException.Refusal> refusals) {
         Map<String, Object> c = new LinkedHashMap<>(cfg);
         String use = takeRef(c, "connection", "connections/", "connection/");
+        Object datasetRaw = c.remove("dataset");
+        if (datasetRaw != null) {
+            String dataset = String.valueOf(datasetRaw).trim();
+            if (dataset.startsWith("datasets/")) dataset = dataset.substring("datasets/".length());
+            if (use != null) {
+                refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id,
+                        "collect declares both dataset: and connection: — one entry consumes one source"));
+            } else if (dataset.isBlank()) {
+                refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id,
+                        "collect.dataset must name a dataset id (bare or datasets/<id>)"));
+            } else {
+                c.put("connector", "dataset");
+                c.put("dataset", dataset);
+            }
+        }
         Object files = c.remove("files");
         if (files != null) c.put("file_pattern", files);
         if (trigger != null) c.put("trigger", trigger);

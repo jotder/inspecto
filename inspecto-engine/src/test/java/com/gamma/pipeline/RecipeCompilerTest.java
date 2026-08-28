@@ -118,6 +118,40 @@ class RecipeCompilerTest {
                 ? raw.get("name") : null, "the schema/<id> registry ref resolved and loaded");
     }
 
+    // ── ELT P3 S3c-2: dataset-entry collect ─────────────────────────────────────
+
+    /** {@code collect: {dataset: datasets/<id>}} compiles to the dataset connector scheme. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void collectDatasetCompilesToTheDatasetConnector() {
+        Map<String, Object> recipe = linearRecipe("/data/db");
+        List<Map<String, Object>> steps = (List<Map<String, Object>>) (List<?>) recipe.get("steps");
+        steps.set(0, step("collect", new LinkedHashMap<>(Map.of(
+                "dataset", "datasets/orders_rollup", "files", "glob:**/*.parquet"))));
+
+        Map<String, Object> out = RecipeCompiler.compile(recipe);
+        Map<String, Object> collector = (Map<String, Object>) out.get("collector");
+        assertEquals("dataset", collector.get("connector"));
+        assertEquals("orders_rollup", collector.get("dataset"), "the datasets/ ref prefix is stripped");
+        assertNull(collector.get("connection"), "a dataset entry binds no connection profile");
+    }
+
+    /** One entry consumes one source: dataset: plus connection: refuses, never a silent pick. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void collectDatasetPlusConnectionRefuses() {
+        Map<String, Object> recipe = linearRecipe("/data/db");
+        List<Map<String, Object>> steps = (List<Map<String, Object>>) (List<?>) recipe.get("steps");
+        steps.set(0, step("collect", new LinkedHashMap<>(Map.of(
+                "dataset", "orders_rollup", "connection", "connections/sftp_prod"))));
+
+        PipelineCompileException e = assertThrows(PipelineCompileException.class,
+                () -> RecipeCompiler.compile(recipe));
+        assertEquals(RecipeCompiler.MALFORMED_STEP, e.refusals().get(0).code());
+        assertTrue(e.refusals().get(0).message().contains("one entry consumes one source"),
+                e.refusals().get(0).message());
+    }
+
     @Test
     void notYetCompilableVerbsRefuseWithNamedCodesNeverSilently() {
         Map<String, Object> recipe = linearRecipe("/data/db");

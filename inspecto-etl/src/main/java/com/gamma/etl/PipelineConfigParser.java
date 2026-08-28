@@ -358,7 +358,7 @@ final class PipelineConfigParser {
         Map<String, Object> src = castMapAt(raw, "collector");
         if (src == null)
             return new Collector(pipelineName, "local", new ArrayList<>(List.of(filePattern)), List.of(), -1,
-                    null, null, null, null, null, null, null, null, null, null, null);
+                    null, null, null, null, null, null, null, null, null, null, null, null);
 
         String id             = opt(src, "id", pipelineName);
         String connector      = opt(src, "connector", "local").toLowerCase();
@@ -372,6 +372,17 @@ final class PipelineConfigParser {
         // Reusable connection-profile binding (resolved against the service's *_connection.toon registry;
         // remote-connector construction from it is roadmap Phase E — the id is parsed/stored now).
         String connection     = opt(src, "connection", null);
+        // Dataset-entry source (ELT P3 S3c-2): `connector: dataset` consumes another store's parquet
+        // snapshots. The id may be spelled bare or as the trigger's `datasets/<id>` ref — one concept,
+        // one spelling stored. Fail-closed both ways: the connector without an id (nothing to consume)
+        // and the id without the connector (a key the engine would silently ignore) are both refused.
+        String dataset        = opt(src, "dataset", null);
+        if (dataset != null && dataset.startsWith("datasets/")) dataset = dataset.substring("datasets/".length());
+        if ("dataset".equals(connector) && (dataset == null || dataset.isBlank()))
+            throw new IllegalArgumentException("connector 'dataset' requires source.dataset: <dataset id>");
+        if (dataset != null && !"dataset".equals(connector))
+            throw new IllegalArgumentException(
+                    "source.dataset is only honored with connector: dataset (got connector '" + connector + "')");
         // ACQ-6 push discovery: poll (default) | watch (filesystem events on a local poll root).
         String discovery      = opt(src, "discovery", "poll");
 
@@ -475,7 +486,7 @@ final class PipelineConfigParser {
                     + "to metadata, checksum or etag.");
 
         return new Collector(id, connector, includes, excludes, recursiveDepth, stability, connection,
-                duplicate, guarantee, gapDetection, fetch, retry, circuitBreaker, postAction,
+                dataset, duplicate, guarantee, gapDetection, fetch, retry, circuitBreaker, postAction,
                 incremental, discovery);
     }
 

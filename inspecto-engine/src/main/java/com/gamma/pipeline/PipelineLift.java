@@ -187,6 +187,7 @@ public final class PipelineLift {
         PipelineConfig.Collector src = cfg.collector();
         Map<String, Object> c = new LinkedHashMap<>();
         put(c, "connector", src.connector());
+        put(c, "dataset", src.dataset());   // S3c-2: the dataset-entry source id, round-tripped verbatim
         put(c, "poll", cfg.dirs().poll());
         put(c, "id", src.id());
         if (!src.includes().isEmpty()) c.put("includes", src.includes());

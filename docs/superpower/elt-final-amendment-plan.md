@@ -930,12 +930,24 @@ Compression wrap. ⚠ Two contract guards fired during the build and were RIGHT 
 `ParsersTest` refuses an empty grammar schema (resolved by declaring the honest option, not by
 exempting), and `ControlApiParsersTest` pins the served catalog (now 8 entries, parquet at
 index 3). `ParquetParsingTest` (5) incl. fail-closed missing-selector. Reactor 3669/0/0/5. ·
-**S3c-2 `collect: {dataset: <id>}` compiling to a DERIVED ACQUISITION** — the entry acquires
-(copies) snapshots from the Dataset's dir (or an S3 prefix) into the pipeline's OWN inbox, then
-normal file ingest. The copy kills the stale-delete race (a snapshot deleted mid-copy fails
-clean and retries), keeps backup/quarantine/markers/retention semantics intact, shrinks
-physical-path coupling to the connector source derived at lift, and needs NO parser fence —
-`dirs.poll` exists and is the pipeline's own inbox. `on: dataset` (S3b) supplies event latency.
+**S3c-2 ✅ SHIPPED 2026-08-28** — dataset-entry collect via a derived acquisition. As built:
+`Collector.dataset` (typed field; `source.dataset` requires `connector: dataset` and vice versa,
+both fail-closed) · the `dataset` connector scheme (`DatasetCollectorConnectorFactory`,
+ServiceLoader-registered IN `inspecto-engine` — resolves the id → snapshot dir FRESH each build
+through the same chain every Dataset reader uses: component `physicalRef` →
+`DataRef.requireUnder(-Ddata.dir)` → `storeReadRoot`; registry off `-Dassist.write.root`, the
+MaterializeTask ambient pattern; delegates discover/fetchTo to `LocalFileSystemConnector` over
+the resolved dir; ⚠ `post` is FORCED to RETAIN — a consumer can never delete/move a producer's
+snapshots, whatever its config says) · `RecipeCompiler.collect` compiles
+`collect: {dataset: datasets/<id>}` → `connector: dataset` + stripped id, and `dataset:` +
+`connection:` refuses MALFORMED_STEP ("one entry consumes one source"); ⚠ deliberately NO
+blanket unknown-collect-key refusal — `RecipeConverter` legitimately round-trips collector keys
+through `collect:` (the AUTHOR-1 regression shape) · `PipelineLift.acquisitionNode` carries the
+key for the editable round-trip; the converter echoes it verbatim. The copy kills the
+stale-delete race, keeps backup/quarantine/markers/retention intact (timestamped snapshot names
+make marker dedup the refresh semantics — no watermark), and no parser fence was needed:
+`dirs.poll` is the pipeline's own inbox. `on: dataset` (S3b) supplies event latency.
+`isRemote()==true` for the scheme, so the B3b acquire cycle drives the copy. Reactor 3674/0/0/5.
 ⚠ Archive compression (.zip/.tar/.bz2) is Path-1 (file feeds) machinery and owes this path
 nothing — Dataset consumption only ever reads product-written parquet. · **S3d** recipe verb + converter projection + the deferred execution
 half of the P3 S4 parity gate (enrich/materialize as recipes, identical outputs).
