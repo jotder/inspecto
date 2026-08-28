@@ -2,6 +2,7 @@ package com.gamma.pipeline.exec;
 
 import com.gamma.api.PublicApi;
 import com.gamma.pipeline.ViewDefinition;
+import com.gamma.query.ViewReaderSql;
 import com.gamma.sql.SqlSandbox;
 import com.gamma.sql.SqlSandboxPolicy;
 
@@ -47,7 +48,9 @@ public final class ViewQuery {
      * @throws IOException           if the sandbox temp DB cannot be created
      */
     public static Result run(ViewDefinition def, int cap) throws SQLException, IOException {
-        String sql = def.derivedSql();
+        // Rendered, not raw: a runner-written definition templates its source read so the Consignment
+        // catalog subtracts superseded files at THIS read rather than at the write (addressing §7-A).
+        String sql = ViewReaderSql.rendered(def);
         if (sql == null || sql.isBlank())
             throw new IllegalStateException(
                     "view '" + def.store() + "' has no derived_sql; re-run pipeline '" + def.flow() + "' to concretise it");

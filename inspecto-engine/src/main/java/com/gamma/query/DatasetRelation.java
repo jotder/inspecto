@@ -55,7 +55,10 @@ public final class DatasetRelation {
         String view = Values.trimToNull(datasetConfig == null ? null : datasetConfig.get("view"));
         if (view != null) {
             Optional<ViewDefinition> def = views == null ? Optional.empty() : views.get(view);
-            String sql = def.map(ViewDefinition::derivedSql).orElse(null);
+            // Rendered, not raw (addressing §7-A): a runner-written definition templates its source read, so
+            // the catalog subtracts superseded files here — the same filtering the physicalRef branch below
+            // applies. A pre-template / hand-authored definition's plain SQL passes through untouched.
+            String sql = def.map(ViewReaderSql::rendered).orElse(null);
             if (def.isEmpty())
                 throw new IllegalArgumentException("dataset references unknown view '" + view + "'");
             if (sql == null || sql.isBlank())

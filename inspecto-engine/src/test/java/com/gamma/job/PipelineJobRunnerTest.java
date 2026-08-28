@@ -359,7 +359,14 @@ class PipelineJobRunnerTest {
 
         ViewDefinition def = new ViewStore(wr.resolve("views")).get("active_subs").orElseThrow();
         assertNotNull(def.derivedSql(), "a single-source linear filter path yields a derived_sql");
-        assertEquals(List.of(1, 3), runIds(def.derivedSql()), "derived_sql selects amt>=100 (id1, id3)");
+        // The persisted SQL TEMPLATES its source read (addressing §7-A) so the Consignment catalog can
+        // subtract superseded files at read time; the runner records the ingredients to render it from.
+        assertTrue(def.derivedSql().contains(com.gamma.query.ViewReaderSql.READER_TOKEN),
+                "the persisted read is a template, not a baked-in glob: " + def.derivedSql());
+        assertNotNull(def.readerRoot(), "the render needs the store read root");
+        assertEquals("PARQUET", def.readerFormat());
+        assertEquals(List.of(1, 3), runIds(com.gamma.query.ViewReaderSql.rendered(def)),
+                "rendered derived_sql selects amt>=100 (id1, id3)");
     }
 
     @Test

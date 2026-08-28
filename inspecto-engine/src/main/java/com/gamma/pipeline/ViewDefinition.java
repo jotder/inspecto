@@ -19,15 +19,27 @@ import static com.gamma.util.Values.str;
  * @param flow         the authored flow id that produces it (run to concretise the view)
  * @param sourceStores the {@code source_store}s the producing flow consumes (lineage)
  * @param derivedSql   the SELECT that derives the view, when expressible as a single statement; else {@code null}
- *                     (the multi-statement transform chain is re-run via {@code flow} instead)
+ *                     (the multi-statement transform chain is re-run via {@code flow} instead). A runner-written
+ *                     definition carries its source read as the {@code ViewReaderSql.READER_TOKEN} placeholder —
+ *                     rendered fresh at every execution so the Consignment catalog can subtract superseded files
+ *                     (addressing §7-A) — with the read's ingredients in {@link #readerRoot}/{@link #readerFormat}.
+ *                     Plain SQL (hand-authored views, pre-template definitions) executes verbatim.
+ * @param readerRoot   the store read root the templated reader globs under; {@code null} for plain SQL
+ * @param readerFormat the templated reader's format ({@code PARQUET}/{@code CSV}); {@code null} for plain SQL
  * @param definedAt    ISO-8601 timestamp the definition was last written
  */
 @PublicApi(since = "4.0.0")
 public record ViewDefinition(String store, String flow, List<String> sourceStores,
-                             String derivedSql, String definedAt) {
+                             String derivedSql, String readerRoot, String readerFormat, String definedAt) {
 
     public ViewDefinition {
         sourceStores = sourceStores == null ? List.of() : List.copyOf(sourceStores);
+    }
+
+    /** The plain-SQL form — every hand-authored view and every pre-template call site. */
+    public ViewDefinition(String store, String flow, List<String> sourceStores,
+                          String derivedSql, String definedAt) {
+        this(store, flow, sourceStores, derivedSql, null, null, definedAt);
     }
 
     /** Lossless map form for {@code ConfigCodec.toToon} persistence. Tier 3 dual-emit (vocabulary plan
@@ -40,6 +52,8 @@ public record ViewDefinition(String store, String flow, List<String> sourceStore
         m.put("flow", flow);
         m.put("source_store", sourceStores);
         if (derivedSql != null && !derivedSql.isBlank()) m.put("derived_sql", derivedSql);
+        if (readerRoot != null && !readerRoot.isBlank()) m.put("reader_root", readerRoot);
+        if (readerFormat != null && !readerFormat.isBlank()) m.put("reader_format", readerFormat);
         m.put("defined_at", definedAt);
         return m;
     }
@@ -52,6 +66,7 @@ public record ViewDefinition(String store, String flow, List<String> sourceStore
         String pipeline = m.get("pipeline") != null ? str(m.get("pipeline")) : str(m.get("flow"));
         return new ViewDefinition(
                 str(m.get("store")), pipeline, sources,
-                str(m.get("derived_sql")), str(m.get("defined_at")));
+                str(m.get("derived_sql")), str(m.get("reader_root")), str(m.get("reader_format")),
+                str(m.get("defined_at")));
     }
 }

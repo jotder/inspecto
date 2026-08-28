@@ -28,6 +28,7 @@ import com.gamma.pipeline.exec.ProvenanceRow;
 import com.gamma.pipeline.exec.RowShaper;
 import com.gamma.pipeline.exec.SourceStoreReader;
 import com.gamma.etl.BatchEventBus;
+import com.gamma.query.ViewReaderSql;
 import com.gamma.sql.SqlViews;
 import com.gamma.util.DuckDbUtil;
 import org.slf4j.Logger;
@@ -463,9 +464,12 @@ public final class PipelineJobRunner implements Job {
         String now = Instant.now().toString();
         for (PipelineStores.Produced p : PipelineStores.producedStores(g)) {
             if (p.restsOnDisk()) continue;     // persistent/materialized already wrote bytes
-            String derivedSql = deriveViewSql(g, p.node(), dir).orElse(null);   // single SELECT when expressible
+            DerivedView derived = deriveViewSql(g, p.node(), dir).orElse(null);   // single SELECT when expressible
+            String derivedSql = derived == null ? null : derived.sql();
             try {
-                views.write(new ViewDefinition(p.store(), pipelineId, srcStores, derivedSql, now));
+                views.write(new ViewDefinition(p.store(), pipelineId, srcStores, derivedSql,
+                        derived == null ? null : derived.readerRoot(),
+                        derived == null ? null : derived.readerFormat(), now));
                 log.info("[PIPELINEJOB] registered logical view '{}' (pipeline '{}', source_store(s) {}){}",
                         p.store(), pipelineId, srcStores, derivedSql == null ? "" : " with derived_sql");
             } catch (Exception e) {
@@ -474,14 +478,22 @@ public final class PipelineJobRunner implements Job {
         }
     }
 
+    /** A derived view's SQL plus the ingredients its templated reader is re-rendered from at read time. */
+    private record DerivedView(String sql, String readerRoot, String readerFormat) {}
+
     /**
      * T32 follow-up — best-effort {@code derived_sql} for a {@code sink.view}: if the view is fed by a
      * <b>single</b> source_store through a <b>linear</b> path of simple nodes
      * ({@code filter}/{@code map}/{@code select}/{@code derive}), fold that path into one SELECT over the source
      * read so a consumer can query the view directly. Returns empty for a branched / merged / multi-source /
      * complex path — the view then stays a re-run-the-flow definition ({@code derived_sql} null).
+     *
+     * <p><b>The source read is a template, not a glob</b> (addressing §7-A). This SQL is persisted and executed
+     * later, so a baked-in glob would keep reading a revision the catalog has since marked superseded — the
+     * defect this shape closes. {@link ViewReaderSql#READER_TOKEN} stands in for the read and is rendered
+     * through the Consignment Selector at every execution, with the root/format recorded alongside.
      */
-    private static Optional<String> deriveViewSql(PipelineGraph g, String viewNodeId, String dir) {
+    private static Optional<DerivedView> deriveViewSql(PipelineGraph g, String viewNodeId, String dir) {
         Map<String, PipelineNode> byId = g.byId();
         List<PipelineNode> chain = new ArrayList<>();       // transforms between source and view, view-first
         String cur = viewNodeId;
@@ -505,15 +517,14 @@ public final class PipelineJobRunner implements Job {
             chain.add(pn);                                        // an intermediate transform to fold
             cur = prev;
         }
-        String glob = SqlViews.storeReadRoot(dir.replace("\\", "/") + "/" + sourceStore)
-                + "/**/*." + SqlViews.ext(sourceFmt);
-        String sql = "SELECT * FROM " + SqlViews.reader(sourceFmt, glob, true);
+        String readerRoot = SqlViews.storeReadRoot(dir.replace("\\", "/") + "/" + sourceStore);
+        String sql = "SELECT * FROM " + ViewReaderSql.READER_TOKEN;
         for (int i = chain.size() - 1; i >= 0; i--) {            // fold in source→view order
             Optional<String> step = RowShaper.toSelect(chain.get(i), sql);
             if (step.isEmpty()) return Optional.empty();          // a non-simple node on the path
             sql = step.get();
         }
-        return Optional.of(sql);
+        return Optional.of(new DerivedView(sql, readerRoot, sourceFmt));
     }
 
     /**

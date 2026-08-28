@@ -142,6 +142,30 @@ statistics. And subtraction fixes *stale inclusion*, not **torn reads**: the glo
 resolve time, so a file revealed a moment later is simply absent from the list. Torn multi-file reads
 across a recompute remain an open defect.
 
+### Which readers are filtered, and which deliberately are not (2026-08-28)
+
+Filtering belongs on readers of **pipeline sink** stores — the only stores a full recompute can leave an
+old revision in. Traced per reader:
+
+| Reader | Filtered? | Why |
+|---|---|---|
+| `SourceStoreReader` | yes — `ConsignmentSelector.resolve` | reads a sink store on a connection |
+| `DatasetRelation` (`physicalRef`) | yes — `sourceLiteral` (walks; no connection in scope) | the dataset read of a sink store |
+| `DatasetRelation` (`view`) + `ViewQuery` | yes — **rendered at read time**, see below | executes a *persisted* definition |
+| `EnrichmentEngine` ×2, `BatchIngestStrategy` | ⛔ no, correctly | read Stage-1 ingest output / the ingest-written reference store — append-only, never `supersedeOtherRevisions` targets, so no catalog-marked file can appear |
+| `ReferenceCompactor` | ⛔ no, correctly | owns an equivalent safety model (`*.refcompact.tmp` / `*.parquet.refcompacting` + journal) — a second authority, not a missing one |
+
+**A persisted read has to be rendered, not stored.** `PipelineJobRunner.deriveViewSql` builds a
+`sink.view`'s SQL once and it is executed arbitrarily later, so the source read is written as the
+`ViewReaderSql.READER_TOKEN` (`{{reader}}`) placeholder with `reader_root`/`reader_format` recorded
+beside it, and every executor renders it through the Selector at read time. The two alternatives are
+both wrong in opposite directions, which is why the template exists: a **baked-in glob** keeps reading a
+revision the catalog has since superseded (silent double-counting — the defect this closed), and a
+**baked-in file list** breaks loudly the moment retention deletes those files. Plain SQL — hand-authored
+views, definitions written before the template — executes verbatim, so this needed no migration; a
+templated definition that has lost its reader fields **refuses**, because rendering it unfiltered would
+reintroduce exactly the staleness it exists to remove.
+
 ## 4. Revisions — how a recompute stays safe
 
 A full pipeline recompute used to rewrite its sink files **in place**. That was atomic per file, so a
