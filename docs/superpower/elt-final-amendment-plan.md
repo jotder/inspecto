@@ -1199,13 +1199,18 @@ reframes each 2026-08-10 finding. Read this section INSTEAD of re-deriving from 
    node whose cross-branch semantics are ill-defined — plausibly a permanent refusal, not a
    feature).
 
-**The decision this leaves for the operator is therefore NARROW:** accept the two refusals in (4)
-as permanent posture (recommended — they fail loudly by name, exactly like the flat lane's own
-refusals, and no demand case exists for either combination), or scope the large node designs. On
-accept: Phase 4 S4 and Phase 6 UNBLOCK with two small preconditions — the commit-log housekeeping
-row (2) and, for Phase 6's legacy-lane deletion specifically, an output-parity test comparing the
-two lanes' outputs on a non-route pipeline (the divert only engages `route:` configs today, so
-Phase 6 additionally needs the lane to carry non-route pipelines — THAT extension re-opens (1)).
+**✅ DECIDED 2026-08-28 (operator): the two refusals in (4) are PERMANENT POSTURE.** Decision-Rule
+routing and versioned reference stores are refused by name when combined with route branches —
+that is the contract, not a gap; do not re-file either as work without a demand case that names a
+real pipeline. **⇒ Phase 4 S4 and Phase 6 are UNBLOCKED**, with two preconditions carried into
+their slices:
+- **S4 precondition (small):** commit-log housekeeping — today a `cleanup` maintenance job on
+  `dirs.temp` with `glob: branch_commit_*.log`; a delete-on-successful-commit in
+  `BatchProcessor.commit`'s tail is the code option if temp growth matters.
+- **Phase 6 precondition (real work, scoped in its slice):** deleting the legacy lane needs the
+  graph lane to carry NON-route pipelines with proven output parity (an output-comparison test of
+  the two lanes on the same non-route pipeline) — and that extension re-opens item (1): move
+  `withMappingContext` into `PipelineLift` in the same change.
 
 ---
 
