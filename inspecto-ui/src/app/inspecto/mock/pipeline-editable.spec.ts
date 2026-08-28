@@ -989,3 +989,50 @@ describe('mock pipeline-editable — marker dedup rides acquisition (P5-a)', () 
         expect((config['dirs'] as Record<string, unknown>)['markers']).toBeUndefined();
     });
 });
+
+describe('mock pipeline-editable — processing.disabled_steps (Phase 4 S4a)', () => {
+    // Mirrors PipelineLift's overlay + PipelineEditable.lower's derivation, pinned so the offline
+    // editor can never show a different disabled state than the backend lifts.
+    const cfgWithDisabled = () => ({
+        name: 'DS',
+        active: false,
+        dirs: { poll: '/in', database: '/db' },
+        output: { format: 'CSV' },
+        collector: { connector: 'local' },
+        processing: { schema_file: 'ds_schema.toon', disabled_steps: ['parse'] },
+    });
+
+    it('overlays enabled:false onto the named node on lift', () => {
+        const g = liftConfig(cfgWithDisabled());
+        const parser = g.nodes.find((n) => n.id === 'parse');
+        expect(parser?.config?.['enabled']).toBe(false);
+        expect(g.nodes.find((n) => n.id === 'acq')?.config?.['enabled']).toBeUndefined();
+    });
+
+    it('derives the list back from node state on lower — round-trip', () => {
+        const existing = cfgWithDisabled();
+        const res = lowerGraph(liftConfig(existing), existing, false);
+        expect('config' in res).toBe(true);
+        const config = (res as { config: Record<string, unknown> }).config;
+        expect((config['processing'] as Record<string, unknown>)['disabled_steps']).toEqual(['parse']);
+    });
+
+    it('a re-enable clears the entry even on a lenient (draft) lower', () => {
+        const existing = cfgWithDisabled();
+        const g = liftConfig(existing);
+        for (const n of g.nodes) if (n.config) delete n.config['enabled'];
+        const res = lowerGraph(g, existing, false);
+        const config = (res as { config: Record<string, unknown> }).config;
+        expect((config['processing'] as Record<string, unknown>)['disabled_steps']).toBeUndefined();
+    });
+
+    it("accepts the Java spelling 'false' (string) too — PipelineNode.enabled() parity", () => {
+        const existing = { ...cfgWithDisabled(), processing: { schema_file: 'ds_schema.toon' } };
+        const g = liftConfig(existing);
+        const parser = g.nodes.find((n) => n.id === 'parse');
+        if (parser) parser.config = { ...(parser.config ?? {}), enabled: 'false' };
+        const res = lowerGraph(g, existing, false);
+        const config = (res as { config: Record<string, unknown> }).config;
+        expect((config['processing'] as Record<string, unknown>)['disabled_steps']).toEqual(['parse']);
+    });
+});

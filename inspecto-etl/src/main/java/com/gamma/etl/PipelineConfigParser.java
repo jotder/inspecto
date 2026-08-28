@@ -713,6 +713,15 @@ final class PipelineConfigParser {
             b.dedup = new PipelineConfig.Dedup(keys, trimToNull(recDedup.get("order_by")));
         }
 
+        // ── per-Step disable list (Phase 4 S4 / D-13 — authoring/round-trip; arming refused until
+        // park/drain ships, see StepDisableArming). One durable home; the lift overlays enabled:false
+        // onto the named nodes so canvas + scratch paths see the bypass without a per-node flat key. ──
+        if (proc.get("disabled_steps") instanceof List<?> rawDisabled) {
+            List<String> steps = new ArrayList<>();
+            for (Object s : rawDisabled) steps.add(String.valueOf(s));
+            b.disabledSteps = List.copyOf(steps);
+        }
+
         // ── summarize (ELT amendment §2.4/Phase 3 — group-by rollup, authoring/round-trip only) ──
         Map<String, Object> recSummarize = castMapAt(proc, "summarize");
         if (recSummarize != null) {

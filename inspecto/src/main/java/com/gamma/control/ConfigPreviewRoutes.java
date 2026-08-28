@@ -82,6 +82,7 @@ final class ConfigPreviewRoutes implements RouteModule {
         // Pre-flight: a route: block that would refuse to arm. Reported here so the editor can show
         // it while the operator is still authoring, rather than at the next run.
         findings.addAll(ConfigRoutes.routeArmingFindings(type, draft));
+        findings.addAll(ConfigRoutes.stepDisableFindings(type, draft));
         // Opt-in hard-fail safety gate (R6): merged in only when the caller asks, so the default
         // /validate response is byte-for-byte unchanged for existing callers.
         boolean safety = "true".equalsIgnoreCase(String.valueOf(body.get("safety")));

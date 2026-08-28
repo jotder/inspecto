@@ -440,6 +440,16 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
         );
     }
 
+    // Phase 4 S4 (D-13): overlay processing.disabled_steps onto the lifted nodes — mirrors
+    // PipelineLift's overlay exactly, so the offline editor shows the same disabled state the
+    // backend lifts. The flat file's ONE home for per-Step enabled: is the id list.
+    const disabledSteps = Array.isArray(processing['disabled_steps'])
+        ? (processing['disabled_steps'] as unknown[]).map(String)
+        : [];
+    for (const n of nodes) {
+        if (disabledSteps.includes(n.id)) n.config = { ...(n.config ?? {}), enabled: false };
+    }
+
     return { name: String(config['name'] ?? ''), active: config['active'] === true, nodes, edges };
 }
 
@@ -657,6 +667,16 @@ export function lowerGraph(
     } else if (strict) {
         delete processing['dedup'];
     }
+
+    // per-Step enabled: → processing.disabled_steps (Phase 4 S4 / D-13) — derived from the whole
+    // graph, recomputed on every lower (lenient included: a re-enable must clear its entry on a
+    // draft save too). Mirrors PipelineEditable.lower exactly.
+    // false or 'false' — PipelineNode.enabled() accepts both spellings, so the mirror must too.
+    const disabledSteps = g.nodes
+        .filter((n) => n.config?.['enabled'] === false || String(n.config?.['enabled']).toLowerCase() === 'false')
+        .map((n) => n.id);
+    if (disabledSteps.length > 0) processing['disabled_steps'] = disabledSteps;
+    else delete processing['disabled_steps'];
 
     // reference join → processing.join ({reference, on}) — authoring-only (ELT P3 S2, D-4)
     if (joinNode) {

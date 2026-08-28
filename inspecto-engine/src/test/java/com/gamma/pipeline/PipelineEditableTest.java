@@ -1611,4 +1611,54 @@ class PipelineEditableTest {
         Files.writeString(p, toon);
         return p;
     }
+
+    // ── Phase 4 S4a: processing.disabled_steps ↔ node-level enabled ─────────────────────
+
+    /**
+     * The flat file's ONE home for per-Step {@code enabled:}: the lift overlays the flag onto the
+     * named node, and a lower derives the list back from node state — round-trip, no per-branch
+     * enumerated-key edits. The list is recomputed WHOLESALE (node order), so a re-enable clears
+     * its entry even on a lenient (draft) lower.
+     */
+    @Test
+    void disabledStepsOverlayAndDeriveRoundTrip(@TempDir Path dir) throws Exception {
+        Path toon = writeRichPipeline(dir);
+        Map<String, Object> raw = decode(toon);
+        // author the disable list onto the rich fixture: the parse node id is 'parse' (PipelineLift)
+        @SuppressWarnings("unchecked")
+        Map<String, Object> processing = (Map<String, Object>) raw.get("processing");
+        processing.put("disabled_steps", List.of("parse"));
+        // an ACTIVE pipeline with a disabled step is refused at prepare() (the S4a gate, pinned in
+        // StepDisableArmingTest) — the round-trip under test is the inactive-draft shape
+        raw.put("active", false);
+        Path authored = dir.resolve("disabled_pipeline.toon");
+        Files.writeString(authored, com.gamma.config.io.ConfigCodec.toToon(raw));
+        PipelineConfig cfg = PipelineConfig.load(authored.toString());
+
+        // lift overlay: the named node reports disabled, everything else untouched
+        PipelineGraph g = PipelineLift.lift(cfg);
+        assertFalse(g.byId().get("parse").enabled(), "the overlay reaches the lifted node");
+        assertTrue(g.byId().get("acq").enabled(), "unnamed nodes stay enabled");
+
+        // lower derives the list back from node state — the round-trip home
+        Map<String, Object> lowered = PipelineEditable.lower(
+                PipelineCodec.fromMap(PipelineEditable.toMap(cfg, raw)), raw, true);
+        assertEquals(List.of("parse"),
+                ((Map<?, ?>) lowered.get("processing")).get("disabled_steps"));
+
+        // re-enable: a graph with every node enabled clears the entry, lenient lower included
+        // (node configs are immutable — rebuild the disabled node without its flag)
+        PipelineGraph withFlag = PipelineCodec.fromMap(PipelineEditable.toMap(cfg, raw));
+        List<PipelineNode> reEnabled = withFlag.nodes().stream().map(n -> {
+            if (n.enabled()) return n;
+            Map<String, Object> c = new LinkedHashMap<>(n.config());
+            c.remove("enabled");
+            return new PipelineNode(n.id(), n.type(), n.name(), n.description(), c, n.use());
+        }).toList();
+        Map<String, Object> cleared = PipelineEditable.lower(
+                new PipelineGraph(withFlag.name(), withFlag.active(), reEnabled, withFlag.edges()),
+                lowered, false);
+        assertFalse(((Map<?, ?>) cleared.get("processing")).containsKey("disabled_steps"),
+                "a re-enable clears the list even on a draft (lenient) save");
+    }
 }

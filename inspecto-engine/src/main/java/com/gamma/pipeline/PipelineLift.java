@@ -92,6 +92,24 @@ public final class PipelineLift {
             branch(nodes, edges, PipelineRel.DATA, null, s.single(), null, cfg, rowFilters);
         }
 
+        // Phase 4 S4 (D-13): overlay the authored disable list onto the lifted nodes — the flat file's
+        // ONE home for per-Step enabled: is processing.disabled_steps, and this is where it becomes the
+        // node-level flag the canvas and the scratch executors (dry-run / run-to-here bypass) read.
+        // The at-rest lane refuses to arm a non-empty list until park/drain ships (StepDisableArming).
+        if (!cfg.disabledSteps().isEmpty()) {
+            List<PipelineNode> overlaid = new ArrayList<>(nodes.size());
+            for (PipelineNode n : nodes) {
+                if (cfg.disabledSteps().contains(n.id())) {
+                    Map<String, Object> c = new LinkedHashMap<>(n.config());
+                    c.put("enabled", false);
+                    overlaid.add(new PipelineNode(n.id(), n.type(), n.name(), n.description(), c, n.use()));
+                } else {
+                    overlaid.add(n);
+                }
+            }
+            nodes = overlaid;
+        }
+
         return new PipelineGraph(cfg.identity().pipelineName(), cfg.active(), nodes, edges);
     }
 

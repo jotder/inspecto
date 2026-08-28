@@ -395,6 +395,10 @@ public final class PipelineEditable {
                 // synthesized ingester/<fqcn> binding is a different thing and stays.
                 nm.put("use", ref);
             Map<String, Object> c = editableConfig(n, raw, collector, dirs, output, processing);
+            // per-Step enabled (Phase 4 S4): editableConfig rebuilds each node's config from the RAW
+            // map by ownership rules, which drops the lift's disabled_steps overlay — carry the
+            // node-level flag explicitly so the editor sees the same disabled state lower derives from.
+            if (!n.enabled()) c.put("enabled", false);
             if (!c.isEmpty()) nm.put("config", c);
             nodes.add(nm);
         }
@@ -666,6 +670,18 @@ public final class PipelineEditable {
         } else if (strict) {
             processing.remove("dedup");
         }
+
+        // per-Step enabled: → processing.disabled_steps (Phase 4 S4 / D-13). The node-level flag is
+        // the editor's vocabulary (PipelineNode.enabled()); the flat file's ONE home is this id list —
+        // derived from the whole graph here so no lowering branch needs `enabled` in its enumerated
+        // key set (the two-mirror drift class this file has already paid for). Recomputed wholesale on
+        // every lower, lenient included: the graph states every node's enabled state, so a re-enable
+        // must clear its entry even on a draft save.
+        List<String> disabledSteps = new ArrayList<>();
+        for (PipelineNode n : g.nodes())
+            if (!n.enabled()) disabledSteps.add(n.id());
+        if (!disabledSteps.isEmpty()) processing.put("disabled_steps", disabledSteps);
+        else processing.remove("disabled_steps");
 
         // route: block — node config verbatim, each branch stamped with the destination database its
         // route:<key> edge feeds, so the flat file (which has no edges) keeps the branch↔sink pairing.

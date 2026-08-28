@@ -133,6 +133,28 @@ final class ConfigRoutes {
     }
 
     /**
+     * {@code processing.disabled_steps} arming findings (Phase 4 S4 / D-13) — the save-time half of
+     * {@link com.gamma.etl.StepDisableArming}, with exactly {@link #routeArmingFindings}' severity
+     * split: an active pipeline cannot run with a disabled step until park/drain ships (ERROR), an
+     * inactive draft is a legitimate work in progress (WARNING, so mid-authoring saves keep working).
+     */
+    static List<Finding> stepDisableFindings(String type, Map<String, Object> draft) {
+        if (!"pipeline".equals(type)) return List.of();
+        Map<?, ?> proc = draft.get("processing") instanceof Map<?, ?> m ? m : Map.of();
+        List<String> disabled = com.gamma.etl.StepDisableArming.draftDisabledSteps(proc);
+        if (disabled.isEmpty()) return List.of();
+        boolean active = Boolean.parseBoolean(String.valueOf(draft.getOrDefault("active", "false")));
+        Severity severity = active ? Severity.ERROR : Severity.WARNING;
+        List<Finding> out = new ArrayList<>();
+        for (String refusal : com.gamma.etl.StepDisableArming.refusals(disabled)) {
+            out.add(new Finding(severity, "disabled_steps", active
+                    ? refusal
+                    : refusal + " (the draft is inactive, so this refuses only once it is activated)"));
+        }
+        return out;
+    }
+
+    /**
      * A <b>remote</b> collector whose {@code connection} names a profile this space does not have. Left
      * unchecked the dangling id reaches the poll cycle, where {@code CollectorConnectors.forConfig} resolves
      * it to {@code null} and the connector factory throws — on <em>every</em> cycle, never once, and never

@@ -1103,6 +1103,16 @@ public final class PipelineConfig {
     private final MapConfig mapConfig;
 
     /**
+     * Step ids the author disabled ({@code processing.disabled_steps}, Phase 4 S4 / D-13) — the ONE
+     * durable home for per-Step {@code enabled:}: the lift overlays {@code enabled: false} onto the
+     * named nodes, so the canvas and the scratch paths (dry-run / run-to-here) see the bypass without
+     * a per-node key in the flat file. Never null; empty ⇒ every step enabled. Arming with a non-empty
+     * list is refused in {@link #prepare()} until park/drain semantics ship (S4b) — see
+     * {@link StepDisableArming}.
+     */
+    private final List<String> disabledSteps;
+
+    /**
      * Other config files this pipeline read at parse time (schema / grammar / segment {@code .toon}s),
      * as given in the file (not absolutised). Used by {@link com.gamma.service.ConfigRegistry} to detect
      * on-disk changes (mtime) and reload only when something actually changed. The pipeline file itself
@@ -1191,6 +1201,9 @@ public final class PipelineConfig {
     public Map<String, Object> triggerConfig() { return trigger; }
     /** Record-grain dedup ({@code processing.dedup}), or {@code null} when absent. */
     public Dedup dedup() { return dedup; }
+
+    /** Step ids disabled by {@code processing.disabled_steps} (S4/D-13); never null, empty ⇒ all enabled. */
+    public List<String> disabledSteps() { return disabledSteps; }
     /**
      * The top-level {@code route:} block <b>verbatim</b>, or {@code null} when absent. Authoring/
      * round-trip only for now: {@link #prepare()} refuses an {@code active} pipeline carrying it, because
@@ -1280,6 +1293,7 @@ public final class PipelineConfig {
         this.summarize = b.summarize;
         this.join = b.join;
         this.mapConfig = b.mapConfig;
+        this.disabledSteps = List.copyOf(b.disabledSteps);
         this.referencedFiles = List.copyOf(b.referencedFiles);
     }
 
@@ -1359,6 +1373,7 @@ public final class PipelineConfig {
         this.summarize = src.summarize;
         this.join = src.join;
         this.mapConfig = src.mapConfig;
+        this.disabledSteps = src.disabledSteps;
         this.referencedFiles = src.referencedFiles;
     }
 
@@ -1560,6 +1575,13 @@ public final class PipelineConfig {
             List<String> refusals = RouteArming.refusals(route, sinkDbs, multiSchema);
             if (!refusals.isEmpty()) throw new IllegalStateException(refusals.get(0));
         }
+        // processing.disabled_steps (Phase 4 S4 / D-13): the shape round-trips, arming refuses until
+        // park/drain semantics exist (S4b) — one rule set, shared with the save path, in
+        // StepDisableArming. Scratch paths (dry-run / run-to-here) keep the bypass regardless.
+        if (active) {
+            List<String> stepRefusals = StepDisableArming.refusals(disabledSteps);
+            if (!stepRefusals.isEmpty()) throw new IllegalStateException(stepRefusals.get(0));
+        }
         // The three Stage-2 blocks below (summarize / dedup / join) arm ONLY when output_store: is
         // authored (A5-at-rest, 2026-08-11): the file itself then declares that its chain executes as
         // a flow job over the landed store (PipelineLift.stageTwo via a pipeline_config: job), so the
@@ -1643,6 +1665,7 @@ public final class PipelineConfig {
         Summarize summarize = null;           // group-by rollup (processing.summarize); null ⇒ none
         Join join = null;                     // reference join (processing.join); null ⇒ none
         MapConfig mapConfig = null;           // authored map projection (processing.map); null ⇒ none
+        List<String> disabledSteps = List.of();   // processing.disabled_steps (S4/D-13); empty ⇒ all enabled
         final List<Path> referencedFiles = new ArrayList<>();   // schema/grammar/segment files read at parse
         String pollDir       = "";
         String databaseDir   = "";

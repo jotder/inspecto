@@ -106,6 +106,47 @@ class ControlApiRouteArmingTest {
         }
     }
 
+    // ── Phase 4 S4a: processing.disabled_steps rides the same gate ──────────────────────
+
+    private static String disabledStepsDraft(boolean active) {
+        return """
+                {"type":"pipeline","config":{
+                   "name":"parked_cdr",
+                   "active":%s,
+                   "dirs":{"poll":"in","database":"out"},
+                   "processing":{"threads":1,"schema_file":"cdr.toon","disabled_steps":["dedup"]}}}"""
+                .formatted(active);
+    }
+
+    @Test
+    @DisplayName("S4a: an ACTIVE pipeline with disabled_steps is refused at the save — 422, nothing written")
+    void activeDisabledStepsAreRefusedAtSave(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> r = post(c.port, "/config/write", disabledStepsDraft(true));
+            assertEquals(422, r.statusCode(), r.body());
+            JsonNode out = V1Body.envelope(r.body()).get("error").get("details");
+            assertFalse(out.get("written").asBoolean(), r.body());
+            String findings = out.get("findings").toString();
+            assertTrue(findings.contains("park/drain"), findings);
+            assertTrue(findings.contains("ERROR"), findings);
+        }
+    }
+
+    @Test
+    @DisplayName("S4a: an INACTIVE draft with disabled_steps saves, warning when it will refuse")
+    void inactiveDisabledStepsWarnButSave(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> r = post(c.port, "/config/write", disabledStepsDraft(false));
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode out = V1Body.of(r.body());
+            assertTrue(out.get("written").asBoolean(), r.body());
+            String findings = out.get("findings").toString();
+            assertTrue(findings.contains("park/drain"), findings);
+            assertFalse(findings.contains("\"severity\":\"ERROR\""), findings);
+            assertTrue(findings.contains("only once it is activated"), findings);
+        }
+    }
+
     @Test
     @DisplayName("/validate reports the same refusals without needing a write root")
     void validateReportsArmingRefusals(@TempDir Path cfg) throws Exception {
