@@ -839,8 +839,11 @@ carried verbatim — the D-4 claim, gated over the corpus; (3)
 `MeasureCompiler` — the S1 byte-compatibility claim, pinned (if the grammar drifts, this fails).
 Full reactor green, incl. every boot/registry scan over the new fixture. **The execution half of
 the original S4 gate (enrich + materialize actually running as recipes with identical outputs)
-lands with S3's executor machinery — it is S3-blocked, not forgotten.** Phase 3 status: S1/S2/S4
-shipped; S3 deferred (documented gap above).
+lands with S3's executor machinery — it is S3-blocked, not forgotten.**
+⚠ **Superseded 2026-08-28:** that execution half SHIPPED as part of **S3d**
+(`RecipeExecutionParityTest`), and grounding refuted its stated blocker — the verbs were no longer
+compile-only, because the A5 at-rest path had been executing them since 2026-08-11. **Phase 3 status:
+S1/S2/S3 (a–d)/S4 ALL SHIPPED — the phase is COMPLETE.**
 
 #### Phase 3 S3 DESIGN 2026-08-06 — table-entry `collect` via a Dataset-write Signal (design of record, pre-implementation)
 
