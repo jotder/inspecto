@@ -108,11 +108,23 @@ node tools/check-secrets.mjs > /dev/null 2>&1; echo "EXIT=$?"
 (In Bash you can also read `${PIPESTATUS[0]}`, or set `set -o pipefail`.) This applies to **every** gate whose
 output you trim — the Maven reactor, the two Node guards, and the npm scripts.
 
-⚠ **Known pre-existing FALSE RED — `check-secrets.mjs` exits 1 on a clean tree.** Its 4 hits are all in
-`inspecto-deploy/ui/chunk-*.js`, which is **gitignored with zero tracked files** (`.gitignore:44`), and are
-minified library property assignments (`withCredentials`, `apiKey`), not credentials. CI is unaffected (a fresh
-clone has no such directory). Don't chase it as a regression, and never silence it with `secret-allow` on
-generated bundle files. → `docs/BACKLOG.md` §6.
+⚠ ~~**Known pre-existing FALSE RED — `check-secrets.mjs` exits 1 on a clean tree.**~~ **STALE — struck
+2026-08-28.** That was CLOSED 2026-07-28: the guard now enumerates **git-tracked files** (`git ls-files -z`)
+instead of walking the filesystem, so a local `inspecto-deploy/` bundle is no longer read at all. Verified
+repeatedly on 2026-08-28 — **exit 0 on a clean tree**. 🔴 Treat a red `check-secrets.mjs` as REAL; this
+paragraph told a shift to ignore one. (The standing rule survives: never silence a hit with `secret-allow`
+on generated bundle files — they are rebuilt.)
+
+### Dependency-review guard (2026-08-28)
+
+```bash
+MVN_CMD=<mvn> MVN_OFFLINE=1 node tools/check-dependencies.mjs
+```
+Diffs the resolved runtime dependency graph against `tools/dependencies.lock` (compliance G7). Not part of
+GAUNTLET — it costs a Maven resolution — but it runs in `ci.yml`, so a dependency change that does not carry
+an updated lock **fails CI**. After a reviewed change: re-run with `--update` and commit the lock in the SAME
+commit. ⛔ It is a review device, not a vulnerability scanner. Exit **2** means it could not run (bad Maven
+invocation, missing lock, empty resolution); exit **1** is real drift.
 
 ### ⚠ …and `-pl <module> -am` is a false green for everything DOWNSTREAM
 

@@ -144,7 +144,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   Launching Maven via `cmd /c` from Git Bash can silently do nothing (MSYS mangles `/c`) — **exit 0
   and an empty log**, indistinguishable from success. Always check the log's **mtime** against your
   run's start time, and prefer `MSYS_NO_PATHCONV=1` / invoking `mvn.cmd` directly.
-- **The two repo guards are NOT in the local build loop — run them before every commit.** Neither the
+- **The repo guards are NOT in the local build loop — run them before every commit.** Neither the
   Maven reactor nor `ng test` runs `node tools/check-secrets.mjs` or `node tools/check-vocabulary.mjs`,
   so a violation is invisible until CI. On 2026-08-26 **`master` was found sitting RED** on the
   vocabulary guard, unnoticed for an unknown stretch, purely because nothing local ran it. Both are now
@@ -155,6 +155,13 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   **above** it (a leaked credential is irreversible, and a hurried security push is exactly when you
   want the check), vocabulary **below** it (that override exists so a human can push an emergency
   security backport, which a banned synonym must not block). ⛔ Do not "tidy" them into one block.
+  ⚠ **A THIRD guard joined them 2026-08-28: `node tools/check-dependencies.mjs`** (dependency review,
+  compliance G7) — but it is **not** in the pre-push pair and does **not** belong there: it shells out
+  to Maven, so it costs a reactor resolution rather than a second. It runs in `ci.yml` **after** the
+  Maven build (it needs the eoiagent install), which is why the "two pure-Node guards run BEFORE the
+  build" shape below no longer describes the whole set. Locally:
+  `MVN_CMD=<mvn> MVN_OFFLINE=1 node tools/check-dependencies.mjs`; after a REVIEWED dependency change
+  re-run with `--update` and commit `tools/dependencies.lock` in the same commit.
 
 - **A guard, hook or reminder that never reaches anyone looks identical to one with nothing to say.**
   Three instances, all 2026-08-26: the committed-secret guard ran only in CI, i.e. only *after* a push
@@ -358,7 +365,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   survive, which is exactly why the bug hides — six unquoted `-D` JVM properties sat latent in the same
   script's launch step, invisible only because it died earlier. Prove it in one line, don't reason about
   it: `pwsh -NoProfile -Command 'function Show { $args | % { "[$_]" } }; Show -Da.b=c "-Dd.e=f"'`.
-- **Two pure-Node CI guards run BEFORE the Maven build** in `ci.yml`, so either can fail a green-code push:
+- **Two pure-Node CI guards run BEFORE the Maven build** in `ci.yml`, so either can fail a green-code push (a third, `tools/check-dependencies.mjs`, runs AFTER it — see the guards note above):
   `tools/check-vocabulary.mjs` (banned synonyms in user-facing docs, **plus banned KEYS in the committed
   TOON config corpus** since 2026-08-04 — it reads `git ls-files`, not the working tree, so local matches
   CI and `spaces/**` runtime state is never scanned; its `CONFIG_ALLOW` doubles as the Flow→Pipeline Tier-3
@@ -367,7 +374,12 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   `secret-allow` comment as the escape hatch. ⚠ **`check-secrets.mjs` was "master-only" while `4.x` still carried the
   live OAuth secrets** (merging it forward would have pinned that branch's CI red, BACKLOG §5); P1 fixed
   the code there and the branch itself was deleted 2026-08-17, so the caveat is now history. A third guard,
-  `npm run lint:tokens`, runs in the separate path-filtered `ui.yml` (§6).
+  `npm run lint:tokens`, runs in the separate path-filtered `ui.yml` (§6). A fourth,
+  **`tools/check-dependencies.mjs`** (2026-08-28), diffs the resolved runtime dependency graph against
+  `tools/dependencies.lock` — it runs LAST in `ci.yml` because it needs the eoiagent install, and it is
+  a **review** device, never a vulnerability scanner. ⚠ Its lock was generated on a developer machine;
+  if CI ever resolves differently the remedy is one `--update` commit, but a persistent local-vs-CI
+  split is a design problem to settle, not to paper over.
 - **`BatchEvent.pipeline()` is the LOWERCASED pipeline name** (`cfg.identity().pipelineName()`). Any name
   matching against it (triggers, `runPipeline`, `pathFor`) must use the lowercased id — tests call
   `runPipeline("up_stream")`, not `"UP_STREAM"`.
