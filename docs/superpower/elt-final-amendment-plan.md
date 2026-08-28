@@ -1283,10 +1283,25 @@ Two hazards found while building it, neither in the plan:
    duplicated call), and its RESULT is part of the admission: a rule that actually routed rows keeps
    the pipeline flat. Caught by `DecisionRuleWiringTest`, which the first cut broke.
 
-**Still flat, and still to do before the lane can be deleted:** `sinks:>1` fan-out · the versioned
-reference-store write · chunked and segmented writes (need a per-write commit-log key) · anything with
-a node between map and sink. Only once those are carried does item (1) — moving `withMappingContext`
-into `PipelineLift` — come due, and only because the graph would then execute the map node itself.
+#### Phase 6 slice B — multi-destination fan-out, SHIPPED 2026-08-29
+
+Grounding refuted the cost here too: **the fan-out needed no new machinery.** The lift already emits one
+`sink.persistent` node per `sinks[]` destination, each fed by its own `data` edge off map, and
+`PipelineExecutor` already writes every data-fed sink independently — so admitting `sinks:>1` was a
+one-line relaxation plus the parity proof, and it GAINS per-destination crash resumption (one `BRANCH`
+row each) that the flat lane's single write loop does not have.
+
+⚠ The thing to keep straight: `dataFedSinkCount` still counts those N sinks as ONE branch. That is an
+ENGAGEMENT question for the ROUTE lane ("is there a second branch worth diverting for?") and must not
+be read as a claim about whether the graph lane can perform the write.
+
+`FlatVsGraphLaneParityTest.bothLanesFanOutTheSameRowsToEveryDestination` diffs both destinations' rows
+across both lanes.
+
+**Still flat, and still to do before the lane can be deleted:** the versioned reference-store write ·
+chunked and segmented writes (need a per-write commit-log key, see hazard 1) · anything with a node
+between map and sink. Only once those are carried does item (1) — moving `withMappingContext` into
+`PipelineLift` — come due, and only because the graph would then execute the map node itself.
 
 ---
 

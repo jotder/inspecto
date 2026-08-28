@@ -121,13 +121,51 @@ class FlatVsGraphLaneParityTest {
     }
 
     /**
-     * A pipeline with a SECOND destination stays flat: {@code sinks:>1} is a fan-out the graph lane
-     * does not implement, and {@code dataFedSinkCount} counts N plain-data sinks as ONE branch — so
-     * engagement could never separate them. Refused by the admission, not discovered at write time.
+     * Slice B — the same diff for a MULTI-DESTINATION pipeline. The lift emits one sink node per
+     * {@code sinks[]} destination and the executor writes each independently, so the fan-out needs no
+     * new machinery; what needs proving is that both lanes put the same rows under both roots.
      */
     @Test
-    void aFanOutPipelineIsNotCarriedByTheGraphLane(@TempDir Path dir) throws Exception {
+    void bothLanesFanOutTheSameRowsToEveryDestination(@TempDir Path dir) throws Exception {
+        PipelineConfig flatCfg  = fanOutConfig(dir.resolve("flat"), dir.resolve("flat_out"));
+        PipelineConfig graphCfg = fanOutConfig(dir.resolve("graph"), dir.resolve("graph_out"));
+        assertTrue(BatchIngestStrategy.graphLaneCarries(graphCfg),
+                "a fan-out is carried too: one sink node per destination, each fed off map");
+
+        BatchIngestStrategy.Written flat;
+        BatchIngestStrategy.Written graph;
+        File flatDb = BatchIngestStrategy.openTempDb(flatCfg, "parity_fanflat_");
+        File graphDb = BatchIngestStrategy.openTempDb(graphCfg, "parity_fangraph_");
+        try (Connection a = DuckDbUtil.openConnection(flatDb); Connection b = DuckDbUtil.openConnection(graphDb)) {
+            seedTable(a);
+            seedTable(b);
+            flat = BatchIngestStrategy.flatWriteAndTrace(a, "transformed", List.of(), flatCfg,
+                    flatCfg.dirs().database(), "feed", "b_0002", Map.of(0, "feed.csv", 1, "feed.csv"),
+                    new com.gamma.query.DecisionRuleApplier.Result(List.of(), List.of()));
+            graph = BatchIngestStrategy.writeAndTrace(b, "transformed", List.of(), graphCfg,
+                    graphCfg.dirs().database(), "feed", "b_0002", Map.of(0, "feed.csv", 1, "feed.csv"), true);
+        } finally {
+            DuckDbUtil.deleteTempDb(flatDb);
+            DuckDbUtil.deleteTempDb(graphDb);
+        }
+
+        assertEquals(2, flat.outputs().size(), "harness precondition: the flat lane wrote both destinations");
+        assertEquals(flat.outputs().size(), graph.outputs().size(), "output file count");
+        // Every destination got the same rows in both lanes — and the SAME rows as each other.
+        for (String dest : List.of("db_a", "db_b")) {
+            assertEquals(dataLines(dir.resolve("flat_out").resolve(dest)),
+                    dataLines(dir.resolve("graph_out").resolve(dest)),
+                    "the two lanes wrote different rows to " + dest);
+            assertEquals(3, dataLines(dir.resolve("graph_out").resolve(dest)).size(), dest + " got every row");
+        }
+        assertEquals(lineageKey(flat), lineageKey(graph), "lineage");
+    }
+
+    /** A two-destination, non-route pipeline rooted at {@code out}. */
+    private static PipelineConfig fanOutConfig(Path dir, Path out) throws Exception {
+        Files.createDirectories(dir);
         String d = dir.toString().replace("\\", "/");
+        String o = out.toString().replace("\\", "/");
         Path schema = dir.resolve("mini_schema.toon");
         Files.writeString(schema, com.gamma.etl.PipelineConfigBatchTest.miniSchema());
         Path toon = dir.resolve("fanout_pipeline.toon");
@@ -136,7 +174,7 @@ class FlatVsGraphLaneParityTest {
             active: true
             dirs:
               poll: %1$s/inbox
-              database: %1$s/db
+              database: %2$s/db
               backup: %1$s/backup
               temp: %1$s/temp
               quarantine: %1$s/quarantine
@@ -144,19 +182,18 @@ class FlatVsGraphLaneParityTest {
             output:
               format: CSV
             sinks[2]{database,format}:
-              "%1$s/db_a",CSV
-              "%1$s/db_b",CSV
+              "%2$s/db_a",CSV
+              "%2$s/db_b",CSV
             processing:
               threads: 1
-              schema_file: "%2$s"
+              schema_file: "%3$s"
               csv_settings:
                 delimiter: ","
                 skip_header_lines: 0
                 date_formats[1]: "%%Y-%%m-%%d"
                 timestamp_formats[1]: "%%Y-%%m-%%d"
-            """.formatted(d, schema.toString().replace("\\", "/")));
-        assertFalse(BatchIngestStrategy.graphLaneCarries(PipelineConfig.load(toon.toString())),
-                "sinks:>1 is a fan-out the graph lane does not implement");
+            """.formatted(d, o, schema.toString().replace("\\", "/")));
+        return PipelineConfig.load(toon.toString());
     }
 
     /** All non-header data lines across every output file under {@code root}, sorted. */

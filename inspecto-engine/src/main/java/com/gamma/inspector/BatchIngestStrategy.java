@@ -312,12 +312,9 @@ interface BatchIngestStrategy {
      *
      * <p>Admitted only when ALL hold:
      * <ul>
-     *   <li><b>one destination</b> — {@code sinks:>1} is a fan-out the graph lane does not implement
-     *       (a route branch is one destination by construction; {@code dataFedSinkCount} deliberately
-     *       counts N plain-data sinks as ONE branch, so engagement could never separate them);</li>
      *   <li><b>no versioned reference store</b> — {@code stampReferenceVersions} is flat-lane-only, and
      *       the graph lane refuses it by name rather than silently skipping the stamp;</li>
-     *   <li><b>the sink is fed straight off the map node</b> — the flat lane materialised the table
+     *   <li><b>every sink is fed straight off the map node</b> — the flat lane materialised the table
      *       through map (plus the {@code csv_settings.where} filter, which the lift places UPSTREAM of
      *       map and the seed therefore skips). Any node BETWEEN map and sink would be executed by the
      *       walk — new behaviour, not parity. Those kinds ({@code dedup}/{@code join}/{@code summarize})
@@ -325,20 +322,30 @@ interface BatchIngestStrategy {
      *       braces, and it fails to the flat lane rather than throwing.</li>
      * </ul>
      *
+     * <p><b>Multi-destination fan-out is carried (slice B).</b> The lift already emits one
+     * {@code sink.persistent} node per {@code sinks[]} destination, each fed by its own {@code data}
+     * edge off map, and {@link com.gamma.pipeline.exec.PipelineExecutor} already writes every data-fed
+     * sink independently — so the fan-out needs no new machinery here, and it GAINS per-destination
+     * crash resumption (one {@code BRANCH} row each) that the flat lane's single loop does not have.
+     * ⚠ {@code dataFedSinkCount} still counts those N sinks as ONE branch; that is an ENGAGEMENT
+     * question for the route lane ("is there a second branch to divert for?") and must not be confused
+     * with this admission, which is about whether the write is reproducible in the graph lane.
+     *
      * <p>Decision-rule outputs are NOT part of the admission: {@code DecisionRuleApplier} runs inside
      * {@code graphWriteAndTrace} exactly as it does on the flat path, and refuses the combination there.
      */
     static boolean graphLaneCarries(PipelineConfig cfg) {
-        if (cfg.sinks().size() != 1) return false;
         if (cfg.producesReference() && cfg.reference().load().versionedStore()) return false;
         com.gamma.pipeline.PipelineGraph lifted = com.gamma.pipeline.PipelineLift.lift(cfg);
         List<com.gamma.pipeline.PipelineNode> sinks = lifted.nodes().stream()
                 .filter(n -> PipelineNodeTypes.isCategory(n.type(), NodeCategory.SINK)).toList();
-        if (sinks.size() != 1) return false;
+        if (sinks.size() != cfg.sinks().size() || sinks.isEmpty()) return false;
         String seed = seedFeedingTheWrite(lifted);
-        return lifted.edgesTo(sinks.get(0).id()).stream()
-                .anyMatch(e -> com.gamma.pipeline.PipelineRel.DATA.equals(e.rel()) && seed.equals(e.from()))
-                && "transform.map".equals(lifted.byId().get(seed).type());
+        if (!"transform.map".equals(lifted.byId().get(seed).type())) return false;
+        // EVERY sink must hang directly off the seed — one straggler behind another node would be
+        // executed by the walk, which is new behaviour rather than the same write.
+        return sinks.stream().allMatch(sink -> lifted.edgesTo(sink.id()).stream()
+                .anyMatch(e -> com.gamma.pipeline.PipelineRel.DATA.equals(e.rel()) && seed.equals(e.from())));
     }
 
     /**
