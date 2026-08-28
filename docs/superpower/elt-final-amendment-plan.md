@@ -1223,6 +1223,36 @@ their slices:
   the two lanes on the same non-route pipeline) — and that extension re-opens item (1): move
   `withMappingContext` into `PipelineLift` in the same change.
 
+#### Phase 6 precondition, GROUNDED 2026-08-29 — three premises corrected
+
+Read before scoping the slice; the paragraph above is directionally right and factually wrong in
+three places.
+
+1. **The engagement gate is not where the plan implies.** `BatchGraphRunner.engages(g)` is
+   `dataFedSinkCount(g) > 1` (`BatchGraphRunner:123`) — it is NOT route-specific. The route gate is
+   the caller's: `BatchIngestStrategy:132` forks only `if (cfg.routeConfig() != null)`. A non-route
+   pipeline is therefore excluded **twice**: by that caller gate, and because its lift has exactly
+   one data branch, so `engages()` would be false anyway. ⚠ A `sinks:[N]` fan-out is deliberately
+   ONE branch with N destinations — admitting non-route pipelines by loosening the count would
+   divert fan-out into a lane that does not implement it.
+2. **`withMappingContext` is dry-run-only, and nothing silently loses it today.** It exists solely
+   in `PipelineDryRun` (`:96,:168`) — no production ingest path calls it. The reason is that the
+   graph lane never executes a `transform.map` node at all: `graphWriteAndTrace` seeds
+   `PipelineExecutor` at the route node's UPSTREAM data edge (`:238-246`), i.e. over a table the
+   flat `CsvIngester` has already parsed and mapped. So item (1) is real but for a different
+   reason than stated: it only bites once the graph lane runs parse→map itself, when `RowShaper`
+   would execute a schema-carrying map node in production for the first time.
+3. **"Carry non-route pipelines" is a lane migration, not a gate flip.** Beyond the seed (which
+   hard-requires a route node — `orElseThrow` at `:240`), two capabilities are flat-lane-ONLY and
+   are today *refused* rather than implemented in the graph lane: multi-destination `sinks:`
+   fan-out, and the versioned reference-store write (`stampReferenceVersions`). Either one appearing
+   in a non-route pipeline means real new work, not a parity assertion.
+
+**No two-lane comparison test exists.** `RouteIngestEndToEndTest` is single-lane (graph only); its
+"finalisation parity" is prose, not a side-by-side diff. The parity gate has to be written, and it
+cannot be written before the graph lane can actually run a non-route pipeline — so it is the slice's
+*exit* criterion, not its entry point.
+
 ---
 
 ## 9. Decisions of record (ALL RESOLVED 2026-08-05 — operator took the recommended option on each)
