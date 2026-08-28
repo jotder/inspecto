@@ -168,7 +168,7 @@ final class CsvBatchStrategy implements BatchIngestStrategy {
                     StepProgress.track(cfg.identity().pipelineName(), batch.batchId(), "sink", 3, 3);
                     var written = writeAndTrace(conn, "transformed", partitionColumns(schema),
                             cfg, databaseDir(batch, cfg), consolidatedBaseName(survivors, batch),
-                            batch.batchId(), srcIdToFile);
+                            batch.batchId(), srcIdToFile, true);   // the batch's ONE write
                     outputs = written.outputs();
                     lineage = written.lineage();
                     bounds  = written.bounds();

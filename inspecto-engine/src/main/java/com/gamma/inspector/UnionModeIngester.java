@@ -146,10 +146,11 @@ final class UnionModeIngester {
                         String destTable = "transformed_" + segKey;
                         DataTransformer.materialize(conn, segSchema, cfg, unionTable, destTable);
 
+                        // ⚠ false: one write per SEGMENT — see the chunked path's note.
                         var written = writeAndTrace(conn, destTable, partitionColumns(segSchema),
                                 cfg, Paths.get(cfg.dirs().database(), segKey).toString(),
                                 consolidatedBaseName(survivors, batch),
-                                batch.batchId(), segSrcToFile);
+                                batch.batchId(), segSrcToFile, false);
 
                         allOutputs.addAll(written.outputs());
                         allLineage.addAll(written.lineage());

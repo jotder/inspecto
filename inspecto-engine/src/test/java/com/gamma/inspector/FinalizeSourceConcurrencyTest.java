@@ -173,7 +173,7 @@ class FinalizeSourceConcurrencyTest {
                             BatchIngestStrategy.Written written = BatchIngestStrategy.writeAndTrace(
                                     conn, "transformed", List.of("year", "month", "day"), w.cfg(),
                                     w.cfg().dirs().database(), "b1", w.batch().batchId(),
-                                    Map.of(1, w.rel()));
+                                    Map.of(1, w.rel()), true);
                             start.await(); // every worker has its outputs ready — finalize together
                             BatchProcessor.finalizeSource(w.batch(), w.cfg(),
                                     w.batch().members(), written.outputs(), written.lineage());

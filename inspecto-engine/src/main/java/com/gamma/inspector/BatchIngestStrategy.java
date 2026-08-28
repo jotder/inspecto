@@ -11,6 +11,8 @@ import com.gamma.etl.PartitionDef;
 import com.gamma.etl.PartitionOutput;
 import com.gamma.etl.PartitionWriter;
 import com.gamma.etl.PipelineConfig;
+import com.gamma.pipeline.NodeCategory;
+import com.gamma.pipeline.PipelineNodeTypes;
 import com.gamma.util.DuckDbUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -119,25 +121,62 @@ interface BatchIngestStrategy {
      */
     static Written writeAndTrace(Connection conn, String table, List<String> partCols,
                                  PipelineConfig cfg, String dbDir, String baseName,
-                                 String batchId, Map<Integer, String> srcIdToFile) throws Exception {
+                                 String batchId, Map<Integer, String> srcIdToFile,
+                                 boolean wholeBatchWrite) throws Exception {
+        // ── the lane fork ─────────────────────────────────────────────────────
+        // This is the one choke point every ingest lane already funnels through, holding the live
+        // connection and the materialised table. Everything downstream of the returned Written
+        // (commit / finalizeSource / writeAudit / events / provenance) is the SAME code either way —
+        // that is the whole parity argument, so do not "improve" this into an earlier divert.
+        //
+        // An authored route: diverts when its lifted graph engages (arming plan S2). A NON-route
+        // pipeline diverts when the two lanes are provably the same write (Phase 6 precondition —
+        // see graphLaneCarries). Everything else stays flat.
+        //
+        // ⚠ `wholeBatchWrite` is why the non-route admission is a CALLER's decision, not a config
+        // property: two of this method's four callers write a batch in SEVERAL calls (one per chunk,
+        // one per segment), and the graph lane's BranchCommitLog is keyed by batchId — so the second
+        // and later calls would be skipped as "already committed" and their rows would vanish. The
+        // route lane is incidentally immune (a chunked batch is single-member + single-destination,
+        // and a segmented one is multi-schema, which route refuses), so its divert is unchanged; the
+        // new admission must not inherit that luck by accident.
+        //
+        // The Decision Rules run ONCE, above the fork: they have side effects (routed writes +
+        // quarantine) that must not repeat, both lanes ran them as their first act anyway, and their
+        // RESULT is part of the admission — a rule that actually routed rows keeps a non-route
+        // pipeline flat, because the graph lane does not implement rule-routed outputs (it refuses
+        // them). Whether rules exist is a property of the space registry, not of the config, so this
+        // is the only place the answer is knowable.
+        DecisionRuleApplier.Result applied = DecisionRuleApplier.apply(
+                conn, table, cfg, dbDir, baseName, partCols, batchId, srcIdToFile);
+
+        com.gamma.pipeline.PipelineGraph lifted = null;
+        if (cfg.routeConfig() != null) {
+            com.gamma.pipeline.PipelineGraph routed = com.gamma.pipeline.PipelineLift.lift(cfg);
+            if (com.gamma.pipeline.exec.BatchGraphRunner.engages(routed)) lifted = routed;
+        } else if (wholeBatchWrite && applied.outputs().isEmpty() && graphLaneCarries(cfg)) {
+            lifted = com.gamma.pipeline.PipelineLift.lift(cfg);
+        }
+        return lifted != null
+                ? graphWriteAndTrace(conn, table, partCols, cfg, dbDir, baseName, batchId, srcIdToFile,
+                        lifted, applied)
+                : flatWriteAndTrace(conn, table, partCols, cfg, dbDir, baseName, batchId, srcIdToFile,
+                        applied);
+    }
+
+    /**
+     * The legacy write: {@code DecisionRuleApplier} → optional reference versioning → the partitioned
+     * write, fanned out to every {@code sinks[]} destination. Split out of {@link #writeAndTrace} when
+     * the lane fork gained a second admission (Phase 6 precondition, 2026-08-29) so both lanes are
+     * callable side by side — which is what {@code FlatVsGraphLaneParityTest} needs to diff them.
+     */
+    static Written flatWriteAndTrace(Connection conn, String table, List<String> partCols,
+                                     PipelineConfig cfg, String dbDir, String baseName,
+                                     String batchId, Map<Integer, String> srcIdToFile,
+                                     DecisionRuleApplier.Result applied) throws Exception {
         List<PipelineConfig.Sink> sinks = cfg.sinks();
         boolean fanOut = sinks.size() > 1;
 
-        // ── branch-aware divert (arming plan S2) ──────────────────────────────
-        // An authored route: whose lifted graph engages takes the graph path from HERE — the one
-        // choke point every ingest lane already funnels through, holding the live connection and
-        // the materialised table. Everything downstream of the returned Written (commit /
-        // finalizeSource / writeAudit / events / provenance) is the SAME code as the flat path —
-        // that is the whole parity argument, so do not "improve" this into an earlier divert.
-        if (cfg.routeConfig() != null) {
-            com.gamma.pipeline.PipelineGraph lifted = com.gamma.pipeline.PipelineLift.lift(cfg);
-            if (com.gamma.pipeline.exec.BatchGraphRunner.engages(lifted))
-                return graphWriteAndTrace(conn, table, partCols, cfg, dbDir, baseName, batchId,
-                        srcIdToFile, lifted);
-        }
-
-        DecisionRuleApplier.Result applied = DecisionRuleApplier.apply(
-                conn, table, cfg, dbDir, baseName, partCols, batchId, srcIdToFile);
         if (fanOut && !applied.outputs().isEmpty())
             throw new IllegalStateException("decision-rule routing writes to a single destination; combining "
                     + "it with a multi-destination sinks: pipeline is not yet supported");
@@ -222,9 +261,8 @@ interface BatchIngestStrategy {
     private static Written graphWriteAndTrace(Connection conn, String table, List<String> partCols,
                                               PipelineConfig cfg, String dbDir, String baseName,
                                               String batchId, Map<Integer, String> srcIdToFile,
-                                              com.gamma.pipeline.PipelineGraph lifted) throws Exception {
-        DecisionRuleApplier.Result applied = DecisionRuleApplier.apply(
-                conn, table, cfg, dbDir, baseName, partCols, batchId, srcIdToFile);
+                                              com.gamma.pipeline.PipelineGraph lifted,
+                                              DecisionRuleApplier.Result applied) throws Exception {
         if (!applied.outputs().isEmpty())
             throw new IllegalStateException("decision-rule routing writes to a single destination; combining "
                     + "it with a route: pipeline's branches is not supported");
@@ -232,18 +270,12 @@ interface BatchIngestStrategy {
             throw new IllegalStateException("a versioned reference store cannot be written per route branch — "
                     + "one version history is ill-defined across branches (same rule as sinks:>1 at prepare())");
 
-        // Seed the node whose data relation IS the materialised table: the route node's upstream
-        // (the map/transform node for this batch's schema). Seeding there means the executor never
-        // re-runs parse/map — it walks route -> sinks only.
-        com.gamma.pipeline.PipelineNode route = lifted.nodes().stream()
-                .filter(n -> "transform.route".equals(n.type())).findFirst()
-                .orElseThrow(() -> new IllegalStateException(
-                        "engaged graph carries no transform.route node — engagement and lift disagree"));
-        String seedNodeId = lifted.edgesTo(route.id()).stream()
-                .filter(e -> com.gamma.pipeline.PipelineRel.DATA.equals(e.rel()))
-                .map(com.gamma.pipeline.PipelineEdge::from).findFirst()
-                .orElseThrow(() -> new IllegalStateException(
-                        "route node '" + route.id() + "' has no inbound data edge to seed"));
+        // Seed the node whose data relation IS the materialised table — the node that FEEDS the write.
+        // With a route: that is the route node's upstream (the map/transform node for this batch's
+        // schema); without one it is the sink's own upstream. Seeding there means the executor never
+        // re-runs parse/map: it walks the write tail only, which is what keeps this a write-lane
+        // divert rather than a second execution engine (Phase 6 precondition, 2026-08-29).
+        String seedNodeId = seedFeedingTheWrite(lifted);
 
         IngestSinkWriter writer = new IngestSinkWriter(
                 conn, cfg, partCols, dbDir, baseName, batchId, srcIdToFile);
@@ -270,6 +302,70 @@ interface BatchIngestStrategy {
                     ParkedBranches.record(batchId, node.id(), parkTable);
                 });
         return new Written(writer.outputs(), writer.lineage(), writer.bounds());
+    }
+
+    /**
+     * <b>Phase 6 precondition, narrow slice (2026-08-29):</b> whether a NON-route pipeline's write may
+     * run through the graph lane. Deleting the legacy lane eventually needs the graph lane to carry
+     * every pipeline; this admits the shape where the two lanes are provably the same write, and leaves
+     * every other shape flat.
+     *
+     * <p>Admitted only when ALL hold:
+     * <ul>
+     *   <li><b>one destination</b> — {@code sinks:>1} is a fan-out the graph lane does not implement
+     *       (a route branch is one destination by construction; {@code dataFedSinkCount} deliberately
+     *       counts N plain-data sinks as ONE branch, so engagement could never separate them);</li>
+     *   <li><b>no versioned reference store</b> — {@code stampReferenceVersions} is flat-lane-only, and
+     *       the graph lane refuses it by name rather than silently skipping the stamp;</li>
+     *   <li><b>the sink is fed straight off the map node</b> — the flat lane materialised the table
+     *       through map (plus the {@code csv_settings.where} filter, which the lift places UPSTREAM of
+     *       map and the seed therefore skips). Any node BETWEEN map and sink would be executed by the
+     *       walk — new behaviour, not parity. Those kinds ({@code dedup}/{@code join}/{@code summarize})
+     *       are already refused at {@code prepare()} for this lane, so this is a structural belt to that
+     *       braces, and it fails to the flat lane rather than throwing.</li>
+     * </ul>
+     *
+     * <p>Decision-rule outputs are NOT part of the admission: {@code DecisionRuleApplier} runs inside
+     * {@code graphWriteAndTrace} exactly as it does on the flat path, and refuses the combination there.
+     */
+    static boolean graphLaneCarries(PipelineConfig cfg) {
+        if (cfg.sinks().size() != 1) return false;
+        if (cfg.producesReference() && cfg.reference().load().versionedStore()) return false;
+        com.gamma.pipeline.PipelineGraph lifted = com.gamma.pipeline.PipelineLift.lift(cfg);
+        List<com.gamma.pipeline.PipelineNode> sinks = lifted.nodes().stream()
+                .filter(n -> PipelineNodeTypes.isCategory(n.type(), NodeCategory.SINK)).toList();
+        if (sinks.size() != 1) return false;
+        String seed = seedFeedingTheWrite(lifted);
+        return lifted.edgesTo(sinks.get(0).id()).stream()
+                .anyMatch(e -> com.gamma.pipeline.PipelineRel.DATA.equals(e.rel()) && seed.equals(e.from()))
+                && "transform.map".equals(lifted.byId().get(seed).type());
+    }
+
+    /**
+     * The node whose {@code data} relation is the already-materialised batch table: the one that feeds
+     * the write tail. For a {@code route:} pipeline it is the route node's upstream; for a non-route
+     * pipeline it is the single data-fed sink's upstream. Both are "the last node the FLAT lane already
+     * executed", which is the invariant that makes seeding there safe — the walk then performs only the
+     * write, never a second parse/map.
+     */
+    static String seedFeedingTheWrite(com.gamma.pipeline.PipelineGraph lifted) {
+        String downstream = lifted.nodes().stream()
+                .filter(n -> "transform.route".equals(n.type()))
+                .map(com.gamma.pipeline.PipelineNode::id).findFirst()
+                .orElseGet(() -> lifted.nodes().stream()
+                        .filter(n -> PipelineNodeTypes.isCategory(n.type(), NodeCategory.SINK))
+                        .map(com.gamma.pipeline.PipelineNode::id)
+                        .filter(id -> lifted.edgesTo(id).stream()
+                                .anyMatch(e -> com.gamma.pipeline.PipelineRel.DATA.equals(e.rel())))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalStateException(
+                                "engaged graph has neither a transform.route node nor a data-fed sink — "
+                                        + "engagement and lift disagree")));
+        return lifted.edgesTo(downstream).stream()
+                .filter(e -> com.gamma.pipeline.PipelineRel.DATA.equals(e.rel()))
+                .map(com.gamma.pipeline.PipelineEdge::from).findFirst()
+                .orElseThrow(() -> new IllegalStateException(
+                        "node '" + downstream + "' has no inbound data edge to seed"));
     }
 
     // ⚠ applyRecordDedup lived here and was deleted 2026-08-11 with the move of record dedup to Stage-2.

@@ -211,12 +211,7 @@ class RouteIngestEndToEndTest {
 
         // uncommitted by choice: the BATCHES ledger says PARKED (the _status_ file is per-member,
         // and the members themselves ingested SUCCESS), and the commit log is KEPT
-        Path batchesCsv;
-        try (Stream<Path> w = Files.walk(Path.of(cfg.dirs().statusFilePath()).getParent())) {
-            batchesCsv = w.filter(p -> p.getFileName().toString().contains("_batches_"))
-                    .findFirst().orElseThrow();
-        }
-        assertTrue(Files.readString(batchesCsv).contains("PARKED"), "the batches ledger records the park");
+        assertTrue(ledgerContains(cfg, "PARKED"), "the batches ledger records the park");
         try (Stream<Path> w = Files.walk(dir.resolve("temp"))) {
             assertTrue(w.anyMatch(p -> p.getFileName().toString().startsWith("branch_commit_")),
                     "the branch commit log survives a park — it is the drain's resume record");
@@ -289,11 +284,11 @@ class RouteIngestEndToEndTest {
             assertTrue(w.noneMatch(p -> p.getFileName().toString().startsWith("branch_commit_")),
                     "the commit log is deleted — a fully committed batch never replays");
         }
-        try (Stream<Path> w = Files.walk(Path.of(cfg.dirs().statusFilePath()).getParent())) {
-            Path batches = w.filter(p -> p.getFileName().toString().contains("_batches_"))
-                    .findFirst().orElseThrow();
-            assertTrue(Files.readString(batches).contains("SUCCESS"), "the drain writes its terminal audit row");
-        }
+        // ⚠ Every PipelineConfig.load stamps a NEW run timestamp, and the batches ledger is named
+        // `_batches_<runTimestamp>.csv` — so the drain writes its row to a DIFFERENT file than the park
+        // run, unless both happen inside the same second. Scan them all; a findFirst() here passes or
+        // fails on which side of a second boundary the test lands.
+        assertTrue(ledgerContains(cfg, "SUCCESS"), "the drain writes its terminal audit row");
 
         // Draining twice is refused, not half-repeated.
         IllegalStateException again = assertThrows(IllegalStateException.class,
@@ -359,6 +354,17 @@ class RouteIngestEndToEndTest {
                     .findFirst().orElseThrow(() -> new AssertionError("parked manifest missing"))
                     .getFileName().toString();
             return name.substring(0, name.length() - ".json".length());
+        }
+    }
+
+    /** Whether ANY of the run-timestamped `_batches_` ledgers holds {@code status} — see the note at
+     *  the drain assertion for why one file is not enough. */
+    private static boolean ledgerContains(PipelineConfig cfg, String status) throws Exception {
+        try (Stream<Path> w = Files.walk(Path.of(cfg.dirs().statusFilePath()).getParent())) {
+            return w.filter(p -> p.getFileName().toString().contains("_batches_")).anyMatch(p -> {
+                try { return Files.readString(p).contains(status); }
+                catch (Exception e) { throw new RuntimeException(e); }
+            });
         }
     }
 

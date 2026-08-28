@@ -1253,6 +1253,41 @@ three places.
 cannot be written before the graph lane can actually run a non-route pipeline — so it is the slice's
 *exit* criterion, not its entry point.
 
+#### Phase 6 slice A — the narrow admission, SHIPPED 2026-08-29
+
+Scope taken: admit a non-route pipeline to the graph lane **only where the two lanes are provably the
+same write**, and prove it with the side-by-side diff. Everything else stays flat, refused by name.
+
+`BatchIngestStrategy.graphLaneCarries(cfg)` admits when ALL hold: one destination (`sinks:>1` is a
+fan-out the graph lane does not implement — and `dataFedSinkCount` counts N plain-data sinks as ONE
+branch, so engagement could never separate them); no versioned reference store
+(`stampReferenceVersions` is flat-lane-only); and the single sink is fed straight off the `map` node,
+so the walk performs only the write. `writeAndTrace`'s seed generalised from "the route node's
+upstream" to `seedFeedingTheWrite` — "the node whose data relation IS the materialised table" —
+which is the same invariant in both lanes. Gate: `FlatVsGraphLaneParityTest` runs one materialised
+table through both lanes and diffs output files, partitions, ROWS ON DISK, the lineage matrix and the
+event-time bounds; nine existing `writeAndTrace` tests now pass production's value, so they became
+parity evidence too.
+
+Two hazards found while building it, neither in the plan:
+
+1. 🔴 **Two of `writeAndTrace`'s four callers write a batch in SEVERAL calls** (one per chunk, one per
+   segment), and the graph lane's `BranchCommitLog` is keyed by batchId — calls 2..N would be skipped
+   as "already committed" and their rows would vanish. The admission is therefore a **caller's**
+   decision (`wholeBatchWrite`), not a config property. The route lane is only *incidentally* immune
+   (a chunked batch is single-member + single-destination; a segmented one is multi-schema, which
+   route refuses) — the new admission must not inherit that luck by accident.
+2. 🔴 **Decision rules are a space-registry fact, not a config property**, so the admission cannot see
+   them statically — and the graph lane refuses rule-routed outputs. `DecisionRuleApplier.apply` is
+   now hoisted **above** the fork (both lanes ran it as their first act anyway, so this also removes a
+   duplicated call), and its RESULT is part of the admission: a rule that actually routed rows keeps
+   the pipeline flat. Caught by `DecisionRuleWiringTest`, which the first cut broke.
+
+**Still flat, and still to do before the lane can be deleted:** `sinks:>1` fan-out · the versioned
+reference-store write · chunked and segmented writes (need a per-write commit-log key) · anything with
+a node between map and sink. Only once those are carried does item (1) — moving `withMappingContext`
+into `PipelineLift` — come due, and only because the graph would then execute the map node itself.
+
 ---
 
 ## 9. Decisions of record (ALL RESOLVED 2026-08-05 — operator took the recommended option on each)
