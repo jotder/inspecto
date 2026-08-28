@@ -32,7 +32,10 @@ public final class RecipeConverter {
     private RecipeConverter() {}
 
     /** Collector keys that ride recipe syntax rather than passing verbatim: {@code connection} rides
-     *  the ref spelling; {@code gap_detection} and {@code duplicate} are Guarantees (Phase 4 fold). */
+     *  the ref spelling; {@code gap_detection} and {@code duplicate} are Guarantees (Phase 4 fold).
+     *  The dataset-entry pair ({@code connector: dataset} + {@code dataset}, S3c-2) collapses back to
+     *  the authored {@code dataset: datasets/<id>} ref spelling — conditionally, in the collect block
+     *  itself, so any other connector's keys keep the verbatim pass-through. */
     private static final Set<String> COLLECT_SPECIAL = Set.of("connection", "gap_detection", "duplicate");
 
     /** Project {@code config} (a decoded canonical pipeline map) into the recipe shape. */
@@ -55,8 +58,12 @@ public final class RecipeConverter {
         Map<String, Object> collect = new LinkedHashMap<>();
         if (collector.get("connection") != null)
             collect.put("connection", "connections/" + collector.get("connection"));
+        boolean datasetEntry = "dataset".equals(collector.get("connector")) && collector.get("dataset") != null;
+        if (datasetEntry) collect.put("dataset", "datasets/" + collector.get("dataset"));
         for (Map.Entry<String, Object> e : collector.entrySet())
-            if (!COLLECT_SPECIAL.contains(e.getKey())) collect.put(e.getKey(), e.getValue());
+            if (!COLLECT_SPECIAL.contains(e.getKey())
+                    && !(datasetEntry && ("connector".equals(e.getKey()) || "dataset".equals(e.getKey()))))
+                collect.put(e.getKey(), e.getValue());
         putIfPresent(collect, "poll", dirs.get("poll"));
         putIfPresent(collect, "files", processing.get("file_pattern"));
         steps.add(step("collect", collect));

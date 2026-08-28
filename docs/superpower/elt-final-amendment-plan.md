@@ -949,8 +949,25 @@ make marker dedup the refresh semantics — no watermark), and no parser fence w
 `dirs.poll` is the pipeline's own inbox. `on: dataset` (S3b) supplies event latency.
 `isRemote()==true` for the scheme, so the B3b acquire cycle drives the copy. Reactor 3674/0/0/5.
 ⚠ Archive compression (.zip/.tar/.bz2) is Path-1 (file feeds) machinery and owes this path
-nothing — Dataset consumption only ever reads product-written parquet. · **S3d** recipe verb + converter projection + the deferred execution
-half of the P3 S4 parity gate (enrich/materialize as recipes, identical outputs).
+nothing — Dataset consumption only ever reads product-written parquet. · **S3d ✅ SHIPPED
+2026-08-28** — the projection polish + the deferred execution half of the P3 S4 parity gate.
+Grounding first REFUTED the slice's own premise: join/summarize were NOT compile-only anymore —
+the A5 at-rest path (2026-08-11) already executes them for real (`PipelineJobRunner` →
+`PipelineExecutor` → `RowShaper`, gated on an authored `output_store:`), so S3d needed no new
+runtime, only the gate and the polish. As built: (1) `RecipeConverter` now collapses the compiled
+`connector: dataset` + `dataset: <id>` pair back to the authored `collect: {dataset:
+datasets/<id>}` ref spelling (the `connection` treatment; conditional, so other connectors keep
+the verbatim pass-through) — before this the projection leaked both raw keys and the round trip
+was untested at the converter layer. (2) `RecipeExecutionParityTest` (com.gamma.job — MaintenanceJob
+is package-private) runs each verb end-to-end through the REAL chain (compile → `ConfigCodec.toToon`
+→ `PipelineConfig.load` → `PipelineJobRunner`) against the legacy runtime over the same rows:
+`transform.join` vs `EnrichmentEngine`'s reference LEFT JOIN (unmatched key carries NULL, both
+arms) and `summarize` vs `MaterializeTask` (same values under the same `MeasureCompiler` column
+names, `sum_amount`/`count`). ⚠ Scope honesty: parity is per VERB — a real `*_enrich.toon`'s
+hand-authored transform SQL (custom names, `ROUND`) is not byte-reproducible by the closed verb
+set and never was the claim. (3) The stale "compile-only" doc comments in
+`RecipeCompiler`/`RecipeVerbParityTest` were corrected to the as-built truth. Reactor 3677/0/0/5.
+**Phase 3 S3 is COMPLETE (S3a–S3d) — UI-S7's table-entry half is unblocked.**
 
 #### Phases 3/6 user-surface scope SUPERSEDED 2026-08-06 — user-facing 'Job' un-banned (operator decision)
 

@@ -1755,15 +1755,19 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   `GEMINI_API_KEY` (not set here), so don't read a node-count drop after a code-only update as loss.
   Optional cleanups it reported, neither blocking: `pip install "graphifyy[sql]"` for the 2 skipped
   `.sql` files, and 97 `.json` files that yield zero nodes (upstream #1666).
-- **UI-S7 — table-entry `collect` authoring is S3-blocked; the summarize half shipped 2026-08-06.**
-  The ELT-amendment UI plan's S7 split in two on grounding. The **summarize** half shipped as measure-
-  grammar validation (contract-pinned to `MeasureCompiler.AGGS`; see the plan's "S7 SPLIT" section) and
-  fixed a latent defect where a `type: 'list'` field's `<mat-error>` could never fire, making every list
-  error — `required` included — invisible.
-  The **table-entry** half is **not** buildable and must not be forced: it needs the deferred Phase 3 S3
-  (a Dataset-write Signal), and separately `PipelineConfigParser.java:129-130` requires
-  `dirs.poll`/`dirs.database` **at parse time**, so a table-sourced draft cannot even load. Revisit only
-  when S3 lands. Two deliberate non-goals recorded there: a structured per-measure builder (drift risk
+- **UI-S7 — table-entry `collect` authoring UNBLOCKED 2026-08-28 (S3 fully landed); the summarize
+  half shipped 2026-08-06.** The ELT-amendment UI plan's S7 split in two on grounding. The
+  **summarize** half shipped as measure-grammar validation (contract-pinned to
+  `MeasureCompiler.AGGS`; see the plan's "S7 SPLIT" section) and fixed a latent defect where a
+  `type: 'list'` field's `<mat-error>` could never fire, making every list error — `required`
+  included — invisible.
+  The **table-entry** half's two blockers are both gone: Phase 3 S3a–S3d shipped the `dataset.write`
+  Signal, the `on: dataset` trigger, the dataset-entry `collect` (`collect: {dataset:
+  datasets/<id>}` → the `dataset` connector scheme) and the converter/parity close-out — and the
+  S3c file-shaped amendment made the parse-time `dirs.poll` requirement moot (a dataset-entry
+  pipeline keeps its own inbox; the draft loads fine). The UI work is now buildable: the
+  pipeline-editor authoring surface for the dataset-entry collect + `on: dataset` trigger.
+  Two deliberate non-goals recorded there: a structured per-measure builder (drift risk
   against the string grammar) and `group_by` entry validation (same shape, easy follow-up).
 - **Build → Test → Run authoring journey — FULLY CLOSED.** G1–G5 shipped 2026-08-02, Step 5 (the real
   test run) shipped 2026-08-14; the plan of record is **archived**, and the durable as-built is

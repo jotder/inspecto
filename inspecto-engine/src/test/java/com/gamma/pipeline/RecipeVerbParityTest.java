@@ -19,9 +19,11 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
- * The Phase-3 parity gate (S4), scoped to what S1/S2 shipped: the new verbs are compile-only
- * (arming refused), so "identical outputs" cannot be executed yet — what CAN be gated is
- * <b>parity of representation against the real artifacts</b> the verbs claim compatibility with:
+ * The Phase-3 parity gate (S4), representation half: <b>parity of representation against the real
+ * artifacts</b> the verbs claim compatibility with. (The execution half — the compiled verbs RUN
+ * at rest and produce the same values as the legacy runtimes — is
+ * {@code com.gamma.job.RecipeExecutionParityTest}, P3 S3d; it became possible when the A5 at-rest
+ * path started executing join/summarize, 2026-08-11.)
  *
  * <ol>
  *   <li>Every {@code references} entry of every real {@code *_enrich.toon} in the repo corpus is

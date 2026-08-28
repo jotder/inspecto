@@ -105,6 +105,30 @@ class RecipeConverterTest {
         assertEquals(cfg, back);
     }
 
+    /** The dataset entry (P3 S3c-2/S3d): the converter re-emits the authored ref spelling —
+     *  {@code collect: {dataset: datasets/<id>}} — never the compiled {@code connector: dataset} pair. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void aDatasetEntryProjectsTheRefSpellingAndRoundTrips() {
+        Map<String, Object> cfg = new LinkedHashMap<>();
+        cfg.put("name", "rollup_consumer");
+        cfg.put("active", false);
+        cfg.put("collector", new LinkedHashMap<>(Map.of(
+                "connector", "dataset", "dataset", "orders_rollup")));
+        cfg.put("dirs", new LinkedHashMap<>(Map.of("poll", "/in", "database", "/db")));
+        cfg.put("parsing", new LinkedHashMap<>(Map.of("grammar", "grammar/parquet")));
+        cfg.put("processing", new LinkedHashMap<>(Map.of("file_pattern", "glob:**/*.parquet")));
+        cfg.put("output", new LinkedHashMap<>(Map.of("format", "PARQUET")));
+
+        Map<String, Object> recipe = RecipeConverter.toRecipe(cfg);
+        Map<String, Object> collect = (Map<String, Object>)
+                ((Map<String, Object>) ((List<Object>) recipe.get("steps")).get(0)).get("collect");
+        assertEquals("datasets/orders_rollup", collect.get("dataset"), "the ref spelling, not the raw id");
+        assertFalse(collect.containsKey("connector"), "the compiled connector key must not leak into the recipe");
+
+        assertEquals(cfg, RecipeCompiler.compile(recipe, cfg, false));
+    }
+
     /** The Phase-4 Guarantees fold (§2.4): housekeeping projects under its declared names, never on steps. */
     @Test
     @SuppressWarnings("unchecked")

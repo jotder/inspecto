@@ -18,13 +18,14 @@ import static com.gamma.util.Values.str;
  *
  * <p><b>Verb coverage:</b> {@code collect / parse / map / dedup / route / summarize / transform.filter
  * / sink} — every linear-chain verb except the Signal-bus unification's own. {@code map} folds into
- * the parser node (schema/mapping resolution is parser-owned in the flat config); {@code summarize} is
- * compile-only (Phase 3 S1 — {@code MaterializeTask} stays the runtime until a recipe-driven executor
- * lands, same posture as {@code route}'s arming gate). {@code transform.join} compiles per D-4
- * ({@code transform: {join: references/x, on: k}} → {@code processing.join}), compile-only too —
- * the join model executes post-commit via {@code EnrichmentEngine}, never in the linear ingest path
- * yet. Not yet compilable, refused with named codes rather than silently dropped:
- * {@code transform.derive} (Phase 3 S3+) and unknown {@code guarantees:} keys.
+ * the parser node (schema/mapping resolution is parser-owned in the flat config); {@code summarize}
+ * and {@code transform.join} (D-4's {@code transform: {join: references/x, on: k}} →
+ * {@code processing.join}) execute on the at-rest Stage-2 path — {@code PipelineJobRunner} lifts them
+ * over the landed store when {@code output_store:} is authored, {@code RowShaper} runs the SQL, and
+ * output parity with {@code MaterializeTask}/{@code EnrichmentEngine} is gated by
+ * {@code RecipeExecutionParityTest} (P3 S3d) — while live-ingest arming stays refused by
+ * {@code PipelineConfig.prepare()}. Not yet compilable, refused with named codes rather than silently
+ * dropped: {@code transform.derive} (Phase 3 S3+) and unknown {@code guarantees:} keys.
  *
  * <p><b>The Guarantees fold (Phase 4, §2.4):</b> the top-level {@code guarantees:} block compiles
  * onto the existing housekeeping homes, all of which are live executable config (no arming gate):
@@ -355,8 +356,9 @@ public final class RecipeCompiler {
     }
 
     /** {@code summarize: {group_by: […], measures: […]}} → the group-by rollup node
-     *  ({@code processing.summarize}). Compile-only for now — {@code MaterializeTask} stays the
-     *  runtime until a recipe-driven executor lands (ELT amendment Phase 3). */
+     *  ({@code processing.summarize}), run at rest by {@code RowShaper} through the same
+     *  {@code MeasureCompiler} grammar {@code MaterializeTask} speaks (output parity gated by
+     *  {@code RecipeExecutionParityTest}); live-ingest arming stays refused at {@code prepare()}. */
     private static PipelineNode summarize(String id, Map<String, Object> cfg,
                                           List<PipelineCompileException.Refusal> refusals) {
         Map<String, Object> c = new LinkedHashMap<>(cfg);
