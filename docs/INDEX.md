@@ -75,6 +75,19 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- [`superpower/parser-plugin-framework.md`](superpower/parser-plugin-framework.md) — **NOT APPROVED,
+  NOTHING BUILT** (listed here 2026-08-28 — it had been sitting in `superpower/` unlisted, which is
+  how a five-phase plan stayed invisible to the board). The operator's "E of ELT" framework:
+  self-describing Parser plugins (`getPreviewText()`/`getConfigSchema()`), grammar-driven, tree-capable
+  preview, P1–P5. ⚠ **It carries no status header and no recorded approval** — do not read its
+  phase list as a scheduled queue; it needs an approval pass first. (An audit on 2026-08-28 called it
+  "fully approved and unblocked"; the file does not support that.)
+- [`superpower/deployment-topology-plan.md`](superpower/deployment-topology-plan.md) — **DRAFT for
+  stakeholder review (2026-07-24), decision asks in §10 unsigned** (listed here 2026-08-28, same
+  omission). Deployment offerings — topologies, security overlays, scaling/DR posture — plus the
+  script/preflight workstreams. Phases 0–1 look like plain build work but ride the same unsigned §10
+  decisions (container image, Postgres driver bundling, DuckDB cap default, OS matrix, RPO/RTO, IAM
+  pairing), so nothing here is schedulable until those are answered.
 - [`superpower/parser-field-tiers-interview-plan.md`](superpower/parser-field-tiers-interview-plan.md) —
   **READY TO RUN 2026-08-28**: the D13 observation-session kit (protocol, per-lane capture sheets,
   the grounded field inventory, and the pre-agreed analysis rule). D13 stays parked until the
