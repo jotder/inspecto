@@ -1575,11 +1575,14 @@ public final class PipelineConfig {
             List<String> refusals = RouteArming.refusals(route, sinkDbs, multiSchema);
             if (!refusals.isEmpty()) throw new IllegalStateException(refusals.get(0));
         }
-        // processing.disabled_steps (Phase 4 S4 / D-13): the shape round-trips, arming refuses until
-        // park/drain semantics exist (S4b) — one rule set, shared with the save path, in
-        // StepDisableArming. Scratch paths (dry-run / run-to-here) keep the bypass regardless.
+        // processing.disabled_steps (Phase 4 S4 / D-13): only an armed route: pipeline's branch
+        // sinks may be disabled — they PARK at rest (S4b); everything else refuses by name. One rule
+        // set, shared with the save path, in StepDisableArming. Scratch paths keep the bypass.
         if (active) {
-            List<String> stepRefusals = StepDisableArming.refusals(disabledSteps);
+            java.util.List<String> allSinkDbs = new java.util.ArrayList<>();
+            for (Sink d : sinks) allSinkDbs.add(d.database());
+            List<String> stepRefusals = StepDisableArming.refusals(disabledSteps,
+                    StepDisableArming.parkableSinkIds(route, allSinkDbs));
             if (!stepRefusals.isEmpty()) throw new IllegalStateException(stepRefusals.get(0));
         }
         // The three Stage-2 blocks below (summarize / dedup / join) arm ONLY when output_store: is

@@ -13,29 +13,74 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Phase 4 S4a (elt-s4-park-drain-plan): {@code processing.disabled_steps} — the shape parses and
- * round-trips, and arming REFUSES every non-empty list until park/drain semantics ship (S4b). Same
- * split as {@code RouteArmingTest} vs {@code RecordDedupRouteConfigTest}: the rule set here, the
- * {@code prepare()} throw-first behaviour via {@code PipelineConfig.load}.
+ * Phase 4 S4 (elt-s4-park-drain-plan): {@code processing.disabled_steps} — the shape parses and
+ * round-trips, and arming allows EXACTLY an armed {@code route:} pipeline's branch sinks (they PARK
+ * at rest, S4b); everything else refuses by name. Same split as {@code RouteArmingTest} vs
+ * {@code RecordDedupRouteConfigTest}: the rule set here, {@code prepare()}'s throw-first behaviour
+ * via {@code PipelineConfig.load}.
  */
 class StepDisableArmingTest {
 
     // ── the rule set ────────────────────────────────────────────────────────────
 
+    private static final Map<String, Object> ROUTE = Map.of(
+            "mode", "case", "default", "apac",
+            "branches", List.of(
+                    Map.of("key", "emea", "database", "emea_db", "where", "ID LIKE 'E%'"),
+                    Map.of("key", "apac", "database", "apac_db", "where", "ID LIKE 'A%'")));
+
     @Test
     @DisplayName("an empty (or absent) list arms — no refusals")
     void emptyListArms() {
-        assertEquals(List.of(), StepDisableArming.refusals(List.of()));
-        assertEquals(List.of(), StepDisableArming.refusals(null));
+        assertEquals(List.of(), StepDisableArming.refusals(List.of(), List.of("sink__d0")));
+        assertEquals(List.of(), StepDisableArming.refusals(null, List.of()));
     }
 
     @Test
-    @DisplayName("S4a posture: ANY non-empty list refuses, naming the alternatives")
-    void anyEntryRefusesUntilParkShips() {
-        List<String> refusals = StepDisableArming.refusals(List.of("dedup"));
+    @DisplayName("a route-branch sink may be disabled — it parks at rest (S4b)")
+    void aBranchSinkArms() {
+        assertEquals(List.of(), StepDisableArming.refusals(
+                List.of("sink__d1"), List.of("sink__d0", "sink__d1")));
+    }
+
+    @Test
+    @DisplayName("no armed route: — nothing can park, the whole list refuses")
+    void noRouteRefuses() {
+        List<String> refusals = StepDisableArming.refusals(List.of("dedup"), List.of());
         assertEquals(1, refusals.size());
-        assertTrue(refusals.get(0).contains("park/drain"), refusals.get(0));
-        assertTrue(refusals.get(0).contains("dry-run"), "the refusal names its alternative: " + refusals.get(0));
+        assertTrue(refusals.get(0).contains("no park boundary"), refusals.get(0));
+        assertTrue(refusals.get(0).contains("dry-run"), "names its alternative: " + refusals.get(0));
+    }
+
+    @Test
+    @DisplayName("an upstream or unknown step refuses by name — a typo must never silently enable")
+    void upstreamOrUnknownStepRefuses() {
+        List<String> refusals = StepDisableArming.refusals(
+                List.of("parse", "sink__d0"), List.of("sink__d0", "sink__d1"));
+        assertEquals(1, refusals.size(), refusals.toString());
+        assertTrue(refusals.get(0).contains("'parse'"), refusals.get(0));
+        assertTrue(refusals.get(0).contains("sink__d0"), "the refusal names the parkable set: " + refusals.get(0));
+    }
+
+    @Test
+    @DisplayName("disabling EVERY branch refuses — pausing the pipeline is spelled active: false")
+    void allBranchesRefuse() {
+        List<String> refusals = StepDisableArming.refusals(
+                List.of("sink__d0", "sink__d1"), List.of("sink__d0", "sink__d1"));
+        assertEquals(1, refusals.size(), refusals.toString());
+        assertTrue(refusals.get(0).contains("active: false"), refusals.get(0));
+    }
+
+    @Test
+    @DisplayName("parkableSinkIds mirrors the lift's id grammar over plain config data")
+    void parkableIdsDerive() {
+        assertEquals(List.of("sink__d0", "sink__d1"),
+                StepDisableArming.parkableSinkIds(ROUTE, List.of("emea_db", "apac_db")));
+        assertEquals(List.of("sink__d1"),
+                StepDisableArming.parkableSinkIds(ROUTE, List.of("other_db", "apac_db")),
+                "only sinks a branch pairs with are parkable");
+        assertEquals(List.of(), StepDisableArming.parkableSinkIds(null, List.of("emea_db")));
+        assertEquals(List.of(), StepDisableArming.parkableSinkIds(ROUTE, List.of()));
     }
 
     @Test
@@ -87,14 +132,14 @@ class StepDisableArmingTest {
     }
 
     @Test
-    @DisplayName("an ACTIVE pipeline with a disabled step is refused at prepare() — fail closed")
-    void activePipelineWithDisabledStepIsRefused(@TempDir Path dir) throws Exception {
+    @DisplayName("an ACTIVE pipeline disabling a non-parkable step is refused at prepare() — fail closed")
+    void activePipelineWithNonParkableStepIsRefused(@TempDir Path dir) throws Exception {
         Path p = write(dir, true, """
                   disabled_steps[1]: dedup
                 """);
         IllegalStateException e = assertThrows(IllegalStateException.class,
                 () -> PipelineConfig.load(p.toString()));
-        assertTrue(e.getMessage().contains("park/drain"), e.getMessage());
+        assertTrue(e.getMessage().contains("park"), e.getMessage());
     }
 
     @Test

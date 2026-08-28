@@ -28,7 +28,11 @@ public final class PipelineBatchSignal {
     /** Build the canonical Signal from a terminal {@link BatchEvent} and emit it onto the current ledger. */
     public static void emit(BatchEvent event) {
         boolean success = "SUCCESS".equals(event.status());
-        String type = success ? "pipeline.batch.committed" : "pipeline.batch.failed";
+        // A PARKED Consignment (Phase 4 S4b) is neither committed nor failed — it stopped at a
+        // disabled Step by operator intent, so reporting it "failed" would teach operators something
+        // broke when nothing did (the 503-vs-error lesson, applied to Signals).
+        String type = success ? "pipeline.batch.committed"
+                : "PARKED".equals(event.status()) ? "pipeline.batch.parked" : "pipeline.batch.failed";
 
         // Event's payload immutability (Map.copyOf, Event.java) rejects null values, so only put the
         // optional error-detail fields when present — mirrors BatchEvent's own null-ability.

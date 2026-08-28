@@ -209,4 +209,51 @@ class PipelineLiftTest {
     private static List<String> ids2(List<PipelineEdge> es) {
         return es.stream().map(PipelineEdge::to).toList();
     }
+
+    /**
+     * Pins {@code StepDisableArming.parkableSinkIds}' hand-mirrored id grammar VERBATIM against a
+     * real lift (Phase 4 S4b): the sink node ids the gate allows must be exactly the sinks the
+     * lifted graph feeds by {@code route:*} edges — extend the grammar in both places together.
+     */
+    @Test
+    void parkableSinkIdsMatchTheLiftedGraph(@TempDir Path dir) throws Exception {
+        Path schema = dir.resolve("mini_schema.toon");
+        Files.writeString(schema, PipelineConfigBatchTest.miniSchema());
+        String d = dir.toString().replace("\\", "/");
+        Path pipe = dir.resolve("route_pipeline.toon");
+        Files.writeString(pipe, """
+                name: ROUTE_LIFT
+                active: false
+                dirs:
+                  poll: %1$s/inbox
+                  database: %1$s/db
+                output:
+                  format: CSV
+                sinks[2]{database,format}:
+                  "%1$s/db_emea",CSV
+                  "%1$s/db_apac",CSV
+                route:
+                  mode: case
+                  default: apac
+                  branches[2]{key,where,database}:
+                    emea,"ID LIKE 'E%%'","%1$s/db_emea"
+                    apac,"ID LIKE 'A%%'","%1$s/db_apac"
+                processing:
+                  threads: 1
+                  schema_file: "%2$s"
+                """.formatted(d, schema.toString().replace("\\", "/")));
+        PipelineConfig cfg = PipelineConfig.load(pipe.toString());
+
+        PipelineGraph g = PipelineLift.lift(cfg);
+        java.util.Set<String> routeFedSinkIds = new java.util.LinkedHashSet<>();
+        for (PipelineEdge e : g.edges())
+            if (e.rel().startsWith("route:")) routeFedSinkIds.add(e.to());
+
+        List<String> sinkDbs = cfg.sinks().stream().map(PipelineConfig.Sink::database).toList();
+        assertEquals(routeFedSinkIds,
+                new java.util.LinkedHashSet<>(
+                        com.gamma.etl.StepDisableArming.parkableSinkIds(cfg.routeConfig(), sinkDbs)),
+                "the gate's mirrored id grammar must match the lift's route-fed sink ids");
+        assertFalse(routeFedSinkIds.isEmpty(), "the fixture actually routes");
+    }
 }

@@ -254,7 +254,21 @@ interface BatchIngestStrategy {
                 new com.gamma.pipeline.exec.BatchGraphRunner.Input(
                         conn, lifted, seedNodeId, table, batchId, dbDir, baseName, commitLog),
                 writer,
-                () -> { /* finalisation is BatchProcessor.commit's, once the outcome returns */ });
+                () -> { /* finalisation is BatchProcessor.commit's, once the outcome returns */ },
+                // Park hook (S4b): a disabled route-branch sink's rows are materialised to a durable
+                // Parquet under the park home (a sibling of backup, never under a database dir a
+                // store glob could sweep) and recorded for BatchProcessor's parked-finalisation.
+                (node, inputTable) -> {
+                    java.nio.file.Path parkDir = java.nio.file.Paths.get(cfg.dirs().backup(), "parked");
+                    java.nio.file.Files.createDirectories(parkDir);
+                    java.nio.file.Path parkTable = parkDir.resolve(batchId + "__" + node.id() + ".parquet");
+                    try (java.sql.Statement st = conn.createStatement()) {
+                        st.execute("COPY " + inputTable + " TO '"
+                                + parkTable.toString().replace('\\', '/').replace("'", "''")
+                                + "' (FORMAT parquet)");
+                    }
+                    ParkedBranches.record(batchId, node.id(), parkTable);
+                });
         return new Written(writer.outputs(), writer.lineage(), writer.bounds());
     }
 

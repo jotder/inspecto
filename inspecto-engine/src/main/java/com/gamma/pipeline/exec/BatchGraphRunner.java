@@ -83,11 +83,24 @@ public final class BatchGraphRunner {
     public static PipelineExecutor.ExecResult run(Input in, PipelineExecutor.SinkWriter writer,
                                                   BranchCommitCoordinator.SourceFinalize onAllBranchesDurable)
             throws Exception {
+        return run(in, writer, onAllBranchesDurable, null);
+    }
+
+    /**
+     * As above, with the at-rest park hook (Phase 4 S4b): a disabled route-branch sink's live relation
+     * is handed to {@code parkWriter} before the bypass, so its rows survive durably instead of
+     * vanishing. {@code null} keeps the bypass — the pre-S4b behavior every scratch path retains.
+     */
+    public static PipelineExecutor.ExecResult run(Input in, PipelineExecutor.SinkWriter writer,
+                                                  BranchCommitCoordinator.SourceFinalize onAllBranchesDurable,
+                                                  PipelineExecutor.ParkWriter parkWriter)
+            throws Exception {
         BranchCommitCoordinator coordinator =
                 new BranchCommitCoordinator(new BranchCommitLog(in.branchCommitLog().toString()));
         return PipelineExecutor.execute(
-                in.conn(), in.graph(), in.seedNodeId(), in.seedTable(), in.batchId(),
-                coordinator, writer, onAllBranchesDurable);
+                in.conn(), in.graph(), java.util.Map.of(in.seedNodeId(), in.seedTable()), in.batchId(),
+                coordinator, writer, onAllBranchesDurable,
+                PipelineExecutor.ProvenanceCollector.NONE, RowShaper.ReferenceResolver.NONE, parkWriter);
     }
 
     /**

@@ -66,16 +66,31 @@ public final class BatchProcessor {
         String error  = outcome.error();
 
         if ("SUCCESS".equals(status)) {
-            try {
-                commit(batch, cfg, outcome.survivors(), outcome.outputs(), outcome.lineage(),
-                        outcome.bounds(), outcome.memberAudits());
-            } catch (Exception e) {
-                // Output was written, but a side effect (backup/manifest/markers) failed. Demote
-                // to FAILED so the batch stays visible to audit/lineage/recovery instead of
-                // vanishing — a silently un-audited batch is the worst outcome for reprocessing.
-                status = "FAILED";
-                error  = "commit failed: " + BatchIngestStrategy.msg(e);
-                log.error("Batch {} failed during commit", batch.batchId(), e);
+            // Phase 4 S4b: the graph lane parked one or more disabled branch sinks — the batch is
+            // deliberately UNCOMMITTED. Parked finalisation (manifest + park-home move, nothing
+            // else) replaces the commit tail; the drain (S4c) completes the normal sequence later.
+            Map<String, java.nio.file.Path> parked = ParkedBranches.drain(batch.batchId());
+            if (!parked.isEmpty()) {
+                try {
+                    parkSource(batch, cfg, outcome.survivors(), parked);
+                    status = "PARKED";
+                } catch (Exception e) {
+                    status = "FAILED";
+                    error  = "park failed: " + BatchIngestStrategy.msg(e);
+                    log.error("Batch {} failed during park", batch.batchId(), e);
+                }
+            } else {
+                try {
+                    commit(batch, cfg, outcome.survivors(), outcome.outputs(), outcome.lineage(),
+                            outcome.bounds(), outcome.memberAudits());
+                } catch (Exception e) {
+                    // Output was written, but a side effect (backup/manifest/markers) failed. Demote
+                    // to FAILED so the batch stays visible to audit/lineage/recovery instead of
+                    // vanishing — a silently un-audited batch is the worst outcome for reprocessing.
+                    status = "FAILED";
+                    error  = "commit failed: " + BatchIngestStrategy.msg(e);
+                    log.error("Batch {} failed during commit", batch.batchId(), e);
+                }
             }
         }
         try {   // audit is always written — even when commit failed above
@@ -126,6 +141,71 @@ public final class BatchProcessor {
         // for flat-lane batches, so deleteIfExists is the right verb.
         java.nio.file.Files.deleteIfExists(
                 com.gamma.pipeline.exec.BranchCommitLog.pathFor(cfg.dirs().temp(), batch.batchId()));
+    }
+
+    /**
+     * Phase 4 S4b — parked finalisation, D-13's "disable → park durably at the boundary → inspect".
+     * Deliberately does ALMOST NOTHING of {@link #finalizeSource}'s sequence: the Consignment is
+     * <b>uncommitted</b>, so no DuckLake register, no §11.3 output registration (the committed
+     * branches' files are durable but register only when the drain completes the batch — registering
+     * half a batch would double-register at drain), no markers, no fingerprint stash, no watermark —
+     * and the branch commit log is KEPT (the drain's resume record). What it does:
+     * <ol>
+     *   <li>writes the manifest with {@code parkedAt} + {@code parkedTables} and every member
+     *       {@code PARKED} — the inspectable record of where and why the Consignment stopped;</li>
+     *   <li>moves each plain member's ORIGINAL to the park home ({@code dirs.backup()/parked/…},
+     *       mirrored by poll-relative path exactly like {@link #backupFile}) so the next poll cycle
+     *       does not re-ingest it. ⚠ An unpack EXPANSION product's original stays in the inbox —
+     *       {@code batch.max_files: 1} splits an archive across batches, so moving the shared
+     *       original would strand its sibling batches; that original re-expands next cycle, which is
+     *       the crash posture (idempotent, wasteful, honest).</li>
+     * </ol>
+     */
+    private static void parkSource(Batch batch, PipelineConfig cfg, List<Batch.Member> survivors,
+                                   Map<String, java.nio.file.Path> parked) throws IOException {
+        Path poll = Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
+        Path parkHome = Paths.get(cfg.dirs().backup(), "parked");
+        Files.createDirectories(parkHome);
+
+        List<BatchManifest.MemberEntry> members = new ArrayList<>();
+        for (Batch.Member m : survivors) {
+            File original = com.gamma.etl.unpack.UnpackOrigins.originalOr(m.file());
+            Path op = original.toPath().toAbsolutePath().normalize();
+            String rel = (op.startsWith(poll) ? poll.relativize(op).toString() : original.getName())
+                    .replace('\\', '/');
+            boolean expanded = com.gamma.etl.unpack.UnpackOrigins.isExpanded(m.file());
+            String parkedPath = "";
+            if (!expanded && Files.exists(op)) {
+                Path dst = parkHome.resolve(rel);
+                Files.createDirectories(dst.getParent());
+                Files.move(op, dst, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                parkedPath = dst.toString();
+            }
+            members.add(new BatchManifest.MemberEntry(m.file().getName(), m.srcId(), rel,
+                    parkedPath, com.gamma.etl.MemberStatus.PARKED.name()));
+        }
+
+        if (cfg.dirs().manifestsDir() != null) {
+            BatchManifest manifest = new BatchManifest();
+            manifest.batchId     = batch.batchId();
+            manifest.pipeline    = cfg.identity().pipelineName();
+            manifest.schemaName  = batch.schemaName();
+            manifest.outputTable = batch.table();
+            manifest.createdAt   = LocalDateTime.now().format(DuckDbUtil.DT_FMT);
+            manifest.schemaFingerprint = schemaFingerprintFor(cfg, batch.schemaName());
+            manifest.members     = members;
+            manifest.outputs     = List.of();
+            manifest.markers     = List.of();
+            manifest.parkedAt    = new ArrayList<>(parked.keySet());
+            Map<String, String> tables = new LinkedHashMap<>();
+            parked.forEach((nodeId, path) -> tables.put(nodeId, path.toString()));
+            manifest.parkedTables = tables;
+            ManifestStore.write(cfg.dirs().manifestsDir(), manifest);
+        }
+        recordStages(cfg.collector().id(), batch.batchId(), survivors, cfg,
+                com.gamma.consignment.FileStage.PARKED);
+        log.info("Batch {} PARKED at {} — park tables under {}, originals in the park home; "
+                + "re-enable the step and drain to complete", batch.batchId(), parked.keySet(), parkHome);
     }
 
     /**

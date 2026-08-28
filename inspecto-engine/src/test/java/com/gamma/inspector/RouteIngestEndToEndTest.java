@@ -121,6 +121,112 @@ class RouteIngestEndToEndTest {
         }
     }
 
+    /**
+     * Phase 4 S4b end to end — the D-13 acceptance row: "a fixture Consignment parks at a disabled
+     * Step, is inspectable". Disabling the apac branch's sink ({@code sink__d1}) arms (S4b relaxed
+     * exactly this shape) and at rest the batch PARKS instead of committing:
+     * the live branch's rows land, the disabled branch's rows survive as a durable park Parquet, the
+     * manifest records {@code parkedAt}, the original moves to the park home (so the next poll does
+     * not re-ingest), nothing is marked, and the branch commit log is KEPT (the drain's resume record).
+     */
+    @Test
+    void aDisabledBranchSinkParksTheConsignment(@TempDir Path dir) throws Exception {
+        String d = dir.toString().replace("\\", "/");
+        Path schema = dir.resolve("mini_schema.toon");
+        Files.writeString(schema, com.gamma.etl.PipelineConfigBatchTest.miniSchema());
+        Path toon = dir.resolve("park_pipeline.toon");
+        Files.writeString(toon, """
+            name: PARK_E2E
+            active: true
+            dirs:
+              poll: %1$s/inbox
+              database: %1$s/db
+              backup: %1$s/backup
+              temp: %1$s/temp
+              quarantine: %1$s/quarantine
+              markers: %1$s/markers
+              status_dir: %1$s/status
+            output:
+              format: CSV
+            sinks[2]{database,format}:
+              "%1$s/db_emea",CSV
+              "%1$s/db_apac",CSV
+            route:
+              mode: case
+              default: apac
+              branches[2]{key,where,database}:
+                emea,"ID LIKE 'E%%'","%1$s/db_emea"
+                apac,"ID LIKE 'A%%'","%1$s/db_apac"
+            processing:
+              threads: 1
+              schema_file: "%2$s"
+              disabled_steps[1]: sink__d1
+              csv_settings:
+                delimiter: ","
+                skip_header_lines: 0
+                date_formats[1]: "%%Y-%%m-%%d"
+                timestamp_formats[1]: "%%Y-%%m-%%d"
+            """.formatted(d, schema.toString().replace("\\", "/")));
+
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+        Path inbox = Files.createDirectories(Path.of(cfg.dirs().poll()));
+        Files.writeString(inbox.resolve("feed.csv"),
+                "ID,AMT,EVENT_DATE\nE1,1.0,2020-04-03\nA2,2.0,2020-04-03\nX3,3.0,2020-04-03\n");
+
+        CollectorProcessor.run(cfg);
+
+        // the live branch committed its row; the disabled branch wrote NOTHING to its destination
+        assertEquals(1, dataLines(dir.resolve("db_emea")).size(), "emea (live) committed");
+        assertFalse(Files.exists(dir.resolve("db_apac")) && dataLines(dir.resolve("db_apac")).size() > 0,
+                "the disabled branch's destination received no rows");
+
+        // the parked rows survive durably as the park table (A2 + X3-via-default = 2 rows)
+        Path parkHome = dir.resolve("backup").resolve("parked");
+        Path parkTable;
+        try (Stream<Path> w = Files.walk(parkHome)) {
+            parkTable = w.filter(p -> p.getFileName().toString().endsWith("__sink__d1.parquet"))
+                    .findFirst().orElseThrow(() -> new AssertionError("park table missing"));
+        }
+        assertTrue(Files.size(parkTable) > 0, "the park table holds the branch's rows");
+
+        // the original moved to the park home — the next poll cannot re-ingest it
+        assertFalse(Files.exists(inbox.resolve("feed.csv")), "original left the inbox");
+        assertTrue(Files.exists(parkHome.resolve("feed.csv")), "original lives in the park home");
+        try (Stream<Path> w = Files.walk(dir.resolve("backup"))) {
+            assertTrue(w.filter(p -> p.getFileName().toString().equals("feed.csv"))
+                            .allMatch(p -> p.startsWith(parkHome)),
+                    "NOT backed up as committed — parked is not committed");
+        }
+
+        // the manifest is the inspectable record: parkedAt + PARKED members + the park table path
+        Path manifest;
+        try (Stream<Path> w = Files.walk(dir.resolve("status"))) {
+            manifest = w.filter(p -> p.getFileName().toString().endsWith(".json"))
+                    .findFirst().orElseThrow(() -> new AssertionError("parked manifest missing"));
+        }
+        String mf = Files.readString(manifest);
+        assertTrue(mf.contains("parkedAt") && mf.contains("sink__d1"), mf);
+        assertTrue(mf.contains("\"PARKED\""), mf);
+        assertTrue(mf.contains("parkedTables"), mf);
+
+        // uncommitted by choice: the BATCHES ledger says PARKED (the _status_ file is per-member,
+        // and the members themselves ingested SUCCESS), and the commit log is KEPT
+        Path batchesCsv;
+        try (Stream<Path> w = Files.walk(Path.of(cfg.dirs().statusFilePath()).getParent())) {
+            batchesCsv = w.filter(p -> p.getFileName().toString().contains("_batches_"))
+                    .findFirst().orElseThrow();
+        }
+        assertTrue(Files.readString(batchesCsv).contains("PARKED"), "the batches ledger records the park");
+        try (Stream<Path> w = Files.walk(dir.resolve("temp"))) {
+            assertTrue(w.anyMatch(p -> p.getFileName().toString().startsWith("branch_commit_")),
+                    "the branch commit log survives a park — it is the drain's resume record");
+        }
+
+        // a second poll cycle ingests nothing new — the park home is outside the poll tree
+        CollectorProcessor.run(cfg);
+        assertEquals(1, dataLines(dir.resolve("db_emea")).size(), "no re-ingest on the next cycle");
+    }
+
     /** All non-header data lines across every output file under {@code root}, sorted. */
     private static List<String> dataLines(Path root) throws Exception {
         try (Stream<Path> w = Files.walk(root)) {

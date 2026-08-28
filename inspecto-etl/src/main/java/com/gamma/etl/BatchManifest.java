@@ -41,6 +41,22 @@ public final class BatchManifest {
     public List<String>      markers;
 
     /**
+     * Phase 4 S4b (park/drain, D-13): the disabled Step (sink node) ids this Consignment PARKED at —
+     * {@code null}/absent on every non-parked manifest, so pre-S4b readers and manifests are
+     * untouched. A parked Consignment is <b>uncommitted</b>: no markers, no ledger stash, no
+     * watermark; the committed branches' rows are durable but unregistered until the drain (S4c)
+     * completes the batch through the normal commit tail.
+     */
+    public List<String> parkedAt;
+
+    /**
+     * nodeId → the durable Parquet file holding the parked branch's rows (the park table) — the
+     * inspectable intermediate D-13 exists for, and the drain's re-seed input. {@code null} when
+     * {@link #parkedAt} is.
+     */
+    public java.util.Map<String, String> parkedTables;
+
+    /**
      * @param filename        member file name
      * @param srcId           0-based index within the batch
      * @param originalRelPath member path relative to the poll dir (for restore target)

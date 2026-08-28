@@ -26,5 +26,12 @@ public enum FileStage {
     /** PATH-mode marker sentinel written, or content-based fingerprint recorded to the ledger. */
     MARKED,
     /** A DB-export connector's watermark advanced past this file. */
-    WATERMARK_ADVANCED
+    WATERMARK_ADVANCED,
+    /**
+     * Phase 4 S4b (park/drain, D-13): the file's Consignment PARKED at a disabled Step — manifest
+     * written with {@code parkedAt}, file moved to the park home, and <b>none</b> of the later
+     * stages ran (no backup-as-committed, no marker, no watermark). The queryable projection of an
+     * uncommitted-by-choice Consignment; cleared by the drain completing the normal sequence.
+     */
+    PARKED
 }

@@ -136,6 +136,36 @@ public final class PipelineExecutor {
                                      BranchCommitCoordinator.SourceFinalize sourceFinalize,
                                      ProvenanceCollector prov,
                                      RowShaper.ReferenceResolver references) throws Exception {
+        return execute(conn, g, seeds, batchId, coordinator, sinkWriter, sourceFinalize, prov, references, null);
+    }
+
+    /**
+     * Hands a disabled SINK node's live inbound relation to the at-rest lane so it can PARK the rows
+     * durably (Phase 4 S4b, D-13) instead of the scratch paths' skip-and-vanish bypass. Called while
+     * the relation is still live on the walk's connection — the same inline constraint as
+     * {@link ProvenanceCollector}.
+     */
+    public interface ParkWriter {
+        void park(PipelineNode node, String inputTable) throws Exception;
+    }
+
+    /**
+     * As the {@link RowShaper.ReferenceResolver} overload, with the at-rest park hook: when
+     * {@code parkWriter} is non-null, a <b>disabled sink</b> whose inbound relation is live is handed
+     * to it before the bypass — park-at-boundary (§2.7: the pause boundary IS the materialisation
+     * boundary; a route's branch table is already materialised when its sink is reached). A
+     * {@code null} hook (every scratch path: dry-run, run-to-here) keeps the pure in-memory bypass —
+     * D-13 keeps those scratch-only on purpose. Disabled NON-sink nodes always bypass: arming
+     * ({@code StepDisableArming}) restricts an armed pipeline's disable list to route-fed sinks, so a
+     * disabled mid-graph node can only occur on paths that never park.
+     */
+    public static ExecResult execute(Connection conn, PipelineGraph g, Map<String, String> seeds,
+                                     String batchId, BranchCommitCoordinator coordinator,
+                                     SinkWriter sinkWriter,
+                                     BranchCommitCoordinator.SourceFinalize sourceFinalize,
+                                     ProvenanceCollector prov,
+                                     RowShaper.ReferenceResolver references,
+                                     ParkWriter parkWriter) throws Exception {
         PipelineValidator.validateOrThrow(g);
         Map<String, PipelineNode> byId = g.byId();
 
@@ -155,7 +185,16 @@ public final class PipelineExecutor {
             StepProgress.track(g.name(), batchId, nodeId, ++step, order.size());
             if (seeds.containsKey(nodeId)) continue;       // pre-seeded source/parse relation
             PipelineNode node = byId.get(nodeId);
-            if (!node.enabled()) continue;                 // disabled node (§3.6) — produces nothing; downstream inert
+            if (!node.enabled()) {                         // disabled node (§3.6) — produces nothing; downstream inert
+                // At-rest park (S4b): a disabled sink's branch relation is already materialised at
+                // this point — hand it to the park hook so the rows survive durably instead of
+                // vanishing with the bypass. Scratch paths pass no hook and keep the bypass.
+                if (parkWriter != null && PipelineNodeTypes.isCategory(node.type(), NodeCategory.SINK)) {
+                    List<PipelineEdge> parkedIn = liveInbound(g, nodeId, produced);
+                    if (!parkedIn.isEmpty()) parkWriter.park(node, tableOf(parkedIn.get(0), produced));
+                }
+                continue;
+            }
             List<PipelineEdge> inbound = liveInbound(g, nodeId, produced);
             if (inbound.isEmpty()) continue;               // upstream not executed here (e.g. acquisition) — skip
 

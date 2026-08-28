@@ -127,7 +127,7 @@ class ControlApiRouteArmingTest {
             JsonNode out = V1Body.envelope(r.body()).get("error").get("details");
             assertFalse(out.get("written").asBoolean(), r.body());
             String findings = out.get("findings").toString();
-            assertTrue(findings.contains("park/drain"), findings);
+            assertTrue(findings.contains("park"), findings);
             assertTrue(findings.contains("ERROR"), findings);
         }
     }
@@ -141,7 +141,7 @@ class ControlApiRouteArmingTest {
             JsonNode out = V1Body.of(r.body());
             assertTrue(out.get("written").asBoolean(), r.body());
             String findings = out.get("findings").toString();
-            assertTrue(findings.contains("park/drain"), findings);
+            assertTrue(findings.contains("park"), findings);
             assertFalse(findings.contains("\"severity\":\"ERROR\""), findings);
             assertTrue(findings.contains("only once it is activated"), findings);
         }

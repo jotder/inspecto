@@ -47,7 +47,15 @@ public enum MemberStatus {
      * reads as a clean success. ⚠ Distinct from {@link #QUARANTINED_UNREADABLE}, which IS a planned
      * member that failed on the way in.
      */
-    SKIPPED_UNREADABLE;
+    SKIPPED_UNREADABLE,
+
+    /**
+     * Phase 4 S4b (park/drain, D-13): the member ingested cleanly but its Consignment PARKED at a
+     * disabled Step, so it is <b>uncommitted</b> — no marker, no ledger stash; its file was moved to
+     * the park home ({@code MemberEntry.backupPath}) so the next poll does not re-ingest it. The
+     * drain (S4c) completes it through the normal commit tail.
+     */
+    PARKED;
 
     /** True when {@code status} is this constant's wire form. For call sites still holding a String. */
     public boolean is(String status) {
