@@ -1340,8 +1340,23 @@ flakiness. **So `graphLaneCarries` now refuses a pipeline with no configured scr
 needs no ledger, so it is the correct lane for that config. The JVM-temp fallback survives only for the
 route lane, where it beats an NPE, and is documented as a last resort.
 
-**Still flat, and still to do before the lane can be deleted:** anything with a node between map and
-sink (`dedup`/`join`/`summarize`, all of which `prepare()` still refuses for this lane anyway). Only once those are carried does item (1) — moving `withMappingContext` into
+#### Phase 6 precondition — MET 2026-08-29
+
+With A, B, C1 and C2 shipped, the graph lane carries **every non-route shape a pipeline can actually be
+armed in**: single destination · multi-destination fan-out · several writes per batch (chunked, segmented)
+· versioned reference stores. The one remaining exclusion is a node BETWEEN map and sink
+(`dedup`/`join`/`summarize`) — a structural belt to braces `prepare()` already wears, since it refuses
+those kinds for this lane outright; carrying them means EXECUTING them at rest, which is Stage-2 work and
+a different decision. Proven by `FlatVsGraphLaneParityTest`, which diffs both lanes' output files,
+partitions, rows on disk, lineage matrix and event-time bounds on each admitted shape — plus the whole
+reactor, which now exercises simple pipelines through the graph lane on every run.
+
+`withMappingContext` (item 1) is **still not due**: the lane seeds at the node whose relation is the
+already-materialised table, so it performs the WRITE and never re-runs parse/map. That item comes due only
+if the graph lane is ever asked to execute the map node itself.
+
+**What remains of Phase 6 is the deletion half, and it is release-gated** (D-2: converter + one flagged
+verification minor, then the legacy readers are deleted). ⛔ Do not start it on momentum. Only once those are carried does item (1) — moving `withMappingContext` into
 `PipelineLift` — come due, and only because the graph would then execute the map node itself.
 
 ---
