@@ -88,6 +88,26 @@ final class SinkPartitions {
     }
 
     /**
+     * Map-entry keys outside the vocabulary the writer reads ({@code column}, {@code source}) — distinct, in
+     * declaration order. The writer silently ignores them, so the preview is the one honest surface: a
+     * misspelled key ({@code sources:}) is otherwise indistinguishable from never declaring it, and the author
+     * loses their event-time bounds with no warning anywhere — this class's founding defect, in key shape.
+     */
+    static List<String> unknownKeys(Object partitions) {
+        Set<String> out = new LinkedHashSet<>();
+        if (partitions instanceof List<?> list) {
+            for (Object o : list) {
+                if (!(o instanceof Map<?, ?> m)) continue;
+                for (Object k : m.keySet()) {
+                    String key = String.valueOf(k);
+                    if (!"column".equals(key) && !"source".equals(key)) out.add(key);
+                }
+            }
+        }
+        return new ArrayList<>(out);
+    }
+
+    /**
      * The single {@code source} column the entries agree on and that is safe to embed in SQL, or {@code null}
      * when the sink identifies no one event time — mirroring {@code PartitionDef.eventTimeDef} on the ingest
      * side, where two different sources mean no single event time is identified.

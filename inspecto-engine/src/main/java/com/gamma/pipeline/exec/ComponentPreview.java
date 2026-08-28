@@ -653,6 +653,12 @@ public final class ComponentPreview {
             warnings.add("partition entry " + bad + " declares no 'column'"
                     + " — the sink will refuse to write until it does");
 
+        List<String> unknownKeys = SinkPartitions.unknownKeys(partitions);
+        if (!unknownKeys.isEmpty())
+            warnings.add("partition entries carry unrecognised key(s) " + unknownKeys
+                    + " — the writer reads only 'column' and 'source', so a misspelled 'source'"
+                    + " silently records no event-time bounds");
+
         for (String pc : SinkPartitions.columns(partitions))
             if (!columns.contains(pc))
                 warnings.add("partition column '" + pc + "' is not present in the sample rows");

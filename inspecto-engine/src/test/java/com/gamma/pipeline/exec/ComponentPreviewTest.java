@@ -247,6 +247,19 @@ class ComponentPreviewTest {
     }
 
     @Test
+    void sinkPreviewWarnsOnAnUnrecognisedPartitionEntryKey() {
+        // 'sources:' (misspelled key) is silently ignored by the writer — indistinguishable from never
+        // declaring it, so the author loses event-time bounds with no other surface saying why
+        Map<String, Object> sink = Map.of("store", "out", "format", "parquet",
+                "partitions", List.of(two("column", "grp", "sources", "amt")));
+        ComponentPreview.SinkResult r = ComponentPreview.sink(sink, SAMPLE);
+
+        assertEquals(1, r.warnings().size());
+        assertTrue(r.warnings().get(0).contains("unrecognised key"));
+        assertTrue(r.warnings().get(0).contains("sources"));
+    }
+
+    @Test
     void sinkPreviewWarnsWhenPartitionsDisagreeOnSource() {
         // both sources exist, but PartitionSinkWriter identifies no single event time → no bounds recorded
         Map<String, Object> sink = Map.of("store", "out", "format", "parquet",
