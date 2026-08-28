@@ -399,10 +399,19 @@ is very likely better than a t-digest: trivially composable, exact to bucket wid
 serialized state, readable when debugging. You lose arbitrary post-hoc quantiles — usually a fine trade
 for known measures like call duration or data volume.
 
-**Verify before betting on sketches:** DuckDB's `approx_quantile` / `approx_count_distinct` compute a
-*final answer*, and (believed, unconfirmed) do **not** expose serializable mergeable state persistable to
-Parquet. If that holds, sketches mean DataSketches on the Java side and a BLOB column from a custom
-processor — real work, not a config flag.
+**VERIFIED 2026-08-28 (live probe, DuckDB v1.5.2 via the reactor's JDBC driver) — the suspicion holds,
+so the histogram wins.** Three measured facts:
+1. **`approx_quantile` cannot export state at all**: `… EXPORT_STATE` fails with *"Cannot use
+   EXPORT_STATE on aggregate functions with custom binders"*. No mergeable quantile state exists, period.
+2. `approx_count_distinct` **does** support `EXPORT_STATE` — `AGGREGATE_STATE<…>` values combine and
+   finalize correctly in-memory (`finalize(combine(a.s, b.s))` works) and cast to `BLOB`, which survives
+   a Parquet round-trip —
+3. — but the trip is **one-way**: there is no `BLOB → AGGREGATE_STATE` cast (the parameterised type is
+   not a nameable/castable type in SQL), so a persisted state can never be re-combined. Persistable ≠
+   restorable.
+Conclusion: DuckDB sketches cannot serve the end-of-period summary pass; sketches would mean
+DataSketches on the Java side and a BLOB column from a custom processor — real work, not a config flag.
+**The fixed-bucket histogram above is the decided representation.**
 
 ## 8. "End of day" is a completeness condition, not a clock
 
@@ -1204,6 +1213,7 @@ processor shipped as a built-in would be speculative surface, and its job is to 
   queryable index?"* The CSV question is a non-question.
 - **Whether `batch_id` stays the column name in extended legacy artifacts** while `consignment_id` is used
   in new ones. Open decision.
-- **Verification items** flagged inline: DuckDB mergeable sketch state (§7.5); whether a durable
+- **Verification items** flagged inline: ~~DuckDB mergeable sketch state (§7.5)~~ ✅ VERIFIED 2026-08-28 —
+  no usable persistable state (see §7.5), histogram is the decided representation; whether a durable
   `DeliveryReceiptStore` implementation exists beyond the in-memory one (§11.7).
 - **Whether Path 1's `Batch*` classes are eventually renamed** or stay legacy internals (§3 assumes stay).
