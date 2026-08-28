@@ -85,8 +85,8 @@ public final class DuckDbCsvIngester {
         // Fixed-width TEXT is parsed natively (read_csv + substring) only — the Java parser has no
         // fixed-width path, so it is always native regardless of the engine knob.
         if (cfg.fixedWidth() != null && !cfg.fixedWidth().binary()) return true;
-        // json / text_regex / xlsx frontends are native-only too.
-        if (cfg.json() != null || cfg.textRegex() != null || cfg.xlsx() != null) return true;
+        // json / text_regex / xlsx / parquet frontends are native-only too.
+        if (cfg.json() != null || cfg.textRegex() != null || cfg.xlsx() != null || cfg.parquet() != null) return true;
         return switch (cfg.csv().engine() == null ? "auto" : cfg.csv().engine().toLowerCase()) {
             case "duckdb" -> true;
             case "java"   -> false;
@@ -106,7 +106,7 @@ public final class DuckDbCsvIngester {
      */
     public static boolean decideNative(Batch batch, PipelineConfig cfg) {
         if (cfg.fixedWidth() != null && !cfg.fixedWidth().binary()) return true;   // fixed-width text: native-only
-        if (cfg.json() != null || cfg.textRegex() != null || cfg.xlsx() != null) return true; // native-only frontends
+        if (cfg.json() != null || cfg.textRegex() != null || cfg.xlsx() != null || cfg.parquet() != null) return true; // native-only frontends
         String engine = cfg.csv().engine() == null ? "auto" : cfg.csv().engine().toLowerCase();
         if (engine.equals("java"))   return false;
         if (engine.equals("duckdb")) return true;
@@ -201,6 +201,8 @@ public final class DuckDbCsvIngester {
             return buildJsonReadSpec(file, schemaConfig, cfg);
         if (cfg.xlsx() != null)
             return buildXlsxReadSpec(file, schemaConfig, cfg);
+        if (cfg.parquet() != null)
+            return buildParquetReadSpec(file, schemaConfig, cfg);
         if (cfg.textRegex() != null)
             return buildTextRegexReadSpec(file, schemaConfig, cfg);
 
@@ -361,6 +363,36 @@ public final class DuckDbCsvIngester {
         if (x.normalizeNames()) rx.append(", normalize_names=true");
         rx.append(')');
         return rx.toString();
+    }
+
+    /**
+     * The {@code read_parquet} spec (ELT Phase 3 S3c-1): selectors are the parquet <b>column
+     * names</b>, and every projected column is {@code CAST(... AS VARCHAR)} — probed against
+     * duckdb_jdbc 1.5.2.1: {@code read_parquet} returns the file's real column types and has no
+     * {@code all_varchar} option, and this lane keeps the raw-lands-as-VARCHAR contract every other
+     * frontend honors (typing is the mapping's concern). No extension load, no Compression wrap —
+     * parquet is built into DuckDB and internally compressed. Pure string assembly.
+     */
+    private static ReadSpec buildParquetReadSpec(File file, Map<String, Object> schemaConfig,
+                                                  PipelineConfig cfg) {
+        List<Map<String, Object>> fields = rawFields(schemaConfig);
+        String filePath = file.getAbsolutePath().replace("\\", "/");
+
+        StringBuilder proj = new StringBuilder();
+        for (int i = 0; i < fields.size(); i++) {
+            if (i > 0) proj.append(", ");
+            proj.append("CAST(\"").append(escapeIdent(String.valueOf(fields.get(i).get("selector"))))
+                .append("\" AS VARCHAR) AS \"").append(fields.get(i).get("name")).append('\"');
+        }
+
+        return new ReadSpec(proj.toString(), parquetReadRelation(filePath, cfg.parquet()));
+    }
+
+    /** The {@code read_parquet(...)} relation — the ONE assembly, shared by ingest and preview
+     *  (the parity rule {@code Parsers} documents). One option: {@code hive_partitioning}. */
+    public static String parquetReadRelation(String filePath, PipelineConfig.Parquet p) {
+        return "read_parquet('" + escapeSql(filePath) + "'"
+                + (p != null && p.hivePartitioning() ? ", hive_partitioning=true" : "") + ")";
     }
 
     /** A double-quoted SQL identifier's escape ({@code "} doubles) — selectors are sheet-column names. */

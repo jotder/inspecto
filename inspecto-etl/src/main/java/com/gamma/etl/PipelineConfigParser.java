@@ -940,6 +940,7 @@ final class PipelineConfigParser {
             b.textRegex        = parseTextRegex(csv);
             // multiformat X1 additive: MS Excel frontend (null unless frontend: xlsx / excel)
             b.xlsx             = parseXlsx(csv);
+            b.parquet          = parseParquet(csv);
         }
         return new Grammar(parsing, grammarBlock, blockShaped, csv, frontend);
     }
@@ -1452,7 +1453,7 @@ final class PipelineConfigParser {
 
     /** The recognised {@code parsing.frontend} values (docs/parsing-options-reference.md §5). */
     private static final Set<String> FRONTENDS =
-            Set.of("delimited", "fixedwidth", "fixed_width", "json", "text_regex", "xlsx", "excel", "asn1", "plugin");
+            Set.of("delimited", "fixedwidth", "fixed_width", "json", "text_regex", "xlsx", "excel", "parquet", "asn1", "plugin");
 
     /**
      * Overlay the unified {@code parsing:} block onto the legacy grammar/{@code csv_settings} map
@@ -1470,7 +1471,7 @@ final class PipelineConfigParser {
         if (parsing.get("delimited") instanceof Map<?, ?> del)
             merged.putAll((Map<String, Object>) del);
         for (String key : new String[]{"frontend", "encoding", "compression",
-                                       "fixedwidth", "json", "text_regex", "xlsx", "asn1"}) {
+                                       "fixedwidth", "json", "text_regex", "xlsx", "parquet", "asn1"}) {
             Object v = parsing.get(key);
             if (v != null) merged.put(key, v);
         }
@@ -1591,6 +1592,25 @@ final class PipelineConfigParser {
      * because both are interpolated into the {@code read_xlsx} SQL and a key the engine cannot honor
      * must never load looking honored.
      */
+    /**
+     * Parse the optional Parquet frontend (ELT Phase 3 S3c-1). Returns {@code null} unless
+     * {@code frontend: parquet}. Exactly one option is honored ({@code hive_partitioning}, see
+     * {@link PipelineConfig.Parquet}); any other key in the {@code parquet:} block hard-fails so an
+     * unhonorable key never loads looking honored (the same posture as xlsx's blank-sheet refusal).
+     */
+    private static PipelineConfig.Parquet parseParquet(Map<String, Object> csv) {
+        String frontend = String.valueOf(csv.getOrDefault("frontend", "delimited")).trim().toLowerCase();
+        if (!frontend.equals("parquet")) return null;
+        Map<String, Object> pBlock = mapAt(csv, "parquet");
+        Map<String, Object> pq = pBlock != null ? pBlock : Map.of();
+        List<String> unknown = pq.keySet().stream().filter(k -> !"hive_partitioning".equals(k)).toList();
+        if (!unknown.isEmpty())
+            throw new IllegalArgumentException("the parquet frontend takes no options beyond "
+                    + "'hive_partitioning'; remove key(s) " + unknown + " from the parquet: block");
+        boolean hive = Boolean.parseBoolean(String.valueOf(pq.getOrDefault("hive_partitioning", "false")));
+        return new PipelineConfig.Parquet(hive);
+    }
+
     private static PipelineConfig.Xlsx parseXlsx(Map<String, Object> csv) {
         String frontend = String.valueOf(csv.getOrDefault("frontend", "delimited")).trim().toLowerCase();
         if (!frontend.equals("xlsx") && !frontend.equals("excel")) return null;

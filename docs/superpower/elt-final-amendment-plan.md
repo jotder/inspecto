@@ -913,9 +913,31 @@ space `EventLog` subscriber in `CollectorService.start()`. 🔴 A namespace FENC
 PIPELINE named `orders_rollup` committing, so `on: dataset` triggers are now skipped there —
 pinned by `datasetTriggerFiresOnDatasetWriteAndNotOnALikeNamedPipelineCommit` (a decoy pipeline
 commit must NOT fire; the Signal must, end-to-end through a real CollectorService).
-Reactor 3664/0/0/5. · **S3c** parser loosening + `collect: {dataset:}` config shape + the
-`TableCollectRunner` + watermark ledger (the big slice — config without this runner would be
-fictional, per the spike) · **S3d** recipe verb + converter projection + the deferred execution
+Reactor 3664/0/0/5. ·
+**S3c — DESIGN AMENDED 2026-08-28 (operator decision, in-session): file-shaped consumption, no
+new runtime.** The runner/watermark half of the 2026-08-06 design is SUPERSEDED. Rationale, from
+grounding the alternative the operator proposed ("use an S3 endpoint like an inbox"): parquet is
+only missing an INGEST lane (fully supported on output); `MaterializeTask` snapshots are
+timestamp-named (`matrix-<millis>.parquet`) so the EXISTING marker dedup gives correct
+re-ingest-on-refresh semantics with no watermark; `LocalFileSystemConnector`/`S3Connector`
+already exist. Amended shape, two legs: **S3c-1 ✅ SHIPPED 2026-08-28** — the `parquet` ingest lane: `PipelineConfig.Parquet` +
+`frontend: parquet` + `DuckDbCsvIngester.buildParquetReadSpec` (per-column `CAST(sel AS VARCHAR)`
+projection — PROBED: `read_parquet` returns the file's real types and has NO `all_varchar` option)
++ the served catalog Builtin + binary preview (`ComponentPreview.parsingParquet`). One honored
+option, `hive_partitioning` (probed: exposes `year=/month=/day=` dir levels as columns, and works
+on a SINGLE file path, not only a glob); every other key refuses by name. No extension load, no
+Compression wrap. ⚠ Two contract guards fired during the build and were RIGHT both times:
+`ParsersTest` refuses an empty grammar schema (resolved by declaring the honest option, not by
+exempting), and `ControlApiParsersTest` pins the served catalog (now 8 entries, parquet at
+index 3). `ParquetParsingTest` (5) incl. fail-closed missing-selector. Reactor 3669/0/0/5. ·
+**S3c-2 `collect: {dataset: <id>}` compiling to a DERIVED ACQUISITION** — the entry acquires
+(copies) snapshots from the Dataset's dir (or an S3 prefix) into the pipeline's OWN inbox, then
+normal file ingest. The copy kills the stale-delete race (a snapshot deleted mid-copy fails
+clean and retries), keeps backup/quarantine/markers/retention semantics intact, shrinks
+physical-path coupling to the connector source derived at lift, and needs NO parser fence —
+`dirs.poll` exists and is the pipeline's own inbox. `on: dataset` (S3b) supplies event latency.
+⚠ Archive compression (.zip/.tar/.bz2) is Path-1 (file feeds) machinery and owes this path
+nothing — Dataset consumption only ever reads product-written parquet. · **S3d** recipe verb + converter projection + the deferred execution
 half of the P3 S4 parity gate (enrich/materialize as recipes, identical outputs).
 
 #### Phases 3/6 user-surface scope SUPERSEDED 2026-08-06 — user-facing 'Job' un-banned (operator decision)

@@ -26,7 +26,7 @@ import java.util.Set;
  */
 final class BuiltinParsers {
 
-    private static final Set<String> IDS = Set.of("delimited", "fixedwidth", "json", "text_regex", "xlsx");
+    private static final Set<String> IDS = Set.of("delimited", "fixedwidth", "json", "text_regex", "xlsx", "parquet");
 
     private BuiltinParsers() {}
 
@@ -113,6 +113,13 @@ final class BuiltinParsers {
                         FieldSpec.of("json.maximum_object_size", "Maximum object size (bytes)", FieldType.INT,
                                 "array/auto only: bound on a single document/record the reader buffers."),
                         FieldSpec.of("compression", "Input compression", FieldType.STRING, "e.g. gzip."))),
+                new Builtin("parquet", "Parquet — columnar file, schema self-describing (read_parquet)",
+                        // The file self-describes its columns (selectors = parquet column names);
+                        // exactly one honored option (PipelineConfig.Parquet), everything else refuses.
+                        List.of(
+                        FieldSpec.withDefault("parquet.hive_partitioning", "Hive partition columns",
+                                FieldType.BOOL, false,
+                                "Expose key=value directory levels (year=/month=/day=) as columns."))),
                 new Builtin("xlsx", "MS Excel — read_xlsx over a workbook (DuckDB excel extension)", List.of(
                         FieldSpec.of("xlsx.sheet", "Sheet", FieldType.STRING,
                                 "Sheet NAME to read; empty = the workbook's first sheet."),
@@ -156,10 +163,12 @@ final class BuiltinParsers {
             draft.put("processing", Map.of("threads", 1));
             draft.put("parsing", parsing);
             PipelineConfig cfg = PipelineConfig.fromMap(draft);
-            // xlsx is BINARY: the sample stays bytes (sample_b64 transport) and never round-trips
-            // through a charset — the same rule the ASN.1 plugin follows.
+            // xlsx and parquet are BINARY: the sample stays bytes (sample_b64 transport) and never
+            // round-trips through a charset — the same rule the ASN.1 plugin follows.
             ComponentPreview.GrammarResult r = "xlsx".equals(id)
                     ? ComponentPreview.parsingXlsx(cfg, sample)
+                    : "parquet".equals(id)
+                    ? ComponentPreview.parsingParquet(cfg, sample)
                     : ComponentPreview.parsing(cfg, new String(sample, charsetOf(grammar)));
             return new ParseResult.Table(r.columns(), r.rows(), r.rowCount(), r.rejectedRows(), r.columnTypes());
         }

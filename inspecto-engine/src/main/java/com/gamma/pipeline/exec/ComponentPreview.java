@@ -165,6 +165,10 @@ public final class ComponentPreview {
             throw new IllegalArgumentException(
                     "an xlsx workbook is binary and cannot be previewed from pasted text — "
                     + "send the file bytes (sample_b64)");
+        if (cfg.parquet() != null)
+            throw new IllegalArgumentException(
+                    "a parquet file is binary and cannot be previewed from pasted text — "
+                    + "send the file bytes (sample_b64)");
         if (cfg.fixedWidth() == null && cfg.json() == null && cfg.textRegex() == null
                 && cfg.schemas().ingesterClass() != null)
             throw new IllegalArgumentException("parsing preview is not supported for the plugin frontend ("
@@ -228,6 +232,55 @@ public final class ComponentPreview {
             }
         } finally {
             java.nio.file.Files.deleteIfExists(wb);
+            DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
+    /**
+     * Preview a draft's <b>parquet</b> parsing frontend over the file's BYTES (ELT Phase 3 S3c-1):
+     * the binary sibling of {@link #parsing(PipelineConfig, String)}, mirroring
+     * {@link #parsingXlsx}. Writes the bytes to a scratch {@code .parquet} and reads with the SAME
+     * {@code read_parquet} relation ingest builds ({@code DuckDbCsvIngester.parquetReadRelation}) —
+     * no extension load (parquet is built into DuckDB). {@code columnTypes} are the file's own
+     * embedded types, read straight from the relation's metadata.
+     */
+    public static GrammarResult parsingParquet(PipelineConfig cfg, byte[] sample)
+            throws SQLException, java.io.IOException {
+        if (cfg.parquet() == null) throw new IllegalArgumentException("draft's parsing frontend is not parquet");
+        if (sample == null || sample.length == 0)
+            throw new IllegalArgumentException("a parquet file sample is required");
+
+        File db = DuckDbUtil.tempDbFile("preview_");
+        java.nio.file.Path pq = java.nio.file.Files.createTempFile("preview_parsing_", ".parquet");
+        try {
+            java.nio.file.Files.write(pq, sample);
+            String path = pq.toAbsolutePath().toString().replace("\\", "/");
+            try (Connection conn = DuckDbUtil.openConnection(db)) {
+                String relation = com.gamma.etl.DuckDbCsvIngester.parquetReadRelation(path, cfg.parquet());
+                try (java.sql.Statement st = conn.createStatement()) {
+                    st.execute("CREATE TABLE preview_parsed AS SELECT * FROM " + relation);
+                }
+                List<String> columns = ScratchTables.columnNames(conn, "preview_parsed");
+                List<Map<String, String>> types = new java.util.ArrayList<>();
+                try (java.sql.Statement st = conn.createStatement();
+                     java.sql.ResultSet rs = st.executeQuery("SELECT * FROM " + relation + " LIMIT 0")) {
+                    java.sql.ResultSetMetaData md = rs.getMetaData();
+                    for (int i = 1; i <= md.getColumnCount(); i++) {
+                        Map<String, String> col = new java.util.LinkedHashMap<>();
+                        col.put("name", md.getColumnName(i));
+                        col.put("type", md.getColumnTypeName(i));
+                        types.add(col);
+                    }
+                }
+                return new GrammarResult(
+                        columns,
+                        ScratchTables.count(conn, "preview_parsed"),
+                        ScratchTables.readRows(conn, "preview_parsed", MAX_ROWS),
+                        0,
+                        types);
+            }
+        } finally {
+            java.nio.file.Files.deleteIfExists(pq);
             DuckDbUtil.deleteTempDb(db);
         }
     }

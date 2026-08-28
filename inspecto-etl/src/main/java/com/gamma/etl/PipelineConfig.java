@@ -491,6 +491,31 @@ public final class PipelineConfig {
                        boolean ignoreErrors, boolean normalizeNames) {}
 
     /**
+     * Parquet parsing frontend (additive, ELT Phase 3 S3c-1). Non-null only when the resolved
+     * parsing settings set {@code frontend: parquet}; {@code null} otherwise, so every existing
+     * pipeline is unaffected.
+     *
+     * <p>Compiles to DuckDB {@code read_parquet(...)} — built into DuckDB, no extension load
+     * (unlike {@link Xlsx}). Parquet is internally compressed, so the {@code Compression} wrapper
+     * never applies. The file self-describes its columns with real types; the lane still lands
+     * every projected column as VARCHAR ({@code CAST(col AS VARCHAR)} per selector — probed against
+     * duckdb_jdbc 1.5.2.1: {@code read_parquet} returns typed columns, and {@code read_parquet} has
+     * no {@code all_varchar} option) because, like every other frontend, typing is the mapping's
+     * concern. Each schema field lands keyed by {@code raw.fields[].selector} — the parquet
+     * <b>column name</b>.
+     *
+     * <p>One option, probed real: {@code hive_partitioning} exposes {@code key=value} directory
+     * levels (the layout {@code PartitionWriter} itself emits — {@code year=/month=/day=}) as
+     * selectable columns, which consuming a partitioned store genuinely needs. Every other
+     * {@code read_parquet} parameter ({@code file_row_number}, …) stays refused — add one only
+     * against a concrete need, never speculatively.
+     *
+     * @param hivePartitioning expose hive {@code key=value} directory levels as columns (default false)
+     */
+    @PublicApi(since = "4.0.0")
+    public record Parquet(boolean hivePartitioning) {}
+
+    /**
      * Text/regex parsing frontend (additive, 4.8; block records additive, 4.9). Non-null only when
      * the resolved parsing settings set {@code frontend: text_regex}; {@code null} otherwise.
      *
@@ -981,6 +1006,7 @@ public final class PipelineConfig {
     private final FixedWidth     fixedWidth;
     private final Json           json;
     private final Xlsx           xlsx;
+    private final Parquet        parquet;
     private final TextRegex      textRegex;
     private final Collector      collector;
 
@@ -1134,6 +1160,8 @@ public final class PipelineConfig {
     public Json           json()       { return json; }
     /** MS Excel frontend config, or {@code null} unless {@code frontend: xlsx}. */
     public Xlsx           xlsx()       { return xlsx; }
+    /** Parquet frontend config, or {@code null} unless {@code frontend: parquet}. */
+    public Parquet        parquet()    { return parquet; }
     /** Text/regex frontend config, or {@code null} unless {@code frontend: text_regex}. */
     public TextRegex      textRegex()  { return textRegex; }
     /** Data-acquisition source binding; never null (defaults to local-FS over {@code dirs.poll}). */
@@ -1230,6 +1258,7 @@ public final class PipelineConfig {
         this.fixedWidth = b.fixedWidth;
         this.json = b.json;
         this.xlsx = b.xlsx;
+        this.parquet = b.parquet;
         this.textRegex = b.textRegex;
         this.collector = b.collector;
         this.statusDirToPrepare = b.statusDirToPrepare;
@@ -1308,6 +1337,7 @@ public final class PipelineConfig {
         this.fixedWidth = src.fixedWidth;
         this.json = src.json;
         this.xlsx = src.xlsx;
+        this.parquet = src.parquet;
         this.textRegex = src.textRegex;
         this.collector = src.collector;
         this.statusDirToPrepare = src.statusDirToPrepare;
@@ -1680,6 +1710,7 @@ public final class PipelineConfig {
         FixedWidth   fixedWidth;          // null ⇒ delimited frontend (the default)
         Json         json;                // null unless frontend: json
         Xlsx         xlsx;                // null unless frontend: xlsx
+        Parquet      parquet;             // null unless frontend: parquet
         TextRegex    textRegex;           // null unless frontend: text_regex
         Collector    collector;          // the parsed collector: block (parser always sets it)
         String outputFormat  = "CSV";
