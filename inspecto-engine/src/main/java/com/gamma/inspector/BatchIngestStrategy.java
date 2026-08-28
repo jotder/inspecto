@@ -266,9 +266,24 @@ interface BatchIngestStrategy {
         if (!applied.outputs().isEmpty())
             throw new IllegalStateException("decision-rule routing writes to a single destination; combining "
                     + "it with a route: pipeline's branches is not supported");
-        if (cfg.producesReference() && cfg.reference().load().versionedStore())
-            throw new IllegalStateException("a versioned reference store cannot be written per route branch — "
-                    + "one version history is ill-defined across branches (same rule as sinks:>1 at prepare())");
+        // Reference Phase-2 P1/P2, carried here in slice C2. Combining it with route BRANCHES stays
+        // refused — one version history across branches is ill-defined (the same rule as sinks:>1 at
+        // prepare(), and a permanent posture since 2026-08-28). Without a route there are no branches,
+        // so this is the flat path's stamp, run on the same relation before the walk seeds it: the
+        // system columns land, within-batch key duplicates fold out, and the batch-unique base name is
+        // what makes the write an APPEND instead of an overwrite of the prior version.
+        String seedTable = table;
+        String writeBase = baseName;
+        if (cfg.producesReference() && cfg.reference().load().versionedStore()) {
+            if (cfg.routeConfig() != null)
+                throw new IllegalStateException("a versioned reference store cannot be written per route branch — "
+                        + "one version history is ill-defined across branches (same rule as sinks:>1 at prepare())");
+            String versioned = "__ref_versioned";
+            stampReferenceVersions(conn, table, versioned, cfg.reference().key(), batchId,
+                    existingStoreReader(dbDir, cfg.output().format()));
+            seedTable = versioned;
+            writeBase = baseName + "__v_" + batchId;   // batch-unique ⇒ append, never overwrite
+        }
 
         // Seed the node whose data relation IS the materialised table — the node that FEEDS the write.
         // With a route: that is the route node's upstream (the map/transform node for this batch's
@@ -278,13 +293,13 @@ interface BatchIngestStrategy {
         String seedNodeId = seedFeedingTheWrite(lifted);
 
         IngestSinkWriter writer = new IngestSinkWriter(
-                conn, cfg, partCols, dbDir, baseName, batchId, srcIdToFile);
+                conn, cfg, partCols, dbDir, writeBase, batchId, srcIdToFile);
         java.nio.file.Path commitLog =
-                com.gamma.pipeline.exec.BranchCommitLog.pathFor(cfg.dirs().temp(), batchId);
+                branchCommitLogPath(cfg, batchId);
         java.nio.file.Files.createDirectories(commitLog.getParent());
         com.gamma.pipeline.exec.BatchGraphRunner.run(
                 new com.gamma.pipeline.exec.BatchGraphRunner.Input(
-                        conn, lifted, seedNodeId, table, batchId, dbDir, baseName, commitLog, writeScope),
+                        conn, lifted, seedNodeId, seedTable, batchId, dbDir, writeBase, commitLog, writeScope),
                 writer,
                 () -> { /* finalisation is BatchProcessor.commit's, once the outcome returns */ },
                 // Park hook (S4b): a disabled route-branch sink's rows are materialised to a durable
@@ -312,8 +327,6 @@ interface BatchIngestStrategy {
      *
      * <p>Admitted only when ALL hold:
      * <ul>
-     *   <li><b>no versioned reference store</b> — {@code stampReferenceVersions} is flat-lane-only, and
-     *       the graph lane refuses it by name rather than silently skipping the stamp;</li>
      *   <li><b>every sink is fed straight off the map node</b> — the flat lane materialised the table
      *       through map (plus the {@code csv_settings.where} filter, which the lift places UPSTREAM of
      *       map and the seed therefore skips). Any node BETWEEN map and sink would be executed by the
@@ -331,11 +344,18 @@ interface BatchIngestStrategy {
      * question for the route lane ("is there a second branch to divert for?") and must not be confused
      * with this admission, which is about whether the write is reproducible in the graph lane.
      *
-     * <p>Decision-rule outputs are NOT part of the admission: {@code DecisionRuleApplier} runs inside
-     * {@code graphWriteAndTrace} exactly as it does on the flat path, and refuses the combination there.
+     * <p><b>A versioned reference store is carried (slice C2).</b> Its refusal in the graph lane was
+     * always route-specific — <i>"one version history is ill-defined across branches"</i> — and a
+     * non-route pipeline has no branches, so the stamp simply runs before the walk exactly as it does
+     * on the flat path. The route combination stays refused by name (permanent posture, 2026-08-28).
      */
     static boolean graphLaneCarries(PipelineConfig cfg) {
-        if (cfg.producesReference() && cfg.reference().load().versionedStore()) return false;
+        // The graph lane keeps a durable branch-commit ledger; the flat lane keeps none. So a pipeline
+        // with no configured scratch dir stays FLAT rather than parking that ledger in the shared JVM
+        // temp dir, where it outlives the batch and is not per-pipeline: a later batch reusing the id
+        // would read the stale rows as "already committed" and skip its own write. Cost one debugging
+        // cycle 2026-08-29 — the stale log was sitting in %TEMP% between runs.
+        if (scratchDir(cfg) == null) return false;
         com.gamma.pipeline.PipelineGraph lifted = com.gamma.pipeline.PipelineLift.lift(cfg);
         List<com.gamma.pipeline.PipelineNode> sinks = lifted.nodes().stream()
                 .filter(n -> PipelineNodeTypes.isCategory(n.type(), NodeCategory.SINK)).toList();
@@ -508,6 +528,26 @@ interface BatchIngestStrategy {
             sb.append("SELECT * FROM \"").append(relations.get(i)).append('"');
         }
         return sb.toString();
+    }
+
+    /**
+     * Where this batch's {@link com.gamma.pipeline.exec.BranchCommitLog} lives. **The one place that
+     * decision is made** — the log is created here, resumed by {@code DrainCommand} and deleted by
+     * {@code BatchProcessor.commit}, and all three must agree or a drain looks in the wrong place.
+     *
+     * <p>{@code dirs.temp} is OPTIONAL, so reading it directly threw a {@code NullPointerException} the
+     * moment the graph lane started carrying pipelines that omit it — a config the flat lane had always
+     * accepted, because the flat lane keeps no commit log at all. Found by the versioned-reference parity
+     * case, 2026-08-29.
+     *
+     * <p>⚠ The JVM-temp fallback is a last resort that only a {@code route:} pipeline can reach —
+     * {@link #graphLaneCarries} refuses a non-route pipeline that has no scratch dir precisely so the new
+     * lane never puts a DURABLE ledger somewhere shared and unswept. Prefer configuring {@code dirs.temp}.
+     */
+    static java.nio.file.Path branchCommitLogPath(PipelineConfig cfg, String batchId) {
+        String dir = scratchDir(cfg);
+        return com.gamma.pipeline.exec.BranchCommitLog.pathFor(
+                dir != null ? dir : System.getProperty("java.io.tmpdir"), batchId);
     }
 
     /**

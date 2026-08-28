@@ -1315,8 +1315,33 @@ path passes its chunk base name, the segmented path its segment key. Pinned by
 `FlatVsGraphLaneParityTest.severalWritesInOneBatchEachLandWhenTheyCarryTheirOwnScope` — distinct scopes
 BOTH write, a repeated scope is still skipped (that replay is what protects a crash-resumed batch).
 
-**Still flat, and still to do before the lane can be deleted:** the versioned reference-store write ·
-anything with a node between map and sink. Only once those are carried does item (1) — moving `withMappingContext` into
+#### Phase 6 slice C2 — the versioned reference store, SHIPPED 2026-08-29
+
+Its refusal in the graph lane was always **route-specific** — *"one version history is ill-defined across
+branches"* — and a non-route pipeline has no branches, so the stamp simply runs before the walk exactly
+as it does on the flat path: system columns appended, within-batch key duplicates folded out, and the
+**batch-unique file stem** that makes the write an append instead of an overwrite of the prior version.
+The route combination stays refused by name (permanent posture, 2026-08-28). Pinned by
+`FlatVsGraphLaneParityTest.bothLanesStampAndAppendAVersionedReferenceStore`, which compares the stem as
+well as the rows — the stem IS the append semantics.
+
+🔴 **It also uncovered two defects around `dirs.temp`, which is OPTIONAL.** First a latent NPE, live
+since the branch-aware executor shipped: the branch commit log read `cfg.dirs().temp()` directly, so ANY
+pipeline omitting it would have thrown on the graph lane — a config the flat lane accepts, because the
+flat lane keeps no commit log at all. The path now resolves through ONE helper
+(`BatchIngestStrategy.branchCommitLogPath`) shared by all three sites that spell it — create,
+drain-resume, cleanup — which is also the invariant that keeps a drain looking where the park run wrote.
+
+Then the fallback itself: a JVM-temp-dir default puts a **durable** ledger somewhere shared and unswept,
+and it is not per-pipeline. A stale `branch_commit_<batchId>.log` left in `%TEMP%` by an earlier run made
+the coordinator skip the branch as "already committed" and the batch wrote NOTHING — which is exactly how
+it presented: a parity case that passed once and then failed identically forever after, looking like
+flakiness. **So `graphLaneCarries` now refuses a pipeline with no configured scratch dir**: the flat lane
+needs no ledger, so it is the correct lane for that config. The JVM-temp fallback survives only for the
+route lane, where it beats an NPE, and is documented as a last resort.
+
+**Still flat, and still to do before the lane can be deleted:** anything with a node between map and
+sink (`dedup`/`join`/`summarize`, all of which `prepare()` still refuses for this lane anyway). Only once those are carried does item (1) — moving `withMappingContext` into
 `PipelineLift` — come due, and only because the graph would then execute the map node itself.
 
 ---

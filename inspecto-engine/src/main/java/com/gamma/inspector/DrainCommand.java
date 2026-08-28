@@ -164,7 +164,7 @@ public final class DrainCommand {
 
             writer = new IngestSinkWriter(conn, cfg, partCols, dbDir, baseName, batchId, srcIdToFile);
             BranchCommitLog commitLog = new BranchCommitLog(
-                    BranchCommitLog.pathFor(cfg.dirs().temp(), batchId).toString());
+                    BatchIngestStrategy.branchCommitLogPath(cfg, batchId).toString());
             // Every branch this batch owes: the ones the park run already committed (durable in the log)
             // plus the parked ones. The coordinator skips the former and gates finalisation on both.
             Set<String> expected = new LinkedHashSet<>(commitLog.committedBranches(batchId));
@@ -194,7 +194,7 @@ public final class DrainCommand {
         // The batch is whole: the park artefacts and the resume record have served their purpose.
         for (Path table : parkTables.values()) Files.deleteIfExists(table);
         ParkedCommit.delete(parkHome, batchId);
-        Files.deleteIfExists(BranchCommitLog.pathFor(cfg.dirs().temp(), batchId));
+        Files.deleteIfExists(BatchIngestStrategy.branchCommitLogPath(cfg, batchId));
 
         writeDrainAudit(batch, cfg, m, writer, start);
         log.info("[DRAIN] {} complete — {} branch(es) drained, {} output file(s)",

@@ -201,6 +201,67 @@ class FlatVsGraphLaneParityTest {
         assertEquals(6, dataLines(dir.resolve("db")).size(), "both writes' rows are on disk, once each");
     }
 
+    /**
+     * Slice C2 — a versioned reference store writes the same way in both lanes. Its refusal in the graph
+     * lane was always route-specific ("one version history is ill-defined across branches"); without a
+     * route there are no branches, so the stamp runs before the walk exactly as it does on the flat path.
+     * What must match: the system columns, the row count, and the **batch-unique file stem** that makes
+     * the write an append instead of an overwrite of the prior version.
+     */
+    @Test
+    void bothLanesStampAndAppendAVersionedReferenceStore(@TempDir Path dir) throws Exception {
+        PipelineConfig flatCfg  = referenceConfig(dir.resolve("flat_ref"));
+        PipelineConfig graphCfg = referenceConfig(dir.resolve("graph_ref"));
+        assertTrue(BatchIngestStrategy.graphLaneCarries(graphCfg),
+                "a non-route versioned reference store is carried — the refusal was about BRANCHES");
+
+        BatchIngestStrategy.Written flat;
+        BatchIngestStrategy.Written graph;
+        File flatDb = BatchIngestStrategy.openTempDb(flatCfg, "parity_refflat_");
+        File graphDb = BatchIngestStrategy.openTempDb(graphCfg, "parity_refgraph_");
+        try (Connection a = DuckDbUtil.openConnection(flatDb); Connection b = DuckDbUtil.openConnection(graphDb)) {
+            seedTable(a);
+            seedTable(b);
+            flat = BatchIngestStrategy.flatWriteAndTrace(a, "transformed", List.of(), flatCfg,
+                    flatCfg.dirs().database(), "feed", "b_ref1", Map.of(0, "feed.csv", 1, "feed.csv"),
+                    new com.gamma.query.DecisionRuleApplier.Result(List.of(), List.of()));
+            graph = BatchIngestStrategy.writeAndTrace(b, "transformed", List.of(), graphCfg,
+                    graphCfg.dirs().database(), "feed", "b_ref1", Map.of(0, "feed.csv", 1, "feed.csv"), "");
+        } finally {
+            DuckDbUtil.deleteTempDb(flatDb);
+            DuckDbUtil.deleteTempDb(graphDb);
+        }
+
+        assertEquals(flat.outputs().size(), graph.outputs().size(), "output file count");
+        // The batch-unique stem is what makes the next batch APPEND rather than overwrite.
+        assertEquals(flat.outputs().stream().map(o -> Path.of(o.outputFile()).getFileName().toString()).sorted().toList(),
+                graph.outputs().stream().map(o -> Path.of(o.outputFile()).getFileName().toString()).sorted().toList(),
+                "the versioned file stem must carry the batch id in BOTH lanes");
+        assertTrue(graph.outputs().get(0).outputFile().contains("__v_b_ref1"),
+                "the graph lane stamped the batch-unique stem: " + graph.outputs().get(0).outputFile());
+        assertEquals(dataLines(dir.resolve("flat_ref").resolve("db")).size(),
+                dataLines(dir.resolve("graph_ref").resolve("db")).size(), "row count");
+        // The reference system columns landed (the stamp ran) — __op is one of them.
+        assertTrue(dataLines(dir.resolve("graph_ref").resolve("db")).stream().anyMatch(l -> l.contains("upsert")),
+                "the graph lane stamped the reference system columns");
+    }
+
+    /** A {@code produces: reference}, {@code load: upsert} pipeline — the versioned-store shape. */
+    private static PipelineConfig referenceConfig(Path dir) throws Exception {
+        Files.createDirectories(dir);
+        return PipelineConfig.fromMap(Map.of(
+                "name", "REF_PARITY",
+                "produces", "reference",
+                "reference", Map.of("load", "upsert", "key", List.of("ID")),
+                // ⚠ dirs.temp is what gives the branch-commit ledger a durable, per-pipeline home; without
+                // it graphLaneCarries refuses (the ledger would land in the shared JVM temp dir).
+                "dirs", Map.of("poll", dir.resolve("in").toString(),
+                        "database", dir.resolve("db").toString(),
+                        "temp", dir.resolve("temp").toString()),
+                "output", Map.of("format", "CSV"),
+                "processing", Map.of("threads", 1)));
+    }
+
     /** A two-destination, non-route pipeline rooted at {@code out}. */
     private static PipelineConfig fanOutConfig(Path dir, Path out) throws Exception {
         Files.createDirectories(dir);

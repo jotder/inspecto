@@ -141,7 +141,7 @@ public final class BatchProcessor {
         // log: it IS the durable partial-commit record BranchCommitCoordinator resumes from. Absent
         // for flat-lane batches, so deleteIfExists is the right verb.
         java.nio.file.Files.deleteIfExists(
-                com.gamma.pipeline.exec.BranchCommitLog.pathFor(cfg.dirs().temp(), batch.batchId()));
+                BatchIngestStrategy.branchCommitLogPath(cfg, batch.batchId()));
     }
 
     /**
