@@ -415,11 +415,11 @@ public final class PipelineLift {
 
     /** The route branch key whose declared {@code database} matches {@code database}, or {@code null}. */
     private static String branchKeyForDatabase(Map<String, Object> routeCfg, String database) {
-        if (routeCfg == null || database == null || !(routeCfg.get("branches") instanceof List<?> branches))
-            return null;
-        for (Object b : branches)
-            if (b instanceof Map<?, ?> m && database.equals(m.get("database")) && m.get("key") != null)
-                return String.valueOf(m.get("key"));
+        if (routeCfg == null || database == null) return null;
+        List<RouteBranch> branches = RouteBranch.listFrom(routeCfg);
+        if (branches == null) return null;
+        for (RouteBranch b : branches)
+            if (b != null && database.equals(b.database()) && b.key() != null) return b.key();
         return null;
     }
 

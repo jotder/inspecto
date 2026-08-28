@@ -1006,9 +1006,19 @@ non-blocking:**
   never persisted** (e.g. `Investigator`'s `status:"draft"` stamp would vanish and an agent fix-draft
   mapping went LIVE). Unknown top-level/row keys on a CSV kind now refuse (422 at the route) instead
   of silently dropping; 3 round-trip fixtures pin TOON remainder survival (incl. through `.history/`)
-  and CSV refusal. Reactor 3660/0/0/5. **Candidate seam #2 (grounded, not started):** one node-kind
-  slice of `PipelineEditable.toMap`/`lower` — never the whole class; refuse `PipelineConfigParser`
-  outright (96-site sweep in disguise); `ConfigRoutes` is read-only, optional.
+  and CSV refusal. Reactor 3660/0/0/5.
+  **Seam #2 `route`/`branches` CLOSED 2026-08-28 (operator-named).** `RouteBranch` (package-private
+  record, `inspecto-engine`) types each branch entry: `key` + `database` as fields, the verbatim
+  entry map carried whole so unmodeled per-branch keys AND their authored order survive by
+  construction (`toMap` substitutes in place, never rebuilds — a reorder is a spurious file diff on
+  a no-edit save, the W3 class). `PipelineEditable.routeSection` and `PipelineLift.branchKeyForDatabase`
+  refactored onto it — no more in-place mutation of an untyped `List<Map>`, the historical
+  branch-destruction mechanism. New fixture covers the gap the file-level `unmodeledKeysArePreserved`
+  never did: an unmodeled key INSIDE `branches[]`, the in-place `database` restamp, and entry key
+  order. Reactor 3661/0/0/5. **Next candidates (grounded):** map/rules already guarded by
+  `MapNodeKeyContractTest` (low value); refuse collector/acquisition (co-mingled borrowed sections)
+  and `PipelineConfigParser` outright (96-site sweep in disguise); `ConfigRoutes` is read-only,
+  optional; sink spans three raw sections (higher blast radius — take only with its own grounding).
 
 The engineering MoSCoW (build hygiene, `CollectorService` decomposition, `agent.spi` facade,
 Fuse-leftover removal, reactor split, shutdown robustness, `@PublicApi` freezing) is **COMPLETE and

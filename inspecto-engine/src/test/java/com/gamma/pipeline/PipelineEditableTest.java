@@ -263,6 +263,47 @@ class PipelineEditableTest {
                 node("dd2", "transform.dedup", Map.of("keys", List.of("imsi"))));
     }
 
+    // ── JAVA-SIMP-2 seam #2 (RouteBranch): branch entries must survive the lower verbatim ──
+
+    /**
+     * Unmodeled per-branch keys — and the AUTHORED ORDER of each entry — survive a lower, and the
+     * {@code database} join-key stamp lands in place. This is the historical branch-destruction seam
+     * (an untyped {@code List<Map>} mutated in place); the file-level {@code unmodeledKeysArePreserved}
+     * never looked inside {@code branches[]}.
+     */
+    @Test
+    void routeBranchUnmodeledKeysAndOrderSurviveLower() {
+        Map<String, Object> big = new LinkedHashMap<>();
+        big.put("note", "operator note");     // unmodeled, authored first
+        big.put("database", "stale_db");      // authored BEFORE key; the stamp must replace it in place
+        big.put("key", "big");
+        Map<String, Object> rest = new LinkedHashMap<>();
+        rest.put("key", "rest");              // no route edge for this key — entry stays verbatim
+        rest.put("threshold", 5);             // unmodeled
+        Map<String, Object> rc = new LinkedHashMap<>();
+        rc.put("on", "amount");
+        rc.put("branches", List.of(big, rest));
+
+        Map<String, Object> lowered = PipelineEditable.lower(new PipelineGraph("x", true, List.of(
+                node("acq", "acquisition", Map.of("poll", "in")),
+                node("parse", "parser", Map.of("schema_file", "s.toon")),
+                node("route", "transform.route", rc),
+                node("sink", "sink.persistent", Map.of("database", "big_orders"))),
+                List.of(new PipelineEdge("route", PipelineRel.route("big"), "sink"))),
+                new LinkedHashMap<>(), true);
+
+        Map<?, ?> route = (Map<?, ?>) lowered.get("route");
+        List<?> branches = (List<?>) route.get("branches");
+        Map<?, ?> b0 = (Map<?, ?>) branches.get(0);
+        assertEquals("operator note", b0.get("note"), "unmodeled per-branch key must survive");
+        assertEquals("big_orders", b0.get("database"), "database restamped from the route edge's sink");
+        assertEquals(List.of("note", "database", "key"), List.copyOf(((Map<String, ?>) b0).keySet()),
+                "the entry keeps its authored key order — a reorder is a spurious file diff on save");
+        Map<?, ?> b1 = (Map<?, ?>) branches.get(1);
+        assertEquals(5, b1.get("threshold"));
+        assertFalse(b1.containsKey("database"), "an edge-less branch is not stamped");
+    }
+
     /** Two routes: the top-level {@code route:} key held one, the chain holds both. */
     @Test
     void secondRouteNodeLowersToTheChain() {

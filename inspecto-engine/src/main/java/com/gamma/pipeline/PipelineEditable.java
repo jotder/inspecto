@@ -932,21 +932,26 @@ public final class PipelineEditable {
      */
     private static Map<String, Object> routeSection(PipelineGraph g, PipelineNode routeNode) {
         Map<String, Object> rc = deepCopy(routeNode.config());
-        if (!(rc.get("branches") instanceof List<?> branches)) return rc;
+        List<RouteBranch> branches = RouteBranch.listFrom(rc);
+        if (branches == null) return rc;
         Map<String, PipelineNode> byId = new LinkedHashMap<>();
         for (PipelineNode n : g.nodes()) byId.put(n.id(), n);
+        Map<String, String> databaseByKey = new LinkedHashMap<>();
         for (PipelineEdge e : g.edges()) {
             if (!e.from().equals(routeNode.id()) || !PipelineRel.isRoute(e.rel())) continue;
-            String key = PipelineRel.routeKey(e.rel());
             PipelineNode sink = byId.get(e.to());
             if (sink == null || sink.cfg("database") == null) continue;
-            for (Object b : branches)
-                if (b instanceof Map<?, ?> m && key.equals(String.valueOf(m.get("key")))) {
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> mm = (Map<String, Object>) m;
-                    mm.put("database", sink.cfg("database"));
-                }
+            databaseByKey.put(PipelineRel.routeKey(e.rel()), String.valueOf(sink.cfg("database")));
         }
+        List<?> original = (List<?>) rc.get("branches");
+        List<Object> lowered = new ArrayList<>(branches.size());
+        for (int i = 0; i < branches.size(); i++) {
+            RouteBranch b = branches.get(i);
+            if (b == null) { lowered.add(original.get(i)); continue; }   // malformed entry: verbatim
+            String database = b.key() == null ? null : databaseByKey.get(b.key());
+            lowered.add((database != null ? b.withDatabase(database) : b).toMap());
+        }
+        rc.put("branches", lowered);
         return rc;
     }
 
