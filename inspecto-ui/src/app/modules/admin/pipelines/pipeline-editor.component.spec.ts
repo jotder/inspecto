@@ -1466,6 +1466,66 @@ describe('PipelineEditorComponent', () => {
                 expect(load).not.toBe(c.definitionKind({ id: 'a', type: 'acquisition' }).icon);
             });
         });
+
+        /**
+         * Phase 4 S4 / D-13 — the per-Step switch. Two things matter: only a sink FED BY THE ROUTE is
+         * offered it (the engine parks at exactly that shape), and switching back on DELETES the key
+         * rather than writing `enabled: true`, so `PipelineEditable` derives an empty `disabled_steps`.
+         */
+        describe('per-Step switch (park/drain)', () => {
+            const routed: AuthoredPipeline = {
+                name: 'p',
+                active: false,
+                nodes: [
+                    { id: 'map', type: 'transform.map' },
+                    { id: 'route', type: 'transform.route', config: { mode: 'case' } },
+                    { id: 'emea', type: 'sink.persistent', config: { database: '/db/emea' } },
+                    { id: 'apac', type: 'sink.persistent', config: { database: '/db/apac' } },
+                ],
+                edges: [
+                    { from: 'map', rel: 'data', to: 'route' },
+                    { from: 'route', rel: 'data', to: 'emea' },
+                    { from: 'route', rel: 'data', to: 'apac' },
+                ],
+            };
+
+            it('offers the switch only on a sink fed by the route Step', () => {
+                const c = make();
+                c.model.set(structuredClone(routed));
+                expect(c.parkableNode({ id: 'apac', type: 'sink.persistent' })).toBe(true);
+                expect(c.parkableNode({ id: 'route', type: 'transform.route' })).toBe(false);
+                expect(c.parkableNode({ id: 'map', type: 'transform.map' })).toBe(false);
+                expect(c.parkableNode(null)).toBe(false);
+            });
+
+            it('offers nothing on a flat pipeline — there is no park boundary without a route', () => {
+                const c = make();
+                c.model.set({
+                    name: 'p',
+                    active: false,
+                    nodes: [
+                        { id: 'map', type: 'transform.map' },
+                        { id: 'out', type: 'sink.persistent', config: { database: '/db' } },
+                    ],
+                    edges: [{ from: 'map', rel: 'data', to: 'out' }],
+                });
+                expect(c.parkableNode({ id: 'out', type: 'sink.persistent' })).toBe(false);
+            });
+
+            it('writes enabled:false on switch-off and DELETES the key on switch-on', () => {
+                const c = make();
+                c.model.set(structuredClone(routed));
+                const apac = () => c.model()?.nodes.find((n) => n.id === 'apac');
+
+                c.setNodeEnabled(apac()!, false);
+                expect(apac()?.config?.['enabled']).toBe(false);
+                expect(apac()?.config?.['database']).toBe('/db/apac'); // the rest of the config survives
+                expect(c.dirty()).toBe(true);
+
+                c.setNodeEnabled(apac()!, true);
+                expect(apac()?.config && 'enabled' in apac()!.config!).toBe(false);
+            });
+        });
     });
 
     /**

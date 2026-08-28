@@ -353,6 +353,9 @@ const PIPELINE_VIEWS = PIPELINES.map((name, i) => ({
 export function batches(pipeline: string): Record<string, string>[] {
     return Array.from({ length: 25 }, (_, i) => {
         const failed = i % 8 === 0;
+        // Phase 4 S4 (D-13): one PARKED Consignment, so the Drain affordance is exercisable offline.
+        // PARKED is neither committed nor failed — it wrote nothing and carries no error.
+        const parked = i === 5;
         const durationMs = 800 + ((i * 137) % 6000);
         const end = NOW - i * 3_600_000;
         return {
@@ -362,13 +365,13 @@ export function batches(pipeline: string): Record<string, string>[] {
             output_table: failed ? '' : pipeline,
             start_time: ledgerTime(end - durationMs),
             end_time: ledgerTime(end),
-            status: failed ? 'FAILED' : 'SUCCESS',
+            status: parked ? 'PARKED' : failed ? 'FAILED' : 'SUCCESS',
             member_count: String(3 + (i % 5)),
             rejected_count: String(failed ? 1 : 0),
             total_input_rows: String(1200 + ((i * 311) % 8000)),
-            total_output_rows: String(failed ? 0 : 1100 + ((i * 293) % 7500)),
-            output_file_count: String(failed ? 0 : 1 + (i % 3)),
-            total_output_bytes: String(failed ? 0 : 250_000 + ((i * 7919) % 400_000)),
+            total_output_rows: String(failed || parked ? 0 : 1100 + ((i * 293) % 7500)),
+            output_file_count: String(failed || parked ? 0 : 1 + (i % 3)),
+            total_output_bytes: String(failed || parked ? 0 : 250_000 + ((i * 7919) % 400_000)),
             duration_ms: String(durationMs),
             error: failed ? 'COPY failed: could not cast column 3 to BIGINT' : '',
             // -1 = "not measured" is written as a BLANK cell (never 0) — mirror both forms
@@ -859,6 +862,18 @@ const PIPELINE_ERRORS = /\/runs\/([^/]+)\/errors(\?|$)/;
 const PIPELINE_REPORT = /\/runs\/([^/]+)\/report$/;
 const PIPELINE_COMMITS = /\/runs\/([^/]+)\/commits$/;
 const PIPELINE_TRIGGER = /\/runs\/([^/]+)\/trigger$/;
+/**
+ * Consignments a drain has completed in THIS browser (Phase 4 S4c). The batch fixture is a pure
+ * function, so the drained set is what makes the offline outcome honest: after a drain the row reads
+ * SUCCESS, and a second drain of the same id is refused exactly as the server refuses it.
+ */
+const DRAINED_COLL = 'drained_consignments';
+
+function drainedIds(store: MockStore, space: string): Set<string> {
+    return new Set(store.list<{ id: string }>(space, DRAINED_COLL).map((d) => d.id));
+}
+
+const PIPELINE_DRAIN = /\/runs\/([^/]+)\/drain$/;
 const PIPELINE_PAUSE = /\/runs\/([^/]+)\/pause$/;
 const PIPELINE_RESUME = /\/runs\/([^/]+)\/resume$/;
 const PIPELINE_RUN_BY_ID = /\/runs\/runs\/([^/]+)$/;
@@ -905,7 +920,14 @@ export function demoHandler(flags: MockFlags): MockHandler {
 
         // ── pipelines ──
         if (method === 'GET' && PIPELINES_LIST.test(url)) return json(PIPELINE_VIEWS);
-        if (method === 'GET' && (m = match(url, PIPELINE_BATCHES))) return json(batches(m[1]));
+        if (method === 'GET' && (m = match(url, PIPELINE_BATCHES))) {
+            const drained = drainedIds(store, space);
+            return json(
+                batches(m[1]).map((b) =>
+                    drained.has(b['consignment_id']) ? { ...b, status: 'SUCCESS', output_file_count: '1' } : b,
+                ),
+            );
+        }
         if (method === 'GET' && (m = match(url, PIPELINE_FILES))) return json(files(m[1]));
         if (method === 'GET' && (m = match(url, PIPELINE_LINEAGE))) return json(lineage(m[1]));
         if (method === 'GET' && (m = match(url, PIPELINE_QUARANTINE))) return json(quarantine(m[1]));
@@ -946,6 +968,31 @@ export function demoHandler(flags: MockFlags): MockHandler {
         }
         if (method === 'POST' && (m = match(url, PIPELINE_TRIGGER))) {
             return json({ runId: `run-${Date.now()}-${m[1]}`, pipeline: m[1], status: 'running' }, 202);
+        }
+        // Phase 4 S4c: mirrors RunRoutes' gate order EXACTLY — 400 without a batchId, 404 for an id this
+        // pipeline never produced, 409 (reason verbatim) for anything not PARKED. A mock that drained
+        // any batch would greenlight an action the server refuses.
+        if (method === 'POST' && (m = match(url, PIPELINE_DRAIN))) {
+            const pipeline = m[1];
+            const batchId = (req.body as { batchId?: string } | null)?.batchId;
+            if (!batchId) return json({ error: { message: "body must include 'batchId'" } }, 400);
+            const row = batches(pipeline).find((b) => b['consignment_id'] === batchId);
+            if (!row) return json({ error: { message: `Manifest not found for batch ${batchId}` } }, 404);
+            const drained = drainedIds(store, space);
+            if (row['status'] !== 'PARKED' || drained.has(batchId))
+                return json(
+                    { error: { message: `Refusing to drain ${batchId}: it is not a PARKED Consignment.` } },
+                    409,
+                );
+            store.put(space, DRAINED_COLL, batchId, { id: batchId });
+            return json({
+                pipeline,
+                batchId,
+                status: 'drained',
+                branches: ['sink__d1'],
+                outputFiles: 1,
+                rows: Number(row['total_input_rows'] ?? 0),
+            });
         }
         if (method === 'POST' && (m = match(url, PIPELINE_PAUSE))) return json({ pipeline: m[1], paused: true });
         if (method === 'POST' && (m = match(url, PIPELINE_RESUME))) return json({ pipeline: m[1], paused: false });

@@ -36,6 +36,15 @@ function create(inputs?: { name: string; embedded: boolean }, confirmResult = tr
                     quarantine: () => of([QUARANTINED]),
                     commits: () => of([]),
                     reprocess: () => of({}),
+                    drain: () =>
+                        of({
+                            pipeline: 'cdr_ingest',
+                            batchId: 'b1',
+                            status: 'drained',
+                            branches: ['sink__d1'],
+                            outputFiles: 1,
+                            rows: 42,
+                        }),
                     rejectedRows: () =>
                         of({
                             pipeline: 'cdr_ingest',
@@ -81,7 +90,11 @@ describe('RunDetailComponent', () => {
 
     it('shows Reprocess in the default (Builder) lens on the Batches tab', () => {
         const c = create().componentInstance;
-        expect(c.auditRowActions.map((a) => a.hint)).toEqual(['Lineage & details', 'Reprocess this batch']);
+        expect(c.auditRowActions.map((a) => a.hint)).toEqual([
+            'Lineage & details',
+            'Reprocess this batch',
+            'Drain this parked Consignment',
+        ]);
     });
 
     it('hides Reprocess (keeps Lineage & details) in the Business (read-only) lens', () => {
@@ -154,6 +167,39 @@ describe('RunDetailComponent', () => {
         const c = create(undefined, false).componentInstance;
         const spy = vi.spyOn(TestBed.inject(RunsService), 'reprocess');
         await c.reprocessRow(BATCH);
+        expect(spy).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Phase 4 S4 / D-13. The Drain affordance appears on a PARKED Consignment and nowhere else: the
+     * engine refuses every other state with a 409, so offering it there would be an action that
+     * predictably fails.
+     */
+    it('offers Drain only on a PARKED row, and drains after confirmation', async () => {
+        const c = create().componentInstance;
+        const drainAction = c.auditRowActions.find((a) => a.hint === 'Drain this parked Consignment');
+        expect(drainAction).toBeDefined();
+        expect(drainAction!.visible?.({ consignment_id: 'b1', status: 'SUCCESS' })).toBe(false);
+        expect(drainAction!.visible?.({ consignment_id: 'b1', status: 'PARKED' })).toBe(true);
+        expect(drainAction!.visible?.({ status: 'PARKED' })).toBe(false); // no id → nothing to drain
+
+        const spy = vi.spyOn(TestBed.inject(RunsService), 'drain');
+        await c.drainRow({ consignment_id: 'b1', status: 'PARKED' });
+        expect(spy).toHaveBeenCalledWith('cdr_ingest', 'b1');
+    });
+
+    it('cancelling the confirm dialog skips the drain call', async () => {
+        const c = create(undefined, false).componentInstance;
+        const spy = vi.spyOn(TestBed.inject(RunsService), 'drain');
+        await c.drainRow({ consignment_id: 'b1', status: 'PARKED' });
+        expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('the Business lens blocks drainRow even when called directly', () => {
+        const c = create().componentInstance;
+        TestBed.inject(LensService).selectLens('business');
+        const spy = vi.spyOn(TestBed.inject(RunsService), 'drain');
+        void c.drainRow({ consignment_id: 'b1', status: 'PARKED' });
         expect(spy).not.toHaveBeenCalled();
     });
 

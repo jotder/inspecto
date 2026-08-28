@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { apiUrl, toParams } from './api-base';
-import { AuditRow, RunResult, RunView, BatchAuditReport, ReportWindow, InboxStatus, RejectedRows } from './models';
+import { AuditRow, DrainResult, RunResult, RunView, BatchAuditReport, ReportWindow, InboxStatus, RejectedRows } from './models';
 
 /** Ingest run lifecycle + audit queries (CONTROL scope). */
 @Injectable({ providedIn: 'root' })
@@ -36,6 +36,14 @@ export class RunsService {
         return this.http.post<Record<string, string>>(apiUrl(`/runs/${encodeURIComponent(name)}/reprocess`), {
             batchId,
         });
+    }
+    /**
+     * Complete a Consignment that PARKED at a disabled route branch (Phase 4 S4 / D-13). Deliberately
+     * separate from a re-enabling save: switching the Step back on is a config change, draining is the
+     * operator saying "now finish the Consignments that waited". Refusals come back 409 with the reason.
+     */
+    drain(name: string, batchId: string): Observable<DrainResult> {
+        return this.http.post<DrainResult>(apiUrl(`/runs/${encodeURIComponent(name)}/drain`), { batchId });
     }
     commits(name: string): Observable<string[]> {
         return this.http.get<string[]>(apiUrl(`/runs/${encodeURIComponent(name)}/commits`));

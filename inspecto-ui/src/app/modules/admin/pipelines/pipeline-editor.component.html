@@ -615,7 +615,9 @@
                                         [status]="statusOf(dn)"
                                         [lastRun]="nodeLastRun(dn)"
                                         [readOnly]="!canAuthor()"
+                                        [parkable]="parkableNode(dn)"
                                         (rename)="renameNode(dn, $event)"
+                                        (enabledChange)="setNodeEnabled(dn, $event)"
                                     />
                                     @if (dn.type === 'acquisition') {
                                         <app-pipeline-collection-definition

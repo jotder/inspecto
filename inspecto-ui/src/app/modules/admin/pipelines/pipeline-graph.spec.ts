@@ -292,6 +292,23 @@ describe('computeNodeStatus', () => {
     });
 
     /**
+     * Phase 4 S4 / D-13: a Step switched off reads as `disabled` whatever else is true of it — the
+     * author's explicit decision outranks every derived state, including a recorded test outcome.
+     * `enabled: true` is the default and must never produce the state.
+     */
+    it('reports a switched-off Step as disabled, over any derived status', () => {
+        const off = { id: 'w', type: 'sink.persistent', config: { database: '/db', enabled: false } };
+        expect(computeNodeStatus(off, 'SINK', refs, noTests)).toBe('disabled');
+        expect(computeNodeStatus(off, 'SINK', refs, new Map([['w', 'tested']]))).toBe('disabled');
+        // A blank-but-disabled Step is still disabled, not 'unconfigured'.
+        expect(computeNodeStatus({ id: 'w', type: 'sink.persistent', config: { enabled: false } }, 'SINK', refs, noTests)).toBe(
+            'disabled',
+        );
+        const on = { id: 'w', type: 'sink.persistent', config: { database: '/db', enabled: true } };
+        expect(computeNodeStatus(on, 'SINK', refs, noTests)).toBe('configured');
+    });
+
+    /**
      * ⚠ The decoupling guard: a transform/sink still needs configuration after losing its bind kind.
      * `needsRef` used to be `bindKindFor(cat) != null`, so nulling those kinds would have quietly made
      * every blank transform 'configured' and dropped its Validate error.

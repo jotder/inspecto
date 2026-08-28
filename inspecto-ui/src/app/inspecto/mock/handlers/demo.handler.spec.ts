@@ -119,9 +119,11 @@ describe('demoHandler', () => {
             'error',
             'cast_failures',
         ]);
-        // batch status is exactly the IngestOutcome vocabulary (SUCCESS | EMPTY | FAILED)
+        // batch status is exactly the engine's terminal vocabulary. PARKED joined it in Phase 4 S4b
+        // (D-13): a Consignment stopped at a disabled route branch is neither committed nor failed.
         const statuses = new Set(rows.map((r) => r['status']));
-        for (const s of statuses) expect(s).toMatch(/^(SUCCESS|EMPTY|FAILED)$/);
+        for (const s of statuses) expect(s).toMatch(/^(SUCCESS|EMPTY|FAILED|PARKED)$/);
+        expect(statuses.has('PARKED')).toBe(true); // the Drain affordance needs one to act on
         // the ledger's timestamp format is "yyyy-MM-dd HH:mm:ss", not ISO
         expect(rows[0]['end_time']).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
         // -1 = "not measured" is a BLANK cast_failures cell, never "-1"

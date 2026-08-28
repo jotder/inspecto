@@ -52,7 +52,7 @@ const NEEDS_CONFIG = new Set(['SOURCE', 'PARSE', 'TRANSFORM', 'SINK']);
 // ── Node status (canvas state) + flow validation (Stages 2 & 4) ──
 
 /** A node's authoring status, shown on the canvas + inspector. */
-export type NodeStatus = 'unconfigured' | 'dangling' | 'configured' | 'tested' | 'rejects';
+export type NodeStatus = 'unconfigured' | 'dangling' | 'disabled' | 'configured' | 'tested' | 'rejects';
 
 /** A test outcome recorded for a node after a run-to-here (drives `tested`/`rejects`). */
 export type TestOutcome = 'tested' | 'rejects';
@@ -64,6 +64,8 @@ export function statusGlyph(status: NodeStatus): string {
             return '⚠ ';
         case 'dangling':
             return '⚠ ';
+        case 'disabled':
+            return '⏸ ';
         case 'tested':
             return '✓ ';
         case 'rejects':
@@ -80,6 +82,8 @@ export function statusLabel(status: NodeStatus): string {
             return 'Needs config';
         case 'dangling':
             return 'Missing component';
+        case 'disabled':
+            return 'Disabled — Consignments park here';
         case 'configured':
             return 'Configured';
         case 'tested':
@@ -102,6 +106,9 @@ export function computeNodeStatus(
     tested: ReadonlyMap<string, TestOutcome>,
     checkDangling = true,
 ): NodeStatus {
+    // An explicit author decision outranks every derived state: a Step switched off is switched off,
+    // however well it is configured (Phase 4 S4 / D-13 — at rest its Consignments PARK here).
+    if (node.config?.['enabled'] === false) return 'disabled';
     const bindKind = bindKindFor(category);
     const ref = node.use?.trim();
     const hasInlineConfig = !!node.config && Object.keys(node.config).length > 0;
@@ -151,6 +158,12 @@ export function validatePipeline(
             });
         } else if (status === 'configured') {
             findings.push({ severity: 'info', nodeId: n.id, message: `${name}: not yet tested.` });
+        } else if (status === 'disabled') {
+            findings.push({
+                severity: 'info',
+                nodeId: n.id,
+                message: `${name}: disabled — Consignments reaching it park until it is re-enabled and drained.`,
+            });
         } else if (status === 'rejects') {
             findings.push({
                 severity: 'warning',
@@ -457,6 +470,8 @@ export function statusIcon(s: NodeStatus): string {
             return 'heroicons_outline:exclamation-triangle';
         case 'dangling':
             return 'heroicons_outline:x-circle';
+        case 'disabled':
+            return 'heroicons_outline:pause-circle';
         case 'tested':
             return 'heroicons_outline:check-circle';
         case 'rejects':

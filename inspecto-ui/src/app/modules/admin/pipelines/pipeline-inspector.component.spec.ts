@@ -207,6 +207,44 @@ describe('PipelineInspectorComponent', () => {
             c.commitIdentity();
             expect(rename).toHaveBeenCalledTimes(1);
         });
+
+        /**
+         * Phase 4 S4 / D-13. The switch is offered ONLY where the engine can park — the host decides
+         * that (`parkable`), so an ordinary Step never shows a toggle that the save gate would refuse.
+         */
+        it('offers the per-Step switch only when the host says the Step is parkable', () => {
+            const sink: AuthoredNode = { id: 'sink__d1', type: 'sink.persistent', config: { database: '/db/apac' } };
+            const { fixture, c } = create({ compact: true });
+            fixture.componentRef.setInput('node', sink);
+            fixture.detectChanges();
+            const el = fixture.nativeElement as HTMLElement;
+            expect(el.querySelector('mat-slide-toggle')).toBeNull();
+
+            fixture.componentRef.setInput('parkable', true);
+            fixture.detectChanges();
+            const toggle = el.querySelector('mat-slide-toggle');
+            expect(toggle).not.toBeNull();
+            expect(toggle?.textContent).toContain('Step enabled');
+            expect(el.textContent).toContain('Switch off to park');
+
+            const changed = vi.fn();
+            c.enabledChange.subscribe(changed);
+            c.setEnabled(false);
+            expect(changed).toHaveBeenCalledWith(false);
+
+            // A switched-off Step says what the state MEANS, not just that it is off.
+            fixture.componentRef.setInput('node', { ...sink, config: { ...sink.config, enabled: false } });
+            fixture.detectChanges();
+            expect(el.textContent).toContain('park until it is switched back on and drained');
+        });
+
+        it('never offers the switch in the read-only lens', () => {
+            const sink: AuthoredNode = { id: 'sink__d1', type: 'sink.persistent', config: {} };
+            const { fixture } = create({ compact: true, readOnly: true, parkable: true });
+            fixture.componentRef.setInput('node', sink);
+            fixture.detectChanges();
+            expect((fixture.nativeElement as HTMLElement).querySelector('mat-slide-toggle')).toBeNull();
+        });
     });
 
     it('has no a11y violations in any of the three states', async () => {

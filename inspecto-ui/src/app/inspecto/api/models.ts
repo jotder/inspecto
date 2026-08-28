@@ -5,6 +5,19 @@
 /** A generic header→value audit row (batches/files/lineage/quarantine/commits, enrichment runs…). */
 export type AuditRow = Record<string, string>;
 
+/**
+ * What `POST /runs/{name}/drain` reports (Phase 4 S4 / D-13): which parked branches were completed,
+ * and what they wrote. A refusal is a 409 carrying the engine's reason, never a result with zeroes.
+ */
+export interface DrainResult {
+    pipeline: string;
+    batchId: string;
+    status: string;
+    branches: string[];
+    outputFiles: number;
+    rows: number;
+}
+
 // ── runs ─────────────────────────────────────────────────────────────────────
 export interface RunView {
     name: string;

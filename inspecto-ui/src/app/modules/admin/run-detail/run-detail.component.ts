@@ -244,7 +244,17 @@ export class RunDetailComponent implements OnInit {
                 onClick: (r) => this.reprocessRow(r),
             },
         ];
-        return this.activeTab === 'quarantine' ? [...operate, rejects] : operate;
+        if (this.activeTab === 'quarantine') return [...operate, rejects];
+        // Phase 4 S4 / D-13: draining is a BATCH-tab action, and only on a PARKED row — a quarantined
+        // file was rejected before any Consignment existed, and the engine refuses every other state
+        // with a 409. Offering it elsewhere would be an affordance that predictably fails.
+        operate.push({
+            icon: 'heroicons_outline:play',
+            hint: 'Drain this parked Consignment',
+            visible: (r) => !!r['consignment_id'] && r['status'] === 'PARKED',
+            onClick: (r) => this.drainRow(r),
+        });
+        return operate;
     }
 
     readonly fileRowActions: InspectoRowAction<AuditRow>[] = [
@@ -359,6 +369,35 @@ export class RunDetailComponent implements OnInit {
             data: { pipeline: this.name, file },
             width: '900px',
             maxHeight: '85vh',
+        });
+    }
+
+    /**
+     * Complete a Consignment that PARKED at a disabled route branch. The Step must already be switched
+     * back on — the engine refuses otherwise (409), and that reason is what the operator sees, because
+     * "re-enable it first" is the actual next step, not a generic failure.
+     */
+    async drainRow(r: AuditRow): Promise<void> {
+        if (!this.lens.canOperateRuns()) return; // Business lens: read-only observe
+        const id = r['consignment_id'];
+        if (!id) {
+            this.toastr.warning('No Consignment id on this row');
+            return;
+        }
+        const ok = await this.confirm.confirm(
+            `Drain parked Consignment "${id}" of "${this.name}"? Its parked rows are written to their ` +
+                `destination and the Consignment is committed.`,
+            'Drain Consignment',
+        );
+        if (!ok) return;
+        this.api.drain(this.name, id).subscribe({
+            next: (res) => {
+                this.toastr.success(
+                    `Drained ${id} — ${res.branches.length} branch(es), ${res.rows.toLocaleString()} row(s)`,
+                );
+                this.loadTab();
+            },
+            error: (e) => this.toastr.error(apiErrorMessage(e, `Drain failed for ${id}`)),
         });
     }
 

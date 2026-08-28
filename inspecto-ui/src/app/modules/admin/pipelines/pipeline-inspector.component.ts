@@ -14,6 +14,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { AuthoredNode } from 'app/inspecto/api';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 import {
@@ -43,6 +44,7 @@ import {
         MatIconModule,
         MatInputModule,
         FormsModule,
+        MatSlideToggleModule,
         ReactiveFormsModule,
         InspectoOptionPickerComponent,
     ],
@@ -88,6 +90,27 @@ import {
                         <input matInput formControlName="description" (change)="commitIdentity()" />
                     </mat-form-field>
                 </form>
+                @if (parkable) {
+                    <!--
+                        Phase 4 S4 / D-13: the per-Step switch. Only a route-branch sink offers it — the
+                        host decides that structurally (a sink fed by the route Step), never by mirroring
+                        the engine's sink-id grammar. Off is a durable PAUSE, not a skip: at rest the
+                        Consignments reaching this branch PARK, and a drain completes them once it is
+                        switched back on.
+                    -->
+                    <div class="mb-2">
+                        <mat-slide-toggle [checked]="node.config?.['enabled'] !== false" (change)="setEnabled($event.checked)">
+                            Step enabled
+                        </mat-slide-toggle>
+                        <p class="mt-1 text-xs opacity-70">
+                            @if (node.config?.['enabled'] === false) {
+                                Consignments reaching this branch park until it is switched back on and drained.
+                            } @else {
+                                Switch off to park this branch's Consignments instead of writing them.
+                            }
+                        </p>
+                    </div>
+                }
             } @else if (renaming()) {
                 <form [formGroup]="renameForm" (ngSubmit)="commitRename()" class="mb-2 space-y-1">
                     <mat-form-field class="w-full" subscriptSizing="dynamic">
@@ -205,6 +228,12 @@ export class PipelineInspectorComponent implements OnChanges {
      * definition-pane nodes).
      */
     @Input() compact = false;
+    /**
+     * Whether this Step may be switched off (Phase 4 S4 / D-13). The HOST decides: only a sink fed by
+     * an armed `route:` Step can park, which is a structural fact of the graph on screen — deriving it
+     * here from the node alone would mean mirroring `StepDisableArming`'s sink-id grammar.
+     */
+    @Input() parkable = false;
 
     @Output() configure = new EventEmitter<AuthoredNode>();
     @Output() edgeRelChange = new EventEmitter<string>();
@@ -214,6 +243,9 @@ export class PipelineInspectorComponent implements OnChanges {
      * The host patches the model; identity (`id`/`type`) stays fixed.
      */
     @Output() rename = new EventEmitter<{ name: string; description: string }>();
+
+    /** The per-Step switch (see {@link parkable}); the host patches `config.enabled` on the model. */
+    @Output() enabledChange = new EventEmitter<boolean>();
 
     /** Whether the inline Name/Description editor is open. Reset whenever the selection changes. */
     readonly renaming = signal(false);
@@ -248,6 +280,10 @@ export class PipelineInspectorComponent implements OnChanges {
         const description = (v.description ?? '').trim();
         if (name === (n.name ?? '') && description === (n.description ?? '')) return;
         this.rename.emit({ name, description });
+    }
+
+    setEnabled(enabled: boolean): void {
+        if (this.node) this.enabledChange.emit(enabled);
     }
 
     startRename(): void {

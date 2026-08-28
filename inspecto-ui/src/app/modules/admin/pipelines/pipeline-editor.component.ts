@@ -2109,6 +2109,45 @@ export class PipelineEditorComponent implements OnInit {
         this.dirty.set(true);
     }
 
+    /**
+     * Whether `node` may be switched off (Phase 4 S4 / D-13). The engine parks at exactly one shape —
+     * a sink STRICTLY inside an armed `route:` subtree — so the test here is structural over the graph
+     * on screen: a sink Step with an inbound edge from a `transform.route` Step. Deliberately NOT a
+     * mirror of `StepDisableArming.parkableSinkIds`' `sink__d<i>` id grammar, which is a lift-time
+     * spelling this model never sees; the save gate remains the authority and its refusals surface
+     * through the PUT's `refusals[]`.
+     */
+    parkableNode(node: AuthoredNode | null): boolean {
+        const m = this.model();
+        if (!node || !m) return false;
+        // The served step-type catalog is the category authority, but it may not have arrived yet (and
+        // never does in a unit test), so the built-in `sink.` type prefix stands in for it. Both agree
+        // in production; without the fallback the switch would simply be absent until the catalog loads.
+        if (this.typeCategory(node.type) !== 'SINK' && !node.type.startsWith('sink.')) return false;
+        const routeIds = new Set(m.nodes.filter((n) => n.type === 'transform.route').map((n) => n.id));
+        if (!routeIds.size) return false;
+        return m.edges.some((e) => e.to === node.id && routeIds.has(e.from));
+    }
+
+    /**
+     * The per-Step switch. Writes the node's own `enabled` config key — the SAME key the lift overlays
+     * from `processing.disabled_steps` and `PipelineEditable` derives that list back from on save, so
+     * this needs no new wire shape. `true` DELETES the key rather than storing it: the engine's default
+     * is enabled, and an explicit `enabled: true` in every sink would be noise in the saved config.
+     */
+    setNodeEnabled(node: AuthoredNode | null, enabled: boolean): void {
+        const n = node && this.model()?.nodes.find((x) => x.id === node.id);
+        if (!n || !this.canAuthor()) return;
+        const config: Record<string, unknown> = { ...(n.config ?? {}) };
+        if (enabled) delete config['enabled'];
+        else config['enabled'] = false;
+        const updated: AuthoredNode = { ...n, config };
+        this.model.update((m) => (m ? applyNodePatchInModel(m, updated) : m));
+        if (this.selectedNode()?.id === updated.id) this.selectedNode.set(updated);
+        this.definitionNode.update((d) => (d && d.id === updated.id ? { ...d, config } : d));
+        this.dirty.set(true);
+    }
+
     /** Arm two-click edge creation from the inspector's selected node. */
     armConnect(): void {
         const n = this.selectedNode();
