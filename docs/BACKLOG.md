@@ -122,8 +122,11 @@ each row's detail stays in its own section.
    exists (`superpower/compliance-certifications-plan.md`), the CC6 controls are live, and what remains
    is the Type II observation window plus external-party pacing, so it is scheduled by the org, not
    built by a shift ·
-   Postgres multi-user — **plan written 2026-07-27**
-   (`superpower/postgres-multi-user-plan.md`); build starts at P1 pooling.
+   Postgres multi-user — **NOT an engineering chain either (corrected 2026-08-28).** The plan
+   prerequisite is met (`superpower/postgres-multi-user-plan.md`, written 2026-07-27, build would start
+   at P1 pooling), but the plan's own header records the **direction as captured and DEFERRED by the
+   operator** — it says it "does not re-open that call". So this is **operator-gated, not
+   shift-schedulable**; §6's row is the detail. ⚠ Do not read "plan exists" as "unblocked".
    *(MNT-14 left this list 2026-07-27 — shipped.)*
 5. **Independent — schedule by value, no ordering constraint:**
    - **AGT-6a inline AI authoring** — **A1–A4 shipped 2026-07-26**; what is left are the three
@@ -160,7 +163,8 @@ each row's detail stays in its own section.
      `spatial` QueryType (§3 Queries row). Retire the phrase rather than re-scoping it.
 6. **Externally gated (parked — not schedulable by us):** OPS-5 live soak (deployment) · EOI-7b
    (infra) · E1 (demand) · **AGT-6b** agent graphs (demand + the `DryRunProvider` prerequisite) ·
-   parser field tiers (UX session, D13 confirmed) · C6 (profiling evidence).
+   parser field tiers (UX session, D13 confirmed). *(~~C6~~ left this list **2026-08-28** — the
+   profiling evidence it waited on was measured and the row CLOSED, see §6.)*
 
 ## 2. Open decisions — ALL ANSWERED 2026-07-25
 
@@ -2297,8 +2301,11 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   its own name: a *committed*-secret guard should only read what is committed. It falls back to the walk
   outside a git checkout (a tarball export). `SKIP_DIRS` is now applied by path segment, since the tracked
   list cannot be pruned by refusing to descend. Verified both ways: exit 0 on a clean tree, and still exit 1
-  on a planted `clientSecret = '<40 hex>'`. ⚠ **The `4.x` copy is unchanged and now DIVERGES** — the file's
-  own header requires the two be identical. Port it. Original finding follows. It reports
+  on a planted `clientSecret = '<40 hex>'`. ~~⚠ **The `4.x` copy is unchanged and now DIVERGES** — the file's
+  own header requires the two be identical. Port it.~~ **MOOT 2026-08-28: `4.x` was deleted 2026-08-17**
+  (BRANCHING.md §0-A; `git branch -a` shows no such ref, local or remote), so there is no second copy to
+  diverge from. The guard's own header already records this and states the standing rule — if a maintenance
+  branch is ever cut again, copy `tools/check-secrets.mjs` to it **verbatim**. Original finding follows. It reports
   *"Committed-secret guard: 4 probable secret(s)"* against `inspecto-deploy/ui/chunk-*.js`, but that
   directory is **gitignored** (`.gitignore:44`) with **zero tracked files** — nothing is committed, and the four
   hits are minified library property assignments (`withCredentials`, `apiKey`), not credentials. CI is unaffected
@@ -2633,8 +2640,11 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     token — a text input that validates numerically, plus a decision about what the spinner affordance
     becomes — which is a renderer change, not a filter tweak. **Do not "fix" it by offering the picker on
     the existing number widget**: that produces a field that looks empty and saves a token.
-- **Postgres multi-user transactional backend** — DIRECTION captured, deferred by operator. **Write a
-  `docs/superpower/` plan before building.** Most of it exists: the stores are interface-seamed with a
+- **Postgres multi-user transactional backend** — DIRECTION captured, **deferred by operator — still the
+  gate as of 2026-08-28**. ✅ The "write a `docs/superpower/` plan before building" prerequisite is
+  **satisfied**: `superpower/postgres-multi-user-plan.md` (2026-07-27) is that plan, and it makes the build
+  schedulable *when the operator takes it* — it does not itself unblock anything. ⚠ Not the same work as
+  `OperationalDb`/**PG-1**, which shipped 2026-08-14/15. Most of the substrate exists: the stores are interface-seamed with a
   `-D*.backend` toggle in `ServiceStores`, JDBC is dialect-aware, alerts/incidents/cases are already
   `ObjectStore` rows, and `PostgresStateStoreTest` round-trips all 7 JDBC stores against embedded
   Postgres. **The real multi-user gap is connection pooling** — every `Db*Store` holds ONE
