@@ -41,8 +41,17 @@ public final class LogicalNames {
     public static final List<String> DEFAULT_DATA_EXTENSIONS =
             List.of(".csv", ".tsv", ".txt", ".json", ".jsonl", ".ndjson", ".xml");
 
-    /** Suffixes the legacy inline path ({@code Compression.java}) understands but no plugin owns yet. */
-    private static final List<String> LEGACY_SUFFIXES = List.of(".zip");
+    /**
+     * The legacy inline path's vocabulary ({@code Compression.INLINE_SUFFIXES}) — READ, never
+     * restated. It is checked in ADDITION to the discovered plugin suffixes so a deployment whose
+     * plugin set is narrower than the inline path still recognises a compressed spelling.
+     *
+     * <p>⚠ Its old comment ("suffixes no plugin owns yet", with {@code .zip} hard-coded) was STALE:
+     * {@code ArchiveDecompressorPlugin$Zip} has owned {@code .zip} since the 2026-08-23 build, so
+     * the entry was already redundant with {@link Decompressors#knownSuffixes()} rather than
+     * covering a gap.
+     */
+    private static final List<String> LEGACY_SUFFIXES = com.gamma.etl.Compression.INLINE_SUFFIXES;
 
     private LogicalNames() {}
 

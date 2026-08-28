@@ -186,6 +186,29 @@ compressed spelling of that logical name has been processed.
   inside a `.zip` is extracted as an opaque member and then quarantines.
 - ⚠ A crash mid-archive re-ingests committed members: the container is marked only after its LAST
   member, so a crash re-expands it whole. Relies on `OVERWRITE_OR_IGNORE` output idempotence.
-- ⚠ **Two decompression vocabularies coexist** — this SPI and the legacy inline `Compression.java`
-  (still used by the Java lane, `SchemaSelector`, `BoundaryScanner`, `FileChunker`). A format added
-  to one is unknown to the other.
+- ✅ **The two decompression vocabularies are UNIFIED (2026-08-28).** The legacy inline
+  `Compression.java` still exists — it is the Java lane's in-stream reader for `SchemaSelector`,
+  `BoundaryScanner`, `FileChunker` and `CsvIngester`, and this SPI does not replace it (the SPI
+  materialises *files*; that path wraps a *stream*). What is gone is the **hand-mirrored list**:
+  `Compression.INLINE_SUFFIXES` is now the one declaration, read by `Compression.isCompressed`, by
+  `UnpackStage.laneReadsItself` and by `LogicalNames.LEGACY_SUFFIXES`. Before, all three spelled
+  `.gz`/`.bz2`/`.zip` out separately.
+  - **The drift that actually bit is one-directional, and that is what the guard checks.**
+    `laneReadsItself` is what lets the stage *skip* a file ("the lane reads it itself"), so a suffix
+    the inline path claims but **no plugin owns** would be skipped by the stage and then handed to a
+    lane that cannot open it. `CompressionTest.inlineVocabularyIsOwnedByPlugins` makes that a red
+    build. ⛔ Do **not** "complete" it with the reverse containment: the SPI is deliberately wider
+    (`.Z`, `.tar`, `.tar.gz`/`.tgz` have plugins and no inline branch) and that is safe, because the
+    stage expands those before any engine sees them.
+  - ⚠ **DuckDB's branch of `laneReadsItself` stays literal on purpose** (`.gz`/`.zst`). It states a
+    *foreign* engine's capability — what `read_csv` auto-decompresses — not a vocabulary this
+    project owns, so deriving it from our plugin set would be wrong, not DRY.
+  - 🔴 Grounding correction found on the way: `LogicalNames.LEGACY_SUFFIXES` was documented as
+    "suffixes the legacy path understands but **no plugin owns yet**", hard-coding `.zip`. That was
+    stale — `ArchiveDecompressorPlugin$Zip` has owned `.zip` since the 2026-08-23 build, so the
+    entry was redundant with `Decompressors.knownSuffixes()` rather than covering a gap.
+- ⚠ **The `META-INF/services` file's header comment is stale** (noticed 2026-08-28, deliberately not
+  touched): it says "ORDER MATTERS: the resolver is a first-match linear scan", but
+  `Decompressors.forFile` resolves by **longest matching suffix** and its own javadoc says ordering
+  the services file is explicitly *not* relied on (ServiceLoader order across jars is unspecified).
+  The listed order is harmless; the reason given for it is wrong.

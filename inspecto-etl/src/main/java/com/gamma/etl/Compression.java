@@ -31,12 +31,33 @@ import java.util.zip.GZIPInputStream;
  */
 public final class Compression {
 
+    /**
+     * The ONE declaration of this legacy inline path's vocabulary — exactly the suffixes
+     * {@link #decompress} has a branch for, lower-case with the dot.
+     *
+     * <p>⛔ Do not restate this list anywhere. It exists because two other places need to know what
+     * the Java lane inflates <em>by itself</em>: {@link #isCompressed} and
+     * {@code UnpackStage.laneReadsItself} (which skips expanding a file the chosen lane already
+     * reads). Both read this field; before 2026-08-28 all three spelled the three suffixes out
+     * separately, which is the drift this closes.
+     *
+     * <p>⚠ Adding an entry here without a matching
+     * {@link com.gamma.etl.unpack.DecompressorPlugin} is a RED build
+     * ({@code CompressionTest.inlineVocabularyIsOwnedByPlugins}): the unpack stage's decision to
+     * leave a file alone is keyed on this list, so a format only this path knew would be skipped by
+     * the stage and then read by a lane that cannot open it. The reverse containment is deliberately
+     * NOT required — the SPI is wider on purpose ({@code .Z}, {@code .tar}, {@code .tar.gz}), and
+     * the stage expands those before any engine sees them.
+     */
+    public static final java.util.List<String> INLINE_SUFFIXES = java.util.List.of(".gz", ".bz2", ".zip");
+
     private Compression() {}
 
     /** Whether {@code fileName} carries a decompressible extension this helper understands. */
     public static boolean isCompressed(String fileName) {
         String n = fileName.toLowerCase();
-        return n.endsWith(".gz") || n.endsWith(".bz2") || n.endsWith(".zip");
+        for (String s : INLINE_SUFFIXES) if (n.endsWith(s)) return true;
+        return false;
     }
 
     /**

@@ -223,10 +223,13 @@ public final class UnpackStage {
 
     /** Whether the chosen lane already decodes this suffix itself (see class comment). */
     private static boolean laneReadsItself(String fileName, boolean nativeLane) {
+        // The Java lane's answer is Compression's own vocabulary, READ not restated — this used to
+        // spell out the same three suffixes, so a format added to one was unknown to the other.
+        // DuckDB's stays literal on purpose: it is a foreign engine's capability
+        // (read_csv auto-decompresses .gz/.zst), not a list this project owns.
+        if (!nativeLane) return com.gamma.etl.Compression.isCompressed(fileName);
         String n = fileName.toLowerCase(Locale.ROOT);
-        return nativeLane
-                ? n.endsWith(".gz") || n.endsWith(".zst")
-                : n.endsWith(".gz") || n.endsWith(".bz2") || n.endsWith(".zip");
+        return n.endsWith(".gz") || n.endsWith(".zst");
     }
 
     /** Reclaim expansion dirs from crashed cycles — anything older than {@link #STALE_WORK_MS}. */
