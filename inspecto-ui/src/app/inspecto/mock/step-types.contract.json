@@ -430,7 +430,7 @@
       "value" : "clone",
       "label" : "clone (fan-out)"
     } ],
-    "help" : "Named routes and their predicates are edited on the canvas edges."
+    "help" : "Branch keys, predicates and destinations are edited on the branch rows in the Recipe view."
   } ]
 }, {
   "verb" : "sink",

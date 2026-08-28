@@ -130,14 +130,42 @@ class ControlApiRouteArmingTest {
                    "processing":{"threads":1,"schema_file":"cdr.toon"},
                    "sinks":[{"database":"emea_db"},{"database":"apac_db"}],
                    "route":{"mode":"case","default":"apac","branches":[
-                       {"key":"emea","database":"emea_db"},
-                       {"key":"apac","database":"apac_db"}]}}}""";
+                       {"key":"emea","database":"emea_db","where":"ID LIKE 'E%'"},
+                       {"key":"apac","database":"apac_db","where":"ID LIKE 'A%'"}]}}}""";
         try (Ctx c = open(cfg, root)) {
             HttpResponse<String> r = post(c.port, "/config/write", armable);
             assertEquals(200, r.statusCode(), r.body());
             JsonNode out = V1Body.of(r.body());
             assertTrue(out.get("written").asBoolean(), r.body());
             assertFalse(out.get("findings").toString().contains("route:"), out.get("findings").toString());
+        }
+    }
+
+    /**
+     * The predicate rule at the HTTP layer. ⚠ This fixture is the one the editor actually produces:
+     * {@code addRouteBranch} writes {@code {key}} and wires the sink, and the author types the
+     * predicate afterwards — so "wired but blank" is the normal intermediate state, not a typo. On an
+     * ACTIVE config it must refuse, because {@code RowShaper.route} would throw on the first row.
+     */
+    @Test
+    @DisplayName("an active route branch with no where: is refused at the save route")
+    void branchWithoutAPredicateIsRefusedOnSave(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        String blankPredicate = """
+                {"type":"pipeline","config":{
+                   "name":"regional_cdr_blank",
+                   "active":true,
+                   "dirs":{"poll":"in","database":"out"},
+                   "processing":{"threads":1,"schema_file":"cdr.toon"},
+                   "sinks":[{"database":"emea_db"},{"database":"apac_db"}],
+                   "route":{"mode":"case","default":"apac","branches":[
+                       {"key":"emea","database":"emea_db","where":"ID LIKE 'E%'"},
+                       {"key":"apac","database":"apac_db"}]}}}""";
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> r = post(c.port, "/config/write", blankPredicate);
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("branch 'apac' has no where:"), r.body());
+            // Only the offending branch is named — the complete one must not be reported.
+            assertFalse(r.body().contains("branch 'emea' has no where:"), r.body());
         }
     }
 }

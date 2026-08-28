@@ -301,14 +301,24 @@ public final class NodeAttributes {
 
     /**
      * {@code transform.route}: {@code mode} is the only scalar. {@code branches} — the list of
-     * {@code {key, where}} that actually does the routing — has no spec because the {@code list} type is
-     * {@code string[]} and these are MAPS; the named routes are authored on the canvas edges anyway.
-     * {@code route_column} was removed (D2): it was read by nothing.
+     * {@code {key, where, database}} that actually does the routing — has no spec because the
+     * {@code list} type is {@code string[]} and these are MAPS.
+     *
+     * <p>⛔ <b>Do not close that by adding a map-list spec type.</b> Branches already have a dedicated
+     * authoring surface (the Recipe view's branch rows: add/remove the branch, name it, type its
+     * {@code when} predicate), and two of the three keys are NOT author-owned — {@code database} is
+     * stamped by {@code PipelineEditable.routeSection} from the sink each {@code route:<key>} edge
+     * feeds, and {@code key} IS that edge's name. Speccing {@code branches} would make it form-OWNED,
+     * and an owned leaf is replaced wholesale on save — which is exactly the branch-destruction bug
+     * {@code RouteBranch} exists to prevent. (Corrected 2026-08-28: this comment used to say the
+     * branches are edited "on the canvas edges", which sent readers looking at the wrong surface.)
+     *
+     * <p>{@code route_column} was removed (D2): it was read by nothing.
      */
     public static final List<NodeAttribute> TRANSFORM_ROUTE = List.of(
             NodeAttribute.of("mode", "Route mode", "select", "required").defaultValue("case")
                     .options("case", "case (exclusive)", "clone", "clone (fan-out)")
-                    .help("Named routes and their predicates are edited on the canvas edges."));
+                    .help("Branch keys, predicates and destinations are edited on the branch rows in the Recipe view."));
 
     /**
      * {@code transform.dedup} (record-grain, → {@code processing.dedup}) — the QUALIFY the engine

@@ -90,6 +90,20 @@ public final class RouteArming {
                 continue;
             }
             keys.add(String.valueOf(m.get("key")));
+            // (2b) every branch needs a `where` predicate. RowShaper.route requires it on EVERY branch
+            //      of both modes (`reqStr(b, "where", …)`, inside the CASE builder and the clone loop),
+            //      so a branch without one throws mid-run — after the route has already registered and
+            //      armed. That is precisely what this gate exists to convert into an authoring-time
+            //      answer. ⚠ Reachable from the product itself, not just hand-editing: the editor's
+            //      `addRouteBranch` creates the entry as `{key}` with the predicate typed in afterwards
+            //      (a separate `setRouteBranchWhere`), so a branch added and then left blank saves
+            //      clean today. An INACTIVE draft still only warns — ConfigRoutes picks the severity —
+            //      which is what keeps mid-authoring saves working.
+            //      ⛔ Do not exempt the `default:` branch: it is one of `branches[]` and RowShaper emits
+            //      a WHEN for it like any other. "Everything else" is the ELSE arm, not a blank branch.
+            if (m.get("where") == null || String.valueOf(m.get("where")).isBlank())
+                out.add("route: branch '" + m.get("key") + "' has no where: predicate — every armed "
+                        + "branch needs one (the run fails on the first row otherwise)");
             String db = String.valueOf(m.get("database"));
             if (!sinkDbs.contains(db))
                 out.add("route: branch '" + m.get("key") + "' names database '" + db + "', which matches "

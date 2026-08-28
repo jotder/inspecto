@@ -282,9 +282,12 @@ const NODE_ATTRIBUTES: Record<string, AttributeSpec[]> = {
             help: 'Which raw column (0-based) the four before-parsing lists above match against. Ignored by the row predicate.',
         },
     ],
-    // `branches` — the list of `{key, where}` that actually does the routing — has no spec: the `list`
-    // type added with D7 is `string[]`, and these are MAPS, so it does not apply here. The named routes
-    // are authored on the canvas edges anyway. `mode` is the only scalar.
+    // `branches` — the list of `{key, where, database}` that actually does the routing — has no spec:
+    // the `list` type added with D7 is `string[]`, and these are MAPS, so it does not apply here.
+    // ⛔ Do not close that with a map-list spec type: branches have their own surface (the Recipe
+    // view's branch rows — add/remove, name, `when` predicate), and `database`/`key` are DERIVED from
+    // the `route:<key>` edge and its sink, so a form-owned `branches` would be replaced wholesale on
+    // save and destroy that stamping. `mode` is the only scalar.
     'transform.route': [
         {
             key: 'mode',
@@ -296,7 +299,7 @@ const NODE_ATTRIBUTES: Record<string, AttributeSpec[]> = {
                 { value: 'case', label: 'case (exclusive)' },
                 { value: 'clone', label: 'clone (fan-out)' },
             ],
-            help: 'Named routes and their predicates are edited on the canvas edges.',
+            help: 'Branch keys, predicates and destinations are edited on the branch rows in the Recipe view.',
         },
     ],
     // Record-grain dedup (→ processing.dedup) — distinct from the file-level duplicate Guarantees.

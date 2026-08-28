@@ -199,8 +199,10 @@ describe('node-attributes', () => {
      * D2 regression (2026-08-03). `route_column` was read by **nothing** — `RowShaper.route` routes on
      * `branches[]{key, where}` (per-branch SQL predicates), plus `mode` and `default`
      * (`RowShaper.java:99-145`); a repo-wide grep found zero Java readers of `route_column`. `mode` is
-     * engine-real and stays. `branches` and `default` are deliberately unspecced — `AttributeSpec` has no
-     * list type and the named routes are authored on the canvas edges.
+     * engine-real and stays. `branches` and `default` are deliberately unspecced — `AttributeSpec` has
+     * no map-list type, and branches have their own surface (the Recipe view's branch rows) whose
+     * `key`/`database` are derived from the `route:<key>` edge, so speccing them would form-OWN a
+     * derived pair and replace it wholesale on save.
      */
     it('offers only the engine-real scalar for a route node', () => {
         const keys = nodeAttributesFor('transform.route')!.map((s) => s.key);

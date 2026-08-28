@@ -1521,3 +1521,63 @@ panel + mock-handler specs 34/34, production build clean.*
 carry a `category`, nodes carry user `name`/`description`, built-in processor definitions exposed for the UI.** **T31 (read-only flow
 visualisation — `PipelineProjection` + `/pipelines` API + the `inspecto-ui` Flows pane) DONE 2026-06-17.**
 Next: Phase 2 (component registry + `use:` refs, T6–T8).
+
+## 19. An armed route branch needs a predicate — and why `branches` still has no spec (2026-08-28)
+
+Two conclusions from grounding the last driver of the map-list `AttributeSpec` type. One is a **build**,
+one is a **refutation**; they are the same investigation because both turn on what a branch entry is.
+
+### 19.1 What a branch entry actually is — three keys, two of them derived
+
+A `route:` branch is `{key, where, database}`, and the three have different owners:
+
+| key | owner | where it comes from |
+|---|---|---|
+| `key` | **derived** | the name of the node's `route:<key>` edge |
+| `database` | **derived** | stamped by `PipelineEditable.routeSection` from the sink that edge feeds — the branch↔sink JOIN KEY on both halves of the round-trip |
+| `where` | **authored** | the branch's SQL predicate; no other home |
+
+### 19.2 BUILD — `RouteArming` now refuses a branch with no `where`
+
+`RowShaper.route` requires `where` on **every** branch of **both** modes (`reqStr(b, "where", …)`, in the
+CASE builder and the clone loop). `RouteArming.refusals` did not check it, so a branch missing the
+predicate passed every arming rule, **registered, armed, and then threw mid-run** on the first row.
+
+⚠ **Reachable from the product itself, not just hand-editing.** The editor's `addRouteBranch` writes the
+entry as `{key}` and wires its sink; the predicate is typed afterwards through a separate
+`setRouteBranchWhere`. "Wired but blank" is the normal intermediate state.
+
+The gate is the usual severity split, so this does **not** break mid-authoring saves: `active: false`
+→ WARNING ("refuses only once it is activated"), `active: true` → ERROR/422. ⛔ The `default:` branch is
+**not** exempt — it is one of `branches[]` and gets a WHEN like any other; "everything else" is the
+CASE's ELSE arm, generated from `default:`, which needs no entry of its own.
+
+🔴 **Three separate fixtures encoded the same hole, and each called itself well-formed.**
+`RouteArmingTest.branch(key, db)`, `RecordDedupRouteConfigTest`'s arming cases (these did carry `where`)
+and `ControlApiRouteArmingTest.wellFormedRouteSavesClean` — the first and last asserted success for a
+route that could never have executed. The control-plane one only surfaced in the FULL reactor, not in the
+targeted `inspecto-etl` run that made the change green. **A fixture named "well-formed" is a claim, and it
+was wrong in two of the three places it was stated.**
+
+### 19.3 REFUTED — do not build a map-list `AttributeSpec` for `branches`
+
+With sink `partitions[]` decided schema-owned (2026-08-13), `transform.route`'s `branches` was the type's
+last remaining driver. It does not survive grounding, for two independent reasons:
+
+1. **There is already an authoring surface.** The Recipe view's branch rows add/remove a branch, name it,
+   and carry a `when …` input bound to `setRouteBranchWhere`. ⚠ The `NodeAttributes.TRANSFORM_ROUTE` help
+   text said the branches are "edited on the canvas edges" — **wrong surface**, corrected here across all
+   four mirrors (Java table, TS table, and both committed contract JSONs). That sentence is how a reader
+   concludes no surface exists and sets out to build a second one.
+2. **Speccing `branches` would destroy the derived pair.** A specced key is form-OWNED, and an owned leaf
+   is deleted and replaced wholesale on save (the `ownedLeaves` rule that half-refuted the D7 partitions
+   row). `key` and `database` are derived from the graph edge, so a form-owned `branches` re-writes them
+   from whatever the form holds — which is precisely the branch-destruction bug `RouteBranch` was
+   introduced to make structurally impossible.
+
+⛔ The map-list `AttributeSpec` type now has **no driver at all**. Do not open it again without one.
+
+*Verified: `mvn -o clean test -Pedition-enterprise` → 3692/0/0/5, exit 0, all 25 modules SUCCESS, none
+skipped (+5 tests). Rule falsified in both directions — stubbing the check to `if (false)` turns all four
+new tests red. UI: `npm run test:ci` 2769 passed/5 skipped exit 0, `lint:tokens` + `build` green, prettier
+clean.*

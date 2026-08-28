@@ -165,6 +165,27 @@ class RecordDedupRouteConfigTest {
     }
 
     @Test
+    void anArmedRouteBranchWithoutAPredicateIsRefused(@TempDir Path dir) throws Exception {
+        // The branch is wired correctly in every OTHER respect — key, a real sink database, a default
+        // naming it. Only the predicate is missing, which RowShaper.route requires on every branch, so
+        // before 2026-08-28 this registered and then threw on the first row of the first run.
+        String d = dir.toString().replace('\\', '/');
+        Path p = write(dir, true, "", """
+                sinks[1]{database,format}:
+                  "%1$s/db_e",CSV
+                route:
+                  mode: case
+                  default: emea
+                  branches[1]{key,database}:
+                    emea,"%1$s/db_e"
+                """.formatted(d));
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> PipelineConfig.load(p.toString()),
+                "a branch with no where: cannot be executed — refuse at load, not mid-run");
+        assertTrue(e.getMessage().contains("no where:"), e.getMessage());
+    }
+
+    @Test
     void aWellFormedActiveRoutePipelineNowArms(@TempDir Path dir) throws Exception {
         String d = dir.toString().replace('\\', '/');
         Path p = write(dir, true, "", """

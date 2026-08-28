@@ -19,8 +19,14 @@ import org.junit.jupiter.api.Test;
  */
 class RouteArmingTest {
 
+    /**
+     * A COMPLETE branch — {@code key}, {@code database} AND {@code where}. ⚠ The predicate is not
+     * decoration: {@code RowShaper.route} requires it on every branch, so a helper that omitted it (as
+     * this one did until 2026-08-28) made every case below assert against a route that could not
+     * actually run.
+     */
     private static Map<String, Object> branch(String key, String db) {
-        return Map.of("key", key, "database", db);
+        return Map.of("key", key, "database", db, "where", "ID LIKE '" + key.toUpperCase() + "%'");
     }
 
     @Test
@@ -85,6 +91,45 @@ class RouteArmingTest {
         assertEquals(2, refusals.size(), refusals.toString());
         assertTrue(refusals.get(0).contains("needs both a key and a database"), refusals.get(0));
         assertTrue(refusals.get(1).contains("matches no sinks[] destination"), refusals.get(1));
+    }
+
+    @Test
+    @DisplayName("an armed branch with no where: predicate is refused — the run would fail on it")
+    void branchWithoutAPredicateIsRefused() {
+        // Exactly what the editor's addRouteBranch writes before the author types the predicate:
+        // key + a wired destination, no `where`. Every OTHER arming rule passes, which is why this
+        // shape used to register and then throw inside RowShaper.route on the first row.
+        Map<String, Object> route = Map.of(
+                "default", "emea",
+                "branches", List.of(Map.of("key", "emea", "database", "emea_db")));
+        List<String> refusals = RouteArming.refusals(route, List.of("emea_db"), false);
+        assertEquals(1, refusals.size(), refusals.toString());
+        assertTrue(refusals.get(0).contains("branch 'emea' has no where:"), refusals.get(0));
+    }
+
+    @Test
+    @DisplayName("a BLANK where: is refused too — a whitespace predicate is not a predicate")
+    void blankPredicateIsRefused() {
+        Map<String, Object> route = Map.of(
+                "default", "emea",
+                "branches", List.of(Map.of("key", "emea", "database", "emea_db", "where", "   ")));
+        List<String> refusals = RouteArming.refusals(route, List.of("emea_db"), false);
+        assertEquals(1, refusals.size(), refusals.toString());
+        assertTrue(refusals.get(0).contains("has no where:"), refusals.get(0));
+    }
+
+    @Test
+    @DisplayName("the default: branch needs a predicate like any other — ELSE is not a blank branch")
+    void theDefaultBranchIsNotExemptFromThePredicateRule() {
+        // RowShaper emits a WHEN for every entry of branches[], the default one included; "everything
+        // else" is the CASE's ELSE arm, which is generated from default: and needs no entry of its own.
+        Map<String, Object> route = Map.of(
+                "default", "rest",
+                "branches", List.of(branch("emea", "emea_db"),
+                        Map.of("key", "rest", "database", "rest_db")));
+        List<String> refusals = RouteArming.refusals(route, List.of("emea_db", "rest_db"), false);
+        assertEquals(1, refusals.size(), refusals.toString());
+        assertTrue(refusals.get(0).contains("branch 'rest' has no where:"), refusals.get(0));
     }
 
     // ── the draft-map readers (the save path's half) ─────────────────────────────
