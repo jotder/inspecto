@@ -251,6 +251,41 @@ class ArchiveUnpackTest {
         assertEquals(original, UnpackStage.cleanup(expanded.toFile()));
     }
 
+    /**
+     * Open item (9): a batch that fails at COMMIT runs neither release path, leaving its mappings
+     * behind. The end-of-run sweep drops exactly the failed run's entries (keyed by the run's poll
+     * root) — a concurrent pipeline on a DIFFERENT root keeps its in-flight entries.
+     */
+    @Test
+    void sweepDropsOnlyThePollRootsLeftovers(@TempDir Path dir) throws Exception {
+        Path rootA = Files.createDirectories(dir.resolve("inboxA"));
+        Path rootB = Files.createDirectories(dir.resolve("inboxB"));
+        Path work = Files.createDirectories(dir.resolve("w"));
+        File leakedArchive = rootA.resolve("arch.zip").toFile();
+        Files.writeString(leakedArchive.toPath(), "x");
+        File otherOriginal = rootB.resolve("feed.csv.bz2").toFile();
+        Files.writeString(otherOriginal.toPath(), "x");
+        Path leaked1 = Files.writeString(work.resolve("00001_l1.csv"), A);
+        Path leaked2 = Files.writeString(work.resolve("00002_l2.csv"), B);
+        Path inflight = Files.writeString(work.resolve("00003_ok.csv"), A);
+
+        UnpackOrigins.register(leaked1, leakedArchive);
+        UnpackOrigins.register(leaked2, leakedArchive);
+        UnpackOrigins.registerSkipped(leakedArchive, java.util.List.of("locked.csv"));
+        UnpackOrigins.register(inflight, otherOriginal);
+
+        assertEquals(2, UnpackOrigins.sweep(rootA), "both of the failed run's mappings dropped");
+        assertFalse(UnpackOrigins.isExpanded(leaked1.toFile()), "mapping gone");
+        assertEquals(0, UnpackOrigins.totalFor(leakedArchive), "archive semantics no longer reported");
+        assertEquals(java.util.List.of(), UnpackOrigins.takeSkipped(leakedArchive), "skipped record purged");
+        assertEquals(leaked1.toFile().getName(), UnpackOrigins.lineageName(leaked1.toFile()),
+                "lineage name falls back to the plain filename after the sweep");
+        // The other root's entry is untouched and still releases normally.
+        assertTrue(UnpackOrigins.isExpanded(inflight.toFile()));
+        assertEquals(otherOriginal, UnpackOrigins.consume(inflight.toFile()));
+        assertEquals(0, UnpackOrigins.sweep(rootA), "idempotent: a clean repeat sweeps nothing");
+    }
+
     // ── config surface + threading (Phases 5/6) ────────────────────────────────
 
     /** An absent block is the shipped posture; a partial block overrides only what it states. */

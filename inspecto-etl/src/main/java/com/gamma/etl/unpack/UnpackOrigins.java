@@ -19,11 +19,12 @@ import java.util.concurrent.ConcurrentHashMap;
  * is consumed. A crash loses the map — and loses nothing with it: no marker/backup happened, the
  * original is still in the inbox, the next cycle re-expands to a fresh temp dir.
  *
- * <p>⚠ RESTRICTION (BACKLOG §4 "Unpack stage — open items" (9)): entries are removed ONLY by
- * {@link #consume} — i.e. by the finalize or quarantine path. A batch that fails at COMMIT runs
- * neither, so its mappings stay behind: a slow leak in a long-running poller, and {@link #totalFor}
- * keeps reporting archive semantics for that original. Bounded in practice (one entry per expanded
- * file per failed batch) but it is unbounded in principle — a per-run sweep is the fix.
+ * <p>Entries are removed by {@link #consume} (the finalize/quarantine paths) — and, since the fix for
+ * BACKLOG §4 "Unpack stage — open items" (9), by the end-of-run {@link #sweep}: a batch that fails at
+ * COMMIT runs neither release path, so {@code CollectorProcessor.run} sweeps this run's leftovers
+ * after every batch has joined (same position as the {@code UnpackLedger} flush). Sweeping restores
+ * exactly the crash posture documented above — no marker/backup fired, the original is still in the
+ * inbox, the next cycle re-expands fresh.
  */
 public final class UnpackOrigins {
 
@@ -142,5 +143,27 @@ public final class UnpackOrigins {
         TOTALS.remove(key);
         SKIPPED.remove(key);   // normally drained at first finalize; purged here when manifests are off
         return original;
+    }
+
+    /**
+     * End-of-run sweep (open item (9)): drop every entry whose ORIGINAL lives under {@code pollRoot},
+     * i.e. the mappings batches that failed at COMMIT never released. Scoped to the run's poll root so
+     * a concurrently running pipeline on a different root keeps its in-flight entries. Returns how
+     * many actual→original mappings were dropped (0 on a clean run — both release paths already ran).
+     */
+    public static int sweep(Path pollRoot) {
+        Path root = pollRoot.toAbsolutePath().normalize();
+        int swept = 0;
+        for (Map.Entry<Path, File> e : ORIGINS.entrySet()) {
+            Path original = e.getValue().toPath().toAbsolutePath().normalize();
+            if (original.startsWith(root) && ORIGINS.remove(e.getKey(), e.getValue())) {
+                NAMES.remove(e.getKey());
+                swept++;
+            }
+        }
+        PENDING.keySet().removeIf(k -> k.startsWith(root));
+        TOTALS.keySet().removeIf(k -> k.startsWith(root));
+        SKIPPED.keySet().removeIf(k -> k.startsWith(root));
+        return swept;
     }
 }

@@ -209,6 +209,16 @@ public class CollectorProcessor {
         com.gamma.etl.unpack.UnpackLedger.flush(cfg.identity().runTimestamp(),
                 cfg.dirs().unpackFilePath(), Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize());
 
+        // Sweep unpack-origin mappings left by batches that failed at COMMIT (neither the finalize nor
+        // the quarantine release path ran for them) — BACKLOG §4 unpack open item (9). Restores the
+        // crash posture: originals stay in the inbox and re-expand next cycle.
+        int leakedOrigins = com.gamma.etl.unpack.UnpackOrigins.sweep(
+                Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize());
+        if (leakedOrigins > 0) {
+            log.warn("Swept {} unpack origin mapping(s) unreleased by COMMIT-failed batches; "
+                    + "their originals remain in the inbox and re-expand next cycle", leakedOrigins);
+        }
+
         if (failedBatches > 0) {
             throw new BatchProcessingException(failedBatches, batches.size());
         }
