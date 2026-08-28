@@ -375,8 +375,8 @@ former root reference docs** (each index lists them):
   verbs are compile-only): a real draft fixture (dedup+join+summarize) joined the walked corpus;
   every real `*_enrich.toon` reference proven expressible as `transform.join`; summarize measures
   pinned to `MaterializeTask`'s grammar via `MeasureCompiler` (`RecipeVerbParityTest`). The
-  execution half of the gate is S3-blocked. **Phase 3: S1/S2/S4 shipped, S3 deferred.** Next: the
-  S3 design (operator call), Phase 4 (Guarantees + Stage C + per-Step `enabled:`), or UI S1–S3.
+  execution half of the gate is S3-blocked. **Phase 3: S1/S2/S4 shipped, S3 deferred.** **Phase 4 S4 (D-13, per-Step `enabled:` with durable park/drain) SHIPPED WHOLE 2026-08-28/29** across five slices — `cb12032d` · `9873ebfe` · `575c9912` · `bb7a3225` · `5f0d9637`; its slice plan is [archived](archived-documents/plans-archive/elt-s4-park-drain-plan.md) and the durable knowledge is the OKF concept [`okf/backend/pipeline-graph/step-park-drain.md`](okf/backend/pipeline-graph/step-park-drain.md). Next: the
+  S3 design (operator call), Phase 6 (non-route lane parity) / Phase 7, or UI S1–S3.
 
 - [`archived-documents/plans-archive/elt-amendment-ui-plan.md`](archived-documents/plans-archive/elt-amendment-ui-plan.md)
   — **ARCHIVED 2026-08-17** (S1–S6 + S7's summarize half shipped; only S7's table-entry half remains and

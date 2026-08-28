@@ -1,6 +1,6 @@
 # ELT Phase 4 S4 — per-Step `enabled:` with park/drain (D-13)
 
-**Status:** IN FLIGHT 2026-08-28. Unblocked by the parity decision of record (elt-final-amendment-plan
+**Status:** ✅ **SHIPPED WHOLE and ARCHIVED 2026-08-29** — S4-pre `cb12032d` · S4a `9873ebfe` · S4b `575c9912` · S4c `bb7a3225` · S4d `5f0d9637`. The durable as-built knowledge now lives in the OKF concept [`okf/backend/pipeline-graph/step-park-drain.md`](../../okf/backend/pipeline-graph/step-park-drain.md); this file is provenance only — never maintained, never linked as current. Originally IN FLIGHT 2026-08-28. Unblocked by the parity decision of record (elt-final-amendment-plan
 §"Parity scope, RE-GROUNDED 2026-08-28"). Parent: `elt-final-amendment-plan.md` Phase 4; decision D-13.
 
 ## Grounding (verified 2026-08-28)
