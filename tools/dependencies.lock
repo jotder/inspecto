@@ -1,0 +1,110 @@
+# Resolved runtime dependency graph — the committed baseline for tools/check-dependencies.mjs.
+#
+# Regenerate with `node tools/check-dependencies.mjs --update`, and commit the result IN THE
+# SAME COMMIT as the change that moved it. That pairing is the whole control: the diff is what
+# a reviewer reads.
+#
+# Scope: every reactor module, runtime scope. The reactor's OWN modules are excluded, and that
+# set is DERIVED from the build rather than hand-listed (this repo builds two groups:
+# com.gamma.inspector and com.gamma.asn).
+# Format: groupId:artifactId:type:version:scope, sorted, deduped.
+#
+# ⚠ Two versions of one artifact is NOT an error here — different modules resolve differently,
+#   and both lines are kept so the split stays visible instead of being silently collapsed.
+# ⚠ SNAPSHOT entries are weakly pinned by construction: content can move under a fixed version.
+#
+# 94 third-party artifacts across 23 reactor modules.
+ai.djl.huggingface:tokenizers:jar:0.36.0:compile
+ai.djl:api:jar:0.36.0:compile
+at.yawk.lz4:lz4-java:jar:1.10.1:runtime
+ch.qos.logback:logback-classic:jar:1.5.18:compile
+ch.qos.logback:logback-core:jar:1.5.18:compile
+com.eoiagent:eoiagent-app-api:jar:0.2.0-SNAPSHOT:compile
+com.eoiagent:eoiagent-config:jar:0.2.0-SNAPSHOT:compile
+com.eoiagent:eoiagent-core:jar:0.2.0-SNAPSHOT:compile
+com.eoiagent:eoiagent-host:jar:0.2.0-SNAPSHOT:compile
+com.eoiagent:eoiagent-knowledge:jar:0.2.0-SNAPSHOT:compile
+com.eoiagent:eoiagent-memory:jar:0.2.0-SNAPSHOT:compile
+com.eoiagent:eoiagent-model:jar:0.2.0-SNAPSHOT:compile
+com.eoiagent:eoiagent-observability:jar:0.2.0-SNAPSHOT:compile
+com.eoiagent:eoiagent-platform:jar:0.2.0-SNAPSHOT:compile
+com.eoiagent:eoiagent-runtime:jar:0.2.0-SNAPSHOT:compile
+com.eoiagent:eoiagent-safety:jar:0.2.0-SNAPSHOT:compile
+com.eoiagent:eoiagent-scratchpad:jar:0.2.0-SNAPSHOT:compile
+com.eoiagent:eoiagent-tool:jar:0.2.0-SNAPSHOT:compile
+com.fasterxml.jackson.core:jackson-annotations:jar:2.17.1:compile
+com.fasterxml.jackson.core:jackson-annotations:jar:2.21:compile
+com.fasterxml.jackson.core:jackson-core:jar:2.17.1:compile
+com.fasterxml.jackson.core:jackson-core:jar:2.21.3:compile
+com.fasterxml.jackson.core:jackson-databind:jar:2.17.1:compile
+com.fasterxml.jackson.core:jackson-databind:jar:2.21.3:compile
+com.github.luben:zstd-jni:jar:1.5.6-4:runtime
+com.google.code.gson:gson:jar:2.11.0:compile
+com.google.errorprone:error_prone_annotations:jar:2.27.0:compile
+com.hierynomus:asn-one:jar:0.6.0:runtime
+com.hierynomus:sshj:jar:0.39.0:compile
+com.knuddels:jtokkit:jar:1.1.0:compile
+com.microsoft.onnxruntime:onnxruntime:jar:1.20.0:compile
+com.opencsv:opencsv:jar:5.9:compile
+com.pgvector:pgvector:jar:0.1.6:compile
+com.squareup.okhttp3:okhttp-sse:jar:4.12.0:compile
+com.squareup.okhttp3:okhttp:jar:4.12.0:compile
+com.squareup.okio:okio-jvm:jar:3.6.0:compile
+com.squareup.okio:okio:jar:3.6.0:compile
+com.sun.mail:javax.mail:jar:1.6.2:compile
+com.univocity:univocity-parsers:jar:2.9.1:compile
+commons-beanutils:commons-beanutils:jar:1.9.4:compile
+commons-codec:commons-codec:jar:1.19.0:compile
+commons-collections:commons-collections:jar:3.2.2:compile
+commons-io:commons-io:jar:2.20.0:compile
+commons-logging:commons-logging:jar:1.2:compile
+commons-net:commons-net:jar:3.6:compile
+dev.langchain4j:langchain4j-agentic:jar:1.16.3-beta26:compile
+dev.langchain4j:langchain4j-anthropic:jar:1.16.3:compile
+dev.langchain4j:langchain4j-core:jar:1.16.3:compile
+dev.langchain4j:langchain4j-embeddings-all-minilm-l6-v2:jar:1.16.3-beta26:compile
+dev.langchain4j:langchain4j-embeddings:jar:1.16.3-beta26:compile
+dev.langchain4j:langchain4j-google-ai-gemini:jar:1.16.3:compile
+dev.langchain4j:langchain4j-guardrails:jar:1.16.3-beta26:compile
+dev.langchain4j:langchain4j-http-client-jdk:jar:1.16.3:compile
+dev.langchain4j:langchain4j-http-client:jar:1.16.3:compile
+dev.langchain4j:langchain4j-mcp:jar:1.16.3-beta26:compile
+dev.langchain4j:langchain4j-ollama:jar:1.16.3:compile
+dev.langchain4j:langchain4j-open-ai:jar:1.16.3:compile
+dev.langchain4j:langchain4j-pgvector:jar:1.16.3-beta26:compile
+dev.langchain4j:langchain4j:jar:1.16.3:compile
+dev.toonformat:jtoon:jar:1.0.9:compile
+javax.activation:activation:jar:1.1:compile
+net.i2p.crypto:eddsa:jar:0.3.0:runtime
+net.java.dev.jna:jna:jar:5.17.0:compile
+org.apache.commons:commons-collections4:jar:4.4:compile
+org.apache.commons:commons-compress:jar:1.28.0:compile
+org.apache.commons:commons-lang3:jar:3.14.0:compile
+org.apache.commons:commons-lang3:jar:3.18.0:compile
+org.apache.commons:commons-text:jar:1.11.0:compile
+org.apache.commons:commons-text:jar:1.12.0:compile
+org.apache.kafka:kafka-clients:jar:3.9.2:compile
+org.apache.opennlp:opennlp-tools:jar:2.5.9:compile
+org.bouncycastle:bcpkix-jdk18on:jar:1.78.1:runtime
+org.bouncycastle:bcprov-jdk18on:jar:1.78.1:runtime
+org.bouncycastle:bcutil-jdk18on:jar:1.78.1:runtime
+org.bsc.async:async-generator:jar:4.3.1:compile
+org.bsc.langgraph4j:langgraph4j-core:jar:1.8.19:compile
+org.checkerframework:checker-qual:jar:3.42.0:runtime
+org.codehaus.jackson:jackson-core-asl:jar:1.9.13:compile
+org.duckdb:duckdb_jdbc:jar:1.5.2.1:compile
+org.jetbrains.kotlin:kotlin-stdlib-common:jar:1.9.10:compile
+org.jetbrains.kotlin:kotlin-stdlib-jdk7:jar:1.8.21:compile
+org.jetbrains.kotlin:kotlin-stdlib-jdk8:jar:1.8.21:compile
+org.jetbrains.kotlin:kotlin-stdlib:jar:1.8.21:compile
+org.jetbrains:annotations:jar:13.0:compile
+org.jetbrains:annotations:jar:24.1.0:compile
+org.jspecify:jspecify:jar:1.0.0:compile
+org.postgresql:postgresql:jar:42.7.2:compile
+org.postgresql:postgresql:jar:42.7.4:compile
+org.slf4j:slf4j-api:jar:1.7.25:compile
+org.slf4j:slf4j-api:jar:2.0.17:compile
+org.xerial.snappy:snappy-java:jar:1.1.10.5:runtime
+tools.jackson.core:jackson-core:jar:3.0.4:runtime
+tools.jackson.core:jackson-databind:jar:3.0.4:runtime
+tools.jackson.module:jackson-module-blackbird:jar:3.0.4:runtime

@@ -44,7 +44,8 @@ jobs:
           java-version: '25'
           cache: maven
 
-      # The optional inspecto-agent module now depends on eoiagent (com.eoiagent:*:0.1.0-SNAPSHOT),
+      # The optional inspecto-agent module now depends on eoiagent (com.eoiagent:*:0.2.0-SNAPSHOT —
+      # the version the parent POM pins; this comment said 0.1.0-SNAPSHOT until 2026-08-28),
       # which replaced the discontinued agent-kernel. eoiagent is pre-release and not yet published to
       # GitHub Packages, so CI checks out its source (public repo jotder/inspect-agent) and installs it
       # into the runner's local ~/.m2 — the same thing a local dev does by hand. Once eoiagent cuts a
@@ -79,6 +80,17 @@ jobs:
             echo "::error::lean core (inspecto) must not depend on agent-kernel"; exit 1
           fi
           echo "OK: inspecto is kernel-free (sources + dependency tree)"
+
+      # Dependency-review guard (compliance C4 / matrix gap G7). Diffs the RESOLVED runtime
+      # dependency graph against the committed tools/dependencies.lock, so a dependency cannot
+      # appear, vanish or change version without the lock moving in the same commit — which is what
+      # makes it reviewable. The POMs pin what we ASK for; the lock pins what we actually GET, and a
+      # sibling SNAPSHOT can move a transitive without any POM here changing a line.
+      # ⛔ NOT a vulnerability scanner (offline by constraint — see the script header); do not cite
+      # it to an auditor as vulnerability management. Runs AFTER the eoiagent install, because the
+      # graph it resolves includes com.eoiagent:*.
+      - name: Guard — dependency review (lockfile diff)
+        run: node tools/check-dependencies.mjs
 
       - name: Upload test reports on failure
         if: failure()

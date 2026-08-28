@@ -163,8 +163,15 @@ hosted offering makes Inspecto a CSP (§6 Q5).
   root + state stores~~ 🔴 **that runbook ALREADY EXISTS** (`docs/ops/backup-restore-runbook.md` —
   Backup / Verify / Restore through the `maintenance` Job Type, with the path-containment preamble;
   corrected 2026-08-28). The real remainder is narrower: **an RTO/RPO statement and a recorded
-  restore drill**, neither of which the runbook carries · **AUDIT-CSV-1** (see C3 above) · dependency-review step (offline: a pinned-versions diff check in CI, not a scanner
-  SaaS) · the RBAC dependencies stay in `rbac-abac-plan` (R1/R2/R5) — this plan only *consumes*
+  restore drill**, neither of which the runbook carries · **AUDIT-CSV-1** (see C3 above) · ~~dependency-review step (offline: a pinned-versions diff check in CI, not a
+  scanner SaaS)~~ **✅ SHIPPED 2026-08-28** — `tools/check-dependencies.mjs` diffs the resolved
+  runtime graph against `tools/dependencies.lock`, wired into `ci.yml`; the reactor's own modules are
+  excluded by a set **derived from the build** (this repo builds two groups, and a one-group constant
+  silently treated seven in-repo artifacts as third-party). 🔴 Building it MEASURED the "lean SBOM"
+  claim: **94 third-party artifacts**, dominated by the optional AI stack — leanness belongs to the
+  lean core / per-edition bundle, **not** the reactor, so **G1's SBOM must be generated per packaged
+  bundle** or it attests a set no customer installs · the RBAC dependencies stay in
+  `rbac-abac-plan` (R1/R2/R5) — this plan only *consumes*
   them; do not partially implement access control here (BACKLOG §6 rule).
 - **C5 — policy pack.** The written security policies auditors require (access control, crypto,
   change management, incident response, retention) — templates live in `compliance/policies/`;
