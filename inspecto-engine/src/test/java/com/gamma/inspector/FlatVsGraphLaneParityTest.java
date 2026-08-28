@@ -93,7 +93,7 @@ class FlatVsGraphLaneParityTest {
                     new com.gamma.query.DecisionRuleApplier.Result(List.of(), List.of()));
             // The graph lane, through the real fork (wholeBatchWrite = the batch's one write).
             graph = BatchIngestStrategy.writeAndTrace(b, "transformed", List.of(), graphCfg,
-                    graphCfg.dirs().database(), "feed", "b_0001", Map.of(0, "feed.csv", 1, "feed.csv"), true);
+                    graphCfg.dirs().database(), "feed", "b_0001", Map.of(0, "feed.csv", 1, "feed.csv"), "");
         } finally {
             DuckDbUtil.deleteTempDb(flatDb);
             DuckDbUtil.deleteTempDb(graphDb);
@@ -143,7 +143,7 @@ class FlatVsGraphLaneParityTest {
                     flatCfg.dirs().database(), "feed", "b_0002", Map.of(0, "feed.csv", 1, "feed.csv"),
                     new com.gamma.query.DecisionRuleApplier.Result(List.of(), List.of()));
             graph = BatchIngestStrategy.writeAndTrace(b, "transformed", List.of(), graphCfg,
-                    graphCfg.dirs().database(), "feed", "b_0002", Map.of(0, "feed.csv", 1, "feed.csv"), true);
+                    graphCfg.dirs().database(), "feed", "b_0002", Map.of(0, "feed.csv", 1, "feed.csv"), "");
         } finally {
             DuckDbUtil.deleteTempDb(flatDb);
             DuckDbUtil.deleteTempDb(graphDb);
@@ -159,6 +159,46 @@ class FlatVsGraphLaneParityTest {
             assertEquals(3, dataLines(dir.resolve("graph_out").resolve(dest)).size(), dest + " got every row");
         }
         assertEquals(lineageKey(flat), lineageKey(graph), "lineage");
+    }
+
+    /**
+     * Slice C1 — the hazard the {@code writeScope} exists for. The chunked and segmented ingest paths
+     * call the write seam SEVERAL times for ONE batch, reusing the same sink node ids. The batch's
+     * branch ledger is shared, so without a per-write scope the second call reads as "already
+     * committed" and its rows vanish silently. Both halves are pinned: distinct scopes both write, and
+     * a REPEATED scope is still skipped (that idempotent replay is what protects a crash-resumed batch).
+     */
+    @Test
+    void severalWritesInOneBatchEachLandWhenTheyCarryTheirOwnScope(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = config(dir.resolve("cfg"), dir.resolve("db").toString());
+        File db = BatchIngestStrategy.openTempDb(cfg, "parity_scope_");
+        int firstFiles;
+        int afterSecondScope;
+        int afterRepeatedScope;
+        try (Connection conn = DuckDbUtil.openConnection(db)) {
+            seedTable(conn);
+            BatchIngestStrategy.Written a = BatchIngestStrategy.writeAndTrace(conn, "transformed", List.of(),
+                    cfg, cfg.dirs().database(), "chunk_a", "b_same", Map.of(0, "feed.csv", 1, "feed.csv"), "chunk_a");
+            firstFiles = a.outputs().size();
+
+            // A DIFFERENT scope: the same batch, the same sink node, a second write that must land.
+            BatchIngestStrategy.Written b = BatchIngestStrategy.writeAndTrace(conn, "transformed", List.of(),
+                    cfg, cfg.dirs().database(), "chunk_b", "b_same", Map.of(0, "feed.csv", 1, "feed.csv"), "chunk_b");
+            afterSecondScope = b.outputs().size();
+
+            // The SAME scope again: the coordinator's idempotent replay skips it, writing nothing.
+            BatchIngestStrategy.Written c = BatchIngestStrategy.writeAndTrace(conn, "transformed", List.of(),
+                    cfg, cfg.dirs().database(), "chunk_b", "b_same", Map.of(0, "feed.csv", 1, "feed.csv"), "chunk_b");
+            afterRepeatedScope = c.outputs().size();
+        } finally {
+            DuckDbUtil.deleteTempDb(db);
+        }
+
+        assertEquals(1, firstFiles, "the first write landed");
+        assertEquals(1, afterSecondScope, "the SECOND write landed too — this is what the scope buys");
+        assertEquals(0, afterRepeatedScope, "a repeated scope is a replay and writes nothing");
+        // Six rows on disk: three from each of the two writes that were supposed to happen.
+        assertEquals(6, dataLines(dir.resolve("db")).size(), "both writes' rows are on disk, once each");
     }
 
     /** A two-destination, non-route pipeline rooted at {@code out}. */

@@ -71,7 +71,7 @@ class FileStageRegistrationTest {
             try (Connection conn = openWithTwoPartitions(db)) {
                 BatchIngestStrategy.Written written = BatchIngestStrategy.writeAndTrace(
                         conn, "transformed", List.of("year", "month", "day"), cfg,
-                        cfg.dirs().database(), "b1", batch.batchId(), Map.of(1, "a.csv", 2, "b.csv"), true);
+                        cfg.dirs().database(), "b1", batch.batchId(), Map.of(1, "a.csv", 2, "b.csv"), "");
                 BatchProcessor.finalizeSource(batch, cfg, survivors, written.outputs(), written.lineage());
             } finally {
                 DuckDbUtil.deleteTempDb(db);
@@ -108,7 +108,7 @@ class FileStageRegistrationTest {
         try (Connection conn = openWithTwoPartitions(db)) {
             BatchIngestStrategy.Written written = BatchIngestStrategy.writeAndTrace(
                     conn, "transformed", List.of("year", "month", "day"), cfg,
-                    cfg.dirs().database(), "b2", batch.batchId(), Map.of(1, "a.csv", 2, "b.csv"), true);
+                    cfg.dirs().database(), "b2", batch.batchId(), Map.of(1, "a.csv", 2, "b.csv"), "");
             assertDoesNotThrow(() -> BatchProcessor.finalizeSource(
                     batch, cfg, survivors, written.outputs(), written.lineage()));
         } finally {

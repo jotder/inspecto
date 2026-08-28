@@ -122,7 +122,7 @@ interface BatchIngestStrategy {
     static Written writeAndTrace(Connection conn, String table, List<String> partCols,
                                  PipelineConfig cfg, String dbDir, String baseName,
                                  String batchId, Map<Integer, String> srcIdToFile,
-                                 boolean wholeBatchWrite) throws Exception {
+                                 String writeScope) throws Exception {
         // ── the lane fork ─────────────────────────────────────────────────────
         // This is the one choke point every ingest lane already funnels through, holding the live
         // connection and the materialised table. Everything downstream of the returned Written
@@ -133,13 +133,12 @@ interface BatchIngestStrategy {
         // pipeline diverts when the two lanes are provably the same write (Phase 6 precondition —
         // see graphLaneCarries). Everything else stays flat.
         //
-        // ⚠ `wholeBatchWrite` is why the non-route admission is a CALLER's decision, not a config
-        // property: two of this method's four callers write a batch in SEVERAL calls (one per chunk,
-        // one per segment), and the graph lane's BranchCommitLog is keyed by batchId — so the second
-        // and later calls would be skipped as "already committed" and their rows would vanish. The
-        // route lane is incidentally immune (a chunked batch is single-member + single-destination,
-        // and a segmented one is multi-schema, which route refuses), so its divert is unchanged; the
-        // new admission must not inherit that luck by accident.
+        // ⚠ `writeScope` is a CALLER's fact, not a config property: two of this method's four callers
+        // write a batch in SEVERAL calls (one per chunk, one per segment) and those writes reuse the
+        // same sink node ids, so without a discriminator the second and later calls would look
+        // "already committed" in the batch's BranchCommitLog and their rows would vanish. Each such
+        // caller passes its own scope; the whole-batch callers pass "" and record exactly the keys
+        // they always did (which is what keeps the drain, reading bare sink ids, untouched).
         //
         // The Decision Rules run ONCE, above the fork: they have side effects (routed writes +
         // quarantine) that must not repeat, both lanes ran them as their first act anyway, and their
@@ -154,12 +153,12 @@ interface BatchIngestStrategy {
         if (cfg.routeConfig() != null) {
             com.gamma.pipeline.PipelineGraph routed = com.gamma.pipeline.PipelineLift.lift(cfg);
             if (com.gamma.pipeline.exec.BatchGraphRunner.engages(routed)) lifted = routed;
-        } else if (wholeBatchWrite && applied.outputs().isEmpty() && graphLaneCarries(cfg)) {
+        } else if (applied.outputs().isEmpty() && graphLaneCarries(cfg)) {
             lifted = com.gamma.pipeline.PipelineLift.lift(cfg);
         }
         return lifted != null
                 ? graphWriteAndTrace(conn, table, partCols, cfg, dbDir, baseName, batchId, srcIdToFile,
-                        lifted, applied)
+                        lifted, applied, writeScope)
                 : flatWriteAndTrace(conn, table, partCols, cfg, dbDir, baseName, batchId, srcIdToFile,
                         applied);
     }
@@ -262,7 +261,8 @@ interface BatchIngestStrategy {
                                               PipelineConfig cfg, String dbDir, String baseName,
                                               String batchId, Map<Integer, String> srcIdToFile,
                                               com.gamma.pipeline.PipelineGraph lifted,
-                                              DecisionRuleApplier.Result applied) throws Exception {
+                                              DecisionRuleApplier.Result applied,
+                                              String writeScope) throws Exception {
         if (!applied.outputs().isEmpty())
             throw new IllegalStateException("decision-rule routing writes to a single destination; combining "
                     + "it with a route: pipeline's branches is not supported");
@@ -284,7 +284,7 @@ interface BatchIngestStrategy {
         java.nio.file.Files.createDirectories(commitLog.getParent());
         com.gamma.pipeline.exec.BatchGraphRunner.run(
                 new com.gamma.pipeline.exec.BatchGraphRunner.Input(
-                        conn, lifted, seedNodeId, table, batchId, dbDir, baseName, commitLog),
+                        conn, lifted, seedNodeId, table, batchId, dbDir, baseName, commitLog, writeScope),
                 writer,
                 () -> { /* finalisation is BatchProcessor.commit's, once the outcome returns */ },
                 // Park hook (S4b): a disabled route-branch sink's rows are materialised to a durable

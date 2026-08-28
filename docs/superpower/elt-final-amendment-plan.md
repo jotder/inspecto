@@ -1298,9 +1298,25 @@ be read as a claim about whether the graph lane can perform the write.
 `FlatVsGraphLaneParityTest.bothLanesFanOutTheSameRowsToEveryDestination` diffs both destinations' rows
 across both lanes.
 
+#### Phase 6 slice C1 — several writes per batch, SHIPPED 2026-08-29
+
+Slice A's hazard 1, closed. The chunked and segmented ingest paths call the write seam once per chunk /
+per segment, reusing the same sink node ids against ONE shared branch ledger — so a second call read as
+"already committed" and its rows would have vanished. Fixed by scoping the LEDGER KEY, not the log:
+`BranchCommitCoordinator` takes a **write scope** and records `<scope>::<branch>`, while
+`branchCommit` still receives the bare branch id (it is a graph node the caller must write). The
+whole-batch callers pass `""` and record exactly the keys they always did — which is what keeps the
+drain, reading bare sink ids back out of the log, and `BatchProcessor.commit`'s single-log cleanup
+untouched. ⚠ Deliberately NOT a per-write log FILE: the batch's log path is spelled by batchId in three
+places (create, drain-resume, cleanup), and multiplying it would have leaked segment logs in `temp`.
+
+The four callers now say what they are: `CsvBatchStrategy` and union streaming pass `""`, the chunked
+path passes its chunk base name, the segmented path its segment key. Pinned by
+`FlatVsGraphLaneParityTest.severalWritesInOneBatchEachLandWhenTheyCarryTheirOwnScope` — distinct scopes
+BOTH write, a repeated scope is still skipped (that replay is what protects a crash-resumed batch).
+
 **Still flat, and still to do before the lane can be deleted:** the versioned reference-store write ·
-chunked and segmented writes (need a per-write commit-log key, see hazard 1) · anything with a node
-between map and sink. Only once those are carried does item (1) — moving `withMappingContext` into
+anything with a node between map and sink. Only once those are carried does item (1) — moving `withMappingContext` into
 `PipelineLift` — come due, and only because the graph would then execute the map node itself.
 
 ---

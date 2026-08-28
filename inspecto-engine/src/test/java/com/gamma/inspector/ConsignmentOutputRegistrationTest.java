@@ -77,7 +77,7 @@ class ConsignmentOutputRegistrationTest {
             try (Connection conn = openWithTwoPartitions(db)) {
                 BatchIngestStrategy.Written written = BatchIngestStrategy.writeAndTrace(
                         conn, "transformed", List.of("year", "month", "day"), cfg,
-                        cfg.dirs().database(), "b1", batch.batchId(), Map.of(1, "a.csv", 2, "b.csv"), true);
+                        cfg.dirs().database(), "b1", batch.batchId(), Map.of(1, "a.csv", 2, "b.csv"), "");
 
                 assertEquals(2, written.outputs().size(), "harness precondition: two partitions written");
                 assertEquals(4, written.lineage().size(),
@@ -151,7 +151,7 @@ class ConsignmentOutputRegistrationTest {
             try (Connection conn = openWithEventTime(db)) {
                 BatchIngestStrategy.Written written = BatchIngestStrategy.writeAndTrace(
                         conn, "transformed", List.of("year", "month", "day"), cfg,
-                        cfg.dirs().database(), "b1", batch.batchId(), Map.of(1, "a.csv", 2, "b.csv"), true);
+                        cfg.dirs().database(), "b1", batch.batchId(), Map.of(1, "a.csv", 2, "b.csv"), "");
                 assertEquals(2, written.bounds().size(), "bounds are keyed by output file, one per written file");
                 BatchProcessor.finalizeSource(batch, cfg, survivors, written.outputs(), written.lineage(),
                         written.bounds());
@@ -214,7 +214,7 @@ class ConsignmentOutputRegistrationTest {
             try (Connection conn = openWithTwoPartitions(db)) {   // no __event_time column at all
                 BatchIngestStrategy.Written written = BatchIngestStrategy.writeAndTrace(
                         conn, "transformed", List.of("year", "month", "day"), cfg,
-                        cfg.dirs().database(), "b1", batch.batchId(), Map.of(1, "a.csv", 2, "b.csv"), true);
+                        cfg.dirs().database(), "b1", batch.batchId(), Map.of(1, "a.csv", 2, "b.csv"), "");
                 assertTrue(written.bounds().isEmpty(), "no event-time column ⇒ no bounds, and no failure");
                 BatchProcessor.finalizeSource(batch, cfg, survivors, written.outputs(), written.lineage(),
                         written.bounds());
@@ -254,7 +254,7 @@ class ConsignmentOutputRegistrationTest {
         try (Connection conn = openWithTwoPartitions(db)) {
             BatchIngestStrategy.Written written = BatchIngestStrategy.writeAndTrace(
                     conn, "transformed", List.of("year", "month", "day"), cfg,
-                    cfg.dirs().database(), "b2", batch.batchId(), Map.of(1, "a.csv", 2, "b.csv"), true);
+                    cfg.dirs().database(), "b2", batch.batchId(), Map.of(1, "a.csv", 2, "b.csv"), "");
             assertDoesNotThrow(() -> BatchProcessor.finalizeSource(
                     batch, cfg, survivors, written.outputs(), written.lineage()));
         } finally {

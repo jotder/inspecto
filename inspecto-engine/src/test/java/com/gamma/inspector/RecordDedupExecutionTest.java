@@ -67,7 +67,7 @@ class RecordDedupExecutionTest {
             }
             BatchIngestStrategy.Written written = BatchIngestStrategy.writeAndTrace(
                     conn, "transformed", List.of("year", "month", "day"), cfg,
-                    cfg.dirs().database(), "b1", "batch-1", Map.of(0, "solo.csv"), true);
+                    cfg.dirs().database(), "b1", "batch-1", Map.of(0, "solo.csv"), "");
 
             long rows = written.lineage().stream().mapToLong(com.gamma.etl.LineageRow::rowCount).sum();
             assertEquals(3, rows, "all 3 rows land — Stage-1 no longer folds the duplicate key");

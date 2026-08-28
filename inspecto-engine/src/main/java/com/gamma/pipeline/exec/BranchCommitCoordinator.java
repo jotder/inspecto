@@ -43,9 +43,27 @@ public final class BranchCommitCoordinator {
     public record Result(java.util.List<String> committedBranches, boolean sourceFinalized) {}
 
     private final BranchCommitLog log;
+    private final String writeScope;
 
     public BranchCommitCoordinator(BranchCommitLog log) {
+        this(log, "");
+    }
+
+    /**
+     * With a <b>write scope</b> — the discriminator that keeps branch keys unique when ONE batch performs
+     * SEVERAL writes. The chunked and segmented ingest paths call the write seam once per chunk / per
+     * segment, and those writes reuse the same sink node ids; without a scope the second write's branches
+     * would look already committed and be skipped, so the batch would silently lose every chunk after the
+     * first.
+     *
+     * <p>The scope qualifies only the LEDGER key — {@code branchCommit} still receives the bare branch id,
+     * because that is the graph node the caller has to write. An empty scope (the whole-batch case, and
+     * every route pipeline) records exactly the keys it always did, so the drain — which reads bare sink
+     * ids back out of the log — and {@code BatchProcessor.commit}'s single-log cleanup are untouched.
+     */
+    public BranchCommitCoordinator(BranchCommitLog log, String writeScope) {
         this.log = log;
+        this.writeScope = writeScope == null ? "" : writeScope;
     }
 
     /**
@@ -60,20 +78,24 @@ public final class BranchCommitCoordinator {
      */
     public Result commit(String batchId, Set<String> expectedBranches,
                          BranchCommit branchCommit, SourceFinalize sourceFinalize) throws Exception {
+        java.util.function.Function<String, String> key =
+                branch -> writeScope.isEmpty() ? branch : writeScope + "::" + branch;
         if (expectedBranches.isEmpty())
             throw new IllegalArgumentException("batch '" + batchId + "' has no branches to commit");
 
         java.util.List<String> committedNow = new java.util.ArrayList<>();
         Set<String> already = log.committedBranches(batchId);
         for (String branch : expectedBranches) {
-            if (already.contains(branch)) continue;     // idempotent replay — already durable
+            if (already.contains(key.apply(branch))) continue;   // idempotent replay — already durable
             branchCommit.commit(branch);
-            log.recordBranch(batchId, branch);          // durable: this branch is committed
+            log.recordBranch(batchId, key.apply(branch));        // durable: this branch is committed
             committedNow.add(branch);
         }
 
         boolean finalizedNow = false;
-        boolean allCommitted = log.committedBranches(batchId).containsAll(expectedBranches);
+        Set<String> expectedKeys = new java.util.LinkedHashSet<>();
+        for (String branch : expectedBranches) expectedKeys.add(key.apply(branch));
+        boolean allCommitted = log.committedBranches(batchId).containsAll(expectedKeys);
         if (allCommitted && !log.isSourceFinalized(batchId)) {
             sourceFinalize.finalizeSource();            // backup -> markers LAST -> ledger/watermark LAST
             log.recordSourceFinalized(batchId);

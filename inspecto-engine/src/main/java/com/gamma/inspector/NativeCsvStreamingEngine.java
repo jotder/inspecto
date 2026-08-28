@@ -138,7 +138,7 @@ final class NativeCsvStreamingEngine {
 
         var written = writeAndTrace(conn, "transformed", partitionColumns(schema),
                 cfg, databaseDir(batch, cfg), consolidatedBaseName(survivors, batch),
-                batch.batchId(), srcIdToFile, true);   // union streaming: the batch's ONE write
+                batch.batchId(), srcIdToFile, "");   // union streaming: the batch's ONE write
 
         return new IngestOutcome(batchStart, "SUCCESS", "", survivors, memberAudits,
                 written.outputs(), written.lineage(), totalInputRows, batch.schemaName(),
@@ -273,10 +273,10 @@ final class NativeCsvStreamingEngine {
             dropTable(conn, "transformed");
             return new Streamed(0, rejects, List.of(), List.of(), Map.of(), castFailures);
         }
-        // ⚠ false: this runs once per CHUNK, so the graph lane's batchId-keyed commit log would skip
-        // every call after the first. Chunked ingest stays flat until that log is per-write.
+        // One write per CHUNK, so each carries its own scope — the base name is unique per chunk and
+        // is what keeps the batch's branch ledger from reading the second chunk as already committed.
         var written = writeAndTrace(conn, "transformed", partCols, cfg, dbDir, baseName,
-                batchId, Map.of(srcId, lineageName), false);
+                batchId, Map.of(srcId, lineageName), baseName);
         dropTable(conn, "transformed");
         return new Streamed(parsed, rejects, written.outputs(), written.lineage(), written.bounds(),
                 castFailures);

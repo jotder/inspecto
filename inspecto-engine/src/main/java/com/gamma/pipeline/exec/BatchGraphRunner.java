@@ -42,9 +42,20 @@ public final class BatchGraphRunner {
      * @param dataDir         data root under which each sink's {@code store} is written as a sub-directory
      * @param baseName        the output file stem (typically the pipeline / batch id)
      * @param branchCommitLog path to this batch's durable {@link BranchCommitLog} (partial-commit state)
+     * @param writeScope      discriminator when one batch performs several writes (chunked / segmented
+     *                        ingest) — see {@link BranchCommitCoordinator#BranchCommitCoordinator(BranchCommitLog, String)};
+     *                        {@code ""} for the whole-batch write
      */
     public record Input(Connection conn, PipelineGraph graph, String seedNodeId, String seedTable,
-                        String batchId, String dataDir, String baseName, Path branchCommitLog) {}
+                        String batchId, String dataDir, String baseName, Path branchCommitLog,
+                        String writeScope) {
+
+        /** The whole-batch write: no scope, so the ledger keys are the bare branch ids. */
+        public Input(Connection conn, PipelineGraph graph, String seedNodeId, String seedTable,
+                     String batchId, String dataDir, String baseName, Path branchCommitLog) {
+            this(conn, graph, seedNodeId, seedTable, batchId, dataDir, baseName, branchCommitLog, "");
+        }
+    }
 
     /** What the run produced: the executor result plus the files written across every sink branch. */
     public record Result(PipelineExecutor.ExecResult exec, List<PartitionOutput> outputs, long totalRows) {}
@@ -95,8 +106,8 @@ public final class BatchGraphRunner {
                                                   BranchCommitCoordinator.SourceFinalize onAllBranchesDurable,
                                                   PipelineExecutor.ParkWriter parkWriter)
             throws Exception {
-        BranchCommitCoordinator coordinator =
-                new BranchCommitCoordinator(new BranchCommitLog(in.branchCommitLog().toString()));
+        BranchCommitCoordinator coordinator = new BranchCommitCoordinator(
+                new BranchCommitLog(in.branchCommitLog().toString()), in.writeScope());
         return PipelineExecutor.execute(
                 in.conn(), in.graph(), java.util.Map.of(in.seedNodeId(), in.seedTable()), in.batchId(),
                 coordinator, writer, onAllBranchesDurable,
