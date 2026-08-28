@@ -113,6 +113,8 @@ final class MaterializeTask {
         content.put("description", "Materialized from dataset '" + source + "' (job '" + cfg.name() + "')");
         content.put("materialized", Map.of("from", source, "at", Instant.now().toString(), "rows", rows));
         store.write("dataset", target, content);
+        // S3a: the data became visible at the swap above — announce it (additive, never throws).
+        com.gamma.signal.DatasetWriteSignal.emit(target, rows, cfg.name());
 
         return JobResult.ok("materialize: " + rows + " row(s) → " + outDir.resolve(snapshot)
                 + " (dataset '" + target + "' refreshed)", (System.nanoTime() - t0) / 1_000_000L);

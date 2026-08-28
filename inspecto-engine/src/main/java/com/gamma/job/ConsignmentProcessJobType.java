@@ -202,6 +202,13 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
                 List<ConsignmentOutput> written =
                         SummaryWriter.write(scratch, summariesRoot(dataDir), consignmentId, rows, processorId);
                 ConsignmentOutputStores.record(written);
+                // S3a: the summaries are visible once recorded — one dataset.write per distinct store
+                // (additive, never throws).
+                java.util.Map<String, Long> rowsByStore = new java.util.LinkedHashMap<>();
+                for (ConsignmentOutput o : written)
+                    rowsByStore.merge(o.tableName(), o.rows(), Long::sum);
+                rowsByStore.forEach((store, n) ->
+                        com.gamma.signal.DatasetWriteSignal.emit(store, n, processorId));
                 ctx.log().info("wrote " + written.size() + " summary file(s) from " + rows.size() + " row(s)",
                         "consignment_id", consignmentId);
             }

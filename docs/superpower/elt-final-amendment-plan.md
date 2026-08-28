@@ -897,8 +897,14 @@ design must respect:
   off `databaseDir` instead. Every existing pipeline kind is untouched (poll still required for
   them — the invariant narrows, it does not vanish).
 
-**Implementation slices (each shippable, in order):** **S3a** the `dataset.write` Signal + tests
-(publish at both write sites; additive) · **S3b** trigger form (`PipelineTrigger` + scheduler
+**Implementation slices (each shippable, in order):** **S3a ✅ SHIPPED 2026-08-28** — the
+`dataset.write` Signal: `com.gamma.signal.DatasetWriteSignal` (mirrors `PipelineBatchSignal`'s
+posture — ambient `EventLog.current()`, never breaks the write it announces), payload
+`{dataset, rows, at, producer}`, published post-swap in `MaterializeTask.run` and
+post-`record` in `ConsignmentProcessJobType.persistSummaries` (one signal per distinct
+`tableName`, rows summed). `DatasetWriteSignal.TYPE` is the constant S3b's scheduler
+subscription matches on. `DatasetWriteSignalTest` (2 tests: queryable payload + subject ref;
+`-1` rows / absent producer never put a null in the payload). Reactor 3663/0/0/5. · **S3b** trigger form (`PipelineTrigger` + scheduler
 subscription + coalesce) · **S3c** parser loosening + `collect: {dataset:}` config shape + the
 `TableCollectRunner` + watermark ledger (the big slice — config without this runner would be
 fictional, per the spike) · **S3d** recipe verb + converter projection + the deferred execution
