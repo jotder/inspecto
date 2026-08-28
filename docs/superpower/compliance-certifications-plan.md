@@ -149,14 +149,21 @@ hosted offering makes Inspecto a CSP (§6 Q5).
     resolved dependency list (hand-rolled step in `package.ps1`/a small Maven exec — no new online
     plugin; the dep list is tiny by design, which is the NFR-7 selling point). Ship it inside the
     deploy bundle next to the .sha256/.asc.
-  - **Audit-log export:** documented, repeatable auditor extraction (existing routes + a
-    `compliance/evidence/` runbook; add a retention statement — see C4).
+  - **Audit-log export: ✅ RUNBOOK WRITTEN 2026-08-28** →
+    [`compliance/evidence/audit-log-extraction.md`](../../compliance/evidence/audit-log-extraction.md)
+    (`/events/export`, `/events/search`, cursor-paged `/api/v1/events`, the `AuditAttrs` field list,
+    the two deliberate exclusions, chain of custody). 🔴 Writing it surfaced **AUDIT-CSV-1**: the CSV
+    export drops EVERY audit attribute, so a `format=csv` pull of `type=AUDIT` looks complete and
+    records nothing — the runbook mandates JSON. Retention statement still owed (C4/G5).
   - **CI evidence:** branch-policy + all-editions build + GAUNTLET runs are the CC8 evidence —
     document where an auditor finds them.
 - **C4 — close the product control gaps** (each its own small change, normal release flow):
   retention config for audit/notification/signal stores (partially exists: `notification_prune`,
-  `ledger_prune` — document + fill gaps) · backup/restore runbook for the write root + state
-  stores · dependency-review step (offline: a pinned-versions diff check in CI, not a scanner
+  `ledger_prune`, `incident_purge` — document + fill gaps) · ~~backup/restore runbook for the write
+  root + state stores~~ 🔴 **that runbook ALREADY EXISTS** (`docs/ops/backup-restore-runbook.md` —
+  Backup / Verify / Restore through the `maintenance` Job Type, with the path-containment preamble;
+  corrected 2026-08-28). The real remainder is narrower: **an RTO/RPO statement and a recorded
+  restore drill**, neither of which the runbook carries · **AUDIT-CSV-1** (see C3 above) · dependency-review step (offline: a pinned-versions diff check in CI, not a scanner
   SaaS) · the RBAC dependencies stay in `rbac-abac-plan` (R1/R2/R5) — this plan only *consumes*
   them; do not partially implement access control here (BACKLOG §6 rule).
 - **C5 — policy pack.** The written security policies auditors require (access control, crypto,

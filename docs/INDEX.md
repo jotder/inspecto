@@ -70,7 +70,11 @@ former root reference docs** (each index lists them):
   bundle's docs). Today: [`controls-matrix.md`](../compliance/controls-matrix.md), the **C2 single
   mapping table** (SOC 2 TSC ↔ ISO 27001 Annex A ↔ NIST 800-53 → implementing file/route/gate →
   evidence → responsibility) — the ISO SoA and the FedRAMP customer-responsibility matrix are
-  **exports of it**, never separate documents. Scanned by the vocabulary guard. Plan:
+  **exports of it**, never separate documents; its §4 is the consolidated gap list (G1–G10). Plus
+  [`evidence/`](../compliance/evidence/) — the C3 auditor runbooks:
+  [`release-verification.md`](../compliance/evidence/release-verification.md) (`.sha256`/`.asc`) and
+  [`audit-log-extraction.md`](../compliance/evidence/audit-log-extraction.md) (⛔ JSON only — the CSV
+  export drops every audit attribute, AUDIT-CSV-1). Scanned by the vocabulary guard. Plan:
   [`superpower/compliance-certifications-plan.md`](superpower/compliance-certifications-plan.md).
 
 ## Stakeholder set (audience-targeted)

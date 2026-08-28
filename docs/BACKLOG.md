@@ -2820,6 +2820,18 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   execute; the control-plane one surfaced ONLY in the full reactor, not in the targeted module run that made
   the change green. As-built: `okf/backend/pipeline-graph/pipeline-graph-design.md` §19.
 
+- 🔴 **AUDIT-CSV-1 — `GET /events/export?format=csv` DROPS every audit attribute.** Filed
+  2026-08-28 while writing the auditor extraction runbook. The CSV projection emits seven columns
+  (`timestamp,level,type,source,pipeline,correlationId,message`) and carries **none** of
+  `AuditAttrs` — no `actor`, `action`, `action_category`, `target_type`/`target_id`, `ip`,
+  `user_agent`, `http_*`, `abac_action` or `policy`. So a CSV export of `type=AUDIT` **looks
+  complete** — right row count, right timestamps — while omitting everything an audit record exists
+  to capture. ⚠ Not a regression: the CSV shape predates the audit trail riding the same event
+  stream, and is right for operational triage. Options: (a) an audit-shaped CSV projection when
+  `type=AUDIT`; (b) refuse `format=csv` for `type=AUDIT` and point at JSON; (c) leave it and rely on
+  documentation. Mitigated meanwhile — `compliance/evidence/audit-log-extraction.md` §3 says
+  JSON-only in bold, with a ⛔ against handing an auditor the CSV. `EventRoutes.eventsCsv`.
+
 ## 7. Docs & ongoing
 
 | Item | Status |
