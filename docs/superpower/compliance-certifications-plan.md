@@ -124,17 +124,28 @@ hosted offering makes Inspecto a CSP (§6 Q5).
   product; write the four one-page applicability statements (SOC 2 in-scope services; ISO 27001
   ISMS boundary; FedRAMP/HIPAA/PCI applicability given self-hosted deployment). →
   `compliance/scope/`.
-- **C2 — control matrix.** One table: control id → SOC 2 TSC ↔ ISO 27001 Annex A ↔ NIST 800-53
-  → implementing product feature (file/route/gate) → evidence source (test, CI run, audit-log
-  query, doc) → responsibility (product / org / customer / IdP-inherited). Seeded from §2 + §2b;
-  the ISO **SoA** and the FedRAMP **customer-responsibility matrix** are *exports of this table*,
-  never separate documents. Living doc, updated as rbac-abac-plan workstreams land. →
-  `compliance/controls-matrix.md`.
+- **C2 — control matrix. ✅ DELIVERED 2026-08-28 → [`compliance/controls-matrix.md`](../../compliance/controls-matrix.md).**
+  One table: control id → SOC 2 TSC ↔ ISO 27001 Annex A ↔ NIST 800-53 → implementing product
+  feature (file/route/gate) → evidence source → responsibility (product / org / customer /
+  IdP-inherited). Seeded from §2 + §2b, then **grounded row by row against the code** rather than
+  copied. The ISO **SoA** and the FedRAMP **customer-responsibility matrix** are *exports of this
+  table*, never separate documents. Living doc — update a control's row in the same change that
+  touches its implementation.
+  - ⚠ **`compliance/**` was outside every vocabulary-guard pass on the day it was created.** It is
+    tracked product documentation shipped in the deploy bundle (§4), so it is as user-facing as
+    `docs/okf` — added to the guard's `DOC_TREES` in the same change, and the guard's summary label
+    is now DERIVED from that list instead of restating it.
+  - Its §4 consolidates every gap the matrix found (G1–G9) so C3/C4 schedule from one place.
 - **C3 — evidence automation (product work).**
-  - **Release integrity (CC8):** SHA-256 checksum + optional GPG detached signature per deploy
-    artifact (`package.ps1` step + customer verification runbook in `compliance/`), so releases
-    are verifiable for integrity AND authenticity.
-  - **SBOM artifact:** emit CycloneDX JSON at package time from the offline Maven reactor's
+  - **Release integrity (CC8): ✅ THE PRODUCT HALF IS ALREADY SHIPPED — corrected 2026-08-28.**
+    `inspecto/package.ps1` **always** writes a `sha256sum`-compatible `<artifact>.sha256` (`:845-856`),
+    and `-Sign` emits a GPG detached `<artifact>.asc` (`:869`) with the key supplied via
+    `-SigningKey`/`$env:INSPECTO_SIGNING_KEY` and never baked in. 🔴 This row read as unbuilt work for
+    months. What actually remains: the **customer verification runbook** (unblocked, G2), and making
+    signing *routine* rather than merely possible, which is §6 Q3 (where the org's key lives, G3).
+  - **SBOM artifact — CONFIRMED STILL A GAP (2026-08-28, G1):** a repo-wide search finds no
+    CycloneDX/SPDX generation anywhere, only prose references. The leanness is real and
+    **unattested**. Emit CycloneDX JSON at package time from the offline Maven reactor's
     resolved dependency list (hand-rolled step in `package.ps1`/a small Maven exec — no new online
     plugin; the dep list is tiny by design, which is the NFR-7 selling point). Ship it inside the
     deploy bundle next to the .sha256/.asc.

@@ -66,6 +66,12 @@ former root reference docs** (each index lists them):
 - [`ops/`](ops/) — operational runbooks: backup/restore, UAT seeding, maintenance, secret rotation.
 - [`ui/accessibility-audit.md`](ui/accessibility-audit.md) — the **living** inspecto-ui WCAG/a11y
   findings register (referenced by `okf/frontend/conventions/accessibility.md`).
+- [`../compliance/`](../compliance/) — the NFR-7 compliance tree (repo root, shipped in the deploy
+  bundle's docs). Today: [`controls-matrix.md`](../compliance/controls-matrix.md), the **C2 single
+  mapping table** (SOC 2 TSC ↔ ISO 27001 Annex A ↔ NIST 800-53 → implementing file/route/gate →
+  evidence → responsibility) — the ISO SoA and the FedRAMP customer-responsibility matrix are
+  **exports of it**, never separate documents. Scanned by the vocabulary guard. Plan:
+  [`superpower/compliance-certifications-plan.md`](superpower/compliance-certifications-plan.md).
 
 ## Stakeholder set (audience-targeted)
 
@@ -526,7 +532,10 @@ former root reference docs** (each index lists them):
 - [`superpower/compliance-certifications-plan.md`](superpower/compliance-certifications-plan.md) —
   **NFR-7 certifications plan, DRAFT 2026-07-23** (SOC 2 Type I → II → ISO 27001 → FedRAMP
   800-53 alignment/ATO-support; HIPAA/PCI scoping statements only); control-level coverage in
-  §2b, workstreams C1–C6, sequencing sign-off pending.
+  §2b, workstreams C1–C6. ⚠ "sequencing sign-off pending" was **stale** — §6 Q1 was answered
+  2026-07-25 (parallel; SOC 2 is not a gate). **C2 shipped 2026-08-28** →
+  [`../compliance/controls-matrix.md`](../compliance/controls-matrix.md); C1 stays org-gated (it
+  needs facts the repo does not hold).
 - [`superpower/postgres-multi-user-plan.md`](superpower/postgres-multi-user-plan.md) — **Postgres
   multi-user backend, PLAN ONLY 2026-07-27, build not started** (BACKLOG §6 required a plan first).
   Pool behind `JdbcDrivers`, scheme-derived sizing, schema-per-space; phases P0–P4. ⚠ Names four

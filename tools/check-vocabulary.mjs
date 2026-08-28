@@ -82,7 +82,17 @@ const USER_FACING = [
 // `docs/archived-documents/**` is EXCLUDED PERMANENTLY, not pending: CLAUDE.md defines that tier as
 // "kept for provenance, never maintained, never linked as current", and it holds most of the repo's raw
 // `flow` hits. Linting a tree nobody may edit would be unfixable-by-design noise.
-const DOC_TREES = ['docs/okf', 'docs/superpower'];
+// `compliance/**` (C2, added 2026-08-28) joins them: it is product documentation, tracked in git and
+// SHIPPED IN THE DEPLOY BUNDLE'S DOCS (compliance plan §4), so it is exactly as user-facing as
+// `docs/okf` — and a control matrix that calls a Pipeline a "Flow" is one an auditor reads. It was
+// outside every pass on the day it was created, which is the silent-exemption shape this guard's own
+// history warns about: a new tier is unscanned by default, and nothing says so.
+const DOC_TREES = ['docs/okf', 'docs/superpower', 'compliance'];
+
+// The trees' own name for themselves. Derived, never restated — the summary line used to say
+// "docs/{okf,superpower}" literally, so adding a third tree left the guard REPORTING A SCOPE IT NO
+// LONGER HAD. A guard that misstates what it scanned is the same failure as one that scans nothing.
+const DOC_TREES_LABEL = `{${DOC_TREES.join(', ')}}`;
 
 // Keyed `<path>::<ruleId>`, exactly like CONFIG_ALLOW, so exempting one known keep never blanket-exempts a
 // file from the other rules. Two legitimate shapes only:
@@ -610,7 +620,7 @@ if (sourceFiles !== null) {
 
 const all = [...violations, ...treeViolations, ...configViolations, ...sourceViolations];
 if (all.length) {
-    console.error(`\n✖ Vocabulary guard: ${violations.length} violation(s) in user-facing docs, ${treeViolations.length} in docs/{okf,superpower}, ${configViolations.length} in TOON config, ${sourceViolations.length} in Java/TS source\n`);
+    console.error(`\n✖ Vocabulary guard: ${violations.length} violation(s) in user-facing docs, ${treeViolations.length} in ${DOC_TREES_LABEL}, ${configViolations.length} in TOON config, ${sourceViolations.length} in Java/TS source\n`);
     for (const v of all) {
         console.error(`  ${v.rel}:${v.line}  [${v.rule}] ${v.hit}`);
         console.error(`      ${v.src}`);
@@ -618,14 +628,14 @@ if (all.length) {
     }
     console.error('Fix by using the canonical term (docs/GLOSSARY.md), or append `vocab-allow` on the line for a justified exception.');
     console.error('A config key needs a deliberate keep? Add `<path>::<ruleId>` to CONFIG_ALLOW WITH a reason — it is tracked debt, not an excuse.');
-    console.error('A doc in docs/{okf,superpower} whose SUBJECT is the banned term, or which uses a sanctioned other sense? Add `<path>::<ruleId>` to DOC_ALLOW WITH a reason. A merely STALE doc must be fixed, not allowlisted.');
+    console.error('A doc in ' + DOC_TREES_LABEL + ' whose SUBJECT is the banned term, or which uses a sanctioned other sense? Add `<path>::<ruleId>` to DOC_ALLOW WITH a reason. A merely STALE doc must be fixed, not allowlisted.');
     console.error('A source identifier using the sanctioned lowercase sense (link-analysis max-flow), or blocked on an external contract? Add `<path>::<ruleId>` to SOURCE_ALLOW WITH a reason, or `vocab-allow` on the line for a one-off citation.\n');
     process.exit(1);
 }
 
 const treeScope = treeMarkdown === null
-    ? 'docs/{okf,superpower} pass skipped (not a git checkout)'
-    : `${treeDocs.length} docs/{okf,superpower} doc(s)`;
+    ? `${DOC_TREES_LABEL} pass skipped (not a git checkout)`
+    : `${treeDocs.length} ${DOC_TREES_LABEL} doc(s)`;
 const configScope = toonFiles === null
     ? 'TOON pass skipped (not a git checkout)'
     : `${toonFiles.length} committed TOON config(s) clean`;
