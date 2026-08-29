@@ -91,6 +91,14 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- [`superpower/step-workbench-design.md`](superpower/step-workbench-design.md) — **DESIGN, not
+  scheduled** (2026-08-29): one Step editor where the author builds a query (named fields, functions,
+  filter, grouping), sees the **generated SQL**, tests it on sample rows, and gets the **output schema
+  derived** instead of restating it. 🔴 Grounded finding: this is mostly WIRING — `TypeFlow` (schema by
+  `DESCRIBE`, no execution) and `RowShaper.fuse` are both written with **no production caller**, and the
+  shipped preview already computes rows the UI discards. ⛔ `fuse` is deliberately NOT used (dead,
+  untested, and only a perf win on a bounded sample). Five slices, S1+S2 deliver most of it.
+
 - [`superpower/sql-only-transform-feasibility.md`](superpower/sql-only-transform-feasibility.md) —
   **ANALYSIS ONLY, nothing built or scheduled** (operator idea, 2026-08-29): drop the mapping and keep
   only SQL Map+Filter, with the Parquet schema taken from the query's resultset metadata. Verdict: the
