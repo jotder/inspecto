@@ -169,6 +169,11 @@ former root reference docs** (each index lists them):
   enterprise reactor **3615/0/0/5** — the new baseline. As-built:
   [`okf/backend/engine/branch-aware-ingest.md`](okf/backend/engine/branch-aware-ingest.md);
   provenance: `archived-documents/plans-archive/branch-aware-executor-arming-plan.md`.
+  **Extended 2026-08-29 (ELT Phase 6 slices A–C2, `52a10577`…`8e14ee7d`): the graph lane is no longer
+  route-only** — it carries every non-route shape a pipeline can actually be armed in (one or many
+  destinations, versioned reference stores, several writes per batch), proven by a two-lane
+  output-parity diff. That was Phase 6's precondition, and it is MET; the phase's remaining half is
+  deleting the legacy readers, which is release-gated (D-2).
 - ~~`superpower/backend-hardening-plan.md`~~ — **COMPLETE + ARCHIVED 2026-08-26** (items 1–5 shipped
   `38c7a32d` 2026-08-25; optional item 6 → BACKLOG §6 PKG-3, trigger-gated). As-built facts distilled
   into [`okf/backend/control-plane/api-v1.md`](okf/backend/control-plane/api-v1.md); provenance in

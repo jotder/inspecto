@@ -506,7 +506,11 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   `PartitionSinkWriter`. (`DecisionRuleApplier` is *not* a fourth: its `RouteSink` already calls
   `LineageCollector`, and `BatchIngestStrategy.writeAndTrace` seeds its accumulators from `applied.outputs()`, so
   routed-rule outputs reach the ingest hook for free. The hook is `BatchProcessor.finalizeSource`, once per
-  Consignment — *not* `writeAndTrace`, which has four callers and is invoked **per segment** in union mode.)
+  Consignment — *not* `writeAndTrace`, which has four callers and is invoked **per segment** in union mode
+  and **per chunk** in chunked mode. ⚠ Since 2026-08-29 that multiplicity is load-bearing: those callers pass a
+  **write scope** so the batch's shared branch-commit ledger keeps their sinks distinct — without it the second
+  and later writes read as "already committed" and their rows vanish. See
+  [`okf/backend/engine/branch-aware-ingest.md`](okf/backend/engine/branch-aware-ingest.md) §"The lane fork".)
   The durable registry (`DbConsignmentOutputStore`, plan §11.3) is **default-off** and `ServiceStores` degrades a
   failed open to `null`, so **never read a missing registry row as proof a file does not exist** — `BatchManifest`/
   `ManifestStore` stays the artifact of record. Note also that no per-file row count exists at write time (a

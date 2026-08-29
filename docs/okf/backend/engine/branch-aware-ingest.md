@@ -9,9 +9,10 @@ ordinary ingest path — the graph editor's route vocabulary finally runs where 
 
 - **Divert point:** `BatchIngestStrategy.writeAndTrace` — the one choke point every ingest lane
   funnels through with the live DuckDB connection and the materialised `transformed` table (the
-  connection is strategy-scoped, which is why no higher divert is possible). When
-  `cfg.routeConfig() != null` and `BatchGraphRunner.engages(PipelineLift.lift(cfg))`, the write
-  segment is replaced by `graphWriteAndTrace`.
+  connection is strategy-scoped, which is why no higher divert is possible). A `route:` pipeline
+  diverts when `BatchGraphRunner.engages(PipelineLift.lift(cfg))`; **since 2026-08-29 a NON-route
+  pipeline diverts too** whenever the two lanes are provably the same write — see *The lane fork*
+  below. Either way the write segment is replaced by `graphWriteAndTrace`.
 - **Machinery:** `BatchGraphRunner.run` (the `SinkWriter` overload) drives `PipelineExecutor` over
   the `route → sinks` subgraph, seeded at the route node's upstream (the map node — parse/map are
   never re-run), committing each branch through a durable per-batch `BranchCommitLog` under
@@ -27,6 +28,44 @@ ordinary ingest path — the graph editor's route vocabulary finally runs where 
   `finalizeSource` registers from the returned lineage exactly as always. The runner's
   once-after-all-branches hook is a documented no-op for the same reason.
 
+## The lane fork (ELT Phase 6 slices A–C2, 2026-08-29)
+
+The graph lane is no longer route-only. `BatchIngestStrategy.graphLaneCarries(cfg)` admits a
+non-route pipeline when the write is reproducible there, which is now every shape a pipeline can
+actually be armed in: **one or many destinations** (the lift emits a sink node per `sinks[]` entry
+and the executor writes each independently — the fan-out gains per-destination crash resumption the
+flat loop never had), **a versioned reference store** (the stamp runs before the walk exactly as it
+does flat; only the ROUTE combination stays refused, because one version history across branches is
+ill-defined), and **several writes per batch**. The seed generalises to `seedFeedingTheWrite` — *the
+node whose data relation IS the materialised table* — so the walk performs the WRITE and never
+re-runs parse/map. That is also why `withMappingContext` (a `PipelineDryRun`-only patch) is still
+not needed here.
+
+Refused, and left flat by name: a node BETWEEN map and sink (`dedup`/`join`/`summarize` — carrying
+them means EXECUTING them at rest, which is Stage-2 work), and a pipeline with **no configured
+scratch dir**.
+
+Three mechanisms a change here must respect:
+
+1. 🔴 **`writeAndTrace` has four callers and two write a batch in SEVERAL calls** (one per chunk, one
+   per segment), reusing the same sink ids against ONE shared branch ledger. Each caller passes a
+   **write scope**; `BranchCommitCoordinator` records `<scope>::<branch>` while handing the bare id
+   to the writer. Whole-batch callers pass `""` and record exactly the keys they always did, which
+   is what keeps the drain — reading bare sink ids back out — and the single-log cleanup working.
+2. 🔴 **Decision rules are a space-registry fact, not a config property**, so the admission cannot
+   see them statically. `DecisionRuleApplier.apply` runs ONCE above the fork and its RESULT is part
+   of the admission: a rule that actually routed rows keeps the pipeline flat.
+3. 🔴 **`dirs.temp` is optional, and the graph lane keeps a DURABLE ledger.** All three sites that
+   spell the log path — create, drain-resume, cleanup — go through
+   `BatchIngestStrategy.branchCommitLogPath`, and a pipeline without a scratch dir stays flat rather
+   than parking that ledger in a shared `%TEMP%`, where a stale `branch_commit_<batchId>.log` makes
+   the coordinator skip the branch and the batch writes NOTHING.
+
+Parity is proven, not asserted: `FlatVsGraphLaneParityTest` runs one materialised table through both
+lanes and diffs output files, partitions, rows on disk, the lineage matrix and event-time bounds on
+each admitted shape — and the whole reactor now exercises simple pipelines through the graph lane on
+every run.
+
 ## The engagement predicate
 
 `BatchGraphRunner.dataFedSinkCount` counts **branches**, not sink nodes: distinct `route:*`
@@ -36,7 +75,10 @@ So: flat single-sink = 1 · plain `sinks[2]` fan-out = 1 (N destinations of ONE 
 route = 2 · multi-schema selector = 1 (its `route:*` rels terminate at map nodes, not sinks).
 ⚠ The original node-count predicate engaged for plain fan-out and was refuted by its own
 falsification test (`BatchGraphRunnerLiftEngagementTest`); a stale `PipelineLiftTest` pin had
-encoded the wrong belief.
+encoded the wrong belief. ⚠ And do not read this predicate as a claim about capability: it answers
+*"is there a second BRANCH worth diverting for?"* for the route lane. Whether the graph lane can
+perform a given write is `graphLaneCarries`' question, and a plain fan-out — one branch, N
+destinations — is carried there since slice B.
 
 ## Fail-closed arming (`PipelineConfig.prepare()`)
 
