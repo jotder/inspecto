@@ -80,7 +80,11 @@ former root reference docs** (each index lists them):
   [`retention-configuration.md`](../compliance/evidence/retention-configuration.md) (G5 — the seven
   prune tasks; 🔴 the event store, AUDIT events included, has NO retention) and
   [`rto-rpo-statement.md`](../compliance/evidence/rto-rpo-statement.md) (G6 — targets are
-  operator-fill; the drill table is the evidence). Scanned by the vocabulary guard. Plan:
+  operator-fill; the drill table is the evidence),
+  [`audit-record-protection.md`](../compliance/evidence/audit-record-protection.md) (AU-9 — what the
+  audit store really guarantees, and the four things it does NOT) and
+  [`air-gap-posture.md`](../compliance/evidence/air-gap-posture.md) (ISO 8.12 / NFR-4 — a
+  **packaging** guarantee, not a runtime network control). Scanned by the vocabulary guard. Plan:
   [`superpower/compliance-certifications-plan.md`](superpower/compliance-certifications-plan.md).
 
 ## Stakeholder set (audience-targeted)

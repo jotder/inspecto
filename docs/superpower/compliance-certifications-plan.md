@@ -86,7 +86,7 @@ product-side theme is **Technological (8.x)**:
 | 8.2–8.5 privileged access, restriction, secure auth | OIDC + Roles/Capabilities (R-workstreams); privileged = Admin role + `canConfigureAccess` |
 | 8.8 vulnerability management | **gap** → C4 offline dep-review step + advisory-watch process (few deps by design helps) |
 | 8.9 configuration management | TOON config + ConfigSafetyValidator + write-root gate; hardening guide (C6) doubles here |
-| 8.12 data-leakage prevention | air-gap/no-egress posture (NFR-4) — a genuine differentiator, write it up |
+| 8.12 data-leakage prevention | ✅ **WRITTEN 2026-08-30** → `compliance/evidence/air-gap-posture.md`. The differentiator is real but is a **packaging** guarantee (hosted-AI SDK classes absent, proven by `EgressGuardTest`), ⛔ **not** a runtime network control; the writeup names the Kafka connector's operator-configured egress rather than omitting it |
 | 8.13 backup | **gap** → C4 backup/restore runbook + restore drill evidence |
 | 8.15–8.17 logging, monitoring, clock sync | Audit Log + Signals + Metrics; clock-sync = deployment note in hardening guide |
 | 8.24 cryptography | TLS, JCEKS secrets, release signing; crypto policy doc (C5); FIPS option (C6) |
@@ -107,7 +107,7 @@ responsibility matrix" shape:
 | Family | Posture |
 |---|---|
 | AC (access control) | product-implemented: RBAC/ABAC (R+A workstreams), session mgmt, least privilege; AC-2 account lifecycle = *inherited from customer IdP* (document the claim contract) |
-| AU (audit) | product-implemented: Audit Log, signals; **gaps**: AU-4/AU-11 retention config (C4), AU-9 audit-record protection statement (append-only guarantees — verify + document what the store actually guarantees, don't overclaim) |
+| AU (audit) | product-implemented: Audit Log, signals; **gaps**: AU-4/AU-11 retention config (C4), ~~AU-9 audit-record protection statement~~ ✅ **WRITTEN 2026-08-30** → `compliance/evidence/audit-record-protection.md` (grounded; the honest claim is narrower than "immutable") |
 | IA (identification & authN) | delegated to customer IdP via OIDC — IA-2 MFA etc. are *inherited*; product statement = "enforces authenticated subjects when an Authenticator is present" |
 | SC (system & comms protection) | TLS in transit; **gap**: SC-13 *FIPS-validated* crypto — add a documented FIPS mode (run on a FIPS-enabled JVM/provider; verify Nimbus/JCEKS paths under it) (C6) |
 | CM (config mgmt) | ConfigSafetyValidator, write-root gate, TOON-as-config-baseline; hardening guide (C6) = CM-6 baseline |
