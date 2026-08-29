@@ -176,16 +176,32 @@ Ordered by what they unblock.
   `EDITIONS.md` now states the exposure instead of denying it, which was the actual defect.
 - 🔴 **Torn multi-file reads across a recompute** — open defect; subtraction fixed stale inclusion,
   not tearing.
-- ⚠ **`retire_superseded` must be configured by an operator** or every full recompute leaves a
-  permanent extra copy on disk. No default exists, deliberately — but nothing surfaces the cost.
-- **`sql-only` §6 step 1** — `EXPR` drops out of the cast-failure audit **silently**. "Small,
-  high-value, independent of everything else."
+- ~~⚠ **`retire_superseded` must be configured by an operator** or every full recompute leaves a
+  permanent extra copy on disk. No default exists, deliberately — but nothing surfaces the cost.~~
+  **SHIPPED 2026-08-29** — `PipelineJobRunner.supersedeEarlierRevisions` now warns, naming the affected
+  store(s), the moment a recompute actually supersedes something with no enabled `retire_superseded` job
+  configured (checked live off `configSnapshot()`, not cached). The default itself is unchanged and stays
+  deliberately absent — only the silence is gone. See `operations-reference.md` and
+  `consignment-addressing.md`.
+- ~~**`sql-only` §6 step 1** — `EXPR` drops out of the cast-failure audit **silently**.~~ **SHIPPED
+  2026-08-29** (`9f14a960`) — `MappingRules.validate` now emits a WARNING `Finding` for every `EXPR`
+  rule. ⚠ The load-bearing half wasn't the warning: `ComponentRoutes`' preview `clean` field and its
+  save gate both treated "any finding" as unclean and would have silently blocked every `EXPR` save the
+  moment it stopped being finding-free — both now key off `Severity.ERROR` specifically.
 
 **Then the substantial builds:**
-- `open-dag` **stage 5** — open `RecipeCompiler`'s closed 8-verb switch + palette `authorable`.
-  **Independent of everything else — "the cheapest standalone win."**
+- ~~`open-dag` **stage 5** — open `RecipeCompiler`'s closed 8-verb switch + palette `authorable`.~~
+  **SHIPPED 2026-08-29** (`4dc63079`, before this register was written) — the premise itself was wrong
+  (`RecipeCompiler` has no production caller); what shipped instead is a contributed node type lowering
+  to a `steps:` entry via `PipelineLift`. See `open-dag-pipeline-design.md` §11. Its own two follow-on
+  §9 questions (per-step chain config; mid-chain-failure semantics) are also now decided and shipped
+  (`6bf92b1b`, 2026-08-29): `chain_config` JSON parameter + `ProcessorContext.config()`; failure stays
+  append-only, no code needed.
 - `open-dag` **stage 4** — the editor surface (needs decision 3.1 first).
-- `open-dag` **stage 6** — parser output-schema publication.
+- ~~`open-dag` **stage 6** — parser output-schema publication.~~ **REFUTED 2026-08-29** (before this
+  register was written) — the seam already exists and is already wired end to end (`ParserPlugin
+  .preview()`'s `columnTypes`, forwarded unconditionally by `POST /parsers/{id}/preview`). Nothing to
+  build. See `open-dag-pipeline-design.md` §12.
 - **Parsing Stage-1 (b)** tree→segments ingest bridge — "**THE** gating slice"; without it
   hierarchical parsers (XML, `ingestable:false`) are preview-only and the UI says so.
 - **W0 lossless lift↔lower proof** — "a hard gate": prove lossless over the 16 configs, or NAME the

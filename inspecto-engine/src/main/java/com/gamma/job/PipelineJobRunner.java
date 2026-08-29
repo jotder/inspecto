@@ -47,6 +47,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 /**
@@ -105,6 +106,9 @@ public final class PipelineJobRunner implements Job {
     private final Supplier<ComponentRegistry> registry;   // nullable — no registry means no `use:` resolution
     /** Loaded-pipeline context a {@code transform.join}'s by-name reference resolves against; nullable. */
     private final Supplier<List<com.gamma.etl.PipelineConfig>> pipelines;
+    /** Whether an enabled {@code retire_superseded} maintenance job exists, or {@code null} if unknown —
+     *  see the 8-arg constructor. */
+    private final BooleanSupplier retireSupersededConfigured;
 
     /** As {@link #PipelineJobRunner(JobConfig, BatchEventBus, PipelineStore, String, String, DbProvenanceStore)} with no provenance store. */
     public PipelineJobRunner(JobConfig cfg, BatchEventBus bus, PipelineStore pipelineStore,
@@ -148,6 +152,29 @@ public final class PipelineJobRunner implements Job {
                          String dataDir, String auditDir, DbProvenanceStore provenance,
                          Supplier<ComponentRegistry> registry,
                          Supplier<List<com.gamma.etl.PipelineConfig>> pipelines) {
+        this(cfg, bus, pipelineStore, dataDir, auditDir, provenance, registry, pipelines, null);
+    }
+
+    /**
+     * As above, plus whether an enabled {@code retire_superseded} maintenance job is configured
+     * ({@code null} if the caller cannot answer — e.g. a runner built outside a {@link JobService} host —
+     * which is read as "don't know" and suppresses the warning below rather than guessing).
+     *
+     * <p>Queried, not held: the scheduler's job set can change between runs (a job added, disabled, or
+     * removed), and this asks fresh each full recompute rather than caching an answer from construction
+     * time.
+     *
+     * @param retireSupersededConfigured answers "is at least one enabled {@code retire_superseded} job
+     *                                    configured", checked only after a full recompute actually
+     *                                    supersedes something (operations-reference.md, addressing §6:
+     *                                    without one, every full recompute leaves a permanent extra copy
+     *                                    on disk, and today nothing says so)
+     */
+    public PipelineJobRunner(JobConfig cfg, BatchEventBus bus, PipelineStore pipelineStore,
+                         String dataDir, String auditDir, DbProvenanceStore provenance,
+                         Supplier<ComponentRegistry> registry,
+                         Supplier<List<com.gamma.etl.PipelineConfig>> pipelines,
+                         BooleanSupplier retireSupersededConfigured) {
         this.cfg = cfg;
         this.bus = bus;
         this.pipelineStore = pipelineStore;
@@ -156,6 +183,7 @@ public final class PipelineJobRunner implements Job {
         this.provenance = provenance;
         this.registry = registry;
         this.pipelines = pipelines;
+        this.retireSupersededConfigured = retireSupersededConfigured;
     }
 
     @Override public String name() { return cfg.name(); }
@@ -356,17 +384,30 @@ public final class PipelineJobRunner implements Job {
      * <p>A no-op when the registry is absent — the pre-step-6 behaviour, where a recompute overwrote in place,
      * is what a deployment without a catalog still gets, and it is self-consistent: nothing recorded the old
      * revision, so nothing needs to un-record it.
+     *
+     * <p>⚠ <b>The bytes this leaves behind are only ever reclaimed by a {@code retire_superseded}
+     * maintenance job, and none is configured by default.</b> Without one, every full recompute is a
+     * permanent extra copy — so once this method actually supersedes something, it asks
+     * {@link #retireSupersededConfigured} and warns if the answer is "no" or "unknown says no was checked".
      */
-    private static void supersedeEarlierRevisions(PipelineGraph g, String batchId) {
+    private void supersedeEarlierRevisions(PipelineGraph g, String batchId) {
         var registry = com.gamma.consignment.ConsignmentOutputStores.shared();
         if (registry == null) return;
+        List<String> supersededStores = new ArrayList<>();
         for (String store : PipelineStores.produced(g)) {
             int superseded = registry.supersedeOtherRevisions(store, batchId);
-            if (superseded > 0)
+            if (superseded > 0) {
+                supersededStores.add(store);
                 log.info("[PIPELINEJOB] full recompute of '{}' superseded {} file(s) from earlier revision(s) — "
                         + "readers stop naming them now; the bytes go with the next retirement pass",
                         store, superseded);
+            }
         }
+        if (!supersededStores.isEmpty() && retireSupersededConfigured != null
+                && !retireSupersededConfigured.getAsBoolean())
+            log.warn("[PIPELINEJOB] no enabled 'retire_superseded' maintenance job is configured — the "
+                    + "file(s) just superseded for {} will never be reclaimed; every future full recompute "
+                    + "of these stores adds another permanent copy on disk", supersededStores);
     }
 
     /**

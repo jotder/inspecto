@@ -552,6 +552,13 @@ leaves a complete extra copy of its output on disk, forever.** That is the one c
 never on by default" has a real cost: define this job with a `retention_days` longer than your longest
 query, or a recompute-heavy pipeline will grow without bound.
 
+⚠ **The cost stopped being silent 2026-08-29.** `PipelineJobRunner.supersedeEarlierRevisions` now asks —
+only after a recompute has actually superseded at least one earlier revision, never unconditionally —
+whether an enabled `retire_superseded` job exists (`JobService.retireSupersededConfigured`, read fresh off
+`configSnapshot()` on every recompute, not cached at build time). If none does, it logs a WARN naming the
+affected store(s). The check is wired through a `BooleanSupplier` the runner's constructor accepts;
+existing callers that pass none are read as "unknown" and stay silent, matching the pre-fix behaviour.
+
 It deletes files and **keeps their catalog rows**. A row for a deleted file is harmless; dropping the row
 of a file still on disk would let it back into every reader's glob. A file locked by an open reader is
 skipped with a warning and retried on the next pass.

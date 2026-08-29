@@ -67,6 +67,75 @@ class PipelineJobRunnerTest {
     }
 
     /**
+     * operations-reference.md / addressing §6: without an enabled {@code retire_superseded} maintenance
+     * job, every full recompute leaves a permanent extra copy on disk. The supplier is asked ONLY once a
+     * recompute has actually superseded something — a first run over an empty registry has nothing to ask
+     * about, and asking anyway would be noise on every ordinary run.
+     */
+    @Test
+    void asksWhetherRetireSupersededIsConfiguredOnlyAfterARecomputeSupersedesSomething() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        String auditDir = tmp.resolve("audit").toString();
+        seedParquet(dataDir, "events", "(1,150),(2,50),(3,200)");
+        PipelineStore store = new PipelineStore(tmp.resolve("flows"));
+        store.write("evt_rollup2", new PipelineGraph("evt_rollup2", true,
+                List.of(PipelineNode.of("src", "acquisition", Map.of("source_store", "events")),
+                        PipelineNode.of("flt", "transform.filter", Map.of("where", "amt >= 100")),
+                        new PipelineNode("out", "sink.persistent", "Rollup2", null, Map.of("store", "rollup2"), null)),
+                List.of(PipelineEdge.data("src", "flt"), PipelineEdge.data("flt", "out"))));
+
+        java.util.concurrent.atomic.AtomicInteger asked = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.function.BooleanSupplier notConfigured = () -> { asked.incrementAndGet(); return false; };
+
+        try (var registry = com.gamma.consignment.DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            com.gamma.consignment.ConsignmentOutputStores.use(registry);
+
+            JobConfig cfg1 = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
+                    Map.of("flow", "evt_rollup2", "data_dir", dataDir, "batch_id", "b1"));
+            assertTrue(new PipelineJobRunner(cfg1, new BatchEventBus(), store, dataDir, auditDir,
+                    null, null, null, notConfigured).run().success());
+            assertEquals(0, asked.get(), "the first run superseded nothing — no reason to ask yet");
+
+            JobConfig cfg2 = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
+                    Map.of("flow", "evt_rollup2", "data_dir", dataDir, "batch_id", "b2"));
+            assertTrue(new PipelineJobRunner(cfg2, new BatchEventBus(), store, dataDir, auditDir,
+                    null, null, null, notConfigured).run().success());
+            assertEquals(1, asked.get(), "the second full recompute superseded the first — now it's asked");
+        } finally {
+            com.gamma.consignment.ConsignmentOutputStores.use(null);
+        }
+    }
+
+    /** A caller that cannot answer (the pre-existing constructors) must not crash on a real supersede. */
+    @Test
+    void aNullRetireSupersededSupplierIsTreatedAsUnknownNotAsAFailure() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        String auditDir = tmp.resolve("audit").toString();
+        seedParquet(dataDir, "events", "(1,150),(2,50),(3,200)");
+        PipelineStore store = new PipelineStore(tmp.resolve("flows"));
+        store.write("evt_rollup3", new PipelineGraph("evt_rollup3", true,
+                List.of(PipelineNode.of("src", "acquisition", Map.of("source_store", "events")),
+                        PipelineNode.of("flt", "transform.filter", Map.of("where", "amt >= 100")),
+                        new PipelineNode("out", "sink.persistent", "Rollup3", null, Map.of("store", "rollup3"), null)),
+                List.of(PipelineEdge.data("src", "flt"), PipelineEdge.data("flt", "out"))));
+
+        try (var registry = com.gamma.consignment.DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            com.gamma.consignment.ConsignmentOutputStores.use(registry);
+
+            JobConfig cfg1 = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
+                    Map.of("flow", "evt_rollup3", "data_dir", dataDir, "batch_id", "b1"));
+            assertTrue(new PipelineJobRunner(cfg1, new BatchEventBus(), store, dataDir, auditDir).run().success());
+
+            JobConfig cfg2 = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
+                    Map.of("flow", "evt_rollup3", "data_dir", dataDir, "batch_id", "b2"));
+            assertTrue(new PipelineJobRunner(cfg2, new BatchEventBus(), store, dataDir, auditDir).run().success(),
+                    "the pre-existing 5-arg constructor (no supplier) must keep superseding without crashing");
+        } finally {
+            com.gamma.consignment.ConsignmentOutputStores.use(null);
+        }
+    }
+
+    /**
      * §5-B — this runner recorded no Run Artifact at all until 2026-08-10, so
      * {@code $upstream(<pipelineJob>).artifact(...)} could never resolve. One per store it wrote bytes to,
      * {@code ref}'d by the store name, because that string is also the Consignment registry's key.

@@ -620,6 +620,55 @@ class JobServiceTest {
         }
     }
 
+    /**
+     * operations-reference.md / addressing §6 wiring: {@code buildPipelineJob} hands the runner a live
+     * check of whether an enabled {@code retire_superseded} job is configured, read fresh off
+     * {@code configSnapshot()} — so adding one between two recomputes changes the answer without a
+     * restart. Both scenarios (absent, then present) must run a full recompute cleanly; a wiring mistake
+     * (wrong method reference, wrong config filter) would surface here as a thrown exception, not just a
+     * missing log line.
+     */
+    @Test
+    void retireSupersededCheckIsWiredFromLiveJobConfigNotJustBuildTime(@TempDir Path dir) throws Exception {
+        String dataDir = dir.resolve("data").toString();
+        seedParquet(dataDir, "events", "(1,150),(2,50),(3,200)");
+        PipelineStore store = new PipelineStore(dir.resolve("flows"));
+        writeRollupFlow(store, "evt_rollup");
+
+        JobConfig fj = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
+                Map.of("flow", "evt_rollup", "data_dir", dataDir, "batch_id", "b1"));
+        try (var registry = com.gamma.consignment.DbConsignmentOutputStore.open("jdbc:duckdb:");
+             Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(fj), new BatchEventBus(), s, null,
+                     dir.resolve("audit").toString(), null, store, dataDir)) {
+            com.gamma.consignment.ConsignmentOutputStores.use(registry);
+            js.start();
+            assertTrue(js.trigger("nightly"));
+            JobRun run1 = await(() -> js.runsFor("nightly").size() >= 1 ? js.runsFor("nightly").get(0) : null);
+            assertEquals("SUCCESS", run1.status(), run1.message() + " -- first run, nothing superseded yet");
+
+            // no retire_superseded job registered: the second recompute supersedes the first batch and
+            // must still complete (the missing-job case only warns, never fails the run)
+            js.upsertJob(new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
+                    Map.of("flow", "evt_rollup", "data_dir", dataDir, "batch_id", "b2")));
+            assertTrue(js.trigger("nightly"));
+            JobRun run2 = await(() -> js.runsFor("nightly").size() >= 2 ? js.runsFor("nightly").get(0) : null);
+            assertEquals("SUCCESS", run2.status(),
+                    run2.message() + " -- recompute superseded the prior batch, no retire_superseded job configured");
+
+            // now register one, enabled — the live check must see it on the very next recompute
+            js.upsertJob(new JobConfig("reclaim", JobType.MAINTENANCE, null, null, true, false,
+                    Map.of("task", "retire_superseded", "retention_days", "30")));
+            js.upsertJob(new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
+                    Map.of("flow", "evt_rollup", "data_dir", dataDir, "batch_id", "b3")));
+            assertTrue(js.trigger("nightly"));
+            JobRun run3 = await(() -> js.runsFor("nightly").size() >= 3 ? js.runsFor("nightly").get(0) : null);
+            assertEquals("SUCCESS", run3.status(), run3.message() + " -- recompute with retire_superseded now configured");
+        } finally {
+            com.gamma.consignment.ConsignmentOutputStores.use(null);
+        }
+    }
+
     @Test
     void adhocFlowRunGetsTheFullLifecycleWithoutRegisteringAJob(@TempDir Path dir) throws Exception {
         // T32 config-less run (POST /pipelines/authored/{id}/trigger): no *_job.toon, no registry entry —

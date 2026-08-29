@@ -188,7 +188,10 @@ The current model:
    dropping the row of a file still on disk would let it back into every glob.
 
 ⚠ **Without a `retire_superseded` job defined, every full recompute leaves a complete extra copy of its
-output on disk permanently.** The old overwrite was O(1) disk; this is not.
+output on disk permanently.** The old overwrite was O(1) disk; this is not. **No longer silent
+(2026-08-29):** `PipelineJobRunner` now warns naming the affected store(s) the moment step 2 actually
+supersedes something and no enabled `retire_superseded` job is configured — see
+[operations-reference.md](../build-run/operations-reference.md) for the wiring.
 
 ## 5. The Watermark — completeness
 

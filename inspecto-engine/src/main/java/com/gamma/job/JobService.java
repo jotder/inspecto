@@ -659,7 +659,14 @@ public final class JobService implements AutoCloseable {
             throw new IllegalStateException("pipeline job '" + c.name()
                     + "' needs an authored-pipeline store; set -Dassist.write.root so authored pipelines can be loaded");
         return new PipelineJobRunner(c, bus, pipelineStore, dataDir, auditDir, provenanceStore,
-                componentRegistry, pipelineConfigs);
+                componentRegistry, pipelineConfigs, this::retireSupersededConfigured);
+    }
+
+    /** Is at least one enabled {@code retire_superseded} maintenance job configured? Queried fresh per
+     *  run (not cached) so a job added/disabled between runs is seen immediately. */
+    private boolean retireSupersededConfigured() {
+        return configSnapshot().stream().anyMatch(j -> "maintenance".equals(j.type()) && j.enabled()
+                && "retire_superseded".equalsIgnoreCase(j.params().getOrDefault("task", "cleanup")));
     }
 
     /** Wire this space's component registry so a pipeline run resolves its {@code use:} bindings (like
