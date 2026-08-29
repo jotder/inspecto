@@ -253,7 +253,7 @@ Ordered by what they unblock.
 - **ELT** D-9 windowed keyed dedup ledger (⛔ "never faked with unbounded history") · D-8 XLSX export
   · branch-commit-log housekeeping.
 - **step-workbench S5** — `TypeFlow` behind a read route; "the one that ends the restating".
-- **G1 SBOM** per bundle, once Q2 is answered · **AU-9** audit-record protection (⛔ "do not assert
+- ~~**G1 SBOM** per bundle, once Q2 is answered~~ **Q2 ANSWERED 2026-08-30 — now plain build work, filed as COMPLY-1 (BACKLOG §6), with COMPLY-2 (signing) and COMPLY-3 (audit prune) alongside it** · **AU-9** audit-record protection (⛔ "do not assert
   immutability the storage layer does not enforce") · ISO 8.8 advisory-watch process · ISO 8.12
   air-gap writeup ("a genuine differentiator; write it up").
 - **agt-6 `kpi_report_builder` host** — it has **no viable host pane**; a new flow, not an adoption.
