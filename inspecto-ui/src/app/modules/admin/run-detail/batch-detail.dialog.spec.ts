@@ -21,14 +21,30 @@ const FILES: AuditRow[] = [
 ];
 const LINEAGE: AuditRow[] = [{ input_file: 'a.csv', output: 'cdr/part-0.parquet' }];
 
+const OUTPUTS = [
+    {
+        tableName: 'totals__derived',
+        partitionKey: 'grp=even',
+        recordDay: null,
+        rows: 7,
+        bytes: 900,
+        state: 'LIVE',
+        producer: 'step_a',
+        writtenAt: '2026-08-29T00:00:00Z',
+        path: '/w/_derived/totals/grp=even/c1.parquet',
+    },
+];
+
 function create(
     resolved: { id: string; label: string } | null = { id: 'event:cdr/main', label: 'cdr_output' },
     batchId = 'b-1',
+    outputs: unknown = { enabled: true, consignmentId: 'b-1', outputs: OUTPUTS },
 ) {
     const stub = {
         batches: vi.fn(() => of(BATCHES)),
         files: vi.fn(() => of(FILES)),
         lineage: vi.fn(() => of(LINEAGE)),
+        consignmentOutputs: vi.fn(() => (outputs === 'error' ? throwError(() => ({ status: 404 })) : of(outputs))),
     };
     const catalog = {
         resolveTable: vi.fn(() => (resolved ? of(resolved) : throwError(() => ({ status: 404 })))),
@@ -52,6 +68,38 @@ function create(
 }
 
 describe('BatchDetailDialog', () => {
+    /** The post-sync lane made visible: what a step derived onto this Consignment, and who made it. */
+    it('shows the Consignment registered outputs, including a derived table', () => {
+        const { fixture, stub } = create();
+        const c = fixture.componentInstance;
+        expect(stub.consignmentOutputs).toHaveBeenCalledWith('cdr', 'b-1');
+        expect(c.batchOutputs().length).toBe(1);
+        expect(c.outputsNote()).toBeNull();
+        const text = fixture.nativeElement.textContent ?? '';
+        expect(text).toContain('Registered outputs (1)');
+    });
+
+    /**
+     * ⚠ "registry off" and "wrote nothing" must NOT render the same. An empty table with the registry
+     * disabled would assert something false about the Consignment.
+     */
+    it('explains a disabled registry rather than showing an empty table', () => {
+        const { fixture } = create(null, 'b-1', { enabled: false, consignmentId: 'b-1', outputs: [] });
+        const c = fixture.componentInstance;
+        expect(c.outputsNote()).toContain('switched off');
+        expect(c.outputsNote()).toContain('not the same');
+        expect(fixture.nativeElement.querySelector('inspecto-alert')).not.toBeNull();
+    });
+
+    /** An older backend without the route must degrade, not blank a dialog that already has data. */
+    it('degrades when the route is absent, keeping the rest of the dialog', () => {
+        const { fixture } = create(null, 'b-1', 'error');
+        const c = fixture.componentInstance;
+        expect(c.outputsNote()).toContain('does not serve');
+        expect(c.batchRow()?.['consignment_id']).toBe('b-1');
+        expect(c.batchLineage().length).toBe(1);
+    });
+
     it('resolves the summary row, member files and lineage for the batch', () => {
         const { fixture, stub } = create();
         const c = fixture.componentInstance;

@@ -11,6 +11,9 @@ import com.gamma.etl.TestConfigs;
 import com.gamma.job.JobConfig;
 import com.gamma.job.JobType;
 import com.gamma.service.CollectorService;
+import com.gamma.consignment.ConsignmentOutput;
+import com.gamma.consignment.ConsignmentOutputStores;
+import com.gamma.consignment.DbConsignmentOutputStore;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -158,6 +161,53 @@ class ControlApiTest {
             // absent limit stays byte-identical to the unpaged list
             JsonNode all = json(send(c.port, "GET", "/runs?offset=0", null));
             assertEquals(1, all.size());
+        }
+    }
+
+    /**
+     * The Consignment output registry, scoped to one Consignment — what a post-sync step's derived tables
+     * and summaries are visible through. Until this route the lane was real and invisible.
+     *
+     * <p>⚠ {@code enabled} is asserted, not just the rows: the registry is switchable, and an empty list
+     * with it OFF would read as "this Consignment wrote nothing", which is false.
+     */
+    @Test
+    void consignmentOutputsAreServedAndSayWhetherTheRegistryIsOn(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            HttpResponse<String> missing = send(c.port, "GET", "/runs/" + c.name + "/outputs", null);
+            assertEquals(400, missing.statusCode(), "consignmentId is required: " + missing.body());
+
+            try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+                ConsignmentOutputStores.use(store);
+                store.record(List.of(new ConsignmentOutput("cX", null, "totals__derived", "grp=even", null,
+                        dir.resolve("t.parquet").toString(), 7L, 900L, "2026-08-29T00:00:00Z", 0,
+                        ConsignmentOutput.State.LIVE, "id:BIGINT", null, "step_a")));
+
+                JsonNode body = json(send(c.port, "GET",
+                        "/runs/" + c.name + "/outputs?consignmentId=cX", null));
+                assertTrue(body.get("enabled").asBoolean(), body.toString());
+                assertEquals(1, body.get("outputs").size(), body.toString());
+                JsonNode row = body.get("outputs").get(0);
+                assertEquals("totals__derived", row.get("tableName").asText());
+                assertEquals("grp=even", row.get("partitionKey").asText());
+                assertEquals(7, row.get("rows").asInt());
+                assertEquals("LIVE", row.get("state").asText());
+                assertEquals("step_a", row.get("producer").asText(), "who made it, not just what it is");
+
+                // a Consignment with nothing registered is an EMPTY list on an ENABLED registry —
+                // distinguishable from the registry being off, which is the whole point of the flag
+                JsonNode none = json(send(c.port, "GET",
+                        "/runs/" + c.name + "/outputs?consignmentId=nope", null));
+                assertTrue(none.get("enabled").asBoolean());
+                assertEquals(0, none.get("outputs").size());
+            } finally {
+                ConsignmentOutputStores.use(null);
+            }
+
+            // …and with the registry off, `enabled` says so rather than implying nothing was written
+            JsonNode off = json(send(c.port, "GET", "/runs/" + c.name + "/outputs?consignmentId=cX", null));
+            assertFalse(off.get("enabled").asBoolean(), off.toString());
+            assertEquals(0, off.get("outputs").size());
         }
     }
 

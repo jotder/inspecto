@@ -2,7 +2,38 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { apiUrl, toParams } from './api-base';
-import { AuditRow, DrainResult, RunResult, RunView, BatchAuditReport, ReportWindow, InboxStatus, RejectedRows } from './models';
+import {
+    AuditRow,
+    DrainResult,
+    RunResult,
+    RunView,
+    BatchAuditReport,
+    ReportWindow,
+    InboxStatus,
+    RejectedRows,
+} from './models';
+
+/** One registered output file of a Consignment. */
+export interface ConsignmentOutputRow {
+    tableName: string;
+    partitionKey: string;
+    recordDay: string | null;
+    rows: number;
+    bytes: number;
+    /** LIVE | SUPERSEDED | COMPACTED_AWAY — what the Selector prunes on. */
+    state: string | null;
+    /** Which step wrote it — the sync tier, or the processor that derived it. */
+    producer: string | null;
+    writtenAt: string;
+    path: string;
+}
+
+/** `enabled: false` means the registry is switched off — NOT that the Consignment wrote nothing. */
+export interface ConsignmentOutputsPage {
+    enabled: boolean;
+    consignmentId: string;
+    outputs: ConsignmentOutputRow[];
+}
 
 /** Ingest run lifecycle + audit queries (CONTROL scope). */
 @Injectable({ providedIn: 'root' })
@@ -57,6 +88,18 @@ export class RunsService {
     lineage(name: string, batchId?: string): Observable<AuditRow[]> {
         return this.http.get<AuditRow[]>(apiUrl(`/runs/${encodeURIComponent(name)}/lineage`), {
             params: toParams({ batchId }),
+        });
+    }
+    /**
+     * One Consignment's registered outputs — every file it wrote, INCLUDING the derived tables and
+     * summaries a post-sync step registered onto it.
+     *
+     * ⚠ `enabled` is not decoration: the output registry is switchable, and an empty list with it OFF
+     * would read as "this Consignment wrote nothing", which is false. Render the two differently.
+     */
+    consignmentOutputs(name: string, consignmentId: string): Observable<ConsignmentOutputsPage> {
+        return this.http.get<ConsignmentOutputsPage>(apiUrl(`/runs/${encodeURIComponent(name)}/outputs`), {
+            params: toParams({ consignmentId }),
         });
     }
     quarantine(name: string): Observable<AuditRow[]> {

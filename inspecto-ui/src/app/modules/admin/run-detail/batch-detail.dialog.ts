@@ -5,14 +5,22 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { RouterLink } from '@angular/router';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
-import { AuditRow, CatalogService, RunsService } from 'app/inspecto/api';
+import { AuditRow, CatalogService, ConsignmentOutputRow, RunsService } from 'app/inspecto/api';
 import { DataTableComponent } from 'app/inspecto/data-table';
+import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 
 /** Batch detail — summary + member files + input→output lineage for one batch. */
 @Component({
     selector: 'app-batch-detail-dialog',
     standalone: true,
-    imports: [MatDialogModule, MatButtonModule, MatProgressSpinnerModule, DataTableComponent, RouterLink],
+    imports: [
+        MatDialogModule,
+        MatButtonModule,
+        MatProgressSpinnerModule,
+        DataTableComponent,
+        InspectoAlertComponent,
+        RouterLink,
+    ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Batch {{ data.batchId }}</h2>
@@ -65,6 +73,23 @@ import { DataTableComponent } from 'app/inspecto/data-table';
                     height="14rem"
                     noRowsTitle="No lineage"
                 />
+
+                <!-- Registered outputs: what SYNC wrote plus what any post-sync step derived onto this
+                     Consignment. Fetched separately from the core forkJoin so a registry that is off, or
+                     a route an older backend has not got, degrades to an explanation instead of blanking
+                     the dialog. -->
+                <div class="mt-4 font-semibold">Registered outputs ({{ batchOutputs().length }})</div>
+                @if (outputsNote(); as note) {
+                    <inspecto-alert variant="info">{{ note }}</inspecto-alert>
+                } @else {
+                    <inspecto-data-table
+                        tier="mini"
+                        sourceName="outputs"
+                        [rows]="batchOutputs()"
+                        height="14rem"
+                        noRowsTitle="No registered outputs"
+                    />
+                }
             }
         </mat-dialog-content>
         <mat-dialog-actions align="end">
@@ -81,6 +106,16 @@ export class BatchDetailDialog implements OnInit {
     readonly batchRow = signal<AuditRow | null>(null);
     readonly batchFiles = signal<AuditRow[]>([]);
     readonly batchLineage = signal<AuditRow[]>([]);
+    /** The Consignment's registered outputs — sync's own files AND any post-sync step's derived tables. */
+    readonly batchOutputs = signal<ConsignmentOutputRow[]>([]);
+    /**
+     * Why there is no table to show, or null when there is one.
+     *
+     * ⚠ "off" and "empty" are DIFFERENT and must not render the same: an empty list with the registry
+     * disabled would read as "this Consignment wrote nothing", which is false — the manifest, not this
+     * table, is authoritative for a file's existence.
+     */
+    readonly outputsNote = signal<string | null>(null);
 
     /** The store this batch wrote, and the catalog node it resolved to — blank/null when unresolvable. */
     readonly outputTable = signal('');
@@ -103,9 +138,29 @@ export class BatchDetailDialog implements OnInit {
                 this.batchLineage.set(lineage);
                 this.loading.set(false);
                 this.resolveCatalogNode();
+                this.loadOutputs(pipeline, batchId);
             },
             error: () => {
                 this.loading.set(false);
+            },
+        });
+    }
+
+    /** Independent of the core fetch: this one failing must not blank a dialog that already has data. */
+    private loadOutputs(pipeline: string, batchId: string): void {
+        this.api.consignmentOutputs(pipeline, batchId).subscribe({
+            next: (page) => {
+                this.batchOutputs.set(page.outputs ?? []);
+                this.outputsNote.set(
+                    page.enabled
+                        ? null
+                        : 'The Consignment output registry is switched off, so this list cannot be shown. ' +
+                              'That is not the same as this Consignment having written nothing.',
+                );
+            },
+            error: () => {
+                this.batchOutputs.set([]);
+                this.outputsNote.set('This backend does not serve registered outputs.');
             },
         });
     }

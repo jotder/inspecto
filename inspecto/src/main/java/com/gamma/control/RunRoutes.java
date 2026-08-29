@@ -6,6 +6,9 @@ import com.gamma.config.safety.SafetyPolicy;
 import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.config.spec.Finding;
 import com.gamma.config.spec.Severity;
+import com.gamma.consignment.ConsignmentOutput;
+import com.gamma.consignment.ConsignmentOutputStores;
+import com.gamma.consignment.DbConsignmentOutputStore;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.inspector.DrainCommand;
 import com.gamma.inspector.ReprocessCommand;
@@ -60,6 +63,10 @@ final class RunRoutes implements RouteModule {
         api.get("/runs/([^/]+)/files",      (e, m) -> api.service().statusStore().files(cfg(api, m)));
         api.get("/runs/([^/]+)/lineage",    (e, m) -> api.service().statusStore().lineage(cfg(api, m), ApiContext.query(e, "batchId")));
         api.get("/runs/([^/]+)/quarantine", (e, m) -> api.service().statusStore().quarantine(cfg(api, m)));
+        // The Consignment output registry, scoped to one Consignment: every file it wrote, INCLUDING the
+        // derived tables and summaries a post-sync step registered onto it. Until this the lane was
+        // real and invisible — a chain could derive a table and nothing in the UI could show it.
+        api.get("/runs/([^/]+)/outputs", (e, m) -> consignmentOutputs(ApiContext.query(e, "consignmentId")));
         // The rejected ROWS behind an error_rows count (audit hole 2): the audit ledgers carry counts,
         // filenames and an error string, never row content — which existed all along in the companion
         // `<base>_errors.csv` but only on disk, so an operator without filesystem access could see
@@ -389,6 +396,39 @@ final class RunRoutes implements RouteModule {
 
     private PipelineConfig cfg(ApiContext api, Matcher m) {
         return api.service().configFor(ApiContext.name(m)).orElseThrow(() -> notFound(ApiContext.name(m)));
+    }
+
+    /**
+     * One Consignment's registered outputs.
+     *
+     * <p>⚠ <b>{@code enabled} is not decoration.</b> The registry is switchable
+     * ({@code -Dconsignment.outputs.backend=none}), and with it off an empty list would read as "this
+     * Consignment wrote nothing" — which is false, and exactly the confusion the engine's own code guards
+     * against ("an absent store means no readable relations, NOT that the Consignment wrote nothing"; the
+     * manifest stays authoritative for existence). So the caller is told which of the two it is.
+     */
+    private static Object consignmentOutputs(String consignmentId) {
+        if (consignmentId == null || consignmentId.isBlank())
+            throw new ApiException(400, "consignmentId is required");
+        DbConsignmentOutputStore store = ConsignmentOutputStores.shared();
+        if (store == null)
+            return Map.of("enabled", false, "consignmentId", consignmentId, "outputs", List.of());
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (ConsignmentOutput o : store.outputs(consignmentId)) {
+            Map<String, Object> r = new LinkedHashMap<>();
+            r.put("tableName", o.tableName());
+            r.put("partitionKey", o.partitionKey());
+            r.put("recordDay", o.recordDay());
+            r.put("rows", o.rows());
+            r.put("bytes", o.bytes());
+            r.put("state", o.state() == null ? null : o.state().name());
+            r.put("producer", o.producer());
+            r.put("writtenAt", o.writtenAt());
+            r.put("path", o.path());
+            rows.add(r);
+        }
+        return Map.of("enabled", true, "consignmentId", consignmentId, "outputs", rows);
     }
 
     private static ApiException notFound(String name) {
