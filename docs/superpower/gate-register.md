@@ -246,8 +246,24 @@ Ordered by what they unblock.
   ⚠ XML's grammar keys moved `xml.*` → `ingester_config.*` (one spelling for preview and load; no
   operator config used the old one). ⚠ The UI needed NO change — every gate reads the served flags.
   See `okf/backend/engine/parser-plugins.md`.
-- **W0 lossless lift↔lower proof** — "a hard gate": prove lossless over the 16 configs, or NAME the
-  supported subset, before W4/W5.
+- ~~**W0 lossless lift↔lower proof** — "a hard gate" before W4/W5~~ 🔴 **THIS ROW IS STALE — W0
+  SHIPPED 2026-08-01**, and W4/W5 were unblocked by it (grounded 2026-08-30).
+  `docs/archived-documents/plans-archive/onboarding-pipeline-unification.md` §3 (`:112-130`) defines
+  the gate, records the finding at `:132-168` (the lower dropped the whole `collector` block) and the
+  resolution at `:170-209`, headed **"✅ W0 SHIPPED 2026-08-01"**; `:251-254` says in terms
+  "W4/W5 unblocked". The row's own escape hatch — *"or NAME the supported subset"* — is what actually
+  happened: the named unsupported subset is at `:194-202` (multi-sink beyond one persistent + one
+  quarantine; CONTROL nodes beyond `gap`; grouping/rollup; operational knobs `status_dir`/`errors`/
+  `log_dir`, dropped on purpose). Proof is `PipelineCompilerTest.collectorBlockRoundTripsEverySource
+  SubRecord` + `singleSchemaRoundTripIsLossless` driving `load → lift → toConfigMap → toToon → load`,
+  plus `PipelineExecutionParityTest` for executability.
+  ⚠ **"the 16 configs" was never a grounded number** — it appears once, as an aspirational target
+  (`:130`), the shipped proof used ONE synthetic fixture rather than a corpus sweep, and the real
+  on-disk `*_pipeline.toon` count is **17**. Do not propagate the figure.
+  ⚠ The only recorded lift/lower loss still worth knowing is **MOCK-LIFT-1** (BACKLOG `:207`,
+  **closed 2026-08-29**) and it is **UI-mock-only** — `inspecto-ui/.../mock/pipeline-editable.ts`
+  always synthesises a trunk sink where Java synthesises one only when `sinks:` is absent. The
+  server's lift is correct; do not read that row as a Java-engine defect.
 - **Consignment** §8 end-of-period summary pass (the only remaining dependency of anything already
   built; representation already decided as a fixed-bucket histogram) · §11.4 `partition_state`.
 - **ELT** D-9 windowed keyed dedup ledger (⛔ "never faked with unbounded history") · D-8 XLSX export
