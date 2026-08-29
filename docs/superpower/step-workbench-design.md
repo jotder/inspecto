@@ -208,8 +208,8 @@ one it assumed, or it will confidently show the wrong types for ASN.1/fixed-widt
 
 | # | Slice | Verify gate |
 |---|---|---|
-| **S1** | Return `columnTypes` + `sql` per relation from `/components/transform/preview` (additive keys); seal the preview connection | real-HTTP test: types match a `DESCRIBE` of the same config; a `read_csv('…')` in a `where` is refused |
-| **S2** | Render what the response already carries — rows in a data table, types as its header, SQL in a read-only pane | UI specs + **drive the preview**: author a `map`, see the rows and types change |
+| **S1** | ✅ **SHIPPED 2026-08-29** — `RelationPreview.columnTypes` (DESCRIBE-derived) + `Result.sql` (the statements as executed), both additive; the transform preview now runs on a **sealed** `SqlSandbox` | ✅ reactor **3749/0/0/5**, 19 modules, exit 0. Seal falsified in both directions: without it a **readable file was read successfully** through a `where` predicate |
+| **S2** | Render what the response already carries — rows in a data table, types as its header, SQL in a read-only pane. ⚠ **First task: mirror `columnTypes`/`sql` in the offline mock** — S1 left it alone deliberately (no consumer, so no behavioural divergence yet), but the moment a renderer exists the offline arm would show an empty schema | UI specs + **drive the preview**: author a `map`, see the rows and types change |
 | **S3** | `TRANSFORM_MAP` attribute spec (name/expr grid) — ⚠ regenerate **both** committed contracts | `NodeConfigNameContractTest` + the full reactor, not a targeted run |
 | **S4** | `configs: [...]` chain preview, per-Step `shape` chaining; honest refusal for a join without reference context | chain of map→filter→summarize previews with a distinct schema per Step |
 | **S5** | Wire `TypeFlow` behind a read route; show the derived pipeline schema beside the authored one | derived columns equal what a real batch writes to Parquet (assert against a written file, not against the SQL) |
@@ -226,3 +226,33 @@ re-registration per connection) · deleting the declarative mapping (refuted —
 using `fuse` on the execution path (worth doing, separately, with tests first) · a whole-query free-SQL
 Step, which would reintroduce exactly the cast-audit denominator problem the feasibility analysis
 recorded.
+
+---
+
+## 11. S1 as-built (2026-08-29)
+
+**Shipped:** `ComponentPreview.RelationPreview` gains `columnTypes` — ordered `{name, type}` pairs from
+`ScratchTables.columnTypes` (`SELECT column_name, column_type FROM (DESCRIBE <table>)`) — and
+`ComponentPreview.Result` gains `sql`. Both are additive, with a pre-S1 compact constructor, so an old
+client sees the previous response unchanged. `transform()` now runs on `SqlSandbox.open(defaultPolicy())`,
+seeding **before** `seal()`.
+
+**Three things the design did not predict:**
+
+1. 🔴 **The unsealed preview really did read the filesystem — proven, not argued.** Falsifying with a
+   `/etc/passwd` probe was *not* a valid test: on Windows it failed as "no such file", which looks
+   identical to a refusal. Re-probed with a **temp file that actually exists**, removing the seal makes
+   the preview return **200 with no exception at all**. That is the vulnerability, demonstrated. ⚠ A
+   negative test whose target does not exist proves nothing — pick a probe that would otherwise SUCCEED.
+2. **`RowShaper` was not modified.** SQL capture is a `SqlRecorder` that wraps the JDBC `Connection` in a
+   `Proxy` and records the SQL passed to any `Statement` it hands out. The alternative — threading a sink
+   through **13 `exec` call sites across 9 private methods** — would have changed production signatures
+   for a preview-only feature. The wrapper also cannot miss a statement, since everything reaches the
+   database through `Connection`.
+3. ⚠ **`sql` is the whole ordered statement list, not one statement per relation.** `route` builds an
+   intermediate `labelled` table before splitting, and per-relation attribution would hide exactly the
+   statement carrying the author's `CASE` expression.
+
+**Deliberately not done in S1:** the offline mock still returns neither key. There is no consumer yet, so
+there is no behavioural divergence — but that changes the moment S2 renders them, which is why it is S2's
+first task.

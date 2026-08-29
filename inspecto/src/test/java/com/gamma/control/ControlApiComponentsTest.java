@@ -322,6 +322,61 @@ class ControlApiComponentsTest {
         }
     }
 
+    /**
+     * S1 over real HTTP: the route publishes the DERIVED output schema and the SQL the config compiled
+     * to, so an author never restates the schema. Both are additive keys — a client that ignores them
+     * sees the pre-S1 response unchanged.
+     */
+    @Test
+    void inlineTransformPreviewPublishesDerivedTypesAndTheCompiledSql(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, null)) {
+            HttpResponse<String> t = send(c.port, "POST", "/components/transform/preview",
+                    "{\"config\":{\"type\":\"transform.map\",\"columns\":[{\"name\":\"ident\",\"expr\":\"id\"},{\"name\":\"amt_d\",\"expr\":\"CAST(amt AS DOUBLE)\"}]},\"sampleRows\":[{\"id\":\"1\",\"amt\":\"150\"},{\"id\":\"2\",\"amt\":\"50\"}]}");
+            assertEquals(200, t.statusCode(), t.body());
+
+            JsonNode data = null;
+            for (JsonNode rel : json(t).get("relations"))
+                if ("data".equals(rel.get("rel").asText())) data = rel;
+            assertNotNull(data, t.body());
+
+            // The derived schema: DuckDB's own types, in the authored column order.
+            JsonNode types = data.get("columnTypes");
+            assertEquals(2, types.size(), t.body());
+            assertEquals("ident", types.get(0).get("name").asText());
+            assertEquals("VARCHAR", types.get(0).get("type").asText(), "a passthrough stays VARCHAR");
+            assertEquals("amt_d", types.get(1).get("name").asText());
+            assertEquals("DOUBLE", types.get(1).get("type").asText(), t.body());
+
+            // The compiled SQL, as executed — the author's own expression appears in it.
+            JsonNode sql = json(t).get("sql");
+            assertTrue(sql.size() > 0, t.body());
+            assertTrue(sql.toString().contains("CAST(amt AS DOUBLE)"), t.body());
+        }
+    }
+
+    /**
+     * 🔴 A transform preview runs AUTHOR-SUPPLIED SQL, so its connection is sealed. Before S1 a `where`
+     * containing read_csv was a live file read on the server — proven by removing the seal, where a
+     * readable file was read successfully. The route must now refuse it, as a 422 rather than a 500.
+     */
+    @Test
+    void authorSqlInAPreviewCannotReachTheFilesystem(@TempDir Path dir) throws Exception {
+        Path readable = Files.createTempFile("route_seal_probe_", ".csv");
+        Files.writeString(readable, "a\n1\n");
+        try (Ctx c = open(dir, null)) {
+            String path = readable.toString().replace("\\", "/").replace("'", "''");
+            HttpResponse<String> t = send(c.port, "POST", "/components/transform/preview",
+                    String.format("{\"config\":{\"type\":\"transform.filter\",\"where\":\"(SELECT count(*) FROM read_csv('%s')) >= 0\"},\"sampleRows\":[{\"id\":\"1\",\"amt\":\"150\"}]}", path));
+            assertEquals(422, t.statusCode(), t.body());
+            assertTrue(t.body().toLowerCase().contains("permission")
+                            || t.body().toLowerCase().contains("not allowed")
+                            || t.body().toLowerCase().contains("disabled"),
+                    "the seal should refuse external access: " + t.body());
+        } finally {
+            Files.deleteIfExists(readable);
+        }
+    }
+
     /** An inline preview reports the SAME result as the by-id arm — one code path, two ways in. */
     @Test
     void inlineAndRegisteredPreviewsAgree(@TempDir Path dir) throws Exception {

@@ -57,6 +57,102 @@ class ComponentPreviewTest {
         assertTrue(row0.containsKey("double_amt"));
     }
 
+    // ── S1: the derived schema, the compiled SQL, and the seal ────────────────
+
+    /**
+     * The point of S1: the author never restates the output schema — DuckDB derives it. A map's declared
+     * cast must show up as the DuckDB type, and an unmapped passthrough must stay VARCHAR (the seeded
+     * shape, which is also production's `read_csv columns={…VARCHAR…}` shape).
+     */
+    @Test
+    void mapPreviewPublishesTheDerivedOutputSchema() throws Exception {
+        PipelineNode node = PipelineNode.of("m", "transform.map",
+                Map.of("columns", List.of(Map.of("name", "ident", "expr", "id"),
+                        Map.of("name", "amt_d", "expr", "CAST(amt AS DOUBLE)"),
+                        Map.of("name", "amt_i", "expr", "CAST(amt AS INTEGER)"))));
+        ComponentPreview.Result r = ComponentPreview.transform(node, SAMPLE);
+
+        Map<String, String> types = new java.util.LinkedHashMap<>();
+        for (Map<String, String> c : rel(r, PipelineRel.DATA).columnTypes())
+            types.put(c.get("name"), c.get("type"));
+
+        assertEquals(List.of("ident", "amt_d", "amt_i"), List.copyOf(types.keySet()),
+                "derived schema keeps the authored column order");
+        assertEquals("VARCHAR", types.get("ident"), "a passthrough stays the seeded VARCHAR");
+        assertEquals("DOUBLE", types.get("amt_d"));
+        assertEquals("INTEGER", types.get("amt_i"));
+    }
+
+    /** Every relation gets its own schema — a filter's kept and dropped sides both carry one. */
+    @Test
+    void everyProducedRelationCarriesItsOwnDerivedSchema() throws Exception {
+        PipelineNode node = PipelineNode.of("f", "transform.filter", Map.of("where", "CAST(amt AS INT) >= 100"));
+        ComponentPreview.Result r = ComponentPreview.transform(node, SAMPLE);
+
+        for (String which : List.of(PipelineRel.DATA, PipelineRel.DROPPED)) {
+            List<Map<String, String>> types = rel(r, which).columnTypes();
+            assertFalse(types.isEmpty(), which + " should carry a derived schema");
+            assertEquals(List.of("id", "grp", "amt"), types.stream().map(c -> c.get("name")).toList(),
+                    which + " passes the input columns through");
+        }
+    }
+
+    /**
+     * The compiled SQL is published so the author can see what their config became. It must be the SQL
+     * that ACTUALLY ran — the recorder wraps the connection rather than re-deriving the string, so this
+     * asserts the author's own expression appears in it.
+     */
+    @Test
+    void thePreviewPublishesTheSqlItActuallyRan() throws Exception {
+        PipelineNode node = PipelineNode.of("f", "transform.filter", Map.of("where", "CAST(amt AS INT) >= 100"));
+        ComponentPreview.Result r = ComponentPreview.transform(node, SAMPLE);
+
+        assertFalse(r.sql().isEmpty(), "the compiled SQL should be published");
+        String all = String.join(" | ", r.sql());
+        assertTrue(all.contains("CAST(amt AS INT) >= 100"), "the author's predicate appears verbatim: " + all);
+        assertTrue(all.contains("CREATE TABLE"), "the shaping statements are what ran: " + all);
+        // The filter produces two relations from two statements; both are recorded, in order.
+        assertEquals(2, r.sql().size(), "one statement per produced relation: " + all);
+    }
+
+    /**
+     * 🔴 A transform preview executes AUTHOR-SUPPLIED SQL, so the connection is SEALED
+     * (`enable_external_access=false`). Before S1 an operator predicate could reach the filesystem —
+     * `read_csv` in a `where` was a live file read on the server. The seal must refuse it.
+     */
+    @Test
+    void authorSqlCannotReachTheFilesystem() throws Exception {
+        // ⚠ A file that REALLY EXISTS, so this discriminates on every OS. Pointing at /etc/passwd made
+        // the unsealed case fail on Windows for the wrong reason (no such file) — it would have been
+        // read on Linux, and the test would still have looked like it was proving something.
+        java.nio.file.Path readable = java.nio.file.Files.createTempFile("preview_seal_probe_", ".csv");
+        java.nio.file.Files.writeString(readable, "a\n1\n");
+        try {
+            String path = readable.toString().replace("\\", "/").replace("'", "''");
+            PipelineNode node = PipelineNode.of("f", "transform.filter",
+                    Map.of("where", "(SELECT count(*) FROM read_csv('" + path + "')) >= 0"));
+            Exception e = assertThrows(Exception.class, () -> ComponentPreview.transform(node, SAMPLE),
+                    "a readable file must still be refused — the seal, not the filesystem, is the gate");
+            assertTrue(String.valueOf(e.getMessage()).toLowerCase().contains("permission")
+                            || String.valueOf(e.getMessage()).toLowerCase().contains("not allowed")
+                            || String.valueOf(e.getMessage()).toLowerCase().contains("disabled"),
+                    "the seal should refuse external access, got: " + e.getMessage());
+        } finally {
+            java.nio.file.Files.deleteIfExists(readable);
+        }
+    }
+
+    /** ...and the seal must not break ordinary SQL: built-in functions still evaluate. */
+    @Test
+    void theSealLeavesOrdinarySqlWorking() throws Exception {
+        PipelineNode node = PipelineNode.of("m", "transform.map",
+                Map.of("columns", List.of(Map.of("name", "shouted", "expr", "upper(grp)"),
+                        Map.of("name", "when_utc", "expr", "timezone('UTC', TIMESTAMP '2026-03-01 10:00:00')"))));
+        ComponentPreview.Result r = ComponentPreview.transform(node, SAMPLE);
+        assertEquals(3, rel(r, PipelineRel.DATA).rowCount());
+        assertTrue(rel(r, PipelineRel.DATA).rows().get(0).containsKey("shouted"));
+    }
+
     @Test
     void emptySampleAndUnsupportedTypeAreRejected() {
         PipelineNode filter = PipelineNode.of("f", "transform.filter", Map.of("where", "true"));

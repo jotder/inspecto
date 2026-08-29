@@ -80,6 +80,29 @@ final class ScratchTables {
         }
     }
 
+    /**
+     * The columns of {@code table} as ordered {@code {name, type}} pairs, from DuckDB's own
+     * {@code DESCRIBE} — <b>the derived output schema</b>.
+     *
+     * <p>DuckDB is the type authority here, and the answer is production-faithful for the delimited
+     * path for a specific reason: {@link #seed} creates the scratch table <b>all VARCHAR</b>, which is
+     * exactly the shape production's {@code read_csv columns={…VARCHAR…}} produces, so an expression
+     * infers against the same input typing it will meet in a real batch. ⚠ It is <b>not</b> faithful
+     * for the typed plugin-ingester path, where raw fields carry their declared types.
+     *
+     * <p>Works on an empty table — {@code DESCRIBE} reads the catalog, not the rows.
+     */
+    static List<Map<String, String>> columnTypes(Connection conn, String table) throws SQLException {
+        List<Map<String, String>> out = new ArrayList<>();
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(
+                     "SELECT column_name, column_type FROM (DESCRIBE " + q(table) + ")")) {
+            while (rs.next())
+                out.add(Map.of("name", rs.getString(1), "type", rs.getString(2)));
+        }
+        return out;
+    }
+
     /** Quote a SQL identifier. */
     static String q(String ident) {
         return SqlIdent.q(ident);

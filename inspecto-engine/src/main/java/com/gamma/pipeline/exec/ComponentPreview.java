@@ -4,6 +4,8 @@ import com.gamma.api.PublicApi;
 import com.gamma.etl.DataTransformer;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.pipeline.PipelineNode;
+import com.gamma.sql.SqlSandbox;
+import com.gamma.sql.SqlSandboxPolicy;
 import com.gamma.util.DuckDbUtil;
 
 import java.io.File;
@@ -36,11 +38,44 @@ public final class ComponentPreview {
 
     private static final String INPUT = "preview_input";
 
-    /** One produced relation in a preview: the {@link com.gamma.pipeline.PipelineRel} and the sampled output rows. */
-    public record RelationPreview(String rel, int rowCount, List<Map<String, Object>> rows) {}
+    /**
+     * One produced relation in a preview: the {@link com.gamma.pipeline.PipelineRel}, the sampled output
+     * rows, and {@code columnTypes} — <b>the derived output schema</b>, ordered {@code {name, type}}
+     * pairs straight from DuckDB's {@code DESCRIBE} (S1).
+     *
+     * <p>{@code columnTypes} is an <b>additive</b> key: a client that does not know it ignores it, the
+     * same contract {@link GrammarResult#columnTypes()} shipped under.
+     */
+    public record RelationPreview(String rel, int rowCount, List<Map<String, Object>> rows,
+                                  List<Map<String, String>> columnTypes) {
+        public RelationPreview {
+            columnTypes = columnTypes == null ? List.of() : List.copyOf(columnTypes);
+        }
 
-    /** The preview outcome: the input column set + every relation the node produced over the sample. */
-    public record Result(List<String> inputColumns, List<RelationPreview> relations) {}
+        /** The pre-S1 shape — no derived schema. */
+        public RelationPreview(String rel, int rowCount, List<Map<String, Object>> rows) {
+            this(rel, rowCount, rows, List.of());
+        }
+    }
+
+    /**
+     * The preview outcome: the input column set, every relation the node produced over the sample, and
+     * {@code sql} — the statements the config compiled to, in execution order (S1).
+     *
+     * <p>{@code sql} is the whole ordered list rather than one statement per relation, deliberately: some
+     * operators build an intermediate table first ({@code route} labels rows before splitting them), and
+     * attributing statements to relations would hide exactly those. The author sees everything that ran.
+     */
+    public record Result(List<String> inputColumns, List<RelationPreview> relations, List<String> sql) {
+        public Result {
+            sql = sql == null ? List.of() : List.copyOf(sql);
+        }
+
+        /** The pre-S1 shape — no compiled SQL. */
+        public Result(List<String> inputColumns, List<RelationPreview> relations) {
+            this(inputColumns, relations, List.of());
+        }
+    }
 
     /**
      * Preview {@code node} (a {@code transform.*} node) over {@code sampleRows}. Throws
@@ -53,19 +88,32 @@ public final class ComponentPreview {
         List<String> columns = ScratchTables.columnsOf(sampleRows);
         if (columns.isEmpty()) throw new IllegalArgumentException("sample rows have no columns");
 
-        File db = DuckDbUtil.tempDbFile("preview_");
-        try (Connection conn = DuckDbUtil.openConnection(db)) {
+        // A transform preview executes AUTHOR-SUPPLIED SQL (a `where` predicate, a map `expr`), so it runs
+        // sealed: enable_external_access=false + lock_configuration=true, plus the policy's memory/thread
+        // caps. Seeding is the trusted registration that must happen BEFORE the seal; after it the node's
+        // own SQL can reach nothing but the scratch tables. ⚠ The grammar/parsing previews below are NOT
+        // sealed and must not be — they read sample text back through read_csv over a temp FILE.
+        try (SqlSandbox sandbox = SqlSandbox.open(SqlSandboxPolicy.defaultPolicy())) {
+            Connection conn = sandbox.connection();
             ScratchTables.seed(conn, INPUT, columns, sampleRows);
-            List<RowShaper.Relation> produced = RowShaper.shape(conn, node, INPUT, "preview_" + node.id());
+            sandbox.seal();
+
+            // Record what the config compiles to WITHOUT touching RowShaper: the recorder wraps the
+            // connection, so the previewed execution is the same execution, statement for statement.
+            SqlRecorder recorder = new SqlRecorder();
+            List<RowShaper.Relation> produced =
+                    RowShaper.shape(recorder.wrap(conn), node, INPUT, "preview_" + node.id());
+
             List<RelationPreview> out = new ArrayList<>();
             for (RowShaper.Relation r : produced) {
                 out.add(new RelationPreview(r.rel(),
                         ScratchTables.count(conn, r.table()),
-                        ScratchTables.readRows(conn, r.table(), MAX_ROWS)));
+                        ScratchTables.readRows(conn, r.table(), MAX_ROWS),
+                        ScratchTables.columnTypes(conn, r.table())));
             }
-            return new Result(columns, out);
-        } finally {
-            DuckDbUtil.deleteTempDb(db);   // throwaway scratch DB
+            return new Result(columns, out, recorder.statements());
+        } catch (java.io.IOException e) {
+            throw new SQLException("could not open the preview sandbox", e);
         }
     }
 
