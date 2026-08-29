@@ -106,6 +106,25 @@ public final class SandboxConsignmentReader implements ConsignmentReader {
         sandbox.close();
     }
 
+    /**
+     * The underlying connection — <b>package-private, for the framework's own writers only</b>
+     * ({@link DerivedTableWriter}).
+     *
+     * <p>⚠ This does <em>not</em> weaken the invariant {@link ConsignmentReader} exists to protect. That
+     * invariant is about what a <b>third-party processor</b> can reach: the public interface still hands
+     * out no {@code Connection}, and every author-supplied statement still passes {@code SqlGuard} before
+     * anything runs it. What changes is only that the framework — which already owns this sandbox and
+     * created its views — can materialise a validated projection without rebuilding the whole view set on
+     * a second connection, which would be a duplicate of {@link #over} free to drift from it.
+     *
+     * <p>⛔ Do not widen this to {@code public} and do not expose it on {@code ConsignmentReader}: a raw
+     * handle in a processor's hands makes the read-modify-write the append-only path forbids trivially
+     * expressible, which is the whole reason this interface has no such method.
+     */
+    java.sql.Connection frameworkConnection() {
+        return sandbox.connection();
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────────
 
     /** The relation name for an output: its target, falling back to {@code consignment} when unnamed. */

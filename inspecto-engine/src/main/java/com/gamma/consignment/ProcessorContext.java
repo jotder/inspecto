@@ -50,6 +50,27 @@ public interface ProcessorContext {
     /** Emit summaries under §7.2's guardrails. The only sanctioned way to emit summary output. */
     SummaryEmitter summaries();
 
+    /**
+     * Ask for <b>derived tables</b> — new tables built from this Consignment's own data. The sanctioned
+     * way to create a table, as {@link #summaries()} is the sanctioned way to emit a measure.
+     *
+     * <p>Choose deliberately between them: a summary's composability is <em>enforced</em> so incremental
+     * rollups stay correct; a derived table is an arbitrary relation with no such guarantee. Freedom is
+     * the point, and so is the absence of a net.
+     *
+     * <p>⚠ <b>A {@code default} that refuses, not one that returns a no-op.</b> Existing test doubles of
+     * this interface predate the method, and a silent no-op would let a processor emit tables into
+     * nothing and pass its own test. Failing loudly is what tells a fake's author to widen it.
+     */
+    default DerivedTableEmitter tables() {
+        return table -> {
+            throw new UnsupportedOperationException(
+                    "this ProcessorContext does not support derived tables — the real context does; widen "
+                    + "your test double to implement tables() (requested: '"
+                    + (table == null ? "null" : table.name()) + "')");
+        };
+    }
+
     /** Structured per-run logging, delegated from the Job run. */
     RunLog log();
 

@@ -4,6 +4,10 @@ import com.gamma.api.PublicApi;
 import com.gamma.consignment.ConsignmentOutput;
 import com.gamma.consignment.ConsignmentOutputStores;
 import com.gamma.consignment.ConsignmentProcessor;
+import com.gamma.consignment.DerivedTable;
+import com.gamma.consignment.DerivedTableEmitter;
+import com.gamma.consignment.DerivedTableWriter;
+import com.gamma.consignment.GuardedDerivedTableEmitter;
 import com.gamma.consignment.ConsignmentReader;
 import com.gamma.consignment.DbConsignmentOutputStore;
 import com.gamma.consignment.GuardedSummaryEmitter;
@@ -152,9 +156,10 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
                         + "relations", "consignment_id", consignmentId);
 
             GuardedSummaryEmitter summaries = new GuardedSummaryEmitter();
+            GuardedDerivedTableEmitter tables = new GuardedDerivedTableEmitter();
             try (ConsignmentReader reader = SandboxConsignmentReader.over(outputs)) {
                 ProcessorResult result = processor.process(
-                        new AdaptedContext(consignmentId, outputs, reader, summaries, ctx));
+                        new AdaptedContext(consignmentId, outputs, reader, summaries, tables, ctx));
 
                 // §7.2's free reconciliation — reported, never thrown: summarising a filtered subset is legal.
                 summaries.reconcile(outputs).ifPresent(diff ->
@@ -165,6 +170,9 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
                     return JobResult.failed("processor '" + processorId + "' returned no result", ms(t0));
 
                 persistSummaries(ctx, consignmentId, summaries.emitted(), processorId);
+                // ⚠ Inside the reader's try-with-resources on purpose: the author's SQL names the
+                // Consignment's lazy views, which live on that sandbox and vanish when it closes.
+                persistDerivedTables(ctx, consignmentId, reader, tables.emitted(), processorId);
                 return new JobResult(result.status(), result.message(), ms(t0));
             }
         }
@@ -185,6 +193,42 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
          *                    rows themselves {@linkplain SummaryRow#bounds() declare} — nothing here derives
          *                    them; see {@link SummaryWriter#write}.
          */
+        /**
+         * Materialise the derived tables a processor asked for, then register them — the same ordering rule
+         * {@link #persistSummaries} follows, because a registry row pointing at a file that does not exist
+         * yet is exactly the window a reader can fall into.
+         *
+         * <p>⚠ Registering them onto THIS Consignment is what makes the chain work: the next step's
+         * {@code outputs()} sees them, and a reprocess supersedes them with the base (supersede is keyed on
+         * the Consignment, so no lineage edge is needed).
+         */
+        private void persistDerivedTables(JobContext ctx, String consignmentId, ConsignmentReader reader,
+                                          List<DerivedTable> tables, String processorId) throws Exception {
+            if (tables.isEmpty()) return;
+            if (dataDir == null) {
+                ctx.log().warn("derived-table persistence is off (no data root) — " + tables.size()
+                        + " validated request(s) were guarded but not materialised",
+                        "consignment_id", consignmentId);
+                return;
+            }
+            if (ctx.dryRun()) {
+                ctx.log().info("dry run — " + tables.size() + " derived table(s) validated, nothing written",
+                        "consignment_id", consignmentId);
+                return;
+            }
+            List<ConsignmentOutput> written = DerivedTableWriter.write(
+                    reader, derivedRoot(dataDir), consignmentId, tables, processorId);
+            ConsignmentOutputStores.record(written);
+            for (ConsignmentOutput o : written)
+                ctx.log().info("derived table written", "consignment_id", consignmentId,
+                        "table", o.tableName(), "partition", o.partitionKey(), "rows", String.valueOf(o.rows()));
+        }
+
+        /** The derived-table tree root — the sibling of the summary root. */
+        private static String derivedRoot(String dataDir) {
+            return java.nio.file.Paths.get(dataDir, "_derived").toString();
+        }
+
         private void persistSummaries(JobContext ctx, String consignmentId, List<SummaryRow> rows,
                                       String processorId) throws Exception {
             if (rows.isEmpty()) return;
@@ -225,7 +269,7 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
      */
     private record AdaptedContext(String consignmentId, List<ConsignmentOutput> outputs,
                                   ConsignmentReader read, SummaryEmitter summaries,
-                                  JobContext job) implements ProcessorContext {
+                                  DerivedTableEmitter tables, JobContext job) implements ProcessorContext {
 
         @Override public RunLog log() { return job.log(); }
 

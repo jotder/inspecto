@@ -347,7 +347,7 @@ thing"* is a one-concept-two-words violation.
 | # | Stage | Note |
 |---|---|---|
 | **1** | ~~decide the output contract~~ | ✅ **DECIDED**: arbitrary tables, registered as outputs |
-| **2** | **The write seam** (§6.3) — one sanctioned writer, the five contract points, `producer` set from the step | 🔴 **no new state at all** — every field exists and the reprocess cascade is free (§6.3 point 5) |
+| **2** | ✅ **SHIPPED 2026-08-29** — `DerivedTableEmitter` / `DerivedTableWriter`, registered onto the same Consignment | no new state; the reprocess cascade is proven free by test. §7 |
 | **3** | **Compose Consignment steps** — an ordered chain over one Consignment | needs stage 2's naming to be meaningful |
 | **4** | **Surface the post-sync lane in the editor** | authoring |
 | **5** | **Open the recipe verb + palette `authorable`** | independent; in-batch plugin steps |
@@ -355,3 +355,48 @@ thing"* is a one-concept-two-words violation.
 
 ⛔ **Retention and merge are NOT stages** — they exist. What they need is for a derived table to arrive
 in the registry with a `partitionKey` and a `State`, which is stage 2's job.
+
+---
+
+## 7. Stage 2 as-built (2026-08-29)
+
+**Shipped:** `ctx.tables().emit(new DerivedTable(name, sql, partitionBy))` — a processor declares a table,
+the framework materialises it after `process()` returns and **registers it onto the same Consignment**.
+`DerivedTable` · `DerivedTableEmitter` · `GuardedDerivedTableEmitter` · `DerivedTableWriter`, plus
+`ProcessorContext.tables()`.
+
+**The four contract points, settled:**
+
+* **`tableName`** — namespaced `<name>__derived`, mirroring the summary tier's `__summary`, so a derived
+  table can never collide with the sync tier's own table of that name. Held to
+  `[A-Za-z_][A-Za-z0-9_]{0,127}` because it becomes a **directory name** — the path jail at the seam
+  where third-party text enters, the same rule `SummaryWriter` applies.
+* **`producer`** — the processor id, so a row is attributable. Pinned end-to-end, not just in the writer.
+* **`partitionKey`** — one file per distinct value, which is what `compact` merges on and what
+  `ConsignmentSelector` prunes with. ⚠ A partition **value** also reaches a path, so it is jailed too:
+  refused, never escaped.
+* **`schemaFingerprint`** — `DESCRIBE` over the produced relation. Never authored; the schema of a
+  derived table *is* its SQL applied to the base (§2.4).
+
+**Three findings from building it:**
+
+1. 🔴 **The author's SQL must clear `SqlGuard`, and a shape check is not a substitute.** A derived table
+   runs on the *same unsealed sandbox* as `ConsignmentReader.query` — the relations are lazy views over
+   files — so without the guard a `SELECT * FROM read_csv('/etc/passwd')` reaches the filesystem exactly
+   where `query()` refuses to let it. **Falsified**: with the guard replaced by a leading-SELECT check,
+   that exact statement is admitted. It is now held to the identical allow-list.
+2. ⚠ **The writer takes the framework's `ConsignmentReader`, not a `Connection`.** The author's SQL names
+   the Consignment's lazy views, which exist only on that sandbox — a fresh connection resolves none of
+   them. `SandboxConsignmentReader` gained a **package-private** `frameworkConnection()`; the public
+   interface still hands out no handle, because that is what stops a processor expressing the
+   read-modify-write the append-only path forbids. ⛔ Do not widen it.
+3. ⚠ **A derived table is not readable within the run that emits it.** Emissions materialise after
+   `process()` returns, matching the summaries precedent. The next step sees it through the registry —
+   which is the chain working as designed, not a limitation to route around.
+
+**The reprocess cascade is proven, not assumed**: a test derives a table, calls `supersede("c1")`, and
+asserts **base and derivative are both `SUPERSEDED`** — no lineage edge involved.
+
+**Not done, deliberately:** nothing *orchestrates* a chain yet (stage 3) and the lane is still invisible
+in the editor (stage 4). A processor is still one Job over one Consignment; what changed is that its
+output is now a first-class table the next one can read.

@@ -1,6 +1,8 @@
 package com.gamma.job;
 
 import com.gamma.consignment.ConsignmentOutput;
+import com.gamma.consignment.DerivedTable;
+import com.gamma.consignment.DerivedTableWriter;
 import com.gamma.consignment.ConsignmentOutputStores;
 import com.gamma.consignment.ConsignmentProcessor;
 import com.gamma.consignment.DbConsignmentOutputStore;
@@ -265,6 +267,85 @@ class ConsignmentProcessJobTypeTest {
             // and producerHighWater groups by producer. This is the end-to-end proof that the id the run
             // resolved is the id that reaches the row — SummaryWriter's own test only proves it carries one.
             assertEquals("daily-counter", summaries.get(0).producer(), "producer is the processor id");
+        }
+    }
+
+    // ── derived tables: a step creating a new table from the base, per Consignment ──
+
+    /** A processor that derives a table from its own Consignment's relation. */
+    private static final class Deriver implements ConsignmentProcessor {
+        @Override public String id() { return "deriver"; }
+
+        @Override
+        public ProcessorResult process(ProcessorContext ctx) {
+            // The relation is the Consignment's own, resolved from the registry — the author names no path.
+            ctx.tables().emit(new DerivedTable("high_ids", "SELECT id FROM cdr WHERE id >= 1"));
+            return ProcessorResult.ok("derived");
+        }
+    }
+
+    /**
+     * 🔴 The end-to-end proof of the chain: what a step derives is written AND registered onto the SAME
+     * Consignment, which is exactly what the next step's {@code outputs()} reads.
+     */
+    @Test
+    void persistsDerivedTablesAndRegistersThemOnTheSameConsignment(@TempDir Path dir) throws Exception {
+        Path f = writeParquet(dir.resolve("detail"), 3);
+        Path data = dir.resolve("data");
+        try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            store.record(List.of(out(f, 3)));
+            ConsignmentOutputStores.use(store);
+
+            JobResult result = job(new Deriver(), data.toString())
+                    .run(new CapturingJobContext(params("c1", "deriver"), false));
+            assertTrue(result.success(), result.message());
+
+            List<ConsignmentOutput> derived = store.outputs("c1").stream()
+                    .filter(o -> o.tableName().endsWith(DerivedTableWriter.DERIVED_SUFFIX)).toList();
+            assertEquals(1, derived.size(), "the derived file is registered on this Consignment");
+            ConsignmentOutput o = derived.get(0);
+            assertEquals("high_ids__derived", o.tableName());
+            assertEquals("deriver", o.producer(), "the PROCESSOR is the producer, so the row is attributable");
+            assertEquals(2, o.rows(), "ids 1,2 of 0,1,2");
+            assertEquals(ConsignmentOutput.State.LIVE, o.state());
+            assertTrue(Files.exists(Path.of(o.path())), "the file exists: " + o.path());
+            assertNotNull(o.schemaFingerprint(), "the schema is derived, not authored");
+        }
+    }
+
+    /** A reprocess supersedes the derivative WITH its base — supersede is keyed on the Consignment. */
+    @Test
+    void aReprocessSupersedesDerivedTablesWithTheirBase(@TempDir Path dir) throws Exception {
+        Path f = writeParquet(dir.resolve("detail"), 3);
+        Path data = dir.resolve("data");
+        try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            store.record(List.of(out(f, 3)));
+            ConsignmentOutputStores.use(store);
+            assertTrue(job(new Deriver(), data.toString())
+                    .run(new CapturingJobContext(params("c1", "deriver"), false)).success());
+
+            store.supersede("c1");
+
+            assertTrue(store.outputs("c1").stream().allMatch(o -> o.state() == ConsignmentOutput.State.SUPERSEDED),
+                    "base AND derivative are both superseded — no lineage edge needed");
+        }
+    }
+
+    /** Dry run must validate and report but never write — the derived tier follows the summary tier's rule. */
+    @Test
+    void writesNoDerivedFilesOnADryRun(@TempDir Path dir) throws Exception {
+        Path f = writeParquet(dir.resolve("detail"), 3);
+        Path data = dir.resolve("data");
+        try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            store.record(List.of(out(f, 3)));
+            ConsignmentOutputStores.use(store);
+
+            assertTrue(job(new Deriver(), data.toString())
+                    .run(new CapturingJobContext(params("c1", "deriver"), true)).success());
+
+            assertFalse(Files.exists(data.resolve("_derived")), "a dry run that leaves files is not a dry run");
+            assertTrue(store.outputs("c1").stream().noneMatch(
+                    o -> o.tableName().endsWith(DerivedTableWriter.DERIVED_SUFFIX)));
         }
     }
 
