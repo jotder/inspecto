@@ -37,12 +37,35 @@ public final class GuardedDerivedTableEmitter implements DerivedTableEmitter {
      */
     static final Pattern SAFE_NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_]{0,127}");
 
+    /**
+     * Whether a path may be named directly in author SQL. The framework passes the registry's own
+     * readability test; {@link #NONE} refuses every path, which is the correct default for any caller that
+     * cannot answer the question.
+     */
+    @FunctionalInterface
+    public interface ReadablePaths {
+        boolean isReadable(String path);
+
+        /** Refuses every path — a caller with no registry cannot vouch for one. */
+        ReadablePaths NONE = path -> false;
+    }
+
     private final List<DerivedTable> emitted = new ArrayList<>();
     private final LinkedHashSet<String> names = new LinkedHashSet<>();
+    private final ReadablePaths readable;
+
+    /** An emitter that admits no direct file reads. */
+    public GuardedDerivedTableEmitter() {
+        this(ReadablePaths.NONE);
+    }
+
+    public GuardedDerivedTableEmitter(ReadablePaths readable) {
+        this.readable = readable == null ? ReadablePaths.NONE : readable;
+    }
 
     @Override
     public void emit(DerivedTable table) {
-        List<String> violations = check(table, names);
+        List<String> violations = check(table, names, readable);
         if (!violations.isEmpty())
             throw new IllegalArgumentException("derived table refused: " + String.join("; ", violations));
         names.add(table.name());
@@ -56,6 +79,21 @@ public final class GuardedDerivedTableEmitter implements DerivedTableEmitter {
 
     /** Every violation in {@code table}, empty when it is acceptable. Package-private so the test can pin it. */
     static List<String> check(DerivedTable table, LinkedHashSet<String> taken) {
+        return check(table, taken, ReadablePaths.NONE);
+    }
+
+    /**
+     * A {@code read_parquet('<literal>')} call, matched narrowly on purpose: the function name, optional
+     * whitespace, one single-quoted literal, optional whitespace, close. Anything richer — extra options,
+     * a non-literal argument, a different reader — does not match, so it is left in the text and
+     * {@code SqlGuard} refuses it. <b>Fail-closed by construction</b>: a call this does not recognise is a
+     * call that gets rejected, never one that slips through unchecked.
+     */
+    private static final Pattern READ_PARQUET =
+            Pattern.compile("(?i)read_parquet\\s*\\(\\s*'((?:[^']|'')*)'\\s*\\)");
+
+    /** Every violation in {@code table}, with {@code readable} deciding which paths may be named directly. */
+    static List<String> check(DerivedTable table, LinkedHashSet<String> taken, ReadablePaths readable) {
         List<String> out = new ArrayList<>();
         if (table == null) return List.of("the request is null");
         if (table.name() == null || !SAFE_NAME.matcher(table.name()).matches())
@@ -68,19 +106,26 @@ public final class GuardedDerivedTableEmitter implements DerivedTableEmitter {
         else {
             // The SAME lexical allow-list ConsignmentReader.query enforces, for the reason that seam
             // states about itself: "invariant protection, not a defence against hostile in-process code".
-            // ⛔ This is NOT a security boundary — a processor is arbitrary Java on the engine classpath
-            // and can open a file directly. What it protects is the ADDRESSING invariant: a `COPY … TO`
-            // in author SQL writes a file the registry never learns about, and everything downstream keys
-            // off registered outputs (ConsignmentSelector's pruning, retire_superseded, compact, and the
-            // next step's own outputs()). An unregistered file is invisible to all of them.
+            // ⛔ NOT a security boundary — a processor is arbitrary Java on the engine classpath and can
+            // open a file directly. What it protects is the ADDRESSING invariant: a `COPY … TO` in author
+            // SQL writes a file the registry never learns about, and everything downstream keys off
+            // registered outputs (the Selector's pruning, retire_superseded, compact, and the next step's
+            // own outputs()). An unregistered file is invisible to all of them.
             //
-            // It also keeps this seam consistent with read(): a derived table must not be a way to do what
-            // query() refuses, or the narrower seam is theatre.
-            //
-            // ⚠ The cost, stated: no direct file reads, so a join against another Consignment or an
-            // outside Reference needs a SEAM rather than a path. That is the same rule the operator's own
-            // model states — "any step gets Consignment data from Consignment info only".
-            for (Finding f : SqlGuard.check(table.sql())) out.add("sql: " + f.message());
+            // ⇒ which is exactly why a REGISTERED path is different, and admitted: reading one keeps the
+            // invariant intact. Each read_parquet('<literal>') is checked against the registry and then
+            // MASKED to an identifier, so the rest of the statement still meets every other SqlGuard rule
+            // — single statement, must start with SELECT/WITH, no other blocked function.
+            String masked = table.sql();
+            for (java.util.regex.MatchResult m : READ_PARQUET.matcher(table.sql()).results().toList()) {
+                String path = m.group(1).replace("''", "'");
+                if (!readable.isReadable(path))
+                    out.add("sql: read_parquet('" + path + "') names a path this registry does not list as "
+                            + "readable — a derived table may read registered outputs, not arbitrary files");
+                else
+                    masked = masked.replace(m.group(), "__registered_read");
+            }
+            for (Finding f : SqlGuard.check(masked)) out.add("sql: " + f.message());
         }
         if (table.partitionBy() != null && !SAFE_NAME.matcher(table.partitionBy()).matches())
             out.add("partitionBy '" + table.partitionBy() + "' must match " + SAFE_NAME.pattern());

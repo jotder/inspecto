@@ -445,3 +445,46 @@ it (`producer` = `first` / `second`).
    alternative — supersede the run's own derivatives on failure — is expressible with the existing state
    but changes "a registered table is a fact" into "a registered table is a fact only if its chain
    finished".
+
+---
+
+## 10. `read_parquet` over registered paths (operator decision, 2026-08-29)
+
+**The question that prompted it:** *"Why does the author's SQL have to clear `SqlGuard`? Any real reason
+to put restriction?"* — a fair challenge, and it corrected a claim of mine.
+
+🔴 **`SqlGuard` here is NOT a security boundary, and saying it was overstated it.** A processor is
+arbitrary Java on the engine classpath; it can open a file directly without going near SQL.
+`ConsignmentReader`'s own javadoc says as much: *"invariant protection, not a defence against hostile
+in-process code."*
+
+**What it actually protects is the ADDRESSING invariant.** A `COPY … TO` in author SQL writes a file the
+registry never learns about, and everything downstream keys off registered outputs — `ConsignmentSelector`'s
+pruning, `retire_superseded`, `compact`, and the next step's own `outputs()`. **An unregistered file is
+invisible to all of them.**
+
+⇒ **Which is exactly why a REGISTERED path is different.** Reading one keeps the invariant intact, so the
+restriction was wider than its own reason. **Decided and shipped: `read_parquet('<literal>')` is allowed
+when the registry lists that path as readable.** That buys the cross-Consignment and Reference joins the
+blanket ban had cost.
+
+**How it is enforced, and why this shape:**
+
+* `DbConsignmentOutputStore.isReadable(path)` is the authority — registered **and** carrying a `LIVE` row.
+  ⚠ It follows `unreadablePaths`' rule exactly: **readability is per-PATH, row state is per-registration**.
+  A full recompute rewrites a stable path in place, so a path legitimately owns an old `SUPERSEDED` row
+  beside a current `LIVE` one and is readable. Pinned by its own test.
+* Each `read_parquet('<literal>')` is checked against the registry, then **masked to an identifier**, and
+  the masked statement goes through `SqlGuard` unchanged. So a verified read is excused and **nothing
+  else is**: a second unregistered reader, a second statement, or a `COPY … TO` beside it all still fail.
+* 🔴 **The pattern is narrow on purpose, and the failure direction is what makes it safe.** It matches only
+  the function name, optional whitespace, one single-quoted literal, close. Anything richer — extra
+  options, a non-literal argument, a different reader — does not match, stays in the text, and `SqlGuard`
+  refuses it. **Fail-closed by construction: an unrecognised call is a rejected call, never an unchecked
+  one.**
+* `GuardedDerivedTableEmitter.ReadablePaths.NONE` is the default, so any caller that cannot ask the
+  registry vouches for nothing.
+
+⚠ **Validation runs on the masked text while the ORIGINAL executes.** That is sound only because the two
+differ *solely* by substrings individually verified against the registry — which is why the verification
+happens before the mask, never after.

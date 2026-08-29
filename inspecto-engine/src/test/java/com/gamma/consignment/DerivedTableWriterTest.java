@@ -70,6 +70,77 @@ class DerivedTableWriterTest {
                 new DerivedTable("t", "SELECT * FROM base"), new LinkedHashSet<>()).isEmpty());
     }
 
+    // ── read_parquet, restricted to registered paths ──────────────────────────
+
+    /** Only these paths are registered; everything else must be refused. */
+    private static final GuardedDerivedTableEmitter.ReadablePaths ONLY_REGISTERED =
+            path -> "/data/other/c2.parquet".equals(path);
+
+    private static List<String> checkRp(String sql) {
+        return GuardedDerivedTableEmitter.check(
+                new DerivedTable("t", sql), new LinkedHashSet<>(), ONLY_REGISTERED);
+    }
+
+    /**
+     * A REGISTERED path may be read directly — that is what makes a cross-Consignment join possible while
+     * keeping the addressing invariant: everything downstream keys off registered outputs, and this reads
+     * one of them.
+     */
+    @Test
+    void aRegisteredPathMayBeReadDirectly() {
+        assertTrue(checkRp("SELECT * FROM read_parquet('/data/other/c2.parquet')").isEmpty(),
+                "a registered path should be admitted");
+        // ...composed with the Consignment's own relations, which is the point of allowing it at all
+        assertTrue(checkRp("SELECT a.id FROM base a JOIN read_parquet('/data/other/c2.parquet') b "
+                + "ON a.id = b.id").isEmpty());
+    }
+
+    /** An UNREGISTERED path is refused, and the message says why rather than just "blocked function". */
+    @Test
+    void anUnregisteredPathIsRefused() {
+        List<String> v = checkRp("SELECT * FROM read_parquet('/etc/secrets.parquet')");
+        assertFalse(v.isEmpty());
+        assertTrue(String.join(";", v).contains("does not list as readable"), v.toString());
+    }
+
+    /** With no registry to vouch for anything, no path is readable — the default refuses. */
+    @Test
+    void withNoRegistryNoPathIsReadable() {
+        assertFalse(GuardedDerivedTableEmitter.check(
+                new DerivedTable("t", "SELECT * FROM read_parquet('/data/other/c2.parquet')"),
+                new LinkedHashSet<>()).isEmpty(), "the no-arg default must vouch for nothing");
+    }
+
+    /**
+     * 🔴 Masking a verified call must not become a way past the REST of the allow-list. The statement is
+     * validated after the verified read is masked out, so everything else still has to pass.
+     */
+    @Test
+    void maskingAVerifiedReadDoesNotExcuseTheRestOfTheStatement() {
+        // a second, UNREGISTERED reader beside a registered one
+        assertFalse(checkRp("SELECT * FROM read_parquet('/data/other/c2.parquet') "
+                + "UNION ALL SELECT * FROM read_csv('/etc/passwd')").isEmpty());
+        // a second statement
+        assertFalse(checkRp("SELECT * FROM read_parquet('/data/other/c2.parquet'); DROP TABLE base").isEmpty());
+        // a write, beside a legitimate read
+        assertFalse(checkRp("COPY (SELECT * FROM read_parquet('/data/other/c2.parquet')) TO '/tmp/x'").isEmpty());
+    }
+
+    /**
+     * ⚠ The pattern is narrow ON PURPOSE, and the failure direction is what matters: a call it does not
+     * recognise stays in the text and {@code SqlGuard} refuses it. Fail-closed by construction — never a
+     * call that slips through unchecked.
+     */
+    @Test
+    void aReadItCannotRecogniseIsRefusedRatherThanAdmitted() {
+        // extra options — not matched, so not verified, so rejected as a blocked function
+        assertFalse(checkRp("SELECT * FROM read_parquet('/data/other/c2.parquet', hive_partitioning=1)").isEmpty());
+        // a non-literal argument cannot be checked against the registry at all
+        assertFalse(checkRp("SELECT * FROM read_parquet(some_column)").isEmpty());
+        // a different reader is not covered by this allowance
+        assertFalse(checkRp("SELECT * FROM read_json('/data/other/c2.parquet')").isEmpty());
+    }
+
     /** A name becomes a DIRECTORY, so it is jailed rather than escaped — the summary tier's rule verbatim. */
     @Test
     void unsafeNamesAndPartitionColumnsAreRefused() {

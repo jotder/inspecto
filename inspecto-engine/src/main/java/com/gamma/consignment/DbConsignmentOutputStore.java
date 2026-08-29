@@ -187,6 +187,36 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
      * {@code table_name} filter would mean mapping a glob root back to a logical table, which nothing can do
      * reliably.
      */
+    /**
+     * Whether {@code path} is a file this registry says is <b>readable</b>: registered, and carrying at least
+     * one {@code LIVE} row.
+     *
+     * <p>The inverse of {@link #unreadablePaths}, and it follows the same rule for the same reason:
+     * <b>readability is per-PATH, row state is per-registration</b>. Output naming is not
+     * one-file-per-Consignment — a full recompute rewrites a stable path in place — so a path legitimately
+     * owns an old {@code SUPERSEDED} row beside a current {@code LIVE} one, and it is readable.
+     *
+     * <p>Its first caller is the derived-table seam, where it decides whether author SQL may name a file
+     * directly: reading a registered path keeps the addressing invariant (everything downstream keys off
+     * registered outputs), while reading an arbitrary path would not.
+     *
+     * <p>⚠ Compares the path <b>as stored</b>. A caller holding a path in another spelling (a different
+     * separator, a relative form) must normalise before asking; this method does not guess.
+     */
+    public synchronized boolean isReadable(String path) {
+        if (path == null || path.isBlank()) return false;
+        String sql = "SELECT 1 FROM " + T + " WHERE path = ? AND coalesce(state, 'LIVE') = 'LIVE' LIMIT 1";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, path);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        } catch (SQLException e) {
+            log.warn("[CONSIGNMENT-OUTPUTS] readability check failed for {}: {}", path, e.getMessage());
+            return false;   // fail closed: an unanswerable question is not a yes
+        }
+    }
+
     public synchronized List<String> unreadablePaths() {
         String sql = "SELECT DISTINCT t.path FROM " + T + " t WHERE coalesce(t.state, 'LIVE') <> 'LIVE' "
                 + "AND NOT EXISTS (SELECT 1 FROM " + T + " l WHERE l.path = t.path "

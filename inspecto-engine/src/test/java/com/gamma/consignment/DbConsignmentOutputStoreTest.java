@@ -19,6 +19,28 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class DbConsignmentOutputStoreTest {
 
+    /**
+     * {@code isReadable} follows the same per-PATH rule {@code unreadablePaths} does, and for the same
+     * reason: output naming is not one-file-per-Consignment, so a full recompute rewrites a stable path in
+     * place and that path legitimately owns an old SUPERSEDED row beside a current LIVE one. Judging by row
+     * would call live data unreadable.
+     */
+    @Test
+    void isReadableIsPerPathNotPerRow() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            String path = "/w/cdr/dt=2026-08-04/stable.parquet";
+            db.record(List.of(out("c1", path, 10, State.SUPERSEDED), out("c2", path, 20, State.LIVE)));
+
+            assertTrue(db.isReadable(path), "one LIVE row makes the PATH readable, whatever else it carries");
+
+            db.record(List.of(out("c3", "/w/cdr/gone.parquet", 5, State.COMPACTED_AWAY)));
+            assertFalse(db.isReadable("/w/cdr/gone.parquet"), "no LIVE row — not readable");
+            assertFalse(db.isReadable("/w/cdr/never-registered.parquet"), "unregistered is not readable");
+            assertFalse(db.isReadable(null));
+            assertFalse(db.isReadable("  "));
+        }
+    }
+
     private static ConsignmentOutput out(String consignment, String path, long rows, State state) {
         return new ConsignmentOutput(consignment, "run-1", "cdr", "dt=2026-08-04", "2026-08-04",
                 path, rows, rows * 100, "2026-08-04T10:00:00Z", 1, state);

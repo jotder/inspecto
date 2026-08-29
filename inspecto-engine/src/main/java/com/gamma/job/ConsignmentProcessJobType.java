@@ -202,7 +202,10 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
                 List<ConsignmentOutput> outputs = (store == null) ? List.of() : store.outputs(consignmentId);
 
                 GuardedSummaryEmitter summaries = new GuardedSummaryEmitter();
-                GuardedDerivedTableEmitter tables = new GuardedDerivedTableEmitter();
+                // Author SQL may name a REGISTERED path directly (a cross-Consignment read); the
+                // registry itself is the authority, and with no store nothing is readable.
+                GuardedDerivedTableEmitter tables = new GuardedDerivedTableEmitter(
+                        store == null ? GuardedDerivedTableEmitter.ReadablePaths.NONE : store::isReadable);
                 // ...and a fresh reader per step, because its lazy views are built from that outputs list.
                 try (ConsignmentReader reader = SandboxConsignmentReader.over(outputs)) {
                     ProcessorResult result = processors.get(i).process(
