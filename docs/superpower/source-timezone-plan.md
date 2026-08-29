@@ -151,10 +151,46 @@ exempt. `SourceZonesTest` — 18 tests, of which 7 assert values on a real DuckD
    header for every column, so a schema that gives *any* field a zone writes `""` for all the others.
    The first cut's null-only checks would have refused every such schema at load.
 
-### S2 — surfaces (next slice)
-`ConfigSpecs` attribute specs, the tab-2 `Source timezone` select, the metadata-grid zone column,
-and offline-mock parity. ⚠ Per `async-spec-swap-drops-seed` and `ui-s7-two-committed-contracts`, the
-node-vocabulary contracts must be regenerated together when the specs change.
+### S2 — surfaces — SHIPPED 2026-08-29
+
+**Built:** `inspecto/schema/time-zones.ts` (the one zone vocabulary) · a `source_timezone`
+`type: 'select'` on the **Types** tab of all four frontends, parsing-level (no `delimited__` prefix,
+matching `encoding`/`compression`) and with **no `default`** · a `Source zone` column in the
+columns table, rendered only when a column carries an instant and only on those rows · mock parity —
+`zoneRefusal` / `schemaZoneFindings` mirror the server's refusals on both the schema write and the
+pipeline write. 28 new UI tests; suite 2816 green, exit 0.
+
+⚠ **`ConfigSpecs` needed nothing** — the plan listed it, but grounding found `date_formats` /
+`timestamp_formats` are not there either: parsing-block keys are frontend `AttributeSpec`s, and no
+backend allow-list gates an unknown config key (`ConfigSafetyValidator` is path-jail + output formats
+only). So the key saves through the control plane untouched.
+
+⚠ **Placement deviates from the board row, deliberately.** The row said "a zone column in the
+metadata grid". `<inspecto-schema-metadata-grid>` is documented as description/unit/classification —
+"Catalog-facing and never read by the ETL" — and a source zone IS ETL-read. It went in the **columns
+table** instead, beside the type it qualifies, following the DECIMAL-parameters precedent (the Type
+cell already reveals per-type inputs). It is therefore self-limiting: no timestamps, no column.
+
+⛔ **`timezone_column` has no editor, by decision.** Offering a per-row column beside ~418 zone names
+in one cell invites exactly the ambiguity the engine's mutual-exclusion rule exists to prevent. A
+hand-authored one is **carried through a save** and shown read-only on its row, so the fixed-zone box
+cannot silently contradict it.
+
+**🔴 The preview found a defect the whole suite missed — pre-existing, and not only ours.** A
+`type: 'select'` asks in a MatDialog, which the CDK attaches to `document.body`, so choosing an
+option never bubbles a click through the pane; all three `pipelines/*-definition` panes derive
+dirtiness from `@HostListener('click')`, so **Apply stayed greyed out over a choice just made** — for
+every select on those drawers, not just this one. Measured, not guessed: a click anywhere in the pane
+afterwards *did* enable Apply, proving the pick already dirtied the form and only the notification
+was missing. Fixed with `@HostListener('document:click')` and pinned by a regression spec.
+
+**Verified in the preview end to end:** the control renders (Optional settings 3 → 4), the
+`Source zone` column appears with exactly one input across four columns (only `call_start`), picking
+`Europe/Berlin` enables Apply immediately, and Save persists
+`parsing.source_timezone: "Europe/Berlin"` as a **sibling of `delimited`** — the path
+`mergeParsing`'s allow-list reads.
+
+**Still open:** a `timezone_column` editor (above) and the `%z`-mixed-COALESCE latent defect (§1b).
 
 ## 5. Non-goals
 The `%z`-mixed-COALESCE latent defect (§1b) · `filenameDate` · the `EXPR` rule · re-opening

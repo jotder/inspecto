@@ -9,3 +9,4 @@
 export * from './schema-fields-editor.component';
 export * from './schema-metadata-grid.component';
 export * from './schema-partitions-editor.component';
+export * from './time-zones';

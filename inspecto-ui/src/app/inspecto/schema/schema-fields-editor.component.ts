@@ -9,6 +9,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { ianaTimeZones } from './time-zones';
 
 /**
  * The DuckDB scalar types the engine honours — the mirror of `SchemaFieldTypes.names()` (Java).
@@ -135,6 +136,15 @@ export interface SchemaFieldRow {
     description?: string;
     unit?: string;
     classification?: string;
+    /** `raw.fields[].timezone` — the zone this column's timestamps are written IN. ETL-read. */
+    timezone?: string;
+    /**
+     * `raw.fields[].timezone_column` — a sibling column naming the zone PER ROW. Deliberately not
+     * editable here (offering it beside 400 zone names in one cell invites exactly the ambiguity the
+     * engine's mutual-exclusion rule exists to prevent), but carried so a hand-authored one survives
+     * a save, and shown read-only on its row so the fixed-zone box cannot silently contradict it.
+     */
+    timezone_column?: string;
 }
 
 type SortKey = 'source' | 'name' | 'selector' | 'type';
@@ -355,6 +365,7 @@ export class InspectoSchemaFieldsEditorComponent {
             selector: [{ value: row.selector, disabled: true }],
             type: [row.type],
             synonym: [row.synonym ?? '', [Validators.pattern(IDENTIFIER_RE)]],
+            timezone: [row.timezone ?? ''],
         });
         g.valueChanges.subscribe(() => this.syncIncludedNames());
         this.fieldRows.push(g);
@@ -377,6 +388,53 @@ export class InspectoSchemaFieldsEditorComponent {
     isDecimal(group: FormGroup): boolean {
         return baseSchemaType(this.typeName(group)) === 'DECIMAL';
     }
+
+    /**
+     * Whether this row carries an instant, i.e. whether a source zone means anything for it.
+     *
+     * <p>⛔ `DATE` is excluded on purpose, matching the engine: a date has no instant, so shifting it
+     * would move a calendar day across midnight under any negative offset.
+     */
+    isTemporal(group: FormGroup): boolean {
+        const t = baseSchemaType(this.typeName(group));
+        return t === 'TIMESTAMP' || t === 'TIMESTAMPTZ';
+    }
+
+    /** A row whose zone comes from a sibling column per row — read-only here, never overwritten. */
+    zoneColumnOf(group: FormGroup, index: number): string {
+        return String(this.rows()[index]?.timezone_column ?? '');
+    }
+
+    /**
+     * 🔴 A `TIMESTAMPTZ` with no zone anywhere is REFUSED by the engine at config load — it cannot be
+     * resolved against anything but the server's own zone, so the same file would import differently
+     * on different machines. Flagged per row here because the pipeline-level default lives on another
+     * tab: this hints, the server decides.
+     */
+    needsZone(group: FormGroup, index: number): boolean {
+        return (
+            baseSchemaType(this.typeName(group)) === 'TIMESTAMPTZ' &&
+            !String(group.get('timezone')?.value ?? '').trim() &&
+            !this.zoneColumnOf(group, index)
+        );
+    }
+
+    /**
+     * Whether any row carries an instant — the Source zone column renders only then, so a schema with
+     * no timestamps is exactly as wide as before.
+     *
+     * <p>⚠ Depends on `includedNames()` as well as `structureVersion()`: retyping a column fires
+     * `valueChanges` (and therefore `syncIncludedNames`) but never bumps the structure version, so a
+     * version-only dependency would leave the column hidden until the next add/remove.
+     */
+    readonly anyTemporal = computed(() => {
+        this.structureVersion();
+        this.includedNames();
+        return this.fieldRows.controls.some((g) => this.isTemporal(g as FormGroup));
+    });
+
+    /** The zone vocabulary offered by the cell's datalist. */
+    readonly zoneOptions = ianaTimeZones();
 
     decimalPrecision(group: FormGroup): number {
         return decimalParts(this.typeName(group)).precision;
@@ -468,16 +526,31 @@ export class InspectoSchemaFieldsEditorComponent {
         return true;
     }
 
-    /** The included rows, trimmed — call {@link validate} first. An empty synonym is dropped. */
+    /**
+     * The included rows, trimmed — call {@link validate} first. An empty synonym or zone is dropped.
+     *
+     * <p>⚠ Each row is rebuilt over its SEED, not over the form alone. The form holds five controls
+     * while a `raw.fields[]` entry legitimately carries more (`description`/`unit`/`classification`
+     * from the metadata grid, a hand-authored `timezone_column`), so emitting `getRawValue()` alone
+     * would silently drop every key this grid does not model — the data-loss shape this repo keeps
+     * meeting. Seed and controls are index-aligned because the seeding effect pushes one row per
+     * `rows()` entry in order.
+     */
     value(): SchemaFieldRow[] {
+        const seed = this.rows();
         return this.fieldRows.controls
-            .map((g) => g.getRawValue() as SchemaFieldRow)
-            .filter((r) => r.include)
-            .map((r) => {
-                const synonym = String(r.synonym ?? '').trim();
-                const out: SchemaFieldRow = { ...r, name: r.name.trim() };
+            .map((g, i) => ({ seed: seed[i], v: g.getRawValue() as SchemaFieldRow }))
+            .filter(({ v }) => v.include)
+            .map(({ seed: original, v }) => {
+                const synonym = String(v.synonym ?? '').trim();
+                const zone = String(v.timezone ?? '').trim();
+                const out: SchemaFieldRow = { ...(original ?? {}), ...v, name: v.name.trim() };
                 if (synonym) out.synonym = synonym;
                 else delete out.synonym;
+                // A blank zone means "inherit the pipeline's source_timezone, else wall clock" — the
+                // engine's own no-key behaviour — so it is dropped rather than written as ''.
+                if (zone) out.timezone = zone;
+                else delete out.timezone;
                 return out;
             });
     }

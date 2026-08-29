@@ -113,3 +113,36 @@ describe('grammar CSV round-trip', () => {
         expect(grammarCsvFilename('')).toBe('grammar_parser.csv');
     });
 });
+
+describe('source time zone spec', () => {
+    const FRONTENDS = ['delimited', 'fixedwidth', 'json', 'xlsx'] as const;
+
+    it('is offered on every frontend that declares the format lists it governs', () => {
+        for (const f of FRONTENDS) {
+            const spec = parsingAttributesFor(f).find((a) => a.key === 'source_timezone');
+            expect(spec, `missing on ${f}`).toBeTruthy();
+            expect(spec!.tab).toBe('types'); // beside date_formats / timestamp_formats
+        }
+    });
+
+    it('⛔ carries NO default — a spec default materializes into every value() and mutates copies', () => {
+        for (const f of FRONTENDS) {
+            const spec = parsingAttributesFor(f).find((a) => a.key === 'source_timezone')!;
+            expect(spec.default).toBeUndefined();
+        }
+    });
+
+    it('is PARSING-level, not a delimited__ key — the zone is a fact about the data', () => {
+        const spec = parsingAttributesFor('delimited').find((a) => a.key === 'source_timezone')!;
+        expect(spec.key).not.toContain('__');
+    });
+
+    it('leads with a blank option so "wall clock" is a named choice, and offers real zones', () => {
+        const spec = parsingAttributesFor('delimited').find((a) => a.key === 'source_timezone')!;
+        expect(spec.options?.[0].value).toBe('');
+        // UTC rather than a region id: the ICU list's spelling of a given region varies by runtime
+        // (this one carries Asia/Calcutta, not Asia/Kolkata), but UTC is added explicitly.
+        expect(spec.options?.some((o) => o.value === 'UTC')).toBe(true);
+        expect(spec.options?.some((o) => o.value === '+05:30')).toBe(false);
+    });
+});

@@ -299,6 +299,26 @@ describe('PipelineParseDefinitionComponent', () => {
     });
 
     /**
+     * 🔴 Regression: a `type: 'select'` asks in a MatDialog, which the CDK attaches to `document.body`
+     * — OUTSIDE this pane. The pane derives dirtiness on interaction, so a host-scoped click listener
+     * never saw the pick and Apply stayed greyed out over a choice the operator had just made. Found
+     * in the preview while adding Source time zone; it affected every select on the drawer.
+     */
+    describe('dirty notification from an overlay-hosted control', () => {
+        it('re-derives dirtiness on a document click, not only on one inside the pane', async () => {
+            const fixture = await create();
+            const host = fixture.componentInstance as { dirty?: boolean };
+            // Dirty the editor the way an overlay control does: value changed, no click in the pane.
+            vi.spyOn(editor(fixture), 'isDirty').mockReturnValue(true);
+            host.dirty = false;
+            document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            fixture.detectChanges();
+            await fixture.whenStable();
+            expect(host.dirty).toBe(true);
+        });
+    });
+
+    /**
      * The per-tab sample thread. The pane does not own it — it renders the strip the host hands in and
      * mirrors Test parse into it, so the chips and every downstream step read the same result.
      */

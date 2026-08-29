@@ -66,7 +66,10 @@ function scanDependents(store: MockStore, space: string, id: string): Record<str
     const add = (kind: string, name: string, via: string): void => {
         (out[kind] ??= []).push({ name, via });
     };
-    const matches = (v: unknown): boolean => String(v ?? '').trim().toLowerCase() === id.toLowerCase();
+    const matches = (v: unknown): boolean =>
+        String(v ?? '')
+            .trim()
+            .toLowerCase() === id.toLowerCase();
 
     for (const rec of store.list<StoredEnrichmentConfig>(space, ENRICHMENT_CONFIGS_COLL)) {
         const cfg = rec.config;
@@ -156,6 +159,14 @@ export function onboardingHandler(flags: MockFlags): MockHandler {
                 const existing = store.get<StoredPipelineConfig>(space, PIPELINE_CONFIGS_COLL, name);
                 if (existing && !body.overwrite)
                     return error(409, `file exists: ${name}.toon (pass overwrite:true to replace)`);
+                // parsing.source_timezone is validated fail-closed at load by PipelineConfigParser —
+                // an unknown zone is a hard DuckDB error at run time that TRY() cannot catch, so a
+                // typo that saved here would look fine offline and kill every batch live.
+                const parsingBlock = body.config['parsing'] as Record<string, unknown> | undefined;
+                if (parsingBlock && parsingBlock['source_timezone'] !== undefined) {
+                    const bad = zoneRefusal(parsingBlock['source_timezone'], 'parsing.source_timezone');
+                    if (bad) return error(422, bad);
+                }
                 // The real route writes `<name>_pipeline.toon` — the bootstrap-scan convention.
                 const path = name.endsWith('_pipeline') ? `${name}.toon` : `${name}_pipeline.toon`;
                 store.put(space, PIPELINE_CONFIGS_COLL, name, {
@@ -197,6 +208,9 @@ export function onboardingHandler(flags: MockFlags): MockHandler {
                         });
                     }
                 }
+                const zoneBad = schemaZoneFindings(body.config);
+                if (zoneBad.length)
+                    return error(422, zoneBad[0], { type: 'schema', written: false, findings: zoneBad });
                 store.put(space, SCHEMA_CONFIGS_COLL, name, {
                     id: name,
                     path: `${name}.toon`,
@@ -286,6 +300,9 @@ export function onboardingHandler(flags: MockFlags): MockHandler {
                         findings,
                     });
                 }
+                const zoneBad = schemaZoneFindings(merged);
+                if (zoneBad.length)
+                    return error(422, zoneBad[0], { type: 'schema', written: false, findings: zoneBad });
                 store.put(space, componentCollection('schema'), name, {
                     type: 'schema',
                     name,
@@ -426,6 +443,65 @@ const WIDENINGS: Record<string, string[]> = {
  * lattice (anything → VARCHAR is fine; types compare case-insensitively), or selector moved
  * (compared verbatim). Findings anchor `raw.fields[NAME]` / `.type` / `.selector`, same messages.
  */
+/**
+ * The SERVER's source-zone refusals, mirrored (mock-never-more-lenient) — `SourceZones.validateZone`
+ * plus `Identifiers.validateFieldZone`.
+ *
+ * <p>⚠ The engine gates on the JVM's `ZoneId.getAvailableZoneIds()`, which a browser cannot enumerate.
+ * `Intl.DateTimeFormat` is used as the resolver instead because it accepts the same region ids —
+ * INCLUDING legacy aliases like `Asia/Calcutta` that `Intl.supportedValuesOf` omits, so validating
+ * against the offered list would refuse values the server accepts (stricter, but wrong).
+ *
+ * <p>⛔ Offset forms are rejected BEFORE the resolver: modern engines accept `+05:30` as a valid
+ * `timeZone`, DuckDB does not, so the resolver alone would green-light the one mistake operators
+ * actually make.
+ */
+export function zoneRefusal(zone: unknown, where: string): string | null {
+    const z = String(zone ?? '').trim();
+    if (!z) return `${where} is blank — remove the key or name a zone`;
+    if (/^[+-]/.test(z) || z === 'Z')
+        return `${where}: a fixed offset is not accepted (it cannot express daylight saving); use the IANA region id, e.g. 'Asia/Kolkata'`;
+    try {
+        new Intl.DateTimeFormat('en-US', { timeZone: z });
+    } catch {
+        return `${where}: unknown time zone '${z}' — use an IANA region id such as 'Asia/Kolkata'`;
+    }
+    return null;
+}
+
+/**
+ * Every source-zone refusal a schema config would draw from the server, in `Identifiers`' order.
+ *
+ * <p>⚠ Deliberately does NOT include the engine's *TIMESTAMPTZ needs a zone* check: that one is a
+ * PIPELINE-load rule (it has to see `parsing.source_timezone`, which lives in a different file), and a
+ * schema write here cannot see the pipeline that references it. The columns editor hints it per row
+ * instead. Known gap, not an oversight — the server still refuses at load.
+ */
+export function schemaZoneFindings(config: Record<string, unknown>): string[] {
+    const raw = config['raw'] as Record<string, unknown> | undefined;
+    const fields = Array.isArray(raw?.['fields']) ? (raw!['fields'] as Record<string, unknown>[]) : [];
+    const declared = new Set(fields.map((f) => String(f['name'] ?? '')));
+    const out: string[] = [];
+    for (const f of fields) {
+        const name = String(f['name'] ?? '');
+        const tz = String(f['timezone'] ?? '').trim();
+        const tzc = String(f['timezone_column'] ?? '').trim();
+        if (tz && tzc) {
+            out.push(
+                `Schema field '${name}' sets both timezone and timezone_column. timezone_column takes precedence, so the fixed timezone would never apply — keep one.`,
+            );
+            continue;
+        }
+        if (tz) {
+            const bad = zoneRefusal(tz, `raw.fields[${name}].timezone`);
+            if (bad) out.push(bad);
+        }
+        if (tzc && !declared.has(tzc))
+            out.push(`Schema field '${name}' sets timezone_column '${tzc}', which is not a declared raw field.`);
+    }
+    return out;
+}
+
 export function schemaBackwardFindings(
     existing: Record<string, unknown>,
     draft: Record<string, unknown>,
@@ -743,10 +819,7 @@ interface SchemaDriftMock {
  * removed and another added, and surfaces as a `missing` + `added` pair. Presenting that pair as a
  * likely rename is a UI affordance over the two facts, never a claim the server (or this mock) makes.
  */
-function schemaDrift(
-    draft: Record<string, unknown>,
-    inferred: { name: string; type: string }[],
-): SchemaDriftMock {
+function schemaDrift(draft: Record<string, unknown>, inferred: { name: string; type: string }[]): SchemaDriftMock {
     const raw = (draft['raw'] ?? {}) as Record<string, unknown>;
     const draftFields = (Array.isArray(raw['fields']) ? raw['fields'] : []) as {
         name?: string;

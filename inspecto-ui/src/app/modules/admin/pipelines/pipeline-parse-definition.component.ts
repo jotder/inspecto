@@ -1178,6 +1178,16 @@ export class PipelineParseDefinitionComponent {
      */
     @HostListener('input')
     @HostListener('click')
+    // 🔴 `document:click` is NOT redundant with the host `click`. A `type: 'select'` renders
+    // `<inspecto-option-picker>`, which asks in a MatDialog — an overlay attached to document.body,
+    // OUTSIDE this pane's subtree — so choosing an option never bubbles a click through the host and
+    // `emitDirty()` never ran. Apply stayed greyed out over a choice the operator had just made, until
+    // some unrelated click in the pane happened to re-derive it (measured in the preview: the pick
+    // DOES dirty the form, so only the notification was missing). Any overlay-hosted control has the
+    // same shape, so the listener is document-level rather than a guess at which event escapes;
+    // `emitDirty` already returns early unless the value actually transitions, so the cost is a few
+    // boolean reads per click, and the pane is only mounted while the drawer is open.
+    @HostListener('document:click')
     onInteraction(): void {
         this.emitDirty();
     }

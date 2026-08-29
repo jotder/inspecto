@@ -94,6 +94,9 @@
                     </button>
                 </th>
                 <th scope="col" class="pb-1">Synonym</th>
+                @if (anyTemporal()) {
+                    <th scope="col" class="w-44 pb-1">Source zone</th>
+                }
                 @if (nameBasedSelectors()) {
                     <th scope="col" class="w-24 pb-1">Selector</th>
                 }
@@ -122,9 +125,7 @@
                     <td class="w-14 py-1">
                         <span
                             [matTooltip]="
-                                autoTypes()
-                                    ? 'Inferred — switch Data types to Declared to override'
-                                    : typeName(e.group)
+                                autoTypes() ? 'Inferred — switch Data types to Declared to override' : typeName(e.group)
                             "
                         >
                             <button
@@ -186,13 +187,46 @@
                             }
                         </mat-form-field>
                     </td>
+                    <!-- Source zone: only a column carrying an INSTANT has one, so the cell is empty
+                         for the rest and the whole column disappears on a schema with no timestamps.
+                         A datalist rather than a select — ~418 zones need filtering, and free text
+                         keeps a legacy alias (Asia/Calcutta) editable instead of blanking it. -->
+                    @if (anyTemporal()) {
+                        <td class="w-44 py-1 pr-2">
+                            @if (isTemporal(e.group)) {
+                                @if (zoneColumnOf(e.group, e.index)) {
+                                    <span
+                                        class="text-secondary text-xs"
+                                        [matTooltip]="
+                                            'This column takes its zone per row from ' + zoneColumnOf(e.group, e.index)
+                                        "
+                                        >per row: {{ zoneColumnOf(e.group, e.index) }}</span
+                                    >
+                                } @else {
+                                    <input
+                                        class="w-full bg-transparent text-sm"
+                                        list="inspecto-iana-zones"
+                                        formControlName="timezone"
+                                        placeholder="Inherit"
+                                        [attr.aria-label]="
+                                            'Source time zone for ' +
+                                            (e.group.get('name')?.value || e.group.get('selector')?.value)
+                                        "
+                                    />
+                                    @if (needsZone(e.group, e.index)) {
+                                        <span class="text-warn text-xs" role="alert"
+                                            >Needs a zone — TIMESTAMPTZ cannot load without one.</span
+                                        >
+                                    }
+                                }
+                            }
+                        </td>
+                    }
                     @if (nameBasedSelectors()) {
                         <td class="w-24 py-1">
                             <span
                                 class="text-secondary block max-w-24 truncate text-xs"
-                                [matTooltip]="
-                                    'Selector: ' + $safeNavigationMigration(e.group.get('selector')?.value)
-                                "
+                                [matTooltip]="'Selector: ' + $safeNavigationMigration(e.group.get('selector')?.value)"
                                 >{{ e.group.get('selector')?.value }}</span
                             >
                         </td>
@@ -214,6 +248,13 @@
         aria-label="Field table pages"
     />
 </div>
+
+<!-- One shared zone vocabulary for every row's Source zone cell (rendered once, not per row). -->
+<datalist id="inspecto-iana-zones">
+    @for (z of zoneOptions; track z) {
+        <option [value]="z"></option>
+    }
+</datalist>
 
 <!-- One shared type menu (§4.3 ③): icon + name + plain-words hint per row, no classic dropdown. -->
 <mat-menu #typeMenu="matMenu">

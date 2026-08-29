@@ -316,12 +316,29 @@ src/app/
   selects (the mapping-rules rows, the columns table's type filter and page size) — a modal per cell is
   worse than the dropdown it replaces. The remaining ~130 hand-rolled `mat-select`s outside those two
   categories are an unswept follow-up, not a decision against the picker.
+  🔴 **A picker change does NOT bubble a click through its host** (2026-08-29): the choices open in a
+  MatDialog, which the CDK attaches to `document.body`, so a pane that derives dirtiness from
+  `@HostListener('click')` never learns about the pick — Apply stayed greyed out over a choice the
+  operator had just made, on every `select` in the three `pipelines/*-definition` panes. Those now also
+  carry `@HostListener('document:click')` (the re-derive already short-circuits unless the value
+  transitions). **Any host that polls state on interaction has this hole for every overlay-hosted
+  control** — dialogs, menus, autocomplete panels. A unit test that dirties the form directly passes
+  either way; this was only visible by driving the picker in the preview.
   ⚠ **A blank-valued option is a real, named choice, not "unset"** (2026-08-23): the picker shows that
   option's LABEL rather than the placeholder, and the popup ticks it when the bound value is null. This
   is the idiom for *"the engine's own default, authored as no key at all"* — the Grammar editor's Parse
   engine ▸ Auto — because a spec `default` is banned there (it materializes into every `value()` and
   mutates faithful copies of stored grammars), and the editor drops a blank whose default is blank.
   ⛔ Don't "fix" such a field by giving it `default: 'auto'`.
+- **Asking for an IANA time zone → `inspecto/schema/time-zones.ts`** (2026-08-29). `ianaTimeZones()` /
+  `timeZoneOptions(blankLabel)` are the ONE vocabulary behind both source-zone surfaces (the Grammar
+  editor's Types tab `source_timezone`, the columns table's per-column zone). ⛔ Never hand-roll a zone
+  list: the engine refuses an unknown zone at config load (DuckDB errors hard at run time and `TRY()`
+  does not catch it), and it refuses **offset forms** (`+05:30`, `Z`) that `Intl` and `ZoneId` both
+  accept. ⚠ It is a SUGGESTION list, not the gate — the runtime's ICU set and the JVM's disagree on
+  spellings in BOTH directions (measured: this ICU has `Asia/Calcutta`, not `Asia/Kolkata`; it omits
+  `UTC` entirely, which we add back), so a stored zone must always render verbatim and survive a save
+  untouched.
 - **Tabular surfaces → `<inspecto-data-table [tier]>`** (`app/inspecto/data-table`), the consolidation of
   every ag-Grid host. Tiers: **mini** (grid) · **standard** (+ icon-only toolbar: column chooser · search ·
   CSV export) · **pro** (+ an **icon-toggled CodeMirror SQL editor — hidden by default** — that runs real SQL

@@ -296,4 +296,97 @@ describe('InspectoSchemaFieldsEditorComponent', () => {
         const { fixture } = await create(rows(3));
         await expectNoA11yViolations(fixture.nativeElement);
     });
+
+    // ── source time zone (S2) ─────────────────────────────────────────────────
+
+    it('hides the Source zone column entirely when no column carries an instant', async () => {
+        const { fixture, c } = await create(rows(3));
+        expect(c.anyTemporal()).toBe(false);
+        expect(fixture.nativeElement.textContent).not.toContain('Source zone');
+    });
+
+    it('shows the Source zone column once a column is a timestamp, and only on that row', async () => {
+        const { fixture, c } = await create([
+            { include: true, name: 'CALL_TS', selector: '0', type: 'TIMESTAMP' },
+            { include: true, name: 'NOTE', selector: '1', type: 'VARCHAR' },
+        ]);
+        expect(c.anyTemporal()).toBe(true);
+        expect(fixture.nativeElement.textContent).toContain('Source zone');
+        const zoneInputs = Array.from(
+            fixture.nativeElement.querySelectorAll('input[list="inspecto-iana-zones"]'),
+        ) as HTMLInputElement[];
+        expect(zoneInputs.length).toBe(1); // the VARCHAR row gets an empty cell, not a control
+    });
+
+    it('⛔ a DATE column is NOT offered a zone — a date has no instant to shift', async () => {
+        const { c } = await create([{ include: true, name: 'D', selector: '0', type: 'DATE' }]);
+        expect(c.anyTemporal()).toBe(false);
+    });
+
+    it('reveals the column when a row is RETYPED to a timestamp, not only on re-seed', async () => {
+        const { fixture, c } = await create(rows(2));
+        expect(c.anyTemporal()).toBe(false);
+        c.setType(c.filteredEntries()[0].group, 'TIMESTAMP');
+        fixture.detectChanges();
+        // Regression: anyTemporal once depended on structureVersion alone, which a retype never bumps.
+        expect(c.anyTemporal()).toBe(true);
+    });
+
+    it('emits a set zone and DROPS a blank one (blank means inherit, not an empty key)', async () => {
+        const { c } = await create([
+            { include: true, name: 'A', selector: '0', type: 'TIMESTAMP', timezone: 'Asia/Kolkata' },
+            { include: true, name: 'B', selector: '1', type: 'TIMESTAMP' },
+        ]);
+        const v = c.value();
+        expect(v[0].timezone).toBe('Asia/Kolkata');
+        expect('timezone' in v[1]).toBe(false);
+    });
+
+    it('🔴 carries keys the grid does not model through a save', async () => {
+        const { c } = await create([
+            {
+                include: true,
+                name: 'A',
+                selector: '0',
+                type: 'TIMESTAMP',
+                timezone_column: 'TZ',
+                description: 'when the call started',
+                unit: 'ms',
+                classification: 'PII',
+            },
+            { include: true, name: 'TZ', selector: '1', type: 'VARCHAR' },
+        ]);
+        const v = c.value();
+        // The form holds five controls; emitting getRawValue() alone silently dropped the rest.
+        expect(v[0].timezone_column).toBe('TZ');
+        expect(v[0].description).toBe('when the call started');
+        expect(v[0].unit).toBe('ms');
+        expect(v[0].classification).toBe('PII');
+    });
+
+    it('shows a per-row zone column read-only rather than a box that could contradict it', async () => {
+        const { fixture, c } = await create([
+            { include: true, name: 'A', selector: '0', type: 'TIMESTAMP', timezone_column: 'TZ' },
+            { include: true, name: 'TZ', selector: '1', type: 'VARCHAR' },
+        ]);
+        expect(c.zoneColumnOf(c.filteredEntries()[0].group, 0)).toBe('TZ');
+        expect(fixture.nativeElement.textContent).toContain('per row: TZ');
+        expect(fixture.nativeElement.querySelectorAll('input[list="inspecto-iana-zones"]').length).toBe(0);
+    });
+
+    it('🔴 flags a TIMESTAMPTZ with no zone anywhere — the engine refuses it at load', async () => {
+        const { fixture, c } = await create([{ include: true, name: 'A', selector: '0', type: 'TIMESTAMPTZ' }]);
+        expect(c.needsZone(c.filteredEntries()[0].group, 0)).toBe(true);
+        expect(fixture.nativeElement.querySelector('[role="alert"]')?.textContent).toContain('Needs a zone');
+    });
+
+    it('does not flag a TIMESTAMPTZ that has a zone', async () => {
+        const { c } = await create([{ include: true, name: 'A', selector: '0', type: 'TIMESTAMPTZ', timezone: 'UTC' }]);
+        expect(c.needsZone(c.filteredEntries()[0].group, 0)).toBe(false);
+    });
+
+    it('has no a11y violations with the Source zone column shown', async () => {
+        const { fixture } = await create([{ include: true, name: 'CALL_TS', selector: '0', type: 'TIMESTAMP' }]);
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
 });

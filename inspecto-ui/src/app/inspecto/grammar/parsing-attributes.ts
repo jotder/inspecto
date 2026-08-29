@@ -1,4 +1,5 @@
 import { AttributeSpec } from 'app/inspecto/component-model';
+import { timeZoneOptions } from 'app/inspecto/schema/time-zones';
 
 /**
  * The Parsing stage's frontend catalog + per-frontend schema-form specs, flat-keyed (`__` path
@@ -99,6 +100,12 @@ export const GRAMMAR_TABS: { id: string; label: string }[] = [
     { id: 'robustness', label: 'Robustness' },
     { id: 'files', label: 'Files & MetaData' },
 ];
+
+/**
+ * Built once: the zone vocabulary is ~418 entries and every frontend's Types tab offers the same one.
+ * The blank entry names the engine's own no-key behaviour, so picking it writes nothing.
+ */
+const SOURCE_TIMEZONE_OPTIONS = timeZoneOptions('Wall clock, as written (default)');
 
 /** Exactly one character — the dialect chars the engine validates fail-closed at load. */
 const SINGLE_CHAR = '[\\s\\S]';
@@ -246,6 +253,23 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     tab: 'types',
                 },
                 {
+                    // ⚠ No `default` — the standing rule: a spec default materializes into every
+                    // value() and would mutate faithful copies of stored grammars. Blank is a NAMED
+                    // choice ("wall clock, as written" IS the engine's behaviour with no key), and
+                    // the editor drops a blank whose default is blank, so picking it writes nothing.
+                    // ⚠ Parsing-LEVEL, not `delimited__`: the zone is a fact about the DATA, not
+                    // about the delimited dialect, so it holds whatever the frontend is — the same
+                    // shape as `encoding`/`compression`, the other two parsing-level scalars, and
+                    // the same allow-list entry in PipelineConfigParser.mergeParsing.
+                    key: 'source_timezone',
+                    label: 'Source time zone',
+                    type: 'select',
+                    tier: 'optional',
+                    options: SOURCE_TIMEZONE_OPTIONS,
+                    help: 'The zone the timestamps in this data are written IN. Set it and values are stored as UTC, instead of being read in the server’s own zone. A column can override it.',
+                    tab: 'types',
+                },
+                {
                     key: 'delimited__null_strings',
                     label: 'Null strings',
                     type: 'list',
@@ -388,6 +412,23 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     tab: 'types',
                 },
                 {
+                    // ⚠ No `default` — the standing rule: a spec default materializes into every
+                    // value() and would mutate faithful copies of stored grammars. Blank is a NAMED
+                    // choice ("wall clock, as written" IS the engine's behaviour with no key), and
+                    // the editor drops a blank whose default is blank, so picking it writes nothing.
+                    // ⚠ Parsing-LEVEL, not `delimited__`: the zone is a fact about the DATA, not
+                    // about the delimited dialect, so it holds whatever the frontend is — the same
+                    // shape as `encoding`/`compression`, the other two parsing-level scalars, and
+                    // the same allow-list entry in PipelineConfigParser.mergeParsing.
+                    key: 'source_timezone',
+                    label: 'Source time zone',
+                    type: 'select',
+                    tier: 'optional',
+                    options: SOURCE_TIMEZONE_OPTIONS,
+                    help: 'The zone the timestamps in this data are written IN. Set it and values are stored as UTC, instead of being read in the server’s own zone. A column can override it.',
+                    tab: 'types',
+                },
+                {
                     key: 'fixedwidth__min_record_length',
                     label: 'Minimum record length',
                     type: 'number',
@@ -489,6 +530,23 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     help: 'Accepted TIMESTAMP parse patterns, tried in order.',
                     tab: 'types',
                 },
+                {
+                    // ⚠ No `default` — the standing rule: a spec default materializes into every
+                    // value() and would mutate faithful copies of stored grammars. Blank is a NAMED
+                    // choice ("wall clock, as written" IS the engine's behaviour with no key), and
+                    // the editor drops a blank whose default is blank, so picking it writes nothing.
+                    // ⚠ Parsing-LEVEL, not `delimited__`: the zone is a fact about the DATA, not
+                    // about the delimited dialect, so it holds whatever the frontend is — the same
+                    // shape as `encoding`/`compression`, the other two parsing-level scalars, and
+                    // the same allow-list entry in PipelineConfigParser.mergeParsing.
+                    key: 'source_timezone',
+                    label: 'Source time zone',
+                    type: 'select',
+                    tier: 'optional',
+                    options: SOURCE_TIMEZONE_OPTIONS,
+                    help: 'The zone the timestamps in this data are written IN. Set it and values are stored as UTC, instead of being read in the server’s own zone. A column can override it.',
+                    tab: 'types',
+                },
                 // ── J1 reader knobs — read_json (array/auto) only; the load refuses them on NDJSON,
                 // so the form hides them there rather than authoring a config the parser rejects.
                 {
@@ -584,6 +642,23 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     tier: 'optional',
                     placeholder: '%Y-%m-%d %H:%M:%S',
                     help: 'Accepted TIMESTAMP parse patterns, tried in order.',
+                    tab: 'types',
+                },
+                {
+                    // ⚠ No `default` — the standing rule: a spec default materializes into every
+                    // value() and would mutate faithful copies of stored grammars. Blank is a NAMED
+                    // choice ("wall clock, as written" IS the engine's behaviour with no key), and
+                    // the editor drops a blank whose default is blank, so picking it writes nothing.
+                    // ⚠ Parsing-LEVEL, not `delimited__`: the zone is a fact about the DATA, not
+                    // about the delimited dialect, so it holds whatever the frontend is — the same
+                    // shape as `encoding`/`compression`, the other two parsing-level scalars, and
+                    // the same allow-list entry in PipelineConfigParser.mergeParsing.
+                    key: 'source_timezone',
+                    label: 'Source time zone',
+                    type: 'select',
+                    tier: 'optional',
+                    options: SOURCE_TIMEZONE_OPTIONS,
+                    help: 'The zone the timestamps in this data are written IN. Set it and values are stored as UTC, instead of being read in the server’s own zone. A column can override it.',
                     tab: 'types',
                 },
                 // ── tab 3: Robustness / error handling ───────────────────────────

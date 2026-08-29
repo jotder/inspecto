@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { MockRequest } from '../mock-http';
 import { MockStore } from '../mock-store';
 import { componentCollection } from './components.handler';
-import { onboardingHandler, PIPELINE_CONFIGS_COLL, StoredPipelineConfig } from './onboarding.handler';
+import {
+    onboardingHandler,
+    PIPELINE_CONFIGS_COLL,
+    StoredPipelineConfig,
+    schemaZoneFindings,
+    zoneRefusal,
+} from './onboarding.handler';
 
 /**
  * Pins the mock's strictness to the server's (mock-never-more-lenient, 2026-07-27 A5.3) for the
@@ -261,7 +267,14 @@ describe('onboardingHandler POST /config/preview/schema — the mapped half (B1)
     const preview = (config: unknown, sampleRows: unknown) =>
         handler(req('POST', '/api/config/preview/schema', { config, sampleRows }), new MockStore());
 
-    const FIELDS = { raw: { fields: [{ name: 'ID', type: 'DOUBLE' }, { name: 'NOTE', type: 'VARCHAR' }] } };
+    const FIELDS = {
+        raw: {
+            fields: [
+                { name: 'ID', type: 'DOUBLE' },
+                { name: 'NOTE', type: 'VARCHAR' },
+            ],
+        },
+    };
     const ROWS = [
         { ID: '1', NOTE: 'a' },
         { ID: 'nope', NOTE: 'b' }, // fails the DOUBLE cast → rejected, so never mapped
@@ -328,7 +341,10 @@ describe('onboardingHandler POST /config/suggest/schema', () => {
         const withDraft = (draft: unknown, sampleRows: unknown) =>
             handler(req('POST', '/api/config/suggest/schema', { config: draft, sampleRows }), new MockStore());
 
-        const SAMPLE = [{ QUANTITY: '1.5', NOTE: 'hi' }, { QUANTITY: '2.5', NOTE: 'there' }];
+        const SAMPLE = [
+            { QUANTITY: '1.5', NOTE: 'hi' },
+            { QUANTITY: '2.5', NOTE: 'there' },
+        ];
 
         it('omits drift entirely when no draft is posted — nothing to have drifted from', () => {
             const body = suggest(SAMPLE)?.body as Record<string, unknown>;
@@ -357,26 +373,29 @@ describe('onboardingHandler POST /config/suggest/schema', () => {
 
         it('does not treat a deliberate OUTPUT rename as drift — the join key is the selector', () => {
             const draft = { raw: { fields: [{ name: 'quantity_sold', selector: 'QUANTITY', type: 'DOUBLE' }] } };
-            const drift = (withDraft(draft, [{ QUANTITY: '1.5' }])?.body as Record<string, unknown>)[
-                'drift'
-            ] as Record<string, unknown>;
+            const drift = (withDraft(draft, [{ QUANTITY: '1.5' }])?.body as Record<string, unknown>)['drift'] as Record<
+                string,
+                unknown
+            >;
             expect(drift['drifted']).toBe(false);
         });
 
         it('surfaces a renamed SOURCE column as the missing+added pair, claiming no rename', () => {
             const draft = { raw: { fields: [{ name: 'ts', selector: 'EVENT_TS', type: 'VARCHAR' }] } };
-            const drift = (withDraft(draft, [{ EVENT_TIME: 'x' }])?.body as Record<string, unknown>)[
-                'drift'
-            ] as Record<string, unknown>;
+            const drift = (withDraft(draft, [{ EVENT_TIME: 'x' }])?.body as Record<string, unknown>)['drift'] as Record<
+                string,
+                unknown
+            >;
             expect(drift['missing']).toEqual([{ name: 'ts', type: 'VARCHAR' }]);
             expect(drift['added']).toEqual([{ name: 'EVENT_TIME', type: 'VARCHAR' }]);
         });
 
         it('a field with no declared type has nothing to have changed from', () => {
             const draft = { raw: { fields: [{ name: 'qty', selector: 'QUANTITY', type: '' }] } };
-            const drift = (withDraft(draft, [{ QUANTITY: '1.5' }])?.body as Record<string, unknown>)[
-                'drift'
-            ] as Record<string, unknown>;
+            const drift = (withDraft(draft, [{ QUANTITY: '1.5' }])?.body as Record<string, unknown>)['drift'] as Record<
+                string,
+                unknown
+            >;
             expect(drift['typeChanged']).toEqual([]);
             expect(drift['drifted']).toBe(false);
         });
@@ -509,5 +528,93 @@ describe('onboardingHandler pipeline delete — dependents gate', () => {
         const res = handler(reqWith('DELETE', '/api/config/pipeline/orders_feed', { force: 'true' }), store);
         expect(res?.status).toBe(409);
         expect(String((res?.body as { error?: string })?.error)).toContain('is active');
+    });
+
+    // ── source time zone: the mock must refuse exactly what the server refuses ─────
+
+    it('⛔ rejects an offset zone — modern Intl ACCEPTS +05:30, DuckDB does not', () => {
+        expect(zoneRefusal('+05:30', 'parsing.source_timezone')).toContain('fixed offset');
+        expect(zoneRefusal('-08:00', 'parsing.source_timezone')).toContain('fixed offset');
+        expect(zoneRefusal('Z', 'parsing.source_timezone')).toContain('fixed offset');
+    });
+
+    it('rejects an unknown zone and a blank one, naming the key', () => {
+        expect(zoneRefusal('Not/AZone', 'raw.fields[T].timezone')).toContain('raw.fields[T].timezone');
+        expect(zoneRefusal('', 'parsing.source_timezone')).toContain('blank');
+    });
+
+    it('accepts region ids INCLUDING a legacy alias the offered list omits', () => {
+        expect(zoneRefusal('Asia/Kolkata', 'x')).toBeNull();
+        expect(zoneRefusal('UTC', 'x')).toBeNull();
+        // ⚠ Both spellings must pass. The offered list and the JVM's set disagree on which one they
+        // carry (this ICU has Calcutta, not Kolkata), so validating against the OFFERED list would
+        // refuse a config the server accepts — in whichever direction the runtime happens to fall.
+        // The resolver accepts both, which is the point.
+        expect(zoneRefusal('Asia/Calcutta', 'x')).toBeNull();
+    });
+
+    it('refuses a schema field that sets BOTH zone forms', () => {
+        const findings = schemaZoneFindings({
+            raw: { fields: [{ name: 'A', type: 'TIMESTAMP', timezone: 'UTC', timezone_column: 'TZ' }] },
+        });
+        expect(findings[0]).toContain('both timezone and timezone_column');
+    });
+
+    it('refuses a timezone_column that names no declared field', () => {
+        const findings = schemaZoneFindings({
+            raw: { fields: [{ name: 'A', type: 'TIMESTAMP', timezone_column: 'NOPE' }] },
+        });
+        expect(findings[0]).toContain('NOPE');
+    });
+
+    it('accepts a timezone_column that names a sibling', () => {
+        expect(
+            schemaZoneFindings({
+                raw: {
+                    fields: [
+                        { name: 'A', type: 'TIMESTAMP', timezone_column: 'TZ' },
+                        { name: 'TZ', type: 'VARCHAR' },
+                    ],
+                },
+            }),
+        ).toEqual([]);
+    });
+
+    it('a schema write carrying a bad zone is a 422, not a green offline save', () => {
+        const store = new MockStore();
+        const res = handler(
+            req('POST', '/api/config/write', {
+                type: 'schema',
+                config: { raw: { name: 's', fields: [{ name: 'A', type: 'TIMESTAMP', timezone: '+05:30' }] } },
+            }),
+            store,
+        );
+        expect(res?.status).toBe(422);
+    });
+
+    it('a pipeline write carrying a bad parsing.source_timezone is a 422', () => {
+        const store = new MockStore();
+        const res = handler(
+            req('POST', '/api/config/write', {
+                type: 'pipeline',
+                config: { name: 'tz_demo', parsing: { source_timezone: 'Not/AZone' } },
+            }),
+            store,
+        );
+        expect(res?.status).toBe(422);
+        expect(String((res?.body as { error?: string })?.error)).toContain('Not/AZone');
+    });
+
+    it('a pipeline write with a GOOD source_timezone still saves', () => {
+        const store = new MockStore();
+        const res = handler(
+            req('POST', '/api/config/write', {
+                type: 'pipeline',
+                config: { name: 'tz_demo', parsing: { source_timezone: 'Asia/Kolkata' } },
+            }),
+            store,
+        );
+        expect(res?.status).toBe(200);
+        expect((res?.body as { written?: boolean })?.written).toBe(true);
     });
 });
