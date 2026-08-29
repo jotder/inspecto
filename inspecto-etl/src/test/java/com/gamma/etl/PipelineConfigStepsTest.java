@@ -71,6 +71,22 @@ class PipelineConfigStepsTest {
                 .getMessage().contains("single-key map"), "two kinds in one entry has no order");
     }
 
+    /**
+     * A CONTRIBUTED kind loads when the deployment registers that node type — the plugin-step half of
+     * the same gate. The check is inverted through {@link StepKindRegistry} because this module sits
+     * below the node-type registry, but the refusal stays at LOAD either way.
+     */
+    @Test
+    void acceptsAContributedKindTheRegistryVouchesFor() {
+        Map<String, Object> cfg = base(Map.of("steps",
+                List.of(Map.of(FakeStepKindRegistry.KIND, Map.of("count", "2")))));
+        PipelineConfig loaded = assertDoesNotThrow(() -> PipelineConfig.fromMap(cfg));
+        assertEquals(1, loaded.steps().size());
+        assertEquals(FakeStepKindRegistry.KIND, loaded.steps().get(0).kind());
+        assertEquals("2", loaded.steps().get(0).config().get("count"),
+                "the config travels verbatim — the core models none of a plugin's keys");
+    }
+
     @Test
     void refusesAnUnknownKind() {
         assertTrue(refused(base(Map.of("steps", List.of(Map.of("frobnicate", Map.of())))))

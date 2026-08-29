@@ -123,8 +123,50 @@ public final class PipelineEditable {
      * type the editor cannot persist is greyed out up front, instead of the user discovering it at
      * Save via an {@link #UNSUPPORTED_NODE} refusal.
      */
+    /** The {@code transform.} prefix a chain step's node type carries; its kind is what follows. */
+    private static final String TRANSFORM_PREFIX = "transform.";
+
+    /**
+     * The {@code steps:} kind a node type lowers to — a built-in's mapped kind, or a <b>contributed</b>
+     * node type's own suffix. {@code null} when the type is not a chain step at all.
+     *
+     * <p>A contributed type needs no entry in {@link #STEP_KIND}: the flat file's chain is a LIST, so a
+     * kind it has never seen is representable, and the config travels verbatim
+     * ({@code stepConfig}'s default arm). That is the whole reason plugin steps land on this spelling
+     * and not on the singular blocks, which have a fixed key each.
+     */
+    static String stepKindOf(String type) {
+        return stepKindOf(type, PipelineNodeTypes.get(type).orElse(null));
+    }
+
+    /**
+     * As {@link #stepKindOf(String)}, with the descriptor supplied — the seam the test uses, because a
+     * CONTRIBUTED descriptor cannot be registered in this build's test scope without entering the served
+     * step catalog, which is a committed contract.
+     *
+     * <p>🔴 <b>CONTRIBUTED only, and that restriction is the load-bearing part.</b> Several built-ins are
+     * registered, executable and deliberately NOT authorable — {@code transform.split} / {@code select} /
+     * {@code derive} / {@code validate} / {@code merge} are absent from {@link #LOWERABLE} and from
+     * {@code RECIPE_VERBS} by decision. Admitting every registered {@code transform.*} would silently
+     * reverse all of those and change the two-types-differ invariant {@code PipelineProjectionTest} pins.
+     * So a built-in keeps whatever {@link #LOWERABLE} already says about it, and only a type the core
+     * does not ship gains the {@code steps:} home.
+     */
+    static String stepKindOf(String type, PipelineNodeType descriptor) {
+        String builtin = STEP_KIND.get(type);
+        if (builtin != null) return builtin;
+        if (type == null || !type.startsWith(TRANSFORM_PREFIX)) return null;
+        // ⚠ Registered AND not a built-in. An unregistered type must keep refusing with UNSUPPORTED_NODE
+        // at save — the author is present at that moment, and a graph that saves and then cannot run is
+        // exactly the descriptor-only trap the executor seam closed.
+        if (descriptor == null || descriptor instanceof BuiltinNodeType) return null;
+        return type.substring(TRANSFORM_PREFIX.length());
+    }
+
     public static boolean isLowerable(String type) {
-        return LOWERABLE.contains(type);
+        // A contributed transform type lowers as a `steps:` entry, so the flat file DOES have a home for
+        // it — which is what makes a plugin Step authorable rather than merely executable.
+        return LOWERABLE.contains(type) || stepKindOf(type) != null;
     }
 
     /**
@@ -562,7 +604,7 @@ public final class PipelineEditable {
             else if (BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type().equals(t)) marker = n;
             // The five chain kinds. Each used to claim a single slot and refuse a second (MULTI_*); they
             // now join an ordered chain, and how many there are stops being the question — see stepsOf.
-            else if (STEP_KIND.containsKey(t)) chain.add(n);
+            else if (stepKindOf(t) != null) chain.add(n);
             else if (BuiltinNodeType.SINK_PERSISTENT.type().equals(t)) {
                 if (isQuarantine(n)) {
                     quarantineSink = n;
@@ -883,6 +925,9 @@ public final class PipelineEditable {
     private static boolean isLegacyShaped(List<PipelineNode> chain) {
         int previous = -1;
         for (PipelineNode n : chain) {
+            // A CONTRIBUTED kind is not in KINDS, so indexOf gives -1 and the chain is not legacy-shaped
+            // — which is correct and not incidental: the singular blocks have one fixed key each and
+            // cannot hold a step type they have never heard of. Such a chain must take `steps:`.
             int position = PipelineConfig.Step.KINDS.indexOf(STEP_KIND.get(n.type()));
             if (position <= previous) return false;
             previous = position;
@@ -894,7 +939,7 @@ public final class PipelineEditable {
     private static List<Map<String, Object>> stepsOf(PipelineGraph g, List<PipelineNode> chain) {
         List<Map<String, Object>> steps = new ArrayList<>();
         for (PipelineNode n : chain) {
-            String kind = STEP_KIND.get(n.type());
+            String kind = stepKindOf(n.type());
             Map<String, Object> entry = new LinkedHashMap<>();
             entry.put(kind, stepConfig(g, n, kind));
             steps.add(entry);

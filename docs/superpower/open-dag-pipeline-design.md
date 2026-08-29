@@ -362,8 +362,8 @@ thing"* is a one-concept-two-words violation.
 | **1** | ~~decide the output contract~~ | ✅ **DECIDED**: arbitrary tables, registered as outputs |
 | **2** | ✅ **SHIPPED 2026-08-29** — `DerivedTableEmitter` / `DerivedTableWriter`, registered onto the same Consignment | no new state; the reprocess cascade is proven free by test. §7 |
 | **3** | ✅ **SHIPPED 2026-08-29** — an ordered chain, the registry re-read per step | §8 |
-| **4** | **Surface the post-sync lane in the editor** | authoring |
-| **5** | **Open the recipe verb + palette `authorable`** | independent; in-batch plugin steps |
+| **4** | ✅ **SHIPPED 2026-08-29** — `GET /runs/{name}/outputs` + the Batch-detail section (`aa777782`) | authoring |
+| **5** | ✅ **SHIPPED 2026-08-29** — a CONTRIBUTED step is authorable via `steps:` | §11 |
 | **6** | **Parser output-schema publication** | independent; point 1's real gap |
 
 ⛔ **Retention and merge are NOT stages** — they exist. What they need is for a derived table to arrive
@@ -501,3 +501,56 @@ blanket ban had cost.
 ⚠ **Validation runs on the masked text while the ORIGINAL executes.** That is sound only because the two
 differ *solely* by substrings individually verified against the registry — which is why the verification
 happens before the mask, never after.
+
+---
+
+## 11. Stage 5 as-built (2026-08-29) — a plugin Step is authorable
+
+**What changed:** a **contributed** node type now lowers to a `steps:` entry, so the palette may offer it
+and a graph carrying one saves. `PipelineNodeExecutor` had made such a type *executable*; this makes it
+*authorable*, which is what the operator's point 4 actually asked for.
+
+🔴 **The design premise was wrong in a useful way.** Stage 5 was written as *"open `RecipeCompiler`'s
+verb switch"*. Grounding found `RecipeCompiler` has **no production caller** — a recipe is a converter
+and parity artifact, not a load path. What IS load-bearing is the flat file's own `steps:` chain, which
+`PipelineLift` already lifts as **`"transform." + kind` with the config verbatim**. The lift was open
+all along; only the two gates around it were shut.
+
+**The three gates, and what each became:**
+
+* **`PipelineEditable.LOWERABLE`** — now also admits a type whose `stepKindOf` resolves, i.e. a
+  registered, **non-built-in** `transform.*`. `isAuthorable` follows for free.
+* **`stepsOf` / chain collection** — keyed by `stepKindOf(type)` rather than the closed `STEP_KIND` map.
+  A contributed step's config travels through `stepConfig`'s existing `default` arm, verbatim.
+* **The parser's closed `Step.KINDS` check** — see below.
+
+🔴 **CONTRIBUTED only, and that restriction is the load-bearing part.** The first cut admitted every
+registered `transform.*`, which would have silently made `transform.split` / `select` / `derive` /
+`validate` / `merge` authorable — all deliberately absent from `LOWERABLE` and `RECIPE_VERBS`, and all
+covered by `PipelineProjectionTest`'s "exactly two types differ" invariant. A built-in keeps whatever
+`LOWERABLE` already says; only a type the core does not ship gains the `steps:` home. Pinned by a test
+that walks all five.
+
+⚠ **`isLegacyShaped` needed no change and that is not luck**: a contributed kind is absent from
+`Step.KINDS`, so `indexOf` gives `-1` and the chain is correctly *not* legacy-shaped — the singular
+blocks have one fixed key each and cannot hold a kind they have never heard of.
+
+### The parser gate, and the guard I nearly traded away
+
+`PipelineConfigParser` refused any kind outside `Step.KINDS`. The first cut relaxed it to a
+safe-identifier shape — and **broke `PipelineConfigStepsTest.refusesAnUnknownKind`**, which was right to
+fail: that trade buys plugin steps by giving up a **load-time** refusal, so a typo'd kind would load and
+surface only at run.
+
+⇒ Inverted instead. **`StepKindRegistry`** is a ServiceLoader seam declared in `inspecto-etl` and
+implemented in `inspecto-engine` (`NodeTypeStepKinds` → `PipelineNodeTypes.isKnown("transform." + kind)`).
+The parser still refuses at load; it just stops needing to know what a node type is. **With no provider
+the answer is "no"**, so the lean core behaves exactly as before.
+
+Both directions are pinned: `frobnicate` is still refused, and a kind a test-scope provider vouches for
+loads with its config verbatim. ⚠ That fixture vouches for exactly ONE obscure kind — a permissive test
+provider is global to the module and would quietly widen every other `steps:` test.
+
+**Still open:** stage 6 (parser output-schema publication), and the two stage-3 questions — per-step
+configuration in the chain parameter, and whether a mid-chain failure should retire what earlier steps
+wrote.

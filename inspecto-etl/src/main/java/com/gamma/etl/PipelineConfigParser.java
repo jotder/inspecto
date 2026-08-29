@@ -50,6 +50,13 @@ import static com.gamma.util.Values.trimToNull;
  */
 final class PipelineConfigParser {
 
+    /**
+     * A contributed {@code steps:} kind. Deliberately the same shape a node type's suffix may take —
+     * it becomes {@code transform.<kind>}, and a kind outside this set could not name one.
+     */
+    private static final java.util.regex.Pattern SAFE_STEP_KIND =
+            java.util.regex.Pattern.compile("[a-z][a-z0-9_]{0,63}");
+
     // Log under PipelineConfig's category so existing log configuration/filtering is unaffected.
     private static final Logger log = LoggerFactory.getLogger(PipelineConfig.class);
 
@@ -554,9 +561,23 @@ final class PipelineConfigParser {
                 }
                 Map.Entry<?, ?> only = sm.entrySet().iterator().next();
                 String kind = String.valueOf(only.getKey()).trim();
-                if (!PipelineConfig.Step.KINDS.contains(kind)) {
+                // A CONTRIBUTED step kind (a plugin node type's suffix) is admitted on SHAPE here and
+                // checked for existence where the node-type registry lives. ⚠ This module sits BELOW
+                // inspecto-engine and cannot see PipelineNodeTypes, so a closed list here would make a
+                // plugin step unreadable — and the file must stay readable, or the editor could write a
+                // graph it can never load back. The type's existence is enforced at SAVE
+                // (PipelineEditable.isLowerable refuses an unregistered type with UNSUPPORTED_NODE) and
+                // again at run (RowShaper names the missing provider).
+                // A CONTRIBUTED kind (a plugin node type's suffix) is admitted when this deployment
+                // actually registers that type. ⚠ The check is inverted through StepKindRegistry because
+                // this module sits BELOW inspecto-engine and cannot see PipelineNodeTypes — but the
+                // refusal stays HERE, at load, where a typo is still caught before anything runs.
+                if (!PipelineConfig.Step.KINDS.contains(kind)
+                        && !(SAFE_STEP_KIND.matcher(kind).matches()
+                             && StepKindRegistry.current().isKnown(kind))) {
                     throw new IllegalArgumentException("unknown steps[] kind '" + kind + "' — expected one of "
-                            + PipelineConfig.Step.KINDS);
+                            + PipelineConfig.Step.KINDS + ", or the suffix of a registered node type "
+                            + "(a kind 'k' names 'transform.k')");
                 }
                 if (only.getValue() != null && !(only.getValue() instanceof Map<?, ?>)) {
                     throw new IllegalArgumentException("steps[] entry '" + kind
