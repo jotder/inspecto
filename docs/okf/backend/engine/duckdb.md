@@ -206,8 +206,8 @@ time, so a value stops depending on which box processed it.
   stayed greyed out over a choice just made** — for every select on those drawers, not just this one. A
   2816-test suite missed it and the preview caught it. Fixed with `@HostListener('document:click')` and
   pinned by a regression spec.
-* 🔴 **The `%z` defect — GROUNDED 2026-08-29 against DuckDB 1.5.2.1, and the board row was wrong in
-  three ways.** It is **not** the plain branch, it does **not** need a mixed list, and it is worse than
+* 🔴 **The `%z` defect — GROUNDED and CLOSED FAIL-CLOSED 2026-08-29. The board row was wrong in
+  three ways, and there is a fourth directive it never mentioned.** It is **not** the plain branch, it does **not** need a mixed list, and it is worse than
   "session-interpreted".
   * ✅ **Confirmed:** a format list mixing a `%z` pattern with a plain one unifies the `COALESCE` to
     `TIMESTAMP WITH TIME ZONE` (a plain-only list stays `TIMESTAMP`).
@@ -237,16 +237,35 @@ time, so a value stops depending on which box processed it.
   * ⚠ **Nothing validates a format string.** `ConfigValidator:84` only *warns* on an empty
     `timestamp_formats`; `%z` is unvalidated free text, offered by no UI list and refused by nothing.
   * **Still latent:** no `.toon` under `spaces/` uses `%z` (the only grep hits are binary parquet).
-  * **The intended semantics are already on record** — the original board row asked to probe "`%z`
-    formats (an offset in the data should **WIN** over any configured zone)". Today it loses, to the
-    host. Two candidate shapes, both unbuilt and the choice is a behaviour call: **(i) fail closed** —
-    refuse `%z` in a format list at config load, the same posture S1 took for a zone-less
-    `TIMESTAMPTZ`, which closes the silent corruption cheaply and leaves the feature for later; or
-    **(ii) build "the offset wins"** — detect a `%z` format and emit `timezone('UTC', …)` instead of
-    `::TIMESTAMP`, making the data's own offset a fifth precedence tier above `timezone_column`. ⚠ (ii)
-    needs a reliable compile-time answer to "does this list contain a live `%z`", which is a string
-    predicate over author-supplied patterns (`%%z` is a literal, not an offset) — that is the part to
-    ground before building.
+  * 🔴 **There are exactly TWO offending directives, not one: `%z` (numeric offset) AND `%Z` (zone
+    name).** `%Z` behaves identically (`10:00:00 UTC` → `15:30` on a Calcutta host, `05:00` on a New
+    York one) and is named nowhere in the row, the plan or the original probe. It was found by
+    **sweeping every ASCII letter directive against the live engine** and reading the return type — not
+    by reading the strptime documentation. Every other accepted directive returns a naive `TIMESTAMP`
+    (`%n` returns `TIMESTAMP_NS`, also naive).
+  * **✅ DECIDED (operator, 2026-08-29) and SHIPPED: fail closed.** `SourceZones.assertNoZoneDirective`
+    refuses a `%z`/`%Z` format in `date_formats` or `timestamp_formats` at config load, called from
+    `PipelineConfigParser`'s single parse site for those two keys — the same posture and the same
+    neighbourhood as the zone-less `TIMESTAMPTZ` refusal above. The message names the key, the format,
+    the directive and the fix (declare a zone instead). No shipped config was affected.
+  * ⚠ **`%%` is an escaped literal percent**, so `'%%z'` is the two characters `%z` in the input text
+    and parses naive — measured, and deliberately admitted. The scan consumes `%%` as a pair, so
+    `'%%%z'` (a literal percent then a real directive) is still refused.
+  * 🔴 **The guard's SCOPE is pinned by re-running the sweep in a test, and was falsified in BOTH
+    directions before being trusted** — dropping `%Z` from the gate fails it with *"these lose their
+    offset to the host zone but the gate admits them: [%Z]"*, and adding a harmless `%y` fails it with
+    the converse. A DuckDB upgrade that introduces a third zone directive therefore breaks the build
+    instead of shipping the corruption.
+  * **The feature is NOT built, deliberately.** The original row wanted "an offset in the data should
+    **WIN** over any configured zone"; that remains a separate, deliberate build (emit
+    `timezone('UTC', …)` and make the data's offset a fifth precedence tier). ⛔ Do not reach it by
+    relaxing this gate.
+  * ⚠ **The offline mock's pipeline-write zone gate is a DIVERGENCE, not parity** (found while scoping
+    this). `onboarding.handler.ts` 422s on a bad `parsing.source_timezone`, but **no Java route
+    validates it on write** — `ConfigSafetyValidator` is path-jail + output formats only and never runs
+    the parser, so the real server accepts the write and refuses at load. S2's "mock parity mirrors the
+    server's refusals" is accurate for the schema write and wrong for the pipeline write. Left as
+    found; deliberately not extended to the format lists.
 * **Dead code flagged, not touched:** `SqlBuilder.buildPartitionExpr` has no production caller (only
   `buildCastExpr` at `TransformCompiler:209` does).
 

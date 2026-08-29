@@ -307,7 +307,99 @@ class SourceZonesTest {
         assertTrue(String.valueOf(e.getMessage()).contains("timezone_column"), e.getMessage());
     }
 
+    // ── the zone-directive refusal (%z / %Z) ──────────────────────────────────
+
+    /**
+     * 🔴 A format list carrying a zone directive is REFUSED, because honouring it silently is worse
+     * than not having it: {@code TRY_STRPTIME} parses the offset into a TIMESTAMPTZ and
+     * {@code appendCoalesce}'s trailing {@code ::TIMESTAMP} then re-renders that instant in the
+     * SERVER's zone. Both directives, both lists.
+     */
+    @Test
+    void aZoneDirectiveInAFormatListIsRefusedAtLoad(@TempDir Path dir) {
+        Exception ts = assertThrows(Exception.class,
+                () -> load(dir, TS_PLAIN, null, "%Y-%m-%d", "%Y-%m-%d %H:%M:%S%z"));
+        assertTrue(String.valueOf(ts.getMessage()).contains("timestamp_formats"), ts.getMessage());
+        assertTrue(String.valueOf(ts.getMessage()).contains("%z"), ts.getMessage());
+
+        Exception upper = assertThrows(Exception.class,
+                () -> load(dir, TS_PLAIN, null, "%Y-%m-%d", "%Y-%m-%d %H:%M:%S %Z"));
+        assertTrue(String.valueOf(upper.getMessage()).contains("%Z"), upper.getMessage());
+
+        Exception date = assertThrows(Exception.class,
+                () -> load(dir, TS_PLAIN, null, "%Y-%m-%d%z", "%Y-%m-%d %H:%M:%S"));
+        assertTrue(String.valueOf(date.getMessage()).contains("date_formats"), date.getMessage());
+    }
+
+    /**
+     * ⚠ {@code %%} is an escaped literal percent, so {@code %%z} is the two characters "%z" in the
+     * input text and stays naive. The gate must not refuse it — and DuckDB must agree, which is why
+     * this asserts the parsed type rather than trusting the scan.
+     */
+    @Test
+    void anEscapedPercentIsALiteralNotAZoneDirective(@TempDir Path dir) throws Exception {
+        assertDoesNotThrow(() -> load(dir, TS_PLAIN, null, "%Y-%m-%d", "%Y-%m-%d %H:%M:%S%%z"));
+        assertEquals("TIMESTAMP", strptimeType("%Y-%m-%d %H:%M:%S%%z"),
+                "DuckDB should read %%z as a literal, leaving the parse naive");
+        // ...but a real directive after an escaped one is still a directive.
+        assertThrows(Exception.class,
+                () -> load(dir, TS_PLAIN, null, "%Y-%m-%d", "%Y-%m-%d %H:%M:%S%%%z"));
+    }
+
+    /**
+     * 🔴 <b>The gate's SCOPE, falsified in BOTH directions against the running engine.</b> The two
+     * offending directives were found by sweeping every ASCII letter, not by reading the strptime
+     * docs — so this re-runs that sweep. Every directive DuckDB accepts must either return a naive
+     * type AND be admitted, or return a zoned type AND be refused. A DuckDB upgrade that adds a third
+     * zone directive fails here instead of shipping the corruption.
+     */
+    @Test
+    void theRefusalCoversExactlyTheDirectivesDuckDbReturnsZonedFor() throws Exception {
+        Set<String> zonedButAdmitted = new TreeSet<>();
+        Set<String> naiveButRefused  = new TreeSet<>();
+        for (char ch : "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".toCharArray()) {
+            String fmt  = "%" + ch;
+            String type = strptimeType(fmt);
+            if (type == null) continue;                       // DuckDB rejects the directive outright
+            boolean zoned   = type.contains("WITH TIME ZONE");
+            boolean refused = !assertsClean(fmt);
+            if (zoned && !refused) zonedButAdmitted.add(fmt);
+            if (!zoned && refused) naiveButRefused.add(fmt);
+        }
+        assertTrue(zonedButAdmitted.isEmpty(),
+                "these lose their offset to the host zone but the gate admits them: " + zonedButAdmitted);
+        assertTrue(naiveButRefused.isEmpty(),
+                "these are naive and harmless but the gate refuses them: " + naiveButRefused);
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
+
+    /** {@code typeof(TRY_STRPTIME(...))} for one format, or {@code null} if DuckDB rejects it. */
+    private static String strptimeType(String format) throws Exception {
+        File db = DuckDbUtil.tempDbFile("tz_directive_");
+        try (Connection c = DuckDbUtil.openConnection(db)) {
+            // A fresh statement per probe: a rejected format leaves the previous one unusable.
+            try (Statement st = c.createStatement();
+                 ResultSet rs = st.executeQuery(
+                         "SELECT typeof(TRY_STRPTIME('x', '" + format.replace("'", "''") + "'))")) {
+                return rs.next() ? rs.getString(1) : null;
+            } catch (Exception rejected) {
+                return null;
+            }
+        } finally {
+            DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
+    /** Whether the gate admits {@code format}. */
+    private static boolean assertsClean(String format) {
+        try {
+            SourceZones.assertNoZoneDirective(List.of(format), "probe");
+            return true;
+        } catch (IllegalArgumentException refused) {
+            return false;
+        }
+    }
 
     @SafeVarargs
     private static Map<String, Object> tsSchema(Map<String, Object>... fields) {
@@ -357,6 +449,12 @@ class SourceZonesTest {
      */
     private static PipelineConfig load(Path dir, String fieldsBlock, String pipelineZone)
             throws Exception {
+        return load(dir, fieldsBlock, pipelineZone, "%Y-%m-%d", "%Y-%m-%d %H:%M:%S");
+    }
+
+    /** As {@link #load(Path, String, String)}, choosing the two format lists. */
+    private static PipelineConfig load(Path dir, String fieldsBlock, String pipelineZone,
+                                       String dateFormat, String tsFormat) throws Exception {
         Path root = Files.createTempDirectory(dir, "tz");
         String rootPath = root.toString().replace(File.separatorChar, '/');
         Path schema = root.resolve("s.toon");
@@ -388,13 +486,13 @@ class SourceZonesTest {
                   delimited:
                     delimiter: ","
                     has_header: true
-                    date_formats[1]: "%%Y-%%m-%%d"
-                    timestamp_formats[1]: "%%Y-%%m-%%d %%H:%%M:%%S"
+                    date_formats[1]: "%s"
+                    timestamp_formats[1]: "%s"
                 processing:
                   threads: 1
                   file_pattern: "glob:**/*"
                   schema_file: "%s"
-                """.formatted(rootPath, rootPath, zoneLine,
+                """.formatted(rootPath, rootPath, zoneLine, dateFormat, tsFormat,
                         schema.toString().replace(File.separatorChar, '/')));
 
         return PipelineConfig.load(pipeline.toString());

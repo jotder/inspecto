@@ -910,6 +910,12 @@ final class PipelineConfigParser {
                 b.dateFormats = (List<String>) df;
             if (csv.get("timestamp_formats") instanceof List<?> tf)
                 b.tsFormats   = (List<String>) tf;
+            // FAIL CLOSED: a %z/%Z directive parses the offset and then loses it to the SERVER's zone
+            // (SqlBuilder.appendCoalesce's trailing ::TIMESTAMP renders the instant as host wall
+            // clock), so the same file would import differently on different machines. Refused rather
+            // than honoured — see SourceZones.assertNoZoneDirective for the measured numbers.
+            SourceZones.assertNoZoneDirective(b.dateFormats,      "csv_settings.date_formats");
+            SourceZones.assertNoZoneDirective(b.tsFormats,        "csv_settings.timestamp_formats");
             // The pipeline-wide SOURCE zone: what the naive text in a timestamp column MEANS.
             // Fail closed — an unknown zone is a hard DuckDB error at run time (and TRY() does not
             // catch it), so a typo here would kill every batch instead of failing the load.

@@ -178,6 +178,74 @@ public final class SourceZones {
         throw new IllegalArgumentException(origin + ": unknown time zone '" + zone + "'" + hint);
     }
 
+    /**
+     * Fail-closed gate for an authored {@code date_formats}/{@code timestamp_formats} list: no format
+     * may carry a <b>zone directive</b>.
+     *
+     * <p><b>Why this is refused rather than honoured.</b> {@code TRY_STRPTIME} with a zone directive
+     * returns {@code TIMESTAMP WITH TIME ZONE} — it reads the offset correctly — but every caller here
+     * finishes with {@code SqlBuilder.appendCoalesce}'s trailing {@code ::TIMESTAMP}, which renders
+     * that instant in the <b>session zone, i.e. the host</b>, and throws the offset away. Measured on
+     * DuckDB 1.5.2.1: {@code 2026-03-01 10:00:00+00:00} lands as {@code 15:30} / {@code 11:00} /
+     * {@code 10:00} / {@code 05:00} under {@code Asia/Calcutta} / {@code Europe/Berlin} / {@code UTC} /
+     * {@code America/New_York}. That is exactly the host-dependence this class exists to remove, so a
+     * zone directive today is silent corruption, not a feature.
+     *
+     * <p>⚠ It is worse with a declared source zone than without: the host render happens <em>first</em>,
+     * so {@link #toNaiveUtc} then reinterprets an already-wrong wall clock and the value can land on a
+     * different calendar day per host. A {@code date_formats} entry moves {@code DATE_*} partition keys
+     * the same way.
+     *
+     * <p>🔴 <b>There are exactly TWO such directives, and both were found by sweeping every ASCII letter
+     * against the live engine rather than by reading the strptime docs</b> — {@code %z} (numeric offset)
+     * and {@code %Z} (zone name). Every other accepted directive returns a naive {@code TIMESTAMP}
+     * ({@code %n} returns {@code TIMESTAMP_NS}, also naive). {@code SourceZonesTest} re-runs that sweep,
+     * so a DuckDB upgrade that adds a third one fails the build instead of shipping the corruption.
+     *
+     * <p>⚠ {@code %%} is an escaped literal percent, so {@code '%%z'} is the two characters {@code %z}
+     * in the input text and stays naive — measured, and accepted here. The scan therefore consumes
+     * {@code %%} as a pair rather than matching {@code %z} anywhere in the string.
+     *
+     * <p><b>This is a refusal, not the feature.</b> Making the data's own offset win — a tier above
+     * {@code timezone_column} — is a deliberate build, not something to slip in by relaxing this gate.
+     *
+     * @param formats the authored list ({@code null} or empty is fine — nothing to check)
+     * @param origin  the config key, so the operator sees which list to fix
+     * @throws IllegalArgumentException naming the offending format and directive
+     */
+    public static void assertNoZoneDirective(List<String> formats, String origin) {
+        if (formats == null) return;
+        for (String fmt : formats) {
+            if (fmt == null) continue;
+            char directive = zoneDirectiveIn(fmt);
+            if (directive == 0) continue;
+            throw new IllegalArgumentException(origin + ": format '" + fmt + "' uses the zone "
+                    + "directive '%" + directive + "', which is not supported. The offset it parses is "
+                    + "then re-rendered in the SERVER's zone, so the same file would import differently "
+                    + "on different machines — the opposite of what a source zone is for. Remove the "
+                    + "directive and declare the zone instead: parsing.source_timezone for the whole "
+                    + "pipeline, or raw.fields[].timezone / .timezone_column for one column. (Write "
+                    + "'%%" + directive + "' if you meant a literal '%" + directive + "' in the text.)");
+        }
+    }
+
+    /**
+     * The zone directive in {@code fmt}, or {@code 0} for none.
+     *
+     * <p>Scans left to right consuming {@code %%} as a pair, so an escaped percent cannot be misread
+     * as the start of a directive — {@code '%%z'} is a literal and {@code '%%%z'} is a literal percent
+     * followed by a real one.
+     */
+    private static char zoneDirectiveIn(String fmt) {
+        for (int i = 0; i < fmt.length() - 1; i++) {
+            if (fmt.charAt(i) != '%') continue;
+            char next = fmt.charAt(i + 1);
+            if (next == '%') { i++; continue; }          // escaped literal — consume the pair
+            if (next == 'z' || next == 'Z') return next;
+        }
+        return 0;
+    }
+
     private static String str(Object o) {
         if (!(o instanceof String s)) return null;
         String t = s.trim();
