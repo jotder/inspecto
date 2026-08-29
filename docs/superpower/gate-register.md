@@ -269,12 +269,15 @@ Ordered by what they unblock.
   wholly unbuilt (`partition_state`/`SEALED`/`REOPENED`: **zero hits** in Java; §11.4's own heading
   reads *"nothing exists"*), and the dependency claim is true and namable — `Measure.Composability`
   and `GuardedSummaryEmitter` already REFUSE a mislabelled non-additive measure but nothing computes
-  the histogram or the detail recompute. Sliced into P1–P6 in
-  [`partition-sealing-plan.md`](partition-sealing-plan.md). 🔴 **P1–P3 are buildable now; P4–P6 are
-  NOT** — sealing needs two operator inputs (what the completeness rule is; whether a lateness horizon
-  has a default at all), and each answer writes a different durable column. ✅ The representation
-  question is CLOSED — fixed-bucket histogram, verified by live DuckDB probe 2026-08-28; do not
-  reopen it.
+  the histogram or the detail recompute. 🔴 **SUPERSEDED 2026-08-30 by operator decision** — the
+  requirement is a **scheduled per-pipeline completeness KPI** (gap/sequence analysis + file/record
+  count deviation), NOT the sealing state machine, so §8's `OPEN/SEALED/REOPENED`, its lateness
+  horizon and §11.4's `partition_state` are **dropped, not deferred**. This deliberately overrides
+  §8's own "no schedule anywhere" claim; the operator was shown the contradiction and chose the
+  schedule. See [`completeness-kpi-plan.md`](completeness-kpi-plan.md), slices K1–K5. 🔴 The chosen
+  count source (`CommitLog`) was REFUTED on grounding — per-batch only, no day column — so the KPI
+  reads the `consignment_outputs` registry (`record_day` + per-file `rows`, on by default). ✅ The
+  histogram representation question is CLOSED (verified 2026-08-28) but is now moot for this row.
 - **ELT** D-9 windowed keyed dedup ledger (⛔ "never faked with unbounded history") 🔴 **the row calls
   this "a designed fast-follow" — GROUNDED 2026-08-30, it is NAMED, not designed**: `scope: window(P4D)`
   appears only in the deferral row and a BACKLOG label, with **no §-numbered design section anywhere**

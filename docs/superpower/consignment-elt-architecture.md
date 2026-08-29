@@ -415,6 +415,19 @@ DataSketches on the Java side and a BLOB column from a custom processor — real
 
 ## 8. "End of day" is a completeness condition, not a clock
 
+> 🔴 **SUPERSEDED 2026-08-30 — DO NOT BUILD §8.2/§8.3.** By operator decision the completeness
+> requirement is a **scheduled per-pipeline KPI job** (gap/sequence analysis + file/record count
+> deviation), which **overrides this section's central claim** that end-of-day is a condition rather
+> than a clock and that there is "no schedule anywhere". The operator was shown that contradiction
+> explicitly and chose the schedule. **Sealing is dropped, not deferred**: no `OPEN/SEALED/REOPENED`
+> state, no lateness horizon, no seal signals, and §11.4's `partition_state` table is not being built.
+> See [`completeness-kpi-plan.md`](completeness-kpi-plan.md).
+>
+> ⚠ **§8.1 survives on its own merits** — recompute a non-additive summary for the record-days a
+> landing Consignment touched, debounced and freshness-stamped. That is a summary-tier behaviour and
+> does not depend on sealing.
+
+
 Files arrive late, out of order, nothing guaranteed. Separate two questions: **when is a number correct**
 and **when is a number final**. Only the second needs a definition of end-of-day.
 
@@ -916,6 +929,11 @@ untouched, a hand-written legacy `{"batchId":…}` manifest still binds, and fre
 end-to-end stitch the accept-both case.
 
 ### 11.4 Partition state — nothing exists
+
+> 🔴 **SUPERSEDED 2026-08-30 — this table is not being built.** It existed to serve §8 sealing, which
+> the operator replaced with a scheduled completeness KPI job. The KPI reads the existing
+> `consignment_outputs` registry (`record_day` + per-file `rows`) instead of a new state table. See
+> [`completeness-kpi-plan.md`](completeness-kpi-plan.md).
 
 §8.2 needs a new table outright:
 

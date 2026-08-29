@@ -95,12 +95,12 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
-- [`superpower/partition-sealing-plan.md`](superpower/partition-sealing-plan.md) — **SLICING PLAN,
-  partly decision-gated** (2026-08-30): Consignment §8 end-of-period pass + §11.4 `partition_state`,
-  which the gate register carried as two one-line rows and which grounding showed to be one workstream
-  of real size (both wholly unbuilt — zero `partition_state` hits in Java). Slices **P1–P3 buildable
-  now**; ⛔ **P4–P6 gated** on two operator inputs (the completeness rule; whether a lateness horizon
-  has a default at all), because each answer writes a different durable column.
+- [`superpower/completeness-kpi-plan.md`](superpower/completeness-kpi-plan.md) — **DECIDED
+  2026-08-30, ready to build**: a scheduled per-pipeline completeness KPI (gap/sequence analysis +
+  file/record count deviation). 🔴 **This REPLACES Consignment §8 sealing and §11.4 `partition_state`,
+  overriding §8's "no schedule anywhere" claim by explicit operator decision** — sealing is dropped,
+  not deferred. 🔴 The operator's chosen count source (`CommitLog`) was REFUTED — it is per-batch with
+  no day column; the KPI reads `consignment_outputs` instead. Slices K1–K5.
 
 - [`superpower/open-dag-pipeline-design.md`](superpower/open-dag-pipeline-design.md) — **DESIGN, not
   scheduled** (operator direction, 2026-08-29): open the pipeline into a NiFi-style DAG — steps after the
