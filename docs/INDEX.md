@@ -95,10 +95,14 @@ former root reference docs** (each index lists them):
   scheduled** (operator direction, 2026-08-29): open the pipeline into a NiFi-style DAG — steps after the
   sink, and pluggable **authorable** steps. Grounded: most machinery exists (the graph executor already
   runs arbitrary topologies; `ParserPlugin` already serves its grammar; `PipelineNodeExecutor` shipped
-  the execution half), and **three independent closed gates** hold the rest — 🔴 the sink emits no `DATA`
-  and the executor publishes no relation for it (a post-sink step is silently SKIPPED, not refused),
-  `PipelineEditable.LOWERABLE` is a hardcoded set, and `RecipeCompiler`'s verb switch is closed. Five
-  stages; ⛔ the sink change is two lines and THREE semantic decisions — don't ship the lines first.
+  the execution half). 🔴 **Corrected the same day** once the operator described the dataflow model: the
+  post-sync carrier is the **Consignment output registry**, not a piped relation — a step reads via
+  `ProcessorContext.outputs()`/`read()` and what it emits is written AND REGISTERED back onto the same
+  Consignment, so the next step sees it. Schema **propagates** through `TypeFlow`, never re-declared.
+  ⛔ So the sink does NOT need to emit `DATA` — that framing solved the wrong problem. What is missing is
+  **composition and authoring** (one processor per Job run, no DAG, not on the canvas) plus the closed
+  `RecipeCompiler` verb switch and hardcoded `LOWERABLE` for plugin steps. Five stages; the open decision
+  is whether a post-sync step may create an arbitrary table or must stay in the summary guardrail.
 
 - [`superpower/step-workbench-design.md`](superpower/step-workbench-design.md) — **DESIGN, not
   scheduled** (2026-08-29): one Step editor where the author builds a query (named fields, functions,
