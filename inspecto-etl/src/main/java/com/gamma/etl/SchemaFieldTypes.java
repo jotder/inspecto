@@ -145,6 +145,26 @@ public final class SchemaFieldTypes {
      *             reaching here with one is a bug and throws rather than degrading to text
      */
     public static String castSql(String col, String type, List<String> dateFormats, List<String> tsFormats) {
+        return castSql(col, type, dateFormats, tsFormats, null);
+    }
+
+    /**
+     * As {@link #castSql(String, String, List, List)}, with the column's <b>source time zone</b>
+     * applied — {@code zoneArg} is a SQL zone argument from
+     * {@link SourceZones#zoneArg(String, String)}, or {@code null} for the wall-clock default.
+     *
+     * <p>A {@code null} {@code zoneArg} reproduces the four-argument form character for character,
+     * which is what makes "no zone declared" a literal no-op rather than an equivalent rewrite.
+     *
+     * <p>⚠ Only {@code TIMESTAMP} and {@code TIMESTAMPTZ} are shifted. A {@code DATE} has no instant
+     * to move, and shifting one would push a calendar day across midnight under any negative offset.
+     *
+     * @throws IllegalArgumentException for a {@code TIMESTAMPTZ} with no zone source — that
+     *         combination is refused at config load, because the zone DuckDB would otherwise supply
+     *         is the <em>host's</em>
+     */
+    public static String castSql(String col, String type, List<String> dateFormats,
+                                 List<String> tsFormats, String zoneArg) {
         String t = normalize(type);
         if (VARCHAR.equals(t)) return col;
         if (!isHonored(t)) {
@@ -154,8 +174,18 @@ public final class SchemaFieldTypes {
         if (DATE_LIKE.contains(t)) {
             StringBuilder sb = new StringBuilder();
             String asText = "CAST(" + col + " AS VARCHAR)";
-            SqlBuilder.appendCoalesce(sb, asText, "DATE".equals(t) ? dateFormats : tsFormats, t);
-            return sb.toString();
+            if ("DATE".equals(t)) {
+                SqlBuilder.appendCoalesce(sb, asText, dateFormats, t);
+                return sb.toString();
+            }
+            // Parse naive first in both cases: TRY_STRPTIME yields a zone-less TIMESTAMP, and the
+            // zone is what turns it into an instant. Casting straight to TIMESTAMPTZ (what this did
+            // before) resolves it against the SESSION zone — the host — which is never the data's.
+            SqlBuilder.appendCoalesce(sb, asText, tsFormats, "TIMESTAMP");
+            String naive = sb.toString();
+            return "TIMESTAMPTZ".equals(t)
+                    ? SourceZones.toInstant(naive, zoneArg)
+                    : SourceZones.toNaiveUtc(naive, zoneArg);
         }
         return "TRY_CAST(" + col + " AS " + t + ")";
     }

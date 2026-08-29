@@ -97,6 +97,7 @@ public final class DataTransformer {
         Map<String, String> fieldTypes = new LinkedHashMap<>();
         for (Map<String, Object> f : fields)
             fieldTypes.put((String) f.get("name"), (String) f.get("type"));
+        SourceZones zones = SourceZones.of(schemaConfig, cfg.csv().sourceTimezone());
 
         StringBuilder select = new StringBuilder("SELECT ");
 
@@ -118,7 +119,7 @@ public final class DataTransformer {
         } else {
             for (PartitionDef pd : partDefs) {
                 select.append(", ");
-                select.append(TransformCompiler.partitionColumn(pd, sourceTable, fieldTypes, cfg.csv()));
+                select.append(TransformCompiler.partitionColumn(pd, sourceTable, fieldTypes, cfg.csv(), zones));
                 select.append(" AS \"").append(pd.column()).append('"');
             }
         }
@@ -129,7 +130,7 @@ public final class DataTransformer {
         // when its date defs disagree on a source column — so PartitionWriter's EXCLUDE can be unconditional
         // and the written output schema never depends on the schema's partition shape.
         select.append(", ").append(PartitionDef.eventTimeDef(partDefs)
-                        .map(pd -> TransformCompiler.eventTimeColumn(pd, sourceTable, fieldTypes, cfg.csv()))
+                        .map(pd -> TransformCompiler.eventTimeColumn(pd, sourceTable, fieldTypes, cfg.csv(), zones))
                         .orElse("CAST(NULL AS TIMESTAMP)"))
                 .append(" AS ").append(TransformCompiler.EVENT_TIME_COL);
 
@@ -167,6 +168,7 @@ public final class DataTransformer {
         for (Map<String, Object> f : (List<Map<String, Object>>)
                 ((Map<String, Object>) schemaConfig.get("raw")).get("fields"))
             fieldTypes.put((String) f.get("name"), (String) f.get("type"));
+        SourceZones zones = SourceZones.of(schemaConfig, cfg.csv().sourceTimezone());
 
         List<Map<String, String>> rules = (List<Map<String, String>>)
                 ((Map<String, Object>) schemaConfig.get("mapping")).get("rules");
@@ -177,7 +179,7 @@ public final class DataTransformer {
             String raw = coercedSourceColumn(rule, fieldTypes);
             if (raw == null) continue;
             String col = "\"" + sourceTable + "\".\"" + raw + '"';
-            String expr = TransformCompiler.dataColumn(rule, fieldTypes, sourceTable, cfg.csv());
+            String expr = TransformCompiler.dataColumn(rule, fieldTypes, sourceTable, cfg.csv(), zones);
             if (!targets.isEmpty()) select.append(", ");
             select.append("SUM(CASE WHEN NULLIF(TRIM(CAST(").append(col).append(" AS VARCHAR)), '') IS NOT NULL")
                     .append(" AND (").append(expr).append(") IS NULL THEN 1 ELSE 0 END)");
@@ -250,6 +252,7 @@ public final class DataTransformer {
         Map<String, String> fieldTypes = new LinkedHashMap<>();
         for (Map<String, Object> f : fields)
             fieldTypes.put((String) f.get("name"), (String) f.get("type"));
+        SourceZones zones = SourceZones.of(schemaConfig, csv.sourceTimezone());
 
         List<Map<String, String>> rules =
                 (List<Map<String, String>>) ((Map<String, Object>) schemaConfig.get("mapping")).get("rules");
@@ -257,7 +260,7 @@ public final class DataTransformer {
         List<Map<String, Object>> cols = new ArrayList<>();
         for (Map<String, String> rule : rules)
             cols.add(Map.of("name", rule.get("targetColumn"),
-                    "expr", TransformCompiler.dataColumn(rule, fieldTypes, sourceTable, csv)));
+                    "expr", TransformCompiler.dataColumn(rule, fieldTypes, sourceTable, csv, zones)));
         return cols;
     }
 }

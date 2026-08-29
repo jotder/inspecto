@@ -40,7 +40,7 @@ public final class TransformCompiler {
     @FunctionalInterface
     public interface ColumnRule {
         String compile(String source, String target, Map<String, String> fieldTypes,
-                       String sourceTable, PipelineConfig.CsvSettings csv);
+                       String sourceTable, PipelineConfig.CsvSettings csv, SourceZones zones);
     }
 
     /**
@@ -79,31 +79,49 @@ public final class TransformCompiler {
      */
     public static String dataColumn(Map<String, String> rule, Map<String, String> fieldTypes,
                                     String sourceTable, PipelineConfig.CsvSettings csv) {
+        return dataColumn(rule, fieldTypes, sourceTable, csv, SourceZones.NONE);
+    }
+
+    /**
+     * As {@link #dataColumn(Map, Map, String, PipelineConfig.CsvSettings)}, with the schema's source
+     * time-zone policy applied.
+     *
+     * <p>⛔ The four-argument form passes {@link SourceZones#NONE} and so compiles every temporal
+     * column as wall-clock. It exists for callers that genuinely have no schema in hand (and for the
+     * tests that pin today's default shape) — <b>a production path must pass a real resolver</b>, or
+     * a configured zone is silently ignored. The three production call sites are in
+     * {@link DataTransformer}.
+     */
+    public static String dataColumn(Map<String, String> rule, Map<String, String> fieldTypes,
+                                    String sourceTable, PipelineConfig.CsvSettings csv,
+                                    SourceZones zones) {
         String source = rule.get("sourceExpression");
         String target = rule.get("targetColumn");
         String type   = rule.get("transformType");
         String norm   = type == null ? "" : type.trim().toUpperCase();
 
         if (norm.isEmpty() || norm.equals("DIRECT"))   // blank / omitted / DIRECT → pass-through cast
-            return direct(source, target, fieldTypes, sourceTable, csv);
+            return direct(source, target, fieldTypes, sourceTable, csv, zones);
 
         ColumnRule r = DATA_RULES.get(norm);
         if (r == null)
             throw new IllegalArgumentException(
                     "Unknown transformType '" + type + "' for target column '" + target
                     + "'. Valid: DIRECT (or leave blank), EXPR, CONCAT_DT, FILENAME_DATE.");
-        return r.compile(source, target, fieldTypes, sourceTable, csv);
+        return r.compile(source, target, fieldTypes, sourceTable, csv, zones);
     }
 
     private static String direct(String source, String target, Map<String, String> fieldTypes,
-                                 String sourceTable, PipelineConfig.CsvSettings csv) {
+                                 String sourceTable, PipelineConfig.CsvSettings csv,
+                                 SourceZones zones) {
         String col  = "\"" + sourceTable + "\".\"" + source + '"';
         // The honoured vocabulary and the SQL each type compiles to live in ONE place
         // (SchemaFieldTypes) — this was a four-branch switch whose `default` emitted the column
         // UNCAST, so a declared BIGINT silently produced text. Unhonoured types are now refused at
         // config load, so every type reaching here casts.
         String type = fieldTypes.getOrDefault(source, SchemaFieldTypes.VARCHAR);
-        return SchemaFieldTypes.castSql(col, type, csv.dateFormats(), csv.tsFormats());
+        return SchemaFieldTypes.castSql(col, type, csv.dateFormats(), csv.tsFormats(),
+                zones.zoneArg(source, sourceTable));
     }
 
     /**
@@ -116,23 +134,37 @@ public final class TransformCompiler {
      * as the Stage-2 transform SQL), so the expression is not sandbox-validated.
      */
     private static String expr(String source, String target, Map<String, String> fieldTypes,
-                               String sourceTable, PipelineConfig.CsvSettings csv) {
+                               String sourceTable, PipelineConfig.CsvSettings csv,
+                               SourceZones zones) {
         return source;
     }
 
+    /**
+     * ⚠ The source zone is taken from the <b>date</b> half ({@code parts[0]}) — that is the raw field
+     * an operator declares a {@code timezone} on, and the time half carries no date to key one from.
+     * Declaring a zone on the time column alone has no effect, by design.
+     */
     private static String concatDt(String source, String target, Map<String, String> fieldTypes,
-                                   String sourceTable, PipelineConfig.CsvSettings csv) {
+                                   String sourceTable, PipelineConfig.CsvSettings csv,
+                                   SourceZones zones) {
         String[] parts  = source.split("\\|", 2);
         String dateCol  = "\"" + sourceTable + "\".\"" + parts[0] + '"';
         String timeCol  = "\"" + sourceTable + "\".\"" + parts[1] + '"';
         StringBuilder sb = new StringBuilder();
         SqlBuilder.appendCoalesce(sb,
                 dateCol + " || ' ' || " + timeCol, csv.tsFormats(), "TIMESTAMP");
-        return sb.toString();
+        return SourceZones.toNaiveUtc(sb.toString(), zones.zoneArg(parts[0], sourceTable));
     }
 
+    /**
+     * ⛔ <b>Deliberately zone-exempt.</b> This lifts a {@code %Y%m%d} <em>date</em> out of a filename.
+     * A date has no instant, so applying a source zone would shift the file dated {@code 20260829}
+     * into the previous day for any negative-offset zone — a silent partition error. Same call as
+     * {@code DATE} in {@link SchemaFieldTypes#castSql}.
+     */
     private static String filenameDate(String source, String target, Map<String, String> fieldTypes,
-                                       String sourceTable, PipelineConfig.CsvSettings csv) {
+                                       String sourceTable, PipelineConfig.CsvSettings csv,
+                                       SourceZones zones) {
         if (!"EVENT_DATE".equals(target)) {
             throw new IllegalArgumentException(
                     "FILENAME_DATE transform is only supported for the EVENT_DATE column, got: " + target);
@@ -168,6 +200,17 @@ public final class TransformCompiler {
      */
     public static String partitionColumn(PartitionDef pd, String sourceTable,
                                          Map<String, String> fieldTypes, PipelineConfig.CsvSettings csv) {
+        return partitionColumn(pd, sourceTable, fieldTypes, csv, SourceZones.NONE);
+    }
+
+    /**
+     * As {@link #partitionColumn(PartitionDef, String, Map, PipelineConfig.CsvSettings)}, with the
+     * source time-zone policy applied — so the partition a row lands in is cut from the <em>same</em>
+     * normalised instant the stored column holds, never from a differently-zoned re-parse.
+     */
+    public static String partitionColumn(PartitionDef pd, String sourceTable,
+                                         Map<String, String> fieldTypes, PipelineConfig.CsvSettings csv,
+                                         SourceZones zones) {
         String col = "\"" + sourceTable + "\".\"" + pd.source() + "\"";
         StringBuilder sb = new StringBuilder();
         switch (pd.type()) {
@@ -175,7 +218,7 @@ public final class TransformCompiler {
             case DOUBLE  -> sb.append("TRY_CAST(").append(col).append(" AS DOUBLE)");
             case INTEGER -> sb.append("TRY_CAST(").append(col).append(" AS INTEGER)");
             case DATE_YEAR, DATE_MONTH, DATE_DAY -> {
-                String dateExpr = dateExpr(pd, sourceTable, fieldTypes, csv);
+                String dateExpr = dateExpr(pd, sourceTable, fieldTypes, csv, zones);
                 switch (pd.type()) {
                     case DATE_YEAR  -> sb.append("YEAR(").append(dateExpr).append(")::VARCHAR");
                     case DATE_MONTH -> sb.append("LPAD(MONTH(").append(dateExpr)
@@ -199,14 +242,22 @@ public final class TransformCompiler {
      * {@code 1900/01/01} sentinel partition.
      */
     private static String dateExpr(PartitionDef pd, String sourceTable,
-                                   Map<String, String> fieldTypes, PipelineConfig.CsvSettings csv) {
+                                   Map<String, String> fieldTypes, PipelineConfig.CsvSettings csv,
+                                   SourceZones zones) {
         String col         = "\"" + sourceTable + "\".\"" + pd.source() + "\"";
         String srcType     = SchemaFieldTypes.normalize(fieldTypes.getOrDefault(pd.source(), SchemaFieldTypes.VARCHAR));
         // A TIMESTAMPTZ source carries a time component exactly like TIMESTAMP, so it must parse
         // with timestamp_formats too — a date-only parse would NULL every row into the sentinel.
         String castType    = ("TIMESTAMP".equals(srcType) || "TIMESTAMPTZ".equals(srcType)) ? "TIMESTAMP" : "DATE";
         String varcharExpr = "CAST(" + col + " AS VARCHAR)";
-        return SqlBuilder.buildCastExpr(varcharExpr, castType, csv.dateFormats(), csv.tsFormats());
+        String parsed      = SqlBuilder.buildCastExpr(varcharExpr, castType, csv.dateFormats(), csv.tsFormats());
+        // A DATE partition source has no instant to shift; only the timestamp branch takes a zone.
+        // Both a TIMESTAMP and a TIMESTAMPTZ source normalise to naive UTC here — deliberately, even
+        // though the stored TIMESTAMPTZ column keeps its offset: a partition cut from an instant
+        // rendered in the SESSION zone would move with the host, which is exactly what this feature
+        // exists to stop.
+        if (!"TIMESTAMP".equals(castType)) return parsed;
+        return SourceZones.toNaiveUtc(parsed, zones.zoneArg(pd.source(), sourceTable));
     }
 
     /**
@@ -223,6 +274,18 @@ public final class TransformCompiler {
      */
     public static String eventTimeColumn(PartitionDef pd, String sourceTable,
                                          Map<String, String> fieldTypes, PipelineConfig.CsvSettings csv) {
-        return "CAST(" + dateExpr(pd, sourceTable, fieldTypes, csv) + " AS TIMESTAMP)";
+        return eventTimeColumn(pd, sourceTable, fieldTypes, csv, SourceZones.NONE);
+    }
+
+    /**
+     * As {@link #eventTimeColumn(PartitionDef, String, Map, PipelineConfig.CsvSettings)}, with the
+     * source time-zone policy applied. It shares {@link #dateExpr} with the partition columns, so the
+     * write-time {@code min()}/{@code max()} bounds and the partition a row lands in can never
+     * disagree about which instant the row carries.
+     */
+    public static String eventTimeColumn(PartitionDef pd, String sourceTable,
+                                         Map<String, String> fieldTypes, PipelineConfig.CsvSettings csv,
+                                         SourceZones zones) {
+        return "CAST(" + dateExpr(pd, sourceTable, fieldTypes, csv, zones) + " AS TIMESTAMP)";
     }
 }

@@ -67,6 +67,50 @@ public final class Identifiers {
     }
 
     /**
+     * Validate a field's source-time-zone declaration.
+     *
+     * <p>Three fail-closed rules, all for the same reason — an unknown zone is a hard DuckDB error at
+     * run time that {@code TRY()} cannot catch, so a typo that loads would kill every batch:
+     * <ul>
+     *   <li>{@code timezone} must be an IANA region id ({@link SourceZones#validateZone});</li>
+     *   <li>{@code timezone_column} must name a field this schema actually declares — otherwise the
+     *       compiled lookup silently reads NULL and every value in the column becomes NULL;</li>
+     *   <li>the two are mutually exclusive. {@code timezone_column} wins by precedence, so writing
+     *       both makes {@code timezone} dead config that reads as if it were in force.</li>
+     * </ul>
+     */
+    private static void validateFieldZone(Map<?, ?> field, java.util.Set<String> declaredFields,
+                                          String origin) {
+        String name = String.valueOf(field.get("name"));
+        // ⚠ Blank is ABSENT, not empty. TOON's tabular field form declares one header for every
+        // column, so a schema that gives any field a timezone writes "" for all the others — a
+        // null-only check would refuse every such schema on the blank rows.
+        String tz   = blankToNull(field.get("timezone"));
+        String tzc  = blankToNull(field.get("timezone_column"));
+        if (tz != null && tzc != null)
+            throw new IllegalArgumentException("Schema field '" + name + "' at " + origin
+                    + " sets both timezone and timezone_column. timezone_column takes precedence, so "
+                    + "the fixed timezone would never apply — keep one.");
+        if (tz != null)
+            SourceZones.validateZone(tz, origin + ".raw.fields[" + name + "].timezone");
+        if (tzc != null) {
+            String col = tzc;
+            if (!declaredFields.contains(col))
+                throw new IllegalArgumentException("Schema field '" + name + "' at " + origin
+                        + " sets timezone_column '" + col + "', which is not a declared raw field. "
+                        + "It must name a sibling column of this same schema holding an IANA zone id "
+                        + "per row.");
+        }
+    }
+
+    /** Trimmed text, or {@code null} for absent/blank — see {@link #validateFieldZone}. */
+    static String blankToNull(Object o) {
+        if (!(o instanceof String s)) return null;
+        String t = s.trim();
+        return t.isEmpty() ? null : t;
+    }
+
+    /**
      * Validate every name a schema config exposes to SQL: {@code raw.fields[].name},
      * {@code mapping.rules[].targetColumn}, and {@code partitions[].column / source}.
      * Called from {@link PipelineConfig#load} for the single-schema, multi-schema,
@@ -82,10 +126,14 @@ public final class Identifiers {
         if (rawSection != null) {
             Object rawFields = rawSection.get("fields");
             if (rawFields instanceof List<?> fieldsList) {
+                java.util.Set<String> declared = new java.util.LinkedHashSet<>();
+                for (Object f : fieldsList)
+                    if (f instanceof Map<?, ?> fm && fm.get("name") instanceof String n) declared.add(n);
                 for (Object f : fieldsList) {
                     if (f instanceof Map<?, ?> fm) {
                         validate((String) fm.get("name"), origin + ".raw.fields[].name");
                         validateFieldType((String) fm.get("type"), (String) fm.get("name"), origin);
+                        validateFieldZone(fm, declared, origin);
                     }
                 }
             }

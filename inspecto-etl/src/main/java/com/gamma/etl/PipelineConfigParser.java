@@ -620,6 +620,7 @@ final class PipelineConfigParser {
                         JToon.decode(Files.readString(schemaFile, StandardCharsets.UTF_8));
                 mergeSiblingMapping(schemaCfg, schemaFile, b);
                 Identifiers.validateSchema(schemaCfg, "schemas[col=" + colCount + "]");
+                requireZoneForTimestampTz(schemaCfg, b.sourceTimezone, "schemas[col=" + colCount + "]");
                 declaredColumns.addAll(columnNamesOf(schemaCfg));
                 if (table != null && !table.isBlank())
                     Identifiers.validate(table, "schemas[col=" + colCount + "].table");
@@ -659,6 +660,7 @@ final class PipelineConfigParser {
                 mergeSiblingMapping(b.singleSchema, schemaFile, b);
                 applyMappingFile(proc, b.singleSchema, configDir, b);
                 Identifiers.validateSchema(b.singleSchema, "schema_file");
+                requireZoneForTimestampTz(b.singleSchema, b.sourceTimezone, "schema_file");
                 declaredColumns.addAll(columnNamesOf(b.singleSchema));
                 validateFixedWidthSelectors(b.fixedWidth, b.singleSchema, "schema_file");
                 validateTextRegexSelectors(b.textRegex, b.singleSchema, "schema_file");
@@ -908,6 +910,12 @@ final class PipelineConfigParser {
                 b.dateFormats = (List<String>) df;
             if (csv.get("timestamp_formats") instanceof List<?> tf)
                 b.tsFormats   = (List<String>) tf;
+            // The pipeline-wide SOURCE zone: what the naive text in a timestamp column MEANS.
+            // Fail closed — an unknown zone is a hard DuckDB error at run time (and TRY() does not
+            // catch it), so a typo here would kill every batch instead of failing the load.
+            b.sourceTimezone  = trimToNull(csv.get("source_timezone"));
+            if (b.sourceTimezone != null)
+                SourceZones.validateZone(b.sourceTimezone, "parsing.source_timezone");
             // 4.1 additive: native read_csv pass-throughs + row filters
             b.encoding         = trimToNull(csv.get("encoding"));
             b.inputCompression = trimToNull(csv.get("compression"));
@@ -1034,6 +1042,7 @@ final class PipelineConfigParser {
                         JToon.decode(Files.readString(schemaFile, StandardCharsets.UTF_8));
                 mergeSiblingMapping(schema, schemaFile, b);
                 Identifiers.validateSchema(schema, "segment[" + key + "]");
+                requireZoneForTimestampTz(schema, b.sourceTimezone, "segment[" + key + "]");
                 declaredColumns.addAll(columnNamesOf(schema));
                 b.segmentSchemas.put(key, schema);
             }
@@ -1483,6 +1492,41 @@ final class PipelineConfigParser {
      * ({@code fixedwidth}/{@code json}/{@code text_regex}) are copied through under the keys the
      * downstream parse already reads. Keys from {@code parsing:} win over the legacy block.
      */
+    /**
+     * Refuse a {@code TIMESTAMPTZ} field that has no source zone to resolve against.
+     *
+     * <p>🔴 <b>Why this is fail-closed rather than a default.</b> {@code TRY_STRPTIME} yields a naive
+     * TIMESTAMP; casting one to {@code TIMESTAMPTZ} resolves it against DuckDB's <b>session</b> zone,
+     * which is the HOST's. So a declared {@code TIMESTAMPTZ} used to import server-local time and look
+     * completely normal — the same value would mean different instants on two machines. There is no
+     * safe default to pick here: the zone is a fact about the data, so the config has to state it.
+     *
+     * <p>Satisfied by any of {@code raw.fields[].timezone_column}, {@code raw.fields[].timezone}, or
+     * the pipeline-level {@code parsing.source_timezone}.
+     */
+    private static void requireZoneForTimestampTz(Map<String, Object> schema, String pipelineZone,
+                                                  String origin) {
+        if (pipelineZone != null) return;                       // covers every field
+        if (!(schema.get("raw") instanceof Map<?, ?> raw)) return;
+        if (!(raw.get("fields") instanceof List<?> fields)) return;
+        for (Object f : fields) {
+            if (!(f instanceof Map<?, ?> fm)) continue;
+            if (!"TIMESTAMPTZ".equals(SchemaFieldTypes.normalize(String.valueOf(fm.get("type")))))
+                continue;
+            // Blank is absent — TOON's tabular field form writes "" for every field that does
+            // not set the column (same rule as Identifiers.validateFieldZone).
+            if (Identifiers.blankToNull(fm.get("timezone")) != null
+                    || Identifiers.blankToNull(fm.get("timezone_column")) != null) continue;
+            throw new IllegalArgumentException("Config error in " + origin + ": field '"
+                    + fm.get("name") + "' is declared TIMESTAMPTZ but no source time zone is set. "
+                    + "A zone-aware column needs to know what zone its text is IN — otherwise it is "
+                    + "resolved against the server's own zone, so the same file imports differently "
+                    + "on different machines. Set raw.fields[].timezone (an IANA id such as "
+                    + "'Asia/Kolkata'), raw.fields[].timezone_column (a sibling column holding one "
+                    + "per row), or parsing.source_timezone for the whole pipeline.");
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private static Map<String, Object> mergeParsing(Map<String, Object> base,
                                                     Map<String, Object> parsing) {
@@ -1490,7 +1534,7 @@ final class PipelineConfigParser {
         if (base != null) merged.putAll(base);
         if (parsing.get("delimited") instanceof Map<?, ?> del)
             merged.putAll((Map<String, Object>) del);
-        for (String key : new String[]{"frontend", "encoding", "compression",
+        for (String key : new String[]{"frontend", "encoding", "compression", "source_timezone",
                                        "fixedwidth", "json", "text_regex", "xlsx", "parquet", "asn1"}) {
             Object v = parsing.get(key);
             if (v != null) merged.put(key, v);

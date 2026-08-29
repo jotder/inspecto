@@ -116,7 +116,8 @@ public final class PipelineConfig {
                               List<String> includePrefixes, List<String> includeRegex,
                               List<String> excludePrefixes, List<String> excludeRegex,
                               int filterTargetColumn, String where,
-                              Boolean ignoreErrors, Boolean nullPadding, Rejects rejects) {
+                              Boolean ignoreErrors, Boolean nullPadding, Rejects rejects,
+                              String sourceTimezone) {
 
         /**
          * The pre-robustness arity, kept so callers built before the error-handling knobs existed still
@@ -137,6 +138,28 @@ public final class PipelineConfig {
                     encoding, inputCompression, strictMode, nullStrings,
                     includePrefixes, includeRegex, excludePrefixes, excludeRegex,
                     filterTargetColumn, where, null, null, Rejects.DEFAULTS);
+        }
+
+        /**
+         * The pre-source-timezone arity. {@code null} means "no source zone declared", which is the
+         * wall-clock default every pipeline had before the key existed — so a caller built against
+         * the older shape keeps compiling AND keeps its exact behaviour.
+         */
+        public CsvSettings(String delimiter, String quote, String escape, String comment,
+                           int skipHeaderLines, int skipJunkLines,
+                           int skipTailLines, int skipTailCols, boolean hasHeader,
+                           String engine, List<String> dateFormats, List<String> tsFormats,
+                           String encoding, String inputCompression, Boolean strictMode,
+                           List<String> nullStrings,
+                           List<String> includePrefixes, List<String> includeRegex,
+                           List<String> excludePrefixes, List<String> excludeRegex,
+                           int filterTargetColumn, String where,
+                           Boolean ignoreErrors, Boolean nullPadding, Rejects rejects) {
+            this(delimiter, quote, escape, comment, skipHeaderLines, skipJunkLines,
+                    skipTailLines, skipTailCols, hasHeader, engine, dateFormats, tsFormats,
+                    encoding, inputCompression, strictMode, nullStrings,
+                    includePrefixes, includeRegex, excludePrefixes, excludeRegex,
+                    filterTargetColumn, where, ignoreErrors, nullPadding, rejects, null);
         }
 
         /** Never null — an absent {@code rejects} block reads as {@link Rejects#DEFAULTS}. */
@@ -1259,7 +1282,8 @@ public final class PipelineConfig {
                 Collections.unmodifiableList(b.excludeRegex),
                 b.filterTargetColumn, b.rowWhere,
                 b.ignoreErrors, b.nullPadding,
-                new CsvSettings.Rejects(b.storeRejects, b.rejectsTable, b.rejectsScan, b.rejectsLimit));
+                new CsvSettings.Rejects(b.storeRejects, b.rejectsTable, b.rejectsScan, b.rejectsLimit),
+                b.sourceTimezone);
         this.output = new Output(b.outputFormat, b.compression, b.duckLakeCfg, b.filenameColumn);
         this.sinks = resolveSinks(b.sinks, this.output, b.databaseDir);
         this.steps = resolveSteps(b.steps, b.rowWhere, b.join, b.dedup, b.summarize, b.route);
@@ -1719,6 +1743,7 @@ public final class PipelineConfig {
         String       csvEngine       = "auto";
         List<String> dateFormats     = new ArrayList<>();
         List<String> tsFormats       = new ArrayList<>();
+        String       sourceTimezone;
         String       encoding;
         String       inputCompression;
         Boolean      strictMode;
