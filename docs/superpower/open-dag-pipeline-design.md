@@ -364,7 +364,7 @@ thing"* is a one-concept-two-words violation.
 | **3** | ✅ **SHIPPED 2026-08-29** — an ordered chain, the registry re-read per step | §8 |
 | **4** | ✅ **SHIPPED 2026-08-29** — `GET /runs/{name}/outputs` + the Batch-detail section (`aa777782`) | authoring |
 | **5** | ✅ **SHIPPED 2026-08-29** — a CONTRIBUTED step is authorable via `steps:` | §11 |
-| **6** | **Parser output-schema publication** | independent; point 1's real gap |
+| **6** | 🔴 **REFUTED 2026-08-29 — already shipped, nothing to build.** See §12 | n/a |
 
 ⛔ **Retention and merge are NOT stages** — they exist. What they need is for a derived table to arrive
 in the registry with a `partitionKey` and a `State`, which is stage 2's job.
@@ -554,3 +554,35 @@ provider is global to the module and would quietly widen every other `steps:` te
 **Still open:** stage 6 (parser output-schema publication), and the two stage-3 questions — per-step
 configuration in the chain parameter, and whether a mid-chain failure should retire what earlier steps
 wrote.
+
+---
+
+## 12. Stage 6 REFUTED (2026-08-29) — the gap was already closed
+
+Stage 6 was framed (§1) as *"a parser's output shape is declared in the schema `.toon`
+(`raw.fields[]`), not returned by the plugin — a parser that discovers its own shape has no seam to
+publish it through"*. **Grounded before building anything, and the seam already exists, is already
+wired end to end for a THIRD-PARTY plugin, and predates this thread.**
+
+* `ParserPlugin.preview()` returns a `ParseResult.Table` carrying **`columnTypes`**
+  (`List<Map<String,String>>`, `{name, type}`) — a field any plugin author fills directly, with no
+  dependency on DuckDB or a built-in sniff.
+* `POST /parsers/{id}/preview` forwards it **unconditionally for every registered parser**, built-in or
+  plugin — `ParserRoutes.preview` doesn't special-case the id, it dispatches through `Parsers.get(id)`
+  and serialises whatever `ParseResult` comes back.
+* `pipeline-parse-definition.component.ts`'s `onPreviewed` — the **one place a schema is ever
+  derived**, per its own comment — reads `columnTypes` off *any* `ParserPreview`, narrows each type to
+  the schema vocabulary, and offers it as the grid's **Auto** mode. An author accepts or overrides per
+  field; nothing is silently applied.
+* The offline mock mirrors the same key (`parsers.handler.ts`), so the loop is honest offline too.
+
+⇒ **A plugin parser that wants to discover its own output shape already has the seam**: fill
+`columnTypes` in `preview()`. Nothing routes, models, or authoring-side needed building. The "real gap"
+in §1 was itself wrong — found by checking the consumer before writing code, the same discipline that
+refuted stage 3's original premise about `RecipeCompiler`.
+
+**The one thing that is NOT this seam, and should not be confused with it:** `TypeFlow`
+(§2.4/§7) derives a **post-map** table's schema by `DESCRIBE`, without a sample and without an author
+in the loop. `columnTypes` here is pre-map, sample-derived, and advisory by design — the two are
+siblings serving different moments (parse-time authoring vs. run-time derivation), not one gap with two
+names.
