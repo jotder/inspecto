@@ -180,6 +180,70 @@ class ControlApiConfigWriteTest {
         }
     }
 
+    /**
+     * A source zone the query engine cannot resolve is refused at save. ⚠ Until 2026-08-29 the OFFLINE
+     * MOCK refused this and no Java route did, so the mock was ahead of the server, not mirroring it —
+     * the author saw a 422 offline and a silent load-time failure against a real backend.
+     */
+    @Test
+    void unresolvableSourceTimezoneIsRefused(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> r = post(c.port, "/config/write", pipelineWithParsing(
+                    "bad_zone", "\"source_timezone\":\"Not/AZone\","));
+            assertEquals(422, r.statusCode(), r.body());
+            JsonNode out = V1Body.envelope(r.body()).get("error").get("details");
+            assertTrue(out.get("findings").toString().contains("source_timezone"),
+                    "the finding names the key: " + out.get("findings"));
+            assertFalse(Files.exists(root.resolve("bad_zone_pipeline.toon")));
+
+            // 🔴 an offset form: ZoneId.of accepts it, DuckDB does not — the reason the gate is
+            // available-ids membership rather than ZoneId.of
+            assertEquals(422, post(c.port, "/config/write", pipelineWithParsing(
+                    "offset_zone", "\"source_timezone\":\"+05:30\",")).statusCode());
+
+            // a real zone writes
+            assertEquals(200, post(c.port, "/config/write", pipelineWithParsing(
+                    "good_zone", "\"source_timezone\":\"Asia/Kolkata\",")).statusCode());
+        }
+    }
+
+    /**
+     * A {@code %z}/{@code %Z} zone directive in a format list is refused at save, matching the engine's
+     * load-time refusal: the offset it parses is re-rendered in the server's own zone, so the same file
+     * would import differently on different machines.
+     */
+    @Test
+    void aZoneDirectiveInATemporalFormatIsRefused(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> r = post(c.port, "/config/write", pipelineWithParsing("zdirective",
+                    "\"delimited\":{\"timestamp_formats\":[\"%Y-%m-%d %H:%M:%S%z\"]},"));
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(V1Body.envelope(r.body()).get("error").get("details").get("findings")
+                            .toString().contains("%z"),
+                    "the finding names the directive");
+            assertFalse(Files.exists(root.resolve("zdirective_pipeline.toon")));
+
+            // %Z (zone name) is the second directive, and was named in no plan or board row
+            assertEquals(422, post(c.port, "/config/write", pipelineWithParsing("zname",
+                    "\"delimited\":{\"date_formats\":[\"%Y-%m-%d %Z\"]},")).statusCode());
+
+            // ⚠ %% is an escaped literal percent, so this one is naive and must still write
+            assertEquals(200, post(c.port, "/config/write", pipelineWithParsing("escaped",
+                    "\"delimited\":{\"timestamp_formats\":[\"%Y-%m-%d %H:%M:%S%%z\"]},")).statusCode());
+        }
+    }
+
+    /** A pipeline body with an extra {@code parsing:} fragment spliced in. */
+    private static String pipelineWithParsing(String name, String parsingFragment) {
+        return """
+                {"type":"pipeline","config":{
+                   "name":"%s",
+                   "parsing":{%s"frontend":"delimited"},
+                   "dirs":{"poll":"in","database":"out"},
+                   "processing":{"threads":1}}}""".formatted(name, parsingFragment);
+    }
+
     /** The same draft stays writable while inactive — that is the whole point of a draft. */
     @Test
     void inactiveDraftWithoutASchemaStillWrites(@TempDir Path cfg, @TempDir Path root) throws Exception {

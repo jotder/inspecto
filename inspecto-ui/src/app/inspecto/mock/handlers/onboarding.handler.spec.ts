@@ -8,6 +8,7 @@ import {
     StoredPipelineConfig,
     schemaZoneFindings,
     zoneRefusal,
+    formatZoneDirectiveRefusal,
 } from './onboarding.handler';
 
 /**
@@ -616,5 +617,38 @@ describe('onboardingHandler pipeline delete — dependents gate', () => {
         );
         expect(res?.status).toBe(200);
         expect((res?.body as { written?: boolean })?.written).toBe(true);
+    });
+});
+
+describe('formatZoneDirectiveRefusal (mirrors the server %z/%Z rule)', () => {
+    const fmts = (key: string, list: string[]) => ({ delimited: { [key]: list } });
+
+    it('accepts a plain format list, and an absent block', () => {
+        expect(formatZoneDirectiveRefusal(undefined)).toBeNull();
+        expect(formatZoneDirectiveRefusal({ frontend: 'delimited' })).toBeNull();
+        expect(formatZoneDirectiveRefusal(fmts('timestamp_formats', ['%Y-%m-%d %H:%M:%S']))).toBeNull();
+    });
+
+    it('refuses both zone directives, in both lists', () => {
+        expect(formatZoneDirectiveRefusal(fmts('timestamp_formats', ['%Y-%m-%d %H:%M:%S%z'])))
+            .toContain('%z');
+        expect(formatZoneDirectiveRefusal(fmts('timestamp_formats', ['%Y-%m-%d %H:%M:%S %Z'])))
+            .toContain('%Z');
+        expect(formatZoneDirectiveRefusal(fmts('date_formats', ['%Y-%m-%d%z'])))
+            .toContain('date_formats');
+        // a clean format beside a dirty one is still refused
+        expect(formatZoneDirectiveRefusal(
+            fmts('timestamp_formats', ['%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M:%S%z']))).not.toBeNull();
+    });
+
+    it('treats %% as an escaped literal percent, not a directive', () => {
+        expect(formatZoneDirectiveRefusal(fmts('timestamp_formats', ['%Y-%m-%d %H:%M:%S%%z']))).toBeNull();
+        // ...but a real directive after an escaped one is still a directive
+        expect(formatZoneDirectiveRefusal(fmts('timestamp_formats', ['%Y-%m-%d %H:%M:%S%%%z'])))
+            .not.toBeNull();
+    });
+
+    it('ignores a list authored at parsing: level, which the engine never reads', () => {
+        expect(formatZoneDirectiveRefusal({ timestamp_formats: ['%Y-%m-%d %H:%M:%S%z'] })).toBeNull();
     });
 });

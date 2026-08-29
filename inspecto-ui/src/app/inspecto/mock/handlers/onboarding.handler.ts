@@ -159,14 +159,18 @@ export function onboardingHandler(flags: MockFlags): MockHandler {
                 const existing = store.get<StoredPipelineConfig>(space, PIPELINE_CONFIGS_COLL, name);
                 if (existing && !body.overwrite)
                     return error(409, `file exists: ${name}.toon (pass overwrite:true to replace)`);
-                // parsing.source_timezone is validated fail-closed at load by PipelineConfigParser —
-                // an unknown zone is a hard DuckDB error at run time that TRY() cannot catch, so a
-                // typo that saved here would look fine offline and kill every batch live.
+                // Both zone gates below now mirror REAL server rules: ConfigSpecs.pipeline() carries
+                // `parsing-source-timezone-resolvable` and `parsing-formats-carry-no-zone-directive`,
+                // and ConfigWriteRoutes 422s on ERROR findings. ⚠ Until 2026-08-29 the first of these
+                // existed HERE ONLY — the mock was ahead of the server, so an author saw a 422 offline
+                // and a silent load-time failure against a real backend.
                 const parsingBlock = body.config['parsing'] as Record<string, unknown> | undefined;
                 if (parsingBlock && parsingBlock['source_timezone'] !== undefined) {
                     const bad = zoneRefusal(parsingBlock['source_timezone'], 'parsing.source_timezone');
                     if (bad) return error(422, bad);
                 }
+                const badFormat = formatZoneDirectiveRefusal(parsingBlock);
+                if (badFormat) return error(422, badFormat);
                 // The real route writes `<name>_pipeline.toon` — the bootstrap-scan convention.
                 const path = name.endsWith('_pipeline') ? `${name}.toon` : `${name}_pipeline.toon`;
                 store.put(space, PIPELINE_CONFIGS_COLL, name, {
@@ -456,6 +460,48 @@ const WIDENINGS: Record<string, string[]> = {
  * `timeZone`, DuckDB does not, so the resolver alone would green-light the one mistake operators
  * actually make.
  */
+/**
+ * The `%z`/`%Z` refusal, mirroring `SourceZoneGrammar.formatRefusal` + the
+ * `parsing-formats-carry-no-zone-directive` rule on `ConfigSpecs.pipeline()`.
+ *
+ * A zone directive parses the offset and then loses it: the engine's trailing `::TIMESTAMP` renders
+ * that instant in the SERVER's zone, so the same file imports differently on different machines.
+ *
+ * ⚠ `%%` is an escaped literal percent, so `'%%z'` is the two characters `%z` in the input text and
+ * is NOT a directive — the scan consumes `%%` as a pair. ⚠ Only the `delimited:` block is checked: a
+ * list authored at `parsing:` level is not read by the engine's `mergeParsing` at all.
+ */
+export function formatZoneDirectiveRefusal(
+    parsing: Record<string, unknown> | undefined,
+): string | null {
+    const delimited = parsing?.['delimited'] as Record<string, unknown> | undefined;
+    if (!delimited) return null;
+    for (const key of ['date_formats', 'timestamp_formats']) {
+        const formats = delimited[key];
+        if (!Array.isArray(formats)) continue;
+        for (const fmt of formats) {
+            const directive = zoneDirectiveIn(String(fmt ?? ''));
+            if (!directive) continue;
+            return `parsing.delimited.${key}: format '${fmt}' uses the zone directive '%${directive}', `
+                + `which is not supported. The offset it parses is then re-rendered in the SERVER's zone, `
+                + `so the same file would import differently on different machines. Declare the zone `
+                + `instead: parsing.source_timezone, or raw.fields[].timezone / .timezone_column.`;
+        }
+    }
+    return null;
+}
+
+/** The zone directive in a strptime format, or `''` for none. Exactly `%z` and `%Z`. */
+function zoneDirectiveIn(format: string): string {
+    for (let i = 0; i < format.length - 1; i++) {
+        if (format[i] !== '%') continue;
+        const next = format[i + 1];
+        if (next === '%') { i++; continue; }       // escaped literal — consume the pair
+        if (next === 'z' || next === 'Z') return next;
+    }
+    return '';
+}
+
 export function zoneRefusal(zone: unknown, where: string): string | null {
     const z = String(zone ?? '').trim();
     if (!z) return `${where} is blank — remove the key or name a zone`;

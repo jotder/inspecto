@@ -80,6 +80,65 @@ class ConfigSpecsTest {
         return rule.check(raw);
     }
 
+    /**
+     * The authoring-time half of the engine's fail-closed source-zone refusal. ⚠ Filed as a real gap:
+     * the offline mock refused a bad zone on the pipeline write while NO Java route did, so the mock
+     * was ahead of the server rather than mirroring it. This rule is what makes it true.
+     */
+    @Test
+    void sourceTimezoneMustBeAZoneTheQueryEngineAccepts() {
+        ConfigSpec p = ConfigSpecs.pipeline();
+        String id = "parsing-source-timezone-resolvable";
+
+        // absent, and blank, are legal — no zone declared is the default wall-clock behaviour
+        assertTrue(fire(p, id, Map.of("parsing", Map.of("frontend", "delimited"))).isEmpty());
+        assertTrue(fire(p, id, Map.of("parsing", Map.of("source_timezone", ""))).isEmpty());
+
+        assertTrue(fire(p, id, Map.of("parsing", Map.of("source_timezone", "Asia/Kolkata"))).isEmpty());
+        assertTrue(fire(p, id, Map.of("parsing", Map.of("source_timezone", "UTC"))).isEmpty());
+
+        assertTrue(fire(p, id, Map.of("parsing", Map.of("source_timezone", "Not/AZone"))).isPresent());
+        // 🔴 the offset forms ZoneId.of would accept but DuckDB rejects — the whole reason this gate
+        // is available-ids membership rather than ZoneId.of
+        assertTrue(fire(p, id, Map.of("parsing", Map.of("source_timezone", "+05:30"))).isPresent());
+        assertTrue(fire(p, id, Map.of("parsing", Map.of("source_timezone", "Z"))).isPresent());
+        // ...and the lower-case spelling DuckDB takes but no config key allows
+        assertTrue(fire(p, id, Map.of("parsing", Map.of("source_timezone", "utc"))).isPresent());
+    }
+
+    /**
+     * The authoring-time half of the %z/%Z refusal. Both directives, both lists, and an escaped
+     * literal percent must still pass.
+     */
+    @Test
+    void temporalFormatsMayNotCarryAZoneDirective() {
+        ConfigSpec p = ConfigSpecs.pipeline();
+        String id = "parsing-formats-carry-no-zone-directive";
+
+        assertTrue(fire(p, id, delimited("timestamp_formats", List.of("%Y-%m-%d %H:%M:%S"))).isEmpty());
+        assertTrue(fire(p, id, Map.of("parsing", Map.of("frontend", "delimited"))).isEmpty());
+
+        assertTrue(fire(p, id, delimited("timestamp_formats", List.of("%Y-%m-%d %H:%M:%S%z"))).isPresent());
+        assertTrue(fire(p, id, delimited("timestamp_formats", List.of("%Y-%m-%d %H:%M:%S %Z"))).isPresent());
+        assertTrue(fire(p, id, delimited("date_formats", List.of("%Y-%m-%d%z"))).isPresent());
+        // a clean format beside a dirty one is still refused
+        assertTrue(fire(p, id, delimited("timestamp_formats",
+                List.of("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S%z"))).isPresent());
+
+        // ⚠ %% is an escaped literal percent — '%%z' is naive text, not a directive
+        assertTrue(fire(p, id, delimited("timestamp_formats", List.of("%Y-%m-%d %H:%M:%S%%z"))).isEmpty());
+        assertTrue(fire(p, id, delimited("timestamp_formats", List.of("%Y-%m-%d %H:%M:%S%%%z"))).isPresent());
+
+        // ⚠ a list authored at parsing: level is not read by mergeParsing at all, so refusing one
+        // there would 422 on something the engine ignores
+        assertTrue(fire(p, id, Map.of("parsing",
+                Map.of("timestamp_formats", List.of("%Y-%m-%d %H:%M:%S%z")))).isEmpty());
+    }
+
+    private static Map<String, Object> delimited(String key, List<String> formats) {
+        return Map.of("parsing", Map.of("frontend", "delimited", "delimited", Map.of(key, formats)));
+    }
+
     @Test
     void pluginIngesterRequiresNonEmptySegments() {
         ConfigSpec p = ConfigSpecs.pipeline();

@@ -252,6 +252,50 @@ public final class ConfigSpecs {
                         List.of("template", "active"),
                         raw -> !(Boolean.parseBoolean(str(raw, "template"))
                                 && Boolean.parseBoolean(str(raw, "active")))),
+                // Both of these mirror a refusal the PARSER already makes at config load. The parser is
+                // what makes the guarantee hold for a hand-edited file; catching them here turns a
+                // load-time throw — which surfaces as a config that silently vanished from the read
+                // surface — into a 422 at the moment of authoring. Same reasoning as
+                // template-cannot-be-active above.
+                //
+                // ⚠ Filed as a real gap: the offline mock ALREADY refused a bad source_timezone on the
+                // pipeline write while no Java route did, so the mock was ahead of the server rather
+                // than mirroring it. This rule is what makes that mock behaviour true.
+                new CrossFieldRule(
+                        "parsing-source-timezone-resolvable",
+                        "parsing.source_timezone must be an IANA region id the query engine accepts — "
+                                + "'Asia/Kolkata', 'Europe/Berlin', 'UTC'. A fixed offset (+05:30, Z) is "
+                                + "not accepted: it cannot express daylight saving, and the engine "
+                                + "rejects it outright.",
+                        Severity.ERROR,
+                        List.of("parsing.source_timezone"),
+                        raw -> {
+                            String tz = str(raw, "parsing.source_timezone");
+                            // Absent is legal — no zone declared is the default, wall-clock behaviour.
+                            return tz == null || tz.isBlank()
+                                    || SourceZoneGrammar.zoneRefusal(tz, "x") == null;
+                        }),
+                new CrossFieldRule(
+                        "parsing-formats-carry-no-zone-directive",
+                        "parsing.delimited.date_formats / .timestamp_formats must not use the zone "
+                                + "directives %z or %Z. The offset they parse is then re-rendered in the "
+                                + "SERVER's zone, so the same file imports differently on different "
+                                + "machines. Declare the zone instead — parsing.source_timezone, or "
+                                + "raw.fields[].timezone / .timezone_column for one column.",
+                        Severity.ERROR,
+                        List.of("parsing.delimited.date_formats", "parsing.delimited.timestamp_formats"),
+                        raw -> {
+                            // ⚠ Only the delimited: block — a list authored at parsing: level is not read
+                            // by mergeParsing at all, so refusing one there would 422 on something inert.
+                            for (String key : List.of("parsing.delimited.date_formats",
+                                                      "parsing.delimited.timestamp_formats")) {
+                                if (!(at(raw, key) instanceof List<?> formats)) continue;
+                                for (Object f : formats)
+                                    if (f != null && SourceZoneGrammar.zoneDirectiveIn(String.valueOf(f)) != 0)
+                                        return false;
+                            }
+                            return true;
+                        }),
                 new CrossFieldRule(
                         "plugin-ingester-requires-segments",
                         "processing.segments must be a non-empty map when processing.ingester is set.",

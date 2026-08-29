@@ -260,12 +260,27 @@ time, so a value stops depending on which box processed it.
     **WIN** over any configured zone"; that remains a separate, deliberate build (emit
     `timezone('UTC', …)` and make the data's offset a fifth precedence tier). ⛔ Do not reach it by
     relaxing this gate.
-  * ⚠ **The offline mock's pipeline-write zone gate is a DIVERGENCE, not parity** (found while scoping
-    this). `onboarding.handler.ts` 422s on a bad `parsing.source_timezone`, but **no Java route
-    validates it on write** — `ConfigSafetyValidator` is path-jail + output formats only and never runs
-    the parser, so the real server accepts the write and refuses at load. S2's "mock parity mirrors the
-    server's refusals" is accurate for the schema write and wrong for the pipeline write. Left as
-    found; deliberately not extended to the format lists.
+  * **✅ The authoring-time half SHIPPED 2026-08-29 — and it closed a real divergence.** The mock was
+    **ahead of the server**: `onboarding.handler.ts` 422'd a bad `parsing.source_timezone` while **no
+    Java route validated it on write at all**, so an author saw a refusal offline and a silent
+    load-time failure against a real backend. `ConfigSpecs.pipeline()` now carries two ERROR
+    `CrossFieldRule`s — `parsing-source-timezone-resolvable` and
+    `parsing-formats-carry-no-zone-directive` — evaluated by `ConfigLoader.validate` and turned into a
+    422 by `ConfigWriteRoutes`. This is the house pattern the `template-cannot-be-active` rule states
+    outright: **the parser's load-time throw is what makes the guarantee hold for a hand-edited file;
+    the rule is what makes it a 422 while the author is still present.**
+  * 🔴 **The shared predicate lives in the LOWER module and is delegated to, not mirrored.**
+    `inspecto-config` sits below `inspecto-etl`, so a rule in `ConfigSpecs` cannot import the engine's
+    copy — the codebase's usual answer is a mirror plus a pinning test (see
+    `processing.unpack.data_extensions`). These predicates need nothing from the engine, so they moved
+    **down** into `com.gamma.config.spec.SourceZoneGrammar` and `SourceZones` delegates to it. One
+    implementation, no pom change, and no second copy to drift.
+  * ⚠ **Two same-looking zone checks, two different correct answers.** `SourceZoneGrammar.zoneRefusal`
+    gates on `ZoneId.getAvailableZoneIds()` because the value reaches **DuckDB**; `ConfigSpecs.meta()`'s
+    `domain-timezone-resolvable` uses plain `ZoneId.of` because that value is resolved by the **JVM**
+    for date math and never reaches DuckDB. ⛔ Do not "unify" them.
+  * ⚠ **Only the `delimited:` block is checked** for formats — a list authored at `parsing:` level is
+    not read by `mergeParsing` at all, so refusing one there would 422 on something inert.
 * **Dead code flagged, not touched:** `SqlBuilder.buildPartitionExpr` has no production caller (only
   `buildCastExpr` at `TransformCompiler:209` does).
 

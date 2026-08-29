@@ -1,5 +1,7 @@
 package com.gamma.etl;
 
+import com.gamma.config.spec.SourceZoneGrammar;
+
 import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -168,14 +170,8 @@ public final class SourceZones {
      * @throws IllegalArgumentException with {@code origin} named, so the operator sees which key
      */
     public static void validateZone(String zone, String origin) {
-        if (zone == null || zone.isBlank())
-            throw new IllegalArgumentException(origin + " is blank — remove the key or name a zone");
-        if (ZoneId.getAvailableZoneIds().contains(zone)) return;
-        String hint = zone.startsWith("+") || zone.startsWith("-") || "Z".equals(zone)
-                ? " — a fixed offset is not accepted (it cannot express daylight saving); use the "
-                  + "IANA region id for the source's zone, e.g. 'Asia/Kolkata'"
-                : " — use an IANA region id such as 'Asia/Kolkata', 'Europe/Berlin' or 'UTC'";
-        throw new IllegalArgumentException(origin + ": unknown time zone '" + zone + "'" + hint);
+        String refusal = SourceZoneGrammar.zoneRefusal(zone, origin);
+        if (refusal != null) throw new IllegalArgumentException(refusal);
     }
 
     /**
@@ -203,8 +199,11 @@ public final class SourceZones {
      * so a DuckDB upgrade that adds a third one fails the build instead of shipping the corruption.
      *
      * <p>⚠ {@code %%} is an escaped literal percent, so {@code '%%z'} is the two characters {@code %z}
-     * in the input text and stays naive — measured, and accepted here. The scan therefore consumes
-     * {@code %%} as a pair rather than matching {@code %z} anywhere in the string.
+     * in the input text and stays naive — measured, and accepted here.
+     *
+     * <p>The predicate itself lives in {@link SourceZoneGrammar}, one module down, so the control
+     * plane's authoring-time {@code CrossFieldRule} and this load-time refusal are the SAME code
+     * rather than two copies that can drift.
      *
      * <p><b>This is a refusal, not the feature.</b> Making the data's own offset win — a tier above
      * {@code timezone_column} — is a deliberate build, not something to slip in by relaxing this gate.
@@ -214,36 +213,8 @@ public final class SourceZones {
      * @throws IllegalArgumentException naming the offending format and directive
      */
     public static void assertNoZoneDirective(List<String> formats, String origin) {
-        if (formats == null) return;
-        for (String fmt : formats) {
-            if (fmt == null) continue;
-            char directive = zoneDirectiveIn(fmt);
-            if (directive == 0) continue;
-            throw new IllegalArgumentException(origin + ": format '" + fmt + "' uses the zone "
-                    + "directive '%" + directive + "', which is not supported. The offset it parses is "
-                    + "then re-rendered in the SERVER's zone, so the same file would import differently "
-                    + "on different machines — the opposite of what a source zone is for. Remove the "
-                    + "directive and declare the zone instead: parsing.source_timezone for the whole "
-                    + "pipeline, or raw.fields[].timezone / .timezone_column for one column. (Write "
-                    + "'%%" + directive + "' if you meant a literal '%" + directive + "' in the text.)");
-        }
-    }
-
-    /**
-     * The zone directive in {@code fmt}, or {@code 0} for none.
-     *
-     * <p>Scans left to right consuming {@code %%} as a pair, so an escaped percent cannot be misread
-     * as the start of a directive — {@code '%%z'} is a literal and {@code '%%%z'} is a literal percent
-     * followed by a real one.
-     */
-    private static char zoneDirectiveIn(String fmt) {
-        for (int i = 0; i < fmt.length() - 1; i++) {
-            if (fmt.charAt(i) != '%') continue;
-            char next = fmt.charAt(i + 1);
-            if (next == '%') { i++; continue; }          // escaped literal — consume the pair
-            if (next == 'z' || next == 'Z') return next;
-        }
-        return 0;
+        String refusal = SourceZoneGrammar.formatRefusal(formats, origin);
+        if (refusal != null) throw new IllegalArgumentException(refusal);
     }
 
     private static String str(Object o) {
