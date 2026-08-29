@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -62,14 +61,16 @@ class ControlApiParsersTest {
                 assertTrue(p.get("grammarSchema").get(0).hasNonNull("path"));
             }
             assertTrue(list.get(3).get("ingestable").asBoolean(), "a builtin is ingestable by identity");
-            // Both plugins are hierarchical; only ASN.1 names an ingester, and the catalog says so.
+            // Both plugins are hierarchical, and since the tree→segments bridge shipped both name an
+            // ingester — the catalog serves the class, which is what the segments editor gates on.
             JsonNode xml = list.get(6);
             assertTrue(xml.get("hierarchical").asBoolean());
-            assertFalse(xml.get("ingestable").asBoolean(),
-                    "tree data cannot load to Tables before the flatten config");
+            assertTrue(xml.get("ingestable").asBoolean(), "XmlRecordIngester flattens onto segments");
+            assertEquals("com.gamma.ingester.XmlRecordIngester", xml.get("ingesterClass").asText());
             JsonNode asn1 = list.get(7);
             assertTrue(asn1.get("hierarchical").asBoolean());
             assertTrue(asn1.get("ingestable").asBoolean(), "Asn1RecordIngester flattens onto segments");
+            assertEquals("com.gamma.ingester.Asn1RecordIngester", asn1.get("ingesterClass").asText());
             assertTrue(list.get(0).get("ingestable").asBoolean());
         }
     }

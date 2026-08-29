@@ -27,12 +27,12 @@ describe('parsersHandler', () => {
         const res = send('GET', '/api/parsers')!;
         const list = res.body as ParserDef[];
         expect(list.map((p) => p.id)).toEqual(['delimited', 'fixedwidth', 'json', 'xlsx', 'text_regex', 'xml', 'asn1']);
-        // Both plugins are tree-shaped; they differ on whether they can load to Tables, and that
-        // difference is exactly what a guided Save gates on.
+        // Both plugins are tree-shaped, and since the tree→segments bridge shipped both load to
+        // Tables — each naming its OWN ingester, which is what a guided Save gates on.
         const xml = list[5];
         expect(xml.hierarchical).toBe(true);
-        expect(xml.ingestable).toBe(false); // preview-only until the flatten configuration
-        expect(xml.ingesterClass).toBeUndefined();
+        expect(xml.ingestable).toBe(true);
+        expect(xml.ingesterClass).toBe('com.gamma.ingester.XmlRecordIngester');
         const asn1 = list[6];
         expect(asn1.hierarchical).toBe(true);
         expect(asn1.ingestable).toBe(true);
@@ -115,7 +115,7 @@ describe('parsersHandler', () => {
 
     it('previews XML as a record tree with @attr leaves and counts all matches', () => {
         const res = send('POST', '/api/parsers/xml/preview', {
-            grammar: { xml: { max_records: 1 } },
+            grammar: { ingester_config: { max_records: 1 } },
             sample_text: '<orders><order id="1"><amount>42.5</amount></order><order id="2"/></orders>',
         })!;
         const t = res.body as ParserTreePreview;
@@ -143,7 +143,7 @@ describe('parsersHandler', () => {
         expect(malformed.status).toBe(422);
         expect(String((malformed.body as { error: string }).error)).toContain('not well-formed');
         const noMatch = send('POST', '/api/parsers/xml/preview', {
-            grammar: { xml: { record_element: 'ghost' } },
+            grammar: { ingester_config: { record_element: 'ghost' } },
             sample_text: '<a><b/></a>',
         })!;
         expect(noMatch.status).toBe(422);

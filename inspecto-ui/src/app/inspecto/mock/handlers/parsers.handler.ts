@@ -278,23 +278,24 @@ const CATALOG: ParserDef[] = [
         id: 'xml',
         label: 'XML — XML file format',
         hierarchical: true,
-        ingestable: false, // preview-only until the flatten configuration
+        ingestable: true,
+        ingesterClass: 'com.gamma.ingester.XmlRecordIngester',
         grammarSchema: [
             str(
-                'xml.record_element',
+                'ingester_config.record_element',
                 'Record element',
                 'Element that starts one record — a local name (order) or a slash path (orders/order). Blank = every direct child of the root.',
             ),
             {
-                path: 'xml.namespace_aware',
+                path: 'ingester_config.namespace_aware',
                 label: 'Namespace aware',
                 type: 'BOOL',
                 defaultValue: false,
                 description: 'Resolve namespaces (element labels then use local names).',
             },
-            str('xml.encoding', 'Encoding', "Overrides the document prolog's encoding (default: auto-detect)."),
+            str('ingester_config.encoding', 'Encoding', "Overrides the document prolog's encoding (default: auto-detect)."),
             {
-                path: 'xml.max_records',
+                path: 'ingester_config.max_records',
                 label: 'Preview records',
                 type: 'INT',
                 defaultValue: 50,
@@ -572,7 +573,7 @@ function textRegex(grammar: Record<string, unknown>, sample: string): ParserPrev
 /** Mirrors `XmlParserPlugin`: record elements → node forest (attributes as `@name` leaves, text as
  *  values), same refusal messages for malformed docs and unmatched record elements. */
 function xmlTree(grammar: Record<string, unknown>, sample: string): ParserPreview {
-    const g = sub(grammar, 'xml');
+    const g = sub(grammar, 'ingester_config');
     const recordPath = String(g['record_element'] ?? '').trim();
     const maxRecords = Math.max(1, Math.min(Number(g['max_records'] ?? 50), 1000));
     const doc = new DOMParser().parseFromString(sample, 'text/xml');

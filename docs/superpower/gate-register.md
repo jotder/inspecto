@@ -201,13 +201,28 @@ Ordered by what they unblock.
   §9 questions (per-step chain config; mid-chain-failure semantics) are also now decided and shipped
   (`6bf92b1b`, 2026-08-29): `chain_config` JSON parameter + `ProcessorContext.config()`; failure stays
   append-only, no code needed.
-- `open-dag` **stage 4** — the editor surface (needs decision 3.1 first).
+- `open-dag` **stage 4** — the editor surface. ⚠ **This row was half-stale (checked 2026-08-30):**
+  the design's §6.4 already marks stage 4 SHIPPED (`aa777782`), but what shipped is the **read-only**
+  registered-outputs list in Batch detail — *authoring* the post-sync chain is still hand-edited TOON.
+  There is also no "decision 3.1" anywhere in `open-dag-pipeline-design.md`; §5 Q1 is closed and §9's
+  two decisions shipped, so nothing is decision-gated here. 🔴 Grounded gap: `chain_config` ships as
+  `ParamType.JSON` (published, tier ADVANCED) and the UI has **no `json` widget** — `widgetFor()` and
+  `schema-form`'s `@switch` both fall through to a bare single-line text box with no validation.
 - ~~`open-dag` **stage 6** — parser output-schema publication.~~ **REFUTED 2026-08-29** (before this
   register was written) — the seam already exists and is already wired end to end (`ParserPlugin
   .preview()`'s `columnTypes`, forwarded unconditionally by `POST /parsers/{id}/preview`). Nothing to
   build. See `open-dag-pipeline-design.md` §12.
-- **Parsing Stage-1 (b)** tree→segments ingest bridge — "**THE** gating slice"; without it
-  hierarchical parsers (XML, `ingestable:false`) are preview-only and the UI says so.
+- ~~**Parsing Stage-1 (b)** tree→segments ingest bridge — "**THE** gating slice"; without it
+  hierarchical parsers (XML, `ingestable:false`) are preview-only and the UI says so.~~
+  **SHIPPED 2026-08-30** — `com.gamma.ingester.XmlRecordIngester`, XML now `ingestable: true`.
+  🔴 There was never a structural blocker: `Parsers.ingestable()` is a DISPLAY flag derived from
+  `ingesterClass()`, and no config/validation/dispatch path ever consulted it — XML was preview-only
+  purely because no ingester existed. The load-bearing decision was that preview and ingest share ONE
+  StAX walker (`XmlRecordReader`): an operator authors selectors against the labels the preview shows,
+  so a second walker would resolve them to `NULL` at load while the preview still looked right.
+  ⚠ XML's grammar keys moved `xml.*` → `ingester_config.*` (one spelling for preview and load; no
+  operator config used the old one). ⚠ The UI needed NO change — every gate reads the served flags.
+  See `okf/backend/engine/parser-plugins.md`.
 - **W0 lossless lift↔lower proof** — "a hard gate": prove lossless over the 16 configs, or NAME the
   supported subset, before W4/W5.
 - **Consignment** §8 end-of-period summary pass (the only remaining dependency of anything already

@@ -29,15 +29,36 @@ class ParsersTest {
     void ingestabilityTracksWhetherAParserCanActuallyLoadToTables() {
         assertTrue(Parsers.ingestable(Parsers.get("delimited").orElseThrow()));
         assertTrue(Parsers.ingestable(Parsers.get("json").orElseThrow()));
-        // Both plugins are hierarchical, but they differ on ingestability — and that difference is
-        // the whole point of the flag: XML still has no ingester, ASN.1 now names one.
+        // Both shipped plugins are hierarchical, and since the tree→segments bridge landed both also
+        // ingest — each naming its OWN ingester, which is what the flag actually tracks.
         ParserPlugin xml = Parsers.get("xml").orElseThrow();
         assertTrue(xml.hierarchical());
-        assertFalse(Parsers.ingestable(xml), "tree data cannot load to Tables before the flatten config");
+        assertTrue(Parsers.ingestable(xml), "XmlRecordIngester flattens the record tree onto segments");
+        assertEquals("com.gamma.ingester.XmlRecordIngester", xml.ingesterClass().orElseThrow());
         ParserPlugin asn1 = Parsers.get("asn1").orElseThrow();
         assertTrue(asn1.hierarchical());
         assertTrue(Parsers.ingestable(asn1), "Asn1RecordIngester flattens onto segment schemas");
         assertEquals("com.gamma.ingester.Asn1RecordIngester", asn1.ingesterClass().orElseThrow());
+    }
+
+    /**
+     * No shipped plugin is preview-only any more, so the negative arm is pinned with a stub — the
+     * mechanism (an absent {@code ingesterClass} means not ingestable) must stay tested even once
+     * every deployed parser happens to satisfy it, or a regression would go unseen.
+     */
+    @Test
+    void aPluginThatNamesNoIngesterIsNotIngestable() {
+        ParserPlugin previewOnly = new ParserPlugin() {
+            @Override public String id() { return "preview_only"; }
+            @Override public String label() { return "Preview only"; }
+            @Override public boolean hierarchical() { return true; }
+            @Override public List<com.gamma.config.spec.FieldSpec> grammarSchema() { return List.of(); }
+            @Override public ParseResult preview(byte[] sample, Map<String, Object> grammar) {
+                return new ParseResult.Tree(0, List.of());
+            }
+        };
+        assertTrue(previewOnly.ingesterClass().isEmpty(), "the SPI default");
+        assertFalse(Parsers.ingestable(previewOnly), "tree data cannot load to Tables with no ingester");
     }
 
     @Test

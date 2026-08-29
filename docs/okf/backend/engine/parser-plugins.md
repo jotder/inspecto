@@ -33,8 +33,10 @@ control-plane change**.
 `ParseResult.Tree`'s node shape mirrors the UI's `ParserTreeNode` verbatim, so the control plane
 serializes without translation. **Preview and ingest are deliberately separate capabilities**: a
 hierarchical parser without an ingester is *preview-only* (`ingestable: false` in the catalog) —
-tree-shaped records cannot honestly land in Tables until the flatten configuration exists
-(BACKLOG §4 "Parsing (Stage-1)").
+tree-shaped records cannot honestly land in Tables until the flatten configuration exists.
+⚠ **No shipped parser is preview-only any more** (XML gained its bridge 2026-08-30), so the
+preview-only *mechanism* is pinned by a stub plugin in `ParsersTest`, not by a deployed example —
+otherwise a regression in the flag would go unseen precisely because every real parser passes.
 
 ## Registry (`com.gamma.parse.Parsers`) + discovery
 
@@ -48,9 +50,17 @@ preview diverge from production parsing. ⚠ `Parsers.load` must NOT use `Map.co
 iteration order, and catalog order (built-ins first) is part of the contract.
 
 Reference plugin: `XmlParserPlugin` (engine, registered via the services file) — JDK StAX, DTDs
-and external entities disabled outright (XXE), grammar `xml.record_element` (local name or slash
-path; blank = the root's direct children) / `namespace_aware` / `encoding` / `max_records`;
-`suggest()` proposes the root's repeated child. Preview-only until the flatten DSL.
+and external entities disabled outright (XXE), grammar `ingester_config.record_element` (local name
+or slash path; blank = the root's direct children) / `namespace_aware` / `encoding` / `max_records`;
+`suggest()` proposes the root's repeated child. **Ingestable since 2026-08-30** — it names
+`com.gamma.ingester.XmlRecordIngester` (below), the tree→segments bridge.
+
+⚠ **The grammar keys live under `ingester_config`, not an `xml.` root** (moved 2026-08-30). That
+block is exactly what the pipeline persists for the ingester, so preview and load are configured by
+ONE set of keys; a separate preview-only spelling would have had to be mapped onto the ingest one
+somewhere, and that mapping is precisely where a silent drift lives. `max_records` is the one
+preview-only key and the ingester ignores it. Nothing operator-authored used the old `xml.` spelling
+(only code, tests and the mock), so this was a clean flip, not a compat layer.
 
 Second plugin: `Asn1ParserPlugin` (engine, registered via the same services file) — **the first
 hierarchical parser that is `ingestable: true`**, because it names an ingester
@@ -60,7 +70,7 @@ depended on as `com.gamma.asn:asn-facade:0.1.0-SNAPSHOT`, installed to the local
 separate `asn-parser/asn-decoders` reactor — not yet resolved from this build, see the coordinate
 note below). Grammar: `asn1.grammar` (the ASN.1 module text) / `asn1.root_type` / `asn1.strictness`
 (BER/DER/CER) / `asn1.file_header_length` / `asn1.record_header_length` / `asn1.max_records`.
-No `suggest()`. Preview-only, same as XML, until the flatten DSL.
+No `suggest()`.
 
 **The grammar is OPTIONAL for preview — structural dump (2026-07-31).** BER is self-describing
 (every value carries its own tag and length), so with `asn1.grammar` blank the plugin skips the
@@ -132,6 +142,46 @@ them.
 stage's toggle and the Pipelines Parser dialog with zero UI change, exactly as designed. The plugin
 sits on the new `asn-facade` API and serves grammar + framing; it is preview-only (no
 `ingesterClass()`).
+
+### The tree→segments bridge — `XmlRecordIngester` (2026-08-30)
+
+**This is what closed "Parsing Stage-1 (b)"**, the slice that kept every hierarchical parser
+preview-only. There was never a structural blocker: `Parsers.ingestable()` is a *display* flag
+derived from `ParserPlugin.ingesterClass()`, and nothing in the config, validation or ingest-dispatch
+path ever consulted it. XML was preview-only because no ingester existed, full stop.
+
+`com.gamma.ingester.XmlRecordIngester` (engine) loads through the same `parsing.plugin` machinery as
+ASN.1 (`frontend: plugin` + `plugin.ingester`/`segments`/`ingester_config`) and follows its rules
+verbatim — segment key = the record element's local name, `raw.fields[].selector` is a dotted path,
+undeclared records are `sink.junk()`, a trailing derived `EVENT_TYPE` carries the segment key, and a
+malformed document fails the file (`QUARANTINED_UNREADABLE`) rather than loading its prefix.
+
+🔴 **The load-bearing decision is that preview and ingest share ONE walker**, `com.gamma.parse
+.XmlRecordReader`. An operator authors a selector against the labels they saw in the preview tree; a
+second StAX walker that labelled nodes even slightly differently would resolve those selectors to
+`NULL` at load while the preview kept looking correct — a silent, per-column data loss with no error
+anywhere. `XmlRecordIngesterTest.previewLabelsAreTheSelectorsThatResolve` pins this by asserting the
+selector vocabulary against the *plugin's own* preview output, not a hand-written list.
+
+The selector vocabulary is therefore the preview's labels: a child element by name, an attribute as
+`@id`, and an element carrying both text and children as `#text`.
+
+⚠ **A selector must name a leaf that occurs ONCE.** A container yields `NULL` (the ASN.1 rule), and
+so does a step matching *repeated* sibling elements — XML has no first-one-wins rule that is not a
+guess, and silently taking one of five `<line>` elements would be a lie dressed as a decoded value.
+A repeated element is not a column; give it its own segment by naming it as the `record_element`.
+
+**Several record kinds in one document** load by leaving `record_element` blank (every direct child
+of the root is then a record) and declaring one segment per kind; an undeclared kind is junk, not a
+silent drop. With an explicit `record_element` the other kinds are simply never records.
+
+`ingester_config`: `record_element` · `namespace_aware` · `encoding` (`max_records` is preview-only
+and ignored here).
+
+⚠ **A plugin ingester with no segments is refused at CONFIG LOAD** (`PipelineConfigParser
+.parsePlugin`), before the ingester is constructed — so the ingester's own segment guard is
+unreachable through a loaded config and exists only for the public SPI's direct callers. A test that
+tries to reach it through `PipelineConfig.load` is testing the parser, not the ingester.
 
 ### Loading to Tables — `Asn1RecordIngester` (2026-07-31)
 

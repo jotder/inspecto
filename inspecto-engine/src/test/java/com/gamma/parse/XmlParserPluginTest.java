@@ -50,10 +50,10 @@ class XmlParserPluginTest {
     void recordElementByLocalNameAndBySlashPath() throws Exception {
         String doc = "<a><b><rec><v>1</v></rec></b><rec><v>2</v></rec></a>";
         ParseResult.Tree byName = (ParseResult.Tree) xml.preview(b(doc),
-                Map.of("xml", Map.of("record_element", "rec")));
+                Map.of("ingester_config", Map.of("record_element", "rec")));
         assertEquals(2, byName.recordCount());
         ParseResult.Tree byPath = (ParseResult.Tree) xml.preview(b(doc),
-                Map.of("xml", Map.of("record_element", "b/rec")));
+                Map.of("ingester_config", Map.of("record_element", "b/rec")));
         assertEquals(1, byPath.recordCount());
         assertEquals("1", byPath.nodes().get(0).children().get(0).value());
     }
@@ -79,7 +79,7 @@ class XmlParserPluginTest {
     @Test
     void noMatchingRecordElementIsACallerError() {
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                () -> xml.preview(b("<a><b/></a>"), Map.of("xml", Map.of("record_element", "ghost"))));
+                () -> xml.preview(b("<a><b/></a>"), Map.of("ingester_config", Map.of("record_element", "ghost"))));
         assertTrue(e.getMessage().contains("ghost"));
     }
 
@@ -96,7 +96,7 @@ class XmlParserPluginTest {
         for (int i = 0; i < 60; i++) doc.append("<r><n>").append(i).append("</n></r>");
         doc.append("</rs>");
         ParseResult.Tree capped = (ParseResult.Tree) xml.preview(b(doc.toString()),
-                Map.of("xml", Map.of("max_records", 10)));
+                Map.of("ingester_config", Map.of("max_records", 10)));
         assertEquals(60, capped.recordCount());
         assertEquals(10, capped.nodes().size());
         // Default cap is DEFAULT_RECORDS (50).
@@ -107,7 +107,7 @@ class XmlParserPluginTest {
     @Test
     void suggestProposesTheRepeatedRootChild() {
         Map<String, Object> clue = xml.suggest(b(ORDERS));
-        assertEquals(Map.of("xml", Map.of("record_element", "order")), clue);
+        assertEquals(Map.of("ingester_config", Map.of("record_element", "order")), clue);
         assertEquals(Map.of(), xml.suggest(b("not xml at all")));
     }
 }

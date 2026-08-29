@@ -27,7 +27,7 @@ const TABLE_PREVIEW: ParserPreview = {
     rejectedRows: 0,
 };
 
-/** A served catalog in the real shape (`GET /parsers`): a built-in + the preview-only XML plugin. */
+/** A served catalog in the real shape (`GET /parsers`): a built-in + the tree-shaped XML plugin. */
 const CATALOG: ParserDef[] = [
     {
         id: 'delimited',
@@ -40,8 +40,9 @@ const CATALOG: ParserDef[] = [
         id: 'xml',
         label: 'XML — XML file format',
         hierarchical: true,
-        ingestable: false,
-        grammarSchema: [{ path: 'xml.record_element', label: 'Record element', type: 'STRING' }],
+        ingestable: true,
+        ingesterClass: 'com.gamma.ingester.XmlRecordIngester',
+        grammarSchema: [{ path: 'ingester_config.record_element', label: 'Record element', type: 'STRING' }],
     },
 ];
 
