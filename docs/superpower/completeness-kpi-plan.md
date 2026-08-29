@@ -71,6 +71,45 @@ absent — it manufactures false confidence in exactly the number it exists to c
 
 ---
 
+## 2b. K2, as built — and the two things still open
+
+**The filename shape is `CDR_{yyyyMMddHH}_{seq}_*`** (operator, 2026-08-30): a date/time token, a
+**separate numeric sequence** token, and an arbitrary suffix.
+
+🔴 **`GapDetector` cannot express this, and could not answer the question even if it could.** Its
+grammar is one `{…}` token holding a date pattern between literal affixes (`GapDetector.java:18-24`),
+so a second numeric token and a wildcard suffix are out of reach. The deeper problem: it enumerates
+the series **between the lowest and highest OBSERVED key**, so a day that stops producing at 20:00
+moves its own observed maximum earlier and reports clean — hiding the hole exactly when it is largest.
+The operator's framing ("run anytime for a duration — how many files missing yesterday?") requires
+enumerating the **window**, not the observations. Hence `FileSequenceGaps`, not an extension of
+`GapDetector`; the latter keeps serving live per-poll alerting unchanged.
+
+**Two limits are structural, pinned by tests, and must not be "fixed" into guarantees:**
+- **Only interior holes are countable.** `1,2,4` is short of 3; `1,2,3` is **not** complete, because
+  the highest sequence received is not knowably the highest sent. **A truncated tail is undetectable
+  from file names alone** — a property of the naming, not of the implementation.
+- **An empty bucket yields no file count.** A silent hour's expected file count is unknowable, so
+  empty buckets are counted as **buckets**, apart from the missing-file total. Estimating them is K3's
+  rolling baseline; mixing an estimate into an exact count would make the exact half untrustworthy.
+
+### ⛔ Still open — K2 cannot be wired without these
+
+1. **Where do processed filenames come from?** 🔴 **No default-on durable store holds them.**
+   `file_stages` is the right shape but `-Dfile.stages.backend` defaults to **`none`**
+   (`ServiceStores.java:141`); the acquisition ledger defaults to **`memory`**
+   (`OperationalDb.java:92`); the status CSV is default-on but **buffered, not fsync'd, and written
+   one file per run**. Building on `file_stages` unflagged would analyse nothing on a stock
+   deployment and report "no gaps" — the `ConservationCheck` trap exactly.
+2. **Does `{seq}` restart per bucket or run continuously?** `SeqScope` is a **required argument** for
+   this reason: the two are indistinguishable within any single bucket, and guessing wrong invents a
+   gap at every boundary or hides every real one.
+
+Also unanswered: where the template itself comes from (the Collector's existing one, a job parameter,
+or the Collector's with an override).
+
+---
+
 ## 3. What already exists (do not rebuild)
 
 - **Gap detection is live in production.** `GapDetector.findGaps(template, names)`
@@ -99,7 +138,7 @@ absent — it manufactures false confidence in exactly the number it exists to c
 | # | Slice | Verify gate |
 |---|---|---|
 | **K1** | A durable per-(pipeline, record-day) read over `consignment_outputs`: files + rows received. Refuses loudly when the registry is disabled; reports UNKNOWN (never 0) where `bounds` is null | A day receiving rows from several batches sums correctly; a disabled registry refuses rather than returning zeros; a null-bounds sink reads UNKNOWN |
-| **K2** | File-count deviation from the **sequence template**, reusing `GapDetector` rather than a second implementation | A missing file in the middle of a period is reported with its expected name; a period with no template degrades honestly instead of guessing |
+| **K2** | ✅ **ANALYSIS HALF SHIPPED 2026-08-30** (`14c6ef0e`) — `FileSequenceGaps`, pure, 10/0/0/0. ⚠ **The wiring half is NOT built** — see §2b for the blocker | ✅ a window-edge silent hour is found; an interior hole is exact; the undetectable tail and the uncountable empty bucket are both pinned |
 | **K3** | Record-count deviation from a **rolling prior-period baseline**, with the window and sensitivity as job parameters | A steady pipeline reports no deviation; a halved day breaches; ⚠ an empty history must read as "no baseline yet", not as a 100% drop |
 | **K4** | The `kpi.completeness` job type: `JobTypeProvider` + descriptor + `ParameterDecl`s, cron'd, **one config per pipeline** (`ReconRunJob` shape). Emits a signal; opens a deduped Incident on breach | Real cron arming; a breach opens exactly one Incident across repeated runs; a pipeline whose registry is off fails the run visibly |
 | **K5** | Retire §8/§11.4: mark the design sections superseded by this plan, with the reason | No doc still presents sealing as pending work |
