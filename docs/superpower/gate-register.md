@@ -264,14 +264,41 @@ Ordered by what they unblock.
   **closed 2026-08-29**) and it is **UI-mock-only** — `inspecto-ui/.../mock/pipeline-editable.ts`
   always synthesises a trunk sink where Java synthesises one only when `sinks:` is absent. The
   server's lift is correct; do not read that row as a Java-engine defect.
-- **Consignment** §8 end-of-period summary pass (the only remaining dependency of anything already
-  built; representation already decided as a fixed-bucket histogram) · §11.4 `partition_state`.
-- **ELT** D-9 windowed keyed dedup ledger (⛔ "never faked with unbounded history") · D-8 XLSX export
-  · branch-commit-log housekeeping.
-- **step-workbench S5** — `TypeFlow` behind a read route; "the one that ends the restating".
-- ~~**G1 SBOM** per bundle, once Q2 is answered~~ **Q2 ANSWERED 2026-08-30 — now plain build work, filed as COMPLY-1 (BACKLOG §6), with COMPLY-2 (signing) and COMPLY-3 (audit prune) alongside it** · **AU-9** audit-record protection (⛔ "do not assert
-  immutability the storage layer does not enforce") · ISO 8.8 advisory-watch process · ISO 8.12
-  air-gap writeup ("a genuine differentiator; write it up").
+- **Consignment** §8 end-of-period summary pass · §11.4 `partition_state` — ⚠ **these two rows are ONE
+  workstream, and the two-line framing understated it** (grounded 2026-08-30). Both parts are real and
+  wholly unbuilt (`partition_state`/`SEALED`/`REOPENED`: **zero hits** in Java; §11.4's own heading
+  reads *"nothing exists"*), and the dependency claim is true and namable — `Measure.Composability`
+  and `GuardedSummaryEmitter` already REFUSE a mislabelled non-additive measure but nothing computes
+  the histogram or the detail recompute. Sliced into P1–P6 in
+  [`partition-sealing-plan.md`](partition-sealing-plan.md). 🔴 **P1–P3 are buildable now; P4–P6 are
+  NOT** — sealing needs two operator inputs (what the completeness rule is; whether a lateness horizon
+  has a default at all), and each answer writes a different durable column. ✅ The representation
+  question is CLOSED — fixed-bucket histogram, verified by live DuckDB probe 2026-08-28; do not
+  reopen it.
+- **ELT** D-9 windowed keyed dedup ledger (⛔ "never faked with unbounded history") 🔴 **the row calls
+  this "a designed fast-follow" — GROUNDED 2026-08-30, it is NAMED, not designed**: `scope: window(P4D)`
+  appears only in the deferral row and a BACKLOG label, with **no §-numbered design section anywhere**
+  for where the ledger persists, its winner policy, or how the window advances. ⚠ Nothing gates it —
+  the 2026-08-11 move of record dedup to Stage-2 (`BatchIngestStrategy.java:192-199`) is its enabling
+  precondition and already shipped — but it needs a design pass before any build. Today's dedup is
+  within-Consignment only (`RowShaper.dedup`, `QUALIFY ROW_NUMBER()`, `:212-230`) · **D-8 XLSX export**
+  ⚠ genuinely zero groundwork (no spreadsheet library in any pom) and gated only by a bare label — the
+  operator call needs *stating as a question* before it can be answered · branch-commit-log
+  housekeeping.
+- ~~**step-workbench S5** — `TypeFlow` behind a read route~~ ✅ **BACKEND SHIPPED 2026-08-30**
+  (`bfec949e`) — `GET /config/schema/derived?pipeline=…`. 🔴 `TypeFlow` had existed and been tested
+  since ELT Phase 2 with **zero production callers**; the gap was never the derivation, only its
+  reachability. ⚠ **The UI half is NOT built** — the derived schema is not yet shown beside the
+  authored one, so "the restating" ends for an API caller, not yet for an author. Reactor
+  3741/0/0/2.
+- ~~**G1 SBOM** per bundle, once Q2 is answered~~ **Q2 ANSWERED 2026-08-30 — now plain build work, filed as COMPLY-1 (BACKLOG §6), with COMPLY-2 (signing) and COMPLY-3 (audit prune) alongside it** · ~~**AU-9** audit-record protection~~ ✅ **WRITTEN 2026-08-30**
+  (`6749aae4`) → `compliance/evidence/audit-record-protection.md`; the claim is deliberately narrow —
+  append-only **by construction** and one dispatch seam, but 🔴 NOT tamper-evident, NOT
+  permission-hardened, and events ARE dropped past 50k on sustained flush failure · **ISO 8.8
+  advisory-watch process** (still open) · ~~ISO 8.12 air-gap writeup~~ ✅ **WRITTEN 2026-08-30** →
+  `compliance/evidence/air-gap-posture.md`; 🔴 the differentiator is a **packaging** guarantee (hosted
+  SDK classes absent, proven by `EgressGuardTest`), **not** a runtime network control, and the writeup
+  names the Kafka connector's operator-configured egress rather than omitting it.
 - **agt-6 `kpi_report_builder` host** — it has **no viable host pane**; a new flow, not an adoption.
   This single row is what keeps that plan out of the archive.
 

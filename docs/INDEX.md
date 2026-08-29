@@ -95,6 +95,13 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- [`superpower/partition-sealing-plan.md`](superpower/partition-sealing-plan.md) — **SLICING PLAN,
+  partly decision-gated** (2026-08-30): Consignment §8 end-of-period pass + §11.4 `partition_state`,
+  which the gate register carried as two one-line rows and which grounding showed to be one workstream
+  of real size (both wholly unbuilt — zero `partition_state` hits in Java). Slices **P1–P3 buildable
+  now**; ⛔ **P4–P6 gated** on two operator inputs (the completeness rule; whether a lateness horizon
+  has a default at all), because each answer writes a different durable column.
+
 - [`superpower/open-dag-pipeline-design.md`](superpower/open-dag-pipeline-design.md) — **DESIGN, not
   scheduled** (operator direction, 2026-08-29): open the pipeline into a NiFi-style DAG — steps after the
   sink, and pluggable **authorable** steps. Grounded: most machinery exists (the graph executor already
