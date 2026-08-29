@@ -223,6 +223,34 @@ class RouteIngestEndToEndTest {
     }
 
     /**
+     * The park home is {@code <dirs.backup>/parked}, and {@code dirs.backup} is OPTIONAL — so a pipeline
+     * that disables a step without one used to ARM, run, and die inside {@code BatchProcessor.parkSource}
+     * on a raw NPE, once per batch, presenting to the operator as {@code park failed: null}. It refuses at
+     * {@code prepare()} now, which is the same posture every other refusal in that gate takes: an
+     * unrunnable config is an authoring-time answer, not a per-cycle failure. Pinned end to end (not just
+     * on {@code StepDisableArming}) because the ONLY thing that could regress is the wiring — the gate
+     * reading the real {@code dirs.backup}.
+     */
+    @Test
+    void disablingAStepWithNoBackupDirIsRefusedAtArming(@TempDir Path dir) throws Exception {
+        Path toon = dir.resolve("park_pipeline.toon");
+        String noBackup = parkFixture(dir, true).lines()
+                .filter(l -> !l.trim().startsWith("backup:"))
+                .collect(java.util.stream.Collectors.joining("\n", "", "\n"));
+        Files.writeString(toon, noBackup);
+
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> PipelineConfig.load(toon.toString()));
+        assertTrue(e.getMessage().contains("dirs.backup"), e.getMessage());
+        assertTrue(e.getMessage().contains("nowhere to park"), e.getMessage());
+
+        // and the same config WITH a backup dir still arms — the refusal is the missing park home,
+        // not the disable itself
+        Files.writeString(toon, parkFixture(dir, true));
+        assertEquals(List.of("sink__d1"), PipelineConfig.load(toon.toString()).disabledSteps());
+    }
+
+    /**
      * Phase 4 S4c — park → re-enable → drain, end to end on the real ingest path. What this pins:
      * <ul>
      *   <li><b>Output parity:</b> after the drain the two destinations together hold exactly the rows a
