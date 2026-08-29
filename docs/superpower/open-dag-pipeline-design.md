@@ -271,6 +271,36 @@ stated position, not an open risk. ⚠ Note the registry is deliberate about it 
 rows now live inside a merged file, which is precisely what a reprocess needs to know to take the §6.2
 partition-rewrite path instead of a no-op unlink."*
 
+### 6.2b The pre-compaction window IS the reprocess window (operator, 2026-08-29)
+
+> *"Before compaction, reprocess should be easier, since every output is separated by consignment id."*
+
+✅ **Correct, and the shipped reprocess is built on exactly that property.** `ReprocessCommand` (1) deletes
+this Consignment's own output paths, (2) restores its backed-up members to the poll dir, (3) supersedes
+the manifest **and the registry rows, keyed by Consignment**, then (4) re-polls under a fresh batch id.
+Every one of those steps works because, before compaction, a Consignment's rows live in **its own files**
+inside a partition — the `compact` task's own description is *"merge the many small **per-batch** Parquet
+output files inside each partition"*.
+
+⇒ **Compaction is precisely the act that destroys the 1:1 file↔Consignment property**, which is why the
+reprocess then refuses rather than degrading: `deleteIfExists` no-ops on a path compaction already
+unlinked while the members are restored, so re-ingest would **duplicate** the rows.
+
+**Two consequences worth carrying into the design:**
+
+* 🔴 **The compaction schedule is the reprocess SLA.** The operator's *"maybe 7 days old data"* is not an
+  arbitrary knob — it is the length of the window in which a Consignment stays cheaply reprocessable.
+  Compacting sooner buys fewer files and costs reprocessability; later, the reverse. That trade should be
+  stated wherever the schedule is configured, not discovered.
+* **Derived tables inherit the property and the trade.** A derived table's outputs are per-Consignment
+  files registered the same way, so before compaction a derived table is reprocess-friendly for exactly
+  the same reason — and compacting it trades exactly the same thing away.
+
+⚠ **A doc/code drift found and fixed while confirming this** (`DbConsignmentOutputStore.supersede`): its
+javadoc said the `COMPACTED_AWAY` state is what *"a reprocess needs to know to take the §6.2
+partition-rewrite path instead of a no-op unlink"*. There is no rewrite path — reprocess **refuses**. The
+javadoc now says so, because a reader would otherwise conclude a compacted Consignment is reprocessable.
+
 ### 6.3 The actual new work: a WRITE seam
 
 `ProcessorContext` today is read-only plus `summaries()` — and that is deliberate, not accidental: a raw

@@ -297,8 +297,14 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
      * beside {@code ManifestStore.supersede}, for when a Consignment's output is replaced by a reprocess.
      *
      * <p>Only {@code LIVE} rows move. A {@code COMPACTED_AWAY} row must keep that state: it is the evidence
-     * that the file's rows now live inside a merged file, which is precisely what a reprocess needs to know to
-     * take the §6.2 partition-rewrite path instead of a no-op unlink.
+     * that the file's rows now live inside a merged file, which is precisely what a reprocess needs to know.
+     *
+     * <p>⚠ <b>What it does with that knowledge today is REFUSE</b>, not rewrite:
+     * {@code ReprocessCommand.refuseIfCompacted} throws <i>"Refusing to reprocess … output file(s) were merged
+     * away by compaction"</i>, because step 1's {@code deleteIfExists} no-ops on a path compaction already
+     * unlinked while the members are restored — so re-ingest would <b>duplicate</b> the rows. The §6.2
+     * partition-rewrite path is the design intent, not the shipped behaviour; do not read this state as
+     * meaning a compacted Consignment can be reprocessed.
      *
      * @return how many rows changed state; {@code 0} is normal when the registry is default-off or the
      *         Consignment predates it, and is never an error.
