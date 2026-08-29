@@ -89,9 +89,9 @@ inspecto-deploy/
 
 - **HTTP(S)**: pure-JDK `HttpServer`/`HttpsServer`, virtual-thread executor. Port `-Dcontrol.port`
   (default **8080**). TLS 1.3 in-process when `-Dhttps.keystore` (PKCS12) + `-Dhttps.keystore.password`
-  are set; otherwise plain HTTP. ⚠️ **Binds all interfaces** — there is no bind-address flag today
-  (`EDITIONS.md` claims Personal is "localhost only"; the code does not enforce it). Until GAP-1 (§10)
-  ships, T1 relies on the OS firewall.
+  are set; otherwise plain HTTP. Bind address `-Dcontrol.bind` (**default: every interface**);
+  ⚠️ unset is still bind-all, so T1 must set `-Dcontrol.bind=127.0.0.1` or keep the OS firewall — the
+  flag restricts a deployment, it did not change the default. GAP-1 (§10) is closed as of 2026-08-29.
 - **Ops endpoints** — the probes are the only unversioned paths; everything else needs the `/api/v1`
   prefix and answers in the v1 envelope: `GET /health` (open, liveness `{"status":"UP"}`) ·
   `GET /ready` (readiness + pipeline count) · `GET /metrics` (Prometheus text, **open by design**:
@@ -134,8 +134,8 @@ inspecto-deploy/
 ```
 
 Personal edition: plain HTTP, **no authentication** (auth-free core; actor attribution via `X-Actor`
-fallback). Intended exposure is loopback-only — enforce with the OS firewall until the bind flag (GAP-1)
-ships. Backup = the `config_backup` maintenance job or plain zip of `spaces/`. Unzip-and-run installation;
+fallback). Intended exposure is loopback-only — **set `-Dcontrol.bind=127.0.0.1`** (shipped 2026-08-29),
+and keep the OS firewall as the belt-and-braces half; the default binds every interface. Backup = the `config_backup` maintenance job or plain zip of `spaces/`. Unzip-and-run installation;
 no service wrapper needed.
 
 ### T2 — Standard single-node server (team / department)
@@ -432,8 +432,12 @@ the `maintenance_backups` catalog give the durable trail).
 
 Design/reality gaps (tracked honestly — none block T1/T2 sales today):
 
-- **GAP-1 bind-all**: no bind-address flag; `EDITIONS.md`'s "localhost only" claim is aspirational. Small
-  core change (`-Dcontrol.bind`) + doc fix; firewall guidance interim. Highest-priority hardening item.
+- ~~**GAP-1 bind-all**~~ **CLOSED 2026-08-29**: `-Dcontrol.bind` ships on both the HTTP and HTTPS paths
+  (`ControlApi.bindAddress`, pinned by `ControlApiBindTest`), and an unresolvable value fails the boot
+  rather than widening. ⚠ **The default is unchanged — every interface** — by deliberate call: narrowing
+  it would make deployed Standard/Enterprise installs unreachable on upgrade. So the operator
+  responsibility is real and now *documented* rather than contradicted: `EDITIONS.md`'s "localhost only"
+  claim was the defect and has been replaced with the exposure note. Firewall guidance stands.
 - **GAP-2 Enterprise packaging** (SCR-8) · **GAP-3 no service wrappers/installers** (SCR-3) · **GAP-4
   DuckDB cap not on-by-default** (D3; mitigated by mandatory-flag guidance) · **GAP-5 T15 surge admission**
   (deferred hot-path work) · **GAP-6 Vault/KMS provider** (SEC-8 deferred; D4) · **GAP-7 gateway/IAM

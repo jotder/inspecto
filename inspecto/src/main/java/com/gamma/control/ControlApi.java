@@ -264,13 +264,46 @@ public final class ControlApi implements AutoCloseable, ApiContext {
     }
 
     /**
+     * The address the control plane listens on: {@code -Dcontrol.bind=<host-or-IP>}, or **every
+     * interface** when unset.
+     *
+     * <p>⚠ <b>The default is the wildcard address, and that is a deliberate call (2026-08-29), not an
+     * oversight.</b> Narrowing it to loopback would silently make every already-deployed Standard and
+     * Enterprise install unreachable on upgrade, so the flag exists to let a deployment restrict itself
+     * rather than to change what an existing one does.
+     *
+     * <p>🔴 <b>Consequently, exposure is an operator responsibility, and it matters most exactly where
+     * there is no authentication.</b> Personal ships no {@code Authenticator} at all
+     * ({@code docs/EDITIONS.md}), so a Personal install left on the default binds an unauthenticated
+     * control plane to every interface. Set {@code -Dcontrol.bind=127.0.0.1} (or firewall the port) for
+     * any single-user install. {@code docs/EDITIONS.md} previously asserted loopback as if the code
+     * enforced it; it never did.
+     *
+     * <p>An unresolvable host fails the boot rather than falling back, mirroring the authenticator check
+     * above: a control plane that cannot honour its stated bind must not come up serving a wider one.
+     */
+    // Package-private, not private: ControlApiBindTest pins the resolution rules directly. Booting a
+    // server per case would prove only that SOME address bound, which is the half that never breaks.
+    static InetSocketAddress bindAddress(int port) throws IOException {
+        String host = System.getProperty("control.bind");
+        if (blank(host)) return new InetSocketAddress(port);
+        InetSocketAddress address = new InetSocketAddress(host.trim(), port);
+        if (address.isUnresolved())
+            throw new IOException("-Dcontrol.bind=" + host.trim() + " does not resolve to an address");
+        return address;
+    }
+
+    /**
      * Plain HTTP by default (Personal edition, unchanged). Set {@code -Dhttps.keystore=<PKCS12 path>}
      * (+ {@code -Dhttps.keystore.password=<pw>}) to serve over TLS 1.3 instead (Standard edition,
      * docs/EDITIONS.md); pure JDK ({@link HttpsServer} + {@code javax.net.ssl}), no new dependency.
+     *
+     * <p>Both transports bind through {@link #bindAddress(int)} — a TLS listener that ignored
+     * {@code -Dcontrol.bind} would be the surprising half of the pair.
      */
     private static HttpServer createServer(int port) throws IOException {
         String keystore = System.getProperty("https.keystore");
-        if (blank(keystore)) return HttpServer.create(new InetSocketAddress(port), 0);
+        if (blank(keystore)) return HttpServer.create(bindAddress(port), 0);
         char[] password = System.getProperty("https.keystore.password", "").toCharArray();
         try (var in = Files.newInputStream(Path.of(keystore.trim()))) {
             java.security.KeyStore ks = java.security.KeyStore.getInstance("PKCS12");
@@ -280,7 +313,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
             kmf.init(ks, password);
             javax.net.ssl.SSLContext ssl = javax.net.ssl.SSLContext.getInstance("TLSv1.3");
             ssl.init(kmf.getKeyManagers(), null, null);
-            HttpsServer https = HttpsServer.create(new InetSocketAddress(port), 0);
+            HttpsServer https = HttpsServer.create(bindAddress(port), 0);
             https.setHttpsConfigurator(new HttpsConfigurator(ssl));
             return https;
         } catch (java.security.GeneralSecurityException e) {

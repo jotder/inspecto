@@ -9,7 +9,7 @@
 
 | Aspect | **Personal** | **Standard** | **Enterprise (partially shipped)** |
 |---|---|---|---|
-| Transport | Plain HTTP, **bind localhost only** | HTTPS (`HttpsServer` + keystore; FIPS provider for Gov) | HTTPS, TLS at LB/gateway |
+| Transport | Plain HTTP; binds **every interface** unless you set `-Dcontrol.bind` — see the note below | HTTPS (`HttpsServer` + keystore; FIPS provider for Gov) | HTTPS, TLS at LB/gateway |
 | AuthN | **None** | **Delegated to an external IAM** (Keycloak / WSO2 / Okta / Entra) — app is an OIDC/OAuth2 **resource server** | Same, centralized IAM + token introspection |
 | AuthZ | None | **RBAC + ABAC** from IAM token claims/groups | RBAC/ABAC + per-tenant boundaries |
 | User mgmt / LDAP / SAML | n/a | **IAM's job** (federates AD/LDAP, brokers SAML) | IAM's job |
@@ -20,6 +20,23 @@
 | Scheduler | in-JVM | in-JVM | **distributed coordination** (leader election / locks) |
 | Compliance scope | none | SOC 2 / ISO 27001 / FedRAMP / HIPAA / PCI | inherits Standard + multi-node controls |
 | Packaging | core fat-JAR, `-Dauth.mode=none` | core + `security` module, `-Dauth.mode=oidc`, TLS on | + `policy` module (ABAC; shipped) — later + shared-store modules, coordinator |
+
+> ### 🔴 Listen address — read this before running Personal on a shared network
+>
+> **The control plane binds every interface by default, in every edition.** `-Dcontrol.bind=<host-or-IP>`
+> restricts it (`-Dcontrol.bind=127.0.0.1` for loopback); an unresolvable value fails the boot rather
+> than falling back to the wider address.
+>
+> ⚠ **This matters most on Personal, which ships no authenticator at all.** Left on the default, a
+> Personal install serves an unauthenticated control plane — including the config-write routes — to
+> every host that can reach the port. Set `-Dcontrol.bind=127.0.0.1`, or firewall the port, for any
+> single-user install.
+>
+> The default is deliberate (2026-08-29): narrowing it to loopback would silently make every deployed
+> Standard and Enterprise install unreachable on upgrade, so the flag lets a deployment restrict itself
+> rather than changing what an existing one does. ⛔ **This table previously read "bind localhost only"
+> for Personal, which the code never enforced** — the claim, not the behaviour, was the defect. Pinned by
+> `ControlApiBindTest`.
 
 ## Assembly model (how an edition is produced)
 
