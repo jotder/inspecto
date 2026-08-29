@@ -91,6 +91,15 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- ~~`superpower/source-timezone-plan.md`~~ — **COMPLETE and ARCHIVED 2026-08-29** →
+  [`archived-documents/plans-archive/source-timezone-plan.md`](archived-documents/plans-archive/source-timezone-plan.md).
+  Temporal columns carry a declared **source zone** and normalise to naive UTC (S1 engine + config
+  `44ecef76`, S2 surfaces `dd02d377`), and the `TIMESTAMPTZ` host-zone trap is closed by refusal at
+  config load. As-built + every finding: [`okf/backend/engine/duckdb.md`](okf/backend/engine/duckdb.md)
+  §*The source time zone for temporal data*. Kept for its live DuckDB probe transcript (§1). Two open
+  items only, both in `BACKLOG.md` §4: no `timezone_column` editor (by decision) and the
+  `%z`-mixed-`COALESCE` latent defect.
+
 - [`superpower/parser-plugin-framework.md`](superpower/parser-plugin-framework.md) — **NOT APPROVED,
   NOTHING BUILT** (listed here 2026-08-28 — it had been sitting in `superpower/` unlisted, which is
   how a five-phase plan stayed invisible to the board). The operator's "E of ELT" framework:

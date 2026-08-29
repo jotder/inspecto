@@ -125,4 +125,91 @@ The engine embeds DuckDB natively (requires the `--enable-native-access=ALL-UNNA
   [`OperationsZone`](../control-plane/jobs.md) means changing the connection's zone as a **third** moving
   part, not just the two Java halves.
 
+## The source time zone for temporal data
+
+**SHIPPED 2026-08-29** (engine + config `44ecef76`, surfaces `dd02d377`). Plan + the full live-probe
+transcript: [`archived-documents/plans-archive/source-timezone-plan.md`](../../../archived-documents/plans-archive/source-timezone-plan.md).
+
+A parsed wall-clock timestamp used to mean whatever the *host* running the batch thought it meant.
+Temporal columns now carry a declared **source zone** and are normalised to **naive UTC** at parse
+time, so a value stops depending on which box processed it.
+
+* **The policy is three tiers, precedence `raw.fields[].timezone_column` > `raw.fields[].timezone` >
+  `parsing.source_timezone` > none.** `SourceZones` (`inspecto-etl`) is the one home for the concept —
+  `validate` / `resolve` / `wrap`. `none` is the default and is **byte-identical to the old behaviour**,
+  pinned by a test.
+* **The compile shape is `timezone('UTC', timezone(Z, <naive-parse>))`** — measured, not reasoned. It
+  yields a naive-UTC `TIMESTAMP`, which is what keeps everything downstream (partitions, BI grains,
+  dedup) naive and consistent.
+* **Four temporal sites, not the "one choke point" the board row assumed.** Applied at
+  `SchemaFieldTypes.castSql` (the mapped column), `TransformCompiler.dateExpr` (`DATE_*` partitions and
+  `__event_time`) and `TransformCompiler.concatDt`. ⛔ **`FILENAME_DATE` and `DATE` are zone-exempt by
+  design** — a date has no instant to shift, and shifting one moves a file dated `20260829` into the
+  previous day for any negative offset. Documented at the method, not silently skipped. The `EXPR` rule
+  is out of scope by the same rule that leaves it un-sandboxed.
+* 🔴 **The `TIMESTAMPTZ` host-zone trap is CLOSED by refusal, not by a default.** A naive value cast
+  `::TIMESTAMPTZ` is interpreted in the **session** zone (i.e. the host — see the bullet above), so a
+  `TIMESTAMPTZ` field with **no** zone source is now refused at config load
+  (`PipelineConfigParser.requireZoneForTimestampTz`, called at all three schema-resolution points:
+  single, multi, segment). No shipped config declared one, so nothing broke.
+* 🔴 **`TRY()` does NOT catch DuckDB's *Unknown TimeZone*.** *Not implemented* errors are outside what
+  `TRY` intercepts, so one bad cell in a `timezone_column` would kill the whole batch with no soft
+  failure available. A per-row zone therefore resolves through a **`pg_timezone_names()` lookup**, which
+  yields NULL for an unknown or NULL zone — the same "bad value becomes NULL" contract every other
+  coercion has, already counted by the cast-failure audit. ~2µs/row, paid only when a `timezone_column`
+  is configured; the fixed-zone form compiles to a literal.
+* 🔴 **The zone-column reference needs `CAST(… AS VARCHAR)`** — `lower()` binds only to VARCHAR, so a
+  typed zone column was a binder error that killed the batch, precisely the failure the lookup exists to
+  prevent. Found by a test, not by inspection.
+* ⚠ **The gate is membership in `ZoneId.getAvailableZoneIds()`, and `ZoneId.of` alone is NOT a valid
+  gate.** Offset forms (`+05:30`, `Z`) are **rejected by DuckDB** though `ZoneId.of` accepts them; the
+  two engines disagree in both directions (DuckDB takes `utc`, Java does not; Java knows `UT`, DuckDB
+  does not). Measured containment: all 604 Java zone ids appear in DuckDB's 638-row
+  `pg_timezone_names()`, so the Java set is a proven-safe subset — pinned against the live engine by
+  `everyZoneTheGateAdmitsIsOneDuckDbAccepts` rather than trusted.
+* **ICU needed no work.** It is statically bundled, `loaded=true` on a bare `jdbc:duckdb:` connection,
+  and named-zone arithmetic **survives the `SqlSandbox` seal** (`autoload_known_extensions=false` +
+  `enable_external_access=false` + `lock_configuration=true`). This was the build's biggest assumed risk
+  and it was not one.
+* **DST-ambiguous and non-existent local times raise nothing** — Berlin `02:30` on both switch days
+  resolves silently to `01:30` UTC. Nothing to guard; worth knowing.
+* ⚠ **A blank cell in TOON's tabular field form is ABSENT, not empty.** `fields[N]{…}` declares one
+  header per column, so a schema giving *any* field a zone writes `""` for all the others — null-only
+  checks would refuse every such schema at load.
+* **Surfaces** (`inspecto-ui`): a `source_timezone` select on the Grammar editor's **Types** tab across
+  all four frontends — parsing-level (no `delimited__` prefix, matching `encoding`/`compression`) and
+  with **no default** — plus a **Source zone** column in the columns table, rendered only on rows whose <!-- vocab-allow: "Source zone" is the shipped UI column label for a temporal ORIGIN zone, not the acquisition entity -->
+  type carries an instant. One shared vocabulary in `inspecto/schema/time-zones.ts`; the offline mock
+  mirrors the server's refusals on both the schema and the pipeline write.
+  * ⚠ **`ConfigSpecs` needed nothing.** Parsing-block keys are frontend `AttributeSpec`s, and no backend
+    allow-list gates an unknown config key (`ConfigSafetyValidator` is path-jail + output formats only),
+    so the key saves through the control plane untouched. `date_formats` / `timestamp_formats` are not
+    in `ConfigSpecs` either.
+  * ⚠ **Placement deviates from the board row deliberately.** The row asked for the metadata grid; that
+    grid is documented as Catalog-facing and *never read by the ETL*, and a source zone IS ETL-read. It
+    went beside the **type it qualifies** in the columns table, on the DECIMAL-parameters precedent —
+    self-limiting, so no timestamps means no column.
+  * ⛔ **`timezone_column` has no editor, by decision.** Offering a per-row column beside ~418 zone names
+    in one cell invites exactly the ambiguity the engine's mutual-exclusion rule prevents. A
+    hand-authored one is **carried through a save** and shown read-only on its row, so the fixed-zone box
+    cannot silently contradict it.
+* 🔴 **Config-level key homes.** `parsing.source_timezone` is a **sibling of `delimited:`**, because it
+  is format-agnostic — which means it had to be added to `PipelineConfigParser.mergeParsing`'s explicit
+  **scalar allow-list**, the only path that carries a parsing-level scalar through. `timezone` /
+  `timezone_column` are validated fail-closed in `Identifiers.validateSchema`; a `timezone_column`
+  naming a field that does not exist is a load error. **`meta.domain.timezone` stays display-only** —
+  activating it here would reverse the 2026-08-15 decision recorded in
+  [`OperationsZone`](../control-plane/jobs.md).
+* 🔴 **A pre-existing UI defect this work exposed, fixed with it.** A `type: 'select'` asks in a MatDialog
+  that the CDK attaches to `document.body`, so choosing an option never bubbles a click through the pane;
+  all three `pipelines/*-definition` panes derived dirtiness from `@HostListener('click')`, so **Apply
+  stayed greyed out over a choice just made** — for every select on those drawers, not just this one. A
+  2816-test suite missed it and the preview caught it. Fixed with `@HostListener('document:click')` and
+  pinned by a regression spec.
+* ⚠ **Still latent, pre-existing, NOT fixed:** a format list mixing a `%z` pattern with a plain one
+  unifies the whole `COALESCE` to `TIMESTAMP WITH TIME ZONE`, so the plain branch is session-zone
+  interpreted. No shipped config uses `%z`. Tracked in `BACKLOG.md` §4.
+* **Dead code flagged, not touched:** `SqlBuilder.buildPartitionExpr` has no production caller (only
+  `buildCastExpr` at `TransformCompiler:209` does).
+
 Output is written via DuckDB `COPY` — see [output & sinks](output-sinks.md).

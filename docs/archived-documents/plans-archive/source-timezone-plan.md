@@ -1,6 +1,10 @@
 # The source time zone for temporal data — grounded plan
 
-**Status:** IN FLIGHT (opened 2026-08-29). Board row: `BACKLOG.md` §4 `Source-timezone for temporal data`
+**Status:** **COMPLETE and ARCHIVED 2026-08-29** — S1 `44ecef76`, S2 `dd02d377`. The durable as-built
+lives in `okf/backend/engine/duckdb.md` §*The source time zone for temporal data*; the two remaining open
+items (no `timezone_column` editor, by decision; the `%z`-mixed-`COALESCE` latent defect) are in
+`BACKLOG.md` §4. This file is kept for the live-probe transcript in §1 and is not maintained.
+(Opened 2026-08-29.) Board row: `BACKLOG.md` §4 `Source-timezone for temporal data`
 (2026-08-22, operator-requested). Concept home on completion:
 `okf/backend/engine/duckdb.md`.
 
