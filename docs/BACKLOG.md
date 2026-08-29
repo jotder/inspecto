@@ -757,6 +757,69 @@ non-blocking:**
 
 ## 6. Engineering / tech-debt
 
+**GUARD-SCOPE-1 — what each guard silently exempts, swept 2026-08-29 (`41d4ce8a`, `c13a2c83`). CLOSED,
+kept because the METHOD generalises.** The sweep asked one question of every guard — *not* "are the rules
+right", which is where attention naturally goes, but **"what is outside the set it scans, and does anything
+say so?"** Three of the four answers were holes, and none of them made a guard go red — a guard is green
+about the files it looked at.
+
+- ✅ **The vocabulary guard did not scan the ROOT CANON.** Scope was `USER_FACING` (9 curated files) +
+  `DOC_TREES`, and `GLOSSARY` · `INDEX` · `BACKLOG` · `PROJECT_NOTES` · `ADVANCED_GUIDE` ·
+  `FEATURE_INVENTORY` · `REQUIREMENTS` · `stakeholders/` were in neither — though CLAUDE.md's doc-lifecycle
+  §1 calls that tier current knowledge. **The file that DEFINES the bans was itself unscanned.** Fixed by a
+  named `ROOT_CANON` list (not `docs/`, which would sweep in the permanently-excluded archive) +
+  `docs/stakeholders` as a tree: **171 → 186 docs**. ⚠ This is the SAME shape the guard's own comment
+  already warned about for `compliance/` — *"a new tier is unscanned by default, and nothing says so"* — so
+  the warning was written and the lesson was not generalised. When a guard records a near-miss, re-ask its
+  question of every OTHER tier the same day.
+- ✅ **What the new scope found was real, not cosmetic.** 37 hits, of which 8 were subject-matter
+  exemptions (`DOC_ALLOW`) and the rest stale rename residue that had survived every earlier pass —
+  including **a documented route that has not existed since the Source→Collector rename**
+  (`ADVANCED_GUIDE` advertised `GET /sources`; it is `GET /collectors`) and **a documented event name that
+  is now only a read-alias** (`FLOW_CONSERVATION_IMBALANCE`; emitters use `PIPELINE_CONSERVATION_IMBALANCE`,
+  and the legacy value survives solely as `EventType.FLOW_CONSERVATION_IMBALANCE_LEGACY` so pre-rename
+  ledger rows still promote). Both were invisible to the guard's own rules — backticked identifiers are
+  stripped before scanning — so **widening a guard's scope pays out in defects the guard cannot itself see**.
+- ✅ **The committed-secret guard skipped `archived-documents/`** — 195 **tracked** files, including
+  `legacy-api-sunset-runbook.md`. That exclusion is correct for the vocabulary LINT (unmaintained prose,
+  unfixable noise) and was copied to a guard asking a different question: a lint asks *is this maintained*,
+  a secret guard asks *is this COMMITTED*. Archiving a runbook does not redact it, and `.md` is in the
+  guard's extension set for exactly this reason (its own comment: *"a rotation runbook or an incident plan
+  is exactly where someone pastes a live credential"*). ⚠ **Falsified in BOTH directions** before the row
+  was closed: a planted assignment in an archived doc now fails the guard (exit 1), and the archive is
+  clean on removal (exit 0) — so this closed a hole, **not** a leak. ⛔ Do not re-add the skip by analogy
+  with the other guard; the analogy is what created it.
+- ⚠ **Left as-is, deliberately: `worktrees` stays skipped.** It is gitignored scratch, so it is outside the
+  "committed" question by definition, and it is cleaned separately (SEC-INCIDENT-1 held unversioned copies
+  of all five secrets there). Recorded so the next sweep does not re-litigate it as a fourth hole.
+
+**BI-5 VOCABULARY — an open question, deliberately NOT settled by editing a requirement.** The
+`measure-threshold` rule says an Alert Rule watches an observability **Metric**, never a BI **Measure**
+(the A2 confusion). `REQUIREMENTS.md` BI-5 describes a **shipped** capability that does exactly that —
+`*_alert.toon` measure rules over `dataset:` + `measure: agg(field)`. So either the rule is over-broad or
+the feature is misnamed, and **the line is not wrong about the product**. Allowlisted as
+`docs/REQUIREMENTS.md::measure-threshold` with that reasoning recorded at the entry. ⛔ Do not resolve this
+by rewording BI-5 to make the guard green — that would hide a naming question behind a passing check.
+**Needs the operator** (GLOSSARY §4/§8 owner), not a shift.
+
+**PARK-HOME-1 — `disabled_steps` armed with nowhere to park. CLOSED 2026-08-29 (`c13a2c83`).** `dirs.backup`
+is OPTIONAL (`PipelineConfigParser` reads it with a plain `get`), but `BatchProcessor.parkSource` parks under
+`<backup>/parked` — so the pipeline armed, ran, and died on a raw NPE the operator saw as `park failed: null`,
+once per batch. Every sibling refusal in `prepare()` exists to convert exactly that into an authoring-time
+answer; this one was simply missing. `StepDisableArming.refusals` now takes `parkHomeConfigured` as a
+**required** argument (no `true`-defaulting overload: a caller that cannot answer must not arm a park), and
+both callers supply it — `prepare()` from `dirs.backup()`, `ConfigRoutes` from the draft via
+`draftHasParkHome`. ⚠ Pinned at BOTH levels on purpose: the rule set in `StepDisableArmingTest`, and the
+**wiring** in `RouteIngestEndToEndTest.disablingAStepWithNoBackupDirIsRefusedAtArming` — a unit test over the
+rule set cannot fail if `prepare()` stops passing the real `dirs.backup`, which is the only thing left that
+could regress.
+- **Same commit, a guard narrowed:** `DrainCommand.refuseExpansionMembers` treated a blank `backupPath` as an
+  unpack expansion. It is not — it means `dirs.backup` was unset (`BatchProcessor`'s `backup != null`
+  ternary), a different condition with a different fix — so a config error would have been reported to the
+  operator as an unpack problem they do not have. Now it tests only the JAR-style `archive!entry` address.
+  ⚠ The wrong arm was **unreachable** (no backup ⇒ park NPEs before a manifest exists) and stayed wrong for
+  that reason: a misdiagnosis in dead code is still a misdiagnosis waiting for the code above it to change.
+
 **Open (added 2026-08-27, from the Phase-1 simplification arc — plan archived):**
 - ✅ **JAVA-SIMP-1 — CLOSED 2026-08-27: route-class map casts adopt `Values.mapAt`.**
   **20 sites converted across 10 files; `@SuppressWarnings("unchecked")` 22 → 5** (measured, not
@@ -1815,7 +1878,8 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   of [`okf/backend/pipeline-graph/pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md)
   §13 R3, which would let the editor lower (and the ingest path run) the full graph vocabulary. Largest
   remaining pipeline-graph piece; explicitly out of scope for W5.
-  - **IN FLIGHT — plan of record:**
+  - **PLAN COMPLETE AND ARCHIVED — this block is a HISTORY, not a queue** (corrected 2026-08-29; it read
+    "IN FLIGHT" while linking into the archive tier, which is a contradiction the reader had to notice):
     [`archived-documents/plans-archive/branch-aware-executor-plan.md`](archived-documents/plans-archive/branch-aware-executor-plan.md). The operator
     reordered the stages 2026-08-01: **throughput/decoupling (Stage B) first**, multi-destination sinks
     later as a plural `sinks:` section, the executor bridge (Stage A) deferred behind B.
@@ -1845,12 +1909,16 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
       "`PipelineConfig.Output` is a single record" **no longer holds**.
     - **Multi-destination did NOT need Stage A.** It shipped as flat-path fan-out in
       `BatchIngestStrategy.writeAndTrace`, not through `BatchGraphRunner`.
-    - **Step 3 is still NOT wired.** `BatchGraphRunner` remains uncalled from main code — the only
-      references are two prose comments in `BatchProcessor.java:87,95`. Its `engages` predicate wants
-      **>1 data-fed sink _node_**, which `sinks:` does not create (that's N destinations for one branch),
-      so the predicate is still `false` for every real ingest config. The remaining trigger for Stage A
-      is a genuinely branching graph, which is exactly the refused-node list above.
-    Stage C is unstarted (needs sign-off).
+    - ~~**Step 3 is still NOT wired.**~~ 🔴 **FALSE since the arming work — corrected 2026-08-29.**
+      `BatchGraphRunner` **is** called from main code: `BatchIngestStrategy.java:300` (`run(...)`), gated by
+      `engages(routed)` at `:155`, with `dataFedSinkCount` also read at `CollectorProcessor.java:127`. The
+      "two prose comments in `BatchProcessor.java:87,95`" reading was true when written and was never
+      re-grounded, so the board carried a shipped lane as unbuilt for weeks. The original text: *"the
+      `engages` predicate wants >1 data-fed sink node, which `sinks:` does not create … so the predicate is
+      still false for every real ingest config."* That half is still the right mental model of **when** the
+      lane engages — a genuinely branching graph — but "uncalled" is not.
+    - ~~Stage C is unstarted (needs sign-off).~~ **SIGNED OFF** — ELT amendment plan §9 **D-5**: *"SIGNED OFF —
+      folded here"* as §2.4 + Phase 4. Stage C closes by reference to that plan; nothing here waits on a call.
     - **Deferred from B3b — acquisition-side "listed remotely but not yet fetched" gauge.** With ingest now
       walking the inbox, `countPending` is the exact *landed* backlog; the remote-side pending signal ("the
       connector listed N files we have not fetched yet") is a distinct, still-unbuilt metric. Decide its
