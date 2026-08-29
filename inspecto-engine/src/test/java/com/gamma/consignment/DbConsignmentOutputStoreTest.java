@@ -41,6 +41,109 @@ class DbConsignmentOutputStoreTest {
         }
     }
 
+    // ── daily volume (completeness KPI, K1) ──────────────────────────────────
+
+    /** One LIVE output for {@code producer} on {@code day}. */
+    private static ConsignmentOutput vol(String consignment, String producer, String day, String path,
+                                         long rows, State state) {
+        return new ConsignmentOutput(consignment, "run-1", "cdr", "dt=" + day, day, path, rows,
+                rows * 100, day + "T10:00:00Z", 1, state, null, null, producer);
+    }
+
+    /**
+     * 🔴 The trap this query exists to avoid. Row state is per-REGISTRATION while a file is one PATH, so a
+     * full recompute rewrites a stable path in place and that path owns a SUPERSEDED row beside its LIVE one.
+     * Summing every row would report a recomputed day as having received MORE data — a volume increase
+     * manufactured by reprocessing, which is precisely the false signal a completeness KPI must not emit.
+     */
+    @Test
+    void aRecomputedDayIsNotCountedTwice() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            String path = "/w/cdr/dt=2026-08-04/stable.parquet";
+            db.record(List.of(
+                    vol("c1", "cdr_pipeline", "2026-08-04", path, 100, State.SUPERSEDED),
+                    vol("c2", "cdr_pipeline", "2026-08-04", path, 120, State.LIVE)));
+
+            List<DbConsignmentOutputStore.DailyVolume> v =
+                    db.dailyVolume("cdr_pipeline", "2026-08-01", "2026-08-31");
+
+            assertEquals(1, v.size());
+            assertEquals(120, v.get(0).rows(), "the LIVE registration only — not 220");
+            assertEquals(1, v.get(0).files(), "one PATH, however many registrations it carries");
+        }
+    }
+
+    /** COMPACTED_AWAY rows live on inside the compacted file, which carries its own LIVE row. */
+    @Test
+    void compactedAwayRowsAreNotCounted() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.record(List.of(
+                    vol("c1", "p", "2026-08-04", "/w/small-1.parquet", 50, State.COMPACTED_AWAY),
+                    vol("c1", "p", "2026-08-04", "/w/small-2.parquet", 50, State.COMPACTED_AWAY),
+                    vol("c2", "p", "2026-08-04", "/w/merged.parquet", 100, State.LIVE)));
+
+            List<DbConsignmentOutputStore.DailyVolume> v = db.dailyVolume("p", "2026-08-01", "2026-08-31");
+            assertEquals(1, v.size());
+            assertEquals(100, v.get(0).rows(), "compaction moved rows, it did not add any");
+            assertEquals(1, v.get(0).files());
+        }
+    }
+
+    /**
+     * 🔴 Unknown is not zero and not empty. A file whose record_day was never established (no event time
+     * materialised, no date partition, or every event time unparseable) must reach the KPI as its own
+     * bucket — folding it into a day invents an attribution, dropping it hides arrived rows, and either way
+     * the KPI reports a deviation that is an artifact of its own bookkeeping.
+     */
+    @Test
+    void theUnknownDayBucketSurvivesAndIsNotADay() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.record(List.of(
+                    vol("c1", "p", "2026-08-04", "/w/known.parquet", 10, State.LIVE),
+                    new ConsignmentOutput("c2", "run-1", "cdr", null, null, "/w/unknown.parquet", 7, 700,
+                            "2026-08-04T10:00:00Z", 1, State.LIVE, null, null, "p")));
+
+            List<DbConsignmentOutputStore.DailyVolume> v = db.dailyVolume("p", "2026-08-01", "2026-08-31");
+
+            assertEquals(2, v.size());
+            assertEquals("2026-08-04", v.get(0).recordDay());
+            assertNull(v.get(1).recordDay(), "the unknown bucket sorts last and keeps a null day");
+            assertEquals(7, v.get(1).rows(), "its rows are reported, not discarded");
+        }
+    }
+
+    @Test
+    void scopesToOneProducerAndRefusesToAggregateAcrossAll() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.record(List.of(
+                    vol("c1", "pipeline_a", "2026-08-04", "/w/a.parquet", 10, State.LIVE),
+                    vol("c2", "pipeline_b", "2026-08-04", "/w/b.parquet", 99, State.LIVE)));
+
+            List<DbConsignmentOutputStore.DailyVolume> v = db.dailyVolume("pipeline_a", "2026-08-01", "2026-08-31");
+            assertEquals(1, v.size());
+            assertEquals(10, v.get(0).rows(), "pipeline_b's rows are not this pipeline's volume");
+
+            assertThrows(IllegalArgumentException.class, () -> db.dailyVolume("  ", "2026-08-01", "2026-08-31"),
+                    "a blank producer must refuse, never silently sum every pipeline");
+        }
+    }
+
+    /** ⚠ A day with no registered output is ABSENT, not zero — only the caller knows the expected calendar. */
+    @Test
+    void daysOutsideTheRangeAreExcludedAndMissingDaysAreAbsent() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.record(List.of(
+                    vol("c1", "p", "2026-08-04", "/w/in.parquet", 10, State.LIVE),
+                    vol("c2", "p", "2026-09-04", "/w/out.parquet", 10, State.LIVE)));
+
+            List<DbConsignmentOutputStore.DailyVolume> v = db.dailyVolume("p", "2026-08-01", "2026-08-31");
+            assertEquals(1, v.size(), "September is outside the range");
+            assertEquals("2026-08-04", v.get(0).recordDay());
+            // 2026-08-05 received nothing and simply does not appear.
+            assertTrue(v.stream().noneMatch(d -> "2026-08-05".equals(d.recordDay())));
+        }
+    }
+
     private static ConsignmentOutput out(String consignment, String path, long rows, State state) {
         return new ConsignmentOutput(consignment, "run-1", "cdr", "dt=2026-08-04", "2026-08-04",
                 path, rows, rows * 100, "2026-08-04T10:00:00Z", 1, state);

@@ -157,6 +157,69 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
      * (so it can take the partition-rewrite path of §6.2 rather than a no-op unlink), and filtering that out
      * here would hide exactly the case the registry exists to expose.
      */
+    /**
+     * One day's received volume for one pipeline, as the completeness KPI reads it
+     * (completeness-kpi-plan K1).
+     *
+     * @param recordDay the event-time day, or {@code null} for the <b>unknown-day</b> bucket — files whose
+     *                  {@code record_day} was never established because the write path materialises no event
+     *                  time (enrichment and Pipeline sinks), the schema declares no date partition, or every
+     *                  row's event time failed to parse. 🔴 <b>Unknown is not zero and not empty.</b> Folding
+     *                  it into a day would attribute rows to a date nothing claimed; dropping it would hide
+     *                  rows that genuinely arrived. A KPI that cannot tell "no data" from "date unknown"
+     *                  reports a confident deviation that is an artifact of its own bookkeeping.
+     * @param files     distinct output files — {@code COUNT(DISTINCT path)}, never a row count.
+     * @param rows      rows across those files.
+     */
+    public record DailyVolume(String recordDay, long files, long rows) {}
+
+    /**
+     * Received volume per record-day for one producing pipeline, over {@code [fromDay, toDay]} inclusive,
+     * plus the unknown-day bucket (a {@code null} {@code recordDay}, sorted last).
+     *
+     * <p>🔴 <b>LIVE rows only, and files counted DISTINCT.</b> Row state is per-<em>registration</em> while a
+     * file is one <em>path</em>: output naming is not one-file-per-Consignment, so a full recompute rewrites a
+     * stable path in place and that path legitimately owns an old {@code SUPERSEDED} row beside its current
+     * {@code LIVE} one (see {@link #unreadablePaths}). Summing every row would count a recomputed day twice
+     * and report a volume <em>increase</em> caused purely by reprocessing — the exact false signal a
+     * completeness KPI exists to rule out. {@code COMPACTED_AWAY} is excluded for the same reason: its rows
+     * live on inside the compacted file, which carries its own LIVE row.
+     *
+     * <p>⚠ Days with no registered output are <b>absent from the result, not zero</b>. Only the caller knows
+     * which days were expected; this method reports what the registry holds and does not invent a calendar.
+     *
+     * @throws IllegalArgumentException if {@code producer} is blank — a KPI must never silently aggregate
+     *                                  across every pipeline when it meant to scope to one.
+     */
+    public synchronized List<DailyVolume> dailyVolume(String producer, String fromDay, String toDay) {
+        if (producer == null || producer.isBlank())
+            throw new IllegalArgumentException("dailyVolume requires a producer (pipeline) — refusing to "
+                    + "aggregate across every pipeline");
+        String sql = "SELECT record_day, COUNT(DISTINCT path) AS files, "
+                + "COALESCE(SUM(row_count), 0) AS rows_total FROM " + T
+                + " WHERE producer = ? AND state = 'LIVE'"
+                // The unknown bucket must survive the range filter: it has no day to compare.
+                + "   AND (record_day IS NULL OR (record_day >= ? AND record_day <= ?))"
+                + " GROUP BY record_day ORDER BY record_day NULLS LAST";
+        List<DailyVolume> out = new ArrayList<>();
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, producer);
+            ps.setString(2, fromDay);
+            ps.setString(3, toDay);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next())
+                    out.add(new DailyVolume(rs.getString("record_day"), rs.getLong("files"), rs.getLong("rows_total")));
+            }
+        } catch (SQLException e) {
+            // ⛔ Deliberately NOT the fail-open warn-and-return-empty of record(): an empty list here is
+            // indistinguishable from "the pipeline received nothing", which is a breach the KPI would report
+            // as fact. A read that failed must not be mistaken for a day that was empty.
+            throw new IllegalStateException("consignment-outputs daily volume query failed for producer '"
+                    + producer + "': " + e.getMessage(), e);
+        }
+        return out;
+    }
+
     public synchronized List<ConsignmentOutput> outputs(String consignmentId) {
         String sql = "SELECT " + COLS + " FROM " + T
                 + " WHERE consignment_id = ? ORDER BY written_at DESC, path";
