@@ -9,6 +9,7 @@ import com.gamma.config.spec.Finding;
 import com.gamma.config.spec.Severity;
 import com.gamma.etl.ConfigValidator;
 import com.gamma.etl.PipelineConfig;
+import com.gamma.etl.TypeFlow;
 import com.gamma.pipeline.exec.ComponentPreview;
 
 import java.io.IOException;
@@ -44,6 +45,86 @@ final class ConfigPreviewRoutes implements RouteModule {
         // scratch-only (stream onboarding's Schema & Mapping stage; the parsed→typed hop).
         api.post("/config/preview/schema", (e, m) -> previewSchema(api.body(e)));
         api.post("/config/suggest/schema", (e, m) -> suggestSchema(api.body(e)));
+        // The DERIVED output schema of a SAVED pipeline: DESCRIBE over the same SELECT the
+        // transform would run, without executing it (step-workbench S5). Distinct from
+        // /config/preview/schema above, which TRY_CASTs a DRAFT against caller-supplied sample
+        // rows — that one needs rows and executes; this one needs neither.
+        api.get("/config/schema/derived", (e, m) -> derivedSchema(api, ApiContext.query(e, "pipeline")));
+    }
+
+    /**
+     * Derived output schema for every schema a saved pipeline declares.
+     *
+     * <p>🔴 {@code typedSource} is the load-bearing input: on the built-in CSV path every raw column
+     * is {@code VARCHAR}, while on the plugin path the declared field types stand. Passing the wrong
+     * one yields types that look authoritative and are wrong — the failure mode the step-workbench
+     * design calls out for ASN.1/fixed-width pipelines. It is derived here from the pipeline's own
+     * config ({@code ingesterClass != null}), never guessed or defaulted, and it is REPORTED in the
+     * response so a reader can see which path was assumed.
+     *
+     * <p>Gates: unknown pipeline → 404 · traversal in the name → 403 · schema-less draft → 422 ·
+     * a Schema/Mapping that does not bind → 422 carrying DuckDB's own column-naming message. There
+     * is no write-root gate: this route writes nothing.
+     */
+    private Object derivedSchema(ApiContext api, String pipeline) throws IOException {
+        if (pipeline == null || pipeline.isBlank())
+            throw new ApiException(400, "query parameter 'pipeline' is required");
+        // A bare config key, never a path: refuse separators outright rather than jailing a path.
+        if (pipeline.contains("/") || pipeline.contains("\\") || pipeline.contains(".."))
+            throw new ApiException(403, "'pipeline' must be a bare pipeline name, not a path");
+
+        PipelineConfig cfg = api.service().configFor(pipeline)
+                .orElseThrow(() -> new ApiException(404, "no pipeline named '" + pipeline + "'"));
+        PipelineConfig.Schemas schemas = cfg.schemas();
+
+        // ingesterClass != null is exactly the plugin path: the parser REFUSES a plugin ingester
+        // without a non-empty segments map (PipelineConfigParser), so the two never disagree.
+        boolean typedSource = schemas.ingesterClass() != null && !schemas.ingesterClass().isBlank();
+
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (schemas.segments() != null)
+            schemas.segments().forEach((key, schema) -> out.add(derivedEntry(key, key, schema, cfg, typedSource)));
+        else if (schemas.selector() != null)
+            for (var sel : schemas.selector().entries())
+                out.add(derivedEntry(sel.table(), sel.table(), sel.schema(), cfg, typedSource));
+        else if (schemas.single() != null)
+            out.add(derivedEntry("single", null, schemas.single(), cfg, typedSource));
+        else
+            throw new ApiException(422, "pipeline '" + pipeline + "' declares no schema "
+                    + "(a draft may be saved schema-less, but nothing can be derived from it)");
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("pipeline", pipeline);
+        body.put("sourcePath", typedSource ? "plugin" : "csv");
+        body.put("typedSource", typedSource);
+        body.put("ingesterClass", schemas.ingesterClass());
+        body.put("schemas", out);
+        return body;
+    }
+
+    /** One schema's derived SINK columns — the written shape, matching PartitionWriter's projection. */
+    private Map<String, Object> derivedEntry(String key, String table, Map<String, Object> schema,
+                                             PipelineConfig cfg, boolean typedSource) {
+        List<TypeFlow.Column> cols;
+        try {
+            cols = TypeFlow.sinkColumns(schema, cfg, typedSource);
+        } catch (IllegalArgumentException doesNotBind) {
+            // Fail closed and name the schema: a partial answer here would read as a complete one.
+            throw new ApiException(422, "schema '" + key + "' does not compile to a valid transform: "
+                    + doesNotBind.getMessage());
+        }
+        List<Map<String, Object>> columns = new ArrayList<>();
+        for (TypeFlow.Column c : cols) {
+            Map<String, Object> one = new LinkedHashMap<>();
+            one.put("name", c.name());
+            one.put("type", c.type());
+            columns.add(one);
+        }
+        Map<String, Object> entry = new LinkedHashMap<>();
+        entry.put("key", key);
+        entry.put("table", table);
+        entry.put("columns", columns);
+        return entry;
     }
 
     private Object validate(ApiContext api, Map<String, Object> body) throws IOException {

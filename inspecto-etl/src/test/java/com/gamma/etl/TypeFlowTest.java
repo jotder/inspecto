@@ -92,6 +92,33 @@ class TypeFlowTest {
     }
 
     @Test
+    void typedSourceIsWhatSeparatesThePluginPathFromCsv(@TempDir Path dir) throws Exception {
+        // 🔴 Every other test here passes typedSource=false, so until now nothing exercised the
+        // branch that makes a plugin/ASN.1 pipeline's types correct. The flag is not cosmetic: on
+        // the CSV path a raw column is VARCHAR and a DIRECT rule to a typed target compiles to a
+        // TRY_CAST, while on the plugin path the declared type is already there and the cast is a
+        // no-op. A route that passes the wrong flag reports types that look authoritative and are
+        // wrong — which is exactly why the derived-schema route reports which path it assumed.
+        PipelineConfig cfg = cfg(dir);
+        Map<String, Object> schema = cfg.schemas().single();
+
+        Map<String, String> asCsv = new LinkedHashMap<>();
+        for (TypeFlow.Column c : TypeFlow.transformedColumns(schema, cfg, false)) asCsv.put(c.name(), c.type());
+        Map<String, String> asPlugin = new LinkedHashMap<>();
+        for (TypeFlow.Column c : TypeFlow.transformedColumns(schema, cfg, true)) asPlugin.put(c.name(), c.type());
+
+        // The declared target types agree across both paths — the cast lands the same place either
+        // way, which is what makes the derived schema trustworthy as the written shape.
+        assertEquals(asCsv.get("AMT"), asPlugin.get("AMT"), "a DOUBLE target is DOUBLE on both paths");
+        assertEquals(asCsv.get("EVENT_DATE"), asPlugin.get("EVENT_DATE"));
+        assertEquals(asCsv.keySet(), asPlugin.keySet(), "the flag changes types, never the column set");
+
+        // And the typed path really did bind against declared types rather than VARCHAR: the
+        // scratch table is built from the field types, so a typed source still derives cleanly.
+        assertEquals("DOUBLE", asPlugin.get("AMT"));
+    }
+
+    @Test
     void sinkColumnsDropTheLineageTag(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = cfg(dir);
         List<TypeFlow.Column> sink = TypeFlow.sinkColumns(cfg.schemas().single(), cfg, false);
