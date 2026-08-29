@@ -48,9 +48,11 @@ class DerivedTableWriterTest {
     // ── the guard ─────────────────────────────────────────────────────────────
 
     /**
-     * 🔴 The security property. A derived table's SQL runs on the SAME unsealed sandbox as
-     * {@code ConsignmentReader.query} — the relations are lazy views over files — so it must clear the same
-     * {@code SqlGuard} allow-list. Shape-checking for a leading SELECT would let every one of these through.
+     * The INVARIANT property (⛔ not a security boundary — a processor is arbitrary Java on the classpath).
+     * A derived table's SQL must clear the same {@code SqlGuard} allow-list {@code ConsignmentReader.query}
+     * does, because a {@code COPY … TO} writes a file the registry never learns about and everything
+     * downstream — the Selector, retention, compaction, the next step's {@code outputs()} — keys off
+     * registered outputs. Shape-checking for a leading SELECT lets every one of these through.
      */
     @Test
     void authorSqlIsHeldToTheSameAllowListAsAQuery() {

@@ -99,6 +99,15 @@ class ConsignmentProcessJobTypeTest {
                 path.toString(), rows, 100L, "2026-08-04T10:00:00Z", 0, ConsignmentOutput.State.LIVE);
     }
 
+    /** A job whose lookup knows several processors, so a chain can resolve every step. */
+    private static Job chainJob(String dataDir, ConsignmentProcessor... all) {
+        Map<String, ConsignmentProcessor> byId = new java.util.LinkedHashMap<>();
+        for (ConsignmentProcessor p : all) byId.put(p.id(), p);
+        return new ConsignmentProcessJobType(byId::get, dataDir)
+                .create(new JobConfig("chain_job", ConsignmentProcessJobType.TYPE_ID, null, null,
+                        true, false, Map.of(), null, null));
+    }
+
     private static Job job(ConsignmentProcessor processor) {
         return job(processor, null);
     }
@@ -329,6 +338,103 @@ class ConsignmentProcessJobTypeTest {
             assertTrue(store.outputs("c1").stream().allMatch(o -> o.state() == ConsignmentOutput.State.SUPERSEDED),
                     "base AND derivative are both superseded — no lineage edge needed");
         }
+    }
+
+    // ── stage 3: an ordered chain over one Consignment ───────────────────────────
+
+    /** Step 1 of a chain: derives a table the NEXT step must be able to see. */
+    private static final class FirstStep implements ConsignmentProcessor {
+        @Override public String id() { return "first"; }
+
+        @Override
+        public ProcessorResult process(ProcessorContext ctx) {
+            ctx.tables().emit(new DerivedTable("mid", "SELECT id FROM cdr WHERE id >= 1"));
+            return ProcessorResult.ok("first");
+        }
+    }
+
+    /**
+     * Step 2: reads what step 1 registered. It asserts INSIDE the processor, because the whole point is
+     * what the step could see at the moment it ran — a check afterwards would prove nothing about that.
+     */
+    private static final class SecondStep implements ConsignmentProcessor {
+        static volatile List<String> sawRelations = List.of();
+        static volatile long sawRows = -1;
+
+        @Override public String id() { return "second"; }
+
+        @Override
+        public ProcessorResult process(ProcessorContext ctx) throws Exception {
+            sawRelations = ctx.read().relations();
+            // the previous step's table is readable, by name, through the ordinary read seam
+            sawRows = (long) ctx.read().query("SELECT count(*) AS n FROM mid__derived").get(0).get("n");
+            ctx.tables().emit(new DerivedTable("final_t", "SELECT * FROM mid__derived"));
+            return ProcessorResult.ok("second");
+        }
+    }
+
+    /**
+     * 🔴 The chain property: step 2 sees the Consignment as step 1 LEFT it. If the registry were read once
+     * outside the loop, step 2 would get the pre-chain view and the ordering would be meaningless.
+     */
+    @Test
+    void aLaterStepSeesWhatTheEarlierStepRegistered(@TempDir Path dir) throws Exception {
+        Path f = writeParquet(dir.resolve("detail"), 3);
+        Path data = dir.resolve("data");
+        try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            store.record(List.of(out(f, 3)));
+            ConsignmentOutputStores.use(store);
+            SecondStep.sawRelations = List.of();
+            SecondStep.sawRows = -1;
+
+            JobResult result = chainJob(data.toString(), new FirstStep(), new SecondStep())
+                    .run(new CapturingJobContext(params("c1", "first,second"), false));
+            assertTrue(result.success(), result.message());
+
+            assertTrue(SecondStep.sawRelations.contains("mid__derived"),
+                    "step 2 should see step 1's table as a relation, saw: " + SecondStep.sawRelations);
+            assertEquals(2L, SecondStep.sawRows, "and read its rows");
+
+            // both steps' outputs are registered, each attributed to the step that made it
+            List<ConsignmentOutput> derived = store.outputs("c1").stream()
+                    .filter(o -> o.tableName().endsWith(DerivedTableWriter.DERIVED_SUFFIX)).toList();
+            assertEquals(2, derived.size(), "both steps registered a table");
+            assertEquals(List.of("first", "second"),
+                    derived.stream().map(ConsignmentOutput::producer).sorted().toList());
+            assertTrue(result.message().contains("first"), result.message());
+        }
+    }
+
+    /**
+     * ⚠ An unresolvable id stops the run BEFORE anything executes. A chain that failed half-way would have
+     * already written and registered the earlier steps' tables, and nothing rolls those back.
+     */
+    @Test
+    void anUnknownStepStopsTheChainBeforeAnythingRuns(@TempDir Path dir) throws Exception {
+        Path f = writeParquet(dir.resolve("detail"), 3);
+        Path data = dir.resolve("data");
+        try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            store.record(List.of(out(f, 3)));
+            ConsignmentOutputStores.use(store);
+
+            JobResult result = chainJob(data.toString(), new FirstStep())
+                    .run(new CapturingJobContext(params("c1", "first,nope"), false));
+
+            assertFalse(result.success());
+            assertTrue(result.message().contains("nothing has run"), result.message());
+            assertTrue(store.outputs("c1").stream().noneMatch(
+                    o -> o.tableName().endsWith(DerivedTableWriter.DERIVED_SUFFIX)),
+                    "the resolvable first step must NOT have written");
+        }
+    }
+
+    /** Order is authored, never inferred — and a repeated id is kept, not de-duplicated. */
+    @Test
+    void theChainIsParsedInAuthoredOrder() {
+        assertEquals(List.of("a"), ConsignmentProcessJobType.chainOf("a"));
+        assertEquals(List.of("a", "b", "c"), ConsignmentProcessJobType.chainOf(" a , b ,c "));
+        assertEquals(List.of("a", "a"), ConsignmentProcessJobType.chainOf("a,,a"));
+        assertEquals(List.of(), ConsignmentProcessJobType.chainOf("  "));
     }
 
     /** Dry run must validate and report but never write — the derived tier follows the summary tier's rule. */

@@ -66,12 +66,20 @@ public final class GuardedDerivedTableEmitter implements DerivedTableEmitter {
         if (table.sql() == null || table.sql().isBlank())
             out.add("sql is blank — name the SELECT that produces the table");
         else {
-            // 🔴 The SAME lexical allow-list ConsignmentReader.query enforces. Without it a derived table
-            // would be a hole straight through the read-only invariant: the author's SQL runs on the same
-            // unsealed sandbox (the relations are lazy views over files), so a `COPY … TO` or a `read_csv`
-            // here would reach the filesystem exactly where query() refuses to let it. Shape-checking for
-            // a leading SELECT is not a substitute — SqlGuard also rejects multiple statements, comment
-            // tricks and the whole blocked-function surface.
+            // The SAME lexical allow-list ConsignmentReader.query enforces, for the reason that seam
+            // states about itself: "invariant protection, not a defence against hostile in-process code".
+            // ⛔ This is NOT a security boundary — a processor is arbitrary Java on the engine classpath
+            // and can open a file directly. What it protects is the ADDRESSING invariant: a `COPY … TO`
+            // in author SQL writes a file the registry never learns about, and everything downstream keys
+            // off registered outputs (ConsignmentSelector's pruning, retire_superseded, compact, and the
+            // next step's own outputs()). An unregistered file is invisible to all of them.
+            //
+            // It also keeps this seam consistent with read(): a derived table must not be a way to do what
+            // query() refuses, or the narrower seam is theatre.
+            //
+            // ⚠ The cost, stated: no direct file reads, so a join against another Consignment or an
+            // outside Reference needs a SEAM rather than a path. That is the same rule the operator's own
+            // model states — "any step gets Consignment data from Consignment info only".
             for (Finding f : SqlGuard.check(table.sql())) out.add("sql: " + f.message());
         }
         if (table.partitionBy() != null && !SAFE_NAME.matcher(table.partitionBy()).matches())

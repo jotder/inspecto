@@ -348,7 +348,7 @@ thing"* is a one-concept-two-words violation.
 |---|---|---|
 | **1** | ~~decide the output contract~~ | ✅ **DECIDED**: arbitrary tables, registered as outputs |
 | **2** | ✅ **SHIPPED 2026-08-29** — `DerivedTableEmitter` / `DerivedTableWriter`, registered onto the same Consignment | no new state; the reprocess cascade is proven free by test. §7 |
-| **3** | **Compose Consignment steps** — an ordered chain over one Consignment | needs stage 2's naming to be meaningful |
+| **3** | ✅ **SHIPPED 2026-08-29** — an ordered chain, the registry re-read per step | §8 |
 | **4** | **Surface the post-sync lane in the editor** | authoring |
 | **5** | **Open the recipe verb + palette `authorable`** | independent; in-batch plugin steps |
 | **6** | **Parser output-schema publication** | independent; point 1's real gap |
@@ -400,3 +400,48 @@ asserts **base and derivative are both `SUPERSEDED`** — no lineage edge involv
 **Not done, deliberately:** nothing *orchestrates* a chain yet (stage 3) and the lane is still invisible
 in the editor (stage 4). A processor is still one Job over one Consignment; what changed is that its
 output is now a first-class table the next one can read.
+
+---
+
+## 8. Stage 3 as-built (2026-08-29)
+
+**Shipped:** the `processor` parameter takes **one id or an ordered comma-separated chain** —
+`mask,rollup,report`. Each step runs in authored order over the same Consignment.
+
+**The one mechanism that makes it a chain:** the registry is **re-read per step**, and a fresh
+`ConsignmentReader` is built from that list, so step N sees the Consignment as step N-1 left it —
+including the tables that step registered. **Falsified**: hoisting the read out of the loop makes step 2
+fail with `Catalog Error: Table with name mid__derived does not exist`, which is exactly the silent
+"ordering is meaningless" failure it prevents.
+
+**Decisions, each with its reason:**
+
+* 🔴 **Every step is resolved before any step runs.** A chain that failed half-way on a typo would
+  already have written and registered the earlier steps' tables, and nothing rolls those back — the data
+  path is append-only. So an unresolvable id fails the run with *"nothing has run"*.
+* **Order is authored, never inferred.** Two steps may both read the base and neither declares a
+  dependency, so the written order is the only honest one.
+* ⚠ **A repeated id is kept, not de-duplicated** — running the same processor twice is legal (it sees a
+  different Consignment state each time), and silently dropping the second would be a surprise.
+* **A failure mid-chain leaves earlier steps' output registered and `LIVE`.** That is the append-only
+  posture, not an oversight: those tables were correctly derived from the state that existed when they
+  ran. ⚠ It does mean a partially-complete chain is indistinguishable, from the registry alone, from a
+  complete one — the Run's status is what says which it was.
+
+**Verified end to end**: step 1 derives `mid`, step 2 finds `mid__derived` among its relations, reads its
+rows, and derives from it; both tables register on the Consignment, each attributed to the step that made
+it (`producer` = `first` / `second`).
+
+---
+
+## 9. Open, and worth deciding before stage 4
+
+1. **Is a comma-separated `processor` string the authoring surface you want**, or should a chain be its
+   own config shape? The string is the smallest thing that works with the existing `ParameterDecl`
+   vocabulary (there is no `LIST` `ParamType`), and it is honest about ordering — but it carries no
+   per-step configuration, so a step that needs parameters has nowhere to put them. That is the first
+   thing stage 4 will run into.
+2. **Should a mid-chain failure retire what earlier steps wrote?** Today it does not (append-only). The
+   alternative — supersede the run's own derivatives on failure — is expressible with the existing state
+   but changes "a registered table is a fact" into "a registered table is a fact only if its chain
+   finished".

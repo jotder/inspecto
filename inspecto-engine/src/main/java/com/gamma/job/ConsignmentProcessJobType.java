@@ -21,6 +21,7 @@ import com.gamma.signal.SignalEmitter;
 import com.gamma.util.RunLog;
 
 import java.util.LinkedHashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
@@ -82,6 +83,26 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
         return java.nio.file.Path.of(dataDir, "_summaries").toString();
     }
 
+    /**
+     * The ordered chain a {@code processor} parameter names: one id, or several separated by commas.
+     *
+     * <p><b>Order is authored, never inferred.</b> Two steps may both read the base and neither
+     * declares a dependency on the other, so the only honest ordering is the one written down.
+     *
+     * <p>⚠ A duplicate id is <b>kept</b>, not de-duplicated: running the same processor twice in a
+     * chain is legal — it sees a different Consignment state each time — and silently dropping the
+     * second would be a surprise.
+     */
+    static List<String> chainOf(String param) {
+        if (param == null || param.isBlank()) return List.of();
+        List<String> out = new ArrayList<>();
+        for (String part : param.split(",")) {
+            String id = part.trim();
+            if (!id.isEmpty()) out.add(id);
+        }
+        return out;
+    }
+
     @Override
     public JobTypeDescriptor descriptor() {
         return new JobTypeDescriptor(TYPE_ID, "Consignment Processor",
@@ -92,7 +113,10 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
                                 "The Consignment to process. Deduced from the firing pipeline.commit Signal; "
                                         + "bind it explicitly for a manual run."),
                         ParameterDecl.required(P_PROCESSOR, ParamType.STRING,
-                                "The id() of the ConsignmentProcessor to run.")),
+                                "The id() of the ConsignmentProcessor to run, or an ordered "
+                                        + "comma-separated chain of them (mask,rollup,report). Each step "
+                                        + "sees the Consignment as the previous one left it, including "
+                                        + "the tables it registered.")),
                 List.of(), List.of());
     }
 
@@ -141,41 +165,74 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
                 return JobResult.failed("no " + P_CONSIGNMENT + ": nothing was bound and $signal.batchId did "
                         + "not resolve — a manual run must bind it in config", ms(t0));
 
-            String processorId = ctx.params().get(P_PROCESSOR);
-            ConsignmentProcessor processor = lookup.apply(processorId);
-            if (processor == null)
-                return JobResult.failed("no ConsignmentProcessor registered with id '" + processorId
-                        + "' — declare it in META-INF/services/" + ConsignmentProcessor.class.getName(), ms(t0));
+            List<String> chain = ConsignmentProcessJobType.chainOf(ctx.params().get(P_PROCESSOR));
+            if (chain.isEmpty())
+                return JobResult.failed("no " + P_PROCESSOR + ": name the processor to run, or an ordered "
+                        + "comma-separated chain of them", ms(t0));
+
+            // Resolve EVERY step before running ANY of them. A chain that fails half-way on a typo has
+            // already written and registered the earlier steps' tables, and those are not rolled back
+            // (the data path is append-only), so an unresolvable id must stop the run before it starts.
+            List<ConsignmentProcessor> processors = new ArrayList<>(chain.size());
+            for (int i = 0; i < chain.size(); i++) {
+                ConsignmentProcessor p = lookup.apply(chain.get(i));
+                if (p == null)
+                    return JobResult.failed("no ConsignmentProcessor registered with id '" + chain.get(i)
+                            + "' — declare it in META-INF/services/" + ConsignmentProcessor.class.getName()
+                            + (chain.size() > 1 ? " (step " + (i + 1) + " of " + chain.size()
+                                    + "; nothing has run)" : ""), ms(t0));
+                processors.add(p);
+            }
 
             // The registry is default-off; an absent store means no readable relations, NOT that the
             // Consignment wrote nothing. The manifest remains authoritative for existence (§11.3).
             DbConsignmentOutputStore store = ConsignmentOutputStores.shared();
-            List<ConsignmentOutput> outputs = (store == null) ? List.of() : store.outputs(consignmentId);
             if (store == null)
                 ctx.log().warn("consignment output registry is disabled — the processor gets no readable "
                         + "relations", "consignment_id", consignmentId);
 
-            GuardedSummaryEmitter summaries = new GuardedSummaryEmitter();
-            GuardedDerivedTableEmitter tables = new GuardedDerivedTableEmitter();
-            try (ConsignmentReader reader = SandboxConsignmentReader.over(outputs)) {
-                ProcessorResult result = processor.process(
-                        new AdaptedContext(consignmentId, outputs, reader, summaries, tables, ctx));
+            ProcessorResult last = null;
+            for (int i = 0; i < processors.size(); i++) {
+                String processorId = chain.get(i);
 
-                // §7.2's free reconciliation — reported, never thrown: summarising a filtered subset is legal.
-                summaries.reconcile(outputs).ifPresent(diff ->
-                        ctx.log().warn("summary count does not reconcile against detail rows",
-                                "consignment_id", consignmentId, "detail", diff));
+                // 🔴 Re-read the registry PER STEP. This is what makes a chain a chain: step N sees the
+                // Consignment as step N-1 left it, including the tables that step registered. Reading it
+                // once outside the loop would give every step the pre-chain view and quietly make the
+                // ordering meaningless.
+                List<ConsignmentOutput> outputs = (store == null) ? List.of() : store.outputs(consignmentId);
 
-                if (result == null)
-                    return JobResult.failed("processor '" + processorId + "' returned no result", ms(t0));
+                GuardedSummaryEmitter summaries = new GuardedSummaryEmitter();
+                GuardedDerivedTableEmitter tables = new GuardedDerivedTableEmitter();
+                // ...and a fresh reader per step, because its lazy views are built from that outputs list.
+                try (ConsignmentReader reader = SandboxConsignmentReader.over(outputs)) {
+                    ProcessorResult result = processors.get(i).process(
+                            new AdaptedContext(consignmentId, outputs, reader, summaries, tables, ctx));
 
-                persistSummaries(ctx, consignmentId, summaries.emitted(), processorId);
-                // ⚠ Inside the reader's try-with-resources on purpose: the author's SQL names the
-                // Consignment's lazy views, which live on that sandbox and vanish when it closes.
-                persistDerivedTables(ctx, consignmentId, reader, tables.emitted(), processorId);
-                return new JobResult(result.status(), result.message(), ms(t0));
+                    // §7.2's free reconciliation — reported, never thrown: summarising a filtered subset is legal.
+                    summaries.reconcile(outputs).ifPresent(diff ->
+                            ctx.log().warn("summary count does not reconcile against detail rows",
+                                    "consignment_id", consignmentId, "detail", diff));
+
+                    if (result == null)
+                        return JobResult.failed("processor '" + processorId + "' returned no result", ms(t0));
+
+                    persistSummaries(ctx, consignmentId, summaries.emitted(), processorId);
+                    // ⚠ Inside the reader's try-with-resources on purpose: the author's SQL names the
+                    // Consignment's lazy views, which live on that sandbox and vanish when it closes.
+                    persistDerivedTables(ctx, consignmentId, reader, tables.emitted(), processorId);
+                    last = result;
+                }
+                if (chain.size() > 1)
+                    ctx.log().info("chain step complete", "consignment_id", consignmentId,
+                            "step", (i + 1) + " of " + chain.size(),
+                            "processor", processorId, "status", last.status());
             }
+            return chain.size() == 1
+                    ? new JobResult(last.status(), last.message(), ms(t0))
+                    : new JobResult(last.status(), chain.size() + " step chain complete ("
+                            + String.join(" then ", chain) + "); last: " + last.message(), ms(t0));
         }
+
 
         /**
          * §7.3: write the validated summary rows, then register the files.
