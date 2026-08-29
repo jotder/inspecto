@@ -160,6 +160,84 @@ describe('JobFormDialog', () => {
         );
     });
 
+    /**
+     * `ParamType.JSON` (the `consignment.process` chain's `chain_config`) has no declarative validity a
+     * spec can express, so it carries a host validator. What matters is that the refusal REACHES THE
+     * SCREEN and blocks the save — a test asserting the control is invalid would pass even if nothing
+     * rendered.
+     */
+    it('refuses an unparseable JSON parameter on screen and does not save', async () => {
+        const describeType = vi.fn(() =>
+            of({
+                id: 'consignment.process',
+                title: 'Consignment Processor',
+                description: '',
+                parameters: [
+                    {
+                        name: 'chain_config',
+                        type: 'JSON',
+                        required: false,
+                        deduce: '',
+                        default: '',
+                        description: 'Per-step config',
+                    },
+                ],
+                emits: [],
+                artifacts: [],
+                requires: [],
+            }),
+        );
+        const { c, fixture, save } = create({}, undefined, describeType);
+        await Promise.resolve(); // flush the queued loadParams microtask
+        fixture.detectChanges();
+
+        c.schemaForm.form.patchValue({ scheduleMode: 'manual' });
+        c.paramForm!.form.patchValue({ chain_config: '[{"config": {' });
+        c.save();
+        fixture.detectChanges();
+
+        expect(save).not.toHaveBeenCalled();
+        expect(fixture.nativeElement.textContent).toContain('Not valid JSON');
+    });
+
+    it('accepts a well-formed JSON parameter and sends it as the text the engine parses', async () => {
+        const describeType = vi.fn(() =>
+            of({
+                id: 'consignment.process',
+                title: 'Consignment Processor',
+                description: '',
+                parameters: [
+                    {
+                        name: 'chain_config',
+                        type: 'JSON',
+                        required: false,
+                        deduce: '',
+                        default: '',
+                        description: 'Per-step config',
+                    },
+                ],
+                emits: [],
+                artifacts: [],
+                requires: [],
+            }),
+        );
+        const { c, fixture, save } = create({}, undefined, describeType);
+        await Promise.resolve();
+        fixture.detectChanges();
+
+        c.schemaForm.form.patchValue({ scheduleMode: 'manual' });
+        c.paramForm!.form.patchValue({ chain_config: '[{"config": {"window": "7d"}}]' });
+        c.save(); // → save step
+        c.saveForm.patchValue({ name: 'nightly_chain' });
+        c.save();
+
+        expect(save).toHaveBeenCalledWith(
+            expect.objectContaining({
+                params: expect.objectContaining({ chain_config: '[{"config": {"window": "7d"}}]' }),
+            }),
+        );
+    });
+
     it("shows the type's declared Platform Service grants as chips (requires:, S1-2)", async () => {
         const describeType = vi.fn(() =>
             of({

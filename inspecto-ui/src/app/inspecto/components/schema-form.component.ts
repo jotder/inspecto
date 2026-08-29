@@ -12,6 +12,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import {
     AttributeOption,
     AttributeSpec,
+    AttributeTier,
     AttributeToken,
     byTier,
     defaultsFor,
@@ -562,10 +563,27 @@ export class InspectoSchemaFormComponent {
         return this.form.dirty;
     }
 
-    /** Mark everything touched (house rule on invalid submit) and report validity. */
+    /**
+     * Mark everything touched (house rule on invalid submit) and report validity.
+     *
+     * <p>⚠ Also OPENS whichever collapsed section holds an invalid control. Marking a control touched
+     * renders its error only where the control itself renders, so an invalid `optional`/`advanced`
+     * field left behind its collapsed disclosure blocked the save with **no visible reason anywhere** —
+     * the submit button simply did nothing. That is worse than a wrong value, because there is nothing
+     * on screen to correct. Applies to every validator, not just the JSON one that surfaced it.
+     */
     validate(): boolean {
-        if (this.form.invalid) this.form.markAllAsTouched();
+        if (this.form.invalid) {
+            this.form.markAllAsTouched();
+            if (this.hasInvalidIn('optional')) this.showOptional.set(true);
+            if (this.hasInvalidIn('advanced')) this.showAdvanced.set(true);
+        }
         return this.form.valid;
+    }
+
+    /** Whether any control in `tier`'s (rendered) specs is currently invalid. */
+    private hasInvalidIn(tier: AttributeTier): boolean {
+        return this.tiers()[tier].some((s) => this.isVisible(s) && !!this.form.get(s.key)?.invalid);
     }
 
     /** The visible values only — hidden (`dependsOn`-suppressed) controls are disabled and excluded. */

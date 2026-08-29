@@ -52,6 +52,23 @@ describe('jobsHandler', () => {
         expect(handler(req('GET', '/api/jobs/types/nope'), store)?.status).toBe(404);
     });
 
+    /**
+     * A mock must never be more lenient than the server — and one that omits a type entirely is the
+     * same failure in a quieter form: the offline preview could neither confirm nor refute the JSON
+     * parameter's widget or its refusal, because the type did not exist here at all.
+     */
+    it('serves consignment.process with its ADVANCED chain_config JSON parameter', () => {
+        const store = seededStore();
+        const t = handler(req('GET', '/api/jobs/types/consignment.process'), store)?.body as {
+            parameters: { name: string; type: string; tier: string; required: boolean }[];
+        };
+        expect(t.parameters.map((p) => p.name)).toEqual(['consignment_id', 'processor', 'chain_config']);
+        const chain = t.parameters.find((p) => p.name === 'chain_config')!;
+        expect(chain.type).toBe('JSON');
+        expect(chain.tier).toBe('ADVANCED');
+        expect(chain.required).toBe(false); // absent means "every step gets no config", not an error
+    });
+
     it('upserts, toggles, reschedules and deletes a job (with its runs)', () => {
         const store = seededStore();
         handler(

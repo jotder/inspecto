@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { JobExpressionDecl, JobParameterDecl } from 'app/inspecto/api';
+import { FormControl } from '@angular/forms';
 import {
+    jsonParameterValidator,
     paramDeclToSpec,
     paramDeclsToSpecs,
+    paramExtraValidators,
     paramTokens,
     paramValueToApi,
     paramValueToForm,
@@ -54,6 +57,9 @@ describe('paramDeclToSpec', () => {
             expect(widget('INSTANT')).toBe('string');
             expect(widget('EMAIL')).toBe('string');
             expect(widget('DATASET_REF')).toBe('autocomplete');
+            // JSON travels as TEXT on the wire (`chainConfigsOf` parses a String), so the textarea is
+            // the honest control — the refusal it cannot give comes from `jsonParameterValidator`.
+            expect(widget('JSON')).toBe('multiline');
         });
 
         it('lets a declared options list win over the type-derived widget', () => {
@@ -356,5 +362,51 @@ describe('paramTokens', () => {
             'cron',
         );
         expect(Object.keys(map)).toEqual(['day']);
+    });
+});
+
+describe('JSON parameters', () => {
+    const jsonDecl = decl({ name: 'chain_config', type: 'JSON' });
+
+    it('offers the accepted shape as a placeholder — a bare textarea tells the author nothing', () => {
+        expect(paramDeclToSpec(jsonDecl).placeholder).toBe('[{"config": {"key": "value"}}]');
+    });
+
+    it('declares no pattern, because JSON is not a regular language', () => {
+        expect(paramDeclToSpec(jsonDecl).pattern).toBeUndefined();
+    });
+
+    describe('jsonParameterValidator', () => {
+        const check = (value: unknown) => jsonParameterValidator()(new FormControl(value));
+
+        it('passes blank — absent chain_config means every step gets no config, not an error', () => {
+            expect(check('')).toBeNull();
+            expect(check('   ')).toBeNull();
+            expect(check(null)).toBeNull();
+        });
+
+        it('passes valid JSON', () => {
+            expect(check('[{"config": {"a": "b"}}]')).toBeNull();
+        });
+
+        it("refuses invalid JSON with the parser's own complaint, not a generic message", () => {
+            const errors = check('[{"config": {');
+            expect(errors).not.toBeNull();
+            // `errorFor()` renders a `message` error verbatim — that is the whole reason to phrase it here.
+            expect(String(errors!['message'])).toMatch(/^Not valid JSON: /);
+        });
+    });
+
+    it('attaches the validator to JSON params only', () => {
+        const validators = paramExtraValidators([
+            jsonDecl,
+            decl({ name: 'processor', type: 'STRING' }),
+            decl({ name: 'body', type: 'TEXT' }),
+        ]);
+        expect(Object.keys(validators)).toEqual(['chain_config']);
+    });
+
+    it('returns nothing for a type declaring no JSON param, so nothing is over-validated', () => {
+        expect(paramExtraValidators([decl({ name: 'processor', type: 'STRING' })])).toEqual({});
     });
 });

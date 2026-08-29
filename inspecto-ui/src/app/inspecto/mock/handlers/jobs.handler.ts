@@ -89,6 +89,52 @@ const JOB_TYPE_DESCRIPTORS = [
         version: '',
     },
     {
+        id: 'consignment.process',
+        title: 'Consignment Processor',
+        description:
+            'Runs a ConsignmentProcessor over one committed Consignment, with a read-only view of the ' +
+            'files it wrote and §7.2-guarded summary emission.',
+        parameters: [
+            decl({
+                name: 'consignment_id',
+                type: 'STRING',
+                required: true,
+                deduce: '$signal.batchId',
+                description:
+                    'The Consignment to process. Deduced from the firing pipeline.commit Signal; ' +
+                    'bind it explicitly for a manual run.',
+            }),
+            decl({
+                name: 'processor',
+                type: 'STRING',
+                required: true,
+                description:
+                    'The id() of the ConsignmentProcessor to run, or an ordered comma-separated chain ' +
+                    'of them (mask,rollup,report). Each step sees the Consignment as the previous one ' +
+                    'left it, including the tables it registered.',
+            }),
+            // The vocabulary's only nested shape. Carried here so the JSON widget + its validity refusal
+            // can be rehearsed offline — without this the type did not exist in the mock at all, and the
+            // preview could neither confirm nor refute the field.
+            decl({
+                name: 'chain_config',
+                type: 'JSON',
+                tier: 'ADVANCED',
+                description:
+                    'Per-step configuration for a processor chain, reachable as ProcessorContext.config(): ' +
+                    'a JSON array of {"config": {...}} objects, one per chain step in the same order (a ' +
+                    'two-step chain needs a two-element array). Absent or empty gives every step no ' +
+                    "config; declared, its length must match the chain's.",
+            }),
+        ],
+        emits: [],
+        artifacts: [],
+        // Provenance (§7.3): the registry assembles these, and every mock type is a built-in.
+        implClass: 'com.gamma.job.ConsignmentProcessJobType',
+        source: 'builtin',
+        version: '',
+    },
+    {
         id: 'report',
         title: 'Report',
         description: 'Computes a report (status / batch / dataset export) and optionally delivers it.',

@@ -106,6 +106,36 @@ describe('InspectoSchemaFormComponent', () => {
         expect(fixture.componentInstance.validate()).toBe(true);
     });
 
+    /**
+     * An invalid value behind a collapsed disclosure used to block submit with NOTHING on screen to
+     * correct — `markAllAsTouched` renders an error only where the control renders. Surfaced by a JSON
+     * job parameter (tier ADVANCED), but it was never JSON-specific: any validator on an
+     * optional/advanced field had it.
+     */
+    it('validate() opens the collapsed section that holds an invalid control', () => {
+        const fixture = create(SPECS);
+        const c = fixture.componentInstance;
+        c.form.get('name')?.setValue('daily_kpi');
+        c.form.get('threads')?.setValue(999); // advanced tier, over max
+        expect(c.showAdvanced()).toBe(false);
+
+        expect(c.validate()).toBe(false);
+        fixture.detectChanges();
+
+        expect(c.showAdvanced()).toBe(true);
+        // The point is the message reaching the SCREEN, not merely the control being invalid.
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain('Threads');
+    });
+
+    it('validate() leaves collapsed sections shut when only a visible field is invalid', () => {
+        const fixture = create(SPECS);
+        const c = fixture.componentInstance;
+        expect(c.validate()).toBe(false); // `name` (required tier) is empty
+
+        expect(c.showAdvanced()).toBe(false);
+        expect(c.showOptional()).toBe(false);
+    });
+
     it('applies declared defaults and patches initial values over them', () => {
         const fixture = create(SPECS, { name: 'weekly', type: 'report' });
         const v = fixture.componentInstance.form.getRawValue();

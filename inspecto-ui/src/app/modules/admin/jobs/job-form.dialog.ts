@@ -43,7 +43,13 @@ import { datasetOptionLoader, pipelineOptionLoader } from 'app/inspecto/componen
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { AttributeSpec } from 'app/inspecto/component-model';
 import { JOB_ATTRIBUTES } from './job-attributes';
-import { paramDeclsToSpecs, paramTokens, paramValueToApi, paramValueToForm } from './job-parameter-specs';
+import {
+    paramDeclsToSpecs,
+    paramExtraValidators,
+    paramTokens,
+    paramValueToApi,
+    paramValueToForm,
+} from './job-parameter-specs';
 
 /** Dialog input: an existing job ⇒ edit; absent ⇒ create. `focusSchedule` opens with the schedule emphasized
  *  (the "Reschedule" action). */
@@ -190,6 +196,13 @@ export class JobFormDialog implements AfterViewInit {
 
     /** The selected Job Type's declared parameters (R3), rendered as a typed form (P3c). */
     readonly paramSpecs = signal<AttributeSpec[]>([]);
+
+    /**
+     * Per-key validators for the declared parameters — today only the `JSON` ones, whose validity no
+     * declarative spec can express. Re-applied by the schema form on every `specs` swap, so a Job Type
+     * change cannot silently leave a JSON field unvalidated.
+     */
+    readonly paramValidators = signal<Record<string, ValidatorFn[]>>({});
     /** The type's declared Platform Service grants (`requires:`, S1-2) — its reach, shown before arming. */
     readonly typeRequires = signal<string[]>([]);
     /** Existing values for the declared parameters (edit) — patched over the schema-form defaults. */
@@ -357,6 +370,7 @@ export class JobFormDialog implements AfterViewInit {
     /** Everything a descriptor drives: typed params, declared grants, suggestions, the "what this does" panel. */
     private applyDescriptor(d: JobTypeDescriptor): void {
         const specs = paramDeclsToSpecs(d.parameters);
+        this.paramValidators.set(paramExtraValidators(d.parameters));
         this.paramSpecs.set(specs);
         this.selectedType.set(d);
         this.typeRequires.set(d.requires ?? []);
@@ -381,6 +395,7 @@ export class JobFormDialog implements AfterViewInit {
 
     /** No descriptor for the selected type: no typed params, no declared grants, no panel. */
     private clearDescriptor(): void {
+        this.paramValidators.set({});
         this.paramSpecs.set([]);
         this.paramInitial.set(undefined);
         this.paramOptionLoaders.set({});

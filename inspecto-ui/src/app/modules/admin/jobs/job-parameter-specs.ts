@@ -1,3 +1,5 @@
+import { AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
+
 import { JobExpressionDecl, JobParameterDecl, typeableForm } from 'app/inspecto/api';
 import {
     AttributeOption,
@@ -25,7 +27,7 @@ import {
  * is to move that refusal to the keystroke, not to invent a second rule. A real date-picker widget is a
  * renderer extension, deliberately deferred until a consumer asks for one (§7.4).
  */
-const TYPE_PRESETS: Record<string, { pattern: string; placeholder: string }> = {
+const TYPE_PRESETS: Record<string, { pattern?: string; placeholder: string }> = {
     DATE: { pattern: '\\d{4}-\\d{2}-\\d{2}', placeholder: '2026-08-06' },
     INSTANT: {
         pattern: '\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z?',
@@ -34,6 +36,9 @@ const TYPE_PRESETS: Record<string, { pattern: string; placeholder: string }> = {
     // Deliberately permissive, matching the engine's own: only delivery truly validates an address,
     // and a strict regex rejects valid ones (§7.2-A).
     EMAIL: { pattern: '[^@\\s]+@[^@\\s]+\\.[^@\\s]+', placeholder: 'ops@example.com' },
+    // Deliberately no `pattern` — JSON is not a regular language, so a regex would either reject valid
+    // input or wave through invalid input. The refusal is `jsonParameterValidator` instead.
+    JSON: { placeholder: '[{"config": {"key": "value"}}]' },
 };
 
 /**
@@ -49,6 +54,11 @@ function widgetFor(decl: JobParameterDecl): AttributeType {
     if (decl.multi) return 'list';
     switch (decl.type) {
         case 'TEXT':
+        // JSON is authored as text and travels as text — `chainConfigsOf` parses a STRING off the wire,
+        // so a textarea is the honest control and no new AttributeType is needed. What a bare textarea
+        // cannot give is a refusal, which is why every JSON parameter also gets `jsonParameterValidator`
+        // (see `paramExtraValidators`) instead of failing at fire time.
+        case 'JSON':
             return 'multiline';
         case 'INTEGER':
         case 'DECIMAL':
@@ -133,6 +143,41 @@ export function paramDeclToSpec(decl: JobParameterDecl): AttributeSpec {
 
 export function paramDeclsToSpecs(decls: JobParameterDecl[]): AttributeSpec[] {
     return (decls ?? []).map(paramDeclToSpec);
+}
+
+/**
+ * Refuses a `JSON` parameter whose text is not parseable JSON, phrasing the parser's own complaint.
+ *
+ * <p>Blank passes: `ParamType.JSON` parameters are optional by declaration (`chain_config` is ADVANCED
+ * and absent means "every step gets no config"), and `Validators.required` is what speaks for a JSON
+ * field that genuinely must be filled.
+ */
+export function jsonParameterValidator(): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+        const text = String(control.value ?? '').trim();
+        if (!text) return null;
+        try {
+            JSON.parse(text);
+            return null;
+        } catch (e) {
+            // `errorFor()` renders a `message` error verbatim — the parser names the offending position,
+            // which no generic "invalid format" line could.
+            return { message: `Not valid JSON: ${e instanceof Error ? e.message : String(e)}` };
+        }
+    };
+}
+
+/**
+ * Per-key validators for a Job Type's declared parameters, for `<inspecto-schema-form>`'s
+ * `[extraValidators]`. Only `JSON` needs one today: it is the one declared type whose validity a
+ * declarative spec cannot express (see {@link jsonParameterValidator}).
+ */
+export function paramExtraValidators(decls: JobParameterDecl[]): Record<string, ValidatorFn[]> {
+    const out: Record<string, ValidatorFn[]> = {};
+    for (const decl of decls ?? []) {
+        if (decl.type === 'JSON') out[decl.name] = [jsonParameterValidator()];
+    }
+    return out;
 }
 
 /**

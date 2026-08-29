@@ -36,6 +36,10 @@ becomes enterprise-scale.
 2. **Reuse the shared design system** — never re-roll a status pill, **inline alert/banner**, empty state,
    skeleton, grid theme, confirm dialog, or connectivity banner.
 3. **Reactive forms only** with inline `<mat-error>` + `markAllAsTouched()` on invalid submit.
+   ⚠ **An error only renders where its control renders** — `<inspecto-schema-form>`'s `validate()` therefore
+   also OPENS the collapsed `optional`/`advanced` section holding an invalid control (2026-08-30). Before
+   that, an invalid value behind a collapsed disclosure blocked submit with **nothing on screen to
+   correct** — the button simply did nothing. Any host rolling its own disclosure has the same hole.
 4. **A11y is not optional** (§6): one `<h1>` per page, `aria-label` on icon-only buttons, `:focus-visible`
    ring (never bare `outline:none`), WCAG 2.2 AA. Add an axe-core assertion to new component specs.
 5. **No new dependencies** without explicit justification — keep the bundle lean.

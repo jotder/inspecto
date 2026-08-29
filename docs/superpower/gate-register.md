@@ -206,8 +206,22 @@ Ordered by what they unblock.
   registered-outputs list in Batch detail — *authoring* the post-sync chain is still hand-edited TOON.
   There is also no "decision 3.1" anywhere in `open-dag-pipeline-design.md`; §5 Q1 is closed and §9's
   two decisions shipped, so nothing is decision-gated here. 🔴 Grounded gap: `chain_config` ships as
-  `ParamType.JSON` (published, tier ADVANCED) and the UI has **no `json` widget** — `widgetFor()` and
-  `schema-form`'s `@switch` both fall through to a bare single-line text box with no validation.
+  `ParamType.JSON` (published, tier ADVANCED) and the UI had **no `json` widget**.
+  ~~`widgetFor()` and `schema-form`'s `@switch` both fall through to a bare single-line text box.~~
+  **AUTHORING HALF SHIPPED 2026-08-30** — `JSON` maps to the `multiline` widget (JSON travels as TEXT:
+  `chainConfigsOf` parses a **String** off the wire) plus `jsonParameterValidator` via the existing
+  `[extraValidators]` seam. ⛔ **Deliberately NOT a new `AttributeType`**: that would drag in
+  `NodeAttribute.TYPES`, `FindingsSpec.TYPES` and `attribute-spec.contract.json` — the whole node
+  vocabulary — for one parameter, when `multiline` is already the right control.
+  🔴 **Driving it in the preview found a defect no unit test would have**: `chain_config` is ADVANCED,
+  and `validate()` marked controls touched without OPENING the collapsed section, so the refusal
+  rendered nowhere and Continue silently did nothing. That was never JSON-specific — every validator on
+  an optional/advanced field had it. `validate()` now opens the section holding an invalid control.
+  ⚠ The mock served **no `consignment.process` type at all**, so this could not be rehearsed offline;
+  it now mirrors the real descriptor.
+  **Still open (the real stage-4 remainder):** an ordered **chain-authoring surface** — today the chain
+  is a comma-separated `processor` string and a positionally-aligned JSON array the author must keep
+  aligned by hand. That is a UX design question, not a gap to fill by reflex.
 - ~~`open-dag` **stage 6** — parser output-schema publication.~~ **REFUTED 2026-08-29** (before this
   register was written) — the seam already exists and is already wired end to end (`ParserPlugin
   .preview()`'s `columnTypes`, forwarded unconditionally by `POST /parsers/{id}/preview`). Nothing to
