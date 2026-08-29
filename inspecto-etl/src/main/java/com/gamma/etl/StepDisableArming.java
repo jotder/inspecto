@@ -22,6 +22,13 @@ import java.util.Set;
  * never become a silently-enabled step), the route node itself (the divert's engagement anchor), and
  * disabling EVERY branch (the executor would have no live sink; {@code active: false} is that ask's
  * honest spelling).
+ *
+ * <p><b>And no park home.</b> {@code dirs.backup} is OPTIONAL ({@code PipelineConfigParser} reads it
+ * with a plain {@code get}), but {@code BatchProcessor.parkSource} parks under
+ * {@code <backup>/parked} — so without it the pipeline arms, runs, and dies at the park with an NPE
+ * the operator sees as {@code park failed: null}, one batch at a time. That is the same
+ * arms-then-fails-every-cycle shape every refusal here exists to convert into an authoring-time
+ * answer, so it is refused by name rather than left to the filesystem.
  */
 public final class StepDisableArming {
 
@@ -37,8 +44,12 @@ public final class StepDisableArming {
      *                        park; empty when the pipeline has no armed {@code route:}. Supplied by
      *                        the caller from what it has ({@link #parkableSinkIds}), exactly like
      *                        {@link RouteArming}'s sink databases.
+     * @param parkHomeConfigured whether {@code dirs.backup} is set — the park home's parent. A required
+     *                        argument rather than an overload defaulting to {@code true}: a caller that
+     *                        cannot answer must not be allowed to arm a pipeline that has nowhere to park.
      */
-    public static List<String> refusals(List<String> disabledSteps, Collection<String> parkableSinkIds) {
+    public static List<String> refusals(List<String> disabledSteps, Collection<String> parkableSinkIds,
+                                        boolean parkHomeConfigured) {
         List<String> out = new ArrayList<>();
         if (disabledSteps == null || disabledSteps.isEmpty()) return out;
 
@@ -50,6 +61,11 @@ public final class StepDisableArming {
                     + "run-to-here to test around a step");
             return out;
         }
+        if (!parkHomeConfigured)
+            out.add("processing.disabled_steps names " + disabledSteps + ", but dirs.backup is not "
+                    + "configured and a parked Consignment's members are moved to <backup>/parked — "
+                    + "there is nowhere to park. Set dirs.backup, or remove the entries (dry-run / "
+                    + "run-to-here tests around a step without parking)");
         for (String step : disabledSteps) {
             if (!parkable.contains(step))
                 out.add("processing.disabled_steps entry '" + step + "' is not a route-branch sink "
@@ -88,6 +104,16 @@ public final class StepDisableArming {
                 out.add("sink" + (sinkDatabases.size() == 1 ? "" : "__d" + d));
         }
         return out;
+    }
+
+    /**
+     * The draft-map form of {@code parkHomeConfigured}: {@code dirs.backup} present and non-blank.
+     * Mirrors {@code PipelineConfigParser}'s plain {@code dirs.get("backup")} — absent and blank are
+     * the same "no park home" to every consumer of it.
+     */
+    public static boolean draftHasParkHome(Map<?, ?> dirs) {
+        Object backup = dirs == null ? null : dirs.get("backup");
+        return backup != null && !String.valueOf(backup).isBlank();
     }
 
     /** The draft-map form: {@code processing.disabled_steps} as a string list (absent ⇒ empty). */

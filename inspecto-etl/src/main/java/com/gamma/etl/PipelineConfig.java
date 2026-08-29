@@ -1606,7 +1606,8 @@ public final class PipelineConfig {
             java.util.List<String> allSinkDbs = new java.util.ArrayList<>();
             for (Sink d : sinks) allSinkDbs.add(d.database());
             List<String> stepRefusals = StepDisableArming.refusals(disabledSteps,
-                    StepDisableArming.parkableSinkIds(route, allSinkDbs));
+                    StepDisableArming.parkableSinkIds(route, allSinkDbs),
+                    dirs.backup() != null && !dirs.backup().isBlank());
             if (!stepRefusals.isEmpty()) throw new IllegalStateException(stepRefusals.get(0));
         }
         // The three Stage-2 blocks below (summarize / dedup / join) arm ONLY when output_store: is

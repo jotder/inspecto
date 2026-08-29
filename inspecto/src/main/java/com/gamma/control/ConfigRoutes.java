@@ -148,8 +148,10 @@ final class ConfigRoutes {
         Map<?, ?> route = draft.get("route") instanceof Map<?, ?> r ? r : null;
         List<String> parkable = com.gamma.etl.StepDisableArming.parkableSinkIds(
                 route, RouteArming.draftSinkDatabases(draft.get("sinks")));
+        Map<?, ?> dirs = draft.get("dirs") instanceof Map<?, ?> d ? d : Map.of();
         List<Finding> out = new ArrayList<>();
-        for (String refusal : com.gamma.etl.StepDisableArming.refusals(disabled, parkable)) {
+        for (String refusal : com.gamma.etl.StepDisableArming.refusals(disabled, parkable,
+                com.gamma.etl.StepDisableArming.draftHasParkHome(dirs))) {
             out.add(new Finding(severity, "disabled_steps", active
                     ? refusal
                     : refusal + " (the draft is inactive, so this refuses only once it is activated)"));

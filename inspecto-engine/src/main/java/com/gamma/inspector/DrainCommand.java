@@ -229,11 +229,17 @@ public final class DrainCommand {
      * archive would strand its sibling batches — {@code BatchProcessor.parkSource}'s ⚠), so it re-expands
      * on the next poll cycle and re-parks as a NEW batch. Completing the old one would commit rows the
      * new batch is about to write again. Refused by name rather than half-handled.
+     *
+     * <p>⚠ The test is the JAR-style {@code archive!entry} address {@code BatchProcessor} writes for a
+     * 1→N expansion, and ONLY that. A blank {@code backupPath} was also treated as expansion here and
+     * is not: it means {@code dirs.backup} was unset ({@code BatchProcessor}'s {@code backup != null}
+     * ternary), which is a different condition with a different fix — and one this batch cannot be in,
+     * because {@code StepDisableArming} now refuses to arm a park with no park home. Keeping it would
+     * have reported that config error as an unpack problem the operator does not have.
      */
     private static void refuseExpansionMembers(String batchId, BatchManifest m) {
         List<String> expansion = m.members.stream()
-                .filter(me -> me.backupPath() == null || me.backupPath().isBlank()
-                        || me.originalRelPath().contains("!"))
+                .filter(me -> me.originalRelPath().contains("!"))
                 .map(BatchManifest.MemberEntry::filename)
                 .toList();
         if (!expansion.isEmpty())

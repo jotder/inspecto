@@ -32,21 +32,21 @@ class StepDisableArmingTest {
     @Test
     @DisplayName("an empty (or absent) list arms — no refusals")
     void emptyListArms() {
-        assertEquals(List.of(), StepDisableArming.refusals(List.of(), List.of("sink__d0")));
-        assertEquals(List.of(), StepDisableArming.refusals(null, List.of()));
+        assertEquals(List.of(), StepDisableArming.refusals(List.of(), List.of("sink__d0"), true));
+        assertEquals(List.of(), StepDisableArming.refusals(null, List.of(), true));
     }
 
     @Test
     @DisplayName("a route-branch sink may be disabled — it parks at rest (S4b)")
     void aBranchSinkArms() {
         assertEquals(List.of(), StepDisableArming.refusals(
-                List.of("sink__d1"), List.of("sink__d0", "sink__d1")));
+                List.of("sink__d1"), List.of("sink__d0", "sink__d1"), true));
     }
 
     @Test
     @DisplayName("no armed route: — nothing can park, the whole list refuses")
     void noRouteRefuses() {
-        List<String> refusals = StepDisableArming.refusals(List.of("dedup"), List.of());
+        List<String> refusals = StepDisableArming.refusals(List.of("dedup"), List.of(), true);
         assertEquals(1, refusals.size());
         assertTrue(refusals.get(0).contains("no park boundary"), refusals.get(0));
         assertTrue(refusals.get(0).contains("dry-run"), "names its alternative: " + refusals.get(0));
@@ -56,7 +56,7 @@ class StepDisableArmingTest {
     @DisplayName("an upstream or unknown step refuses by name — a typo must never silently enable")
     void upstreamOrUnknownStepRefuses() {
         List<String> refusals = StepDisableArming.refusals(
-                List.of("parse", "sink__d0"), List.of("sink__d0", "sink__d1"));
+                List.of("parse", "sink__d0"), List.of("sink__d0", "sink__d1"), true);
         assertEquals(1, refusals.size(), refusals.toString());
         assertTrue(refusals.get(0).contains("'parse'"), refusals.get(0));
         assertTrue(refusals.get(0).contains("sink__d0"), "the refusal names the parkable set: " + refusals.get(0));
@@ -66,9 +66,36 @@ class StepDisableArmingTest {
     @DisplayName("disabling EVERY branch refuses — pausing the pipeline is spelled active: false")
     void allBranchesRefuse() {
         List<String> refusals = StepDisableArming.refusals(
-                List.of("sink__d0", "sink__d1"), List.of("sink__d0", "sink__d1"));
+                List.of("sink__d0", "sink__d1"), List.of("sink__d0", "sink__d1"), true);
         assertEquals(1, refusals.size(), refusals.toString());
         assertTrue(refusals.get(0).contains("active: false"), refusals.get(0));
+    }
+
+    @Test
+    @DisplayName("no park home refuses — dirs.backup is optional, but a parked batch has nowhere to go")
+    void noParkHomeRefuses() {
+        List<String> refusals = StepDisableArming.refusals(
+                List.of("sink__d1"), List.of("sink__d0", "sink__d1"), false);
+        assertEquals(1, refusals.size(), refusals.toString());
+        assertTrue(refusals.get(0).contains("dirs.backup"), refusals.get(0));
+        assertTrue(refusals.get(0).contains("nowhere to park"), refusals.get(0));
+        assertTrue(refusals.get(0).contains("dry-run"), "names its alternative: " + refusals.get(0));
+    }
+
+    @Test
+    @DisplayName("an EMPTY list still arms without a park home — nothing can park, so nothing needs a home")
+    void noParkHomeArmsWhenNothingIsDisabled() {
+        assertEquals(List.of(), StepDisableArming.refusals(List.of(), List.of("sink__d0"), false));
+        assertEquals(List.of(), StepDisableArming.refusals(null, List.of("sink__d0"), false));
+    }
+
+    @Test
+    @DisplayName("draftHasParkHome mirrors PipelineConfigParser: absent and blank are both 'no home'")
+    void draftParkHomeReader() {
+        assertTrue(StepDisableArming.draftHasParkHome(Map.of("backup", "/data/backup")));
+        assertFalse(StepDisableArming.draftHasParkHome(Map.of("backup", "   ")));
+        assertFalse(StepDisableArming.draftHasParkHome(Map.of("poll", "/data/in")));
+        assertFalse(StepDisableArming.draftHasParkHome(null));
     }
 
     @Test
