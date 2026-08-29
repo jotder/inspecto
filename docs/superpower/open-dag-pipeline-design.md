@@ -264,9 +264,12 @@ it.
 | the lifecycle those need | `State` = `LIVE` / `SUPERSEDED` ("replaced by a reprocess of the same Consignment") / `COMPACTED_AWAY` ("merged into a compacted file and unlinked") |
 | readers not seeing retired files | `ConsignmentSelector`: `resolve(glob) = glob MINUS paths the catalog marks SUPERSEDED / COMPACTED_AWAY` |
 
-⚠ **One shipped trade-off a derived table would inherit**: after compaction, *"reprocess of a
-compacted-away batch is no longer supported"*. So compaction and reprocess already interact, and a
-derived-table chain does not get to ignore that.
+**One shipped trade-off a derived table inherits — ✅ ACCEPTED (operator, 2026-08-29):** after
+compaction, *"reprocess of a compacted-away batch is no longer supported"*. Known and fine; it is a
+stated position, not an open risk. ⚠ Note the registry is deliberate about it — `supersede()` moves only
+`LIVE` rows, because *"a `COMPACTED_AWAY` row must keep that state: it is the evidence that the file's
+rows now live inside a merged file, which is precisely what a reprocess needs to know to take the §6.2
+partition-rewrite path instead of a no-op unlink."*
 
 ### 6.3 The actual new work: a WRITE seam
 
@@ -286,18 +289,35 @@ thing"* is a one-concept-two-words violation.
    key to merge on and the Selector has nothing to filter. ⚠ This is the field most likely to be left
    blank by an author and the one that silently disables both.
 4. **`schemaFingerprint`** — computed from the propagated schema (§2.4, `TypeFlow`), not authored.
-5. **Reprocess cascade** — when the base Consignment is reprocessed, do derived tables become
-   `SUPERSEDED` too? The state exists; what does not exist is anything that walks the *derivation*
-   edges, because today nothing records that table B was derived from table A. **That edge is the one
-   genuinely new piece of state this decision introduces.** Without it, a reprocess supersedes the base
-   and silently leaves stale derivatives `LIVE`.
+5. **Reprocess cascade — 🔴 already FREE, correcting an earlier claim in this document.** I wrote that
+   a derivation edge was "the one genuinely new piece of state this decision introduces". That is
+   **wrong**: supersede is keyed on the Consignment, not on lineage —
+
+   ```sql
+   UPDATE … SET state = 'SUPERSEDED' WHERE consignment_id = ? AND state = 'LIVE'
+   ```
+
+   A derived table registers under the **same `consignmentId`**, so a reprocess already marks it
+   `SUPERSEDED` along with the base. No lineage walk, no new edge. (A second path supersedes every
+   `LIVE` row of a *table* outside the keeping Consignment — the full-recompute case — and is likewise
+   lineage-free.) ⚠ What the cascade does *not* do is recompute: the derivative is marked stale, and the
+   chain must re-run to produce a new generation. That is the right default — stale is marked, never
+   silently kept — but it means **the chain has to be re-runnable per Consignment**, which is stage 3's
+   problem, not a state problem.
+
+   ⚠ **A derivation edge would still buy something, just not this**: partial invalidation (re-run step B
+   without step A) and lineage display. Neither is required by the decision, so neither should be built
+   for it. Note also that the *structural* lineage edge already exists in the catalog — `EdgeKind.FEEDS`,
+   *"TABLE → DERIVED_TABLE … data lineage"* — but `MetadataGraphBuilder` assembles that
+   *"from configuration alone (no audit, no DuckDB)"*, so it is design-grain, not instance-grain, and
+   cannot answer a per-generation question either way.
 
 ### 6.4 Revised staging
 
 | # | Stage | Note |
 |---|---|---|
 | **1** | ~~decide the output contract~~ | ✅ **DECIDED**: arbitrary tables, registered as outputs |
-| **2** | **The write seam** (§6.3) — one sanctioned writer, the five contract points, `producer` set from the step | the derivation edge (point 5) is the only new state |
+| **2** | **The write seam** (§6.3) — one sanctioned writer, the five contract points, `producer` set from the step | 🔴 **no new state at all** — every field exists and the reprocess cascade is free (§6.3 point 5) |
 | **3** | **Compose Consignment steps** — an ordered chain over one Consignment | needs stage 2's naming to be meaningful |
 | **4** | **Surface the post-sync lane in the editor** | authoring |
 | **5** | **Open the recipe verb + palette `authorable`** | independent; in-batch plugin steps |
