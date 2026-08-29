@@ -77,27 +77,6 @@ each row's detail stays in its own section.
    engineering task: five OAuth secrets, one of them a named-customer production credential, were public
    on GitHub for six weeks. The code is clean as of 2026-07-25 but **rotation at the issuer is
    outstanding** — history keeps the values, so deletion remediated nothing.
-0-b. ✅ **SEC-EXCHANGE-ATTRS — CLOSED 2026-08-11.** The authenticated Subject could leak between requests
-   on a shared-attribute runtime: `HttpExchange` attributes are per-exchange only by *default* —
-   `sun.net.httpserver.ExchangeImpl` picks the map at class-init
-   (`perExchangeAttributes = !System.getProperty("jdk.httpserver.attributes","").equals("context")`), and
-   wherever it falls back (**any pre-26 runtime, or a current one started with
-   `-Djdk.httpserver.attributes=context`**) ControlApi's single `createContext("/")` means one map shared
-   by every request. `ATTR_SUBJECT` was set only on success and never cleared, so request A's alice was
-   readable by request B's public-path request, flowing into `requireCapability`, `actor()` and
-   `authorize()`; `ATTR_RAW_BODY` rode the same map.
-   **Grounding that closed the "is it latent?" question:** the `-NoRuntime` bundle flavor explicitly
-   supports "target server must provide **Java 24+**" (`inspecto/package.ps1:40`, `:555`, `:702`) and
-   nothing anywhere sets the property — so the shared-map configuration is a *supported deployment*, not
-   a hypothetical, which is what warranted the fix without waiting further.
-   **Fix (2026-08-11):** `ControlApi.clearRequestScope` clears the full `REQUEST_SCOPED_ATTRS` roster
-   (all ten `ApiContext.ATTR_*` plus `Roles.ATTR_CONFIG_ROOT`, `AccessDecider.ATTR_MATCHED_POLICY` and
-   the effective-path) as dispatch's first act, in the outermost `correlation` stage — a shared-map
-   runtime now behaves like a private-map one; on a private-map runtime the map is empty and it's a no-op.
-   `ExchangeAttributeScopeTest` pins the leak scenario and enforces roster completeness by reflection
-   over `ApiContext`'s `ATTR_*` constants (a new constant missing from the roster is a red build, not a
-   leak). The in-request hand-clears in `authorize()`/`RowScope` stay — they guard staleness *between two
-   `decide()` calls of the same request*, which the dispatch-start clear does not cover.
 1. **Root enablers — DRAINED, now including MNT-14.** RBAC/ABAC R0–R5 + A1–A5, job-concurrency bound,
    Incidents I1 resolution gate, `ObjectStore.delete`, and off-request-thread legacy triggers all shipped
    2026-07-23/24; the last survivor **MNT-14 shipped 2026-07-27** as the `incident_purge` maintenance task
@@ -197,7 +176,7 @@ you remember the old framing, re-read those three.
 | D14 | **Ratified with one tightening — SHIPPED 2026-07-25 (`aa9fb47b`).** ⚠ `canConfigureAccess` + `canApproveShares` were **already** admin/super-only in `Roles.SEED`, so the "bootstrap deadlock left them over-granted" premise was unfounded. `canAuthorAlertRules`/`canRequestShares` ratified as developer/ops-tier. `canOfferDatasets` moved to admin (cross-space data exposure with no second gate) | `okf/…/auth-security.md` |
 | D15 | **Withdrawn, not answered — there is no vendor of record.** The IdP/gateway is a per-client deployment choice; standards-only and configurable. Litmus test: new auth code that can't be pointed at a different compliant IdP by config alone is wrong. **Both residuals SHIPPED 2026-07-25**: `KeycloakTokenRelay` → **`OidcTokenRelay`** (incl. the `META-INF/services` entry), and the Keycloak-shaped `tokenEndpoint` default deleted. ⚠ **BREAKING for existing deployments** — `-Dauth.oidc.tokenEndpoint` is now **required** and fails fast at startup; it is no longer derived from the issuer, so a Keycloak deployment that relied on the derived path will not boot until the flag is set from the provider's `/.well-known/openid-configuration`. `X-JWT-Assertion` default kept, now documented as *a* convention | `okf/…/auth-security.md` |
 | D16 | ~~A dedicated system Space owns the domain-seeded pattern packs~~ — **OVERTURNED 2026-07-26 (operator): per-Space forking is acceptable.** The central-fix rationale (a system Space so a fix to a shipped pattern reaches every copy) was weighed and dropped; packs are ordinary per-Space `pattern-pack` components. ⚠ Two costs of the system-Space shape are recorded in the plan so it is not re-proposed blind: a `_`-sentinel dir holding `config/` passes `SpaceManager.discover`'s filter and then dies in `SpaceId.of` (a spurious `Skipping space dir` WARN every boot), and a sentinel without `config/` can't be reached through `/spaces/{id}/…` at all ⇒ a dedicated cross-space read route. **✅ SHIPPED end-to-end 2026-07-26** — the kind (2 registrations, no new endpoint or capability), 18 seed files across the three tracked spaces, and the toolbox reading `GET /components/pattern-pack` with the `PATTERN_PACKS` const as the fallback. ⚠ Load-bearing: a kind absent from `WRITABLE_TYPES` is **unreadable**, not read-only; a step's start `direction` persists as the **empty string** because TOON cannot encode `{}` in a list; `patternPacks` must be a **signal** (`OnPush`); and `spaces/uat/` is gitignored so it stays on the fallback. Plan archived | `okf/frontend/features/link-analysis.md` |
-| D17 | 🔴 **STALE ROW — the feature is SHIPPED.** Verified in code 2026-08-28: `record_split` (`blank_line` or any literal delimiter) lives in `PipelineConfigParser` → `PipelineConfig.TextRegex.recordSplit()` → `DuckDbCsvIngester.buildTextRegexBlockReadSpec`, covered by `TextRegexTest`. `FEATURE_INVENTORY.md` had it `[LIVE]` since 2026-07-20 — this row was recorded 2026-07-25 without grounding. Nothing to build | §7 |
+| D17 | ✅ **Nothing to build — the feature was already shipped when this row was filed.** Verified in code 2026-08-28: `record_split` (`blank_line` or any literal delimiter) lives in `PipelineConfigParser` → `PipelineConfig.TextRegex.recordSplit()` → `DuckDbCsvIngester.buildTextRegexBlockReadSpec`, covered by `TextRegexTest`. `FEATURE_INVENTORY.md` had it `[LIVE]` since 2026-07-20 — this row was recorded 2026-07-25 without grounding — nothing to build. The row is kept only as that record; its §7 duplicate was deleted 2026-08-29 | `FEATURE_INVENTORY.md` |
 
 ## 3. Product remainder (MoSCoW of record: `REQUIREMENTS.md` §5)
 
@@ -2459,18 +2438,17 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   so both the delay provider and the `if (config?.mockApi?.service)` branch were dead. ⚠ The app's own
   `mockApiInterceptor` is a **different symbol** from `app/inspecto/mock` (same name, distinct module) —
   THE mock backend is unaffected. ⚠ This is a deliberate divergence from upstream `@gamma`.
-- **DuckDB capping remainder** — all scratch connections are now cappable by one operator knob
-  (`-Dprocessing.duckdb.memory_limit`/`.temp_directory`/`.max_temp_directory_size`/`.threads`) and
-  job concurrency is boundable (`-Djobs.maxConcurrentRuns`, default `0`=unbounded). Still open, both
-  **D12 SHIPPED, D11 DECLINED (2026-07-25).** Chunking is now on by default at **8 GiB**. The
-  **on-by-default `memory_limit` (D11) was deliberately not shipped** — operator call, "spill routing
-  only". ⚠ **The exposure D11 existed to close therefore remains open:** unset `memory_limit` ⇒ DuckDB
-  defaults to ≈80% RAM *per instance* ⇒ concurrent runs overcommit ⇒ the whole box (incl. the HTTP API)
-  can go unresponsive, and chunking is now the only bound on a pathological file. ~~**To reopen, bring a
-  measured value**~~ — **MEASURED 2026-07-27, see the row below.** A semaphore-computed cap stays rejected
-  (`maxConcurrentRuns` defaults to unbounded; batch-ingest has a second limiter). Spill *routing* already
-  ships (`scratchDir` → `dirs.temp` on the data volume); `max_temp_directory_size` has no fixed default
-  because none is defensible without the volume size. Read-path is **not** the risk (see C6 below).
+- **DuckDB capping remainder** — ⚠ **row corrected 2026-08-29: it read "D11 DECLINED … the
+  on-by-default `memory_limit` was deliberately not shipped", which the D11 bullet below has
+  contradicted since 2026-08-26.** The pair (`memory_limit=2GB` + `maxConcurrentRuns=4`) **is live and
+  on by default**, owned by the server configuration and editable at **Settings ▸ Scheduler ▸ Resource
+  caps** — so the overcommit exposure this row was written about is **closed**, and chunking is no longer
+  the only bound on a pathological file. As-built + the measurement that unblocked it: the D11 bullet
+  below. **What survives as open, all by decision:** `max_temp_directory_size` still gets **no default**
+  (none is defensible without knowing the volume size), and preview/dry-run connections stay
+  **uncapped** (bounded samples — only `EnrichmentEngine`, `PipelineJobRunner`, `BatchIngestStrategy`
+  resolve a limit). A semaphore-computed cap stays rejected. Spill *routing* already ships
+  (`scratchDir` → `dirs.temp` on the data volume). Read-path is **not** the risk (see C6 below).
   `okf/backend/engine/duckdb.md`
 - **D11 — ✅ SHIPPED 2026-08-26 (measured 2026-07-27).** The pair is live and on by default, owned by the
   server configuration and editable at **Settings ▸ Scheduler ▸ Resource caps**; see the §2 D11 row for the
@@ -2836,7 +2814,6 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 
 | Item | Status |
 |---|---|
-| `record_split` for `text_regex` block records | 🔴 **STALE — SHIPPED, verified in code 2026-08-28** (see D17 in §2): `blank_line`/literal delimiters parse, ingest and are tested. The "open gap" was recorded without grounding |
 | Parser required-vs-advanced field tiers | **Parked by decision (D13, 2026-07-25)** — needs a real onboarding-observation session (interview #2); explicitly NOT an engineering guess. **Session kit READY 2026-08-28**: [`superpower/parser-field-tiers-interview-plan.md`](superpower/parser-field-tiers-interview-plan.md) — protocol, per-lane capture sheets, grounded field inventory, pre-agreed analysis rule. Remaining blocker is purely scheduling a real user. 🔴 Grounding fact for the session: every `tier:'required'` field ships `required:false` validators — 'required' is disclosure-only today, and whether it should validate is the session's second question |
 | Template seed-pack enrichment (frontend C7) | Ongoing, continuous — not a discrete item |
 | Reconciliation explicit **non-goals** (N>3, non-additive aggs, fuzzy keys) | Recorded, not open work — `okf/frontend/features/reconciliation.md` |
