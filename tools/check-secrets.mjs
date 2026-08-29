@@ -49,12 +49,21 @@ import { dirname, join, relative, sep } from 'node:path';
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const toPosix = (p) => p.split(sep).join('/');
 
-// Directories never worth scanning: dependencies, build output, generated artifacts, and the
-// unmaintained archive. `.claude/worktrees/` is gitignored scratch — it held unversioned copies of
-// all five leaked secrets, which is why it is cleaned separately rather than guarded here.
+// Directories never worth scanning: dependencies, build output, generated artifacts.
+// `.claude/worktrees/` is gitignored scratch — it held unversioned copies of all five leaked
+// secrets, which is why it is cleaned separately rather than guarded here.
+//
+// ⚠ `archived-documents` was in this list until 2026-08-29 and should never have been. It is the
+// vocabulary guard's exclusion, and it is right THERE: linting prose nobody may edit is unfixable
+// noise. It is wrong HERE, and the two guards are not the same question. What a lint asks is "is
+// this doc maintained"; what this guard asks is "is this doc COMMITTED" — 195 tracked files,
+// including `legacy-api-sunset-runbook.md`, were invisible. That is precisely the class the `.md`
+// extension below exists for ("a rotation runbook or an incident plan is exactly where someone
+// pastes a live credential"), and archiving a runbook does not redact it. The archive was verified
+// clean the day it was added to scope, so this closes a hole rather than a leak.
 const SKIP_DIRS = new Set([
     'node_modules', '.git', 'target', 'dist', 'out', '.angular', '.mvn',
-    'graphify-out', 'worktrees', 'archived-documents', 'coverage',
+    'graphify-out', 'worktrees', 'coverage',
 ]);
 
 // `.md` is here because a rotation runbook or an incident plan is exactly where someone pastes a

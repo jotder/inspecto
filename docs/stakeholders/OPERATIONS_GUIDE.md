@@ -47,7 +47,7 @@
 ## When something's wrong
 
 1. Check the **connectivity banner** story first (backend down ≠ a 503 from a write gate).
-2. `GET /health`, then `/metrics` error counters, then the Signal ledger filtered to the pipeline/Source.
+2. `GET /health`, then `/metrics` error counters, then the Signal ledger filtered to the pipeline/Collector.
 3. Failing Run → **Diagnosis** (AI RCA, produces an Incident with a suggested fix) if the agent module
    is present.
 4. Escalate with the correlation id — it threads UI → API → runs → audit.

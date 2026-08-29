@@ -280,7 +280,7 @@ the rest are planned in subsequent phases. Features that can't run offline (remo
 **D. Output** — csv-output `[done]`; parquet-compression (snappy/zstd/gzip), large-file-chunking.
 **E. Acquisition** — stability-gate, dedup-path, dedup-checksum, incremental-watermark, gap-detection; sftp-with-retry `[ref]`, post-action-move `[ref]`.
 **F. Jobs** — enrich-on-commit, enrich-cron (+catch_up), maintenance-cleanup, flow-job-on-pipeline.
-**G. Flows** — filter-route, merge-two-sources, sink-view.
+**G. Pipeline graphs** — filter-route, merge-two-sources, sink-view.
 
 **View definitions (`<space>/config/views/<store>_view.toon`)** — three ship as of 2026-08-18:
 `default/config/views/premium_cdr_view_view.toon` (`TARIFF = 'premium'`),

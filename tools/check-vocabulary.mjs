@@ -87,12 +87,35 @@ const USER_FACING = [
 // `docs/okf` — and a control matrix that calls a Pipeline a "Flow" is one an auditor reads. It was
 // outside every pass on the day it was created, which is the silent-exemption shape this guard's own
 // history warns about: a new tier is unscanned by default, and nothing says so.
-const DOC_TREES = ['docs/okf', 'docs/superpower', 'compliance'];
+// `docs/stakeholders/**` joins them 2026-08-29 for the same reason — CLAUDE.md's doc-lifecycle §1 names
+// it part of the tier-1 canon, and a stakeholder brief is read by the least forgiving audience there is.
+const DOC_TREES = ['docs/okf', 'docs/superpower', 'compliance', 'docs/stakeholders'];
+
+// The ROOT CANON (CLAUDE.md doc-lifecycle §1) — tier-1 current knowledge that is not under a tree, so
+// every pass missed it: `docs/` also holds `ops/`, `roadmap/`, `api/`, `ui/` and the permanently
+// unscanned `archived-documents/`, which is why this is a NAMED FILE LIST and not `docs/`.
+//
+// Added 2026-08-29 after an audit asked what each guard's SCOPE quietly exempts. It found the same
+// silent-exemption shape `compliance/` had: GLOSSARY — the file that DEFINES the bans — plus INDEX,
+// BACKLOG, PROJECT_NOTES, ADVANCED_GUIDE and FEATURE_INVENTORY were outside every pass, and four of
+// them carried live `Flow` residue the rename program had already retired everywhere it looked.
+// `USER_GUIDE.md` is absent on purpose: it is already pass 1's, under the stricter no-allowlist rules.
+const ROOT_CANON = [
+    'docs/ADVANCED_GUIDE.md',
+    'docs/BACKLOG.md',
+    'docs/BRANCHING.md',
+    'docs/EDITIONS.md',
+    'docs/FEATURE_INVENTORY.md',
+    'docs/GLOSSARY.md',
+    'docs/INDEX.md',
+    'docs/PROJECT_NOTES.md',
+    'docs/REQUIREMENTS.md',
+];
 
 // The trees' own name for themselves. Derived, never restated — the summary line used to say
 // "docs/{okf,superpower}" literally, so adding a third tree left the guard REPORTING A SCOPE IT NO
 // LONGER HAD. A guard that misstates what it scanned is the same failure as one that scans nothing.
-const DOC_TREES_LABEL = `{${DOC_TREES.join(', ')}}`;
+const DOC_TREES_LABEL = `{${[...DOC_TREES, 'root canon'].join(', ')}}`;
 
 // Keyed `<path>::<ruleId>`, exactly like CONFIG_ALLOW, so exempting one known keep never blanket-exempts a
 // file from the other rules. Two legitimate shapes only:
@@ -122,6 +145,27 @@ const DOC_ALLOW = {
         'Sanctioned sense: "Remote Sources" are data origins (Stream/Reference axis, GLOSSARY §3), not collection tasks.',
     'docs/okf/backend/log.md::bare-flow':
         'Historical changelog: the entry records the `flow-graph`→`pipeline-graph` directory rename itself.',
+
+    // ── root canon (added with the tier, 2026-08-29) ──────────────────────────────────────────────
+    // Four files, four SUBJECT-MATTER exemptions. Everything else the new scope found was stale and was
+    // FIXED in the same change (the guard's own rule) — including a documented route, `GET /sources`,
+    // that has not existed since the rename: it is `GET /collectors`.
+    'docs/GLOSSARY.md::bare-flow':
+        'Subject matter: GLOSSARY is where the bans are DECLARED (§1 ban table, §13 rename map) — it must be able to print the banned word it retires.',
+    'docs/GLOSSARY.md::data-store':
+        'Subject matter: the §1 ban table and §13 rename-map rows for Data Store → Dataset.',
+    'docs/GLOSSARY.md::source-acquisition-entity':
+        'Subject matter: the §1 ban table and §13 rename-map rows for Source → Collector / Stream / Reference.',
+    'docs/GLOSSARY.md::cube-noun':
+        'Subject matter: the §13 rename-map rows for Cube → Matrix.',
+    'docs/INDEX.md::bare-flow':
+        'Subject matter: the one hit names the Flow→Pipeline rename as the largest remaining blast radius (517 files / 39 @PublicApi).',
+    'docs/BACKLOG.md::source-acquisition-entity':
+        'Subject matter: the one hit cites the Source→Collector rename (GLOSSARY §13) as a worked example of a concept renamed three times.',
+    'docs/PROJECT_NOTES.md::bare-flow':
+        'Subject matter: the one hit records that CONFIG_ALLOW doubles as the Flow→Pipeline Tier-3 ledger. The other four hits in this file were stale and were fixed 2026-08-29.',
+    'docs/REQUIREMENTS.md::measure-threshold':
+        'Sanctioned: BI-5 is a SHIPPED capability — `*_alert.toon` measure rules alert on a BI Measure — so the line describes the product, not the A2 confusion. ⚠ Whether that capability is correctly NAMED is an open vocabulary question (BACKLOG §6), not something to settle by editing a requirement to make a guard green.',
 };
 
 // Each rule: a per-line matcher returning the matched text (or null), plus a message. Rules run against
@@ -542,7 +586,7 @@ const usedDocAllow = new Set();
 const treeViolations = [];
 const treeMarkdown = trackedFiles('*.md');
 const treeDocs = (treeMarkdown ?? []).filter(
-    (p) => DOC_TREES.some((t) => p.startsWith(`${t}/`)),
+    (p) => DOC_TREES.some((t) => p.startsWith(`${t}/`)) || ROOT_CANON.includes(p),
 );
 for (const rel of treeDocs) {
     for (const hit of scanProse(rel)) {

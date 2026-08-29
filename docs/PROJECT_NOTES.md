@@ -97,7 +97,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
 - **Keep the core lean.** All network deps live in `inspecto-connectors`; hosted-AI SDKs in
   `inspecto-agent-hosted` (physically absent from air-gapped builds). The zero-new-dep rule was retired
   2026-06-13 (logback replaced slf4j-simple, user-approved) — still no gratuitous deps.
-- **Flow-graph track is `master`-only** (`feat:` → master; empty merge-forward set; retired lines untouched).
+- **Pipeline-graph track is `master`-only** (`feat:` → master; empty merge-forward set; retired lines untouched).
 - **Multi-space (multi-project), `master`-only `feat:` track.** One server hosts many isolated **spaces**
   (`-Dspaces.root`, default `./spaces`); each = `spaces/<id>/{config,data,audit,duckdb,flows}` + `space.toon`.
   The ~40-method `@PublicApi` per-instance `CollectorService` is **wrapped, not rewritten**: `SpaceManager` →
@@ -423,7 +423,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   `data_0.parquet`, so two writers targeting the same partition **overwrite each other** — which silently converts
   the append-only invariant into a rewrite. `PartitionWriter` exists for this: it stages, then reveals each file
   under a caller-supplied per-unit-of-work name. `SummaryWriter` reuses it for exactly this reason.
-- **Flow seed = exactly one `source_store`** in Phase-A live execution (rejects 0 or >1; multi-source merge is
+- **Pipeline seed = exactly one `source_store`** in Phase-A live execution (rejects 0 or >1; multi-source merge is
   the `transform.merge` path).
 - **Per-space `space` MDC must reach EVERY worker thread on the execution path.** Singleton routing reads the
   MDC on the *current* thread, and MDC does NOT cross thread-pool boundaries. Each executor running ingest/commit
@@ -566,7 +566,7 @@ touching `inspecto-ui/`.** Highlights (full detail there):
   auth flow is a **no-op on Personal** (OIDC only when `bootstrap.features.authMode` says so, W6d).
 - **Feature panes** in `src/app/modules/admin/<feature>/`, **signals + OnPush**. A pane can be reused across
   routes via `ActivatedRoute.snapshot.data` (Cases/Issues = one `ObjectsComponent`).
-- **Second "lens" on a pane = `mat-button-toggle-group`, NOT a new nav item** (Flows `flow|combined`, Jobs
+- **Second "lens" on a pane = `mat-button-toggle-group`, NOT a new nav item** (Pipelines `flow|combined`, Jobs
   `schedules|reporting`). Factor shared blocks into `<ng-template>` + `*ngTemplateOutlet`.
 - **No hardcoded colors** — CI guard `npm run lint:tokens` fails on hex/`rgb()`/`levelClass`-style helpers under
   `inspecto/**` + `modules/admin/**` (allowlist: `chart-tokens.ts`, `status-badge.component.ts`). Status/level
@@ -662,7 +662,7 @@ touching `inspecto-ui/`.** Highlights (full detail there):
 - **Optimistic mutations** — `optimisticMutate({apply,commit,reconcile,rollback,onError})` (`inspecto/api/
   optimistic.ts`); reassign arrays (`rows=[...]`) so the grid re-renders.
 - **G6 graph** — reuse `modules/admin/catalog/graph-view.component.ts` (`@Input data`, `@Output nodeClick`);
-  nodes are canvas-drawn (not DOM) → verify inspector logic via unit test, not preview clicks. Flow graph data
+  nodes are canvas-drawn (not DOM) → verify inspector logic via unit test, not preview clicks. Pipeline graph data
   via `flow-graph.ts#toFlowG6Data`.
 - **Viz plugins register by side effect** — `import 'app/inspecto/viz/plugins'` runs `registerBuiltinViz()`.
   Admin shell surfaces trigger it transitively; a **guest/shell-less or lazy route that renders widgets must

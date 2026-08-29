@@ -11,7 +11,7 @@ never a permission — server-enforced **Roles** arrive with the Standard editio
 
 - **Business** — consume Dashboards/KPIs, investigate provenance & lineage, raise **Requirements**
   (KPI / Report / Reconciliation / Rule requests with a triage lifecycle).
-- **Builder** — author in the **Workbench** (Connections, Sources, Pipelines) and the **Studio**
+- **Builder** — author in the **Workbench** (Connections, Collectors, Pipelines) and the **Studio**
   (Datasets, Queries, Widgets, Dashboards, Link Analysis, Geo Map Analysis).
 - **Ops** — operate Runs, the Signal ledger, Alerts → Incidents → Cases.
 
@@ -22,7 +22,7 @@ Auditing, and Link Analysis instantiate a ready-made Space per use case.
 
 | Area | What the user gets | Status |
 |---|---|---|
-| **Acquire** | Connections (SFTP/FTP/FTPS/DB) + scheduled Sources with dedup, watermarks, gap detection | ✅ Shipped |
+| **Acquire** | Connections (SFTP/FTP/FTPS/DB) + scheduled Collectors with dedup, watermarks, gap detection | ✅ Shipped |
 | **Parse & validate** | CSV/delimited grammars, fixed-width (text+binary), plugin formats, compressed input; schema casting + quarantine | ✅ Shipped (JSON + text/regex frontends: planned MUST) |
 | **Process** | Visual **Pipeline** DAG authoring; medallion ELT to a Parquet lakehouse; event-driven incremental runs; async run-now | ✅ Shipped (final live e2e verification pending) |
 | **Query** | **Query Library** — reusable Queries with `$`-Parameters, executed live on the embedded engine | ✅ Shipped |

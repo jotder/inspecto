@@ -80,7 +80,7 @@ read-only/draft-only today; the embedded-intelligence design adds a governed aut
 1. **API**: consume `/api/v1` only (envelope + error codes; OpenAPI file is the contract).
 2. **Identity (Standard)**: point OIDC at your IAM; roles map via `RoleMapper`; gateway (WSO2-style)
    can front the API unchanged.
-3. **Data**: land files via Connections/Sources (SFTP/FTP/FTPS/DB today; object storage on the MUST
+3. **Data**: land files via Connections/Collectors (SFTP/FTP/FTPS/DB today; object storage on the MUST
    list); query the lakehouse via the warehouse layer (pg_duckdb) — [`../okf/backend/integrations.md`](../okf/backend/integrations.md).
 4. **Observability**: scrape Prometheus metrics; consume the Signal ledger; ship the audit trail.
 5. **Packaging**: `package.ps1 -Edition <personal|standard|…>` → fat JAR + jlink bundle; air-gap

@@ -73,11 +73,11 @@ AI-driven autonomy without redesign.
 
 | ID | Requirement | MoSCoW | Status | Edition |
 |---|---|---|---|---|
-| ACQ-1 | **Connections**: named endpoint+credential definitions (SFTP/FTP/FTPS, database), reused by many Sources | Must | SHIPPED | All |
-| ACQ-2 | **Sources**: configured collection tasks (paths/queries, cadence, filename patterns, dedup policy) bound to one Connection | Must | SHIPPED | All |
+| ACQ-1 | **Connections**: named endpoint+credential definitions (SFTP/FTP/FTPS, database), reused by many Collectors | Must | SHIPPED | All |
+| ACQ-2 | **Collectors**: configured collection tasks (paths/queries, cadence, filename patterns, dedup policy) bound to one Connection | Must | SHIPPED | All |
 | ACQ-3 | Acquisition framework: ledgers, dedup, watermarks, gap detection, retry (Phases A–F) | Must | SHIPPED | All |
 | ACQ-4 | Object-storage (S3/GCS/Azure/MinIO) + network-share (NFS/SMB) connectors on the connector SPI | **Must** | SHIPPED (2026-07-08: `connector: s3` — SDK-free SigV4, covers S3/MinIO/GCS-interop; `connector: azure` — SDK-free SharedKey signing over JDK HttpClient, List Blobs pagination + Range resume + copy-status-guarded MOVE, etags feed ACQ-7, Azurite-compatible for LAN testing; NFS/SMB = documented OS-mounted-share pattern, UNC stays jail-rejected by design. GCS *native* API remains demand-gated — interop mode covers it today) | All |
-| ACQ-5 | Streaming source consumer (e.g. Kafka topic as a Source) | Should | SHIPPED (2026-07-08: `connector: kafka` — a topic drained per scan cycle into virtual slice files on the existing CollectorConnector SPI, no core-engine change; `assign()`+`seek()`, no consumer group — the consumed frontier rides the ledger watermark and is persisted only post-commit (at-least-once, DB-export machinery); envelope-NDJSON or raw-value payloads, retention clamp + `max_records` cap, optional SASL PLAIN; kafka-clients 3.9.2 confined to inspecto-connectors, tested offline via in-jar `MockConsumer`, no broker) | All |
+| ACQ-5 | Streaming source consumer (e.g. a Kafka topic drained by a Collector) | Should | SHIPPED (2026-07-08: `connector: kafka` — a topic drained per scan cycle into virtual slice files on the existing CollectorConnector SPI, no core-engine change; `assign()`+`seek()`, no consumer group — the consumed frontier rides the ledger watermark and is persisted only post-commit (at-least-once, DB-export machinery); envelope-NDJSON or raw-value payloads, retention clamp + `max_records` cap, optional SASL PLAIN; kafka-clients 3.9.2 confined to inspecto-connectors, tested offline via in-jar `MockConsumer`, no broker) | All |
 | ACQ-6 | Push/event-driven file discovery (replace poll where the remote can notify) | Could | SHIPPED (2026-07-08: `POST /sources/{id}/notify` — external systems trigger an immediate scan, 202+runId on v1, `canOperateRuns`-gated, audited as `source.notified`; plus `source.discovery: watch` — WatchService push for local/mounted inboxes, debounced, poll loop stays on as backstop) | All |
 | ACQ-7 | etag/version-aware dedup dimensions | Should | SHIPPED (2026-07-08: `source.duplicate.mode: etag` — pre-fetch skip on the connector's listing etag/object version; ledger columns `etag`/`object_version` with in-place migration; degrades to size+mtime when the connector supplies neither) | All |
 
@@ -156,7 +156,7 @@ AI-driven autonomy without redesign.
 | INC-2 | **Alert → Incident → Case** lifecycle, object-link graph, SLA, comments | Must | SHIPPED | All |
 | INC-3 | **Notification** delivery channels (email/webhook) + per-user preferences | **Must** | SHIPPED (2026-07-07: webhook channel in core, SMTP in connectors, `notify.*` sysprops, `ALERT_FIRED` rule; preferences remain single-global until the auth module adds users) | All |
 | INC-4 | Incident workflow depth: queues, escalation, watchers | Should | SHIPPED (2026-07-08: **queues** first-class — `*_queue.toon` / `POST /queues`, members + `round_robin`\|`least_loaded`\|`manual` routing via `QueueRouter`; **assignment** `POST /objects/{id}/assign` (person or queue-routed) advances the workflow + emits `OBJECT_ASSIGNED` (the assignment history); **watchers** `POST /objects/{id}/watch`\|`unwatch` + `GET .../watchers`; **escalation** `*_escalation.toon` policy the SLA sweep applies on breach — severity bump + queue re-route + `OBJECT_ESCALATED` notify. Queue store in-memory (Db parity a noted follow-on, as links/notes began); per-user notification delivery still rides the global channel tags) | All |
-| INC-5 | **Diagnosis**: AI-assisted RCA of a failing Run/Source producing an Incident | Should | SHIPPED | All |
+| INC-5 | **Diagnosis**: AI-assisted RCA of a failing Run/Collector producing an Incident | Should | SHIPPED | All |
 
 ### 3.9 Spaces & tenancy (SPC)
 
@@ -175,7 +175,7 @@ AI-driven autonomy without redesign.
 | MET-1 | Everything authored is a **Component** `{kind, name, config, parts?, wiring?}`; kind registry declares config schemas | Must | SHIPPED | All |
 | MET-2 | Derived **Registry** reuse graph + Catalog + lineage graph (canonical edge/node kinds, `CONSUMES` etc.) | Must | SHIPPED | All |
 | MET-3 | Single ref derivation (`deriveRefs`) feeding reuse graph, bundles, delete-protection | Must | SHIPPED (R1) | All |
-| MET-4 | **Stream** read-model in the Catalog (browsable data origins; IA reorg Phase B) | Should | SHIPPED (2026-07-08: `GET /catalog/streams` — every Source as a data-origin catalog node (connector/connection/pipeline/discovery attrs), shaped to the UI `MetadataNode` contract the mock already served; UI needed no change) | All |
+| MET-4 | **Stream** read-model in the Catalog (browsable data origins; IA reorg Phase B) | Should | SHIPPED (2026-07-08: `GET /catalog/streams` — every Collector as a data-origin catalog node (connector/connection/pipeline/discovery attrs), shaped to the UI `MetadataNode` contract the mock already served; UI needed no change) | All |
 | MET-5 | Draft/published Component version history (W3b) | Could | SHIPPED (2026-07-09: `ComponentStore.write` archives the prior copy under `<typeDir>/.history/<id>.v<N>.toon` — a sub-dir, not a sibling `.toon`, so the registry scan never mis-reads it as a duplicate — keep-N (`-Dcomponents.history.keep`, default 10); `GET /components/{type}/{id}/versions` + `POST …/versions/{v}/restore` (restore is itself a versioned write); reusable `ComponentHistoryDialog` + a History button on the dashboard editor; mock mirrors the archive/list/restore. Reactor 1139/0/0/3 + UI specs/live-walk green) | All |
 
 ### 3.11 API & integration (API)
@@ -406,7 +406,7 @@ template gallery + apply).*
 
 ## 8. Traceability
 
-| Source | What it grounds |
+| Document | What it grounds |
 |---|---|
 | [`archived-documents/plans-archive/feature-matrix-editions.md`](archived-documents/plans-archive/feature-matrix-editions.md) | Original H/M/S/N ratings + edition tiers (2026-07-02 planning view) |
 | [`archived-documents/plans-archive/api-contract-design.md`](archived-documents/plans-archive/api-contract-design.md) | 33 product-owner API guidelines; W1–W7 delivery worklog |

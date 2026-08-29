@@ -181,7 +181,7 @@ Each sub-section: **Responsibility · Process · Events · Metrics · State · C
   once instead of being rediscovered and reprocessed every poll cycle (an EMPTY batch never backs up/marks);
   `year=NULL` partitions (see [`troubleshooting.md`](okf/backend/build-run/troubleshooting.md)); a `BATCH_FAILED` with `offendingFile`.
 
-### 5.3 Flow engine (`com.gamma.pipeline`, `com.gamma.pipeline.exec`)
+### 5.3 Pipeline-graph engine (`com.gamma.pipeline`, `com.gamma.pipeline.exec`)
 - **Responsibility:** NiFi-style pipeline-as-graph. Two faces: (a) **read-only projection** of lifted pipelines
   for visualisation; (b) **authored flows** (`*_flow.toon`) that are CRUD-able, dry-runnable, and (T32) executable.
 - **Process:** `PipelineLift` lifts a legacy `PipelineConfig` → `PipelineGraph` (lossless). `PipelineValidator` rejects
@@ -204,9 +204,12 @@ Each sub-section: **Responsibility · Process · Events · Metrics · State · C
   (idempotent re-run via a stable `batch_id`), or **opt-in incremental** via the `incremental_column` job param
   (single-source): reads only rows past a stored watermark and appends; the watermark lives at
   `<jobs-audit>/<flow>__<store>.watermark`.
-- **Events:** `FLOW_CONSERVATION_IMBALANCE` (T22, §11.4) when the data plane finds a non-amplifying node where
+- **Events:** `PIPELINE_CONSERVATION_IMBALANCE` (T22, §11.4) when the data plane finds a non-amplifying node where
   `recordsIn != recordsOut` — records lost (`LOSS`) or unexpectedly amplified (`AMPLIFICATION`); `EventObjectBridge`
-  promotes it to a managed ALERT (de-duped per flow+node). Flow runs also publish a `BatchEvent` like any job.
+  promotes it to a managed ALERT (de-duped per pipeline+node). Pipeline runs also publish a `BatchEvent` like any
+  job. ⚠ `FLOW_CONSERVATION_IMBALANCE` is the pre-rename value and survives only as
+  `EventType.FLOW_CONSERVATION_IMBALANCE_LEGACY`, a READ-alias so existing event-ledger rows still promote — nothing
+  emits it.
 - **Data plane / provenance (T20–T22, §11):** when `-Dprovenance.backend=duckdb` is set, `PipelineExecutor` reports
   per-`(node, relationship)` record counts (a `ProvenanceCollector`) which `PipelineJobRunner` persists to
   `DbProvenanceStore` keyed by `(flow, batchId)`. Query a past run via **`GET /provenance?flow=&batch=`** (per-node-rel
@@ -469,7 +472,7 @@ infra probes: `/health`, `/ready`, `/metrics`, `/metrics/acquisition`.
 - **Idempotency (v4.8.0):** any `POST/PUT/DELETE` may carry an `Idempotency-Key` header; a retry with the same
   key replays the first response (`Idempotency-Replayed: true`) instead of re-running (per-instance, ~10 min TTL).
 - **Enrichment:** `GET /enrichment`, `GET /enrichment/{job}/runs|lineage|report`.
-- **Sources:** `GET /sources` (incl. current DB watermark).
+- **Collectors:** `GET /collectors` (incl. current DB watermark).
 - **Connections:** `GET /connections`, `GET /connections/{id}`, `POST /connections/{id}/test`,
   `POST /connections` *(503)*, `PUT/DELETE /connections/{id}` *(503; DELETE 409 if in use)*.
 - **Events:** `GET /events`, `/events/search`, `/events/{id}`, `/events/export`, `GET/POST /events/views`,
@@ -558,7 +561,7 @@ inputs: `GET /pipelines/{n}/quarantine` (reason subdir tells you field_mismatch 
 **Sequence gap / missing file.** `SEQUENCE_GAP` event (attrs expected/sequence/unit), `inspecto_sequence_gaps_total`;
 also auto-promoted to an `ALERT` object via `EventObjectBridge` (find it in `/objects?type=ALERT`).
 
-**Source circuit open.** `SOURCE_CIRCUIT_OPEN` event (attr source) after repeated discover failures; the source is
+**Collector circuit open.** `SOURCE_CIRCUIT_OPEN` event (attr source) after repeated discover failures; the collector is
 skipped until the breaker half-opens. Check connectivity (`POST /connections/{id}/test`), then it self-recovers.
 
 **A job isn't firing.** Cron: is it enabled + a valid `cron`? `GET /jobs` shows `nextFire`. Event: does
@@ -570,7 +573,7 @@ means the previous run is still in flight (`LockingRunner`).
 (`BranchCommitLog`). Use a fresh `batch_id` (default = per-run timestamp) to recompute. Also: `sink.view` writes no
 bytes in Phase A.
 
-**Flow job fails to build / run.** `IllegalStateException` at build = no `-Dassist.write.root` (flow store
+**Pipeline job fails to build / run.** `IllegalStateException` at build = no `-Dassist.write.root` (flow store
 fail-closed). At run: unknown `flow` id, or a flow that declares **no** `source_store` (≥1 required; multiple are
 unioned/joined via `transform.merge` since Phase C).
 
