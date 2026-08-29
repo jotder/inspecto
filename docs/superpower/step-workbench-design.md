@@ -209,7 +209,7 @@ one it assumed, or it will confidently show the wrong types for ASN.1/fixed-widt
 | # | Slice | Verify gate |
 |---|---|---|
 | **S1** | ✅ **SHIPPED 2026-08-29** — `RelationPreview.columnTypes` (DESCRIBE-derived) + `Result.sql` (the statements as executed), both additive; the transform preview now runs on a **sealed** `SqlSandbox` | ✅ reactor **3749/0/0/5**, 19 modules, exit 0. Seal falsified in both directions: without it a **readable file was read successfully** through a `where` predicate |
-| **S2** | Render what the response already carries — rows in a data table, types as its header, SQL in a read-only pane. ⚠ **First task: mirror `columnTypes`/`sql` in the offline mock** — S1 left it alone deliberately (no consumer, so no behavioural divergence yet), but the moment a renderer exists the offline arm would show an empty schema | UI specs + **drive the preview**: author a `map`, see the rows and types change |
+| **S2** | ✅ **SHIPPED 2026-08-29** — `<inspecto-step-preview-result>`: derived schema as chips, rows in a `<inspecto-data-table>`, SQL in a read-only pane; the mock mirrors the keys as **honestly empty** | ✅ UI **2826 passed / 5 skipped**, exit 0; lint:tokens + build + all three tsconfigs green; **driven in the preview** — both arms rendered |
 | **S3** | `TRANSFORM_MAP` attribute spec (name/expr grid) — ⚠ regenerate **both** committed contracts | `NodeConfigNameContractTest` + the full reactor, not a targeted run |
 | **S4** | `configs: [...]` chain preview, per-Step `shape` chaining; honest refusal for a join without reference context | chain of map→filter→summarize previews with a distinct schema per Step |
 | **S5** | Wire `TypeFlow` behind a read route; show the derived pipeline schema beside the authored one | derived columns equal what a real batch writes to Parquet (assert against a written file, not against the SQL) |
@@ -256,3 +256,42 @@ seeding **before** `seal()`.
 **Deliberately not done in S1:** the offline mock still returns neither key. There is no consumer yet, so
 there is no behavioural divergence — but that changes the moment S2 renders them, which is why it is S2's
 first task.
+
+---
+
+## 12. S2 as-built (2026-08-29)
+
+**Shipped:** `<inspecto-step-preview-result>` (`inspecto/components/`) renders one preview: the input
+columns, then per relation its **derived schema** as `<inspecto-chip>`s and its rows in an
+`<inspecto-data-table tier="mini">`, then the compiled SQL in a read-only pane. The drawer's transform
+arm now hands the whole response to it; the **sink** arm keeps its text lines (it has no schema to show).
+
+**The call that shaped it — what should the MOCK return?**
+
+⛔ **Not invented types.** The mock has no SQL engine, and its own contract note already bans writing a
+second evaluator. A guessed type is worse than a blank: `CAST(amt AS DOUBLE)` would print as `VARCHAR`
+and teach the operator something false. Special-casing verbs (a filter passes columns through, a map does
+not) *is* that second evaluator. So the mock returns `columnTypes: []` / `sql: []` and the renderer says
+**"Derived offline — the schema and SQL need the query engine, so they are not available here."** ⚠ An
+empty chip row would have read as *"this Step produces no columns"*, which is a different and false claim
+— that distinction is pinned by a spec in both the handler and the component.
+
+**Two things the build found:**
+
+1. ⚠ **Rendering a data table drags `GAMMA_APP_CONFIG` into every host spec.** `<inspecto-data-table>`
+   injects the real `InspectoGridThemeService`, which walks up to that token — so the drawer's own spec
+   started failing `NG0201` the moment the table appeared inside it. Stub it as the data-table's spec does.
+2. ⚠ **The host spec asserted the old count lines** (`out 'data': 1 row(s)`) and failed correctly — a
+   real regression caught by an existing test, updated to assert the new rendering instead.
+
+**Verified in the preview** (offline server, Builder lens, `cdr_ingest` ▸ Row filter ▸ Test this Step):
+the component mounts, the rows render in a real table, and the offline arm shows the explanation rather
+than an empty schema. Feeding the server's response shape through the same component renders
+`DERIVED SCHEMA · msisdn VARCHAR · amt_d DOUBLE` and the SQL pane. ⚠ **One step was synthetic**: the
+sample rows were seeded onto the editor's parse thread rather than produced by running a parse, because
+S2 changed nothing about where those rows come from. Everything downstream of that — the click, the HTTP
+call through the mock interceptor, the response mapping and the render — was real.
+
+**Not done:** the component is not in the `/design` gallery. It composes existing primitives (chip +
+data-table) for one feature rather than introducing a design-system primitive, so it is not gallery
+material; revisit if a second host adopts it (S4's chain preview is the likely one).

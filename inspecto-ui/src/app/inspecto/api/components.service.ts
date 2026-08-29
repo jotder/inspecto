@@ -55,16 +55,32 @@ export interface ComponentVersion {
 }
 
 /** One produced relation in a preview (transform / schema): the rel key, its row count, and a bounded sample. */
+/** One `{name, type}` pair of a derived output schema — the type is DuckDB's own, verbatim. */
+export interface DerivedColumn {
+    name: string;
+    type: string;
+}
+
 export interface RelationPreview {
     rel: string;
     rowCount: number;
     rows: Record<string, unknown>[];
+    /**
+     * The DERIVED output schema — DuckDB's `DESCRIBE` of the produced relation, so the author never
+     * restates it. ⚠ Empty offline: the mock has no SQL engine and will not guess a type.
+     */
+    columnTypes?: DerivedColumn[];
 }
 
 /** Transform/schema dry-run result (POST /components/{transform,schema}/{id}/test). */
 export interface RelationsPreview {
     inputColumns: string[];
     relations: RelationPreview[];
+    /**
+     * The statements the config compiled to, in execution order — what actually ran, recorded rather
+     * than re-derived. ⚠ Empty offline, for the same reason as `columnTypes`.
+     */
+    sql?: string[];
 }
 
 /** Grammar parse result (POST /components/grammar/{id}/test). */

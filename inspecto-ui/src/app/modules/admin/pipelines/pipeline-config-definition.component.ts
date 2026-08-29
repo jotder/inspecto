@@ -26,11 +26,13 @@ import {
     ComponentsService,
     ConfigService,
     LensService,
+    RelationsPreview,
     SpacesService,
 } from 'app/inspecto/api';
 import { AttributeSpec, KEY_SEP, flattenBlock, nestKeys } from 'app/inspecto/component-model';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
+import { StepPreviewResultComponent } from 'app/inspecto/components/step-preview-result.component';
 import { pipelineOptionLoader, referenceOptionLoader } from 'app/inspecto/components/entity-option-loaders';
 import { EnrichmentEditorComponent } from 'app/inspecto/enrichment/enrichment-editor.component';
 import { ENRICHMENT_WIRING_ATTRIBUTES } from 'app/inspecto/enrichment/enrichment-attributes';
@@ -96,6 +98,7 @@ const MAX_TEST_ROWS = 50;
         InspectoSchemaFormComponent,
         EnrichmentEditorComponent,
         PipelineExtraConfigComponent,
+        StepPreviewResultComponent,
     ],
     template: `
         <!-- Enrichment (W4b): the node authors the REAL companion config through the shared editor —
@@ -183,6 +186,9 @@ const MAX_TEST_ROWS = 50;
                 </div>
                 @if (testError(); as e) {
                     <p class="text-warn m-0 mt-2 text-sm" role="alert">{{ e }}</p>
+                }
+                @if (transformResult(); as preview) {
+                    <inspecto-step-preview-result [result]="preview" />
                 }
                 @if (testResult(); as lines) {
                     <ul class="m-0 mt-2 list-none p-0 text-sm" role="status" aria-live="polite">
@@ -297,8 +303,14 @@ export class PipelineConfigDefinitionComponent {
     readonly testRows = computed(() => (this.sampleRows() ?? []).slice(0, MAX_TEST_ROWS));
     readonly canTestInline = computed(() => !!this.testFamily() && this.testRows().length > 0);
     readonly testing = signal(false);
-    /** The last inline preview, as lines to render — one shape for both families, only text is shown. */
+    /**
+     * The last SINK preview, as lines to render. The transform arm renders structurally instead — see
+     * {@link transformResult} — because its rows, derived schema and SQL were already being fetched and
+     * thrown away.
+     */
     readonly testResult = signal<string[] | null>(null);
+    /** The last TRANSFORM preview: relations + their derived schemas + the compiled SQL. */
+    readonly transformResult = signal<RelationsPreview | null>(null);
     readonly testError = signal<string | null>(null);
 
     private lastDirty = false;
@@ -417,34 +429,40 @@ export class PipelineConfigDefinitionComponent {
         this.testing.set(true);
         this.testError.set(null);
         this.testResult.set(null);
-        const lines$ =
-            family === 'transform'
-                ? this.components
-                      .previewTransform({ ...config, type: this.node().type }, rows)
-                      .pipe(
-                          map((p) => [
-                              `in: ${p.inputColumns.length} column(s) over ${rows.length} row(s)`,
-                              ...p.relations.map((r) => `out '${r.rel}': ${r.rowCount} row(s)`),
-                          ]),
-                      )
-                : this.components
-                      .previewSink(config, rows)
-                      .pipe(
-                          map((p) => [
-                              `store: ${p.store ?? '(none declared)'} — ${p.rowCount} row(s) would be written`,
-                              ...p.warnings,
-                          ]),
-                      );
-        lines$.subscribe({
-            next: (lines) => {
-                this.testing.set(false);
-                this.testResult.set(lines);
-            },
-            error: (e) => {
-                this.testing.set(false);
-                this.testError.set(apiErrorMessage(e, 'The test failed.'));
-            },
-        });
+        this.transformResult.set(null);
+
+        const fail = (e: unknown) => {
+            this.testing.set(false);
+            this.testError.set(apiErrorMessage(e, 'The test failed.'));
+        };
+
+        // The transform arm renders the WHOLE result — rows, the derived schema and the compiled SQL were
+        // always in this response and were being reduced to two count lines.
+        if (family === 'transform') {
+            this.components.previewTransform({ ...config, type: this.node().type }, rows).subscribe({
+                next: (preview) => {
+                    this.testing.set(false);
+                    this.transformResult.set(preview);
+                },
+                error: fail,
+            });
+            return;
+        }
+        this.components
+            .previewSink(config, rows)
+            .pipe(
+                map((p) => [
+                    `store: ${p.store ?? '(none declared)'} — ${p.rowCount} row(s) would be written`,
+                    ...p.warnings,
+                ]),
+            )
+            .subscribe({
+                next: (lines) => {
+                    this.testing.set(false);
+                    this.testResult.set(lines);
+                },
+                error: fail,
+            });
     }
 
     /**

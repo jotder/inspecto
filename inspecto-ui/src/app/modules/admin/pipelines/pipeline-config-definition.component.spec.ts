@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { INSPECTO_GRID_DARK, InspectoGridThemeService } from 'app/inspecto/grid';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
@@ -56,6 +57,9 @@ async function create(inputs: PaneInputs, api: Partial<ConfigService> = {}) {
         imports: [PipelineConfigDefinitionComponent],
         providers: [
             provideNoopAnimations(),
+            // The preview result renders <inspecto-data-table>, whose real theme service walks up to
+            // GAMMA_APP_CONFIG — stub it, as the data-table's own spec does.
+            { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } },
             { provide: ComponentsService, useValue: { list: () => of([]) } },
             {
                 provide: ConfigService,
@@ -629,9 +633,24 @@ describe('PipelineConfigDefinitionComponent', () => {
             expect(fixture.componentInstance.testFamily()).toBeNull();
         });
 
-        it('sends the node type inside config and renders the per-relation counts', async () => {
+        /**
+         * S2: the drawer renders the WHOLE preview — the derived schema and the compiled SQL were always
+         * in this response and used to be reduced to two count lines.
+         */
+        it('sends the node type inside config and renders the derived schema, rows and SQL', async () => {
             const previewTransform = vi.fn(() =>
-                of({ inputColumns: ['qty'], relations: [{ rel: 'data', rowCount: 1, rows: [{ qty: '2' }] }] }),
+                of({
+                    inputColumns: ['qty'],
+                    relations: [
+                        {
+                            rel: 'data',
+                            rowCount: 1,
+                            rows: [{ qty: '2' }],
+                            columnTypes: [{ name: 'qty', type: 'VARCHAR' }],
+                        },
+                    ],
+                    sql: ['CREATE TABLE preview_flt__data AS SELECT * FROM "preview_input" WHERE qty > 0'],
+                }),
             );
             withPreview({ previewTransform });
             const fixture = await create(filter());
@@ -643,7 +662,11 @@ describe('PipelineConfigDefinitionComponent', () => {
                 { qty: '2' },
                 { qty: '1' },
             ]);
-            expect(fixture.nativeElement.textContent).toContain("out 'data': 1 row(s)");
+            const text = fixture.nativeElement.textContent ?? '';
+            expect(text).toContain('Derived schema');
+            expect(text).toContain('VARCHAR');
+            expect(text).toContain('1 row(s)');
+            expect(fixture.nativeElement.querySelector('pre')?.textContent).toContain('WHERE qty > 0');
         });
 
         it('reports a sink preview as its store plus any warnings', async () => {

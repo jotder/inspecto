@@ -383,8 +383,16 @@ function previewInline(family: string, body: Record<string, unknown> | null): Mo
     const type = cfg['type'];
     if (typeof type !== 'string' || !type.startsWith('transform.'))
         return error(422, "inline config is not a transform ('type: transform.*' required)");
+    // ⛔ `columnTypes` and `sql` are deliberately EMPTY offline, not invented. The server derives both by
+    // running the production RowShaper on a real DuckDB — it DESCRIBEs the produced table and records the
+    // statements it executed. This layer has no SQL engine, so any type it printed would be a guess, and a
+    // guess is worse than a blank: `CAST(amt AS DOUBLE)` would render as VARCHAR and teach the operator
+    // something false. The renderer says "not available offline" instead. ⛔ Do NOT populate these by
+    // special-casing verbs (a filter passes its columns through, a map does not) — that is the second
+    // evaluator this handler exists to avoid.
     return json({
         inputColumns: [...new Set(sample.flatMap((r) => Object.keys(r ?? {})))],
-        relations: [{ rel: 'data', rowCount: sample.length, rows: sample.slice(0, MAX_PREVIEW_ROWS) }],
+        relations: [{ rel: 'data', rowCount: sample.length, rows: sample.slice(0, MAX_PREVIEW_ROWS), columnTypes: [] }],
+        sql: [],
     });
 }

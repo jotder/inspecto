@@ -210,7 +210,10 @@ describe('componentsHandler', () => {
      */
     describe('inline preview', () => {
         it('refuses a body with no config, exactly as the route does', () => {
-            const res = handler(req('POST', '/api/components/transform/preview', { sampleRows: [{ a: 1 }] }), seededStore());
+            const res = handler(
+                req('POST', '/api/components/transform/preview', { sampleRows: [{ a: 1 }] }),
+                seededStore(),
+            );
             expect(res?.status).toBe(400);
         });
 
@@ -227,7 +230,10 @@ describe('componentsHandler', () => {
 
         it('refuses an empty sample', () => {
             const res = handler(
-                req('POST', '/api/components/transform/preview', { config: { type: 'transform.filter' }, sampleRows: [] }),
+                req('POST', '/api/components/transform/preview', {
+                    config: { type: 'transform.filter' },
+                    sampleRows: [],
+                }),
                 seededStore(),
             );
             expect(res?.status).toBe(400);
@@ -244,7 +250,30 @@ describe('componentsHandler', () => {
             expect(res?.status).toBe(200);
             const body = res?.body as { inputColumns: string[]; relations: { rel: string; rowCount: number }[] };
             expect(body.inputColumns).toEqual(['a', 'b']);
-            expect(body.relations).toEqual([{ rel: 'data', rowCount: 2, rows: [{ a: 1 }, { a: 2, b: 'x' }] }]);
+            expect(body.relations).toEqual([
+                { rel: 'data', rowCount: 2, rows: [{ a: 1 }, { a: 2, b: 'x' }], columnTypes: [] },
+            ]);
+        });
+
+        /**
+         * ⛔ `columnTypes` and `sql` are EMPTY offline ON PURPOSE, and this pins that. The server derives
+         * both from a real DuckDB (DESCRIBE over the produced relation; the statements it recorded), and
+         * this layer has no SQL engine. A guessed type is worse than a blank — `CAST(amt AS DOUBLE)` would
+         * print as VARCHAR and teach the operator something false — so the renderer says "not available
+         * offline" instead. Populating these by special-casing verbs is the second evaluator this handler
+         * exists to avoid.
+         */
+        it('returns NO derived schema and NO sql offline, rather than guessing them', () => {
+            const res = handler(
+                req('POST', '/api/components/transform/preview', {
+                    config: { type: 'transform.map', columns: [{ name: 'amt_d', expr: 'CAST(amt AS DOUBLE)' }] },
+                    sampleRows: [{ amt: '1.5' }],
+                }),
+                seededStore(),
+            );
+            const body = res?.body as { relations: { columnTypes: unknown[] }[]; sql: unknown[] };
+            expect(body.sql).toEqual([]);
+            expect(body.relations[0].columnTypes).toEqual([]);
         });
 
         it('warns when a sink declares no store, and names it when it does', () => {
