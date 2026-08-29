@@ -5,6 +5,7 @@ import com.gamma.etl.DataTransformer;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.pipeline.BuiltinNodeType;
 import com.gamma.pipeline.PipelineNode;
+import com.gamma.pipeline.PipelineNodeTypes;
 import com.gamma.pipeline.PipelineRel;
 import com.gamma.query.MeasureCompiler;
 
@@ -111,6 +112,12 @@ public final class RowShaper {
     public static List<Relation> shape(Connection conn, PipelineNode node, String input, String outPrefix,
                                        ReferenceResolver references) throws SQLException {
         String type = node.type();
+        // The plugin seam's EXECUTION half. Consulted before the built-ins, deliberately, so a provider may
+        // specialise a core verb as well as add a new one — the same rule PipelineNodeTypes applies to
+        // descriptors ("an edition can specialise a node type without forking the core"). Empty in a stock
+        // build, so this costs one map lookup and changes nothing that ships.
+        Optional<PipelineNodeExecutor> contributed = PipelineNodeExecutors.get(type);
+        if (contributed.isPresent()) return contributed.get().shape(conn, node, input, outPrefix, references);
         if (BuiltinNodeType.TRANSFORM_JOIN.type().equals(type))     return join(conn, node, input, outPrefix, references);
         if (BuiltinNodeType.TRANSFORM_FILTER.type().equals(type))   return filter(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_VALIDATE.type().equals(type)) return validate(conn, node, input, outPrefix);
@@ -121,7 +128,15 @@ public final class RowShaper {
         if (BuiltinNodeType.TRANSFORM_MAP.type().equals(type)
                 || BuiltinNodeType.TRANSFORM_SELECT.type().equals(type)
                 || BuiltinNodeType.TRANSFORM_DERIVE.type().equals(type)) return project(conn, node, input, outPrefix);
-        throw new IllegalArgumentException("RowShaper cannot shape node type '" + type + "' (id=" + node.id() + ")");
+        // ⚠ Name the seam in the message: a CONTRIBUTED node type reaches here having rendered in the
+        // palette, validated and lifted, so "cannot shape" alone reads as a core bug rather than a
+        // missing provider — which was the whole shape of the descriptor-only gap.
+        throw new IllegalArgumentException("RowShaper cannot shape node type '" + type + "' (id=" + node.id()
+                + "). A built-in type is shaped here; a contributed one needs a PipelineNodeExecutor "
+                + "provider registered under META-INF/services/com.gamma.pipeline.exec.PipelineNodeExecutor"
+                + (PipelineNodeTypes.isKnown(type)
+                        ? " — the type IS registered as a descriptor, so only its executor is missing."
+                        : " — and this type is not a registered node type at all."));
     }
 
     // ── filter / validate (predicate split) ────────────────────────────────────

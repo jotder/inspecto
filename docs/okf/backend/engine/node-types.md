@@ -34,16 +34,47 @@ for (PipelineNodeType t : ServiceLoader.load(PipelineNodeType.class)) m.put(t.ty
 whose relationship is not in `emits()` is **rejected**), the lift, and the executor's sink-category
 checks.
 
-🔴 **What it does NOT carry: execution.** The interface says so outright — *"Execution and dry-run hooks
-are added in later phases, so this interface stays small and stable for now."* Execution dispatches
-through `RowShaper.shape`, a hardcoded `if`-chain that ends in
-`throw new IllegalArgumentException("RowShaper cannot shape node type '…'")`. **So a contributed type
-renders in the palette, validates, and lifts — and then throws at run time.** Anyone implementing a
-provider today gets a descriptor, not a runnable Step.
+**What it does NOT carry: execution** — by design, and there is a second seam for that.
+`PipelineNodeType`'s own javadoc says *"Execution and dry-run hooks are added in later phases, so this
+interface stays small and stable for now."*
 
 ⚠ **No external provider exists as of 4.x** — every shipped type is a `BuiltinNodeType`. The seam is
 kept deliberately (`PipelineNodeType`: *"Don't remove it for being 'unused' — implement a provider
 against it instead"*).
+
+## The execution half — `PipelineNodeExecutor` (SHIPPED 2026-08-29)
+
+**The gap that closed.** Until this, execution dispatched through `RowShaper.shape`, a *closed*
+`if`-chain over the built-ins ending in `throw new IllegalArgumentException("RowShaper cannot shape node
+type '…'")`. A contributed type rendered in the palette, validated and lifted — and then **threw at run
+time**. The seam was descriptor-only in the literal sense: you could describe a node type but not run one.
+
+`com.gamma.pipeline.exec.PipelineNodeExecutor` is the execution counterpart, discovered the same way
+(`META-INF/services/com.gamma.pipeline.exec.PipelineNodeExecutor`, registry
+`PipelineNodeExecutors`). `RowShaper.shape` consults it **before** the built-in chain.
+
+* 🔴 **A plugin needs BOTH halves, and they are independent registrations.** A descriptor without an
+  executor is the old gap; an executor without a descriptor shapes relations the validator will not let
+  anyone wire (an outbound edge whose relationship the type does not `emits()` is rejected). The refusal
+  message now says *which* half is missing rather than a bare "cannot shape" — that ambiguity was
+  precisely what made the gap read as a core bug.
+* ⚠ **A provider may override a built-in** by claiming the same `type()`, deliberately mirroring
+  `PipelineNodeTypes` (providers layered last so "an edition can specialise a node type without forking
+  the core"). Same trade, stated: a provider can silently change what a core verb does. ⚠ This is the one
+  behaviour **not covered by a test** — `ServiceLoader` registration is global and class-load-resolved,
+  so shadowing a core verb in test scope would change it for every other test in the module. The reason
+  it is untested is the reason it is powerful.
+* ⚠ **Single-input only.** The seam covers `RowShaper.shape`. Multi-input fan-in (`transform.merge`)
+  goes through `RowShaper.merge`, a different signature, and is deliberately out of the contract rather
+  than half-working.
+* **Cost to a stock build: one map lookup**, and the registry is empty unless a provider is installed.
+* Worked example: `FakeNodeExecutor` (`inspecto-engine/src/test`) contributes `transform.take` through
+  the executor service file. ⚠ It deliberately registers **no descriptor**, and that is a finding worth
+  keeping: **the served step catalog is a COMMITTED CONTRACT** (`StepTypesContractTest` vs
+  `inspecto-ui/.../step-types.contract.json`), so a test-scope `PipelineNodeType` provider either fails
+  that guard or gets a fixture type baked into the shipped client contract. Registering one broke three
+  contract assertions on the first attempt. A REAL plugin still registers both halves — it just does so
+  outside this build.
 
 ## Authorable ≠ lowerable — two flags, on purpose
 
