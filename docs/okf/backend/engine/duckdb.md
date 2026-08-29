@@ -206,9 +206,47 @@ time, so a value stops depending on which box processed it.
   stayed greyed out over a choice just made** — for every select on those drawers, not just this one. A
   2816-test suite missed it and the preview caught it. Fixed with `@HostListener('document:click')` and
   pinned by a regression spec.
-* ⚠ **Still latent, pre-existing, NOT fixed:** a format list mixing a `%z` pattern with a plain one
-  unifies the whole `COALESCE` to `TIMESTAMP WITH TIME ZONE`, so the plain branch is session-zone
-  interpreted. No shipped config uses `%z`. Tracked in `BACKLOG.md` §4.
+* 🔴 **The `%z` defect — GROUNDED 2026-08-29 against DuckDB 1.5.2.1, and the board row was wrong in
+  three ways.** It is **not** the plain branch, it does **not** need a mixed list, and it is worse than
+  "session-interpreted".
+  * ✅ **Confirmed:** a format list mixing a `%z` pattern with a plain one unifies the `COALESCE` to
+    `TIMESTAMP WITH TIME ZONE` (a plain-only list stays `TIMESTAMP`).
+  * 🔴 **REFUTED — the plain branch is NOT corrupted by the mixing.** `SqlBuilder.appendCoalesce`
+    appends a trailing `::TIMESTAMP`, which converts *back* through the same session zone, so the
+    promotion round-trips to an identity. Measured: `2026-03-01 10:00:00` returns `10:00:00` under
+    `Asia/Calcutta`, `Europe/Berlin`, `UTC` and `America/New_York` alike, plain-only list and mixed
+    list, bare and wrapped in `SourceZones.toNaiveUtc`. The one exception is narrow and is its own
+    bullet below.
+  * 🔴 **The real defect is the `%z` branch, and a `%z`-ONLY list has it too — mixing is irrelevant.**
+    `TRY_STRPTIME` parses the offset correctly, and then the trailing `::TIMESTAMP` **throws the
+    instant away by rendering it in the HOST's wall clock**. The same input
+    `2026-03-01 10:00:00+00:00` yields `15:30` · `11:00` · `10:00` · `05:00` under those four host
+    zones. The correct naive-UTC value is `10:00`, reachable as `timezone('UTC', <the TIMESTAMPTZ>)`.
+    This is exactly the host-dependence the rest of this section exists to remove.
+  * 🔴 **With a declared source zone it is doubly wrong and still host-dependent.** A `%z` value under
+    `toNaiveUtc(zone='Asia/Tokyo')` lands on `2026-03-01 06:30` on an `Asia/Calcutta` host and
+    `2026-02-28 20:00` on an `America/New_York` one — **a different calendar day**. The host render
+    happens first, so the declared zone is then applied to an already-corrupted wall clock.
+  * 🔴 **A `DATE` column is affected too, and it feeds partitions.** `date_formats` containing `%z`
+    puts `2026-03-01 23:00:00+00:00` on `2026-03-02` (Calcutta host) vs `2026-03-01` (New York host)
+    — so `DATE_*` partition keys become host-dependent.
+  * ⚠ **The one thing mixing does add** is a DST-gap shift on the plain branch: a local time that does
+    not exist in the **host's** zone is silently moved forward (Berlin `2026-03-29 02:30:00` → `03:30`
+    on a mixed list, `02:30` on a plain-only one). The ambiguous fall-back case (`2026-10-25 02:30:00`)
+    is an identity.
+  * ⚠ **Nothing validates a format string.** `ConfigValidator:84` only *warns* on an empty
+    `timestamp_formats`; `%z` is unvalidated free text, offered by no UI list and refused by nothing.
+  * **Still latent:** no `.toon` under `spaces/` uses `%z` (the only grep hits are binary parquet).
+  * **The intended semantics are already on record** — the original board row asked to probe "`%z`
+    formats (an offset in the data should **WIN** over any configured zone)". Today it loses, to the
+    host. Two candidate shapes, both unbuilt and the choice is a behaviour call: **(i) fail closed** —
+    refuse `%z` in a format list at config load, the same posture S1 took for a zone-less
+    `TIMESTAMPTZ`, which closes the silent corruption cheaply and leaves the feature for later; or
+    **(ii) build "the offset wins"** — detect a `%z` format and emit `timezone('UTC', …)` instead of
+    `::TIMESTAMP`, making the data's own offset a fifth precedence tier above `timezone_column`. ⚠ (ii)
+    needs a reliable compile-time answer to "does this list contain a live `%z`", which is a string
+    predicate over author-supplied patterns (`%%z` is a literal, not an offset) — that is the part to
+    ground before building.
 * **Dead code flagged, not touched:** `SqlBuilder.buildPartitionExpr` has no production caller (only
   `buildCastExpr` at `TransformCompiler:209` does).
 
