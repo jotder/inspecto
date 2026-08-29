@@ -131,13 +131,16 @@ former root reference docs** (each index lists them):
   items only, both in `BACKLOG.md` §4: no `timezone_column` editor (by decision) and the
   `%z`-mixed-`COALESCE` latent defect.
 
-- [`superpower/parser-plugin-framework.md`](superpower/parser-plugin-framework.md) — **NOT APPROVED,
-  NOTHING BUILT** (listed here 2026-08-28 — it had been sitting in `superpower/` unlisted, which is
-  how a five-phase plan stayed invisible to the board). The operator's "E of ELT" framework:
-  self-describing Parser plugins (`getPreviewText()`/`getConfigSchema()`), grammar-driven, tree-capable
-  preview, P1–P5. ⚠ **It carries no status header and no recorded approval** — do not read its
-  phase list as a scheduled queue; it needs an approval pass first. (An audit on 2026-08-28 called it
-  "fully approved and unblocked"; the file does not support that.)
+- [`archived-documents/plans-archive/parser-plugin-framework.md`](archived-documents/plans-archive/parser-plugin-framework.md)
+  — **ARCHIVED 2026-08-30, FULLY DELIVERED.** The operator's "E of ELT" framework: self-describing
+  Parser plugins, grammar-driven, tree-capable preview. P1–P5 shipped 2026-07-30/31; the last gating
+  item (the tree→segments ingest bridge) shipped 2026-08-30 (`8f7bee75`). Current behaviour lives in
+  [`okf/backend/engine/parser-plugins.md`](okf/backend/engine/parser-plugins.md).
+  🔴 **This row said "NOT APPROVED, NOTHING BUILT" from 2026-08-28 to 2026-08-30 — false on both counts**,
+  while every deliverable (the OKF concept, `ParserRoutes`, `ParsersService`, the segments editor, the
+  GLOSSARY *Grammar* entry) was already in the tree. The status was inferred from the plan file's missing
+  header instead of from the code. **A plan with no status header has an UNKNOWN status, not an unbuilt
+  one** — grep for its deliverables before writing a status into this index.
 - [`superpower/deployment-topology-plan.md`](superpower/deployment-topology-plan.md) — **DRAFT for
   stakeholder review (2026-07-24), decision asks in §10 unsigned** (listed here 2026-08-28, same
   omission). Deployment offerings — topologies, security overlays, scaling/DR posture — plus the

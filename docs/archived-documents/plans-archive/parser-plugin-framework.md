@@ -1,6 +1,21 @@
 # Parser framework — self-describing Parser plugins, grammar-driven, tree-capable preview
 
-> On approval, persist to `docs/superpower/parser-plugin-framework.md` (repo rule: plans live in-repo).
+> **ARCHIVED 2026-08-30 — FULLY DELIVERED.** P1–P5 shipped 2026-07-30/31 (framework, `GET /parsers`,
+> `POST /parsers/{id}/preview`, UI adoption, segments editor, the OKF concept, the GLOSSARY *Grammar*
+> entry); the last gating item, **(b) the tree→segments ingest bridge**, shipped 2026-08-30 as
+> `XmlRecordIngester` (`8f7bee75`), so hierarchical parsers are no longer preview-only.
+>
+> 🔴 **`docs/INDEX.md` carried this as "NOT APPROVED, NOTHING BUILT" until 2026-08-30** — wrong on both
+> counts, and wrong for over a month while every one of its deliverables sat in the tree. The 2026-08-28
+> pass that added the row was correcting a real problem (the plan was unlisted) and introduced a worse
+> one by inferring status from the FILE's missing header rather than from the code. A plan carrying no
+> status header means its status is unknown, not that it is unbuilt — check for its deliverables.
+>
+> Durable as-built facts live in `docs/okf/backend/engine/parser-plugins.md`. Its recorded follow-ons
+> (drop-in `plugins/` dir; the ASN.1 declarative decode profile's grammar-source half) are BACKLOG §4
+> rows. ⚠ Everything below is the ORIGINAL plan text, including statements the as-built refuted — most
+> notably "hierarchical parsers are preview-only until the flatten DSL" and the §Verification
+> expectation that XML serves `ingestable:false`. Read it for rationale, never as current behaviour.
 
 ## Context — the operator's framework, mapped onto what exists
 
