@@ -122,6 +122,17 @@ compatibility gate. This is the ELT amendment's own §3.4.4 direction.
 SQL should be *told* they are leaving the audited path (today `EXPR` drops out of the audit silently).
 That is a small, high-value piece of work and it is independent of everything else here.
 
+**§6 step 1 SHIPPED 2026-08-29.** `MappingRules.validate` now emits a WARNING `Finding` for every
+`EXPR` rule, anchored to `rules[N].transformType`: *"EXPR runs author-owned SQL verbatim and is not
+covered by the batch's cast-failure audit…"* — rendered by the mapping grid editor exactly like any
+other finding (it already distinguished WARNING from ERROR styling; only ERROR ever reached it before).
+⚠ **The load-bearing half of the fix wasn't the warning — it was two `clean`/gate computations that
+had silently equated "any finding" with "unclean" and would have blocked every `EXPR` save the moment
+it stopped being finding-free.** Both `ComponentRoutes.validateMapping`'s `clean` field and the
+`PUT /components` save-path gate now key off `Severity.ERROR` specifically, matching the pattern the
+adjacent schema-findings check already used. `countCastFailures` itself is untouched — the exclusion
+stays, only the boundary is now visible before a batch runs, not discovered from it.
+
 **⚠ Feasible but a real project: SQL macros as the UDF surface.** Measured to work under the seal.
 Needs a component kind, a registry, and re-registration on every scratch connection.
 
@@ -133,7 +144,8 @@ coercion, the per-field metadata and the compatibility contract with it.
 
 ## 6. If it is pursued, the order that de-risks it
 
-1. Make the audited/unaudited boundary visible at authoring (`EXPR` today, any SQL Step tomorrow).
+1. ~~Make the audited/unaudited boundary visible at authoring (`EXPR` today, any SQL Step tomorrow).~~
+   **SHIPPED 2026-08-29** — see §5.
 2. Publish `TypeFlow`'s derived schema as the Step's output schema on the read surfaces, so the
    duplication disappears before any deletion is attempted.
 3. Only then ask whether a declarative rule table still earns its place — with the audit and the

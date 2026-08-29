@@ -25,7 +25,6 @@ class MappingRulesTest {
     void cleanRulesProduceNoFindings() {
         assertEquals(List.of(), MappingRules.validate(List.of(
                 rule("MSISDN", "msisdn", "DIRECT"),
-                rule("AMOUNT", "TRY_CAST(amt AS DOUBLE) / 100", "EXPR"),
                 rule("IMSI", "imsi", ""))));
     }
 
@@ -70,14 +69,22 @@ class MappingRulesTest {
         for (String type : TransformCompiler.TRANSFORM_TYPES) {
             String target = "FILENAME_DATE".equals(type) ? "EVENT_DATE" : "COL";
             String source = "CONCAT_DT".equals(type) ? "d|t" : "src";
-            assertEquals(List.of(), MappingRules.validate(List.of(rule(target, source, type))),
-                    "compiler accepts " + type + " but the validator does not");
+            List<Finding> f = MappingRules.validate(List.of(rule(target, source, type)));
+            if ("EXPR".equals(type)) {
+                // legal, but flagged — the one type-specific case that IS a finding, deliberately WARNING
+                assertEquals(1, f.size(), "compiler accepts " + type + " but the validator does not");
+                assertEquals(Severity.WARNING, f.get(0).severity());
+            } else {
+                assertEquals(List.of(), f, "compiler accepts " + type + " but the validator does not");
+            }
         }
     }
 
     @Test
     void transformTypeIsCaseInsensitiveLikeTheCompiler() {
-        assertEquals(List.of(), MappingRules.validate(List.of(rule("MSISDN", "a", "expr"))));
+        List<Finding> f = MappingRules.validate(List.of(rule("MSISDN", "a", "expr")));
+        assertEquals(1, f.size());
+        assertEquals(Severity.WARNING, f.get(0).severity(), "still recognised as EXPR, lowercased");
     }
 
     @Test
@@ -104,9 +111,15 @@ class MappingRulesTest {
     }
 
     @Test
-    void anExprsSqlIsNotValidated() {
-        // Deliberate: TransformCompiler emits EXPR verbatim and documents it as operator-trusted.
-        assertEquals(List.of(), MappingRules.validate(List.of(rule("X", "SELECT ( not sql", "EXPR"))));
+    void anExprsSqlIsNotValidatedButIsFlaggedAsUnaudited() {
+        // Deliberate: TransformCompiler emits EXPR verbatim and documents it as operator-trusted — the
+        // bad SQL itself draws no ERROR. It does draw the one WARNING every EXPR rule draws: this bypasses
+        // the batch's cast-failure audit (sql-only-transform-feasibility.md §5/§6 step 1).
+        List<Finding> f = MappingRules.validate(List.of(rule("X", "SELECT ( not sql", "EXPR")));
+        assertEquals(1, f.size());
+        assertEquals(Severity.WARNING, f.get(0).severity());
+        assertEquals("rules[0].transformType", f.get(0).fieldPath());
+        assertTrue(f.get(0).message().contains("cast-failure audit"), f.get(0).message());
     }
 
     @Test

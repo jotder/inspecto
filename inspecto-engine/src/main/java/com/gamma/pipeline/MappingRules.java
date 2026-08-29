@@ -94,7 +94,13 @@ public final class MappingRules {
                                 "FILENAME_DATE is only supported for the EVENT_DATE column, got '"
                                 + target + "'."));
                 }
-                default -> { }   // DIRECT/blank and EXPR carry no further structural precondition
+                // The boundary this rule leaves is legal, not broken — WARNING, so it stays visible
+                // without blocking save (sql-only-transform-feasibility.md §5/§6 step 1: today this
+                // exclusion happens silently, inside countCastFailures, with nothing telling the author).
+                case "EXPR" -> out.add(Finding.warning(at + "transformType",
+                        "EXPR runs author-owned SQL verbatim and is not covered by the batch's "
+                        + "cast-failure audit — a row this produces NULL for will not be counted."));
+                default -> { }   // DIRECT/blank carries no further structural precondition
             }
         }
         return out;

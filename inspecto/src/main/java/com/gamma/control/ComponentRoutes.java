@@ -83,7 +83,9 @@ final class ComponentRoutes implements RouteModule {
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("type", "mapping");
         r.put("findings", findings);
-        r.put("clean", findings.isEmpty());
+        // WARNING is legal-but-flagged (e.g. an EXPR rule outside the cast-failure audit) — only an
+        // ERROR blocks save, matching the schema-findings gate below and Finding's own contract.
+        r.put("clean", findings.stream().noneMatch(f -> f.severity() == Severity.ERROR));
         return r;
     }
 
@@ -531,8 +533,10 @@ final class ComponentRoutes implements RouteModule {
                 typed.add(cast);
             }
             List<Finding> findings = MappingRules.validate(typed);
-            if (!findings.isEmpty())
-                throw new IllegalArgumentException("mapping rules are invalid: " + findings.stream()
+            List<Finding> ruleErrors = findings.stream()
+                    .filter(f -> f.severity() == Severity.ERROR).toList();
+            if (!ruleErrors.isEmpty())
+                throw new IllegalArgumentException("mapping rules are invalid: " + ruleErrors.stream()
                         .map(f -> (f.fieldPath().isEmpty() ? "" : f.fieldPath() + ": ") + f.message())
                         .collect(java.util.stream.Collectors.joining("; ")));
         }
