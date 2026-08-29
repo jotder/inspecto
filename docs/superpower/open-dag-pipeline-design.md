@@ -23,7 +23,24 @@ once the operator described the dataflow model — see §2). No code beyond what
 
 ---
 
-## 0. The short version
+## 0. DECIDED 2026-08-29 (operator)
+
+> **Arbitrary tables, registered as Consignment outputs.** *"Steps may write arbitrary tables; the chain
+> needs an ownership and retention model — that's correct. For each persisted table (Parquet) we will
+> have retention / merge (small-file merge per partition key, on schedule, maybe 7-day-old data) etc.
+> later on."*
+
+⇒ §5 Q1 is closed: a post-sync step is **not** confined to the summary guardrail. §6 is what that costs
+and what it does not.
+
+🔴 **And most of the "later on" is already shipped** — see §6.2. The registry row already carries
+`tableName`, `producer`, `partitionKey`, `generation` and a lifecycle `State`; `retire_superseded` and
+`compact` are shipped maintenance tasks. The ownership/retention model is not a thing to invent; it is a
+thing to **connect**.
+
+---
+
+## 0b. The short version
 
 🔴 **That model is already implemented, more completely than it looks — and it is NOT the model my first
 draft of this design assumed.** The carrier between post-sync steps is the **Consignment output
@@ -216,3 +233,75 @@ a much smaller thing. Building the chain first bakes that answer in by accident.
 4. **Reports/matrices — Step or Job?** `okf/backend/control-plane/job-vs-step.md` already draws this
    line; the incremental-summary tier suggests these are Consignment steps, but a cross-Consignment
    report is a Job by that concept's own rule. Worth re-reading before answering.
+
+---
+
+## 6. What "arbitrary tables, registered as outputs" costs
+
+### 6.1 The registry already has the shape
+
+`ConsignmentOutput` is:
+
+```java
+record ConsignmentOutput(String consignmentId, String runId, String tableName, String partitionKey,
+                         String recordDay, String path, long rows, long bytes, String writtenAt,
+                         int generation, State state, String schemaFingerprint,
+                         EventTimeBounds bounds, String producer)
+```
+
+Every field the decision needs is present: **`tableName`** (so a derived table is representable at all),
+**`producer`** (ownership), **`partitionKey`** (the merge key), **`generation` + `State`** (lifecycle),
+**`schemaFingerprint`** (the propagated schema, §2.4). Nothing here has to change to admit a derived
+table — which is the strongest argument that this decision fits the existing model rather than bending
+it.
+
+### 6.2 🔴 Retention and merge are ALREADY BUILT, not "later on"
+
+| Wanted | Shipped |
+|---|---|
+| retention of replaced files | **`retire_superseded`** maintenance task — deletes the bytes of files the catalog marks `SUPERSEDED`, gated on `retention_days` (≥ 1) |
+| small-file merge per partition key, on schedule | **`compact`** maintenance task — *"merge the many small per-batch Parquet output files inside each partition"*, via `PartitionCompactor` |
+| the lifecycle those need | `State` = `LIVE` / `SUPERSEDED` ("replaced by a reprocess of the same Consignment") / `COMPACTED_AWAY` ("merged into a compacted file and unlinked") |
+| readers not seeing retired files | `ConsignmentSelector`: `resolve(glob) = glob MINUS paths the catalog marks SUPERSEDED / COMPACTED_AWAY` |
+
+⚠ **One shipped trade-off a derived table would inherit**: after compaction, *"reprocess of a
+compacted-away batch is no longer supported"*. So compaction and reprocess already interact, and a
+derived-table chain does not get to ignore that.
+
+### 6.3 The actual new work: a WRITE seam
+
+`ProcessorContext` today is read-only plus `summaries()` — and that is deliberate, not accidental: a raw
+`Connection` was rejected because it *"makes the read-modify-write §5.1 forbids trivially expressible"*,
+and `ArtifactRecorder` was deliberately not delegated because *"two plausible ways to emit the same
+thing"* is a one-concept-two-words violation.
+
+⇒ Admitting arbitrary tables means adding **one** sanctioned writer beside `summaries()`, not opening a
+`Connection`. Its contract has to settle five things the registry fields ask for:
+
+1. **`tableName` — who names it, and in what namespace?** Two steps in two pipelines must not collide.
+   The natural key is the step's own id within the Consignment, but that is a decision.
+2. **`producer` — the step id**, so ownership is recorded rather than inferred. Free, since the field
+   exists and the sync tier already sets it.
+3. **`partitionKey` / `recordDay` — a derived table must declare its partitioning**, or `compact` has no
+   key to merge on and the Selector has nothing to filter. ⚠ This is the field most likely to be left
+   blank by an author and the one that silently disables both.
+4. **`schemaFingerprint`** — computed from the propagated schema (§2.4, `TypeFlow`), not authored.
+5. **Reprocess cascade** — when the base Consignment is reprocessed, do derived tables become
+   `SUPERSEDED` too? The state exists; what does not exist is anything that walks the *derivation*
+   edges, because today nothing records that table B was derived from table A. **That edge is the one
+   genuinely new piece of state this decision introduces.** Without it, a reprocess supersedes the base
+   and silently leaves stale derivatives `LIVE`.
+
+### 6.4 Revised staging
+
+| # | Stage | Note |
+|---|---|---|
+| **1** | ~~decide the output contract~~ | ✅ **DECIDED**: arbitrary tables, registered as outputs |
+| **2** | **The write seam** (§6.3) — one sanctioned writer, the five contract points, `producer` set from the step | the derivation edge (point 5) is the only new state |
+| **3** | **Compose Consignment steps** — an ordered chain over one Consignment | needs stage 2's naming to be meaningful |
+| **4** | **Surface the post-sync lane in the editor** | authoring |
+| **5** | **Open the recipe verb + palette `authorable`** | independent; in-batch plugin steps |
+| **6** | **Parser output-schema publication** | independent; point 1's real gap |
+
+⛔ **Retention and merge are NOT stages** — they exist. What they need is for a derived table to arrive
+in the registry with a `partitionKey` and a `State`, which is stage 2's job.
