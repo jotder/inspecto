@@ -57,8 +57,16 @@ describe('DesignSystemComponent', () => {
         expect(pane.querySelector('button[aria-label="Full screen"]')).toBeTruthy();
     });
 
-    it('has no a11y violations', async () => {
-        const fixture = await create();
-        await expectNoA11yViolations(fixture.nativeElement);
-    });
+    // ⚠ 30s, not the 15s default: this is the suite's single heaviest assertion — axe over the WHOLE
+    // gallery, every shared pattern mounted at once — and it was sitting close enough to the default
+    // that adding four unrelated specs elsewhere in the suite tipped it over (2026-08-29). A timeout
+    // here says nothing about a11y, so the honest fix is headroom rather than a smaller scan.
+    it(
+        'has no a11y violations',
+        async () => {
+            const fixture = await create();
+            await expectNoA11yViolations(fixture.nativeElement);
+        },
+        30_000,
+    );
 });

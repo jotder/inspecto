@@ -413,16 +413,26 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
     if (processing['intake'] != null) sinkCfg['intake'] = processing['intake'];
     const store = String(config['name'] ?? 'out');
     sinkCfg['store'] = store;
-    const sinkDefs: { id: string; name: string; cfg: Cfg }[] = [{ id: 'sink', name: store, cfg: sinkCfg }];
+    // ⚠ An authored `sinks:` block IS the destination list (PipelineConfigParser: "Absent ⇒
+    // PipelineConfig synthesises the single-`output:` one-element shorthand"), so it gets one node per
+    // entry and NO separate trunk — the ids mirroring the backend lift's `sink` / `sink__d<i>`. Emitting
+    // a trunk as well used to invent a third destination on save whenever the entries did not happen to
+    // include `dirs.database`, and gave the extras mock-only ids the engine cannot match (MOCK-LIFT-1).
+    // The config-level keys the lower reads back (backup/temp/threads/batch/intake/store) ride the FIRST
+    // destination, which is the node `primarySink` resolves to.
     const sinksList = Array.isArray(config['sinks']) ? (config['sinks'] as unknown[]).map(asMap) : [];
-    let extra = 2;
-    for (const s of sinksList) {
-        if (s['database'] == null || String(s['database']) === String(dirs['database'])) continue; // primary already lifted
-        const c: Cfg = { database: s['database'] };
-        for (const k of ['format', 'compression', 'ducklake', 'filename_column']) if (s[k] != null) c[k] = s[k];
-        sinkDefs.push({ id: `sink_${extra}`, name: `out_${extra}`, cfg: c });
-        extra++;
-    }
+    const sinkDefs: { id: string; name: string; cfg: Cfg }[] = sinksList.length
+        ? sinksList.map((s, i) => {
+              const c: Cfg = i === 0 ? { ...sinkCfg } : {};
+              if (s['database'] != null) c['database'] = s['database'];
+              for (const k of ['format', 'compression', 'ducklake', 'filename_column']) if (s[k] != null) c[k] = s[k];
+              return {
+                  id: sinksList.length === 1 ? 'sink' : `sink__d${i}`,
+                  name: i === 0 ? store : `out_${i + 1}`,
+                  cfg: c,
+              };
+          })
+        : [{ id: 'sink', name: store, cfg: sinkCfg }];
     const branchKeyFor = (db: unknown): string | null => {
         if (!routeCfg || db == null || !Array.isArray(routeCfg['branches'])) return null;
         const hit = (routeCfg['branches'] as Cfg[]).find(
@@ -770,13 +780,21 @@ export function lowerGraph(
         }
     }
 
+    // Whether the file being lowered onto declares its destinations explicitly. When it does, `output:`
+    // and `dirs.database` are NOT the destination — `dirs.database` is the fan-out's BASE, the root each
+    // destination is re-rooted against (`IngestSinkWriter`: dest.database + dbDir-relative-to-it) — so
+    // deriving them from a sink node would overwrite the base with the first destination (MOCK-LIFT-1).
+    const authoredSinks = Array.isArray(existing['sinks']) && (existing['sinks'] as unknown[]).length > 0;
+
     if (primarySink) {
-        for (const k of Object.keys(output)) delete output[k];
-        setOrDel(output, 'format', primarySink.config?.['format']);
-        setOrDel(output, 'compression', primarySink.config?.['compression']);
-        setOrDel(output, 'ducklake', primarySink.config?.['ducklake']);
-        setOrDel(output, 'filename_column', primarySink.config?.['filename_column']);
-        setOrDel(dirs, 'database', primarySink.config?.['database']);
+        if (!authoredSinks) {
+            for (const k of Object.keys(output)) delete output[k];
+            setOrDel(output, 'format', primarySink.config?.['format']);
+            setOrDel(output, 'compression', primarySink.config?.['compression']);
+            setOrDel(output, 'ducklake', primarySink.config?.['ducklake']);
+            setOrDel(output, 'filename_column', primarySink.config?.['filename_column']);
+            setOrDel(dirs, 'database', primarySink.config?.['database']);
+        }
         setOrDel(dirs, 'backup', primarySink.config?.['backup']);
         setOrDel(dirs, 'temp', primarySink.config?.['temp']);
         for (const k of ['threads', 'duckdb_threads', 'priority']) setOrDel(processing, k, primarySink.config?.[k]);
@@ -790,7 +808,9 @@ export function lowerGraph(
     }
     // Multi-destination: emit a plural sinks: list of the distinct destinations (the single output:/
     // dirs.database above stays the shorthand). One destination => no sinks: block (verbatim round-trip).
-    if (destByDatabase.size > 1) {
+    // An authored block round-trips as a block even with ONE entry — collapsing it into the `output:`
+    // shorthand would move the write root whenever that entry is not `dirs.database`.
+    if (destByDatabase.size > 1 || (authoredSinks && destByDatabase.size > 0)) {
         out['sinks'] = [...destByDatabase.values()].map((s) => {
             const sink: Cfg = { database: s.config?.['database'] };
             if (s.config?.['format'] != null) sink['format'] = s.config['format'];

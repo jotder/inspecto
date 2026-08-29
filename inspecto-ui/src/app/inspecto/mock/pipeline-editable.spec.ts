@@ -1036,3 +1036,68 @@ describe('mock pipeline-editable — processing.disabled_steps (Phase 4 S4a)', (
         expect((config['processing'] as Record<string, unknown>)['disabled_steps']).toEqual(['parse']);
     });
 });
+
+describe('mock pipeline-editable — an authored sinks: block IS the destination list (MOCK-LIFT-1)', () => {
+    // The case that exposed the divergence: every sinks[] entry differs from dirs.database. The backend
+    // parser synthesises the output:/dirs.database shorthand ONLY when `sinks:` is absent, and
+    // dirs.database stays the fan-out's BASE (IngestSinkWriter re-roots each destination against it).
+    const fanOut = () => ({
+        name: 'FAN',
+        active: false,
+        dirs: { poll: '/in', database: '/db', temp: '/tmp' },
+        output: { format: 'PARQUET' },
+        sinks: [
+            { database: '/out/a', format: 'CSV' },
+            { database: '/out/b', format: 'CSV' },
+        ],
+        processing: { threads: 1, schema_file: 's.toon' },
+    });
+
+    it('lifts one sink node per entry — no invented trunk — with the backend id grammar', () => {
+        const g = liftConfig(fanOut());
+        const sinks = g.nodes.filter((n) => n.type === 'sink.persistent');
+        expect(sinks.map((n) => n.id)).toEqual(['sink__d0', 'sink__d1']);
+        expect(sinks.map((n) => n.config?.['database'])).toEqual(['/out/a', '/out/b']);
+        // The config-level keys the lower reads back ride the FIRST destination.
+        expect(sinks[0].config?.['temp']).toBe('/tmp');
+        expect(sinks[0].config?.['threads']).toBe(1);
+    });
+
+    it('round-trips without inventing a destination or moving the fan-out base', () => {
+        const cfg = fanOut();
+        const res = lowerGraph(liftConfig(cfg), cfg, false);
+        expect('config' in res).toBe(true);
+        const out = (res as { config: Record<string, unknown> }).config;
+        expect(out['sinks']).toEqual([
+            { database: '/out/a', format: 'CSV' },
+            { database: '/out/b', format: 'CSV' },
+        ]);
+        // 🔴 The regression this pins: dirs.database is the BASE, never the first destination.
+        expect((out['dirs'] as Record<string, unknown>)['database']).toBe('/db');
+        expect((out['output'] as Record<string, unknown>)['format']).toBe('PARQUET');
+    });
+
+    it('keeps a single-entry block a block — collapsing it would move the write root', () => {
+        const cfg = { ...fanOut(), sinks: [{ database: '/out/only', format: 'CSV' }] };
+        const g = liftConfig(cfg);
+        expect(g.nodes.filter((n) => n.type === 'sink.persistent').map((n) => n.id)).toEqual(['sink']);
+        const res = lowerGraph(g, cfg, false);
+        const out = (res as { config: Record<string, unknown> }).config;
+        expect(out['sinks']).toEqual([{ database: '/out/only', format: 'CSV' }]);
+        expect((out['dirs'] as Record<string, unknown>)['database']).toBe('/db');
+    });
+
+    it('still lowers a shorthand pipeline (no sinks: block) to output:/dirs.database', () => {
+        const cfg = {
+            name: 'ONE',
+            active: false,
+            dirs: { poll: '/in', database: '/db' },
+            output: { format: 'CSV' },
+            processing: { threads: 1, schema_file: 's.toon' },
+        };
+        const res = lowerGraph(liftConfig(cfg), cfg, false);
+        const out = (res as { config: Record<string, unknown> }).config;
+        expect(out['sinks']).toBeUndefined();
+        expect((out['dirs'] as Record<string, unknown>)['database']).toBe('/db');
+    });
+});
