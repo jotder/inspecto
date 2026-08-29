@@ -91,6 +91,16 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- [`superpower/sql-only-transform-feasibility.md`](superpower/sql-only-transform-feasibility.md) —
+  **ANALYSIS ONLY, nothing built or scheduled** (operator idea, 2026-08-29): drop the mapping and keep
+  only SQL Map+Filter, with the Parquet schema taken from the query's resultset metadata. Verdict: the
+  mechanism is **already built** (`TypeFlow` derives the output schema by `DESCRIBE` over the identical
+  SELECT), but the strong form is refuted — 🔴 the raw relation is **deliberately all-VARCHAR**, so
+  resultset metadata carries no types until something casts, and whatever casts *is* the mapping.
+  Measured: `CREATE MACRO` works and survives the `SqlSandbox` seal, but duckdb_jdbc exposes **no**
+  Java-side UDF API. Carries the four guarantees a declarative mapping buys (cast-failure audit,
+  forgiving coercion, per-field metadata, the BACKWARD compatibility contract).
+
 - ~~`superpower/source-timezone-plan.md`~~ — **COMPLETE and ARCHIVED 2026-08-29** →
   [`archived-documents/plans-archive/source-timezone-plan.md`](archived-documents/plans-archive/source-timezone-plan.md).
   Temporal columns carry a declared **source zone** and normalise to naive UTC (S1 engine + config
