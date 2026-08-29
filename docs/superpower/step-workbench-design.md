@@ -210,7 +210,7 @@ one it assumed, or it will confidently show the wrong types for ASN.1/fixed-widt
 |---|---|---|
 | **S1** | ✅ **SHIPPED 2026-08-29** — `RelationPreview.columnTypes` (DESCRIBE-derived) + `Result.sql` (the statements as executed), both additive; the transform preview now runs on a **sealed** `SqlSandbox` | ✅ reactor **3749/0/0/5**, 19 modules, exit 0. Seal falsified in both directions: without it a **readable file was read successfully** through a `where` predicate |
 | **S2** | ✅ **SHIPPED 2026-08-29** — `<inspecto-step-preview-result>`: derived schema as chips, rows in a `<inspecto-data-table>`, SQL in a read-only pane; the mock mirrors the keys as **honestly empty** | ✅ UI **2826 passed / 5 skipped**, exit 0; lint:tokens + build + all three tsconfigs green; **driven in the preview** — both arms rendered |
-| **S3** | `TRANSFORM_MAP` attribute spec (name/expr grid) — ⚠ regenerate **both** committed contracts | `NodeConfigNameContractTest` + the full reactor, not a targeted run |
+| **S3** | 🔴 **REFUTED 2026-08-29 — do not build.** `transform.map` already has a dedicated, richer editor (`app-pipeline-load-definition`), and neither it nor `transform.derive` reaches the drawer an AttributeSpec would serve. See §13 | n/a — the premise was wrong, nothing shipped |
 | **S4** | `configs: [...]` chain preview, per-Step `shape` chaining; honest refusal for a join without reference context | chain of map→filter→summarize previews with a distinct schema per Step |
 | **S5** | Wire `TypeFlow` behind a read route; show the derived pipeline schema beside the authored one | derived columns equal what a real batch writes to Parquet (assert against a written file, not against the SQL) |
 
@@ -295,3 +295,35 @@ call through the mock interceptor, the response mapping and the render — was r
 **Not done:** the component is not in the `/design` gallery. It composes existing primitives (chip +
 data-table) for one feature rather than introducing a design-system primitive, so it is not gallery
 material; revisit if a second host adopts it (S4's chain preview is the likely one).
+
+---
+
+## 13. S3 REFUTED (2026-08-29) — the premise was wrong, nothing shipped
+
+S3 said `transform.map` "executes `columns: [{name, expr}]` but publishes no attribute spec, so the Build
+pane has nothing to render", and proposed adding a `TRANSFORM_MAP` spec with a two-column grid. **Three
+findings killed it, in order:**
+
+1. 🔴 **An `AttributeSpec` cannot express a list of maps at all.** `type: 'list'` edits a `string[]`. The
+   house answer for this shape is already on record: `TRANSFORM_ROUTE` specs only `mode` and its help text
+   says *"Branch keys, predicates and destinations are edited on the branch rows in the Recipe view"* — a
+   list-of-maps gets a **dedicated editor**, never a spec. So the plan's mechanism was impossible as
+   written.
+2. 🔴 **`transform.map` already HAS that dedicated editor, and it is richer than what S3 proposed.**
+   `pipeline-editor.component.html` routes `dn.type === 'transform.map'` to
+   **`app-pipeline-load-definition`** — a mapping-rules grid (`TARGET COLUMN / RULE / SOURCE`), the
+   verbatim-expression warning (*"cast explicitly (TRY_CAST(amt AS DOUBLE) \* 2), or the run refuses
+   it"*), a MAPPED OUTPUT preview and a **Test mapping** action. It never reaches
+   `app-pipeline-config-definition`, which is the pane an `AttributeSpec` would have served.
+3. ⚠ **`transform.derive` is not reachable in the pipeline editor either** — it appears only in the
+   Components registry dialog, not in the palette and not in the editor's routing arms.
+
+**A grid was built for map/derive in the config drawer and then reverted**, because it was unreachable
+for both types. ⚠ **Unit tests could not have caught this**: the drawer genuinely rendered the grid and
+its specs passed — the component is simply never used for those node types. **Only driving the running
+app showed it**, by opening the Map step and finding a completely different pane.
+
+**What remains true:** `transform.map` in the pipeline editor edits **mapping rules**, which is the
+legacy-lifted shape (`RowShaper.columnsOf` compiles them when no `columns` key is authored). Whether an
+**authored** `columns` list is editable anywhere is genuinely open — but it is a different question from
+the one S3 asked, and it needs its own grounding before anyone opens it. ⛔ Do not re-open S3 as written.
