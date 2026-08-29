@@ -757,6 +757,32 @@ non-blocking:**
 
 ## 6. Engineering / tech-debt
 
+**COMPLY-1/2/3 — three compliance gaps that became BUILD WORK on 2026-08-30.** Filed together because
+one operator sitting answered all three decisions (gate-register §2 cluster C); none is decision-gated
+any more, and each has an auditor-facing consequence if it is left as stated-but-unbuilt policy.
+
+- **COMPLY-1 — generate the SBOM (gap G1, workstream C3).** Emit **both CycloneDX and SPDX**
+  (operator, plan §6 Q2). 🔴 **Per packaged bundle, NOT from the reactor** — the reactor resolves 94
+  third-party artifacts dominated by the *optional* AI stack, so a reactor SBOM attests a set no
+  customer installs (`controls-matrix.md` CC9). ⚠ Both documents must come from the **same resolved
+  set in the same packaging run**; generated independently they will drift, and two disagreeing SBOMs
+  are worse evidence than one. ⛔ `tools/dependencies.lock` is a review baseline, not an SBOM — it
+  carries coordinates, no licences or hashes.
+- **COMPLY-2 — make release signing routine (gap G3, workstream C3).** The key lives in the **CI
+  secret store** (operator, plan §6 Q3), so signing moves from an optional `package.ps1 -Sign` flag
+  into a **mandatory release-pipeline step**. ⚠ Two accepted consequences to wire in deliberately,
+  not discover: a release cut **outside CI cannot be signed at all**, and key custody (rotation, who
+  can read the secret, CI-provider compromise) is now a **CC6 access-control** item. Update
+  `evidence/release-verification.md` §4 when it ships — it currently documents the pre-decision state
+  on purpose.
+- **COMPLY-3 — build the event-store prune task (gap G5, workstream C4).** The audit-retention window
+  is **one year** (operator, 2026-08-30). The Parquet event store is Hive-partitioned by
+  `level/year/month/day`, so retention is a **file delete by partition, not a SQL DELETE**
+  (`ParquetEventStore` implements no prune today). ⚠ Does **not** override the MNT-14 G3 stance — a
+  purged Incident's history, purge record included, is still deliberately retained *within* the
+  window. ⛔ **Until this ships the window is stated policy the code does not apply** — an auditor
+  must not be told it is enforced.
+
 **GUARD-SCOPE-1 — what each guard silently exempts, swept 2026-08-29 (`41d4ce8a`, `c13a2c83`). CLOSED,
 kept because the METHOD generalises.** The sweep asked one question of every guard — *not* "are the rules
 right", which is where attention naturally goes, but **"what is outside the set it scans, and does anything

@@ -219,15 +219,38 @@ the evidence" for every technical control an auditor asks about.
      this is ready to schedule, but it is a real ordering constraint, not a preference).
    * Anything requiring an **external party** (3PAO, auditor, certification body) is still sequential in
      practice and paced by them, not us — parallelism applies to the evidence work we own.
-2. **SBOM format:** CycloneDX JSON (recommended; widest tool acceptance) vs SPDX.
-3. **Where does the GPG release key live** (org secret management — blocks C3 release signing
-   being *routine* rather than merely possible).
-4. Does any near-term prospect actually need HIPAA/PCI language beyond the applicability
-   statement? (Drives whether C1's one-pagers grow controls.)
-5. **Is a hosted SaaS offering ever planned?** If yes, FedRAMP shifts from C6 alignment to real
-   authorization (3PAO, ConMon, POA&M — a program, not a workstream) and SOC 2 scope grows the
-   Availability category's infra controls. Today's answer assumed: self-hosted only.
+2. ~~**SBOM format:**~~ **ANSWERED 2026-08-30 (operator): BOTH CycloneDX and SPDX**, emitted side by
+   side. Rationale: neither format is dropped, so no downstream procurement demand forces a re-cut.
+   ⚠ The cost is that the generation step and the thing that can drift are both doubled — the two
+   documents must be produced from the **same** resolved set in the same packaging run, never
+   independently. 🔴 **Scope, unchanged and load-bearing (CC9): generate PER PACKAGED BUNDLE, not
+   from the reactor** — the reactor resolves 94 artifacts dominated by the optional AI stack, so a
+   reactor SBOM attests a set no customer installs. `tools/dependencies.lock` is a review baseline,
+   not an SBOM. ⇒ G1 is unblocked; what remains is build work.
+3. ~~**Where does the GPG release key live**~~ **ANSWERED 2026-08-30 (operator): the CI secret
+   store.** The private key is held in the CI provider's encrypted secrets and **no shift holds it
+   locally**; signing therefore becomes a mandatory step of the release pipeline rather than an
+   optional `package.ps1 -Sign` flag a release can forget. ⚠ Two consequences follow and are not
+   optional: a release cut **outside** CI cannot be signed at all (that is the intended trade), and
+   the key's own custody — rotation, who can read the secret, what happens on CI-provider
+   compromise — becomes a CC6 access-control question rather than a personal one. ⇒ G3 is
+   unblocked; what remains is wiring signing into the release pipeline.
+4. ~~Does any near-term prospect actually need HIPAA/PCI language beyond the applicability
+   statement?~~ **ANSWERED 2026-08-30 (operator): YES — HIPAA and/or PCI demand exists.** C1's
+   one-pagers therefore **grow controls**; an applicability statement alone is no longer the
+   deliverable. ⛔ **Do not generate those statements from the controls matrix** (standing
+   instruction, gate-register §2 cluster C) — the matrix records what is built, and an applicability
+   statement asserts what is *in scope*, which is an org claim. This one still needs the operator to
+   say which of the two, and for which prospect, before C1 can be scoped.
+5. ~~**Is a hosted SaaS offering ever planned?**~~ **ANSWERED 2026-08-30 (operator): NO — self-hosted
+   only.** The previously *assumed* answer is now a stated one. Consequences, both negative and both
+   worth keeping explicit: FedRAMP does **not** become a real authorization program (see Q7), and
+   SOC 2 scope does **not** grow the Availability category's infra controls. The ISMS boundary stays
+   at the product we ship, not a service we operate.
 6. **SOC 2 Type II observation window length** (3 vs 6 months) and when to open it — gated on the
    rbac-abac-plan R-workstreams landing, since CC6 controls must operate during the window.
-7. **FedRAMP baseline target** for C6 statements: Moderate (assumed — typical for agency data
-   tools) vs Low.
+7. ~~**FedRAMP baseline target** for C6 statements~~ **ANSWERED 2026-08-30 (operator): Moderate.**
+   The assumed baseline is now stated. 🔴 **Read together with Q5:** Moderate is the baseline C6
+   *statements* are written against — it does **not** make FedRAMP an authorization program, because
+   Q5 answered self-hosted-only and authorization only enters scope if a hosted offering exists.
+   C6 stays **alignment at the Moderate baseline**. No 3PAO, no ConMon, no POA&M.

@@ -76,7 +76,12 @@ artifact, and the `package.ps1` source above.
 ## 4. Known limitation — signing is possible, not yet routine
 
 Signing today depends on whoever runs `package.ps1` supplying a key, so a release can ship
-unsigned without anything failing. Making it routine requires a decision about **where the
-organization's signing key lives** (compliance plan §6 Q3, gap **G3**) — a key-custody question,
-not an engineering one. Until it is answered, treat a missing `.asc` as "this release was not
-signed", never as "signatures are not offered".
+unsigned without anything failing. The key-custody question (compliance plan §6 Q3, gap **G3**) is
+now **ANSWERED — 2026-08-30, operator: the release key lives in the CI secret store**, held by no
+individual locally. Signing therefore becomes a **mandatory step of the release pipeline**, and what
+remains is engineering, not a decision.
+
+⚠ Until that wiring ships, this section still describes the live state: treat a missing `.asc` as
+"this release was not signed", never as "signatures are not offered". 🔴 One accepted consequence of
+the custody choice, worth stating to a verifier: a release cut **outside CI cannot be signed at
+all**.

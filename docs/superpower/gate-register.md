@@ -99,16 +99,25 @@ carries literal `<OPERATOR TO STATE>` placeholders and its drill table has **zer
 with no drill behind it is the document an auditor disproves first"); the IAM reference pair is
 unvalidated. **One action unblocks the cluster.**
 
-### Cluster C — four short org answers unblock repo work
-| Q | Ask | Blocks |
-|---|---|---|
-| §6 Q2 | SBOM format — CycloneDX or SPDX? (CycloneDX recommended) | **G1**. ⚠ Must be generated **per packaged bundle**, not from the reactor — the reactor resolves 94 third-party artifacts dominated by the *optional* AI stack, so a reactor SBOM "attests a set no customer installs". `tools/dependencies.lock` is a review baseline, **not** an SBOM. |
-| §6 Q3 | Where does the GPG release key live? | **G3** — signing is *possible* (`package.ps1 -Sign`) but not *routine*, so a release can ship unsigned. |
-| — | What audit-retention window? | **G5** — the Parquet event store is **unbounded**. "Never a default to invent." Once stated, a shift builds the partition-delete prune task. |
-| §6 Q4/Q5/Q7 | HIPAA/PCI demand? · hosted SaaS ever? · FedRAMP Moderate or Low? | C1 scope, whether FedRAMP becomes a real authorization program, baseline assumption |
+### Cluster C — ~~four short org answers~~ ANSWERED BY THE OPERATOR (2026-08-30)
 
-Also org-only, no repo path: C1 applicability statements (⛔ "do not generate them from this table"),
-ISMS boundary, auditor engagement, pen test, incident-response and crypto policy content.
+**All four asked and answered.** G1, G3 and G5 are no longer decision-gated — each is now ordinary
+engineering. Recorded at the sites that are actually read: `compliance-certifications-plan.md` §6
+Q2/Q3/Q4/Q5/Q7, `compliance/controls-matrix.md` G1/G3/G5, and the two evidence docs
+(`release-verification.md` §4, `retention-configuration.md` §2/§3).
+
+| Q | Answer (operator, 2026-08-30) | Effect |
+|---|---|---|
+| §6 Q2 | **SBOM: BOTH CycloneDX and SPDX** | **G1 unblocked.** ⚠ Emit both from the **same resolved set in the same packaging run** — produced independently they drift. 🔴 Scope unchanged and load-bearing: **per packaged bundle, never from the reactor** (94 artifacts, dominated by the optional AI stack ⇒ a reactor SBOM attests a set no customer installs). |
+| §6 Q3 | **The GPG release key lives in the CI secret store** | **G3 unblocked.** Signing becomes a mandatory pipeline step, not an optional `package.ps1 -Sign` flag. ⚠ Two accepted consequences: a release cut **outside CI cannot be signed at all**, and key custody becomes a **CC6 access-control** question rather than a personal one. |
+| — | **Audit-retention window: ONE YEAR** | **G5 unblocked.** Remaining is the partition-delete prune task over `level/year/month/day` — a **file delete by partition, not a SQL DELETE**. ⚠ Does NOT override MNT-14 G3: a purged Incident's history is still retained *within* the window. ⛔ Until the task ships the window is **stated policy the code does not apply** — do not tell an auditor it is enforced. |
+| §6 Q4/Q5/Q7 | **HIPAA/PCI demand EXISTS** · **hosted SaaS: NO, self-hosted only** · **FedRAMP baseline: Moderate** | 🔴 **Read Q5 and Q7 together:** Moderate is the baseline C6 *statements* are written against; because there is no hosted offering, FedRAMP stays **alignment, NOT an authorization program** — no 3PAO, no ConMon, no POA&M. SOC 2 scope does **not** grow the Availability infra controls. C1's one-pagers **do** grow controls (Q4), so C1 is scoped-up, not closed. |
+
+**Still operator-owed in this cluster:** *which* of HIPAA/PCI, and for which prospect — Q4 says
+demand exists but not its shape, and C1 cannot be scoped without it. Plus, unchanged: C1
+applicability statements (⛔ **"do not generate them from this table"** — the matrix records what is
+*built*, an applicability statement asserts what is *in scope*, which is an org claim), ISMS
+boundary, auditor engagement, pen test, incident-response and crypto policy content.
 
 ### Cluster D — cross-repo (eoiagent)
 **AGT-6b** blocked by two upstream items: the approval gate is **synchronous per-call** so nesting
