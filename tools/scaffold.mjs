@@ -4,6 +4,7 @@
 //
 //   node tools/scaffold.mjs new job       --id acme.reconcile --name "Acme Reconcile"
 //   node tools/scaffold.mjs new processor --id acme.masker    --name "Acme Masker"
+//   node tools/scaffold.mjs new nodetype  --id acme.redact    --name "Acme Redact"
 //   node tools/scaffold.mjs new step      ...   # refuses until the Step-kind registry lands (S2-3)
 //   node tools/scaffold.mjs new service   ...   # refuses until contributed services land (S3-1)
 //
@@ -31,11 +32,18 @@ const templateRoot = join(repoRoot, 'tools', 'templates');
 const KINDS = {
     job: { template: 'job', gate: null },
     processor: { template: 'processor', gate: null },
+    // A node type is a pipeline STEP deployed on the engine CLASSPATH — the same delivery as a
+    // processor, and deliberately NOT the gated `step` kind below, which is pack-hosted (isolated
+    // classloader, StepContext, watchdog) and still owned by platform-services S2-3.
+    nodetype: { template: 'nodetype', gate: null },
     step: {
-        gate: 'Executable Steps are not hosted yet. The Step-kind registry opens at S2-3 of '
-            + 'docs/superpower/platform-services-plan.md, which is itself gated on the branch-aware '
-            + "executor becoming the armed path — until then a generated Step could not run. "
-            + 'For work that runs on a schedule or a Signal today, scaffold a job instead.',
+        gate: 'PACK-hosted Steps are not hosted yet. The Step-kind registry opens at S2-3 of '
+            + 'docs/superpower/platform-services-plan.md (StepContext, the services ceiling, failure '
+            + 'mapping and the watchdog), which is itself gated on the branch-aware executor becoming '
+            + 'the armed path — until then a pack-loaded Step could not run. '
+            + 'For a Step you can ship TODAY, scaffold a `nodetype`: it is a node type deployed on the '
+            + 'engine CLASSPATH (PipelineNodeType + PipelineNodeExecutor), which runs now. What it does '
+            + 'NOT get is what this gate is about — hot deploy, an isolated classloader, and a watchdog.',
     },
     service: {
         gate: 'Packs cannot contribute Platform Services yet. That is S3-1 of '
@@ -63,7 +71,7 @@ function parseArgs(argv) {
 
 function usage() {
     return [
-        'usage: node tools/scaffold.mjs new <job|processor> --id <id> --name "<Name>" [--package <pkg>] [--out <dir>]',
+        'usage: node tools/scaffold.mjs new <job|processor|nodetype> --id <id> --name "<Name>" [--package <pkg>] [--out <dir>]',
         '',
         '  --id       the type id authors reference, e.g. acme.reconcile (lowercase, dot-separated)',
         '  --name     the human title shown in the UI',
@@ -185,6 +193,9 @@ if (existsSync(outDir)) fail(`${relative(repoRoot, outDir)} already exists — d
 const tokens = {
     id,
     name: flags.name,
+    // A node type's discriminator is `transform.<suffix>`: dots are not legal inside it, because
+    // RowShaper matches the type STRING exactly and `transform.dedup*` is already prefix-matched.
+    typeSuffix: id.replace(/\./g, '_'),
     className: classNameOf(id),
     artifactId: artifactIdOf(id),
     packageName,

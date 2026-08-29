@@ -68,8 +68,18 @@ time**. The seam was descriptor-only in the literal sense: you could describe a 
   goes through `RowShaper.merge`, a different signature, and is deliberately out of the contract rather
   than half-working.
 * **Cost to a stock build: one map lookup**, and the registry is empty unless a provider is installed.
-* Worked example: `FakeNodeExecutor` (`inspecto-engine/src/test`) contributes `transform.take` through
-  the executor service file. ⚠ It deliberately registers **no descriptor**, and that is a finding worth
+* **Worked example, and how to start one:** `node tools/scaffold.mjs new nodetype --id acme.redact
+  --name "Acme Redact"` generates a complete, buildable plugin — both halves, both service files, and a
+  test that runs the Step through `RowShaper.shape` the way the engine will (template:
+  `tools/templates/nodetype/`). ⚠ Building it outside the reactor resolves `inspecto-engine` from
+  `~/.m2`, so install a current one first (`mvn -o install -DskipTests -pl inspecto-engine -am`) or it
+  fails with *"cannot find symbol: class PipelineNodeExecutor"*.
+* ⛔ **`scaffold.mjs new step` remains GATED and is a different thing** — that kind is *pack-hosted*
+  (isolated classloader, `StepContext`, services ceiling, watchdog) and is owned by platform-services
+  S2-3. A `nodetype` deploys on the engine **classpath**, like a Consignment Processor: it runs today,
+  and it gets no hot deploy, no isolated classloader and no watchdog.
+* The in-repo test fixture `FakeNodeExecutor` (`inspecto-engine/src/test`) contributes `transform.take`
+  through the executor service file. ⚠ It deliberately registers **no descriptor**, and that is a finding worth
   keeping: **the served step catalog is a COMMITTED CONTRACT** (`StepTypesContractTest` vs
   `inspecto-ui/.../step-types.contract.json`), so a test-scope `PipelineNodeType` provider either fails
   that guard or gets a fixture type baked into the shipped client contract. Registering one broke three
