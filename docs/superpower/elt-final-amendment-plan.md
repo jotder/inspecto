@@ -585,7 +585,10 @@ resolved** — `processing.schema_file: schema/<id>` now executes the registry c
 `MappingCsvTest`, `SchemaCompatibilityTest`, `MappingComponentTest`, `ControlApiSchemaSplitTest`
 (+ the two W1 guard tests flipped to the new contract). Full reactor green.
 **Phase 1 remaining:** the schema *structure* CSV shape (§3.2 first table) — schemas persist as
-TOON for now; revisit with Phase 2's type flow.
+TOON for now. ⚠ **Its gate is SPENT (noted 2026-08-29): "revisit with Phase 2's type flow" — and Phase 2
+is fully closed** (see P2 S5, 2026-08-06). So this is not deferred work waiting on a prerequisite; it is
+unblocked work nobody went back to. Re-scope or drop it deliberately rather than leaving it wearing a
+prerequisite that no longer exists.
 
 #### Phase 2 GROUNDED 2026-08-05 — findings that shape the slices
 
@@ -1029,8 +1032,11 @@ legacy lane's dedup/filter/quarantine counts and extend the provenance substrate
 `recordsIn/recordsOut/diverted` edge grain; conservation gate green over a fixture · **P4 S4**
 per-Step `enabled:` park/drain (D-13) — flip executor bypass to halt-at-boundary, manifest
 `parked_at` accretion, drain on re-enable, recipe compiles per-Step `enabled:`; gated by the S2
-stage progression (per §2.7 cost 3). **IN FLIGHT 2026-08-28: S4-pre/S4a/S4b shipped, S4c/S4d remain
-— [`elt-s4-park-drain-plan.md`](../archived-documents/plans-archive/elt-s4-park-drain-plan.md).**
+stage progression (per §2.7 cost 3). **S4 COMPLETE — S4-pre/S4a/S4b shipped 2026-08-28, S4c (`bb7a3225`,
+drain through the real commit tail) and S4d (`5f0d9637`, the per-Step switch + Drain action) shipped
+2026-08-29.** ⚠ The text below was left mid-flight and read "S4c/S4d remain" until 2026-08-29; it is the
+commits, not this paragraph, that were authoritative. Superseded wording follows: ~~IN FLIGHT 2026-08-28: S4-pre/S4a/S4b shipped, S4c/S4d remain~~
+— slice plan: [`elt-s4-park-drain-plan.md`](../archived-documents/plans-archive/elt-s4-park-drain-plan.md).
 
 **P4 S1 SHIPPED 2026-08-06** — the Guarantees fold: `RecipeCompiler` compiles a top-level
 `guarantees:` map ({`file_dedup`, `gap_watch`, `markers`, `quarantine`, `retention`}) onto the live
@@ -1144,8 +1150,9 @@ Signal). ~~**Phase 4 status: S1/S2/S3 shipped; S4 deferred (documented gap above
 > Read this and the "RE-GROUNDED" subsection below, never the 2026-08-10 findings alone. Reason (2)
 > died when the executor armed in production (2026-08-26); reason (1)'s park semantics and reason
 > (3)'s flat-file home were BUILT by the slices below. **Phase 4 status: S1/S2/S3 shipped; S4-pre +
-> S4a + S4b SHIPPED 2026-08-28 (`cb12032d`, `9873ebfe`, `575c9912`); S4c (drain) and S4d (canvas
-> toggle) remain** — slice plan, refusals and as-built facts:
+> S4a + S4b SHIPPED 2026-08-28 (`cb12032d`, `9873ebfe`, `575c9912`); **S4c (drain, `bb7a3225`) and S4d
+> (canvas toggle, `5f0d9637`) SHIPPED 2026-08-29 ⇒ Phase 4 S4 is COMPLETE** — slice plan, refusals and
+> as-built facts:
 > [`elt-s4-park-drain-plan.md`](../archived-documents/plans-archive/elt-s4-park-drain-plan.md). The flat-file home is
 > `processing.disabled_steps` (one id list, lift-overlaid, lower-derived); park writes the manifest's
 > `parkedAt`/`parkedTables` with the rows durable as Parquet under the park home.

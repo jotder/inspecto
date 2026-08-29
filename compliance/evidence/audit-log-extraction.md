@@ -68,7 +68,8 @@ AUDIT-CSV-1 / matrix G10; fixed by the audit-shaped projection in `EventRoutes.e
 All routes are `GET` and read-only. Substitute your host, and authenticate as your deployment
 requires.
 
-**A dated slice of the audit trail (JSON — the one to use):**
+**A dated slice of the audit trail (JSON — preferred because it also carries `payload`; a CSV export
+filtered to `type=AUDIT` is equally audit-complete on the §2 attributes):**
 
 ```bash
 curl -s 'http://<host>/events/export?type=AUDIT&from=2026-01-01T00:00:00Z&to=2026-03-31T23:59:59Z' > audit-q1.json
@@ -111,8 +112,15 @@ tracing a single request end to end across subsystems.
 ## 6. Known limitations to disclose
 
 1. **Authentication events are absent** (§1) — the IdP owns them.
-2. **CSV export omits the audit attributes** (§3). Filed as a product gap in the matrix; until it
-   is closed, JSON is the only complete extraction.
+2. **An UNFILTERED CSV export omits the audit attributes** — and looks complete while doing it (§3).
+   `format=csv` projects the attribute columns only when the export is filtered to `type=AUDIT` or
+   `type=ACCESS_DENIED`; without that filter it keeps the seven-column operational-triage shape,
+   because attributes of mixed event types cannot be projected into one set of columns. **Always pass
+   `type=AUDIT`.** ⚠ *Corrected 2026-08-29:* this entry previously said CSV dropped the attributes
+   outright and that JSON was the only complete extraction. That was true until **2026-08-28**
+   (AUDIT-CSV-1 / matrix G10) and is not true now — a filtered CSV is audit-complete. The stale
+   wording survived the fix by three weeks; it is recorded here rather than deleted because an
+   auditor may hold an earlier copy of this document.
 3. **Retention is not yet configurable** for the event/audit store (matrix gap **G5**, NIST
    AU-4/AU-11). Extract before any retention pressure applies, and do not claim a retention period
    the deployment does not enforce.

@@ -199,6 +199,15 @@ needs authoring, not a new SPI.
 
 ## 4. A staged path
 
+> 🔴 **This table is SUPERSEDED by §6.4's renumbering — read that one for stage numbers (noted
+> 2026-08-29).** Once §5 Q1 closed, §6.4 renumbered the path (1 ~~decide~~ · 2 derived-table emitter ·
+> 3 ordered chain · 4 editor · 5 recipe verb · 6 parser schema) and the two numberings have since
+> disagreed in a way that misreads the as-builts: **§7 "Stage 2 as-built"** describes the write seam,
+> which has no counterpart in the table below at all; **§8 "Stage 3 as-built"** describes what the table
+> below calls stage 2; and **§9's "before stage 4"** means §6.4's stage 4 (**the editor**), not this
+> table's stage 4 (the recipe verb). Keep the table only for its ordering rationale — the ⛔ below — and
+> that rationale is itself spent now that Q1 is answered.
+
 | # | Stage | Delivers | Gate |
 |---|---|---|---|
 | **1** | **Decide the post-sync output contract** — may a step create an arbitrary table, or must it stay within the summary guardrail? | settles point 3's scope before anything is built | operator, §5 Q1 |
@@ -224,9 +233,13 @@ a much smaller thing. Building the chain first bakes that answer in by accident.
    half of this question is already answered** (§2.4): a derived table's shape is propagated and
    SQL-mapped through `TypeFlow`, never re-declared. What remains is naming, lifecycle/retention, and
    whether it registers as a Consignment output (so the next step sees it) or as something else.
-2. **Does a chained step see the Consignment as the previous step left it, or as sync left it?** The
-   registry makes the former natural, but it means a step's view depends on execution order — which is
-   fine in a DAG and surprising in a re-run.
+2. ~~**Does a chained step see the Consignment as the previous step left it, or as sync left it?**~~
+   ✅ **ANSWERED BY THE AS-BUILT — see §8** (noted 2026-08-29; this question outlived its own answer by a
+   day). It sees it **as the previous step left it**: the registry is re-read per step and a fresh
+   `ConsignmentReader` built from that list. Not a preference — falsified: hoisting the read out of the
+   loop makes step 2 fail with `Catalog Error: Table with name mid__derived does not exist`. The
+   consequence this question worried about is real and accepted: a step's view depends on execution
+   order, which is why §8 records that order is **authored, never inferred**.
 3. **Re-runs and idempotence.** A Consignment can be reprocessed. If step B ran over A's output and A
    re-runs, what happens to B's? (`retire_superseded` and the revision model already exist for the sync
    tier — the post-sync tier would need the same answer.)

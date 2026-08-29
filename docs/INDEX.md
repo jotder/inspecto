@@ -375,6 +375,17 @@ former root reference docs** (each index lists them):
   trigger was silently inert until step 16. Deferrals (no CC on `mail.send`; INTEGER tokens unreachable
   from the UI because a native number input cannot display one) → [`BACKLOG.md`](BACKLOG.md) §4.
 
+- [`superpower/gate-register.md`](superpower/gate-register.md) — **the gate register (2026-08-29)** —
+  every item currently gated, blocked or restricted across BACKLOG, the active plans, the root canon +
+  `compliance/` and the OKF tier, deduplicated and sorted by **who can actually lift the gate**. Three
+  findings: much of what reads as blocked is doc-rot whose gate is already gone (§1, corrected in place
+  that day); the real external gates collapse into **five clusters**, not fifty rows (§2); and the
+  restriction register — write-root gate, PathJail, ExpressionGuard, SqlGuard, edition boundaries,
+  air-gap posture, append-only registry — is reasoned design that must NOT be "resolved" (§5). ⚠ It
+  records two of its own rows as wrong (Platform Services Stage 2's gate survives in a different shape;
+  `DbAcquisitionLedger` was already fixed) — sweeps read struck-through annotations badly, so verify a
+  row against the repo before acting on it. Retire this file once §2's clusters are answered.
+
 - [`superpower/elt-final-amendment-plan.md`](superpower/elt-final-amendment-plan.md) —
   **APPROVED v1.0 (2026-08-05) — the ELT final amendment: one model, one vocabulary, one authoring
   surface.** The operator's unification directive: a Pipeline is an ordered chain of uniform Steps
@@ -561,14 +572,14 @@ former root reference docs** (each index lists them):
   `AttributeSpec` table per concern · plugin-parser parity · one promotion-grade export pipe · no identity
   churn. Residuals in `BACKLOG.md` §6 (branch-aware executor to *run* the full graph vocabulary;
   `ConfigSpecs.enrichment()` `references:` spec).
-- [`superpower/4x-public-pkce-plan.md`](superpower/4x-public-pkce-plan.md) — **`4.x` public-PKCE auth,
-  SCOPED 2026-07-25** — the gate on the SEC-INCIDENT-1 rotation (BACKLOG §5): `4.x` must stop needing a
-  client secret before the leaked secrets can be rotated. Verified against `4.x` `308f9717`, and three
-  findings reshape it: the live token exchange is `modules/auth/auth-service.ts` (**not** the file BACKLOG
-  §5 names), the hardcoded inline secret sits in **dead** code and is deletable today with no design
-  change (P0), and `master`'s `inspecto/api/pkce.ts` is a zero-import RFC 7636 impl that ports verbatim —
-  so P1 is a **port, not a design exercise** (master's `session.service.ts` does *not* port: it needs
-  `/bootstrap` + `/api/v1`). Blocking ask Q1: does the IdP support PKCE + a public client?
+- **`4.x` public-PKCE auth — ARCHIVED 2026-08-29, its purpose lapsed.** The plan existed to unblock the
+  SEC-INCIDENT-1 rotation (`4.x` had to stop needing a client secret before the leaked secrets could be
+  rotated); that incident is **closed by decommission** — the system no longer exists — so P2 has nothing
+  to deploy to and Q1–Q4 (IdP PKCE/public-client support, refresh-token behaviour, which deployments are
+  live) have no subject. P0/P1 shipped 2026-07-25 and stand on their own. Provenance:
+  `archived-documents/plans-archive/4x-public-pkce-plan.md`; the incident record is `BACKLOG.md` §5 and
+  `compliance/controls-matrix.md` CC6.1. The two incident-only runbooks moved with it:
+  `archived-documents/secret-rotation-runbook.md`, `archived-documents/github-support-purge-request.md`.
 - [`superpower/agt-6-plan.md`](superpower/agt-6-plan.md) — **AGT-6 plan — AGT-6a A1–A4 (incl. A4-status)
   SHIPPED 2026-07-26, plan STILL ACTIVE** (**A5** + the `kpi_report_builder` host + all of AGT-6b remain).
   Splits the requirement: **AGT-6a** inline AI authoring (one shared `<inspecto-ai-assist>` surface + a pane
