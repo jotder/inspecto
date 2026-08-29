@@ -91,6 +91,15 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- [`superpower/open-dag-pipeline-design.md`](superpower/open-dag-pipeline-design.md) — **DESIGN, not
+  scheduled** (operator direction, 2026-08-29): open the pipeline into a NiFi-style DAG — steps after the
+  sink, and pluggable **authorable** steps. Grounded: most machinery exists (the graph executor already
+  runs arbitrary topologies; `ParserPlugin` already serves its grammar; `PipelineNodeExecutor` shipped
+  the execution half), and **three independent closed gates** hold the rest — 🔴 the sink emits no `DATA`
+  and the executor publishes no relation for it (a post-sink step is silently SKIPPED, not refused),
+  `PipelineEditable.LOWERABLE` is a hardcoded set, and `RecipeCompiler`'s verb switch is closed. Five
+  stages; ⛔ the sink change is two lines and THREE semantic decisions — don't ship the lines first.
+
 - [`superpower/step-workbench-design.md`](superpower/step-workbench-design.md) — **DESIGN, not
   scheduled** (2026-08-29): one Step editor where the author builds a query (named fields, functions,
   filter, grouping), sees the **generated SQL**, tests it on sample rows, and gets the **output schema
