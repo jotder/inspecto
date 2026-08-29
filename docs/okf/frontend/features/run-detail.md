@@ -15,6 +15,21 @@ Route `/runs/:name` (carries a list→name [breadcrumb](../conventions/routing-a
 [data-tables](../design-system/data-table.md); a row opens the **batch-detail dialog** (mini/single-select
 grids inside). Backed by `RunsService`.
 
+**Registered outputs on the batch-detail dialog (shipped 2026-08-29).** `GET /runs/{name}/outputs?consignmentId=`
+returns one Consignment's registered outputs — sync's own files **and** whatever a post-sync step derived
+onto it — so the post-sync lane, which was real and invisible in the UI, is finally visible with each row
+attributed to the step that wrote it (`producer`).
+
+🔴 **`enabled` is not decoration, and off must not render like empty.** The output registry is switchable
+(`-Dconsignment.outputs.backend=none`); an empty table with it OFF would read as *"this Consignment wrote
+nothing"*, which is false — the **manifest**, not the registry, is authoritative for a file's existence.
+Registry-off renders an `<inspecto-alert>` explaining it; genuinely-empty renders the table's own empty
+state. Pinned by three specs.
+
+⚠ **Fetched OUTSIDE the dialog's core `forkJoin`.** A registry that is off, or a backend too old to serve
+the route, must degrade to an explanation — not blank a dialog that already has its summary, members and
+lineage.
+
 **Quarantine remediation (D-ETL, shipped 2026-07-20):** the Quarantine tab lists `GET /runs/{name}/quarantine`
 rows via the same generic audit-row grid. ⚠ **Corrected 2026-08-13**: the server's `FileStatusStore.quarantine`
 *synthesizes* these rows off the on-disk `<reason>/<filename>` layout, so each row carries only `file, reason,

@@ -371,7 +371,20 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   CI and `spaces/**` runtime state is never scanned; its `CONFIG_ALLOW` doubles as the Flow→Pipeline Tier-3
   debt register and fails when an entry goes stale; **plus the operator-visible MESSAGES since 2026-08-26** — pass 4 scanned only IDENTIFIERS, so a banned word inside a 4xx body, a Signal message or a template label was invisible to all four passes, which left the words a user actually reads as the least-guarded surface in the repo) and `tools/check-secrets.mjs` (a
   secret-ish key assigned a ≥16-char literal — SEC-INCIDENT-1). Both take a per-line `vocab-allow` /
-  `secret-allow` comment as the escape hatch. ⚠ **`check-secrets.mjs` was "master-only" while `4.x` still carried the
+  `secret-allow` comment as the escape hatch.
+  🔴 **SCOPE AUDIT 2026-08-29 — both guards silently exempted a tier, and a guard's scope is the part
+  nobody re-reads.** `check-secrets` skipped `archived-documents/`, borrowed from the vocabulary guard's
+  exclusion list — but the two ask **different questions**: a lint asks "is this doc maintained" (so
+  linting prose nobody may edit is unfixable noise), while the secret guard asks "is this doc
+  **COMMITTED**". 195 tracked files were invisible, including `legacy-api-sunset-runbook.md` — precisely
+  the class the `.md` extension exists for, since **archiving a runbook does not redact it**. The archive
+  was verified clean when scope was restored, so it closed a hole rather than a leak. `check-vocabulary`
+  missed `docs/stakeholders/**` and the **root canon — including `GLOSSARY.md`, the file that DEFINES the
+  bans**; four canon files carried live `Flow` residue the rename program had already retired everywhere
+  it looked. ⚠ The canon is a **named file list, not `docs/`**, because `docs/` also holds `ops/`,
+  `roadmap/`, `api/`, `ui/` and the permanently-unscanned archive. **A new tier is unscanned by default
+  and nothing says so** — that is the recurring shape.
+  ⚠ **`check-secrets.mjs` was "master-only" while `4.x` still carried the
   live OAuth secrets** (merging it forward would have pinned that branch's CI red, BACKLOG §5); P1 fixed
   the code there and the branch itself was deleted 2026-08-17, so the caveat is now history. A third guard,
   `npm run lint:tokens`, runs in the separate path-filtered `ui.yml` (§6). A fourth,

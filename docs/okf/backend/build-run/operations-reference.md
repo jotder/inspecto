@@ -316,6 +316,22 @@ java -cp inspecto.jar com.gamma.control.ControlApi \
      -Dservice.poll.seconds=60 config/
 ```
 
+🔴 **Listen address — `-Dcontrol.bind` (shipped 2026-08-29, GAP-1).** Unset means **every interface**,
+in every edition. `-Dcontrol.bind=127.0.0.1` restricts it to loopback; an unresolvable value **fails the
+boot** rather than falling back to the wider address, so an operator who asked for loopback can never
+silently get more. Both the HTTP and HTTPS paths honour it.
+
+⚠ **Combine that default with the auth model below before exposing a Personal install.** Personal ships
+no `Authenticator` at all, so left on the default it serves an unauthenticated control plane — config-write
+routes included — to every host that can reach the port. The `-Dassist.write.root` gate is the only thing
+in front of those routes, and an operator may well have set it. **Set `-Dcontrol.bind=127.0.0.1`, or
+firewall the port, for any single-user install.**
+
+The wildcard default is deliberate, not an oversight: narrowing it would make every already-deployed
+Standard/Enterprise install unreachable on upgrade. `ControlApiBindTest` pins it so a later "hardening"
+fails a test instead of surprising an operator. ⛔ `EDITIONS.md` asserted "bind localhost only" for years
+without the code enforcing it — the claim was the defect, and it now states the exposure instead.
+
 **Auth model (editions realignment, 2026-06-16).** The common core is **auth-free**: on the Personal
 edition every route is open — no token, guard, or login (the old `CONTROL`/`assist.*` token scopes were
 removed). The **Standard** edition re-adds authentication out-of-band via the `Authenticator` / `Subject` /

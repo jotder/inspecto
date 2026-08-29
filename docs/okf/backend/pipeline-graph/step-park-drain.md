@@ -54,7 +54,20 @@ subtree** — and refuses, at SAVE and at `prepare()`, never as a silent skip at
    below them; the answer is `active: false` or the Stage-B half-pause);
 3. disabling the `transform.route` node itself (the divert's engagement anchor);
 4. an unknown Step id (a typo must never become a silently-enabled Step);
-5. **all** branches (`active: false` is that ask).
+5. **all** branches (`active: false` is that ask);
+6. **no park home** (added 2026-08-29). `dirs.backup` is OPTIONAL — `PipelineConfigParser` reads it with a
+   plain `get` — but `BatchProcessor.parkSource` parks under `<backup>/parked`, so without it the pipeline
+   arms, runs, and dies at the park with an NPE the operator reads as `park failed: null`, **one batch
+   every cycle**. That is the arms-then-fails-forever shape this whole list exists to convert into an
+   authoring-time answer. ⚠ `refusals()` takes `parkHomeConfigured` as a **required** argument rather than
+   an overload defaulting to `true`: a caller that cannot answer must not be allowed to arm a pipeline with
+   nowhere to park. Draft-map callers use `StepDisableArming.draftHasParkHome(dirs)`, which mirrors the
+   parser exactly — absent and blank are both "no home".
+
+⇒ **Consequence for `DrainCommand`:** a blank `backupPath` on a member is no longer read as a 1→N unpack
+expansion. It never was one — it means `dirs.backup` was unset — and no armed batch can now be in that
+state. Reporting it as an unpack problem described a fault the operator did not have; the expansion test
+is now the JAR-style `archive!entry` address and only that.
 
 ⚠ `StepDisableArming.parkableSinkIds` **hand-mirrors the lift's `sink__d<i>` id grammar**. That is legitimate
 only because an armed `route:` pipeline is single-schema (so the suffix is empty), and it is pinned verbatim
