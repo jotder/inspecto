@@ -5,6 +5,7 @@ import com.gamma.signal.SignalEmitter;
 import com.gamma.util.RunLog;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * <b>§14.3 — everything a {@link ConsignmentProcessor} may read.</b> A Consignment-scoped façade derived from a
@@ -85,4 +86,12 @@ public interface ProcessorContext {
      * nothing and say so — never fall through to the real action.
      */
     boolean dryRun();
+
+    /**
+     * This step's own configuration (open-dag design §9): a comma-separated {@code processor} chain names
+     * steps but has nowhere to put their parameters, so a chained step's entry in {@code chain_config}
+     * (an ordered JSON array, one object per chain position) lands here. Empty — never {@code null} — when
+     * the chain declared no config for this step, or when the processor is running standalone.
+     */
+    default Map<String, String> config() { return Map.of(); }
 }

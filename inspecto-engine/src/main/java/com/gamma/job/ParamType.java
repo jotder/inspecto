@@ -11,5 +11,8 @@ public enum ParamType {
     INTEGER, DECIMAL, BOOLEAN, DATE, INSTANT,
     /** An email address — the first real consumer is the {@code mail.send} reference Job (§9). */
     EMAIL,
-    DATASET_REF
+    DATASET_REF,
+    /** Structured, author-supplied JSON — the vocabulary's only nested shape. First consumer: a
+     *  {@code consignment.process} chain's per-step {@code chain_config} (open-dag design §9). */
+    JSON
 }

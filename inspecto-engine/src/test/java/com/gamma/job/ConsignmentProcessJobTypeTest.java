@@ -127,6 +127,12 @@ class ConsignmentProcessJobTypeTest {
         return p;
     }
 
+    private static Map<String, String> params(String consignmentId, String processorId, String chainConfig) {
+        Map<String, String> p = params(consignmentId, processorId);
+        if (chainConfig != null) p.put("chain_config", chainConfig);
+        return p;
+    }
+
     // ── the run ──────────────────────────────────────────────────────────────────
 
     @Test
@@ -483,6 +489,78 @@ class ConsignmentProcessJobTypeTest {
             assertTrue(ctx.warnings.stream().anyMatch(w -> w.contains("not stored")),
                     "expected a not-stored warning, got " + ctx.warnings);
         }
+    }
+
+    // ── stage 4 §9: per-step chain_config ────────────────────────────────────────
+
+    /** A processor that records the config it was handed, so a test can assert what it saw. */
+    private static final class ConfigCapturer implements ConsignmentProcessor {
+        final String id;
+        volatile Map<String, String> sawConfig;
+
+        ConfigCapturer(String id) { this.id = id; }
+
+        @Override public String id() { return id; }
+
+        @Override
+        public ProcessorResult process(ProcessorContext ctx) {
+            sawConfig = ctx.config();
+            return ProcessorResult.ok(id);
+        }
+    }
+
+    @Test
+    void aStandaloneProcessorSeesAnEmptyConfigByDefault() throws Exception {
+        ConfigCapturer p = new ConfigCapturer("row-counter");
+        JobResult result = job(p).run(new CapturingJobContext(params("c1", "row-counter"), false));
+        assertTrue(result.success(), result.message());
+        assertEquals(Map.of(), p.sawConfig, "no chain_config bound — every step gets no config");
+    }
+
+    @Test
+    void eachChainStepReceivesItsOwnPositionallyAlignedConfig() throws Exception {
+        ConfigCapturer first = new ConfigCapturer("first-cfg");
+        ConfigCapturer second = new ConfigCapturer("second-cfg");
+        Map<String, String> params = params("c1", "first-cfg,second-cfg",
+                "[{\"config\":{\"mode\":\"a\"}},{\"config\":{\"mode\":\"b\",\"limit\":\"5\"}}]");
+
+        JobResult result = chainJob(null, first, second).run(new CapturingJobContext(params, false));
+
+        assertTrue(result.success(), result.message());
+        assertEquals(Map.of("mode", "a"), first.sawConfig);
+        assertEquals(Map.of("mode", "b", "limit", "5"), second.sawConfig);
+    }
+
+    @Test
+    void aMismatchedChainConfigLengthFailsBeforeAnyStepRuns() throws Exception {
+        ConfigCapturer first = new ConfigCapturer("first-cfg");
+        ConfigCapturer second = new ConfigCapturer("second-cfg");
+        Map<String, String> params = params("c1", "first-cfg,second-cfg", "[{\"config\":{\"mode\":\"a\"}}]");
+
+        JobResult result = chainJob(null, first, second).run(new CapturingJobContext(params, false));
+
+        assertFalse(result.success());
+        assertTrue(result.message().contains("chain_config"), result.message());
+        assertNull(first.sawConfig, "nothing ran — the mismatch is caught before step 1");
+        assertNull(second.sawConfig);
+    }
+
+    @Test
+    void malformedChainConfigJsonFailsClearly() throws Exception {
+        JobResult result = job(new ConfigCapturer("row-counter"))
+                .run(new CapturingJobContext(params("c1", "row-counter", "not json"), false));
+
+        assertFalse(result.success());
+        assertTrue(result.message().contains("chain_config"), result.message());
+    }
+
+    /** Positional, not keyed by id — index 0 configures whichever step the chain names first. */
+    @Test
+    void chainConfigsAreParsedPositionally() {
+        assertEquals(List.of(), ConsignmentProcessJobType.chainConfigsOf(null));
+        assertEquals(List.of(), ConsignmentProcessJobType.chainConfigsOf("  "));
+        assertEquals(List.of(Map.of("a", "1"), Map.of()),
+                ConsignmentProcessJobType.chainConfigsOf("[{\"config\":{\"a\":\"1\"}},{}]"));
     }
 
     /** The legacy no-arg entry point cannot carry parameters, so it must refuse rather than half-run. */

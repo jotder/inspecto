@@ -447,17 +447,21 @@ it (`producer` = `first` / `second`).
 
 ---
 
-## 9. Open, and worth deciding before stage 4
+## 9. Decided 2026-08-29 (operator)
 
-1. **Is a comma-separated `processor` string the authoring surface you want**, or should a chain be its
-   own config shape? The string is the smallest thing that works with the existing `ParameterDecl`
-   vocabulary (there is no `LIST` `ParamType`), and it is honest about ordering — but it carries no
-   per-step configuration, so a step that needs parameters has nowhere to put them. That is the first
-   thing stage 4 will run into.
-2. **Should a mid-chain failure retire what earlier steps wrote?** Today it does not (append-only). The
-   alternative — supersede the run's own derivatives on failure — is expressible with the existing state
-   but changes "a registered table is a fact" into "a registered table is a fact only if its chain
-   finished".
+1. **Per-step config: a `chain_config` JSON parameter, added alongside `processor` — shipped.** The
+   `processor` string still names the ordered chain; `chain_config` is an optional, positionally-aligned
+   JSON array of `{"config": {...}}` objects (index 0 configures the first-named step). A length mismatch
+   against the chain fails the run before any step executes, same fail-closed posture as an unresolvable
+   processor id. Landed as: a new `ParamType.JSON` (the vocabulary's first nested shape); a default
+   `ProcessorContext.config()` (empty `Map` when the chain declared none, or when running standalone —
+   backward compatible for existing third-party `ConsignmentProcessor` implementers, since it's an
+   additive default method); `ConsignmentProcessJobType.chainConfigsOf` parses and validates. Pinned in
+   `ConsignmentProcessJobTypeTest` (standalone default-empty, positional alignment, length-mismatch
+   refusal, malformed-JSON refusal, the parser unit tests).
+2. **Mid-chain failure: stays append-only — no change.** A registered table remains a fact regardless of
+   what a later step in its chain does; the Run's own status is what says whether the chain finished.
+   Matches the registry's existing invariant elsewhere and needed no code.
 
 ---
 
@@ -551,9 +555,8 @@ Both directions are pinned: `frobnicate` is still refused, and a kind a test-sco
 loads with its config verbatim. ⚠ That fixture vouches for exactly ONE obscure kind — a permissive test
 provider is global to the module and would quietly widen every other `steps:` test.
 
-**Still open:** stage 6 (parser output-schema publication), and the two stage-3 questions — per-step
-configuration in the chain parameter, and whether a mid-chain failure should retire what earlier steps
-wrote.
+**Still open:** nothing from this thread — stage 6 was REFUTED (§12, the seam already existed) and the
+two stage-3 §9 questions are now decided and shipped (chain_config landed; append-only confirmed).
 
 ---
 

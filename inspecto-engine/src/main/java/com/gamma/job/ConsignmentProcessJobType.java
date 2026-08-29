@@ -1,5 +1,7 @@
 package com.gamma.job;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.api.PublicApi;
 import com.gamma.consignment.ConsignmentOutput;
 import com.gamma.consignment.ConsignmentOutputStores;
@@ -51,6 +53,9 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
 
     static final String P_CONSIGNMENT = "consignment_id";
     static final String P_PROCESSOR = "processor";
+    static final String P_CHAIN_CONFIG = "chain_config";
+
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private final Function<String, ConsignmentProcessor> lookup;
     private final String dataDir;
@@ -103,6 +108,37 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
         return out;
     }
 
+    /**
+     * The ordered per-step config a {@code chain_config} parameter carries: a JSON array of
+     * {@code {"config": {...}}} objects, positionally aligned with {@link #chainOf}'s chain — index 0
+     * configures the first named step, and so on. Blank/absent yields {@code List.of()}, which callers
+     * read as "every step gets no config" rather than an error; a non-blank value that is not valid JSON,
+     * or whose {@code config} entry is not an object, throws.
+     */
+    static List<Map<String, String>> chainConfigsOf(String json) {
+        if (json == null || json.isBlank()) return List.of();
+        List<Map<String, Object>> raw;
+        try {
+            raw = JSON.readValue(json, new TypeReference<List<Map<String, Object>>>() {});
+        } catch (Exception e) {
+            throw new IllegalArgumentException(
+                    "chain_config is not a JSON array of {\"config\": {...}} objects: " + e.getMessage(), e);
+        }
+        List<Map<String, String>> out = new ArrayList<>(raw.size());
+        for (Map<String, Object> entry : raw) {
+            Object cfg = entry.get("config");
+            Map<String, String> m = new LinkedHashMap<>();
+            if (cfg != null) {
+                if (!(cfg instanceof Map<?, ?>))
+                    throw new IllegalArgumentException(
+                            "chain_config entry's \"config\" must be an object, got: " + cfg);
+                ((Map<?, ?>) cfg).forEach((k, v) -> m.put(String.valueOf(k), v == null ? null : String.valueOf(v)));
+            }
+            out.add(Map.copyOf(m));
+        }
+        return out;
+    }
+
     @Override
     public JobTypeDescriptor descriptor() {
         return new JobTypeDescriptor(TYPE_ID, "Consignment Processor",
@@ -116,7 +152,16 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
                                 "The id() of the ConsignmentProcessor to run, or an ordered "
                                         + "comma-separated chain of them (mask,rollup,report). Each step "
                                         + "sees the Consignment as the previous one left it, including "
-                                        + "the tables it registered.")),
+                                        + "the tables it registered."),
+                        ParameterDecl.of(P_CHAIN_CONFIG, ParamType.JSON)
+                                .tier(ParameterDecl.Tier.ADVANCED)
+                                .description("Per-step configuration for a " + P_PROCESSOR + " chain, "
+                                        + "reachable as ProcessorContext.config(): a JSON array of "
+                                        + "{\"config\": {...}} objects, one per chain step in the same "
+                                        + "order (a two-step chain needs a two-element array). Absent or "
+                                        + "empty gives every step no config; declared, its length must "
+                                        + "match the chain's.")
+                                .build()),
                 List.of(), List.of());
     }
 
@@ -170,6 +215,17 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
                 return JobResult.failed("no " + P_PROCESSOR + ": name the processor to run, or an ordered "
                         + "comma-separated chain of them", ms(t0));
 
+            List<Map<String, String>> chainConfigs;
+            try {
+                chainConfigs = ConsignmentProcessJobType.chainConfigsOf(ctx.params().get(P_CHAIN_CONFIG));
+            } catch (IllegalArgumentException e) {
+                return JobResult.failed(e.getMessage(), ms(t0));
+            }
+            if (!chainConfigs.isEmpty() && chainConfigs.size() != chain.size())
+                return JobResult.failed(P_CHAIN_CONFIG + " has " + chainConfigs.size() + " entr"
+                        + (chainConfigs.size() == 1 ? "y" : "ies") + " but the chain names " + chain.size()
+                        + " step(s) — one config entry per chain step, in order", ms(t0));
+
             // Resolve EVERY step before running ANY of them. A chain that fails half-way on a typo has
             // already written and registered the earlier steps' tables, and those are not rolled back
             // (the data path is append-only), so an unresolvable id must stop the run before it starts.
@@ -207,9 +263,10 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
                 GuardedDerivedTableEmitter tables = new GuardedDerivedTableEmitter(
                         store == null ? GuardedDerivedTableEmitter.ReadablePaths.NONE : store::isReadable);
                 // ...and a fresh reader per step, because its lazy views are built from that outputs list.
+                Map<String, String> stepConfig = chainConfigs.isEmpty() ? Map.of() : chainConfigs.get(i);
                 try (ConsignmentReader reader = SandboxConsignmentReader.over(outputs)) {
                     ProcessorResult result = processors.get(i).process(
-                            new AdaptedContext(consignmentId, outputs, reader, summaries, tables, ctx));
+                            new AdaptedContext(consignmentId, outputs, reader, summaries, tables, stepConfig, ctx));
 
                     // §7.2's free reconciliation — reported, never thrown: summarising a filtered subset is legal.
                     summaries.reconcile(outputs).ifPresent(diff ->
@@ -329,11 +386,14 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
      */
     private record AdaptedContext(String consignmentId, List<ConsignmentOutput> outputs,
                                   ConsignmentReader read, SummaryEmitter summaries,
-                                  DerivedTableEmitter tables, JobContext job) implements ProcessorContext {
+                                  DerivedTableEmitter tables, Map<String, String> config,
+                                  JobContext job) implements ProcessorContext {
 
         @Override public RunLog log() { return job.log(); }
 
         @Override public boolean dryRun() { return job.dryRun(); }
+
+        @Override public Map<String, String> config() { return config; }
 
         /** Stamps {@code consignment_id} into every payload so an author never re-states it. */
         @Override
