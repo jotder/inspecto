@@ -174,8 +174,12 @@ Ordered by what they unblock.
   fails the boot on an unresolvable value. ⚠ The **default is deliberately unchanged** (every
   interface) — narrowing it would strand deployed Standard/Enterprise installs on upgrade — so
   `EDITIONS.md` now states the exposure instead of denying it, which was the actual defect.
-- 🔴 **Torn multi-file reads across a recompute** — open defect; subtraction fixed stale inclusion,
-  not tearing.
+- ~~🔴 **Torn multi-file reads across a recompute** — open defect; subtraction fixed stale inclusion,
+  not tearing.~~ **SHIPPED 2026-08-29** — `ConsignmentSelector` now always pins the enumerated file list
+  to an explicit array once a registry exists, rather than falling back to a live glob string DuckDB
+  re-expands at scan time. Accepted tradeoff: the SQL always carries a file array now, and a pinned
+  list can fail loudly (not silently) if `retire_superseded` deletes one of its files mid-read. See
+  `consignment-addressing.md` §3.
 - ~~⚠ **`retire_superseded` must be configured by an operator** or every full recompute leaves a
   permanent extra copy on disk. No default exists, deliberately — but nothing surfaces the cost.~~
   **SHIPPED 2026-08-29** — `PipelineJobRunner.supersedeEarlierRevisions` now warns, naming the affected

@@ -16,31 +16,40 @@ import java.util.Set;
 
 /**
  * <b>Consignment addressing §7-A — the Selector.</b> Turns a store's read glob into the read expression a
- * caller should actually use: the same glob, minus the files the catalog says are no longer readable.
+ * caller should actually use: the files the glob matches <em>at this instant</em>, minus the ones the
+ * catalog says are no longer readable, pinned to an explicit list rather than left as a glob string.
  *
- * <p><b>It filters the glob; it never replaces it.</b> That is the whole design, and it is a correction to the
- * plan it implements. §1 wanted the catalog to <em>produce</em> the file list, but
- * {@link DbConsignmentOutputStore} is contractually optional — its own javadoc says a store that can
- * legitimately be absent must never be the only record that a file exists. An optional index cannot be an
- * existence oracle. So the filesystem stays the authority for what exists, and the catalog only ever
- * <em>subtracts</em>:
+ * <p><b>It filters the glob; it never replaces it as the source of truth for what exists.</b> §1 wanted
+ * the catalog to <em>produce</em> the file list, but {@link DbConsignmentOutputStore} is contractually
+ * optional — its own javadoc says a store that can legitimately be absent must never be the only record
+ * that a file exists. An optional index cannot be an existence oracle. So the filesystem stays the
+ * authority for what exists — this class only ever <em>enumerates and subtracts</em> — and the pinning
+ * below is a snapshot of that enumeration, not a second source of existence:
  *
- * <pre>{@code resolve(glob) = glob  MINUS  paths the catalog marks SUPERSEDED / COMPACTED_AWAY}</pre>
+ * <pre>{@code resolve(glob) = enumerate(glob) MINUS paths the catalog marks SUPERSEDED / COMPACTED_AWAY,
+ *              pinned to the enumerated instant}</pre>
  *
  * <p>A file with <b>no</b> catalog row stays in. That is decision D3 — unknown is a possible match, never an
  * exclusion — applied to the file list rather than only to the bounds, and it is what makes this safe to switch
  * on everywhere: a deployment whose registry is off, or predates the files on disk, reads exactly what it read
  * before. Nothing needs backfilling.
  *
- * <p><b>Fail-open at every step.</b> No registry, nothing excluded, or any failure enumerating the glob, and
- * the caller gets the plain glob expression it would have built itself — byte for byte, not merely equivalent.
- * The SQL only changes shape when there is genuinely a file to leave out, which keeps the blast radius of this
- * change confined to the case it exists to fix.
+ * <p><b>Fail-open when there is no registry, or enumeration itself fails.</b> Either way the caller gets the
+ * plain glob expression it would have built itself — byte for byte, not merely equivalent — because there is
+ * nothing this class can safely pin in that case.
  *
- * <p><b>What it does not do.</b> This is not generation pinning and must not be sold as it: the glob is
- * evaluated at resolve time, so a file revealed by a concurrent writer a moment later is simply not in the
- * list, and a reader holding this list across a recompute has a stale one rather than a consistent one.
- * Subtraction fixes <em>stale inclusion</em>. Torn multi-file reads are a separate, still-open defect (§7-A).
+ * <p><b>Always pins once a registry exists — 2026-08-29, closing the torn-read gap this class's javadoc used
+ * to describe as still-open.</b> Earlier, an empty exclusion set fell back to the caller's own live glob
+ * string, on the reasoning that the common path should be "provably a no-op." That saved SQL size, but it
+ * meant DuckDB re-expanded the glob against the live filesystem at actual scan time — so a file written by a
+ * concurrent recompute between this class's enumeration and the query's own scan was silently pulled into a
+ * read the catalog never approved, exactly the torn read the old javadoc named. Pinning the enumerated list
+ * unconditionally closes that window: whatever this class saw at resolve time is exactly what the read scans,
+ * whether or not anything needed excluding. ⚠ The tradeoff, accepted deliberately: the SQL always carries an
+ * explicit file array now (no longer a glob string in the common case), and a list pinned across a long-lived
+ * read can fail loudly if {@code retire_superseded} deletes one of its files out from under it mid-read,
+ * where the old glob fallback would have silently re-scanned around it. A loud failure on an actually-deleted
+ * file is judged the lesser risk against a silent, wrong answer from an unapproved file appearing mid-scan.
  */
 @PublicApi(since = "4.0.0")
 public final class ConsignmentSelector {
@@ -50,7 +59,9 @@ public final class ConsignmentSelector {
     private ConsignmentSelector() {}
 
     /**
-     * The read expression for {@code glob}, with unreadable files subtracted when the catalog knows of any.
+     * The read expression for {@code glob}: the files it matches right now, pinned to an explicit list with
+     * anything the catalog marks unreadable already subtracted — or, when there is no registry to ask or
+     * enumeration itself fails, the plain glob expression the caller would have built unfiltered.
      *
      * @param conn   the connection the read will run on — used only to enumerate the glob, through DuckDB's own
      *               {@code glob()} table function rather than a filesystem walk, so the file set this selects
@@ -65,11 +76,11 @@ public final class ConsignmentSelector {
     }
 
     /**
-     * The SQL <b>source literal</b> for reading {@code root}'s {@code .ext} files — the quoted
-     * {@code root}{@code /**}{@code /*.ext} glob when the catalog has nothing to exclude, else a bracketed list
-     * of the survivors. For the callers that have no {@link Connection}: {@code DatasetRelation} hands the
-     * literal straight to {@link SqlViews#readerOverLiteral}, so it decides the source without deciding the
-     * read options.
+     * The SQL <b>source literal</b> for reading {@code root}'s {@code .ext} files: a bracketed, pinned list of
+     * whatever currently matches minus anything the catalog marks unreadable, or the quoted
+     * {@code root}{@code /**}{@code /*.ext} glob when there is no registry to ask or the walk itself fails. For
+     * the callers that have no {@link Connection}: {@code DatasetRelation} hands the literal straight to
+     * {@link SqlViews#readerOverLiteral}, so it decides the source without deciding the read options.
      *
      * <p>The glob is built here rather than accepted, so the pattern this enumerates and the pattern it falls
      * back to cannot drift apart.
@@ -81,12 +92,10 @@ public final class ConsignmentSelector {
     }
 
     /**
-     * The files {@code glob} matches that the catalog has not marked unreadable, or {@code null} when the
-     * caller should just use the glob — no registry, nothing excluded, or the enumeration failed.
-     *
-     * <p>{@code null} rather than "all the files", deliberately: it lets {@link #resolve} hand back the
-     * caller's original expression unchanged instead of an equivalent-but-different list of every file, so the
-     * common path is provably a no-op rather than a reimplementation of one.
+     * The files {@code glob} currently matches, with anything the catalog marks unreadable already
+     * subtracted — pinned at this call, so a file appearing after this point never reaches the read this
+     * builds. {@code null} only when the caller should just use the glob unfiltered: no registry to ask, or
+     * enumeration itself failed.
      */
     static List<String> select(Connection conn, String glob) {
         Set<String> excluded = excluded();
@@ -162,9 +171,10 @@ public final class ConsignmentSelector {
     }
 
     /**
-     * The normalised set of paths the catalog says are unreadable, or {@code null} when there is nothing to do —
-     * no registry, or a registry with no dead rows. Both enumerators bail on {@code null} before touching a
-     * filesystem or a connection, so the default path costs one indexed query and nothing else.
+     * The normalised set of paths the catalog says are unreadable — possibly empty — or {@code null} only
+     * when there is no registry to ask at all. Both enumerators bail on {@code null} before touching a
+     * filesystem or a connection; an <b>empty</b> set still triggers enumeration, because pinning what exists
+     * right now is the point even when nothing needs excluding (2026-08-29 — see the class javadoc).
      *
      * <p>Normalised on both sides because the registry stores the writer's own spelling, which may be relative,
      * while an enumerator answers in its own. Comparing raw would match nothing and report success — the silent
@@ -173,17 +183,18 @@ public final class ConsignmentSelector {
     private static Set<String> excluded() {
         DbConsignmentOutputStore store = ConsignmentOutputStores.shared();
         if (store == null) return null;
-        List<String> unreadable = store.unreadablePaths();
-        if (unreadable.isEmpty()) return null;
         Set<String> normalised = new HashSet<>();
-        for (String path : unreadable) normalised.add(DbConsignmentOutputStore.norm(path));
+        for (String path : store.unreadablePaths()) normalised.add(DbConsignmentOutputStore.norm(path));
         return normalised;
     }
 
-    /** {@code kept} when anything was actually removed, else {@code null} so the caller keeps its own glob. */
+    /**
+     * {@code kept}, always — the pin — logging only when something was actually excluded, since an empty
+     * exclusion is the ordinary case and not worth a line every read.
+     */
     private static List<String> report(int removed, List<String> kept, String what) {
-        if (removed == 0) return null;
-        log.debug("Consignment selector: {} of {} file(s) excluded under {}", removed, removed + kept.size(), what);
+        if (removed > 0)
+            log.debug("Consignment selector: {} of {} file(s) excluded under {}", removed, removed + kept.size(), what);
         return kept;
     }
 }

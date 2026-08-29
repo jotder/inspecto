@@ -134,13 +134,23 @@ would match nothing and report success.
 **A path with any `LIVE` row is never excluded**, whatever dead rows also name it: output naming is not
 one-file-per-Consignment, so one path can own an old `SUPERSEDED` row and a current `LIVE` one.
 
-⛔ **Not a pruner and not generation pinning.** Bounds-based window pruning is deliberately unbuilt: a
-file whose bounds miss the window contains no matching rows, so the query's own predicate already
-excludes them — identical answers, pure performance, and the measured ceiling was 1.3–2.6× wall-clock
-(rung A) against 29–88× fewer rows scanned, because DuckDB already skips row groups on Parquet
-statistics. And subtraction fixes *stale inclusion*, not **torn reads**: the glob is evaluated at
-resolve time, so a file revealed a moment later is simply absent from the list. Torn multi-file reads
-across a recompute remain an open defect.
+⛔ **Not a pruner.** Bounds-based window pruning is deliberately unbuilt: a file whose bounds miss the
+window contains no matching rows, so the query's own predicate already excludes them — identical
+answers, pure performance, and the measured ceiling was 1.3–2.6× wall-clock (rung A) against 29–88×
+fewer rows scanned, because DuckDB already skips row groups on Parquet statistics.
+
+✅ **Torn multi-file reads across a recompute — CLOSED 2026-08-29.** Subtraction always fixed *stale
+inclusion*; the still-open half was that an empty exclusion set fell back to the caller's own **live
+glob string**, which DuckDB re-expands against the filesystem at actual scan time — so a file written by
+a concurrent recompute between `resolve()`'s enumeration and the query's own scan could be silently
+pulled into a read the catalog never approved. `ConsignmentSelector` now **always pins** the enumerated
+file list to an explicit array once any registry exists, falling back to the live glob only when there
+is no registry at all or enumeration itself fails. ⚠ **Accepted tradeoff:** the SQL always carries an
+explicit file array now (no longer a bare glob string in the common no-exclusions case), and a pinned
+list can fail loudly if `retire_superseded` deletes one of its files mid-read, where the old glob
+fallback would have silently rescanned around it — judged the lesser risk against a silent wrong answer.
+Regression-pinned by `ConsignmentSelectorTest.aFileWrittenAfterResolveIsInvisibleToTheAlreadyPinnedRead`:
+a file written after `resolve()` runs is provably absent from the pinned read it returns.
 
 ### Which readers are filtered, and which deliberately are not (2026-08-28)
 

@@ -17,8 +17,10 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * {@link ConsignmentSelector} (consignment addressing §7-A): the catalog subtracts from the glob, it never
- * replaces it. Two properties carry the whole design and every test here is one of them —
- * <b>unknown files stay in</b>, and <b>nothing to exclude means the caller's own expression back, unchanged</b>.
+ * replaces it as the authority for what exists — but since 2026-08-29 it always pins the enumerated result
+ * to an explicit list rather than falling back to a live glob string once a registry exists. Two properties
+ * carry the whole design — <b>unknown files stay in</b>, and <b>only the absence of a registry, or a failed
+ * enumeration, hands the caller its own expression back unchanged</b>.
  */
 class ConsignmentSelectorTest {
 
@@ -57,7 +59,7 @@ class ConsignmentSelectorTest {
         return ids;
     }
 
-    // ── the no-op path: absence and emptiness both hand back the caller's own glob ──
+    // ── absence of a registry is the ONLY thing that hands back the caller's own glob ──
 
     @Test
     void withNoRegistryTheCallerGetsItsOwnGlobBack(@TempDir Path dir) throws Exception {
@@ -71,16 +73,43 @@ class ConsignmentSelectorTest {
         }
     }
 
+    /**
+     * 2026-08-29: this used to be the "no-op" case — nothing excluded, so the caller got its own glob back
+     * unchanged. It is now pinned instead: a registry exists, so the enumerated file set is pinned to a
+     * list even when nothing needed subtracting, closing the window where a live glob could pick up a file
+     * revealed after this call (see {@link #aFileWrittenAfterResolveIsInvisibleToTheAlreadyPinnedRead}).
+     */
     @Test
-    void withNothingToExcludeTheCallerGetsItsOwnGlobBack(@TempDir Path dir) throws Exception {
+    void withNothingToExcludeTheCallerStillGetsAPinnedList(@TempDir Path dir) throws Exception {
         try (Connection conn = JdbcDrivers.connect("jdbc:duckdb:");
              DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
             String a = parquet(conn, dir, "a", 1);
             db.record(List.of(row(a, State.LIVE)));
             ConsignmentOutputStores.use(db);
 
-            assertEquals(SqlViews.reader("PARQUET", glob(dir), true),
-                    ConsignmentSelector.resolve(conn, "PARQUET", glob(dir), true));
+            String expr = ConsignmentSelector.resolve(conn, "PARQUET", glob(dir), true);
+            assertTrue(expr.startsWith("read_parquet(["), "pinned to a list even though nothing was excluded");
+            assertEquals(List.of(1), idsFrom(conn, expr));
+        }
+    }
+
+    /**
+     * The regression this fix exists for: a file appearing after {@code resolve()} already ran must not
+     * reach a read built from its result — the torn-read window the class javadoc used to document as open.
+     */
+    @Test
+    void aFileWrittenAfterResolveIsInvisibleToTheAlreadyPinnedRead(@TempDir Path dir) throws Exception {
+        try (Connection conn = JdbcDrivers.connect("jdbc:duckdb:");
+             DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            String a = parquet(conn, dir, "a", 1);
+            db.record(List.of(row(a, State.LIVE)));
+            ConsignmentOutputStores.use(db);
+
+            String expr = ConsignmentSelector.resolve(conn, "PARQUET", glob(dir), true);   // pinned now
+            parquet(conn, dir, "b", 2);   // a concurrent writer lands a new file AFTER resolve()
+
+            assertEquals(List.of(1), idsFrom(conn, expr),
+                    "the pinned expression must not see a file that appeared after it was resolved");
         }
     }
 
@@ -136,8 +165,8 @@ class ConsignmentSelectorTest {
 
             assertTrue(db.unreadablePaths().isEmpty(), "readability is per path, not per registration");
             ConsignmentOutputStores.use(db);
-            assertEquals(SqlViews.reader("PARQUET", glob(dir), true),
-                    ConsignmentSelector.resolve(conn, "PARQUET", glob(dir), true));
+            assertEquals(List.of(1), idsFrom(conn, ConsignmentSelector.resolve(conn, "PARQUET", glob(dir), true)),
+                    "the path stays readable — pinned into the list, not excluded from it");
         }
     }
 
@@ -180,8 +209,9 @@ class ConsignmentSelectorTest {
 
     // ── the connection-free enumerator (DatasetRelation's path) ──────────────
 
+    /** As {@link #withNothingToExcludeTheCallerStillGetsAPinnedList}, for the connection-free enumerator. */
     @Test
-    void sourceLiteralIsThePlainQuotedGlobWhenThereIsNothingToExclude(@TempDir Path dir) throws Exception {
+    void sourceLiteralIsAPinnedListEvenWithNothingToExclude(@TempDir Path dir) throws Exception {
         try (Connection conn = JdbcDrivers.connect("jdbc:duckdb:");
              DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
             String a = parquet(conn, dir, "a", 1);
@@ -189,7 +219,9 @@ class ConsignmentSelectorTest {
             ConsignmentOutputStores.use(db);
 
             String root = dir.toString().replace("\\", "/");
-            assertEquals("'" + root + "/**/*.parquet'", ConsignmentSelector.sourceLiteral(root, "parquet"));
+            String literal = ConsignmentSelector.sourceLiteral(root, "parquet");
+            assertTrue(literal.startsWith("["), "pinned to a list even though nothing was excluded: " + literal);
+            assertEquals(List.of(1), idsFrom(conn, "read_parquet(" + literal + ")"));
         }
     }
 
