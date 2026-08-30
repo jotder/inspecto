@@ -220,20 +220,41 @@ export function refsOf(item: BundleItem): { kind: BundleKind; id: string }[] {
 }
 
 /**
+ * Extra closure edges the SERVER resolved, keyed `<kind>/<id>` — see {@link withDependencies}.
+ * Supplied for authored pipelines from `GET /pipelines/{name}/related`.
+ */
+export type ServerRefs = Map<string, { kind: BundleKind; id: string }[]>;
+
+/**
  * Expand a selection to its dependency closure (BFS over {@link refsOf}), resolving against
  * everything available on this instance. References that don't resolve are reported, not fatal —
  * the bundle still exports, the import preview will show them as unresolved on the target too.
+ *
+ * <p>🔴 `serverRefs` closes a real hole (pipeline spec gap 6a). {@link refsOf} derives a pipeline's
+ * edges from `nodes[].use` alone, so a companion bound by CONFIG KEY rather than a node binding —
+ * `parsing.grammar: grammar/cdr`, `processing.mapping_file: mapping/x` — was invisible to it. Such a
+ * pipeline exported without its grammar, and the import landed a pipeline that could not parse. The
+ * server reads what the ENGINE resolved, so its answer is authoritative; these edges are merged with
+ * the derived ones rather than replacing them, because the two see different things and neither is a
+ * superset (a node `use:` on an unsaved draft has no server-side counterpart yet).
  */
 export function withDependencies(
     selected: BundleItem[],
     available: BundleItem[],
+    serverRefs?: ServerRefs,
 ): { items: BundleItem[]; missing: string[] } {
     const byKey = new Map(available.map((i) => [key(i.kind, i.id), i]));
     const out = new Map(selected.map((i) => [key(i.kind, i.id), i]));
     const missing = new Set<string>();
     const queue = [...selected];
+    const edges = (item: BundleItem): { kind: BundleKind; id: string }[] => {
+        const derived = refsOf(item);
+        const fromServer = serverRefs?.get(key(item.kind, item.id)) ?? [];
+        const seen = new Set(derived.map((r) => key(r.kind, r.id)));
+        return [...derived, ...fromServer.filter((r) => !seen.has(key(r.kind, r.id)))];
+    };
     while (queue.length) {
-        for (const ref of refsOf(queue.shift()!)) {
+        for (const ref of edges(queue.shift()!)) {
             const k = key(ref.kind, ref.id);
             if (out.has(k)) continue;
             const found = byKey.get(k);

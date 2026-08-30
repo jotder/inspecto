@@ -61,6 +61,22 @@ export interface PipelineGraph {
     consumes: string[];
 }
 
+/**
+ * What a pipeline points OUT to and what points IN at it — the server-side closure
+ * (`GET /pipelines/{name}/related`, pipeline spec gap 5).
+ *
+ * `references[]` is the outward half: each entry is a companion the ENGINE actually resolved, carrying
+ * `ref: "<type>/<id>"` when it is a shared component and only a `path` when it is a plain file.
+ * `dependents` is the inward half, grouped by kind. ⛔ Connections never appear (D9).
+ */
+export interface PipelineRelated {
+    pipeline: string;
+    references: { kind: string; ref?: string; path: string }[];
+    dependents: Record<string, { name: string; via: string }[]>;
+    total: number;
+    truncated: boolean;
+}
+
 /** A node-type descriptor for the editor palette (GET /pipelines/node-types). */
 export interface PipelineNodeType {
     type: string;
@@ -382,6 +398,17 @@ export class PipelinesService {
      */
     pipelineGraphRaw(name: string): Observable<AuthoredPipeline> {
         return this.http.get<AuthoredPipeline>(apiUrl(`/pipelines/${encodeURIComponent(name)}/graph/raw`));
+    }
+
+    /**
+     * Everything related to a pipeline — the server-side closure (pipeline spec gap 5).
+     *
+     * 🔴 For an EXPORT closure only `references[]` applies, and only entries carrying a `ref`. The
+     * outward half is what the pipeline NEEDS; `dependents` is what needs IT, and dragging those into a
+     * bundle would export every job that happens to trigger on the pipeline.
+     */
+    pipelineRelated(name: string): Observable<PipelineRelated> {
+        return this.http.get<PipelineRelated>(apiUrl(`/pipelines/${encodeURIComponent(name)}/related`));
     }
 
     /**

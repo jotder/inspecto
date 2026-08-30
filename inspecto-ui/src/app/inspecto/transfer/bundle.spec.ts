@@ -11,6 +11,7 @@ import {
     resolveRequires,
     targetIndex,
     withDependencies,
+    type ServerRefs,
 } from './bundle';
 import { hashContent } from './content-hash';
 
@@ -97,6 +98,51 @@ describe('job transport (R2)', () => {
         const { items, missing } = withDependencies([JOB], [JOB, pipeline]);
         expect(missing).toEqual([]);
         expect(items.map((i) => i.id).sort()).toEqual(['enrich_roaming', 'mediation_backbone']);
+    });
+
+    /**
+     * 🔴 Pipeline spec gap 6a. The client derives a pipeline's edges from `nodes[].use` alone, so a
+     * companion bound by CONFIG KEY — `parsing.grammar: grammar/cdr` — is invisible to it, and such a
+     * pipeline exported WITHOUT its grammar. The server reads what the engine resolved.
+     */
+    it('follows a companion the server resolved that no node binding mentions', () => {
+        const pipeline = item('authored-pipeline', 'cdr_ingest', { name: 'cdr_ingest', nodes: [], edges: [] });
+        const grammar = item('grammar', 'cdr', { name: 'cdr' });
+
+        // without the server's answer the grammar is simply not seen — the hole this closes
+        expect(withDependencies([pipeline], [pipeline, grammar]).items.map((i) => i.id)).toEqual(['cdr_ingest']);
+
+        const serverRefs: ServerRefs = new Map([['authored-pipeline/cdr_ingest', [{ kind: 'grammar', id: 'cdr' }]]]);
+        const { items, missing } = withDependencies([pipeline], [pipeline, grammar], serverRefs);
+        expect(items.map((i) => i.id).sort()).toEqual(['cdr', 'cdr_ingest']);
+        expect(missing).toEqual([]);
+    });
+
+    /** A server edge to something this instance does not hold is reported, never fatal. */
+    it('reports an unresolvable server edge as missing', () => {
+        const pipeline = item('authored-pipeline', 'cdr_ingest', { name: 'cdr_ingest', nodes: [], edges: [] });
+        const serverRefs: ServerRefs = new Map([['authored-pipeline/cdr_ingest', [{ kind: 'grammar', id: 'gone' }]]]);
+        expect(withDependencies([pipeline], [pipeline], serverRefs).missing).toEqual(['grammar/gone']);
+    });
+
+    /**
+     * ⚠ Server edges MERGE with derived ones rather than replacing them — neither is a superset. A node
+     * `use:` on a draft the server has not stored yet has no server-side counterpart.
+     */
+    it('keeps a node binding the server did not report', () => {
+        const pipeline = item('authored-pipeline', 'cdr_ingest', {
+            name: 'cdr_ingest',
+            nodes: [{ id: 'parse', use: 'grammar/from_node' }],
+            edges: [],
+        });
+        const fromNode = item('grammar', 'from_node', { name: 'from_node' });
+        const fromServer = item('grammar', 'from_config', { name: 'from_config' });
+        const serverRefs: ServerRefs = new Map([
+            ['authored-pipeline/cdr_ingest', [{ kind: 'grammar', id: 'from_config' }]],
+        ]);
+
+        const { items } = withDependencies([pipeline], [pipeline, fromNode, fromServer], serverRefs);
+        expect(items.map((i) => i.id).sort()).toEqual(['cdr_ingest', 'from_config', 'from_node']);
     });
 });
 

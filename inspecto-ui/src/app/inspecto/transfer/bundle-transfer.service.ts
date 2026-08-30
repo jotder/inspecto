@@ -16,7 +16,15 @@ import {
 } from 'app/inspecto/api';
 import type { AuthoredPipeline } from 'app/inspecto/api/pipelines.service';
 import type { JobDetail } from 'app/inspecto/api/jobs.service';
-import { BUNDLE_KINDS, BundleItem, BundleKind, MetadataBundle, buildBundle, withDependencies } from './bundle';
+import {
+    BUNDLE_KINDS,
+    BundleItem,
+    BundleKind,
+    MetadataBundle,
+    ServerRefs,
+    buildBundle,
+    withDependencies,
+} from './bundle';
 
 /** What the caller asks for per item; anything absent takes the server's default (existing ⇒ skip). */
 export type ImportAction = 'overwrite' | 'skip';
@@ -79,6 +87,50 @@ export class BundleTransferService {
     private jobs = inject(JobsService);
     private decisionRules = inject(DecisionRulesService);
     private spaces = inject(SpacesService);
+
+    /**
+     * The closure edges the SERVER resolved for each selected authored pipeline (pipeline spec gap 6a),
+     * keyed `<kind>/<id>` for {@link withDependencies}.
+     *
+     * <p>🔴 Why this is not decoration: the client derives a pipeline's edges from `nodes[].use` alone,
+     * so a companion bound by CONFIG KEY — `parsing.grammar: grammar/cdr` — was invisible, and such a
+     * pipeline exported WITHOUT its grammar. The import then landed a pipeline that could not parse.
+     *
+     * <p>⚠ Only the outward `references[]` are used, and only entries carrying a `ref`: `dependents` is
+     * what needs the pipeline, and pulling those in would export every job that triggers on it. A
+     * reference with only a `path` is a plain file (a schema TOON), not a bundle item.
+     *
+     * <p>⚠ Degrades to no extra edges per pipeline — an older server without the route, or one refusing
+     * it, must not fail the export; the client-derived closure is then exactly what it was before.
+     */
+    private serverRefsFor(selected: BundleItem[]): Observable<ServerRefs> {
+        const pipelines = selected.filter((i) => i.kind === 'authored-pipeline');
+        if (!pipelines.length) return of(new Map() as ServerRefs);
+        return forkJoin(
+            pipelines.map((p) =>
+                this.pipelines.pipelineRelated(p.id).pipe(
+                    map((r) => [p.id, r] as const),
+                    catchError(() => of([p.id, null] as const)),
+                ),
+            ),
+        ).pipe(
+            map((pairs) => {
+                const out: ServerRefs = new Map();
+                for (const [id, related] of pairs) {
+                    if (!related) continue;
+                    const refs = (related.references ?? [])
+                        .filter((r) => !!r.ref)
+                        .map((r) => {
+                            const slash = r.ref!.indexOf('/');
+                            return { kind: r.ref!.slice(0, slash) as BundleKind, id: r.ref!.slice(slash + 1) };
+                        })
+                        .filter((r) => BUNDLE_KINDS.some((k) => k.kind === r.kind));
+                    if (refs.length) out.set(`authored-pipeline/${id}`, refs);
+                }
+                return out;
+            }),
+        );
+    }
 
     /** Load every exportable artifact (component kinds + connections + lossless pipelines + jobs + rules). */
     loadAll(): Observable<BundleItem[]> {
@@ -184,24 +236,34 @@ export class BundleTransferService {
         available: BundleItem[],
         includeDeps: boolean,
     ): Observable<{ bundle: MetadataBundle; missing: string[]; absent: string[] }> {
-        let items = selected;
-        let missing: string[] = [];
-        if (includeDeps) ({ items, missing } = withDependencies(selected, available));
-        const local = buildBundle(items, this.spaces.currentSpaceId());
-        const body = {
-            items: local.items.map((i) => ({ kind: i.kind, id: i.id, refs: i.refs })),
-            sourceSpace: local.sourceSpace,
-            requires: local.requires,
-        };
-        return this.http
-            .post<{ bundle: MetadataBundle; missing?: { kind: string; id: string }[] }>(apiUrl('/bundle/export'), body)
-            .pipe(
-                map((res) => ({
-                    bundle: res.bundle,
-                    missing,
-                    absent: (res.missing ?? []).map((m) => `${m.kind}/${m.id}`),
-                })),
-            );
+        // ⚠ The server's closure edges are fetched only when dependencies are actually being followed —
+        // a selection-only export must not make N extra calls to answer a question nobody asked.
+        const refs$ = includeDeps ? this.serverRefsFor(selected) : of(new Map() as ServerRefs);
+        return refs$.pipe(
+            concatMap((serverRefs) => {
+                let items = selected;
+                let missing: string[] = [];
+                if (includeDeps) ({ items, missing } = withDependencies(selected, available, serverRefs));
+                const local = buildBundle(items, this.spaces.currentSpaceId());
+                const body = {
+                    items: local.items.map((i) => ({ kind: i.kind, id: i.id, refs: i.refs })),
+                    sourceSpace: local.sourceSpace,
+                    requires: local.requires,
+                };
+                return this.http
+                    .post<{
+                        bundle: MetadataBundle;
+                        missing?: { kind: string; id: string }[];
+                    }>(apiUrl('/bundle/export'), body)
+                    .pipe(
+                        map((res) => ({
+                            bundle: res.bundle,
+                            missing,
+                            absent: (res.missing ?? []).map((m) => `${m.kind}/${m.id}`),
+                        })),
+                    );
+            }),
+        );
     }
 
     /** Trigger a browser download of a bundle as pretty-printed JSON. */

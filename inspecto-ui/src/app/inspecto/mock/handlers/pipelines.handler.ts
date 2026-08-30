@@ -346,6 +346,7 @@ const DRY_RUN = /\/pipelines\/authored\/([^/]+)\/dry-run$/;
 const RUN_TO = /\/pipelines\/authored\/([^/]+)\/run$/;
 const AUTHORED_ID = /\/pipelines\/authored\/([^/]+)$/;
 const GRAPH_RAW = /\/pipelines\/([^/]+)\/graph\/raw$/;
+const RELATED = /\/pipelines\/([^/]+)\/related$/;
 const PIPELINE_GRAPH = /\/pipelines\/([^/]+)\/graph$/;
 const SAVE_AS_TEMPLATE = /\/pipelines\/([^/]+)\/save-as-template$/;
 const LABEL = /\/pipelines\/([^/]+)\/label$/;
@@ -405,6 +406,11 @@ export function pipelinesHandler(flags: MockFlags): MockHandler {
             const g = graphOfName(m[1]);
             return g ? json(g) : error(404, `no pipeline named '${m[1]}'`);
         }
+        // GET /pipelines/{name}/related — the server-side closure (pipeline spec gap 5).
+        if (method === 'GET' && (m = match(url, RELATED))) {
+            const rec = store.get<StoredPipelineConfig>(space, PIPELINE_CONFIGS_COLL, m[1]);
+            return rec ? json(relatedOf(m[1], rec.config)) : error(404, `no pipeline named '${m[1]}'`);
+        }
         if (method === 'POST' && (m = match(url, SAVE_AS_TEMPLATE))) {
             return saveAsTemplate(store, space, m[1], req.body as { id?: string; name?: string });
         }
@@ -463,6 +469,50 @@ export function pipelinesHandler(flags: MockFlags): MockHandler {
         return undefined;
     };
 }
+
+/**
+ * `GET /pipelines/{name}/related` — the outward half of the server's closure, over the stored config.
+ *
+ * ⚠ Mirrors what `PipelineRelated` reports from `PipelineConfig.referencedFiles()`: a companion named by
+ * a REGISTRY REF (`grammar/cdr`) is a shared component and carries `ref`; a companion named by a plain
+ * path is a file and carries only `path`. That distinction is the whole point offline — the export
+ * closure follows `ref` entries and ignores files, so a mock that labelled everything the same way would
+ * rehearse a closure the server does not produce.
+ *
+ * ⚠ `dependents` stays empty here: the mock has no cross-config scan, and an export closure reads only
+ * the outward half. Reporting a fake inward half would be worse than reporting none.
+ */
+function relatedOf(name: string, config: Record<string, unknown>): Record<string, unknown> {
+    const references: { kind: string; ref?: string; path: string }[] = [];
+    const seen = new Set<string>();
+    const add = (raw: unknown, fallbackKind: string): void => {
+        const value = typeof raw === 'string' ? raw.trim() : '';
+        if (!value || seen.has(value)) return;
+        seen.add(value);
+        const slash = value.indexOf('/');
+        // A registry reference is `<dir>/<id>`; anything else is a plain path, reported as a file.
+        const dir = slash > 0 ? value.slice(0, slash) : '';
+        const type = REGISTRY_REF_TYPES[dir];
+        if (type) references.push({ kind: type, ref: `${type}/${value.slice(slash + 1)}`, path: value });
+        else references.push({ kind: fallbackKind, path: value });
+    };
+    const processing = (config['processing'] ?? {}) as Record<string, unknown>;
+    const parsing = (config['parsing'] ?? {}) as Record<string, unknown>;
+    add(parsing['grammar'] ?? processing['grammar'], 'file');
+    add(processing['schema_file'], 'file');
+    add(processing['mapping_file'], 'file');
+    return { pipeline: name, references, dependents: {}, total: 0, truncated: false };
+}
+
+/** Registry directory (either spelling the engine accepts) → the canonical component type. */
+const REGISTRY_REF_TYPES: Record<string, string> = {
+    grammar: 'grammar',
+    grammars: 'grammar',
+    mapping: 'mapping',
+    mappings: 'mapping',
+    schemas: 'schema',
+    references: 'reference',
+};
 
 /**
  * PUT /pipelines/{name}/graph — lower the graph onto the existing canonical config (or a fresh

@@ -323,6 +323,64 @@ describe('pipelinesHandler — the W5 canonical graph round-trip (lift/lower ove
  * cannot touch its source, so a mock that left one `dirs` entry pointing at the original would let the
  * preview greenlight precisely the collision this exists to prevent.
  */
+describe('pipelinesHandler — GET /related, the server-side closure (pipeline spec gap 5)', () => {
+    const handler = pipelinesHandler({ mockPipelines: true, mockStudio: true });
+
+    const withConfig = (config: Record<string, unknown>): MockStore => {
+        const store = seededStore();
+        store.put('default', PIPELINE_CONFIGS_COLL, 'closure_demo', {
+            id: 'closure_demo',
+            path: 'closure_demo_pipeline.toon',
+            config: { name: 'closure_demo', ...config },
+            registered: true,
+        });
+        return store;
+    };
+
+    const related = (store: MockStore, name = 'closure_demo') =>
+        handler(req('GET', `/api/pipelines/${name}/related`), store)?.body as {
+            references: { kind: string; ref?: string; path: string }[];
+        };
+
+    /**
+     * ⚠ The ref/path distinction is the whole point offline: the export closure follows `ref` entries
+     * and ignores plain files, so a mock labelling both the same way would rehearse a closure the
+     * server never produces.
+     */
+    it('reports a registry reference with a canonical ref, and a plain path as a file', () => {
+        const refs = related(
+            withConfig({
+                parsing: { grammar: 'grammar/cdr' },
+                processing: { schema_file: 'cdr_schema.toon' },
+            }),
+        ).references;
+
+        expect(refs).toContainEqual({ kind: 'grammar', ref: 'grammar/cdr', path: 'grammar/cdr' });
+        expect(refs).toContainEqual({ kind: 'file', path: 'cdr_schema.toon' });
+    });
+
+    /** ⚠ Either directory spelling resolves in the engine; the reported type is always the canonical one. */
+    it('normalises the plural directory spelling to the canonical type', () => {
+        expect(related(withConfig({ processing: { mapping_file: 'mappings/rules' } })).references).toContainEqual({
+            kind: 'mapping',
+            ref: 'mapping/rules',
+            path: 'mappings/rules',
+        });
+    });
+
+    it('prefers parsing.grammar over the legacy processing.grammar, as the parser does', () => {
+        const refs = related(
+            withConfig({ parsing: { grammar: 'grammar/new' }, processing: { grammar: 'grammar/legacy' } }),
+        ).references;
+        expect(refs.map((r) => r.ref)).toContain('grammar/new');
+        expect(refs.map((r) => r.ref)).not.toContain('grammar/legacy');
+    });
+
+    it('404s an unknown pipeline', () => {
+        expect(handler(req('GET', '/api/pipelines/nope/related'), seededStore())?.status).toBe(404);
+    });
+});
+
 describe('pipelinesHandler — save-as-template mirrors the server gates and neutralising', () => {
     const handler = pipelinesHandler({ mockPipelines: true, mockStudio: true });
     const post = (url: string, body: unknown, store: MockStore) => handler(req('POST', url, body), store);
