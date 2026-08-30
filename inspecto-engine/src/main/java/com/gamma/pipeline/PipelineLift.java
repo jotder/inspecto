@@ -134,8 +134,10 @@ public final class PipelineLift {
      *   <li>no chain, or no {@code output_store:} — nothing to run / nowhere to write;</li>
      *   <li>a multi-schema pipeline (selector/segments) — it lands several stores, and one seed cannot
      *       pick among them;</li>
-     *   <li>a {@code route} step — its branches need one sink per branch key, which one
-     *       {@code output_store} cannot name (ingest-side demux stays with the branch-aware executor);</li>
+     *   <li>a {@code route} step — route's home is the <b>ingest</b> lane, where the branch-aware
+     *       executor gives each branch key its own sink; one {@code output_store} cannot name them, so the
+     *       refusal points the author at the lane where route <em>does</em> work rather than stating twice
+     *       what it cannot do here;</li>
      *   <li>a legacy-projected {@code filter} step — the legacy filter is <b>pre-map</b> (fused
      *       {@code csv_settings}), so its predicate speaks raw-column vocabulary the landed store no
      *       longer has; an explicit {@code steps:} filter is post-map and fine — unless it carries a
@@ -157,8 +159,11 @@ public final class PipelineLift {
                     + "stores, and the at-rest Stage-2 lift cannot pick one seed among them");
         for (PipelineConfig.Step step : steps) {
             if (PipelineConfig.Step.ROUTE.equals(step.kind()))
-                throw new IllegalArgumentException("pipeline '" + name + "' chains a 'route' step — route "
-                        + "demux needs one sink per branch, which a single output_store cannot name");
+                throw new IllegalArgumentException("pipeline '" + name + "' chains a 'route' step. Route "
+                        + "runs on the INGEST lane, where the branch-aware executor gives each branch key its "
+                        + "own sink; the at-rest lift has one output_store and so cannot name them. Activate "
+                        + "the pipeline and let it route during ingest, or drop the route step from the "
+                        + "at-rest chain");
             if (PipelineConfig.Step.FILTER.equals(step.kind())) {
                 if (!cfg.hasExplicitSteps())
                     throw new IllegalArgumentException("pipeline '" + name + "' carries a legacy (pre-map) "

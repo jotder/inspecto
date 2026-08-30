@@ -489,7 +489,8 @@ The redesign's actual agenda. Each item is grounded, not suspected.
 3. ⚠ **The UI's edge rules are looser than the validator's**, so a canvas edge can be built that save
    refuses.
 4. ⚠ **Two spellings for one concept** in several places (`parsing.grammar` vs `processing.grammar`,
-   two fixed-width spellings).
+   two fixed-width spellings). ✅ **CLOSED 2026-08-31** — and the framing was off: the write side was
+   already canonical, so the live defect was that `ConfigSpecs` declared **only the deprecated key**.
 5. ⚠ **Reference direction is inconsistent** (§4): pipelines point out to schemas, enrichments and jobs
    point in. "Everything related to this pipeline" needs a reverse scan.
 
@@ -501,7 +502,8 @@ The redesign's actual agenda. Each item is grounded, not suspected.
    classpath-only.
 8. ⚠ **`output_store:` as the Stage-2 arming condition is undiscoverable** (§3) — a `steps:` chain
    silently cannot run without it, and the only signal is a refusal at arming time.
-9. ⚠ **`route` cannot run at rest** (§3) — it exists only on the ingest graph lane.
+9. ⚠ **`route` cannot run at rest** (§3) — it exists only on the ingest graph lane. ✅ **CLOSED
+   2026-08-31** (message half) — **two** refusal sites, both now naming the lane where route does work.
 10. 🔴 **Two authorities read the config and disagree** (§3) — a whole `parsing:` block, four `dirs.*`
     keys, `trigger:`, `steps:`, `route:` and five transform blocks are engine-read but spec-invisible.
     **The largest structural problem in the current design.**
@@ -521,7 +523,18 @@ The redesign's actual agenda. Each item is grounded, not suspected.
 ### Dead or misleading
 
 16. `MULTI_SINK` is a dead constant still named in refusal documentation and the UI's error handling.
-17. Six of the ten declared edge relations never appear in a lifted graph.
+    ✅ **CLOSED 2026-08-31.**
+17. Six of the ten declared edge relations never appear in a lifted graph. ✅ **Wave 0 half CLOSED
+    2026-08-31** — and grounding split the six into two unlike groups, which the one-line framing hid.
+    `PipelineLift` builds only `data`, `unmatched` (parse → quarantine), `gap` (acquisition → gap) and
+    `route:*`. Of the other six, **`dropped` / `invalid` / `duplicate` are real at runtime** —
+    `RowShaper` returns them as named relations and `ConservationCheck` balances against them; they are
+    simply not edges a *lift* draws, so "never appear" is true of the lift and false of the run.
+    **`success` / `failure` / `on_commit` have no producer at all**: `on_commit` is only ever READ (the
+    executor and validator skip it as a cross-pipeline trigger), and the other two are declared
+    vocabulary nothing constructs. D2 moves that outcome set to Signals. `PipelineRel` and
+    `BuiltinNodeType` now say this, and both say `accepts`/`emits` is **token** vocabulary — the
+    constants keep their spelling (renaming breaks two committed contracts; that is Phase 7's half).
 
 ---
 
@@ -644,16 +657,17 @@ dependency order, so a decision can be taken with the cost visible.
 (b) §11 — adopt the token model or keep the `DATA` edge. **Wave 0 and Wave 1 need neither**, which is
 the point of separating them: roughly half the list can close before either decision is taken.
 
-### Wave 0 — free now: vocabulary, dead code, honest messages
+### Wave 0 — ✅ SHIPPED 2026-08-31 (all four)
 
-No decision, no design, no runtime change.
+No decision, no design, no runtime change. Reactor after: **BUILD SUCCESS, 3781 / 0 / 0 / 2** — the
+recorded baseline, unmoved.
 
-| Gap | Fix | Cost |
+| Gap | Fix | Outcome |
 |---|---|---|
-| **16** `MULTI_SINK` is dead | delete the constant and the UI's mention of it in its refusal handling | minutes |
-| **17** six relations never appear · **§11 step 1** | correct `BuiltinNodeType`'s doc and this spec to describe **tokens**; stop calling `data` a record flow | an afternoon |
-| **4** two spellings for one concept | declare `parsing.*` canonical; keep `processing.grammar` / `fixed_width` as **read-only aliases** that emit a deprecation `Finding` on save, and stop *writing* them | small |
-| **9** `route` cannot run at rest | the refusal already exists — make its message name the ingest lane as the place route *does* work, instead of stating two negatives | minutes |
+| **16** `MULTI_SINK` is dead | delete the constant and the UI's mention of it in its refusal handling | ✅ constant deleted from `PipelineEditable`; it was declared once and referenced by **nothing** — safe because `@PublicApi(since="4.0.0")` is unreleased (newest ancestor tag is `v3.11.0`), so no shipped contract names it. Four comments cited it: two as a **live** example (`pipelines.service.ts`, `pipeline-editor.component.ts`) and one asserting the mock must refuse it (`pipelines.handler.ts`) — 🔴 that last one was **actively false**, since the server accepts a multi-sink graph. All now cite `MULTI_PARSER`, which still fires. The mock-editable comment explaining it is *not* a refusal is load-bearing and was kept. |
+| **17** six relations never appear · **§11 step 1** | correct `BuiltinNodeType`'s doc and this spec to describe **tokens**; stop calling `data` a record flow | ✅ `PipelineRel` and `BuiltinNodeType` now state the token model and that `accepts`/`emits` is advisory token vocabulary, not a record-flow contract. Constants keep their spelling (renaming breaks two committed contracts — Phase 7's half, per D2). 🔴 Grounding **split the six into two unlike groups** — see §10 item 17. Also repointed two javadocs at `docs/okf/backend/pipeline-graph/pipeline-graph-design.md`; they cited `docs/flow-graph-design.md`, which has not existed since 2026-07-16 *and* used the banned word *Flow*. |
+| **4** two spellings for one concept | declare `parsing.*` canonical; keep `processing.grammar` / `fixed_width` as **read-only aliases** that emit a deprecation `Finding` on save, and stop *writing* them | ✅ 🔴 The real defect was narrower and worse than the row: the **write side was already canonical** (`PipelineEditable` writes `parsing.grammar`; `fixedwidth` is what a fresh node stamps), and the parser has preferred `parsing.grammar` for as long as the `parsing:` block has existed — but `ConfigSpecs.pipeline()` declared **only the deprecated `processing.grammar`** and never the canonical key. The spec published the wrong spelling and stayed silent on the right one. Both are declared now, and a `parsing-grammar-is-canonical` cross-field rule emits a **WARNING** (never an ERROR — the legacy key still reads, and refusing it would break deployed configs to make a naming point). ⛔ The `fixed_width` passthrough in `PipelineEditable.lower` is a **deliberate verbatim round-trip**, not drift — left alone. |
+| **9** `route` cannot run at rest | the refusal already exists — make its message name the ingest lane as the place route *does* work, instead of stating two negatives | ✅ 🔴 There were **two** refusal sites, not one, and the row described the second. `PipelineLift.stageTwo` refuses a `route` step in an at-rest chain; `PipelineConfig.prepare()` refused with *"which neither the linear path nor the at-rest route can execute"* — two negatives that never told the author route works at all. Both now name route's home: the top-level `route:` block on the **ingest** lane, where the branch-aware executor gives each branch key its own sink. No test pinned either string. |
 
 ### Wave 1 — cheap engineering, still no decision needed
 

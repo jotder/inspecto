@@ -1662,11 +1662,16 @@ public final class PipelineConfig {
                                 + "or keep the pipeline inactive (active: false)");
             }
             // the at-rest route (PipelineLift.stageTwo) refuses a route step — one output_store cannot
-            // name N branches — so arming here would only defer that refusal to the job's first run
+            // name N branches — so arming here would only defer that refusal to the job's first run.
+            // ⚠ The message names route's HOME (the top-level route: block, driven by the branch-aware
+            // ingest executor) rather than listing the two lanes that cannot run it: an author who is told
+            // only what is refused has to guess whether route works at all, and it does.
             if (steps.stream().anyMatch(s -> Step.ROUTE.equals(s.kind()))) {
                 throw new IllegalStateException(
-                        "steps: chains a 'route' step, which neither the linear path nor the at-rest "
-                                + "route can execute — route demux needs the branch-aware executor");
+                        "steps: chains a 'route' step, but route runs on the INGEST lane — author it as "
+                                + "the top-level route: block, where the branch-aware executor gives each "
+                                + "branch key its own sink. A steps: chain runs at rest against one "
+                                + "output_store, which cannot name N branches");
             }
         }
         if (statusDirToPrepare != null && !statusDirToPrepare.isBlank()) {

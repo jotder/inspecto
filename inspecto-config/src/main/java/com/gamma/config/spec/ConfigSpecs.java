@@ -110,9 +110,20 @@ public final class ConfigSpecs {
                                 + "pipeline needs this, a schemas[] dispatch list, or a plugin ingester."),
                 FieldSpec.of("processing.ingester", "Plugin ingester class", FieldType.STRING,
                         "FQCN of a plugin ingester; when set, processing.segments must be non-empty."),
-                FieldSpec.of("processing.grammar", "Delimited grammar file", FieldType.FILEPATH,
-                        "Path to a reusable *.grammar.toon holding the delimited parse settings (the same keys "
-                                + "as processing.csv_settings). Inline csv_settings keys override the grammar file."),
+                // ── grammar: one concept, two spellings — `parsing.grammar` is CANONICAL ────────
+                // The parser has preferred `parsing.grammar` over `processing.grammar` since the parsing:
+                // block became the design-of-record (PipelineConfigParser#resolveGrammarRef), but only the
+                // LEGACY spelling was declared here — so the spec published the deprecated key and stayed
+                // silent about the one the engine actually reads. Both are declared now; the legacy one
+                // keeps working (a deployed config must not start failing) and earns a WARNING instead.
+                FieldSpec.of("parsing.grammar", "Parse grammar file", FieldType.FILEPATH,
+                        "CANONICAL. Path to a reusable *.grammar.toon holding the parse settings, or a registry "
+                                + "reference (grammar/<id>) as a Grammar-bound parser node lowers to. Inline "
+                                + "csv_settings keys override the grammar file."),
+                FieldSpec.of("processing.grammar", "Delimited grammar file (deprecated)", FieldType.FILEPATH,
+                        "DEPRECATED alias of parsing.grammar, read only for configs authored before the "
+                                + "parsing: block existed. parsing.grammar wins when both are present; nothing "
+                                + "writes this spelling any more."),
                 FieldSpec.enumField("processing.csv_settings.engine", "CSV engine",
                         List.of("auto", "duckdb", "java"), "auto",
                         "auto uses DuckDB's native reader for clean configs and the Java parser otherwise."),
@@ -261,6 +272,22 @@ public final class ConfigSpecs {
                 // ⚠ Filed as a real gap: the offline mock ALREADY refused a bad source_timezone on the
                 // pipeline write while no Java route did, so the mock was ahead of the server rather
                 // than mirroring it. This rule is what makes that mock behaviour true.
+                // Pipeline spec Wave 0, item 4 — two spellings for one concept. A WARNING, never an
+                // ERROR: the legacy key still READS, so refusing it would break deployed configs to make
+                // a naming point. The finding is what turns "silently deprecated" into something an
+                // author is told once, at the moment they save.
+                new CrossFieldRule(
+                        "parsing-grammar-is-canonical",
+                        "processing.grammar is the deprecated spelling of parsing.grammar. It is still read, "
+                                + "and parsing.grammar wins when both are set — but nothing writes it any "
+                                + "more, so move the value to parsing.grammar to keep one spelling per "
+                                + "concept.",
+                        Severity.WARNING,
+                        List.of("processing.grammar", "parsing.grammar"),
+                        raw -> {
+                            String legacy = str(raw, "processing.grammar");
+                            return legacy == null || legacy.isBlank();
+                        }),
                 new CrossFieldRule(
                         "parsing-source-timezone-resolvable",
                         "parsing.source_timezone must be an IANA region id the query engine accepts — "

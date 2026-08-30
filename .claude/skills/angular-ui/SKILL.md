@@ -235,7 +235,7 @@ src/app/
   new pipeline via the shared **`pipelineScaffold(name)`** (`inspecto/component-model`) → `configApi.write('pipeline', …)` → `registerPipeline`; delete via `configApi.remove('pipeline', name)`.
   ⚠ Node config values are the **raw config-file sections verbatim** — never a typed shape — so
   unmodeled keys survive a save. ⚠ A `PUT …/graph` 422 carries named **`refusals[]`** (`UNSUPPORTED_NODE`
-  / `MULTI_SINK` / `NO_*`) under `error.details`; surface them, don't swallow them (the editor's
+  / `MULTI_PARSER` / `NO_*`) under `error.details`; surface them, don't swallow them (the editor's
   `showRefusals`). ⚠ The old `*_flow.toon` authoring writes (`POST /pipelines/authored`, `PUT`,
   `/nodes`, `/edges`) are **retired** — grandfathered flows stay readable/deletable only. ⚠ The mock's
   TS lift/lower (`mock/pipeline-editable.ts`) must keep refusing exactly what the server does, or the

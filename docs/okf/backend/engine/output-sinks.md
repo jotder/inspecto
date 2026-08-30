@@ -72,7 +72,9 @@ one-element shorthand; `PipelineConfig.sinks()` is never empty (it synthesises t
   distinct sink database lowers to a `sinks:` list (the shorthand stays consistent with the first
   destination). Safe because a `transform.route`/`derive` node is not `LOWERABLE` (fails
   `UNSUPPORTED_NODE` first), so every sink reaching here is a replicate-per-destination fan-out. The
-  `MULTI_SINK` constant is kept but never emitted; the Angular mock mirrors it.
+  `MULTI_SINK` constant was deleted with the pipeline spec's Wave 0 (2026-08-31) — it had been
+  unreachable since this change, and an unreachable refusal code reads as a live one; the Angular
+  mock's comment mirrors the removal.
 * **Refusals (deliberate, at load/runtime).** A **versioned reference store** (`reference.load:
   upsert|scd2`) + `sinks>1` is refused at `PipelineConfig.prepare()` (single version history is
   ill-defined across destinations). **Decision-rule *routing* + `sinks>1`** is refused at runtime in

@@ -387,7 +387,7 @@ export class PipelinesService {
     /**
      * Lower the graph to the canonical `<name>_pipeline.toon` (URL name authoritative). An active
      * graph must be complete; an inactive draft may be partial. 422 carries named `refusals[]`
-     * (UNSUPPORTED_NODE / MULTI_SINK / NO_* completeness codes) when the topology cannot be
+     * (UNSUPPORTED_NODE / UNSUPPORTED_BINDING / MULTI_PARSER / NO_* completeness codes) when the topology cannot be
      * represented as a flat config, or `findings[]` when the lowered config fails the write gate.
      */
     savePipelineGraph(name: string, pipeline: AuthoredPipeline): Observable<PipelineGraphWriteResult> {

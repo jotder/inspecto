@@ -35,13 +35,16 @@ public final class PipelineEditable {
 
     // ── refusal codes (stable; the UI renders them next to the offending node) ──────
     public static final String UNSUPPORTED_NODE = "UNSUPPORTED_NODE";
-    public static final String MULTI_SINK = "MULTI_SINK";
-    // ⚠ MULTI_JOIN / MULTI_DEDUP / MULTI_ROUTE / MULTI_SUMMARIZE were removed in the multiplicity plan's
-    // slice A3. They were never the destination — they made a silent discard VISIBLE while the flat file
-    // still had exactly one slot per kind (`2cf7005e`, after `6e4d4be0` measured the loss). The file can
-    // now hold an ordered `steps:` chain, so the thing they were protecting no longer exists, and the
-    // codes went in the same change that widened the format — never before it, which would have restored
-    // the silent discard they replaced.
+    // ⚠ MULTI_SINK / MULTI_JOIN / MULTI_DEDUP / MULTI_ROUTE / MULTI_SUMMARIZE are all gone. MULTI_JOIN /
+    // MULTI_DEDUP / MULTI_ROUTE / MULTI_SUMMARIZE went in the multiplicity plan's slice A3; MULTI_SINK
+    // stopped firing when `sinks:` became a plural block (sinks-config-format slice 4) and lingered as an
+    // unreachable constant until the pipeline spec's Wave 0 deleted it — a constant no code path can emit
+    // reads to the UI, and to the next author, as a refusal that still exists.
+    // None was ever the destination — they made a silent discard VISIBLE while the flat file still had
+    // exactly one slot per kind (`2cf7005e`, after `6e4d4be0` measured the loss). The file can now hold an
+    // ordered `steps:` chain, so the thing they were protecting no longer exists, and each code went in the
+    // same change that widened the format — never before it, which would have restored the silent discard
+    // it replaced.
     public static final String NO_ACQUISITION = "NO_ACQUISITION";
     public static final String NO_PARSER = "NO_PARSER";
     public static final String NO_PERSISTENT_SINK = "NO_PERSISTENT_SINK";

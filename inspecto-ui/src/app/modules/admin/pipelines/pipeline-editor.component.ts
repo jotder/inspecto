@@ -1164,7 +1164,7 @@ export class PipelineEditorComponent implements OnInit {
     }
 
     /**
-     * Surface named lower-refusals (UNSUPPORTED_NODE / MULTI_SINK / NO_*) in the Validation dock, or
+     * Surface named lower-refusals (UNSUPPORTED_NODE / MULTI_PARSER / NO_*) in the Validation dock, or
      * false if the error carried none. Every refusal is listed and stays put — a first-only transient
      * toast turned an n-problem graph into n save→fix→save cycles.
      */

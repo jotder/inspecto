@@ -18,9 +18,10 @@ import java.util.List;
  * inactive draft may be partial).
  *
  * <p>⚠ <b>The "too many of a kind" codes are gone, and that is the direction of travel.</b>
- * {@code MULTI_SINK} stopped firing when {@code sinks:} became a plural block, and
- * {@code MULTI_JOIN} / {@code MULTI_DEDUP} / {@code MULTI_ROUTE} / {@code MULTI_SUMMARIZE} were
- * removed with the ordered {@code steps:} chain (multiplicity plan A3). Each existed only to make a
+ * {@code MULTI_SINK} stopped firing when {@code sinks:} became a plural block and its constant was
+ * deleted with the pipeline spec's Wave 0; {@code MULTI_JOIN} / {@code MULTI_DEDUP} /
+ * {@code MULTI_ROUTE} / {@code MULTI_SUMMARIZE} were removed with the ordered {@code steps:} chain
+ * (multiplicity plan A3). Each existed only to make a
  * silent discard visible while the flat file had one slot per kind; none was ever the destination, and
  * each went in the same change that let the format hold what it was refusing. A count is not what
  * should constrain a pipeline — whether a step accepts its neighbours is ({@code PipelineValidator}).

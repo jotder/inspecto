@@ -15,7 +15,7 @@ import java.util.Set;
  * The authored (or lifted) pipeline topology: typed {@link PipelineNode}s wired by {@link PipelineEdge}s.
  * This is the single IR the executor, the validator and the visualiser consume. A legacy
  * {@code *_pipeline.toon} is auto-lifted into a {@code PipelineGraph}; an authored {@code *_flow.toon}
- * parses into one directly. See {@code docs/flow-graph-design.md} (§5 lift, §15 capability inventory).
+ * parses into one directly. See {@code docs/okf/backend/pipeline-graph/pipeline-graph-design.md} (§5 lift, §15 capability inventory).
  *
  * <p>Instances are immutable — {@code nodes}/{@code edges} are defensive copies. Lookup and adjacency
  * are computed on demand; graphs are small (tens of nodes), so no index is cached.

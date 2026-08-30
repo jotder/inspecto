@@ -466,8 +466,8 @@ export function pipelinesHandler(flags: MockFlags): MockHandler {
 /**
  * PUT /pipelines/{name}/graph — lower the graph onto the existing canonical config (or a fresh
  * scaffold), refusing unrepresentable topologies with named codes exactly as the backend does. The
- * strictness here is load-bearing: a mock that accepted a MULTI_SINK graph would green-light a
- * preview the real server 422s.
+ * strictness here is load-bearing: a mock that accepted a second parser node would green-light a
+ * preview the real server 422s with MULTI_PARSER.
  */
 function saveGraph(store: MockStore, space: string, name: string, body: AuthoredPipeline): MockResponse {
     const g: AuthoredPipeline = { ...body, name };

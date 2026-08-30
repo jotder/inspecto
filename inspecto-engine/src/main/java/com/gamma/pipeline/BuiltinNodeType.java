@@ -9,6 +9,12 @@ import java.util.Set;
  * for the UI, and advisory {@code accepts}/{@code emits} sets for the lift and the (Phase-3) wiring
  * validator. Operator-defined {@code route:*} branches are flagged by {@link #emitsNamedRoutes()}.
  *
+ * <p>🔴 <b>{@code accepts}/{@code emits} are TOKEN vocabulary, not a record-flow contract</b>
+ * (pipeline spec §11, decision D2). They say which {@link PipelineRel} relationships may meet at this
+ * node; they do not assert that rows travel an edge, because no runtime path pipes rows between nodes —
+ * a Step receives a Consignment reference and resolves data by SQL. They stay <b>advisory</b>: the lift
+ * and the Phase-3 wiring validator consult them, the executor does not.
+ *
  * <p>Reflects the §15 capability inventory: the {@code transform.*} family includes the
  * index-anchored {@code transform.filter} (G1) and the marker dedup subtype (G2). The former
  * fingerprint dedup subtype was folded into the acquisition node 2026-08-04 — it executes in the
