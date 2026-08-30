@@ -10,11 +10,7 @@ import { ChipComponent } from './chip.component';
     imports: [ChipComponent],
     changeDetection: ChangeDetectionStrategy.Eager,
     template: `
-        <inspecto-chip
-            [variant]="variant()"
-            [tone]="tone()"
-            [removable]="removable()"
-            (removed)="onRemoved()"
+        <inspecto-chip [variant]="variant()" [tone]="tone()" [removable]="removable()" (removed)="onRemoved()"
             >label</inspecto-chip
         >
     `,

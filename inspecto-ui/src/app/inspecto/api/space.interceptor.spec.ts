@@ -50,7 +50,8 @@ describe('spaceInterceptor', () => {
 
         it('does not prefix the /spaces/_meta probe', () => expectUrl(`${base}/spaces/_meta`, `${base}/spaces/_meta`));
 
-        it('ignores non-API URLs (static assets)', () => expectUrl('./assets/icons/heroicons-outline.svg', './assets/icons/heroicons-outline.svg'));
+        it('ignores non-API URLs (static assets)', () =>
+            expectUrl('./assets/icons/heroicons-outline.svg', './assets/icons/heroicons-outline.svg'));
 
         // W7: apiUrl() builds '/api/v1/…' — the space id goes AFTER the version segment.
         it('prefixes a v1 feature call as /v1/spaces/<id>', () =>

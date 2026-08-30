@@ -56,8 +56,8 @@ import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/compon
 
             <inspecto-alert variant="info" title="Changes apply live; a shrink drains">
                 A saved cap takes effect immediately — no restart. Lowering a cap never interrupts running work:
-                Consignments already executing finish, and the new ceiling gates the next admissions. 0 means
-                unbounded. Rule of thumb: server cap × each pipeline's DuckDB threads ≈ the host's
+                Consignments already executing finish, and the new ceiling gates the next admissions. 0 means unbounded.
+                Rule of thumb: server cap × each pipeline's DuckDB threads ≈ the host's
                 {{ view()?.cores ?? '…' }} cores.
             </inspecto-alert>
 
@@ -81,9 +81,11 @@ import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/compon
                         </div>
                         <p class="text-secondary text-sm">
                             The ceiling every space draws from. {{ view()!.live.system_in_flight }} Consignment(s)
-                            executing right now@if (view()!.live.system_free !== null) {<span
-                                >, {{ view()!.live.system_free }} slot(s) free</span
-                            >}.
+                            executing right now
+                            @if (view()!.live.system_free !== null) {
+                                <span>, {{ view()!.live.system_free }} slot(s) free</span>
+                            }
+                            .
                         </p>
                         <div class="flex flex-wrap items-start gap-3">
                             <mat-form-field class="w-60" subscriptSizing="dynamic">
@@ -131,10 +133,13 @@ import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/compon
                             </button>
                         </div>
                         <p class="text-secondary text-xs">
-                            The intake globals govern how many inbox files one poll cycle may admit per pipeline
-                            (fleet default; a pipeline's own intake settings override it). In force now:
-                            {{ view()!.system.effectiveIntake?.active ? (view()!.system.effectiveIntake?.maxFilesPerCycle + ' files/cycle') : 'off (unbounded)' }},
-                            floor {{ view()!.system.effectiveIntake?.minFilesPerCycle }}, adaptive
+                            The intake globals govern how many inbox files one poll cycle may admit per pipeline (fleet
+                            default; a pipeline's own intake settings override it). In force now:
+                            {{
+                                view()!.system.effectiveIntake?.active
+                                    ? view()!.system.effectiveIntake?.maxFilesPerCycle + ' files/cycle'
+                                    : 'off (unbounded)'
+                            }}, floor {{ view()!.system.effectiveIntake?.minFilesPerCycle }}, adaptive
                             {{ view()!.system.effectiveIntake?.adaptive ? 'on' : 'off' }}.
                         </p>
                     </section>
@@ -153,9 +158,8 @@ import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/compon
                             >
                         </div>
                         <p class="text-secondary text-sm">
-                            These two work as a pair: total memory at risk is the per-instance limit times the
-                            number of Runs allowed at once. Capping one without the other leaves the product
-                            unbounded.
+                            These two work as a pair: total memory at risk is the per-instance limit times the number of
+                            Runs allowed at once. Capping one without the other leaves the product unbounded.
                         </p>
                         <div class="flex flex-wrap items-start gap-3">
                             <mat-form-field class="w-60" subscriptSizing="dynamic">
@@ -180,15 +184,19 @@ import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/compon
                             In force now:
                             {{ view()!.system.duckdbMemoryLimit ?? 'DuckDB’s own default (~80% of RAM per Run)' }}
                             ({{ view()!.system.duckdbMemoryLimitSource }}),
-                            {{ view()!.system.maxConcurrentJobRuns === 0 ? 'unbounded' : view()!.system.maxConcurrentJobRuns }}
+                            {{
+                                view()!.system.maxConcurrentJobRuns === 0
+                                    ? 'unbounded'
+                                    : view()!.system.maxConcurrentJobRuns
+                            }}
                             concurrent Run(s) ({{ view()!.system.maxConcurrentJobRunsSource }}). A Run beyond the
                             ceiling queues; it is not rejected.
                         </p>
                         <p class="text-secondary text-xs">
                             Do not tighten the memory limit below 1GB. Below roughly that, DuckDB's grouping and
-                            de-duplication steps fail outright rather than spilling to disk, which turns working
-                            jobs into failing ones. A percentage resolves against this host's RAM, so check what it
-                            works out to before using one on a small machine.
+                            de-duplication steps fail outright rather than spilling to disk, which turns working jobs
+                            into failing ones. A percentage resolves against this host's RAM, so check what it works out
+                            to before using one on a small machine.
                         </p>
                     </section>
                 </form>
@@ -275,8 +283,8 @@ import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/compon
                     <section class="flex flex-col gap-2">
                         <h2 class="text-lg font-medium">Throttled by intake control</h2>
                         <p class="text-secondary text-sm">
-                            These pipelines are admitting fewer files per cycle than their cap allows, because
-                            recent runs overran the poll interval. They recover automatically once runs fit again.
+                            These pipelines are admitting fewer files per cycle than their cap allows, because recent
+                            runs overran the poll interval. They recover automatically once runs fit again.
                         </p>
                         <ul class="flex flex-col gap-1">
                             @for (t of throttled(); track t.pipeline) {
@@ -327,8 +335,16 @@ export class SchedulerSettingsComponent implements OnInit {
     /** Blank-valued option = the real, named "inherit" choice (the option-picker idiom) — never a
      *  spec default, which would materialize into every save. */
     readonly ADAPTIVE_OPTIONS: PickerOption[] = [
-        { value: '', label: 'Inherit launch default', hint: 'Whatever -Dingest.backpressure.adaptive says (on unless set to false).' },
-        { value: 'true', label: 'On', hint: 'Cycle overrun halves a pipeline’s admission cap; a comfortable fit restores it.' },
+        {
+            value: '',
+            label: 'Inherit launch default',
+            hint: 'Whatever -Dingest.backpressure.adaptive says (on unless set to false).',
+        },
+        {
+            value: 'true',
+            label: 'On',
+            hint: 'Cycle overrun halves a pipeline’s admission cap; a comfortable fit restores it.',
+        },
         { value: 'false', label: 'Off (hard cap)', hint: 'The stated cap is pinned; overrun never adjusts it.' },
     ];
 
@@ -372,24 +388,30 @@ export class SchedulerSettingsComponent implements OnInit {
         }
         this.saving.set(true);
         const v = this.form.getRawValue();
-        this.api.saveSystem(v.system ?? null, {
-            maxFilesPerCycle: v.intakeMax ?? null,
-            minFilesPerCycle: v.intakeMin ?? null,
-            adaptive: v.intakeAdaptive === '' ? null : v.intakeAdaptive === 'true',
-        }, {
-            duckdbMemoryLimit: v.memoryLimit?.trim() ? v.memoryLimit.trim() : null,
-            maxConcurrentJobRuns: v.jobRuns ?? null,
-        }).subscribe({
-            next: (v) => {
-                this.saving.set(false);
-                this.apply(v);
-                this.toastr.success('Server-wide cap applied to the running scheduler.');
-            },
-            error: (err) => {
-                this.saving.set(false);
-                this.toastr.error(apiErrorMessage(err, 'Saving the server-wide cap failed.'));
-            },
-        });
+        this.api
+            .saveSystem(
+                v.system ?? null,
+                {
+                    maxFilesPerCycle: v.intakeMax ?? null,
+                    minFilesPerCycle: v.intakeMin ?? null,
+                    adaptive: v.intakeAdaptive === '' ? null : v.intakeAdaptive === 'true',
+                },
+                {
+                    duckdbMemoryLimit: v.memoryLimit?.trim() ? v.memoryLimit.trim() : null,
+                    maxConcurrentJobRuns: v.jobRuns ?? null,
+                },
+            )
+            .subscribe({
+                next: (v) => {
+                    this.saving.set(false);
+                    this.apply(v);
+                    this.toastr.success('Server-wide cap applied to the running scheduler.');
+                },
+                error: (err) => {
+                    this.saving.set(false);
+                    this.toastr.error(apiErrorMessage(err, 'Saving the server-wide cap failed.'));
+                },
+            });
     }
 
     saveSpace(): void {

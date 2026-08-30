@@ -134,7 +134,8 @@ export const NODE_TYPES: PipelineNodeType[] = (
             type: 'parser.plugin',
             category: 'PARSE',
             label: 'Custom',
-            description: 'Decodes records through a deployed custom ParserPlugin, loaded via its StreamingFileIngester.',
+            description:
+                'Decodes records through a deployed custom ParserPlugin, loaded via its StreamingFileIngester.',
             accepts: ['data'],
             emits: ['data', 'unmatched'],
             emitsNamedRoutes: true,
@@ -421,9 +422,9 @@ export function pipelinesHandler(flags: MockFlags): MockHandler {
         }
         // POST/PUT /pipelines/authored* retired with W5 — 405 where the path still serves reads.
         if (method === 'POST' && AUTHORED.test(url))
-            return error(405, 'authored-flow writes retired (W5) — edit the pipeline graph');   // vocab-allow: cites the retired authored-`*_flow.toon` surface
+            return error(405, 'authored-flow writes retired (W5) — edit the pipeline graph'); // vocab-allow: cites the retired authored-`*_flow.toon` surface
         if (method === 'PUT' && match(url, AUTHORED_ID))
-            return error(405, 'authored-flow writes retired (W5) — PUT /pipelines/{name}/graph');   // vocab-allow: cites the retired authored-`*_flow.toon` surface
+            return error(405, 'authored-flow writes retired (W5) — PUT /pipelines/{name}/graph'); // vocab-allow: cites the retired authored-`*_flow.toon` surface
         if (method === 'DELETE' && (m = match(url, AUTHORED_ID))) {
             // Referential integrity (R2) — e.g. a job triggering on this pipeline blocks the delete.
             const refs = store.referencesTo(space, PIPELINES_COLL, m[1]);

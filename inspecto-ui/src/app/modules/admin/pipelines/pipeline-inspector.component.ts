@@ -99,7 +99,10 @@ import {
                         switched back on.
                     -->
                     <div class="mb-2">
-                        <mat-slide-toggle [checked]="node.config?.['enabled'] !== false" (change)="setEnabled($event.checked)">
+                        <mat-slide-toggle
+                            [checked]="node.config?.['enabled'] !== false"
+                            (change)="setEnabled($event.checked)"
+                        >
                             Step enabled
                         </mat-slide-toggle>
                         <p class="mt-1 text-xs opacity-70">

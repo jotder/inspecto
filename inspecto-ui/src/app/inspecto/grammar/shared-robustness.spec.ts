@@ -34,17 +34,27 @@ describe('shared read_csv robustness knobs', () => {
     it.each(LINE_READERS)('%s declares each knob exactly once', (frontend) => {
         const keys = parsingAttributesFor(frontend).map((s) => s.key);
         for (const k of SHARED) {
-            expect(keys.filter((x) => x === k), `${frontend} duplicates ${k}`).toHaveLength(1);
+            expect(
+                keys.filter((x) => x === k),
+                `${frontend} duplicates ${k}`,
+            ).toHaveLength(1);
         }
     });
 
     it('never mirrors them under a per-frontend root — that key would be DEAD CONFIG', () => {
         for (const frontend of LINE_READERS) {
             const keys = parsingAttributesFor(frontend).map((s) => s.key);
-            for (const bad of ['fixedwidth__ignore_errors', 'text_regex__ignore_errors',
-                               'fixedwidth__store_rejects', 'text_regex__store_rejects']) {
-                expect(keys, `${frontend} mirrors ${bad}: mergeParsing keeps that root NESTED, so the `
-                    + `engine never reads it`).not.toContain(bad);
+            for (const bad of [
+                'fixedwidth__ignore_errors',
+                'text_regex__ignore_errors',
+                'fixedwidth__store_rejects',
+                'text_regex__store_rejects',
+            ]) {
+                expect(
+                    keys,
+                    `${frontend} mirrors ${bad}: mergeParsing keeps that root NESTED, so the ` +
+                        `engine never reads it`,
+                ).not.toContain(bad);
             }
         }
     });

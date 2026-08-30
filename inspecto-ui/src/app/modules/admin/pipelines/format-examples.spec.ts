@@ -54,12 +54,16 @@ describe('format-example pack — one pipeline per DuckDB-native parser frontend
      *  are copies, never bindings) — never a `use: grammar/<id>` binding, which the retired CS pack
      *  used and which predates that reversal. */
     it('no node binds a Grammar by reference', () => {
-        for (const p of FORMAT_EXAMPLE_PIPELINES)
-            for (const n of p.nodes) expect(n.use).toBeUndefined();
+        for (const p of FORMAT_EXAMPLE_PIPELINES) for (const n of p.nodes) expect(n.use).toBeUndefined();
     });
 
     it('every node is a real, currently-lowerable type', () => {
-        const known = new Set(['acquisition', ...Object.keys(PARSE_NODE_FRONTENDS), 'transform.map', 'sink.persistent']);
+        const known = new Set([
+            'acquisition',
+            ...Object.keys(PARSE_NODE_FRONTENDS),
+            'transform.map',
+            'sink.persistent',
+        ]);
         for (const p of FORMAT_EXAMPLE_PIPELINES)
             for (const n of p.nodes) expect(known.has(n.type), `${p.name}/${n.id}: ${n.type}`).toBe(true);
     });

@@ -710,22 +710,19 @@ describe('formatZoneDirectiveRefusal (mirrors the server %z/%Z rule)', () => {
     });
 
     it('refuses both zone directives, in both lists', () => {
-        expect(formatZoneDirectiveRefusal(fmts('timestamp_formats', ['%Y-%m-%d %H:%M:%S%z'])))
-            .toContain('%z');
-        expect(formatZoneDirectiveRefusal(fmts('timestamp_formats', ['%Y-%m-%d %H:%M:%S %Z'])))
-            .toContain('%Z');
-        expect(formatZoneDirectiveRefusal(fmts('date_formats', ['%Y-%m-%d%z'])))
-            .toContain('date_formats');
+        expect(formatZoneDirectiveRefusal(fmts('timestamp_formats', ['%Y-%m-%d %H:%M:%S%z']))).toContain('%z');
+        expect(formatZoneDirectiveRefusal(fmts('timestamp_formats', ['%Y-%m-%d %H:%M:%S %Z']))).toContain('%Z');
+        expect(formatZoneDirectiveRefusal(fmts('date_formats', ['%Y-%m-%d%z']))).toContain('date_formats');
         // a clean format beside a dirty one is still refused
-        expect(formatZoneDirectiveRefusal(
-            fmts('timestamp_formats', ['%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M:%S%z']))).not.toBeNull();
+        expect(
+            formatZoneDirectiveRefusal(fmts('timestamp_formats', ['%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M:%S%z'])),
+        ).not.toBeNull();
     });
 
     it('treats %% as an escaped literal percent, not a directive', () => {
         expect(formatZoneDirectiveRefusal(fmts('timestamp_formats', ['%Y-%m-%d %H:%M:%S%%z']))).toBeNull();
         // ...but a real directive after an escaped one is still a directive
-        expect(formatZoneDirectiveRefusal(fmts('timestamp_formats', ['%Y-%m-%d %H:%M:%S%%%z'])))
-            .not.toBeNull();
+        expect(formatZoneDirectiveRefusal(fmts('timestamp_formats', ['%Y-%m-%d %H:%M:%S%%%z']))).not.toBeNull();
     });
 
     it('ignores a list authored at parsing: level, which the engine never reads', () => {

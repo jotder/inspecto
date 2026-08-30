@@ -118,7 +118,12 @@ describe('filterNavByLens (lens-default nav scope)', () => {
 
     it('drops a group once ALL its children are out of scope', () => {
         const nav: GammaNavigationItem[] = [
-            { id: 'g', title: 'Group', type: 'collapsable', children: [{ id: 'kpi-reports', title: 'KPIs', type: 'basic', link: '/kpi-reports' }] },
+            {
+                id: 'g',
+                title: 'Group',
+                type: 'collapsable',
+                children: [{ id: 'kpi-reports', title: 'KPIs', type: 'basic', link: '/kpi-reports' }],
+            },
         ];
         // kpi-reports is business/builder-only; ops has no use for the group at all
         expect(filterNavByLens(nav, 'ops')).toEqual([]);

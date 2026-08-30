@@ -61,12 +61,8 @@ describe('DesignSystemComponent', () => {
     // gallery, every shared pattern mounted at once — and it was sitting close enough to the default
     // that adding four unrelated specs elsewhere in the suite tipped it over (2026-08-29). A timeout
     // here says nothing about a11y, so the honest fix is headroom rather than a smaller scan.
-    it(
-        'has no a11y violations',
-        async () => {
-            const fixture = await create();
-            await expectNoA11yViolations(fixture.nativeElement);
-        },
-        30_000,
-    );
+    it('has no a11y violations', async () => {
+        const fixture = await create();
+        await expectNoA11yViolations(fixture.nativeElement);
+    }, 30_000);
 });

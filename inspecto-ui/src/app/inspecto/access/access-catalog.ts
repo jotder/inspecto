@@ -313,4 +313,3 @@ const SCOPE_BY_LENS: Record<Lens, ReadonlySet<string>> = {
 
 /** Every id any lens names — the complement defines "unscoped" (visible everywhere). */
 const ALL_SCOPED_IDS: ReadonlySet<string> = new Set(Object.values(LENS_NAV_SCOPE).flat());
-

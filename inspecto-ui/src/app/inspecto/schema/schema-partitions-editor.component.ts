@@ -126,8 +126,8 @@ const DATE_TYPES = new Set(['DATE_YEAR', 'DATE_MONTH', 'DATE_DAY']);
         }
         @if (mixedDateSources()) {
             <p class="text-warn m-0 mt-1 text-xs" role="alert">
-                The date segments disagree on their source field — the engine will still write them, but it
-                records no event-time bounds for a scheme with no single event time.
+                The date segments disagree on their source field — the engine will still write them, but it records no
+                event-time bounds for a scheme with no single event time.
             </p>
         }
         <div class="mt-2 flex flex-wrap items-center gap-2">
@@ -146,12 +146,7 @@ const DATE_TYPES = new Set(['DATE_YEAR', 'DATE_MONTH', 'DATE_DAY']);
                 [formControl]="dateSourceCtrl"
                 [options]="dateFieldOptions()"
             />
-            <inspecto-option-picker
-                class="block"
-                label="Grain"
-                [formControl]="grainCtrl"
-                [options]="grainOptions"
-            />
+            <inspecto-option-picker class="block" label="Grain" [formControl]="grainCtrl" [options]="grainOptions" />
             <button
                 mat-stroked-button
                 type="button"

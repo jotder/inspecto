@@ -128,22 +128,24 @@ export function systemHandler(flags: MockFlags): MockHandler {
                 engine: 'duckdb',
                 engineProperty: 'inspecto.db',
                 driverAvailable: false,
-                families: FAMILIES.map(([family, label, backendProperty, urlProperty, userProperty, passwordProperty]) => {
-                    // Only the two families whose own backend defaults to on are enabled offline.
-                    const enabled = family === 'CONSIGNMENT_OUTPUTS' || family === 'STATUS';
-                    return {
-                        family,
-                        label,
-                        enabled,
-                        source: enabled ? 'SPACE_DEFAULT' : 'DISABLED',
-                        url: enabled ? `jdbc:duckdb:${urlProperty.replace(/\./g, '-')}.db` : null,
-                        user: null,
-                        backendProperty,
-                        urlProperty,
-                        userProperty,
-                        passwordProperty,
-                    };
-                }),
+                families: FAMILIES.map(
+                    ([family, label, backendProperty, urlProperty, userProperty, passwordProperty]) => {
+                        // Only the two families whose own backend defaults to on are enabled offline.
+                        const enabled = family === 'CONSIGNMENT_OUTPUTS' || family === 'STATUS';
+                        return {
+                            family,
+                            label,
+                            enabled,
+                            source: enabled ? 'SPACE_DEFAULT' : 'DISABLED',
+                            url: enabled ? `jdbc:duckdb:${urlProperty.replace(/\./g, '-')}.db` : null,
+                            user: null,
+                            backendProperty,
+                            urlProperty,
+                            userProperty,
+                            passwordProperty,
+                        };
+                    },
+                ),
             });
         }
 
@@ -156,7 +158,11 @@ export function systemHandler(flags: MockFlags): MockHandler {
             const password = (body.password ?? '').trim();
             if (password && !password.startsWith('${'))
                 return json(
-                    { error: { message: 'password must be a secret reference (${ENV:…}, ${KEYSTORE:…} or ${FILE:…})' } },
+                    {
+                        error: {
+                            message: 'password must be a secret reference (${ENV:…}, ${KEYSTORE:…} or ${FILE:…})',
+                        },
+                    },
                     422,
                 );
             // Offline there is no database to reach — answer the honest named outcome, never a fake OK.

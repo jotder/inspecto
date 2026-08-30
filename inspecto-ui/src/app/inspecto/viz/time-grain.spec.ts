@@ -28,9 +28,7 @@ describe('time-grain', () => {
 
     it('bucketSpecRows buckets every grained column and only those', () => {
         const rows = [{ t: '2026-06-24 09:00:00', u: '2026-06-24 09:00:00', v: 1 }];
-        expect(bucketSpecRows(rows, { t: 'month', u: 'day' })).toEqual([
-            { t: '2026-06', u: '2026-06-24', v: 1 },
-        ]);
+        expect(bucketSpecRows(rows, { t: 'month', u: 'day' })).toEqual([{ t: '2026-06', u: '2026-06-24', v: 1 }]);
         expect(bucketSpecRows(rows, undefined)).toBe(rows);
         expect(bucketSpecRows(rows, {})).toBe(rows);
     });

@@ -958,8 +958,7 @@ describe('mock pipeline-editable — marker dedup rides acquisition (P5-a)', () 
     it('still lowers a legacy standalone marker node — read-compat, never re-emitted', () => {
         const g = liftConfig(markerConfig());
         const acq = g.nodes.find((n) => n.type === 'acquisition')!;
-        for (const k of ['duplicate_check', 'marker_extension', 'retention_days', 'markers_dir'])
-            delete acq.config![k];
+        for (const k of ['duplicate_check', 'marker_extension', 'retention_days', 'markers_dir']) delete acq.config![k];
         g.nodes.push({
             id: 'dedup_marker',
             type: 'transform.dedup.marker',
@@ -967,10 +966,7 @@ describe('mock pipeline-editable — marker dedup rides acquisition (P5-a)', () 
         });
 
         const res = lowerGraph(g, markerConfig(), true);
-        const processing = (res as { config: Record<string, unknown> }).config['processing'] as Record<
-            string,
-            unknown
-        >;
+        const processing = (res as { config: Record<string, unknown> }).config['processing'] as Record<string, unknown>;
         expect(processing['duplicate_check']).toEqual({ enabled: true, retention_days: 7 });
     });
 

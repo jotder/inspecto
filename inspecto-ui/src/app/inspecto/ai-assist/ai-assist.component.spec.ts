@@ -121,7 +121,10 @@ describe('AiAssistComponent', () => {
                 findings: [],
                 draft: { title: 'Revenue', tiles: [{ widgetId: 'revenue_kpi', span: 1 }] },
                 widgets: [
-                    { id: 'revenue_kpi', draft: { vizType: 'kpi', datasetId: 'orders', options: { title: 'Revenue' } } },
+                    {
+                        id: 'revenue_kpi',
+                        draft: { vizType: 'kpi', datasetId: 'orders', options: { title: 'Revenue' } },
+                    },
                     { id: 'revenue_chart', draft: { vizType: 'bar', datasetId: 'orders' } },
                 ],
             }),
@@ -162,8 +165,7 @@ describe('AiAssistComponent', () => {
         const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
         expect(text).toContain('Needs attention');
         // ...while the prerequisite is listed without a competing verdict of its own.
-        expect(fixture.componentInstance.prerequisiteRows(fixture.componentInstance.activeDraft()!))
-            .toHaveLength(1);
+        expect(fixture.componentInstance.prerequisiteRows(fixture.componentInstance.activeDraft()!)).toHaveLength(1);
         expect(text).not.toContain('Validated');
     });
 

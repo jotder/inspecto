@@ -309,7 +309,8 @@ describe('agentHandler · kpi_report_builder', () => {
 describe('agentHandler · approvals inbox', () => {
     const handler = agentHandler({ mockOps: true });
 
-    const get = (store: MockStore, url: string) => handler({ method: 'GET', url, body: null, params: {}, space: 'default' }, store);
+    const get = (store: MockStore, url: string) =>
+        handler({ method: 'GET', url, body: null, params: {}, space: 'default' }, store);
     const post = (store: MockStore, url: string, body: unknown) =>
         handler({ method: 'POST', url, body, params: {}, space: 'default' }, store);
 

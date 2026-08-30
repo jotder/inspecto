@@ -47,7 +47,9 @@ describe('format', () => {
         });
 
         it('is absolute beyond ±24h', () => {
-            expect(fmtWhen('2026-08-01T12:00:00Z', now)).toBe(DateTime.fromISO('2026-08-01T12:00:00Z').toLocaleString());
+            expect(fmtWhen('2026-08-01T12:00:00Z', now)).toBe(
+                DateTime.fromISO('2026-08-01T12:00:00Z').toLocaleString(),
+            );
         });
     });
 });
@@ -68,9 +70,6 @@ describe('FmtWhenPipe', () => {
     it('renders an em-dash for null/undefined and delegates otherwise', () => {
         expect(pipe.transform(null)).toBe('—');
         expect(pipe.transform(undefined)).toBe('—');
-        expect(pipe.transform('2026-08-20T12:00:00Z')).toBe(
-            DateTime.fromISO('2026-08-20T12:00:00Z').toLocaleString(),
-        );
+        expect(pipe.transform('2026-08-20T12:00:00Z')).toBe(DateTime.fromISO('2026-08-20T12:00:00Z').toLocaleString());
     });
 });
-

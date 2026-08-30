@@ -124,9 +124,7 @@ describe('settingsHandler', () => {
         const store = new MockStore();
         const handle = systemHandler({ mockOps: true } as MockFlags);
         const sys = (): Record<string, unknown> =>
-            (handle(req('GET', '/system/scheduler'), store)?.body as Record<string, Record<string, unknown>>)[
-                'system'
-            ];
+            (handle(req('GET', '/system/scheduler'), store)?.body as Record<string, Record<string, unknown>>)['system'];
 
         // The pair ships ON: a bound is in force with `default` provenance before any save.
         expect(sys()).toMatchObject({
@@ -142,8 +140,10 @@ describe('settingsHandler', () => {
         // Nothing was stored by either refusal — the server validates the whole body before persisting.
         expect(sys()).toMatchObject({ duckdbMemoryLimitSource: 'default', maxConcurrentJobRunsSource: 'default' });
 
-        expect(handle(req('PUT', '/system/scheduler', { duckdbMemoryLimit: '2GB', maxConcurrentJobRuns: 2 }), store)
-            ?.status).toBe(200);
+        expect(
+            handle(req('PUT', '/system/scheduler', { duckdbMemoryLimit: '2GB', maxConcurrentJobRuns: 2 }), store)
+                ?.status,
+        ).toBe(200);
         expect(sys()).toMatchObject({
             duckdbMemoryLimit: '2GB',
             duckdbMemoryLimitSource: 'file',

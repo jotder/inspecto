@@ -384,10 +384,8 @@ function handleApprovals(req: MockRequest, store: MockStore, space: string): Ret
         const approve = APPROVE_WORDS.has(word) ? true : DECLINE_WORDS.has(word) ? false : null;
         if (approve === null) return error(400, "decision is required and must be 'approve' or 'decline'");
         const doc = store.get<ApprovalDoc>(space, APPROVALS_COLL, id);
-        if (!doc || doc.status !== 'PENDING')
-            return error(404, `unknown or already-decided approval: '${id}'`);
-        const decidedBy =
-            typeof b.decidedBy === 'string' && b.decidedBy.trim() ? b.decidedBy.trim() : 'operator';
+        if (!doc || doc.status !== 'PENDING') return error(404, `unknown or already-decided approval: '${id}'`);
+        const decidedBy = typeof b.decidedBy === 'string' && b.decidedBy.trim() ? b.decidedBy.trim() : 'operator';
         const decided: ApprovalDoc = {
             ...doc,
             status: approve ? 'APPROVED' : 'DENIED',

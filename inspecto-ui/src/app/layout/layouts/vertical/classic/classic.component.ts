@@ -265,8 +265,6 @@ export class ClassicLayoutComponent implements OnInit, OnDestroy {
      */
     private _applyNavSearch(): void {
         const full = this._accessState.filterNav(this.navigation?.default ?? []);
-        this.displayedNavigation.set(
-            this.navSearchActive ? flattenNavForSearch(full, this.navSearchQuery) : full,
-        );
+        this.displayedNavigation.set(this.navSearchActive ? flattenNavForSearch(full, this.navSearchQuery) : full);
     }
 }

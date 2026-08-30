@@ -637,8 +637,7 @@ export function lowerGraph(
 
     if (acq) {
         for (const k of Object.keys(collector)) if (k !== 'gap_detection') delete collector[k];
-        for (const [k, v] of Object.entries(acq.config ?? {}))
-            if (!ACQ_FOREIGN_KEYS.includes(k)) collector[k] = v;
+        for (const [k, v] of Object.entries(acq.config ?? {})) if (!ACQ_FOREIGN_KEYS.includes(k)) collector[k] = v;
         delete collector['connection'];
         if (acq.use?.startsWith('connection/')) collector['connection'] = acq.use.slice('connection/'.length);
         setOrDel(dirs, 'poll', acq.config?.['poll']);
@@ -651,11 +650,7 @@ export function lowerGraph(
     // (mirrors PipelineLift.markerHome — a legacy graph's own marker node is still READ, never
     // emitted, and an explicit `duplicate_check: false` must not fall through and re-enable it).
     const markerHome =
-        acq?.config?.['duplicate_check'] != null
-            ? acq.config['duplicate_check'] === true
-                ? acq
-                : undefined
-            : marker;
+        acq?.config?.['duplicate_check'] != null ? (acq.config['duplicate_check'] === true ? acq : undefined) : marker;
     if (markerHome) {
         const dc: Cfg = { enabled: true };
         const mc = markerHome.config ?? {};

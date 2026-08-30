@@ -1374,8 +1374,19 @@ export function filterEvents(rows: EventRow[], params: Record<string, string>): 
  * Keep byte-identical to the Java list; the header is pinned in ops.handler.spec.ts.
  */
 const AUDIT_ATTR_COLUMNS = [
-    'actor', 'actor_type', 'action', 'action_category', 'target_type', 'target_id',
-    'ip', 'user_agent', 'http_method', 'http_path', 'http_status', 'abac_action', 'policy',
+    'actor',
+    'actor_type',
+    'action',
+    'action_category',
+    'target_type',
+    'target_id',
+    'ip',
+    'user_agent',
+    'http_method',
+    'http_path',
+    'http_status',
+    'abac_action',
+    'policy',
 ];
 
 /**

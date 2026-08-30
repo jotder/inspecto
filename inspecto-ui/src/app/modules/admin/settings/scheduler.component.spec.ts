@@ -17,7 +17,8 @@ const VIEW: SchedulerView = {
         duckdbMemoryLimitSource: 'default',
         // The size grammar is the SERVER's, served in the GET — the form has no regex of its own, so a
         // fixture that omitted this would (correctly) have no shape check at all.
-        duckdbMemoryLimitPattern: '^(\\d+(\\.\\d+)?\\s*(B|K|KB|KIB|M|MB|MIB|G|GB|GIB|T|TB|TIB)|([1-9][0-9]?(\\.\\d+)?|100)%)$',
+        duckdbMemoryLimitPattern:
+            '^(\\d+(\\.\\d+)?\\s*(B|K|KB|KIB|M|MB|MIB|G|GB|GIB|T|TB|TIB)|([1-9][0-9]?(\\.\\d+)?|100)%)$',
         maxConcurrentJobRuns: 4,
         maxConcurrentJobRunsSource: 'default',
     },
@@ -40,9 +41,7 @@ const VIEW: SchedulerView = {
 describe('SchedulerSettingsComponent', () => {
     const setup = async (opts?: { canOperate?: boolean; view?: SchedulerView; fail?: boolean }) => {
         const api = {
-            view: vi.fn(() =>
-                opts?.fail ? throwError(() => ({ status: 503 })) : of(opts?.view ?? VIEW),
-            ),
+            view: vi.fn(() => (opts?.fail ? throwError(() => ({ status: 503 })) : of(opts?.view ?? VIEW))),
             // The real PUT answers with systemShape() — the values it just stored, with their provenance
             // flipped to `file`. Echo that here: a mock that dropped the saved fields would make the
             // component's (correct) re-seed from the response look like a bug.
@@ -92,9 +91,9 @@ describe('SchedulerSettingsComponent', () => {
         const { fixture } = await setup();
         const el: HTMLElement = fixture.nativeElement;
         expect(el.textContent).toContain('Server-wide cap');
-        expect(el.textContent).toContain('file');            // system provenance chip
+        expect(el.textContent).toContain('file'); // system provenance chip
         expect(el.textContent).toContain("This space's cap");
-        expect(el.textContent).toContain('cdr_ingest');      // live occupancy row
+        expect(el.textContent).toContain('cdr_ingest'); // live occupancy row
         expect(el.textContent).toContain('priority 3');
         expect(el.textContent).toContain('14 slot(s) free');
         // S8: a throttled pipeline is visible with the cap it is actually admitting at.

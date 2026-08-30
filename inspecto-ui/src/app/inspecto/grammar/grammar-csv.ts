@@ -43,10 +43,7 @@ export interface GrammarCsvImport {
 
 /** The operator-specified filename: `<pipeline>_parser.csv` (verbatim — a filename is not UI copy). */
 export function grammarCsvFilename(pipelineName: string): string {
-    const base =
-        (pipelineName || 'grammar')
-            .replace(/[^A-Za-z0-9._-]+/g, '_')
-            .replace(/^_+|_+$/g, '') || 'grammar';
+    const base = (pipelineName || 'grammar').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '') || 'grammar';
     return `${base}_parser.csv`;
 }
 

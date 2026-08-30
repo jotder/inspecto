@@ -108,9 +108,7 @@ describe('KpiReportsComponent', () => {
         const { fixture } = create({ reportJobs: [REPORT_JOB], canAuthor: false });
         // Zoneless CD: loadReportDetails resolves via Promise.then (microtasks whenStable()
         // cannot see) — poll for the detail fetch to land, then commit the render.
-        await vi.waitFor(() =>
-            expect(fixture.componentInstance.reportJobs().length).toBeGreaterThan(0),
-        );
+        await vi.waitFor(() => expect(fixture.componentInstance.reportJobs().length).toBeGreaterThan(0));
         fixture.detectChanges();
         expect(fixture.componentInstance.jobsFor('cdr_overview').map((j) => j.name)).toEqual(['daily_cdr_export']);
         expect(fixture.nativeElement.textContent).not.toContain('Schedule export');

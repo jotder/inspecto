@@ -100,7 +100,11 @@ const CATALOG: ParserDef[] = [
                 'Timestamp formats',
                 'Accepted TIMESTAMP parse patterns, tried in order.',
             ),
-            list('delimited.null_strings', 'Null strings', "Literal text values read as NULL, e.g. ['', 'NULL', 'N/A']."),
+            list(
+                'delimited.null_strings',
+                'Null strings',
+                "Literal text values read as NULL, e.g. ['', 'NULL', 'N/A'].",
+            ),
             // Robustness
             {
                 path: 'delimited.strict_mode',
@@ -213,8 +217,11 @@ const CATALOG: ParserDef[] = [
                 description:
                     'auto only, and only when the content is itself line-delimited: a malformed record lands as an all-NULL row. Refused under format: array.',
             },
-            int('json.maximum_object_size', 'Maximum object size (bytes)',
-                'array/auto only: bound on a single document/record the reader buffers.'),
+            int(
+                'json.maximum_object_size',
+                'Maximum object size (bytes)',
+                'array/auto only: bound on a single document/record the reader buffers.',
+            ),
             str('compression', 'Input compression', 'e.g. gzip.'),
         ],
     },
@@ -293,7 +300,11 @@ const CATALOG: ParserDef[] = [
                 defaultValue: false,
                 description: 'Resolve namespaces (element labels then use local names).',
             },
-            str('ingester_config.encoding', 'Encoding', "Overrides the document prolog's encoding (default: auto-detect)."),
+            str(
+                'ingester_config.encoding',
+                'Encoding',
+                "Overrides the document prolog's encoding (default: auto-detect).",
+            ),
             {
                 path: 'ingester_config.max_records',
                 label: 'Preview records',
@@ -538,7 +549,7 @@ function ndjsonRecords(sample: string): JsonRecords {
 function jsonTable({ records, rejected }: JsonRecords): ParserPreview {
     const seen = new Set<string>();
     const keys: string[] = [];
-    for (const r of records) for (const k of Object.keys(r)) if (!seen.has(k)) (seen.add(k), keys.push(k));
+    for (const r of records) for (const k of Object.keys(r)) if (!seen.has(k)) seen.add(k), keys.push(k);
     const rows = records.map((r) =>
         Object.fromEntries(
             keys.map((k) => {

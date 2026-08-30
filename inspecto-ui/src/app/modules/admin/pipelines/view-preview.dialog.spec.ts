@@ -48,7 +48,9 @@ describe('ViewPreviewDialog', () => {
         const err = new HttpErrorResponse({
             status: 409,
             error: {
-                error: { message: "view 'orders_view' has no derived_sql; re-run pipeline 'orders_etl' to concretise it" },
+                error: {
+                    message: "view 'orders_view' has no derived_sql; re-run pipeline 'orders_etl' to concretise it",
+                },
             },
         });
         const c = create({}, { data: () => throwError(() => err) }).componentInstance;

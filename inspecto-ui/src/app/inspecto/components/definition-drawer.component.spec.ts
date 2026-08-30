@@ -130,9 +130,7 @@ describe('DefinitionDrawerComponent', () => {
         btn.click();
         fixture.detectChanges();
         expect(fixture.componentInstance.maximized).toBe(true);
-        const exit = fixture.nativeElement.querySelector(
-            'button[aria-label="Exit full width"]',
-        ) as HTMLButtonElement;
+        const exit = fixture.nativeElement.querySelector('button[aria-label="Exit full width"]') as HTMLButtonElement;
         expect(exit).toBeTruthy();
 
         exit.click();
