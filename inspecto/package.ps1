@@ -580,6 +580,18 @@ fi
 # PostgreSQL JDBC driver sidecar (PG-1): present in Standard/Enterprise bundles, and honored on ANY
 # bundle so a drop-in works — the classpath entry is inert until -Dinspecto.db=postgres selects it.
 [ -f postgresql.jar ] && CP="${CP}:postgresql.jar"
+# Operational stores on PostgreSQL (2026-08-31). The three ledgers (status/batches/lineage) are now
+# SERVED from a database by default; Personal stays on the bundled DuckDB with zero configuration,
+# and Standard/Enterprise move to PostgreSQL here — the edition seam, per the codebase's rule that
+# editions differ by what the BUNDLE carries, never by a default baked into the engine.
+# ⚠ Driver PRESENCE alone must not select PostgreSQL: OperationalDb.verifySelectable() fails the boot
+# when postgres is chosen without a URL, so auto-enabling on the sidecar would break every Standard
+# deployment that has not configured one yet. The URL is the signal.
+if [ -f postgresql.jar ] && [ -n "${INSPECTO_DB_URL:-}" ]; then
+    JAVA_OPTS+=("-Dinspecto.db=postgres" "-Dinspecto.db.url=${INSPECTO_DB_URL}")
+    [ -n "${INSPECTO_DB_USER:-}" ] && JAVA_OPTS+=("-Dinspecto.db.user=${INSPECTO_DB_USER}")
+    [ -n "${INSPECTO_DB_PASSWORD:-}" ] && JAVA_OPTS+=("-Dinspecto.db.password=${INSPECTO_DB_PASSWORD}")
+fi
 # Operator-supplied extra JVM flags. Appended LAST, on purpose: the flags this script requires
 # (--enable-native-access=ALL-UNNAMED, port, spaces root, auth) are already in the array and
 # cannot be clobbered from the environment. Whitespace-separated; INSPECTO_JAVA_OPTS wins over
@@ -643,6 +655,13 @@ if exist inspecto-security.jar (
 rem PostgreSQL JDBC driver sidecar (PG-1): present in Standard/Enterprise bundles, and honored on ANY
 rem bundle so a drop-in works - the classpath entry is inert until -Dinspecto.db=postgres selects it.
 if exist postgresql.jar set "CP=%CP%;postgresql.jar"
+rem Operational stores on PostgreSQL (2026-08-31) - the edition seam; see serve.sh for the reasoning.
+rem The URL is the signal, never the driver's presence: postgres without a URL fails the boot.
+rem WARNING: OPTS, never JAVA_OPTS - that name is assigned below and a flag set on it never reaches
+rem the JVM (BUNDLE-1). Single-line ifs, not a parenthesised block, so %OPTS% expands per statement.
+if exist postgresql.jar if defined INSPECTO_DB_URL set "OPTS=%OPTS% -Dinspecto.db=postgres -Dinspecto.db.url=%INSPECTO_DB_URL%"
+if exist postgresql.jar if defined INSPECTO_DB_URL if defined INSPECTO_DB_USER set "OPTS=%OPTS% -Dinspecto.db.user=%INSPECTO_DB_USER%"
+if exist postgresql.jar if defined INSPECTO_DB_URL if defined INSPECTO_DB_PASSWORD set "OPTS=%OPTS% -Dinspecto.db.password=%INSPECTO_DB_PASSWORD%"
 rem Operator-supplied extra JVM flags. Appended LAST, on purpose: the flags this script requires
 rem (--enable-native-access=ALL-UNNAMED, port, spaces root, auth) are already in OPTS and cannot
 rem be clobbered from the environment. INSPECTO_JAVA_OPTS wins over EXTRA_JAVA_OPTS. Deliberately

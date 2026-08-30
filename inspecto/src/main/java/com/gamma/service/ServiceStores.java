@@ -285,8 +285,13 @@ final class ServiceStores {
      * future distributed deployment; {@code -Dstatus.db.user}/{@code .password} are optional.
      */
     static StatusStore openStatusStore(SpaceRoot root) {
-        String backend = System.getProperty("status.backend", "file");
+        // ⚠ ONE declaration of the default — the family owns it. This used to repeat "file" here, so
+        // the two could drift and the effective default would depend on which one you read.
+        String requested = System.getProperty(OperationalDb.Family.STATUS.backendProperty);
+        boolean explicit = requested != null && !requested.isBlank();
+        String backend = explicit ? requested : OperationalDb.Family.STATUS.backendDefault;
         if (!"db".equalsIgnoreCase(backend)) return new FileStatusStore();
+
         String url = OperationalDb.urlFor(OperationalDb.Family.STATUS, root.statusDbUrl());
         try {
             StatusStore db = DbStatusStore.open(url,
@@ -294,7 +299,19 @@ final class ServiceStores {
             log.info("Status backend: database ({})", url);
             return db;
         } catch (Exception e) {
-            throw new IllegalStateException("Could not open status DB at " + url, e);
+            // 🔴 An EXPLICIT request still fails loudly: the operator asked for this database, and
+            // quietly serving them something else would hide a misconfigured deployment.
+            if (explicit)
+                throw new IllegalStateException("Could not open status DB at " + url, e);
+            // ⚠ But the DEFAULT must not be able to stop the product booting. The CSVs are the durable
+            // write-ahead and FileStatusStore reads them directly, so degrading costs only the queried
+            // surface — nothing is lost, and ingest is untouched. Loud, because a silent degrade would
+            // leave an operator wondering why their status tables are empty.
+            log.warn("Status backend: could not open the default status DB at {} — falling back to the "
+                    + "on-disk audit. The ledgers are intact; only the database projection is unavailable. "
+                    + "Set -D{}=file to make this deliberate, or fix the database to restore it. Cause: {}",
+                    url, OperationalDb.Family.STATUS.backendProperty, e.toString());
+            return new FileStatusStore();
         }
     }
 }

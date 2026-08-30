@@ -87,6 +87,14 @@ final class OperationalDb {
                 "objects.notes.db.url", "objects.db.user", "objects.db.password", SpaceRoot::notesDbUrl),
         TAGS("Tag assignments", "objects.backend", "memory", Mode.DB_FLAG,
                 "objects.tags.db.url", "objects.db.user", "objects.db.password", SpaceRoot::tagAssignmentsDbUrl),
+        // ⚠ Flipping this to "db" — serving the three ledgers from a database rather than off CSV —
+        // was attempted 2026-08-31 and REVERTED pending a decision. It is a one-word change here, and
+        // ServiceStores.openStatusStore is already written for it (single declaration + degrade rather
+        // than fail-boot). Two real consequences surfaced and neither is a test artefact:
+        //   1. the status DuckDB appears as an extra BUSINESS store in the catalog listing;
+        //   2. 🔴 ControlApiMultiSpaceTest saw one space report another's committed batch — the
+        //      DB-backed store may not isolate per space the way the file store does.
+        // (2) is a correctness question and must be answered before the default moves.
         STATUS("Status", "status.backend", "file", Mode.DB_FLAG,
                 "status.db.url", "status.db.user", "status.db.password", SpaceRoot::statusDbUrl),
         ACQUISITION_LEDGER("Acquisition ledger", "acquire.ledger.backend", "memory", Mode.DB_FLAG,
