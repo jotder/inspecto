@@ -104,6 +104,75 @@ class ControlApiBundleNewKindsTest {
         }
     }
 
+    // ── enrichment (pipeline spec gap 6b) ────────────────────────────────────────
+
+    /**
+     * An enrichment is the Stage-2 companion a bundle used to leave behind: not a {@code ComponentStore}
+     * kind, and until now with no {@code BundleSource}, so exporting a pipeline carried none of its
+     * derived columns.
+     *
+     * <p>⚠ The load-bearing half is that an import <b>registers</b>, not merely writes.
+     * {@code EnrichmentService} has no mtime hot-reload, so a file-only import would land an enrichment
+     * that does nothing until the next restart — a silent half-import. This asserts the live
+     * {@code /enrichment} surface sees it, exactly as the job kind asserts {@code /jobs} does.
+     */
+    @Test
+    void enrichmentImportRegistersAndExportsRoundTrip(@TempDir Path dir) throws Exception {
+        Path wr = dir.resolve("wr");
+        try (Ctx c = open(dir, wr)) {
+            String parts = "\"partitions\":[\"year\",\"month\",\"day\"]";
+            String content = "{\"name\":\"daily_rollup\",\"input\":{\"database\":\"" + db(dir, "in")
+                    + "\",\"format\":\"PARQUET\"," + parts + "},\"output\":{\"database\":\"" + db(dir, "out")
+                    + "\",\"format\":\"PARQUET\"," + parts + "},\"transform\":\"SELECT 1 AS n\"}";
+
+            JsonNode imp = json(send(c.port, "POST", "/bundle/import", bundleOf("enrichment", "daily_rollup", content)));
+            assertEquals(1, imp.get("imported").asInt(), imp.toString());
+
+            // ⚠ the suffix is not decoration — ServiceBootstrap indexes enrichments BY it, so a file
+            // written without it silently drops out of the scan on the next restart
+            assertTrue(java.nio.file.Files.isRegularFile(wr.resolve("daily_rollup_enrich.toon")),
+                    "written as <id>_enrich.toon at the write root");
+
+            JsonNode listed = json(send(c.port, "GET", "/enrichment", null));
+            assertTrue(listed.toString().contains("daily_rollup"),
+                    "hot-registered on the live EnrichmentService, not just written: " + listed);
+
+            JsonNode exp = json(send(c.port, "POST", "/bundle/export",
+                    "{\"items\":[{\"kind\":\"enrichment\",\"id\":\"daily_rollup\"}]}"));
+            assertEquals(1, exp.get("bundle").get("items").size());
+            assertEquals("daily_rollup",
+                    exp.get("bundle").get("items").get(0).get("content").get("name").asText());
+
+            JsonNode imp2 = json(send(c.port, "POST", "/bundle/import", bundleOf("enrichment", "daily_rollup", content)));
+            assertEquals(1, imp2.get("unchanged").asInt(), imp2.toString());
+        }
+    }
+
+    /** Malformed content fails THAT item rather than the whole import — the per-item contract. */
+    @Test
+    void anInvalidEnrichmentFailsItsOwnItem(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, dir.resolve("wr"))) {
+            // no input/output sections ⇒ EnrichmentConfig.load refuses
+            JsonNode imp = json(send(c.port, "POST", "/bundle/import",
+                    bundleOf("enrichment", "broken", "{\"name\":\"broken\",\"transform\":\"SELECT 1\"}")));
+            assertEquals(0, imp.get("imported").asInt(), imp.toString());
+            assertEquals("failed", imp.get("results").get(0).get("status").asText(), imp.toString());
+        }
+    }
+
+    /** ⚠ An enrichment NAMES the pipeline it triggers on, so it must be applied after one. */
+    @Test
+    void enrichmentIsAppliedAfterTheAuthoredPipeline() {
+        assertTrue(BundleRoutes.APPLY_ORDER.indexOf("enrichment")
+                        > BundleRoutes.APPLY_ORDER.indexOf("authored-pipeline"),
+                BundleRoutes.APPLY_ORDER.toString());
+    }
+
+    /** A path under the temp dir, JSON-escaped for embedding in the bundle literal. */
+    private static String db(Path dir, String leaf) {
+        return dir.resolve(leaf).toString().replace("\\", "/");
+    }
+
     // ── saved-view ───────────────────────────────────────────────────────────────
 
     @Test

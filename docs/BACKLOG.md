@@ -757,6 +757,35 @@ non-blocking:**
 
 ## 6. Engineering / tech-debt
 
+**BUNDLE-SCHEMA-1 — the server writes a bundle kind that was RETIRED a month earlier (2026-08-31).**
+Found while ordering `mapping` into `BundleRoutes.APPLY_ORDER` (pipeline spec gap 6c). 🔴 The gap's row
+said to order "`schema`/`mapping`"; grounding **refuted the `schema` half** — it was retired as a bundle
+kind on **2026-07-31 (unification W1)**, a month before the row was written, so it was excluded and only
+`mapping` was ordered. Three surfaces disagree about whether a `schema` item may travel:
+
+- **UI export** — retired, explicitly: *"a schema is no longer a registry component — a schema lives
+  only in the config TOON the engine executes … it must never be offered for export again."* Kept in the
+  TYPE only so an already-exported bundle still parses instead of failing whole-file on `unknown kind`.
+- **Offline mock import** — **skips** it (`RETIRED` in `mock/handlers/bundle.handler.ts`), reporting
+  `unsupported kind`. Deliberate too: pinned by its own spec, *"skips a retired kind with a reason
+  instead of writing it"*.
+- **Real server import** — **writes** it. `BundleRoutes.supported()` reuses
+  `ComponentStore.WRITABLE_TYPES`, which carries `schema` (and `mapping`), so there is no retired notion
+  server-side at all.
+
+🔴 So the **same old bundle imports differently offline and against a backend** — the mock-vs-server
+divergence this codebase repeatedly warns about, here in the *stricter* direction. The UI's own comment
+asserted the server skips these; that claim was false and has been corrected in place.
+
+**The likely fix is one line** — drop `schema` from the server's notion of a supported BUNDLE kind (it
+must stay in `WRITABLE_TYPES`, since `/components/schema/{id}` is a live route with its own
+`SchemaCompatibility` gate — so `supported()` needs its own set rather than reusing that one). ⛔ Left
+undone deliberately: it changes what an old bundle does on import, which is a product call, and the
+UI/mock behaviour it would align to is already pinned by a test asserting the opposite of today's server.
+
+⚠ `mapping` is a different case and was handled: never an export kind, but a live component a pipeline
+references and which *both* import paths write — so it is now ordered before `authored-pipeline`.
+
 **LEDGER-DB-1 — serve status/batches/lineage from a database (2026-08-31).** The operator asked for the
 three ledgers on DuckDB (Personal) and PostgreSQL (other editions). ⚠ **Most of it already exists**:
 `StatusStore` with `FileStatusStore` and `DbStatusStore`, which projects all three into

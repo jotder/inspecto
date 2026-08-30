@@ -4,6 +4,7 @@ import { error, json, MockHandler, MockRequest } from '../mock-http';
 import { MockStore } from '../mock-store';
 import { componentCollection } from './components.handler';
 import { CONNECTIONS_COLL } from './connections.handler';
+import { ENRICHMENT_CONFIGS_COLL } from './onboarding.handler';
 import { JOBS_COLL } from './jobs.handler';
 import { PIPELINES_COLL } from './pipelines.handler';
 
@@ -35,6 +36,10 @@ import { PIPELINES_COLL } from './pipelines.handler';
 const APPLY_ORDER = [
     'connection',
     'grammar',
+    // 🔴 mapping joined 2026-08-31 (pipeline spec gap 6c): a live component kind a pipeline references,
+    // which was unordered and so applied LAST — after the pipeline that names it.
+    // ⛔ schema is deliberately NOT here: retired as a bundle kind 2026-07-31 (unification W1).
+    'mapping',
     'transform',
     'sink',
     'dataset',
@@ -42,10 +47,13 @@ const APPLY_ORDER = [
     'widget',
     'dashboard',
     'reconciliation',
-    'link-analysis-view',
-    'geo-map-view',
-    'decision-rule',
+    // ⚠ link-analysis-view / geo-map-view / decision-rule were listed HERE and not in the backend's
+    // APPLY_ORDER, so this "mirror" applied them mid-list while the server applies them last. Dropped
+    // 2026-08-31 to actually mirror. Last is the correct place for all three: a decision-rule TARGETS a
+    // pipeline (so it must follow one), and the two saved views reference datasets, which already
+    // precede this point. A kind absent from the list applies last, on both sides.
     'authored-pipeline',
+    'enrichment',
     'job',
     'saved-view',
 ];
@@ -54,6 +62,7 @@ const APPLY_ORDER = [
 const OWN_STORE: Record<string, string> = {
     connection: CONNECTIONS_COLL,
     'authored-pipeline': PIPELINES_COLL,
+    enrichment: ENRICHMENT_CONFIGS_COLL,
     job: JOBS_COLL,
     'decision-rule': 'decision-rule',
 };
@@ -130,12 +139,36 @@ function toBundleView(content: Record<string, unknown>): Record<string, unknown>
     return out;
 }
 
-/** What this instance would store for an item — the export content and the `originHash` baseline. */
+/**
+ * What this instance would store for an item — the export content and the `originHash` baseline.
+ *
+ * ⚠ Two kinds are held WRAPPED rather than as bare content, so the bundle view has to unwrap them or an
+ * export ships the wrapper: `connection` masks through `toBundleView`, and `enrichment` is stored as
+ * `{id, path, config, registered}` by the onboarding handler (the shape every other enrichment surface
+ * reads). Hashing the wrapper instead of the content would also make a re-import of identical config
+ * never report `unchanged`.
+ */
 function storedContent(store: MockStore, space: string, kind: string, id: string): Record<string, unknown> | null {
     if (RETIRED.has(kind)) return null;
     const raw = store.get<Record<string, unknown>>(space, collectionFor(kind), id);
     if (!raw) return null;
-    return kind === 'connection' ? toBundleView(raw) : raw;
+    if (kind === 'connection') return toBundleView(raw);
+    if (kind === 'enrichment') return (raw['config'] as Record<string, unknown>) ?? null;
+    return raw;
+}
+
+/**
+ * The record this instance actually persists for an imported item — the inverse of the unwrap above.
+ * ⚠ `enrichment` is stored REGISTERED, mirroring the server, whose import calls
+ * `registerEnrichment` rather than only writing the file: EnrichmentService has no mtime hot-reload,
+ * so a written-but-unregistered enrichment does nothing until restart, and a mock that stored it
+ * inert would rehearse a half-import as a success.
+ */
+function toStoredRecord(kind: string, id: string, content: Record<string, unknown>): Record<string, unknown> {
+    if (kind === 'enrichment')
+        return { id, path: `${id}_enrich.toon`, config: { ...content, name: id }, registered: true };
+    const idField = kind === 'connection' ? 'id' : 'name';
+    return { ...content, [idField]: id };
 }
 
 /**
@@ -240,7 +273,9 @@ export function bundleHandler(flags: MockFlags): MockHandler {
             }
 
             const coll = collectionFor(kind);
-            const current = store.get<Record<string, unknown>>(space, coll, id);
+            // ⚠ the BUNDLE view, not the raw record — see storedContent: a wrapped kind would otherwise
+            // hash its wrapper and never report `unchanged` on a re-import of identical content
+            const current = storedContent(store, space, kind, id);
             const incomingHash = item.provenance?.contentHash ?? `sha256:${hashContent(item.content)}`;
             if (current && incomingHash === `sha256:${hashContent(current)}`) {
                 push('unchanged');
@@ -260,8 +295,7 @@ export function bundleHandler(flags: MockFlags): MockHandler {
             }
             // The id is authoritative — the item's own identity field is stamped from it, exactly as
             // every per-kind mock create does, so a bundle cannot rename an artifact by editing content.
-            const idField = kind === 'connection' ? 'id' : 'name';
-            store.put(space, coll, id, { ...item.content, [idField]: id });
+            store.put(space, coll, id, toStoredRecord(kind, id, item.content));
             push(current ? 'overwritten' : 'imported');
             if (current) overwritten++;
             else imported++;

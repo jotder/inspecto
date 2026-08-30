@@ -260,6 +260,49 @@ class ControlApiBundleImportTest {
                 new DataSourceBundle("test_etl", pipeline, conn, schemas, java.util.List.of(), java.util.List.of()), config, "alpha");
     }
 
+    // ── apply order (pipeline spec gap 6c) ───────────────────────────────────────────────────────────
+
+    /**
+     * <b>A referenced kind must be applied before its referencer.</b> That is the invariant the import
+     * order exists for, and the one {@code mapping} broke: it is a live component kind
+     * ({@code ComponentStore.WRITABLE_TYPES}) that a pipeline names, but it never appeared in
+     * {@code APPLY_ORDER}, so {@code orderOf} sorted it LAST — after the pipeline referencing it.
+     * {@code grammar}, the companion beside it, was ordered correctly all along, which is what made the
+     * omission easy to miss.
+     *
+     * <p>⛔ <b>{@code schema} is deliberately excluded</b>, against the letter of pipeline spec gap 6c:
+     * it was retired as a bundle kind on 2026-07-31 (unification W1) and {@code transfer/bundle.ts} says
+     * it "must never be offered for export again". Ordering it would enshrine a withdrawn kind. (That the
+     * server still WRITES one is a separate defect — BUNDLE-SCHEMA-1.)
+     *
+     * <p>⚠ <b>Deliberately not "every supported kind must be listed".</b> Omission means "apply last",
+     * which is the CORRECT place for a kind that references a pipeline rather than being referenced by
+     * one — {@code expectation} and {@code decision-rule} are right to be absent. A test demanding
+     * completeness would push those into the wrong half of the order.
+     */
+    @Test
+    void aPipelinesCompanionsAreAppliedBeforeThePipeline() {
+        int pipeline = BundleRoutes.APPLY_ORDER.indexOf("authored-pipeline");
+        assertTrue(pipeline >= 0, "authored-pipeline must be ordered at all");
+        assertFalse(BundleRoutes.APPLY_ORDER.contains("schema"),
+                "schema was retired as a bundle kind (unification W1); ordering it would re-admit it");
+        for (String companion : java.util.List.of("grammar", "mapping", "connection")) {
+            int at = BundleRoutes.APPLY_ORDER.indexOf(companion);
+            assertTrue(at >= 0, companion + " is a supported kind an authored pipeline references, so "
+                    + "leaving it out of APPLY_ORDER applies it AFTER the pipeline that needs it");
+            assertTrue(at < pipeline, companion + " must be applied before authored-pipeline, got "
+                    + at + " vs " + pipeline + " in " + BundleRoutes.APPLY_ORDER);
+        }
+    }
+
+    /** A job may reference the pipeline it triggers on, so it follows one. */
+    @Test
+    void aJobIsAppliedAfterThePipelineItMayTriggerOn() {
+        assertTrue(BundleRoutes.APPLY_ORDER.indexOf("job")
+                        > BundleRoutes.APPLY_ORDER.indexOf("authored-pipeline"),
+                BundleRoutes.APPLY_ORDER.toString());
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────────────────────────────
 
     private java.util.List<String> idList(int port, String path) throws Exception {

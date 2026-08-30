@@ -1,6 +1,9 @@
 package com.gamma.control;
 
 import com.gamma.acquire.ConnectionProfile;
+import com.gamma.config.io.ConfigCodec;
+import com.gamma.config.io.ConfigLoader;
+import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.event.SavedView;
 import com.gamma.event.SavedViewStore;
 import com.gamma.job.JobConfig;
@@ -11,10 +14,13 @@ import com.gamma.pipeline.PipelineCodec;
 import com.gamma.pipeline.PipelineGraph;
 import com.gamma.pipeline.PipelineStore;
 import com.gamma.service.SpaceRoot;
+import com.gamma.util.AtomicFiles;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -66,14 +72,36 @@ final class BundleRoutes implements RouteModule {
     static final String FORMAT = "inspecto-metadata-bundle";
 
     /** The non-{@link ComponentStore} kinds this module also serves (each has its own {@link BundleSource}). */
-    private static final Set<String> OWN_STORE_KINDS = Set.of("authored-pipeline", "job", "saved-view", "connection");
+    private static final Set<String> OWN_STORE_KINDS =
+            Set.of("authored-pipeline", "job", "saved-view", "connection", "enrichment");
 
     /** Supported kinds in dependency order (referenced kinds first) — the import apply order. {@code connection}
      *  is first: it has no outbound refs of its own and an authored pipeline's source may reference it.
-     *  Authored pipelines/jobs may reference the component kinds above them; saved-view has no references. */
-    private static final List<String> APPLY_ORDER =
-            List.of("connection", "grammar", "transform", "sink", "dataset", "query", "widget",
-                    "dashboard", "reconciliation", "authored-pipeline", "job", "saved-view");
+     *  Authored pipelines/jobs may reference the component kinds above them; saved-view has no references.
+     *
+     *  <p>🔴 {@code mapping} joined the list 2026-08-31 (pipeline spec gap 6c). It is a live component kind
+     *  ({@link ComponentStore#WRITABLE_TYPES}, the Mapping CSV added in ELT amendment Phase 1) that a
+     *  pipeline REFERENCES, but being absent here meant {@link #orderOf} sorted it LAST — so an authored
+     *  pipeline was written before the mapping it names. It sits beside {@code grammar}, the companion that
+     *  WAS ordered correctly, which is what made the omission easy to miss.
+     *
+     *  <p>⛔ <b>{@code schema} is deliberately NOT here, against the letter of that gap.</b> It was retired
+     *  as a bundle kind on 2026-07-31 (unification W1): a schema lives only in the config TOON the engine
+     *  executes, and {@code transfer/bundle.ts} states it "must never be offered for export again". Ordering
+     *  it would enshrine a kind the product withdrew. 🔴 Separately, this server does NOT honour that
+     *  retirement — {@code supported()} reuses {@code WRITABLE_TYPES}, which still carries {@code schema},
+     *  so an old bundle's schema item is WRITTEN here while the UI and its mock expect it skipped. Filed as
+     *  BUNDLE-SCHEMA-1; not resolved here, because whichever way it goes is a product call, not an
+     *  ordering one.
+     *
+     *  <p>⚠ Absence is not always a bug: a kind that REFERENCES a pipeline rather than being referenced by
+     *  one ({@code expectation}, {@code decision-rule}) is correct to apply last, which is exactly what
+     *  omission gives it. So the invariant worth pinning is "a referenced kind precedes its referencer",
+     *  not "every supported kind appears here" — see {@code ControlApiBundleImportTest}. */
+    static final List<String> APPLY_ORDER =
+            List.of("connection", "grammar", "mapping", "transform", "sink", "dataset", "query",
+                    "widget", "dashboard", "reconciliation", "authored-pipeline", "enrichment", "job",
+                    "saved-view");
 
     private static boolean supported(String kind) {
         return ComponentStore.WRITABLE_TYPES.contains(kind) || OWN_STORE_KINDS.contains(kind);
@@ -378,6 +406,7 @@ final class BundleRoutes implements RouteModule {
             case "job" -> new JobBundleSource(api);
             case "saved-view" -> new SavedViewBundleSource(api.service().savedViews());
             case "connection" -> new ConnectionBundleSource(api);
+            case "enrichment" -> new EnrichmentBundleSource(api, root);
             default -> null;
         };
     }
@@ -468,6 +497,74 @@ final class BundleRoutes implements RouteModule {
      * hash use {@code toBundleMap}, a stripped literal is invisible to drift detection — a re-import of the
      * same bundle is honestly {@code unchanged} even though the target holds a credential the bundle never did.
      */
+    /**
+     * {@code enrichment} — the {@code <write-root>/<id>_enrich.toon} companion (pipeline spec gap 6b).
+     *
+     * <p><b>Why an enrichment could not travel before.</b> It is not a {@link ComponentStore} component
+     * and had no {@link BundleSource}, so a bundle carrying a pipeline left its Stage-2 enrichment
+     * behind — and an enrichment is where a deployment's derived columns live, which makes it exactly
+     * the kind of thing an import needs.
+     *
+     * <p>⚠ <b>A write registers, it does not merely persist.</b> `EnrichmentService` has no mtime
+     * hot-reload, so writing the file alone would import an enrichment that does nothing until the next
+     * restart — a silent half-import. This mirrors {@code EnrichmentRoutes.registerEnrichment}: validate
+     * structurally, write atomically, then register, exactly as {@code JobBundleSource} hot-registers a
+     * job. ⚠ Registration failure is an {@link IllegalArgumentException} so it lands as a per-item
+     * "failed" result rather than failing the whole import.
+     *
+     * <p>⚠ It sorts AFTER {@code authored-pipeline} in {@link #APPLY_ORDER}: an enrichment's
+     * {@code triggers.on_pipeline} names a pipeline, so it is the referencer, not the referenced.
+     */
+    private record EnrichmentBundleSource(ApiContext api, Path writeRoot) implements BundleSource {
+        public Optional<Map<String, Object>> get(String id) {
+            Path f = file(id);
+            if (!Files.isRegularFile(f)) return Optional.empty();
+            try {
+                return Optional.of(ConfigLoader.filesystem().decode(f.toString()));
+            } catch (RuntimeException | IOException malformed) {
+                // Unreadable or malformed reads as "missing" — an export naming a broken companion should
+                // report it absent, not 500 the whole bundle. Mirrors ComponentBundleSource's Optional.
+                return Optional.empty();
+            }
+        }
+
+        public boolean exists(String id) { return Files.isRegularFile(file(id)); }
+
+        public Map<String, Object> write(String id, Map<String, Object> content) throws IOException {
+            Map<String, Object> stamped = stamp(id, content);
+            Path target = file(id);
+            Files.createDirectories(target.getParent());
+            AtomicFiles.write(target, ConfigCodec.toToon(stamped).getBytes(StandardCharsets.UTF_8), ".cfg-");
+            try {
+                api.service().registerEnrichment(EnrichmentConfig.load(target.toString()));
+            } catch (RuntimeException invalid) {
+                throw new IllegalArgumentException("not a valid enrichment: " + invalid.getMessage());
+            }
+            return stamped;
+        }
+
+        public Map<String, Object> normalized(String id, Map<String, Object> content) {
+            return stamp(id, content);
+        }
+
+        /** In-file identity == the bundle item's id, as every other source stamps it. */
+        private static Map<String, Object> stamp(String id, Map<String, Object> content) {
+            Map<String, Object> c = new LinkedHashMap<>(content);
+            c.put("name", id);
+            return c;
+        }
+
+        /**
+         * {@code <write-root>/<id>_enrich.toon}. The suffix is not decoration — {@code ServiceBootstrap}
+         * indexes enrichments BY it, so a file written without it drops out of the scan on the next
+         * restart. {@link ConfigFileSupport#fileBase} is the one place that rule lives.
+         */
+        private Path file(String id) {
+            return WriteGates.jail(writeRoot,
+                    writeRoot.resolve(ConfigFileSupport.fileBase("enrichment", id) + ".toon"), "enrichment id");
+        }
+    }
+
     private record ConnectionBundleSource(ApiContext api) implements BundleSource {
         public Optional<Map<String, Object>> get(String id) {
             return api.service().connection(id).map(ConnectionProfile::toBundleMap);

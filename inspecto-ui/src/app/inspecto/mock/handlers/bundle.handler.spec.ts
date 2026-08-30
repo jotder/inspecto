@@ -5,6 +5,7 @@ import { MockStore } from '../mock-store';
 import { bundleHandler } from './bundle.handler';
 import { componentCollection } from './components.handler';
 import { CONNECTIONS_COLL } from './connections.handler';
+import { ENRICHMENT_CONFIGS_COLL } from './onboarding.handler';
 
 /**
  * The gates are the whole point of this handler (U-F): the UI stopped writing bundle items itself so
@@ -210,6 +211,36 @@ describe('bundleHandler — POST /bundle/import', () => {
         expect(out.skipped).toBe(1);
         expect(out.results[0].message).toContain('unsupported kind');
         expect(store.has('default', componentCollection('schema'), 'orders_schema')).toBe(false);
+    });
+
+    /**
+     * Pipeline spec gap 6b. ⚠ An enrichment is held WRAPPED (`{id, path, config, registered}`) — the
+     * shape every other enrichment surface reads — so a flat write would corrupt the store for them.
+     * And it is stored REGISTERED, mirroring the server, whose import calls `registerEnrichment`:
+     * EnrichmentService has no mtime hot-reload, so an unregistered enrichment does nothing until
+     * restart and a mock storing it inert would rehearse a half-import as success.
+     */
+    it('stores an imported enrichment wrapped and registered, not as a flat content map', () => {
+        const config = { name: 'daily_rollup', transform: 'SELECT 1' };
+        const { store, res } = run({ bundle: envelope([item('enrichment', 'daily_rollup', config)]) });
+
+        expect((res?.body as Outcome).imported).toBe(1);
+        const stored = store.get<Record<string, unknown>>('default', ENRICHMENT_CONFIGS_COLL, 'daily_rollup');
+        expect(stored?.['registered']).toBe(true);
+        expect(stored?.['path']).toBe('daily_rollup_enrich.toon');
+        expect(stored?.['config']).toEqual({ name: 'daily_rollup', transform: 'SELECT 1' });
+    });
+
+    /** ⚠ The idempotence hash must read the CONFIG, not the wrapper, or a re-import never says unchanged. */
+    it('reports a re-imported identical enrichment as unchanged', () => {
+        const config = { name: 'daily_rollup', transform: 'SELECT 1' };
+        const body = { bundle: envelope([item('enrichment', 'daily_rollup', config)]) };
+        const store = new MockStore();
+
+        expect((run(body, store).res?.body as Outcome).imported).toBe(1);
+        const again = run(body, store).res?.body as Outcome;
+        expect(again.unchanged).toBe(1);
+        expect(again.imported).toBe(0);
     });
 
     it('fails an item with no content object rather than writing an empty artifact', () => {

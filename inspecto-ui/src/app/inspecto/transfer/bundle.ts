@@ -32,6 +32,10 @@ export type BundleKind =
       >
     | 'connection'
     | 'authored-pipeline'
+    // The Stage-2 companion (pipeline spec gap 6b, 2026-08-31). Not a registry component — it is the
+    // `<name>_enrich.toon` beside the pipeline — so the server serves it through its own BundleSource,
+    // and an import REGISTERS it (EnrichmentService has no mtime hot-reload).
+    | 'enrichment'
     | 'job'
     | 'decision-rule'
     // LEGACY, retired 2026-07-31 (unification W1): `schema` is no longer a registry component — a schema
@@ -56,6 +60,8 @@ export const BUNDLE_KINDS: { kind: BundleKind; label: string }[] = [
     { kind: 'widget', label: 'Widgets' },
     { kind: 'dashboard', label: 'Dashboards' },
     { kind: 'authored-pipeline', label: 'Pipelines' },
+    // After the pipeline: an enrichment's `triggers.on_pipeline` names one, so it is the referencer.
+    { kind: 'enrichment', label: 'Enrichments' },
     { kind: 'job', label: 'Jobs' },
     { kind: 'decision-rule', label: 'Decision Rules' },
 ];
@@ -107,7 +113,14 @@ export interface MetadataBundle {
 }
 
 /** Kinds retired from export but still ACCEPTED on import, so an older bundle parses instead of being
- *  rejected outright; the server then reports them per-item as skipped. */
+ *  rejected outright.
+ *
+ *  🔴 The line that used to end "…the server then reports them per-item as skipped" was WRONG, and was
+ *  corrected 2026-08-31. The offline mock skips such an item (its own spec pins that), but the real
+ *  `BundleRoutes` WRITES it: `supported()` reuses `ComponentStore.WRITABLE_TYPES`, which carries
+ *  `schema`. So the same old bundle imports differently offline and against a backend. Filed in BACKLOG
+ *  — do not "fix" either side by assuming the other is right; it is a product question about what a
+ *  bundle may carry. */
 export const LEGACY_BUNDLE_KINDS: BundleKind[] = ['schema'];
 
 /** Sort order. Legacy kinds are appended so an item of a retired kind still gets a REAL index — a
