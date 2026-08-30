@@ -506,7 +506,13 @@ The redesign's actual agenda. Each item is grounded, not suspected.
    2026-08-31** (message half) — **two** refusal sites, both now naming the lane where route does work.
 10. 🔴 **Two authorities read the config and disagree** (§3) — a whole `parsing:` block, four `dirs.*`
     keys, `trigger:`, `steps:`, `route:` and five transform blocks are engine-read but spec-invisible.
-    **The largest structural problem in the current design.**
+    **The largest structural problem in the current design.** ⚠ **Measured 2026-08-31, and this line was
+    partly wrong:** `parsing:` is **not** wholly invisible — `parsing.source_timezone` and
+    `parsing.delimited.*` were already declared, and `parsing.grammar` was declared by Wave 0's item 4.
+    The five transform blocks are exact (`dedup`, `duplicate_check`, `join`, `map`, `summarize`), and
+    `trigger:`/`steps:`/`route:` are confirmed. True block-level debt is **18**, now pinned and
+    ratcheted by `PipelineKeyCoverageContractTest`. The `dirs.*` leaf keys are a **separate, still-open**
+    problem: `dirs` is declared as a block, so a block-level contract cannot see inside it.
 11. ⚠ **`steps:` has no authoring surface.** A chain is authored as a comma-separated `processor`
     string plus a positionally-aligned JSON array the author keeps aligned by hand.
 12. ⚠ **The post-sync chain is invisible in the editor.** `open-dag-pipeline-design.md` §6.4 marks
@@ -673,7 +679,7 @@ recorded baseline, unmoved.
 
 | Gap | Fix | Notes |
 |---|---|---|
-| **10** two authorities disagree — *the largest structural problem* | **Start with a sixth contract test**, not a rewrite: enumerate the keys `PipelineConfigParser` reads and assert every one is declared in `ConfigSpecs.pipeline()`. It fails today (that is the point), so land it with the known set as an explicit allow-list and **shrink the list** as keys are declared. | 🔴 This makes drift *visible* and **blocks new drift immediately**, which no amount of declaring keys does. There are already five contract tests (`NodeAttributes`, `StepTypes`, `NodeConfigName`, `MapNodeKey`, `BindKindHome`) — this is the idiomatic move here, not a novel one. |
+| **10** two authorities disagree — *the largest structural problem* | ✅ **SHIPPED 2026-08-31** — `PipelineKeyCoverageContractTest` (inspecto-etl), the sixth contract test. **Measured debt: 18 blocks** the engine reads and the spec does not declare — 8 top-level (`active`, `collector`, `output_store`, `route`, `sinks`, `steps`, `template`, `trigger`) and 10 under `processing.*`. They are the `UNDECLARED_BLOCKS` allow-list, which **only ever shrinks**: a new undeclared block fails immediately, and a newly declared one must be *removed* or the ratchet test fails. | 🔴 Drift is now visible and **new drift is blocked**. ⚠ **Granularity is the block, deliberately** — reconstructing dotted leaf paths from a dozen nested sub-parsers would be a heuristic, and a heuristic census over-reports. So leaf-level drift *inside* a declared block (the `dirs.*` keys §10 names) is **not** covered; that needs its own move. 🔴 **Falsified in four directions before being trusted** — a new parser read, a stale allow-list entry, a broken comment strip, and a new shadowing local each fail it. |
 | **8** `output_store:` arming is undiscoverable | declare it in the spec with a **cross-field rule** — "`steps`/`dedup`/`summarize`/`join` require `output_store`" — so the UI can show the requirement and a save returns a **field-anchored 422** | converts a run-time surprise into an authoring-time error; the refusal text already exists, it just fires too late |
 | **3** UI looser than the validator | ⚠ `accepts` is **already published** on `GET /pipelines/node-types` — the UI simply does not read it. Check the target's `accepts` on edge creation, next to the existing `typeEmits` lookup | purely client-side; the server stays the authority |
 | **5** reference direction is inconsistent | add **`GET /pipelines/{n}/related`** — the server-side closure: the schema and mapping it points at, plus the enrichments, jobs and datasets that point at *it* | one endpoint that also fixes 6, and is the honest answer to "what belongs to this pipeline" |
