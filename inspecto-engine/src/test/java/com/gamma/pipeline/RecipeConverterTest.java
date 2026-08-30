@@ -129,6 +129,33 @@ class RecipeConverterTest {
         assertEquals(cfg, RecipeCompiler.compile(recipe, cfg, false));
     }
 
+    /**
+     * 🔴 {@code output.filename_column} is SINK-owned (PipelineEditable's {@code SINK_OUTPUT_KEYS},
+     * lifted and lowered beside format/compression/ducklake), so the projection has to carry it — the
+     * rule the comment beside those three states: "a present sink node owns them wholesale in the
+     * lowering, so the projection must carry them or a round trip deletes them."
+     *
+     * <p>It was omitted, so the source-filename lineage column was silently dropped on every round
+     * trip. Found by creating a pipeline through the UI end to end: {@code pipelineScaffold} writes
+     * this key, so <b>no UI-scaffolded pipeline round-tripped at all</b> — and no existing fixture
+     * carried the key, so the repo-wide sweep had nothing to catch it with.
+     */
+    @Test
+    void theSourceFilenameLineageColumnSurvivesTheRoundTrip() {
+        Map<String, Object> cfg = new LinkedHashMap<>();
+        cfg.put("name", "e2e_orders");
+        cfg.put("active", false);
+        cfg.put("dirs", new LinkedHashMap<>(Map.of("poll", "/in", "database", "/db")));
+        cfg.put("processing", new LinkedHashMap<>(Map.of("threads", 1)));
+        cfg.put("parsing", new LinkedHashMap<>(Map.of("frontend", "delimited")));
+        cfg.put("output", new LinkedHashMap<>(Map.of("filename_column", "file_name")));
+
+        Map<String, Object> recipe = RecipeConverter.toRecipe(cfg);
+
+        assertEquals(cfg, RecipeCompiler.compile(recipe, cfg, false),
+                "output.filename_column must survive projection + compile, like its sink-owned siblings");
+    }
+
     /** The Phase-4 Guarantees fold (§2.4): housekeeping projects under its declared names, never on steps. */
     @Test
     @SuppressWarnings("unchecked")

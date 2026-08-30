@@ -101,6 +101,11 @@ public final class RecipeConverter {
         putIfPresent(sink, "format", output.get("format"));
         putIfPresent(sink, "compression", output.get("compression"));
         putIfPresent(sink, "ducklake", output.get("ducklake"));
+        // ⚠ filename_column belongs with its three neighbours above: it is a SINK-owned output key
+        // (PipelineEditable's SINK_OUTPUT_KEYS, lifted and lowered with format/compression/ducklake),
+        // so omitting it here deleted the source-filename lineage column on every round trip. Every
+        // pipeline the UI scaffolds carries it, so no UI-created pipeline round-tripped at all.
+        putIfPresent(sink, "filename_column", output.get("filename_column"));
         putIfPresent(sink, "database", dirs.get("database"));
         putIfPresent(sink, "backup", dirs.get("backup"));
         putIfPresent(sink, "temp", dirs.get("temp"));
