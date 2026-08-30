@@ -639,6 +639,7 @@
                                         <app-pipeline-load-definition
                                             [node]="dn"
                                             [schemaFile]="parserSchemaFile()"
+                                            [pipeline]="selectedId() || ''"
                                             [sample]="sampleThread()"
                                             (applied)="onDefinitionApplied($event)"
                                             (dirtyChange)="definitionDirty.set($event)"

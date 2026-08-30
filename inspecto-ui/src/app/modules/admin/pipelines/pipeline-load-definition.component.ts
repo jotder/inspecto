@@ -10,6 +10,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { AuthoredNode, ConfigService, apiErrorMessage } from 'app/inspecto/api';
 import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
 import { FILENAME_DATE_TARGET, TRANSFORM_TYPES } from 'app/inspecto/mapping';
+import { DerivedSchemaPanelComponent } from 'app/inspecto/schema';
 import { schemaNameFromPath } from 'app/inspecto/segments';
 
 /**
@@ -84,6 +85,7 @@ interface RuleRow {
         MatInputModule,
         MatSelectModule,
         MatTooltipModule,
+        DerivedSchemaPanelComponent,
     ],
     template: `
         <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-1">
@@ -296,6 +298,18 @@ interface RuleRow {
                 }
             }
         </form>
+
+        <!--
+            S5: the engine already knows what this pipeline writes, so show it beside the mapping the
+            author is editing rather than making them restate it. Read-only, outside the <form> (the
+            form owns the authored side; this panel has no write path at all).
+            ⚠ Only for a SAVED pipeline — a name is what the route resolves, and a draft has none.
+        -->
+        @if (pipeline()) {
+            <div class="mt-4 border-t pt-3">
+                <inspecto-derived-schema-panel [pipeline]="pipeline()" />
+            </div>
+        }
     `,
 })
 export class PipelineLoadDefinitionComponent {
@@ -309,6 +323,11 @@ export class PipelineLoadDefinitionComponent {
      * rules map FROM live on that node, not this one.
      */
     readonly schemaFile = input('');
+    /**
+     * The saved pipeline's name, for the read-only derived-schema panel (S5). Blank for a pipeline
+     * that has never been saved — the route resolves a name, and there is nothing to derive without one.
+     */
+    readonly pipeline = input('');
     /**
      * This tab's sample thread, or null when the host keeps none — in which case the mapping still
      * edits and only *Test mapping* is unavailable. Same input shape as the Parse pane's, and for the

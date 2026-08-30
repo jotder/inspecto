@@ -9,6 +9,7 @@ import {
     ConfigSpec,
     ConfigType,
     ConfigWriteResult,
+    DerivedSchemaResult,
     EnrichmentPreview,
     EnrichmentRegisterResult,
     ParsingPreview,
@@ -31,6 +32,18 @@ export class ConfigService {
     /** Field/rule spec for a config type — used to render the authoring form. */
     spec(type: ConfigType): Observable<ConfigSpec> {
         return this.http.get<ConfigSpec>(apiUrl(`/config/spec/${encodeURIComponent(type)}`));
+    }
+    /**
+     * The DERIVED output schema of a saved pipeline (step-workbench S5) — DESCRIBE over the transform's
+     * own SELECT, without executing it, for every schema the pipeline declares.
+     *
+     * ⚠ 422 when a Schema/Mapping does not bind; the message carries DuckDB's own binder error, which
+     * names the offending column — surface it, it is the most useful thing this route says.
+     */
+    derivedSchema(pipeline: string): Observable<DerivedSchemaResult> {
+        return this.http.get<DerivedSchemaResult>(apiUrl('/config/schema/derived'), {
+            params: toParams({ pipeline }),
+        });
     }
     /** Validate a saved .toon file on disk. */
     validateFile(configPath: string): Observable<ValidateResult> {
@@ -80,12 +93,7 @@ export class ConfigService {
      * and, for a pipeline, also refuses one that other configs still reference. Pass `force` to delete
      * over those dependents; it does NOT bypass the active gate, which is a separate refusal.
      */
-    remove(
-        type: ConfigType,
-        name: string,
-        subdir?: string,
-        force?: boolean,
-    ): Observable<ConfigDeleteResult> {
+    remove(type: ConfigType, name: string, subdir?: string, force?: boolean): Observable<ConfigDeleteResult> {
         return this.http.delete<ConfigDeleteResult>(
             apiUrl(`/config/${encodeURIComponent(type)}/${encodeURIComponent(name)}`),
             { params: toParams({ subdir, force: force ? 'true' : undefined }) },
@@ -93,10 +101,9 @@ export class ConfigService {
     }
     /** What still references this pipeline — read-only, so a caller can warn before deleting. */
     impact(name: string, subdir?: string): Observable<ConfigImpact> {
-        return this.http.get<ConfigImpact>(
-            apiUrl(`/config/pipeline/${encodeURIComponent(name)}/impact`),
-            { params: toParams({ subdir }) },
-        );
+        return this.http.get<ConfigImpact>(apiUrl(`/config/pipeline/${encodeURIComponent(name)}/impact`), {
+            params: toParams({ subdir }),
+        });
     }
     /**
      * Register a freshly written pipeline file with the running service (`POST /runs` — pairs with

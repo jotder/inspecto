@@ -467,6 +467,41 @@ export interface SchemaPreview {
     mappedRows?: Record<string, unknown>[];
 }
 
+/** One derived output column — DuckDB's own inferred type, verbatim (`VARCHAR`, `DOUBLE`, …). */
+export interface DerivedSchemaColumn {
+    name: string;
+    type: string;
+}
+
+/** One declared schema's derived SINK shape: the written table's columns. */
+export interface DerivedSchema {
+    key: string;
+    table: string | null;
+    columns: DerivedSchemaColumn[];
+}
+
+/**
+ * Result of `GET /config/schema/derived?pipeline=…` (step-workbench S5) — the output schema the engine
+ * would produce, derived by DuckDB `DESCRIBE` over the same SELECT the transform runs, WITHOUT
+ * executing it. This is what the author no longer has to restate by hand.
+ *
+ * ⚠ `sourcePath`/`typedSource` are not decoration. On the CSV path every raw column is `VARCHAR`; on
+ * the plugin path the declared field types stand — so the same Schema derives different types
+ * depending on which one applies. The server reports which it assumed precisely so a reader is never
+ * misled by types that look authoritative, and the UI must keep showing it.
+ *
+ * ⚠ The derived SINK shape includes the partition columns; the Parquet file FOOTER will not, because
+ * Hive encodes those as directories. Both are correct answers to different questions — this is the
+ * written-table one.
+ */
+export interface DerivedSchemaResult {
+    pipeline: string;
+    sourcePath: 'csv' | 'plugin';
+    typedSource: boolean;
+    ingesterClass: string | null;
+    schemas: DerivedSchema[];
+}
+
 /** Result of POST /config/suggest/schema — a DRAFT `raw.fields` + identity mapping inferred from
  *  already-parsed sample rows (TRY_CAST voting); seeds a human edit, never auto-applied.
  *  `drift` (B3) is present only when the caller posted the draft it holds. */

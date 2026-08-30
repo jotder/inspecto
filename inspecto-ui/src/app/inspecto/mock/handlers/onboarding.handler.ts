@@ -51,6 +51,7 @@ const PREVIEW_PARSING = /\/config\/preview\/parsing$/;
 const PREVIEW_SCHEMA = /\/config\/preview\/schema$/;
 const SUGGEST_SCHEMA = /\/config\/suggest\/schema$/;
 const CONFIG_FILE = /\/config\/(pipeline|schema|enrichment)\/([^/?]+)$/;
+const SCHEMA_DERIVED = /\/config\/schema\/derived(\?.*)?$/;
 const CONFIG_IMPACT = /\/config\/pipeline\/([^/?]+)\/impact$/;
 const RUNS = /\/runs$/;
 const ENRICHMENT = /\/enrichment$/;
@@ -369,6 +370,55 @@ export function onboardingHandler(flags: MockFlags): MockHandler {
             }
         }
 
+        // GET /config/schema/derived?pipeline=… (step-workbench S5). ⚠ Mirrors the server's GATES
+        // exactly — 400 missing param, 403 a path where a bare name belongs, 404 unknown pipeline,
+        // 422 no schema to derive from — because a mock that answers 200 where the server refuses
+        // turns a hard failure into a passing rehearsal.
+        // ⚠ FIDELITY LIMIT, stated rather than hidden: the real route derives TYPES from DuckDB
+        // (`DESCRIBE`). Offline there is no engine, so the declared field types are echoed instead.
+        // The SHAPE and the gates are faithful; the exact type strings are not, and no offline check
+        // can stand in for the server's own inference.
+        if (method === 'GET' && SCHEMA_DERIVED.test(url)) {
+            // ⚠ Query params arrive as req.params, NOT in the url — Angular's HttpRequest.url carries
+            // no query string, so parsing the url here silently sees every request as param-less.
+            const pipeline = (req.params['pipeline'] ?? '').trim();
+            if (!pipeline) return error(400, "query parameter 'pipeline' is required");
+            if (pipeline.includes('/') || pipeline.includes('\\') || pipeline.includes('..'))
+                return error(403, "'pipeline' must be a bare pipeline name, not a path");
+            const rec = store.get<StoredPipelineConfig>(space, PIPELINE_CONFIGS_COLL, pipeline);
+            if (!rec) return error(404, `no pipeline named '${pipeline}'`);
+
+            const processing = (rec.config['processing'] ?? {}) as Record<string, unknown>;
+            const parsing = (rec.config['parsing'] ?? {}) as Record<string, unknown>;
+            const plugin = (parsing['plugin'] ?? {}) as Record<string, unknown>;
+            const ingesterClass = (plugin['ingester'] ?? processing['ingester'] ?? null) as string | null;
+            const schemaRef = String(processing['schema_file'] ?? '').replace(/\.toon$/, '');
+            const schema = schemaRef
+                ? (store.get<StoredSchemaConfig>(space, SCHEMA_CONFIGS_COLL, schemaRef)?.config ??
+                  (store.get<{ content?: Record<string, unknown> }>(space, componentCollection('schema'), schemaRef)
+                      ?.content as Record<string, unknown> | undefined))
+                : undefined;
+            if (!schema)
+                return error(
+                    422,
+                    `pipeline '${pipeline}' declares no schema (a draft may be saved schema-less, but nothing can be derived from it)`,
+                );
+
+            const typedSource = !!ingesterClass && String(ingesterClass).trim() !== '';
+            const raw = (schema['raw'] ?? {}) as Record<string, unknown>;
+            const fields = (raw['fields'] ?? []) as { name?: string; type?: string }[];
+            const columns = fields
+                .filter((f) => !!f?.name)
+                .map((f) => ({ name: String(f.name), type: typedSource ? String(f.type ?? 'VARCHAR') : 'VARCHAR' }));
+            return json({
+                pipeline,
+                sourcePath: typedSource ? 'plugin' : 'csv',
+                typedSource,
+                ingesterClass: ingesterClass ?? null,
+                schemas: [{ key: 'single', table: schemaRef || null, columns }],
+            });
+        }
+
         if (method === 'GET' && (m = match(url, CONFIG_FILE))) {
             const [, type, name] = m;
             const rec = store.get<StoredPipelineConfig | StoredSchemaConfig>(space, collFor(type), name);
@@ -471,9 +521,7 @@ const WIDENINGS: Record<string, string[]> = {
  * is NOT a directive — the scan consumes `%%` as a pair. ⚠ Only the `delimited:` block is checked: a
  * list authored at `parsing:` level is not read by the engine's `mergeParsing` at all.
  */
-export function formatZoneDirectiveRefusal(
-    parsing: Record<string, unknown> | undefined,
-): string | null {
+export function formatZoneDirectiveRefusal(parsing: Record<string, unknown> | undefined): string | null {
     const delimited = parsing?.['delimited'] as Record<string, unknown> | undefined;
     if (!delimited) return null;
     for (const key of ['date_formats', 'timestamp_formats']) {
@@ -482,10 +530,12 @@ export function formatZoneDirectiveRefusal(
         for (const fmt of formats) {
             const directive = zoneDirectiveIn(String(fmt ?? ''));
             if (!directive) continue;
-            return `parsing.delimited.${key}: format '${fmt}' uses the zone directive '%${directive}', `
-                + `which is not supported. The offset it parses is then re-rendered in the SERVER's zone, `
-                + `so the same file would import differently on different machines. Declare the zone `
-                + `instead: parsing.source_timezone, or raw.fields[].timezone / .timezone_column.`;
+            return (
+                `parsing.delimited.${key}: format '${fmt}' uses the zone directive '%${directive}', ` +
+                `which is not supported. The offset it parses is then re-rendered in the SERVER's zone, ` +
+                `so the same file would import differently on different machines. Declare the zone ` +
+                `instead: parsing.source_timezone, or raw.fields[].timezone / .timezone_column.`
+            );
         }
     }
     return null;
@@ -496,7 +546,10 @@ function zoneDirectiveIn(format: string): string {
     for (let i = 0; i < format.length - 1; i++) {
         if (format[i] !== '%') continue;
         const next = format[i + 1];
-        if (next === '%') { i++; continue; }       // escaped literal — consume the pair
+        if (next === '%') {
+            i++;
+            continue;
+        } // escaped literal — consume the pair
         if (next === 'z' || next === 'Z') return next;
     }
     return '';

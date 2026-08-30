@@ -291,9 +291,13 @@ Ordered by what they unblock.
 - ~~**step-workbench S5** — `TypeFlow` behind a read route~~ ✅ **BACKEND SHIPPED 2026-08-30**
   (`bfec949e`) — `GET /config/schema/derived?pipeline=…`. 🔴 `TypeFlow` had existed and been tested
   since ELT Phase 2 with **zero production callers**; the gap was never the derivation, only its
-  reachability. ⚠ **The UI half is NOT built** — the derived schema is not yet shown beside the
-  authored one, so "the restating" ends for an API caller, not yet for an author. Reactor
-  3741/0/0/2.
+  reachability. ✅ **UI HALF SHIPPED 2026-08-30** — `<inspecto-derived-schema-panel>`, read-only,
+  in the `transform.map` definition pane; the restating now ends for the author, not just an API
+  caller. **S5 COMPLETE.** 🔴 The panel always states which source path the types came from — hiding
+  that would re-create the trap the route closed. 🔴 **The preview caught a defect no unit test could**:
+  the offline mock parsed its query param out of `req.url`, which Angular never populates (params
+  arrive as `req.params`), so every request read as param-less and the panel showed a 400 while 7 green
+  specs said otherwise. Reactor 3741/0/0/2 · UI 2848/0, exit 0.
 - ~~**G1 SBOM** per bundle, once Q2 is answered~~ **Q2 ANSWERED 2026-08-30 — now plain build work, filed as COMPLY-1 (BACKLOG §6), with COMPLY-2 (signing) and COMPLY-3 (audit prune) alongside it** · ~~**AU-9** audit-record protection~~ ✅ **WRITTEN 2026-08-30**
   (`6749aae4`) → `compliance/evidence/audit-record-protection.md`; the claim is deliberately narrow —
   append-only **by construction** and one dispatch seam, but 🔴 NOT tamper-evident, NOT
