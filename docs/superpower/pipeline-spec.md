@@ -5,12 +5,13 @@ described.** It is written to be changed: the intent is to rewrite the subsystem
 
 **What this replaces.** Pipeline knowledge was spread across ~20 files and >500 KB, and no one of them
 told you what a Pipeline *is*. This document states the whole subsystem as it stands today. The deep
-files stay on disk as evidence and are mapped in §13; ⚠ **they are not maintained as a parallel truth
+files stay on disk as evidence and are mapped in §14; ⚠ **they are not maintained as a parallel truth
 — when this document and one of them disagree, fix one of them, do not silently diverge.**
 
 **How to read it.** §1–§4 are the authored surface. §5–§6 are the model. §7 is what actually runs.
 §8–§9 are the seams. **§10 is the honest list of what is broken, missing, or contradictory**, and
-**§11 is the proposed fix**, and **§12 turns the gaps into work** — the part a redesign starts from.
+**§11 is the proposed fix**, **§12 turns the gaps into work**, and **§13 is the interview** —
+the decisions to take before implementing.
 
 🔴 **Every claim here was checked against the code, not against the older docs.** Where the code and a
 previous doc disagreed, the code won and the disagreement is recorded.
@@ -660,7 +661,8 @@ No decision, no design, no runtime change.
 | **3** UI looser than the validator | ⚠ `accepts` is **already published** on `GET /pipelines/node-types` — the UI simply does not read it. Check the target's `accepts` on edge creation, next to the existing `typeEmits` lookup | purely client-side; the server stays the authority |
 | **5** reference direction is inconsistent | add **`GET /pipelines/{n}/related`** — the server-side closure: the schema and mapping it points at, plus the enrichments, jobs and datasets that point at *it* | one endpoint that also fixes 6, and is the honest answer to "what belongs to this pipeline" |
 | **6** export/import is not a full set | three parts: **(a)** bundle export calls `related` instead of the UI deriving the closure; **(b)** add `enrichment` as a bundle kind; **(c)** put `schema`/`mapping` into `APPLY_ORDER` *before* `authored-pipeline` | (c) is a one-line ordering fix; (a) depends on 5 |
-| **2** the verb catalogue authors a generic `parser` | emit one catalogue entry **per format** rather than one generic `parse`, and have New-pipeline write `parsing.frontend` so the lift types the Step immediately | ⛔ needs one product answer first: does New-pipeline **ask** for the format, or **default** to delimited? |
+| **2** the verb catalogue authors a generic `parser` | emit one catalogue entry **per format** rather than one generic `parse`, and have New-pipeline write `parsing.frontend` so the lift types the Step immediately | ⛔ needs one product answer first: does New-pipeline **ask** for the format, or **default** to delimited? (§13 D3) |
+| **ledgers served from a database** *(status / batches / lineage)* | the seam already exists end to end — `StatusStore` with a `FileStatusStore` and a `DbStatusStore` that projects into `inspecto_status_*` on **DuckDB or Postgres**, and every read route already goes through the interface, so **the UI needs no change**. The engine keeps appending the CSVs as the durable write-ahead | ⛔ blocked on §13 D4: flipping the default surfaced a possible **cross-space isolation** defect and made the status DB visible as a *business* store. The bundle seam and the degrade path shipped 2026-08-31; the default is a one-word change once D4 is answered |
 
 ### Wave 2 — gated on a decision
 
@@ -689,7 +691,101 @@ No decision, no design, no runtime change.
 
 ---
 
-## 13. Source map
+## 13. The interview — decisions to take before implementing
+
+Each is posed so it can be answered in one sitting. **Options carry their consequence**, because a
+decision taken without the cost is taken twice. ⚠ Ordered by what they unblock, not by size.
+
+### D1 — Finish the approved amendment, or replace it? *(gates most of Wave 2)*
+
+The ELT final amendment (§0) is approved and ~90% shipped: `trigger:` + `steps:` + `guarantees:`,
+three config types unified into one user concept.
+
+- **(a) Finish it** — Phase 6's deletion half + Phase 7's rename. Predictable, already designed,
+  release-gated. Nothing new is learned.
+- **(b) Replace it** — ⚠ strands a landed migration and re-opens settled ground (the seven verbs, the
+  Guarantees fold, park/drain). Needs a reason the amendment cannot reach.
+- **(c) Finish it, then extend** — the amendment lands, §11's token model becomes the *next* step.
+
+### D2 — Adopt the token model? *(gates the Step SPI, fan-in, the edge cleanup)*
+
+§11: a Step passes a Consignment token carrying **references**, never rows.
+
+- **(a) Adopt fully** — ten relations become three; lifecycle and observations become Signals; the Step
+  SPI opens on the shape `ConsignmentProcessor` already has. ⚠ Breaks two committed contracts, so it
+  rides Phase 7's major window.
+- **(b) Adopt the vocabulary only** — Wave 0 steps 1–3: say tokens, delete the five non-edges, collapse
+  the rejects. **No runtime change**, and it can start today.
+- **(c) Keep the `DATA` edge** — then §10's items 7, 13, 17 stay open permanently, and the docs must
+  stop claiming rows flow, because they do not.
+
+### D3 — Does New-pipeline ask for the parser format, or default to one? *(unblocks Wave 1 gap 2)*
+
+Today the verb catalogue authors a generic `parser`, against the recorded decision that a parser is
+always format-specific.
+
+- **(a) Ask** — one more question at create time; the Step is typed immediately and never needs the
+  custody dialog.
+- **(b) Default to delimited** — no new question; a non-CSV author changes it once. ⚠ Guesses for them.
+- **(c) Neither — leave the Step untyped until Parse is configured** — honest, but keeps the generic
+  "Parse" Step that prompted the complaint.
+
+### D4 — Serving the ledgers from a database: what is required first? *(live — attempted 2026-08-31)*
+
+Flipping `status.backend` to `db` surfaced two real consequences (recorded at the declaration):
+
+- 🔴 **Isolation**: `ControlApiMultiSpaceTest` saw one space report another's committed batch. **Is a
+  DB-backed status store required to isolate per space exactly as the file store does?** If yes, that is
+  a defect to fix before the flip; if the store is intentionally shared, the test encodes a stale
+  assumption and should say so.
+- **Catalog**: the status DuckDB now appears as a *business* store in `/db/catalog`. Should an
+  operational store be visible there at all, or filtered out as `ops:*` is?
+
+### D5 — `Batch` → `Consignment`: finish or retire? *(gap 1)*
+
+The rename was decided 2026-08-03 and never rolled out; code and API still say `Batch`.
+
+- **(a) Finish** — 517 files, 39 `@PublicApi` types, one commit with a codemod plus both contract
+  regens, in the major window. ⛔ Not drip-fed: dripping leaves the split state indefinitely.
+- **(b) Retire the rename** — keep `Batch` everywhere and delete the GLOSSARY entry. Honest, cheap, and
+  loses a genuinely better word.
+- ⚠ **Doing neither is the current state**, and it is the worst of the three.
+
+### D6 — Fan-in: keep it canvas-only? *(gap 13; depends on D2)*
+
+D-6 keeps fan-in out of the verb vocabulary. A token model makes it *expressible*.
+
+- **(a) Keep D-6** — fan-in stays canvas-authored; the recipe stays a chain-plus-branches.
+- **(b) Open it** — ⚠ then the authoring shape is a DAG, not a chain, and the Pipeline Document, the
+  recipe compiler and the editor all follow.
+
+### D7 — What shape is the `steps:` authoring surface? *(gap 11 + 12; needs UX)*
+
+Today a chain is a comma-separated `processor` string plus a positionally-aligned JSON array kept
+aligned by hand. One surface would also make the post-sync lane visible (gap 12).
+
+### D8 — D-9 windowed dedup: what are the window semantics? *(gap 14 — not schedulable without this)*
+
+⛔ It is **named, not designed**. Needed before it can be estimated at all: where the ledger persists,
+the winner policy, and how the window advances.
+
+### D9 — What exactly "belongs to" a Pipeline? *(unblocks gaps 5 + 6)*
+
+`GET /pipelines/{n}/related` needs a definition. Schema and mapping are certain. **Enrichments and Jobs
+that name the pipeline?** (they point inward — §4). **Datasets registered from its sink?** **Connections?**
+⛔ The operator has already said connections are excluded from export; is that also true of "related"?
+
+### D10 — Config: one declaration, or two readers kept honest? *(gap 10 — the largest)*
+
+- **(a) Contract test now, single declaration later** — the recommended first move (§12): make drift
+  visible and block new drift, then close the existing gap incrementally.
+- **(b) Go straight to one declaration** — `ConfigSpecs` becomes the source and the parser reads from
+  it. ⚠ Large, and it touches the loader every pipeline depends on.
+- **(c) Accept two readers** — then the spec must stop being described as the config's definition.
+
+---
+
+## 14. Source map
 
 **Code** — `inspecto-etl`: `PipelineConfig`, `PipelineConfigParser`, `DataTransformer`,
 `PartitionWriter`, `Batch`, `ConsignmentPlanner`, `CommitLog`. `inspecto-engine`: `pipeline/`
