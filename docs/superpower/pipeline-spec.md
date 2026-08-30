@@ -707,9 +707,19 @@ recorded baseline, unmoved.
 
 ### The honest shape of it
 
-- **Wave 0 + Wave 1 close 10 of the 17 items** and need no architectural decision. The most valuable
-  single item is the **key-coverage test** (10) — not because it fixes the drift, but because it stops
-  it growing while the rest is decided.
+**Progress 2026-08-31: Wave 0 fully drained (4/4) and Wave 1 items 10, 8 and 3 shipped — 7 of the 17.**
+What remains in Wave 1 is one dependency chain plus two singles:
+
+| Left in Wave 1 | State |
+|---|---|
+| **5** `GET /pipelines/{n}/related` | ⏳ **next, and mostly assembled already.** 🔴 Grounding found the inward half **already exists**: `PipelineDependents.scan` (`inspecto/service/`) reports enrichment · job · expectation · decision-rule · dataset · widget · dashboard, capped at 200 with a true `total` — a superset of what D9 asks for. The outward half is also mostly there: `PipelineGraphRoutes.collectRefs` + `COMPONENT_DIRS` walk the recipe's component refs, and `PipelineConfig.referencedFiles()` carries the plain schema/mapping paths. The work is a **route + a small service that joins the two halves**, not new traversal. ⛔ Connections stay excluded (D9). |
+| **6** export/import | blocked on 5 for (a); **(c)** — putting `schema`/`mapping` into `APPLY_ORDER` before `authored-pipeline` — is a one-line ordering fix and independent |
+| **2** verb catalogue authors a generic `parser` | unblocked by D3 (New-pipeline **asks** for the format); needs a UI change at create time |
+| ledgers from a database | ⛔ still blocked on D4 — the projection must refresh on commit first |
+
+- The most valuable single item was the **key-coverage test** (10) — not because it fixes the drift,
+  but because it stops it growing while the rest is decided. It has already earned that: declaring
+  `output_store` for gap 8 made the ratchet fire on a real change, not a probe.
 - **Wave 2 is where the leverage is**, and all of it waits on the two decisions in §0/§11.
 - ⚠ **Sequence matters in one place:** 5 → 6(a). Everything else in Waves 0–1 is independent and can
   be taken in any order, or by different people.
