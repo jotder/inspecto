@@ -710,15 +710,21 @@ recorded baseline, unmoved.
 
 ### The honest shape of it
 
-**Progress 2026-08-31: Wave 0 fully drained (4/4) and Wave 1 items 10, 8 and 3 shipped — 7 of the 17.**
-What remains in Wave 1 is one dependency chain plus two singles:
+**2026-08-31: Waves 0 and 1 are DRAINED — 11 of the 17 items.** Wave 0 all four; Wave 1 items 10, 8, 3,
+5, 6 (all three parts) and 2. Everything still open is **gated**, not merely unscheduled:
 
-| Left in Wave 1 | State |
+| Still open | Gate |
 |---|---|
-| **5** `GET /pipelines/{n}/related` | ✅ **SHIPPED 2026-08-31** — and it was, as predicted, a join rather than a build. The inward half was `PipelineDependents.scan` verbatim; the outward half `referencedFiles()`. ⛔ Connections excluded. |
-| **6** export/import | ✅ **SHIPPED 2026-08-31** — all three parts; (c)'s `schema` half refuted and re-filed as BUNDLE-SCHEMA-1 |
-| **2** verb catalogue authors a generic `parser` | unblocked by D3 (New-pipeline **asks** for the format); needs a UI change at create time |
-| ledgers from a database | ⛔ still blocked on D4 — the projection must refresh on commit first |
+| ledgers served from a database | ⛔ **D4** — `syncStatus()` projects the audit once, at boot, so a DB-backed store serves a snapshot frozen at startup. Refresh on commit first; then the default is a one-word change |
+| **7** plugin Step types · **11**/**12** the `steps:` authoring surface · **13** fan-in (D-6) · **1** `Batch`→`Consignment` · **15** Phase 6's deletion half | Wave 2 — §0/§11 decisions, a UX design, or the major-bump window |
+| **14** D-9 cross-Consignment dedup | Wave 3 — **named, not designed**; not schedulable until someone writes the spec |
+
+🔴 **What the drain actually taught, and what a future reader should not have to re-learn:** of the
+eleven rows, **six were mis-framed** — 4, 9, 16, 17 in Wave 0, then 6(c) and 2. A row's stated cause is
+a hypothesis; grounding it first changed the work in every one of those cases, and in 6(c) it changed
+the *answer* (the `schema` half was refused outright and became BUNDLE-SCHEMA-1). Two of the fixes —
+gap 3's edge mirror and gap 2's create question — were only proved by driving the **preview**, and gap
+2's real defect (a refusal with nothing on screen) was invisible to a green unit suite.
 
 - The most valuable single item was the **key-coverage test** (10) — not because it fixes the drift,
   but because it stops it growing while the rest is decided. It has already earned that: declaring
