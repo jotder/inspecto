@@ -74,8 +74,8 @@
             <!-- The list is bounded server-side; say so rather than implying it is everything. -->
             @if (problems()?.truncated) {
                 <inspecto-alert class="mb-4 block" variant="info" title="Showing the newest problems">
-                    {{ problems()!.rows.length | number }} of {{ problems()!.total | number }} problem files are
-                    shown. Narrow the range or fix the loudest pipelines first.
+                    {{ problems()!.rows.length | number }} of {{ problems()!.total | number }} problem files are shown.
+                    Narrow the range or fix the loudest pipelines first.
                 </inspecto-alert>
             }
 
