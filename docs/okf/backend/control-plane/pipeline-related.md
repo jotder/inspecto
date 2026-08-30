@@ -32,7 +32,7 @@ that and scan both ways itself. This is the server-side closure, computed once, 
 
 ⛔ **Neither half is a new traversal.** That is the point of the design, not an implementation detail.
 
-| Half | Source | Notes |
+| Half | Comes from | Notes |
 |---|---|---|
 | **Inward** | `PipelineDependents.scan` | Already serving `/config/pipeline/{name}/impact`. Reports a *superset* of D9 (enrichment · job · expectation · decision-rule · dataset · widget · dashboard), bounded by `MAX_DEPENDENTS` with a TRUE total. Reused verbatim — one scan, one set of matching rules, one place to fix. |
 | **Outward** | `PipelineConfig.referencedFiles()` | The files the parser **actually read**. Deliberately *not* re-derived from config keys: a second reader of the same config is exactly the drift `PipelineKeyCoverageContractTest` exists to stop. |
