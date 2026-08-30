@@ -1,6 +1,14 @@
 # Flow Graph — Pipeline-as-Graph Design
 > *Moved from `docs/flow-graph-design.md` and renamed (Flow is a banned synonym for Pipeline) — docs consolidation, 2026-07-16.*
 
+> 🔴 **Its EDGE MODEL is superseded (2026-08-30).** This document describes edges as carrying records
+> (`PipelineRel.DATA`). The runtime does not: a Step receives a **Consignment token** and resolves data
+> **by reference** (`ProcessorContext.outputs()`/`read()`), no rows travel an edge, and `transform.map`
+> is never executed as a node at all. Six of the ten declared relations never appear in a lifted graph.
+> The corrected model and the migration are
+> [`superpower/pipeline-spec.md`](../../../superpower/pipeline-spec.md) §11. Everything else here —
+> the IR, lift, validator, executor, registry — stands.
+>
 > **Status: IMPLEMENTED (design authored 2026-06-16; shipped 2026-06-18/19+).** The graph IR, lift, validator,
 > executor, and component registry described below are live — see [`live-execution.md`](live-execution.md)
 > for the runtime and the [`okf/backend/pipeline-graph/`](index.md) bundle for the as-built reference.

@@ -5,12 +5,12 @@ described.** It is written to be changed: the intent is to rewrite the subsystem
 
 **What this replaces.** Pipeline knowledge was spread across ~20 files and >500 KB, and no one of them
 told you what a Pipeline *is*. This document states the whole subsystem as it stands today. The deep
-files stay on disk as evidence and are mapped in §11; ⚠ **they are not maintained as a parallel truth
+files stay on disk as evidence and are mapped in §12; ⚠ **they are not maintained as a parallel truth
 — when this document and one of them disagree, fix one of them, do not silently diverge.**
 
 **How to read it.** §1–§4 are the authored surface. §5–§6 are the model. §7 is what actually runs.
-§8–§9 are the seams. **§10 is the honest list of what is broken, missing, or contradictory** — the
-part a redesign starts from.
+§8–§9 are the seams. **§10 is the honest list of what is broken, missing, or contradictory**, and
+**§11 is the proposed fix** — the part a redesign starts from.
 
 🔴 **Every claim here was checked against the code, not against the older docs.** Where the code and a
 previous doc disagreed, the code won and the disagreement is recorded.
@@ -288,6 +288,11 @@ Declared vocabulary: `data` · `unmatched` · `gap` · `success` · `failure` ·
 ⚠ **Declared ≠ emitted.** A lifted graph only ever contains **`data`, `gap`, `unmatched`, `route:*`**.
 The rest appear in node types' declared out-sets and in `ConservationCheck`'s loss accounting.
 
+🔴 **And the `data` edge is a fiction.** No records travel along it. The engine materialises one table
+(`DataTransformer`, a single `CREATE TABLE AS SELECT`) and `COPY`s it out; `transform.map` is never
+executed as a node at all. What the edge actually expresses is *"this Step's output is that Step's
+input"* — a reference, not a flow. §11 proposes fixing the model to say what the engine already does.
+
 ### What lowering refuses
 
 `UNSUPPORTED_NODE` · `NO_ACQUISITION` / `NO_PARSER` / `NO_PERSISTENT_SINK` · `PARSER_NO_SCHEMA` ·
@@ -303,6 +308,11 @@ ordering.
 ## 6. Step types and which may connect
 
 28 builtin types in 5 categories. Each declares what it **accepts** and **emits**.
+
+⚠ **Read this table as the CURRENT declaration, not as the intended model.** It is phrased in terms of
+records flowing along a `data` edge; the runtime passes a Consignment token and resolves data by
+reference (§11). The connection *rules* below survive that change — only the thing being passed is
+misdescribed.
 
 | Category | Types | Accepts | Emits |
 |---|---|---|---|
@@ -511,7 +521,117 @@ The redesign's actual agenda. Each item is grounded, not suspected.
 
 ---
 
-## 11. Source map
+## 11. Proposed fix — a Step passes a token, not data
+
+**Operator proposal, 2026-08-30:** *a Step does not accept or emit data; it emits **control
+information** — like a NiFi FlowFile — which may carry a path to data.*
+
+🔴 **This is not a new direction. It is what the engine already does, and what the type system
+contradicts.** The evidence:
+
+| Already the token model | Where |
+|---|---|
+| The Step contract is *"Consignment in → Consignment out (+ rejects)"* | `GLOSSARY.md:264` |
+| `ProcessorContext` — the SPI a third party implements — offers `consignmentId()`, `outputs()` (path · rows · bytes · partition · record-day · state), `read()` for SQL **by reference**, `summaries()`, `tables()`, `log()`, `signals()`. **There is no row stream in it.** | `ConsignmentProcessor` / `ProcessorContext` |
+| The post-sync lane's carrier is **the output registry, not a piped relation** | `derived-tables-post-sync-lane` |
+| `transform.map` is never executed as a node; one `CREATE TABLE AS SELECT` is materialised and `COPY`d | §7.3 |
+| A Consignment already has an id, a status, member Files and registered outputs | §1, §7.4 |
+
+Against that, `BuiltinNodeType` declares `accepts`/`emits` in terms of `PipelineRel.DATA`, which
+asserts that records flow along an edge. **Both cannot be true.** The token model is the one the
+runtime implements; the `DATA` edge is the one that produces the anomalies in §10.
+
+### 12.1 What the current edge vocabulary conflates
+
+Ten relations, doing four unrelated jobs:
+
+| Job | Relations | Really a… |
+|---|---|---|
+| the token continues | `data` | **edge** |
+| content demux | `route:<key>` | **edge** |
+| records the Step did not pass on, with a cause | `unmatched` · `dropped` · `invalid` · `duplicate` | **edge**, but one kind with a reason — not four kinds |
+| lifecycle outcome | `success` · `failure` · `on_commit` | **not an edge — a Signal** |
+| an observation | `gap` | **not an edge — a Signal** |
+
+That conflation is why six of the ten never appear in a lifted graph (§5) and why
+`ConservationCheck` has to hand-list four of them as "loss" edges: they were never the same kind of
+thing.
+
+### 12.2 The proposed model
+
+A Step consumes one **Consignment token** and emits zero or more tokens on named **outlets**:
+
+```
+token = { consignmentId, runId, attributes{…}, dataRefs[ {store, table, partition, path, rows} ] }
+```
+
+⚠ **`dataRefs` is a reference, never a payload.** A Step resolves data by reference when it needs it
+(`ctx.read()`), which is what makes "map is folded into the write" honest rather than a special case:
+the token's `dataRefs` are rewritten; nothing moves.
+
+**Three outlet kinds replace ten relations:**
+
+| Outlet | Meaning |
+|---|---|
+| `main` | the token continues |
+| `reject:<reason>` | records the Step did not pass on — `reason` ∈ `unmatched`, `dropped`, `invalid`, `duplicate`, … |
+| `route:<key>` | operator-named content branch |
+
+**Lifecycle and observations leave the graph and become Signals.** `Signal` already carries
+`subject`, `source`, `correlationId`, `causationId`, `severity` and a payload — everything
+`success`/`failure`/`on_commit`/`gap` need. ⚠ This is existing machinery, not new: `gap` already emits
+`SEQUENCE_GAP`, and Jobs already subscribe to commits via `on_pipeline`. The change is deleting the
+edge spelling, not building a replacement.
+
+### 12.3 What this fixes
+
+| §10 item | Fixed how |
+|---|---|
+| 13 — six relations never appear | they stop being edges |
+| 17 / `ConservationCheck`'s hand-list | one `reject:` kind with a reason; loss accounting reads the reason |
+| 7 — no plugin can add a Step type | a Step becomes *token → tokens*, which is **exactly `ConsignmentProcessor`**. The SPI to open is one that already exists and already has the right shape |
+| the map-folding special case | a Step that only rewrites `dataRefs` is an ordinary Step, not an exception the lane has to admit |
+| 9 — `route` cannot run at rest | routing splits tokens; nothing about it is ingest-specific once data is by reference |
+| 11 / park–drain | parking is *holding tokens at an outlet* — which is what `BranchCommitLog` already does |
+| 8 — `output_store:` as a hidden arming condition | a Step declares its execution mode (`LOWERED` \| `EXECUTED`, the D0-B vocabulary); the config stops encoding it by side effect |
+
+⚠ It also makes the **Stage 1 / Stage 2 split a property of the Step, not of the config's shape** —
+`LOWERED` contributes SQL, `EXECUTED` runs imperative Java. That is precisely the open registry
+platform-services D0-B already proposed, so this proposal and that one converge rather than compete.
+
+### 12.4 What it does NOT fix, and what it costs
+
+- ⛔ **It does not make the config non-flat.** Lift/lower stays until the amendment's target shape
+  (§0) lands. The token model is about the *runtime contract*; the authoring shape is a separate
+  decision.
+- ⛔ **Fan-in still needs its own decision** (D-6 keeps it canvas-only). A token model makes fan-in
+  *expressible* — several tokens converging — which is a reason to revisit D-6, not a reason to
+  assume it.
+- ⚠ **It is a breaking change to two committed contracts** (`node-attributes`, `step-types`) and to
+  `BuiltinNodeType`'s declared sets, so it belongs with Phase 7's major-bump window (§0), beside the
+  `Batch` → `Consignment` rename — which it also makes more urgent, since the token *is* the
+  Consignment.
+- ⚠ **`ConservationCheck` must keep working.** Its loss accounting is real and load-bearing; it moves
+  from "these four rels are loss" to "a `reject:` outlet is loss, and its reason names which kind".
+
+### 12.5 Suggested sequence
+
+1. **Say it before building it** — correct `BuiltinNodeType`'s doc and this spec so `accepts`/`emits`
+   describe *tokens*, and stop describing `data` as a record flow. Costs nothing, ends the
+   contradiction.
+2. **Delete the five non-edges** — move `success`/`failure`/`on_commit`/`gap` to Signals, which they
+   effectively already are. Removes five of the ten relations with no runtime change.
+3. **Collapse the rejects** into `reject:<reason>`; teach `ConservationCheck` the reason.
+4. **Open the Step SPI** on the `ConsignmentProcessor` shape, with the `LOWERED`/`EXECUTED` mode from
+   D0-B — the first point at which a third party can add a Step.
+5. Only then revisit **fan-in** and the authoring shape.
+
+⚠ Steps 1–3 are documentation and vocabulary and can land before any redesign is agreed; 4–5 are the
+part that needs the §0 decision first.
+
+---
+
+## 12. Source map
 
 **Code** — `inspecto-etl`: `PipelineConfig`, `PipelineConfigParser`, `DataTransformer`,
 `PartitionWriter`, `Batch`, `ConsignmentPlanner`, `CommitLog`. `inspecto-engine`: `pipeline/`
