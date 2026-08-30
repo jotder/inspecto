@@ -278,8 +278,11 @@ Ordered by what they unblock.
   count source (`CommitLog`) was REFUTED on grounding — per-batch only, no day column — so the KPI
   reads the `consignment_outputs` registry (`record_day` + per-file `rows`, on by default). ✅ The
   histogram representation question is CLOSED (verified 2026-08-28) but is now moot for this row.
-- **ELT** D-9 windowed keyed dedup ledger (⛔ "never faked with unbounded history") 🔴 **the row calls
-  this "a designed fast-follow" — GROUNDED 2026-08-30, it is NAMED, not designed**: `scope: window(P4D)`
+- **ELT** D-9 windowed keyed dedup ledger (⛔ "never faked with unbounded history") ⛔ **DECIDED
+  2026-08-31 (pipeline-spec §13 D8): NOT SCHEDULABLE, and it stops being called a fast-follow** —
+  inviting an estimate for undesigned work is the actual defect. It returns only with three answers:
+  where the ledger persists, the winner policy, and how the window advances. 🔴 **GROUNDED 2026-08-30,
+  it is NAMED, not designed**: `scope: window(P4D)`
   appears only in the deferral row and a BACKLOG label, with **no §-numbered design section anywhere**
   for where the ledger persists, its winner policy, or how the window advances. ⚠ Nothing gates it —
   the 2026-08-11 move of record dedup to Stage-2 (`BatchIngestStrategy.java:192-199`) is its enabling

@@ -98,9 +98,9 @@ former root reference docs** (each index lists them):
 - [`superpower/pipeline-spec.md`](superpower/pipeline-spec.md) — **the single consolidated Pipeline
   specification** (2026-08-30), written as the basis for a redesign: vocabulary, config surface, the
   DERIVED graph, Step types and connection rules, execution, extension seams, transfer, and §10's
-  grounded list of what is broken. 🔴 Read its §0 first — an approved redesign
-  (`elt-final-amendment-plan.md`) already exists and is mostly shipped, so the first decision is
-  whether to finish it or replace it.
+  grounded list of what is broken, §11's proposed token model, §12's wave plan, and **§13's ten
+  decisions, taken 2026-08-31**. ✅ D1: finish the approved amendment
+  (`elt-final-amendment-plan.md`, already ~90% shipped) and treat the token model as its next step.
 
 - [`superpower/completeness-kpi-plan.md`](superpower/completeness-kpi-plan.md) — **DECIDED
   2026-08-30, ready to build**: a scheduled per-pipeline completeness KPI (gap/sequence analysis +

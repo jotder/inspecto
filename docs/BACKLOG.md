@@ -757,6 +757,23 @@ non-blocking:**
 
 ## 6. Engineering / tech-debt
 
+**LEDGER-DB-1 — serve status/batches/lineage from a database (2026-08-31).** The operator asked for the
+three ledgers on DuckDB (Personal) and PostgreSQL (other editions). ⚠ **Most of it already exists**:
+`StatusStore` with `FileStatusStore` and `DbStatusStore`, which projects all three into
+`inspecto_status_*` on either engine, and every read route already goes through the interface — so the
+**UI needs no change**. Shipped 2026-08-31 (`10a42efd`): the Standard/Enterprise bundle selects
+PostgreSQL when it carries the driver **and** a URL is configured (the edition seam lives in the launch
+script, since editions differ by what the bundle carries), and `openStatusStore` degrades to the file
+store with a warning rather than failing boot on a default. ⛔ **The default stays `file`, blocked on
+FRESHNESS**: `CollectorService.syncStatus()` projects the audit **once, at boot**, so a DB-backed store
+serves a snapshot frozen at startup — a run triggered afterwards reports no commits at all (this is how
+`ControlApiMultiSpaceTest` failed; it read its OWN commit back as empty). 🔴 There is **no** cross-space
+leak — `statusDbUrl()` is per space. **Fix: refresh the projection on commit** (`BatchEventBus` already
+publishes the event) or write through; then the default is a one-word change in
+`OperationalDb.Family.STATUS`. ⚠ Rides along: the status DuckDB then lists as a *business* store in
+`/db/catalog`, where an operational store arguably does not belong. Decision record: `pipeline-spec.md`
+§13 D4.
+
 **COMPLY-1/2/3 — three compliance gaps that became BUILD WORK on 2026-08-30.** Filed together because
 one operator sitting answered all three decisions (gate-register §2 cluster C); none is decision-gated
 any more, and each has an auditor-facing consequence if it is left as stated-but-unbuilt policy.
