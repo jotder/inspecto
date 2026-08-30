@@ -5,12 +5,12 @@ described.** It is written to be changed: the intent is to rewrite the subsystem
 
 **What this replaces.** Pipeline knowledge was spread across ~20 files and >500 KB, and no one of them
 told you what a Pipeline *is*. This document states the whole subsystem as it stands today. The deep
-files stay on disk as evidence and are mapped in §12; ⚠ **they are not maintained as a parallel truth
+files stay on disk as evidence and are mapped in §13; ⚠ **they are not maintained as a parallel truth
 — when this document and one of them disagree, fix one of them, do not silently diverge.**
 
 **How to read it.** §1–§4 are the authored surface. §5–§6 are the model. §7 is what actually runs.
 §8–§9 are the seams. **§10 is the honest list of what is broken, missing, or contradictory**, and
-**§11 is the proposed fix** — the part a redesign starts from.
+**§11 is the proposed fix**, and **§12 turns the gaps into work** — the part a redesign starts from.
 
 🔴 **Every claim here was checked against the code, not against the older docs.** Where the code and a
 previous doc disagreed, the code won and the disagreement is recorded.
@@ -631,7 +631,65 @@ part that needs the §0 decision first.
 
 ---
 
-## 12. Source map
+## 12. How the gaps get filled
+
+The §10 list, turned into work. ⚠ **Nothing here is scheduled** — it is the shape of the work and its
+dependency order, so a decision can be taken with the cost visible.
+
+**Two decisions gate the second half.** (a) §0 — finish the approved amendment or replace it.
+(b) §11 — adopt the token model or keep the `DATA` edge. **Wave 0 and Wave 1 need neither**, which is
+the point of separating them: roughly half the list can close before either decision is taken.
+
+### Wave 0 — free now: vocabulary, dead code, honest messages
+
+No decision, no design, no runtime change.
+
+| Gap | Fix | Cost |
+|---|---|---|
+| **16** `MULTI_SINK` is dead | delete the constant and the UI's mention of it in its refusal handling | minutes |
+| **17** six relations never appear · **§11 step 1** | correct `BuiltinNodeType`'s doc and this spec to describe **tokens**; stop calling `data` a record flow | an afternoon |
+| **4** two spellings for one concept | declare `parsing.*` canonical; keep `processing.grammar` / `fixed_width` as **read-only aliases** that emit a deprecation `Finding` on save, and stop *writing* them | small |
+| **9** `route` cannot run at rest | the refusal already exists — make its message name the ingest lane as the place route *does* work, instead of stating two negatives | minutes |
+
+### Wave 1 — cheap engineering, still no decision needed
+
+| Gap | Fix | Notes |
+|---|---|---|
+| **10** two authorities disagree — *the largest structural problem* | **Start with a sixth contract test**, not a rewrite: enumerate the keys `PipelineConfigParser` reads and assert every one is declared in `ConfigSpecs.pipeline()`. It fails today (that is the point), so land it with the known set as an explicit allow-list and **shrink the list** as keys are declared. | 🔴 This makes drift *visible* and **blocks new drift immediately**, which no amount of declaring keys does. There are already five contract tests (`NodeAttributes`, `StepTypes`, `NodeConfigName`, `MapNodeKey`, `BindKindHome`) — this is the idiomatic move here, not a novel one. |
+| **8** `output_store:` arming is undiscoverable | declare it in the spec with a **cross-field rule** — "`steps`/`dedup`/`summarize`/`join` require `output_store`" — so the UI can show the requirement and a save returns a **field-anchored 422** | converts a run-time surprise into an authoring-time error; the refusal text already exists, it just fires too late |
+| **3** UI looser than the validator | ⚠ `accepts` is **already published** on `GET /pipelines/node-types` — the UI simply does not read it. Check the target's `accepts` on edge creation, next to the existing `typeEmits` lookup | purely client-side; the server stays the authority |
+| **5** reference direction is inconsistent | add **`GET /pipelines/{n}/related`** — the server-side closure: the schema and mapping it points at, plus the enrichments, jobs and datasets that point at *it* | one endpoint that also fixes 6, and is the honest answer to "what belongs to this pipeline" |
+| **6** export/import is not a full set | three parts: **(a)** bundle export calls `related` instead of the UI deriving the closure; **(b)** add `enrichment` as a bundle kind; **(c)** put `schema`/`mapping` into `APPLY_ORDER` *before* `authored-pipeline` | (c) is a one-line ordering fix; (a) depends on 5 |
+| **2** the verb catalogue authors a generic `parser` | emit one catalogue entry **per format** rather than one generic `parse`, and have New-pipeline write `parsing.frontend` so the lift types the Step immediately | ⛔ needs one product answer first: does New-pipeline **ask** for the format, or **default** to delimited? |
+
+### Wave 2 — gated on a decision
+
+| Gap | Gated on | Fix |
+|---|---|---|
+| **7** no plugin can add a Step type | §11 | open the SPI on the `ConsignmentProcessor` shape with the `LOWERED`/`EXECUTED` mode (D0-B). The interface already has the right shape; what is missing is the registry and the mode |
+| **11** `steps:` has no authoring surface · **12** post-sync chain invisible | §0 + a UX design | one surface serves both — an ordered chain editor is what makes the post-sync lane visible |
+| **13** fan-in is canvas-only (D-6) | §11 | a token model makes fan-in *expressible*; that is a reason to **revisit** D-6, not to assume it is overturned |
+| **1** `Batch` → `Consignment` | §0 (Phase 7) | mechanical but wide: 517 files, 39 `@PublicApi` types. ⚠ Do it as **one** commit with a codemod plus both contract regens — dripping it leaves the codebase in the split state indefinitely, which is the current complaint |
+| **15** Phase 6's deletion half | the major-bump window | already decided; it just needs the window |
+
+### Wave 3 — needs design before it can be estimated
+
+| Gap | Why |
+|---|---|
+| **14** D-9 cross-Consignment dedup | it is **named, not designed**: no spec for where the ledger persists, the winner policy, or how the window advances. ⛔ Not schedulable until someone writes that; the "designed fast-follow" label is wrong |
+
+### The honest shape of it
+
+- **Wave 0 + Wave 1 close 10 of the 17 items** and need no architectural decision. The most valuable
+  single item is the **key-coverage test** (10) — not because it fixes the drift, but because it stops
+  it growing while the rest is decided.
+- **Wave 2 is where the leverage is**, and all of it waits on the two decisions in §0/§11.
+- ⚠ **Sequence matters in one place:** 5 → 6(a). Everything else in Waves 0–1 is independent and can
+  be taken in any order, or by different people.
+
+---
+
+## 13. Source map
 
 **Code** — `inspecto-etl`: `PipelineConfig`, `PipelineConfigParser`, `DataTransformer`,
 `PartitionWriter`, `Batch`, `ConsignmentPlanner`, `CommitLog`. `inspecto-engine`: `pipeline/`
