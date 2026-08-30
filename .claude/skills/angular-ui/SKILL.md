@@ -90,6 +90,13 @@ src/app/
                             # whole time. When adding/editing a handler, diff its accepted args AND its
                             # result keys against the real tool/route — and pin the strictness in a
                             # `*.handler.spec.ts`, since the preview cannot catch what the mock permits.
+                            # 🔴 QUERY PARAMS REACH A HANDLER AS `req.params`, NEVER IN `req.url`
+                            # (2026-08-30): Angular's `HttpRequest.url` carries no query string, so a
+                            # handler that parses `url.split('?')` sees EVERY request as param-less and
+                            # answers its own 400/empty branch. Unit specs that stub the service never
+                            # exercise the interceptor, so this is invisible until the running app --
+                            # it cost a preview cycle on `/config/schema/derived`. Note `CONFIG_FILE`-style
+                            # regexes ending `([^/?]+)$` imply otherwise; they are defensive, not evidence.
     theme/                  # chart-tokens.ts (the ONLY place canvas colors are hardcoded)
     testing/                # a11y.ts (expectNoA11yViolations)
     auth.service.ts, confirm.service.ts, …
