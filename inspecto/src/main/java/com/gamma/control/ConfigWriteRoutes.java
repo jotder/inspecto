@@ -262,7 +262,10 @@ final class ConfigWriteRoutes implements RouteModule {
             if (sub.isAbsolute()) throw new ApiException(400, "subdir must be relative");
             dir = WriteGates.jail(writeRoot, writeRoot.resolve(sub), "subdir");
         }
-        Path target = ConfigFileSupport.resolveConfigFile(writeRoot, dir, type, fileName);
+        // Pipeline-aware: a patch addresses a registered pipeline by name, and deactivating one is
+        // the prerequisite for deleting it — resolving only against the write root made that
+        // impossible for every pipeline whose file lives in a subdirectory.
+        Path target = ConfigFileSupport.resolveRegisteredConfigFile(api, writeRoot, dir, type, fileName, subdir);
         String rel = writeRoot.relativize(target).toString().replace('\\', '/');
         if (!Files.isRegularFile(target))
             throw new ApiException(404, "no such config: " + rel + " (create it via /config/write first)");

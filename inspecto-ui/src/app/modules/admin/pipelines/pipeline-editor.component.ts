@@ -1045,9 +1045,7 @@ export class PipelineEditorComponent implements OnInit {
         const id = pipelineId(name);
         // W5: a new pipeline IS a canonical draft — write the space-convention scaffold (inactive,
         // with the parser-required dirs) and register it, then load its lifted graph.
-        this.configApi
-            .write('pipeline', pipelineScaffold(name, { space: this.spaces.currentSpaceId() }))
-            .subscribe({
+        this.configApi.write('pipeline', pipelineScaffold(name, { space: this.spaces.currentSpaceId() })).subscribe({
             next: (written) => {
                 this.configApi.registerPipeline(written.path).subscribe({
                     next: () => {
@@ -1477,36 +1475,77 @@ export class PipelineEditorComponent implements OnInit {
         if (!id) return;
         const impact = await firstValueFrom(this.configApi.impact(id).pipe(catchError(() => of(null))));
         const breaks = impact?.total ?? 0;
-        const ok = await this.confirm.confirmDestructive(
+        // The delete has three separable parts, so it ASKS rather than assuming. ⚠ The companion
+        // schema defaults ON (it is this pipeline's own config, useless once the pipeline is gone),
+        // while the DATA defaults OFF — it is the only part that destroys something unrecoverable, and
+        // an operator confirming quickly must not lose their output by default.
+        const choice = await this.confirm.confirmDestructiveWith(
             breaks === 0
                 ? `Permanently delete the authored pipeline '${id}'?`
                 : `'${id}' is still referenced by ${breaks} config${breaks === 1 ? '' : 's'}: ` +
                       `${describeDependents(impact!)}. Deleting it leaves ` +
                       `${breaks === 1 ? 'that reference' : 'those references'} pointing at nothing. ` +
                       `Delete anyway? This cannot be undone.`,
-            { title: 'Delete pipeline', confirmText: 'Delete' },
+            {
+                title: 'Delete pipeline',
+                confirmText: 'Delete',
+                checkboxes: [
+                    {
+                        key: 'schema',
+                        label: 'Also delete its schema and enrichment',
+                        hint: `The companions this pipeline owns (${id}_schema, ${id}_enrich and any segment schemas).`,
+                        checked: true,
+                    },
+                    {
+                        key: 'data',
+                        label: 'Also delete its data',
+                        hint: 'Everything written under this pipeline’s database, backup, errors, quarantine, markers, status and log directories. The inbox is never touched, and a directory another pipeline shares is kept.',
+                        checked: false,
+                    },
+                ],
+            },
         );
-        if (!ok) return;
+        if (!choice.ok) return;
+        const alsoSchema = choice.checked['schema'] === true;
+        const alsoData = choice.checked['data'] === true;
         // W5: deleting a registered pipeline discards its canonical config (the server refuses an
         // active pipeline — deactivate first).
         const companion = (suffix: string): string => companionSchemaName(id, suffix);
         // Read the per-segment schemas off the graph BEFORE the delete clears it.
         const segmentSchemas = this.ownedSegmentSchemas(id).filter((n) => n !== companion('schema'));
         this.configApi
-            .remove('pipeline', id, undefined, breaks > 0)
+            .remove('pipeline', id, undefined, breaks > 0, alsoData)
             .pipe(
                 switchMap((res) =>
-                    forkJoin([
-                        this.configApi.remove('schema', companion('schema')).pipe(catchError(() => of(null))),
-                        this.configApi.remove('enrichment', companion('enrich')).pipe(catchError(() => of(null))),
-                        ...segmentSchemas.map((name) =>
-                            this.configApi.remove('schema', name).pipe(catchError(() => of(null))),
-                        ),
-                    ]).pipe(map(() => res)),
+                    // Companion cleanup is opt-in now. Each is still best-effort: a companion that was
+                    // never created 404s, and that must not fail a delete that already succeeded.
+                    (alsoSchema
+                        ? forkJoin([
+                              this.configApi.remove('schema', companion('schema')).pipe(catchError(() => of(null))),
+                              this.configApi.remove('enrichment', companion('enrich')).pipe(catchError(() => of(null))),
+                              ...segmentSchemas.map((name) =>
+                                  this.configApi.remove('schema', name).pipe(catchError(() => of(null))),
+                              ),
+                          ])
+                        : of([])
+                    ).pipe(map(() => res)),
                 ),
             )
             .subscribe({
-                next: () => {
+                next: (res) => {
+                    // ⚠ Report what the data delete KEPT. A directory another pipeline also declares is
+                    // deliberately retained, and an operator who ticked "delete its data" would
+                    // otherwise believe it all went — then find the files still there and distrust the
+                    // whole action. Silence about a deliberate refusal is the same defect as a silent
+                    // failure.
+                    const retained = Object.entries(res?.dataRetained ?? {});
+                    if (alsoData && retained.length)
+                        this.toast.warning(
+                            `Deleted '${id}'. ${retained.length} data ${
+                                retained.length === 1 ? 'directory was' : 'directories were'
+                            } kept: ${retained.map(([dir, why]) => `${dir} (${why})`).join('; ')}`,
+                        );
+                    else this.toast.success(`Deleted '${id}'`);
                     this.flows.update((fs) => fs.filter((f) => f.name !== id));
                     // ⚠ The same teardown `closeTab` does, and for the same reason. Dropping the pipeline
                     // from `flows` alone left its TAB alive: `tabs` maps `openIds`, not `flows`, and

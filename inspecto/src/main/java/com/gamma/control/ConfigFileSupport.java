@@ -44,6 +44,34 @@ final class ConfigFileSupport {
     }
 
     /**
+     * As {@link #resolveConfigFile}, but a REGISTERED pipeline is found wherever its file actually is.
+     *
+     * <p>🔴 A pipeline is addressed by NAME, and its file need not sit at the write root: every sample
+     * pipeline in this repo lives in {@code config/<name>/<name>_pipeline.toon}. Resolving only against
+     * the write root answered "no such config" for all of them, so delete, patch and read-back were all
+     * unusable on any pipeline the caller had not just created at the root — you could not even
+     * deactivate one, which is the prerequisite for deleting it.
+     *
+     * <p>The registry already knows the path ({@code PipelineGraphRoutes.saveGraph} writes through the
+     * same {@code pathFor}), so ask it and fall back to the write-root convention for an unregistered
+     * draft. ⚠ Still jailed: a registered path outside the write root does not win, it is simply not
+     * accepted — the registry is a lookup here, never an authority on what may be written.
+     *
+     * <p>⚠ Only consulted when the caller supplied no explicit {@code subdir}: an explicit subdir is
+     * the caller saying WHERE, and silently looking elsewhere would ignore them.
+     */
+    static Path resolveRegisteredConfigFile(ApiContext api, Path writeRoot, Path dir, String type,
+                                            String safeName, String subdir) {
+        Path byConvention = resolveConfigFile(writeRoot, dir, type, safeName);
+        if (!"pipeline".equals(type) || (subdir != null && !subdir.isBlank())) return byConvention;
+        if (Files.isRegularFile(byConvention)) return byConvention;
+        return api.service().pathFor(safeName).map(Path::normalize)
+                .filter(p -> p.startsWith(writeRoot))
+                .filter(Files::isRegularFile)
+                .orElse(byConvention);
+    }
+
+    /**
      * The read-side of the split: merge a schema file's sibling {@code _mapping.csv} (if any) into
      * its decoded map, so clients always see the conflated shape they authored — the same dual-read
      * the engine's {@code PipelineConfigParser} performs.

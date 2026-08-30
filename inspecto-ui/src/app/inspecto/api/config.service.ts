@@ -93,10 +93,24 @@ export class ConfigService {
      * and, for a pipeline, also refuses one that other configs still reference. Pass `force` to delete
      * over those dependents; it does NOT bypass the active gate, which is a separate refusal.
      */
-    remove(type: ConfigType, name: string, subdir?: string, force?: boolean): Observable<ConfigDeleteResult> {
+    remove(
+        type: ConfigType,
+        name: string,
+        subdir?: string,
+        force?: boolean,
+        data?: boolean,
+    ): Observable<ConfigDeleteResult> {
         return this.http.delete<ConfigDeleteResult>(
             apiUrl(`/config/${encodeURIComponent(type)}/${encodeURIComponent(name)}`),
-            { params: toParams({ subdir, force: force ? 'true' : undefined }) },
+            {
+                params: toParams({
+                    subdir,
+                    force: force ? 'true' : undefined,
+                    // ⚠ Separate from `force` on purpose: force overrides a DEPENDENTS refusal, this
+                    // destroys written data. Sent only when the operator ticked it.
+                    data: data ? 'true' : undefined,
+                }),
+            },
         );
     }
     /** What still references this pipeline — read-only, so a caller can warn before deleting. */

@@ -169,6 +169,10 @@ describe('PipelineEditorComponent', () => {
                     useValue: {
                         confirm: vi.fn().mockResolvedValue(true),
                         confirmDestructive: vi.fn().mockResolvedValue(true),
+                        // The delete asks with checkboxes now: schema defaults ON, data OFF.
+                        confirmDestructiveWith: vi
+                            .fn()
+                            .mockResolvedValue({ ok: true, checked: { schema: true, data: false } }),
                     },
                 },
                 { provide: MatDialog, useValue: dialog },
@@ -255,6 +259,7 @@ describe('PipelineEditorComponent', () => {
         function confirmOf() {
             return TestBed.inject(InspectoConfirmService) as unknown as {
                 confirmDestructive: ReturnType<typeof vi.fn>;
+                confirmDestructiveWith: ReturnType<typeof vi.fn>;
             };
         }
 
@@ -263,7 +268,7 @@ describe('PipelineEditorComponent', () => {
             c.select('demo');
             await c.deletePipeline();
 
-            expect(config.remove).toHaveBeenCalledWith('pipeline', 'demo', undefined, false);
+            expect(config.remove).toHaveBeenCalledWith('pipeline', 'demo', undefined, false, false);
             expect(config.remove).toHaveBeenCalledWith('schema', 'demo_schema');
             expect(config.remove).toHaveBeenCalledWith('enrichment', 'demo_enrich');
         });
@@ -281,8 +286,8 @@ describe('PipelineEditorComponent', () => {
             c.select('demo');
             await c.deletePipeline();
 
-            expect(confirmOf().confirmDestructive.mock.calls[0][0]).toContain('2 datasets, 1 widget');
-            expect(config.remove).toHaveBeenCalledWith('pipeline', 'demo', undefined, true);
+            expect(confirmOf().confirmDestructiveWith.mock.calls[0][0]).toContain('2 datasets, 1 widget');
+            expect(config.remove).toHaveBeenCalledWith('pipeline', 'demo', undefined, true, false);
         });
 
         /** The impact read is ADVISORY — the server re-checks and refuses on its own, so a failed
@@ -293,11 +298,46 @@ describe('PipelineEditorComponent', () => {
             c.select('demo');
             await c.deletePipeline();
 
-            expect(config.remove).toHaveBeenCalledWith('pipeline', 'demo', undefined, false);
+            expect(config.remove).toHaveBeenCalledWith('pipeline', 'demo', undefined, false, false);
+        });
+
+        /**
+         * 🔴 The companion cascade is an OPT-IN now, not automatic. Unticking it must leave the
+         * schema and enrichment on disk — an operator who wants to keep a hand-tuned schema and
+         * re-point a new pipeline at it has no other way to say so.
+         */
+        it('keeps the companions when the schema box is unticked', async () => {
+            confirmOf().confirmDestructiveWith.mockResolvedValueOnce({
+                ok: true,
+                checked: { schema: false, data: false },
+            });
+            const c = make();
+            c.select('demo');
+            await c.deletePipeline();
+
+            expect(config.remove).toHaveBeenCalledWith('pipeline', 'demo', undefined, false, false);
+            expect(config.remove).not.toHaveBeenCalledWith('schema', 'demo_schema');
+            expect(config.remove).not.toHaveBeenCalledWith('enrichment', 'demo_enrich');
+        });
+
+        /**
+         * ⚠ Data deletion is carried as its own flag, never implied by `force`. `force` overrides a
+         * dangling-REFERENCE refusal the operator can repair; this destroys written output.
+         */
+        it('asks for the data only when the data box is ticked', async () => {
+            confirmOf().confirmDestructiveWith.mockResolvedValueOnce({
+                ok: true,
+                checked: { schema: true, data: true },
+            });
+            const c = make();
+            c.select('demo');
+            await c.deletePipeline();
+
+            expect(config.remove).toHaveBeenCalledWith('pipeline', 'demo', undefined, false, true);
         });
 
         it('deletes nothing when the confirm is declined', async () => {
-            confirmOf().confirmDestructive.mockResolvedValueOnce(false);
+            confirmOf().confirmDestructiveWith.mockResolvedValueOnce({ ok: false, checked: {} });
             const c = make();
             c.select('demo');
             await c.deletePipeline();
@@ -1087,7 +1127,14 @@ describe('PipelineEditorComponent', () => {
                 c.model.set({
                     name: 'demo',
                     active: false,
-                    nodes: [{ id: 'out', name: 'Warehouse', type: 'sink.persistent', config: { database: 'd/db', filename_column: 'src_file' } }],
+                    nodes: [
+                        {
+                            id: 'out',
+                            name: 'Warehouse',
+                            type: 'sink.persistent',
+                            config: { database: 'd/db', filename_column: 'src_file' },
+                        },
+                    ],
                     edges: [],
                 });
                 expect(c.filenameColumnTarget()).toEqual({ value: 'src_file', target: 'Warehouse' });
@@ -2323,6 +2370,10 @@ describe('PipelineEditorComponent recipe view (UI plan §1, S1)', () => {
                     useValue: {
                         confirm: vi.fn().mockResolvedValue(true),
                         confirmDestructive: vi.fn().mockResolvedValue(true),
+                        // The delete asks with checkboxes now: schema defaults ON, data OFF.
+                        confirmDestructiveWith: vi
+                            .fn()
+                            .mockResolvedValue({ ok: true, checked: { schema: true, data: false } }),
                     },
                 },
                 { provide: MatDialog, useValue: { open: vi.fn() } },

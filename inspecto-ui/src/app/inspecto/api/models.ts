@@ -407,6 +407,10 @@ export interface ConfigDeleteResult {
     name: string;
     deleted: boolean;
     path: string;
+    /** Data directories removed, when the delete asked for the data too. */
+    dataRemoved?: string[];
+    /** Directories deliberately KEPT, by path → reason (most often: another pipeline shares it). */
+    dataRetained?: Record<string, string>;
 }
 
 /** One config that references a pipeline — `via` names the key carrying the reference. */
