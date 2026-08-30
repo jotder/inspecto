@@ -43,6 +43,16 @@ jobs:
       - name: Design-system guard
         run: npm run lint:tokens
 
+      # Formatting guard. .prettierrc.json has been pinned since 2026-08-13, but nothing ran
+      # `prettier --check`, so 68 files under src/ had drifted out of it unnoticed by 2026-08-31.
+      # ⚠ Deliberately --check and never --write in CI: a reflow can change what a template
+      # RENDERS (Angular collapses an inserted newline into a space) and can strand a `ds-allow`
+      # comment from the line the design-system guard matches it against, so a human runs
+      # `npm run format` and reads the diff. .prettierignore already exempts the vendored
+      # gamma/Fuse tree and the Jackson-written *.contract.json the Java tests byte-compare.
+      - name: Formatting guard
+        run: npm run format:check
+
       # Unit tests (Vitest via @angular/build:unit-test, jsdom); single run, no watch.
       # The guarded e2e backend smoke (src/e2e) self-skips without E2E_BASE_URL.
       - name: Unit tests
