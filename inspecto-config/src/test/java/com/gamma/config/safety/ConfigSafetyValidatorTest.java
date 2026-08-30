@@ -20,6 +20,78 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class ConfigSafetyValidatorTest {
 
+    // ── config refs resolve config-relative first (W1b) ──────────────────────
+
+    /** A pipeline whose only path surface is a `processing.schema_file` ref. */
+    private static Map<String, Object> pipelineWithSchemaRef(String ref) {
+        Map<String, Object> raw = new LinkedHashMap<>();
+        raw.put("name", "TEST");
+        Map<String, Object> processing = new LinkedHashMap<>();
+        processing.put("schema_file", ref);
+        raw.put("processing", processing);
+        return raw;
+    }
+
+    /**
+     * 🔴 The defect this pins. The Parse drawer deliberately writes the PORTABLE bare `<name>.toon`
+     * beside its pipeline (W1b: a config ref resolves config-relative first, working-directory
+     * second). This gate resolved it against the working directory instead and raised an ERROR —
+     * "outside the allowed roots" for a file sitting right next to the config — which 422'd the save
+     * before the two checks that resolve correctly could run. Creating a pipeline from the UI could
+     * not be completed at all.
+     */
+    @Test
+    void aPortableSchemaRefBesideItsConfigIsAccepted(@TempDir Path root) throws IOException {
+        Path configDir = java.nio.file.Files.createDirectories(root.resolve("config"));
+        java.nio.file.Files.writeString(configDir.resolve("e2e_schema.toon"), "raw:\n  name: e2e\n");
+
+        List<Finding> f = ConfigSafetyValidator.check("pipeline", pipelineWithSchemaRef("e2e_schema.toon"),
+                SafetyPolicy.withRoots(root), configDir);
+
+        assertTrue(f.isEmpty(), "a ref beside its own config is contained, not an escape: " + f);
+    }
+
+    /** Without the dir the old behaviour stands — the caller that cannot supply one is unchanged. */
+    @Test
+    void withoutAConfigDirTheRefStillResolvesFromTheWorkingDirectory(@TempDir Path root) {
+        List<Finding> f = ConfigSafetyValidator.check("pipeline", pipelineWithSchemaRef("e2e_schema.toon"),
+                SafetyPolicy.withRoots(root));
+
+        assertFalse(f.isEmpty(), "no config dir ⇒ working-directory resolution ⇒ outside the root");
+    }
+
+    /**
+     * 🔴 Falsified in the other direction, because a resolution change is exactly where a jail gets
+     * weakened by accident: config-relative resolution must not launder a traversal INTO the config
+     * directory. `../../etc/passwd` normalises out of the base and is still refused.
+     */
+    @Test
+    void configRelativeResolutionDoesNotLaunderATraversal(@TempDir Path root) throws IOException {
+        Path configDir = java.nio.file.Files.createDirectories(root.resolve("config"));
+
+        List<Finding> f = ConfigSafetyValidator.check("pipeline",
+                pipelineWithSchemaRef("../../etc/passwd"), SafetyPolicy.withRoots(root), configDir);
+
+        assertFalse(f.isEmpty(), "a traversal must still be refused when a config dir is supplied");
+        assertEquals(Severity.ERROR, f.get(0).severity());
+    }
+
+    /**
+     * ⚠ The existence half of the loader's rule. A ref that does NOT exist config-relative keeps
+     * resolving from the working directory — otherwise every legacy config, whose refs resolve that
+     * way and which is the form every config in this repo uses, would start failing.
+     */
+    @Test
+    void aRefThatDoesNotExistBesideTheConfigKeepsTheWorkingDirectoryMeaning(@TempDir Path root)
+            throws IOException {
+        Path configDir = java.nio.file.Files.createDirectories(root.resolve("config"));
+
+        List<Finding> f = ConfigSafetyValidator.check("pipeline", pipelineWithSchemaRef("absent.toon"),
+                SafetyPolicy.withRoots(root), configDir);
+
+        assertFalse(f.isEmpty(), "nothing beside the config ⇒ the as-authored form is judged, as before");
+    }
+
     /** A minimal pipeline map with the given dirs map + optional processing/output overlays. */
     private static Map<String, Object> pipeline(Map<String, Object> dirs) {
         Map<String, Object> raw = new LinkedHashMap<>();

@@ -269,7 +269,12 @@ final class PipelineGraphRoutes implements RouteModule {
 
         // The same gate POST /config/write runs — the graph editor is a caller, not a second pipe.
         List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), lowered));
-        findings.addAll(ConfigSafetyValidator.check("pipeline", lowered, SafetyPolicy.defaultPolicy()));
+        // ⚠ The config's OWN directory goes in: a config ref resolves config-relative first (W1b), and
+        // without it this ERROR gate resolved the portable bare `<name>.toon` against the working
+        // directory and refused a schema sitting right beside its pipeline — short-circuiting the save
+        // before the two checks below, which resolve correctly, could run.
+        findings.addAll(ConfigSafetyValidator.check("pipeline", lowered, SafetyPolicy.defaultPolicy(),
+                target.getParent()));
         // W3: against the file's OWN directory — a reference resolves config-relative first, so the
         // portable bare `<name>.toon` the Parse drawer writes would otherwise warn on every save.
         findings.addAll(ConfigRoutes.schemaFileFindings("pipeline", lowered, Severity.WARNING, target.getParent()));

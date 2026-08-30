@@ -58,6 +58,12 @@ final class ConfigWriteRoutes implements RouteModule {
         Map<String, Object> draft = mapAt(body, "config");
 
         // Gate: spec validation + the hard-fail safety check (R6). Block on ERRORs; warnings pass.
+        // ⚠ No config dir is passed here, unlike the patch route below and PUT /pipelines/{n}/graph:
+        // this gate runs BEFORE the target path is derived, so a config ref can only be resolved
+        // working-directory-relative. A pipeline written through THIS route carrying the portable bare
+        // `<name>.toon` would still be refused. Every UI path that authors one goes through the graph
+        // route, which is why it is not reordered here — moving a write gate is a bigger change than
+        // the defect warrants, and doing it blind risks the ordering the gate depends on.
         List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(spec, draft));
         findings.addAll(ConfigSafetyValidator.check(type, draft, SafetyPolicy.defaultPolicy()));
         // ERROR: an armed pipeline with no schema source parses nowhere. Without this the write
@@ -280,7 +286,8 @@ final class ConfigWriteRoutes implements RouteModule {
         // Same gate as /config/write, over the WHOLE merged draft: spec + hard-fail safety check;
         // schema references resolve config-relative here because the file has a home directory.
         List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(spec, merged));
-        findings.addAll(ConfigSafetyValidator.check(type, merged, SafetyPolicy.defaultPolicy()));
+        findings.addAll(ConfigSafetyValidator.check(type, merged, SafetyPolicy.defaultPolicy(),
+                target.getParent()));
         findings.addAll(ConfigRoutes.schemaFileFindings(type, merged, Severity.WARNING, target.getParent()));
         findings.addAll(ConfigRoutes.armedWithoutSchemaFindings(type, merged));
         findings.addAll(ConfigRoutes.routeArmingFindings(type, merged));              // a patch can break arming too
