@@ -107,6 +107,70 @@ class ConfigSpecsTest {
     }
 
     /**
+     * Pipeline spec Wave 0, item 4 — one concept, two spellings. A WARNING and never an ERROR: the
+     * legacy key still READS, so refusing it would break deployed configs to make a naming point.
+     */
+    @Test
+    void theLegacyGrammarSpellingWarnsButIsStillAccepted() {
+        ConfigSpec p = ConfigSpecs.pipeline();
+        String id = "parsing-grammar-is-canonical";
+
+        // the canonical spelling alone is silent
+        assertTrue(fire(p, id, Map.of("parsing", Map.of("grammar", "grammar/cdr"))).isEmpty());
+        assertTrue(fire(p, id, Map.of()).isEmpty());
+
+        Optional<Finding> f = fire(p, id, Map.of("processing", Map.of("grammar", "cdr.grammar.toon")));
+        assertTrue(f.isPresent(), "the deprecated spelling must be reported");
+        assertEquals(Severity.WARNING, f.get().severity(),
+                "a legacy key that still reads must never be an ERROR — that would 422 a deployed config");
+
+        // both present is still only a warning; parsing.grammar wins in the parser
+        assertTrue(fire(p, id, Map.of("parsing", Map.of("grammar", "grammar/cdr"),
+                "processing", Map.of("grammar", "cdr.grammar.toon"))).isPresent());
+
+        // both spellings are declared — the point of the item was that only the legacy one was
+        assertTrue(p.field("parsing.grammar").isPresent(), "the canonical key must be declared");
+        assertTrue(p.field("processing.grammar").isPresent(), "the legacy key stays declared, as read-only");
+    }
+
+    /**
+     * Pipeline spec Wave 1, gap 8 — {@code output_store:} arming was undiscoverable. This mirrors the
+     * FOUR refusals in {@code PipelineConfig.prepare()} (summarize / dedup / join / steps), which fire
+     * at registration; the rule moves the same answer to authoring time.
+     */
+    @Test
+    void stageTwoBlocksRequireAnOutputStoreOnlyWhenActive() {
+        ConfigSpec p = ConfigSpecs.pipeline();
+        String id = "stage-two-blocks-require-output-store";
+
+        // ⚠ an INACTIVE draft may be incomplete — refusing one would break authoring in progress
+        assertTrue(fire(p, id, Map.of("processing", Map.of("dedup", Map.of("keys", List.of("a"))))).isEmpty());
+        assertTrue(fire(p, id, Map.of("active", false,
+                "processing", Map.of("dedup", Map.of("keys", List.of("a"))))).isEmpty());
+
+        // each of the four blocks, active and unaccompanied by output_store
+        assertTrue(fire(p, id, Map.of("active", true, "steps", List.of(Map.of("kind", "dedup")))).isPresent());
+        for (String block : List.of("dedup", "summarize", "join"))
+            assertTrue(fire(p, id, Map.of("active", true,
+                            "processing", Map.of(block, Map.of("keys", List.of("a"))))).isPresent(),
+                    block + " must require output_store when active");
+
+        // ...and each is satisfied by declaring one
+        assertTrue(fire(p, id, Map.of("active", true, "output_store", "landed",
+                "steps", List.of(Map.of("kind", "dedup")))).isEmpty());
+
+        // an ACTIVE pipeline carrying none of the four is fine without output_store
+        assertTrue(fire(p, id, Map.of("active", true, "processing", Map.of("threads", 4))).isEmpty());
+
+        // 🔴 an EMPTY block is not an authored one — the engine tests the parsed field, which an empty
+        // section leaves null, so refusing here would refuse a pipeline the engine arms happily
+        assertTrue(fire(p, id, Map.of("active", true, "steps", List.of())).isEmpty());
+        assertTrue(fire(p, id, Map.of("active", true, "processing", Map.of("dedup", Map.of()))).isEmpty());
+
+        assertTrue(p.field("output_store").isPresent(), "the arming condition must be declared to be discoverable");
+    }
+
+    /**
      * The authoring-time half of the %z/%Z refusal. Both directives, both lists, and an escaped
      * literal percent must still pass.
      */

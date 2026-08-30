@@ -9,6 +9,7 @@ import {
     schemaZoneFindings,
     zoneRefusal,
     formatZoneDirectiveRefusal,
+    stageTwoOutputStoreRefusal,
 } from './onboarding.handler';
 
 /**
@@ -606,6 +607,42 @@ describe('onboardingHandler pipeline delete — dependents gate', () => {
         expect(String((res?.body as { error?: string })?.error)).toContain('Not/AZone');
     });
 
+    /**
+     * 🔴 The WIRING, not the rule. `stageTwoOutputStoreRefusal` is unit-tested below, but a correct
+     * function the save path never calls refuses nothing — the failure mode a green unit suite hides.
+     */
+    it('a pipeline write of an ACTIVE steps: chain with no output_store is a 422', () => {
+        const store = new MockStore();
+        const res = handler(
+            req('POST', '/api/config/write', {
+                type: 'pipeline',
+                config: { name: 'chain_demo', active: true, steps: [{ kind: 'dedup' }] },
+            }),
+            store,
+        );
+        expect(res?.status).toBe(422);
+        expect(String((res?.body as { error?: string })?.error)).toContain('output_store');
+        expect(store.get('default', PIPELINE_CONFIGS_COLL, 'chain_demo')).toBeUndefined();
+    });
+
+    it('...and saves once output_store names the store the chain writes', () => {
+        const store = new MockStore();
+        const res = handler(
+            req('POST', '/api/config/write', {
+                type: 'pipeline',
+                config: {
+                    name: 'chain_demo',
+                    active: true,
+                    output_store: 'landed',
+                    steps: [{ kind: 'dedup' }],
+                },
+            }),
+            store,
+        );
+        expect(res?.status).toBe(200);
+        expect((res?.body as { written?: boolean })?.written).toBe(true);
+    });
+
     it('a pipeline write with a GOOD source_timezone still saves', () => {
         const store = new MockStore();
         const res = handler(
@@ -617,6 +654,49 @@ describe('onboardingHandler pipeline delete — dependents gate', () => {
         );
         expect(res?.status).toBe(200);
         expect((res?.body as { written?: boolean })?.written).toBe(true);
+    });
+});
+
+describe('stageTwoOutputStoreRefusal (mirrors stage-two-blocks-require-output-store)', () => {
+    const dedup = { keys: ['msisdn'] };
+
+    it('exempts an inactive draft, which is allowed to be incomplete', () => {
+        expect(stageTwoOutputStoreRefusal({ processing: { dedup } })).toBeNull();
+        expect(stageTwoOutputStoreRefusal({ active: false, processing: { dedup } })).toBeNull();
+    });
+
+    it('refuses each of the four Stage-2 blocks on an active pipeline with no output_store', () => {
+        expect(stageTwoOutputStoreRefusal({ active: true, steps: [{ kind: 'dedup' }] })).toContain('steps');
+        for (const block of ['dedup', 'summarize', 'join'])
+            expect(stageTwoOutputStoreRefusal({ active: true, processing: { [block]: dedup } })).toContain(
+                `processing.${block}`,
+            );
+    });
+
+    it('is satisfied by an output_store, and ignores a pipeline carrying none of the four', () => {
+        expect(
+            stageTwoOutputStoreRefusal({
+                active: true,
+                output_store: 'landed',
+                steps: [{ kind: 'dedup' }],
+            }),
+        ).toBeNull();
+        expect(stageTwoOutputStoreRefusal({ active: true, processing: { threads: 4 } })).toBeNull();
+    });
+
+    it('does not treat an EMPTY block as authored — the engine tests the parsed field', () => {
+        expect(stageTwoOutputStoreRefusal({ active: true, steps: [] })).toBeNull();
+        expect(stageTwoOutputStoreRefusal({ active: true, processing: { dedup: {} } })).toBeNull();
+    });
+
+    it('names every offending block, not just the first', () => {
+        const refusal = stageTwoOutputStoreRefusal({
+            active: true,
+            steps: [{ kind: 'x' }],
+            processing: { join: dedup },
+        });
+        expect(refusal).toContain('steps');
+        expect(refusal).toContain('processing.join');
     });
 });
 

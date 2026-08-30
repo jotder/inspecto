@@ -172,6 +172,13 @@ export function onboardingHandler(flags: MockFlags): MockHandler {
                 }
                 const badFormat = formatZoneDirectiveRefusal(parsingBlock);
                 if (badFormat) return error(422, badFormat);
+                // Mirrors ConfigSpecs.pipeline()'s `stage-two-blocks-require-output-store` (pipeline
+                // spec gap 8): an ACTIVE pipeline carrying a Stage-2 block must declare output_store:.
+                // ⚠ Added in the same change as the server rule — a mock that saved this happily would
+                // be MORE LENIENT than the server, letting an author build offline what a real backend
+                // then 422s. Inactive drafts are exempt, exactly as prepare() and the rule are.
+                const badStageTwo = stageTwoOutputStoreRefusal(body.config);
+                if (badStageTwo) return error(422, badStageTwo);
                 // The real route writes `<name>_pipeline.toon` — the bootstrap-scan convention.
                 const path = name.endsWith('_pipeline') ? `${name}.toon` : `${name}_pipeline.toon`;
                 store.put(space, PIPELINE_CONFIGS_COLL, name, {
@@ -539,6 +546,44 @@ export function formatZoneDirectiveRefusal(parsing: Record<string, unknown> | un
         }
     }
     return null;
+}
+
+/**
+ * The `output_store:` refusal, mirroring `ConfigSpecs.pipeline()`'s
+ * `stage-two-blocks-require-output-store` rule and the four refusals in `PipelineConfig.prepare()`
+ * (pipeline spec gap 8).
+ *
+ * `steps:`, `processing.dedup`, `processing.summarize` and `processing.join` execute AT REST — a
+ * `pipeline_config:` job over the landed store — never on the linear ingest path. Without a
+ * top-level `output_store:` they have nowhere to write and the pipeline refuses to arm.
+ *
+ * ⚠ Only an ACTIVE pipeline is refused: an inactive draft is allowed to be incomplete, and refusing
+ * one here would break authoring a pipeline in progress. ⚠ An EMPTY block is not an authored one —
+ * the engine tests the parsed field, which an empty section leaves null.
+ */
+export function stageTwoOutputStoreRefusal(config: Record<string, unknown>): string | null {
+    if (config['active'] !== true) return null;
+    const processing = (config['processing'] ?? {}) as Record<string, unknown>;
+    const authored = (v: unknown): boolean => {
+        if (v === null || v === undefined) return false;
+        if (Array.isArray(v)) return v.length > 0;
+        if (typeof v === 'object') return Object.keys(v as object).length > 0;
+        return String(v).trim() !== '';
+    };
+    const blocks: [string, unknown][] = [
+        ['steps', config['steps']],
+        ['processing.dedup', processing['dedup']],
+        ['processing.summarize', processing['summarize']],
+        ['processing.join', processing['join']],
+    ];
+    const named = blocks.filter(([, v]) => authored(v)).map(([k]) => k);
+    if (named.length === 0) return null;
+    if (authored(config['output_store'])) return null;
+    return (
+        `${named.join(', ')} executes at rest, not on the linear ingest path, so an active pipeline ` +
+        `carrying it must declare a top-level output_store: naming the store the chain writes. ` +
+        `Author output_store:, keep the pipeline inactive (active: false), or remove the block.`
+    );
 }
 
 /** The zone directive in a strptime format, or `''` for none. Exactly `%z` and `%Z`. */

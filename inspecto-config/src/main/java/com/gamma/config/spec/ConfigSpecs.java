@@ -110,6 +110,14 @@ public final class ConfigSpecs {
                                 + "pipeline needs this, a schemas[] dispatch list, or a plugin ingester."),
                 FieldSpec.of("processing.ingester", "Plugin ingester class", FieldType.STRING,
                         "FQCN of a plugin ingester; when set, processing.segments must be non-empty."),
+                // The Stage-2 arming condition (pipeline spec gap 8). Undeclared until 2026-08-31, which
+                // is why a steps:/dedup/summarize/join pipeline could only learn it needed this key by
+                // being REFUSED at registration — the rule below moves that answer to authoring time.
+                FieldSpec.of("output_store", "Stage-2 output store", FieldType.STRING,
+                        "Names the store an at-rest chain writes. Required to ARM a pipeline carrying "
+                                + "steps:, processing.dedup, processing.summarize or processing.join — "
+                                + "those execute at rest (a pipeline_config: job), never on the linear "
+                                + "ingest path, and the chain needs an authored name for what it writes."),
                 // ── grammar: one concept, two spellings — `parsing.grammar` is CANONICAL ────────
                 // The parser has preferred `parsing.grammar` over `processing.grammar` since the parsing:
                 // block became the design-of-record (PipelineConfigParser#resolveGrammarRef), but only the
@@ -272,6 +280,32 @@ public final class ConfigSpecs {
                 // ⚠ Filed as a real gap: the offline mock ALREADY refused a bad source_timezone on the
                 // pipeline write while no Java route did, so the mock was ahead of the server rather
                 // than mirroring it. This rule is what makes that mock behaviour true.
+                // Pipeline spec Wave 1, gap 8 — output_store: arming was undiscoverable. FOUR refusals
+                // in PipelineConfig.prepare() (summarize / dedup / join / steps) already say this, but
+                // they fire at REGISTRATION: the author saves happily, activates, and only then learns
+                // the pipeline cannot run. Declaring the requirement lets the UI show it and a save
+                // return a field-anchored 422. ⚠ The predicate mirrors prepare()'s condition exactly,
+                // `active` included — an inactive draft is allowed to be incomplete, and refusing one
+                // here would break authoring a pipeline in progress.
+                new CrossFieldRule(
+                        "stage-two-blocks-require-output-store",
+                        "An ACTIVE pipeline carrying steps:, processing.dedup, processing.summarize or "
+                                + "processing.join must declare a top-level output_store:. Those blocks "
+                                + "execute at rest (a pipeline_config: job over the landed store), never "
+                                + "on the linear ingest path, so without output_store: they have nowhere "
+                                + "to write and the pipeline refuses to arm. Author output_store:, keep "
+                                + "the pipeline inactive (active: false), or remove the block.",
+                        Severity.ERROR,
+                        List.of("output_store", "steps", "processing.dedup",
+                                "processing.summarize", "processing.join"),
+                        raw -> {
+                            if (!Boolean.parseBoolean(str(raw, "active"))) return true;
+                            boolean needs = false;
+                            for (String block : List.of("steps", "processing.dedup",
+                                                        "processing.summarize", "processing.join"))
+                                needs |= authored(raw, block);
+                            return !needs || present(raw, "output_store");
+                        }),
                 // Pipeline spec Wave 0, item 4 — two spellings for one concept. A WARNING, never an
                 // ERROR: the legacy key still READS, so refusing it would break deployed configs to make
                 // a naming point. The finding is what turns "silently deprecated" into something an
@@ -720,5 +754,18 @@ public final class ConfigSpecs {
                                 return false;
                             }
                         })));
+    }
+
+    /**
+     * Whether {@code path} holds a block an author actually wrote. ⚠ Stricter than
+     * {@link RawConfig#present}: an empty {@code steps: []} or {@code dedup: {}} is not an authored
+     * block, and the engine's own arming checks agree — they test the PARSED field, which an empty
+     * section leaves null. Treating empty as authored would refuse a pipeline the engine arms happily.
+     */
+    private static boolean authored(Map<String, Object> raw, String path) {
+        Object v = at(raw, path);
+        if (v instanceof Map<?, ?> m) return !m.isEmpty();
+        if (v instanceof List<?> l) return !l.isEmpty();
+        return present(raw, path);
     }
 }

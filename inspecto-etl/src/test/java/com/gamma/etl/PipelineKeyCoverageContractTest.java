@@ -59,14 +59,16 @@ class PipelineKeyCoverageContractTest {
     private static final String PARSER = "inspecto-etl/src/main/java/com/gamma/etl/PipelineConfigParser.java";
 
     /**
-     * The blocks the parser reads that the spec does not declare, as of 2026-08-31. ⚠ This list may only
-     * ever SHRINK. Each entry is a key the engine honours and no generated form can show.
+     * The blocks the parser reads that the spec does not declare. ⚠ This list may only ever SHRINK.
+     * Each entry is a key the engine honours and no generated form can show.
+     *
+     * <p>18 when this landed (2026-08-31); <b>17</b> after gap 8 declared {@code output_store} the same
+     * day — the ratchet caught that one for real, not in a probe.
      */
     private static final Set<String> UNDECLARED_BLOCKS = Set.of(
             // ── top-level ────────────────────────────────────────────────────────
             "active",              // the arming switch itself — authored on every runnable pipeline
             "collector",           // the acquisition block (GLOSSARY: Collector)
-            "output_store",        // the Stage-2 arming condition (gap 8)
             "route",               // gap 9's block — the branch-aware ingest lane
             "sinks",               // the plural destination block
             "steps",               // the ordered Stage-2 chain (gap 11)
