@@ -88,13 +88,17 @@ final class OperationalDb {
         TAGS("Tag assignments", "objects.backend", "memory", Mode.DB_FLAG,
                 "objects.tags.db.url", "objects.db.user", "objects.db.password", SpaceRoot::tagAssignmentsDbUrl),
         // ⚠ Flipping this to "db" — serving the three ledgers from a database rather than off CSV —
-        // was attempted 2026-08-31 and REVERTED pending a decision. It is a one-word change here, and
+        // was attempted 2026-08-31 and REVERTED. It is a one-word change here, and
         // ServiceStores.openStatusStore is already written for it (single declaration + degrade rather
-        // than fail-boot). Two real consequences surfaced and neither is a test artefact:
-        //   1. the status DuckDB appears as an extra BUSINESS store in the catalog listing;
-        //   2. 🔴 ControlApiMultiSpaceTest saw one space report another's committed batch — the
-        //      DB-backed store may not isolate per space the way the file store does.
-        // (2) is a correctness question and must be answered before the default moves.
+        // than fail-boot). 🔴 THE BLOCKER IS FRESHNESS, not isolation: CollectorService.syncStatus()
+        // projects the on-disk audit into this store exactly ONCE, at boot. Nothing re-projects it when
+        // a batch commits, so a DB-backed store serves a snapshot frozen at startup — a run triggered
+        // after boot reports no commits at all, which is how ControlApiMultiSpaceTest failed (it read
+        // its OWN commit back as empty; there was no cross-space leak — statusDbUrl() is per space).
+        // ⛔ Do not move this default until the projection refreshes on commit; BatchEventBus already
+        // publishes the event to hang it on. A second, smaller question rides along: the status DuckDB
+        // then appears as a BUSINESS store in /db/catalog, where an operational store arguably does not
+        // belong.
         STATUS("Status", "status.backend", "file", Mode.DB_FLAG,
                 "status.db.url", "status.db.user", "status.db.password", SpaceRoot::statusDbUrl),
         ACQUISITION_LEDGER("Acquisition ledger", "acquire.ledger.backend", "memory", Mode.DB_FLAG,
