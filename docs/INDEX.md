@@ -95,6 +95,13 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- [`superpower/pipeline-spec.md`](superpower/pipeline-spec.md) — **the single consolidated Pipeline
+  specification** (2026-08-30), written as the basis for a redesign: vocabulary, config surface, the
+  DERIVED graph, Step types and connection rules, execution, extension seams, transfer, and §10's
+  grounded list of what is broken. 🔴 Read its §0 first — an approved redesign
+  (`elt-final-amendment-plan.md`) already exists and is mostly shipped, so the first decision is
+  whether to finish it or replace it.
+
 - [`superpower/completeness-kpi-plan.md`](superpower/completeness-kpi-plan.md) — **DECIDED
   2026-08-30, ready to build**: a scheduled per-pipeline completeness KPI (gap/sequence analysis +
   file/record count deviation). 🔴 **This REPLACES Consignment §8 sealing and §11.4 `partition_state`,
