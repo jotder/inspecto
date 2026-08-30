@@ -1461,6 +1461,11 @@ export class PipelineParseDefinitionComponent {
             .subscribe({
                 next: () => {
                     this.writing.set(false);
+                    // ⚠ Clear the refusal this write just answered. Without it the BACKWARD message
+                    // ("schema edit is not BACKWARD-compatible; not written") stayed on screen after
+                    // the operator took the override and the write SUCCEEDED — the pane reporting a
+                    // failure for a schema it had just replaced.
+                    this.editor?.error.set('');
                     grid.markPristine();
                     this.metaGrid?.markPristine();
                     this.partitionsEditor?.markPristine();

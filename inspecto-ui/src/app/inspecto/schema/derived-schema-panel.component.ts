@@ -49,7 +49,13 @@ import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.comp
             @if (loading()) {
                 <inspecto-skeleton [lines]="4" />
             } @else if (bindError()) {
-                <inspecto-alert variant="warning" title="This Schema and Mapping do not compile">
+                <!--
+                    ⚠ One title for every 422, because the route refuses for more than one reason — a
+                    Schema/Mapping that does not bind, AND a pipeline that declares no schema at all.
+                    Titling both "does not compile" told an author to go fix a transform that may not
+                    exist yet. The server's own message says which; the heading must not pre-empt it.
+                -->
+                <inspecto-alert variant="warning" title="The output schema could not be derived">
                     {{ bindError() }}
                 </inspecto-alert>
             } @else if (loadError()) {
@@ -134,7 +140,8 @@ export class DerivedSchemaPanelComponent {
                 error: (err: HttpErrorResponse) => {
                     this.result.set(null);
                     // 422 is the author's own config failing to compile — actionable, and phrased as such.
-                    if (err.status === 422) this.bindError.set(apiErrorMessage(err, 'The transform does not compile.'));
+                    if (err.status === 422)
+                        this.bindError.set(apiErrorMessage(err, 'The pipeline refused to derive a schema.'));
                     else this.loadError.set(apiErrorMessage(err, 'Could not derive the output schema.'));
                     this.loading.set(false);
                 },

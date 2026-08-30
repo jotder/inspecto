@@ -75,8 +75,12 @@ describe('DerivedSchemaPanelComponent', () => {
         expect(fixture.nativeElement.textContent).toContain('Plugin path');
     });
 
-    /** A 422 is the author's own config failing to bind — the most actionable thing this route says. */
-    it('surfaces a non-binding schema as a warning carrying the binder message', async () => {
+    /**
+     * A 422 is the author's own config being refused — the most actionable thing this route says.
+     * ⚠ The heading must stay neutral across BOTH 422 causes (a Schema/Mapping that does not bind, and
+     * a pipeline that declares no schema at all); the server message is what distinguishes them.
+     */
+    it('surfaces a refusal as a warning carrying the server message', async () => {
         const err = new HttpErrorResponse({
             status: 422,
             error: { error: { message: 'Referenced column "NOPE" not found' } },
@@ -88,14 +92,29 @@ describe('DerivedSchemaPanelComponent', () => {
         expect(fixture.nativeElement.textContent).toContain('NOPE');
     });
 
+    /**
+     * 🔴 Found by driving a real pipeline: a pipeline that declares no schema also 422s, and the panel
+     * headlined it "This Schema and Mapping do not compile" — telling the author to fix a transform
+     * that did not exist yet. The heading is now neutral and the server's reason carries the meaning.
+     */
+    it('does not blame the transform when the pipeline simply declares no schema', async () => {
+        const err = new HttpErrorResponse({
+            status: 422,
+            error: { error: { message: "pipeline 'e2e' declares no schema" } },
+        });
+        await build({ derivedSchema: () => throwError(() => err) } as Partial<ConfigService>);
+
+        expect(fixture.nativeElement.textContent).toContain('declares no schema');
+        expect(fixture.nativeElement.textContent).not.toContain('do not compile');
+    });
+
     /** A transport failure is a different thing from a config that does not compile — don't merge them. */
     it('reports a transport failure separately from a binder refusal', async () => {
         await build({
             derivedSchema: () => throwError(() => new HttpErrorResponse({ status: 500 })),
         } as Partial<ConfigService>);
 
-        expect(fixture.nativeElement.textContent).toContain('Could not derive');
-        expect(fixture.nativeElement.textContent).not.toContain('do not compile');
+        expect(fixture.nativeElement.textContent).toContain('Could not derive the schema');
     });
 
     /** A pipeline with no schema is an honest empty state, not an error. */
