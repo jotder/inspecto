@@ -1903,11 +1903,33 @@ describe('PipelineEditorComponent', () => {
         expect(c.unsupportedTypeList()).toBe('transform.split, transform.merge');
     });
 
+    /**
+     * 🔴 Decision D3 / pipeline spec gap 2. The lift retypes a parse node to its per-format subtype only
+     * when `parsing.frontend` names one EXPLICITLY, so a create without it opened the editor on a generic
+     * Parse Step the author had to convert through a custody dialog. ⚠ Not defaulted — guessing a format
+     * would author one nobody chose and re-create that Step by another route.
+     */
+    it('refuses to create until a parse format is chosen, and writes it as parsing.frontend', () => {
+        const c = make();
+        c.startNew();
+        c.newName.setValue('orders');
+        c.createPipeline();
+        expect(config.write).not.toHaveBeenCalled();
+        expect(c.newFrontend.touched).toBe(true);
+
+        c.newFrontend.setValue('fixedwidth');
+        c.createPipeline();
+        expect(config.write).toHaveBeenCalledTimes(1);
+        const written = config.write.mock.calls[0][1] as Record<string, unknown>;
+        expect(written['parsing']).toEqual({ frontend: 'fixedwidth' });
+    });
+
     it('a 503 on create marks the editor read-only', () => {
         config.write.mockReturnValue(throwError(() => ({ status: 503 })));
         const c = make();
         c.startNew();
         c.newName.setValue('x');
+        c.newFrontend.setValue('delimited'); // D3: a create names its parse format
         c.createPipeline();
         expect(c.unavailable()).toBe(true);
     });
@@ -1956,6 +1978,33 @@ describe('PipelineEditorComponent', () => {
      * message, so a 409 (`duplicate`) printed "A name is required" over a field that visibly held a
      * name — a dead end with nothing to act on.
      */
+    /**
+     * 🔴 <b>The refusal must be VISIBLE</b> — caught in the preview, and no unit test would have found it.
+     * `<inspecto-option-picker>` derives its error from its OWN `required` input and its OWN touched
+     * signal, which it sets on interaction; a host validating on submit (`markAsTouched()` on the
+     * control) reaches neither. So Create correctly refused while nothing appeared on screen, leaving the
+     * author with a button that simply did nothing — the §0.3 failure. The host renders the message.
+     */
+    it('says why Create refused when no parse format was chosen', () => {
+        const fixture = TestBed.createComponent(PipelineEditorComponent);
+        const c = fixture.componentInstance;
+        c.model.set(structuredClone(FLOW));
+        fixture.detectChanges();
+        c.startNew();
+        c.newName.setValue('orders');
+        fixture.detectChanges();
+        // Clicked, not called — only a real event marks the OnPush view for check (see below).
+        const create = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].find(
+            (b) => b.textContent?.trim() === 'Create',
+        ) as HTMLButtonElement;
+        create.click();
+        fixture.detectChanges();
+
+        expect(config.write).not.toHaveBeenCalled();
+        const alert = (fixture.nativeElement as HTMLElement).querySelector('[role="alert"]');
+        expect(alert?.textContent).toContain('Choose the format');
+    });
+
     it('names a duplicate pipeline rather than claiming the field is empty', () => {
         config.write.mockReturnValue(throwError(() => ({ status: 409 })));
         const fixture = TestBed.createComponent(PipelineEditorComponent);
@@ -1967,6 +2016,7 @@ describe('PipelineEditorComponent', () => {
         fixture.detectChanges();
         c.startNew();
         c.newName.setValue('orders');
+        c.newFrontend.setValue('delimited'); // D3: a create names its parse format
         c.newName.markAsTouched();
         fixture.detectChanges();
         // Clicked, not called: a plain FormControl is not a signal, so only a real event marks the
@@ -1993,6 +2043,7 @@ describe('PipelineEditorComponent', () => {
         const c = make();
         c.startNew();
         c.newName.setValue('my-pipe');
+        c.newFrontend.setValue('delimited'); // D3: a create names its parse format
         c.createPipeline();
         expect(config.write).toHaveBeenCalledWith('pipeline', expect.objectContaining({ id: 'my_pipe' }));
         expect(c.selectedId()).toBe('my_pipe');

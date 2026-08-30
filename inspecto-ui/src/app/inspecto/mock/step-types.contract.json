@@ -281,10 +281,58 @@
   } ]
 }, {
   "verb" : "parse",
-  "type" : "parser",
+  "type" : "parser.delimited",
   "category" : "PARSE",
-  "label" : "Parser",
-  "description" : "Reads a landed file into rows; may dispatch by schema/segment (route:*) with an unmatched branch.",
+  "label" : "Delimited",
+  "description" : "Reads a delimited (CSV-like) landed file into rows; the delimited grammar is its config.",
+  "lowerable" : true,
+  "attributes" : [ ]
+}, {
+  "verb" : "parse",
+  "type" : "parser.fixedwidth",
+  "category" : "PARSE",
+  "label" : "Fixed-Width",
+  "description" : "Reads a fixed-width landed file into rows; positional slices carved from each record.",
+  "lowerable" : true,
+  "attributes" : [ ]
+}, {
+  "verb" : "parse",
+  "type" : "parser.json",
+  "category" : "PARSE",
+  "label" : "JSON",
+  "description" : "Reads an NDJSON or JSON-array landed file into rows; top-level keys become the columns.",
+  "lowerable" : true,
+  "attributes" : [ ]
+}, {
+  "verb" : "parse",
+  "type" : "parser.text_regex",
+  "category" : "PARSE",
+  "label" : "Regex",
+  "description" : "Reads matching lines into rows via named capture groups; non-matching lines are dropped.",
+  "lowerable" : true,
+  "attributes" : [ ]
+}, {
+  "verb" : "parse",
+  "type" : "parser.xlsx",
+  "category" : "PARSE",
+  "label" : "Excel",
+  "description" : "Reads an .xlsx workbook sheet into rows via DuckDB read_xlsx; header cells name the columns.",
+  "lowerable" : true,
+  "attributes" : [ ]
+}, {
+  "verb" : "parse",
+  "type" : "parser.asn1",
+  "category" : "PARSE",
+  "label" : "ASN.1",
+  "description" : "Decodes BER/DER records against an X.680 grammar and flattens them onto segment schemas.",
+  "lowerable" : true,
+  "attributes" : [ ]
+}, {
+  "verb" : "parse",
+  "type" : "parser.plugin",
+  "category" : "PARSE",
+  "label" : "Custom",
+  "description" : "Decodes records through a deployed custom ParserPlugin, loaded via its StreamingFileIngester.",
   "lowerable" : true,
   "attributes" : [ ]
 }, {

@@ -21,6 +21,29 @@
                     <mat-error>A name is required</mat-error>
                 }
             </mat-form-field>
+            <!-- D3: ONE question at create time types the Parse Step immediately. Without it the lift
+                 produces the generic parser node, which the author then converts through a custody
+                 dialog — the detour this removes. Deliberately not defaulted: guessing a format would
+                 author one nobody chose. -->
+            <div class="w-56">
+                <inspecto-option-picker
+                    label="Parse format"
+                    placeholder="Choose a format"
+                    [options]="parseFormats"
+                    [formControl]="newFrontend"
+                />
+                <!-- ⚠ The error is rendered HERE, not by the picker's own `required` line, and the two
+                     must not both fire. The picker derives `invalid` from its OWN `required` input and
+                     its OWN touched signal, which it sets on interaction — a host that validates on
+                     submit (`markAsTouched()` on the control) reaches neither, so pressing Create with
+                     no format chosen left the button doing nothing with nothing on screen to correct.
+                     Same shape as the `list`-field rule: where a control cannot surface its own error,
+                     the host renders one explicitly. Setting `[required]` as well would double the
+                     message once the picker has also been opened. -->
+                @if (newFrontend.touched && newFrontend.invalid) {
+                    <p class="text-warn m-0 text-xs" role="alert">Choose the format this pipeline reads</p>
+                }
+            </div>
             <button mat-flat-button color="primary" type="button" (click)="createPipeline()">Create</button>
             <button mat-button type="button" (click)="creating.set(false)">Cancel</button>
         } @else {

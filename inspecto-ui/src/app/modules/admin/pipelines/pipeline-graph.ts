@@ -716,7 +716,17 @@ function walkStepChain(
  */
 export const RECIPE_VERBS: readonly { type: string; label: string }[] = [
     { type: 'acquisition', label: 'Collect' },
-    { type: 'parser', label: 'Parse' },
+    // 🔴 One entry PER FORMAT (pipeline spec gap 2, decision D3). The generic `parser` type is
+    // READ_COMPAT_ONLY server-side, so the canvas palette never offered it — but this fallback did,
+    // and so did the served catalogue, which is how a recipe author ended up with an untyped Parse
+    // Step to convert through a custody dialog. A parser is always FORMAT-SPECIFIC.
+    { type: 'parser.delimited', label: 'Parse (delimited)' },
+    { type: 'parser.fixedwidth', label: 'Parse (fixed-width)' },
+    { type: 'parser.json', label: 'Parse (JSON)' },
+    { type: 'parser.text_regex', label: 'Parse (regex)' },
+    { type: 'parser.xlsx', label: 'Parse (Excel)' },
+    { type: 'parser.asn1', label: 'Parse (ASN.1)' },
+    { type: 'parser.plugin', label: 'Parse (custom)' },
     { type: 'transform.map', label: 'Map' },
     { type: 'transform.dedup', label: 'Dedup' },
     { type: 'transform.filter', label: 'Transform (filter)' },

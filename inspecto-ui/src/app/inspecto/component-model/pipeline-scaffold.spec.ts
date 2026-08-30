@@ -82,4 +82,23 @@ describe('pipelineScaffold', () => {
     it('seeds output.filename_column as file_name for new pipelines', () => {
         expect(pipelineScaffold('cdr')['output']).toEqual({ filename_column: 'file_name' });
     });
+
+    /**
+     * 🔴 Decision D3 / pipeline spec gap 2. The lift retypes a parse node to its per-format subtype ONLY
+     * when `parsing.frontend` names one explicitly, so a scaffold without it produced the generic Step
+     * an author then had to convert through a custody dialog.
+     */
+    it('writes parsing.frontend so the lift types the Parse Step immediately', () => {
+        expect(pipelineScaffold('cdr', { frontend: 'delimited' })['parsing']).toEqual({ frontend: 'delimited' });
+        expect(pipelineScaffold('cdr', { frontend: 'fixedwidth' })['parsing']).toEqual({ frontend: 'fixedwidth' });
+    });
+
+    /**
+     * ⚠ Absent, never defaulted. Guessing `delimited` would author a format nobody chose and re-create
+     * the generic Step by another route — D3 weighed that and chose to ask.
+     */
+    it('omits parsing entirely when no format was chosen', () => {
+        expect(pipelineScaffold('cdr')).not.toHaveProperty('parsing');
+        expect(pipelineScaffold('cdr', { frontend: '  ' })).not.toHaveProperty('parsing');
+    });
 });

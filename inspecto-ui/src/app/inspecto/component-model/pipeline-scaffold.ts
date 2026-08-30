@@ -91,6 +91,19 @@ export function pipelineScaffold(
         reference?: boolean;
         /** Active space id; scopes the derived dirs so the write clears the path jail. See {@link spaceBase}. */
         space?: string | null;
+        /**
+         * The parse format this pipeline reads, written as `parsing.frontend` (decision D3).
+         *
+         * 🔴 Without it the lift produces the GENERIC `parser` node — `PipelineEditable.toMap` retypes a
+         * parse node to its per-format subtype only when `parsing.frontend` names one EXPLICITLY — so a
+         * new pipeline began life with an untyped Parse Step the author had to convert through a custody
+         * dialog. A parser is always FORMAT-SPECIFIC (operator, 2026-08-21), so New-pipeline asks and the
+         * Step is typed from its first read.
+         *
+         * ⚠ Omitted when absent rather than defaulted: guessing `delimited` would author a format nobody
+         * chose and re-create the generic Step by another route — D3 weighed exactly that and chose to ask.
+         */
+        frontend?: string;
     } = {},
 ): Record<string, unknown> {
     const base = spaceBase(opts.space);
@@ -130,6 +143,7 @@ export function pipelineScaffold(
         // silently shadow real data.
         output: { filename_column: 'file_name' },
     };
+    if (opts.frontend?.trim()) config['parsing'] = { frontend: opts.frontend.trim() };
     if (opts.description?.trim()) config['description'] = opts.description.trim();
     if (opts.reference) config['produces'] = 'reference';
     return config;

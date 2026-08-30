@@ -53,6 +53,7 @@ import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { companionSchemaName, schemaNameFromPath, segmentPathsOf } from 'app/inspecto/segments';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 import { DefinitionDrawerComponent } from 'app/inspecto/components/definition-drawer.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoSplitDirective } from 'app/inspecto/components/split.directive';
@@ -176,6 +177,7 @@ const TABBED_PANE_WIDTH = 420;
         MatMenuModule,
         MatTooltipModule,
         InspectoAlertComponent,
+        InspectoOptionPickerComponent,
         DefinitionDrawerComponent,
         PipelineCollectionDefinitionComponent,
         PipelineParseDefinitionComponent,
@@ -415,6 +417,28 @@ export class PipelineEditorComponent implements OnInit {
 
     readonly creating = signal(false);
     readonly newName = this.fb.control('', { nonNullable: true, validators: [Validators.required] });
+    /**
+     * The parse format a new pipeline reads, written as `parsing.frontend` (decision D3, gap 2).
+     *
+     * 🔴 Required, and deliberately not defaulted. The lift retypes a parse node to its per-format
+     * subtype only when `parsing.frontend` names one EXPLICITLY, so a scaffold without it opened with an
+     * untyped Parse Step the author had to convert through a custody dialog. Defaulting to `delimited`
+     * would author a format nobody chose and re-create that generic Step by another route — D3 weighed
+     * exactly that and chose to ASK. ⚠ The palette already offers seven specific parsers, so one
+     * question here is consistent with what the author sees a moment later.
+     */
+    readonly newFrontend = this.fb.control('', { nonNullable: true, validators: [Validators.required] });
+
+    /** The parse formats New-pipeline offers — the authorable parser family, minus the plugin frontend,
+     *  which needs an ingester FQCN a create form has no way to ask for yet. */
+    readonly parseFormats: PickerOption[] = [
+        { value: 'delimited', label: 'Delimited (CSV-like)', hint: 'Fields separated by a delimiter.' },
+        { value: 'fixedwidth', label: 'Fixed-width', hint: 'Positional slices carved from each record.' },
+        { value: 'json', label: 'JSON', hint: 'One record per JSON document or line.' },
+        { value: 'text_regex', label: 'Text (regex)', hint: 'Fields captured from each line by a pattern.' },
+        { value: 'xlsx', label: 'Excel', hint: 'Rows read from a worksheet.' },
+        { value: 'asn1', label: 'ASN.1', hint: 'Binary records decoded by a grammar.' },
+    ];
 
     /** The right dock (properties / assist) is collapsible to a rail — the canvas takes the space back. */
     readonly inspectorOpen = signal(true);
@@ -1047,11 +1071,13 @@ export class PipelineEditorComponent implements OnInit {
     startNew(): void {
         this.creating.set(true);
         this.newName.reset('');
+        this.newFrontend.reset('');
     }
 
     createPipeline(): void {
-        if (this.newName.invalid) {
+        if (this.newName.invalid || this.newFrontend.invalid) {
             this.newName.markAsTouched();
+            this.newFrontend.markAsTouched();
             return;
         }
         const name = this.newName.value.trim();
@@ -1061,37 +1087,45 @@ export class PipelineEditorComponent implements OnInit {
         const id = pipelineId(name);
         // W5: a new pipeline IS a canonical draft — write the space-convention scaffold (inactive,
         // with the parser-required dirs) and register it, then load its lifted graph.
-        this.configApi.write('pipeline', pipelineScaffold(name, { space: this.spaces.currentSpaceId() })).subscribe({
-            next: (written) => {
-                this.configApi.registerPipeline(written.path).subscribe({
-                    next: () => {
-                        this.creating.set(false);
-                        this.flows.update((fs) => [
-                            ...fs,
-                            {
-                                name: id,
-                                ...(name === id ? {} : { displayName: name }),
-                                active: false,
-                                nodeCount: 0,
-                                edgeCount: 0,
-                                produces: [],
-                                consumes: [],
-                            },
-                        ]);
-                        this.select(id);
-                    },
-                    error: () => {
-                        // the file exists; the row appears after the next rescan
-                        this.creating.set(false);
-                        this.select(id);
-                    },
-                });
-            },
-            error: (err) => {
-                if ((err as { status?: number })?.status === 409) this.newName.setErrors({ duplicate: true });
-                else this.onWriteError(err, 'Could not create the pipeline');
-            },
-        });
+        this.configApi
+            .write(
+                'pipeline',
+                pipelineScaffold(name, {
+                    space: this.spaces.currentSpaceId(),
+                    frontend: this.newFrontend.value,
+                }),
+            )
+            .subscribe({
+                next: (written) => {
+                    this.configApi.registerPipeline(written.path).subscribe({
+                        next: () => {
+                            this.creating.set(false);
+                            this.flows.update((fs) => [
+                                ...fs,
+                                {
+                                    name: id,
+                                    ...(name === id ? {} : { displayName: name }),
+                                    active: false,
+                                    nodeCount: 0,
+                                    edgeCount: 0,
+                                    produces: [],
+                                    consumes: [],
+                                },
+                            ]);
+                            this.select(id);
+                        },
+                        error: () => {
+                            // the file exists; the row appears after the next rescan
+                            this.creating.set(false);
+                            this.select(id);
+                        },
+                    });
+                },
+                error: (err) => {
+                    if ((err as { status?: number })?.status === 409) this.newName.setErrors({ duplicate: true });
+                    else this.onWriteError(err, 'Could not create the pipeline');
+                },
+            });
     }
 
     /**

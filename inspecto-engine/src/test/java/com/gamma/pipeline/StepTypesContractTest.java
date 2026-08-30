@@ -64,8 +64,24 @@ class StepTypesContractTest {
     void everyVerbAuthorsALowerableTypeInPipelineOrder() {
         List<Map<String, Object>> catalog = PipelineProjection.stepCatalog();
         List<String> verbs = catalog.stream().map(e -> (String) e.get("verb")).toList();
-        assertEquals(List.of("collect", "parse", "map", "dedup", "transform", "transform", "summarize",
-                "route", "sink"), verbs);
+        // ⚠ Asserted as the DISTINCT sequence, because a verb is entered once per SHAPE it authors and
+        // that multiplicity is expected to change: `transform` names filter and join, and since
+        // 2026-08-31 `parse` names one entry per FORMAT (pipeline spec gap 2). Pinning the flat list
+        // made a deliberate widening look like a regression while saying nothing extra — the invariant
+        // that matters is pipeline ORDER, plus each verb's entries staying contiguous.
+        List<String> distinct = verbs.stream().distinct().toList();
+        assertEquals(List.of("collect", "parse", "map", "dedup", "transform", "summarize", "route", "sink"),
+                distinct, "verbs, in pipeline order: " + verbs);
+        java.util.Set<String> closed = new java.util.LinkedHashSet<>();
+        String open = null;
+        for (String v : verbs) {
+            if (v.equals(open)) continue;
+            if (open != null) closed.add(open);
+            assertFalse(closed.contains(v),
+                    "verb '" + v + "' resumes after another verb intervened; a verb's entries must be "
+                            + "contiguous or the palette interleaves shapes: " + verbs);
+            open = v;
+        }
         for (Map<String, Object> e : catalog)
             assertEquals(Boolean.TRUE, e.get("lowerable"), e.get("verb") + " authors a type the save refuses");
     }
@@ -109,5 +125,35 @@ class StepTypesContractTest {
                 assertFalse(attrs.isEmpty(), verb + " serves no attribute specs");
             }
         }
+    }
+
+    /**
+     * <b>The two served catalogues must agree about what may be AUTHORED.</b> {@code node-types} publishes
+     * {@code authorable} (an {@code isAuthorable} filter the canvas palette honours), while
+     * {@code step-types} publishes the recipe-verb palette — and nothing connected them, so the same
+     * vocabulary could disagree with itself across two surfaces served from one enum.
+     *
+     * <p>🔴 It did, until 2026-08-31 (pipeline spec gap 2): the generic {@code parser} type is
+     * {@code READ_COMPAT_ONLY}, so the canvas never offered it, yet this catalogue published it as the
+     * {@code parse} verb. A recipe author got an untyped Parse Step that had to be converted through a
+     * custody dialog — the operator-reported symptom behind the gap. It now emits one entry per FORMAT.
+     */
+    @Test
+    void everyOfferedStepTypeIsOneTheEditorMayActuallyAuthor() {
+        for (Map<String, Object> e : PipelineProjection.stepCatalog()) {
+            String type = (String) e.get("type");
+            assertTrue(PipelineEditable.isAuthorable(type),
+                    "step-types offers '" + type + "', which node-types marks NOT authorable — one "
+                            + "vocabulary, two served surfaces, and an author can only act on the "
+                            + "intersection. Either drop it here or make it authorable there.");
+        }
+    }
+
+    /** ⚠ A parser is always FORMAT-SPECIFIC (operator, 2026-08-21) — the generic type is never offered. */
+    @Test
+    void theGenericParserIsNeverOffered() {
+        for (Map<String, Object> e : PipelineProjection.stepCatalog())
+            assertNotEquals(BuiltinNodeType.PARSER.type(), e.get("type"),
+                    "the generic parser is read-compat only; a new Step must name its format");
     }
 }

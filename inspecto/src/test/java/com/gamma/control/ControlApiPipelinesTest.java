@@ -131,11 +131,14 @@ class ControlApiPipelinesTest {
                 verbs.add(t.get("verb").asText());
                 assertTrue(t.get("lowerable").asBoolean(), t.get("verb").asText() + " must author a saveable type");
             }
-            // `transform` appears TWICE — once per shape it authors (transform.filter, transform.join).
-            // The recipe spells a join `transform: {join: …}` and RecipeCompiler has no `join` verb, so the
-            // palette entry is per SHAPE while the verb stays the recipe's own word. `type` is the unique key.
-            assertEquals(java.util.List.of("collect", "parse", "map", "dedup", "transform", "transform",
-                    "summarize", "route", "sink"), verbs);
+            // A verb appears once per SHAPE it authors: `transform` twice (filter, join — the recipe
+            // spells a join `transform: {join: …}` and RecipeCompiler has no `join` verb), and since
+            // 2026-08-31 `parse` once per FORMAT (pipeline spec gap 2). `type` is the unique key, never
+            // `verb`. ⚠ Asserted as the DISTINCT sequence for the same reason as
+            // StepTypesContractTest: the multiplicity is expected to change, the pipeline ORDER is not,
+            // and pinning the flat list made a deliberate widening read as a regression.
+            assertEquals(java.util.List.of("collect", "parse", "map", "dedup", "transform", "summarize",
+                    "route", "sink"), verbs.stream().distinct().toList(), "verbs in order: " + verbs);
             // dedup serves its specs (§5: specs reach the verbs, not just the raw node-type catalog)
             for (JsonNode t : arr)
                 if ("dedup".equals(t.get("verb").asText()))

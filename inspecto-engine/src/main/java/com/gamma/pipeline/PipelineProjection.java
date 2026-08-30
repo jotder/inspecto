@@ -63,8 +63,9 @@ public final class PipelineProjection {
     }
 
     /**
-     * The recipe-verb palette (ELT amendment §5, Phase 5): the seven verbs + {@code route}, in pipeline
-     * order (see {@link #RECIPE_VERBS} — a verb may be entered once per shape it authors),
+     * The recipe-verb palette (ELT amendment §5, Phase 5): the verbs in pipeline order (see
+     * {@link #RECIPE_VERBS} — a verb may be entered once per shape it authors, so {@code parse} appears
+     * once per FORMAT and {@code transform} once per shape),
      * each carrying the node type it authors as plus that type's served attribute specs — the
      * server-published version of the verb table the UI carried as its documented interim
      * ({@code RECIPE_VERBS}). {@code map} authors a {@code transform.map} node in the GRAPH editor even
@@ -94,7 +95,19 @@ public final class PipelineProjection {
      */
     private static final List<String[]> RECIPE_VERBS = List.of(
             new String[] {"collect", BuiltinNodeType.ACQUISITION.type()},
-            new String[] {"parse", BuiltinNodeType.PARSER.type()},
+            // 🔴 One entry PER FORMAT, not one generic `parse` (pipeline spec gap 2, decision D3). The
+            // generic BuiltinNodeType.PARSER is READ_COMPAT_ONLY, so `isAuthorable` already refuses it
+            // and the canvas palette never offered it — but this catalogue published it anyway, which
+            // meant the SAME vocabulary disagreed with itself across two served surfaces, and a recipe
+            // author got an untyped Parse Step that had to be converted through a custody dialog.
+            // The verb stays the recipe's own word (`parse`); `type` is what makes an entry unique.
+            new String[] {"parse", BuiltinNodeType.PARSER_DELIMITED.type()},
+            new String[] {"parse", BuiltinNodeType.PARSER_FIXEDWIDTH.type()},
+            new String[] {"parse", BuiltinNodeType.PARSER_JSON.type()},
+            new String[] {"parse", BuiltinNodeType.PARSER_TEXT_REGEX.type()},
+            new String[] {"parse", BuiltinNodeType.PARSER_XLSX.type()},
+            new String[] {"parse", BuiltinNodeType.PARSER_ASN1.type()},
+            new String[] {"parse", BuiltinNodeType.PARSER_PLUGIN.type()},
             new String[] {"map", BuiltinNodeType.TRANSFORM_MAP.type()},
             new String[] {"dedup", BuiltinNodeType.TRANSFORM_DEDUP.type()},
             new String[] {"transform", BuiltinNodeType.TRANSFORM_FILTER.type()},
