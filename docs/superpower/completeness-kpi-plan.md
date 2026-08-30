@@ -1,6 +1,14 @@
 # Pipeline completeness KPI — a scheduled per-pipeline job
 
-**Status:** operator-decided 2026-08-30, ready to build. Supersedes this file's first draft (a slicing
+**Status:** ⏸ **ON HOLD by operator decision, 2026-08-30.** K1, K2's analysis half and K3 are shipped
+and pushed (`31e00005`, `14c6ef0e`, `3959a857`); **K2's wiring, K4 and K5 are NOT started and are not
+to be picked up** until the operator lifts the hold. The plan stays in `docs/superpower/` — it is
+paused, not finished, so it is not archivable yet. The two questions in §2b remain owed and are
+**not** why the work stopped; the hold is the operator's own call and supersedes them. ⚠ The shipped
+half is dormant: `VolumeBaseline` and `FileSequenceGaps` have **no production caller** (K4 was to be
+the caller), and nothing schedules or surfaces this KPI today.
+
+*(Design status, unchanged by the hold: operator-decided 2026-08-30.)* Supersedes this file's first draft (a slicing
 of Consignment §8 sealing), which the operator's answers **replaced outright**.
 
 **What changed and why:** the gate register carried "Consignment §8 end-of-period summary pass ·
