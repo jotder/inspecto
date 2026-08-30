@@ -21,6 +21,8 @@ import {
     authoredToG6,
     bindKindFor,
     candidateRelsFor,
+    edgeRefusal,
+    EdgeRules,
     categoryVisualKind,
     computeNodeStatus,
     decodeEdgeId,
@@ -515,6 +517,108 @@ describe('candidateRelsFor', () => {
 
     it('returns an empty list for a malformed edge id', () => {
         expect(candidateRelsFor(null, 'bad', new Map())).toEqual([]);
+    });
+
+    it("drops a rel the TARGET refuses, but never the edge's current one", () => {
+        const model: AuthoredPipeline = {
+            name: 'f',
+            active: false,
+            nodes: [
+                { id: 'a', type: 'transform.filter' },
+                { id: 'b', type: 'gap' },
+            ],
+            edges: [],
+        };
+        const emits = new Map([['transform.filter', ['dropped']]]);
+        const rules = new Map<string, EdgeRules>([
+            ['transform.filter', { accepts: ['data'], emits: ['data', 'dropped'], emitsNamedRoutes: false }],
+            // a gap node takes only `gap` — neither `data` nor `dropped`
+            ['gap', { accepts: ['gap'], emits: [], emitsNamedRoutes: false }],
+        ]);
+        const id = encodeEdgeId('a', 'b', 'gap');
+        // without rules the picker offers everything the source emits — the old, looser behaviour
+        expect(candidateRelsFor(model, id, emits)).toEqual(['data', 'dropped', 'gap']);
+        // with them, only the current rel survives: the target accepts neither of the others
+        expect(candidateRelsFor(model, id, emits, rules)).toEqual(['gap']);
+    });
+});
+
+/**
+ * 🔴 A mirror of the server's `PipelineValidator` edge checks. It must be exact in BOTH directions:
+ * looser and the canvas builds a graph the save 422s; stricter and it greys out work the backend
+ * would happily store.
+ */
+describe('edgeRefusal (mirrors PipelineValidator)', () => {
+    const model: AuthoredPipeline = {
+        name: 'f',
+        active: false,
+        nodes: [
+            { id: 'src', type: 'transform.filter' },
+            { id: 'sink', type: 'sink.persistent' },
+            { id: 'gap', type: 'gap' },
+            { id: 'plugin', type: 'some.served.plugin' },
+        ],
+        edges: [],
+    };
+    const rules = new Map<string, EdgeRules>([
+        ['transform.filter', { accepts: ['data'], emits: ['data', 'dropped'], emitsNamedRoutes: false }],
+        ['sink.persistent', { accepts: ['data'], emits: [], emitsNamedRoutes: false }],
+        ['gap', { accepts: ['gap'], emits: ['gap'], emitsNamedRoutes: false }],
+        ['router', { accepts: ['data'], emits: ['data'], emitsNamedRoutes: true }],
+    ]);
+
+    it('allows a data edge into a target that accepts data', () => {
+        expect(edgeRefusal(model, 'src', 'sink', 'data', rules)).toBeNull();
+    });
+
+    it('refuses a rel the source does not emit (ILLEGAL_EMIT)', () => {
+        expect(edgeRefusal(model, 'src', 'sink', 'invalid', rules)).toContain('does not emit');
+    });
+
+    it('refuses a data edge into a target that does not accept data (ILLEGAL_ACCEPT)', () => {
+        // the gap node accepts only `gap`
+        const refusal = edgeRefusal(model, 'src', 'gap', 'data', rules);
+        expect(refusal).toContain('does not accept data');
+    });
+
+    it('accepts an outcome edge when the target accepts data — the handler exemption', () => {
+        // sink accepts only `data`, yet a `dropped` stream is rows to a row-consumer
+        expect(edgeRefusal(model, 'src', 'sink', 'dropped', rules)).toBeNull();
+    });
+
+    it('refuses an outcome edge the target neither names nor consumes as rows (ILLEGAL_PAIRING)', () => {
+        const gapOnly = new Map(rules);
+        gapOnly.set('sink.persistent', { accepts: ['gap'], emits: [], emitsNamedRoutes: false });
+        expect(edgeRefusal(model, 'src', 'sink', 'dropped', gapOnly)).toContain('does not consume rows');
+    });
+
+    it('exempts on_commit — a cross-pipeline trigger whose target is not a local node', () => {
+        const withOnCommit = new Map(rules);
+        withOnCommit.set('transform.filter', {
+            accepts: ['data'],
+            emits: ['data', 'dropped', 'on_commit'],
+            emitsNamedRoutes: false,
+        });
+        withOnCommit.set('sink.persistent', { accepts: ['gap'], emits: [], emitsNamedRoutes: false });
+        expect(edgeRefusal(model, 'src', 'sink', 'on_commit', withOnCommit)).toBeNull();
+    });
+
+    it('⚠ exempts an UNKNOWN type, exactly as the server does inside ifPresent', () => {
+        // a served/plugin type this map has not seen must not be refused
+        expect(edgeRefusal(model, 'plugin', 'sink', 'anything', rules)).toBeNull();
+        expect(edgeRefusal(model, 'src', 'plugin', 'data', rules)).toBeNull();
+    });
+
+    it('allows a route:* branch only from a source that emits named routes', () => {
+        const routed: AuthoredPipeline = {
+            ...model,
+            nodes: [...model.nodes, { id: 'r', type: 'router' }],
+        };
+        expect(edgeRefusal(routed, 'r', 'sink', 'route:emea', rules)).toBeNull();
+        // ...and the plain filter, which does not, is refused
+        expect(edgeRefusal(routed, 'src', 'sink', 'route:emea', rules)).toContain('does not emit');
+        // a bare `route:` with no key is not a named route
+        expect(edgeRefusal(routed, 'r', 'sink', 'route:', rules)).toContain('does not emit');
     });
 });
 

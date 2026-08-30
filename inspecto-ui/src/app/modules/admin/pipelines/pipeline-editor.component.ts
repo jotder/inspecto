@@ -94,6 +94,8 @@ import {
     applyNodePatchInModel,
     authoredToG6,
     candidateRelsFor,
+    edgeRefusal,
+    EdgeRules,
     categoryLabel,
     categoryVisualKind,
     computeNodeStatus,
@@ -399,6 +401,12 @@ export class PipelineEditorComponent implements OnInit {
     private readonly lastRunCounts = signal<Map<string, number>>(new Map());
     /** node-type → emitted relationships, for the edge relationship picker. */
     private readonly typeEmits = signal<Map<string, string[]>>(new Map());
+    /**
+     * node-type → the served wiring rules, so a canvas edge is checked against the SAME accepts/emits
+     * the server validates with. 🔴 `accepts` was published all along and simply never read, which is
+     * why the canvas could build an edge the save then refused (pipeline spec gap 3).
+     */
+    private readonly typeRules = signal<Map<string, EdgeRules>>(new Map());
     readonly findings = signal<PipelineFinding[]>([]);
     readonly activating = signal(false);
     readonly statusLabel = statusLabel;
@@ -744,7 +752,7 @@ export class PipelineEditorComponent implements OnInit {
     /** Relationships the selected edge may carry — the inspector's picker options. */
     candidateRels(): string[] {
         const id = this.selectedEdgeId();
-        return id ? candidateRelsFor(this.model(), id, this.typeEmits()) : [];
+        return id ? candidateRelsFor(this.model(), id, this.typeEmits(), this.typeRules()) : [];
     }
 
     /** The relationship the selected edge currently carries. */
@@ -789,6 +797,14 @@ export class PipelineEditorComponent implements OnInit {
                 this.typeCat.set(typeCategoryMap(ts));
                 this.typeLabel.set(typeLabelMap(ts));
                 this.typeEmits.set(new Map(ts.map((t) => [t.type, t.emits])));
+                this.typeRules.set(
+                    new Map(
+                        ts.map((t) => [
+                            t.type,
+                            { accepts: t.accepts, emits: t.emits, emitsNamedRoutes: t.emitsNamedRoutes },
+                        ]),
+                    ),
+                );
                 this.typeLowerable.set(new Map(ts.map((t) => [t.type, t.lowerable])));
                 // Only types the server actually specced — a type whose `attributes` the payload omits
                 // entirely (an older server) must stay absent so the dialog uses its fallback table.
@@ -1992,6 +2008,18 @@ export class PipelineEditorComponent implements OnInit {
         this.clearSelection();
     }
 
+    /**
+     * Whether a drag-to-draw may connect two nodes, answered with the SERVER's own reason. ⚠ A bound
+     * arrow property, not a method reference, so `this` survives being called from the canvas.
+     */
+    readonly connectRefusal = (source: string, target: string): string | null =>
+        edgeRefusal(this.model(), source, target, 'data', this.typeRules());
+
+    /** Surface why a drag-to-draw was refused — the canvas has already declined to draw it. */
+    onConnectRefused(reason: string): void {
+        this.toast.warning(reason);
+    }
+
     /** Drag-to-draw: G6 already drew the edge, so only record it in the model (default `data` relationship). */
     onEdgeCreated(e: { source: string; target: string }): void {
         if (!this.canAuthor()) return; // read-only (Business lens or View mode): canvas drag-to-draw can't mutate
@@ -2397,6 +2425,13 @@ export class PipelineEditorComponent implements OnInit {
     private addEdge(from: string, to: string, rel: string, opts: { skipCanvas?: boolean } = {}): void {
         const m = this.model();
         if (!m) return;
+        // Check the target's `accepts` before building the edge, not at save (gap 3). The message is the
+        // server's own reason, so the answer here and the 422 there say the same thing.
+        const refusal = edgeRefusal(m, from, to, rel, this.typeRules());
+        if (refusal) {
+            this.toast.warning(refusal);
+            return;
+        }
         const next = addEdgeToModel(m, from, to, rel);
         if (!next) return; // duplicate — no-op
         this.model.set(next);

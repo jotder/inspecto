@@ -65,6 +65,14 @@ export class PipelineEditorGraphComponent implements AfterViewInit, OnChanges, O
     @Output() deleteKey = new EventEmitter<void>();
     /** Drag-to-draw: a new edge was dragged from one node to another (source→target). */
     @Output() edgeCreated = new EventEmitter<{ source: string; target: string }>();
+    /**
+     * Why a drag-to-draw between two nodes must be refused, or `null` to allow it. ⚠ Consulted BEFORE
+     * `edgeCreated` fires, so G6 never draws an edge the host will not record — otherwise a refused
+     * drag leaves a phantom edge on the canvas with nothing behind it in the model.
+     */
+    @Input() connectRefusal: (source: string, target: string) => string | null = () => null;
+    /** The reason a drag-to-draw was refused, for the host to surface. */
+    @Output() connectRefused = new EventEmitter<string>();
     /** Hover preview: node id + viewport coords on enter, or null on leave. */
     @Output() nodeHover = new EventEmitter<{ id: string; x: number; y: number } | null>();
 
@@ -282,6 +290,11 @@ export class PipelineEditorGraphComponent implements AfterViewInit, OnChanges, O
                             ?.getEdgeData()
                             .some((x) => x.source === source && x.target === target);
                         if (alreadyLinked) return false;
+                        const refusal = this.connectRefusal(source, target);
+                        if (refusal) {
+                            this.connectRefused.emit(refusal);
+                            return false;
+                        }
                         this.edgeCreated.emit({ source, target });
                         return {
                             id: `${source}->${target}:data:${Date.now()}`,

@@ -1012,15 +1012,87 @@ export function insertRouteAfter(
     };
 }
 
-/** Relationships a canvas edge may carry: the source node's emitted rels, `data`, and the edge's current rel. */
+/**
+ * The wiring rules for one node type, exactly as `GET /pipelines/node-types` publishes them.
+ *
+ * 🔴 `accepts` has been served all along and the editor simply never read it — which is why a canvas
+ * edge could be drawn that the save then 422s (pipeline spec gap 3).
+ */
+export interface EdgeRules {
+    accepts: string[];
+    emits: string[];
+    emitsNamedRoutes: boolean;
+}
+
+/**
+ * Why `(from) --rel--> (to)` cannot be wired, or `null` when it can — a faithful mirror of the SERVER's
+ * `PipelineValidator` edge checks (`ILLEGAL_EMIT` / `ILLEGAL_ACCEPT` / `ILLEGAL_PAIRING`).
+ *
+ * <p>⚠ The mirror must be exact in BOTH directions. Looser and the canvas builds a graph the save
+ * refuses; stricter and it greys out work the backend would happily store — the same class of bug
+ * pointing the other way. Three details carry that:
+ * <ul>
+ *   <li>an <b>unknown type</b> is exempt, because the server's checks sit inside
+ *       `PipelineNodeTypes.get(...).ifPresent(...)` — a served or plugin type this map has not seen
+ *       must not be refused here;</li>
+ *   <li><b>`on_commit` is exempt</b> — it is a cross-pipeline trigger whose target is not a local node;</li>
+ *   <li>an outcome/route edge passes if the target accepts that rel <b>or accepts `data`</b> (the
+ *       handler exemption: a reject or route stream is rows to a row-consumer).</li>
+ * </ul>
+ */
+export function edgeRefusal(
+    model: AuthoredPipeline | null,
+    from: string,
+    to: string,
+    rel: string,
+    rules: ReadonlyMap<string, EdgeRules>,
+): string | null {
+    const src = model?.nodes.find((n) => n.id === from);
+    const dst = model?.nodes.find((n) => n.id === to);
+    const srcRules = src ? rules.get(src.type) : undefined;
+    const dstRules = dst ? rules.get(dst.type) : undefined;
+
+    if (srcRules && !(srcRules.emits.includes(rel) || (isRouteRel(rel) && srcRules.emitsNamedRoutes)))
+        return (
+            `${src?.type} does not emit '${rel}' — it emits ${srcRules.emits.join(', ') || 'nothing'}` +
+            `${srcRules.emitsNamedRoutes ? ' + route:*' : ''}.`
+        );
+
+    if (!dstRules) return null;
+    if (rel === 'data')
+        return dstRules.accepts.includes('data')
+            ? null
+            : `${dst?.type} does not accept data — it accepts ${dstRules.accepts.join(', ') || 'nothing'}.`;
+    if (rel === 'on_commit') return null;
+    return dstRules.accepts.includes(rel) || dstRules.accepts.includes('data')
+        ? null
+        : `${dst?.type} cannot be wired after '${from}' via '${rel}' — it accepts ` +
+              `${dstRules.accepts.join(', ') || 'nothing'} and does not consume rows.`;
+}
+
+/** Whether `rel` is an operator-defined content route (`route:<key>`), mirroring `PipelineRel.isRoute`. */
+function isRouteRel(rel: string): boolean {
+    return rel.startsWith('route:') && rel.length > 'route:'.length;
+}
+
+/**
+ * Relationships a canvas edge may carry: the source node's emitted rels, `data`, and the edge's current
+ * rel — minus any the TARGET refuses, so the picker cannot offer a relabel the save would 422.
+ */
 export function candidateRelsFor(
     model: AuthoredPipeline | null,
     g6EdgeId: string,
     typeEmits: ReadonlyMap<string, string[]>,
+    rules?: ReadonlyMap<string, EdgeRules>,
 ): string[] {
     const p = decodeEdgeId(g6EdgeId);
     if (!p) return [];
     const src = model?.nodes.find((n) => n.id === p.from);
     const emits = src ? (typeEmits.get(src.type) ?? []) : [];
-    return [...new Set(['data', ...emits, p.rel])];
+    const all = [...new Set(['data', ...emits, p.rel])];
+    if (!rules) return all;
+    // ⚠ The edge's CURRENT rel always stays offered even when refused: a stored graph may already carry
+    // a pairing this deployment's types no longer allow, and dropping it from the list would silently
+    // re-label the edge the moment the picker is opened.
+    return all.filter((rel) => rel === p.rel || !edgeRefusal(model, p.from, p.to, rel, rules));
 }

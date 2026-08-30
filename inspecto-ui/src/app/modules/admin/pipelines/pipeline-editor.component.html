@@ -500,6 +500,8 @@
                         (backgroundClick)="onBackgroundClick()"
                         (dropAdd)="onDropAdd($event)"
                         (deleteKey)="onDeleteKey()"
+                        [connectRefusal]="connectRefusal"
+                        (connectRefused)="onConnectRefused($event)"
                         (edgeCreated)="onEdgeCreated($event)"
                         (nodeHover)="onNodeHover($event)"
                         (nodeOpen)="onNodeOpen($event)"
