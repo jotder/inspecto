@@ -314,7 +314,17 @@ src/app/
   and must NOT be wrapped in a `mat-form-field`: a form field derives error state from an `NgControl` on
   its projected input, so a `<mat-error>` beside it could never fire (the same trap `type: 'list'` hit).
   The error is an explicit `role="alert"` line — **assert the rendered element**, never that a getter
-  returned the string. ⚠ Two behaviours are load-bearing: a **dismissed** popup writes nothing (a Cancel
+  returned the string.
+  🔴 **Its error line CANNOT be triggered by a host validating on submit** (2026-08-31): `invalid()` is
+  `required() && touched() && !value()`, where `required` is the component's OWN input and `touched` its
+  OWN signal, set on interaction. A host that calls `markAsTouched()` on the bound control reaches
+  **neither** — so Create/Save correctly refuses while **nothing appears on screen** and the button
+  simply does nothing (§0.3's failure). Until the component learns the bound `NgControl`, a host that
+  validates on submit must render its own `role="alert"` line beside the picker — the same rule as a
+  `list` field — and must NOT also set `[required]`, or the two messages double up once the picker has
+  also been opened. ⚠ Only the **preview** catches this: every unit test that dirties the control
+  directly passes either way. Reference: the Pipelines New-pipeline "Parse format" question.
+  ⚠ Two behaviours are load-bearing: a **dismissed** popup writes nothing (a Cancel
   that nulled the control would destroy a stored value), and a value matching **no offered option is shown
   verbatim** rather than as unset (a stored config can name a choice this deployment no longer serves, and
   blanking it invites an accidental overwrite). ⛔ Don't build the trigger from a `mat-*-button` — Material

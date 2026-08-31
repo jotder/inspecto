@@ -26,8 +26,9 @@ v1 files stay importable (refs/provenance optional ⇒ derived on the target). S
 hot-registers via `upsertJob`, exactly like the `/jobs` write routes), and `saved-view` (the event-viewer
 `SavedViewStore`; **not** the run-generated `pipeline.ViewStore` `sink.view` definitions, which aren't
 authored config), and, since 2026-07-25, `connection` (the live `CollectorService` connection registry —
-**reference-only, secrets stripped**; see the boundary section). Every supported kind is read/written through the uniform `BundleSource` seam regardless
-of its backing store:
+**reference-only, secrets stripped**; see the boundary section), and, since 2026-08-31, `enrichment`
+(the `<write-root>/<id>_enrich.toon` companion — pipeline spec gap 6b). Every supported kind is
+read/written through the uniform `BundleSource` seam regardless of its backing store:
 
 * **`POST /bundle/export`** — `{items, provenance?, requires?}` → `{bundle, missing}`; real content + real
   `provenance.contentHash`; each resolvable `requires` ref is stamped with an `originHash` (the source's stored
@@ -35,6 +36,12 @@ of its backing store:
 * **`POST /bundle/preview`** — read-only fit-check: per item `new | unchanged | drifted | unsupported` (incoming
   hash, normalized to the stored form, vs the target's), each `requires` entry `satisfied | different | missing`
   (`different` = present but at a different version — the carried `originHash` disagrees with the target's). No writes.
+* **`POST /bundle/export`** — since 2026-08-31 the UI's closure for an authored pipeline is seeded by
+  [`GET /pipelines/{name}/related`](pipeline-related.md) (gap 6a). 🔴 The client derives a pipeline's
+  edges from `nodes[].use` **alone**, so a companion bound by CONFIG KEY (`parsing.grammar: grammar/cdr`)
+  was invisible and such a pipeline exported **without its grammar**. ⚠ Only the **outward**
+  `references[]` are followed, and only entries carrying a `ref`; server edges MERGE with the derived
+  ones (neither is a superset), and the call degrades so an older server cannot fail an export.
 * **`POST /bundle/import`** — sequential upsert in dependency order (referenced kinds first), gated
   `canAuthorWorkbench` → write-root 503 → **integrity pre-check 422** (MNT-16: `ComponentIntegrity` blocks only
   findings the import would *introduce* — computed over (registry ∪ incoming) minus pre-existing). Existing
@@ -69,6 +76,27 @@ of its backing store:
     it) and is **not** in `INTEGRITY_KINDS` — `ComponentIntegrity`'s ref graph covers only `ComponentStore`
     kinds. Persistence reuses `ConnectionRoutes.persistConnection` (jail → atomic write → hot-register), so an
     imported profile behaves exactly like a `POST /connections`.
+  * `enrichment` (2026-08-31) is the Stage-2 companion a bundle used to leave behind, so a pipeline
+    travelled without its derived columns. ⚠ **An import REGISTERS, it does not merely persist** —
+    `EnrichmentService` has no mtime hot-reload, so writing the file alone imports an enrichment that
+    does nothing until the next restart, a silent half-import. It mirrors
+    `EnrichmentRoutes.registerEnrichment` (validate → atomic write → register), exactly as the `job`
+    kind hot-registers. ⚠ The `_enrich` suffix is load-bearing: `ServiceBootstrap` indexes enrichments
+    BY it, so a file written without it drops out of the scan on the next restart
+    (`ConfigFileSupport.fileBase` is the one place that rule lives). It sorts **after**
+    `authored-pipeline` — `triggers.on_pipeline` makes it the referencer, not the referenced.
+  * **The apply order's invariant is "a referenced kind precedes its referencer"**, not "every
+    supported kind is listed". Omission means *apply last*, which is CORRECT for a kind that references
+    a pipeline (`expectation`, `decision-rule`). `mapping` was ordered before `authored-pipeline` on
+    2026-08-31 (gap 6c) because it had been absent and therefore applied after the pipeline naming it;
+    `grammar` beside it was right all along, which is what made the omission easy to miss.
+  * 🔴 **`schema` is deliberately NOT ordered, and the server disagrees with the UI about it.** It was
+    retired as a bundle kind on 2026-07-31 (unification W1) — a schema lives only in the config TOON the
+    engine executes — and `transfer/bundle.ts` keeps it in the TYPE only so an older bundle still
+    parses. But `supported()` reuses `ComponentStore.WRITABLE_TYPES`, which still carries `schema`, so
+    **the server WRITES a schema item the UI and its offline mock expect skipped**: the same old bundle
+    imports differently offline and against a backend. Filed as **BUNDLE-SCHEMA-1** (`BACKLOG.md` §6) —
+    a product call, since whichever way it resolves, one of the three surfaces changes.
 * `requires` classify `satisfied | different | missing` — *present-but-different* (2026-07-18) compares the
   ref's export-stamped `originHash` to the target's stored hash; a ref that travels hash-less (older bundle, or
   unresolvable at export) can only be `satisfied`/`missing`, so the classification degrades gracefully.

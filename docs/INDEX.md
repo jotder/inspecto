@@ -101,6 +101,12 @@ former root reference docs** (each index lists them):
   grounded list of what is broken, §11's proposed token model, §12's wave plan, and **§13's ten
   decisions, taken 2026-08-31**. ✅ D1: finish the approved amendment
   (`elt-final-amendment-plan.md`, already ~90% shipped) and treat the token model as its next step.
+  **Waves 0 and 1 DRAINED 2026-08-31 — 11 of 17 items.** Still in flight because everything left is
+  **gated**: the ledgers row on D4, Wave 2 on the §0/§11 decisions or the major-bump window, Wave 3
+  (D-9) on a design nobody has written. As-built facts from the drain live in
+  [`okf/backend/control-plane/pipeline-related.md`](okf/backend/control-plane/pipeline-related.md)
+  (gap 5) and [`okf/backend/control-plane/metadata-bundle.md`](okf/backend/control-plane/metadata-bundle.md)
+  (gap 6); the one item it opened rather than closed is **BUNDLE-SCHEMA-1** in `BACKLOG.md` §6.
 
 - [`superpower/completeness-kpi-plan.md`](superpower/completeness-kpi-plan.md) — **DECIDED
   2026-08-30, ready to build**: a scheduled per-pipeline completeness KPI (gap/sequence analysis +
