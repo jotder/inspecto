@@ -473,8 +473,6 @@ const SOURCE_ALLOW = {
     // 4xx body is never allowlisted: those got renamed when this rule landed.
     'inspecto-intelligence/src/main/java/com/gamma/intelligence/pack/InspectoTools.java::flow-message':
         'The `flow` AGENT TOOL ARGUMENT and its JSON-schema descriptions — an external contract the model is prompted against, the same Tier-3 debt as this file\'s flow-identifier entry. The messages ("flow is required and must be an object") name that argument, so renaming the prose without dual-accepting the argument would describe a key that does not exist.',
-    'inspecto-ui/src/app/inspecto/mock/handlers/agent.handler.ts::flow-message':
-        'The offline mirror of InspectoTools above — it must answer with the SERVER\'s wording for the `flow` tool argument, or the mock stops reproducing the failure the real backend gives (BACKLOG: the A2 Pipelines adoption shipped broken behind a mock more lenient than the server).',
 
     // ── the sanctioned lowercase "flow of value" sense: link-analysis max-flow, not a Pipeline ─────
     'inspecto-ui/src/app/modules/admin/studio/link-analysis/link-analysis-toolbox.component.ts::flow-message':
@@ -483,8 +481,6 @@ const SOURCE_ALLOW = {
         'The template half of the same toolbox ("Max flow / min cut", "circular flow, forwarding loops").',
     'inspecto-ui/src/app/modules/admin/studio/link-analysis/pattern-packs.ts::flow-message':
         'The "Circular flow" MOTIF label — a money-movement pattern, the same sanctioned sense as the `circular-flow.toon` pattern packs (which CONFIG_PATH_RULES spares by name).',
-    'inspecto-ui/src/app/inspecto/mock/seeds/seed-utils.ts::flow-message':
-        'The offline seed of that same "Circular flow" motif label.',
 };
 
 /** Committed paths matching a pathspec (repo-relative, forward slashes), or null outside a git checkout. */
