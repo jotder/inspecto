@@ -10,7 +10,7 @@ timestamp: 2026-07-07T00:00:00Z
 > **RETIRED 2026-08-31.** The offline UI mock backend was deleted — `inspecto-ui/src/app/inspecto/mock/`,
 > `environment.offline.ts`, the `offline` build/serve configurations and `npm run start:offline` are all gone,
 > along with the ten `environment.mock*` flags and every production branch on them. The UI now talks only to a
-> real ControlApi. Kept for provenance; **not current**. See `docs/superpower/mock-backend-removal-plan.md`.
+> real ControlApi. Kept for provenance; **not current**. See `docs/archived-documents/plans-archive/mock-backend-removal-plan.md`.
 
 # Mock Backends
 

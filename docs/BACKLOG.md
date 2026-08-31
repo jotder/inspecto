@@ -757,6 +757,26 @@ non-blocking:**
 
 ## 6. Engineering / tech-debt
 
+**MOCK-DEAD-COMPUTE-1 — four blocks of in-browser computation nothing calls (2026-08-31).** Left by the
+offline mock removal (`f1553136`). Each was the *offline arm* of a server-first path; with offline mode
+gone nothing reaches them, and they are referenced **only by their own specs**:
+
+| Dead block | Home |
+|---|---|
+| `projectPoints`, `projectRoutes` | `modules/admin/studio/geo-map/geo-projection.ts` |
+| `projectEntities` | `modules/admin/studio/link-analysis/entity-projection.ts` |
+| `aggregateRecon`, `reconBreakSets` | `inspecto/reconciliation/recon-board.ts` |
+
+⚠ **Not simply deletable — decide per block.** Each spec suite may be readable as a **mirror of the
+server's contract** rather than a test of dead code: `recon-board.ts`'s own doc says its types "mirror the
+backend `/recon/run` and `/recon/breaks` contracts byte-for-byte" and that it is "unit-tested for parity
+with the backend's `ReconServiceTest`". Deleting that would drop a cross-language parity guard, which is
+the same class of thing the six contract JSONs exist to protect. The geo/link-analysis folds have no such
+stated parity claim — check before assuming symmetry.
+
+⚠ `inspecto/fixtures/sample-sources.ts` survives only to feed these plus three Studio spec suites; it goes
+when the last consumer does. ⛔ Do not delete it while any spec still imports it.
+
 **~~BUNDLE-SCHEMA-1~~ — FIXED 2026-08-31: a pipeline's schema travels again.** Operator decision taken
 the same day: make the schema travel. Three surfaces, all shipped —
 
@@ -780,7 +800,7 @@ declaring site, not the note about it.**
 
 **~~MOCK-GONE-1~~ — three defects the offline mock was hiding — ALL THREE FIXED 2026-08-31.**
 Found in the end-user test after the mock backend was deleted
-(`superpower/mock-backend-removal-plan.md`). ⚠ **All three are PRE-EXISTING** — every one is on a code
+(`archived-documents/plans-archive/mock-backend-removal-plan.md`). ⚠ **All three are PRE-EXISTING** — every one is on a code
 path that already ran against the real backend whenever the `mock*` flags were false (the shipping
 default). What changed is that they are now *visible*: in offline mode a sample fold answered instead.
 Filed together because they share that cause, but they are three independent fixes.
@@ -840,7 +860,7 @@ and the parser rewrites it to `registry/schema/<id>`. So the server writing it w
 surface was the UI, whose `transfer/bundle.ts` still carried the July retirement note.
 
 ⚠ The mock-vs-server half of the original row is **moot**: the offline mock backend was deleted
-2026-08-31 (`superpower/mock-backend-removal-plan.md`), so there is only one import path now.
+2026-08-31 (`archived-documents/plans-archive/mock-backend-removal-plan.md`), so there is only one import path now.
 
 **What is actually open.** `schema` is a **referenced kind** — a pipeline names it — but it is absent from
 `BundleRoutes.APPLY_ORDER`, so `orderOf` sorts it LAST and an authored pipeline is written **before** the

@@ -1,6 +1,9 @@
 # Removing the offline UI mock backend
 
-**Status:** IN FLIGHT — opened 2026-08-31.
+**Status:** ✅ **COMPLETE and ARCHIVED 2026-08-31.** Shipped as `f1553136` (removal + the three defects
+it surfaced), with the follow-on closures `757add5e`, `4ad3583c`, `6bc4a782`, `41464d51`. The one slice
+NOT taken — §3b, the four dead in-browser compute blocks — moved to `docs/BACKLOG.md`
+(**MOCK-DEAD-COMPUTE-1**). Kept for provenance; not maintained.
 **Operator directive:** *"remove offline UI facility, it's adding complexity and confusion. work with
 real backend."* Two follow-on decisions taken the same day (§1).
 

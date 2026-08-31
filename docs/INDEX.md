@@ -95,15 +95,17 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
-- [`superpower/mock-backend-removal-plan.md`](superpower/mock-backend-removal-plan.md) — **removing the
-  offline UI mock backend** (opened 2026-08-31, operator directive). Deletes `inspecto-ui/src/app/inspecto/mock/`
-  (~22k LOC), `environment.offline.ts`, the `offline` build/serve configurations, `npm run start:offline`, the
-  ten `environment.mock*` flags and every production branch on them — the UI now talks only to a real
-  ControlApi. 🔴 Six **server-published contract JSONs** and the TS lift/lower lived under `mock/` by
-  accident and were promoted out first (`inspecto/contracts/`, `modules/admin/pipelines/pipeline-editable.ts`,
-  `inspecto/fixtures/`); six Java contract tests read those files **by path** and moved with them, as did
-  the `.prettierignore` exemption that keeps them byte-identical to Jackson's output. The retired concept
-  is [`archived-documents/retired-concepts/mock-backends.md`](archived-documents/retired-concepts/mock-backends.md).
+- ~~`superpower/mock-backend-removal-plan.md`~~ — **COMPLETE and ARCHIVED 2026-08-31** →
+  [`archived-documents/plans-archive/mock-backend-removal-plan.md`](archived-documents/plans-archive/mock-backend-removal-plan.md).
+  The offline UI mock backend is gone (`f1553136`): `inspecto-ui/src/app/inspecto/mock/` (~22k LOC),
+  `environment.offline.ts`, the `offline` build/serve configurations, `npm run start:offline`, the ten
+  `environment.mock*` flags and every production branch on them. 🔴 Six **server-published contract JSONs**
+  and the TS lift/lower lived under `mock/` by accident and were promoted out first
+  (`inspecto/contracts/`, `modules/admin/pipelines/pipeline-editable.ts`, `inspecto/fixtures/`); six Java
+  contract tests read those files **by path** and moved with them, as did the `.prettierignore` exemption
+  that keeps them byte-identical to Jackson's output. The retired concept is
+  [`archived-documents/retired-concepts/mock-backends.md`](archived-documents/retired-concepts/mock-backends.md).
+  Still open: **MOCK-DEAD-COMPUTE-1** in `BACKLOG.md` (four dead in-browser compute blocks).
 
 - [`superpower/pipeline-spec.md`](superpower/pipeline-spec.md) — **the single consolidated Pipeline
   specification** (2026-08-30), written as the basis for a redesign: vocabulary, config surface, the

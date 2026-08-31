@@ -607,7 +607,18 @@ touching `inspecto-ui/`.** Highlights (full detail there):
   the path aliases come from the Angular builder). Use `npx ng test --no-watch --include='<glob>'`, and the
   include must be a **glob**: a literal file path yields *"No test files found, exiting with code 1"*, which
   reads like a config break rather than a bad flag.
-- ⚠ **The offline mock must never be more lenient than the server** (2026-07-27, AGT-6a A5.3). A handler
+- 🔴 **The offline mock backend was DELETED 2026-08-31** (`f1553136`, plan archived at
+  `archived-documents/plans-archive/mock-backend-removal-plan.md`). `inspecto-ui/src/app/inspecto/mock/`,
+  `environment.offline.ts`, the `offline` build/serve configurations, `npm run start:offline` and the ten
+  `environment.mock*` flags are gone; the UI talks only to a real ControlApi. **Running it now needs a
+  backend** — dev: `npm start` on :4204 with `proxy.conf.json` forwarding `/api` to :8080; packaged:
+  `-Dui.dir=…/dist/gamma/browser` (note the `browser` subdir). ⚠ Two directories survive the move and are
+  NOT mocks: `inspecto/contracts/` (six server-published contract JSONs, read **by path** by six Java
+  contract tests and exempted in `.prettierignore` because they are byte-compared against Jackson's output)
+  and `inspecto/fixtures/` (spec-only sample rows). The note below is kept for the LESSON, which outlived
+  the mock: it is why a mock-vs-server divergence was the whole reason for the removal.
+- ⚠ **The offline mock must never be more lenient than the server** (2026-07-27, AGT-6a A5.3) — *historical;
+  there is no mock any more.* A handler
   that accepts a shape the backend rejects — or returns a richer shape than the backend returns — turns a
   hard failure into a passing rehearsal. The Pipelines `pipeline_author` adoption shipped **broken through
   two slices** (flat args where the tool requires `flow`; a name string where `adaptToolResult` requires the
