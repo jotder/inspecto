@@ -60,10 +60,6 @@ export const provideGamma = (
     provideEnvironmentInitializer(() => inject(GammaUtilsService)),
   ];
 
-  // The vendored @gamma/lib/mock-api shell was removed (BACKLOG "M4 Fuse remainder", 2026-08-26):
-  // THE mock backend is the app-owned app/inspecto/mock, wired in app.config.ts. This provider never
-  // received a mockApi config, so the branch that used it was dead.
-
   // Return the providers
   return providers;
 };

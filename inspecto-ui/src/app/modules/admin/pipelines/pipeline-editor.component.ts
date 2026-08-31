@@ -378,8 +378,7 @@ export class PipelineEditorComponent implements OnInit {
     /**
      * Run-to-here works against a real server since 2026-08-14 (Build→Test→Run Step 5c):
      * `POST /pipelines/authored/{id}/run?to=` is registered, runs the picked inbox files through the
-     * real ingest path into a scratch root, and writes nothing to production. Ungated — it was
-     * `environment.mockPipelines` only while the route was reserved-but-unregistered.
+     * real ingest path into a scratch root, and writes nothing to production. Ungated.
      *
      * ⚠ The `to=` cutoff itself is still unbuilt (Step 5b): the server runs the whole graph and says so
      * in `warnings`, which the dock renders. Do not re-gate this on the cutoff landing.

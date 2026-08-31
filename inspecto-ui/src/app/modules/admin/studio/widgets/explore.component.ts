@@ -253,11 +253,10 @@ export class ExploreComponent implements OnInit {
         if (!plugin || !ds || plugin.meta.viewKind) return;
         const spec = plugin.buildQuery(this.controls(), { datasetId: ds.id, sourceName: ds.sourceName, filters: null });
         this.running.set(true);
-        const rows = bucketSpecRows(this.rows(), spec.grains);
-        // Through DatasetResultService (M2): offline AlaSQL in mock mode, POST /bi/query when Studio is
-        // live — the builder previews against the same data path the saved widget will render with.
+        // Through DatasetResultService: POST /bi/query — the builder previews against the same data
+        // path the saved widget will render with.
         this.datasetResult
-            .run(spec, rows, this.colMetas())
+            .run(spec, this.colMetas())
             .then((res) => {
                 this.props.set(plugin.transformProps(res.ok ? res.rows : [], this.controls()));
             })

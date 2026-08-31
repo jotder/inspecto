@@ -1,13 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { environment } from '../../../environments/environment';
+import { describe, expect, it, vi } from 'vitest';
 import { DbBrowserService, DbResult } from 'app/inspecto/api/db-browser.service';
 import { QueryModel } from 'app/inspecto/query';
-import { SAMPLE_SOURCES } from 'app/inspecto/mock/sample-sources';
 import { DatasetRowsService, RowSourceRef } from './dataset-rows.service';
-
-const WAS_MOCK_STUDIO = environment.mockStudio;
 
 /** A virtual dataset's model — one complete leaf, so it survives `evaluateRows`' incomplete-leaf filter. */
 function premiumOnly(): QueryModel {
@@ -54,43 +50,8 @@ function setup(over: Partial<Record<'table' | 'query' | 'catalog', unknown>> = {
 
 const CDR: RowSourceRef = { sourceName: 'cdr' };
 
-afterEach(() => {
-    environment.mockStudio = WAS_MOCK_STUDIO;
-});
-
-describe('DatasetRowsService — offline (mockStudio)', () => {
-    it('serves the store‘s sample rows with inferred columns and never calls the backend', async () => {
-        environment.mockStudio = true;
-        const { svc, table, query } = setup();
-        const res = await svc.rows(CDR);
-        expect(res.rows).toBe(SAMPLE_SOURCES['cdr']);
-        expect(res.columns.map((c) => c.name)).toContain('msisdn');
-        expect(res.truncated).toBe(false);
-        expect(table).not.toHaveBeenCalled();
-        expect(query).not.toHaveBeenCalled();
-    });
-
-    it('applies the dataset‘s own model, so a virtual dataset previews its filtered rows', async () => {
-        environment.mockStudio = true;
-        const { svc } = setup();
-        const res = await svc.rows({ sourceName: 'cdr', query: premiumOnly() });
-        expect(res.rows.length).toBeGreaterThan(0);
-        expect(res.rows.length).toBeLessThan(SAMPLE_SOURCES['cdr'].length);
-        expect(res.rows.every((r) => r['tariff'] === 'premium')).toBe(true);
-    });
-
-    it('says WHY a store is empty rather than resolving silently to no rows', async () => {
-        environment.mockStudio = true;
-        const { svc } = setup();
-        const res = await svc.rows({ sourceName: 'a_real_store_with_no_sample' });
-        expect(res.rows).toEqual([]);
-        expect(res.error).toContain('a_real_store_with_no_sample');
-    });
-});
-
-describe('DatasetRowsService — live', () => {
+describe('DatasetRowsService — rows', () => {
     it('reads a plain store over /db/table, mapping DuckDB types to Query Core types', async () => {
-        environment.mockStudio = false;
         const { svc, table, query } = setup();
         const res = await svc.rows(CDR, 250);
         expect(table).toHaveBeenCalledWith({ name: 'cdr', limit: 250 });
@@ -103,7 +64,6 @@ describe('DatasetRowsService — live', () => {
     });
 
     it('compiles a virtual dataset‘s model to SQL over the named store and posts it to /db/query', async () => {
-        environment.mockStudio = false;
         const { svc, table, query } = setup();
         await svc.rows({ sourceName: 'cdr', query: premiumOnly(), columns: [{ name: 'tariff', type: 'string' }] }, 10);
         expect(table).not.toHaveBeenCalled();
@@ -115,7 +75,6 @@ describe('DatasetRowsService — live', () => {
     });
 
     it('reports the page as truncated when the server says the store held more', async () => {
-        environment.mockStudio = false;
         const { svc } = setup({
             table: vi.fn(() => of(dbResult({ statistics: { rowCount: 1, elapsedMs: 1, truncated: true } }))),
         });
@@ -123,7 +82,6 @@ describe('DatasetRowsService — live', () => {
     });
 
     it('maps an unknown store (404) to an explained empty result and never throws', async () => {
-        environment.mockStudio = false;
         const { svc } = setup({
             table: vi.fn(() => throwError(() => ({ status: 404, error: { error: "no store 'cdr'" } }))),
         });
@@ -133,7 +91,6 @@ describe('DatasetRowsService — live', () => {
     });
 
     it('does not cache a failed read, so the next call retries instead of replaying the error', async () => {
-        environment.mockStudio = false;
         const table = vi
             .fn()
             .mockReturnValueOnce(throwError(() => ({ status: 503 })))
@@ -145,40 +102,53 @@ describe('DatasetRowsService — live', () => {
     });
 });
 
+describe('DatasetRowsService — a Dataset with no source', () => {
+    // MOCK-GONE-1(b): a blank sourceName used to build `GET /db/table?limit=1` with NO `name`.
+    it('refuses without a request, and says why instead of rendering an empty grid', async () => {
+        const { svc, table, query } = setup();
+        const res = await svc.rows({ sourceName: '' });
+        expect(table).not.toHaveBeenCalled();
+        expect(query).not.toHaveBeenCalled();
+        expect(res.rows).toEqual([]);
+        expect(res.error).toMatch(/names no store/i);
+    });
+
+    it('whitespace is not a source name either', async () => {
+        const { svc, table } = setup();
+        expect((await svc.rows({ sourceName: '   ' })).error).toBeTruthy();
+        expect(table).not.toHaveBeenCalled();
+    });
+
+    it('still offers the declared columns, so a picker built from them keeps working', async () => {
+        const { svc } = setup();
+        const cols = await svc.columns({ sourceName: '', columns: [{ name: 'tariff', type: 'string' }] });
+        expect(cols).toEqual([{ name: 'tariff', type: 'string' }]);
+    });
+});
+
 describe('DatasetRowsService — the store list', () => {
-    it('live: lists the business stores and EXCLUDES the operational groups', async () => {
-        environment.mockStudio = false;
+    it('lists the business stores and EXCLUDES the operational groups', async () => {
         const { svc } = setup();
         expect(await svc.stores()).toEqual({ names: ['billing', 'switch_cdr'] });
     });
 
-    it('live: an unreadable catalog is explained, not reported as "this space has no stores"', async () => {
-        environment.mockStudio = false;
+    it('an unreadable catalog is explained, not reported as "this space has no stores"', async () => {
         const { svc } = setup({ catalog: vi.fn(() => throwError(() => ({ status: 503 }))) });
         const res = await svc.stores();
         expect(res.names).toEqual([]);
         expect(res.error).toBeTruthy();
     });
-
-    it('offline: the sample store keys, with no request', async () => {
-        environment.mockStudio = true;
-        const { svc, catalog } = setup();
-        expect((await svc.stores()).names).toEqual(Object.keys(SAMPLE_SOURCES));
-        expect(catalog).not.toHaveBeenCalled();
-    });
 });
 
 describe('DatasetRowsService — authored SQL', () => {
-    it('live: posts the SQL to /db/query against the named store', async () => {
-        environment.mockStudio = false;
+    it('posts the SQL to /db/query against the named store', async () => {
         const { svc, query } = setup();
         const res = await svc.sql('cdr', 'SELECT * FROM "cdr"', 50);
         expect(query).toHaveBeenCalledWith({ table: 'cdr', sql: 'SELECT * FROM "cdr"', limit: 50 });
         expect(res.rows).toEqual([{ msisdn: '880', duration_s: 12 }]);
     });
 
-    it('live: a rejected statement comes back as an error result, never a throw', async () => {
-        environment.mockStudio = false;
+    it('a rejected statement comes back as an error result, never a throw', async () => {
         const { svc } = setup({
             query: vi.fn(() => throwError(() => ({ status: 422, error: { error: 'SQL failed the check' } }))),
         });
@@ -186,27 +156,10 @@ describe('DatasetRowsService — authored SQL', () => {
         expect(res.rows).toEqual([]);
         expect(res.error).toBeTruthy();
     });
-
-    it('offline: runs in-browser over the store‘s sample page, with no request', async () => {
-        environment.mockStudio = true;
-        const { svc, query } = setup();
-        const res = await svc.sql('cdr', 'SELECT tariff FROM cdr');
-        expect(query).not.toHaveBeenCalled();
-        expect(res.rows.length).toBeGreaterThan(0);
-        expect(Object.keys(res.rows[0])).toEqual(['tariff']);
-    });
-
-    it('offline: a store with no sample says so instead of running over nothing', async () => {
-        environment.mockStudio = true;
-        const { svc } = setup();
-        const res = await svc.sql('a_real_store_with_no_sample', 'SELECT 1');
-        expect(res.error).toContain('a_real_store_with_no_sample');
-    });
 });
 
 describe('DatasetRowsService — caching and columns', () => {
     it('dedupes an identical request and clear() drops it', async () => {
-        environment.mockStudio = false;
         const { svc, table } = setup();
         const p1 = svc.rows(CDR);
         expect(svc.rows(CDR)).toBe(p1);
@@ -218,13 +171,11 @@ describe('DatasetRowsService — caching and columns', () => {
     });
 
     it('does not share a page across different limits — a 1-row probe is not the drill-through page', async () => {
-        environment.mockStudio = false;
         const { svc } = setup();
         expect(svc.rows(CDR, 1)).not.toBe(svc.rows(CDR, 1000));
     });
 
     it('columns(): declared columns win, with no round-trip', async () => {
-        environment.mockStudio = false;
         const { svc, table } = setup();
         const cols = await svc.columns({ sourceName: 'cdr', columns: [{ name: 'tariff', type: 'string' }] });
         expect(cols).toEqual([{ name: 'tariff', type: 'string' }]);
@@ -232,7 +183,6 @@ describe('DatasetRowsService — caching and columns', () => {
     });
 
     it('columns(): with none declared, probes the store for one row', async () => {
-        environment.mockStudio = false;
         const { svc, table } = setup();
         const cols = await svc.columns(CDR);
         expect(table).toHaveBeenCalledWith({ name: 'cdr', limit: 1 });

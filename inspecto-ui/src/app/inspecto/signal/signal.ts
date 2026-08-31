@@ -6,7 +6,7 @@ import type { FiredAlert } from '../api/alerts.service';
  * R4 of the living-operational-system roadmap — the Signal network's ONE envelope. Previously the
  * platform carried three parallel operational shapes in three stores (`EventRow`, `FiredAlert`,
  * `NotificationRow`); R4 unifies emission onto a single {@link Signal} written to one ledger
- * (`inspecto/mock/signals.ts`), and the old read surfaces (`/events`, `/alerts`) become thin
+ * (one ledger, server-side), and the old read surfaces (`/events`, `/alerts`) become thin
  * **projections** back to their view-models via the pure functions here.
  *
  * A Signal is a *lightweight emitted fact — it announces, never decides* (living-operational-system §1).

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SAMPLE_SOURCES } from 'app/inspecto/mock/sample-sources';
+import { SAMPLE_SOURCES } from 'app/inspecto/fixtures/sample-sources';
 import {
     coLocations,
     frequentLocations,

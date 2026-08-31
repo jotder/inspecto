@@ -47,7 +47,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class BindKindHomeContractTest {
 
     /** Shared with the TS side, so the editor's picker cannot drift from the save path's homes. */
-    private static final String CONTRACT = "inspecto-ui/src/app/inspecto/mock/bind-kinds.contract.json";
+    private static final String CONTRACT = "inspecto-ui/src/app/inspecto/contracts/bind-kinds.contract.json";
 
     private static final ObjectMapper JSON = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 

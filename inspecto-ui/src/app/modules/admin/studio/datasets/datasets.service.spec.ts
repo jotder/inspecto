@@ -44,9 +44,32 @@ describe('DatasetsService', () => {
         expect(saved?.id).toBe('d1');
     });
 
-    it('a dataset stored without a sourceName reads back blank, never a fabricated source', () => {
+    /**
+     * ⚠ This assertion was INVERTED on 2026-08-31 (MOCK-GONE-1(b)), deliberately. It used to require a
+     * blank `sourceName` here. The rule it was written to protect — "never a FABRICATED source", i.e.
+     * the old `?? 'data'` that named a store nobody had — is unchanged and still pinned by the test
+     * below. `physicalRef` is not a fabrication: go-live writes the landed store's NAME there and
+     * writes no `sourceName` at all, so treating it as blank left every such dataset unreadable and
+     * built `GET /db/table` with no `name`.
+     */
+    it("a dataset stored with only a physicalRef reads that store's name as its source", () => {
         // What go-live writes: a physical dataset over a real store, with no sourceName.
         const { svc } = setup({ name: 'orders_feed', kind: 'physical', physicalRef: 'orders_feed' });
+        let datasets: { sourceName: string }[] = [];
+        svc.list().subscribe((d) => (datasets = d));
+        expect(datasets[0].sourceName).toBe('orders_feed');
+    });
+
+    it('with neither sourceName nor physicalRef the source stays blank — nothing is invented', () => {
+        const { svc } = setup({ name: 'empty', kind: 'virtual', columns: [], measures: [] });
+        let datasets: { sourceName: string }[] = [];
+        svc.list().subscribe((d) => (datasets = d));
+        expect(datasets[0].sourceName).toBe('');
+    });
+
+    it('a cross-space shared ref is NOT a local store name', () => {
+        // `shared/<owner>/<item>` is resolved server-side; passing it to /db/table as a table would 404.
+        const { svc } = setup({ name: 'bound', kind: 'physical', physicalRef: 'shared/partner/orders' });
         let datasets: { sourceName: string }[] = [];
         svc.list().subscribe((d) => (datasets = d));
         expect(datasets[0].sourceName).toBe('');

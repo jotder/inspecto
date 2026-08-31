@@ -283,7 +283,7 @@
   [kpi-reports](./features/kpi-reports.md) features; [features index](./features/index.md) regrouped to
   the Operations/Workbench/Studio/Catalog/Settings navigation (~35 screens);
   [overview](./overview.md) + [api-and-data](./conventions/api-and-data.md) +
-  [multi-space](./conventions/multi-space.md) + [mock-backends](./conventions/mock-backends.md) updated
+  [multi-space](./conventions/multi-space.md) updated
   for the `/api/v1` flip, the interceptor chain, and the OIDC no-op-on-Personal story;
   [architecture](./architecture.md) gains the shared `inspecto/` libraries (geo, investigation, graph,
   component-model, viz). Superseded loose docs (`ui-components.md`, `devextreme-migration-plan.md`)

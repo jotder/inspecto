@@ -13,7 +13,7 @@ Routes `/incidents` and `/cases` (Operations nav group) — a single `ObjectMail
 route data (`incidents.routes.ts` / `cases.routes.ts`), the canonical
 [pane-reuse pattern](../conventions/routing-and-navigation.md). The chain is **Alert → Incident → Case**
 ([`GLOSSARY.md`](../../../GLOSSARY.md) §9) — never "Issue". Backed by `ObjectsService`; offline via the
-`mockOps` [interceptor](../conventions/mock-backends.md).
+the real ControlApi.
 
 * **Mail shell** — Gmail-metaphor 3 panes: folder nav (My Cases / Escalated / Identified / Diagnosing /
   Resolved / Archived + Tags) · list · detail panel; both side panes resize via the shared
@@ -97,7 +97,7 @@ route data (`incidents.routes.ts` / `cases.routes.ts`), the canonical
     lossy for zero reuse.
   * ⚠ **That canonical-frontend-shape choice is paid for by a hand-kept backend mirror, so it is pinned by
     a cross-language contract test** (2026-08-15, the `MeasureCompiler.AGGS` idiom). One committed
-    artifact, `inspecto/mock/attribute-spec.contract.json`, is compared by `FindingsSpecContractTest`
+    artifact, `inspecto/contracts/attribute-spec.contract.json`, is compared by `FindingsSpecContractTest`
     (Java) and `attribute-spec.contract.spec.ts` (TS), so neither side moves alone. Drift used to be
     silent in the worse direction: a type added only in TypeScript makes the server **422 a section the
     renderer could have drawn**, with an error naming a control the author's own form offers. The unions

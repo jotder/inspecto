@@ -12,5 +12,4 @@ timestamp: 2026-06-28T00:00:00Z
 Route `/enrichment` (Operations nav group). A **standard**, single-select [data-table](../design-system/data-table.md)
 of stage-2 jobs; selecting a job opens a detail panel with tabs: **Runs** / **Lineage** (filter by run id) /
 **Report** (a date-range rollup with percentile stats). The runs/lineage rows render in a **pro** data-table;
-the report is a stat table. Backed by `EnrichmentService`; offline via the `mockOps`
-[interceptor](../conventions/mock-backends.md).
+the report is a stat table. Backed by `EnrichmentService`.

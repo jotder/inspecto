@@ -14,4 +14,4 @@ Route under the Settings nav group. Manages reusable component definitions via `
 (used by the data-table [rule](../design-system/rule.md) save, but intentionally **not** in the palette).
 Grammars are created/edited from the [Pipelines](pipelines.md) `GrammarEditorDialog`, or Onboarding's
 Parsing stage — one shared surface, see [Grammar configuration](grammar-config.md). Offline via the `mockFlows`
-`/components/{type}` CRUD store ([mock backends](../conventions/mock-backends.md)).
+`/components/{type}` CRUD store.

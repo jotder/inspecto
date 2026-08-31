@@ -24,7 +24,7 @@ public final class MeasureCompiler {
      *  validate {@code group_by} columns, and {@code MeasureGrammarContractTest} pins the two together. */
     static final Pattern SAFE_IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
     /** Package-private, not public: {@code MeasureGrammarContractTest} pins it against the committed
-     *  {@code inspecto-ui/src/app/inspecto/mock/measure-grammar.contract.json} the Angular authoring form
+     *  {@code inspecto-ui/src/app/inspecto/contracts/measure-grammar.contract.json} the Angular authoring form
      *  validates from, so adding an aggregate here fails that test until the client agrees. */
     static final List<String> AGGS = List.of("count", "countDistinct", "sum", "avg", "min", "max");
     /** Time buckets a temporal dimension may be grouped into. Package-private and contract-pinned for the

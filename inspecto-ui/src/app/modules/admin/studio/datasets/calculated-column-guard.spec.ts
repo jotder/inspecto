@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import GUARD_CONTRACT from 'app/inspecto/mock/expression-guard.contract.json';
+import GUARD_CONTRACT from 'app/inspecto/contracts/expression-guard.contract.json';
 import { checkCalculatedExpr, checkCalculatedName } from './calculated-column-guard';
 
 describe('checkCalculatedExpr', () => {

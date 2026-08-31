@@ -78,25 +78,13 @@ src/app/
     api/                    # @Injectable({providedIn:'root'}) services + barrel index.ts
     components/             # shared UI: status-badge, empty-state, skeleton, chart, connectivity-banner, schema-form
     grid/                   # ag-Grid theme + helpers (index.ts)
-    mock/                   # THE unified mock backend: MockStore (per-space, localStorage-persisted) +
-                            # framework-free domain handlers + ONE mockApiInterceptor. New mock endpoints
-                            # go here as handlers — never as a new per-feature mock interceptor.
-                            # ⚠ A MOCK MUST NEVER BE MORE LENIENT THAN THE SERVER (2026-07-27, AGT-6a
-                            # A5.3). A handler that accepts a shape the backend 422s, or returns a
-                            # richer shape than the backend does, converts a hard failure into a
-                            # passing rehearsal: the Pipelines `pipeline_author` adoption shipped
-                            # BROKEN through two slices (flat args where the tool wants `flow`; a name
-                            # string where the adapter wants the graph) and looked correct offline the
-                            # whole time. When adding/editing a handler, diff its accepted args AND its
-                            # result keys against the real tool/route — and pin the strictness in a
-                            # `*.handler.spec.ts`, since the preview cannot catch what the mock permits.
-                            # 🔴 QUERY PARAMS REACH A HANDLER AS `req.params`, NEVER IN `req.url`
-                            # (2026-08-30): Angular's `HttpRequest.url` carries no query string, so a
-                            # handler that parses `url.split('?')` sees EVERY request as param-less and
-                            # answers its own 400/empty branch. Unit specs that stub the service never
-                            # exercise the interceptor, so this is invisible until the running app --
-                            # it cost a preview cycle on `/config/schema/derived`. Note `CONFIG_FILE`-style
-                            # regexes ending `([^/?]+)$` imply otherwise; they are defensive, not evidence.
+    contracts/              # server-published contract JSONs the UI is pinned to (node-attributes,
+                            # step-types, bind-kinds, attribute-spec, expression-guard, measure-grammar).
+                            # 🔴 Six Java contract tests read these SAME FILES BY PATH — regenerate them
+                            # from the backend, never hand-edit, and never move them without repointing
+                            # the Java constants in the same change.
+    fixtures/               # sample rows for SPECS ONLY (sample-sources.ts). The running app never
+                            # reads them: every Dataset resolves over /db/* against the real backend.
     theme/                  # chart-tokens.ts (the ONLY place canvas colors are hardcoded)
     testing/                # a11y.ts (expectNoA11yViolations)
     auth.service.ts, confirm.service.ts, …
@@ -237,9 +225,9 @@ src/app/
   unmodeled keys survive a save. ⚠ A `PUT …/graph` 422 carries named **`refusals[]`** (`UNSUPPORTED_NODE`
   / `MULTI_PARSER` / `NO_*`) under `error.details`; surface them, don't swallow them (the editor's
   `showRefusals`). ⚠ The old `*_flow.toon` authoring writes (`POST /pipelines/authored`, `PUT`,
-  `/nodes`, `/edges`) are **retired** — grandfathered flows stay readable/deletable only. ⚠ The mock's
-  TS lift/lower (`mock/pipeline-editable.ts`) must keep refusing exactly what the server does, or the
-  offline preview greenlights a topology the backend 422s.
+  `/nodes`, `/edges`) are **retired** — grandfathered flows stay readable/deletable only. ⚠ The UI's
+  TS lift/lower (`modules/admin/pipelines/pipeline-editable.ts`) must keep refusing exactly what the
+  server does, or the editor greenlights a topology the backend 422s.
 - **Labelling something with cross-entity tags → `TagAssignmentDialog`** (`inspecto/tags/`, D7). Kind-
   agnostic: `dialog.open(TagAssignmentDialog, {data: {targetKind, targetId, label}})`, where `targetKind`
   is `object` or a `ComponentStore.WRITABLE_TYPES` value. Adopting it on a new pane is a menu item, not a
@@ -270,8 +258,6 @@ src/app/
   engine, and it re-states what the screen already knows); terms are **canonical** spellings, never banned
   synonyms; and it is **NOT gated on `canAuthorWorkbench()`** — it has no write path, and a Business-lens
   user is who needs it most, so don't "make it consistent" with the authoring surface. Adopted on 12 panes.
-  ⚠ A new pane's terms must also be added to the **subset** `GLOSSARY` map in `mock/handlers/agent.handler.ts`
-  (verbatim from the real file) or they can't resolve offline.
 - **"Why is this red" on a ROW → `<inspecto-ai-status>`** (`inspecto/ai-assist/`, AGT-6a A4-status). The third
   family member — `<inspecto-ai-assist>` authors, `<inspecto-ai-explain>` defines vocabulary, this one reports
   **deployment state**: `<inspecto-ai-status [label]="row.name" [pipelineId]="row.name" />`, or pass
@@ -284,27 +270,21 @@ src/app/
   can only answer "nothing" is worse than none); and the Incidents/Cases `object-detail` header, shown only
   when `obj.correlationId` is set and getting the timeline half **alone** — an Incident has no pipeline, so
   there is no live state to read (the independent degrade working, not a gap to fill with a pipeline
-  lookup). ⚠ Offline it answers from the **mock store's own ledger**
-  (`agent.handler.ts` now takes `(req, store)`) — an empty ledger honestly answers "nothing was recorded"
-  rather than inventing activity. Details: `docs/okf/frontend/features/inline-ai-authoring.md`.
+  lookup). Details: `docs/okf/frontend/features/inline-ai-authoring.md`.
   ⚠ **A `[rowActions]` column on a wide grid is horizontally virtualized out of view** — ag-Grid reports it
   as displayed while no header/button is in the DOM. Add `[pinActions]="true"` (this cost a preview cycle on
   the Alerts grid, whose 7 columns already fill the viewport).
 - **Reading a Dataset's rows → `DatasetRowsService`** (`inspecto/viz/dataset-rows.service.ts`, split S2
-  slice B 2026-08-14). ONE seam for "what does this `sourceName` resolve to": `rows(ds, limit?)` (live
-  `GET /db/table`, or `POST /db/query` with the dataset's Query Core model compiled by `compileSql`;
-  offline the `inspecto/mock/sample-sources.ts` page filtered by `evaluateRows`), `sql(store, text)` for
+  slice B 2026-08-14). ONE seam for "what does this `sourceName` resolve to": `rows(ds, limit?)` (`GET /db/table`,
+  or `POST /db/query` with the dataset's Query Core model compiled by `compileSql`), `sql(store, text)` for
   authored SQL, `columns(ds)` for declared-else-1-row-probe columns, `stores()` for the space's store
   list (`/db/catalog`, business groups only — an `ops:*` table needs a group id a `sourceName` can't carry). ⛔ **Never write
-  `SAMPLE_SOURCES[ds.sourceName]` in a feature again** — that synchronous lookup is why Studio showed
-  sample data live. ⚠ **A result is a PAGE**: honour `truncated` and surface `error`, never render an
+  `SAMPLE_SOURCES[ds.sourceName]` in a feature** — `inspecto/fixtures/sample-sources.ts` is SPEC-ONLY
+  data; that synchronous lookup is why Studio once showed sample data live. ⚠ **A result is a PAGE**: honour `truncated` and surface `error`, never render an
   empty grid for a store that 404'd. ⚠ It is async, so a `computed()` that read rows becomes an
   effect-fed `signal` — watch the ordering that creates (a saved view that patches a form AFTER an async
-  column-pick will be clobbered; resolve the pick explicitly with `{emitEvent: false}` first). ⛔ Do NOT
-  convert a fold that is already the **offline arm** of a server-first path (Link Analysis / Geo
-  projections, `ReconExecService`) — those call `sampleDatasetRows` deliberately, after the server call
-  failed. ⚠ `DatasetResultService.run` takes rows as a **thunk** for the same reason: its live branch
-  never reads them.
+  column-pick will be clobbered; resolve the pick explicitly with `{emitEvent: false}` first). ⚠ The sample-fold *offline arms* of Link Analysis / Geo / `ReconExecService` were DELETED with the
+  mock backend (2026-08-31): a failed server call must now surface as an error, never as sample data.
 - **Asking for ONE choice → `<inspecto-option-picker>`** (`inspecto/components/option-picker.component.ts`,
   operator ask 2026-08-22). ⛔ **`mat-select` is no longer the way to ask for a single choice.** The picker
   is a `ControlValueAccessor`, so `formControlName` / `[ngModel]` bind exactly as `mat-select` did, but the
@@ -542,11 +522,7 @@ src/app/
   `loginRequired()`**). The flow is **backend-mediated (BFF)**: the SPA never holds a refresh token — it does
   Auth-Code+PKCE (`inspecto/api/pkce.ts`), then the backend `/auth/exchange|refresh|logout` routes keep the
   refresh token in an httpOnly cookie and return only a short-lived access token (in memory). Guest screens:
-  `modules/admin/session/{sign-in,callback}.component`. **The offline switch (binding constraint): keep it
-  working with no backend** — the mock `auth.handler` answers `/bootstrap` as Personal by default
-  (`environment.mockAuthMode:'none'` → no login, boots straight to the app, byte-for-byte as before); set
-  `mockAuthMode:'oidc'` (or `localStorage['inspecto.mockAuthMode']='oidc'`) to exercise the whole sign-in UX
-  offline (the mock mints fake tokens, `auth.mock=true` skips the real IAM redirect). Real deployments read
+  `modules/admin/session/{sign-in,callback}.component`. Real deployments read
   `bootstrap.auth` (or fall back to `environment.oidc`) for the authorize URL + public client id (no secret —
   public PKCE client). `/bootstrap` + `/auth` are server-global (exempt in `spaceInterceptor`).
 - **Downloads** (CSV/blob) go through `HttpClient` (responseType `blob`/`text`) + an object
@@ -575,9 +551,7 @@ src/app/
   computed: the persisted preference constrained to `lens.allowedLenses()` (Business always; Builder ⇐
   `canAuthorWorkbench`; Ops ⇐ `canOperateRuns`) — the switcher iterates `allowedLenses()`, and a spec
   that stubs `SessionService` must include `authMode: () => 'none'` (+ `capabilities: () => []`) or
-  every LensService capability read throws. Offline dev switch for constrained subjects:
-  `localStorage['inspecto.mockCapabilities'] = 'canOperateRuns'` (with `inspecto.mockAuthMode='oidc'`).
-  Default heuristic: operational actions (run-now, enable/disable, dry-run, activate) stay available in
+  every LensService capability read throws. Default heuristic: operational actions (run-now, enable/disable, dry-run, activate) stay available in
   every lens — gate only true config-authoring — *unless* the plan explicitly says otherwise for a pane
   (Runs is "read-only observe" for Business, hence `canOperateRuns`). Gate the **mutating method**
   (defense-in-depth), not just the button, on canvas/drag surfaces. Unlike the space switcher, switching
@@ -686,19 +660,15 @@ src/app/
    **⚠ Two ways a preview check reports a false green.** (a) **Toggling a control and clicking its submit
    button in the SAME eval call silently does nothing** — Angular has not re-rendered `[disabled]` yet, so
    the click lands on a still-disabled button while the UI looks like it worked. Split them into two calls
-   and assert `button.disabled === false` before clicking. (b) **A raw `fetch('/api/…')` bypasses the
-   offline mock entirely** (it is an `HttpInterceptor`, not a service worker) and returns an empty body —
-   so it can neither confirm nor refute a write. Confirm a mutation by reading the mock store
-   (`localStorage['inspecto.mock.v22']` → `<space>[<collection>]`) or by re-opening the UI, never by
-   observing that a dialog closed. (The key is bumped whenever the seed contract changes — read
-   `MOCK_STORE_KEY` in `mock/mock-store.ts` rather than trusting this literal.)
+   and assert `button.disabled === false` before clicking. (b) Confirm a mutation by re-reading it
+   from the backend or by re-opening the UI, never by observing that a dialog closed.
    **The preview browser does NOT deliver `ResizeObserver` callbacks** (it renders from DOM snapshots, no
    continuous paint loop) — RO-driven behavior (chart/graph/map container-resize) can't be exercised
    in-preview; rely on the unit test (observer wired + disconnected) + the shared RO→`resize()` precedent.
 4b. **Formatting is pinned by `.prettierrc.json`/`.prettierignore`** (added 2026-08-13: printWidth 120,
    tabWidth 4, singleQuote, trailingComma all — measured off the pre-upgrade tree, not guessed).
    **`.prettierignore` excludes** `src/@gamma/` + `modules/auth/` (vendored, §3 bans restyling it — stays
-   mergeable with upstream), `src/app/inspecto/mock/*.contract.json` (Jackson-written,
+   mergeable with upstream), `src/app/inspecto/contracts/*.contract.json` (Jackson-written,
    byte/string-compared by `NodeAttributesContractTest`/`StepTypesContractTest`/
    `MeasureGrammarContractTest` in `inspecto-engine` — reformatting these breaks the **Java** build, a
    gate the UI verify loop never runs), and `src/assets/` (fixture payloads). ⚠ **Prettier's HTML

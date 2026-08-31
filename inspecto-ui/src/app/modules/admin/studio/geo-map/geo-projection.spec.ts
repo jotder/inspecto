@@ -182,13 +182,12 @@ describe('DatasetGeoSource / RouteProjectionGeoSource (backend-first, client fal
         expect(out.skipped).toBe(3);
     });
 
-    it('DatasetGeoSource falls back to the client fold over sample rows when the backend is unavailable', async () => {
-        const geo = { project: () => throwError(() => new Error('offline')) } as never;
+    it('DatasetGeoSource surfaces a backend failure instead of substituting sample rows', async () => {
+        const geo = { project: () => throwError(() => new Error('backend down')) } as never;
         const src = new DatasetGeoSource({ get: () => of(ds) } as never, geo);
-        const out = (await src.query({
-            projection: { datasetId: 'geo-ds', latCol: 'lat', lonCol: 'lon', entityCol: 'msisdn' },
-        })) as ProjectedGeo;
-        expect(out.points.length).toBeGreaterThan(0);
+        await expect(
+            src.query({ projection: { datasetId: 'geo-ds', latCol: 'lat', lonCol: 'lon', entityCol: 'msisdn' } }),
+        ).rejects.toThrow(/backend down/);
     });
 
     it('RouteProjectionGeoSource calls POST /geo/routes first and folds the server result', async () => {

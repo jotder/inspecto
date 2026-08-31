@@ -1,15 +1,10 @@
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
-import { environment } from '../../../environments/environment';
 import { BiQueryService } from 'app/inspecto/api/bi-query.service';
 import { QuerySpec } from './viz-types';
 import { biQueryBody, DatasetResultService } from './dataset-result.service';
 
-const ROWS = [
-    { tariff: 'gold', duration_s: 10 },
-    { tariff: 'gold', duration_s: 20 },
-];
 const COLS = [
     { name: 'tariff', type: 'string' as const },
     { name: 'duration_s', type: 'number' as const },
@@ -45,121 +40,68 @@ function setup(biRun: ReturnType<typeof vi.fn> = vi.fn()) {
 describe('DatasetResultService', () => {
     it('dedupes: two calls with an identical spec (different object identity) share one run', () => {
         const { svc } = setup();
-        const p1 = svc.run(spec(), ROWS);
-        const p2 = svc.run(spec(), ROWS); // structurally identical, but a fresh object literal
+        const p1 = svc.run(spec());
+        const p2 = svc.run(spec()); // structurally identical, but a fresh object literal
         expect(p1).toBe(p2);
     });
 
     it('does not dedupe across a different spec (e.g. a different filter)', () => {
         const { svc } = setup();
-        const p1 = svc.run(spec(), ROWS);
-        const p2 = svc.run(spec({ groupBy: ['msisdn'] }), ROWS);
+        const p1 = svc.run(spec());
+        const p2 = svc.run(spec({ groupBy: ['msisdn'] }));
         expect(p1).not.toBe(p2);
     });
 
     it('still returns the cached run after it resolves (not just while in flight)', async () => {
         const { svc } = setup();
-        const p1 = svc.run(spec(), ROWS);
+        const p1 = svc.run(spec());
         await p1;
-        const p2 = svc.run(spec(), ROWS);
+        const p2 = svc.run(spec());
         expect(p1).toBe(p2);
     });
 
     it('clear() drops the cache, so the next identical spec runs fresh', async () => {
         const { svc } = setup();
-        const p1 = svc.run(spec(), ROWS);
+        const p1 = svc.run(spec());
         await p1;
         svc.clear();
-        const p2 = svc.run(spec(), ROWS);
+        const p2 = svc.run(spec());
         expect(p1).not.toBe(p2);
     });
 
-    it('offline: rows supplied as a thunk are awaited and run over', async () => {
-        const { svc } = setup();
-        environment.mockStudio = true;
-        try {
-            const res = await svc.run(spec(), () => Promise.resolve(ROWS), COLS);
-            expect(res.ok).toBe(true);
-            expect(res.rows).toEqual([{ tariff: 'gold', sum_duration_s: 30 }]);
-        } finally {
-            environment.mockStudio = false;
-        }
-    });
+    // ── the server run (POST /bi/query) ───────────────────────────────────────
 
-    it('live: a rows thunk is NEVER invoked — the server run must not pay for rows it discards', async () => {
-        const biRun = vi.fn(() => of({ rows: [] }));
-        const { svc } = setup(biRun);
-        const rows = vi.fn(() => Promise.resolve(ROWS));
-        environment.mockStudio = false;
-        try {
-            await svc.run(spec(), rows, COLS);
-            expect(rows).not.toHaveBeenCalled();
-            expect(biRun).toHaveBeenCalled();
-        } finally {
-            environment.mockStudio = false;
-        }
-    });
-
-    it('mock mode (mockStudio=true) stays offline — the BI endpoint is never called', async () => {
-        const { svc, biRun } = setup();
-        environment.mockStudio = true; // explicit, like every live-branch test below — never rely on the default
-        try {
-            await svc.run(spec(), ROWS, COLS);
-            expect(biRun).not.toHaveBeenCalled();
-        } finally {
-            environment.mockStudio = false;
-        }
-    });
-
-    // ── M2 live branch (mockStudio=false → POST /bi/query) ─────────────────────
-
-    it('live mode maps the spec to the wire body and returns the server rows', async () => {
+    it('maps the spec to the wire body and returns the server rows', async () => {
         const biRun = vi.fn(() => of({ rows: [{ tariff: 'gold', sum_duration_s: 30 }] }));
         const { svc } = setup(biRun);
-        environment.mockStudio = false;
-        try {
-            const res = await svc.run(spec(), ROWS, COLS);
-            expect(res.ok).toBe(true);
-            expect(res.rows).toEqual([{ tariff: 'gold', sum_duration_s: 30 }]);
-            expect(biRun).toHaveBeenCalledWith({
-                dataset: 'cdr_sample',
-                measures: [{ agg: 'sum', field: 'duration_s' }],
-                groupBy: ['tariff'],
-            });
-        } finally {
-            environment.mockStudio = true;
-        }
+        const res = await svc.run(spec(), COLS);
+        expect(res.ok).toBe(true);
+        expect(res.rows).toEqual([{ tariff: 'gold', sum_duration_s: 30 }]);
+        expect(biRun).toHaveBeenCalledWith({
+            dataset: 'cdr_sample',
+            measures: [{ agg: 'sum', field: 'duration_s' }],
+            groupBy: ['tariff'],
+        });
     });
 
-    it('live mode maps a server error to an ok:false result (never throws)', async () => {
+    it('maps a server error to an ok:false result (never throws)', async () => {
         const biRun = vi.fn(() => throwError(() => ({ status: 422, error: { error: 'bad spec' } })));
         const { svc } = setup(biRun);
-        environment.mockStudio = false;
-        try {
-            const res = await svc.run(spec(), ROWS, COLS);
-            expect(res.ok).toBe(false);
-            expect(res.error).toBeTruthy();
-        } finally {
-            environment.mockStudio = true;
-        }
+        const res = await svc.run(spec(), COLS);
+        expect(res.ok).toBe(false);
+        expect(res.error).toBeTruthy();
     });
 
-    it('live mode fails honestly on an unmappable spec without calling the endpoint', async () => {
+    it('fails honestly on an unmappable spec without calling the endpoint', async () => {
         const { svc, biRun } = setup();
-        environment.mockStudio = false;
-        try {
-            // A named-measure expression has no structured {agg, field} origin — offline-only.
-            const res = await svc.run(
-                spec({ measures: [{ id: 'avg_cost', expression: 'SUM(x)/COUNT(*)', label: 'avg cost' }] }),
-                ROWS,
-                COLS,
-            );
-            expect(res.ok).toBe(false);
-            expect(res.error).toContain('offline-only');
-            expect(biRun).not.toHaveBeenCalled();
-        } finally {
-            environment.mockStudio = true;
-        }
+        // A named-measure expression has no structured {agg, field} origin — not expressible on the wire.
+        const res = await svc.run(
+            spec({ measures: [{ id: 'avg_cost', expression: 'SUM(x)/COUNT(*)', label: 'avg cost' }] }),
+            COLS,
+        );
+        expect(res.ok).toBe(false);
+        expect(res.error).toContain('cannot run');
+        expect(biRun).not.toHaveBeenCalled();
     });
 });
 

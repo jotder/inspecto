@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class ExpressionGuardContractTest {
 
-    private static final String CONTRACT = "inspecto-ui/src/app/inspecto/mock/expression-guard.contract.json";
+    private static final String CONTRACT = "inspecto-ui/src/app/inspecto/contracts/expression-guard.contract.json";
 
     private static final ObjectMapper JSON = new ObjectMapper();
 

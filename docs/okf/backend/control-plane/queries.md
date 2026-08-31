@@ -79,7 +79,7 @@ A widget's time bucket is part of the query, not a client-side afterthought:
 * **Wire** — the body's optional `grains` object maps a **`groupBy` column** to `day`/`week`/`month`.
   A grain naming a column that is not grouped is a **422, not a silent no-op** — the caller believes it
   asked for a bucket. The vocabulary is pinned across the two languages by
-  `inspecto-ui/src/app/inspecto/mock/measure-grammar.contract.json` (`MeasureGrammarContractTest`),
+  `inspecto-ui/src/app/inspecto/contracts/measure-grammar.contract.json` (`MeasureGrammarContractTest`),
   the same mechanism that pins the aggregate set.
 * **Compilation** — `MeasureCompiler` emits `STRFTIME(DATE_TRUNC('<grain>', "col"), '<fmt>')` in the
   select list **and repeats the whole expression in the GROUP BY** (the bucketed dimension is aliased

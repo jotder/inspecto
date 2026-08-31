@@ -15,7 +15,7 @@ import java.util.stream.Stream;
  *
  * <p>⚠ <b>These two tables must stay identical, and a test enforces it rather than a comment.</b>
  * {@code NodeAttributesContractTest} compares this table against the committed
- * {@code inspecto-ui/src/app/inspecto/mock/node-attributes.contract.json}, and the TS
+ * {@code inspecto-ui/src/app/inspecto/contracts/node-attributes.contract.json}, and the TS
  * {@code node-attributes.spec.ts} compares its own table against the SAME file — so neither side can
  * drift without one of the two suites failing. The JSON is not generated at build time on purpose: a
  * generated artifact would silently absorb a change on whichever side ran the generator.

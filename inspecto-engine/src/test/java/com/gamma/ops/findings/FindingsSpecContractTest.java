@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class FindingsSpecContractTest {
 
-    private static final String CONTRACT = "inspecto-ui/src/app/inspecto/mock/attribute-spec.contract.json";
+    private static final String CONTRACT = "inspecto-ui/src/app/inspecto/contracts/attribute-spec.contract.json";
 
     private static final ObjectMapper JSON = new ObjectMapper();
 

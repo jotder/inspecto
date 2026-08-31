@@ -35,7 +35,8 @@ src/app/
 Beyond the dirs above, `src/app/inspecto/` hosts the cross-feature libraries:
 
 * `api/` — resource services, `apiUrl`, and the v1/space/auth interceptors ([API & data](./conventions/api-and-data.md)).
-* `mock/` — the unified offline mock backend ([mock backends](./conventions/mock-backends.md)).
+* `contracts/` — the server-published contract JSONs the UI is pinned to (node attributes, step types, bind kinds, attribute spec, expression guard, measure grammar); Java contract tests read the same files by path.
+* `fixtures/` — sample rows used only by specs.
 * `component-model/` — the Component metamodel: `AttributeSpec` metadata (rendered by the shared `schema-form` component), kinds, refs, reuse graph.
 * `viz/` — the `VizPlugin` registry (chart/scatter/funnel/… plugins) + `time-grain`.
 * `graph/` — the shared AntV G6 host (Link Analysis, reuse graph, geo co-location bridge).

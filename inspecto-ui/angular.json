@@ -82,17 +82,6 @@
                             "optimization": false,
                             "extractLicenses": false,
                             "sourceMap": true
-                        },
-                        "offline": {
-                            "optimization": false,
-                            "extractLicenses": false,
-                            "sourceMap": true,
-                            "fileReplacements": [
-                                {
-                                    "replace": "src/environments/environment.ts",
-                                    "with": "src/environments/environment.offline.ts"
-                                }
-                            ]
                         }
                     },
                     "defaultConfiguration": "production"
@@ -109,9 +98,6 @@
                         },
                         "development": {
                             "buildTarget": "gamma:build:development"
-                        },
-                        "offline": {
-                            "buildTarget": "gamma:build:offline"
                         }
                     },
                     "defaultConfiguration": "development"

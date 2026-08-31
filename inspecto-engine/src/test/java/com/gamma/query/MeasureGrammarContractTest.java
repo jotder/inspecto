@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class MeasureGrammarContractTest {
 
-    private static final String CONTRACT = "inspecto-ui/src/app/inspecto/mock/measure-grammar.contract.json";
+    private static final String CONTRACT = "inspecto-ui/src/app/inspecto/contracts/measure-grammar.contract.json";
 
     private static final ObjectMapper JSON = new ObjectMapper();
 

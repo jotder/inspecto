@@ -1,7 +1,7 @@
 /**
  * Reconciliation — C9 (Wave 3). Pure, framework-free: define a **Dataset-vs-Dataset** match (key
  * columns + per-column numeric tolerances) and compute the **breaks** between the two sides. Stored as a
- * `reconciliation` component (mock-served today), mirroring `dataset-types.ts`/`requirement-types.ts`'s
+ * `reconciliation` component, mirroring `dataset-types.ts`/`requirement-types.ts`'s
  * "just a component" shape.
  *
  * Semantics locked with the product owner 2026-07-03: match rows by `keyColumns`; for each
@@ -58,6 +58,12 @@ export interface ReconciliationConfig {
     rightDataset: string;
     /** Optional third dataset — turns the recon 3-way (anchor = leftDataset, design §6). */
     thirdDataset?: string;
+    /**
+     * The **v2** anchor-first dataset list — the shape `/recon/run` takes and the shape an authored
+     * config on disk uses (`datasets[3]: a, b, c`). Read-side only: {@code fromContent} folds it into
+     * {@link leftDataset}/{@link rightDataset}/{@link thirdDataset}, which stay the UI's model.
+     */
+    datasets?: string[];
     keyColumns: string[];
     compareColumns: CompareColumn[];
     /** Board severity bands (defaults to {@link DEFAULT_BANDS} when absent). */

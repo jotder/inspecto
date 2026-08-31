@@ -1,6 +1,6 @@
 import { AbstractControl, ValidatorFn } from '@angular/forms';
 
-import MEASURE_CONTRACT from 'app/inspecto/mock/measure-grammar.contract.json';
+import MEASURE_CONTRACT from 'app/inspecto/contracts/measure-grammar.contract.json';
 
 /**
  * The `transform.summarize` grammar — client-side authoring validation for rules the pipeline itself

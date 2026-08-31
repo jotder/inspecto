@@ -13,7 +13,6 @@ import { spaceInterceptor } from './inspecto/api/space.interceptor';
 import { authInterceptor } from './inspecto/api/auth.interceptor';
 import { v1Interceptor } from './inspecto/api/v1.interceptor';
 import { SessionService } from './inspecto/api/session.service';
-import { mockApiInterceptor } from './inspecto/mock';
 
 export const appConfig: ApplicationConfig = {
     providers: [
@@ -25,21 +24,10 @@ export const appConfig: ApplicationConfig = {
 
         // Main HttpClient. The Personal/core edition is auth-free; the Standard edition adds OIDC via
         // the authInterceptor (W6d), which is a no-op unless SessionService.authMode === 'oidc'. Order:
-        // v1 envelope unwrap (W7 — first, so it also sees mock short-circuit responses) → mock
-        // (offline, short-circuits) → space scope rewrite → auth bearer/refresh → error tracker.
+        // v1 envelope unwrap (W7 — first) → space scope rewrite → auth bearer/refresh → error tracker.
         provideHttpClient(
             withXhr(),
-            // mockApiInterceptor is THE unified mock backend (inspecto/mock/): a persistent, per-space
-            // MockStore behind framework-free domain handlers (auth/bootstrap, demo, connections,
-            // components, pipelines, ops, jobs) plus the liveness simulator. It runs before the space
-            // rewrite; per-domain environment.mock* flags gate each handler.
-            withInterceptors([
-                v1Interceptor,
-                mockApiInterceptor,
-                spaceInterceptor,
-                authInterceptor,
-                inspectoErrorInterceptor,
-            ]),
+            withInterceptors([v1Interceptor, spaceInterceptor, authInterceptor, inspectoErrorInterceptor]),
         ),
 
         // Angular 21: use async animations provider for better performance

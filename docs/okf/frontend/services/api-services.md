@@ -45,4 +45,3 @@ re-exported from the `inspecto/api` barrel. See [API & data conventions](../conv
 
 * `errorInterceptor` — global error → connectivity / per-screen handling ([errors & connectivity](../conventions/errors-and-connectivity.md)).
 * `spaceInterceptor` — multi-space path rewrite ([multi-space](../conventions/multi-space.md)).
-* `connectionMockInterceptor` · `flowMockInterceptor` · `opsMockInterceptor` — env-gated offline [mock backends](../conventions/mock-backends.md).

@@ -49,7 +49,7 @@ export class KpiComponent {
     readonly mode = signal<KpiMode>('standard');
 
     /** Where the value was computed — mirrors `DatasetResultService.run()`'s branch on the same flag. */
-    readonly caption = environment.mockStudio ? 'offline aggregate' : 'live aggregate';
+    readonly caption = 'live aggregate';
 
     readonly display = computed(() => new Intl.NumberFormat().format(this.value()));
 

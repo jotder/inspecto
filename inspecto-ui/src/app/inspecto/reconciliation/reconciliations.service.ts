@@ -51,12 +51,19 @@ function toContent(r: Reconciliation): Record<string, unknown> {
 
 function fromContent(name: string, content: Record<string, unknown>): Reconciliation {
     const c = content as Partial<ReconciliationConfig> & { name?: string };
+    // 🔴 Dual-read: an AUTHORED reconciliation on disk uses the v2 anchor-first `datasets[]` list —
+    // the same shape `serverConfig()` posts to /recon/run — while UI-written ones use the legacy
+    // left/right/third fields. Reading only the legacy trio left every authored recon with blank
+    // datasets: the grid showed empty Left/Right columns and Run posted `datasets: []`, which the
+    // server refused with "expected 2 or 3 datasets … got 0" (BACKLOG MOCK-GONE-1(c)).
+    // ⚠ Order matters — the explicit field wins, so a config carrying both is read as authored.
+    const list = Array.isArray(c.datasets) ? c.datasets.map((d) => String(d ?? '').trim()) : [];
     return {
         id: name,
         name: c.name ?? name,
-        leftDataset: c.leftDataset ?? '',
-        rightDataset: c.rightDataset ?? '',
-        thirdDataset: c.thirdDataset,
+        leftDataset: c.leftDataset ?? list[0] ?? '',
+        rightDataset: c.rightDataset ?? list[1] ?? '',
+        thirdDataset: c.thirdDataset ?? list[2] ?? undefined,
         keyColumns: (c.keyColumns as string[]) ?? [],
         compareColumns: (c.compareColumns as CompareColumn[]) ?? [],
         bands: c.bands,

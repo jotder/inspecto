@@ -12,51 +12,7 @@ export const environment = {
     // environment.ts is the one that actually ships.)
     apiBaseUrl: '/api',
     hmr: false,
-    // Prototype-only: serve mocked connect/explore/test/sample for the connection workbench until the
-    // real library + control routes land (B2). Gates the connections handler in the unified mock store
-    // (inspecto/mock/); flip false in B2.
-    mockConnectionProbe: false,
-    // Prototype-only (W5): serve the server-global /spaces surface (meta/list/create/delete/datasources)
-    // + the /spaces/templates catalog from the mock store, making the multi-space runtime + the
-    // Space-Templates gallery fully demoable offline. Flip false against a real multi-space backend.
-    mockSpaces: false,
-    // Prototype-only: serve the Pipelines graph editor fully offline (node-type palette, authored-flow
-    // CRUD, dry-run, per-processor test) from an in-memory store. Flip false / remove the interceptor
-    // once the real flow backend is wired.
-    mockPipelines: false,
-    // Prototype-only: serve the operational-intelligence surfaces (events / alerts / objects / enrichment)
-    // fully offline from in-memory datasets, so the reusable query panel can be exercised with no backend.
-    // Gates the ops handler in the unified mock store; flip false once wired to the real backend.
-    mockOps: false,
-    // Offline-only: serve Studio's component kinds (dataset/chart/dashboard/recon), settings, and the
-    // BI template/share/public-dashboard/inv shims from the unified mock store. The real backend has
-    // full CRUD for all of these — false (the default) serves them live.
-    mockStudio: false,
-    // Prototype-only: serve the Scheduler's write actions (create/edit/delete/enable/disable/reschedule) and
-    // per-run logs/events. The read endpoints (list/runs/trigger) already exist on the backend; the mock
-    // seeds jobs so the page works offline. Gates the jobs handler in the unified mock store; flip false
-    // once the real Java endpoints land (see the plan's follow-on).
-    mockJobs: false,
-    // Prototype-only (§3.6): serve the cross-space Exchange (/exchange/* offers, grants, requests,
-    // snapshots) from the mock store so the Catalog sharing surfaces work offline. Flip false against
-    // a real multi-space backend (-Dspaces.root). Gates the exchange handler in the unified mock store.
-    mockExchange: false,
-    // Prototype-only: serve the lens access configuration (/access/catalog + /access/profiles) from the
-    // mock store so Settings ▸ Access works offline. Flip false against a real backend (AccessRoutes).
-    mockAccess: false,
-    // Master demo-mode flag: mocks every remaining endpoint (health, status, pipelines, sources,
-    // notifications, catalog, diagnoses, config) so the full UI works with no backend at all.
-    // Gates the demo handler in the unified mock store (inspecto/mock/).
-    mockDemo: false,
-    // Prototype-only: serve the per-space Data Browser (/db/catalog|table|query) offline. Flip true
-    // together with mockDemo for a no-backend walk; false = the real DbBrowserRoutes serve it.
-    mockDb: false,
-    // W6d edition switch (offline): 'none' → the mock /bootstrap reports Personal, so the app boots
-    // with NO login (byte-for-byte as before). Flip to 'oidc' (or localStorage['inspecto.mockAuthMode'])
-    // to exercise the whole Standard sign-in UX offline against the mock (auth.handler mints fake tokens).
-    mockAuthMode: 'none' as 'none' | 'oidc',
-    // Real Standard-deployment OIDC config (public PKCE client — no secret). Left blank in dev because
-    // offline mock mode supplies its own auth block (auth.mock=true). A real deployment sets the IAM's
+    // Real Standard-deployment OIDC config (public PKCE client — no secret). Left blank in dev. A real deployment sets the IAM's
     // authorize endpoint + the SPA's public client id here; the SessionService reads bootstrap.auth first
     // and falls back to this. `endSessionUrl` is the provider's `end_session_endpoint` (RP-initiated
     // logout) — declared, never derived from the issuer, same call D15 made for tokenEndpoint. Leave it

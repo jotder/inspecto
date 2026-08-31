@@ -875,7 +875,7 @@ describe('moveStepInChain', () => {
 
 describe('recipe edit round trip (over the mock lift/lower, which mirrors the server)', () => {
     it('an inserted Step survives lower → lift, and untouched sections stay byte-stable', async () => {
-        const { liftConfig, lowerGraph } = await import('app/inspecto/mock/pipeline-editable');
+        const { liftConfig, lowerGraph } = await import('app/modules/admin/pipelines/pipeline-editable');
         const cfg = {
             name: 'orders',
             active: false,
@@ -1043,7 +1043,7 @@ describe('insertRouteAfter', () => {
 
 describe('RECIPE_VERBS fallback vs the served step-types contract (S4 dual-read)', () => {
     it('every client verb maps to the same node type the server publishes, in the same order', async () => {
-        const contract = (await import('app/inspecto/mock/step-types.contract.json')).default as {
+        const contract = (await import('app/inspecto/contracts/step-types.contract.json')).default as {
             verb: string;
             type: string;
             lowerable: boolean;
@@ -1067,7 +1067,7 @@ describe('RECIPE_VERBS fallback vs the served step-types contract (S4 dual-read)
 
 describe('route parity round trip (mock lift/lower mirrors PipelineEditable/PipelineLift)', () => {
     it('a route: block lifts to branches, an added branch lowers back with its database stamped', async () => {
-        const { liftConfig, lowerGraph } = await import('app/inspecto/mock/pipeline-editable');
+        const { liftConfig, lowerGraph } = await import('app/modules/admin/pipelines/pipeline-editable');
         const cfg = {
             name: 'orders',
             active: false,
@@ -1122,7 +1122,7 @@ describe('route parity round trip (mock lift/lower mirrors PipelineEditable/Pipe
      * reported success, and reopening showed the destination gone. Reproduced live 2026-08-17.
      */
     it('keeps a branch added in the editor across a save, with no manual destination', async () => {
-        const { liftConfig, lowerGraph } = await import('app/inspecto/mock/pipeline-editable');
+        const { liftConfig, lowerGraph } = await import('app/modules/admin/pipelines/pipeline-editable');
         const cfg = {
             name: 'orders',
             active: false,

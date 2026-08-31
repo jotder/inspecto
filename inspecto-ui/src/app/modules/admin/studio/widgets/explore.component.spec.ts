@@ -10,7 +10,7 @@ import { ComponentsService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { DatasetResultService } from 'app/inspecto/viz/dataset-result.service';
 import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
-import { SAMPLE_SOURCES } from 'app/inspecto/mock/sample-sources';
+import { SAMPLE_SOURCES } from 'app/inspecto/fixtures/sample-sources';
 import { runSpec } from 'app/inspecto/viz/query-spec';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';

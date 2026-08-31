@@ -223,6 +223,9 @@ final class ConfigReadRoutes implements RouteModule {
             dir = WriteGates.jail(writeRoot, writeRoot.resolve(sub), "subdir");
         }
         Path target = ConfigFileSupport.resolveRegisteredConfigFile(api, writeRoot, dir, type, fileName, subdir);
+        // A satellite (schema/mapping/enrichment) lives beside its pipeline, not at the write root —
+        // resolve it there when the convention path misses. READ ONLY; see resolveSatelliteForRead.
+        target = ConfigFileSupport.resolveSatelliteForRead(writeRoot, target, type, fileName, subdir);
         String rel = writeRoot.relativize(target).toString().replace('\\', '/');
         if (!Files.isRegularFile(target)) throw new ApiException(404, "no such config: " + rel);
 

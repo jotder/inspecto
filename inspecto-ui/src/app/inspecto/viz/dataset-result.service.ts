@@ -1,28 +1,18 @@
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { environment } from '../../../environments/environment';
 import { BiFilter, BiQueryBody, BiQueryService } from 'app/inspecto/api/bi-query.service';
 import { apiErrorMessage } from 'app/inspecto/api/api-base';
 import { ColumnMeta, Condition, ConditionGroup, columnType } from 'app/inspecto/query';
 import { SqlRunResult } from 'app/inspecto/data-table/sql/sql-run';
 import { QuerySpec } from './viz-types';
-import { runSpec } from './query-spec';
 
 /**
  * De-dupes/caches identical {@link QuerySpec} runs so N widgets sharing a dataset + cross-filter compute
- * once, not N times (e.g. dashboard tiles, gallery thumbnails). M2 form: when the Studio domain is live
- * (`environment.mockStudio` false — the same flag that decides whether datasets themselves come from the
- * real ComponentStore), the spec is mapped to validated identifiers and executed server-side via
- * {@link BiQueryService} (`POST /bi/query`); offline/mock mode keeps the M1 in-browser AlaSQL run
- * byte-identical. Same `run()` signature either way — callers ({@link WidgetHostComponent}, the Explore
- * builder) never change. A spec that cannot cross the wire faithfully (a named-measure SQL expression, an
- * OR filter branch) fails honestly instead of silently dropping terms.
+ * once, not N times (e.g. dashboard tiles, gallery thumbnails). The spec is mapped to validated
+ * identifiers and executed server-side via {@link BiQueryService} (`POST /bi/query`). A spec that cannot
+ * cross the wire faithfully (a named-measure SQL expression, an OR filter branch) fails honestly instead
+ * of silently dropping terms.
  */
-/**
- * The rows a spec runs over offline. A **thunk** when producing them costs something (a page from
- * {@link DatasetRowsService}): the live branch never reads the rows, so it must never pay for them.
- */
-export type SpecRows = Record<string, unknown>[] | (() => Promise<Record<string, unknown>[]>);
 
 @Injectable({ providedIn: 'root' })
 export class DatasetResultService {
@@ -30,11 +20,11 @@ export class DatasetResultService {
     private cache = new Map<string, Promise<SqlRunResult>>();
 
     /** Run `spec` — an identical spec already in flight or resolved is reused, not re-run. */
-    run(spec: QuerySpec, rows: SpecRows, cols: ColumnMeta[] = []): Promise<SqlRunResult> {
+    run(spec: QuerySpec, cols: ColumnMeta[] = []): Promise<SqlRunResult> {
         const key = hashSpec(spec);
         const cached = this.cache.get(key);
         if (cached) return cached;
-        const promise = environment.mockStudio ? this.runOffline(spec, rows, cols) : this.runRemote(spec, cols);
+        const promise = this.runRemote(spec, cols);
         this.cache.set(key, promise);
         // A failed run shouldn't stick forever — drop it so the next call retries instead of replaying the error.
         promise.catch(() => this.cache.delete(key));
@@ -46,12 +36,7 @@ export class DatasetResultService {
         this.cache.clear();
     }
 
-    /** M1: run the spec in-browser. Rows supplied lazily are only ever fetched here. */
-    private async runOffline(spec: QuerySpec, rows: SpecRows, cols: ColumnMeta[]): Promise<SqlRunResult> {
-        return runSpec(spec, typeof rows === 'function' ? await rows() : rows, cols);
-    }
-
-    /** M2: execute the spec server-side. Never throws — errors come back as `{ok:false}` results. */
+    /** Execute the spec server-side. Never throws — errors come back as `{ok:false}` results. */
     private async runRemote(spec: QuerySpec, cols: ColumnMeta[]): Promise<SqlRunResult> {
         const body = biQueryBody(spec, cols);
         if (!body) {
@@ -59,8 +44,8 @@ export class DatasetResultService {
                 ok: false,
                 rows: [],
                 error:
-                    'This widget uses offline-only features (a named-measure SQL expression, an OR filter, ' +
-                    'or an empty projection) that the live BI endpoint cannot run.',
+                    'This widget uses features (a named-measure SQL expression, an OR filter, or an ' +
+                    'empty projection) that the BI endpoint cannot run.',
             };
         }
         try {
@@ -83,7 +68,7 @@ export function biQueryBody(spec: QuerySpec, cols: ColumnMeta[] = []): BiQueryBo
     if (!spec.measures.length && !spec.groupBy.length) return null; // the wire needs at least one of them
     const measures: BiQueryBody['measures'] = [];
     for (const m of spec.measures) {
-        if (!m.agg) return null; // named-measure SQL expression — offline-only
+        if (!m.agg) return null; // named-measure SQL expression — not expressible on the wire
         measures.push(m.agg === 'count' ? { agg: 'count' } : { agg: m.agg, field: m.field ?? m.id });
     }
     const filters = flattenFilters(spec.filters ?? null, cols);

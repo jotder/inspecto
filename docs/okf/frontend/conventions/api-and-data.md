@@ -32,4 +32,4 @@ bodies pass through untouched), so **services keep their raw-DTO signatures**. v
 gating in features — auth stays at the interceptor/edition seam.
 
 See [errors & connectivity](errors-and-connectivity.md) for the error interceptor, [multi-space](multi-space.md)
-for request scoping, and [mock backends](mock-backends.md) for offline operation.
+for request scoping.

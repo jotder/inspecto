@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { ComponentsService } from 'app/inspecto/api';
 import { CalculatedColumn, Dataset, DatasetColumn, DatasetConfig, DatasetKind, NamedMeasure } from './dataset-types';
+import { isSharedRef } from 'app/inspecto/api/shared-ref';
 
 /**
  * Dataset store — persists {@link Dataset}s through the component registry as the `dataset` component type
@@ -54,10 +55,21 @@ function fromContent(name: string, content: Record<string, unknown>): Dataset {
         id: name,
         name: (content['name'] as string) ?? name,
         kind: (content['kind'] as DatasetKind) ?? 'virtual',
-        // ⛔ Never default this to a source name. The old `?? 'data'` named a key SAMPLE_SOURCES
-        // does not have, so a dataset written without a sourceName read `[]` rows in every consumer
-        // and was indistinguishable from an empty store. An absent source stays absent.
-        sourceName: (content['sourceName'] as string) ?? '',
+        // ⛔ Never default this to an INVENTED source name. The old `?? 'data'` named a key that did
+        // not exist, so a dataset written without a sourceName read `[]` rows in every consumer and was
+        // indistinguishable from an empty store.
+        //
+        // 🔴 `physicalRef` is different, and IS the honest answer: go-live registration writes the
+        // landed store's name there (`DatasetRegistrationService` — `physicalRef: store`) and writes no
+        // `sourceName` at all. Every such dataset therefore had a blank source, and the rows seam built
+        // `GET /db/table?limit=1` with NO `name` → 400, leaving the column pickers silently empty
+        // (BACKLOG MOCK-GONE-1(b), found by driving the real app 2026-08-31).
+        // ⚠ A `shared/<owner>/<item>` ref is NOT a local store name — it spans spaces and is resolved
+        // server-side, so it is excluded here rather than passed to `/db/table` as a table name.
+        sourceName:
+            (content['sourceName'] as string) ||
+            (isSharedRef(content['physicalRef'] as string) ? '' : ((content['physicalRef'] as string) ?? '')) ||
+            '',
         query: (content['query'] as Dataset['query']) ?? null,
         physicalRef: (content['physicalRef'] as string | null) ?? null,
         columns: (content['columns'] as DatasetColumn[]) ?? [],

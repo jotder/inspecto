@@ -1,40 +1,21 @@
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { environment } from '../../../environments/environment';
 import { DbBrowserService, DbResult } from 'app/inspecto/api/db-browser.service';
 import { apiErrorMessage } from 'app/inspecto/api/api-base';
-import {
-    ColumnMeta,
-    ColumnType,
-    QueryModel,
-    compileSql,
-    dbColumnType,
-    evaluateRows,
-    inferColumns,
-} from 'app/inspecto/query';
-import { runSql } from 'app/inspecto/data-table/sql/sql-run';
-import { SAMPLE_SOURCES, SAMPLE_SOURCE_NAMES } from 'app/inspecto/mock/sample-sources';
+import { ColumnMeta, ColumnType, QueryModel, compileSql, dbColumnType } from 'app/inspecto/query';
 
 /**
- * The **rows seam**: what a Dataset's `sourceName` actually resolves to. Live (the default —
- * `environment.mockStudio` false, the same flag that decides whether datasets themselves come from the
- * real ComponentStore) that is the real store, read over `/db/table` (or `/db/query` when the dataset
- * embeds a Query Core model, compiled by {@link compileSql}); offline it is the store's entry in
- * {@link SAMPLE_SOURCES}, filtered in-browser by {@link evaluateRows}. Same signature either way.
+ * The **rows seam**: what a Dataset's `sourceName` actually resolves to. It is always the real
+ * store, read over `/db/table` (or `/db/query` when the dataset embeds a Query Core model, compiled by
+ * {@link compileSql}).
  *
- * This is the layer under {@link DatasetResultService}: that one runs a {@link QuerySpec} (offline over
- * rows, live over `/bi/query`), this one supplies the rows a screen reads directly — drill-throughs,
- * filter-value pickers, SQL previews, column pickers.
+ * This is the layer under {@link DatasetResultService}: that one runs a {@link QuerySpec} over
+ * `/bi/query`, this one supplies the rows a screen reads directly — drill-throughs, filter-value
+ * pickers, SQL previews, column pickers.
  *
  * ⚠ **A result is a PAGE, not the store.** `truncated` says the store held more than `limit`; a consumer
  * that folds, counts or aggregates over `rows` must say so rather than imply completeness — no real
- * endpoint returns unbounded rows, which is exactly why the old synchronous `SAMPLE_SOURCES[name]`
- * lookups could not be repointed in place.
- *
- * ⚠ **Not every sample-row read is a defect this replaces.** Link Analysis, Geo and Reconciliation each
- * already pair a server call with a sample fold as its *offline arm* (`EntityProjectionGraphSource`,
- * `PointProjectionGeoSource`, `ReconExecService`); those folds are correct as written. Converting them to
- * this service would put a second server round-trip behind a path that already has one.
+ * endpoint returns unbounded rows.
  */
 @Injectable({ providedIn: 'root' })
 export class DatasetRowsService {
@@ -47,10 +28,21 @@ export class DatasetRowsService {
      * An identical request already in flight or resolved is reused.
      */
     rows(ds: RowSourceRef, limit = DEFAULT_ROW_LIMIT): Promise<DatasetRows> {
+        // 🔴 A Dataset with no source names no store, so there is nothing to ask for. Saying so beats
+        // issuing `GET /db/table?limit=1` with NO `name`, which 400s and leaves a column picker silently
+        // empty with no clue why (BACKLOG MOCK-GONE-1(b)). The seam refuses rather than the caller,
+        // because every consumer reaches the store through here.
+        if (!ds.sourceName?.trim())
+            return Promise.resolve({
+                rows: [],
+                columns: declaredColumns(ds),
+                truncated: false,
+                error: 'This Dataset names no store, so its rows cannot be read. Set its source.',
+            });
         const key = `${ds.sourceName}|${limit}|${ds.query ? JSON.stringify(ds.query) : ''}`;
         const cached = this.cache.get(key);
         if (cached) return cached;
-        const promise = environment.mockStudio ? Promise.resolve(sampleRows(ds)) : this.remoteRows(ds, limit);
+        const promise = this.remoteRows(ds, limit);
         this.cache.set(key, promise);
         // A failed read shouldn't stick forever — drop it so the next call retries instead of replaying it.
         promise.then((r) => (r.error ? this.cache.delete(key) : undefined));
@@ -68,12 +60,11 @@ export class DatasetRowsService {
     }
 
     /**
-     * The stores a Dataset may read — the business groups of `/db/catalog` live, the sample keys offline.
+     * The stores a Dataset may read — the business groups of `/db/catalog`.
      * Operational (`ops:*`) groups are excluded: they are the control plane's own tables, not business
      * data, and `/db/table` needs their group id, which a Dataset's `sourceName` cannot carry.
      */
     async stores(): Promise<StoreList> {
-        if (environment.mockStudio) return { names: [...SAMPLE_SOURCE_NAMES] };
         try {
             const catalog = await firstValueFrom(this.db.catalog());
             const names = (catalog.groups ?? [])
@@ -86,19 +77,11 @@ export class DatasetRowsService {
     }
 
     /**
-     * Run authored SQL against one store: `/db/query` live (guarded server-side — a single read-only
-     * statement), the in-browser AlaSQL engine over the store's sample page offline. Not cached: the SQL
+     * Run authored SQL against one store over `/db/query` (guarded server-side — a single read-only
+     * statement). Not cached: the SQL
      * is being edited, so every run is a new question. Never throws.
      */
     async sql(sourceName: string, sql: string, limit = DEFAULT_ROW_LIMIT): Promise<DatasetRows> {
-        if (environment.mockStudio) {
-            const page = sampleRows({ sourceName });
-            if (page.error) return page;
-            const res = await runSql(sql, sourceName, page.rows);
-            return res.ok
-                ? { rows: res.rows, columns: inferColumns(res.rows), truncated: false }
-                : { rows: [], columns: [], truncated: false, error: res.error };
-        }
         try {
             return fromDbResult(await firstValueFrom(this.db.query({ table: sourceName, sql, limit })), []);
         } catch (e) {
@@ -171,35 +154,6 @@ export const DEFAULT_ROW_LIMIT = 1000;
 
 function declaredColumns(ds: RowSourceRef): ColumnMeta[] {
     return (ds.columns ?? []).map((c) => ({ name: c.name, type: c.type }));
-}
-
-/**
- * Offline: the store's sample rows, through the dataset's own model when it has one. Exported because
- * the *offline arms* of the three server-first folds (Link Analysis, Geo, Reconciliation) need exactly
- * this and nothing else — they already made the server call, so they must not go through the service and
- * make a second one. Before this there were two divergent copies of it; the Reconciliation one dropped
- * the column metadata, which silently compared numbers and dates as strings.
- */
-export function sampleDatasetRows(ds: RowSourceRef | null): Record<string, unknown>[] {
-    return ds ? sampleRows(ds).rows : [];
-}
-
-function sampleRows(ds: RowSourceRef): DatasetRows {
-    const raw = SAMPLE_SOURCES[ds.sourceName];
-    if (!raw) {
-        return {
-            rows: [],
-            columns: declaredColumns(ds),
-            truncated: false,
-            error: `No offline sample rows for the store "${ds.sourceName}".`,
-        };
-    }
-    const declared = declaredColumns(ds);
-    const columns = declared.length ? declared : inferColumns(raw);
-    // The model defines a virtual/materialized dataset, so it applies whenever one is set; a physical
-    // dataset carries `query: null` by construction (`buildDataset`).
-    const rows = ds.query ? evaluateRows(ds.query, { name: ds.sourceName, rows: raw, columns }) : raw;
-    return { rows, columns, truncated: false };
 }
 
 /** Map a `/db/*` result to the seam's shape — DuckDB type names become Query Core {@link ColumnType}s. */

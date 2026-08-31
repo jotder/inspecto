@@ -1,11 +1,10 @@
 /**
- * Offline sample stores — the rows a Dataset resolves to when the Studio domain is mock-served
- * (`environment.mockStudio`). Live, {@link DatasetRowsService} reads the real store over `/db/*` instead
- * and these are never touched; they exist so the Query Core, the widget/dashboard previews and the demo
- * seeds work with no backend.
+ * Sample store rows — **test fixture data only**. The running app never reads these: every Dataset
+ * resolves through {@link DatasetRowsService} over `/db/*` against the real backend.
  *
- * Lives in the mock layer, not under a feature: it is consumed across Studio, Reconciliation, Link
- * Analysis and Geo, and shared code may not import a feature (`angular-ui` §3).
+ * They survived the removal of the offline mock backend (2026-08-31) because the Query Core, widget
+ * and projection specs assert over them. Lives outside any feature: shared code may not import a
+ * feature (`angular-ui` §3), and specs across Studio, Link Analysis and Geo use it.
  */
 export const SAMPLE_SOURCES: Record<string, Record<string, unknown>[]> = {
     cdr: [

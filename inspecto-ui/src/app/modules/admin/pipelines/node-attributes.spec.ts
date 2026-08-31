@@ -7,7 +7,7 @@ import {
     OUTPUT_ATTRIBUTES,
     UNPACK_ATTRIBUTES,
 } from 'app/inspecto/component-model';
-import NODE_ATTRIBUTE_CONTRACT from 'app/inspecto/mock/node-attributes.contract.json';
+import NODE_ATTRIBUTE_CONTRACT from 'app/inspecto/contracts/node-attributes.contract.json';
 import { nodeAttributesFor, speccedNodeTypes } from './node-attributes';
 
 /**

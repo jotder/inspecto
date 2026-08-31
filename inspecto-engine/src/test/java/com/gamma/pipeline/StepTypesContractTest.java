@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class StepTypesContractTest {
 
     /** Shared with the TS side + the mock's `/pipelines/step-types`, so the offline preview cannot drift. */
-    private static final String CONTRACT = "inspecto-ui/src/app/inspecto/mock/step-types.contract.json";
+    private static final String CONTRACT = "inspecto-ui/src/app/inspecto/contracts/step-types.contract.json";
 
     private static final ObjectMapper JSON = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 

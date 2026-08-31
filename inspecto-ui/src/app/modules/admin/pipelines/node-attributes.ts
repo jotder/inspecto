@@ -372,7 +372,7 @@ const NODE_ATTRIBUTES: Record<string, AttributeSpec[]> = {
  * prefers that. This copy is what the editor uses before the catalog resolves and what the offline/mock
  * build runs on — so it must stay identical to the served one, which
  * `node-attributes.spec.ts` enforces against the committed
- * `inspecto/mock/node-attributes.contract.json` that the Java `NodeAttributesContractTest` also checks.
+ * `inspecto/contracts/node-attributes.contract.json` that the Java `NodeAttributesContractTest` also checks.
  * Neither side can drift without one of the two suites failing.
  */
 export function nodeAttributesFor(type: string | undefined): AttributeSpec[] | undefined {

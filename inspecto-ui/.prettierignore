@@ -18,7 +18,7 @@ src/app/modules/auth/
 # as STRINGS by NodeAttributesContractTest / StepTypesContractTest /
 # MeasureGrammarContractTest in inspecto-engine. Any reformat fails the JAVA
 # build, which the UI gate would never catch.
-src/app/inspecto/mock/*.contract.json
+src/app/inspecto/contracts/*.contract.json
 
 # Demo/fixture payloads — large, generated, and reformatting them is pure churn.
 src/assets/

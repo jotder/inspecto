@@ -63,4 +63,85 @@ describe('ReconciliationsService', () => {
         expect(out[0].id).toBe('switch_vs_billing');
         expect(out[0].leftDataset).toBe('switch_cdr');
     });
+
+    // ── the v2 `datasets[]` read (MOCK-GONE-1(c)) ─────────────────────────────
+
+    it('reads an AUTHORED recon whose datasets are the v2 anchor-first list', () => {
+        const list = vi.fn(() =>
+            of([
+                {
+                    type: 'reconciliation',
+                    name: 'orders_regional_recon',
+                    ref: '',
+                    content: {
+                        name: 'orders_regional_recon',
+                        datasets: ['orders_dataset', 'orders_enriched_dataset', 'orders_rollup_dataset'],
+                        keyColumns: ['REGION'],
+                        compareColumns: [{ column: 'GROSS', agg: 'sum' }],
+                    },
+                },
+            ]),
+        );
+        TestBed.configureTestingModule({
+            providers: [ReconciliationsService, { provide: ComponentsService, useValue: { list } }],
+        });
+        let out: { leftDataset: string; rightDataset: string; thirdDataset?: string }[] = [];
+        TestBed.inject(ReconciliationsService)
+            .list()
+            .subscribe((r) => (out = r));
+        // Anchor first: without this the Run button posted `datasets: []` and the server refused.
+        expect(out[0].leftDataset).toBe('orders_dataset');
+        expect(out[0].rightDataset).toBe('orders_enriched_dataset');
+        expect(out[0].thirdDataset).toBe('orders_rollup_dataset');
+    });
+
+    it('a two-dataset v2 list stays 2-way — no empty third is invented', () => {
+        const list = vi.fn(() =>
+            of([
+                {
+                    type: 'reconciliation',
+                    name: 'two_way',
+                    ref: '',
+                    content: { datasets: ['a', 'b'], keyColumns: [], compareColumns: [] },
+                },
+            ]),
+        );
+        TestBed.configureTestingModule({
+            providers: [ReconciliationsService, { provide: ComponentsService, useValue: { list } }],
+        });
+        let out: { rightDataset: string; thirdDataset?: string }[] = [];
+        TestBed.inject(ReconciliationsService)
+            .list()
+            .subscribe((r) => (out = r));
+        expect(out[0].rightDataset).toBe('b');
+        expect(out[0].thirdDataset).toBeUndefined();
+    });
+
+    it('the explicit legacy fields WIN over a v2 list, so a config carrying both is unambiguous', () => {
+        const list = vi.fn(() =>
+            of([
+                {
+                    type: 'reconciliation',
+                    name: 'both',
+                    ref: '',
+                    content: {
+                        leftDataset: 'explicit_left',
+                        rightDataset: 'explicit_right',
+                        datasets: ['list_a', 'list_b'],
+                        keyColumns: [],
+                        compareColumns: [],
+                    },
+                },
+            ]),
+        );
+        TestBed.configureTestingModule({
+            providers: [ReconciliationsService, { provide: ComponentsService, useValue: { list } }],
+        });
+        let out: { leftDataset: string; rightDataset: string }[] = [];
+        TestBed.inject(ReconciliationsService)
+            .list()
+            .subscribe((r) => (out = r));
+        expect(out[0].leftDataset).toBe('explicit_left');
+        expect(out[0].rightDataset).toBe('explicit_right');
+    });
 });

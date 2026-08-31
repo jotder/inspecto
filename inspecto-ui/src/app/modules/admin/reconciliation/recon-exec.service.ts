@@ -1,35 +1,20 @@
 import { Injectable, inject } from '@angular/core';
-import { firstValueFrom, forkJoin, of } from 'rxjs';
-import { environment } from '../../../../environments/environment';
+import { firstValueFrom } from 'rxjs';
 import { ReconApiService, ReconServerConfig } from 'app/inspecto/api';
-import {
-    aggregateRecon,
-    Reconciliation,
-    ReconBreakSets,
-    reconBreakSets,
-    ReconRunResult,
-    SideKey,
-} from 'app/inspecto/reconciliation';
-import { DatasetsService } from '../studio/datasets/datasets.service';
-import { sampleDatasetRows } from 'app/inspecto/viz/dataset-rows.service';
+import { Reconciliation, ReconBreakSets, ReconRunResult, SideKey } from 'app/inspecto/reconciliation';
 
 /**
- * Reconciliation execution seam — the recon analogue of `DatasetResultService`: when the Studio domain
- * is mock-served (`environment.mockStudio`) the comparison runs in-browser over the datasets' sample
- * rows (the offline engine in `recon-board.ts`); against a real backend it executes server-side in
- * DuckDB via `POST /recon/run` / `/recon/breaks`. Same signatures either way — the Board and the Breaks
- * page never change. This replaces the C9 review-sheet's `datasetRows()` mock seam.
+ * Reconciliation execution seam — the recon analogue of `DatasetResultService`. The comparison executes
+ * server-side in DuckDB via `POST /recon/run` / `/recon/breaks`; the Board and the Breaks page read the
+ * result. This replaces the C9 review-sheet's `datasetRows()` mock seam.
  */
 @Injectable({ providedIn: 'root' })
 export class ReconExecService {
     private api = inject(ReconApiService);
-    private datasets = inject(DatasetsService);
 
     /** Run the Board aggregate comparison. */
     async run(recon: Reconciliation): Promise<ReconRunResult> {
-        if (!environment.mockStudio) return firstValueFrom(this.api.run(serverConfig(recon)));
-        const { left, right, third } = await this.rows(recon);
-        return aggregateRecon(recon, left, right, third);
+        return firstValueFrom(this.api.run(serverConfig(recon)));
     }
 
     /**
@@ -42,29 +27,7 @@ export class ReconExecService {
         type?: 'missing_left' | 'missing_right' | 'value_break' | null,
         side: SideKey = 'b',
     ): Promise<ReconBreakSets> {
-        if (!environment.mockStudio) return firstValueFrom(this.api.breaks(serverConfig(recon), path, type, side));
-        const { left, right, third } = await this.rows(recon);
-        return reconBreakSets(recon, left, right, path, type, side, third);
-    }
-
-    /** Offline row resolution — the datasets' sample-source rows through their Query Core when virtual. */
-    private async rows(recon: Reconciliation): Promise<{
-        left: Record<string, unknown>[];
-        right: Record<string, unknown>[];
-        third: Record<string, unknown>[] | null;
-    }> {
-        const { left, right, third } = await firstValueFrom(
-            forkJoin({
-                left: this.datasets.get(recon.leftDataset),
-                right: this.datasets.get(recon.rightDataset),
-                third: recon.thirdDataset ? this.datasets.get(recon.thirdDataset) : of(null),
-            }),
-        );
-        return {
-            left: sampleDatasetRows(left),
-            right: sampleDatasetRows(right),
-            third: third ? sampleDatasetRows(third) : null,
-        };
+        return firstValueFrom(this.api.breaks(serverConfig(recon), path, type, side));
     }
 }
 

@@ -14,5 +14,4 @@ Route `/events` (Operations nav group). The newest-first operational event strea
 query; a **live-tail** toggle polls via `visibleInterval` while the tab is visible; a saved-views menu
 persists filter sets; matching rows export to CSV. The grid is a **pro** [data-table](../design-system/data-table.md)
 with `[searchable]="false"` `[exportable]="false"` (backend search/export are kept) and an Actions column
-(row detail → correlation/type drill-down). Backed by `EventsService`; offline via the `mockOps`
-[interceptor](../conventions/mock-backends.md).
+(row detail → correlation/type drill-down). Backed by `EventsService`.

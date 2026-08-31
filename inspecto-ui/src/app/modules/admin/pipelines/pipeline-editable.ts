@@ -13,7 +13,7 @@
  * second dedup would be *stricter* than the server, which greys out work the backend would happily
  * save — the same class of bug as being lenient, pointing the other way.
  */
-import type { AuthoredEdge, AuthoredNode, AuthoredPipeline } from '../api/pipelines.service';
+import type { AuthoredEdge, AuthoredNode, AuthoredPipeline } from 'app/inspecto/api/pipelines.service';
 
 export interface Refusal {
     code: string;

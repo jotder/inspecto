@@ -12,5 +12,4 @@ violated. The [testing & build](testing-and-build.md) concept is the Definition 
 * [Errors & connectivity](errors-and-connectivity.md) - the global error interceptor and the connectivity banner.
 * [Routing & navigation](routing-and-navigation.md) - lazy routes, the nav data file, breadcrumbs, global search.
 * [Multi-space](multi-space.md) - `SpacesService` + the `spaceInterceptor` path rewrite.
-* [Mock backends](mock-backends.md) - env-gated HTTP interceptors for fully-offline operation.
 * [Testing & build](testing-and-build.md) - vitest + axe, the token guard, the production build, the definition of done.

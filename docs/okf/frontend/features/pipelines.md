@@ -24,7 +24,7 @@ configures PARSE nodes: a thin host over the shared `<inspecto-grammar-editor>` 
 stage. A Grammar lives **inline** on the node's own `parsing:` config by default; "Save as reusable
 Grammar" extracts it to a `grammar` [component](components.md) bound via `use: grammar/<id>`. Backed
 by `PipelinesService` / `ComponentsService`; offline via the `mockFlows`-gated handler of the unified
-[mock backend](../conventions/mock-backends.md).
+the real ControlApi.
 
 ## Three lenses, and nothing loads until you ask for it (2026-08-02)
 
@@ -305,7 +305,7 @@ partitioning is schema-level `partitions[]{column, source, type}` / legacy `part
 `where` — is reachable only from an authored `*_flow.toon` graph via `PipelineJobRunner`, and
 `POST`/`PUT /pipelines/authored` are **405 since W5**. This editor can only write the flat
 `*_pipeline.toon`, whose lower merges a `transform.filter` node's cfg **wholesale** into
-`processing.csv_settings` (`PipelineEditable.java:277`, mirrored in `mock/pipeline-editable.ts`).
+`processing.csv_settings` (`PipelineEditable.java:277`, mirrored in `modules/admin/pipelines/pipeline-editable.ts`).
 
 **Corollary for any future key check:** "read somewhere in `PipelineLift`/`PipelineCompiler`/`RowShaper`" is
 too weak a right-hand side — it would have called the pre-fix `where` green. Bind a node type to the runtime
@@ -422,13 +422,13 @@ Four things to know before touching it:
   `AttributeSpec`), so widening an `AttributeType` stays a one-place change. `FieldSpec` in inspecto-config
   is a *different* vocabulary and is deliberately not reused.
 - **Both tables are byte-compared to one committed artifact**,
-  `inspecto/mock/node-attributes.contract.json` — by `NodeAttributesContractTest` on the Java side and
+  `inspecto/contracts/node-attributes.contract.json` — by `NodeAttributesContractTest` on the Java side and
   `node-attributes.spec.ts` on the TS side. Regenerate only deliberately
   (`mvn … -Dnode.attributes.write=true`), and when it fails decide *which* side is wrong first: regenerating
   makes the test pass by moving the goalposts.
 - ⚠ **The node vocabulary feeds TWO committed contracts, not one** (learned UI-S7, 2026-08-28). The same
   `NodeAttributes` tables also compose the served **step** catalog, byte-compared to
-  `inspecto/mock/step-types.contract.json` by `StepTypesContractTest` (regen flag
+  `inspecto/contracts/step-types.contract.json` by `StepTypesContractTest` (regen flag
   `-Dstep.types.write=true`). Adding an attribute and regenerating only `node-attributes.contract.json`
   leaves the second test red — and it fails in a *different* module run than the one you just made pass.
 - **The mock serves that same file**, so the offline preview cannot drive node forms from a different table

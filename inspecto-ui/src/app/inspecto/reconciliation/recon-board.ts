@@ -12,10 +12,11 @@ import {
 /**
  * Reconciliation Board wire types + the offline aggregate engine (DAT-7,
  * `docs/superpower/reconciliation-board-design.md`). The types mirror the backend `/recon/run` and
- * `/recon/breaks` contracts byte-for-byte; {@link aggregateRecon}/{@link reconBreakSets} are the
- * in-browser mirror of the server's `ReconService` used when the Studio domain is mock-served
- * (`environment.mockStudio` — the same seam as `DatasetResultService`). Framework-free and
- * unit-tested for parity with the backend's `ReconServiceTest`.
+ * `/recon/breaks` contracts byte-for-byte; {@link aggregateRecon}/{@link reconBreakSets} are an
+ * in-browser mirror of the server's `ReconService`, unit-tested for parity with the backend's
+ * `ReconServiceTest`. ⚠ Since the offline mock backend was removed (2026-08-31) NOTHING CALLS THEM —
+ * `ReconExecService` always executes server-side. They are kept only as that parity mirror; see
+ * `docs/superpower/mock-backend-removal-plan.md` §3b, which decides whether they stay.
  */
 
 /** Wire name of the implicit COUNT(*) measure (always compared on the Board). */

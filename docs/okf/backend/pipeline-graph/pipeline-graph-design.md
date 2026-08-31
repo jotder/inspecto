@@ -1301,7 +1301,7 @@ speaks the **config-file vocabulary end to end**, so nothing typed crosses the H
   no home for is the *ref*. Giving map a `steps:` entry remains wrong for a separate reason — a map node
   never enters the chain, so it would change **when `steps:` is emitted at all**.
 
-  The offline mirror (`inspecto-ui/src/app/inspecto/mock/pipeline-editable.ts`) refuses identically, in
+  The offline mirror (`inspecto-ui/src/app/modules/admin/pipelines/pipeline-editable.ts`) refuses identically, in
   the same commit — a preview that accepts what the backend refuses is the same defect reversed.
 
   🔴 **A DERIVED ref is not an unhomed one** (`PipelineEditable.DERIVED_USE`, 2026-08-15). The 08-14
@@ -1407,7 +1407,7 @@ widen what executes.
 `ControlApiPipelineCrudTest` (7 — the canonical round-trip, grandfathered reads, retired writes), full
 `inspecto-engine,inspecto` reactor 618/0/0; UI gate 1945/0 + prod build; a live offline walk (create →
 canonical `*_pipeline.toon` written with the full space-convention dir set + `registered:true` → lifted
-to the graph). The mock's TS lift/lower (`inspecto-ui/.../mock/pipeline-editable.ts`) pins the same
+to the graph). The UI's TS lift/lower (`inspecto-ui/.../modules/admin/pipelines/pipeline-editable.ts`) pins the same
 refusals so the offline preview cannot pass a topology the server 422s.*
 
 #### The chain has two spellings, and the FILE owns which one (fixed 2026-08-18)

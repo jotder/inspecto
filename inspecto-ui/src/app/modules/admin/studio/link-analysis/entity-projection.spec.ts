@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { of, throwError } from 'rxjs';
-import { SAMPLE_SOURCES } from 'app/inspecto/mock/sample-sources';
+import { SAMPLE_SOURCES } from 'app/inspecto/fixtures/sample-sources';
 import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
 import {
     EntityProjectionGraphSource,
@@ -127,24 +127,26 @@ describe('EntityProjectionGraphSource', () => {
         calculated: [],
     };
 
-    /** An InvService stub for the offline path: the backend call fails, forcing the client fold. */
-    const offlineInv = { project: () => throwError(() => new Error('offline')) } as never;
+    /** An InvService stub whose backend call fails — the source must surface it, never fold locally. */
+    const failingInv = { project: () => throwError(() => new Error('backend down')) } as never;
 
-    it('falls back to the client fold over sample rows when the backend is unavailable', async () => {
-        const src = new EntityProjectionGraphSource({ get: () => of(ds) } as never, offlineInv);
-        const g = (await src.query({
-            projection: { datasetId: 'links-ds', sourceCol: 'source', targetCol: 'target', linkKindCol: 'link_type' },
-        })) as ProjectedGraph;
-        expect(g.nodes.length).toBeGreaterThan(0);
-        expect(g.edges.some((e) => e.data.kind.startsWith('shared_device'))).toBe(true);
+    it('surfaces a backend failure instead of substituting sample rows', async () => {
+        const src = new EntityProjectionGraphSource({ get: () => of(ds) } as never, failingInv);
+        await expect(
+            src.query({
+                projection: {
+                    datasetId: 'links-ds',
+                    sourceCol: 'source',
+                    targetCol: 'target',
+                    linkKindCol: 'link_type',
+                },
+            }),
+        ).rejects.toThrow(/backend down/);
     });
 
-    it('requires a mapping and surfaces projection errors as thrown messages', async () => {
-        const src = new EntityProjectionGraphSource({ get: () => of(ds) } as never, offlineInv);
+    it('requires a mapping before it asks the backend anything', async () => {
+        const src = new EntityProjectionGraphSource({ get: () => of(ds) } as never, failingInv);
         await expect(src.query({})).rejects.toThrow(/mapping/);
-        await expect(
-            src.query({ projection: { datasetId: 'links-ds', sourceCol: 'bogus', targetCol: 'target' } }),
-        ).rejects.toThrow(/bogus/);
     });
 
     it('multi-mapping: merges N mappings into one graph via q.projections, type-scoping node ids', async () => {

@@ -23,7 +23,6 @@ configured instance bound to a Dataset's Result Set; a **Dashboard** is a layout
 * **Persistence is real** — datasets/widgets/dashboards/queries are writable component kinds since W3/W4
   (`/components` + ETag/If-Match; [backend registry](../../backend/components/component-registry.md));
   query execution runs on DuckDB via [`POST /queries/{id}/run`](../../backend/control-plane/queries.md).
-  Offline, the same surface runs against the mock store ([mock backends](../conventions/mock-backends.md)).
 * **Widgets are library citizens** — identity + tags, the browsable Viz Library gallery, a standalone
   `WidgetHost` render path, and one shared `DatasetResultService` result layer: live it runs
   `POST /bi/query` (DuckDB), offline the same specs run byte-identically on AlaSQL; unmappable specs
@@ -59,8 +58,7 @@ configured instance bound to a Dataset's Result Set; a **Dashboard** is a layout
   and never reads rows — a ten-tile dashboard would otherwise fetch and discard ten pages.
 * **The store picker lists real stores (2026-08-14, split S2 slice A).** The Dataset editor's
   `sourceName` field offers catalogued stores, not a hardcoded sample table: `DatasetRowsService.stores()`
-  reads `/db/catalog` — which offline IS `SAMPLE_SOURCES`, so every offline surface describes one reality
-  ([mock backends](../conventions/mock-backends.md)) — and offers its **business** groups only — an `ops:*` table needs a group id that a
+  reads `/db/catalog` — and offers its **business** groups only — an `ops:*` table needs a group id that a
   Dataset's `sourceName` cannot carry. Create mode lands on the first catalogued store; an unreadable
   catalog says so rather than rendering as "this space has no stores"; and a saved dataset's own source
   stays in the list even when the catalog no longer names it, because a `mat-select` whose value is

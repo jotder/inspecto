@@ -12,7 +12,6 @@ import {
 } from 'app/inspecto/geo';
 import { GeoProjectionResult, GeoService } from 'app/inspecto/api';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
-import { sampleDatasetRows } from 'app/inspecto/viz/dataset-rows.service';
 
 /**
  * The `dataset` **GeoSource**: project a Dataset's rows onto the map — each row with a valid
@@ -176,7 +175,7 @@ function foldServerResult(res: GeoProjectionResult): ProjectedGeo {
     };
 }
 
-/** The pluggable source: backend-first ({@code POST /geo/projection}); Dataset rows → {@link projectPoints} on failure. */
+/** The pluggable source: {@code POST /geo/projection}. */
 export class DatasetGeoSource implements GeoSource {
     readonly id = 'dataset' as const;
     readonly label = 'Locations (from a Dataset)';
@@ -189,29 +188,21 @@ export class DatasetGeoSource implements GeoSource {
         const p = q.projection;
         if (!p?.datasetId) throw new Error('The dataset source needs a Dataset mapping.');
         if (!p.latCol || !p.lonCol) throw new Error('The mapping needs a latitude and a longitude column.');
-        try {
-            const res = await firstValueFrom(
-                this.geo.project({
-                    dataset: p.datasetId,
-                    latCol: p.latCol,
-                    lonCol: p.lonCol,
-                    entityCol: p.entityCol || undefined,
-                    kindCol: p.kindCol || undefined,
-                    timeCol: p.timeCol || undefined,
-                }),
-            );
-            return foldServerResult(res);
-        } catch {
-            // Offline / mock (501) or an older backend: the original client-side sample fold.
-            const ds = await firstValueFrom(this.datasets.get(p.datasetId));
-            const out = projectPoints(sampleDatasetRows(ds), p);
-            if (isGeoProjectionError(out)) throw new Error(out.error);
-            return out;
-        }
+        const res = await firstValueFrom(
+            this.geo.project({
+                dataset: p.datasetId,
+                latCol: p.latCol,
+                lonCol: p.lonCol,
+                entityCol: p.entityCol || undefined,
+                kindCol: p.kindCol || undefined,
+                timeCol: p.timeCol || undefined,
+            }),
+        );
+        return foldServerResult(res);
     }
 }
 
-/** The `od-routes` source: backend-first ({@code POST /geo/routes}); Dataset rows → {@link projectRoutes} on failure. */
+/** The `od-routes` source: {@code POST /geo/routes}. */
 export class RouteProjectionGeoSource implements GeoSource {
     readonly id = 'od-routes' as const;
     readonly label = 'Routes (origin → destination)';
@@ -226,27 +217,19 @@ export class RouteProjectionGeoSource implements GeoSource {
         if (!p.fromLatCol || !p.fromLonCol || !p.toLatCol || !p.toLonCol) {
             throw new Error('The mapping needs origin and destination latitude/longitude columns.');
         }
-        try {
-            const res = await firstValueFrom(
-                this.geo.routes({
-                    dataset: p.datasetId,
-                    fromLatCol: p.fromLatCol,
-                    fromLonCol: p.fromLonCol,
-                    toLatCol: p.toLatCol,
-                    toLonCol: p.toLonCol,
-                    fromCol: p.fromCol || undefined,
-                    toCol: p.toCol || undefined,
-                    kindCol: p.kindCol || undefined,
-                }),
-            );
-            return foldServerResult(res);
-        } catch {
-            // Offline / mock (501) or an older backend: the original client-side sample fold.
-            const ds = await firstValueFrom(this.datasets.get(p.datasetId));
-            const out = projectRoutes(sampleDatasetRows(ds), p);
-            if (isGeoProjectionError(out)) throw new Error(out.error);
-            return out;
-        }
+        const res = await firstValueFrom(
+            this.geo.routes({
+                dataset: p.datasetId,
+                fromLatCol: p.fromLatCol,
+                fromLonCol: p.fromLonCol,
+                toLatCol: p.toLatCol,
+                toLonCol: p.toLonCol,
+                fromCol: p.fromCol || undefined,
+                toCol: p.toCol || undefined,
+                kindCol: p.kindCol || undefined,
+            }),
+        );
+        return foldServerResult(res);
     }
 }
 

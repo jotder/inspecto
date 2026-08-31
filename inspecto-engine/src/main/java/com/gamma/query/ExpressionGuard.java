@@ -33,7 +33,7 @@ public final class ExpressionGuard {
     private ExpressionGuard() {}
 
     // ── The constants below are package-private, not private, so ExpressionGuardContractTest can assert
-    // each one against inspecto-ui/src/app/inspecto/mock/expression-guard.contract.json — the file the
+    // each one against inspecto-ui/src/app/inspecto/contracts/expression-guard.contract.json — the file the
     // Angular inline-feedback mirror IMPORTS. Both sides therefore compare to one checked-in artifact,
     // and a divergence surfaces as a reviewable diff on the contract instead of a form that quietly
     // accepts what the engine will refuse. ⛔ Do not re-narrow the visibility. ──

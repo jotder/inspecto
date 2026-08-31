@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import ATTRIBUTE_CONTRACT from 'app/inspecto/mock/attribute-spec.contract.json';
+import ATTRIBUTE_CONTRACT from 'app/inspecto/contracts/attribute-spec.contract.json';
 
 import { ATTRIBUTE_KEYS, ATTRIBUTE_TIERS, ATTRIBUTE_TYPES } from './attribute-spec';
 

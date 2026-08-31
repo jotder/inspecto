@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import BIND_KINDS from 'app/inspecto/mock/bind-kinds.contract.json';
-import { DERIVED_USE, SUBTYPE_FRONTENDS } from 'app/inspecto/mock/pipeline-editable';
+import BIND_KINDS from 'app/inspecto/contracts/bind-kinds.contract.json';
+import { DERIVED_USE, SUBTYPE_FRONTENDS } from 'app/modules/admin/pipelines/pipeline-editable';
 
 import { bindKindFor } from './pipeline-graph';
 import { PARSE_NODE_FRONTENDS } from './pipeline-parse-definition.component';

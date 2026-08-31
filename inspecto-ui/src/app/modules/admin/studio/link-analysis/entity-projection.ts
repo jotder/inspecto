@@ -10,7 +10,6 @@ import {
 import { InvService, ProjectionTriple } from 'app/inspecto/api';
 import { firstValueFrom } from 'rxjs';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
-import { sampleDatasetRows } from 'app/inspecto/viz/dataset-rows.service';
 
 /**
  * The P3 **entity-projection** GraphSource (GLOSSARY §11): fold a Dataset's rows into a business
@@ -195,24 +194,16 @@ export class EntityProjectionGraphSource implements GraphSource {
     private async queryOne(p: EntityProjection): Promise<ProjectedGraph> {
         if (!p.datasetId) throw new Error('The entity-projection source needs a Dataset mapping.');
         if (!p.sourceCol || !p.targetCol) throw new Error('The mapping needs a source and a target column.');
-        try {
-            const res = await firstValueFrom(
-                this.inv.project({
-                    dataset: p.datasetId,
-                    sourceCol: p.sourceCol,
-                    targetCol: p.targetCol,
-                    linkKindCol: p.linkKindCol || undefined,
-                    attrCols: p.attrCols?.length ? p.attrCols : undefined,
-                }),
-            );
-            return projectTriples(res.rows, res.truncated, p);
-        } catch {
-            // Offline / mock (501) or an older backend: the original client-side sample fold.
-            const ds = await firstValueFrom(this.datasets.get(p.datasetId));
-            const out = projectEntities(sampleDatasetRows(ds), p);
-            if (isProjectionError(out)) throw new Error(out.error);
-            return out;
-        }
+        const res = await firstValueFrom(
+            this.inv.project({
+                dataset: p.datasetId,
+                sourceCol: p.sourceCol,
+                targetCol: p.targetCol,
+                linkKindCol: p.linkKindCol || undefined,
+                attrCols: p.attrCols?.length ? p.attrCols : undefined,
+            }),
+        );
+        return projectTriples(res.rows, res.truncated, p);
     }
 
     /**

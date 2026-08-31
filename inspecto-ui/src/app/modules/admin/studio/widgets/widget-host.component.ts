@@ -196,12 +196,8 @@ export class WidgetHostComponent {
                 sourceName: dataset.sourceName,
                 filters: this.filter(),
             });
-            // Lazily: only the offline branch reads rows, so a live tile never pays for a page it discards.
-            // The spec's own `grains` drives the bucketing, so offline buckets exactly what the live
-            // `/bi/query` body asks the server to DATE_TRUNC.
-            const rows = async () => bucketSpecRows((await this.datasetRows.rows(dataset)).rows, spec.grains);
             this.datasetResult
-                .run(spec, rows, this.colMetas())
+                .run(spec, this.colMetas())
                 .then((res) => {
                     this.runOk.set(res.ok);
                     this.props.set(plugin.transformProps(res.ok ? res.rows : [], widget.controls));

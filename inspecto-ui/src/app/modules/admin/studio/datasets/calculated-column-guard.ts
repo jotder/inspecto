@@ -1,4 +1,4 @@
-import GUARD_CONTRACT from 'app/inspecto/mock/expression-guard.contract.json';
+import GUARD_CONTRACT from 'app/inspecto/contracts/expression-guard.contract.json';
 
 /**
  * Client-side mirror of the backend `com.gamma.query.ExpressionGuard` (DAT-5,
