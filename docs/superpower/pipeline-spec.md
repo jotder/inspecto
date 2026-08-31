@@ -748,7 +748,8 @@ deletes.
 | ~~**13** fan-in (D-6)~~ | ✅ **CLOSED 2026-08-31** — decided by D6, not open work |
 | ~~**12** the post-sync chain's authoring surface~~ | ✅ **CLOSED 2026-08-31** — an ordered-step editor over the `consignment.process` Job's param pair. The engine-side value contract it exposed is **CHAIN-CONFIG-1** |
 | ~~**7** node-type packs~~ | ✅ **CLOSED 2026-08-31** — owner-keyed pack overlay on both node registries; `JobPackManager` loads the two node SPIs. 🔴 The committed-contract gate I claimed for it did not exist |
-| **1** `Batch`→`Consignment` · **15** Phase 6's deletion half | Wave 2 — **the major-bump window**. The last two rows, and the only gate left on the whole board |
+| **1** `Batch`→`Consignment` | Wave 2 — **operator timing (D5)**. ✅ Inventory ready: `pipeline-waves-drain-plan.md` §2.3 — measured scope is **~185 files, not 517**; the data half is already done behind `Csv.LEGACY_HEADERS`; the codemod exclusions (JDBC `addBatch`, the concurrency sense, the ledger's prose name) are listed |
+| **15** Phase 6's deletion half | Wave 2 — 🔴 **a RELEASE EVENT, not the vague "window"**: D-2 requires *converter + one flagged verification minor, then* deletion. The converter exists; **no minor has shipped** (nothing after 3.x has), so deleting now skips the verification window D-2 exists to provide. Not closable by code |
 | **14** D-9 cross-Consignment dedup | Wave 3 — ✅ **DESIGNED 2026-08-31**, `pipeline-waves-drain-plan.md` §3: ledger = a new per-space `OperationalDb.Family` (default `duckdb`, never off) · winner = declared `order_by`, **required** once `scope:` is a window · window advance = a `MaintenanceJob` task aged by **event time, not mtime**. 🔴 Its sharpest risk is named there: a reprocess must **retract** that Consignment's keys or re-ingested rows are permanently suppressed |
 
 🔴 **What the drain actually taught, and what a future reader should not have to re-learn:** of the

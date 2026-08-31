@@ -136,6 +136,65 @@ hashed keys, a PII question; and the concurrency semantics).
 
 ---
 
+## 2.3 The last two rows — why each is blocked, precisely, and what is ready
+
+Both were previously recorded as *"the major-bump window"*, which is true but too vague to act on. §0-A of
+`BRANCHING.md` says **"work goes along `master`; at some point the next major is cut as a release
+branch"** — so a breaking change **landing on `master` is normal here**; the window gates *cutting the
+release*, not the commit. That makes the vague gate the wrong reason for both rows. The real ones:
+
+### Row 15 — Phase 6's deletion half: blocked on a RELEASE EVENT, not on engineering
+
+**D-2 is a three-step sequence, not a bump:** *"Converter + **one flagged verification minor**, then the
+legacy readers are deleted. No permanent dual-format."*
+
+1. ✅ **The converter exists** (`inspecto migrate-configs`, amended `f72f7fc8` 2026-08-18 after its corpus
+   gate caught the `steps:`-spelling blindness).
+2. ⛔ **The flagged verification minor has not shipped** — *nothing after `3.x` has shipped at all*
+   (newest tag `v3.12.0`; `v4.0.0` was deleted with the `4.x` branch on 2026-08-17).
+3. Therefore deleting the legacy readers now **skips the verification window D-2 exists to provide**. It
+   would leave no release in which a deployment could run the new path with the old one still available
+   behind a flag.
+
+⇒ **Nobody can close row 15 by writing code.** It needs a minor to be released with the flag, deployments
+to verify on it, and *then* the deletion. Stating this so the next reader does not re-scope it as work.
+
+### Row 1 — `Batch`→`Consignment`: ready to execute as ONE commit, and here is the inventory
+
+D5: one commit, a codemod, **both** contract regens, ⛔ never drip-fed. What was missing was a safe
+inventory; this is it.
+
+🔴 **The spec's "517 files" does not match the tree.** Measured 2026-08-31: **46 Java files** ·
+**24 UI `.ts` files** · **115 docs** — ~185, plus configs and ledger headers. Scope from a re-measure,
+never from that number.
+
+🔴 **The data-surface half is ALREADY DONE, and it set the pattern.** `Csv.LEGACY_HEADERS` is
+`Map.of("batch_id", "consignment_id")` — the ledger header was renamed with a **read-compat alias** for
+the legacy spelling. So the answer to *"hard break or alias?"* is already recorded in code for the
+persisted surface: **rename, keep a read alias.** The remaining served surface should follow it:
+`GET /runs/{n}/batches` and `GET /provenance/batches` gain the `consignments` spelling with the old path
+still answering.
+
+⛔ **`Batch` is also an ordinary English word, and a blind codemod corrupts three kinds of site.** A
+template codemod has already damaged 84 attributes in this repo once, so the exclusions are the design:
+
+| Site | Why it must NOT be renamed |
+|---|---|
+| `ps.addBatch()` (`DbConsignmentOutputStore:144`, `DbFileStageStore:82`, others) | **JDBC's own API.** Renaming it does not compile. |
+| *"Concurrent batches"*, *"all cores per batch"* (`ConfigSpecs:102,105`) | The **concurrency** sense — `processing.threads`' semaphore permits. Nothing to do with a Consignment. |
+| *"the batches ledger"* prose (`AlertRule:52`, `AlertService:36,377`, `OperationalTables:57`) | Names the **artifact**, whose header rename already happened behind an alias. Decide the artifact's name once, then follow it everywhere — do not let a codemod decide it. |
+
+**The order that makes it verifiable:** rename Java identifiers → regen **both** committed contracts
+(`node-attributes`, `step-types` — a targeted run stays green while the FULL reactor goes red if only one
+is regenerated) → UI `.ts` mirrors → routes with aliases → docs → `node tools/check-vocabulary.mjs`
+(the guard is the arbiter of the canonical word) → full reactor.
+
+⚠ **Still not started deliberately.** D5 fixes the *timing* ("in Phase 7's window… sequenced last for
+blast radius"), and that is an operator decision with its reason recorded, not an engineering gap. This
+section removes the excuse of "we don't know what it touches" — nothing else.
+
+---
+
 ## 3. D-9 — cross-Consignment windowed record dedup, designed
 
 D8 requires exactly three answers before this returns to the board. Here they are, each with the
