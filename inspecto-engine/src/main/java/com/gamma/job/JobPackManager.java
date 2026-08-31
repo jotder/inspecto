@@ -1,6 +1,10 @@
 package com.gamma.job;
 
 import com.gamma.signal.Severity;
+import com.gamma.pipeline.PipelineNodeType;
+import com.gamma.pipeline.PipelineNodeTypes;
+import com.gamma.pipeline.exec.PipelineNodeExecutor;
+import com.gamma.pipeline.exec.PipelineNodeExecutors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,9 +41,13 @@ import static java.nio.file.StandardWatchEventKinds.ENTRY_DELETE;
 import static java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY;
 
 /**
- * Hot-deployable Job Packs (R8, {@code docs/job-framework-design.md} §12). A Job Pack is a single jar
- * dropped into {@code -Djobs.packs.dir} bundling one or more {@link JobTypeProvider}s (SPI +
- * {@link JobTypeMeta}) plus their shaded deps. Each jar loads in its own parent-first
+ * Hot-deployable Job Packs (R8, {@code docs/job-framework-design.md} §12). A Pack is a single jar
+ * dropped into {@code -Djobs.packs.dir} bundling one or more providers plus their shaded deps —
+ * {@link JobTypeProvider}s (SPI + {@link JobTypeMeta}), {@link ExpressionProvider}s, and since
+ * 2026-08-31 {@link PipelineNodeType}s and {@link PipelineNodeExecutor}s (pipeline spec gap 7, whose
+ * remaining half was exactly that a contributed node type had to sit on the classpath at boot). A pack
+ * carrying only ONE of those kinds is valid; the property keeps its {@code jobs.} name so no deployment's
+ * configuration changes. Each jar loads in its own parent-first
  * {@link URLClassLoader} — SPI/API types resolve from the engine, pack-private deps stay isolated — and
  * its providers register into the shared {@link JobTypeRegistry} keyed by the jar filename (the pack's
  * "owner"), so unload/reload touches only that pack's types and never a built-in.
@@ -200,9 +208,20 @@ final class JobPackManager implements AutoCloseable {
             List<ExpressionProvider> exprProviders = new ArrayList<>();
             for (ExpressionProvider p : ServiceLoader.load(ExpressionProvider.class, loader))
                 if (p.getClass().getClassLoader() == loader) exprProviders.add(p);
-            if (providers.isEmpty() && exprProviders.isEmpty())
+            // A pack may also contribute PIPELINE node types and/or their executors (pipeline spec gap 7,
+            // whose remainder was exactly that these were classpath-only). Same rules as the two above:
+            // only this pack's own providers, and the "empty" check spans all four kinds so a pack whose
+            // whole purpose is a node type is not made to ship a Job Type it does not have.
+            List<PipelineNodeType> nodeTypes = new ArrayList<>();
+            for (PipelineNodeType t : ServiceLoader.load(PipelineNodeType.class, loader))
+                if (t.getClass().getClassLoader() == loader) nodeTypes.add(t);
+            List<PipelineNodeExecutor> nodeExecutors = new ArrayList<>();
+            for (PipelineNodeExecutor e : ServiceLoader.load(PipelineNodeExecutor.class, loader))
+                if (e.getClass().getClassLoader() == loader) nodeExecutors.add(e);
+            if (providers.isEmpty() && exprProviders.isEmpty() && nodeTypes.isEmpty() && nodeExecutors.isEmpty())
                 throw new IllegalStateException(
-                        "no JobTypeProvider or ExpressionProvider in META-INF/services");
+                        "no JobTypeProvider, ExpressionProvider, PipelineNodeType or PipelineNodeExecutor "
+                                + "in META-INF/services");
 
             List<String> ids = new ArrayList<>();
             for (JobTypeProvider p : providers) {
@@ -222,6 +241,11 @@ final class JobPackManager implements AutoCloseable {
             // ExpressionRegistry.register is itself fail-closed on a colliding token, and the catch below
             // deregisters both registries — so a pack whose token clashes is rejected whole, never half-in.
             for (ExpressionProvider p : exprProviders) expressions.register(p, name);
+            // Node types before executors: a type refused (a built-in discriminator, or one another pack
+            // owns) must reject the pack BEFORE any executor is registered, and the catch below takes both
+            // overlays back — so a pack is never half-registered into the pipeline vocabulary.
+            for (PipelineNodeType t : nodeTypes) PipelineNodeTypes.register(t, name);
+            for (PipelineNodeExecutor e : nodeExecutors) PipelineNodeExecutors.register(e, name);
 
             String[] mf = manifest(jar);
             LoadedPack pack = new LoadedPack(mf[0] != null ? mf[0] : name, mf[1] != null ? mf[1] : "?",
@@ -232,7 +256,9 @@ final class JobPackManager implements AutoCloseable {
             return true;
         } catch (Exception | ServiceConfigurationError ex) {   // Error: a provider that fails to instantiate
             registry.deregister(name);                                  // roll back any partial registration
-            expressions.deregister(name);                               // both registries, or the pack half-loads
+            expressions.deregister(name);                               // all four registries, or the pack
+            PipelineNodeTypes.deregister(name);                         // half-loads — a refused node type
+            PipelineNodeExecutors.deregister(name);                     // must not leave an executor behind
             if (loader != null) try { loader.close(); } catch (IOException ignore) { /* best effort */ }
             if (staged != null) try { Files.deleteIfExists(staged); } catch (IOException ignore) { /* best effort */ }
             log.warn("[PACKS] rejected {}: {}", name, ex.toString());
@@ -249,6 +275,10 @@ final class JobPackManager implements AutoCloseable {
         if (pack == null) return;
         List<String> removed = registry.deregister(name);
         List<String> removedTokens = expressions.deregister(name);
+        // ⚠ A stored pipeline naming an unloaded node type stops loading — the same exposure a Job typed
+        // on an unloaded pack already has, which is why a pack is normally REPLACED rather than removed.
+        PipelineNodeTypes.deregister(name);
+        PipelineNodeExecutors.deregister(name);
         log.info("[PACKS] unloaded {} ({}): {}{}", pack.id(), name, removed,
                 removedTokens.isEmpty() ? "" : " + tokens " + removedTokens);
         signals.emit("job.pack.unloaded", Severity.INFO, packPayload(pack));

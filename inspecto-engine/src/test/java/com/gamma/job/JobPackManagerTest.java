@@ -156,6 +156,59 @@ class JobPackManagerTest {
         }
     }
 
+    /**
+     * Pipeline spec gap 7's actual remainder: a pack carrying ONLY a {@code PipelineNodeType} — no Job
+     * Type, no Expression — loads, its type becomes authorable, and removing the jar takes it back.
+     *
+     * <p>🔴 Before this, {@code PipelineNodeTypes} was a {@code static final} map built once at class-load,
+     * so a contributed node type had to be on the classpath at boot. The gap was never the SPI (which
+     * `StepKindRegistry` already honoured) — it was the deployment path.
+     */
+    @Test
+    void aPackContributesAPipelineNodeTypeAndTakesItBackOnUnload(@TempDir Path work) throws Exception {
+        assumeTrue(ToolProvider.getSystemJavaCompiler() != null, "needs a JDK (javac) to build the pack jar");
+        Path packsDir = Files.createDirectories(work.resolve("packs"));
+        Path jar = buildNodeTypePackJar(work, packsDir.resolve("acme-node-1.jar"), "transform.redact",
+                "RedactNodeType", "acme.redact");
+
+        JobTypeRegistry registry = new JobTypeRegistry();
+        ExpressionRegistry expressions = ExpressionRegistry.withBuiltins();
+        Sink sink = new Sink();
+        try (JobPackManager mgr = new JobPackManager(packsDir.toString(), registry, expressions, sink)) {
+            try {
+                mgr.scanAtStartup();
+
+                assertTrue(com.gamma.pipeline.PipelineNodeTypes.isKnown("transform.redact"),
+                        "a node-type-only pack is a valid pack");
+                assertEquals("acme-node-1.jar",
+                        com.gamma.pipeline.PipelineNodeTypes.ownerOf("transform.redact").orElseThrow());
+                assertTrue(sink.types.contains("job.pack.loaded"));
+                // The authoring surface the type exists for: the served step catalog offers it, so the
+                // palette can. (`StepKindRegistry.current()` — the parser's load-time gate — is
+                // package-private in com.gamma.etl and delegates to the same registry.)
+                assertTrue(com.gamma.pipeline.PipelineProjection.stepCatalog().stream()
+                                .anyMatch(e -> "transform.redact".equals(e.get("type"))),
+                        "a contributed type must reach the served step catalog");
+
+                Files.delete(jar);
+                mgr.rescan();
+
+                assertFalse(com.gamma.pipeline.PipelineNodeTypes.isKnown("transform.redact"),
+                        "unload takes the pack's node type back with it");
+                assertTrue(com.gamma.pipeline.PipelineProjection.stepCatalog().stream()
+                                .noneMatch(e -> "transform.redact".equals(e.get("type"))),
+                        "…and the served catalog stops offering it");
+                for (com.gamma.pipeline.BuiltinNodeType b : com.gamma.pipeline.BuiltinNodeType.values())
+                    assertTrue(com.gamma.pipeline.PipelineNodeTypes.isKnown(b.type()),
+                            "and leaves the built-ins alone: " + b.type());
+            } finally {
+                // Static registries outlive this test; a leak would show another suite a type that does
+                // not exist in a stock build.
+                com.gamma.pipeline.PipelineNodeTypes.deregister("acme-node-1.jar");
+            }
+        }
+    }
+
     @Test
     void aPackContributesAnExpressionTokenAndTakesItBackOnUnload(@TempDir Path work) throws Exception {
         assumeTrue(ToolProvider.getSystemJavaCompiler() != null, "needs a JDK (javac) to build the pack jar");
@@ -337,6 +390,26 @@ class JobPackManagerTest {
 
     /** Compile an {@link ExpressionProvider} declaring {@code token} (and nothing else) into a real pack
      *  jar — the "a plugin adds vocabulary" case, with no Job Type in the pack at all. */
+    /** Compile a {@link com.gamma.pipeline.PipelineNodeType} and package it as a node-type-only pack. */
+    private static Path buildNodeTypePackJar(Path work, Path jar, String nodeType, String cls, String packId)
+            throws Exception {
+        String fqcn = "com.acme.pack." + cls;
+        String src = """
+                package com.acme.pack;
+                import com.gamma.pipeline.PipelineNodeType;
+                public class %s implements PipelineNodeType {
+                    public String type() { return "%s"; }
+                    public String label() { return "Redact"; }
+                }
+                """.formatted(cls, nodeType);
+
+        // `compile` builds against the com.gamma.job code-source location — the same jar/classes dir that
+        // holds com.gamma.pipeline, so the node-type SPI resolves without a second classpath entry.
+        Path classes = compile(work, "com/acme/pack/" + cls + ".java", src);
+        writeJar(jar, classes, packId, Map.of("com.gamma.pipeline.PipelineNodeType", fqcn));
+        return jar;
+    }
+
     private static Path buildExpressionPackJar(Path work, Path jar, String token, String cls, String packId)
             throws Exception {
         String fqcn = "com.acme.pack." + cls;

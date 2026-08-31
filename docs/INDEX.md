@@ -121,10 +121,12 @@ former root reference docs** (each index lists them):
   (`elt-final-amendment-plan.md`, already ~90% shipped) and treat the token model as its next step.
   **Waves 0 and 1 DRAINED 2026-08-31 — 11 of 17 items**, and **Wave 2 re-grounded the same day**: rows
   **11** (the `steps:` authoring surface — the Recipe view's step cards ARE that editor) and **13**
-  (fan-in, decided by D6) are **CLOSED**, row **7** was two-thirds refuted, and Wave 3's row **14** is
-  **DESIGNED**. Still in flight because what remains is **one gate**: rows 1, 7 and 15 all wait on the
-  major-bump window, and row 12 (the post-sync chain's authoring surface) on a UX design. See
-  [`superpower/pipeline-waves-drain-plan.md`](superpower/pipeline-waves-drain-plan.md). As-built facts from the drain live in
+  (fan-in, decided by D6) were already **CLOSED** and mis-recorded; rows **12** (an ordered-step editor
+  for the post-sync chain) and **7** (node-type packs hot-load through an owner-keyed pack overlay) were
+  **BUILT the same day**, and Wave 3's row **14** (D-9) is **DESIGNED**, satisfying D8's three
+  conditions. Still in flight for exactly **two rows on one gate**: **1** (`Batch`→`Consignment`) and
+  **15** (Phase 6's deletion half) both wait on the **major-bump window** — a release call, not a design
+  gap. See [`superpower/pipeline-waves-drain-plan.md`](superpower/pipeline-waves-drain-plan.md). As-built facts from the drain live in
   [`okf/backend/control-plane/pipeline-related.md`](okf/backend/control-plane/pipeline-related.md)
   (gap 5) and [`okf/backend/control-plane/metadata-bundle.md`](okf/backend/control-plane/metadata-bundle.md)
   (gap 6); the one item it opened rather than closed is **BUNDLE-SCHEMA-1** in `BACKLOG.md` §6.

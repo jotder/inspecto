@@ -16,7 +16,7 @@ table says.** Each finding below is from the code, not from a note about the cod
 |---|---|---|
 | **11** `steps:` has no authoring surface | *"A chain is authored as a comma-separated `processor` string plus a positionally-aligned JSON array the author keeps aligned by hand."* | 🔴 **Two different subsystems, conflated.** The pipeline `steps:` block **has** an ordered chain editor, live and wired: `<app-pipeline-step-cards>` (`pipeline-editor.component.html:492`, `[editable]="canAuthor()"`) renders one card per Step in chain order, with insert-between, remove, **move up/down**, and nested `route` branches. Order is node order and lowers to `steps:` at `pipeline-editable.ts:757`. **The quoted `processor`-string pain is row 12's subject, not row 11's** — see below. ⇒ **Row 11 is SHIPPED.** |
 | **12** post-sync chain invisible in the editor | one surface serves both (D7) | The post-sync lane is **not the `steps:` model at all**: it is a `consignment.process` **Job Type** (`ConsignmentProcessJobType`, `TYPE_ID = "consignment.process"`), configured as **Job params** — `processor` (a comma-separated chain of `ConsignmentProcessor` ids) plus `chain_config`, *"array of `{"config": {…}}` objects **positionally aligned** with the `processor` chain"*. **That** is the hand-alignment pain. ⇒ Row 12 is real, and its home is the **Job** surface, not the pipeline canvas. |
-| **7** no plugin can add a Step type | *"the SPI is real but unused, and the deployment story is classpath-only"* | 🔴 **Two of three clauses refuted.** A plugin step type **is** authorable — `StepKindRegistry` (ServiceLoader seam, `inspecto-etl`, provider `NodeTypeStepKinds` in `inspecto-engine`) admits a contributed kind at parse time, and a CONTRIBUTED node type lowers to a `steps:` entry (open-dag §11 Stage 5, shipped 2026-08-29). "Unused" is false: `packs-dev/{acme.masker,acme.reconcile,acme.redact}` plus `tools/templates/{nodetype,processor,job}`. **The third clause is exactly true and is the whole remainder:** `JobPackManager` (`-Djobs.packs.dir`, hot rescan via `POST /jobs/packs/rescan`) loads **only** `JobTypeProvider` and `ExpressionProvider`, and *rejects a pack carrying neither*. A node-type pack (`PipelineNodeType` + `PipelineNodeExecutor`, which `tools/templates/nodetype` scaffolds) therefore has **no hot-load path** and must sit on the classpath. |
+| **7** no plugin can add a Step type | *"the SPI is real but unused, and the deployment story is classpath-only"* | 🔴 **Two of three clauses refuted.** A plugin step type **is** authorable — `StepKindRegistry` (ServiceLoader seam, `inspecto-etl`, provider `NodeTypeStepKinds` in `inspecto-engine`) admits a contributed kind at parse time, and a CONTRIBUTED node type lowers to a `steps:` entry (open-dag §11 Stage 5, shipped 2026-08-29). "Unused" is false: `packs-dev/{acme.masker,acme.reconcile,acme.redact}` plus `tools/templates/{nodetype,processor,job}`. **The third clause was exactly true and was the whole remainder — now SHIPPED (§2.2):** `JobPackManager` (`-Djobs.packs.dir`, hot rescan via `POST /jobs/packs/rescan`) loads **only** `JobTypeProvider` and `ExpressionProvider`, and *rejects a pack carrying neither*. A node-type pack (`PipelineNodeType` + `PipelineNodeExecutor`, which `tools/templates/nodetype` scaffolds) therefore has **no hot-load path** and must sit on the classpath. |
 | **13** fan-in canvas-only | gated on §11 | **Decided, not open** — §13 **D6** keeps it canvas-only, and says a token model is *not* a reason to overturn it speculatively. ⇒ No work; a closed row. |
 | **1** `Batch`→`Consignment` · **15** Phase 6 deletion half | major-bump window | Unchanged and **operator-gated**. D5: one commit, 517 files, 39 `@PublicApi` types, in Phase 7's window. D2 puts the token *runtime* model and the Step SPI shape-change in the same window (they break two committed contracts). ⛔ Not a design gap — a release decision. |
 | **14** D-9 cross-Consignment dedup | Wave 3, named not designed | Confirmed: **nothing reads a `scope:`/`window()` key anywhere**. D8 says it returns with three answers. §3 below is that design pass. |
@@ -39,7 +39,7 @@ relabel it: the honest gap is *"no ITEM schema facility in FieldSpec"*, not *"ga
 
 | # | Work | Gate | Where |
 |---|---|---|---|
-| **A** | Node-type packs load through the packs dir (row 7's true remainder) | ⛔ **the major-bump window** — see below | `JobPackManager` + the node-type registry |
+| **A** | Node-type packs load through the packs dir (row 7's true remainder) | ✅ **SHIPPED** — the gate was my error, see §2.2 | `JobPackManager` + both node registries |
 | **B** | A structural editor for the post-sync chain — `processor` + `chain_config` aligned by construction (row 12) | ✅ **SHIPPED** — see §2.1 | the Job surface |
 | **C** | The D-9 design pass: where the ledger persists · winner policy · window advance (row 14) | **none** to *design*; building it is separate | §3 below |
 | **D** | `Batch`→`Consignment` (row 1) · Phase 6's deletion half (row 15) · D2's runtime token model + Step SPI | ⛔ **the major-bump window — operator** | — |
@@ -84,29 +84,55 @@ deliberately not invented here.
 was checked against the engine's own descriptor constants, not a mock, because a mocked param name is
 exactly how a feature ships as dead code.
 
-### 🔴 A is gated too — found after this table was first written, by reading the loader
+### 🔴 2.2 A — SHIPPED, and the gate I claimed for it was WRONG
 
-The first draft of this plan called A ungated. **That was wrong, and the reason matters.**
-`PipelineNodeTypes.REGISTRY` is a `private static final Map` loaded **once** at class-init by
-`ServiceLoader` on the system classloader — no owner key, no deregister, nothing the pack loader's
-`register(p, owner)`/`deregister(owner)` pattern can attach to. That alone is an architecture change
-rather than a slice. **What actually gates it:** `PipelineProjection` builds the served
-**node-attributes** *and* **step-types** catalogs from `PipelineNodeTypes.catalog()`, and
-`NodeAttributesContractTest` / `StepTypesContractTest` **byte-compare** both against committed JSON.
-Hot-loadable node types would make a committed contract vary with whatever jars happen to sit in the
-packs dir — which is the *same* constraint §13 **D2** cites when it defers the Step SPI to the major
-window ("*the full model plus the Step SPI, since it breaks two committed contracts*"). ⇒ Row 7's
-remainder belongs in that window with rows 1 and 15, and this plan does not build it.
+This plan first called A ungated, then **corrected itself to "major-bump window"**, then had to correct
+that correction. The wrong step is worth keeping, because it is the same mistake this whole document is
+about: **I reasoned from a description of the contract tests instead of reading them.**
 
-⚠ A narrower, ungated alternative exists and is **not** recommended without an operator call: teach
-the loader node-type packs but require a **restart** (no hot unload), leaving the contracts static per
-boot. That trades the packs dir's whole point (hot deploy) for one class of provider, so it should be
-decided deliberately, not slipped in.
+The claim was: hot-loadable node types would make the **node-attributes** and **step-types** committed
+contracts vary with whatever jars sit in the packs dir, so row 7 belongs in D2's window. Both halves are
+false:
 
-🔴 **So "complete all Waves" cannot be reached by engineering alone.** Only **B** and **C** are
-ungated — they close rows 12 and 14. Rows **1, 7 and 15** are all *decided* and wait on a major-bump
-window being cut, which is a release call, not an engineering one. Rows **11** and **13** are already
-closed (§1). That is the honest shape, and the gate is the same single gate for all three.
+- `NodeAttributesContractTest` compares `NodeAttributes.wireMap()` — a **static Java table**. A plugin
+  type is not in it and cannot drift it.
+- `StepTypesContractTest` does read `PipelineProjection.stepCatalog()`, but its own comment says the test
+  *"runs with none on it, so `stepCatalog()` here is exactly the verb table"* — **the authors already
+  accounted for plugin types being additive at runtime.** A deployment serving more types than the repo's
+  test JVM is what a plugin IS, and `ParserPlugin`'s served catalog has worked that way for months.
+
+**What shipped.** Both node registries gained an owner-keyed **pack overlay** — `register(type, owner)` /
+`deregister(owner)`, mirroring `JobTypeRegistry`'s contract, read through a volatile copy-on-write
+snapshot so `isKnown`/`get` stay lock-free. `JobPackManager` now discovers `PipelineNodeType` and
+`PipelineNodeExecutor` from a pack jar, includes them in the "pack contributes nothing" check (so a
+node-type-only pack is valid), registers types **before** executors, and takes both overlays back on
+unload *and* on the rejection path — a pack is never half-registered into the pipeline vocabulary.
+
+**Two rules that differ on purpose, each pinned by a test:**
+
+- ⛔ **A pack may NOT redefine a built-in node type.** A classpath provider still may — that is an edition
+  specialising the core at build time, reviewed and shipped together. A jar dropped in a directory
+  silently redefining `sink.persistent` would change what every existing pipeline means.
+- ✅ **A pack MAY specialise a built-in verb's executor**, because that is what `RowShaper` consults that
+  registry for, and refusing it removes the one thing a processing pack is for.
+
+⚠ **Unloading a pack makes its types unknown, so a stored pipeline naming one stops loading** — the same
+exposure a Job typed on an unloaded pack already has, and the reason a pack is normally replaced rather
+than removed. Stated, not fixed.
+
+**Verified:** `JobPackManagerTest` 8 → **9** tests (the new one compiles a `PipelineNodeType` with javac,
+jars it, and loads it through the real manager — 0 skipped, so it genuinely ran), plus 9 new registry
+tests, with **both contract tests still green**: 29/0/0/0. **Falsified:** drop the `PipelineNodeTypes.register`
+call and the pack test fails with *"a node-type-only pack is a valid pack ==> expected: <true> but was:
+<false>"*.
+
+🔴 **What is genuinely left.** A (row 7), B (row 12) and C (row 14's design) are **done**; rows 11
+and 13 were already closed (§1). **Two rows remain, both on one gate: the major-bump window** — row 1
+(`Batch`→`Consignment`, D5: one commit, 517 files, 39 `@PublicApi` types) and row 15 (Phase 6's deletion
+half). Neither is a design gap and neither is mine to schedule: D5 names the window explicitly, and row
+15's gate protects **deployed 3.x configs** whose legacy read path would vanish. Row 14 is now
+*schedulable* but not built — building it needs two answers only the operator can give (§3.5: verbatim vs
+hashed keys, a PII question; and the concurrency semantics).
 
 ---
 
