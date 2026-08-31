@@ -822,6 +822,41 @@ W1's retirement of 2026-07-31 accurately. What nobody checked was that
 `grammar/<id>`. **The lesson: a retirement is only current if nothing re-admitted it — check the
 declaring site, not the note about it.**
 
+**SATELLITE-WRITE-1 — the editor WRITES a pipeline's satellite config to the write root, not beside the
+pipeline (2026-08-31).** The unfixed other half of MOCK-GONE-1(a). That row fixed the **read** side
+(`ConfigFileSupport.resolveSatelliteForRead`); the write side was named there but deliberately not touched,
+because it was ungrounded at the time. **It is now grounded — by its own output sitting in this checkout.**
+
+🔴 **Evidence, reproducible today.** `spaces/default/config/` holds two UNTRACKED files at the config
+**root**: `csv_example_schema.toon` and `csv_example_mapping.csv`. The pipeline that owns them is
+`spaces/default/config/csv_example/csv_example_pipeline.toon`, whose
+`schema_file: spaces/default/config/csv_example/csv_example_schema.toon` names the **tracked** schema in the
+per-pipeline subdirectory. The two root files are a **different-content duplicate pair that nothing
+references** — left behind when someone opened that pipeline in the editor and applied. Cause:
+`pipeline-parse-definition.component.ts` calls `configApi.write('schema', …, {overwrite: true})` with **no
+`subdir`**, and `ConfigService.write` posts to `/config/write`, which resolves against the write root.
+
+🔴 **This actively POISONS the read fix, which is why it matters more than a stray file.**
+`resolveSatelliteForRead` only falls through to the pipeline's directory when the **convention path
+misses**. With a stray root-level `csv_example_schema.toon` present, `GET /config/schema/csv_example_schema`
+hits the root copy first and the editor reads **the wrong schema** — silently, and with the pipeline's real
+one untouched. So the write bug does not merely litter: it makes the drawer edit a file the engine never
+executes. ⚠ The read fix is still correct on a clean tree; the two defects compose badly.
+
+**The fix needs the pipeline's subdir plumbed, which the UI does not model at all** — `grep -rn "subdir"
+inspecto-ui/src/app/modules/admin/pipelines/` returns nothing. The server knows: `readConfig` already
+returns `path` relative to the write root (e.g. `csv_example/csv_example_schema.toon`), and
+`ConfigService.write`/`patch` already **accept** a `subdir`. So the shape is: carry the pipeline's own
+directory (from `read('pipeline', id).path`, or a new field on `PipelineSummary`) into the parse-definition
+pane and pass it on both read and write. ⛔ Do **not** "fix" this by widening
+`resolveSatelliteForRead` to the write path — a read that finds the wrong file shows wrong data; a WRITE
+that does destroys the right one.
+
+⚠ **Do not commit the two untracked files.** They are bug output: orphaned, unreferenced, and
+content-divergent from the schema the pipeline actually runs. Deleting them is the correct cleanup, but
+they predate this shift and are not this shift's to remove — and while they exist, the read path on
+`csv_example` is wrong.
+
 **~~MOCK-GONE-1~~ — three defects the offline mock was hiding — ALL THREE FIXED 2026-08-31.**
 Found in the end-user test after the mock backend was deleted
 (`archived-documents/plans-archive/mock-backend-removal-plan.md`). ⚠ **All three are PRE-EXISTING** — every one is on a code
