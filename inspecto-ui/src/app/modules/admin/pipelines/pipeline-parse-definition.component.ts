@@ -621,6 +621,21 @@ export class PipelineParseDefinitionComponent {
      * destroyed — the partitions[] data-loss lesson, generalised to unknown/future keys.
      */
     private schemaExtras: Record<string, unknown> = {};
+
+    /**
+     * The three NAMES a stored schema declares, retained across an edit.
+     *
+     * <p>🔴 `mapping.canonicalName` is not decoration — `PipelineLift` reads it as the pipeline's declared
+     * output **store** (falling back to the pipeline name), which is the join key a downstream job,
+     * enrichment or Dataset matches its source against, and what `GET /pipelines` reports as `produces`.
+     * `raw.name` is the RAW/source identity that `BatchProcessor.resolvedSchema` matches a selector or
+     * segment descriptor by. This pane used to rebuild all three from the schema FILE's name, so an Apply
+     * silently renamed the store from `csv_example` to `csv_example_schema` and broke every downstream
+     * binding — measured on a fresh boot: `produces` flipped with it. All eleven committed schemas
+     * declare `canonicalName` = the PIPELINE name, and `raw.name` as a separate source identity
+     * (`ORDERS`, `CALL`, `SITES`), so the file name was never the convention.
+     */
+    private schemaIdentity: { rawName?: string; canonicalName?: string; mappingRawName?: string } = {};
     /** What a partition may derive from: the schema's INCLUDED field names. */
     readonly schemaFieldNames = computed(() =>
         this.schemaSeed()
@@ -1083,6 +1098,7 @@ export class PipelineParseDefinitionComponent {
      */
     private loadSavedSchema(): void {
         this.schemaExtras = {}; // a re-seed must not carry a previous node's stored keys
+        this.schemaIdentity = {}; // …nor a previous node's declared names
         if (!this.authorsSchema() || !this.existingSchemaFile()) return;
         this.schemaLoading.set(true);
         this.configApi.read('schema', this.schemaName(), this.satelliteSubdir()).subscribe({
@@ -1099,6 +1115,14 @@ export class PipelineParseDefinitionComponent {
                 delete extras['partitions'];
                 delete extras['partitionKey'];
                 this.schemaExtras = extras;
+                // Retain the declared names too, and BEFORE the no-fields early return below: the draft
+                // must re-emit them rather than rebuild them from the file name (see `schemaIdentity`).
+                const storedMapping = (r.config?.['mapping'] ?? {}) as Record<string, unknown>;
+                this.schemaIdentity = {
+                    rawName: declaredName(raw['name']),
+                    canonicalName: declaredName(storedMapping['canonicalName']),
+                    mappingRawName: declaredName(storedMapping['rawName']),
+                };
                 const fields = Array.isArray(raw['fields']) ? (raw['fields'] as Record<string, unknown>[]) : [];
                 if (!fields.length) return;
                 this.schemaSeed.set(
@@ -1454,12 +1478,20 @@ export class PipelineParseDefinitionComponent {
         const partitions = this.partitionsEditor?.value() ?? this.partitionSeed();
         const fields = this.withMetadata(grid.value());
         const name = this.schemaName();
+        // The declared names: what the stored schema says, else the PIPELINE name — never the schema
+        // file's name, which is what silently renamed the output store (see `schemaIdentity`). The file
+        // name survives only as the last resort, for a host that knows no pipeline (the custody dialog),
+        // where emitting a blank would be worse than today's behaviour.
+        const identity = this.pipelineName().trim() || name;
+        const rawBlockName = this.schemaIdentity.rawName ?? identity;
+        const canonicalName = this.schemaIdentity.canonicalName ?? identity;
+        const mappingRawName = this.schemaIdentity.mappingRawName ?? rawBlockName;
         const draft = {
             // Unmodeled stored keys ride along first, so every modeled key below wins.
             ...this.schemaExtras,
             ...(partitions.length ? { partitions } : {}),
             raw: {
-                name,
+                name: rawBlockName,
                 format: 'CSV',
                 // §4.4: the Auto/Declared marker rides the schema companion (additive, ETL-ignored);
                 // in Auto the written types ARE the inferred snapshot — declared = inferred by
@@ -1476,8 +1508,8 @@ export class PipelineParseDefinitionComponent {
                 })),
             },
             mapping: {
-                canonicalName: name,
-                rawName: name,
+                canonicalName,
+                rawName: mappingRawName,
                 rules: fields.map((f) => ({ targetColumn: f.name, sourceExpression: f.name })),
             },
         };
@@ -1547,6 +1579,12 @@ export class PipelineParseDefinitionComponent {
  * server's own phrase because the route returns no machine code for it; a wrong match here would
  * offer a destructive "replace" for an unrelated error, so it is deliberately narrow.
  */
+/** A name a stored schema declares, or `undefined` when it declares none — never a blank string. */
+function declaredName(v: unknown): string | undefined {
+    const t = String(v ?? '').trim();
+    return t || undefined;
+}
+
 function isBackwardRefusal(e: unknown): boolean {
     const err = e as { status?: number; error?: { error?: { message?: string } } };
     if (err?.status !== 422) return false;

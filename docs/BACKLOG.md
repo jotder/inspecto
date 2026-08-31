@@ -872,11 +872,8 @@ the real one declares `ORDER_ID…NOTE`, which made the proof unambiguous:
 renders the real columns with none of the garbage; an Apply wrote schema + `_mapping.csv` into
 `config/csv_example/` and left both root strays **byte-identical** (md5 unchanged).
 
-⚠ **Observed while verifying, NOT diagnosed — do not treat as a filed cause.** That Apply also rewrote
-`raw.name` and `mapping.canonicalName`/`rawName` from `csv_example` to `csv_example_schema` (the
-file-derived name), alongside the expected `partitionKey`→`partitions[]` migration and the mapping split.
-`canonicalName` names the output, so if that rewrite is real it is worth its own row — but it was seen in
-one Apply on one sample and the sample was restored, so it needs grounding before anyone acts on it.
+✅ **The rewrite noticed while verifying this row was GROUNDED and FIXED the same day** — it is now
+**SCHEMA-NAME-1** below, not a footnote here.
 
 ⚠ **The two untracked root files are still there, deliberately.** They are bug output (orphaned,
 unreferenced, content-divergent) and deleting them is still the correct cleanup, but they predate this
@@ -3000,6 +2997,44 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   `ControlApiEventsTest.eventsFeedSearchDetailAndExport` (real HTTP: base header exact-matched for a
   non-audit filter; audit header exact-matched against `AuditAttrs.ALL`; `actor`/`action` values
   asserted present). Runbook §3 and matrix G10 updated in the same change. `EventRoutes.eventsCsv`.
+
+**~~SCHEMA-NAME-1~~ — the Parse pane rebuilt a schema's declared names from its FILE name, renaming the
+pipeline's output store — ✅ FIXED 2026-08-31.** Noticed while verifying SATELLITE-WRITE-1 (an Apply on
+`csv_example` rewrote `csv_example` → `csv_example_schema`), then grounded rather than assumed.
+
+🔴 **It is not cosmetic: `mapping.canonicalName` IS the pipeline's declared output store.**
+`PipelineLift.emitSinks` uses it for the sink's `store` — the join key a downstream job, enrichment or
+Dataset matches its source against — falling back to the pipeline name, and `PipelineLift` line 180 uses
+it for the Stage-2 landed-store source too. **Measured, not reasoned:** changing *only*
+`canonicalName`/`rawName` in `csv_example_schema.toon` and rebooting flipped the lifted sink from
+`store: csv_example` to `store: csv_example_schema` and `GET /pipelines` from `produces: ["csv_example"]`
+to `["csv_example_schema"]`. So an Apply silently renamed the store and broke every downstream binding.
+
+⚠ **The first measurement was WORTHLESS and said the opposite.** Re-reading `graph/raw` without a restart
+returned the pipeline registered at BOOT — the map node still reported the old `canonicalName` — so the
+store looked unchanged. A lift-time question needs a fresh process; check that the response reflects the
+edit before believing it.
+
+**The convention was already unambiguous** — all **eleven** committed schemas declare `canonicalName` = the
+**pipeline** name (`orders`, `csv_example`, `payments`, `sites`, …), never `<pipeline>_schema`; and `raw.name`
+is a *separate* raw/source identity, often uppercase (`ORDERS`, `CALL`, `SITES`). The pane used
+`schemaName()` — the schema FILE's name — for all three keys. Fixed by retaining what the stored schema
+declares and defaulting to the pipeline name; the file name survives only as a last resort for a host that
+knows no pipeline (the custody dialog), where a blank would be worse.
+
+⚠ **`raw.name` is load-bearing for selector/segment pipelines** — `BatchProcessor.resolvedSchema` matches a
+descriptor by it. It returns immediately for a *single* schema, so the flat case was safe either way, and
+per-segment schemas keep their own naming path (`schemaNameFor(key)`). Retaining the stored value is what
+makes both safe.
+
+⚠ **Both new tests were falsified**: reverting the three names to the file-derived value fails exactly
+them and nothing else. Nothing pinned the old behaviour, which is how it drifted.
+
+⚠ **Pre-existing configs written by the old code still carry the wrong name** — any pipeline created
+through the UI before this fix declares `canonicalName: <pipeline>_schema`, so it `produces` a store whose
+name nothing else uses. **Hypothesis, NOT verified:** that mismatch may be part of why
+**CATALOG-DS-COLUMNS-1**'s auto-registered Dataset resolves nothing — it is registered with
+`sourceName: <pipeline>`. Check the two together; do not assume one causes the other.
 
 ## 7. Docs & ongoing
 

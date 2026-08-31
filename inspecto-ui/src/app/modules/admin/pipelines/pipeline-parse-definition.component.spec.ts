@@ -186,6 +186,8 @@ let savedPartitions: Record<string, unknown>[] | null = null;
 let savedLegacyPartitionKey: string | null = null;
 /** Foreign top-level keys the stored schema toon carries — the unmodeled-key round-trip fixture. */
 let savedForeignKeys: Record<string, unknown> | null = null;
+/** A stored `mapping:` block, so a test can pin that its declared names survive an Apply. */
+let savedMapping: Record<string, unknown> | null = null;
 /** S4/D7: what the destructive re-derive confirm answers. */
 let confirmAnswer = true;
 
@@ -255,6 +257,7 @@ async function create(
                                       ...(savedPartitions ? { partitions: savedPartitions } : {}),
                                       ...(savedLegacyPartitionKey ? { partitionKey: savedLegacyPartitionKey } : {}),
                                       ...(savedForeignKeys ?? {}),
+                                      ...(savedMapping ? { mapping: savedMapping } : {}),
                                   },
                               }),
                 },
@@ -1314,6 +1317,54 @@ describe('PipelineParseDefinitionComponent', () => {
             } finally {
                 savedForeignKeys = null;
             }
+        });
+
+        /**
+         * 🔴 `mapping.canonicalName` is the pipeline's declared output STORE — `PipelineLift` reads it
+         * (falling back to the pipeline name) for the sink's `store`, which is the join key a downstream
+         * job/enrichment/Dataset matches against and what `GET /pipelines` reports as `produces`. This
+         * pane rebuilt all three names from the schema FILE's name, so an Apply renamed the store from
+         * `csv_example` to `csv_example_schema` and broke every downstream binding. Measured on a fresh
+         * boot: changing canonicalName alone flipped `produces` with it. All eleven committed schemas
+         * declare canonicalName = the PIPELINE name, and `raw.name` as a separate source identity.
+         */
+        it('re-emits the names the stored schema declares, never the schema file’s name', async () => {
+            savedMapping = { canonicalName: 'cdr_landed', rawName: 'CDR' };
+            try {
+                const fixture = await create(delimitedNode(), [], 0, null, 'cdr');
+                pane(fixture).submit();
+                fixture.detectChanges();
+                expect(schemaWrites).toHaveLength(1);
+                const config = schemaWrites[0].config;
+                const mapping = config['mapping'] as Record<string, unknown>;
+                expect(mapping['canonicalName']).toBe('cdr_landed');
+                expect(mapping['rawName']).toBe('CDR');
+                // The stored raw/source identity survives too — the samples use e.g. ORDERS / CALL there.
+                expect((config['raw'] as Record<string, unknown>)['name']).toBe('record');
+            } finally {
+                savedMapping = null;
+            }
+        });
+
+        /**
+         * The DEFAULT arm: a stored schema that declares no `mapping:` at all. The declared store name
+         * then falls back to the PIPELINE name — matching every committed sample and the engine's own
+         * fallback — and NOT to `<pipeline>_schema`, which is merely the file this pane happens to write.
+         * ⚠ Deliberately exercised through a stored schema so a write always happens: gating the
+         * assertions on `schemaWrites.length` would let this pass vacuously.
+         */
+        it('falls back to the pipeline name, not the file name, when the schema declares no mapping', async () => {
+            const fixture = await create(delimitedNode(), [], 0, null, 'cdr');
+            pane(fixture).submit();
+            fixture.detectChanges();
+            expect(schemaWrites).toHaveLength(1);
+            const config = schemaWrites[0].config;
+            // 'cdr', never 'cdr_schema' — which is what `schemaName()` yields and what used to be written.
+            expect((config['mapping'] as Record<string, unknown>)['canonicalName']).toBe('cdr');
+            // `raw.name` is stored ('record'), so it is retained rather than defaulted — and
+            // `mapping.rawName`, absent from the store, follows the raw identity rather than the file.
+            expect((config['raw'] as Record<string, unknown>)['name']).toBe('record');
+            expect((config['mapping'] as Record<string, unknown>)['rawName']).toBe('record');
         });
 
         it('modeled keys win over a stored duplicate (a stale stored raw cannot shadow the edit)', async () => {
