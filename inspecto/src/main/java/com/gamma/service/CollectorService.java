@@ -302,8 +302,10 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     /**
      * @param statusStore the read surface for the Control API + observability. When this
      *                    is a {@link DbStatusStore}, the service projects the on-disk audit
-     *                    into it at startup and after each poll cycle; {@code null} falls
-     *                    back to the file-backed store (the on-disk audit read directly).
+     *                    into it at startup, after each poll cycle, and after each TRIGGERED
+     *                    run ({@link #runPipeline} — added 2026-08-31; that last one was the
+     *                    freshness gap that made a DB-backed store unusable); {@code null}
+     *                    falls back to the file-backed store (the on-disk audit read directly).
      */
     public CollectorService(List<Path> registry, List<EnrichmentConfig> enrichJobs,
                          long pollSeconds, int maxConcurrentRuns, StatusStore statusStore) {
@@ -1496,22 +1498,46 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         return configFor(pipelineName).filter(PipelineConfig::template).isPresent();
     }
 
-    /** Run a single registered pipeline once. Empty if no pipeline by that name. */
+    /**
+     * Run a single registered pipeline once. Empty if no pipeline by that name.
+     *
+     * <p>🔴 <b>This is where every non-cycle run path refreshes the status projection</b> (D4). A
+     * {@link DbStatusStore} is a PROJECTION of the on-disk audit, not a second writer, so it is only as
+     * fresh as its last {@link #syncStatus()}. The poll cycle refreshes itself — {@code PipelineScheduler.runOne}
+     * fires it once the cycle's last run finishes — but <b>nothing else did</b>: a manual API trigger, a
+     * {@code notify}, an {@code on_commit} chained run and a dataset-write trigger all funnel through here
+     * and left the DB serving a stale snapshot, so a run reported <b>no commits at all</b> until the next
+     * poll cycle. That is what made a DB-backed store unusable and gated the ledgers row.
+     *
+     * <p>⚠ Hooked <b>here</b> rather than on {@code BatchEventBus}: the bus delivers synchronously on the
+     * publishing (ingest) thread and fires <b>per batch</b>, so projecting the whole audit from a listener
+     * would put repeated DB work on the ingest path. Once per run, after the run, is the cheap seam.
+     *
+     * <p>⚠ And <b>not</b> inside {@code runOne}'s per-run body: {@code PipelineScheduler} deliberately
+     * batches the cycle's refresh to one call for the whole cycle. {@code runOne} does not route through
+     * this method, so the two never double up.
+     */
     public Optional<MultiCollectorProcessor.RunResult> runPipeline(String pipelineName) {
         refuseIfTemplate(pipelineName);
-        return underSpace(() -> pathFor(pipelineName).map(p -> {
-            // Block until THIS pipeline is free (a cycle run of it, or another trigger, may be in flight);
-            // unrelated pipelines are unaffected. See PipelineRunGuard for why blocking is right here.
-            try (PipelineRunGuard.Claim claim = runGuard.acquire(pipelineName)) {
-                running.add(pipelineName);
-                try {
-                    pipelineScheduler.recordManualRun(pipelineName, System.currentTimeMillis());   // T13: any run resets the cadence
-                    return MultiCollectorProcessor.runAll(List.of(p), 1, bus.sink());
-                } finally {
-                    running.remove(pipelineName);
+        return underSpace(() -> {
+            Optional<MultiCollectorProcessor.RunResult> result = pathFor(pipelineName).map(p -> {
+                // Block until THIS pipeline is free (a cycle run of it, or another trigger, may be in flight);
+                // unrelated pipelines are unaffected. See PipelineRunGuard for why blocking is right here.
+                try (PipelineRunGuard.Claim claim = runGuard.acquire(pipelineName)) {
+                    running.add(pipelineName);
+                    try {
+                        pipelineScheduler.recordManualRun(pipelineName, System.currentTimeMillis());   // T13: any run resets the cadence
+                        return MultiCollectorProcessor.runAll(List.of(p), 1, bus.sink());
+                    } finally {
+                        running.remove(pipelineName);
+                    }
                 }
-            }
-        }));
+            });
+            // After the run, and after the claim is released: the audit is on disk, so the projection can
+            // read it, and a DB hiccup cannot hold the pipeline's lock. No-op for the file store.
+            if (result.isPresent()) syncStatus();
+            return result;
+        });
     }
 
     /**

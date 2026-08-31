@@ -100,8 +100,23 @@ class ControlApiDbBrowserTest {
             HttpResponse<String> r = get(c.port, "/spaces/s1/db/catalog");
             assertEquals(200, r.statusCode(), r.body());
             JsonNode groups = V1Body.of(r.body()).get("groups");
-            assertEquals(1, groups.size());
-            JsonNode stores = groups.get(0);
+            // ⚠ Assert the BUSINESS group precisely rather than counting every group. Since the status
+            // backend's default became "db" (2026-08-31), a DB-backed operational store also appears here
+            // — as "ops:<id>"/kind "operational", which is what the Data Browser exists to show and what
+            // `DatasetRowsService.stores()` filters out of the business list. The guard that matters is
+            // "exactly ONE business group, and nothing unclassified", which is what this now says.
+            JsonNode stores = null;
+            for (JsonNode g : groups) {
+                if ("stores".equals(g.get("id").asText())) {
+                    assertNull(stores, "exactly one business store group");
+                    stores = g;
+                } else {
+                    assertTrue(g.get("id").asText().startsWith("ops:"),
+                            "every non-business group must be operational: " + g.get("id").asText());
+                    assertEquals("operational", g.get("kind").asText());
+                }
+            }
+            assertNotNull(stores, "the business store group is listed: " + groups);
             assertEquals("stores", stores.get("id").asText());
             assertEquals("parquet", stores.get("kind").asText());
             JsonNode tables = stores.get("tables");

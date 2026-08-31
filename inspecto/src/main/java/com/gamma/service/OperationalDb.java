@@ -87,19 +87,29 @@ final class OperationalDb {
                 "objects.notes.db.url", "objects.db.user", "objects.db.password", SpaceRoot::notesDbUrl),
         TAGS("Tag assignments", "objects.backend", "memory", Mode.DB_FLAG,
                 "objects.tags.db.url", "objects.db.user", "objects.db.password", SpaceRoot::tagAssignmentsDbUrl),
-        // ⚠ Flipping this to "db" — serving the three ledgers from a database rather than off CSV —
-        // was attempted 2026-08-31 and REVERTED. It is a one-word change here, and
+        // ⚠ Flipping this to "db" — serving the three ledgers from a database rather than off CSV — was
+        // attempted 2026-08-31 and REVERTED for a FRESHNESS blocker. **That blocker is now FIXED**
+        // (2026-08-31): CollectorService.runPipeline refreshes the projection after every triggered run,
+        // pinned by StatusProjectionFreshnessTest. Flipping this is a one-word change, and
         // ServiceStores.openStatusStore is already written for it (single declaration + degrade rather
-        // than fail-boot). 🔴 THE BLOCKER IS FRESHNESS, not isolation: CollectorService.syncStatus()
-        // projects the on-disk audit into this store exactly ONCE, at boot. Nothing re-projects it when
-        // a batch commits, so a DB-backed store serves a snapshot frozen at startup — a run triggered
-        // after boot reports no commits at all, which is how ControlApiMultiSpaceTest failed (it read
-        // its OWN commit back as empty; there was no cross-space leak — statusDbUrl() is per space).
-        // ⛔ Do not move this default until the projection refreshes on commit; BatchEventBus already
-        // publishes the event to hang it on. A second, smaller question rides along: the status DuckDB
-        // then appears as a BUSINESS store in /db/catalog, where an operational store arguably does not
-        // belong.
-        STATUS("Status", "status.backend", "file", Mode.DB_FLAG,
+        // than fail-boot).
+        //
+        // 🔴 Two claims in the original gating note were STALE and are corrected here, so nobody re-derives
+        // them: (1) "projects exactly ONCE, at boot" was wrong — PipelineScheduler.runOne already refreshed
+        // once a poll cycle's last run finished. The real gap was the TRIGGER paths (manual API run, notify,
+        // on_commit chain, dataset-write), which all funnel through runPipeline and refreshed nothing.
+        // (2) The "rides along" worry that the status DuckDB would appear as a BUSINESS store in
+        // /db/catalog does not happen: DbStatusStore implements BrowsableStore, so DbBrowserRoutes lists it
+        // as "ops:<id>" with kind "operational", and its file lives in the space's duckdb/ dir, not data/.
+        //
+        // ✅ DEFAULT FLIPPED to "db" 2026-08-31 by operator decision, once the gate above was met. Every
+        // deployment now serves status/batches/lineage from the projection (DuckDB on Personal; PostgreSQL
+        // where the bundle carries the driver AND a URL is configured). ⚠ The CSVs remain the durable
+        // write-ahead and the on-disk audit stays the source of truth — this changes the READ surface only.
+        // ⚠ openStatusStore degrades to FileStatusStore with a loud warning rather than failing boot on
+        // this default; an EXPLICIT -Dstatus.backend=db still fails loudly. Set -Dstatus.backend=file to
+        // opt back out.
+        STATUS("Status", "status.backend", "db", Mode.DB_FLAG,
                 "status.db.url", "status.db.user", "status.db.password", SpaceRoot::statusDbUrl),
         ACQUISITION_LEDGER("Acquisition ledger", "acquire.ledger.backend", "memory", Mode.DB_FLAG,
                 "acquire.ledger.db.url", null, null, SpaceRoot::acquisitionLedgerDbUrl);
