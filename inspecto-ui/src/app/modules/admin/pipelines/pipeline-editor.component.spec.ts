@@ -231,11 +231,50 @@ describe('PipelineEditorComponent', () => {
         it('refuses while the tab is dirty', () => {
             const c = make();
             c.select('demo');
+            // `select` legitimately reads the pipeline's own config to learn its directory (the satellite
+            // subdir, SATELLITE-WRITE-1) — clear that so the assertion below means what it says: the
+            // EXPORT read nothing.
+            config.read.mockClear();
             c.dirty.set(true);
             c.exportConfig();
 
             expect(config.read).not.toHaveBeenCalled();
             expect(toast.warning).toHaveBeenCalled();
+        });
+    });
+
+    /**
+     * BACKLOG SATELLITE-WRITE-1. The definition panes read and write the pipeline's satellite configs
+     * (its schema, and the `_mapping.csv` the server splits out beside it) and used to pass no `subdir`,
+     * so every write landed at the write ROOT — orphaning a duplicate for any pipeline in a
+     * subdirectory, and leaving a root-level file that then WINS the read, so the drawer edited a schema
+     * the engine never loads. The host resolves the directory once per open pipeline; these pin both
+     * arms, because getting the ROOT case wrong would send every UI-created pipeline into a stray subdir.
+     */
+    describe('the satellite subdir (SATELLITE-WRITE-1)', () => {
+        it('is the pipeline config file’s own directory, for a pipeline in a subdirectory', () => {
+            config.read.mockReturnValue(of({ config: {}, path: 'csv_example/csv_example_pipeline.toon' }));
+            const c = make();
+            c.select('csv_example');
+
+            expect(config.read).toHaveBeenCalledWith('pipeline', 'csv_example');
+            expect(c.configSubdir()).toBe('csv_example');
+        });
+
+        it('is blank for a pipeline at the write root, so the read keeps its server-side fallback', () => {
+            config.read.mockReturnValue(of({ config: {}, path: 'demo_orders_pipeline.toon' }));
+            const c = make();
+            c.select('demo_orders');
+
+            expect(c.configSubdir()).toBe('');
+        });
+
+        it('falls back to the write root when the pipeline has no readable config yet', () => {
+            config.read.mockReturnValue(throwError(() => ({ status: 404 })));
+            const c = make();
+            c.select('draft');
+
+            expect(c.configSubdir()).toBe('');
         });
 
         /** A satellite that could not be read is NAMED — the file downloaded, but re-importing it
@@ -2412,7 +2451,16 @@ describe('PipelineEditorComponent recipe view (UI plan §1, S1)', () => {
             providers: [
                 provideNoopAnimations(),
                 { provide: PipelinesService, useValue: api },
-                { provide: ConfigService, useValue: { write: vi.fn(), registerPipeline: vi.fn(), remove: vi.fn() } },
+                {
+                    provide: ConfigService,
+                    useValue: {
+                        write: vi.fn(),
+                        registerPipeline: vi.fn(),
+                        remove: vi.fn(),
+                        // `select` reads the pipeline's own config for its satellite subdir.
+                        read: vi.fn().mockReturnValue(of({ config: {}, path: 'demo_pipeline.toon' })),
+                    },
+                },
                 { provide: ComponentsService, useValue: { list: vi.fn().mockReturnValue(of([])) } },
                 { provide: ToastrService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } },
                 {

@@ -218,6 +218,23 @@ export class PipelineConfigDefinitionComponent {
 
     /** The node being configured (identity fixed; config/use editable). */
     readonly node = input.required<AuthoredNode>();
+
+    /**
+     * The directory the open pipeline's own config file lives in, relative to the write root (`''` at the
+     * root), supplied by the host — see `PipelineEditorComponent.configSubdir`.
+     *
+     * <p>🔴 An enrichment is a pipeline SATELLITE too: the committed samples put it beside the pipeline
+     * (`config/orders/orders_daily_enrich.toon`), and `ConfigFileSupport.resolveSatelliteForRead` names
+     * enrichment alongside schema and mapping. This pane passed no `subdir`, so it had the same defect
+     * the Parse and Load panes did — reads leaned on the server's fallback scan and every WRITE landed at
+     * the write root, orphaning a duplicate beside nothing (BACKLOG SATELLITE-WRITE-1).
+     */
+    readonly configSubdir = input('');
+
+    /** As the Parse pane's: `undefined` at the root so the read keeps its server-side fallback scan. */
+    protected satelliteSubdir(): string | undefined {
+        return this.configSubdir().trim() || undefined;
+    }
     /**
      * The type's config vocabulary as published by the server (`GET /pipelines/node-types`).
      * `undefined` ⇒ the catalog has not resolved — fall back to the local table. A served EMPTY array is
@@ -364,7 +381,7 @@ export class PipelineConfigDefinitionComponent {
         this.enrichName.setValue(bound ?? node.id);
         if (bound) {
             this.enrichSource.set('loading');
-            this.configApi.read('enrichment', bound).subscribe({
+            this.configApi.read('enrichment', bound, this.satelliteSubdir()).subscribe({
                 next: (r) => this.enrichSource.set(r.config),
                 error: () => {
                     this.enrichSource.set(null);
@@ -562,7 +579,7 @@ export class PipelineConfigDefinitionComponent {
         if (Object.keys(parts.references).length > 0) draft['references'] = parts.references;
 
         this.savingEnrichment.set(true);
-        this.configApi.write('enrichment', draft, { overwrite: true }).subscribe({
+        this.configApi.write('enrichment', draft, { overwrite: true, subdir: this.satelliteSubdir() }).subscribe({
             next: (written) => {
                 // Register every save: enrichments do NOT hot-reload by mtime.
                 this.configApi.registerEnrichment(written.path).subscribe({

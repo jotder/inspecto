@@ -664,6 +664,7 @@
                                         <app-pipeline-load-definition
                                             [node]="dn"
                                             [schemaFile]="parserSchemaFile()"
+                                            [configSubdir]="configSubdir()"
                                             [pipeline]="selectedId() || ''"
                                             [sample]="sampleThread()"
                                             (applied)="onDefinitionApplied($event)"
@@ -681,6 +682,7 @@
                                         <app-pipeline-parse-definition
                                             [node]="dn"
                                             [pipelineName]="selectedId() ?? ''"
+                                            [configSubdir]="configSubdir()"
                                             [sample]="sampleThread()"
                                             [filenameColumnTarget]="filenameColumnTarget()"
                                             (filenameColumnChange)="onSinkFilenameColumnChange($event)"
@@ -698,6 +700,7 @@
                                         -->
                                         <app-pipeline-config-definition
                                             [node]="dn"
+                                            [configSubdir]="configSubdir()"
                                             [attributes]="definitionAttributes()"
                                             [enrichmentHost]="dn.type === 'enrichment' ? enrichmentHost() : undefined"
                                             [sampleRows]="sampleThread()?.parsedRows()"

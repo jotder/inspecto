@@ -1039,6 +1039,41 @@ export class PipelineEditorComponent implements OnInit {
             },
         });
         this.loadLastRun(id);
+        this.loadConfigSubdir(id);
+    }
+
+    /**
+     * The directory the OPEN pipeline's own config file lives in, **relative to the write root** — `''`
+     * for a pipeline at the root (everything `pipelineScaffold` creates), `<name>` for a committed sample
+     * laid out as `config/<name>/<name>_pipeline.toon`.
+     *
+     * <p>🔴 Load-bearing for the definition panes, which read and write the pipeline's SATELLITE configs
+     * (its schema, and the `_mapping.csv` the server splits out beside it). They used to pass no `subdir`
+     * at all, so every write landed at the write ROOT regardless of where the pipeline lived — leaving an
+     * orphaned duplicate pair for any pipeline in a subdirectory, and a root-level file that then WINS the
+     * read (`ConfigFileSupport.resolveSatelliteForRead` only scans when the convention path misses), so
+     * the drawer went on editing a schema the engine never loads (BACKLOG SATELLITE-WRITE-1).
+     *
+     * <p>⚠ The host resolves it, not the panes: it is one fact per open pipeline, and two panes each
+     * fetching it would be two requests that can disagree. ⛔ And it must NOT be inferred server-side on
+     * the write path — a read that finds the wrong file shows wrong data, a write that does destroys the
+     * right one. The caller knows which pipeline it has open; that is the authority.
+     */
+    readonly configSubdir = signal('');
+
+    private loadConfigSubdir(id: string): void {
+        this.configSubdir.set('');
+        this.configApi.read('pipeline', id).subscribe({
+            next: (r) => {
+                if (this.pendingSelect !== id) return; // superseded — the operator moved on
+                const path = String(r.path ?? '').replace(/\\/g, '/');
+                const cut = path.lastIndexOf('/');
+                this.configSubdir.set(cut > 0 ? path.slice(0, cut) : '');
+            },
+            // An unregistered draft has no file yet: the write root is the right answer, and this is
+            // context for a write that has its own error path — never a reason to fail opening.
+            error: () => this.configSubdir.set(''),
+        });
     }
 
     /**

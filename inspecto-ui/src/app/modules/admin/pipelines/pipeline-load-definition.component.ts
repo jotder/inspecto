@@ -323,6 +323,14 @@ export class PipelineLoadDefinitionComponent {
      * rules map FROM live on that node, not this one.
      */
     readonly schemaFile = input('');
+
+    /**
+     * The directory the open pipeline's own config file lives in, relative to the write root (`''` at the
+     * root), supplied by the host. This pane only READS the schema, but it must read the SAME file the
+     * Parse pane writes — see `PipelineEditorComponent.configSubdir` and BACKLOG SATELLITE-WRITE-1. A
+     * blank stays `undefined` so the server's fallback scan remains available for a root-level pipeline.
+     */
+    readonly configSubdir = input('');
     /**
      * The saved pipeline's name, for the read-only derived-schema panel (S5). Blank for a pipeline
      * that has never been saved — the route resolves a name, and there is nothing to derive without one.
@@ -485,7 +493,7 @@ export class PipelineLoadDefinitionComponent {
         const name = schemaNameFromPath(path);
         if (!name) return;
         this.loading.set(true);
-        this.configApi.read('schema', name).subscribe({
+        this.configApi.read('schema', name, this.configSubdir().trim() || undefined).subscribe({
             next: (r) => {
                 this.loading.set(false);
                 const raw = (r.config?.['raw'] ?? {}) as Record<string, unknown>;

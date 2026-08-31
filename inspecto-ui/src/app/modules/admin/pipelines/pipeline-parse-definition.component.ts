@@ -536,6 +536,30 @@ export class PipelineParseDefinitionComponent {
     readonly pipelineName = input('');
 
     /**
+     * The directory the open pipeline's own config file lives in, relative to the write root (`''` at the
+     * root). Supplied by the host, which resolves it once per open pipeline — see
+     * `PipelineEditorComponent.configSubdir` for why it is a host fact and why the server must not guess
+     * it on a write.
+     */
+    readonly configSubdir = input('');
+
+    /**
+     * Where this pipeline's SATELLITE configs are read and written: its own config directory.
+     *
+     * <p>🔴 Every satellite call here used to pass nothing, so a write always landed at the write ROOT —
+     * orphaning a duplicate schema (plus the `_mapping.csv` the server splits out beside it) for any
+     * pipeline in a subdirectory, and leaving a root-level file that then WINS the read, so this drawer
+     * edited a schema the engine never loads (BACKLOG SATELLITE-WRITE-1).
+     *
+     * <p>⚠ `undefined` rather than `''` when the pipeline sits at the root: a blank keeps the read's
+     * server-side fallback scan (`resolveSatelliteForRead`) available, and keeps the param off the URL.
+     * A non-blank subdir deliberately DISABLES that scan — the caller saying WHERE is never second-guessed.
+     */
+    protected satelliteSubdir(): string | undefined {
+        return this.configSubdir().trim() || undefined;
+    }
+
+    /**
      * This tab's sample thread, or null when the host keeps none — in which case the grammar editor
      * falls back to its own sample box and nothing downstream sees the sample, exactly as before.
      * Passed in (never injected) because the thread belongs to the TAB, not to this pane.
@@ -1061,7 +1085,7 @@ export class PipelineParseDefinitionComponent {
         this.schemaExtras = {}; // a re-seed must not carry a previous node's stored keys
         if (!this.authorsSchema() || !this.existingSchemaFile()) return;
         this.schemaLoading.set(true);
-        this.configApi.read('schema', this.schemaName()).subscribe({
+        this.configApi.read('schema', this.schemaName(), this.satelliteSubdir()).subscribe({
             next: (r) => {
                 this.schemaLoading.set(false);
                 const raw = (r.config?.['raw'] ?? {}) as Record<string, unknown>;
@@ -1148,7 +1172,7 @@ export class PipelineParseDefinitionComponent {
         const reads = keys.map((key) => {
             const name = schemaNameFromPath(paths[key]);
             if (!name) return of<SegmentDraft>({ key, columns: [] });
-            return this.configApi.read('schema', name).pipe(
+            return this.configApi.read('schema', name, this.satelliteSubdir()).pipe(
                 map((r) => segmentDraftFrom(key, r.config)),
                 catchError(() => of<SegmentDraft>({ key, columns: [] })),
             );
@@ -1383,7 +1407,10 @@ export class PipelineParseDefinitionComponent {
         this.writing.set(true);
         forkJoin(
             drafts.map((d) =>
-                this.configApi.write('schema', schemaDraftFor(d, this.schemaNameFor(d.key)), { overwrite: true }),
+                this.configApi.write('schema', schemaDraftFor(d, this.schemaNameFor(d.key)), {
+                    overwrite: true,
+                    subdir: this.satelliteSubdir(),
+                }),
             ),
         ).subscribe({
             next: () => {
@@ -1457,7 +1484,11 @@ export class PipelineParseDefinitionComponent {
         this.writing.set(true);
         this.schemaReplaceNeeded.set(false);
         this.configApi
-            .write('schema', draft, { overwrite: true, ...(replace ? { compatibility: 'none' as const } : {}) })
+            .write('schema', draft, {
+                overwrite: true,
+                subdir: this.satelliteSubdir(),
+                ...(replace ? { compatibility: 'none' as const } : {}),
+            })
             .subscribe({
                 next: () => {
                     this.writing.set(false);

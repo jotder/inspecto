@@ -853,8 +853,37 @@ W1's retirement of 2026-07-31 accurately. What nobody checked was that
 `grammar/<id>`. **The lesson: a retirement is only current if nothing re-admitted it — check the
 declaring site, not the note about it.**
 
-**SATELLITE-WRITE-1 — the editor WRITES a pipeline's satellite config to the write root, not beside the
-pipeline (2026-08-31).** The unfixed other half of MOCK-GONE-1(a). That row fixed the **read** side
+**~~SATELLITE-WRITE-1~~ — the editor WROTE a pipeline's satellite config to the write root, not beside the
+pipeline — ✅ FIXED 2026-08-31.** Fixed as the row prescribed: the pipeline editor resolves its open
+pipeline's own directory once (`read('pipeline', id).path`'s parent, write-root-relative) and passes it as
+`subdir` on every satellite read AND write in **all three** definition panes. ⚠ The row named only the
+Parse pane; the Load pane reads the same schema, and the **enrichment** pane had the identical hole — the
+committed samples put an enrichment beside its pipeline (`config/orders/orders_daily_enrich.toon`) and
+`resolveSatelliteForRead` names enrichment alongside schema and mapping, so fixing two of three would have
+left the bug live under another name. The `_mapping.csv` came along free —
+the server splits it out as a sibling of the schema target, so it follows the schema's directory. ⛔ The
+row's refusal was honoured: nothing was inferred server-side on the write path.
+
+**Verified against the running backend, on the poisoned tree that grounded the row** — the stray root
+`csv_example_schema.toon` is garbage (`META/FORMAT/FIELD_2/DELIMITED`, junk partitions `ada`/`afaf`) while
+the real one declares `ORDER_ID…NOTE`, which made the proof unambiguous:
+`GET …/config/schema/csv_example_schema` → `path: csv_example_schema.toon` (the stray) vs
+`?subdir=csv_example` → `path: csv_example/csv_example_schema.toon`; the drawer now issues the latter and
+renders the real columns with none of the garbage; an Apply wrote schema + `_mapping.csv` into
+`config/csv_example/` and left both root strays **byte-identical** (md5 unchanged).
+
+⚠ **Observed while verifying, NOT diagnosed — do not treat as a filed cause.** That Apply also rewrote
+`raw.name` and `mapping.canonicalName`/`rawName` from `csv_example` to `csv_example_schema` (the
+file-derived name), alongside the expected `partitionKey`→`partitions[]` migration and the mapping split.
+`canonicalName` names the output, so if that rewrite is real it is worth its own row — but it was seen in
+one Apply on one sample and the sample was restored, so it needs grounding before anyone acts on it.
+
+⚠ **The two untracked root files are still there, deliberately.** They are bug output (orphaned,
+unreferenced, content-divergent) and deleting them is still the correct cleanup, but they predate this
+shift. With the fix in place they no longer poison the editor's read — an explicit `subdir` wins over the
+fallback scan — so they are now inert litter rather than an active defect.
+
+**Original diagnosis, kept as the record.** The unfixed other half of MOCK-GONE-1(a). That row fixed the **read** side
 (`ConfigFileSupport.resolveSatelliteForRead`); the write side was named there but deliberately not touched,
 because it was ungrounded at the time. **It is now grounded — by its own output sitting in this checkout.**
 
@@ -882,11 +911,6 @@ directory (from `read('pipeline', id).path`, or a new field on `PipelineSummary`
 pane and pass it on both read and write. ⛔ Do **not** "fix" this by widening
 `resolveSatelliteForRead` to the write path — a read that finds the wrong file shows wrong data; a WRITE
 that does destroys the right one.
-
-⚠ **Do not commit the two untracked files.** They are bug output: orphaned, unreferenced, and
-content-divergent from the schema the pipeline actually runs. Deleting them is the correct cleanup, but
-they predate this shift and are not this shift's to remove — and while they exist, the read path on
-`csv_example` is wrong.
 
 **~~MOCK-GONE-1~~ — three defects the offline mock was hiding — ALL THREE FIXED 2026-08-31.**
 Found in the end-user test after the mock backend was deleted

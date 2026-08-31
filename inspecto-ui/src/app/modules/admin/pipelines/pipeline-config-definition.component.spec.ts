@@ -50,6 +50,7 @@ interface PaneInputs {
     attributes?: AttributeSpec[];
     enrichmentHost?: EnrichmentHostPipeline;
     sampleRows?: Record<string, unknown>[];
+    configSubdir?: string;
 }
 
 async function create(inputs: PaneInputs, api: Partial<ConfigService> = {}) {
@@ -95,6 +96,7 @@ async function create(inputs: PaneInputs, api: Partial<ConfigService> = {}) {
     if (inputs.attributes !== undefined) fixture.componentRef.setInput('attributes', inputs.attributes);
     if (inputs.enrichmentHost) fixture.componentRef.setInput('enrichmentHost', inputs.enrichmentHost);
     if (inputs.sampleRows) fixture.componentRef.setInput('sampleRows', inputs.sampleRows);
+    if (inputs.configSubdir !== undefined) fixture.componentRef.setInput('configSubdir', inputs.configSubdir);
     fixture.detectChanges();
     return fixture;
 }
@@ -465,7 +467,10 @@ describe('PipelineConfigDefinitionComponent', () => {
         );
         const out = applied(fixture);
         fixture.detectChanges(); // the async read landed; the hydrate effect sees the editor
-        expect(read).toHaveBeenCalledWith('enrichment', 'orders_enrich');
+        // The 3rd arg is the satellite subdir (SATELLITE-WRITE-1): `undefined` here because this host
+        // binds no `configSubdir`, i.e. the pipeline sits at the write root — which deliberately leaves
+        // the server's fallback scan available. The set case is pinned in its own test below.
+        expect(read).toHaveBeenCalledWith('enrichment', 'orders_enrich', undefined);
         expect(fixture.componentInstance.enrichName.value).toBe('orders_enrich');
         expect(editor(fixture).sql()).toBe('SELECT 1 FROM input');
 
@@ -477,6 +482,53 @@ describe('PipelineConfigDefinitionComponent', () => {
         expect((draft['output'] as Record<string, unknown>)['partitions']).toEqual(['year']);
         expect((draft['triggers'] as Record<string, unknown>)['on_pipeline']).toBe('orders');
         expect(out()?.use).toBe('enrichment/orders_enrich');
+    });
+
+    /**
+     * BACKLOG SATELLITE-WRITE-1. An enrichment is a pipeline SATELLITE — the committed samples put it
+     * beside its pipeline (`config/orders/orders_daily_enrich.toon`) — so both the read and the WRITE must
+     * carry the pipeline's own directory. This pane passed neither, so every save landed at the write root
+     * and orphaned a duplicate. ⚠ The write matters more than the read: the read had a server-side
+     * fallback scan to lean on, the write had nothing.
+     */
+    it('carries the pipeline directory on the enrichment read AND write', async () => {
+        const read = vi.fn(() =>
+            of({
+                type: 'enrichment',
+                name: 'orders_enrich',
+                path: 'orders/orders_enrich.toon',
+                config: {
+                    name: 'orders_enrich',
+                    input: { database: 'in/db', format: 'CSV' },
+                    output: { database: 'out/db' },
+                    transform: 'SELECT 1 FROM input',
+                },
+            }),
+        );
+        const write = vi.fn((type: string, cfg: Record<string, unknown>, _opts?: { subdir?: string }) =>
+            of({
+                type,
+                written: true,
+                path: `orders/${String(cfg['name'])}.toon`,
+                name: String(cfg['name']),
+                bytes: 1,
+                overwritten: false,
+                findings: [],
+            }),
+        );
+        const fixture = await create(
+            {
+                node: { id: 'enrich1', type: 'enrichment', use: 'enrichment/orders_enrich' },
+                configSubdir: 'orders',
+            },
+            { read, write },
+        );
+        fixture.detectChanges();
+
+        expect(read).toHaveBeenCalledWith('enrichment', 'orders_enrich', 'orders');
+
+        fixture.componentInstance.submit();
+        expect(write.mock.calls[0][2]?.subdir).toBe('orders');
     });
 
     it('a BOUND companion wins over the host-derived seed — the file is the truth', async () => {
