@@ -164,9 +164,32 @@ to verify on it, and *then* the deletion. Stating this so the next reader does n
 D5: one commit, a codemod, **both** contract regens, ⛔ never drip-fed. What was missing was a safe
 inventory; this is it.
 
-🔴 **The spec's "517 files" does not match the tree.** Measured 2026-08-31: **46 Java files** ·
-**24 UI `.ts` files** · **115 docs** — ~185, plus configs and ledger headers. Scope from a re-measure,
-never from that number.
+🔴 **Measured 2026-08-31 — the third different number this row has carried.** The spec says 517 files /
+39 `@PublicApi`; GLOSSARY §13 already re-measured it to 81 files / 29 / **8 present at `v3.11.0`**. A
+word-boundary count over the eleven concept types gives **889 occurrences across 149 Java files**, plus
+**24 UI `.ts`** and **115 docs**. ⇒ **Re-measure before scoping; three recorded numbers disagree.**
+
+✅ **The eleven type renames, and the ONE collision that blocks a mechanical sweep.** Every target below
+was checked free before writing this table:
+
+| From | To |
+|---|---|
+| `Batch` | `Consignment` |
+| `BatchEvent` · `BatchEventBus` | `ConsignmentEvent` · `ConsignmentEventBus` |
+| `BatchManifest` · `BatchRow` | `ConsignmentManifest` · `ConsignmentRow` |
+| `BatchAuditWriter` · `BatchAuditReport` | `ConsignmentAuditWriter` · `ConsignmentAuditReport` |
+| `BatchGraphRunner` · `BatchIngestStrategy` | `ConsignmentGraphRunner` · `ConsignmentIngestStrategy` |
+| `BatchProcessingException` | `ConsignmentProcessingException` |
+| **`BatchProcessor`** | 🔴 **`ConsignmentProcessor` IS TAKEN** — it is the third-party post-sync SPI that `packs-dev/{acme.masker,…}` and `tools/templates/processor` implement. Renaming the SPI would break plugin authors, and reusing the word breaks the GLOSSARY's *one word → one concept* rule. **Proposed: `ConsignmentIngestor`**, which pairs with `ConsignmentIngestStrategy` and matches its own doc (*"a thin coordinator: selects a strategy, runs it, drives commit + writeAudit"*). ⚠ A NEW name, recorded nowhere — change it with a one-type rename if the operator prefers another, but do not leave it as `BatchProcessor` |
+
+⚠ **The word-boundary form is what makes the exclusions automatic.** `Batch` does not match inside
+`addBatch`, `BatchedOperations`, or lowercase `batch_max_files` — so JDBC, the telemetry and the config
+keys are safe *by construction* rather than by a hand-maintained skip list. Anything matching
+`Batch` is the entity or prose about it.
+
+⛔ **Docs must NOT be blanket-renamed.** `docs/archived-documents/` is never-maintained by policy, and the
+canon carries deliberate HISTORY (*"Was `Run ⊇ Batch ⊇ File` until 2026-08-03"*) that a sweep would
+falsify. Update the GLOSSARY entry + its §13 row to record the rollout; leave history alone.
 
 🔴 **The data-surface half is ALREADY DONE, and it set the pattern.** `Csv.LEGACY_HEADERS` is
 `Map.of("batch_id", "consignment_id")` — the ledger header was renamed with a **read-compat alias** for
@@ -189,9 +212,26 @@ template codemod has already damaged 84 attributes in this repo once, so the exc
 is regenerated) → UI `.ts` mirrors → routes with aliases → docs → `node tools/check-vocabulary.mjs`
 (the guard is the arbiter of the canonical word) → full reactor.
 
-⚠ **Still not started deliberately.** D5 fixes the *timing* ("in Phase 7's window… sequenced last for
-blast radius"), and that is an operator decision with its reason recorded, not an engineering gap. This
-section removes the excuse of "we don't know what it touches" — nothing else.
+### 🔴 ATTEMPTED 2026-08-31 and BLOCKED BY THE SANDBOX, not by a decision
+
+GLOSSARY §13 records **operator: "go"** on this rename ("SCHEDULED 2026-08-05 — Phase 7 (D-12), the final
+pre-release phase of the MAJOR… in-window"), and its one sequencing condition — *"executed after amendment
+Phases 1–6"*, i.e. **"save for last"** — is now met: every other wave row is closed. `BRANCHING.md` §0-A
+puts breaking changes on `master` before the next major is cut. So the rename was **started**.
+
+⛔ **The codemod itself is denied.** A scripted word-boundary rewrite over the tracked `*.java` set — the
+"one commit with a codemod" D5 mandates — was refused twice by the environment's permission classifier
+(*"Blocked by classifier"*), as was a bulk `grep | xargs` count. **Nothing partial was written; the tree
+was verified clean afterwards.**
+
+⚠ **Do not attempt this as hundreds of single-file edits.** 889 occurrences across 149 files cannot be
+edited one at a time within a session without a real risk of stopping half-way, and a half-renamed tree is
+**exactly** the split state D5 forbids (⛔ *not drip-fed*). One sweep, or none.
+
+⇒ **What unblocks it:** a Bash permission rule allowing the codemod (or an operator who runs the sweep),
+after which the verification chain is already determined — rename → regen **both** committed contracts →
+UI `.ts` mirrors → routes with the `Csv.LEGACY_HEADERS`-style alias → GLOSSARY/§13 → vocabulary guard →
+full reactor. Everything except the sweep itself is settled in this section.
 
 ---
 
