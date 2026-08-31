@@ -249,6 +249,24 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 
 ## 5. UI residuals + security-module residuals
 
+**CATALOG-DS-COLUMNS-1 — the Dataset registered at go-live carries no columns (2026-08-31).** Found by
+building a pipeline in the UI end to end and following it into the Catalog. Activating a pipeline registers
+its landed store as a Dataset (`inspecto/api/dataset-registration.service.ts:60`), and the Data Catalog card
+then reads **"0 columns"** — nothing can be bound to it (a widget/dashboard needs the column list) without
+an operator opening the Dataset editor and adding them by hand.
+
+- **Verified, not inferred:** the stored component is exactly `name` / `kind` / `sourceName` /
+  `physicalRef` / `description` (`spaces/<space>/config/registry/datasets/<name>.toon`) — there is no
+  `columns` key, and the served `GET /components/dataset` agrees.
+- ⚠ **The columns are available at that moment**, which is what makes this a plumbing gap rather than a
+  missing capability: the pipeline's schema `.toon` next to it already declares every field with a type
+  (5 fields for the reference case), and `DatasetRowsService.columns(ds)` already falls back to a 1-row
+  probe for a dataset that declares none — so decide deliberately between projecting the schema at
+  registration and leaving the probe to answer, rather than shipping a card that says 0.
+- ⛔ Do **not** assume the description is also broken: an em-dash mojibake reported on 2026-08-31 was a
+  **reading artifact** (Python decoding UTF-8 stdin as cp1252 on Windows), not a defect. The stored bytes
+  and the HTTP response both carry a correct `—`.
+
 > ### ~~🟠 REVIEW-1 — defects found by the 2026-08-17 Angular sweep~~ **✅ ALL 18 FIXED 2026-08-17**
 >
 > Closed by `e2166e2f` + `c191d9fc`. The table is kept as the record of what each was and where, since
@@ -756,6 +774,19 @@ non-blocking:**
 > **Do not partially implement security concerns elsewhere** — this section stays the single scope.
 
 ## 6. Engineering / tech-debt
+
+**LEDGER-OUTPUT-BYTES-1 — the per-file ledger reports `output_sizes_bytes` as 0 for a real file
+(2026-08-31).** Found by driving two pipelines to SUCCESS and comparing the ledgers against the files on
+disk. Every row of `<pipeline>_status_<ts>.csv` carries `output_sizes_bytes` `"0"` while the parquet/CSV it
+names is non-zero (measured: 857 B, 785 B, 295 B, 130 B).
+
+- 🔴 **The asymmetry is the tell, and it narrows the fix:** the **batch**-level ledger's
+  `total_output_bytes` in `<pipeline>_batches_<ts>.csv` is **correct** (295 / 194 / 130), so the size IS
+  measured — only the per-file column loses it. `BatchAuditWriter:191` serialises `f.outputSizes()`
+  faithfully, so the zero arrives from the caller; start at what populates the per-file record, not at the
+  writer.
+- ⚠ Cosmetic today, but it is an **audit** column, and `-1` already means "not measured" here (see
+  `failure-audit-holes-closed`) — so `0` is an assertion that the output was empty, which is false.
 
 **CHAIN-CONFIG-1 — a post-sync step's config is stringified, and a null value NPEs (2026-08-31).** Found
 while building the `consignment.process` chain editor (pipeline spec gap 12); **the UI now refuses both

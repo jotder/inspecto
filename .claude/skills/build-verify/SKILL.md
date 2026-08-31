@@ -214,7 +214,12 @@ pwsh -File inspecto\package.ps1 -NoUi -GraalvmCache 'D:\jdks\.graalvm-cache'   #
 
 ```powershell
 # One-shot ETL pipeline
-java --enable-native-access=ALL-UNNAMED -jar inspecto\target\inspecto-processor-*.jar `
+# `assist.safety.roots` is MANDATORY here and has NO default: the engine CLI does no space discovery,
+# so a pipeline carrying a `schema_file:`/`dirs.*` dies on "no allowed roots configured for
+# 'schema_file'" before it reads a byte. package.ps1's launcher sets it to the space dir; a bare -jar
+# run must pass it too. Measured 2026-08-31 - the recipe without it fails.
+java --enable-native-access=ALL-UNNAMED "-Dassist.safety.roots=<abs path to spaces\<space>>" `
+     -jar inspecto\target\inspecto-processor-*.jar `
      inspecto\config\voucher\voucher_unknown_pipeline.toon
 
 # Long-running control plane + UI (ControlApi, default :8080)
