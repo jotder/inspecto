@@ -105,7 +105,21 @@ export class DatasetsComponent implements OnInit {
         this.filterText.set((ev.target as HTMLInputElement).value);
     }
 
-    /** Column count gives a quick sense of the dataset's shape on the card. */
+    /**
+     * Column count gives a quick sense of the dataset's shape on the card — but only when the Dataset
+     * DECLARES columns.
+     *
+     * <p>⚠ Zero declared is not zero columns. A physical Dataset registered automatically (the one a
+     * pipeline registers at go-live) declares none, and `DatasetRowsService.columns` answers for it with a
+     * 1-row probe of the store, so every screen that needs a column list already gets one — the card was
+     * the only thing asserting "0 columns" over a store that resolves perfectly well, which reads as a
+     * registration that produced nothing (BACKLOG CATALOG-DS-COLUMNS-1). The template therefore says
+     * where the shape comes from instead of printing a false zero.
+     *
+     * <p>⛔ Do not "fix" this by projecting the schema's fields into `columns` at registration: a DECLARED
+     * list WINS over the probe, so a baked snapshot would silently outlive a schema change and start
+     * describing the store wrongly. Deriving at read time is the property worth keeping.
+     */
     columnCount(d: Dataset): number {
         return d.columns.length;
     }

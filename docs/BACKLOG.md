@@ -249,23 +249,37 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 
 ## 5. UI residuals + security-module residuals
 
-**CATALOG-DS-COLUMNS-1 — the Dataset registered at go-live carries no columns (2026-08-31).** Found by
-building a pipeline in the UI end to end and following it into the Catalog. Activating a pipeline registers
-its landed store as a Dataset (`inspecto/api/dataset-registration.service.ts:60`), and the Data Catalog card
-then reads **"0 columns"** — nothing can be bound to it (a widget/dashboard needs the column list) without
-an operator opening the Dataset editor and adding them by hand.
+**~~CATALOG-DS-COLUMNS-1~~ — the Datasets card claimed "0 columns" over a store that resolves fine —
+✅ FIXED 2026-08-31, and this row's own diagnosis was WRONG.**
 
-- **Verified, not inferred:** the stored component is exactly `name` / `kind` / `sourceName` /
-  `physicalRef` / `description` (`spaces/<space>/config/registry/datasets/<name>.toon`) — there is no
-  `columns` key, and the served `GET /components/dataset` agrees.
-- ⚠ **The columns are available at that moment**, which is what makes this a plumbing gap rather than a
-  missing capability: the pipeline's schema `.toon` next to it already declares every field with a type
-  (5 fields for the reference case), and `DatasetRowsService.columns(ds)` already falls back to a 1-row
-  probe for a dataset that declares none — so decide deliberately between projecting the schema at
-  registration and leaving the probe to answer, rather than shipping a card that says 0.
-- ⛔ Do **not** assume the description is also broken: an em-dash mojibake reported on 2026-08-31 was a
-  **reading artifact** (Python decoding UTF-8 stdin as cp1252 on Windows), not a defect. The stored bytes
-  and the HTTP response both carry a correct `—`.
+🔴 **What it claimed, and why it was wrong.** It said *"nothing can be bound to it (a widget/dashboard
+needs the column list) without an operator opening the Dataset editor and adding them by hand"*. **Refuted
+by reading the consumers:** `DatasetRowsService.columns(ds)` is *declared-**else** a 1-row probe*, so every
+screen that needs a column list already gets one. Measured live: `GET /db/table?name=demo_orders` answers
+with all six columns, their types and real rows, and `/db/catalog` already links the store to the Dataset
+(`{"name":"demo_orders","dataset":"demo_orders"}`). The dataset editor infers them too, so an operator
+opening it sees six, not zero. **Zero DECLARED is not zero columns.** The one real defect was the card
+printing a false zero, which reads as a registration that produced nothing.
+
+✅ **Fixed on the card:** the count shows when columns are declared, and *"columns derived from the store"*
+(with a tooltip) when they are not — `datasets.component.html`. Falsified: restoring the old chip fails
+exactly the new test and nothing else.
+
+⛔ **The fix this row proposed is REFUSED, and the reason is worth more than the fix.** Projecting the
+pipeline's schema fields into `columns` at registration would create a DECLARED list, and a declared list
+**WINS over the probe** — so the snapshot would silently outlive the next schema change and start describing
+the store wrongly. Deriving at read time is the property to protect (same lesson as *persisted SQL must
+render at read time, not bake at write time*).
+
+🔴 **A linked hypothesis was also REFUTED.** SCHEMA-NAME-1 raised the idea that its `canonicalName`
+mismatch (`produces: <pipeline>_schema` vs a Dataset registered `sourceName: <pipeline>`) was why this
+Dataset resolved nothing. It was not: `/db/catalog` derives a store's name from the data DIRECTORY, so the
+Dataset matched either way, and the store resolved fully *while* the mismatch was present. Two real defects
+that looked related and were not.
+
+⛔ Do **not** assume the description is broken either: an em-dash mojibake reported the same day was a
+**reading artifact** (Python decoding UTF-8 stdin as cp1252 on Windows), not a defect. The stored bytes
+and the HTTP response both carry a correct `—`.
 
 > ### ~~🟠 REVIEW-1 — defects found by the 2026-08-17 Angular sweep~~ **✅ ALL 18 FIXED 2026-08-17**
 >
@@ -3032,9 +3046,10 @@ them and nothing else. Nothing pinned the old behaviour, which is how it drifted
 
 ⚠ **Pre-existing configs written by the old code still carry the wrong name** — any pipeline created
 through the UI before this fix declares `canonicalName: <pipeline>_schema`, so it `produces` a store whose
-name nothing else uses. **Hypothesis, NOT verified:** that mismatch may be part of why
-**CATALOG-DS-COLUMNS-1**'s auto-registered Dataset resolves nothing — it is registered with
-`sourceName: <pipeline>`. Check the two together; do not assume one causes the other.
+name nothing else uses. 🔴 **That hypothesis was TESTED and REFUTED the same day** — `/db/catalog`
+derives a store's name from the data DIRECTORY, so **CATALOG-DS-COLUMNS-1**'s Dataset matched it either
+way and resolved fully while the mismatch was present. The residue here is only the stale `produces` name
+on such configs, not a broken Dataset.
 
 ## 7. Docs & ongoing
 

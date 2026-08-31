@@ -113,6 +113,38 @@ describe('DatasetsComponent', () => {
         expect(c.sharedOwner(D1)).toBeNull();
     });
 
+    /**
+     * BACKLOG CATALOG-DS-COLUMNS-1. A physical Dataset registered automatically at go-live declares no
+     * columns, and the card printed "0 columns" over a store whose shape resolves perfectly well —
+     * `DatasetRowsService.columns` answers with a 1-row probe — so it read as a registration that had
+     * produced nothing. Zero DECLARED is not zero columns; the card must say where the shape comes from.
+     */
+    it('does not claim zero columns for a Dataset that declares none', () => {
+        const auto: Dataset = {
+            id: 'demo_orders',
+            name: 'demo_orders',
+            kind: 'physical',
+            sourceName: 'demo_orders',
+            columns: [],
+            measures: [],
+            calculated: [],
+        };
+        const { fixture } = create([auto]);
+        fixture.detectChanges();
+        const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+        expect(text).not.toContain('0 columns');
+        expect(text).toContain('columns derived from the store');
+    });
+
+    /** …and a Dataset that DOES declare them still shows the count. */
+    it('shows the declared column count when there is one', () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+        expect(text).toContain('1 columns');
+        expect(text).not.toContain('columns derived from the store');
+    });
+
     it('renders the empty state with no a11y violations', async () => {
         const { fixture } = create([]);
         fixture.detectChanges();

@@ -85,7 +85,14 @@
                             <span
                                 >source: <span class="font-mono">{{ d.sourceName }}</span></span
                             >
-                            <span>· {{ columnCount(d) }} columns</span>
+                            @if (columnCount(d)) {
+                                <span>· {{ columnCount(d) }} columns</span>
+                            } @else {
+                                <span
+                                    matTooltip="This Dataset declares no columns; screens read its shape from the store it points at."
+                                    >· columns derived from the store</span
+                                >
+                            }
                         </div>
                     </div>
                     <div class="flex flex-wrap items-center gap-1">
