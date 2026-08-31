@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
     BUNDLE_FORMAT,
+    BUNDLE_KINDS,
     BUNDLE_VERSION,
+    LEGACY_BUNDLE_KINDS,
     BundleItem,
     BundleKind,
     buildBundle,
@@ -304,5 +306,35 @@ describe('resolveRequires', () => {
             { ref: { kind: 'dataset', id: 'cdr_sample', rel: 'binds', resolution: 'external' }, status: 'satisfied' },
         ]);
         expect(resolveRequires(bundle, targetIndex([])).map((r) => r.status)).toEqual(['missing']);
+    });
+});
+
+describe('schema is a first-class bundle kind (BUNDLE-SCHEMA-1)', () => {
+    /**
+     * 🔴 Inverted 2026-08-31. `schema` was dropped from the export list when unification W1 retired the
+     * kind on 2026-07-31 — but that retirement was REVERSED five days later (ELT amendment Phase 1
+     * slice 3): `processing.schema_file: schema/<id>` resolves to `registry/schema/<id>`, so a registry
+     * schema is the schema the engine executes. While this file said otherwise, a pipeline naming one
+     * exported WITHOUT it and the import landed a pipeline that could not parse.
+     */
+    it('is offered for export again', () => {
+        expect(BUNDLE_KINDS.map((k) => k.kind)).toContain('schema');
+    });
+
+    it('is ordered BEFORE the pipeline that names it, beside grammar and mapping', () => {
+        const order = BUNDLE_KINDS.map((k) => k.kind);
+        const pipeline = order.indexOf('authored-pipeline');
+        expect(pipeline).toBeGreaterThan(-1);
+        for (const companion of ['grammar', 'schema'] as BundleKind[]) {
+            const at = order.indexOf(companion);
+            expect(at).toBeGreaterThan(-1);
+            expect(at).toBeLessThan(pipeline);
+        }
+    });
+
+    /** ⚠ The list stays DECLARED but empty — it is what gives a genuinely retired kind a real sort index
+     *  and a place in the known-kinds set, so an old bundle still parses instead of failing whole-file. */
+    it('leaves the legacy list empty rather than deleted', () => {
+        expect(LEGACY_BUNDLE_KINDS).toEqual([]);
     });
 });

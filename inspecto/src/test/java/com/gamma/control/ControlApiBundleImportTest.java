@@ -270,10 +270,14 @@ class ControlApiBundleImportTest {
      * {@code grammar}, the companion beside it, was ordered correctly all along, which is what made the
      * omission easy to miss.
      *
-     * <p>⛔ <b>{@code schema} is deliberately excluded</b>, against the letter of pipeline spec gap 6c:
-     * it was retired as a bundle kind on 2026-07-31 (unification W1) and {@code transfer/bundle.ts} says
-     * it "must never be offered for export again". Ordering it would enshrine a withdrawn kind. (That the
-     * server still WRITES one is a separate defect — BUNDLE-SCHEMA-1.)
+     * <p>🔴 <b>{@code schema} is now REQUIRED here, and this assertion was inverted on 2026-08-31</b>
+     * (BUNDLE-SCHEMA-1). It previously demanded schema's ABSENCE, on the belief the kind was retired by
+     * unification W1 (2026-07-31). That retirement was <b>reversed five days later</b>:
+     * {@code ComponentStore.WRITABLE_TYPES} records {@code schema} re-added 2026-08-05 with the original
+     * objection resolved — {@code processing.schema_file: schema/<id>} resolves to
+     * {@code registry/schema/<id>}, so a registry schema IS the executed schema. It is therefore a
+     * referenced kind exactly like {@code grammar}, and excluding it meant a pipeline was written before
+     * the schema it parses with.
      *
      * <p>⚠ <b>Deliberately not "every supported kind must be listed".</b> Omission means "apply last",
      * which is the CORRECT place for a kind that references a pipeline rather than being referenced by
@@ -284,9 +288,7 @@ class ControlApiBundleImportTest {
     void aPipelinesCompanionsAreAppliedBeforeThePipeline() {
         int pipeline = BundleRoutes.APPLY_ORDER.indexOf("authored-pipeline");
         assertTrue(pipeline >= 0, "authored-pipeline must be ordered at all");
-        assertFalse(BundleRoutes.APPLY_ORDER.contains("schema"),
-                "schema was retired as a bundle kind (unification W1); ordering it would re-admit it");
-        for (String companion : java.util.List.of("grammar", "mapping", "connection")) {
+        for (String companion : java.util.List.of("grammar", "mapping", "schema", "connection")) {
             int at = BundleRoutes.APPLY_ORDER.indexOf(companion);
             assertTrue(at >= 0, companion + " is a supported kind an authored pipeline references, so "
                     + "leaving it out of APPLY_ORDER applies it AFTER the pipeline that needs it");

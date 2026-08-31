@@ -85,21 +85,24 @@ final class BundleRoutes implements RouteModule {
      *  pipeline was written before the mapping it names. It sits beside {@code grammar}, the companion that
      *  WAS ordered correctly, which is what made the omission easy to miss.
      *
-     *  <p>⛔ <b>{@code schema} is deliberately NOT here, against the letter of that gap.</b> It was retired
-     *  as a bundle kind on 2026-07-31 (unification W1): a schema lives only in the config TOON the engine
-     *  executes, and {@code transfer/bundle.ts} states it "must never be offered for export again". Ordering
-     *  it would enshrine a kind the product withdrew. 🔴 Separately, this server does NOT honour that
-     *  retirement — {@code supported()} reuses {@code WRITABLE_TYPES}, which still carries {@code schema},
-     *  so an old bundle's schema item is WRITTEN here while the UI and its mock expect it skipped. Filed as
-     *  BUNDLE-SCHEMA-1; not resolved here, because whichever way it goes is a product call, not an
-     *  ordering one.
+     *  <p>🔴 <b>{@code schema} joined 2026-08-31</b> (BUNDLE-SCHEMA-1), and the story is worth keeping
+     *  because it was got wrong twice. Gap 6c's row said to order it; that was refused on the grounds it had
+     *  been "retired as a bundle kind on 2026-07-31 (unification W1)". The retirement was real but was
+     *  <b>REVERSED five days later</b> — {@code ComponentStore.WRITABLE_TYPES} records {@code schema}
+     *  re-added 2026-08-05 (ELT amendment Phase 1 slice 3) with the original objection resolved: a registry
+     *  schema IS executable, since {@code processing.schema_file: schema/<id>} resolves to
+     *  {@code registry/schema/<id>}, the exact mirror of {@code grammar/<id>}
+     *  ({@code ConfigSafetyValidator.REGISTRY_REF_PREFIXES}). So this server was right to write it and the
+     *  UI was the stale surface. It is a REFERENCED kind like {@code grammar} and {@code mapping}: absent
+     *  from this list, {@link #orderOf} sorted it LAST and an authored pipeline was written <b>before</b>
+     *  the schema it executes — the identical defect ordering {@code mapping} fixed.
      *
      *  <p>⚠ Absence is not always a bug: a kind that REFERENCES a pipeline rather than being referenced by
      *  one ({@code expectation}, {@code decision-rule}) is correct to apply last, which is exactly what
      *  omission gives it. So the invariant worth pinning is "a referenced kind precedes its referencer",
      *  not "every supported kind appears here" — see {@code ControlApiBundleImportTest}. */
     static final List<String> APPLY_ORDER =
-            List.of("connection", "grammar", "mapping", "transform", "sink", "dataset", "query",
+            List.of("connection", "grammar", "mapping", "schema", "transform", "sink", "dataset", "query",
                     "widget", "dashboard", "reconciliation", "authored-pipeline", "enrichment", "job",
                     "saved-view");
 

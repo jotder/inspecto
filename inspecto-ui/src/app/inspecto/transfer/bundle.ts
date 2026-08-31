@@ -38,12 +38,13 @@ export type BundleKind =
     | 'enrichment'
     | 'job'
     | 'decision-rule'
-    // LEGACY, retired 2026-07-31 (unification W1): `schema` is no longer a registry component — a schema
-    // lives only in the config TOON the engine executes. Kept in the TYPE, and in KNOWN_KINDS below, so an
-    // ALREADY-EXPORTED bundle still parses and the operator gets an honest per-item "skipped: unsupported
-    // kind" row from the server. Dropping it here instead would make parseBundle reject the whole file with
-    // `unknown kind "schema"` — a hard failure over one obsolete item. Not in BUNDLE_KINDS: it must never
-    // be offered for export again.
+    // 🔴 `schema` was retired as a bundle kind on 2026-07-31 (unification W1) and RE-ADMITTED on
+    // 2026-08-05 (ELT amendment Phase 1 slice 3) with the original objection resolved — a registry schema
+    // IS executable: `processing.schema_file: schema/<id>` resolves to `registry/schema/<id>`, the exact
+    // mirror of the `grammar/<id>` wiring (`ConfigSafetyValidator.REGISTRY_REF_PREFIXES`). This file kept
+    // the July retirement note for a month, which is why export stopped offering it while the server kept
+    // writing it. Restored to BUNDLE_KINDS 2026-08-31 (BACKLOG BUNDLE-SCHEMA-1): a pipeline that names a
+    // registry schema must carry it, or the import lands a pipeline that cannot parse.
     | 'schema';
 
 /** Import order: referenced kinds before their referencers, so a fresh instance renders everything
@@ -51,6 +52,9 @@ export type BundleKind =
 export const BUNDLE_KINDS: { kind: BundleKind; label: string }[] = [
     { kind: 'connection', label: 'Connections' },
     { kind: 'grammar', label: 'Grammars' },
+    // Beside grammar, and for the same reason: a pipeline REFERENCES it by config key
+    // (`processing.schema_file: schema/<id>`), so it must be written before the pipeline that names it.
+    { kind: 'schema', label: 'Schemas' },
     { kind: 'transform', label: 'Transforms' },
     { kind: 'sink', label: 'Sinks' },
     { kind: 'dataset', label: 'Datasets (metadata)' },
@@ -115,13 +119,16 @@ export interface MetadataBundle {
 /** Kinds retired from export but still ACCEPTED on import, so an older bundle parses instead of being
  *  rejected outright.
  *
- *  🔴 The line that used to end "…the server then reports them per-item as skipped" was WRONG, and was
- *  corrected 2026-08-31. The offline mock skips such an item (its own spec pins that), but the real
- *  `BundleRoutes` WRITES it: `supported()` reuses `ComponentStore.WRITABLE_TYPES`, which carries
- *  `schema`. So the same old bundle imports differently offline and against a backend. Filed in BACKLOG
- *  — do not "fix" either side by assuming the other is right; it is a product question about what a
- *  bundle may carry. */
-export const LEGACY_BUNDLE_KINDS: BundleKind[] = ['schema'];
+ *  ✅ **Empty since 2026-08-31** (BUNDLE-SCHEMA-1). It held `schema`, on the belief that the kind was
+ *  retired — but the retirement was reversed five days later and a registry schema is executable, so the
+ *  server was right to write it and this file was the stale surface. `schema` is a first-class
+ *  {@link BUNDLE_KINDS} entry again.
+ *
+ *  ⚠ Kept as a declared, EMPTY list rather than deleted: it is what gives a genuinely retired kind a real
+ *  index in {@link KIND_ORDER} (a missing one makes `byKindThenId` compute NaN) and a place in
+ *  `KNOWN_KINDS` so `parseBundle` does not reject a whole old file over one obsolete item. The next
+ *  retirement needs this, not a re-invention of it. */
+export const LEGACY_BUNDLE_KINDS: BundleKind[] = [];
 
 /** Sort order. Legacy kinds are appended so an item of a retired kind still gets a REAL index — a
  *  missing one would make `byKindThenId` compute NaN and leave an old bundle's items unordered. */
