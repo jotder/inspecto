@@ -401,8 +401,9 @@ export class PipelineLoadDefinitionComponent {
         // …and arms the drawer's Apply. ⚠ Without this the pane emitted `dirtyChange` only from the node
         // effect and from `submit()` itself, so EVERY mapping edit left Apply greyed out: a builder could
         // author rules, press Apply, and watch the Map Step stay "Needs config" — the same dead end
-        // BUILDER-1a closed on the Parse drawer. `dirty` is a form flag, so the programmatic seeding in
-        // `seedRules` (which ends `markAsPristine`) reports false and cannot arm it spuriously.
+        // BUILDER-1a closed on the Parse drawer. `dirty` is a form flag, so seeding AUTHORED rules (which
+        // ends `markAsPristine`) reports false and cannot arm it spuriously; a DERIVED proposal arms it
+        // deliberately — see `seedRules`.
         this.form.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.emitDirty());
     }
 
@@ -495,6 +496,7 @@ export class PipelineLoadDefinitionComponent {
                 if (!this.ruleRows.length && names.length)
                     this.seedRules(
                         names.map((n) => ({ targetColumn: n, sourceExpression: n, transformType: 'DIRECT' })),
+                        true,
                     );
             },
             error: (e) => {
@@ -505,7 +507,19 @@ export class PipelineLoadDefinitionComponent {
         });
     }
 
-    private seedRules(rows: RuleRow[]): void {
+    /**
+     * Fill the rule rows.
+     *
+     * <p>⚠ `proposal` is the difference between AUTHORED and DERIVED rows, and it decides whether Apply
+     * is reachable. Rules read off the node are authored config: seeding them leaves the form PRISTINE, so
+     * re-opening a configured Step does not read as unsaved. The straight-through rows `loadSchemaFields`
+     * derives from the parser's schema are a *proposal* — nothing is authored yet — and seeding those
+     * pristine greyed Apply out over a complete, correct mapping: the Step stayed "Needs config" and the
+     * only way forward was to fake an edit on a field that already held the right value. That defeated the
+     * derivation's own stated purpose ("a freshly-parsed pipeline maps end to end without hand-typing") and
+     * was the first wall a new author hit. A proposal therefore arms Apply, so accepting it is one click.
+     */
+    private seedRules(rows: RuleRow[], proposal = false): void {
         this.ruleRows.clear();
         for (const r of rows) {
             this.ruleRows.push(
@@ -516,7 +530,11 @@ export class PipelineLoadDefinitionComponent {
                 }),
             );
         }
-        this.form.markAsPristine();
+        if (proposal) this.form.markAsDirty();
+        else this.form.markAsPristine();
+        // The `form.valueChanges` subscription already fired for every `push` above — while the form was
+        // still pristine — so the flag flipped after it and nothing has told the drawer yet.
+        this.emitDirty();
     }
 
     private emitDirty(): void {

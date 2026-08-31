@@ -410,12 +410,30 @@ describe('PipelineLoadDefinitionComponent — mapped output (B1)', () => {
      * programmatic spec would pass against the broken build.
      */
     it('arms the drawer Apply when a rule is edited', async () => {
-        const fixture = await create();
-        expect(fixture.componentInstance.dirty).toBe(false); // seeding alone must not arm it
+        // Baseline on a node whose rules are AUTHORED: seeding those must not arm Apply spuriously.
+        // (The derived-proposal case is the opposite and is asserted below.)
+        const fixture = await create(mapNode({ rules: [{ targetColumn: 'A_NUMBER', sourceExpression: 'A_NUMBER' }] }));
+        expect(fixture.componentInstance.dirty).toBe(false);
         const cell = fixture.nativeElement.querySelectorAll('input[aria-label="Target column"]')[0] as HTMLInputElement;
         cell.value = 'MSISDN';
         cell.dispatchEvent(new Event('input'));
         fixture.detectChanges();
+        expect(fixture.componentInstance.dirty).toBe(true);
+    });
+
+    /**
+     * Found by building a pipeline in the UI end to end: the straight-through rules derived from the
+     * parser's schema were seeded PRISTINE, so Apply was greyed out over a complete, correct mapping and
+     * the Step stayed "Needs config" — the author's only way forward was to fake an edit on a field that
+     * already held the right value. A DERIVED proposal is not authored config; accepting it must be one
+     * click. ⚠ Asserts the emitted `dirtyChange`, which is what actually arms the drawer's button.
+     */
+    it('arms the drawer Apply on the straight-through mapping derived from the schema', async () => {
+        const fixture = await create(mapNode()); // no authored rules ⇒ the schema fields are proposed
+        const targets = Array.from(
+            fixture.nativeElement.querySelectorAll('input[aria-label="Target column"]') as NodeListOf<HTMLInputElement>,
+        ).map((i) => i.value);
+        expect(targets).toEqual(['A_NUMBER', 'DURATION']);
         expect(fixture.componentInstance.dirty).toBe(true);
     });
 
