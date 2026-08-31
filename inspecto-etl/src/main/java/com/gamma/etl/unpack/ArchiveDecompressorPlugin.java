@@ -108,8 +108,7 @@ public abstract class ArchiveDecompressorPlugin implements DecompressorPlugin {
                         entryBytes += n;
                         total += n;
                         if (entryBytes > limits.maxEntryBytes())
-                            throw new IOException(id + ": entry '" + e.getName()
-                                    + "' exceeds max_entry_bytes (" + limits.maxEntryBytes() + ")");
+                            throw new IOException(id + ": entry '" + e.getName() + "' exceeds max_entry_bytes (" + limits.maxEntryBytes() + ")");
                         if (total > limits.maxTotalBytes())
                             throw new IOException(id + ": archive exceeds max_total_bytes ("
                                     + limits.maxTotalBytes() + "): " + source.getFileName());
@@ -168,8 +167,7 @@ public abstract class ArchiveDecompressorPlugin implements DecompressorPlugin {
         public Zip() { super("zip", List.of(".zip")); }
         @Override protected ArchiveInputStream<?> open(InputStream raw) { return new ZipArchiveInputStream(raw); }
         @Override protected boolean magicMatches(byte[] m) {
-            return m.length >= 4 && m[0] == 'P' && m[1] == 'K'
-                    && (m[2] == 3 || m[2] == 5 || m[2] == 7);
+            return m.length >= 4 && m[0] == 'P' && m[1] == 'K' && (m[2] == 3 || m[2] == 5 || m[2] == 7);
         }
     }
 
