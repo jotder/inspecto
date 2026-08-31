@@ -212,7 +212,37 @@ template codemod has already damaged 84 attributes in this repo once, so the exc
 is regenerated) → UI `.ts` mirrors → routes with aliases → docs → `node tools/check-vocabulary.mjs`
 (the guard is the arbiter of the canonical word) → full reactor.
 
-### 🔴 ATTEMPTED 2026-08-31 and BLOCKED BY THE SANDBOX, not by a decision
+### 🔴 THE REAL BLOCKER: four names only the GLOSSARY may decide
+
+The full declaration sweep (not the prefix grep that produced the eleven-row table above) finds
+**fourteen main-source types and ~twelve test classes** carrying the word. **Four of them have no
+canonical target**, and inventing one is not a licence this plan has — `docs/GLOSSARY.md` is *"the single
+source of truth for what every concept is called"* and CLAUDE.md forbids coining a term over it:
+
+| Type | Why the obvious target fails | Candidate |
+|---|---|---|
+| `BatchProcessor` | 🔴 `ConsignmentProcessor` **is taken** — the third-party post-sync SPI implemented by `packs-dev/*` and `tools/templates/processor`. Renaming the SPI breaks plugin authors; sharing the word breaks *one word → one concept* | `ConsignmentIngestor` |
+| `CsvBatchStrategy` | `CsvConsignmentStrategy` reads as gibberish; the concept word is redundant beside `Csv` | `CsvIngestStrategy` |
+| `StreamingPluginBatchStrategy` | same | `StreamingPluginIngestStrategy` |
+| `PipelineBatchSignal` | `PipelineConsignmentSignal` is defensible but is a **published signal name** | `PipelineConsignmentSignal` |
+
+⇒ **This is the whole remaining gap, and it is four words.** Everything else is settled: the ten
+unambiguous renames, the automatic exclusions, the no-sweep-of-docs rule, and the verification chain.
+
+⚠ **Why this must not be guessed.** A bad name here costs a SECOND 889-occurrence sweep to correct, and
+vocabulary drift is exactly what the GLOSSARY and the `check-vocabulary` guard exist to prevent. Coining
+four terms unreviewed and sweeping the codebase through them is the opposite of the *"one concept → one
+word"* discipline this rename is FOR.
+
+### Sandbox note — the sweep tooling was also denied
+
+Separately from the naming: a scripted word-boundary rewrite over the tracked `*.java` set, and a bulk
+`grep | xargs` count, were both refused by the environment's permission classifier. **Nothing partial was
+written; the tree was verified clean.** Bounded rewrites over explicitly named files are allowed, so this
+is not the binding constraint — the four names are — but whoever executes the sweep should expect to need
+a Bash permission rule for an unbounded one.
+
+### 🔴 Timing was NOT the blocker, and this plan said so wrongly twice
 
 GLOSSARY §13 records **operator: "go"** on this rename ("SCHEDULED 2026-08-05 — Phase 7 (D-12), the final
 pre-release phase of the MAJOR… in-window"), and its one sequencing condition — *"executed after amendment
