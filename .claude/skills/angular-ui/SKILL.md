@@ -221,6 +221,21 @@ src/app/
   lossless editable graph), save with `savePipelineGraph(name, graph)` (`PUT /pipelines/{name}/graph` —
   the backend lowers it back over the existing file through the SAME `/config/write` gate). Create a
   new pipeline via the shared **`pipelineScaffold(name)`** (`inspecto/component-model`) → `configApi.write('pipeline', …)` → `registerPipeline`; delete via `configApi.remove('pipeline', name)`.
+  ⚠ **A pipeline's SATELLITE configs must carry its own directory** (2026-08-31, SATELLITE-WRITE-1):
+  the editor resolves `read('pipeline', id).path`'s parent into `configSubdir` and every definition pane
+  passes it as `subdir` on each satellite read AND write — schema, mapping **and enrichment** (the
+  committed samples put an enrichment beside its pipeline). Without it a write lands at the write ROOT,
+  orphaning a duplicate for any pipeline in a subdirectory, and the root file then WINS the read
+  (`resolveSatelliteForRead` only scans when the convention path misses) — so the drawer edits a schema
+  the engine never loads. Blank stays `undefined`, not `''`, so a root-level pipeline keeps the server's
+  fallback scan. ⛔ Never infer the directory server-side on a write: a read that finds the wrong file
+  shows wrong data, a write that does destroys the right one. The `_mapping.csv` needs no plumbing — the
+  server splits it out as a sibling of the schema target.
+  ⚠ **`mapping.canonicalName` is the pipeline's declared output STORE**, not decoration —
+  `PipelineLift.emitSinks` reads it (falling back to the pipeline name) for the sink's `store`, the join
+  key downstream jobs/enrichments/Datasets match on and what `GET /pipelines` reports as `produces`. All
+  eleven committed schemas set it to the **pipeline** name, and `raw.name` is a separate raw/source
+  identity (`ORDERS`, `CALL`, `SITES`). ⛔ Never rebuild either from the schema FILE's name.
   ⚠ Node config values are the **raw config-file sections verbatim** — never a typed shape — so
   unmodeled keys survive a save. ⚠ A `PUT …/graph` 422 carries named **`refusals[]`** (`UNSUPPORTED_NODE`
   / `MULTI_PARSER` / `NO_*`) under `error.details`; surface them, don't swallow them (the editor's
@@ -278,7 +293,11 @@ src/app/
   slice B 2026-08-14). ONE seam for "what does this `sourceName` resolve to": `rows(ds, limit?)` (`GET /db/table`,
   or `POST /db/query` with the dataset's Query Core model compiled by `compileSql`), `sql(store, text)` for
   authored SQL, `columns(ds)` for declared-else-1-row-probe columns, `stores()` for the space's store
-  list (`/db/catalog`, business groups only — an `ops:*` table needs a group id a `sourceName` can't carry). ⛔ **Never write
+  list (`/db/catalog`, business groups only — an `ops:*` table needs a group id a `sourceName` can't carry). ⚠ **A DECLARED column list WINS over the probe**, so ⛔ never bake a schema snapshot into a
+  Dataset's `columns` (e.g. at auto-registration): it would silently outlive the next schema change and
+  start describing the store wrongly — derive at read time (2026-08-31, CATALOG-DS-COLUMNS-1). By the
+  same token **zero DECLARED columns is not zero columns**: a card that prints `columns.length` asserts
+  a false 0 over a store that resolves fine. ⛔ **Never write
   `SAMPLE_SOURCES[ds.sourceName]` in a feature** — `inspecto/fixtures/sample-sources.ts` is SPEC-ONLY
   data; that synchronous lookup is why Studio once showed sample data live. ⚠ **A result is a PAGE**: honour `truncated` and surface `error`, never render an
   empty grid for a store that 404'd. ⚠ It is async, so a `computed()` that read rows becomes an
