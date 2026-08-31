@@ -757,6 +757,27 @@ non-blocking:**
 
 ## 6. Engineering / tech-debt
 
+**CHAIN-CONFIG-1 — a post-sync step's config is stringified, and a null value NPEs (2026-08-31).** Found
+while building the `consignment.process` chain editor (pipeline spec gap 12); **the UI now refuses both
+cases at authoring time**, so this row is about the ENGINE still accepting them from a hand-authored job.
+`ConsignmentProcessJobType.chainConfigsOf` reads each entry into a `Map<String,String>` with
+`String.valueOf(v)`:
+
+- 🔴 **A nested value is silently mangled.** `{"config":{"columns":["a","b"]}}` saves, runs, and reaches
+  the processor as the string `"[a, b]"` — a Java `List.toString()`. Nothing warns; the step reads
+  nonsense. Either refuse a non-scalar at parse time, or document that `config` is scalars-only and keep
+  refusing — but not the current accept-and-corrupt.
+- ⚠ **A null value throws NPE, not a message.** The map is built with a null value and then handed to
+  `Map.copyOf`, which rejects nulls — so `{"config":{"x":null}}` fails the run with a stack trace instead
+  of naming the key.
+- ⚠ **The length check is run-time only** (`chainConfigs.size() != chain.size()` → `JobResult.failed`), so
+  a misaligned pair authored by hand still gets discovered on the next Consignment commit rather than at
+  save. The editor makes it unsavable through the UI; the API accepts it.
+
+⛔ Not fixed with the editor deliberately: all three are engine behaviour changes, and one of them
+(refusing a non-scalar) could refuse a config a deployment is already running. Needs the operator's call
+on whether to refuse or document.
+
 **~~MOCK-DEAD-COMPUTE-1~~ — CLOSED 2026-08-31: all three blocks are RETAINED, deliberately.** Filed the
 same day as "four blocks of in-browser computation nothing calls", left by the offline mock removal
 (`f1553136`). Grounding refuted the row: **no production path calls any of them — that part held — but

@@ -563,3 +563,142 @@ describe('JobFormDialog', () => {
         });
     });
 });
+
+/**
+ * The `consignment.process` chain (pipeline spec gap 12): the structural editor replaces `processor` +
+ * `chain_config`. These are WIRING tests — the mapper and the editor each have their own specs, and the
+ * defects this codebase keeps finding live between correct units, not inside them.
+ */
+describe('JobFormDialog — the post-sync chain editor', () => {
+    const decl = (name: string, type: string) => ({
+        name,
+        type,
+        required: type !== 'JSON',
+        deduce: '',
+        default: '',
+        description: '',
+    });
+    const chainType = () =>
+        of({
+            id: 'consignment.process',
+            title: 'Process a Consignment',
+            description: '',
+            parameters: [decl('consignment_id', 'STRING'), decl('processor', 'STRING'), decl('chain_config', 'JSON')],
+            emits: [],
+            artifacts: [],
+            requires: [],
+        });
+
+    function chainJob(params: Record<string, unknown>): JobFormData {
+        return {
+            job: {
+                name: 'j-chain',
+                type: 'consignment.process' as never,
+                cron: null,
+                enabled: true,
+                params,
+            } as never,
+        };
+    }
+
+    it('engages on a type declaring both params, and drops them from the generated form', async () => {
+        const { fixture, c } = create(chainJob({ processor: 'mask,rollup' }), undefined, vi.fn(chainType));
+        await Promise.resolve(); // flush the queued loadParams microtask
+        fixture.detectChanges();
+        expect(c.chainEngaged()).toBe(true);
+        expect(c.paramSpecs().map((s) => s.key)).toEqual(['consignment_id']);
+    });
+
+    it('🔴 fails OPEN on a chain_config it cannot represent — both raw fields stay', async () => {
+        const { fixture, c } = create(
+            chainJob({ processor: 'mask', chain_config: '{"not":"an array"}' }),
+            undefined,
+            vi.fn(chainType),
+        );
+        await Promise.resolve(); // flush the queued loadParams microtask
+        fixture.detectChanges();
+        expect(c.chainEngaged()).toBe(false);
+        expect(
+            c
+                .paramSpecs()
+                .map((s) => s.key)
+                .sort(),
+        ).toEqual(['chain_config', 'consignment_id', 'processor']);
+    });
+
+    it('does not engage on a type declaring only one of the two', async () => {
+        const oneOnly = () =>
+            of({
+                id: 'other',
+                title: '',
+                description: '',
+                parameters: [decl('processor', 'STRING')],
+                emits: [],
+                artifacts: [],
+                requires: [],
+            });
+        const { fixture, c } = create(chainJob({ processor: 'mask' }), undefined, vi.fn(oneOnly));
+        await Promise.resolve(); // flush the queued loadParams microtask
+        fixture.detectChanges();
+        expect(c.chainEngaged()).toBe(false);
+    });
+
+    it('🔴 seeds the editor even though it is rendered behind an @if (the ViewChild setter)', async () => {
+        const { fixture, c } = create(
+            chainJob({ processor: 'mask,rollup', chain_config: [{ config: { columns: 'a' } }, { config: {} }] }),
+            undefined,
+            vi.fn(chainType),
+        );
+        await Promise.resolve(); // flush the queued loadParams microtask
+        fixture.detectChanges();
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('app-job-chain-editor')).toBeTruthy();
+        expect(c.chainEditorRefForTest?.rows.length).toBe(2);
+    });
+
+    it('🔴 a reorder reaches the SAVED body as both params, aligned', async () => {
+        const save = vi.fn(() => of({ name: 'j-chain' }));
+        const { fixture, c } = create(
+            chainJob({ processor: 'mask,rollup', chain_config: [{ config: { m: 1 } }, { config: { r: 2 } }] }),
+            save,
+            vi.fn(chainType),
+        );
+        await Promise.resolve(); // flush the queued loadParams microtask
+        fixture.detectChanges();
+        fixture.detectChanges();
+        c.chainEditorRefForTest!.move(0, 1);
+        fixture.detectChanges();
+        // Everything the dialog needs BESIDES the chain, so the chain is the only variable under test.
+        c.schemaForm.form.patchValue({ scheduleMode: 'manual' });
+        c.paramForm!.form.patchValue({ consignment_id: 'c-1' });
+        c.save();
+        expect(save).toHaveBeenCalled();
+        // The helper types `save` as zero-arg, so reach the recorded arguments through the call list.
+        // ⚠ This is the EDIT path: `update(name, body)` — the body is the LAST argument, not the first.
+        const call = (save.mock.calls as unknown as unknown[][])[0];
+        const body = call[call.length - 1] as { params: Record<string, unknown> };
+        expect(body.params['processor']).toBe('rollup,mask');
+        expect(body.params['chain_config']).toEqual([{ config: { r: 2 } }, { config: { m: 1 } }]);
+    });
+
+    it('🔴 refuses to save while a step has no id, and does not call the API', async () => {
+        const save = vi.fn(() => of({ name: 'j-chain' }));
+        const { fixture, c } = create(
+            chainJob({ processor: 'mask', chain_config: [{ config: {} }, { config: { orphan: true } }] }),
+            save,
+            vi.fn(chainType),
+        );
+        await Promise.resolve(); // flush the queued loadParams microtask
+        fixture.detectChanges();
+        fixture.detectChanges();
+        // Fill everything else, so the ONLY reason this save can refuse is the id-less chain step.
+        // Without this the test would pass on the required `consignment_id` and prove nothing.
+        c.schemaForm.form.patchValue({ scheduleMode: 'manual' });
+        c.paramForm!.form.patchValue({ consignment_id: 'c-1' });
+        expect(c.paramForm!.validate()).toBe(true);
+        c.save();
+        expect(save).not.toHaveBeenCalled();
+        // …and it is visible: the blank-id row's error is on screen, not just in the form state.
+        expect(fixture.nativeElement.textContent).toContain('had no matching processor');
+    });
+});

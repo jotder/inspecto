@@ -80,6 +80,15 @@
         ></inspecto-schema-form>
         }
 
+        <!-- A post-sync chain's two params, edited as ordered steps instead of a comma-separated id list
+             kept aligned with a positional JSON array by hand (pipeline spec gap 12). The schema form above
+             no longer renders either param while this is engaged. -->
+        @if (chainEngaged()) {
+        <div class="mt-3">
+            <app-job-chain-editor #chain></app-job-chain-editor>
+        </div>
+        }
+
         <!-- Platform Service grants (S1-2): the type's declared reach — what it may touch beyond its Run. -->
         @if (typeRequires().length) {
         <div class="mt-4 text-secondary text-xs font-semibold uppercase tracking-wider">Uses services</div>

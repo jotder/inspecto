@@ -107,15 +107,24 @@ former root reference docs** (each index lists them):
   [`archived-documents/retired-concepts/mock-backends.md`](archived-documents/retired-concepts/mock-backends.md).
   Still open: **MOCK-DEAD-COMPUTE-1** in `BACKLOG.md` (four dead in-browser compute blocks).
 
+- [`superpower/pipeline-waves-drain-plan.md`](superpower/pipeline-waves-drain-plan.md) — **IN FLIGHT
+  2026-08-31**, the drain of `pipeline-spec.md`'s remaining waves. §1 records what grounding found the
+  spec's own wave tables got wrong (three of six rows), §2 the work left and its single gate, **§3 the
+  D-9 design pass** that satisfies D8's three conditions. ⛔ Records one thing deliberately NOT done:
+  declaring `steps` in `ConfigSpecs` would shrink the key-coverage ratchet while leaving its own
+  justification true, which is gaming the guard rather than closing the gap.
 - [`superpower/pipeline-spec.md`](superpower/pipeline-spec.md) — **the single consolidated Pipeline
   specification** (2026-08-30), written as the basis for a redesign: vocabulary, config surface, the
   DERIVED graph, Step types and connection rules, execution, extension seams, transfer, and §10's
   grounded list of what is broken, §11's proposed token model, §12's wave plan, and **§13's ten
   decisions, taken 2026-08-31**. ✅ D1: finish the approved amendment
   (`elt-final-amendment-plan.md`, already ~90% shipped) and treat the token model as its next step.
-  **Waves 0 and 1 DRAINED 2026-08-31 — 11 of 17 items.** Still in flight because everything left is
-  **gated**: the ledgers row on D4, Wave 2 on the §0/§11 decisions or the major-bump window, Wave 3
-  (D-9) on a design nobody has written. As-built facts from the drain live in
+  **Waves 0 and 1 DRAINED 2026-08-31 — 11 of 17 items**, and **Wave 2 re-grounded the same day**: rows
+  **11** (the `steps:` authoring surface — the Recipe view's step cards ARE that editor) and **13**
+  (fan-in, decided by D6) are **CLOSED**, row **7** was two-thirds refuted, and Wave 3's row **14** is
+  **DESIGNED**. Still in flight because what remains is **one gate**: rows 1, 7 and 15 all wait on the
+  major-bump window, and row 12 (the post-sync chain's authoring surface) on a UX design. See
+  [`superpower/pipeline-waves-drain-plan.md`](superpower/pipeline-waves-drain-plan.md). As-built facts from the drain live in
   [`okf/backend/control-plane/pipeline-related.md`](okf/backend/control-plane/pipeline-related.md)
   (gap 5) and [`okf/backend/control-plane/metadata-bundle.md`](okf/backend/control-plane/metadata-bundle.md)
   (gap 6); the one item it opened rather than closed is **BUNDLE-SCHEMA-1** in `BACKLOG.md` §6.

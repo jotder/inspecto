@@ -43,6 +43,8 @@ import { datasetOptionLoader, pipelineOptionLoader } from 'app/inspecto/componen
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { AttributeSpec } from 'app/inspecto/component-model';
 import { JOB_ATTRIBUTES } from './job-attributes';
+import { JobChainEditorComponent } from './job-chain-editor.component';
+import { parseChain } from './job-chain';
 import {
     paramDeclsToSpecs,
     paramExtraValidators,
@@ -133,6 +135,7 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
         InspectoAlertComponent,
         ChipComponent,
         InspectoSchemaFormComponent,
+        JobChainEditorComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     templateUrl: './job-form.dialog.html',
@@ -148,6 +151,25 @@ export class JobFormDialog implements AfterViewInit {
 
     @ViewChild('sf') schemaForm!: InspectoSchemaFormComponent;
     @ViewChild('pf') paramForm?: InspectoSchemaFormComponent;
+    /**
+     * The chain editor, seeded the moment it enters the view. A SETTER because the editor is rendered by
+     * `@if (chainEngaged())` and so does not exist when the descriptor is applied — inputs and ViewChilds
+     * are both unresolved at that point. Seeding here also makes it exactly-once: the pending seed is
+     * cleared, so a later re-query (a step switch re-rendering the dialog) cannot clobber live edits.
+     */
+    private chainEditorRef?: JobChainEditorComponent;
+    /** Test seam: the chain editor lives behind an `@if`, so a spec cannot reach it through the DOM. */
+    get chainEditorRefForTest(): JobChainEditorComponent | undefined {
+        return this.chainEditorRef;
+    }
+    @ViewChild('chain') set chainEditor(c: JobChainEditorComponent | undefined) {
+        this.chainEditorRef = c;
+        const seed = this.pendingChainSeed;
+        if (c && seed) {
+            c.seed(seed.processor, seed.chainConfig);
+            this.pendingChainSeed = null;
+        }
+    }
 
     readonly isEdit = !!this.data.job;
     readonly saving = signal(false);
@@ -196,6 +218,26 @@ export class JobFormDialog implements AfterViewInit {
 
     /** The selected Job Type's declared parameters (R3), rendered as a typed form (P3c). */
     readonly paramSpecs = signal<AttributeSpec[]>([]);
+
+    /**
+     * The two params of a post-sync chain (`consignment.process`). When the descriptor declares BOTH and
+     * the stored `chain_config` is representable, `<app-job-chain-editor>` owns them and they are dropped
+     * from the generated form — the author edits ordered steps instead of keeping a comma-separated id
+     * list aligned with a JSON array by counting (pipeline spec gap 12).
+     *
+     * ⚠ **Fails OPEN, deliberately.** Either param missing from the descriptor, or a `chain_config`
+     * this editor cannot represent, leaves both raw fields exactly as they were. A structural editor that
+     * cannot read a value must not be the thing that rewrites it.
+     */
+    private static readonly CHAIN_PARAMS = ['processor', 'chain_config'] as const;
+    readonly chainEngaged = signal(false);
+    /**
+     * The values the chain editor must be seeded with once it exists. The editor is rendered by
+     * `@if (chainEngaged())`, so it is NOT in the view when `applyDescriptor` runs — the seed is applied
+     * from `seedChainIfPending()` after the next render, and cleared so it is applied exactly once
+     * (re-seeding a form the author is editing clobbers it).
+     */
+    private pendingChainSeed: { processor: unknown; chainConfig: unknown } | null = null;
 
     /**
      * Per-key validators for the declared parameters — today only the `JSON` ones, whose validity no
@@ -369,7 +411,22 @@ export class JobFormDialog implements AfterViewInit {
 
     /** Everything a descriptor drives: typed params, declared grants, suggestions, the "what this does" panel. */
     private applyDescriptor(d: JobTypeDescriptor): void {
-        const specs = paramDeclsToSpecs(d.parameters);
+        let specs = paramDeclsToSpecs(d.parameters);
+        // A post-sync chain: hand both params to the structural editor and drop them from the generated
+        // form. Fails open — see CHAIN_PARAMS.
+        const declaredKeys = new Set(specs.map((sp) => sp.key));
+        const chainable = JobFormDialog.CHAIN_PARAMS.every((k) => declaredKeys.has(k));
+        const chainSeed = chainable
+            ? { processor: this.data.job?.params?.['processor'], chainConfig: this.data.job?.params?.['chain_config'] }
+            : null;
+        if (chainSeed && parseChain(chainSeed.processor, chainSeed.chainConfig) !== null) {
+            specs = specs.filter((sp) => !JobFormDialog.CHAIN_PARAMS.includes(sp.key as 'processor'));
+            this.chainEngaged.set(true);
+            this.pendingChainSeed = chainSeed;
+        } else {
+            this.chainEngaged.set(false);
+            this.pendingChainSeed = null;
+        }
         this.paramValidators.set(paramExtraValidators(d.parameters));
         this.paramSpecs.set(specs);
         this.selectedType.set(d);
@@ -439,6 +496,8 @@ export class JobFormDialog implements AfterViewInit {
     save(): void {
         if (!this.schemaForm.validate()) return;
         if (this.paramForm && !this.paramForm.validate()) return;
+        // The chain owns two params the generated form no longer renders, so it validates separately.
+        if (this.chainEngaged() && this.chainEditorRef && !this.chainEditorRef.validate()) return;
         // Create asks the job id only now, at save time — config valid ⇒ advance to the save step.
         if (!this.isEdit && this.step() === 'config') {
             if (this.saveForm.controls.name.pristine) this.saveForm.patchValue({ name: this.suggestedName() });
@@ -468,6 +527,14 @@ export class JobFormDialog implements AfterViewInit {
                 // omitted here like any other blank optional.
                 if (val !== null && val !== undefined && val !== '') params[k] = paramValueToApi(val);
             }
+        }
+        // The chain's two params, aligned by construction rather than by the author counting positions.
+        // ⚠ Written BEFORE the hand-added key/value pairs, which never override a declared param — so a
+        // stale hand-typed `processor` row cannot shadow what the editor produced.
+        if (this.chainEngaged() && this.chainEditorRef) {
+            const chain = this.chainEditorRef.value();
+            params['processor'] = chain.processor;
+            params['chain_config'] = chain.chain_config;
         }
         // Then any additional key/value params the author added by hand (never overriding a declared one).
         for (const g of this.paramsArray.controls) {

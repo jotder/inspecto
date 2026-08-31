@@ -503,7 +503,12 @@ The redesign's actual agenda. Each item is grounded, not suspected.
    2026-08-30.)* ✅ **CLOSED 2026-08-31** — all three, though (c)'s `schema` half was refuted and became
    BUNDLE-SCHEMA-1 instead.
 7. 🔴 **No plugin can add a Step type** (§8) — the SPI is real but unused, and the deployment story is
-   classpath-only.
+   classpath-only. 🔴 **GROUNDED 2026-08-31: two of those three clauses are FALSE.** A contributed
+   step type is authorable (`StepKindRegistry` + Stage 5's CONTRIBUTED lowering) and the SPI has three
+   dev packs and a scaffolding template. **Only "classpath-only" survives**, and precisely:
+   `JobPackManager` loads *only* `JobTypeProvider`/`ExpressionProvider`, so a node-type pack cannot hot
+   load. Now **window-gated** — hot types would make two byte-compared committed contracts vary with the
+   packs dir.
 8. ⚠ **`output_store:` as the Stage-2 arming condition is undiscoverable** (§3) — a `steps:` chain
    silently cannot run without it, and the only signal is a refusal at arming time. ✅ **CLOSED
    2026-08-31** — declared, plus a cross-field rule and its mock mirror, so the answer arrives at save.
@@ -518,16 +523,28 @@ The redesign's actual agenda. Each item is grounded, not suspected.
     `trigger:`/`steps:`/`route:` are confirmed. True block-level debt is **18**, now pinned and
     ratcheted by `PipelineKeyCoverageContractTest`. The `dirs.*` leaf keys are a **separate, still-open**
     problem: `dirs` is declared as a block, so a block-level contract cannot see inside it.
-11. ⚠ **`steps:` has no authoring surface.** A chain is authored as a comma-separated `processor`
-    string plus a positionally-aligned JSON array the author keeps aligned by hand.
-12. ⚠ **The post-sync chain is invisible in the editor.** `open-dag-pipeline-design.md` §6.4 marks
+11. ~~⚠ **`steps:` has no authoring surface.**~~ ✅ **CLOSED 2026-08-31 — the row was wrong twice.**
+    The Recipe view's `<app-pipeline-step-cards>` **is** an ordered chain editor (cards in chain order,
+    insert/remove/move up-down, nested `route` branches), live and wired with `[editable]`. And the
+    "comma-separated `processor` string plus a positionally-aligned JSON array" it describes is **not
+    `steps:` at all** — that is the `consignment.process` Job's param pair, i.e. item 12.
+12. ~~⚠ **The post-sync chain is invisible in the editor.**~~ ✅ **CLOSED 2026-08-31** — authored as ordered
+    steps in the Job dialog (`pipeline-waves-drain-plan.md` §2.1), which also surfaced the engine's
+    accept-and-corrupt handling of a non-scalar config value (**CHAIN-CONFIG-1**). Original text:
+    ⚠ **The post-sync chain is invisible in the editor.** `open-dag-pipeline-design.md` §6.4 marks
     stage 4 SHIPPED in its table (a read-only registered-outputs list) while its own prose two lines
     later says the lane is still invisible — 🔴 the document contradicts itself; the honest reading is
     *read-only view shipped, no canvas authoring*.
-13. ⚠ **Fan-in is canvas-only by decision (D-6)** — it is deliberately never user-wired in the verb
-    vocabulary. A redesign must keep or explicitly overturn that.
+13. ~~⚠ **Fan-in is canvas-only by decision (D-6)**~~ ✅ **CLOSED 2026-08-31 by §13 D6** — kept
+    canvas-only, deliberately, and a token model is explicitly *not* grounds to overturn it
+    speculatively. Not open work; a recorded decision.
 14. ⚠ **D-9 (cross-Consignment windowed dedup) is NAMED, not designed** — no persistence, winner
     policy or window-advance spec exists, despite being called "a designed fast-follow".
+    ✅ **DESIGNED 2026-08-31** — all three answers in `pipeline-waves-drain-plan.md` §3, each forced by a
+    code constraint rather than chosen freely. 🔴 Grounding also refuted two things this spec
+    repeats: the losing rows are **not** automatically quarantined (`duplicate` is just a named relation
+    whose fate the graph decides), and the winner is **non-deterministic** whenever `order_by` is
+    omitted — which is why the design makes it *required* once a window is declared.
 15. ⚠ **Phase 6's deletion half is release-gated** to a major bump, so the legacy read path and the new
     one coexist until then — by decision, not by neglect.
 
@@ -694,13 +711,21 @@ recorded baseline, unmoved.
 
 ### Wave 2 — gated on a decision
 
-| Gap | Gated on | Fix |
+🔴 **GROUNDED 2026-08-31 — three of these five rows were not what the table said.** See
+[`pipeline-waves-drain-plan.md`](pipeline-waves-drain-plan.md) §1 for the reads behind each verdict.
+
+| Gap | Gated on | Verdict after grounding |
 |---|---|---|
-| **7** no plugin can add a Step type | §11 | open the SPI on the `ConsignmentProcessor` shape with the `LOWERED`/`EXECUTED` mode (D0-B). The interface already has the right shape; what is missing is the registry and the mode |
-| **11** `steps:` has no authoring surface · **12** post-sync chain invisible | §0 + a UX design | one surface serves both — an ordered chain editor is what makes the post-sync lane visible |
-| **13** fan-in is canvas-only (D-6) | §11 | a token model makes fan-in *expressible*; that is a reason to **revisit** D-6, not to assume it is overturned |
+| **7** no plugin can add a Step type | ~~§11~~ → **the major-bump window** | 🔴 **Two of three clauses REFUTED.** A plugin step type **is** authorable (`StepKindRegistry` admits a contributed kind at parse time; a CONTRIBUTED node type lowers to a `steps:` entry — open-dag §11 Stage 5, shipped 2026-08-29) and the SPI is **not** unused (`packs-dev/{acme.masker,acme.reconcile,acme.redact}` + `tools/templates/{nodetype,processor,job}`). **The true remainder is the third clause only:** `JobPackManager` loads *only* `JobTypeProvider`/`ExpressionProvider` and rejects a pack with neither, so a node-type pack has **no hot-load path**. ⚠ And that is **window-gated for D2's own reason**: `PipelineProjection` builds the node-attributes **and** step-types catalogs from `PipelineNodeTypes.catalog()`, both **byte-compared** against committed JSON, so hot types would make a committed contract vary with the packs dir |
+| **11** `steps:` has no authoring surface | — | ✅ **SHIPPED — the row was wrong.** `<app-pipeline-step-cards>` is live and wired (`pipeline-editor.component.html:492`, `[editable]="canAuthor()"`), reached by the **Recipe** view toggle: one card per Step in chain order, insert-between, remove, **move up/down** (`moveStepInChain`, tested in `pipeline-graph.spec.ts`), `route` branches nested. Order is node order and lowers at `pipeline-editable.ts:757`. 🔴 The row's *description* — a comma-separated `processor` string plus a positionally-aligned JSON array — describes **row 12's** subject, not this one |
+| **12** post-sync chain invisible | ~~a UX design~~ | ✅ **SHIPPED 2026-08-31.** `<app-job-chain-editor>` in `JobFormDialog`: when the Job Type declares both `processor` and `chain_config`, they leave the generated form and the author edits **ordered steps** — one row per step with its own config, accessible move up/down — emitting the two params **aligned by construction**. 🔴 Grounding found the value contract too: `chainConfigsOf` stringifies every config value, so a nested one is **accepted and corrupted** (`{"columns":["a"]}` → `"[a]"`), and a null NPEs. Both refused at authoring time; the engine half is **CHAIN-CONFIG-1**. Details: `pipeline-waves-drain-plan.md` §2.1 |
+| **13** fan-in is canvas-only (D-6) | ~~§11~~ | ✅ **DECIDED, not open** — §13 **D6** keeps it canvas-only and says a token model is not a reason to overturn it speculatively. A closed row; no work |
 | **1** `Batch` → `Consignment` | §0 (Phase 7) | mechanical but wide: 517 files, 39 `@PublicApi` types. ⚠ Do it as **one** commit with a codemod plus both contract regens — dripping it leaves the codebase in the split state indefinitely, which is the current complaint |
 | **15** Phase 6's deletion half | the major-bump window | already decided; it just needs the window |
+
+🔴 **The gate collapsed to ONE gate.** Rows **1**, **7** and **15** all wait on the same
+major-bump window; rows **11** and **13** are closed; row **12** is the only Wave 2 row an engineer can
+take today. "Gated on a decision" was three different gates when written and is now one release call.
 
 ### Wave 3 — needs design before it can be estimated
 
@@ -716,8 +741,11 @@ recorded baseline, unmoved.
 | Still open | Gate |
 |---|---|
 | ~~ledgers served from a database~~ | ✅ **CLOSED 2026-08-31.** The freshness gate was met (`runPipeline` refreshes after every triggered run; `StatusProjectionFreshnessTest`, falsified) and the operator then took the default: `OperationalDb.Family.STATUS` is now **`db`**, so every deployment serves status/batches/lineage from the projection — DuckDB on Personal, PostgreSQL where the bundle carries the driver and a URL. ⚠ Read surface only: the CSVs stay the durable write-ahead, and `openStatusStore` degrades to the file store with a warning rather than failing boot. 🔴 D4's recorded diagnosis was stale twice over — see §13 D4 |
-| **7** plugin Step types · **11**/**12** the `steps:` authoring surface · **13** fan-in (D-6) · **1** `Batch`→`Consignment` · **15** Phase 6's deletion half | Wave 2 — §0/§11 decisions, a UX design, or the major-bump window |
-| **14** D-9 cross-Consignment dedup | Wave 3 — **named, not designed**; not schedulable until someone writes the spec |
+| ~~**11** the `steps:` authoring surface~~ | ✅ **CLOSED 2026-08-31 — the row was wrong**: the Recipe view's step cards are that editor, live and wired |
+| ~~**13** fan-in (D-6)~~ | ✅ **CLOSED 2026-08-31** — decided by D6, not open work |
+| ~~**12** the post-sync chain's authoring surface~~ | ✅ **CLOSED 2026-08-31** — an ordered-step editor over the `consignment.process` Job's param pair. The engine-side value contract it exposed is **CHAIN-CONFIG-1** |
+| **1** `Batch`→`Consignment` · **7** node-type packs (row 7's true remainder) · **15** Phase 6's deletion half | Wave 2 — **the major-bump window**, one release call for all three. 7 joins them because hot node types would make two **byte-compared committed contracts** vary with the packs dir — D2's own reason |
+| **14** D-9 cross-Consignment dedup | Wave 3 — ✅ **DESIGNED 2026-08-31**, `pipeline-waves-drain-plan.md` §3: ledger = a new per-space `OperationalDb.Family` (default `duckdb`, never off) · winner = declared `order_by`, **required** once `scope:` is a window · window advance = a `MaintenanceJob` task aged by **event time, not mtime**. 🔴 Its sharpest risk is named there: a reprocess must **retract** that Consignment's keys or re-ingested rows are permanently suppressed |
 
 🔴 **What the drain actually taught, and what a future reader should not have to re-learn:** of the
 eleven rows, **six were mis-framed** — 4, 9, 16, 17 in Wave 0, then 6(c) and 2. A row's stated cause is
@@ -829,6 +857,13 @@ post-sync lane a second-class citizen. ⚠ The visual design is genuinely open a
 ⛔ It is named, not designed: nothing states where the ledger persists, the winner policy, or how the
 window advances. **Calling it "a designed fast-follow" is the actual defect** — it invites someone to
 estimate work that has no design. It returns to the board only with those three answers.
+
+> ✅ **The three answers were written 2026-08-31** — `pipeline-waves-drain-plan.md` §3. D8's condition is
+> therefore met and D-9 **is schedulable**, as a build with a named correctness risk: a reprocess is a
+> whole-Consignment supersede with **no row-level retraction anywhere**, so a ledger keyed only on "have
+> I seen this key" would permanently suppress every re-ingested row. The ledger row must carry its
+> producing `consignmentId` and retract in the same transaction as `registry.supersede`. ⚠ Scheduling it
+> is still an operator call — the design does not schedule itself.
 
 ### D9 — "Related to a pipeline" = what it owns, what names it, and what an import needs.
 
