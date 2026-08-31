@@ -18,10 +18,14 @@ import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.serv
  * WGS84 lat/lon becomes a {@link GeoPoint}. Since Phase 4 (`GeoRoutes`, 2026-07-22) this is
  * **backend-first**: `POST /geo/projection` does the DuckDB-side fold over the real Dataset
  * (scaling far beyond the browser's {@link GEO_POINT_CAP}) and {@link foldServerResult} maps the
- * result into the identical `GeoPoint` shape. When the backend is unavailable (offline demo — the
- * mock answers 501, or a pre-Phase-4 backend) it falls back to the original client-side fold over
- * the Dataset editor's sample rows, byte-identical to the mock-first behaviour. Mirrors the Link
+ * result into the identical `GeoPoint` shape. A backend failure **surfaces** — there is no
+ * client-side fallback since the offline mock backend was removed (`f1553136`). Mirrors the Link
  * Analysis studio's `EntityProjectionGraphSource`/`InvService` backend-first pattern.
+ *
+ * {@link projectPoints}/{@link projectRoutes} are that former fallback, **deliberately retained**
+ * (MOCK-DEAD-COMPUTE-1, decided 2026-08-31): no production path calls them, but they are the fold
+ * `geo-case-studies.spec.ts` runs the CS1–CS5 sample datasets through to pin their invariants
+ * against the live `app/inspecto/geo` analytics. Delete them and that guard goes with them.
  */
 
 /** Above this many points the projection truncates (and says so) rather than melt the map. */

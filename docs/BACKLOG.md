@@ -757,25 +757,28 @@ non-blocking:**
 
 ## 6. Engineering / tech-debt
 
-**MOCK-DEAD-COMPUTE-1 — four blocks of in-browser computation nothing calls (2026-08-31).** Left by the
-offline mock removal (`f1553136`). Each was the *offline arm* of a server-first path; with offline mode
-gone nothing reaches them, and they are referenced **only by their own specs**:
+**~~MOCK-DEAD-COMPUTE-1~~ — CLOSED 2026-08-31: all three blocks are RETAINED, deliberately.** Filed the
+same day as "four blocks of in-browser computation nothing calls", left by the offline mock removal
+(`f1553136`). Grounding refuted the row: **no production path calls any of them — that part held — but
+every one is load-bearing as a test vehicle, for three different reasons.** The row's own framing that
+they are "referenced only by their own specs" was also wrong (the recon pair has three component-spec
+consumers).
 
-| Dead block | Home |
-|---|---|
-| `projectPoints`, `projectRoutes` | `modules/admin/studio/geo-map/geo-projection.ts` |
-| `projectEntities` | `modules/admin/studio/link-analysis/entity-projection.ts` |
-| `aggregateRecon`, `reconBreakSets` | `inspecto/reconciliation/recon-board.ts` |
+| Block | Home | Why it stays |
+|---|---|---|
+| `projectPoints`, `projectRoutes` | `geo-map/geo-projection.ts` | The fold `geo-case-studies.spec.ts` runs the CS1–CS5 datasets through to pin their invariants against the **live** `app/inspecto/geo` analytics (`stayPoints`, `coLocations`, `frequentLocations`, `haversineMeters`, `timeExtent`). Deleting it defuses all five case studies. |
+| `projectEntities` | `link-analysis/entity-projection.ts` | The **reference fold** the live server path `projectTriples` is asserted to agree with shape-for-shape (ids, `kind · count`, node cap), plus the vehicle the four C5 example graph sources are pinned through. |
+| `aggregateRecon`, `reconBreakSets` | `inspecto/reconciliation/recon-board.ts` | The cross-language parity guard its own doc claims (`/recon/run` + `/recon/breaks`, parity with `ReconServiceTest`) — and three component specs (`recon-board`, `recon-view-widget`, `reconciliation-detail`) reach into it. The two are one unit: `reconBreakSets` calls `aggregateRecon`. |
 
-⚠ **Not simply deletable — decide per block.** Each spec suite may be readable as a **mirror of the
-server's contract** rather than a test of dead code: `recon-board.ts`'s own doc says its types "mirror the
-backend `/recon/run` and `/recon/breaks` contracts byte-for-byte" and that it is "unit-tested for parity
-with the backend's `ReconServiceTest`". Deleting that would drop a cross-language parity guard, which is
-the same class of thing the six contract JSONs exist to protect. The geo/link-analysis folds have no such
-stated parity claim — check before assuming symmetry.
+**Shipped with the close** — the stale artifacts the grounding surfaced, all mock-removal residue: both
+projection files' header docs still promised a *"falls back to the client-side fold — the mock answers
+501"* path that no longer exists (a backend failure now surfaces), and each now records **why its fold is
+retained** so this does not get refiled. `geo-projection.spec.ts` had a suite titled *"backend-first,
+client fallback"* and a case titled *"falls back to the client fold when the backend is unavailable"* that
+in fact asserts a rejection — both retitled.
 
-⚠ `inspecto/fixtures/sample-sources.ts` survives only to feed these plus three Studio spec suites; it goes
-when the last consumer does. ⛔ Do not delete it while any spec still imports it.
+⚠ `inspecto/fixtures/sample-sources.ts` therefore **stays indefinitely**: it feeds the geo case studies and
+the C5 graph cases, not just the three Studio spec suites. ⛔ Its retirement is no longer pending anything.
 
 **~~BUNDLE-SCHEMA-1~~ — FIXED 2026-08-31: a pipeline's schema travels again.** Operator decision taken
 the same day: make the schema travel. Three surfaces, all shipped —

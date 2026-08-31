@@ -18,9 +18,14 @@ import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.serv
  *
  * Since INV-1 (2026-07-08) the projection is <b>backend-first</b>: `POST /inv/projection` does the
  * DuckDB-side aggregation over the real Dataset (scaling far beyond browser row-folding) and
- * {@link projectTriples} maps the aggregated triples into the identical G6 shapes. When the backend
- * is unavailable (offline demo — the mock answers 501) it falls back to the original client-side
- * fold over the Dataset editor's sample rows, byte-identical to the mock-first behaviour.
+ * {@link projectTriples} maps the aggregated triples into the identical G6 shapes. A backend failure
+ * **surfaces** — there is no client-side fallback since the offline mock backend was removed
+ * (`f1553136`).
+ *
+ * {@link projectEntities} is that former fallback, **deliberately retained** (MOCK-DEAD-COMPUTE-1,
+ * decided 2026-08-31): no production path calls it, but it is the **reference fold** the live
+ * {@link projectTriples} is asserted to agree with shape-for-shape, and the vehicle the C5 example
+ * graph sources are pinned through. Delete it and both guards go with it.
  */
 
 /** Above this many entities the projection truncates (and says so) rather than melt the canvas. */

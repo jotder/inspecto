@@ -135,7 +135,7 @@ describe('projectPoints', () => {
 // Backend-first wiring (Phase 4, `GeoRoutes`): mirrors the Link Analysis studio's
 // `EntityProjectionGraphSource`/`InvService` pattern — the real assertions live here since
 // `geo-projection.ts` is the only place `GeoService` is called.
-describe('DatasetGeoSource / RouteProjectionGeoSource (backend-first, client fallback)', () => {
+describe('DatasetGeoSource / RouteProjectionGeoSource (backend-first, no fallback)', () => {
     const ds: Dataset = {
         id: 'geo-ds',
         name: 'Geo',
@@ -225,13 +225,13 @@ describe('DatasetGeoSource / RouteProjectionGeoSource (backend-first, client fal
         ]);
     });
 
-    it('RouteProjectionGeoSource falls back to the client fold when the backend is unavailable', async () => {
+    it('RouteProjectionGeoSource surfaces a backend failure instead of substituting sample rows', async () => {
         const geo = { routes: () => throwError(() => new Error('offline')) } as never;
         const src = new RouteProjectionGeoSource({ get: () => of(ds) } as never, geo);
         await expect(
             src.query({
                 routes: { datasetId: 'geo-ds', fromLatCol: 'a', fromLonCol: 'b', toLatCol: 'c', toLonCol: 'd' },
             }),
-        ).rejects.toThrow(); // simbox_sweep has no o/d columns named a/b/c/d — surfaces as a mapping error
+        ).rejects.toThrow(); // the mock-era client fallback is gone (`f1553136`) — the failure propagates
     });
 });
