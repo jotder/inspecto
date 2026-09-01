@@ -789,6 +789,27 @@ non-blocking:**
 
 ## 6. Engineering / tech-debt
 
+**PIPELINE-WAVES-REMAINDER — the last two Pipeline Wave items, both unschedulable as engineering
+(2026-09-01).** The board is **16 of 17** after this shift; plan and evidence in
+[`superpower/pipeline-waves-drain-plan.md`](superpower/pipeline-waves-drain-plan.md).
+
+- **Row 15 — Phase 6's deletion half. ⛔ NOT closable by code.** ELT amendment §6 gives it four steps and
+  **two are unmet**: (3) the legacy read path must be *kept behind a flag* for one verification minor —
+  🔴 **that flag was never built** (no system property or gate disables the legacy read path anywhere in
+  main source); and (4) that minor must ship — the newest tag **`v3.12.0` is 2026-06-05**, ten weeks
+  *before* the converter landed (`f72f7fc8`, 2026-08-18), and is **not an ancestor of `master`**.
+  ⛔ The amendment's §8 also says of this work *"Do not start it on momentum."* Deleting the readers now
+  would destroy the verification window D-2 exists to provide. **Returns only with a release decision.**
+- **D-9 cross-Consignment windowed dedup (wave row 14) — DESIGNED, not scheduled.** D8's three conditions
+  are answered in the plan's §3 (ledger = a new per-space `OperationalDb.Family`, default `duckdb` never
+  off · winner = a **required** `order_by` once `scope:` is a window · window advance = a `MaintenanceJob`
+  task aged by **event time, not mtime**). Two answers remain **operator-owned** before any build:
+  **hashed vs verbatim business keys** (a PII question — verbatim keys in an operational DB is a
+  data-protection surface today's ledgers do not have; recommend hashed) and the **concurrency rule**
+  (recommend insert-wins on a unique `(key, window)` constraint). 🔴 Its sharpest risk is named there: a
+  reprocess is a whole-Consignment supersede with **no row-level retraction**, so a ledger keyed only on
+  "have I seen this key" would permanently suppress every re-ingested row.
+
 **LEDGER-OUTPUT-BYTES-1 — the per-file ledger reports `output_sizes_bytes` as 0 for a real file
 (2026-08-31).** Found by driving two pipelines to SUCCESS and comparing the ledgers against the files on
 disk. Every row of `<pipeline>_status_<ts>.csv` carries `output_sizes_bytes` `"0"` while the parquet/CSV it
