@@ -10,7 +10,7 @@ configured defaults). As-built: `execution-lanes.md` (recovery-per-lane block),
 `stage1-architecture.md` §Step 3, `db-layer.md` §3.11. ⚠ Known accepted behavior: a dry-run of a
 windowed dedup REFUSES (NONE context, fail-loud by design) — a read-only preview context is a
 possible follow-up, filed under X5's envelope thinking. Companion to
-[`authoring-residuals-plan.md`](authoring-residuals-plan.md); this plan owns what was SPEC'D
+[`authoring-residuals-plan.md`](../archived-documents/plans-archive/authoring-residuals-plan.md); this plan owns what was SPEC'D
 rather than built. Prior
 art: the DataForge wiki (`C:\sandbox\incubetor\docs\wiki` modules 02/03/08 — uncompiled design
 spec; its threading doc uses a superseded preview API, so treat every mechanism as unproven).

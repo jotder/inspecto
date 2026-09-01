@@ -124,7 +124,7 @@ former root reference docs** (each index lists them):
   [`archived-documents/retired-concepts/mock-backends.md`](archived-documents/retired-concepts/mock-backends.md).
   Still open: **MOCK-DEAD-COMPUTE-1** in `BACKLOG.md` (four dead in-browser compute blocks).
 
-- [`superpower/authoring-residuals-plan.md`](superpower/authoring-residuals-plan.md) — **FULLY
+- [`archived-documents/plans-archive/authoring-residuals-plan.md`](archived-documents/plans-archive/authoring-residuals-plan.md) — **FULLY
   DRAINED 2026-09-02, ready to distill+archive**: R1/R2/R4/R5/R6 shipped 2026-09-01 (diagnostics
   codes+guidance incl. COLLECTOR-ERRMSG-1 · the pipeline bundle routes closing TRANSFER-ARCH-1 ·
   snapshot undo/redo · Open-dialog MRU+pins · Dataset-hop retry banner); **R3 mid-branch

@@ -790,7 +790,7 @@ non-blocking:**
 ## 6. Engineering / tech-debt
 
 **AUTHORING-RESIDUALS — FULLY DRAINED 2026-09-02** (spec
-[`superpower/authoring-residuals-plan.md`](superpower/authoring-residuals-plan.md), ready to
+[`archived-documents/plans-archive/authoring-residuals-plan.md`](archived-documents/plans-archive/authoring-residuals-plan.md), ready to
 archive; R1/R2/R4/R5/R6 shipped 2026-09-01, R3 mid-branch `steps:` + the bundle-UI migration
 shipped 2026-09-02; only R7 convert-to-composite remains, a future sketch by design). Two small
 rows R3's grounding opened:
