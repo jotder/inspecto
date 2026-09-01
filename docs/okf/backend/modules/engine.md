@@ -31,7 +31,7 @@ dependencies**: remote protocols live in [connectors](connectors.md), hosted mod
 The concept docs are unchanged by the move; only the home module changed:
 
 - **`inspecto-engine`** (`inspecto-engine`) — the engine cluster: `signal`, `query`,
-  [`pipeline` / pipeline-graph](../pipeline-graph/design.md), `inspector` ([DuckDB](../engine/duckdb.md) sinks
+  [`pipeline` / pipeline-graph](../pipeline-graph/pipeline-graph-design.md), `inspector` ([DuckDB](../engine/duckdb.md) sinks
   plus the fat-jar entry points `CollectorProcessor` and `MainApp`), `ingester`, `ops`,
   [`job`](../control-plane/jobs.md), `enrich`, `alert`, `notify`, `catalog`.
 - **`inspecto-etl`** (`inspecto-etl`) — [`etl`](../engine/ingestion.md): `PipelineConfig`, the

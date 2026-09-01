@@ -165,5 +165,5 @@ concurrent poll or a crash inside that window re-ingests the file — the same i
 
 ## See also
 
-- [Design](design.md) — the graph IR, lift and executor this rides on.
+- [Design](pipeline-graph-design.md) — the graph IR, lift and executor this rides on.
 - [Consignment status flow](../engine/consignment-status-flow.md) — where `FileStage` and the batch ledger fit.

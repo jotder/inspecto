@@ -9,14 +9,15 @@ timestamp: 2026-08-04T00:00:00Z
 
 # Collector configuration
 
-Two screens author a pipeline's `collector:` block, and they are **one** feature:
+One surface authors a pipeline's `collector:` block: the [pipeline editor](pipeline-editor.md)'s
+**`acquisition`** Step definition drawer (also reached through guided mode's Collect chip — the
+onboarding stage-rail shell that used to host a second screen was deleted 2026-08-16, see
+[Onboarding](onboarding.md)).
 
-- Onboarding's **Collection** stage (`/catalog/onboard/<name>/collection`) — see [Onboarding](onboarding.md);
-- the Pipelines editor's **`acquisition`** node dialog — see [Pipelines](pipelines.md).
-
-They always shared the store, the model, the spec table, the form renderer and the engine
-(W2/U-D, 2026-07-31). What they did **not** share — the chrome, the write route, and the node
-model — was unified 2026-08-04.
+Historically two screens rendered it; they always shared the store, the model, the spec table, the
+form renderer and the engine (W2/U-D, 2026-07-31), and the chrome/write-route/node-model gap was
+unified 2026-08-04. The per-*block*-not-per-*node* rules below date from that two-adopter era and
+still hold — the shared table must stay correct for any future second adopter.
 
 ## One store, one spec table
 
@@ -58,7 +59,7 @@ persisted shapes genuinely differ: a `collector:` block vs. a node's raw config 
 The third mode authors the **dataset entry** the engine shipped in ELT Phase 3 S3c-2: `collector:
 {connector: dataset, dataset: <id>}`, resolved to the producer's snapshot dir fresh at every acquire
 cycle by the `dataset` connector scheme, which copies new parquet snapshots into this pipeline's
-inbox. See [Pipelines](pipelines.md) and `okf/backend/engine/`'s S3 concepts.
+inbox. See [Pipelines](pipeline-editor.md) and `okf/backend/engine/`'s S3 concepts.
 
 - The mode owns its field the same way Connection does: `dataset` is asked **only** in Dataset mode,
   `connection` only in Connection mode, and `connector` stays **derived** (Dataset mode ⇒ `dataset`).

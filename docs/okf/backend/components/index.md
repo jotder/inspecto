@@ -1,6 +1,6 @@
 # Components
 
-Reusable, independently-validated building blocks referenced by authored [Pipelines](../pipeline-graph/design.md) via
+Reusable, independently-validated building blocks referenced by authored [Pipelines](../pipeline-graph/pipeline-graph-design.md) via
 `use:`. Stored as TOON files under the write-root registry and served over the `/components` + `/pipelines`
 control routes.
 

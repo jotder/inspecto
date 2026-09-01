@@ -4,7 +4,6 @@
 `docs/superpower/`, the root canon + `compliance/`, and `docs/okf/`. Nothing here is new work — it is
 the existing record, deduplicated and sorted by **who can actually lift the gate**.
 
-⚠ Not yet linked from `docs/INDEX.md` — add the line if this file is kept past the discussion.
 
 ---
 

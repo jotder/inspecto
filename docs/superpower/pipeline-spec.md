@@ -1,7 +1,13 @@
 # The Pipeline — one consolidated specification
 
 **Status:** working document for a redesign (2026-08-30). **This is the single place the Pipeline is
-described.** It is written to be changed: the intent is to rewrite the subsystem from here.
+described *as a plan*.** It is written to be changed: the intent is to rewrite the subsystem from here.
+
+> **Layer split (docs consolidation, 2026-09-01):** as-built truth lives in the OKF tier — the
+> editor UI in `okf/frontend/features/pipeline-editor.md`, the backend model in
+> `okf/backend/pipeline-graph/pipeline-graph-design.md`. This file stays the ACTIVE plan; when its
+> waves drain, distill here-only durable facts into those concepts and archive it per the
+> lifecycle rule.
 
 **What this replaces.** Pipeline knowledge was spread across ~20 files and >500 KB, and no one of them
 told you what a Pipeline *is*. This document states the whole subsystem as it stands today. The deep
@@ -899,7 +905,7 @@ exist, so this is the house pattern.
 `control/` (`PipelineGraphRoutes`, `ConfigReadRoutes`, `ConfigWriteRoutes`, `BundleRoutes`).
 
 **Documents folded into this one** (still on disk as evidence; ⚠ not maintained in parallel):
-`okf/backend/pipeline-graph/` — `pipeline-anatomy.md`, `design.md`, `pipeline-graph-design.md` (144 KB,
+`okf/backend/pipeline-graph/` — `pipeline-anatomy.md`, `pipeline-graph-design.md` (`design.md` was merged into it 2026-09-01) (144 KB,
 the deep design incl. its §14 backlog), `live-execution.md`, `multi-location-ingest.md`,
 `step-park-drain.md` · `okf/backend/engine/` — `node-types.md`, `plugins.md`, `stage1-architecture.md`,
 `ingestion.md`, `branch-aware-ingest.md`, `consignment-status-flow.md`, `consignment-addressing.md`,

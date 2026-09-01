@@ -12,6 +12,6 @@ timestamp: 2026-06-28T00:00:00Z
 Route under the Settings nav group. Manages reusable component definitions via `ComponentsService` —
 `ComponentType` = `grammar` · `schema` · `transform` · `sink` (the palette `COMPONENT_TYPES`), plus `rule`
 (used by the data-table [rule](../design-system/rule.md) save, but intentionally **not** in the palette).
-Grammars are created/edited from the [Pipelines](pipelines.md) `GrammarEditorDialog`, or Onboarding's
+Grammars are created/edited from the [Pipelines](pipeline-editor.md) `GrammarEditorDialog`, or Onboarding's
 Parsing stage — one shared surface, see [Grammar configuration](grammar-config.md). Offline via the `mockFlows`
 `/components/{type}` CRUD store.

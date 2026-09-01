@@ -9,7 +9,7 @@ timestamp: 2026-07-07T00:00:00Z
 
 # Component Registry
 
-Components are the `use:`-referenced building blocks of authored [Pipelines](../pipeline-graph/design.md). They
+Components are the `use:`-referenced building blocks of authored [Pipelines](../pipeline-graph/pipeline-graph-design.md). They
 live under `<write-root>/registry/<type>/` as TOON files, addressed by `<type>/<name>`.
 
 * **Types**: `connection`, `grammar`, `transform`, `sink`, `alert`. ⚠ **`schema` is NOT a component**
@@ -53,4 +53,4 @@ wiring editor nor a storage unification. Adoption (D0→P4) completed 2026-06-28
 `docs/archived-documents/plans-archive/component-model.md` (+ its adoption plan).
 
 The UI counterparts are the [components](../../frontend/features/components.md) and
-[Pipelines](../../frontend/features/pipelines.md) features in the frontend bundle.
+[Pipelines](../../frontend/features/pipeline-editor.md) features in the frontend bundle.

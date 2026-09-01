@@ -387,16 +387,18 @@ exactly one row action, the pencil — **Open onboarding** (*Resume onboarding* 
 pencil is the one and only alter path for a data origin.
 
 **Onboarding a data origin** — *Onboard Stream / Onboard Reference* (the header button on those
-tabs, authoring lenses) opens the guided editor: a stage rail — **Collection → Parsing → Schema &
-Mapping → Enrichment** *(optional)* **→ Dataset & Go-live** (References: Collection → Parsing →
-**Keys & Load** → **Publish**) — over a server-held draft, so you can leave and resume any time;
-the row shows **Draft** in the Catalog until you go live. Capture one sample and each stage shows
-*your* data after that step: parse it, type it (only honestly-cast types are offered), and for
-Streams optionally join in a published Reference **by name** with transform SQL — the enrichment
-then runs after every committed batch. Go-live flips the pipeline active after a confirm; an
-activity glance shows the inbox working, with a link to the full Run history.
+tabs, authoring lenses) asks the minimum in a create dialog (kind, name, optional description),
+then opens the **pipeline editor in guided mode**: a checklist chip strip — **Collect → Parse →
+Schema → Enrich** *(optional)* **→ Publish** (References: Collect → Parse → **Keys & Load** →
+**Publish**) — each chip showing that stage's status and opening its Step. The config on the
+server IS the draft, so you can leave and resume any time; the row shows **Draft** in the Catalog
+until you go live. Capture one sample and it follows you through the definition: parse it, type it
+(only honestly-cast types are offered), and for Streams optionally join in a published Reference
+**by name** with transform SQL — the enrichment then runs after every committed batch. Go-live
+flips the pipeline active after a confirm; an activity glance shows the inbox working, with a link
+to the full Run history.
 
-**Changing a data origin after go-live** — the pencil reopens the same stage rail; nothing is
+**Changing a data origin after go-live** — the pencil reopens the same guided editor; nothing is
 locked. Two things to understand before you press Save:
 
 - **On a Live stream, saving a stage takes effect immediately.** The running service picks up the
@@ -421,11 +423,10 @@ Runs** (row action Pause/Resume).
 - **A Draft**: open it and use **Discard draft** (header button). After a confirm this deletes the
   draft's config files — the pipeline and its schema/enrichment companions. It cannot be undone,
   but it touches configuration only.
-- **A Live stream cannot be removed from the app today.** Discard is hidden once live, and the
-  server refuses to delete an active pipeline — it must be deactivated first, and there is
-  currently **no take-offline control** in the UI (a recorded gap). Retiring a Live stream today is
-  an operator step (deactivate the pipeline in its config file), after which the config can be
-  deleted.
+- **A Live stream is taken offline first, then removed.** The pipeline editor's toolbar
+  **Deactivate** writes `active: false` (the inverse of go-live — landed data and the registered
+  Dataset are kept), after which the config can be deleted; the server refuses to delete an active
+  pipeline.
 - **Removing a Stream never deletes its data.** Deleting the config removes the Catalog row and
   stops future collection, but everything the stream ever produced — the partitioned Parquet, the
   audit trail, quarantine, markers — stays on disk under the Space's data directory and remains

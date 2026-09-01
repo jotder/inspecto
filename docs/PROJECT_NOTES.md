@@ -681,7 +681,7 @@ touching `inspecto-ui/`.** Highlights (full detail there):
   2026-08-04: the server publishes them** on `GET /pipelines/node-types` (`attributes[]`, from
   `NodeAttributes.java`), so `pipelines/node-attributes.ts` is a **fallback**, not the source. Change a node
   attribute in BOTH, or the committed `inspecto/contracts/node-attributes.contract.json` drift check fails on one
-  of the two sides (deliberately — see `okf/frontend/features/pipelines.md`). Adding an `AttributeType` still
+  of the two sides (deliberately — see `okf/frontend/features/pipeline-editor.md`). Adding an `AttributeType` still
   needs `FindingsSpec.TYPES` widened, which `NodeAttribute` now delegates to.
 - **Optimistic mutations** — `optimisticMutate({apply,commit,reconcile,rollback,onError})` (`inspecto/api/
   optimistic.ts`); reassign arrays (`rows=[...]`) so the grid re-renders.

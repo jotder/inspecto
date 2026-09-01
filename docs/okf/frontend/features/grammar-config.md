@@ -13,7 +13,7 @@ One surface authors how raw bytes become rows — a **Grammar** (`docs/GLOSSARY.
 "parser config" / "parse options", banned synonyms):
 
 - the Pipelines editor's **`parse`** node — since 2026-08-15 either the right-dock **Parse drawer** or the
-  `GrammarEditorDialog`, split by the rule below — see [Pipelines](pipelines.md).
+  `GrammarEditorDialog`, split by the rule below — see [Pipelines](pipeline-editor.md).
 
 ⚠ **The Onboarding Parsing stage no longer exists** (P6-e, definition-surface unification): the drawer
 and the dialog are the only two adopters of `<inspecto-grammar-editor>` today. Earlier sections below
@@ -237,7 +237,7 @@ green. The regression spec therefore uses an rxjs `delay` to reproduce productio
 reacts to a fetch, a test that resolves it synchronously is testing a different component.**
 
 - **`[lockType]`** hides the format picker: for a per-format node the format *is* the node's type
-  ([per-format node types](../../backend/pipeline-graph/design.md)), so offering a switch could only author
+  ([per-format node types](../../backend/pipeline-graph/pipeline-graph-design.md)), so offering a switch could only author
   a block the save path refuses with `PARSER_FRONTEND_MISMATCH`. The pane stamps its **derived** frontend
   (`frontend()`, read off the node type) onto the block it emits, never a literal.
 - The pane follows the P2 pure-pane contract: `[node]` in, `(applied)`/`(dirtyChange)` out, no injected

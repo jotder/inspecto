@@ -23,7 +23,7 @@ writes to a sink store. It is hosted as a [`JobType.PIPELINE`](../control-plane/
    a hard error). The Phase-A MVP allowed exactly one seed; Phase C relaxed it to **≥1** (a downstream
    `transform.merge` joins/unions multiple sources).
 3. For each seed, `SourceStoreReader.registerView(…)` registers a DuckDB view over the at-rest Parquet/CSV.
-4. `PipelineExecutor.execute(…)` walks the graph (see [design](design.md)).
+4. `PipelineExecutor.execute(…)` walks the graph (see [design](pipeline-graph-design.md)).
 5. `PartitionSinkWriter` (the `SinkWriter` impl) delegates each sink write to
    [`PartitionWriter`](../engine/output-sinks.md).
 6. Optionally collect provenance (`DbProvenanceStore`, one row per node — shared with the ingest lane

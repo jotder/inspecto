@@ -19,7 +19,9 @@
   `menu-builder.component.spec`). Preview-verified offline end-to-end: star a leaf → the "Favorites" group
   appears top-of-sidebar with the item linking to `/w/<nodeId>`; the star's aria-label flips Add↔Remove; no
   console errors.
-* **Onboarding per-stage "blocked" chip SHIPPED** (BACKLOG §3 Onboarding — "Per-stage findings → blocked
+* *(SUPERSEDED 2026-08-16: the onboarding stage rail this entry describes was deleted — P6-e; the
+  editor's guided checklist chips are the successor, see
+  [pipeline-editor](./features/pipeline-editor.md).)* **Onboarding per-stage "blocked" chip SHIPPED** (BACKLOG §3 Onboarding — "Per-stage findings → blocked
   chip state", the small version): the Stream/Reference onboarding rail now surfaces validation findings as
   a persistent per-stage chip instead of only a transient toast. `StageStatus` gains `'blocked'`;
   `OnboardingStateService` retains each stage's last-save `POST /config/write` findings in a `stageFindings`

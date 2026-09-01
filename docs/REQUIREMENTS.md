@@ -235,7 +235,7 @@ AI-driven autonomy without redesign.
 | UI-1 | **Lens** switcher (Business/Builder/Ops) + Capability-gated panes | Must | SHIPPED | All |
 | UI-2 | Shared design system (status-badge, empty-state, skeleton, grid, connectivity-banner, data-table family) + no-hardcoded-colors CI gate + `/design` gallery | Must | SHIPPED | All |
 | UI-3 | Accessibility: WCAG 2.2 AA, axe-core gate in CI | Must | SHIPPED | All |
-| UI-4 | Offline mock-first operation (one `MockStore`, seed packs, v1-envelope parity) | Must | SHIPPED | All |
+| UI-4 | ~~Offline mock-first operation (one `MockStore`, seed packs, v1-envelope parity)~~ | Must | SUPERSEDED (mock backend deleted 2026-08-31 — the UI now requires a real ControlApi; see `docs/INDEX.md` mock-backend-removal entry) | All |
 | UI-5 | Responsive sweep (32 routes × 2 breakpoints) | Must | SHIPPED | All |
 | UI-6 | **Requirement** intake: Business submits (KPI/Report/Reconciliation/Rule), Builder triages, delivery recorded | Should | SHIPPED (2026-07-07: `RequirementRoutes` — `/requirements` submit/list + `/requirements/{id}/decision`+`/deliver` over the `requirement` component store; UI moved off generic component CRUD to these routes; offline mock parity) | All |
 | UI-7 | **Reconciliation** + **Breaks** (auto-close on re-match; manual resolutions preserved) | Must | SHIPPED | All |

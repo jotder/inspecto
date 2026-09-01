@@ -93,6 +93,13 @@ former root reference docs** (each index lists them):
   capabilities, technical architecture, operations guide, **testing guide** (added 2026-07-16).
 - [`roadmap/`](roadmap/) — stakeholder overview, roadmap (Now/Next/Later), presentation decks.
 
+> **Docs consolidation, pipeline-editor pilot (2026-09-01):** the editor UI's single source of truth
+> is now [`okf/frontend/features/pipeline-editor.md`](okf/frontend/features/pipeline-editor.md)
+> (replaces `pipelines.md`, left as a pointer); `okf/backend/pipeline-graph/design.md` was merged
+> into [`pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md). Layer
+> split: OKF owns as-built truth (UI + backend model separately); `superpower/pipeline-spec.md`
+> stays the active plan. This pass is the template for the per-module consolidation of the rest.
+
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
 - ~~`superpower/mock-backend-removal-plan.md`~~ — **COMPLETE and ARCHIVED 2026-08-31** →
@@ -107,6 +114,8 @@ former root reference docs** (each index lists them):
   [`archived-documents/retired-concepts/mock-backends.md`](archived-documents/retired-concepts/mock-backends.md).
   Still open: **MOCK-DEAD-COMPUTE-1** in `BACKLOG.md` (four dead in-browser compute blocks).
 
+- [`superpower/gate-register.md`](superpower/gate-register.md) — the register of decision-gated
+  rows: what each is waiting on and who owns the call.
 - [`superpower/pipeline-waves-drain-plan.md`](superpower/pipeline-waves-drain-plan.md) — **IN FLIGHT
   2026-08-31**, the drain of `pipeline-spec.md`'s remaining waves. §1 records what grounding found the
   spec's own wave tables got wrong (three of six rows), §2 the work left and its single gate, **§3 the
@@ -292,7 +301,7 @@ former root reference docs** (each index lists them):
   parse → see schema → edit → re-derive; and the generic `parser` migrates to the per-format drawer
   (grounded against the engine's `csv_settings`/`parsing:` merge first) — a parser is always
   format-specific by operator directive, the demo seed included. As-built:
-  [`okf/frontend/features/pipelines.md`](okf/frontend/features/pipelines.md).
+  [`okf/frontend/features/pipeline-editor.md`](okf/frontend/features/pipeline-editor.md).
 
 - ~~`superpower/multiformat-parser-lanes-plan.md`~~ — **COMPLETE and ARCHIVED 2026-08-20**
   ([archive copy](archived-documents/plans-archive/multiformat-parser-lanes-plan.md)). Excel joins
@@ -343,9 +352,9 @@ former root reference docs** (each index lists them):
   redirect**. ⚠ `grammar-editor.dialog` is NOT retired: it still serves a **dangling** `use: grammar/<id>`,
   **binary fixed-width**, and any **generic `parser` node** — all deliberate keeps, and the last of them is
   why the sample thread does not reach every pipeline. As-built lives in
-  [`okf/frontend/features/pipelines.md`](okf/frontend/features/pipelines.md) (the editor, incl. the per-tab
+  [`okf/frontend/features/pipeline-editor.md`](okf/frontend/features/pipeline-editor.md) (the editor, incl. the per-tab
   sample thread), [`okf/frontend/features/onboarding.md`](okf/frontend/features/onboarding.md) (what
-  onboarding still means), [`okf/backend/pipeline-graph/design.md`](okf/backend/pipeline-graph/design.md)
+  onboarding still means), [`okf/backend/pipeline-graph/pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md)
   and [`okf/frontend/features/grammar-config.md`](okf/frontend/features/grammar-config.md).
 
 - ~~`superpower/grammar-templates-not-bindings-plan.md`~~ — **SHIPPED and ARCHIVED 2026-08-15**
@@ -518,7 +527,7 @@ former root reference docs** (each index lists them):
 - ~~`superpower/vocabulary-and-config-contract-plan.md`~~ — **SHIPPED and ARCHIVED 2026-08-04**
   ([archive copy](archived-documents/plans-archive/vocabulary-and-config-contract-plan.md), provenance only).
   All nine defects (D1–D9) and all twelve sequence items closed or reclassified. As-built knowledge lives in
-  [`okf/frontend/features/pipelines.md`](okf/frontend/features/pipelines.md); the deliberate deferrals (D6
+  [`okf/frontend/features/pipeline-editor.md`](okf/frontend/features/pipeline-editor.md); the deliberate deferrals (D6
   timezone-governs-scheduling, D8 authorable `reference:` block, the agent-tool `flow` argument, bare-word
   `flow` identifiers) are in [`BACKLOG.md`](BACKLOG.md). What it left behind, all still live:
   the four-pass vocabulary guard (`tools/check-vocabulary.mjs` — docs, TOON keys, knowledge trees, Java/TS
@@ -599,7 +608,7 @@ former root reference docs** (each index lists them):
   can now test a pipeline against their own data, and run-to-here bounds the run where they asked.
   **Current knowledge → [`okf/backend/engine/pipeline-test-run.md`](okf/backend/engine/pipeline-test-run.md)**
   (containment, the `files` jail, the `to=` cutoff, the falsification probes) and
-  [`okf/frontend/features/pipelines.md`](okf/frontend/features/pipelines.md). The one residual — the node
+  [`okf/frontend/features/pipeline-editor.md`](okf/frontend/features/pipeline-editor.md). The one residual — the node
   config dialog's `/components/*` "Test" affordance, still mock-gated because a node with inline config
   binds no registered component — is a [`BACKLOG.md`](BACKLOG.md) §Pipelines row.
 

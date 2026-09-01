@@ -22,7 +22,7 @@ Inspecto is deliberately **framework-free**: no Spring, no web framework, no IoC
   `static global()` singletons. No annotations, no container.
 * **`ServiceLoader` SPIs** — extension points are plain `META-INF/services` SPIs: the ingestion SPI
   ([`StreamingFileIngester`](./engine/ingestion.md)), source [connectors](./acquisition/connectors.md)
-  (`CollectorConnectorFactory`), pipeline [node types](./pipeline-graph/design.md) (`PipelineNodeType`), the
+  (`CollectorConnectorFactory`), pipeline [node types](./pipeline-graph/pipeline-graph-design.md) (`PipelineNodeType`), the
   [assist agent](./agent/assist-agent.md) (`AssistAgent`), and the `Authenticator` / `Subject` / `TokenRelay`
   trio implemented by `inspecto-security` on Standard ([auth](./editions/auth-security.md)). An absent module
   simply isn't discovered — the no-op path wins. This is what makes
@@ -41,7 +41,7 @@ Inspecto is deliberately **framework-free**: no Spring, no web framework, no IoC
 * **Control plane** ([API](./control-plane/control-api.md), [events/metrics](./control-plane/events-metrics.md),
   [jobs](./control-plane/jobs.md), [multi-space](./control-plane/multi-space.md)) exposes everything over HTTP
   and schedules work.
-* **Pipeline graph** ([design](./pipeline-graph/design.md), [live execution](./pipeline-graph/live-execution.md))
+* **Pipeline graph** ([design](./pipeline-graph/pipeline-graph-design.md), [live execution](./pipeline-graph/live-execution.md))
   is the authored-Pipeline IR + executor layered on top of the engine.
 
 ## Code geography
