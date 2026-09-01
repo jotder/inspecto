@@ -93,12 +93,22 @@ former root reference docs** (each index lists them):
   capabilities, technical architecture, operations guide, **testing guide** (added 2026-07-16).
 - [`roadmap/`](roadmap/) — stakeholder overview, roadmap (Now/Next/Later), presentation decks.
 
-> **Docs consolidation, pipeline-editor pilot (2026-09-01):** the editor UI's single source of truth
-> is now [`okf/frontend/features/pipeline-editor.md`](okf/frontend/features/pipeline-editor.md)
-> (replaces `pipelines.md`, left as a pointer); `okf/backend/pipeline-graph/design.md` was merged
-> into [`pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md). Layer
-> split: OKF owns as-built truth (UI + backend model separately); `superpower/pipeline-spec.md`
-> stays the active plan. This pass is the template for the per-module consolidation of the rest.
+> **Docs consolidation (2026-09-01), passes 1–2 — the Pipeline module.** Layer split: OKF owns
+> as-built truth; `superpower/pipeline-spec.md` stays the active plan. **UI:**
+> [`okf/frontend/features/pipeline-editor.md`](okf/frontend/features/pipeline-editor.md) (replaces
+> `pipelines.md`, left as a pointer). **Backend:** the
+> [`okf/backend/pipeline-graph/`](okf/backend/pipeline-graph/index.md) bundle is the module home —
+> [`pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md) (the model,
+> token voice; 2026-06 design-era prose archived),
+> [`editable-round-trip.md`](okf/backend/pipeline-graph/editable-round-trip.md) (the former
+> §16–§20), NEW [`execution-lanes.md`](okf/backend/pipeline-graph/execution-lanes.md) (the one
+> owner of "which lanes run a pipeline") and NEW
+> [`pipeline-config-keys.md`](okf/backend/pipeline-graph/pipeline-config-keys.md) (the key census:
+> 42 read / 25 declared / 17 parser-only). Re-grounded the same day: `job-vs-step.md` (the
+> PipelineNodeExecutor + packs reality), `ADVANCED_GUIDE.md` §5.3/§10 (retired flow-authoring
+> surface removed, current route list), the Batch→Consignment prose sweep (code names; wire/DDL
+> residuals stay BACKLOG §4), and `configuration.md`'s ghost `source:` block → `collector:`
+> (COLLECTOR-ERRMSG-1 filed). This pattern is the template for the remaining modules.
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
@@ -395,7 +405,7 @@ former root reference docs** (each index lists them):
   `processing.map` instead of being dropped by `PipelineEditable.lower`. Decisions taken as
   recommended — new key (not relocating authoring to the parser node), **refuse** an authored `columns`
   next to a declared `processing.mapping_file`, hand-rolled validation. As-built in
-  [`okf/backend/pipeline-graph/pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md) §16.
+  [`okf/backend/pipeline-graph/editable-round-trip.md`](okf/backend/pipeline-graph/editable-round-trip.md) §16.
 
 - ~~`superpower/consignment-chain-plan.md`~~ — **SHIPPED and ARCHIVED 2026-08-13**
   ([archive copy](archived-documents/plans-archive/consignment-chain-plan.md), provenance only).

@@ -1,7 +1,7 @@
 # Operations: Utilities, Batching, Output & Deployment
 > *Moved from `docs/operations.md` (docs consolidation, 2026-07-16).*
 
-> Part of the [Inspecto](../../../../inspecto/README.md) documentation. See the [docs index](../../../../inspecto/README.md#documentation).
+> Part of the [Inspecto](../../../../inspecto/README.md) documentation. See the [docs index](../../INDEX.md).
 
 ## Pre-ETL Utility Suite
 

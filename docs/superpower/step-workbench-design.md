@@ -3,7 +3,8 @@
 **Status:** DESIGN, not scheduled (operator asked to "fill up the gap", 2026-08-29). No code.
 **Follows:** [`sql-only-transform-feasibility.md`](sql-only-transform-feasibility.md) — this is that
 analysis's recommended step 2, designed. **Concept home on build:**
-`okf/backend/engine/etl-transform.md` + `okf/frontend/features/pipeline-editor.md`.
+`okf/backend/engine/etl-transform.md` (file to be created when this ships) +
+`okf/frontend/features/pipeline-editor.md`.
 
 **The ask:** one place where an author builds a query — naming fields, using functions, choosing the
 input relation, free SQL, a column filter and grouping *together* — tests it against sample data, and

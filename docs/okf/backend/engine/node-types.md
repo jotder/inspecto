@@ -103,6 +103,15 @@ a graph that legitimately still carries one."* Exactly **two** types differ toda
 This is the table to consult before proposing that any of them merge. The second relation is the whole
 story: **a plain `SELECT` emits one relation.**
 
+⚠ **`accepts`/`emits` is the pre-token DATA vocabulary, and the facts below are still real** — each row
+names the DuckDB relations the lift wires and `RowShaper` produces. What changed is what an edge
+*relation* means: under the committed token voice
+([`pipeline-spec.md`](../../../superpower/pipeline-spec.md) §13 D2) a Step receives a **Consignment
+token** and resolves the data by reference — an edge carries **no records**, it names the *outlet* a
+token continues on (`DATA` = the token continues; `DROPPED`/`INVALID`/`DUPLICATE`/`route:*` = a token
+whose `dataRefs` point at that side-relation). The constants keep their spelling deliberately (renaming
+breaks two committed contracts); the full runtime edge model converges at **Phase 7**.
+
 | Type | emits | Authorable? |
 |---|---|---|
 | `transform.map` | `DATA` | ✅ (verb `map`) |

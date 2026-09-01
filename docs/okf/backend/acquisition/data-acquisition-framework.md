@@ -5,8 +5,8 @@
 > *requirement*; the as-built design + phase log live in
 > [`docs/archived-documents/superpowers/specs/2026-06-14-data-acquisition-framework-roadmap.md`](../../../archived-documents/superpowers/specs/2026-06-14-data-acquisition-framework-roadmap.md),
 > and the operator-facing config/runbook are in
-> [`configuration.md`](../config/configuration.md#data-acquisition--the-source-block) and
-> [`integrations.md`](../integrations.md#remote-source-connectors-sftp--ftp).
+> [`configuration.md`](../config/configuration.md#data-acquisition--the-collector-block) and
+> [`integrations.md`](../integrations.md#remote-source-connectors-sftp--ftp--ftps).
 > **Delivered:** the `CollectorConnector` SPI (`com.gamma.acquire`) + local parity (A); readiness/stability gate (B);
 > fingerprint ledger + content dedup (C); collection-guarantee knob + sequence-gap→alert (D); **SFTP + FTP**
 > connectors in the optional `inspecto-connectors` module + connection profiles + integrity + `.bz2`/`.zip` (E);

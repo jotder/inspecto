@@ -15,8 +15,8 @@ timestamp: 2026-09-01T00:00:00Z
 > - [Grammar configuration](grammar-config.md) — the Parse pane and everything Grammar;
 > - [Collector configuration](collector-config.md) — the `acquisition` Step surface;
 > - [Inline AI authoring](inline-ai-authoring.md) — the `<inspecto-ai-assist>` adoption;
-> - `okf/backend/pipeline-graph/` — the backend Pipeline model (lift/lower/validator/executor);
-> - `superpower/pipeline-spec.md` — the ACTIVE redesign plan (distills here when it drains).
+> - [`okf/backend/pipeline-graph/`](../../backend/pipeline-graph/index.md) — the backend Pipeline model (lift/lower/validator/executor);
+> - [`superpower/pipeline-spec.md`](../../../superpower/pipeline-spec.md) — the ACTIVE redesign plan (distills here when it drains).
 >
 > This file replaced `pipelines.md` (2026-09-01 consolidation); the dated change-log form lives in
 > git history and the archived plans it cites. **Current truth only** — superseded states are kept
@@ -379,7 +379,7 @@ database; the lift rebuilds pairing from the stamp.
   `routeNode`, `summarizeNode` are last-one-wins, silently): the discard behavior is PINNED per
   slot in `PipelineEditableTest`; inverting it is an operator call (BACKLOG §4). Mid-branch
   `steps:` sub-chains are refused by both authoring surfaces — design:
-  `superpower/mid-branch-transforms-design.md`.
+  [`superpower/mid-branch-transforms-design.md`](../../../superpower/mid-branch-transforms-design.md).
 
 ## The Recipe view and the step cards
 
@@ -450,7 +450,7 @@ before trusting a described save.
   comma-separated key + refresh seconds. Dedicated `GET/POST /pipelines/{name}/settings` — NOT
   `PUT .../graph`; `PipelineEditable` deliberately never models non-node keys. A hand-built form:
   `fieldSpecsToAttributes` deliberately skips served `LIST`. Backend:
-  [pipeline-graph-design §17](../../backend/pipeline-graph/pipeline-graph-design.md).
+  [editable-round-trip §17](../../backend/pipeline-graph/editable-round-trip.md).
 - **`description`** is declared (`ConfigSpecs.pipeline()`), parsed, projected conditionally by
   `GET /pipelines`, and rendered as the open-dialog row subtitle. ⛔ Display only. ⚠ Settable at
   creation only — the settings dialog has no control for it yet.
@@ -514,7 +514,7 @@ it, owned by BACKLOG (do not trust a save/refusal path without checking these):
   `pipeline-parse-definition.component.ts` — among them the Load drawer's header labeling a
   `transform.map` Step "PARSER" (`kindLabel` is an acquisition/else ternary; cosmetic).
 - **BUILDER-2 #8** (§1): a Recipe-editor branch silently destroyed on save — the editor-side face
-  of the mid-branch refusal (`superpower/mid-branch-transforms-design.md`).
+  of the mid-branch refusal ([`mid-branch-transforms-design.md`](../../../superpower/mid-branch-transforms-design.md)).
 - Single-slot inversion question (§4): whether `recordDedup`/`routeNode`/`summarizeNode` should
   refuse instead of last-one-wins.
 - `description` is not editable post-creation (settings dialog gap, this file §Pipeline-level).

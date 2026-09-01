@@ -11,7 +11,9 @@ timestamp: 2026-07-07T00:00:00Z
 
 An authored Pipeline is **job-style**: it reads data at rest (`source_store`), runs `transform.*` nodes, and
 writes to a sink store. It is hosted as a [`JobType.PIPELINE`](../control-plane/jobs.md) job on the existing
-`JobService` scheduler (cron / `on_pipeline` / manual). Design of record (T32 plan, shipped 2026-06-18/19):
+`JobService` scheduler (cron / `on_pipeline` / manual). This is the **at-rest job lane** — for how it sits
+beside the other four lanes see [execution-lanes.md](execution-lanes.md). Design of record (T32 plan,
+shipped 2026-06-18/19):
 [`flow-live-execution-plan.md`](../../../archived-documents/plans-archive/flow-live-execution-plan.md).
 
 ## `PipelineJobRunner.run()`
@@ -33,10 +35,19 @@ writes to a sink store. It is hosted as a [`JobType.PIPELINE`](../control-plane/
    [consignment status flow](../engine/consignment-status-flow.md).
 7. Advance `PipelineWatermarkStore` per source (opt-in incremental mode); register `sink.view` outputs as durable
    `ViewDefinition`s.
-8. Publish a `BatchEvent`, return a `JobResult`.
+8. Publish a `ConsignmentEvent`, return a `JobResult`.
 
-Config (`*_job.toon`): `type: pipeline`, `pipeline: <authored-pipeline-id>` (canonical since the Tier 3
-rename, vocabulary plan §4 — the pre-rename `flow:` key still reads, dual-read only, never written again).
+Config (`*_job.toon`): `type: pipeline`, plus **exactly one of the two graph sources** (mutually
+exclusive; `PipelineJobRunner` enforces "pick one" at run time — ⛔ neither is `required` in the
+descriptor, see [stage1-architecture §Step 3](../engine/stage1-architecture.md)):
+
+- `pipeline: <authored-pipeline-id>` — an authored graph from `PipelineStore` (canonical since the
+  Tier 3 rename, vocabulary plan §4 — the pre-rename `flow:` key still reads, dual-read only, never
+  written again);
+- `pipeline_config: <path/to/*_pipeline.toon>` — a **flat file's Stage-2 `steps:` chain**, lifted at
+  run time by `PipelineLift.stageTwo` into `source_store(landed) → chain → sink.persistent(output_store)`
+  (the flat file stays the truth). A `transform.join` here resolves its Reference Dataset through the
+  shared `ReferenceReader`, identically to Stage-2 enrichment.
 
 
 ## Config-less ad-hoc run (2026-07-18)
@@ -46,12 +57,10 @@ rename, vocabulary plan §4 — the pre-rename `flow:` key still reads, dual-rea
 and runs it through the exact registered-job lifecycle — deletion-fence `runningFlows()` tracking, per-flow-id
 non-overlap (a re-fire while running records `SKIPPED`), the durable run ledger, and `GET /jobs/runs/{runId}`
 polling — so `GET /jobs` stays config-only while `GET /jobs/{flowId}/runs` serves the ad-hoc history (runs are
-recorded under the flow id; the chain `BatchEvent` is likewise published under the flow id, so downstream
+recorded under the flow id; the chain `ConsignmentEvent` is likewise published under the flow id, so downstream
 `on_pipeline:` consumers key on it, not on a job name). Response mirrors `POST /jobs/{name}/trigger`:
-`202 {runId, pipeline, status}` + `Location`. **Deliberately `…/trigger`, not `…/run`** — `POST …/run?to={nodeId}`
-is the editor's scratch-only run-to-here contract and must never fire a production run. **That route is
-registered since 2026-08-14** (`PipelineGraphRoutes.testRun`, `canAuthorWorkbench`): it parses picked inbox files
-through the real ingest path into a scratch root and writes nothing to production — see
-[`../engine/pipeline-test-run.md`](../engine/pipeline-test-run.md). The split of verbs stands: `…/run` is a
-**simulate**, `…/trigger` is the **operate**. Prefer a persisted `*_job.toon` when a run needs `data_dir`/`batch_id` overrides, a schedule,
+`202 {runId, pipeline, status}` + `Location`. **Deliberately `…/trigger`, not `…/run`** — `…/run` is the
+scratch lane's **simulate** verb, `…/trigger` the **operate**; see
+[execution-lanes.md](execution-lanes.md) and [`../engine/pipeline-test-run.md`](../engine/pipeline-test-run.md).
+Prefer a persisted `*_job.toon` when a run needs `data_dir`/`batch_id` overrides, a schedule,
 or chaining; the ad-hoc route takes no params.

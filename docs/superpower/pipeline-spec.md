@@ -49,7 +49,10 @@ park/drain). Phase 6 slices A–C2 shipped 2026-08-29 (narrow admission, multi-d
 several writes per batch, versioned reference store). **What remains** is Phase 6's *deletion half* —
 retiring the legacy read path, deliberately release-gated to a major bump so there is no permanent dual
 format — and **Phase 7, the `Batch` → `Consignment` rename** (517 files, 39 `@PublicApi` types),
-sequenced last for blast radius. ⚠ I could not confirm a Phase 7 SHIPPED marker; treat it as not done.
+sequenced last for blast radius. ~~⚠ I could not confirm a Phase 7 SHIPPED marker; treat it as not
+done.~~ ✅ **Corrected 2026-09-01: the rename SHIPPED** (`ff33246a`, 155 files — see §12 row 1); the
+deferred residuals (DDL column, wire/persisted `batch_id` spellings, the `.toon` `processing.batch.*`
+keys) are BACKLOG §4 rows, not Phase-7 work.
 
 ⛔ **So the first design decision is not "what should the Pipeline look like" — it is "do we finish the
 approved amendment, or replace it?"** Starting a fresh design without answering that re-opens
@@ -134,7 +137,6 @@ Worked example — `spaces/demo/config/orders/orders_pipeline.toon`:
 ```toon
 name: orders
 active: true
-version: 1
 
 dirs:
   poll:       spaces/demo/data/inbox/orders
@@ -192,7 +194,7 @@ runs it). **They are not the same surface.** Keys the engine reads that the spec
 |---|---|
 | the **entire `parsing:` block** — the design-of-record parsing surface | the UI and validator cannot describe or gate it; only the parser knows it exists. Cross-field *rules* reference `parsing.source_timezone` and `parsing.delimited.date_formats` **with no matching field declared** |
 | `dirs.errors` · `dirs.quarantine` · `dirs.markers` · `dirs.log_dir` | four real directories the engine uses, invisible to validation |
-| `output_store` · `id` | `output_store` is the Stage-2 arming condition (below); `id` is the stable identity |
+| ~~`output_store` · `id`~~ | ✅ corrected 2026-09-01: **both are declared now** (`id` since 2026-08-02; `output_store` 2026-08-31 with the `stage-two-blocks-require-output-store` rule — §12 row 8). Current census: [`okf/backend/pipeline-graph/pipeline-config-keys.md`](../okf/backend/pipeline-graph/pipeline-config-keys.md) — 17 parser-only blocks, not this table's 18 |
 | `route:` · `steps:` · `processing.disabled_steps` | the whole authored chain |
 | `processing.dedup` · `.summarize` · `.join` · `.map` (and `duplicate_check` has only a rule) | five transform blocks |
 | `trigger:` | **no field spec at all** — how a pipeline starts is undescribed |
@@ -905,7 +907,7 @@ exist, so this is the house pattern.
 `control/` (`PipelineGraphRoutes`, `ConfigReadRoutes`, `ConfigWriteRoutes`, `BundleRoutes`).
 
 **Documents folded into this one** (still on disk as evidence; ⚠ not maintained in parallel):
-`okf/backend/pipeline-graph/` — `pipeline-anatomy.md`, `pipeline-graph-design.md` (`design.md` was merged into it 2026-09-01) (144 KB,
+`okf/backend/pipeline-graph/` — `pipeline-graph-design.md` (`design.md` was merged into it 2026-09-01) (144 KB,
 the deep design incl. its §14 backlog), `live-execution.md`, `multi-location-ingest.md`,
 `step-park-drain.md` · `okf/backend/engine/` — `node-types.md`, `plugins.md`, `stage1-architecture.md`,
 `ingestion.md`, `branch-aware-ingest.md`, `consignment-status-flow.md`, `consignment-addressing.md`,

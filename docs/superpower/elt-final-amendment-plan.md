@@ -687,7 +687,7 @@ converter's sink step carries the sink-owned write-tuning keys (`threads`, `duck
 > (`spaces/demo/config/orders/orders_pipeline.toon`). The fix also needed a second half in
 > `PipelineEditable.lower`, which chose the chain spelling from the graph shape alone and so renormalised
 > an authored `steps:` file back to the singular keys — exactness was unreachable without it. As-built
-> in `okf/backend/pipeline-graph/pipeline-graph-design.md` §16. **Two standing lessons for the remaining
+> in `okf/backend/pipeline-graph/editable-round-trip.md` §16. **Two standing lessons for the remaining
 > phases: a fixture-corpus parity gate proves nothing about a shape no fixture uses, and every reader
 > of a multi-spelling key must be checked against EVERY spelling before it is called lossless.**
 

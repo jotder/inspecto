@@ -1,7 +1,7 @@
 # Configuration Reference
 > *Moved from `docs/configuration.md` (docs consolidation, 2026-07-16).*
 
-> Part of the [Inspecto](../../../../inspecto/README.md) documentation. See the [docs index](../../../../inspecto/README.md#documentation).
+> Part of the [Inspecto](../../../../inspecto/README.md) documentation. See the [docs index](../../INDEX.md).
 
 ## Configuration Reference
 
@@ -261,130 +261,23 @@ enrichment** (`*_enrich.toon`, hand-written SQL over the partitioned output).
 
 ### 3. Pipeline Config (`<source>_pipeline.toon`)
 
-**Machine-generated** by `create-schema`; edit to adjust runtime settings. Also serves as the single configuration file for all pre-ETL utility commands.
+**Machine-generated** by `create-schema` (and by the UI's create scaffold); edit to adjust runtime
+settings. One file configures everything for a source: the `dirs`, `output`, `parsing` and `processing`
+sections drive the ETL runtime, while the `search`, `copy_tars` and `backup` sections are read
+exclusively by the pre-ETL utility commands in `MainApp` — all sections coexist by design.
 
-```yaml
-name: <data_source>_ETL
-active: true        # opt-in execution gate — see "Activation" below
-version: 1
-
-dirs:
-  poll:       inbox/<data_source>
-  database:   database/<data_source>
-  backup:     backup/<data_source>
-  temp:       temp/<data_source>
-  errors:     errors/<data_source>
-  quarantine: quarantine/<data_source>
-  markers:    markers/<data_source>
-  status_dir: status/<data_source>
-  log_dir:    logs/<data_source>
-
-output:
-  format: PARQUET
-  compression: snappy
-  ducklake:
-    enabled: false
-    catalog_url: "postgresql://user:password@localhost:5432/ducklake_db"
-    data_path: "/opt/adj-lake"
-    schema: <data_source>s
-    table: <data_source>_data
-
-processing:
-  threads: 4
-  file_pattern: "glob:**/*.{csv,csv.gz}"
-  duplicate_check:
-    enabled: true
-    marker_extension: .processed
-    retention_days: 90
-  schema_file: "spaces/<id>/config/<data_source>/<data_source>_schema.toon"
-  csv_settings:
-    delimiter: ","
-    skip_header_lines: 0
-    skip_junk_lines: 13
-    skip_tail_lines: 2
-    skip_tail_columns: 0
-    date_formats[3]: %d-%b-%y, "%d-%b-%Y %H:%M:%S", "%d-%b-%Y"
-    timestamp_formats[3]: %d-%b-%y, "%d-%b-%Y %H:%M:%S", "%d-%b-%Y"
-
-search:
-  base_dirs[2]: /mnt/rawdata/feed1, /mnt/rawdata/feed2
-  csv_input:     GSM_RESUBMISSION_1.csv
-  log_available: available_files.csv
-  log_missing:   missing_files.csv
-  log_error:     error_log.csv
-
-copy_tars:
-  base_dirs[2]: /mnt/rawdata/feed1, /mnt/rawdata/feed2
-
-backup:
-  base_dirs[2]: /mnt/rawdata/feed1, /mnt/rawdata/feed2
-  log_available: available_files.csv
-```
-
-The `dirs`, `output`, and `processing` sections are used by `CollectorProcessor` (the ETL runtime). The `search`, `copy_tars`, and `backup` sections are used exclusively by the pre-ETL utility commands in `MainApp`. All sections coexist in a single file — the one file configures everything for a source.
-
-All seven core `dirs.*` entries are required for CollectorProcessor (`poll`, `database`, `backup`, `temp`, `errors`, `quarantine`, `markers`). The optional `status_dir` and `log_dir` entries enable per-run audit and log files. Startup validation confirms that all managed directories are not nested inside the `poll` directory.
-
-**`dirs.markers`** — dedicated directory for `.processed` sentinel files. Mirrors the poll directory tree: a file at `inbox/<data_source>/20200403/feed.csv.gz` produces a marker at `markers/<data_source>/20200403/feed.csv.gz.processed`. Markers are pruned automatically at each poll start; any marker file older than `processing.duplicate_check.retention_days` days is deleted and empty subdirectories are removed. This keeps the markers directory bounded in size without manual intervention.
-
-**`dirs.status_dir`** — directory for per-run status CSVs. Each ETL run creates a new file named `<pipeline_name>_status_<yyyyMMdd_HHmmss>.csv` — runs never overwrite each other. Omit (or leave blank) to disable the status log.
-
-**`dirs.log_dir`** — directory for per-run log files. Each run creates `<pipeline_name>_log_<yyyyMMdd_HHmmss>.log`, capturing a tee of all stdout and stderr output. The timestamp matches the status file for easy correlation. Omit (or leave blank) to disable file logging.
-
-**`processing.duplicate_check.retention_days`** — how far back duplicate detection reaches (default: `90`). A file delivered more than 90 days after its first processing will be treated as a new file and processed again. Increase this value for sources that occasionally re-deliver old data.
+**The block-by-block reference lives in one place:**
+[Pipeline config keys — the single block census](../pipeline-graph/pipeline-config-keys.md).
+That page owns, for every top-level block (`collector:`, `parsing:`, `processing.*`, `output:`/`sinks:`,
+`output_store:`, `route:`, `steps:`, `trigger:`, `produces`/`reference`/`stream`, `template`, …):
+who **declares** it (`ConfigSpecs.pipeline()` vs parser-only), who **reads** it (the engine class),
+which surface **authors** it, and the declared-vs-parser-only coverage census with its ratchet
+(`PipelineKeyCoverageContractTest`). This section deliberately no longer duplicates that material —
+including the multi-schema `schemas[]` dispatch, the `dirs.*` semantics and the `output.format`/
+`compression` tables, whose details now live with the census page and the engine concepts it links.
 
 > **JToon note:** The `.toon` format does not support `#` comment lines. Parsing stops at the first unrecognised character, so do not add inline or standalone comments.
 > 🔴 **This is not always an error.** A comment between two top-level sections makes `JToon.decode` **truncate the file there**, and `PipelineConfig.load` accepts the truncated map with no error and no warning — every key after the comment is silently gone (verified 2026-08-18: a comment block in `spaces/demo/config/orders/orders_pipeline.toon` dropped `output_store:`, `steps:` and `collector:`). Decode an edited config and compare its top-level key list; a successful load is not evidence.
-
-**`processing.csv_settings.has_header`** (default: `true`) — when set to `false`, the first data line is treated as a row rather than a column-name header. Use for source files that contain no header row; columns are bound to the schema by `selector` index. Omitting the key is equivalent to `true`.
-
-#### Multi-schema dispatch
-
-When a single pipeline must handle input files with different column layouts (e.g. three related feeds delivered to the same inbox), replace the single `schema_file:` key with a `schemas[]` inline array. Each entry maps a column count to a schema file and target table, with an optional filename glob for the fast path.
-
-```yaml
-processing:
-  threads: 4
-  file_pattern: "glob:**/*.csv"
-  schemas[3]{column_count,file_pattern,schema_file,table}:
-    76,  "glob:**/*other*", "config/<data_source>/<data_source>_76.toon",  <data_source>_other
-    116, "glob:**/*main*",  "config/<data_source>/<data_source>_116.toon", <data_source>_main
-    537, "",                "config/<data_source>/<data_source>_537.toon", <data_source>_cdr
-  csv_settings:
-    delimiter: ","
-    has_header: false
-    skip_header_lines: 0
-    date_formats[1]: "%Y%m%d"
-```
-
-**Schema selection — two-pass algorithm:**
-
-1. **File-pattern match (fast path, no file I/O)** — entries are checked in declaration order; the first whose `file_pattern` glob matches the input file path is selected. Entries with an empty `file_pattern` are skipped in this pass.
-2. **Column-count probe (fallback)** — if no pattern matched, the file is opened, up to 200 non-blank lines are scanned, and the entry whose `column_count` equals the maximum column count seen is selected.
-
-| Field | Required | Description |
-|---|---|---|
-| `column_count` | yes | Expected column count; used as the key for the fallback probe |
-| `file_pattern` | no | Glob applied to the full input file path. Set to `""` to skip pattern matching for this entry (column-count probe only) |
-| `schema_file` | yes | Path to the `_schema.toon` for this layout |
-| `table` | yes | Logical table name used in log output and DuckLake registration |
-
-> **Windows glob ordering:** Java's `PathMatcher` is case-insensitive on Windows — `glob:**/vou_*` matches `VOU_MAIN_2018.csv`. Always list the most specific patterns first; the first match wins. For entries that should be reached only via the column-count probe, set `file_pattern` to `""` rather than using a broad pattern that could steal files from more specific entries.
-
-#### `output.format`
-
-| Value | Effect |
-|---|---|
-| `CSV` | Writes `.csv` files; `compression` is ignored |
-| `PARQUET` | Writes `.parquet` files with the specified compression codec |
-
-#### `output.compression` (Parquet only)
-
-| Value | Notes |
-|---|---|
-| `snappy` | Default. Fast, moderate compression — best for analytics workloads |
-| `zstd` | Higher compression ratio, slightly slower |
-| `gzip` | Maximum compatibility with external tools |
 
 ---
 
@@ -411,18 +304,25 @@ status/batch/lineage CSVs; only the parse is cached.
 
 ---
 
-### Data acquisition — the `source:` block
+### Data acquisition — the `collector:` block
+
+> ⚠ **Corrected 2026-09-01:** this section previously spelled the block `source:` — a key
+> `PipelineConfigParser` never reads (only `collector:` is parsed; a `source:` block is silently
+> ignored). The parser's own error messages still say `source.dataset` for `collector:` keys —
+> BACKLOG row filed. ⚠ Also note: the collector-level `duplicate:` block is a **no-op on the
+> legacy local poll path** — file-grain dedup there is `processing.duplicate_check` (markers);
+> see [pipeline-config-keys](../pipeline-graph/pipeline-config-keys.md).
 
 By default a pipeline acquires files exactly as it always has: it scans the local `dirs.poll` tree for
-`processing.file_pattern`. An **optional, additive** top-level `source:` block makes acquisition pluggable —
+`processing.file_pattern`. An **optional, additive** top-level `collector:` block makes acquisition pluggable —
 selecting a connector (local / SFTP / FTP), gating half-written files, deduplicating by content, detecting gaps
 in an expected series, and (for remote sources) fetching with retries, integrity checks, parallelism, rate
-limits, and source-side post-actions. **A pipeline with no `source:` block is byte-for-byte unchanged** — every
+limits, and source-side post-actions. **A pipeline with no `collector:` block is byte-for-byte unchanged** — every
 sub-block below defaults to today's behaviour, and each is parsed only when present, so features can be adopted
 one at a time.
 
 ```yaml
-source:
+collector:
   connector: sftp                 # local (default) | sftp | ftp
   connection: prod_sftp           # id of a *_connection.toon profile (remote connectors only)
   include[1]: "glob:**/*.csv"     # defaults to processing.file_pattern; glob: or regex: prefixes

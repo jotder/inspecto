@@ -2,7 +2,7 @@
 type: Concept
 title: Consignment status flow (the flowfile question)
 description: What is recorded about a Consignment as it moves — per-lane identity, status, provenance, live gauges — and how an operator audits a failed file or record.
-resource: inspecto-etl/src/main/java/com/gamma/etl/BatchAuditWriter.java
+resource: inspecto-etl/src/main/java/com/gamma/etl/ConsignmentAuditWriter.java
 tags: [engine, consignment, observability, audit, provenance, quarantine, status]
 timestamp: 2026-08-13T00:00:00Z
 ---
@@ -12,20 +12,18 @@ timestamp: 2026-08-13T00:00:00Z
 "Where is this Consignment, and what happened to it?" — NiFi's flowfile question, answered by four
 separate mechanisms rather than one attribute bag. As-built after the consignment-chain plan
 (shipped 2026-08-12/13; provenance from S3, the live gauge from S7, the audit holes closed after).
-Vocabulary: user-facing **Consignment**; code still says `Batch*` pending the GLOSSARY §13 Phase-7
-sweep (`ConsignmentPlanner` landed early).
+Vocabulary: **Consignment** in code too since the Phase-7 rename shipped (`ff33246a` —
+`ConsignmentAuditWriter`, `ConsignmentManifest`, `ConsignmentEvent`, …); ⚠ wire and persisted
+spellings deliberately kept `batch_id`/`batches` (ledger columns via read-alias, `GET /runs/{n}/batches`,
+the `__batch_id` output column, the `batch_id` `.toon` job key — deferred residuals, BACKLOG §4).
 
-## The two lanes
+## Per lane
 
-| | Ingest lane (EL) | Job lane (T) |
-|---|---|---|
-| Identity | `batchId` = `TS_slug_seq`; `BatchManifest` authoritative per file | `runId`; `batchId` on provenance rows |
-| Terminal status | `SUCCESS`/`FAILED`/`EMPTY` + per-file `QUARANTINED_*` → three CSV ledgers + `CommitLog` (`BatchAuditWriter`) | `JobRun` → `DbJobRunStore` |
-| Per-step counts | `BatchProcessor.recordProvenance` → `parse`/`sink` rows (SUCCESS only) | `PipelineExecutor` records one row per node, flushed with the commit |
-| Live position | `IngestProgress` (which FILE) + `StepProgress` (which STEP) | `StepProgress` (which node of the walk) |
-| Terminal event | `BatchEvent` on the sync `BatchEventBus` **and** the `pipeline.batch.committed\|failed` Signal | `BatchEvent` published by `PipelineJobRunner` |
+The per-lane identity/status table lives in
+[execution-lanes.md](../pipeline-graph/execution-lanes.md) — this page owns the recording mechanisms
+below (gauges, ledgers, quarantine, drill-down).
 
-Both lanes write provenance into the same `inspecto_pipeline_provenance` matrix, through **one**
+All provenance-writing lanes share the same `inspecto_pipeline_provenance` matrix, through **one**
 `DbProvenanceStore` shared via the per-space `ProvenanceStores` registry — DuckDB is single-writer, so
 two independently-opened stores would contend. Default-off (`-Dprovenance.backend=duckdb`); absent, the
 editor's per-edge weights 404 and recording is a map lookup.
@@ -38,7 +36,7 @@ failure alike. Both are served by the existing poll route (`InboxStatus.current`
 `RunRoutes`). Two alternatives were **refused** with reasons that still hold:
 
 - ⛔ **Per-step Signals.** A Signal is a durable ledger write, and the one existing emission is already
-  synchronous *inside the pipeline's run claim* (`BatchAuditWriter.flush` → `PipelineBatchSignal`).
+  synchronous *inside the pipeline's run claim* (`ConsignmentAuditWriter.flush` → `PipelineConsignmentSignal`).
   Per-step would multiply durable writes on the claim-holding thread — and because Signals trigger
   `on_signal` jobs, a mid-batch Signal invites triggered work to fire **while the claim is held**: the
   re-entrancy class [PROJECT_NOTES §6](../../../PROJECT_NOTES.md) forbids. Revisit only at
@@ -78,8 +76,8 @@ by `consignment_id`, and Reprocess by batch id.
 edge** — the designed pattern ("the user never wires these, only tunes where they rest").
 `ConservationCheck` alerts on an unexplained in/out imbalance either way.
 
-⚠ **The batches-ledger header has FIVE mirrors** — `BatchAuditWriter`'s header string, its
-`batchLine()` codec, `BatchRow`, and `OperationalTables.BATCHES` (the agent's SQL surface, which
+⚠ **The batches-ledger header has FIVE mirrors** — `ConsignmentAuditWriter`'s header string, its
+`batchLine()` codec, `ConsignmentRow`, and `OperationalTables.BATCHES` (the agent's SQL surface, which
 declares the header explicitly). Readers parse **by header name per file** (`Csv.readInto`), so
 *appending* a column never breaks old ledger files; a stale mirror silently hides it.
 

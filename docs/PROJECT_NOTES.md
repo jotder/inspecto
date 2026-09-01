@@ -68,6 +68,10 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
 | Production investigation (process/events/metrics/state/`-D` flags/Control API/troubleshooting) | [`ADVANCED_GUIDE.md`](ADVANCED_GUIDE.md) — **living doc** |
 | Pipeline-graph design (IR, lift, validator, executor, registry, T-checklist §14) | [`pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md) |
 | Live execution of authored Pipelines (`JobType.PIPELINE`, T32) | [`live-execution.md`](okf/backend/pipeline-graph/live-execution.md) |
+| Pipeline spec of record + decisions D1–D10 (**active plan**) | [`pipeline-spec.md`](superpower/pipeline-spec.md) |
+| Pipeline editor UI (Recipe/graph views, drawer, attribute forms) | [`pipeline-editor.md`](okf/frontend/features/pipeline-editor.md) |
+| Step park & drain (disabled route branches, `POST /runs/{n}/drain`) | [`step-park-drain.md`](okf/backend/pipeline-graph/step-park-drain.md) |
+| Branch-aware ingest executor (armed `route:`, engagement) | [`branch-aware-ingest.md`](okf/backend/engine/branch-aware-ingest.md) |
 | Data acquisition framework (Phases A–F, connectors, dedup, watermarks) | [`data-acquisition-framework.md`](okf/backend/acquisition/data-acquisition-framework.md) |
 | All TOON config keys | [`configuration.md`](okf/backend/config/configuration.md) |
 | Editions (Personal/Standard/Enterprise = build flavors) | [`EDITIONS.md`](EDITIONS.md) |

@@ -5,15 +5,18 @@
 Closes design §13 R3: an **active** pipeline carrying `route:` executes its branch tree on the
 ordinary ingest path — the graph editor's route vocabulary finally runs where it is authored.
 
+This page owns the **ingest flat / graph-fork mechanism**; the map of all lanes lives in
+[execution-lanes.md](../pipeline-graph/execution-lanes.md).
+
 ## How it runs
 
-- **Divert point:** `BatchIngestStrategy.writeAndTrace` — the one choke point every ingest lane
+- **Divert point:** `ConsignmentIngestStrategy.writeAndTrace` — the one choke point every ingest path
   funnels through with the live DuckDB connection and the materialised `transformed` table (the
   connection is strategy-scoped, which is why no higher divert is possible). A `route:` pipeline
-  diverts when `BatchGraphRunner.engages(PipelineLift.lift(cfg))`; **since 2026-08-29 a NON-route
+  diverts when `ConsignmentGraphRunner.engages(PipelineLift.lift(cfg))`; **since 2026-08-29 a NON-route
   pipeline diverts too** whenever the two lanes are provably the same write — see *The lane fork*
   below. Either way the write segment is replaced by `graphWriteAndTrace`.
-- **Machinery:** `BatchGraphRunner.run` (the `SinkWriter` overload) drives `PipelineExecutor` over
+- **Machinery:** `ConsignmentGraphRunner.run` (the `SinkWriter` overload) drives `PipelineExecutor` over
   the `route → sinks` subgraph, seeded at the route node's upstream (the map node — parse/map are
   never re-run), committing each branch through a durable per-batch `BranchCommitLog` under
   `dirs.temp` via `BranchCommitCoordinator`.
@@ -23,14 +26,14 @@ ordinary ingest path — the graph editor's route vocabulary finally runs where 
   format/compression/`filename_column`, per-branch `LineageCollector` rows and event-time bounds.
 - **Parity by shared code, not mirrors:** the method returns the flat `Written` shape into
   `IngestOutcome`, so `commit`/`finalizeSource`/`writeAudit` — manifest, backup, markers-LAST,
-  dedup ledger, watermark, all three CSV ledgers, `BatchEvent` → signals/enrichment, provenance —
+  dedup ledger, watermark, all three CSV ledgers, `ConsignmentEvent` → signals/enrichment, provenance —
   are the SAME code as the flat path. `IngestSinkWriter` deliberately does NOT register §11.3;
   `finalizeSource` registers from the returned lineage exactly as always. The runner's
   once-after-all-branches hook is a documented no-op for the same reason.
 
 ## The lane fork (ELT Phase 6 slices A–C2, 2026-08-29)
 
-The graph lane is no longer route-only. `BatchIngestStrategy.graphLaneCarries(cfg)` admits a
+The graph lane is no longer route-only. `ConsignmentIngestStrategy.graphLaneCarries(cfg)` admits a
 non-route pipeline when the write is reproducible there, which is now every shape a pipeline can
 actually be armed in: **one or many destinations** (the lift emits a sink node per `sinks[]` entry
 and the executor writes each independently — the fan-out gains per-destination crash resumption the
@@ -57,7 +60,7 @@ Three mechanisms a change here must respect:
    of the admission: a rule that actually routed rows keeps the pipeline flat.
 3. 🔴 **`dirs.temp` is optional, and the graph lane keeps a DURABLE ledger.** All three sites that
    spell the log path — create, drain-resume, cleanup — go through
-   `BatchIngestStrategy.branchCommitLogPath`, and a pipeline without a scratch dir stays flat rather
+   `ConsignmentIngestStrategy.branchCommitLogPath`, and a pipeline without a scratch dir stays flat rather
    than parking that ledger in a shared `%TEMP%`, where a stale `branch_commit_<batchId>.log` makes
    the coordinator skip the branch and the batch writes NOTHING.
 
@@ -68,13 +71,13 @@ every run.
 
 ## The engagement predicate
 
-`BatchGraphRunner.dataFedSinkCount` counts **branches**, not sink nodes: distinct `route:*`
+`ConsignmentGraphRunner.dataFedSinkCount` counts **branches**, not sink nodes: distinct `route:*`
 relations reaching a SINK-category node, plus one for the trunk when any sink is plain-`data`-fed.
 So: flat single-sink = 1 · plain `sinks[2]` fan-out = 1 (N destinations of ONE branch — stays on
 `writeAndTrace`'s flat fan-out with its reference-versioning and decision rules) · a two-branch
 route = 2 · multi-schema selector = 1 (its `route:*` rels terminate at map nodes, not sinks).
 ⚠ The original node-count predicate engaged for plain fan-out and was refuted by its own
-falsification test (`BatchGraphRunnerLiftEngagementTest`); a stale `PipelineLiftTest` pin had
+falsification test (`ConsignmentGraphRunnerLiftEngagementTest`); a stale `PipelineLiftTest` pin had
 encoded the wrong belief. ⚠ And do not read this predicate as a claim about capability: it answers
 *"is there a second BRANCH worth diverting for?"* for the route lane. Whether the graph lane can
 perform a given write is `graphLaneCarries`' question, and a plain fan-out — one branch, N

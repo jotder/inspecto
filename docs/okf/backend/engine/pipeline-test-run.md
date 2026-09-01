@@ -8,7 +8,9 @@ files — the "Test" in the Build → Test → Run authoring journey. Shipped 20
 `PipelineRunResult`.
 
 It is a **simulate**, which is why it is author-gated and why the path is deliberately *not*
-`…/trigger` — that sibling is the operate verb (`canOperateRuns`) and fires a real run. See
+`…/trigger` — that sibling is the operate verb (`canOperateRuns`) and fires a real run. This page owns
+the **scratch lane** mechanism; the lane map is
+[`../pipeline-graph/execution-lanes.md`](../pipeline-graph/execution-lanes.md), the operate lane
 [`../pipeline-graph/live-execution.md`](../pipeline-graph/live-execution.md).
 
 ## Why it is safe: two independent containments, both structural
@@ -16,7 +18,7 @@ It is a **simulate**, which is why it is author-gated and why the path is delibe
 A test run that mutates production state would be worse than no feature at all, so containment is by
 construction rather than by a flag anyone can forget.
 
-**1 · Call-graph containment.** `BatchProcessor.process` is, in order: `strategy.ingest(...)`, then
+**1 · Call-graph containment.** `ConsignmentIngestor.process` is, in order: `strategy.ingest(...)`, then
 `commit(...)`, then `writeAudit(...)`, then `recordProvenance(...)`. `PipelineTestRun` calls **only the
 first**. This is the load-bearing decision, because **five destinations are not derived from the config
 at all** and so could never have been redirected by one:
@@ -29,13 +31,13 @@ at all** and so could never have been redirected by one:
 | `pipeline.batch.*` Signal | ambient `EventLog.current()` (space MDC) | `writeAudit` |
 | Provenance matrix | process-wide registry | `recordProvenance` |
 
-⛔ **If a fourth side-effecting statement is ever added to `BatchProcessor.process`, do not mirror it
+⛔ **If a fourth side-effecting statement is ever added to `ConsignmentIngestor.process`, do not mirror it
 into `PipelineTestRun`.** The omission *is* the safety property.
 
 **2 · Filesystem containment.** Picked files are **copied** into `scratchRoot/poll`, and the run
 executes against `PipelineConfig.forScratchRun(scratchRoot)`, which re-roots every destination.
 
-⚠ **The copy is not an optimisation to remove.** `CsvBatchStrategy` quarantines an unreadable /
+⚠ **The copy is not an optimisation to remove.** `CsvIngestStrategy` quarantines an unreadable /
 field-mismatched / empty member through `QuarantineManager.quarantine`, which does a **`Files.move` of
 the source file** — from *inside* the ingest half. Redirecting `dirs.quarantine` does not help, because
 the source is the problem: run against the real inbox and **testing a malformed file would delete it

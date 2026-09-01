@@ -13,24 +13,27 @@ Both do work on data, so they invite the question "which one should this be?". T
 matter of taste: [`GLOSSARY.md`](../../../GLOSSARY.md) §5 and
 [`pipeline-graph-design.md`](../pipeline-graph/pipeline-graph-design.md) §3.8 make **in-motion
 (Pipeline) vs at-rest (Job)** a *binding* line. This page carries the full capability comparison behind
-that rule, verified against source 2026-08-07.
+that rule, verified against source 2026-08-07; extensibility and naming re-grounded 2026-09-01.
 
 ## 0. The one-line difference
 
 **A Step is not an *Executable*** — the Pipeline is; a Step is a node inside it. A Job is imperative
 Java — you implement `Job.run(ctx)` and ship a class. A Step is *today* declarative config lowered into
-DuckDB SQL by `RowShaper`/`TransformCompiler` and executed by `BatchGraphRunner`: no `run()` a Step author
-implements, no service façade a Step sees. As built, the extension models are opposites — you **author** a
-Step, you **write** a Job. [Platform Services](platform-services.md) stage 2 (still unbuilt) narrows that
-second half: a Step *may* become a program via the Step SPI (`EXECUTED` mode) — without changing what a Step
-**is**: a node producing batch counters inside someone else's Run, never an Executable.
+DuckDB SQL by `RowShaper`/`TransformCompiler` and executed by `ConsignmentGraphRunner`. In the committed
+vocabulary ([`pipeline-spec.md`](../../../superpower/pipeline-spec.md) §13 D2) a Step receives a
+**Consignment token** and resolves the data by reference — edges carry no records; the full runtime edge
+model converges at Phase 7. Since 2026-08-29 a plugin *can* supply a Step's execution
+(`PipelineNodeExecutor`, §3) — that changes who writes the SQL-shaping code, not what a Step **is**, and
+it still gets no service façade. [Platform Services](platform-services.md) stage 2 (still unbuilt) is
+the different, richer thing: a pack-hosted Step *program* (`EXECUTED` mode) — again without changing what
+a Step **is**: a node producing consignment counters inside someone else's Run, never an Executable.
 
 ## 1. What each one is
 
 | | Pipeline Step | Job |
 |---|---|---|
-| Internal type | `PipelineNode`, discriminated by `BuiltinNodeType` (20 ids) | `Job` + `JobTypeProvider` |
-| Executed by | `BatchGraphRunner` / `BatchProcessor`, inside `CollectorProcessor`'s poll cycle | `JobService.runJob` on a virtual thread |
+| Internal type | `PipelineNode`, discriminated by the type registry — `BuiltinNodeType` (29 ids) layered under `PipelineNodeType` providers | `Job` + `JobTypeProvider` |
+| Executed by | `ConsignmentGraphRunner` / `ConsignmentIngestor`, inside `CollectorProcessor`'s poll cycle | `JobService.runJob` on a virtual thread |
 | Is it an **Executable**? | **No** — the *Pipeline* is the Executable; a Step is a node inside it | **Yes** — the Scheduler starts it and it produces a Run |
 | Authored as | node entries in the pipeline TOON | `<name>_job.toon` |
 
@@ -40,13 +43,13 @@ Real symmetry, not coincidence — several of these were built to the same shape
 
 | Capability | Step | Job |
 |---|---|---|
-| **Declared config contract** | `NodeAttribute` — `key`, `label`, `type`, `tier`, `required`, `defaultValue`, `options`, `min`/`max`, `help`, `placeholder` | `ParameterDecl` — the same, plus `pattern`, `group`, `multi`, `secret`, `deduce`, `expressions` |
+| **Declared config contract** | `NodeAttribute` — `key`, `label`, `type`, `tier`, `required`, `defaultValue`, `options`, `min`/`max`, `help`, `placeholder`, `dependsOn` | `ParameterDecl` — the same (minus `dependsOn`), plus `pattern`, `group`, `multi`, `secret`, `deduce`, `expressions` |
 | **Server-published for the UI** | `GET /pipelines/node-types` | `GET /jobs/types[/{id}]` |
 | **Overlap guard** | `PipelineRunGuard` — binary semaphore per pipeline id; poll `tryAcquire` (skip), operator `acquire` (block) | `LockingRunner.runExclusiveOrSkip` per job name; a fire during a Run records `SKIPPED` |
 | **Concurrency cap** | back-pressure skips (`inspecto_acquire_backpressure_skips_total`) | `-Djobs.maxConcurrentRuns` semaphore |
 | **Dry run** | `PipelineDryRun` (T18) — bounded sample through a scratch DuckDB, commits nothing | `JobContext.dryRun()` — a destructive Job Type previews instead of acting; `POST /jobs/{name}/trigger?dryRun=true` |
 | **Prometheus metrics** | `inspecto_batches_total`, `inspecto_batch_duration_seconds`, `inspecto_output_rows_total`, … | `inspecto_jobs_total`, `inspecto_job_duration_seconds` |
-| **Durable audit** | `BatchAuditWriter` — `status` (per file), `batches`, `lineage` | `JobRunLedger` (`jobs_runs.csv`) + optional DuckDB projection |
+| **Durable audit** | `ConsignmentAuditWriter` — `status` (per file), `batches`, `lineage` (ledger file names keep the pre-rename spelling — BACKLOG §4 residual) | `JobRunLedger` (`jobs_runs.csv`) + optional DuckDB projection |
 | **Repeat safety** | `.processed` markers + the acquisition dedup ledger | `TriggerCoalescer`, signal chain-depth cut, `catch_up` |
 | **UI surface** | `/pipelines` | `/jobs`, `/jobs/:name` |
 | **Timeout / cancellation** | ⛔ none | ⛔ none — a `CronHandle.cancel()` only un-arms *future* fires |
@@ -58,18 +61,18 @@ rows; the Job one makes a *real, destructive* action non-destructive. Do not des
 
 | Dimension | Pipeline Step | Job |
 |---|---|---|
-| **Data state** | **In motion** — rows in flight in a Batch | **At rest** — data already landed |
+| **Data state** | **In motion** — the Step's Consignment token references rows in flight | **At rest** — data already landed |
 | **Implementation** | Config → DuckDB SQL | Java class in a jar |
-| **Extensibility** | `BuiltinNodeType`, compiled in. `PipelineNodeType` is `ServiceLoader`-shaped but **descriptor-only — no execution hook**, so no third party can ship a Step today | **Open registry**: `JobTypeProvider` via `ServiceLoader` *and* hot-deployable Job Packs |
-| **Hot deploy / unload** | ⛔ none — requires a build | `JobPackManager`: watched dir, isolated `URLClassLoader`, atomic load-or-reject, in-flight-Run quiesce before unload |
-| **Code trust** | n/a — all node code is compiled in | `-Djobs.packs.requireSignature` verifies every class entry of a pack jar |
+| **Extensibility** | **Open, in two independent halves** (both `ServiceLoader` seams): `PipelineNodeType` (descriptor) + `PipelineNodeExecutor` (execution, SHIPPED 2026-08-29) — a third party CAN ship a Step type today; a plugin needs **both** registrations. See [node-types.md §"The execution half"](../engine/node-types.md) | **Open registry**: `JobTypeProvider` via `ServiceLoader` *and* hot-deployable Job Packs |
+| **Hot deploy / unload** | via a **pack**: `JobPackManager` also registers pack-contributed node types + executors into the owner-keyed overlay (`PipelineNodeTypes.register` / `PipelineNodeExecutors.register`, first pack wins per type, deregistered on unload — `JobPackManager.java:247-248`, 2026-08-31). Classpath (`META-INF/services`) providers still require a build | `JobPackManager`: watched dir, isolated `URLClassLoader`, atomic load-or-reject, in-flight-Run quiesce before unload |
+| **Code trust** | classpath providers: none needed (compiled/deployed with the engine); pack-contributed ones inherit the pack jar's signature check | `-Djobs.packs.requireSignature` verifies every class entry of a pack jar |
 | **Runtime context** | ⛔ none — config plus a SQL relation | `JobContext`: `runId`, `spaceId`, `trigger`, `config`, `params`, `log()`, `signals()`, `artifacts()`, `dryRun()` |
-| **Unit of work** | one **Batch**, over one input relation | one **Run** |
+| **Unit of work** | one **Consignment**, over one input relation | one **Run** |
 | **Trigger** | ⛔ cannot be scheduled — fires only inside its Pipeline's poll cycle | `cron` · `on_pipeline` · `on_signal` (+`when:`/`bind:`) · manual · catch-up |
 | **Cross-run state** | ⛔ none of its own | watermarks (`PipelineWatermarkStore`), Run Artifacts, `$job.last_success_time` |
 | **Emits** | nothing directly (the CONTROL trio `gap`/`alert`/`event` emit via the engine) | declared Signals + `ArtifactDecl`s |
-| **Failure grain** | file → quarantine (`QUARANTINED_UNREADABLE`/`_MISMATCH`); batch → `FAILED`; retried by the next poll of the same input | thrown exception → `FAILED` JobRun; missing/invalid parameter → `REJECTED` before user code runs |
-| **Observability grain** | per batch + per file; T22 per-`(node, relationship)` provenance counts | per Run: ledger row, structured `RunLog`, Artifacts |
+| **Failure grain** | file → quarantine (`QUARANTINED_UNREADABLE`/`_MISMATCH`); Consignment → `FAILED`; retried by the next poll of the same input | thrown exception → `FAILED` JobRun; missing/invalid parameter → `REJECTED` before user code runs |
+| **Observability grain** | per Consignment + per file; T22 per-`(node, relationship)` provenance counts | per Run: ledger row, structured `RunLog`, Artifacts |
 | **Secrets** | ⛔ `NodeAttribute` has no `secret` | `ParameterDecl.secret` — masked at the response boundary |
 | **`$`-Expressions** | ⛔ no `deduce`/`expressions` in the node contract | authored values resolve at fire time through `ExpressionRegistry` |
 
@@ -87,7 +90,7 @@ rows; the Job one makes a *real, destructive* action non-destructive. Do not des
 
 ### Decision rule
 
-- Transforming rows as they flow through one Pipeline's Batch → **Step**.
+- Transforming rows as they flow through one Pipeline's Consignment → **Step**.
 - Own clock or event, spanning Pipelines, reading status/metadata, or reaching outside → **Job**.
 - Java that must run per record/file *inside* the data path → **`ConsignmentProcessor`** (§5).
 
@@ -97,8 +100,13 @@ rows; the Job one makes a *real, destructive* action non-destructive. Do not des
    Java in the data path, but it is hosted *by* the `consignment.process` **Job** Type over one committed
    Consignment, and gets a narrower `ProcessorContext` — its javadoc states authors never touch `Job` or
    `JobContext`. So there are already **two** plugin surfaces with different reach.
-2. **`PipelineNodeType` looks extensible and is not.** It is `ServiceLoader`-shaped with no execution
-   hook; a reader would reasonably conclude a plugin Step is possible today. It is not.
+2. **A node-type plugin is a Step, but it is not the pack-hosted Step *kind*.** The old trap here
+   ("`PipelineNodeType` looks extensible and is not") closed 2026-08-29: `PipelineNodeExecutor` is the
+   execution half, and a plugin registering **both** halves runs today. The residual blur is between
+   that — engine-classpath (or pack-overlay) code with no isolation, no `StepContext`, no watchdog —
+   and the platform-services **S2-3** Step kind (isolated classloader, services ceiling, watchdog),
+   which stays gated. `scaffold.mjs new nodetype` builds the former; `new step` is the latter and is
+   still refused.
 3. **`TriggerCoalescer` lives in `com.gamma.pipeline.exec` but is Job-only.** Package placement misleads.
 4. **`transform.join` against a Reference Dataset is compile-only** — no runtime executor. So "a Step
    cannot read a second Dataset" is true *today* but is a missing executor, **not** part of the boundary.
@@ -134,7 +142,8 @@ rows; the Job one makes a *real, destructive* action non-destructive. Do not des
 - **No timeout or cancellation on either side.** → *Partially owned*: the **S2-3** watchdog covers
   `EXECUTED` Steps (plan R1); the Job-side watchdog stays a recorded gap beyond that plan.
 - **`NodeAttribute` lacks `secret`, `pattern`, `group`, `multi` and expression support** that
-  `ParameterDecl` gained in the job-parameter-contract work. → *Fulfilled by* stage 2's widened
+  `ParameterDecl` gained in the job-parameter-contract work (re-verified 2026-09-01; it has since
+  gained `dependsOn`, which `ParameterDecl` lacks). → *Fulfilled by* stage 2's widened
   `StepTypeProvider` descriptor (**S2-1**).
 
 > ⚠ **The §6 gaps have an owner: [Platform Services](platform-services.md).** **Stage 1 is COMPLETE
@@ -146,6 +155,9 @@ rows; the Job one makes a *real, destructive* action non-destructive. Do not des
 > [`PROJECT_NOTES.md`](../../../PROJECT_NOTES.md) §5; this page's §0 wording came from **S1-0**, and the
 > plan itself is archived at
 > [`plans-archive/platform-services-plan.md`](../../../archived-documents/plans-archive/platform-services-plan.md).
+> ⚠ Stage 2 being gated no longer means "no plugin Step at all": the classpath node-type seam
+> (`PipelineNodeType` + `PipelineNodeExecutor`, plus the pack overlay) shipped independently,
+> 2026-08-29/31 — what S2 still owns is the *pack-hosted* Step kind with isolation and a watchdog.
 
 Related: [Jobs & Scheduling](jobs.md) · [Pipeline graph design](../pipeline-graph/pipeline-graph-design.md)
 · [Signal backbone](signal-backbone.md) · [Platform Services](platform-services.md)

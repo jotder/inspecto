@@ -182,45 +182,26 @@ Each sub-section: **Responsibility · Process · Events · Metrics · State · C
   `year=NULL` partitions (see [`troubleshooting.md`](okf/backend/build-run/troubleshooting.md)); a `BATCH_FAILED` with `offendingFile`.
 
 ### 5.3 Pipeline-graph engine (`com.gamma.pipeline`, `com.gamma.pipeline.exec`)
-- **Responsibility:** NiFi-style pipeline-as-graph. Two faces: (a) **read-only projection** of lifted pipelines
-  for visualisation; (b) **authored flows** (`*_flow.toon`) that are CRUD-able, dry-runnable, and (T32) executable.
-- **Process:** `PipelineLift` lifts a legacy `PipelineConfig` → `PipelineGraph` (lossless). `PipelineValidator` rejects
-  broken graphs (cycles, dangling, illegal emit/accept, same-graph `on_commit`). `PipelineExecutor` does a Kahn topo
-  walk: each `transform.*` runs through `RowShaper` (filter/validate/route/dedup/split/map/select/derive/merge →
-  multiple named relations) and each sink is a **branch** committed via `BranchCommitCoordinator` +
-  `BranchCommitLog` (idempotent multi-branch commit; replay skips committed branches). `PipelineDryRun` runs a bounded
-  sample on a throwaway DuckDB (no commit). Component registry (`ComponentStore`/`ComponentRegistry`) holds
-  reusable `grammar`/`schema`/`transform`/`sink` components referenced via `use:`.
-- **Live execution (T32 — flows as jobs):** an authored flow is **job-style** (reads one or more `source_store`s,
-  writes a sink `store`). `PipelineJobRunner` (a `JobType.PIPELINE` job) seeds **each** `source_store` as its own view
-  (`SourceStoreReader`) — a `transform.merge` joins/unions them (multi-source, Phase C) — drives `PipelineExecutor`, and
-  writes sinks via `PartitionSinkWriter` (unpartitioned single-file COPY when a sink declares no `partitions`;
-  `sink.view` writes no bytes — instead the job registers a durable `ViewDefinition` under `<write-root>/views/`
-  (store + flow + source_store lineage, plus the single-statement `derived_sql` when expressible). **Consume it via
-  `GET /views` (list), `GET /views/{name}` (definition incl. `derived_sql`), `GET /views/{name}/data?limit=N`** —
-  the last runs the recorded `derived_sql` on a resource-capped (un-sealed) `SqlSandbox` via `ViewQuery` and returns
-  bounded rows (default 1000, max 10000; `capped` flag). 404 if absent, **409** if the view has no `derived_sql`
-  (a multi-statement view — re-run its `flow` to concretise it), 422 on a query error). Full-recompute by default
-  (idempotent re-run via a stable `batch_id`), or **opt-in incremental** via the `incremental_column` job param
-  (single-source): reads only rows past a stored watermark and appends; the watermark lives at
-  `<jobs-audit>/<flow>__<store>.watermark`.
-- **Events:** `PIPELINE_CONSERVATION_IMBALANCE` (T22, §11.4) when the data plane finds a non-amplifying node where
-  `recordsIn != recordsOut` — records lost (`LOSS`) or unexpectedly amplified (`AMPLIFICATION`); `EventObjectBridge`
-  promotes it to a managed ALERT (de-duped per pipeline+node). Pipeline runs also publish a `BatchEvent` like any
-  job. ⚠ `FLOW_CONSERVATION_IMBALANCE` is the pre-rename value and survives only as
-  `EventType.FLOW_CONSERVATION_IMBALANCE_LEGACY`, a READ-alias so existing event-ledger rows still promote — nothing
-  emits it.
-- **Data plane / provenance (T20–T22, §11):** when `-Dprovenance.backend=duckdb` is set, `PipelineExecutor` reports
-  per-`(node, relationship)` record counts (a `ProvenanceCollector`) which `PipelineJobRunner` persists to
-  `DbProvenanceStore` keyed by `(flow, batchId)`. Query a past run via **`GET /provenance?flow=&batch=`** (per-node-rel
-  counts to paint onto the `PipelineGraph` edges as a Sankey) and **`GET /provenance/batches?flow=&limit=`** (recent runs).
-  Default-off ⇒ no counting overhead, no events, `/provenance` 404s.
-- **State:** `<write-root>/flows/<id>.toon`, `<write-root>/registry/<typeDir>/<id>.toon`; per-run branch-commit log
-  under the jobs audit dir; the provenance DB (`-Dprovenance.db.url`, default `jdbc:duckdb:provenance.duckdb`) when enabled.
-- **Config:** authored flows + a `type: pipeline` `*_job.toon` (`flow:` id, optional `data_dir`/`batch_id`). `-D` flags:
-  `-Dprovenance.backend=duckdb` + `-Dprovenance.db.url` (data-plane provenance, default off).
-- **Failure modes:** flow job writes nothing on idempotent replay (same `batch_id` → "0 file(s)"); no
-  `source_store` declared (rejected; ≥1 required, multiple supported since Phase C); fail-closed if no `-Dassist.write.root`.
+- **Responsibility:** the pipeline-as-graph layer. `PipelineLift` lifts the canonical `*_pipeline.toon`
+  → `PipelineGraph` (lossless); `PipelineValidator` rejects broken graphs (cycles, dangling, illegal
+  emit/accept); authoring is the **graph round-trip** — `GET /pipelines/{name}/graph/raw` →
+  `PUT /pipelines/{name}/graph` — over that same file. Runtime voice: a Step receives a
+  **Consignment token** and resolves the data by reference — edges carry no records (the full runtime
+  edge model converges at Phase 7; `docs/superpower/pipeline-spec.md` §13 D2).
+- **Execution:** in-motion Consignments run through `ConsignmentGraphRunner`/`RowShaper` inside the
+  poll cycle (§3); an authored pipeline also runs at rest as a `JobType.PIPELINE` job
+  (`PipelineJobRunner`) — sinks via `PartitionSinkWriter`, `sink.view` as a durable `ViewDefinition`
+  (`GET /views`, `GET /views/{name}[/data]`), idempotent multi-branch commits via
+  `BranchCommitCoordinator`/`BranchCommitLog`, optional data-plane provenance
+  (`-Dprovenance.backend=duckdb` + `-Dprovenance.db.url`; `GET /provenance?flow=&batch=`).
+- ⚠ **The `*_flow.toon` authoring surface is RETIRED**
+  ([`pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md) §16):
+  grandfathered flows stay readable/runnable/deletable, never newly written.
+- **Deep dives (design of record):** the [`okf/backend/pipeline-graph/`](okf/backend/pipeline-graph/index.md)
+  bundle — `pipeline-graph-design.md`, `editable-round-trip.md`, `live-execution.md` (views,
+  provenance, incremental watermarks, failure modes), `step-park-drain.md`, `multi-location-ingest.md`.
+  Reusable `use:` components (`ComponentStore`/`ComponentRegistry`) →
+  [`component-registry.md`](okf/backend/components/component-registry.md).
 
 ### 5.4 Jobs (`com.gamma.job`) + the deletion fence
 - **Responsibility:** scheduled/triggered downstream work. Types: `ENRICH`, `REPORT`, `MAINTENANCE`, `FLOW`.
@@ -480,10 +461,22 @@ infra probes: `/health`, `/ready`, `/metrics`, `/metrics/acquisition`.
 - **Alerts:** `GET /alerts`, `/alerts/rules`, `POST /alerts/evaluate` (503 if no rules).
 - **Objects:** `GET/POST /objects`, `GET /objects/{id}`, `POST /objects/{id}/ack|resolve|transition|links|comments|attachments|rca`,
   `GET /objects/{id}/links|graph|comments|attachments`, `GET /rca/templates`.
-- **Pipelines:** `GET /pipelines`, `/pipelines/node-types`, `/pipelines/combined`, `/pipelines/{n}/graph`; `GET /pipelines/authored`,
-  `POST /pipelines/authored` *(503)*, `GET /pipelines/authored/{n}` (structural projection), `GET /pipelines/authored/{n}/raw`
-  (lossless authored map incl. node config — for the editor), `PUT/DELETE /pipelines/authored/{n}` *(503)*,
-  `POST /pipelines/authored/{n}/nodes|edges|dry-run` *(503)*.
+- **Pipelines** (each line names its OKF owner; re-verified against `Pipeline*Routes` 2026-09-01):
+  - `GET /pipelines`, `/pipelines/node-types`, `/pipelines/step-types`, `/pipelines/combined` — list + palette/step catalogs → [`pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md).
+  - `GET /pipelines/{n}/graph` — lifted read-only graph projection → [`pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md).
+  - `GET /pipelines/{n}/graph/raw` — lossless editable graph for the editor → [`editable-round-trip.md`](okf/backend/pipeline-graph/editable-round-trip.md).
+  - `PUT /pipelines/{n}/graph` *(canAuthorWorkbench)* — save the graph over the canonical `*_pipeline.toon` (THE authoring write) → [`editable-round-trip.md`](okf/backend/pipeline-graph/editable-round-trip.md).
+  - `GET /pipelines/{n}/document` — read-only Markdown projection for sign-off (`X-Config-Fingerprint`) → [`pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md).
+  - `GET|POST /pipelines/{n}/settings` — pipeline settings read/write → [`pipeline-identity.md`](okf/backend/control-plane/pipeline-identity.md).
+  - `POST /pipelines/{n}/label` — display label → [`pipeline-identity.md`](okf/backend/control-plane/pipeline-identity.md).
+  - `POST /pipelines/{n}/save-as-template` — clone into a template → [`pipeline-identity.md`](okf/backend/control-plane/pipeline-identity.md).
+  - `POST /pipelines/{n}/rename`, `POST /pipelines/rename/resume` — two-phase rename + crash resume → [`pipeline-identity.md`](okf/backend/control-plane/pipeline-identity.md).
+  - `GET /pipelines/{n}/related` — cross-entity neighbourhood → [`pipeline-related.md`](okf/backend/control-plane/pipeline-related.md).
+  - `POST /pipelines/authored/{n}/run?to={nodeId}` *(canAuthorWorkbench)* — scratch-only run-to-here over real inbox files; never a production run → [`pipeline-test-run.md`](okf/backend/engine/pipeline-test-run.md).
+  - `POST /pipelines/authored/{n}/trigger` *(canOperateRuns)* — fire a real run (mirrors `POST /jobs/{n}/trigger`) → [`live-execution.md`](okf/backend/pipeline-graph/live-execution.md).
+  - `POST /pipelines/authored/{n}/dry-run` — bounded sample on a throwaway DuckDB → [`pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md).
+  - `GET /pipelines/authored[/{n}[/raw]]`, `DELETE /pipelines/authored/{n}` — read/delete of authored entries incl. grandfathered flows (the `*_flow.toon` CRUD surface is retired — no POST/PUT here) → [`pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md) §16.
+  - `POST /runs/{n}/drain` *(canOperateRuns)* — complete a PARKED Consignment (also listed under ingest runs above) → [`step-park-drain.md`](okf/backend/pipeline-graph/step-park-drain.md).
 - **Components:** `GET /components/{type}[/{id}]` *(single-GET carries a strong `ETag`=content hash; `If-None-Match`→304)*,
   `POST/PUT/DELETE` *(503; PUT honours `If-Match`→409 `CONFLICT_STALE_VERSION`; DELETE 409 if referenced)*,
   `POST /components/{transform|grammar|schema|sink}/{id}/test` *(503)*,

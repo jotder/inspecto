@@ -37,7 +37,10 @@ live under `<write-root>/registry/<type>/` as TOON files, addressed by `<type>/<
   alongside `PipelineGraphRoutes`, `PipelineRenameRoutes`, `PipelineSettingsRoutes` and the shared
   `PipelineSupport` helpers): `GET /pipelines`
   (lifted pipelines), `GET /pipelines/node-types` (the editor palette catalog), `GET /pipelines/combined` (the
-  store-joined pipeline+job topology), and `/pipelines/authored/*` CRUD + `dry-run` for authored Pipelines. The
+  store-joined pipeline+job topology). Authoring goes through the graph round-trip — `PUT
+  /pipelines/{name}/graph` (+ `GET …/graph/raw`) — owned by the
+  [pipeline-graph bundle](../pipeline-graph/editable-round-trip.md); the old `/pipelines/authored/*`
+  CRUD surface is retired (grandfathered flows stay readable/runnable/deletable). The
   store superimposition (`PipelineStores.superimpose`) joins consumer `source_store` names to producer `store`
   names — no `on_pipeline` name-coupling — and a `DeletionFence` guards store deletion.
 

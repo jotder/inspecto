@@ -9,13 +9,12 @@ timestamp: 2026-08-29T00:00:00Z
 
 # Per-Step `enabled` — park and drain
 
-Switching a Step off means different things in the two lanes, and conflating them is the whole design
-problem this concept solves:
-
-- **Scratch lanes** (dry-run, run-to-here) — a disabled node is an in-memory **bypass**: it produces
-  nothing and everything downstream is inert. Correct there, and deliberately unchanged.
-- **At rest** (the ingest lane) — a bypass would *lose rows*. So a disabled Step is a durable **pause**:
-  the Consignments that reach it **PARK**, and a later **drain** completes them.
+Switching a Step off means different things per execution lane (the lane map is
+[execution-lanes.md](execution-lanes.md)), and conflating them is the whole design problem this
+concept solves: in the **scratch lane** a disabled node is an in-memory **bypass** (it produces
+nothing, everything downstream is inert — correct there, deliberately unchanged), while on the
+**ingest lanes** a bypass would *lose rows* — so there a disabled Step is a durable **pause**: the
+Consignments that reach it **PARK**, and a later **drain** completes them.
 
 Decision of record: **D-13**, ELT Phase 4 S4. Shipped 2026-08-28/29 across five slices; the slice plan is
 [`elt-s4-park-drain-plan.md`](../../../archived-documents/plans-archive/elt-s4-park-drain-plan.md).
@@ -56,7 +55,7 @@ subtree** — and refuses, at SAVE and at `prepare()`, never as a silent skip at
 4. an unknown Step id (a typo must never become a silently-enabled Step);
 5. **all** branches (`active: false` is that ask);
 6. **no park home** (added 2026-08-29). `dirs.backup` is OPTIONAL — `PipelineConfigParser` reads it with a
-   plain `get` — but `BatchProcessor.parkSource` parks under `<backup>/parked`, so without it the pipeline
+   plain `get` — but `ConsignmentIngestor.parkSource` parks under `<backup>/parked`, so without it the pipeline
    arms, runs, and dies at the park with an NPE the operator reads as `park failed: null`, **one batch
    every cycle**. That is the arms-then-fails-forever shape this whole list exists to convert into an
    authoring-time answer. ⚠ `refusals()` takes `parkHomeConfigured` as a **required** argument rather than
@@ -76,12 +75,12 @@ by `PipelineLiftTest.parkableSinkIdsMatchTheLiftedGraph`. Extend both together.
 ## Park — the boundary IS the materialisation boundary
 
 `PipelineExecutor.ParkWriter` is a hook invoked when the walk reaches a **disabled SINK with a live inbound
-relation**. It is `null` on every scratch path, so the bypass stays. At rest `BatchIngestStrategy` supplies a
+relation**. It is `null` on every scratch path, so the bypass stays. At rest `ConsignmentIngestStrategy` supplies a
 lambda that `COPY`s the branch relation to `dirs.backup()/parked/<batchId>__<nodeId>.parquet` and records it
 in the batchId-keyed `ParkedBranches` stash (the `UnpackOrigins` lifecycle idiom — threading `IngestOutcome`'s
 eight constructor sites was rejected).
 
-`BatchProcessor.parkSource` then does **almost nothing** of the normal commit tail, because a parked
+`ConsignmentIngestor.parkSource` then does **almost nothing** of the normal commit tail, because a parked
 Consignment is *uncommitted*: no DuckLake register, no §11.3 output registration, no markers, no fingerprint
 stash, no watermark. What it does:
 
@@ -114,7 +113,7 @@ writes them beside the park tables, and the drain consumes and deletes them.
 structural sibling of `reprocess`). **Not a re-ingest and not a graph re-walk**: a route branch's table is
 complete when its sink is reached, so nothing upstream needs re-running and no transform remains between the
 park table and the write. Drain registers each park table with `read_parquet`, writes it through the ordinary
-`IngestSinkWriter`, and then runs the ordinary `BatchProcessor.finalizeSource` for the **whole** batch over
+`IngestSinkWriter`, and then runs the ordinary `ConsignmentIngestor.finalizeSource` for the **whole** batch over
 the union of the sidecar's outputs and its own.
 
 Refusals (loud, never a partial — the `guardAgainstCompactedOutputs` posture); the route answers 409 with the
@@ -131,7 +130,7 @@ reason verbatim, and 404 only for a batch with no manifest:
 Two mechanisms worth knowing before changing this code:
 
 ⚠ **The coordinator's `SOURCE` row is not this lane's finalisation signal.** The ingest path passes a no-op
-`SourceFinalizer` to `BatchGraphRunner` (finalisation belongs to `BatchProcessor.commit`, once the batch
+`SourceFinalizer` to `ConsignmentGraphRunner` (finalisation belongs to `ConsignmentIngestor.commit`, once the batch
 outcome exists), so a park run has *already* recorded `SOURCE` having finalised nothing. Drain therefore uses
 `BranchCommitCoordinator` only for the durable, idempotent per-BRANCH skip, and runs the commit tail itself.
 

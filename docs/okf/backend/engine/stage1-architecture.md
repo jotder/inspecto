@@ -78,7 +78,7 @@ does these; see the scope note above):
 > **That question is now answered — see *Step 3 — the Stage-2 transform chain, at rest* below.**
 >
 > - ✅ **Record dedup (`processing.dedup`) used to run here** — a `ROW_NUMBER()` QUALIFY in
->   `BatchIngestStrategy`, the one genuine cross-record operation in the multiplexer. **Removed
+>   `BatchIngestStrategy` (now `ConsignmentIngestStrategy`), the one genuine cross-record operation in the multiplexer. **Removed
 >   2026-08-11**: dedup is a transform concern, so in ELT terms it belongs in the T, not the EL.
 >   The key still parses, lifts and round-trips; `prepare()` now **refuses to arm** a pipeline carrying
 >   it, exactly as it does for `summarize`, `join` and `route`. Stage-2 executes it.
@@ -181,15 +181,15 @@ com.gamma
   inspector/
     CollectorProcessor          — single-source ETL runner; virtual-thread + semaphore batch fan-out
     MultiCollectorProcessor     — runs many sources concurrently in one JVM (outer M..N orchestrator)
-    BatchProcessor           — thin per-batch coordinator: selects a BatchIngestStrategy, then drives the shared commit → audit tail
-    BatchIngestStrategy      — ingest+transform+write seam (delimited-text vs plugin); returns a typed IngestOutcome (+ shared dropTable/msg helpers)
-    CsvBatchStrategy         — built-in delimited-text path → transform → write → lineage. Native (read_csv) batches stream with
+    ConsignmentIngestor           — thin per-batch coordinator: selects a ConsignmentIngestStrategy, then drives the shared commit → audit tail
+    ConsignmentIngestStrategy      — ingest+transform+write seam (delimited-text vs plugin); returns a typed IngestOutcome (+ shared dropTable/msg helpers)
+    CsvIngestStrategy         — built-in delimited-text path → transform → write → lineage. Native (read_csv) batches stream with
                                NO raw_f/raw_input table copies: single member via one read_csv VIEW, many members via
                                per-member views UNION ALL-ed into one transform (materialised once). Files over
                                processing.chunking.max_file_bytes are streamed in bounded chunks (FileChunker). The Java
                                parse engine keeps the per-file temp table → raw_input(__src_id) staging path.
     FileChunker              — streams an oversized file into bounded, header-replicating chunks (one on disk at a time)
-    StreamingPluginBatchStrategy — the plugin path (StreamingFileIngester): per batch, picks union mode (many small
+    StreamingPluginIngestStrategy — the plugin path (StreamingFileIngester): per batch, picks union mode (many small
                                files → emit into per-member tables → union per segment → one transform/write/lineage) or
                                generation mode (huge file → DuckDbRecordSink flushes bounded generations) by file size
     DuckDbRecordSink         — framework RecordSink impl: Appender-loads emitted rows to DuckDB; generation-flushes on a
@@ -209,8 +209,8 @@ com.gamma
     MarkerManager            — .processed sentinel files for idempotent ingest; retention-based cleanup
     QuarantineManager        — moves zero-valid-row and unreadable files to quarantine/
     DuckLakeRegistrar        — optional: registers written Parquet files into a DuckLake catalog
-    BatchAuditWriter         — thread-safe append to the per-run status, batches, and lineage CSVs
-    BatchPlanner             — groups polled files into batches respecting max_files / max_bytes limits
+    ConsignmentAuditWriter         — thread-safe append to the per-run status, batches, and lineage CSVs
+    ConsignmentPlanner             — groups polled files into batches respecting max_files / max_bytes limits
     ManifestStore            — writes and reads per-batch JSON manifests under status_dir/manifests/
     LineageCollector         — tracks input-to-output row counts for the lineage CSV; dynamic partition paths
     IngestResult             — record: parsedRows, errorRows, junkCandidateRows
@@ -240,15 +240,15 @@ com.gamma
     FileMoverByDate          — date-partition files from a flat directory into year/month/day tree
 ```
 
-**Design principle:** `CollectorProcessor` is a pure orchestrator — it creates the thread pool and drives the per-batch lifecycle, but contains zero business logic itself.  Every concern is owned by a focused single-responsibility class: batch planning (`BatchPlanner`), parsing (`CsvIngester`), transformation (`DataTransformer`), deduplication (`MarkerManager`), quarantine (`QuarantineManager`), registration (`DuckLakeRegistrar`), and auditing (`BatchAuditWriter`, `ManifestStore`, `LineageCollector`).  All shared low-level helpers live in `com.gamma.util` and are reused by both the ETL and the pre-ETL utilities.
+**Design principle:** `CollectorProcessor` is a pure orchestrator — it creates the thread pool and drives the per-batch lifecycle, but contains zero business logic itself.  Every concern is owned by a focused single-responsibility class: batch planning (`ConsignmentPlanner`), parsing (`CsvIngester`), transformation (`DataTransformer`), deduplication (`MarkerManager`), quarantine (`QuarantineManager`), registration (`DuckLakeRegistrar`), and auditing (`ConsignmentAuditWriter`, `ManifestStore`, `LineageCollector`).  All shared low-level helpers live in `com.gamma.util` and are reused by both the ETL and the pre-ETL utilities.
 
 **Behavior-injection seams.** Variant behavior is injected into the engine rather than branched inline, so the orchestration code stays thin and a new variant is a closed-set edit:
 
-- **`BatchIngestStrategy`** (`CsvBatchStrategy` / `StreamingPluginBatchStrategy`) — the per-batch ingest+transform+write path. `BatchProcessor.process` selects one by config (the built-in delimited-text path when no `ingester`, else the streaming plugin engine) and consumes its typed `IngestOutcome`; the shared commit → audit tail is path-agnostic. The plugin engine then self-selects union vs generation mode per batch by file size.
+- **`ConsignmentIngestStrategy`** (`CsvIngestStrategy` / `StreamingPluginIngestStrategy`) — the per-batch ingest+transform+write path. `ConsignmentIngestor.process` selects one by config (the built-in delimited-text path when no `ingester`, else the streaming plugin engine) and consumes its typed `IngestOutcome`; the shared commit → audit tail is path-agnostic. The plugin engine then self-selects union vs generation mode per batch by file size.
 - **`StreamingFileIngester`** (SPI, by FQCN) — custom parsers emit records into a `RecordSink`; the reference `TypedRecordIngester` splits one input into many typed segment streams.
 - **`TransformCompiler`** — a `transformType → ColumnRule` function registry; `DataTransformer` assembles the SELECT and delegates each column expression.
 - **`OutputFormat`** — enum-as-strategy owning each format's extension, COPY token, and compression rule, used by `PartitionWriter`.
-- **`StatusStore`** (`FileStatusStore` / `DbStatusStore`) and the **`BatchEventBus`** (`Consumer<BatchEvent>` observers) — pluggable audit backend and commit-event fan-out.
+- **`StatusStore`** (`FileStatusStore` / `DbStatusStore`) and the **`ConsignmentEventBus`** (`Consumer<ConsignmentEvent>` observers) — pluggable audit backend and commit-event fan-out.
 
 These keep the data path lean while making formats, ingest paths, transforms, and audit sinks independently extensible and testable. See [design-notes → D7](../../../archived-documents/design-notes.md#d7--engine-modularity-pass-behavior-injection-seams--done-v390).
 
@@ -398,10 +398,6 @@ one `output_store` cannot name N branch destinations, so a `route` step refuses 
 multi-destination `sinks:` arming. ⚠ **Refused at rest as well:** a *legacy* (pre-map) filter, whose
 predicate speaks raw-column vocabulary the landed store no longer has, and any filter carrying pre-parse
 include/exclude keys. An explicit `steps:` filter is post-map and runs fine.
-
-⚠ **Open gap, deliberate:** nothing yet warns when a pipeline authors `output_store:` and no
-`pipeline_config:` job exists to run its chain — the chain is then quietly not running. A scheduler-audit
-finding is the fail-visible follow-up (`BACKLOG` §4).
 
 ---
 
