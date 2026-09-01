@@ -29,7 +29,27 @@ describe('PipelineSettingsDialog', () => {
     it('closes with reference: null when produces stays stream', () => {
         const { c, ref } = make();
         c.save();
-        expect(ref.close).toHaveBeenCalledWith({ produces: 'stream', reference: null });
+        expect(ref.close).toHaveBeenCalledWith({ produces: 'stream', reference: null, description: '' });
+    });
+
+    it('seeds the description from the served settings and sends it trimmed', () => {
+        const { c, ref } = make({ settings: { produces: 'stream', reference: null, description: 'Daily orders' } });
+        expect(c.form.controls.description.value).toBe('Daily orders');
+        c.form.controls.description.setValue('  Retail orders (EU)  ');
+        c.save();
+        expect(ref.close).toHaveBeenCalledWith({
+            produces: 'stream',
+            reference: null,
+            description: 'Retail orders (EU)',
+        });
+    });
+
+    /** The POST contract: an empty/blank description CLEARS the stored one — so blank is still SENT. */
+    it('sends a blank description as the empty string, which clears it server-side', () => {
+        const { c, ref } = make({ settings: { produces: 'stream', reference: null, description: 'old' } });
+        c.form.controls.description.setValue('   ');
+        c.save();
+        expect(ref.close).toHaveBeenCalledWith({ produces: 'stream', reference: null, description: '' });
     });
 
     it('seeds the form from an already-saved reference block', () => {
@@ -48,6 +68,7 @@ describe('PipelineSettingsDialog', () => {
         expect(ref.close).toHaveBeenCalledWith({
             produces: 'reference',
             reference: { load: 'upsert', key: ['msisdn', 'event_date'], refresh_seconds: 0 },
+            description: '',
         });
     });
 
@@ -69,6 +90,7 @@ describe('PipelineSettingsDialog', () => {
         expect(ref.close).toHaveBeenCalledWith({
             produces: 'reference',
             reference: { load: 'replace', key: [], refresh_seconds: 0 },
+            description: '',
         });
     });
 

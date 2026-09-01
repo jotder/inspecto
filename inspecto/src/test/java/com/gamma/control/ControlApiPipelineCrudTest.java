@@ -204,8 +204,13 @@ class ControlApiPipelineCrudTest {
 
         try (Ctx c = open(dir, wr)) {
             String b = dir.toString().replace('\\', '/');
+            // active:false deliberately — this fixture carries NO schema (the grammar binding is the
+            // subject under test), and an active pipeline with no schema is refused at save since the
+            // graph route gained the arming pre-checks (armedWithoutSchemaFindings; it would also
+            // hard-fail at PipelineConfig.load). The old active:true only saved because the gate was
+            // missing — exactly the silent-arm-failure the pre-check closes.
             String flow = """
-                {"active":true,
+                {"active":false,
                  "nodes":[{"id":"acq","type":"acquisition","config":{"poll":"%1$s/in"}},
                           {"id":"p","type":"parser","use":"grammar/%2$s"},
                           {"id":"out","type":"sink.persistent","config":{"database":"%1$s/db"}}],

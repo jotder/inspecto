@@ -329,6 +329,8 @@ export interface PipelineReferenceSettings {
 export interface PipelineSettings {
     produces: 'stream' | 'reference';
     reference: PipelineReferenceSettings | null;
+    /** Optional pipeline description (2026-09-01). On POST an empty/blank string CLEARS it. */
+    description?: string;
 }
 
 export interface PipelineSettingsResult {

@@ -147,6 +147,7 @@ final class PipelineSettingsRoutes implements RouteModule {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("produces", raw.getOrDefault("produces", "stream"));
         out.put("reference", raw.get("reference"));
+        out.put("description", raw.get("description"));
         return out;
     }
 
@@ -168,6 +169,13 @@ final class PipelineSettingsRoutes implements RouteModule {
         Map<String, Object> out = new LinkedHashMap<>(src);
         if (body.containsKey("produces")) out.put("produces", body.get("produces"));
         if (body.containsKey("reference")) out.put("reference", body.get("reference"));
+        // description was settable only at creation (the create dialog) — the settings surface is its
+        // one post-creation home (display-only key; nothing in the engine reads it). Blank clears.
+        if (body.containsKey("description")) {
+            Object d = body.get("description");
+            if (d == null || String.valueOf(d).isBlank()) out.remove("description");
+            else out.put("description", String.valueOf(d).trim());
+        }
 
         List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), out));
         findings.addAll(ConfigSafetyValidator.check("pipeline", out, SafetyPolicy.defaultPolicy()));

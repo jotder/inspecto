@@ -1,7 +1,9 @@
 import {
     ChangeDetectionStrategy,
     Component,
+    HostListener,
     Input,
+    OnDestroy,
     OnInit,
     ViewChild,
     ViewEncapsulation,
@@ -12,6 +14,7 @@ import {
     signal,
 } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -60,6 +63,7 @@ import { InspectoSplitDirective } from 'app/inspecto/components/split.directive'
 import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
 import { grammarContentAsParsingBlock, nonDelimitedGrammarBlock } from 'app/inspecto/grammar';
 import { TransferMenuComponent } from 'app/inspecto/transfer';
+import { planStreamImport } from 'app/inspecto/transfer/stream-bundle';
 import { StreamTransferService } from 'app/inspecto/transfer/stream-transfer.service';
 import { G6GraphData } from 'app/modules/admin/catalog/catalog-graph';
 import { PipelineDryRunPanelComponent } from './pipeline-dry-run-panel.component';
@@ -77,6 +81,7 @@ import {
 import { EnrichmentHostPipeline, PipelineConfigDefinitionComponent } from './pipeline-config-definition.component';
 import { PipelineLoadDefinitionComponent } from './pipeline-load-definition.component';
 import { GrammarEditorDialog } from './grammar-editor.dialog';
+import { PipelineDuplicateDialog, PipelineDuplicateResultData } from './pipeline-duplicate.dialog';
 import { PipelineOpenDialog } from './pipeline-open.dialog';
 import { PipelineChangeIdDialog, PipelineChangeIdResultData } from './pipeline-change-id.dialog';
 import { PipelineRenameDialog, PipelineRenameResultData } from './pipeline-rename.dialog';
@@ -133,6 +138,18 @@ import { incompleteStages, pipelineLifecycle, PipelineStageId, StageChip, stageC
 
 /** The `use:` prefix a Grammar component is referenced by — also how its ref is keyed in `validRefs`. */
 const GRAMMAR_REF_PREFIX = 'grammar/';
+
+/**
+ * The browser's own timer pair, un-patched by zone.js (which stashes the originals under
+ * `__zone_symbol__` keys). See {@link PipelineEditorComponent.liveValidate} for why the zone's
+ * patched setTimeout cannot be used there.
+ */
+const nativeSetTimeout: typeof setTimeout =
+    (globalThis as Record<string, unknown>)['__zone_symbol__setTimeout'] as typeof setTimeout | undefined ??
+    setTimeout;
+const nativeClearTimeout: typeof clearTimeout =
+    (globalThis as Record<string, unknown>)['__zone_symbol__clearTimeout'] as typeof clearTimeout | undefined ??
+    clearTimeout;
 
 /**
  * "2 datasets, 1 widget" — the impact report as a phrase for a confirm dialog. Names kinds and
@@ -202,7 +219,7 @@ const TABBED_PANE_WIDTH = 420;
     changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,
 })
-export class PipelineEditorComponent implements OnInit {
+export class PipelineEditorComponent implements OnInit, OnDestroy {
     private api = inject(PipelinesService);
     private configApi = inject(ConfigService);
     private transfer = inject(StreamTransferService);
@@ -211,6 +228,7 @@ export class PipelineEditorComponent implements OnInit {
     private iconMapApi = inject(IconMapService);
     private spaces = inject(SpacesService);
     private fb = inject(FormBuilder);
+    private router = inject(Router);
     private toast = inject(ToastrService);
     private confirm = inject(InspectoConfirmService);
     private dialog = inject(MatDialog);
@@ -800,10 +818,15 @@ export class PipelineEditorComponent implements OnInit {
                 // about what the user had chosen. The Open dialog is the only thing that opens a tab.
                 // Re-listing (after a save/import) must not disturb tabs already open.
                 this.openIds.update((ids) => ids.filter((id) => fs.some((f) => f.name === id)));
+                this.restoreOpenTabs(new Set(fs.map((f) => f.name)));
             },
             error: () => {
                 this.flows.set([]);
                 this.loading.set(false);
+                // Deliberately does NOT arm the persist mirror: with no list nothing can be opened,
+                // and an armed mirror would overwrite the stored tab set with `[]` — a backend-down
+                // reload would then forget every tab. Left unarmed, the stored set survives to the
+                // next session that can actually list.
             },
         });
         this.api.nodeTypes().subscribe({
@@ -895,12 +918,88 @@ export class PipelineEditorComponent implements OnInit {
     /** Any tab with unsaved edits — drives the leave/close warnings. */
     readonly anyDirty = computed(() => this.dirtyIds().size > 0);
 
+    /**
+     * Warn on browser close/refresh while ANY tab has unsaved edits. The active tab's `dirty` is
+     * consulted directly AS WELL AS the per-tab set: {@link trackDirtyPerTab} mirrors on Angular's
+     * effect schedule, so right after an edit the set can lag one flush behind the signal — and a
+     * beforeunload fires on the browser's clock, not Angular's. No custom message: browsers ignore
+     * the text and show their own.
+     */
+    @HostListener('window:beforeunload', ['$event'])
+    onBeforeUnload(event: BeforeUnloadEvent): void {
+        if (!this.dirty() && this.dirtyIds().size === 0) return;
+        event.preventDefault();
+        // The legacy arming half of the standard pattern — the value itself is never shown.
+        event.returnValue = true;
+    }
+
+    /**
+     * Ctrl+S / Cmd+S saves the active tab. preventDefault fires UNCONDITIONALLY while focus is
+     * inside the editor — the browser's own save-page dialog is never the right answer over a
+     * pipeline — but the save itself runs only when this session may author (never in View mode or
+     * the Business lens) and there is something unsaved to write.
+     */
+    @HostListener('keydown', ['$event'])
+    onHostKeydown(event: KeyboardEvent): void {
+        if (!(event.ctrlKey || event.metaKey) || event.altKey || event.key.toLowerCase() !== 's') return;
+        event.preventDefault();
+        if (this.canAuthor() && this.dirty() && !this.saving()) void this.save();
+    }
+
+    // ── open-tab persistence — the tab SET survives a reload; edits do not (beforeunload's job) ────
+    private static readonly OPEN_TABS_KEY = 'inspecto.pipelines.openTabs';
+    /**
+     * Restore runs at most once, after the FIRST pipeline list lands — it is the filter that drops
+     * tabs whose pipeline no longer exists. Until then the persist effect stays quiet, or the
+     * initial empty `openIds` would overwrite the stored set before restore ever read it.
+     */
+    private tabsRestored = false;
+
+    /** Remember the open set + selection. A plain mirror: effects here must never LOAD anything. */
+    private readonly persistOpenTabs = effect(() => {
+        const open = this.openIds();
+        const selected = this.selectedId();
+        if (!this.tabsRestored) return;
+        try {
+            localStorage.setItem(PipelineEditorComponent.OPEN_TABS_KEY, JSON.stringify({ open, selected }));
+        } catch {
+            // Storage unavailable (private mode, quota) — persistence is a convenience, never worth erroring.
+        }
+    });
+
+    /**
+     * Re-open the tabs a previous session left open — lazily, exactly as the Open dialog does: only
+     * the restored SELECTION is fetched ({@link select}); every other tab lifts its graph on first
+     * activation. Unknown names (deleted/renamed pipelines) are silently dropped. The `?open=`
+     * deep link wins: a tab it already opened (or has in flight via {@link pendingSelect}) keeps the
+     * selection, and the restored set merges around it.
+     */
+    private restoreOpenTabs(known: ReadonlySet<string>): void {
+        if (this.tabsRestored) return;
+        this.tabsRestored = true;
+        let stored: { open?: unknown; selected?: unknown } | null = null;
+        try {
+            const raw = localStorage.getItem(PipelineEditorComponent.OPEN_TABS_KEY);
+            stored = raw ? (JSON.parse(raw) as { open?: unknown; selected?: unknown }) : null;
+        } catch {
+            return; // unreadable / corrupt — start clean, the next persist overwrites it
+        }
+        const open = Array.isArray(stored?.open)
+            ? stored.open.filter((id): id is string => typeof id === 'string' && known.has(id))
+            : [];
+        if (!open.length) return;
+        this.openIds.update((ids) => [...open, ...ids.filter((id) => !open.includes(id))]);
+        if (this.selectedId() || this.pendingSelect) return; // the deep link already chose
+        const sel = typeof stored?.selected === 'string' && known.has(stored.selected) ? stored.selected : open[0];
+        this.select(sel);
+    }
+
     /** Search-and-choose the open set. Returns the FULL desired set, so unticking closes a tab. */
     openPipelines(): void {
         this.dialog
             .open(PipelineOpenDialog, {
                 width: '30rem',
-                data: { pipelines: this.flows(), open: this.openIds() },
+                data: { pipelines: this.flows(), open: this.openIds(), dirty: [...this.dirtyIds()] },
             })
             .afterClosed()
             .subscribe((next?: string[]) => {
@@ -1372,33 +1471,80 @@ export class PipelineEditorComponent implements OnInit {
             return;
         }
         this.exportingConfig.set(true);
-        this.configApi
-            .read('pipeline', id)
-            .pipe(
-                // Stream-vs-reference off the CONFIG's own `produces` — the same read the shell used.
-                // ⛔ Not PipelineSummary.produces, which is the list of stores the pipeline produces.
-                switchMap((r) =>
-                    this.transfer.buildExport(
-                        id,
-                        String(r.config['produces'] ?? '') === 'reference' ? 'reference' : 'stream',
-                        r.config,
-                    ),
-                ),
-            )
-            .subscribe({
-                next: ({ bundle, missing }) => {
-                    this.exportingConfig.set(false);
-                    this.transfer.download(bundle);
-                    // A satellite that could not be read is named, not swallowed — the file downloaded,
-                    // but it is incomplete and re-importing it would silently lose that piece.
-                    if (missing.length)
-                        this.toast.warning(`Exported without ${missing.join(', ')} — could not be read.`);
-                    else this.toast.success(`Exported "${id}" configuration`);
-                },
-                error: (err) => {
-                    this.exportingConfig.set(false);
-                    this.toast.error(apiErrorMessage(err, 'Could not export the configuration.'));
-                },
+        // The read + kind derivation live on the transfer service (`exportPipeline`) so the Open
+        // dialog's per-row export builds the exact same bundle from a name alone.
+        this.transfer.exportPipeline(id).subscribe({
+            next: ({ bundle, missing }) => {
+                this.exportingConfig.set(false);
+                this.transfer.download(bundle);
+                // A satellite that could not be read is named, not swallowed — the file downloaded,
+                // but it is incomplete and re-importing it would silently lose that piece.
+                if (missing.length) this.toast.warning(`Exported without ${missing.join(', ')} — could not be read.`);
+                else this.toast.success(`Exported "${id}" configuration`);
+            },
+            error: (err) => {
+                this.exportingConfig.set(false);
+                this.toast.error(apiErrorMessage(err, 'Could not export the configuration.'));
+            },
+        });
+    }
+
+    /**
+     * New pipeline via the guided Catalog onboarding — the compliant cheap version: a feature may not
+     * import another feature's create dialog, but it may NAVIGATE there, and the onboarding flow
+     * already redirects back into the guided editor after the create.
+     */
+    newPipelineViaOnboarding(): void {
+        this.router.navigate(['/catalog'], { queryParams: { onboard: 'stream' } });
+    }
+
+    /**
+     * Duplicate the selected pipeline as a runnable (inactive) copy under a new name, reusing the
+     * proven stream-bundle retarget path end to end: {@link StreamTransferService.exportPipeline}
+     * builds the portable bundle (body + schema + per-segment schemas + enrich companion, identity
+     * stripped), {@link planStreamImport} retargets everything to the NEW name, and
+     * {@link StreamTransferService.applyImport} writes the satellites then the inactive draft.
+     *
+     * <p>⚠ Reads SERVER state, exactly like {@link exportConfig} — so a dirty tab refuses with the
+     * same toast pattern rather than duplicating something other than what is on screen.
+     */
+    duplicatePipeline(): void {
+        const id = this.selectedId();
+        if (!id || !this.canAuthor()) return;
+        if (this.dirty()) {
+            this.toast.warning('Apply this pipeline before duplicating — a duplicate copies the saved configuration.');
+            return;
+        }
+        this.dialog
+            .open(PipelineDuplicateDialog, {
+                width: '32rem',
+                data: { sourceId: id, existingNames: this.flows().map((f) => f.name) },
+            })
+            .afterClosed()
+            .subscribe((res?: PipelineDuplicateResultData) => {
+                if (!res) return;
+                const newId = pipelineId(res.name);
+                this.transfer
+                    .exportPipeline(id)
+                    .pipe(
+                        switchMap(({ bundle, missing }) => {
+                            // A satellite that could not be read is named BEFORE the writes — the copy
+                            // still lands, but silently dropping a schema would be a trap.
+                            if (missing.length)
+                                this.toast.warning(`Duplicating without ${missing.join(', ')} — could not be read.`);
+                            return this.transfer.applyImport(
+                                planStreamImport(bundle, { name: res.name, space: this.spaces.currentSpaceId() }),
+                            );
+                        }),
+                    )
+                    .subscribe({
+                        next: () => {
+                            this.toast.success(`Duplicated as '${res.name}' — an inactive draft.`);
+                            this.load(); // the new row, without disturbing open tabs
+                            this.select(newId);
+                        },
+                        error: (err) => this.onWriteError(err, 'Duplicate failed'),
+                    });
             });
     }
 
@@ -2360,11 +2506,80 @@ export class PipelineEditorComponent implements OnInit {
 
     /** Walk the flow for activation-blocking issues; opens the findings panel. */
     validate(): PipelineFinding[] {
+        const f = this.refreshFindings();
+        this.bottomTab.set('validation');
+        return f;
+    }
+
+    /**
+     * The findings-computation half of {@link validate}, without forcing the dock open — what the
+     * live re-validate runs. Pure over the model (it never touches `dirty`), so the debounce effect
+     * below cannot feed back into itself.
+     */
+    private refreshFindings(): PipelineFinding[] {
         const m = this.model();
         const f = m ? validatePipeline(m, this.typeCat(), this.validRefs(), this.testedStatus()) : [];
         this.findings.set(f);
-        this.bottomTab.set('validation');
         return f;
+    }
+
+    /** Error-severity findings from the last validate — drives the Save button's warning state. */
+    readonly errorFindingCount = computed(() => this.findings().filter((f) => f.severity === 'error').length);
+
+    /** The Save tooltip names the problem count — the warning must be text, not colour alone. */
+    readonly saveTooltip = computed(() => {
+        const n = this.errorFindingCount();
+        if (!n) return 'Save';
+        return `Save — ${n} validation error${n === 1 ? '' : 's'} (drafts may save with problems)`;
+    });
+
+    /** The pending live re-validate, if any — one timer, cancelled by the effect on every re-run. */
+    private validateTimer: ReturnType<typeof setTimeout> | null = null;
+
+    /**
+     * Live validation while a tab is dirty: ~1.5s after the LAST graph mutation, re-run the same
+     * pure validator and let the findings badge + Save warning update in place. Hooked on the model
+     * signal — every graph mutation goes `model.set(...)` + `dirty.set(true)` — so drawer-form
+     * keystrokes (which live outside the model until Apply) never trigger it. The effect only ever
+     * CANCELS the timer on re-run, so a tab switch or close cancels a pending validate for free; the
+     * fired callback re-checks the tab and dirtiness, so a stale timer for a clean or switched-away
+     * tab is a no-op. Writes findings only — never `dirty`, never `bottomTab` — so no feedback loop
+     * and no dock popping open uninvited.
+     */
+    private readonly liveValidate = effect(() => {
+        this.model(); // track: every graph mutation lands here
+        const id = this.selectedId();
+        const isDirty = this.dirty();
+        if (this.validateTimer !== null) {
+            this.cancelValidateTimer(this.validateTimer);
+            this.validateTimer = null;
+        }
+        if (!id || !isDirty) return; // a clean tab never validates on the timer
+        this.validateTimer = this.armValidateTimer(() => {
+            this.validateTimer = null;
+            if (this.selectedId() !== id || !this.dirty()) return; // superseded — the operator moved on
+            this.refreshFindings();
+        });
+    });
+
+    /**
+     * The timer seam the specs override to fire the debounce deterministically — this runner has no
+     * fakeAsync ProxyZone, vi.useFakeTimers() recurses ApplicationRef.tick under zone-testing
+     * (NG0101), and a real-time await destabilises the zone scheduler the same way. ⚠ The UNPATCHED
+     * setTimeout, deliberately (the same escape Angular's own scheduler uses): this is armed from an
+     * effect INSIDE a tick, and a zone-patched macrotask armed there re-enters the tick recursively.
+     * The bare signal write in the callback is enough — the change-detection scheduler notices it
+     * without the zone's help.
+     */
+    protected armValidateTimer(cb: () => void): ReturnType<typeof setTimeout> {
+        return nativeSetTimeout(cb, 1500);
+    }
+    protected cancelValidateTimer(handle: ReturnType<typeof setTimeout>): void {
+        nativeClearTimeout(handle);
+    }
+
+    ngOnDestroy(): void {
+        if (this.validateTimer !== null) this.cancelValidateTimer(this.validateTimer);
     }
 
     /**

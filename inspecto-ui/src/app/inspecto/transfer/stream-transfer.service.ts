@@ -26,6 +26,27 @@ export class StreamTransferService {
     private spaces = inject(SpacesService);
 
     /**
+     * Build a pipeline's portable bundle from its NAME alone — the server-held config is read here,
+     * so no open tab (or lifted graph) is needed. The stream-vs-reference kind comes off the config's
+     * own `produces` — ⛔ not `PipelineSummary.produces`, which is the list of stores it produces.
+     * One seam for every caller that starts from a name: the editor's Export configuration, the Open
+     * dialog's per-row export, and Duplicate's read half.
+     */
+    exportPipeline(name: string): Observable<{ bundle: StreamBundle; missing: string[] }> {
+        return this.configApi
+            .read('pipeline', name)
+            .pipe(
+                switchMap((r) =>
+                    this.buildExport(
+                        name,
+                        String(r.config['produces'] ?? '') === 'reference' ? 'reference' : 'stream',
+                        r.config,
+                    ),
+                ),
+            );
+    }
+
+    /**
      * Read the satellites a full export needs and assemble the bundle. A satellite that fails to
      * read is omitted rather than failing the export — a partial export the operator is TOLD about
      * beats no export at all (the caller surfaces `missing`).

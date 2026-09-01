@@ -44,6 +44,11 @@ export interface PipelineSettingsData {
                 to by name — pick a load mode to make one.
             </inspecto-alert>
             <form [formGroup]="form" (ngSubmit)="save()" class="mt-4 flex flex-col gap-3">
+                <mat-form-field class="w-full" subscriptSizing="dynamic">
+                    <mat-label>Description</mat-label>
+                    <textarea matInput rows="2" formControlName="description"></textarea>
+                    <mat-hint>Optional — leaving it blank clears the stored description.</mat-hint>
+                </mat-form-field>
                 <inspecto-option-picker
                     class="block w-full"
                     label="Produces"
@@ -108,6 +113,7 @@ export class PipelineSettingsDialog {
     readonly error = signal<string | null>(null);
 
     readonly form = this.fb.group({
+        description: [this.data.settings.description ?? ''],
         produces: [this.data.settings.produces],
         load: [this.data.settings.reference?.load ?? 'replace'],
         key: [(this.data.settings.reference?.key ?? []).join(', ')],
@@ -120,8 +126,10 @@ export class PipelineSettingsDialog {
         this.error.set(null);
         const v = this.form.getRawValue();
         const produces = (v.produces ?? 'stream') as PipelineSettings['produces'];
+        // Always sent: the POST contract clears a stored description on empty/blank.
+        const description = String(v.description ?? '').trim();
         if (produces === 'stream') {
-            this.ref.close({ produces, reference: null });
+            this.ref.close({ produces, reference: null, description });
             return;
         }
         const load = (v.load ?? 'replace') as 'replace' | 'upsert' | 'scd2';
@@ -137,6 +145,7 @@ export class PipelineSettingsDialog {
         this.ref.close({
             produces,
             reference: { load, key, refresh_seconds: Number(v.refreshSeconds) || 0 },
+            description,
         });
     }
 }

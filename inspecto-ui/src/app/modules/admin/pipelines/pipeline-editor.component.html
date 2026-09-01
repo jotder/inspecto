@@ -59,15 +59,25 @@
                 <button mat-icon-button (click)="startNew()" matTooltip="New pipeline" aria-label="New pipeline">
                     <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
                 </button>
+                <!-- Error findings turn Save into a WARNING (icon + tooltip naming the count) but never
+                     disable it — drafts may save with problems; a save the server refuses still lands
+                     its refusals in the Validation dock. -->
                 <button
                     mat-icon-button
                     color="primary"
                     [disabled]="!dirty() || saving()"
                     (click)="save()"
-                    matTooltip="Save"
+                    [matTooltip]="saveTooltip()"
                     aria-label="Save pipeline"
                 >
-                    <mat-icon svgIcon="heroicons_outline:check"></mat-icon>
+                    <mat-icon
+                        [class.text-warn]="errorFindingCount() > 0"
+                        [svgIcon]="
+                            errorFindingCount() > 0
+                                ? 'heroicons_outline:exclamation-triangle'
+                                : 'heroicons_outline:check'
+                        "
+                    ></mat-icon>
                 </button>
             }
 
@@ -87,6 +97,16 @@
             }
             <mat-menu #pipelineMenu="matMenu">
                 @if (canAuthor()) {
+                    <!-- The guided create — navigates to Catalog onboarding, which redirects back into
+                         the guided editor after the create (a feature may not import a feature's dialog). -->
+                    <button mat-menu-item (click)="newPipelineViaOnboarding()">
+                        <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
+                        <span>New pipeline&hellip;</span>
+                    </button>
+                    <button mat-menu-item (click)="duplicatePipeline()">
+                        <mat-icon svgIcon="heroicons_outline:square-2-stack"></mat-icon>
+                        <span>Duplicate&hellip;</span>
+                    </button>
                     <button mat-menu-item (click)="renamePipeline()">
                         <mat-icon svgIcon="heroicons_outline:pencil"></mat-icon>
                         <span>Rename&hellip;</span>

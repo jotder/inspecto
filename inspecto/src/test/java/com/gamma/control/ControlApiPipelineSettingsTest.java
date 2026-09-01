@@ -91,6 +91,33 @@ class ControlApiPipelineSettingsTest {
     }
 
     @Test
+    void descriptionRoundTripsAndBlankClearsIt() throws Exception {
+        Path root = Files.createTempDirectory("pipeline-settings-desc");
+        try (Ctx c = open(root)) {
+            // settable post-creation through the settings surface — its one home after the create dialog
+            HttpResponse<String> set = post(c.port, "/pipelines/mini_etl/settings",
+                    "{\"description\":\"  Nightly CDR feed  \"}");
+            assertEquals(200, set.statusCode(), set.body());
+            JsonNode reread = V1Body.of(get(c.port, "/pipelines/mini_etl/settings").body());
+            assertEquals("Nightly CDR feed", reread.get("description").asText(), "trimmed on write");
+
+            // an absent key is untouched by a body that does not mention it
+            assertEquals(200, post(c.port, "/pipelines/mini_etl/settings", "{\"produces\":\"stream\"}").statusCode());
+            assertEquals("Nightly CDR feed",
+                    V1Body.of(get(c.port, "/pipelines/mini_etl/settings").body()).get("description").asText());
+
+            // blank clears — the key leaves the file rather than persisting as an empty string
+            assertEquals(200, post(c.port, "/pipelines/mini_etl/settings", "{\"description\":\"\"}").statusCode());
+            assertTrue(V1Body.of(get(c.port, "/pipelines/mini_etl/settings").body()).get("description").isNull());
+            Path pipe = c.root.resolve("mini_pipeline.toon");
+            Map<String, Object> onDisk = ConfigLoader.filesystem().decode(pipe.toString());
+            assertFalse(onDisk.containsKey("description"), "blank must remove the key from the file");
+        } finally {
+            deleteRecursive(root);
+        }
+    }
+
+    @Test
     void savingAValidReferenceBlockPersistsAndReadsBack() throws Exception {
         Path root = Files.createTempDirectory("pipeline-settings-save");
         try (Ctx c = open(root)) {

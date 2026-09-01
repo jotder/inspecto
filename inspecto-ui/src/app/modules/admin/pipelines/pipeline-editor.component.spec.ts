@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { Router, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { MatDialog } from '@angular/material/dialog';
@@ -56,7 +57,12 @@ describe('PipelineEditorComponent', () => {
         impact: ReturnType<typeof vi.fn>;
         read: ReturnType<typeof vi.fn>;
     };
-    let transfer: { buildExport: ReturnType<typeof vi.fn>; download: ReturnType<typeof vi.fn> };
+    let transfer: {
+        buildExport: ReturnType<typeof vi.fn>;
+        exportPipeline: ReturnType<typeof vi.fn>;
+        applyImport: ReturnType<typeof vi.fn>;
+        download: ReturnType<typeof vi.fn>;
+    };
     let dialog: { open: ReturnType<typeof vi.fn> };
     let components: { list: ReturnType<typeof vi.fn>; create: ReturnType<typeof vi.fn> };
     let toast: {
@@ -69,6 +75,8 @@ describe('PipelineEditorComponent', () => {
     beforeEach(() => {
         // LensService persists to localStorage; clear it so a lens set by one test/file can't leak into another.
         localStorage.removeItem('inspecto.currentLens');
+        // The editor persists its open-tab set the same way — a set left by one test must not restore in another.
+        localStorage.removeItem('inspecto.pipelines.openTabs');
         api = {
             list: vi.fn().mockReturnValue(of([])),
             nodeTypes: vi.fn().mockReturnValue(
@@ -146,6 +154,10 @@ describe('PipelineEditorComponent', () => {
         };
         transfer = {
             buildExport: vi.fn().mockReturnValue(of({ bundle: { kind: 'inspecto-stream-config' }, missing: [] })),
+            exportPipeline: vi
+                .fn()
+                .mockReturnValue(of({ bundle: { kind: 'stream', source: { name: 'demo' } }, missing: [] })),
+            applyImport: vi.fn().mockReturnValue(of({ path: 'copy_pipeline.toon' })),
             download: vi.fn(),
         };
         dialog = { open: vi.fn() };
@@ -155,6 +167,8 @@ describe('PipelineEditorComponent', () => {
             imports: [PipelineEditorComponent],
             providers: [
                 provideNoopAnimations(),
+                // Item 1 (2026-09-01): New pipeline… navigates to the Catalog onboarding entry.
+                provideRouter([]),
                 // Rendering the toolbar's create field pulls the shell config service, which walks up
                 // to this token — without it the editor cannot be rendered at all in a spec.
                 { provide: GAMMA_CONFIG, useValue: {} },
@@ -204,26 +218,16 @@ describe('PipelineEditorComponent', () => {
      * `StreamTransferService.buildExport` would have had no caller at all.
      */
     describe('export configuration (P6-e)', () => {
-        it('exports the SERVER-held config, with the kind off its own `produces`', () => {
-            config.read.mockReturnValue(of({ config: { name: 'demo', produces: 'reference' } }));
+        /** The read + kind derivation moved onto `StreamTransferService.exportPipeline` (2026-09-01)
+         *  so the Open dialog's per-row export shares it — the editor now delegates by NAME. */
+        it('exports the SERVER-held config through the shared by-name seam', () => {
             const c = make();
             c.select('demo');
             c.exportConfig();
 
-            expect(config.read).toHaveBeenCalledWith('pipeline', 'demo');
-            expect(transfer.buildExport).toHaveBeenCalledWith('demo', 'reference', {
-                name: 'demo',
-                produces: 'reference',
-            });
+            expect(transfer.exportPipeline).toHaveBeenCalledWith('demo');
             expect(transfer.download).toHaveBeenCalled();
-        });
-
-        it('defaults to a stream when `produces` says nothing', () => {
-            const c = make();
-            c.select('demo');
-            c.exportConfig();
-
-            expect(transfer.buildExport).toHaveBeenCalledWith('demo', 'stream', expect.anything());
+            expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('demo'));
         });
 
         /** ⚠ The export carries the SAVED config — shipping it while the tab shows unapplied edits
@@ -231,15 +235,82 @@ describe('PipelineEditorComponent', () => {
         it('refuses while the tab is dirty', () => {
             const c = make();
             c.select('demo');
-            // `select` legitimately reads the pipeline's own config to learn its directory (the satellite
-            // subdir, SATELLITE-WRITE-1) — clear that so the assertion below means what it says: the
-            // EXPORT read nothing.
-            config.read.mockClear();
             c.dirty.set(true);
             c.exportConfig();
 
-            expect(config.read).not.toHaveBeenCalled();
+            expect(transfer.exportPipeline).not.toHaveBeenCalled();
             expect(toast.warning).toHaveBeenCalled();
+        });
+    });
+
+    /** Item 1 (operator batch 2026-09-01): the compliant cheap create — navigate to Catalog
+     *  onboarding (⛔ never import the other feature's dialog); it redirects back after the create. */
+    describe('new pipeline via onboarding', () => {
+        it('navigates to /catalog with the onboard=stream handshake', () => {
+            const router = TestBed.inject(Router);
+            const nav = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+            const c = make();
+            c.newPipelineViaOnboarding();
+
+            expect(nav).toHaveBeenCalledWith(['/catalog'], { queryParams: { onboard: 'stream' } });
+        });
+    });
+
+    /**
+     * Item 2 (operator batch 2026-09-01): Duplicate — a runnable copy through the PROVEN
+     * stream-bundle retarget path (export → planStreamImport under the new name → applyImport), so
+     * satellites, directories and the inactive-draft posture are the import planner's, not new code.
+     */
+    describe('duplicate pipeline', () => {
+        const BUNDLE = {
+            format: 'inspecto-stream-config',
+            version: 1,
+            exportedAt: '2026-09-01T00:00:00.000Z',
+            source: { space: null, name: 'demo', contentHash: 'x' },
+            kind: 'stream',
+            pipeline: { parsing: { frontend: 'delimited' } },
+            requires: [],
+        };
+
+        it('plans the import under the typed name and opens the copy as a tab', () => {
+            transfer.exportPipeline.mockReturnValue(of({ bundle: BUNDLE, missing: [] }));
+            dialog.open.mockReturnValue({ afterClosed: () => of({ name: 'demo copy' }) });
+            const c = make();
+            c.select('demo');
+            c.duplicatePipeline();
+
+            expect(transfer.exportPipeline).toHaveBeenCalledWith('demo');
+            const plan = transfer.applyImport.mock.calls[0][0];
+            // The planner stamps identity from the typed name exactly as a fresh create would.
+            expect(plan.pipeline['name']).toBe('demo copy');
+            expect(plan.pipeline['id']).toBe('demo_copy');
+            expect(plan.pipeline['active']).toBe(false);
+            // The copy opens as a tab under its registered id.
+            expect(api.pipelineGraphRaw).toHaveBeenCalledWith('demo_copy');
+            expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('demo copy'));
+        });
+
+        /** Same rule (and toast pattern) as exportConfig: the duplicate reads SERVER state. */
+        it('refuses while the tab is dirty', () => {
+            const c = make();
+            c.select('demo');
+            c.dirty.set(true);
+            c.duplicatePipeline();
+
+            expect(dialog.open).not.toHaveBeenCalled();
+            expect(transfer.exportPipeline).not.toHaveBeenCalled();
+            expect(toast.warning).toHaveBeenCalled();
+        });
+
+        it('names an unreadable satellite but still writes the copy', () => {
+            transfer.exportPipeline.mockReturnValue(of({ bundle: BUNDLE, missing: ['schema "demo_schema"'] }));
+            dialog.open.mockReturnValue({ afterClosed: () => of({ name: 'copy' }) });
+            const c = make();
+            c.select('demo');
+            c.duplicatePipeline();
+
+            expect(toast.warning).toHaveBeenCalledWith(expect.stringContaining('demo_schema'));
+            expect(transfer.applyImport).toHaveBeenCalled();
         });
     });
 
@@ -280,7 +351,7 @@ describe('PipelineEditorComponent', () => {
         /** A satellite that could not be read is NAMED — the file downloaded, but re-importing it
          *  would silently lose that piece. */
         it('names an unreadable satellite instead of swallowing it', () => {
-            transfer.buildExport.mockReturnValue(of({ bundle: {}, missing: ['demo_schema'] }));
+            transfer.exportPipeline.mockReturnValue(of({ bundle: {}, missing: ['demo_schema'] }));
             const c = make();
             c.select('demo');
             c.exportConfig();
@@ -1768,6 +1839,299 @@ describe('PipelineEditorComponent', () => {
         });
     });
 
+    /** Rendered fixture with the canvas double injected — the DOM-driven tests below dispatch real events. */
+    function makeRendered() {
+        const fixture = TestBed.createComponent(PipelineEditorComponent);
+        const c = fixture.componentInstance;
+        (c as unknown as { canvas: unknown }).canvas = canvasMock();
+        fixture.detectChanges(); // runs ngOnInit and attaches the host/window listeners
+        return { fixture, c };
+    }
+
+    /** Item 1 (2026-09-01 batch) — the browser must warn before discarding ANY tab's unsaved edits. */
+    describe('beforeunload guard', () => {
+        function fireBeforeUnload(): Event {
+            const e = new Event('beforeunload', { cancelable: true });
+            window.dispatchEvent(e);
+            return e;
+        }
+
+        it('arms the warning while the ACTIVE tab is dirty — before the per-tab mirror has flushed', () => {
+            const { c } = makeRendered();
+            c.select('demo');
+            // Dirty through a real mutation, not dirty.set — the guard must see what an edit sets.
+            // A config-only mutation keeps the graph recipe-expressible, so the rendered fixture
+            // never mounts the real G6 canvas (which jsdom cannot host).
+            c.setNodeEnabled(c.model()!.nodes[1], false);
+            // Deliberately NO TestBed.tick(): the per-tab dirty mirror is an effect and has not run
+            // yet, and a browser unload fires on its own clock — the guard cannot wait for Angular.
+            const e = fireBeforeUnload();
+            expect(e.defaultPrevented).toBe(true);
+        });
+
+        it('arms for a PARKED dirty tab even when the active tab is clean', () => {
+            const { c } = makeRendered();
+            c.select('demo');
+            c.setNodeEnabled(c.model()!.nodes[1], false);
+            TestBed.tick(); // flush the per-tab dirty mirror before parking
+            api.pipelineGraphRaw.mockReturnValue(of({ name: 'other', active: false, nodes: [], edges: [] }));
+            c.select('other');
+            expect(c.dirty()).toBe(false); // the active tab is clean…
+            const e = fireBeforeUnload();
+            expect(e.defaultPrevented).toBe(true); // …but demo's parked edits still arm the warning
+        });
+
+        it('stays quiet when nothing is dirty', () => {
+            const { c } = makeRendered();
+            c.select('demo');
+            const e = fireBeforeUnload();
+            expect(e.defaultPrevented).toBe(false);
+        });
+    });
+
+    /** Item 3 — Ctrl+S / Cmd+S saves; the browser's save-page dialog is always suppressed. */
+    describe('Ctrl+S / Cmd+S', () => {
+        function press(el: HTMLElement, init: KeyboardEventInit = {}): KeyboardEvent {
+            const e = new KeyboardEvent('keydown', {
+                key: 's',
+                ctrlKey: true,
+                cancelable: true,
+                bubbles: true,
+                ...init,
+            });
+            el.dispatchEvent(e);
+            return e;
+        }
+
+        it('saves the dirty tab and eats the browser shortcut', () => {
+            const { fixture, c } = makeRendered();
+            c.select('demo');
+            c.setNodeEnabled(c.model()!.nodes[1], false); // config-only mutation — no G6 mount in jsdom
+            const e = press(fixture.nativeElement as HTMLElement);
+            expect(e.defaultPrevented).toBe(true);
+            expect(api.savePipelineGraph).toHaveBeenCalledTimes(1);
+        });
+
+        it('Cmd+S (metaKey) is the same gesture', () => {
+            const { fixture, c } = makeRendered();
+            c.select('demo');
+            c.setNodeEnabled(c.model()!.nodes[1], false);
+            const e = press(fixture.nativeElement as HTMLElement, { ctrlKey: false, metaKey: true });
+            expect(e.defaultPrevented).toBe(true);
+            expect(api.savePipelineGraph).toHaveBeenCalledTimes(1);
+        });
+
+        it('preventDefaults on a clean tab too, but writes nothing', () => {
+            const { fixture, c } = makeRendered();
+            c.select('demo');
+            const e = press(fixture.nativeElement as HTMLElement);
+            expect(e.defaultPrevented).toBe(true); // the browser dialog is never the right answer here
+            expect(api.savePipelineGraph).not.toHaveBeenCalled();
+        });
+
+        it('never saves in View mode, even over a dirty model — but still suppresses the dialog', () => {
+            const { fixture, c } = makeRendered();
+            c.readOnly = true;
+            c.selectedId.set('demo');
+            c.model.set(structuredClone(FLOW));
+            c.dirty.set(true); // the gate under test is canAuthor, not the dirty-arming path
+            const e = press(fixture.nativeElement as HTMLElement);
+            expect(e.defaultPrevented).toBe(true);
+            expect(api.savePipelineGraph).not.toHaveBeenCalled();
+        });
+
+        it('a plain "s" keystroke is not the gesture', () => {
+            const { fixture, c } = makeRendered();
+            c.select('demo');
+            c.setNodeEnabled(c.model()!.nodes[1], false);
+            const e = press(fixture.nativeElement as HTMLElement, { ctrlKey: false });
+            expect(e.defaultPrevented).toBe(false);
+            expect(api.savePipelineGraph).not.toHaveBeenCalled();
+        });
+    });
+
+    /** Item 2 — the open-tab SET survives a reload; dirty edits do not (that is the guard's job). */
+    describe('open-tab persistence', () => {
+        const KEY = 'inspecto.pipelines.openTabs';
+        const row = (name: string) => ({
+            name,
+            active: false,
+            nodeCount: 0,
+            edgeCount: 0,
+            produces: [],
+            consumes: [],
+        });
+
+        it('persists the open set + selection as tabs change', () => {
+            api.list.mockReturnValue(of([row('demo'), row('other')]));
+            const c = make();
+            c.select('demo');
+            TestBed.tick(); // flush the persist mirror
+            expect(JSON.parse(localStorage.getItem(KEY)!)).toEqual({ open: ['demo'], selected: 'demo' });
+        });
+
+        it('restores the stored set LAZILY — only the selected tab lifts its graph', () => {
+            localStorage.setItem(KEY, JSON.stringify({ open: ['a', 'b'], selected: 'b' }));
+            api.list.mockReturnValue(of([row('a'), row('b'), row('c')]));
+            const c = make();
+            expect(c.openIds()).toEqual(['a', 'b']);
+            expect(c.selectedId()).toBe('b');
+            // Exactly one lift: 'a' waits for its first activation, exactly as the Open dialog leaves it.
+            expect(api.pipelineGraphRaw).toHaveBeenCalledTimes(1);
+            expect(api.pipelineGraphRaw).toHaveBeenCalledWith('b');
+        });
+
+        it('silently drops names the served list no longer has, falling back to the first survivor', () => {
+            localStorage.setItem(KEY, JSON.stringify({ open: ['a', 'ghost'], selected: 'ghost' }));
+            api.list.mockReturnValue(of([row('a')]));
+            const c = make();
+            expect(c.openIds()).toEqual(['a']);
+            expect(c.selectedId()).toBe('a');
+        });
+
+        it('the ?open= deep link wins the selection over the stored one', () => {
+            localStorage.setItem(KEY, JSON.stringify({ open: ['a', 'b'], selected: 'b' }));
+            api.list.mockReturnValue(of([row('a'), row('b'), row('c')]));
+            const fixture = TestBed.createComponent(PipelineEditorComponent);
+            fixture.componentRef.setInput('openId', 'c');
+            const c = fixture.componentInstance;
+            (c as unknown as { canvas: unknown }).canvas = canvasMock();
+            fixture.detectChanges(); // ngOnInit (restore) + the deep-link effect
+            expect(c.selectedId()).toBe('c');
+            expect(c.openIds()).toEqual(expect.arrayContaining(['a', 'b', 'c']));
+        });
+
+        it('ignores a corrupt stored value, and never persists graphs or dirty flags — ids only', () => {
+            localStorage.setItem(KEY, '{not json');
+            api.list.mockReturnValue(of([row('demo')]));
+            const c = make();
+            expect(c.openIds()).toEqual([]);
+            c.select('demo');
+            c.onDropAdd({ type: 'transform.filter', x: 1, y: 2 }); // dirty — must NOT be remembered
+            TestBed.tick();
+            expect(JSON.parse(localStorage.getItem(KEY)!)).toEqual({ open: ['demo'], selected: 'demo' });
+        });
+
+        it('a failed list fetch must NOT wipe the stored set', () => {
+            localStorage.setItem(KEY, JSON.stringify({ open: ['a'], selected: 'a' }));
+            api.list.mockReturnValue(throwError(() => new Error('down')));
+            make();
+            TestBed.tick();
+            expect(JSON.parse(localStorage.getItem(KEY)!)).toEqual({ open: ['a'], selected: 'a' });
+        });
+    });
+
+    /**
+     * Item 4 — live validation while a tab is dirty; the Save button warns but stays enabled.
+     *
+     * ⚠ Driven through the component's timer SEAM, not clocks: this runner has no fakeAsync
+     * ProxyZone, vi.useFakeTimers() recurses ApplicationRef.tick under zone-testing (NG0101), and a
+     * real-time await destabilises the zone scheduler the same way. Capturing the armed callback
+     * and firing it by hand tests the same wiring deterministically.
+     */
+    describe('live validation (debounced)', () => {
+        /** Replace the timer seam with a capture: `pending` is the armed debounce, null once cancelled. */
+        function captureTimer(c: PipelineEditorComponent): { pending: (() => void) | null; armed: number } {
+            const state = { pending: null as (() => void) | null, armed: 0 };
+            const seam = c as unknown as {
+                armValidateTimer(cb: () => void): unknown;
+                cancelValidateTimer(handle: unknown): void;
+            };
+            seam.armValidateTimer = (cb) => {
+                state.pending = cb;
+                state.armed++;
+                return 0;
+            };
+            seam.cancelValidateTimer = () => (state.pending = null);
+            return state;
+        }
+
+        it('arms on a graph mutation and, when it fires, validates without opening the dock or touching dirty', () => {
+            const c = make();
+            const timer = captureTimer(c);
+            c.select('demo');
+            TestBed.tick(); // a clean tab arms nothing
+            expect(timer.pending).toBeNull();
+            expect(c.findings()).toEqual([]);
+            c.onDropAdd({ type: 'transform.filter', x: 10, y: 20 });
+            TestBed.tick(); // the mutation re-runs the effect, arming the timer
+            expect(timer.pending).not.toBeNull();
+            expect(c.findings()).toEqual([]); // never synchronous — the window is open
+            timer.pending!();
+            expect(c.findings().length).toBeGreaterThan(0);
+            expect(c.bottomTab()).toBeNull(); // the live pass never pops the dock open
+            expect(c.dirty()).toBe(true); // and never launders the dirty flag
+        });
+
+        it('re-arms on every further mutation — a debounce, not an interval', () => {
+            const c = make();
+            const timer = captureTimer(c);
+            c.select('demo');
+            c.onDropAdd({ type: 'transform.filter', x: 10, y: 20 });
+            TestBed.tick();
+            expect(timer.armed).toBe(1);
+            c.onDropAdd({ type: 'transform.filter', x: 30, y: 40 });
+            TestBed.tick(); // the second mutation cancels the first window and opens a new one
+            expect(timer.armed).toBe(2);
+            expect(timer.pending).not.toBeNull();
+            timer.pending!();
+            expect(c.findings().length).toBeGreaterThan(0);
+        });
+
+        it('a pending validate is cancelled by switching tabs, and a stale callback is a no-op', () => {
+            const c = make();
+            const timer = captureTimer(c);
+            c.select('demo');
+            c.onDropAdd({ type: 'transform.filter', x: 10, y: 20 });
+            TestBed.tick();
+            const stale = timer.pending!;
+            api.pipelineGraphRaw.mockReturnValue(of({ name: 'other', active: false, nodes: [], edges: [] }));
+            c.select('other');
+            TestBed.tick(); // the effect re-runs for the clean tab and cancels the timer
+            expect(timer.pending).toBeNull(); // nothing armed for a clean tab
+            // Belt and braces: even a callback that somehow survived the cancel refuses to fire
+            // for a tab that is no longer the dirty one it was armed for.
+            stale();
+            expect(c.findings()).toEqual([]);
+        });
+
+        it('closing the dirty tab cancels the pending validate', async () => {
+            const c = make();
+            const timer = captureTimer(c);
+            c.select('demo');
+            c.onDropAdd({ type: 'transform.filter', x: 10, y: 20 });
+            TestBed.tick();
+            expect(timer.pending).not.toBeNull();
+            await c.closeTab('demo'); // the confirm mock approves the discard
+            TestBed.tick();
+            expect(timer.pending).toBeNull();
+            expect(c.findings()).toEqual([]);
+        });
+
+        it('the Save button warns (icon + tooltip naming the count) on error findings but stays ENABLED', () => {
+            const { fixture, c } = makeRendered();
+            c.select('demo');
+            // A config-only mutation: dirties the tab while keeping the graph recipe-expressible,
+            // so the rendered fixture never mounts the real G6 canvas (which jsdom cannot host).
+            c.setNodeEnabled(c.model()!.nodes[1], false);
+            c.findings.set([{ severity: 'error', nodeId: 'x', message: 'boom' }]);
+            fixture.detectChanges();
+            const btn = fixture.nativeElement.querySelector(
+                'button[aria-label="Save pipeline"]',
+            ) as HTMLButtonElement;
+            expect(btn).toBeTruthy();
+            expect(btn.disabled).toBe(false); // drafts may save with problems
+            expect(btn.querySelector('mat-icon')!.classList.contains('text-warn')).toBe(true);
+            expect(c.saveTooltip()).toBe('Save — 1 validation error (drafts may save with problems)');
+
+            // Clearing the errors restores the plain Save affordance.
+            c.findings.set([{ severity: 'warning', nodeId: 'x', message: 'meh' }]);
+            fixture.detectChanges();
+            expect(btn.querySelector('mat-icon')!.classList.contains('text-warn')).toBe(false);
+            expect(c.saveTooltip()).toBe('Save');
+        });
+    });
+
     it('readOnly withholds authoring even when the lens would allow it', () => {
         const c = make();
         c.readOnly = true;
@@ -2438,6 +2802,7 @@ describe('PipelineEditorComponent recipe view (UI plan §1, S1)', () => {
     beforeEach(() => {
         localStorage.removeItem('inspecto.currentLens');
         localStorage.removeItem('inspecto.pipelines.viewMode');
+        localStorage.removeItem('inspecto.pipelines.openTabs');
         api = {
             list: vi.fn().mockReturnValue(of([])),
             nodeTypes: vi.fn().mockReturnValue(of([])),

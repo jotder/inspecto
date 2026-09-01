@@ -278,6 +278,13 @@ final class PipelineGraphRoutes implements RouteModule {
         // W3: against the file's OWN directory — a reference resolves config-relative first, so the
         // portable bare `<name>.toon` the Parse drawer writes would otherwise warn on every save.
         findings.addAll(ConfigRoutes.schemaFileFindings("pipeline", lowered, Severity.WARNING, target.getParent()));
+        // The arming pre-checks /config/write and /config/patch already run (ERROR when active,
+        // WARNING on an inactive draft). Without them this route answered 200 written:true for a
+        // config that then failed to arm at the next ConfigRegistry.rebuild — one WARN log, the
+        // pipeline silently skipped every cycle.
+        findings.addAll(ConfigRoutes.armedWithoutSchemaFindings("pipeline", lowered));
+        findings.addAll(ConfigRoutes.routeArmingFindings("pipeline", lowered));
+        findings.addAll(ConfigRoutes.stepDisableFindings("pipeline", lowered));
         if (findings.stream().anyMatch(f -> f.severity() == Severity.ERROR))
             return ApiContext.respondJson(e, 422, Map.of("written", false,
                     "error", "config has ERROR-level findings; not written", "findings", findings));
