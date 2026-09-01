@@ -32,7 +32,7 @@ import java.util.Map;
  * decision-rules.md}). Three subjects hook in:
  * <ul>
  *   <li><b>pipeline batches</b> — the {@code transformed} table, between {@link com.gamma.etl.DataTransformer}
- *       and {@link PartitionWriter} ({@code BatchIngestStrategy.writeAndTrace}), matched by
+ *       and {@link PartitionWriter} ({@code ConsignmentIngestStrategy.writeAndTrace}), matched by
  *       {@code targetType: pipeline};</li>
  *   <li><b>{@code sql.template} job runs</b> — the materialized template result before its snapshot
  *       {@code COPY}, matched by {@code targetType: job} + the job's name;</li>

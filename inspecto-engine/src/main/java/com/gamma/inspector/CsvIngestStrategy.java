@@ -16,14 +16,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.gamma.inspector.BatchIngestStrategy.configure;
-import static com.gamma.inspector.BatchIngestStrategy.consolidatedBaseName;
-import static com.gamma.inspector.BatchIngestStrategy.databaseDir;
-import static com.gamma.inspector.BatchIngestStrategy.dropTable;
-import static com.gamma.inspector.BatchIngestStrategy.msg;
-import static com.gamma.inspector.BatchIngestStrategy.openTempDb;
-import static com.gamma.inspector.BatchIngestStrategy.partitionColumns;
-import static com.gamma.inspector.BatchIngestStrategy.writeAndTrace;
+import static com.gamma.inspector.ConsignmentIngestStrategy.configure;
+import static com.gamma.inspector.ConsignmentIngestStrategy.consolidatedBaseName;
+import static com.gamma.inspector.ConsignmentIngestStrategy.databaseDir;
+import static com.gamma.inspector.ConsignmentIngestStrategy.dropTable;
+import static com.gamma.inspector.ConsignmentIngestStrategy.msg;
+import static com.gamma.inspector.ConsignmentIngestStrategy.openTempDb;
+import static com.gamma.inspector.ConsignmentIngestStrategy.partitionColumns;
+import static com.gamma.inspector.ConsignmentIngestStrategy.writeAndTrace;
 
 /**
  * Built-in CSV ingest path. Tags every accepted row with {@code __src_id}, transforms once, writes
@@ -41,21 +41,21 @@ import static com.gamma.inspector.BatchIngestStrategy.writeAndTrace;
  *       {@link #ingest}), since the line-by-line parser cannot stream through a view.</li>
  * </ul>
  *
- * <p>Behaviour-identical to the former {@code BatchProcessor.processCsv} — only the
- * commit/audit tail was lifted out into {@link BatchProcessor}.
+ * <p>Behaviour-identical to the former {@code ConsignmentIngestor.processCsv} — only the
+ * commit/audit tail was lifted out into {@link ConsignmentIngestor}.
  */
-final class CsvBatchStrategy implements BatchIngestStrategy {
+final class CsvIngestStrategy implements ConsignmentIngestStrategy {
 
-    private static final Logger log = LoggerFactory.getLogger(CsvBatchStrategy.class);
+    private static final Logger log = LoggerFactory.getLogger(CsvIngestStrategy.class);
 
     @Override
-    public IngestOutcome ingest(Batch batch, PipelineConfig cfg) {
+    public IngestOutcome ingest(Consignment batch, PipelineConfig cfg) {
         LocalDateTime batchStart = LocalDateTime.now();
         String batchStatus = "SUCCESS";
         String batchError  = "";
 
         Map<Integer, String> srcIdToFile  = new LinkedHashMap<>();
-        List<Batch.Member>   survivors    = new ArrayList<>();
+        List<Consignment.Member>   survivors    = new ArrayList<>();
         List<MemberAudit>    memberAudits = new ArrayList<>();
         long totalInputRows = 0;
         List<PartitionOutput> outputs = List.of();
@@ -85,7 +85,7 @@ final class CsvBatchStrategy implements BatchIngestStrategy {
                     // materialises instead of chunking; multi-destination + a chunking-sized file is rare.)
                     boolean fanOut = cfg.sinks().size() > 1;
                     if (batch.members().size() == 1 && !fanOut) {
-                        Batch.Member only = batch.members().get(0);
+                        Consignment.Member only = batch.members().get(0);
                         return cfg.chunking().appliesTo(only.file().length())
                                 ? NativeCsvStreamingEngine.chunkedIngest(batch, only, cfg, conn, batchStart)
                                 : NativeCsvStreamingEngine.streamingIngest(batch, only, cfg, conn, batchStart);
@@ -96,7 +96,7 @@ final class CsvBatchStrategy implements BatchIngestStrategy {
                 boolean rawCreated = false;
                 int memberIdx = 0;
                 StepProgress.track(cfg.identity().pipelineName(), batch.batchId(), "parse", 1, 3);
-                for (Batch.Member m : batch.members()) {
+                for (Consignment.Member m : batch.members()) {
                     IngestProgress.track(cfg.identity().pipelineName(), batch.batchId(),
                             m.file().getName(), ++memberIdx, batch.members().size());
                     LocalDateTime mStart = LocalDateTime.now();
@@ -177,7 +177,7 @@ final class CsvBatchStrategy implements BatchIngestStrategy {
         } catch (Exception e) {
             batchStatus = "FAILED";
             batchError  = msg(e);
-            log.error("Batch {} failed during CSV processing", batch.batchId(), e);
+            log.error("Consignment {} failed during CSV processing", batch.batchId(), e);
         } finally {
             if (tempDb != null) DuckDbUtil.deleteTempDb(tempDb);
         }

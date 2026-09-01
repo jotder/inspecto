@@ -4,7 +4,7 @@ import com.gamma.consignment.DbFileStageStore;
 import com.gamma.consignment.FileStage;
 import com.gamma.consignment.FileStageRecord;
 import com.gamma.consignment.FileStages;
-import com.gamma.etl.Batch;
+import com.gamma.etl.Consignment;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.SchemaSelector;
 import com.gamma.util.DuckDbUtil;
@@ -34,9 +34,9 @@ class FileStageRegistrationTest {
         FileStages.use(null);   // the registry is process-wide static — never leak into another test
     }
 
-    private Batch.Member member(PipelineConfig cfg, File f, int id) {
+    private Consignment.Member member(PipelineConfig cfg, File f, int id) {
         SchemaSelector.Selection sel = new SchemaSelector.Selection(cfg.schemas().single(), null);
-        return new Batch.Member(f, id, f.length(), sel);
+        return new Consignment.Member(f, id, f.length(), sel);
     }
 
     private Connection openWithTwoPartitions(File db) throws Exception {
@@ -61,18 +61,18 @@ class FileStageRegistrationTest {
         Files.createDirectories(inbox);
         Path solo = inbox.resolve("solo.csv");
         Files.writeString(solo, "ID,AMT,EVENT_DATE\nx,9.0,2020-04-03\n");
-        List<Batch.Member> survivors = List.of(member(cfg, solo.toFile(), 0));
-        Batch batch = new Batch(cfg.identity().runTimestamp() + "_stg_0001", "stg", null, survivors);
+        List<Consignment.Member> survivors = List.of(member(cfg, solo.toFile(), 0));
+        Consignment batch = new Consignment(cfg.identity().runTimestamp() + "_stg_0001", "stg", null, survivors);
 
         try (DbFileStageStore store = DbFileStageStore.open("jdbc:duckdb:")) {
             FileStages.use(store);
 
             File db = DuckDbUtil.tempDbFile("stg_ingest_");
             try (Connection conn = openWithTwoPartitions(db)) {
-                BatchIngestStrategy.Written written = BatchIngestStrategy.writeAndTrace(
+                ConsignmentIngestStrategy.Written written = ConsignmentIngestStrategy.writeAndTrace(
                         conn, "transformed", List.of("year", "month", "day"), cfg,
                         cfg.dirs().database(), "b1", batch.batchId(), Map.of(1, "a.csv", 2, "b.csv"), "");
-                BatchProcessor.finalizeSource(batch, cfg, survivors, written.outputs(), written.lineage());
+                ConsignmentIngestor.finalizeSource(batch, cfg, survivors, written.outputs(), written.lineage());
             } finally {
                 DuckDbUtil.deleteTempDb(db);
             }
@@ -99,17 +99,17 @@ class FileStageRegistrationTest {
         Files.createDirectories(inbox);
         Path solo = inbox.resolve("solo.csv");
         Files.writeString(solo, "ID,AMT,EVENT_DATE\nx,9.0,2020-04-03\n");
-        List<Batch.Member> survivors = List.of(member(cfg, solo.toFile(), 0));
-        Batch batch = new Batch(cfg.identity().runTimestamp() + "_stg_0002", "stg", null, survivors);
+        List<Consignment.Member> survivors = List.of(member(cfg, solo.toFile(), 0));
+        Consignment batch = new Consignment(cfg.identity().runTimestamp() + "_stg_0002", "stg", null, survivors);
 
         assertNull(FileStages.shared(), "precondition: no registry for the default space");
 
         File db = DuckDbUtil.tempDbFile("stg_off_");
         try (Connection conn = openWithTwoPartitions(db)) {
-            BatchIngestStrategy.Written written = BatchIngestStrategy.writeAndTrace(
+            ConsignmentIngestStrategy.Written written = ConsignmentIngestStrategy.writeAndTrace(
                     conn, "transformed", List.of("year", "month", "day"), cfg,
                     cfg.dirs().database(), "b2", batch.batchId(), Map.of(1, "a.csv", 2, "b.csv"), "");
-            assertDoesNotThrow(() -> BatchProcessor.finalizeSource(
+            assertDoesNotThrow(() -> ConsignmentIngestor.finalizeSource(
                     batch, cfg, survivors, written.outputs(), written.lineage()));
         } finally {
             DuckDbUtil.deleteTempDb(db);

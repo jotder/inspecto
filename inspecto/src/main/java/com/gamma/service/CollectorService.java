@@ -8,8 +8,8 @@ import com.gamma.catalog.ConfigSource;
 import com.gamma.catalog.MetadataGraphService;
 import com.gamma.catalog.SemanticModel;
 import com.gamma.enrich.EnrichmentConfig;
-import com.gamma.etl.BatchEvent;
-import com.gamma.etl.BatchEventBus;
+import com.gamma.etl.ConsignmentEvent;
+import com.gamma.etl.ConsignmentEventBus;
 import com.gamma.etl.IngestProgress;
 import com.gamma.etl.StepProgress;
 import com.gamma.etl.PipelineConfig;
@@ -55,7 +55,7 @@ import java.util.concurrent.locks.ReentrantLock;
 /**
  * Long-running service that hosts the ETL: it loads a registry of pipeline configs,
  * polls them on a schedule, runs them concurrently under a global budget, and emits
- * batch-commit events on a {@link BatchEventBus} that downstream stages (Stage-2
+ * batch-commit events on a {@link ConsignmentEventBus} that downstream stages (Stage-2
  * enrichment, M2) subscribe to.
  *
  * <h3>Model</h3>
@@ -67,7 +67,7 @@ import java.util.concurrent.locks.ReentrantLock;
  *       {@link MultiCollectorProcessor#runAll(List, int, java.util.function.Consumer)},
  *       which bounds concurrent sources to the global run budget.</li>
  *   <li><b>Recovery</b> — on startup, report each pipeline's previously committed
- *       batches from the commit log via {@link StatusStore}. Batch atomicity (commit
+ *       batches from the commit log via {@link StatusStore}. Consignment atomicity (commit
  *       ordering: markers last) + marker-based dedup already make an interrupted batch
  *       safe to reprocess next cycle; the commit log provides the visibility.</li>
  *   <li><b>Event bus</b> — {@link #eventBus()} is handed to the runners as the commit
@@ -105,7 +105,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     private volatile java.util.concurrent.ScheduledFuture<?> pollTask;
     private volatile java.util.concurrent.ScheduledFuture<?> acquireTask;
     private final int  maxConcurrentRuns;
-    private final BatchEventBus bus = new BatchEventBus();
+    private final ConsignmentEventBus bus = new ConsignmentEventBus();
     /** Append-only operational event store (Phase 1, v4.2.0) — the durable record of "what happened",
      *  backing the {@code /events*} API. Built from {@code -Devents.backend} (memory|parquet) and
      *  installed into the process-wide {@link EventLog} so the SLF4J capture appender and the domain
@@ -375,16 +375,16 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // This space's Consignment output-file registry (§11.3). Default-off: openConsignmentOutputStore
         // returns null unless -Dconsignment.outputs.backend is set, and register() then no-ops. It is published
         // to a static per-space registry rather than held as a field because the write paths that record into it
-        // (BatchProcessor.finalizeSource, EnrichmentEngine.runResult) are static — the AcquisitionLedgers idiom.
+        // (ConsignmentIngestor.finalizeSource, EnrichmentEngine.runResult) are static — the AcquisitionLedgers idiom.
         com.gamma.consignment.ConsignmentOutputStores.register(
                 spaceId, ServiceStores.openConsignmentOutputStore(root));
         // This space's per-file stage-progression registry (Phase 4 §2.4) — same default-off, static-registry
-        // idiom as the output-file registry above, since BatchProcessor.finalizeSource is static.
+        // idiom as the output-file registry above, since ConsignmentIngestor.finalizeSource is static.
         com.gamma.consignment.FileStages.register(
                 spaceId, ServiceStores.openFileStageStore(root));
         // This space's data-plane provenance projection (T21) — ONE instance shared by both lanes:
         // the ingest lane records via the same static per-space idiom as the two registries above
-        // (BatchProcessor is static), and the Job engine gets the identical instance ctor-injected
+        // (ConsignmentIngestor is static), and the Job engine gets the identical instance ctor-injected
         // below. One store, one connection — DuckDB is single-writer; JDBC close is idempotent, so
         // the teardown double-close (JobService + unregister) is free.
         com.gamma.pipeline.exec.DbProvenanceStore provenanceStore = ServiceStores.openProvenanceStore(root);
@@ -502,7 +502,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // bus here (before start()) so the first terminal batch is recorded as a structured event.
         this.events = ServiceStores.openEventStore(root);
         this.eventLog.installStore(events);
-        bus.subscribe(this::onBatchEvent);
+        bus.subscribe(this::onConsignmentEvent);
         // Notification engine (Phase B2): render operational events into the appUser's in-app feed.
         // Subscribed on the EventLog (the unified event stream, so it sees BATCH_FAILED/SEQUENCE_GAP/…);
         // each match is handed to NotificationService's own virtual-thread executor — never run inline on
@@ -698,7 +698,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     }
 
     /** The bus carrying committed-batch events; subscribe before {@link #start()}. */
-    public BatchEventBus eventBus() {
+    public ConsignmentEventBus eventBus() {
         return bus;
     }
 
@@ -814,20 +814,20 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     }
 
     /**
-     * Bus bridge: turn every terminal {@link BatchEvent} into a structured {@link Event}
+     * Bus bridge: turn every terminal {@link ConsignmentEvent} into a structured {@link Event}
      * ({@link EventType#BATCH_COMMITTED} on SUCCESS, {@link EventType#BATCH_FAILED} otherwise), keyed
      * by {@code correlationId = batchId} so an investigation can pivot from a batch to everything that
      * happened around it. Subscribed before {@link #start()} so the first commit of a poll cycle is
      * recorded.
      */
-    private void onBatchEvent(BatchEvent e) {
+    private void onConsignmentEvent(ConsignmentEvent e) {
         boolean ok = "SUCCESS".equalsIgnoreCase(e.status());
         Event.Builder b = Event.builder(ok ? EventType.BATCH_COMMITTED : EventType.BATCH_FAILED)
                 .level(ok ? EventLevel.INFO : EventLevel.ERROR)
                 .source(CollectorService.class.getName())
                 .pipeline(e.pipeline())
                 .correlationId(e.batchId())
-                .message((ok ? "Batch committed: " : "Batch failed: ") + e.pipeline() + "/" + e.batchId())
+                .message((ok ? "Consignment committed: " : "Consignment failed: ") + e.pipeline() + "/" + e.batchId())
                 .attr("batchId", e.batchId())
                 .attr("outputRows", e.outputRows())
                 .attr("durationMs", e.durationMs())
@@ -1300,7 +1300,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         return jobs;
     }
 
-    /** Live pipeline names, lowercased to match {@code BatchEvent.pipeline()} — the valid
+    /** Live pipeline names, lowercased to match {@code ConsignmentEvent.pipeline()} — the valid
      *  {@code on_pipeline} targets the scheduler_audit maintenance task checks against (MNT-4). */
     private java.util.Set<String> pipelineNamesForAudit() {
         java.util.Set<String> names = new java.util.HashSet<>();
@@ -1509,7 +1509,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
      * and left the DB serving a stale snapshot, so a run reported <b>no commits at all</b> until the next
      * poll cycle. That is what made a DB-backed store unusable and gated the ledgers row.
      *
-     * <p>⚠ Hooked <b>here</b> rather than on {@code BatchEventBus}: the bus delivers synchronously on the
+     * <p>⚠ Hooked <b>here</b> rather than on {@code ConsignmentEventBus}: the bus delivers synchronously on the
      * publishing (ingest) thread and fires <b>per batch</b>, so projecting the whole audit from a listener
      * would put repeated DB work on the ingest path. Once per run, after the run, is the cheap seam.
      *

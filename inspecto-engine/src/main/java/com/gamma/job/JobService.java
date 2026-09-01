@@ -1,7 +1,7 @@
 package com.gamma.job;
 
 import com.gamma.api.PublicApi;
-import com.gamma.etl.BatchEvent;
+import com.gamma.etl.ConsignmentEvent;
 import com.gamma.pipeline.DeletionFence;
 import com.gamma.pipeline.PipelineStore;
 import com.gamma.pipeline.exec.TriggerCoalescer;
@@ -9,7 +9,7 @@ import com.gamma.event.Event;
 import com.gamma.event.EventLog;
 import com.gamma.event.EventType;
 import com.gamma.metrics.MetricRegistry;
-import com.gamma.etl.BatchEventBus;
+import com.gamma.etl.ConsignmentEventBus;
 import com.gamma.util.Scheduler;
 import com.gamma.util.CronExpression;
 import com.gamma.util.OperationsZone;
@@ -51,7 +51,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * <ul>
  *   <li><b>Cron</b> — jobs with a {@code cron} field are armed on the borrowed {@link Scheduler}.</li>
  *   <li><b>Event</b> — jobs with {@code on_pipeline} run when that pipeline (or upstream job)
- *       commits a batch, via the shared {@link BatchEventBus}.</li>
+ *       commits a batch, via the shared {@link ConsignmentEventBus}.</li>
  *   <li><b>Signal</b> — jobs with {@code on_signal} run when a matching Signal is published (exact id
  *       or a {@code prefix.*} match), optionally narrowed by a {@code when:} guard over the firing
  *       Signal's payload (P1c).</li>
@@ -82,7 +82,7 @@ public final class JobService implements AutoCloseable {
      *  runtime — every dispatch loop below (event/signal/catch-up) re-derives from this list on each
      *  firing, so mutating it is sufficient for those trigger kinds; only cron needs separate re-arming. */
     private final List<JobConfig> configs;
-    private final BatchEventBus bus;
+    private final ConsignmentEventBus bus;
     private final Scheduler scheduler;
     private final ReportRunner reports;
     /** The {@link OperationsZone} — governs cron firing AND the {@code $today} family, deliberately one
@@ -275,19 +275,19 @@ public final class JobService implements AutoCloseable {
     public record JobView(String name, String type, String cron, String onPipeline, String onSignal,
                           boolean enabled, String lastStatus, String lastRunTime, String nextFire) {}
 
-    public JobService(List<JobConfig> configs, BatchEventBus bus, Scheduler scheduler,
+    public JobService(List<JobConfig> configs, ConsignmentEventBus bus, Scheduler scheduler,
                       ReportRunner reports, String auditDir) {
         this(configs, bus, scheduler, reports, auditDir, null);
     }
 
     /** As above, plus an optional DuckDB job-run projection for reporting (T27); {@code null} disables it. */
-    public JobService(List<JobConfig> configs, BatchEventBus bus, Scheduler scheduler,
+    public JobService(List<JobConfig> configs, ConsignmentEventBus bus, Scheduler scheduler,
                       ReportRunner reports, String auditDir, DbJobRunStore jobRunStore) {
         this(configs, bus, scheduler, reports, auditDir, jobRunStore, null, "database");
     }
 
     /** As the full constructor, with no data-plane provenance store (T21). */
-    public JobService(List<JobConfig> configs, BatchEventBus bus, Scheduler scheduler,
+    public JobService(List<JobConfig> configs, ConsignmentEventBus bus, Scheduler scheduler,
                       ReportRunner reports, String auditDir, DbJobRunStore jobRunStore,
                       PipelineStore pipelineStore, String dataDir) {
         this(configs, bus, scheduler, reports, auditDir, jobRunStore, pipelineStore, dataDir, null);
@@ -299,7 +299,7 @@ public final class JobService implements AutoCloseable {
      * optional {@code provenanceStore} (T21) it records per-edge record counts to. All may be left at
      * {@code null}/default when no flow jobs / no provenance backend are configured.
      */
-    public JobService(List<JobConfig> configs, BatchEventBus bus, Scheduler scheduler,
+    public JobService(List<JobConfig> configs, ConsignmentEventBus bus, Scheduler scheduler,
                       ReportRunner reports, String auditDir, DbJobRunStore jobRunStore,
                       PipelineStore pipelineStore, String dataDir,
                       com.gamma.pipeline.exec.DbProvenanceStore provenanceStore) {
@@ -310,7 +310,7 @@ public final class JobService implements AutoCloseable {
     /** As the full constructor, plus the host's Platform Service registry (plan S1-2) — injected
      *  rather than wired post-construction because {@link #registerBuiltins()} and the startup pack
      *  scan below must be able to validate a {@code requires:} declaration fail-closed. */
-    public JobService(List<JobConfig> configs, BatchEventBus bus, Scheduler scheduler,
+    public JobService(List<JobConfig> configs, ConsignmentEventBus bus, Scheduler scheduler,
                       ReportRunner reports, String auditDir, DbJobRunStore jobRunStore,
                       PipelineStore pipelineStore, String dataDir,
                       com.gamma.pipeline.exec.DbProvenanceStore provenanceStore,
@@ -517,7 +517,7 @@ public final class JobService implements AutoCloseable {
 
     /** Wire the event/signal subscribers and arm cron schedules. */
     public void start() {
-        bus.subscribe(this::onBatchEvent);
+        bus.subscribe(this::onConsignmentEvent);
         int cronCount = 0, eventCount = 0, signalCount = 0;
         for (JobConfig c : configs) {
             if (!c.enabled()) continue;
@@ -526,7 +526,7 @@ public final class JobService implements AutoCloseable {
             if (c.hasSignal()) { signalCoalescers.put(c.name(), new TriggerCoalescer()); signalCount++; }
         }
         // On-signal Triggers (P1c): subscribe to THIS space's ledger (per-instance subscriber list ⇒
-        // space-correct), and mirror each BatchEvent as a pipeline.commit signal so on_signal:pipeline.commit
+        // space-correct), and mirror each ConsignmentEvent as a pipeline.commit signal so on_signal:pipeline.commit
         // works. Both are no-ops when no event ledger is wired (bare-JobService test constructors).
         if (eventLog != null) {
             signalSubscriber = this::onSignalEvent;
@@ -685,7 +685,7 @@ public final class JobService implements AutoCloseable {
         this.pipelineConfigs = supplier;
     }
 
-    private void onBatchEvent(BatchEvent event) {
+    private void onConsignmentEvent(ConsignmentEvent event) {
         if (!"SUCCESS".equals(event.status())) return;
         for (JobConfig c : configs) {
             if (!c.enabled() || !c.hasEvent()) continue;
@@ -715,7 +715,7 @@ public final class JobService implements AutoCloseable {
      * gate-closing upstream's commit. A Job that binds nothing behaves exactly as before —
      * {@code Firing.NONE} was an empty payload, and nothing else reads it.
      */
-    private void fireOnCommit(String name, BatchEvent event) {
+    private void fireOnCommit(String name, ConsignmentEvent event) {
         if (!jobs.containsKey(name)) return;
         String runId = newRunId(name);
         submitRun(runId, name, "event:" + event.pipeline(), runId, null, 0,
@@ -753,17 +753,17 @@ public final class JobService implements AutoCloseable {
         }
     }
 
-    /** Mirror each committed BatchEvent as a {@code pipeline.commit} signal (§8.3) so a Job may
-     *  {@code on_signal: pipeline.commit}. The existing {@code on_pipeline} path (via {@link #onBatchEvent})
+    /** Mirror each committed ConsignmentEvent as a {@code pipeline.commit} signal (§8.3) so a Job may
+     *  {@code on_signal: pipeline.commit}. The existing {@code on_pipeline} path (via {@link #onConsignmentEvent})
      *  is unchanged — the two coexist (no double-fire; different config keys). */
-    private void mirrorPipelineCommit(BatchEvent be) {
+    private void mirrorPipelineCommit(ConsignmentEvent be) {
         emitSignal("pipeline.commit", "SUCCESS".equals(be.status()) ? Severity.INFO : Severity.WARN,
                 be.batchId(), null, Ref.of("pipeline", be.pipeline()), commitPayload(be));
     }
 
     /** The commit fields both event surfaces speak — {@code bind:} resolves {@code $signal.<field>}
      *  against this map whether the Job fired {@code on_signal: pipeline.commit} or {@code on_pipeline}. */
-    private static Map<String, Object> commitPayload(BatchEvent be) {
+    private static Map<String, Object> commitPayload(ConsignmentEvent be) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("pipeline", be.pipeline());
         payload.put("batchId", be.batchId());
@@ -1330,7 +1330,7 @@ public final class JobService implements AutoCloseable {
     // ── scheduler_audit seams (System Maintenance MNT-4) ─────────────────────────
 
     /** Valid {@code on_pipeline} targets: the host's live pipeline names, lowercased to match
-     *  {@code BatchEvent.pipeline()}. Null until wired — the audit then skips that finding class
+     *  {@code ConsignmentEvent.pipeline()}. Null until wired — the audit then skips that finding class
      *  rather than guessing. Set by the hosting service (like {@link #eventLog}). */
     private volatile java.util.function.Supplier<Set<String>> knownPipelines;
 

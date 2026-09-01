@@ -27,7 +27,7 @@ import java.util.Map;
  *       {@code job()} accessor §14.3 rejected on exactly that ground.</li>
  *   <li>{@code Manifest manifest()} is <b>deferred</b>: no {@code Manifest} type exists. §2/§4 specify it as a
  *       relation and neither is built, so it is blocked the same way {@code outputs()} was blocked on §11.3.
- *       The existing per-Consignment {@code BatchManifest} was rejected as a stand-in — it is an ingest-side
+ *       The existing per-Consignment {@code ConsignmentManifest} was rejected as a stand-in — it is an ingest-side
  *       Gson DTO, and §14.3 excludes in-motion types precisely to stop the at-rest tier re-coupling to them.
  *       Until §2/§4 land, {@link #outputs()} is the addressing authority.</li>
  * </ul>

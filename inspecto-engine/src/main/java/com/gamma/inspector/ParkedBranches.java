@@ -7,7 +7,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Per-batch registry of PARKED branch sinks (Phase 4 S4b, D-13): {@code graphWriteAndTrace}'s park
- * hook records each disabled sink it materialised a park table for, and {@code BatchProcessor.process}
+ * hook records each disabled sink it materialised a park table for, and {@code ConsignmentIngestor.process}
  * drains the batch's entries exactly once to decide parked-finalisation over the normal commit.
  *
  * <p>Same lifecycle idiom as {@code UnpackOrigins}/{@code AcquisitionLedgers.stashChecksum}: written

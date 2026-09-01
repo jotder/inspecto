@@ -24,11 +24,11 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Stage A step 1 — {@link BatchGraphRunner} drives a {@code parse → filter → route → 2 sinks} batch through
+ * Stage A step 1 — {@link ConsignmentGraphRunner} drives a {@code parse → filter → route → 2 sinks} batch through
  * the real {@link PartitionSinkWriter} and {@link BranchCommitCoordinator}: both sink branches are written
  * exactly once (each store gets a file on disk) and the injected {@code SourceFinalize} runs exactly once.
  */
-class BatchGraphRunnerTest {
+class ConsignmentGraphRunnerTest {
 
     @TempDir Path dir;
     private File db;
@@ -77,8 +77,8 @@ class BatchGraphRunnerTest {
                      com.gamma.consignment.DbConsignmentOutputStore.open("jdbc:duckdb:")) {
             com.gamma.consignment.ConsignmentOutputStores.use(registry);
 
-            BatchGraphRunner.Result res = BatchGraphRunner.run(
-                    new BatchGraphRunner.Input(conn, g, "parse", "parsed", "batch-sink-1",
+            ConsignmentGraphRunner.Result res = ConsignmentGraphRunner.run(
+                    new ConsignmentGraphRunner.Input(conn, g, "parse", "parsed", "batch-sink-1",
                             dir.resolve("data").toString(), "route_etl", dir.resolve("bc_reg.csv")),
                     sinkOutputs -> { });
 
@@ -129,8 +129,8 @@ class BatchGraphRunnerTest {
         String dataDir = dir.resolve("data").toString();
         int[] finalised = {0};
 
-        BatchGraphRunner.Result res = BatchGraphRunner.run(
-                new BatchGraphRunner.Input(conn, g, "parse", "parsed", "batch1",
+        ConsignmentGraphRunner.Result res = ConsignmentGraphRunner.run(
+                new ConsignmentGraphRunner.Input(conn, g, "parse", "parsed", "batch1",
                         dataDir, "route_etl", dir.resolve("branch_commit.csv")),
                 sinkOutputs -> finalised[0]++);
 
@@ -162,8 +162,8 @@ class BatchGraphRunnerTest {
                         PipelineEdge.data("parse", "sink"),
                         new PipelineEdge("parse", PipelineRel.UNMATCHED, "quarantine")));
 
-        assertEquals(1, BatchGraphRunner.dataFedSinkCount(flat), "quarantine (unmatched) is not a data-fed sink");
-        assertFalse(BatchGraphRunner.engages(flat), "flat single-sink config keeps the legacy write path");
+        assertEquals(1, ConsignmentGraphRunner.dataFedSinkCount(flat), "quarantine (unmatched) is not a data-fed sink");
+        assertFalse(ConsignmentGraphRunner.engages(flat), "flat single-sink config keeps the legacy write path");
     }
 
     @Test
@@ -186,8 +186,8 @@ class BatchGraphRunnerTest {
                         new PipelineEdge("r", PipelineRel.route("lo"), "sink_lo"),
                         new PipelineEdge("parse", PipelineRel.UNMATCHED, "quarantine")));
 
-        assertEquals(2, BatchGraphRunner.dataFedSinkCount(multi), "two route-fed sinks; quarantine excluded");
-        assertTrue(BatchGraphRunner.engages(multi), "multi-sink fan-out needs the branch executor");
+        assertEquals(2, ConsignmentGraphRunner.dataFedSinkCount(multi), "two route-fed sinks; quarantine excluded");
+        assertTrue(ConsignmentGraphRunner.engages(multi), "multi-sink fan-out needs the branch executor");
     }
 
     private void sql(String s) throws SQLException {

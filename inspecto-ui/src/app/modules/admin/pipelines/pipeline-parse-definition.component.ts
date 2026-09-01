@@ -628,7 +628,7 @@ export class PipelineParseDefinitionComponent {
      * <p>🔴 `mapping.canonicalName` is not decoration — `PipelineLift` reads it as the pipeline's declared
      * output **store** (falling back to the pipeline name), which is the join key a downstream job,
      * enrichment or Dataset matches its source against, and what `GET /pipelines` reports as `produces`.
-     * `raw.name` is the RAW/source identity that `BatchProcessor.resolvedSchema` matches a selector or
+     * `raw.name` is the RAW/source identity that `ConsignmentIngestor.resolvedSchema` matches a selector or
      * segment descriptor by. This pane used to rebuild all three from the schema FILE's name, so an Apply
      * silently renamed the store from `csv_example` to `csv_example_schema` and broke every downstream
      * binding — measured on a fresh boot: `produces` flipped with it. All eleven committed schemas

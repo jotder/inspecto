@@ -23,7 +23,14 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { forkJoin, Observable } from 'rxjs';
-import { apiErrorMessage, AuditRow, BatchAuditReport, InboxStatus, LensService, RunsService } from 'app/inspecto/api';
+import {
+    apiErrorMessage,
+    AuditRow,
+    ConsignmentAuditReport,
+    InboxStatus,
+    LensService,
+    RunsService,
+} from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { DataTableComponent } from 'app/inspecto/data-table';
@@ -131,7 +138,7 @@ export class RunDetailComponent implements OnInit {
     // report tab
     from: Date | null = null;
     to: Date | null = null;
-    readonly report = signal<BatchAuditReport | null>(null);
+    readonly report = signal<ConsignmentAuditReport | null>(null);
 
     ngOnInit(): void {
         this.name = this.nameInput() ?? this.route.snapshot.paramMap.get('name') ?? '';

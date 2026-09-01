@@ -2,7 +2,7 @@ package com.gamma.job;
 
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.DecisionRules;
-import com.gamma.etl.BatchEventBus;
+import com.gamma.etl.ConsignmentEventBus;
 import com.gamma.util.Scheduler;
 import com.gamma.util.DuckDbUtil;
 import org.junit.jupiter.api.AfterEach;
@@ -68,7 +68,7 @@ class SqlTemplateJobTest {
                 null, null);
 
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(job), new BatchEventBus(), s, null,
+             JobService js = new JobService(List.of(job), new ConsignmentEventBus(), s, null,
                      dir.resolve("audit").toString(), null, null, dataDir.toString())) {
             js.start();
             assertTrue(js.triggerRun("rollup", null).isPresent());
@@ -103,7 +103,7 @@ class SqlTemplateJobTest {
                         "sources", "transactions", "sink_dataset", "txn_rollup"),
                 null, null);
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(job), new BatchEventBus(), s, null,
+             JobService js = new JobService(List.of(job), new ConsignmentEventBus(), s, null,
                      dir.resolve("audit").toString(), null, null, dataDir.toString())) {
             js.start();
             assertTrue(js.trigger("rollup"));
@@ -162,7 +162,7 @@ class SqlTemplateJobTest {
                         Map.of("action", "route", "destination", "big_accounts")));
 
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(rollupJob()), new BatchEventBus(), s, null,
+             JobService js = new JobService(List.of(rollupJob()), new ConsignmentEventBus(), s, null,
                      dir.resolve("audit").toString(), null, null, dataDir.toString())) {
             js.start();
             assertTrue(js.triggerRun("rollup", null).isPresent());
@@ -195,7 +195,7 @@ class SqlTemplateJobTest {
                 List.of(Map.of("action", "quarantine", "destination", "")));
 
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(rollupJob()), new BatchEventBus(), s, null,
+             JobService js = new JobService(List.of(rollupJob()), new ConsignmentEventBus(), s, null,
                      dir.resolve("audit").toString(), null, null, dataDir.toString())) {
             js.start();
             assertTrue(js.triggerRun("rollup", null).isPresent());

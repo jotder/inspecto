@@ -23,13 +23,13 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class ChunkedStreamingTest {
 
-    private Batch.Member member(PipelineConfig cfg, File f, int id) {
+    private Consignment.Member member(PipelineConfig cfg, File f, int id) {
         SchemaSelector.Selection sel = new SchemaSelector.Selection(cfg.schemas().single(), null);
-        return new Batch.Member(f, id, f.length(), sel);
+        return new Consignment.Member(f, id, f.length(), sel);
     }
 
-    private void process(PipelineConfig cfg, Batch batch) {
-        BatchProcessor.process(batch, cfg, new BatchAuditWriter(
+    private void process(PipelineConfig cfg, Consignment batch) {
+        ConsignmentIngestor.process(batch, cfg, new ConsignmentAuditWriter(
                 cfg.dirs().statusFilePath(), cfg.dirs().batchesFilePath(), cfg.dirs().lineageFilePath()));
     }
 
@@ -78,7 +78,7 @@ class ChunkedStreamingTest {
         Files.writeString(solo, DATA);
         assertTrue(solo.toFile().length() > 30, "file must exceed the chunk threshold");
 
-        Batch batch = new Batch(cfg.identity().runTimestamp() + "_mini_0001", "mini", null,
+        Consignment batch = new Consignment(cfg.identity().runTimestamp() + "_mini_0001", "mini", null,
                 List.of(member(cfg, solo.toFile(), 0)));
         process(cfg, batch);
 
@@ -121,7 +121,7 @@ class ChunkedStreamingTest {
         Files.createDirectories(Path.of(base.dirs().poll()));
         Path baseFile = Path.of(base.dirs().poll()).resolve("solo.csv");
         Files.writeString(baseFile, DATA);
-        process(base, new Batch(base.identity().runTimestamp() + "_mini_0001", "mini", null,
+        process(base, new Consignment(base.identity().runTimestamp() + "_mini_0001", "mini", null,
                 List.of(member(base, baseFile.toFile(), 0))));
         long baseRows = outputDataRows(base);
 
@@ -137,7 +137,7 @@ class ChunkedStreamingTest {
         Files.createDirectories(Path.of(ch.dirs().poll()));
         Path chFile = Path.of(ch.dirs().poll()).resolve("solo.csv");
         Files.writeString(chFile, DATA);
-        process(ch, new Batch(ch.identity().runTimestamp() + "_mini_0001", "mini", null,
+        process(ch, new Consignment(ch.identity().runTimestamp() + "_mini_0001", "mini", null,
                 List.of(member(ch, chFile.toFile(), 0))));
         long chRows = outputDataRows(ch);
 

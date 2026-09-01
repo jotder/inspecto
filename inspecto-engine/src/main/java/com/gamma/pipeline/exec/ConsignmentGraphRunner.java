@@ -23,13 +23,13 @@ import java.util.List;
  * {@link PartitionSinkWriter} it takes primitives ({@code conn}, {@code dataDir}, {@code baseName},
  * {@code batchId}), never a {@code PipelineConfig} — so the {@code inspecto.exec} layer keeps no dependency
  * on the ingest config model. The {@code inspector}-package caller maps its config to these primitives and
- * supplies the real {@link BranchCommitCoordinator.SourceFinalize} (the re-homed {@code BatchProcessor.commit}
+ * supplies the real {@link BranchCommitCoordinator.SourceFinalize} (the re-homed {@code ConsignmentIngestor.commit}
  * finalize body: backup → markers LAST → ledger / watermark).
  */
 @PublicApi(since = "4.0.0")
-public final class BatchGraphRunner {
+public final class ConsignmentGraphRunner {
 
-    private BatchGraphRunner() {}
+    private ConsignmentGraphRunner() {}
 
     /**
      * Everything the runner needs to drive one batch through {@link PipelineExecutor#execute}.
@@ -74,7 +74,7 @@ public final class BatchGraphRunner {
     /**
      * Drive the {@code transform → sink} subgraph downstream of the seed and commit it. {@code finalizer}
      * runs once, after every sink branch is durable, with the outputs written across all branches — the
-     * ingest path passes the re-homed {@code BatchProcessor.commit} body; a test may pass a no-op.
+     * ingest path passes the re-homed {@code ConsignmentIngestor.commit} body; a test may pass a no-op.
      */
     public static Result run(Input in, SourceFinalizer finalizer) throws Exception {
         PartitionSinkWriter writer =

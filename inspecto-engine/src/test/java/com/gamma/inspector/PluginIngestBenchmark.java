@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * End-to-end throughput benchmark for the unified streaming plugin engine
- * ({@link StreamingPluginBatchStrategy} + {@link DuckDbRecordSink}), measuring both execution modes:
+ * ({@link StreamingPluginIngestStrategy} + {@link DuckDbRecordSink}), measuring both execution modes:
  *
  * <ul>
  *   <li><b>union</b> — the default config-driven mode for files under {@code large_file_bytes}
@@ -77,13 +77,13 @@ class PluginIngestBenchmark {
 
         // 1) union mode (config-driven): the small-files path — one transform/write for the batch
         Result union = run("streaming union (1 batch)   ", unionCfg, rows,
-                () -> new StreamingPluginBatchStrategy().ingest(buildBatch(unionCfg, input), unionCfg));
+                () -> new StreamingPluginIngestStrategy().ingest(buildBatch(unionCfg, input), unionCfg));
 
         // 2) generation mode (forced flushRows = rows/4): the huge-file path — bounded scratch
         long budget = Math.max(1, rows / 4);
         Result gen = run("streaming gen (" + ((rows + budget - 1) / budget) + " generations)  ",
                 genCfg, rows,
-                () -> new StreamingPluginBatchStrategy(budget).ingest(buildBatch(genCfg, input), genCfg));
+                () -> new StreamingPluginIngestStrategy(budget).ingest(buildBatch(genCfg, input), genCfg));
 
         System.out.printf("%n--- summary (rows=%,d) ---%n", rows);
         System.out.printf("%-30s %9s %12s %10s %9s%n", "option", "wall", "rows/s", "outFiles", "peakMB");
@@ -170,10 +170,10 @@ class PluginIngestBenchmark {
         }
     }
 
-    private static Batch buildBatch(PipelineConfig cfg, File file) {
+    private static Consignment buildBatch(PipelineConfig cfg, File file) {
         SchemaSelector.Selection sel = new SchemaSelector.Selection(java.util.Map.of(), null);
-        Batch.Member m = new Batch.Member(file, 0, file.length(), sel);
-        return new Batch(cfg.identity().runTimestamp() + "_evt_0001", "evt", null, List.of(m));
+        Consignment.Member m = new Consignment.Member(file, 0, file.length(), sel);
+        return new Consignment(cfg.identity().runTimestamp() + "_evt_0001", "evt", null, List.of(m));
     }
 
     private static PipelineConfig buildConfig(Path dir, String tag, String format, String ingesterClass) throws Exception {

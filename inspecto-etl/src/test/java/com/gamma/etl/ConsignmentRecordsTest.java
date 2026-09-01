@@ -8,7 +8,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class BatchRecordsTest {
+class ConsignmentRecordsTest {
     @Test
     void recordsHoldValues() {
         PartitionOutput po = new PartitionOutput("year=2020/month=04/day=03", "/db/b_out.csv", 123L);
@@ -20,8 +20,8 @@ class BatchRecordsTest {
 
         SchemaSelector.Selection sel =
                 new SchemaSelector.Selection(Map.of("raw", Map.of("name", "mini")), "mini");
-        Batch.Member m = new Batch.Member(new File("a.csv"), 0, 10L, sel);
-        Batch b = new Batch("B1", "mini", "mini", List.of(m));
+        Consignment.Member m = new Consignment.Member(new File("a.csv"), 0, 10L, sel);
+        Consignment b = new Consignment("B1", "mini", "mini", List.of(m));
         assertEquals("B1", b.batchId());
         assertEquals(1, b.members().size());
         assertEquals(0, b.members().get(0).srcId());

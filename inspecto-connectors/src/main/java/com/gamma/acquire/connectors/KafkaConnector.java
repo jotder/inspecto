@@ -44,7 +44,7 @@ import static com.gamma.acquire.CollectorConnector.Capability.STREAM;
  * The connector uses {@code assign()} + {@code seek()} — no group coordinator, no broker-side commit, minimal
  * ACLs. The consumed frontier (next offset per partition) rides the ledger's per-key watermark exactly like the
  * DB-export row watermark: {@link #fetchTo} stashes the reached offset via
- * {@link AcquisitionLedgers#stashDbWatermark}, and {@code BatchProcessor.commit} persists it only <em>after the
+ * {@link AcquisitionLedgers#stashDbWatermark}, and {@code ConsignmentIngestor.commit} persists it only <em>after the
  * batch is durable</em> — so a crash mid-ingest re-drains the slice rather than skipping it (at-least-once).
  *
  * <h3>Configuration (in the bound {@link ConnectionProfile})</h3>
@@ -220,7 +220,7 @@ public final class KafkaConnector implements CollectorConnector {
             if (pos == from)
                 throw new AcquisitionException("Kafka drain got no records for " + file.relativePath()
                         + " (broker unreachable or slice pruned) — will retry next cycle");
-            // Advance the frontier only after the batch commits — stash it for BatchProcessor to persist
+            // Advance the frontier only after the batch commits — stash it for ConsignmentIngestor to persist
             // (the DB-export watermark machinery; key is per topic-partition).
             AcquisitionLedgers.stashDbWatermark(dest, watermarkKey(partition), Long.toString(pos));
             log.info("Kafka drain {} p{} [{},{}) → {} record(s) → {}", topic, partition, from, pos, written,

@@ -8,7 +8,7 @@ import java.io.File;
  * The plugin ingestion SPI for custom file formats (binary, proprietary text, ASN.1, delimited, …).
  * The implementation decodes records and pushes them one at a time into the supplied
  * {@link RecordSink}; the framework owns buffering, the DuckDB writes, transform, partitioned output,
- * and lineage. The {@link com.gamma.inspector.StreamingPluginBatchStrategy unified engine} then picks
+ * and lineage. The {@link com.gamma.inspector.StreamingPluginIngestStrategy unified engine} then picks
  * an execution mode per batch by file size:
  *
  * <ul>

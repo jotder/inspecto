@@ -1,25 +1,25 @@
 package com.gamma.inspector;
 
-import com.gamma.etl.Batch;
+import com.gamma.etl.Consignment;
 import com.gamma.etl.MemberStatus;
 
 import java.time.LocalDateTime;
 
 /**
- * Per-input-file audit record accumulated while a {@link BatchIngestStrategy} processes
- * a batch, then consumed by {@link BatchProcessor}'s audit assembly. Extracted from
- * {@code BatchProcessor} so both the CSV and plugin strategies can build it directly.
+ * Per-input-file audit record accumulated while a {@link ConsignmentIngestStrategy} processes
+ * a batch, then consumed by {@link ConsignmentIngestor}'s audit assembly. Extracted from
+ * {@code ConsignmentIngestor} so both the CSV and plugin strategies can build it directly.
  */
 record MemberAudit(int srcId, String filename, MemberStatus status,
                    long parsedRows, long errorRows, String error, LocalDateTime start,
                    String origin, java.io.File originPath) {
 
-    static MemberAudit accepted(Batch.Member m, long parsed, long errors, LocalDateTime start) {
+    static MemberAudit accepted(Consignment.Member m, long parsed, long errors, LocalDateTime start) {
         return new MemberAudit(m.srcId(), m.file().getName(), MemberStatus.SUCCESS, parsed, errors, "", start,
                 origin(m), originPath(m));
     }
 
-    static MemberAudit rejected(Batch.Member m, MemberStatus status, String error, LocalDateTime start) {
+    static MemberAudit rejected(Consignment.Member m, MemberStatus status, String error, LocalDateTime start) {
         return new MemberAudit(m.srcId(), m.file().getName(), status, 0, 0, error, start,
                 origin(m), originPath(m));
     }
@@ -33,7 +33,7 @@ record MemberAudit(int srcId, String filename, MemberStatus status,
      * mapping — so resolving it later reads blank for every expanded file. The lookup is cheap
      * (a map hit) and this is the last moment the mapping is guaranteed to exist.
      */
-    private static String origin(Batch.Member m) {
+    private static String origin(Consignment.Member m) {
         java.io.File original = com.gamma.etl.unpack.UnpackOrigins.originalOr(m.file());
         return original.equals(m.file()) ? "" : original.getName();
     }
@@ -47,7 +47,7 @@ record MemberAudit(int srcId, String filename, MemberStatus status,
      * basename, and keying an archive roll-up on it would silently sum two archives into one row.
      * {@code null} when this member is not an expansion product.
      */
-    private static java.io.File originPath(Batch.Member m) {
+    private static java.io.File originPath(Consignment.Member m) {
         java.io.File original = com.gamma.etl.unpack.UnpackOrigins.originalOr(m.file());
         return original.equals(m.file()) ? null : original;
     }

@@ -12,7 +12,7 @@ import java.util.function.Supplier;
  * Platform Service {@code schema} (platform-services S1-5): read-only access to the space's reusable
  * {@code schema} components ({@code registry/schemas/*.toon}, indexed by {@link ComponentRegistry})
  * and their canonical fingerprints — the same {@link CanonicalHash} the engine pins into
- * {@code BatchManifest.schemaFingerprint} and {@code consignment_outputs.schema_fingerprint}.
+ * {@code ConsignmentManifest.schemaFingerprint} and {@code consignment_outputs.schema_fingerprint}.
  * Granted to a Run via a Job Type's {@code requires: [schema]} declaration.
  *
  * <h3>Dry-run contract (plan §3.4)</h3>

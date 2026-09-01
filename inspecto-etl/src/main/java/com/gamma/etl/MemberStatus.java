@@ -4,14 +4,14 @@ package com.gamma.etl;
  * The end status of ONE source file inside a Consignment — the "member" vocabulary.
  *
  * <p>Declared once, here, because it is written by four independent ingest paths
- * ({@code CsvBatchStrategy}, {@code NativeCsvStreamingEngine}, {@code GenerationModeIngester},
- * {@code UnionModeIngester}) and read by two ({@code BatchProcessor}'s manifest assembly and its
+ * ({@code CsvIngestStrategy}, {@code NativeCsvStreamingEngine}, {@code GenerationModeIngester},
+ * {@code UnionModeIngester}) and read by two ({@code ConsignmentIngestor}'s manifest assembly and its
  * audit-ledger assembly). It lived as bare string literals across those six files and drifted
  * exactly as predicted: a fifth value, {@link #SKIPPED_UNREADABLE}, was added on 2026-08-26 to only
  * one of them.
  *
  * <p><b>The constant name IS the wire form.</b> It is what lands in the JSON
- * {@link BatchManifest.MemberEntry#status()} and in the {@code status} column of the per-file audit
+ * {@link ConsignmentManifest.MemberEntry#status()} and in the {@code status} column of the per-file audit
  * ledger, verbatim — so renaming a constant is an on-disk format change, and the tests that assert
  * the literal strings are the guard that says so.
  *
@@ -22,7 +22,7 @@ package com.gamma.etl;
  *       unpack stage's run-level verdict. This one describes a <b>member</b>.</li>
  *   <li>{@code IngestOutcome.status} ({@code SUCCESS}/{@code EMPTY}/{@code FAILED}) describes the
  *       whole <b>batch</b>, not any one file in it.</li>
- *   <li>{@code JobResult}/{@code ProcessorResult}/{@code BatchEvent} statuses are execution
+ *   <li>{@code JobResult}/{@code ProcessorResult}/{@code ConsignmentEvent} statuses are execution
  *       outcomes of a run, and share only the spelling of {@code SUCCESS}.</li>
  * </ul>
  */

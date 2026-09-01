@@ -4,8 +4,8 @@ import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.enrich.EnrichmentConfig.Input;
 import com.gamma.enrich.EnrichmentConfig.Output;
 import com.gamma.enrich.EnrichmentConfig.Triggers;
-import com.gamma.etl.BatchEvent;
-import com.gamma.etl.BatchEventBus;
+import com.gamma.etl.ConsignmentEvent;
+import com.gamma.etl.ConsignmentEventBus;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
 import com.gamma.util.DuckDbUtil;
@@ -86,7 +86,7 @@ class EnrichmentServiceTest {
     }
 
     /** Poll {@code events} until one with {@code pipeline} appears, or the deadline passes. */
-    private static boolean await(List<BatchEvent> events, String pipeline, long timeoutMs) throws Exception {
+    private static boolean await(List<ConsignmentEvent> events, String pipeline, long timeoutMs) throws Exception {
         long deadline = System.nanoTime() + timeoutMs * 1_000_000L;
         while (System.nanoTime() < deadline) {
             synchronized (events) {
@@ -105,15 +105,15 @@ class EnrichmentServiceTest {
         seedInput(in);
         EnrichmentConfig job = dailyKpi("DAILY", in, out, new Triggers("EVENTS", 0));
 
-        BatchEventBus bus = new BatchEventBus();
-        List<BatchEvent> seen = Collections.synchronizedList(new ArrayList<>());
+        ConsignmentEventBus bus = new ConsignmentEventBus();
+        List<ConsignmentEvent> seen = Collections.synchronizedList(new ArrayList<>());
         bus.subscribe(seen::add);
         Scheduler sched = new Scheduler();
         EnrichmentService es = new EnrichmentService(List.of(job), bus, sched);
         try {
             es.start();
             // A Stage-1 batch committed just the CALL/2020/04/03 partition.
-            bus.publish(new BatchEvent("EVENTS", "b1", "SUCCESS",
+            bus.publish(new ConsignmentEvent("EVENTS", "b1", "SUCCESS",
                     List.of("event_type=CALL/year=2020/month=04/day=03"), 2, 100L, 0));
 
             assertTrue(await(seen, "DAILY", 10_000), "enrichment should announce its own commit");
@@ -134,8 +134,8 @@ class EnrichmentServiceTest {
         seedInput(in);
         EnrichmentConfig job = dailyKpi("DAILY_SCHED", in, out, new Triggers(null, 1));
 
-        BatchEventBus bus = new BatchEventBus();
-        List<BatchEvent> seen = Collections.synchronizedList(new ArrayList<>());
+        ConsignmentEventBus bus = new ConsignmentEventBus();
+        List<ConsignmentEvent> seen = Collections.synchronizedList(new ArrayList<>());
         bus.subscribe(seen::add);
         Scheduler sched = new Scheduler();
         EnrichmentService es = new EnrichmentService(List.of(job), bus, sched);
@@ -158,8 +158,8 @@ class EnrichmentServiceTest {
     void hotRegisteredJobFiresOnTheNextBatchEvent(@TempDir Path dir) throws Exception {
         Path in = dir.resolve("in"), out = dir.resolve("out");
         seedInput(in);
-        BatchEventBus bus = new BatchEventBus();
-        List<BatchEvent> seen = Collections.synchronizedList(new ArrayList<>());
+        ConsignmentEventBus bus = new ConsignmentEventBus();
+        List<ConsignmentEvent> seen = Collections.synchronizedList(new ArrayList<>());
         bus.subscribe(seen::add);
         Scheduler sched = new Scheduler();
         // A fresh space: the service starts hosting ZERO jobs (always constructed since v5.1.0).
@@ -169,7 +169,7 @@ class EnrichmentServiceTest {
             es.register(dailyKpi("DAILY_HOT", in, out, new Triggers("EVENTS", 0)));
             assertEquals(1, es.configs().size(), "hosted immediately, no restart");
 
-            bus.publish(new BatchEvent("EVENTS", "b1", "SUCCESS",
+            bus.publish(new ConsignmentEvent("EVENTS", "b1", "SUCCESS",
                     List.of("event_type=CALL/year=2020/month=04/day=03"), 2, 100L, 0));
             assertTrue(await(seen, "DAILY_HOT", 10_000), "hot-registered job fires on the next event");
             assertEquals(Map.of("CALL|03", 2L), readCounts(out, "event_count"));
@@ -183,8 +183,8 @@ class EnrichmentServiceTest {
     void reRegisterReplacesByNameSoTheNewConfigFires(@TempDir Path dir) throws Exception {
         Path in = dir.resolve("in"), out1 = dir.resolve("out1"), out2 = dir.resolve("out2");
         seedInput(in);
-        BatchEventBus bus = new BatchEventBus();
-        List<BatchEvent> seen = Collections.synchronizedList(new ArrayList<>());
+        ConsignmentEventBus bus = new ConsignmentEventBus();
+        List<ConsignmentEvent> seen = Collections.synchronizedList(new ArrayList<>());
         bus.subscribe(seen::add);
         Scheduler sched = new Scheduler();
         EnrichmentService es = new EnrichmentService(List.of(), bus, sched);
@@ -195,7 +195,7 @@ class EnrichmentServiceTest {
             es.register(dailyKpi("DAILY_UPSERT", in, out2, new Triggers("EVENTS", 0)));
             assertEquals(1, es.configs().size(), "replaced, not duplicated");
 
-            bus.publish(new BatchEvent("EVENTS", "b1", "SUCCESS",
+            bus.publish(new ConsignmentEvent("EVENTS", "b1", "SUCCESS",
                     List.of("event_type=CALL/year=2020/month=04/day=03"), 2, 100L, 0));
             assertTrue(await(seen, "DAILY_UPSERT", 10_000));
             assertEquals(Map.of("CALL|03", 2L), readCounts(out2, "event_count"),
@@ -215,8 +215,8 @@ class EnrichmentServiceTest {
         seedInput(in);
         EnrichmentConfig job = dailyKpi("DAILY_UNREG", in, out, new Triggers(null, 1));
 
-        BatchEventBus bus = new BatchEventBus();
-        List<BatchEvent> seen = Collections.synchronizedList(new ArrayList<>());
+        ConsignmentEventBus bus = new ConsignmentEventBus();
+        List<ConsignmentEvent> seen = Collections.synchronizedList(new ArrayList<>());
         bus.subscribe(seen::add);
         Scheduler sched = new Scheduler();
         EnrichmentService es = new EnrichmentService(List.of(job), bus, sched);
@@ -247,8 +247,8 @@ class EnrichmentServiceTest {
     void reRegisterWithAFasterIntervalReArmsInsteadOfKeepingTheOriginal(@TempDir Path dir) throws Exception {
         Path in = dir.resolve("in"), out = dir.resolve("out");
         seedInput(in);
-        BatchEventBus bus = new BatchEventBus();
-        List<BatchEvent> seen = Collections.synchronizedList(new ArrayList<>());
+        ConsignmentEventBus bus = new ConsignmentEventBus();
+        List<ConsignmentEvent> seen = Collections.synchronizedList(new ArrayList<>());
         bus.subscribe(seen::add);
         Scheduler sched = new Scheduler();
         EnrichmentService es = new EnrichmentService(List.of(), bus, sched);
@@ -283,14 +283,14 @@ class EnrichmentServiceTest {
                         + "FROM input GROUP BY event_type, year, month, day",
                 new Triggers("STAGE2_A", 0));
 
-        BatchEventBus bus = new BatchEventBus();
-        List<BatchEvent> seen = Collections.synchronizedList(new ArrayList<>());
+        ConsignmentEventBus bus = new ConsignmentEventBus();
+        List<ConsignmentEvent> seen = Collections.synchronizedList(new ArrayList<>());
         bus.subscribe(seen::add);
         Scheduler sched = new Scheduler();
         EnrichmentService es = new EnrichmentService(List.of(a, b), bus, sched);
         try {
             es.start();
-            bus.publish(new BatchEvent("EVENTS", "b1", "SUCCESS",
+            bus.publish(new ConsignmentEvent("EVENTS", "b1", "SUCCESS",
                     List.of("event_type=CALL/year=2020/month=04/day=03"), 2, 100L, 0));
 
             assertTrue(await(seen, "STAGE2_B", 10_000), "downstream B should fire on A's commit");
@@ -310,8 +310,8 @@ class EnrichmentServiceTest {
         seedInput(in);
         EnrichmentConfig job = dailyKpi("DAILY_BOTH", in, out, new Triggers("EVENTS", 1));
 
-        BatchEventBus bus = new BatchEventBus();
-        List<BatchEvent> seen = Collections.synchronizedList(new ArrayList<>());
+        ConsignmentEventBus bus = new ConsignmentEventBus();
+        List<ConsignmentEvent> seen = Collections.synchronizedList(new ArrayList<>());
         bus.subscribe(seen::add);
         Scheduler sched = new Scheduler();
         EnrichmentService es = new EnrichmentService(List.of(job), bus, sched);
@@ -319,7 +319,7 @@ class EnrichmentServiceTest {
             es.start();   // scheduled full recompute every 1s …
             // … while a burst of events also recomputes the same partitions.
             for (int i = 0; i < 5; i++) {
-                bus.publish(new BatchEvent("EVENTS", "b" + i, "SUCCESS", List.of(
+                bus.publish(new ConsignmentEvent("EVENTS", "b" + i, "SUCCESS", List.of(
                         "event_type=CALL/year=2020/month=04/day=03",
                         "event_type=CALL/year=2020/month=04/day=04",
                         "event_type=SMS/year=2020/month=04/day=03"), 4, 100L, 0));
@@ -344,14 +344,14 @@ class EnrichmentServiceTest {
         seedInput(in);
         EnrichmentConfig job = dailyKpi("DAILY_AUDIT", in, out, new Triggers("EVENTS", 0));
 
-        BatchEventBus bus = new BatchEventBus();
-        List<BatchEvent> seen = Collections.synchronizedList(new ArrayList<>());
+        ConsignmentEventBus bus = new ConsignmentEventBus();
+        List<ConsignmentEvent> seen = Collections.synchronizedList(new ArrayList<>());
         bus.subscribe(seen::add);
         Scheduler sched = new Scheduler();
         EnrichmentService es = new EnrichmentService(List.of(job), bus, sched);
         try {
             es.start();
-            bus.publish(new BatchEvent("EVENTS", "b1", "SUCCESS",
+            bus.publish(new ConsignmentEvent("EVENTS", "b1", "SUCCESS",
                     List.of("event_type=CALL/year=2020/month=04/day=03"), 2, 100L, 0));
             assertTrue(await(seen, "DAILY_AUDIT", 10_000), "recompute should complete");
         } finally {
@@ -381,8 +381,8 @@ class EnrichmentServiceTest {
         seedInput(in);
         EnrichmentConfig job = dailyKpi("DAILY_READ", in, out, new Triggers("EVENTS", 0));
 
-        BatchEventBus bus = new BatchEventBus();
-        List<BatchEvent> seen = Collections.synchronizedList(new ArrayList<>());
+        ConsignmentEventBus bus = new ConsignmentEventBus();
+        List<ConsignmentEvent> seen = Collections.synchronizedList(new ArrayList<>());
         bus.subscribe(seen::add);
         Scheduler sched = new Scheduler();
         EnrichmentService es = new EnrichmentService(List.of(job), bus, sched);
@@ -394,7 +394,7 @@ class EnrichmentServiceTest {
             assertEquals(0, es.views().get(0).runCount());
             assertTrue(es.runs("DAILY_READ").isEmpty());
 
-            bus.publish(new BatchEvent("EVENTS", "b1", "SUCCESS",
+            bus.publish(new ConsignmentEvent("EVENTS", "b1", "SUCCESS",
                     List.of("event_type=CALL/year=2020/month=04/day=03"), 2, 100L, 0));
             assertTrue(await(seen, "DAILY_READ", 10_000), "recompute should complete");
         } finally {
@@ -450,7 +450,7 @@ class EnrichmentServiceTest {
                 "SELECT year, month, day, COUNT(*) AS n FROM input GROUP BY year, month, day",
                 new Triggers("test_etl", 0));   // pipeline name is lower-cased by identity
 
-        List<BatchEvent> seen = Collections.synchronizedList(new ArrayList<>());
+        List<ConsignmentEvent> seen = Collections.synchronizedList(new ArrayList<>());
         try (CollectorService svc = new CollectorService(List.of(toon), List.of(job), 3600, 1)) {
             svc.eventBus().subscribe(seen::add);
             // start() wires the enrichment subscriber and then schedules an immediate poll

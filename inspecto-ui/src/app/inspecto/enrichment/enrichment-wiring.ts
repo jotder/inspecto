@@ -20,7 +20,7 @@ export const ENRICHMENT_DEFAULT_PARTITIONS: readonly string[] = ['year', 'month'
 export interface EnrichmentWiringSeed {
     /** Companion identity (`<pipeline>_enrich`) — names the output directory. */
     enrichName: string;
-    /** The engine's normalized pipeline id — what `BatchEvent.pipeline()` carries. */
+    /** The engine's normalized pipeline id — what `ConsignmentEvent.pipeline()` carries. */
     pipelineId: string;
     /** Space-relative root: `spaces/<id>`, or `.` when single-tenant. */
     base: string;

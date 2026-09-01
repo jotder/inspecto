@@ -12,7 +12,7 @@ import java.util.List;
  * @param table      output table sub-directory under {@code dirs.database}; may be {@code null}
  * @param members    member files in deterministic order, each with its 0-based {@code srcId}
  */
-public record Batch(String batchId, String schemaName, String table, List<Member> members) {
+public record Consignment(String batchId, String schemaName, String table, List<Member> members) {
 
     /**
      * @param file      the member input file

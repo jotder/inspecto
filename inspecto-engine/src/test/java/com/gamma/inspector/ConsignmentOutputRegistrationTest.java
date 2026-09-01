@@ -3,7 +3,7 @@ package com.gamma.inspector;
 import com.gamma.consignment.ConsignmentOutput;
 import com.gamma.consignment.ConsignmentOutputStores;
 import com.gamma.consignment.DbConsignmentOutputStore;
-import com.gamma.etl.Batch;
+import com.gamma.etl.Consignment;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.SchemaSelector;
 import com.gamma.util.DuckDbUtil;
@@ -37,9 +37,9 @@ class ConsignmentOutputRegistrationTest {
         ConsignmentOutputStores.use(null);   // the registry is process-wide static — never leak into another test
     }
 
-    private Batch.Member member(PipelineConfig cfg, File f, int id) {
+    private Consignment.Member member(PipelineConfig cfg, File f, int id) {
         SchemaSelector.Selection sel = new SchemaSelector.Selection(cfg.schemas().single(), null);
-        return new Batch.Member(f, id, f.length(), sel);
+        return new Consignment.Member(f, id, f.length(), sel);
     }
 
     /** Four rows over two record-days, contributed by two members so each output file needs a real sum. */
@@ -67,15 +67,15 @@ class ConsignmentOutputRegistrationTest {
         Files.createDirectories(inbox);
         Path solo = inbox.resolve("solo.csv");
         Files.writeString(solo, "ID,AMT,EVENT_DATE\nx,9.0,2020-04-03\n");
-        List<Batch.Member> survivors = List.of(member(cfg, solo.toFile(), 0));
-        Batch batch = new Batch(cfg.identity().runTimestamp() + "_mini_0001", "mini", null, survivors);
+        List<Consignment.Member> survivors = List.of(member(cfg, solo.toFile(), 0));
+        Consignment batch = new Consignment(cfg.identity().runTimestamp() + "_mini_0001", "mini", null, survivors);
 
         try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
             ConsignmentOutputStores.use(store);
 
             File db = DuckDbUtil.tempDbFile("cor_ingest_");
             try (Connection conn = openWithTwoPartitions(db)) {
-                BatchIngestStrategy.Written written = BatchIngestStrategy.writeAndTrace(
+                ConsignmentIngestStrategy.Written written = ConsignmentIngestStrategy.writeAndTrace(
                         conn, "transformed", List.of("year", "month", "day"), cfg,
                         cfg.dirs().database(), "b1", batch.batchId(), Map.of(1, "a.csv", 2, "b.csv"), "");
 
@@ -83,7 +83,7 @@ class ConsignmentOutputRegistrationTest {
                 assertEquals(4, written.lineage().size(),
                         "harness precondition: 2 members x 2 partitions of lineage detail");
 
-                BatchProcessor.finalizeSource(batch, cfg, survivors, written.outputs(), written.lineage());
+                ConsignmentIngestor.finalizeSource(batch, cfg, survivors, written.outputs(), written.lineage());
             } finally {
                 DuckDbUtil.deleteTempDb(db);
             }
@@ -141,19 +141,19 @@ class ConsignmentOutputRegistrationTest {
         Files.createDirectories(inbox);
         Path solo = inbox.resolve("solo.csv");
         Files.writeString(solo, "ID,AMT,EVENT_DATE\nx,9.0,2020-04-03\n");
-        List<Batch.Member> survivors = List.of(member(cfg, solo.toFile(), 0));
-        Batch batch = new Batch(cfg.identity().runTimestamp() + "_mini_0001", "mini", null, survivors);
+        List<Consignment.Member> survivors = List.of(member(cfg, solo.toFile(), 0));
+        Consignment batch = new Consignment(cfg.identity().runTimestamp() + "_mini_0001", "mini", null, survivors);
 
         try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
             ConsignmentOutputStores.use(store);
 
             File db = DuckDbUtil.tempDbFile("cor_bounds_");
             try (Connection conn = openWithEventTime(db)) {
-                BatchIngestStrategy.Written written = BatchIngestStrategy.writeAndTrace(
+                ConsignmentIngestStrategy.Written written = ConsignmentIngestStrategy.writeAndTrace(
                         conn, "transformed", List.of("year", "month", "day"), cfg,
                         cfg.dirs().database(), "b1", batch.batchId(), Map.of(1, "a.csv", 2, "b.csv"), "");
                 assertEquals(2, written.bounds().size(), "bounds are keyed by output file, one per written file");
-                BatchProcessor.finalizeSource(batch, cfg, survivors, written.outputs(), written.lineage(),
+                ConsignmentIngestor.finalizeSource(batch, cfg, survivors, written.outputs(), written.lineage(),
                         written.bounds());
             } finally {
                 DuckDbUtil.deleteTempDb(db);
@@ -204,19 +204,19 @@ class ConsignmentOutputRegistrationTest {
         Files.createDirectories(inbox);
         Path solo = inbox.resolve("solo.csv");
         Files.writeString(solo, "ID,AMT,EVENT_DATE\nx,9.0,2020-04-03\n");
-        List<Batch.Member> survivors = List.of(member(cfg, solo.toFile(), 0));
-        Batch batch = new Batch(cfg.identity().runTimestamp() + "_mini_0001", "mini", null, survivors);
+        List<Consignment.Member> survivors = List.of(member(cfg, solo.toFile(), 0));
+        Consignment batch = new Consignment(cfg.identity().runTimestamp() + "_mini_0001", "mini", null, survivors);
 
         try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
             ConsignmentOutputStores.use(store);
 
             File db = DuckDbUtil.tempDbFile("cor_nobounds_");
             try (Connection conn = openWithTwoPartitions(db)) {   // no __event_time column at all
-                BatchIngestStrategy.Written written = BatchIngestStrategy.writeAndTrace(
+                ConsignmentIngestStrategy.Written written = ConsignmentIngestStrategy.writeAndTrace(
                         conn, "transformed", List.of("year", "month", "day"), cfg,
                         cfg.dirs().database(), "b1", batch.batchId(), Map.of(1, "a.csv", 2, "b.csv"), "");
                 assertTrue(written.bounds().isEmpty(), "no event-time column ⇒ no bounds, and no failure");
-                BatchProcessor.finalizeSource(batch, cfg, survivors, written.outputs(), written.lineage(),
+                ConsignmentIngestor.finalizeSource(batch, cfg, survivors, written.outputs(), written.lineage(),
                         written.bounds());
             } finally {
                 DuckDbUtil.deleteTempDb(db);
@@ -245,17 +245,17 @@ class ConsignmentOutputRegistrationTest {
         Files.createDirectories(inbox);
         Path solo = inbox.resolve("solo.csv");
         Files.writeString(solo, "ID,AMT,EVENT_DATE\nx,9.0,2020-04-03\n");
-        List<Batch.Member> survivors = List.of(member(cfg, solo.toFile(), 0));
-        Batch batch = new Batch(cfg.identity().runTimestamp() + "_mini_0002", "mini", null, survivors);
+        List<Consignment.Member> survivors = List.of(member(cfg, solo.toFile(), 0));
+        Consignment batch = new Consignment(cfg.identity().runTimestamp() + "_mini_0002", "mini", null, survivors);
 
         assertNull(ConsignmentOutputStores.shared(), "precondition: no registry for the default space");
 
         File db = DuckDbUtil.tempDbFile("cor_off_");
         try (Connection conn = openWithTwoPartitions(db)) {
-            BatchIngestStrategy.Written written = BatchIngestStrategy.writeAndTrace(
+            ConsignmentIngestStrategy.Written written = ConsignmentIngestStrategy.writeAndTrace(
                     conn, "transformed", List.of("year", "month", "day"), cfg,
                     cfg.dirs().database(), "b2", batch.batchId(), Map.of(1, "a.csv", 2, "b.csv"), "");
-            assertDoesNotThrow(() -> BatchProcessor.finalizeSource(
+            assertDoesNotThrow(() -> ConsignmentIngestor.finalizeSource(
                     batch, cfg, survivors, written.outputs(), written.lineage()));
         } finally {
             DuckDbUtil.deleteTempDb(db);

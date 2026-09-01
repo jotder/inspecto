@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * present. Without {@code as_of} the same store resolves to the current view (P1 semantics).
  *
  * <p>Two batches are staged exactly as the write path lays them down (see
- * {@code BatchIngestStrategy.stampReferenceVersions}).
+ * {@code ConsignmentIngestStrategy.stampReferenceVersions}).
  */
 class ReferenceScd2AsOfTest {
 

@@ -13,13 +13,13 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Deep-dive integration tests for the plugin-ingester path in {@link BatchProcessor}.
+ * Deep-dive integration tests for the plugin-ingester path in {@link ConsignmentIngestor}.
  *
  * <p>Covers: multi-member batches with per-date partition splitting, quarantine via
  * IOException and zero rows, empty-segment omission, mixed-batch partial survival,
  * data row-count accuracy in output CSVs, and lineage file content.
  */
-class BatchProcessorPluginDeepTest {
+class ConsignmentIngestorPluginDeepTest {
 
     // ── stub ingesters ────────────────────────────────────────────────────────
 
@@ -110,7 +110,7 @@ class BatchProcessorPluginDeepTest {
         assertTrue(lineage.contains("events_day1.bin"), "lineage missing events_day1.bin");
         assertTrue(lineage.contains("events_day2.bin"), "lineage missing events_day2.bin");
 
-        // Batch audit: SUCCESS
+        // Consignment audit: SUCCESS
         assertTrue(Files.readString(Path.of(cfg.dirs().batchesFilePath())).contains(",SUCCESS,"));
     }
 
@@ -251,7 +251,7 @@ class BatchProcessorPluginDeepTest {
         // Bad member quarantined
         assertFileExistsInTree(cfg.dirs().quarantine(), "bad_corrupt.bin");
 
-        // Batch-level SUCCESS (one survivor present)
+        // Consignment-level SUCCESS (one survivor present)
         assertTrue(Files.readString(Path.of(cfg.dirs().batchesFilePath())).contains(",SUCCESS,"),
                 "batches.csv should be SUCCESS with at least one surviving member");
 
@@ -343,19 +343,19 @@ class BatchProcessorPluginDeepTest {
     }
 
     private static void run(PipelineConfig cfg, File... files) {
-        Batch batch = buildBatch(cfg, files);
-        BatchAuditWriter audit = new BatchAuditWriter(
+        Consignment batch = buildBatch(cfg, files);
+        ConsignmentAuditWriter audit = new ConsignmentAuditWriter(
                 cfg.dirs().statusFilePath(), cfg.dirs().batchesFilePath(), cfg.dirs().lineageFilePath());
-        BatchProcessor.process(batch, cfg, audit);
+        ConsignmentIngestor.process(batch, cfg, audit);
     }
 
-    private static Batch buildBatch(PipelineConfig cfg, File... files) {
-        List<Batch.Member> members = new ArrayList<>();
+    private static Consignment buildBatch(PipelineConfig cfg, File... files) {
+        List<Consignment.Member> members = new ArrayList<>();
         for (int i = 0; i < files.length; i++) {
             SchemaSelector.Selection sel = new SchemaSelector.Selection(Map.of(), null);
-            members.add(new Batch.Member(files[i], i, files[i].length(), sel));
+            members.add(new Consignment.Member(files[i], i, files[i].length(), sel));
         }
-        return new Batch(cfg.identity().runTimestamp() + "_events_0001", "events", null, members);
+        return new Consignment(cfg.identity().runTimestamp() + "_events_0001", "events", null, members);
     }
 
     /** Asserts that the segment output directory exists and contains exactly {@code expected} files. */

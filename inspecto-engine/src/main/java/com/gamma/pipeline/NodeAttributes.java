@@ -322,7 +322,7 @@ public final class NodeAttributes {
 
     /**
      * {@code transform.dedup} (record-grain, → {@code processing.dedup}) — the QUALIFY the engine
-     * applies before the partitioned write ({@code BatchIngestStrategy}). Distinct from the
+     * applies before the partitioned write ({@code ConsignmentIngestStrategy}). Distinct from the
      * file-level duplicate Guarantees (marker / fingerprint), which are never Steps.
      * Keys proven by {@code NodeConfigNameContractTest} (keys / order_by reach {@code cfg.dedup()}).
      */

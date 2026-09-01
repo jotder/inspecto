@@ -36,7 +36,7 @@ import java.util.Set;
  * a deterministic sequential topological walk (correct + ordered); running independent branches on the
  * existing vthread pool/permit pattern is a follow-up optimisation.
  *
- * <p><b>Additive:</b> this does not replace the legacy single-output {@code BatchProcessor} path. It starts
+ * <p><b>Additive:</b> this does not replace the legacy single-output {@code ConsignmentIngestor} path. It starts
  * from a <em>seed</em> relation — the {@code data} output of the parse stage, already materialised in
  * {@code conn} by the existing ingest — and executes the downstream {@code transform → sink} subgraph.
  * Routing a legacy config's whole suite through it (byte-for-byte parity) is T5b, still future.

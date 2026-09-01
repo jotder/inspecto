@@ -4,7 +4,7 @@ import com.eoiagent.core.RunId;
 import com.eoiagent.core.ToolCall;
 import com.eoiagent.core.ToolResult;
 import com.eoiagent.tool.Tool;
-import com.gamma.etl.BatchAuditWriter;
+import com.gamma.etl.ConsignmentAuditWriter;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewDefinition;
@@ -235,14 +235,14 @@ class InspectoToolsTest {
         Path statusDir = Path.of(cfg.dirs().statusFilePath()).toAbsolutePath().getParent();
         Files.createDirectories(statusDir);
         String name = cfg.identity().pipelineName();   // reader globs <name>_batches_*.csv
-        BatchAuditWriter w = new BatchAuditWriter(
+        ConsignmentAuditWriter w = new ConsignmentAuditWriter(
                 statusDir.resolve(name + "_status_TEST.csv").toString(),
                 statusDir.resolve(name + "_batches_TEST.csv").toString(),
                 statusDir.resolve(name + "_lineage_TEST.csv").toString());
-        w.flush(new BatchAuditWriter.BatchRow("B1", name, "mini", "",
+        w.flush(new ConsignmentAuditWriter.ConsignmentRow("B1", name, "mini", "",
                 "2026-06-09 08:00:00", "2026-06-09 08:00:02", "SUCCESS",
                 1, 0, 100, 100, 1, 120L, 2000, ""), List.of(), List.of());
-        w.flush(new BatchAuditWriter.BatchRow("B2", name, "mini", "",
+        w.flush(new ConsignmentAuditWriter.ConsignmentRow("B2", name, "mini", "",
                 "2026-06-09 09:00:00", "2026-06-09 09:00:05", "FAILED",
                 1, 0, 100, 40, 1, 120L, 5000, "boom"), List.of(), List.of());
 

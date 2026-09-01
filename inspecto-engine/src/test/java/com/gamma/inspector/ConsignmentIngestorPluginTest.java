@@ -13,13 +13,13 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Integration test for the plugin-ingester path in {@link BatchProcessor}.
+ * Integration test for the plugin-ingester path in {@link ConsignmentIngestor}.
  *
  * <p>Uses a stub {@link StreamingFileIngester} ({@link StubEventIngester}) registered as an
  * inner class so there is no external JAR dependency. The stub reads lines from a plain text
  * file and emits CALL/SMS records, which the unified streaming engine consolidates per segment.
  */
-class BatchProcessorPluginTest {
+class ConsignmentIngestorPluginTest {
 
     // ── stub ingester ─────────────────────────────────────────────────────────
 
@@ -64,11 +64,11 @@ class BatchProcessorPluginTest {
                 "CALL,C002,2020-04-03\n" +
                 "SMS,S001,2020-04-03\n");
 
-        Batch batch = buildBatch(cfg, inputFile.toFile());
-        BatchAuditWriter audit = new BatchAuditWriter(
+        Consignment batch = buildBatch(cfg, inputFile.toFile());
+        ConsignmentAuditWriter audit = new ConsignmentAuditWriter(
                 cfg.dirs().statusFilePath(), cfg.dirs().batchesFilePath(), cfg.dirs().lineageFilePath());
 
-        BatchProcessor.process(batch, cfg, audit);
+        ConsignmentIngestor.process(batch, cfg, audit);
 
         // CALL output: database/CALL/year=2020/month=04/day=03/...
         Path callOut = Path.of(cfg.dirs().database(), "CALL");
@@ -114,10 +114,10 @@ class BatchProcessorPluginTest {
         Path inputFile = inbox.resolve("events_20200404.bin");
         Files.writeString(inputFile, "CALL,C001,2020-04-03\nCALL,C002,2020-04-04\n");
 
-        Batch batch = buildBatch(cfg, inputFile.toFile());
-        BatchAuditWriter audit = new BatchAuditWriter(
+        Consignment batch = buildBatch(cfg, inputFile.toFile());
+        ConsignmentAuditWriter audit = new ConsignmentAuditWriter(
                 cfg.dirs().statusFilePath(), cfg.dirs().batchesFilePath(), cfg.dirs().lineageFilePath());
-        BatchProcessor.process(batch, cfg, audit);
+        ConsignmentIngestor.process(batch, cfg, audit);
 
         Path callOut = Path.of(cfg.dirs().database(), "CALL");
         List<Path> files;
@@ -220,10 +220,10 @@ class BatchProcessorPluginTest {
         return pipeline.toString();
     }
 
-    private static Batch buildBatch(PipelineConfig cfg, File file) {
-        // For the plugin path, selection schema is unused by BatchProcessor (segmentSchemas used instead)
+    private static Consignment buildBatch(PipelineConfig cfg, File file) {
+        // For the plugin path, selection schema is unused by ConsignmentIngestor (segmentSchemas used instead)
         SchemaSelector.Selection sel = new SchemaSelector.Selection(Map.of(), null);
-        Batch.Member m = new Batch.Member(file, 0, file.length(), sel);
-        return new Batch(cfg.identity().runTimestamp() + "_events_0001", "events", null, List.of(m));
+        Consignment.Member m = new Consignment.Member(file, 0, file.length(), sel);
+        return new Consignment(cfg.identity().runTimestamp() + "_events_0001", "events", null, List.of(m));
     }
 }

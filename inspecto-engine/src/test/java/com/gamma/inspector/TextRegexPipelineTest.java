@@ -53,10 +53,10 @@ class TextRegexPipelineTest {
                 """, StandardCharsets.UTF_8);
 
         SchemaSelector.Selection sel = new SchemaSelector.Selection(cfg.schemas().single(), null);
-        Batch batch = new Batch(cfg.identity().runTimestamp() + "_tr_0001", "tr", null,
-                List.of(new Batch.Member(log.toFile(), 0, log.toFile().length(), sel)));
+        Consignment batch = new Consignment(cfg.identity().runTimestamp() + "_tr_0001", "tr", null,
+                List.of(new Consignment.Member(log.toFile(), 0, log.toFile().length(), sel)));
 
-        BatchProcessor.process(batch, cfg, new BatchAuditWriter(
+        ConsignmentIngestor.process(batch, cfg, new ConsignmentAuditWriter(
                 cfg.dirs().statusFilePath(), cfg.dirs().batchesFilePath(), cfg.dirs().lineageFilePath()));
 
         try (Stream<Path> w = Files.walk(Path.of(cfg.dirs().database()))) {

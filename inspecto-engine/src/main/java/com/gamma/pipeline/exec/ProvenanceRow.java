@@ -8,7 +8,7 @@ import com.gamma.api.PublicApi;
  * "node {@code nodeId} emitted {@code rowCount} records on relationship {@code rel} during run {@code batchId}
  * of pipeline {@code pipelineId}." The structure plane (the {@link com.gamma.pipeline.PipelineGraph} edges) supplies
  * the topology; these rows are the quantities painted onto it. Keyed by {@code (pipelineId, batchId)} — the same
- * {@code batchId} the run publishes as its {@code BatchEvent} correlation id.
+ * {@code batchId} the run publishes as its {@code ConsignmentEvent} correlation id.
  *
  * <p>⚠ {@code flowId} → {@code pipelineId} is a Tier 2 (breaking, internal) rename — this record is  vocab-allow: cites the pre-rename name
  * {@code @PublicApi}, which is why it did NOT move in the Tier 1 sweep despite being an obvious Flow→Pipeline

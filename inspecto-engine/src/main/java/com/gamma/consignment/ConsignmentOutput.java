@@ -14,14 +14,14 @@ import com.gamma.api.PublicApi;
  * here has to be summed from {@code LineageCollector}'s per-{@code (srcId, partition)} counts, which is why
  * this is a distinct type rather than a persisted alias.
  *
- * <p><b>Relationship to the JSON manifest (decided).</b> {@code BatchManifest}/{@code ManifestStore} remain
+ * <p><b>Relationship to the JSON manifest (decided).</b> {@code ConsignmentManifest}/{@code ManifestStore} remain
  * the crash-recovery artifact of record — a plain JSON file survives a corrupt DuckDB, and
  * {@code ServiceStores} deliberately degrades a failed store open to {@code null}. So <b>the JSON is
  * authoritative for existence, this table for state</b>. Never treat a missing row here as proof the file
  * does not exist.
  *
  * @param consignmentId the unit of work that wrote the file. Named {@code consignment_id}, not
- *                      {@code batch_id}: GLOSSARY §13 bans <i>Batch</i> for this concept, and a table born
+ *                      {@code batch_id}: GLOSSARY §13 bans <i>Consignment</i> for this concept, and a table born
  *                      after that decision starts correct rather than needing the migration the legacy
  *                      artifacts do.
  * @param runId         the execution the Consignment belonged to (GLOSSARY §6-A: {@code Run ⊇ Consignment ⊇ File}).

@@ -3,7 +3,7 @@ package com.gamma.inspector;
 import com.gamma.consignment.ConsignmentOutput;
 import com.gamma.consignment.ConsignmentOutputStores;
 import com.gamma.consignment.DbConsignmentOutputStore;
-import com.gamma.etl.BatchManifest;
+import com.gamma.etl.ConsignmentManifest;
 import com.gamma.etl.ManifestStore;
 import com.gamma.etl.PipelineConfig;
 import org.slf4j.Logger;
@@ -30,14 +30,14 @@ public final class ReprocessCommand {
         if (cfg.dirs().manifestsDir() == null)
             throw new IllegalStateException("No manifests dir configured (set dirs.status_dir).");
 
-        BatchManifest m = ManifestStore.read(cfg.dirs().manifestsDir(), batchId);
+        ConsignmentManifest m = ManifestStore.read(cfg.dirs().manifestsDir(), batchId);
         log.info("[REPROCESS] {} — {} member(s), {} output(s)",
                 batchId, m.members.size(), m.outputs.size());
 
         guardAgainstCompactedOutputs(batchId, m);
 
         // 1. delete outputs
-        for (BatchManifest.OutputEntry o : m.outputs) {
+        for (ConsignmentManifest.OutputEntry o : m.outputs) {
             if (!Files.deleteIfExists(Paths.get(o.outputFile())))
                 log.warn("[REPROCESS] {} — output already absent, nothing to delete: {}. If it was merged by "
                                 + "the compact job rather than removed by hand, re-ingest will DUPLICATE its "
@@ -52,7 +52,7 @@ public final class ReprocessCommand {
         }
         // 3. restore members from backup into the inbox (original relative path)
         Path poll = Paths.get(cfg.dirs().poll()).toAbsolutePath();
-        for (BatchManifest.MemberEntry me : m.members) {
+        for (ConsignmentManifest.MemberEntry me : m.members) {
             if (me.backupPath() == null || me.backupPath().isBlank()) continue;
             Path src = Paths.get(me.backupPath());
             if (!Files.exists(src)) {
@@ -90,7 +90,7 @@ public final class ReprocessCommand {
      * predate the registry, nothing is decidable and nothing is blocked — the per-file warning in step 1 is all
      * that can honestly be said.
      */
-    private static void guardAgainstCompactedOutputs(String batchId, BatchManifest m) {
+    private static void guardAgainstCompactedOutputs(String batchId, ConsignmentManifest m) {
         DbConsignmentOutputStore registry = ConsignmentOutputStores.shared();
         if (registry == null) return;
 

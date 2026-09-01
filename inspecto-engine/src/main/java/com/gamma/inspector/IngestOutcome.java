@@ -1,7 +1,7 @@
 package com.gamma.inspector;
 
 import com.gamma.consignment.EventTimeBounds;
-import com.gamma.etl.Batch;
+import com.gamma.etl.Consignment;
 import com.gamma.etl.LineageRow;
 import com.gamma.etl.PartitionOutput;
 
@@ -10,8 +10,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The result of a {@link BatchIngestStrategy#ingest} pass — everything
- * {@link BatchProcessor} needs to commit and audit one batch, independent of which
+ * The result of a {@link ConsignmentIngestStrategy#ingest} pass — everything
+ * {@link ConsignmentIngestor} needs to commit and audit one batch, independent of which
  * ingest path produced it.
  *
  * @param batchStart     when ingest began (audit start timestamp)
@@ -36,7 +36,7 @@ import java.util.Map;
 record IngestOutcome(LocalDateTime batchStart,
                      String status,
                      String error,
-                     List<Batch.Member> survivors,
+                     List<Consignment.Member> survivors,
                      List<MemberAudit> memberAudits,
                      List<PartitionOutput> outputs,
                      List<LineageRow> lineage,
@@ -46,7 +46,7 @@ record IngestOutcome(LocalDateTime batchStart,
                      long castFailures) {
 
     /** Unmeasured form — the coercion count defaults to {@code -1} ("not measured"), never {@code 0}. */
-    IngestOutcome(LocalDateTime batchStart, String status, String error, List<Batch.Member> survivors,
+    IngestOutcome(LocalDateTime batchStart, String status, String error, List<Consignment.Member> survivors,
                   List<MemberAudit> memberAudits, List<PartitionOutput> outputs, List<LineageRow> lineage,
                   long totalInputRows, String schemaLabel, Map<String, EventTimeBounds> bounds) {
         this(batchStart, status, error, survivors, memberAudits, outputs, lineage, totalInputRows,
@@ -54,7 +54,7 @@ record IngestOutcome(LocalDateTime batchStart,
     }
 
     /** No-bounds form — {@code EMPTY}/{@code FAILED} outcomes and any path that wrote no output files. */
-    IngestOutcome(LocalDateTime batchStart, String status, String error, List<Batch.Member> survivors,
+    IngestOutcome(LocalDateTime batchStart, String status, String error, List<Consignment.Member> survivors,
                   List<MemberAudit> memberAudits, List<PartitionOutput> outputs, List<LineageRow> lineage,
                   long totalInputRows, String schemaLabel) {
         this(batchStart, status, error, survivors, memberAudits, outputs, lineage, totalInputRows,

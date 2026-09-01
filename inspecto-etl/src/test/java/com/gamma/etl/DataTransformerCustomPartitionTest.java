@@ -71,13 +71,13 @@ class DataTransformerCustomPartitionTest {
     }
 
     /**
-     * Simulates exactly what {@link com.gamma.inspector.BatchProcessorPluginDeepTest.StubEventIngester}
+     * Simulates exactly what {@link com.gamma.inspector.ConsignmentIngestorPluginDeepTest.StubEventIngester}
      * produces: a raw table with {@code EVENT_DATE} stored as VARCHAR, but the schema
      * declaring it as DATE. Rows span TWO different dates → expects 2 distinct
      * {@code day=} partition outputs from PartitionWriter.
      *
      * <p>This test isolates the DataTransformer + PartitionWriter layer, independent
-     * of BatchProcessor, to determine whether multi-date partitioning works at the SQL
+     * of ConsignmentIngestor, to determine whether multi-date partitioning works at the SQL
      * level before the full integration test is blamed.
      */
     @Test
@@ -85,7 +85,7 @@ class DataTransformerCustomPartitionTest {
         Path toon = PipelineConfigBatchTest.writePipeline(dir, "");
         PipelineConfig cfg = PipelineConfig.load(toon.toString());
 
-        // Schema identical to callSchemaToon() in BatchProcessorPluginDeepTest:
+        // Schema identical to callSchemaToon() in ConsignmentIngestorPluginDeepTest:
         // EVENT_DATE declared as DATE, but the ingester inserts it as VARCHAR.
         Map<String, Object> schema = Map.of(
                 "partitions", List.of(

@@ -13,12 +13,12 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Integration test for the streaming plugin-ingester path ({@link StreamingPluginBatchStrategy} +
+ * Integration test for the streaming plugin-ingester path ({@link StreamingPluginIngestStrategy} +
  * {@link DuckDbRecordSink}). A stub {@link StreamingFileIngester} reads a text file and {@code emit}s
  * one record per line into the framework-owned sink — exercising the full transform → partitioned
  * write → lineage path, including bounded multi-generation flushing.
  */
-class StreamingPluginBatchStrategyTest {
+class StreamingPluginIngestStrategyTest {
 
     // ── stub streaming ingesters ────────────────────────────────────────────────
 
@@ -78,10 +78,10 @@ class StreamingPluginBatchStrategyTest {
                 "CALL,C003,2020-04-04\n" +
                 "SMS,S001,2020-04-03\n" +
                 "SMS,S002,2020-04-04\n");
-        Batch batch = buildBatch(cfg, input);
+        Consignment batch = buildBatch(cfg, input);
 
         // flushRows=2 forces several bounded generations over 5 records.
-        IngestOutcome out = new StreamingPluginBatchStrategy(2).ingest(batch, cfg);
+        IngestOutcome out = new StreamingPluginIngestStrategy(2).ingest(batch, cfg);
 
         assertEquals("SUCCESS", out.status());
         assertEquals(5, out.totalInputRows(), "all 5 emitted records are accepted");
@@ -116,9 +116,9 @@ class StreamingPluginBatchStrategyTest {
                 "CALL,C003,2020-04-04\n" +
                 "SMS,S001,2020-04-03\n" +
                 "SMS,S002,2020-04-04\n");
-        Batch batch = buildBatch(cfg, input);
+        Consignment batch = buildBatch(cfg, input);
 
-        IngestOutcome out = new StreamingPluginBatchStrategy().ingest(batch, cfg);
+        IngestOutcome out = new StreamingPluginIngestStrategy().ingest(batch, cfg);
 
         assertEquals("SUCCESS", out.status());
         long outputRows = out.lineage().stream().mapToLong(LineageRow::rowCount).sum();
@@ -139,12 +139,12 @@ class StreamingPluginBatchStrategyTest {
         PipelineConfig cfg = setup(dir, StubStreamingIngester.class.getName());
         File input = writeInput(cfg, "events_20200403.bin",
                 "CALL,C001,2020-04-03\nSMS,S001,2020-04-03\n");
-        Batch batch = buildBatch(cfg, input);
-        BatchAuditWriter audit = new BatchAuditWriter(
+        Consignment batch = buildBatch(cfg, input);
+        ConsignmentAuditWriter audit = new ConsignmentAuditWriter(
                 cfg.dirs().statusFilePath(), cfg.dirs().batchesFilePath(), cfg.dirs().lineageFilePath());
 
-        // BatchProcessor must detect StreamingFileIngester and route to the streaming strategy.
-        BatchProcessor.process(batch, cfg, audit);
+        // ConsignmentIngestor must detect StreamingFileIngester and route to the streaming strategy.
+        ConsignmentIngestor.process(batch, cfg, audit);
 
         assertTrue(Files.exists(Path.of(cfg.dirs().database(), "CALL")), "CALL output should exist");
         assertTrue(Files.exists(Path.of(cfg.dirs().database(), "SMS")), "SMS output should exist");
@@ -154,9 +154,9 @@ class StreamingPluginBatchStrategyTest {
     void zeroRecordsQuarantinedAsMismatch(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = setup(dir, EmptyStreamingIngester.class.getName());
         File input = writeInput(cfg, "empty_20200403.bin", "garbage that the ingester ignores\n");
-        Batch batch = buildBatch(cfg, input);
+        Consignment batch = buildBatch(cfg, input);
 
-        IngestOutcome out = new StreamingPluginBatchStrategy().ingest(batch, cfg);
+        IngestOutcome out = new StreamingPluginIngestStrategy().ingest(batch, cfg);
 
         assertEquals("EMPTY", out.status());
         assertEquals(1, out.memberAudits().size());
@@ -167,9 +167,9 @@ class StreamingPluginBatchStrategyTest {
     void decodeFailureQuarantinedAsUnreadable(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = setup(dir, UnreadableStreamingIngester.class.getName());
         File input = writeInput(cfg, "bad_20200403.bin", "anything\n");
-        Batch batch = buildBatch(cfg, input);
+        Consignment batch = buildBatch(cfg, input);
 
-        IngestOutcome out = new StreamingPluginBatchStrategy().ingest(batch, cfg);
+        IngestOutcome out = new StreamingPluginIngestStrategy().ingest(batch, cfg);
 
         assertEquals("EMPTY", out.status());
         assertEquals(com.gamma.etl.MemberStatus.QUARANTINED_UNREADABLE, out.memberAudits().get(0).status());
@@ -188,9 +188,9 @@ class StreamingPluginBatchStrategyTest {
                 "CALL,C003,2020-04-04\n" +
                 "SMS,S001,2020-04-03\n" +
                 "SMS,S002,2020-04-04\n");
-        Batch batch = buildBatch(cfg, input);
+        Consignment batch = buildBatch(cfg, input);
 
-        IngestOutcome out = new StreamingPluginBatchStrategy(2).ingest(batch, cfg);
+        IngestOutcome out = new StreamingPluginIngestStrategy(2).ingest(batch, cfg);
 
         assertEquals("EMPTY", out.status());
         assertEquals(com.gamma.etl.MemberStatus.QUARANTINED_UNREADABLE, out.memberAudits().get(0).status());
@@ -231,10 +231,10 @@ class StreamingPluginBatchStrategyTest {
         return f.toFile();
     }
 
-    private static Batch buildBatch(PipelineConfig cfg, File file) {
+    private static Consignment buildBatch(PipelineConfig cfg, File file) {
         SchemaSelector.Selection sel = new SchemaSelector.Selection(Map.of(), null);
-        Batch.Member m = new Batch.Member(file, 0, file.length(), sel);
-        return new Batch(cfg.identity().runTimestamp() + "_events_0001", "events", null, List.of(m));
+        Consignment.Member m = new Consignment.Member(file, 0, file.length(), sel);
+        return new Consignment(cfg.identity().runTimestamp() + "_events_0001", "events", null, List.of(m));
     }
 
     private static String callSchemaToon() {

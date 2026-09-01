@@ -6,7 +6,7 @@ import java.util.*;
 
 /**
  * Groups matched files by resolved schema/table, then greedily packs each group
- * into {@link Batch}es honoring {@code maxFiles} OR {@code maxBytes} (whichever
+ * into {@link Consignment}es honoring {@code maxFiles} OR {@code maxBytes} (whichever
  * trips first). A file larger than {@code maxBytes} forms a batch of one.
  *
  * <p>Pure and side-effect free apart from reading {@link File#length()}; the
@@ -14,7 +14,7 @@ import java.util.*;
  * without a {@link PipelineConfig}.
  *
  * <p>Named for the canonical <b>Consignment</b> concept (GLOSSARY §2) ahead of the coordinated
- * Batch→Consignment sweep (§13, amendment Phase 7) — the {@link Batch} type it returns renames there.
+ * Consignment→Consignment sweep (§13, amendment Phase 7) — the {@link Consignment} type it returns renames there.
  */
 public final class ConsignmentPlanner {
 
@@ -37,7 +37,7 @@ public final class ConsignmentPlanner {
     public enum Order { NAME, MTIME }
 
     /** As {@link #plan(List, SchemaResolver, int, long, String, Order)} with the default {@link Order#MTIME}. */
-    public static List<Batch> plan(List<File> files, SchemaResolver resolver,
+    public static List<Consignment> plan(List<File> files, SchemaResolver resolver,
                                    int maxFiles, long maxBytes, String runTimestamp)
             throws IOException {
         return plan(files, resolver, maxFiles, maxBytes, runTimestamp, Order.MTIME);
@@ -55,7 +55,7 @@ public final class ConsignmentPlanner {
      * @return batches, grouped by schema/table, in deterministic order
      * @throws IOException if schema resolution fails
      */
-    public static List<Batch> plan(List<File> files, SchemaResolver resolver,
+    public static List<Consignment> plan(List<File> files, SchemaResolver resolver,
                                    int maxFiles, long maxBytes, String runTimestamp, Order order)
             throws IOException {
 
@@ -77,13 +77,13 @@ public final class ConsignmentPlanner {
             selByFile.put(f, sel);
         }
 
-        List<Batch> batches = new ArrayList<>();
+        List<Consignment> batches = new ArrayList<>();
         int seq = 1;
         for (Map.Entry<String, List<File>> group : byKey.entrySet()) {
             String key  = group.getKey();
             String slug = key.replaceAll("[^A-Za-z0-9]+", "_");
 
-            List<Batch.Member> current = new ArrayList<>();
+            List<Consignment.Member> current = new ArrayList<>();
             long currentBytes = 0;
             for (File f : group.getValue()) {
                 long bytes = f.length();
@@ -94,7 +94,7 @@ public final class ConsignmentPlanner {
                     current = new ArrayList<>();
                     currentBytes = 0;
                 }
-                current.add(new Batch.Member(f, current.size(), bytes, selByFile.get(f)));
+                current.add(new Consignment.Member(f, current.size(), bytes, selByFile.get(f)));
                 currentBytes += bytes;
             }
             if (!current.isEmpty())
@@ -103,18 +103,18 @@ public final class ConsignmentPlanner {
         return batches;
     }
 
-    private static Batch buildBatch(String ts, String slug, int seq, String table,
-                                    List<Batch.Member> members,
+    private static Consignment buildBatch(String ts, String slug, int seq, String table,
+                                    List<Consignment.Member> members,
                                     Map<File, SchemaSelector.Selection> selByFile) {
         // Re-index srcId from 0 within the final batch (members were added with running index).
-        List<Batch.Member> reindexed = new ArrayList<>(members.size());
+        List<Consignment.Member> reindexed = new ArrayList<>(members.size());
         for (int i = 0; i < members.size(); i++) {
-            Batch.Member m = members.get(i);
-            reindexed.add(new Batch.Member(m.file(), i, m.bytes(), m.selection()));
+            Consignment.Member m = members.get(i);
+            reindexed.add(new Consignment.Member(m.file(), i, m.bytes(), m.selection()));
         }
         String batchId = String.format("%s_%s_%04d", ts, slug, seq);
         String schemaName = schemaNameOf(reindexed.get(0).selection());
-        return new Batch(batchId, schemaName, "default".equals(table) ? null : table, reindexed);
+        return new Consignment(batchId, schemaName, "default".equals(table) ? null : table, reindexed);
     }
 
     @SuppressWarnings("unchecked")

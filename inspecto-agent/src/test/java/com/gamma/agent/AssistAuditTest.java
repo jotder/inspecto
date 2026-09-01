@@ -6,7 +6,7 @@ import com.gamma.agent.kernel.model.ModelRouter;
 import com.gamma.agent.kernel.observe.AgentCompleted;
 import com.gamma.assist.AssistRequest;
 import com.gamma.assist.AssistResult;
-import com.gamma.etl.BatchEvent;
+import com.gamma.etl.ConsignmentEvent;
 import com.gamma.service.CollectorService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -147,7 +147,7 @@ class AssistAuditTest {
                     e -> captured.add((AgentCompleted) e));
             agent.init(svc);   // subscribes the failure reactor to the bus
 
-            svc.eventBus().publish(new BatchEvent("MINI_ETL", "B1", "FAILED", List.of(),
+            svc.eventBus().publish(new ConsignmentEvent("MINI_ETL", "B1", "FAILED", List.of(),
                     0, 10L, 1, "schema selector mismatch", "bad.csv", 3));
 
             // Diagnosis happens on the reactor's executor — await the audit event.
@@ -177,7 +177,7 @@ class AssistAuditTest {
                     ModelRouter.of(FakeModelProvider.canned("ignored")), e -> captured.add((AgentCompleted) e));
             agent.init(svc);
 
-            svc.eventBus().publish(new BatchEvent("MINI_ETL", "ok1", "SUCCESS", List.of(), 5, 10L, 0));
+            svc.eventBus().publish(new ConsignmentEvent("MINI_ETL", "ok1", "SUCCESS", List.of(), 5, 10L, 0));
             Thread.sleep(200);   // give any (erroneous) async work a chance to run
 
             assertEquals(0, captured.size(), "SUCCESS commits are not diagnosed");

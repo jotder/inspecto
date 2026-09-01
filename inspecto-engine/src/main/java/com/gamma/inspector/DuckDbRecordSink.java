@@ -15,10 +15,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.gamma.inspector.BatchIngestStrategy.dropTable;
+import static com.gamma.inspector.ConsignmentIngestStrategy.dropTable;
 
 /**
- * Framework-side {@link RecordSink} backing {@link StreamingPluginBatchStrategy}: the bridge that
+ * Framework-side {@link RecordSink} backing {@link StreamingPluginIngestStrategy}: the bridge that
  * turns a {@link StreamingFileIngester}'s record stream into bounded, partitioned output.
  *
  * <p>Two levels of buffering keep both heap <em>and</em> scratch bounded for an arbitrarily large
@@ -34,8 +34,8 @@ import static com.gamma.inspector.BatchIngestStrategy.dropTable;
  *       coexist in the partition dirs (valid Hive layout) — the same approach the CSV chunker uses.</li>
  * </ul>
  *
- * <p>The transform/write/lineage path is exactly the one {@link CsvBatchStrategy}/{@link
- * StreamingPluginBatchStrategy} use ({@link DataTransformer#materialize}, {@link PartitionWriter#write},
+ * <p>The transform/write/lineage path is exactly the one {@link CsvIngestStrategy}/{@link
+ * StreamingPluginIngestStrategy} use ({@link DataTransformer#materialize}, {@link PartitionWriter#write},
  * {@link LineageCollector#collect}) over the same {@code transformed_<KEY>} table shape, so output is
  * identical to the classic path — only the scheduling differs. The {@code __src_id} lineage tag is
  * carried as a trailing column on the raw table (the ingester does not supply it).

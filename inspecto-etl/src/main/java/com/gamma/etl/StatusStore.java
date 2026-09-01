@@ -27,7 +27,7 @@ public interface StatusStore {
      */
     Set<String> committedBatches(PipelineConfig cfg);
 
-    /** Batch audit rows across all runs of the pipeline (newest run last). */
+    /** Consignment audit rows across all runs of the pipeline (newest run last). */
     List<Map<String, String>> batches(PipelineConfig cfg);
 
     /** Per-member-file audit rows across all runs of the pipeline. */

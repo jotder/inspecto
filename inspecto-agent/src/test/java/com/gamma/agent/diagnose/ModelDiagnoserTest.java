@@ -6,7 +6,7 @@ import com.gamma.agent.kernel.model.ModelRouter;
 import com.gamma.assist.Diagnosis;
 import com.gamma.catalog.MetadataNode;
 import com.gamma.catalog.NodeKind;
-import com.gamma.etl.BatchEvent;
+import com.gamma.etl.ConsignmentEvent;
 import com.gamma.service.CollectorService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -25,8 +25,8 @@ class ModelDiagnoserTest {
 
     private static final long EPOCH = 1_700_000_000_000L;
 
-    private static BatchEvent failed(String pipeline) {
-        return new BatchEvent(pipeline, "B1", "FAILED", List.of(), 0, 10L, 1,
+    private static ConsignmentEvent failed(String pipeline) {
+        return new ConsignmentEvent(pipeline, "B1", "FAILED", List.of(), 0, 10L, 1,
                 "schema selector mismatch", "bad.csv", 3);
     }
 

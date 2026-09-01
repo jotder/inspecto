@@ -1,6 +1,6 @@
 package com.gamma.inspector;
 
-import com.gamma.etl.Batch;
+import com.gamma.etl.Consignment;
 import com.gamma.etl.ConsignmentPlanner;
 import com.gamma.etl.IngestProgress;
 import com.gamma.etl.LineageRow;
@@ -40,7 +40,7 @@ import java.util.stream.Stream;
  *
  * <h2>Why this is safe — two independent containments, both by construction</h2>
  *
- * <p><b>1. Call-graph containment.</b> {@link BatchProcessor#process} is, in order:
+ * <p><b>1. Call-graph containment.</b> {@link ConsignmentIngestor#process} is, in order:
  * {@code strategy.ingest(...)}, then {@code commit(...)}, then {@code writeAudit(...)}, then
  * {@code recordProvenance(...)}. This class calls <b>only the first</b>. That matters because the
  * destinations which are <em>not</em> derived from the config — and therefore cannot be redirected by
@@ -53,7 +53,7 @@ import java.util.stream.Stream;
  * <p><b>2. Filesystem containment.</b> The picked files are <b>copied</b> into
  * {@code scratchRoot/poll} and the run executes against {@link PipelineConfig#forScratchRun}, whose
  * every destination is re-rooted under {@code scratchRoot}. ⚠ The copy is <b>not</b> an optimisation
- * to remove: {@code CsvBatchStrategy} quarantines an unreadable / field-mismatched / empty member via
+ * to remove: {@code CsvIngestStrategy} quarantines an unreadable / field-mismatched / empty member via
  * {@code QuarantineManager.quarantine}, which does a {@code Files.move} of the <em>source</em> file.
  * Run against the real inbox and testing a malformed file would delete it from the user's inbox.
  *
@@ -107,7 +107,7 @@ public final class PipelineTestRun {
                 ? scratch.schemas().selector()::select
                 : f -> new SchemaSelector.Selection(scratch.schemas().single(), null);
 
-        List<Batch> batches = ConsignmentPlanner.plan(
+        List<Consignment> batches = ConsignmentPlanner.plan(
                 staged, resolver,
                 scratch.processing().batchMaxFiles(), scratch.processing().batchMaxBytes(),
                 scratch.identity().runTimestamp(),
@@ -120,22 +120,22 @@ public final class PipelineTestRun {
         boolean anyFailed = false, anyRows = false;
         String error = "";
 
-        for (Batch batch : batches) {
-            BatchIngestStrategy strategy = (scratch.schemas().ingesterClass() == null)
-                    ? new CsvBatchStrategy()
-                    : new StreamingPluginBatchStrategy();
+        for (Consignment batch : batches) {
+            ConsignmentIngestStrategy strategy = (scratch.schemas().ingesterClass() == null)
+                    ? new CsvIngestStrategy()
+                    : new StreamingPluginIngestStrategy();
 
             IngestOutcome outcome;
             try {
                 outcome = strategy.ingest(batch, scratch);
             } finally {
-                // Mirrors BatchProcessor.process — a progress snapshot must never outlive the batch.
+                // Mirrors ConsignmentIngestor.process — a progress snapshot must never outlive the batch.
                 IngestProgress.clear(scratch.identity().pipelineName());
                 StepProgress.clear(scratch.identity().pipelineName());
             }
             // ⚠ DELIBERATELY NOT CALLED: commit(...) / writeAudit(...) / recordProvenance(...).
             // Those three are the entire production side-effect surface — see the class javadoc.
-            // If you add a fourth side-effecting call to BatchProcessor.process, it must not be
+            // If you add a fourth side-effecting call to ConsignmentIngestor.process, it must not be
             // mirrored here, and this comment is where you will find out why.
 
             for (MemberAudit m : outcome.memberAudits())

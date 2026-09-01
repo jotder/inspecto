@@ -13,7 +13,7 @@ import java.util.Map;
  * (ELT amendment Phase 3 <b>S3a</b>, design of record 2026-08-06). Payload
  * {@code {dataset, rows, at, producer}} where {@code producer} is the writing pipeline/job name.
  *
- * <p>Strictly <b>additive</b>, mirroring {@link PipelineBatchSignal}'s posture: it joins — never
+ * <p>Strictly <b>additive</b>, mirroring {@link PipelineConsignmentSignal}'s posture: it joins — never
  * replaces — the three pipeline-shaped commit mechanisms ({@code PipelineScheduler.onUpstreamCommit},
  * {@code JobService.mirrorPipelineCommit}'s {@code pipeline.commit} mirror, and
  * {@code pipeline.batch.committed|failed}), none of which carries a Dataset id. S3b subscribes the

@@ -83,7 +83,7 @@ public final class EventType {
     public static final String SEQUENCE_GAP     = "SEQUENCE_GAP";
     /** The record-grain {@code dedup} Step (§2.4) dropped one or more duplicate rows by business key —
      *  a reject stream the user tunes where it rests, never wires (§2.6). Phase 4 §2.4/§11.3's
-     *  legacy-lane counter, since {@code BatchIngestStrategy} has no per-node provenance graph to
+     *  legacy-lane counter, since {@code ConsignmentIngestStrategy} has no per-node provenance graph to
      *  record against. The {@code keys} and {@code dropped} attributes carry the dedup key list and
      *  the count; {@code correlationId} is the batch id. */
     public static final String DEDUP_RECORDS_DROPPED = "DEDUP_RECORDS_DROPPED";

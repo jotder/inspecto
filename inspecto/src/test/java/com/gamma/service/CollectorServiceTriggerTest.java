@@ -129,7 +129,7 @@ class CollectorServiceTriggerTest {
         try (CollectorService svc = new CollectorService(List.of(up, down), 3600, 2)) {
             // Await the downstream's own commit event rather than polling its db dir: the writer
             // stages under db/.staging while the run is in flight, so a concurrent Files.walk can
-            // race the staging cleanup (NoSuchFileException). BatchEvent is emitted only after the
+            // race the staging cleanup (NoSuchFileException). ConsignmentEvent is emitted only after the
             // batch is durably committed — outputs revealed, staging gone.
             CountDownLatch downCommitted = new CountDownLatch(1);
             svc.eventBus().subscribe(e -> {

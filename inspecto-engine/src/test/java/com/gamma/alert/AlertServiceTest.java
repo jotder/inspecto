@@ -3,7 +3,7 @@ package com.gamma.alert;
 import com.gamma.catalog.ConfigSource;
 import com.gamma.catalog.SemanticModel;
 import com.gamma.enrich.EnrichmentConfig;
-import com.gamma.etl.BatchEvent;
+import com.gamma.etl.ConsignmentEvent;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.ops.InMemoryObjectStore;
@@ -135,13 +135,13 @@ class AlertServiceTest {
                 configs(cfg), store(ledger));
 
         // Event-driven entry point: a terminal batch for this pipeline triggers evaluation.
-        svc.onEvent(new BatchEvent("MINI_ETL", "B9", "SUCCESS", List.of(), 10, 100, 0, null, null, 0));
+        svc.onEvent(new ConsignmentEvent("MINI_ETL", "B9", "SUCCESS", List.of(), 10, 100, 0, null, null, 0));
         List<Map<String, Object>> recent = svc.recent(10);
         assertEquals(1, recent.size(), "only the matching, breached rule fires");
         assertEquals("r-failed_batches", recent.get(0).get("rule"));
 
         // Same condition immediately after: suppressed by the cooldown, not duplicated.
-        svc.onEvent(new BatchEvent("MINI_ETL", "B10", "SUCCESS", List.of(), 10, 100, 0, null, null, 0));
+        svc.onEvent(new ConsignmentEvent("MINI_ETL", "B10", "SUCCESS", List.of(), 10, 100, 0, null, null, 0));
         assertEquals(1, svc.recent(10).size(), "re-fire suppressed while in cooldown");
     }
 

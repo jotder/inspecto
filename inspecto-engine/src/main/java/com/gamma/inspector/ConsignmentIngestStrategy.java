@@ -2,7 +2,7 @@ package com.gamma.inspector;
 
 import com.gamma.consignment.ConsignmentOutputs;
 import com.gamma.consignment.EventTimeBounds;
-import com.gamma.etl.Batch;
+import com.gamma.etl.Consignment;
 import com.gamma.etl.CsvIngester;
 import com.gamma.query.DecisionRuleApplier;
 import com.gamma.etl.LineageCollector;
@@ -27,29 +27,29 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The ingest+transform+write half of processing one {@link Batch} — the part that
+ * The ingest+transform+write half of processing one {@link Consignment} — the part that
  * differs between the built-in CSV path and the plugin-ingester path. Each strategy
  * owns its own DuckDB connection lifecycle and produces an {@link IngestOutcome}
  * (survivors, outputs, lineage, per-member audit, status); the shared, path-agnostic
  * tail — commit (register → manifest → backup → markers) and audit — stays in
- * {@link BatchProcessor}, which selects the strategy and drives that tail.
+ * {@link ConsignmentIngestor}, which selects the strategy and drives that tail.
  *
  * <p>This replaces the former {@code processCsv}/{@code processPlugin} god-methods:
- * {@link BatchProcessor#process} now dispatches polymorphically on
+ * {@link ConsignmentIngestor#process} now dispatches polymorphically on
  * {@link PipelineConfig.Schemas#ingesterClass()} instead of branching inline.
  *
  * <p>Implementations are stateless and cheap to instantiate per batch.
  */
-interface BatchIngestStrategy {
+interface ConsignmentIngestStrategy {
 
-    Logger log = LoggerFactory.getLogger(BatchIngestStrategy.class);
+    Logger log = LoggerFactory.getLogger(ConsignmentIngestStrategy.class);
 
     /**
      * Ingest, transform, and write {@code batch}. Never throws: ingest failures are
      * captured into the returned outcome as {@code status = "FAILED"} so the batch
      * still flows through commit-skip + audit exactly as before.
      */
-    IngestOutcome ingest(Batch batch, PipelineConfig cfg);
+    IngestOutcome ingest(Consignment batch, PipelineConfig cfg);
 
     // ── shared helpers ──────────────────────────────────────────────────────────
 
@@ -152,7 +152,7 @@ interface BatchIngestStrategy {
         com.gamma.pipeline.PipelineGraph lifted = null;
         if (cfg.routeConfig() != null) {
             com.gamma.pipeline.PipelineGraph routed = com.gamma.pipeline.PipelineLift.lift(cfg);
-            if (com.gamma.pipeline.exec.BatchGraphRunner.engages(routed)) lifted = routed;
+            if (com.gamma.pipeline.exec.ConsignmentGraphRunner.engages(routed)) lifted = routed;
         } else if (applied.outputs().isEmpty() && graphLaneCarries(cfg)) {
             lifted = com.gamma.pipeline.PipelineLift.lift(cfg);
         }
@@ -241,15 +241,15 @@ interface BatchIngestStrategy {
 
     /**
      * The branch-aware write (arming plan S2, Option B): drive the {@code route -> sinks} subgraph of
-     * {@code lifted} over the already-materialised {@code table} through {@link BatchGraphRunner},
+     * {@code lifted} over the already-materialised {@code table} through {@link ConsignmentGraphRunner},
      * committing each branch through the durable {@link com.gamma.pipeline.exec.BranchCommitLog} and
      * writing it to its paired {@code sinks[]} destination via {@link IngestSinkWriter}.
      *
-     * <p><b>Finalisation stays with {@code BatchProcessor.commit}</b> — the runner's
+     * <p><b>Finalisation stays with {@code ConsignmentIngestor.commit}</b> — the runner's
      * once-after-all-branches hook is a no-op here, deliberately: this method returns the flat
      * {@code Written} shape into {@link IngestOutcome}, and the caller's commit/audit tail then runs
      * the REAL {@code finalizeSource} (manifest, backup, markers LAST, ledger, watermark) plus
-     * {@code writeAudit} (ledgers, BatchEvent, signals) — the same code, not a mirror. The runner's
+     * {@code writeAudit} (ledgers, ConsignmentEvent, signals) — the same code, not a mirror. The runner's
      * own finalizer cannot be that body: it fires inside the strategy, before the batch outcome
      * exists, and the plan's Option-B constraint is a shared seam, never a second caller.
      *
@@ -297,14 +297,14 @@ interface BatchIngestStrategy {
         java.nio.file.Path commitLog =
                 branchCommitLogPath(cfg, batchId);
         java.nio.file.Files.createDirectories(commitLog.getParent());
-        com.gamma.pipeline.exec.BatchGraphRunner.run(
-                new com.gamma.pipeline.exec.BatchGraphRunner.Input(
+        com.gamma.pipeline.exec.ConsignmentGraphRunner.run(
+                new com.gamma.pipeline.exec.ConsignmentGraphRunner.Input(
                         conn, lifted, seedNodeId, seedTable, batchId, dbDir, writeBase, commitLog, writeScope),
                 writer,
-                () -> { /* finalisation is BatchProcessor.commit's, once the outcome returns */ },
+                () -> { /* finalisation is ConsignmentIngestor.commit's, once the outcome returns */ },
                 // Park hook (S4b): a disabled route-branch sink's rows are materialised to a durable
                 // Parquet under the park home (a sibling of backup, never under a database dir a
-                // store glob could sweep) and recorded for BatchProcessor's parked-finalisation.
+                // store glob could sweep) and recorded for ConsignmentIngestor's parked-finalisation.
                 (node, inputTable) -> {
                     java.nio.file.Path parkDir = java.nio.file.Paths.get(cfg.dirs().backup(), "parked");
                     java.nio.file.Files.createDirectories(parkDir);
@@ -507,14 +507,14 @@ interface BatchIngestStrategy {
      * Consolidated-output base name: a single surviving member keeps its file stem (legacy
      * {@code <basename>_out.<ext>} naming); a multi-member batch is named by its batch id.
      */
-    static String consolidatedBaseName(List<Batch.Member> survivors, Batch batch) {
+    static String consolidatedBaseName(List<Consignment.Member> survivors, Consignment batch) {
         return survivors.size() == 1
                 ? CsvIngester.stripExtensions(survivors.get(0).file().getName())
                 : batch.batchId();
     }
 
     /** Output database dir for a batch: {@code dirs.database}, or a {@code table}-named subdir when set. */
-    static String databaseDir(Batch batch, PipelineConfig cfg) {
+    static String databaseDir(Consignment batch, PipelineConfig cfg) {
         return (batch.table() != null && !batch.table().isBlank())
                 ? Paths.get(cfg.dirs().database(), batch.table()).toString()
                 : cfg.dirs().database();
@@ -533,7 +533,7 @@ interface BatchIngestStrategy {
     /**
      * Where this batch's {@link com.gamma.pipeline.exec.BranchCommitLog} lives. **The one place that
      * decision is made** — the log is created here, resumed by {@code DrainCommand} and deleted by
-     * {@code BatchProcessor.commit}, and all three must agree or a drain looks in the wrong place.
+     * {@code ConsignmentIngestor.commit}, and all three must agree or a drain looks in the wrong place.
      *
      * <p>{@code dirs.temp} is OPTIONAL, so reading it directly threw a {@code NullPointerException} the
      * moment the graph lane started carrying pipelines that omit it — a config the flat lane had always

@@ -1,7 +1,7 @@
 package com.gamma.service;
 
-import com.gamma.etl.BatchEvent;
-import com.gamma.etl.BatchEventBus;
+import com.gamma.etl.ConsignmentEvent;
+import com.gamma.etl.ConsignmentEventBus;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.acquire.CollectorConnectors;
 import com.gamma.acquire.IntakeGovernor;
@@ -71,7 +71,7 @@ import java.util.function.Consumer;
  *       exclusion is per-pipeline, so a slow pipeline no longer delays the next tick for every other
  *       pipeline. The narrow {@code registryLock} that remains serialises only registry mutation +
  *       {@code ConfigRegistry.rebuild}, never a run.</li>
- *   <li><b>Off-thread event hand-off.</b> {@link BatchEventBus#publish} is synchronous on the
+ *   <li><b>Off-thread event hand-off.</b> {@link ConsignmentEventBus#publish} is synchronous on the
  *       publishing (claim-holding) thread; {@link #onUpstreamCommit} therefore hands the triggered run
  *       to {@link #triggerWorkers} (a virtual thread) instead of running it inline.
  *       <p>⚠ A {@link PipelineRunGuard} claim is deliberately <em>not</em> reentrant, so an inline run of
@@ -96,7 +96,7 @@ final class PipelineScheduler {
     private final PipelineRunGuard runGuard;
     /** Serialises registry mutation + {@code ConfigRegistry.rebuild} only — never held across a run. */
     private final ReentrantLock registryLock;
-    private final BatchEventBus bus;
+    private final ConsignmentEventBus bus;
     private final ExecutorService triggerWorkers;
     /** The scheduler's poll delay (ms) — the budget one cycle is expected to fit inside, and so the
      *  overrun threshold the T15 admission controller adjusts against ({@link #governCycle}). Volatile:
@@ -149,7 +149,7 @@ final class PipelineScheduler {
 
     PipelineScheduler(List<Path> registry, ConfigRegistry configRegistry, Set<String> paused,
                       Set<String> running, PipelineRunGuard runGuard, ReentrantLock registryLock,
-                      BatchEventBus bus,
+                      ConsignmentEventBus bus,
                       ExecutorService triggerWorkers, int maxConcurrentRuns, int maxConcurrentAcquisitions,
                       int acquireHighWater,
                       long pollIntervalMs, Consumer<String> runPipeline, Runnable syncStatus) {
@@ -404,7 +404,7 @@ final class PipelineScheduler {
      * publishing thread, which holds that pipeline's claim; running inline would deadlock) and coalesced per
      * flow so an upstream storm collapses to one non-overlapping run.
      */
-    void onUpstreamCommit(BatchEvent event) {
+    void onUpstreamCommit(ConsignmentEvent event) {
         if (!"SUCCESS".equals(event.status())) return;
         for (Path p : registry) {
             PipelineConfig cfg = configRegistry.configForPath(p).orElse(null);

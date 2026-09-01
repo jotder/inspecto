@@ -11,7 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Process-wide, per-space {@link DbProvenanceStore} accessor (consignment-chain-plan.md S3) — the same
  * global-registry idiom as {@code FileStages}/{@code ConsignmentOutputStores}, so the static ingest
- * lane ({@code BatchProcessor}) can record step counts without threading a store through every call.
+ * lane ({@code ConsignmentIngestor}) can record step counts without threading a store through every call.
  *
  * <p><b>Pure registry — no backend resolution here.</b> {@code ServiceStores.openProvenanceStore}
  * remains the single place that reads {@code -Dprovenance.backend}; the {@code CollectorService}

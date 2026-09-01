@@ -24,7 +24,7 @@ import java.util.Set;
  * honest spelling).
  *
  * <p><b>And no park home.</b> {@code dirs.backup} is OPTIONAL ({@code PipelineConfigParser} reads it
- * with a plain {@code get}), but {@code BatchProcessor.parkSource} parks under
+ * with a plain {@code get}), but {@code ConsignmentIngestor.parkSource} parks under
  * {@code <backup>/parked} — so without it the pipeline arms, runs, and dies at the park with an NPE
  * the operator sees as {@code park failed: null}, one batch at a time. That is the same
  * arms-then-fails-every-cycle shape every refusal here exists to convert into an authoring-time

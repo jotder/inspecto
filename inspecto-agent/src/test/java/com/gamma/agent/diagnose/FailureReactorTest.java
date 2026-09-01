@@ -1,7 +1,7 @@
 package com.gamma.agent.diagnose;
 
 import com.gamma.assist.Diagnosis;
-import com.gamma.etl.BatchEvent;
+import com.gamma.etl.ConsignmentEvent;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -21,8 +21,8 @@ class FailureReactorTest {
 
     private static final long EPOCH = 1_700_000_000_000L;
 
-    private static BatchEvent failed(String batchId, String error, String offending, long outRows, long errRows) {
-        return new BatchEvent("EVENTS", batchId, "FAILED", List.of(), outRows, 10L, 1, error, offending, errRows);
+    private static ConsignmentEvent failed(String batchId, String error, String offending, long outRows, long errRows) {
+        return new ConsignmentEvent("EVENTS", batchId, "FAILED", List.of(), outRows, 10L, 1, error, offending, errRows);
     }
 
     private static FailureReactor.Diagnoser heuristic() {
@@ -37,9 +37,9 @@ class FailureReactorTest {
                 HeuristicDiagnoser.severityOf(failed("b", "boom", null, 0, 5)), "FAILED with no output");
         assertEquals(Diagnosis.Severity.WARNING,
                 HeuristicDiagnoser.severityOf(failed("b", "boom", null, 3, 1)), "FAILED but some output");
-        BatchEvent partial = new BatchEvent("EVENTS", "b", "SUCCESS", List.of(), 9, 1L, 0, null, null, 2);
+        ConsignmentEvent partial = new ConsignmentEvent("EVENTS", "b", "SUCCESS", List.of(), 9, 1L, 0, null, null, 2);
         assertEquals(Diagnosis.Severity.WARNING, HeuristicDiagnoser.severityOf(partial), "success w/ error rows");
-        BatchEvent clean = new BatchEvent("EVENTS", "b", "SUCCESS", List.of(), 9, 1L, 0);
+        ConsignmentEvent clean = new ConsignmentEvent("EVENTS", "b", "SUCCESS", List.of(), 9, 1L, 0);
         assertEquals(Diagnosis.Severity.INFO, HeuristicDiagnoser.severityOf(clean), "clean success");
     }
 
@@ -92,7 +92,7 @@ class FailureReactorTest {
     void ignoresNonFailedEvents() {
         DiagnosisStore store = new DiagnosisStore();
         try (FailureReactor reactor = new FailureReactor(Runnable::run, 16, heuristic(), store, null)) {
-            reactor.onEvent(new BatchEvent("EVENTS", "ok1", "SUCCESS", List.of(), 5, 1L, 0));
+            reactor.onEvent(new ConsignmentEvent("EVENTS", "ok1", "SUCCESS", List.of(), 5, 1L, 0));
             assertEquals(0, store.size(), "SUCCESS events are not diagnosed");
         }
     }

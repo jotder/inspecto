@@ -54,7 +54,7 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
      * @param baseName      the output file stem ({@code <baseName>_out.<ext>}); typically the pipeline/job id
      * @param consignmentId the unit of work these files belong to, recorded in the §11.3 output registry. This
      *                      writer registers its own files (it has the per-partition counts and the target store
-     *                      name in scope); {@code BatchProcessor.finalizeSource} deliberately does not, so the
+     *                      name in scope); {@code ConsignmentIngestor.finalizeSource} deliberately does not, so the
      *                      graph path does not double-count. May be {@code null} — nothing is registered then.
      */
     public PartitionSinkWriter(Connection conn, String dataDir, String baseName, String consignmentId) {

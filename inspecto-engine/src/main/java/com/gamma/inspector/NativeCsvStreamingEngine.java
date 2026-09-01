@@ -17,19 +17,19 @@ import java.util.List;
 import java.util.Map;
 import com.gamma.consignment.EventTimeBounds;
 
-import static com.gamma.inspector.BatchIngestStrategy.consolidatedBaseName;
-import static com.gamma.inspector.BatchIngestStrategy.databaseDir;
-import static com.gamma.inspector.BatchIngestStrategy.dropTable;
-import static com.gamma.inspector.BatchIngestStrategy.msg;
-import static com.gamma.inspector.BatchIngestStrategy.partitionColumns;
-import static com.gamma.inspector.BatchIngestStrategy.scratchDir;
-import static com.gamma.inspector.BatchIngestStrategy.unionAll;
-import static com.gamma.inspector.BatchIngestStrategy.writeAndTrace;
+import static com.gamma.inspector.ConsignmentIngestStrategy.consolidatedBaseName;
+import static com.gamma.inspector.ConsignmentIngestStrategy.databaseDir;
+import static com.gamma.inspector.ConsignmentIngestStrategy.dropTable;
+import static com.gamma.inspector.ConsignmentIngestStrategy.msg;
+import static com.gamma.inspector.ConsignmentIngestStrategy.partitionColumns;
+import static com.gamma.inspector.ConsignmentIngestStrategy.scratchDir;
+import static com.gamma.inspector.ConsignmentIngestStrategy.unionAll;
+import static com.gamma.inspector.ConsignmentIngestStrategy.writeAndTrace;
 
 /**
- * The native {@code read_csv} streaming ingest engine for {@link CsvBatchStrategy}: the fully
+ * The native {@code read_csv} streaming ingest engine for {@link CsvIngestStrategy}: the fully
  * streaming paths that materialise a batch's data exactly once, with no per-member
- * {@code raw_f}/{@code raw_input} table copies. {@code CsvBatchStrategy.ingest} dispatches here when
+ * {@code raw_f}/{@code raw_input} table copies. {@code CsvIngestStrategy.ingest} dispatches here when
  * {@link DuckDbCsvIngester#decideNative} selects the native engine:
  * <ul>
  *   <li>single member → one streaming pass ({@link #streamingIngest}), chunked for huge files
@@ -38,14 +38,14 @@ import static com.gamma.inspector.BatchIngestStrategy.writeAndTrace;
  *       transform ({@link #unionStreamingIngest}).</li>
  * </ul>
  * The Java parse-engine path (per-member materialise → {@code raw_input}) stays in
- * {@link CsvBatchStrategy}. All methods are static; the connection is owned by the caller.
+ * {@link CsvIngestStrategy}. All methods are static; the connection is owned by the caller.
  *
- * <p>The logger keeps {@code CsvBatchStrategy}'s category so log output is unchanged from when this
+ * <p>The logger keeps {@code CsvIngestStrategy}'s category so log output is unchanged from when this
  * code lived there.
  */
 final class NativeCsvStreamingEngine {
 
-    private static final Logger log = LoggerFactory.getLogger(CsvBatchStrategy.class);
+    private static final Logger log = LoggerFactory.getLogger(CsvIngestStrategy.class);
 
     private NativeCsvStreamingEngine() {}
 
@@ -70,17 +70,17 @@ final class NativeCsvStreamingEngine {
      * to the per-member loop it replaces, with the same {@code baseName} rule (single survivor keeps
      * its file stem; otherwise the consolidated output is named by batch id).
      */
-    static IngestOutcome unionStreamingIngest(Batch batch, PipelineConfig cfg,
+    static IngestOutcome unionStreamingIngest(Consignment batch, PipelineConfig cfg,
                                               Connection conn, LocalDateTime batchStart) throws Exception {
         Map<String, Object>  schema       = batch.members().get(0).selection().schema();
         Map<Integer, String> srcIdToFile  = new LinkedHashMap<>();
-        List<Batch.Member>   survivors    = new ArrayList<>();
+        List<Consignment.Member>   survivors    = new ArrayList<>();
         List<MemberAudit>    memberAudits = new ArrayList<>();
         List<String>         memberViews  = new ArrayList<>();
         long totalInputRows = 0;
 
         int memberIdx = 0;
-        for (Batch.Member m : batch.members()) {
+        for (Consignment.Member m : batch.members()) {
             IngestProgress.track(cfg.identity().pipelineName(), batch.batchId(),
                     m.file().getName(), ++memberIdx, batch.members().size());
             LocalDateTime mStart = LocalDateTime.now();
@@ -167,7 +167,7 @@ final class NativeCsvStreamingEngine {
      * Quarantine/empty semantics mirror the per-member path exactly (unreadable → QUARANTINED_UNREADABLE;
      * 0 valid rows + rejects → QUARANTINED_MISMATCH; otherwise EMPTY/SUCCESS).
      */
-    static IngestOutcome streamingIngest(Batch batch, Batch.Member m, PipelineConfig cfg,
+    static IngestOutcome streamingIngest(Consignment batch, Consignment.Member m, PipelineConfig cfg,
                                          Connection conn, LocalDateTime batchStart) throws Exception {
         Map<String, Object> schema = m.selection().schema();
         LocalDateTime mStart = LocalDateTime.now();
@@ -199,7 +199,7 @@ final class NativeCsvStreamingEngine {
      * which coexist in the partition dirs (valid Hive layout). Counts/outputs/lineage aggregate; the
      * <em>original</em> file remains the member for audit/markers/backup, so commit is unchanged.
      */
-    static IngestOutcome chunkedIngest(Batch batch, Batch.Member m, PipelineConfig cfg,
+    static IngestOutcome chunkedIngest(Consignment batch, Consignment.Member m, PipelineConfig cfg,
                                        Connection conn, LocalDateTime batchStart) throws Exception {
         Map<String, Object> schema = m.selection().schema();
         LocalDateTime mStart = LocalDateTime.now();
@@ -283,7 +283,7 @@ final class NativeCsvStreamingEngine {
     }
 
     /** Apply the shared empty/quarantine/success decision for a single-member outcome. */
-    private static IngestOutcome finishSingle(Batch batch, Batch.Member m, PipelineConfig cfg,
+    private static IngestOutcome finishSingle(Consignment batch, Consignment.Member m, PipelineConfig cfg,
                                               LocalDateTime batchStart, LocalDateTime mStart,
                                               long parsed, long rejects,
                                               List<PartitionOutput> outputs, List<LineageRow> lineage,
@@ -308,7 +308,7 @@ final class NativeCsvStreamingEngine {
                 outputs, lineage, parsed, batch.schemaName(), bounds, castFailures);
     }
 
-    private static IngestOutcome empty(Batch batch, LocalDateTime batchStart, MemberAudit memberAudit) {
+    private static IngestOutcome empty(Consignment batch, LocalDateTime batchStart, MemberAudit memberAudit) {
         return new IngestOutcome(batchStart, "EMPTY", "", List.of(), List.of(memberAudit),
                 List.of(), List.of(), 0, batch.schemaName());
     }

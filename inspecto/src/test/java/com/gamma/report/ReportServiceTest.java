@@ -53,7 +53,7 @@ class ReportServiceTest {
             assertTrue(ps.committedBatches() >= 1);
             assertEquals("SUCCESS", ps.lastBatchStatus(), "last batch outcome surfaced");
 
-            ReportService.BatchAuditReport br = reports.batchReport("test_etl");
+            ReportService.ConsignmentAuditReport br = reports.batchReport("test_etl");
             assertTrue(br.totalBatches() >= 1);
             assertEquals(br.totalBatches(), br.success(), "all batches succeeded");
             assertEquals(0, br.failed());
@@ -84,7 +84,7 @@ class ReportServiceTest {
             ReportService.StatusReport status = svc.reports().statusReport();
             assertEquals(1, status.pipelineCount());
             assertEquals(0, status.totalCommittedBatches());
-            ReportService.BatchAuditReport br = svc.reports().batchReport("test_etl");
+            ReportService.ConsignmentAuditReport br = svc.reports().batchReport("test_etl");
             assertEquals(0, br.totalBatches());
             assertEquals(0.0, br.errorRate());
         }
@@ -162,7 +162,7 @@ class ReportServiceTest {
         StatusStore store = new FakeStore(rows);
         try (CollectorService svc = new CollectorService(List.of(toon), List.of(), 3600, 1, store)) {
             // unbounded: all 7, nearest-rank percentiles over [100..500,1000,2000]
-            ReportService.BatchAuditReport all = svc.reports().batchReport("test_etl");
+            ReportService.ConsignmentAuditReport all = svc.reports().batchReport("test_etl");
             assertEquals(7, all.totalBatches());
             assertEquals(400, all.p50DurationMs());
             assertEquals(2000, all.p95DurationMs());
@@ -172,7 +172,7 @@ class ReportServiceTest {
             assertEquals("", all.windowTo());
 
             // May only: 5 batches; a date-only `to` covers the whole day
-            ReportService.BatchAuditReport may = svc.reports().batchReport(
+            ReportService.ConsignmentAuditReport may = svc.reports().batchReport(
                     "test_etl", ReportService.Window.of("2026-05-01", "2026-05-31"));
             assertEquals(5, may.totalBatches());
             assertEquals(500, may.maxDurationMs());
@@ -182,12 +182,12 @@ class ReportServiceTest {
             assertEquals("2026-05-31 23:59:59", may.windowTo(), "date-only upper bound widened to end-of-day");
 
             // open-ended lower bound: June onward
-            ReportService.BatchAuditReport june = svc.reports().batchReport(
+            ReportService.ConsignmentAuditReport june = svc.reports().batchReport(
                     "test_etl", ReportService.Window.of("2026-06-01", null));
             assertEquals(2, june.totalBatches());
 
             // window with no rows → zeroed, never throws
-            ReportService.BatchAuditReport none = svc.reports().batchReport(
+            ReportService.ConsignmentAuditReport none = svc.reports().batchReport(
                     "test_etl", ReportService.Window.of("2000-01-01", "2000-12-31"));
             assertEquals(0, none.totalBatches());
             assertEquals(0, none.p95DurationMs());

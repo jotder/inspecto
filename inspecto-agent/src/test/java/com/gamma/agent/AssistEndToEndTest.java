@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.agent.model.FakeModelProvider;
 import com.gamma.agent.kernel.model.ModelRouter;
 import com.gamma.control.ControlApi;
-import com.gamma.etl.BatchEvent;
+import com.gamma.etl.ConsignmentEvent;
 import com.gamma.service.CollectorService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -172,7 +172,7 @@ class AssistEndToEndTest {
             assertEquals(0, json(get(c.port, "/assist/diagnoses").body()).size(),
                     "no failures yet");
 
-            c.svc.eventBus().publish(new BatchEvent("MINI_ETL", "B1", "FAILED", List.of(),
+            c.svc.eventBus().publish(new ConsignmentEvent("MINI_ETL", "B1", "FAILED", List.of(),
                     0, 10L, 1, "schema selector mismatch", "bad.csv", 3));
 
             // Diagnosis runs off-thread; poll the endpoint until it lands.

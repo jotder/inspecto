@@ -1,7 +1,7 @@
 package com.gamma.job;
 
 import com.gamma.pipeline.ComponentStore;
-import com.gamma.etl.BatchEventBus;
+import com.gamma.etl.ConsignmentEventBus;
 import com.gamma.util.Scheduler;
 import com.gamma.signal.Severity;
 import com.gamma.signal.SignalEmitter;
@@ -114,7 +114,7 @@ class ReconRunJobTest {
     @Test
     void reconRunIsRegisteredAsABuiltInType() throws Exception {
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(), new BatchEventBus(), s, null,
+             JobService js = new JobService(List.of(), new ConsignmentEventBus(), s, null,
                      "audit", null, null, "data")) {
             assertTrue(js.jobType("recon.run").isPresent(), "recon.run registered as a built-in Job Type");
             assertEquals("Reconciliation Run", js.jobType("recon.run").get().title());

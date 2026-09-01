@@ -16,7 +16,7 @@ import java.util.List;
 /**
  * Persists <b>run-level audit + lineage</b> for Stage-2 enrichment recomputes — the
  * concern deferred since M0, now that recomputes are orchestrated (event / schedule / CLI).
- * It mirrors the Stage-1 {@link com.gamma.etl.BatchAuditWriter} idea (append-only CSVs plus
+ * It mirrors the Stage-1 {@link com.gamma.etl.ConsignmentAuditWriter} idea (append-only CSVs plus
  * a durable {@link CommitLog}) but at the enrichment grain: one <em>run</em> per recompute,
  * and one lineage row per written output partition file.
  *

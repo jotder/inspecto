@@ -1,11 +1,11 @@
 package com.gamma.job;
 
-import com.gamma.etl.BatchEvent;
+import com.gamma.etl.ConsignmentEvent;
 import com.gamma.pipeline.PipelineEdge;
 import com.gamma.pipeline.PipelineGraph;
 import com.gamma.pipeline.PipelineNode;
 import com.gamma.pipeline.PipelineStore;
-import com.gamma.etl.BatchEventBus;
+import com.gamma.etl.ConsignmentEventBus;
 import com.gamma.util.Scheduler;
 import com.gamma.util.DuckDbUtil;
 import org.junit.jupiter.api.Test;
@@ -64,7 +64,7 @@ class JobServiceTest {
         JobConfig hb = maintenance("hb", null, null, Map.of("task", "heartbeat"));
         Path auditDir = dir.resolve("jobs_audit");
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(hb), new BatchEventBus(), s, null, auditDir.toString())) {
+             JobService js = new JobService(List.of(hb), new ConsignmentEventBus(), s, null, auditDir.toString())) {
             js.start();
             assertTrue(js.trigger("hb"), "known job triggers");
             JobRun run = await(() -> js.lastRunOf("hb").orElse(null));
@@ -82,7 +82,7 @@ class JobServiceTest {
         // T32 Phase C — an operator/channel passed to trigger(name, actor) is recorded as 'manual:<actor>'.
         JobConfig hb = maintenance("hb", null, null, Map.of("task", "heartbeat"));
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(hb), new BatchEventBus(), s, null, dir.resolve("audit").toString())) {
+             JobService js = new JobService(List.of(hb), new ConsignmentEventBus(), s, null, dir.resolve("audit").toString())) {
             js.start();
             assertTrue(js.trigger("hb", "alice"));
             JobRun run = await(() -> js.lastRunOf("hb").orElse(null));
@@ -95,7 +95,7 @@ class JobServiceTest {
         // W5: triggerRun returns the runId synchronously; runById polls it RUNNING → terminal.
         JobConfig hb = maintenance("hb", null, null, Map.of("task", "heartbeat"));
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(hb), new BatchEventBus(), s, null, dir.resolve("audit").toString())) {
+             JobService js = new JobService(List.of(hb), new ConsignmentEventBus(), s, null, dir.resolve("audit").toString())) {
             js.start();
             var runId = js.triggerRun("hb", null);
             assertTrue(runId.isPresent(), "a known job returns its runId");
@@ -113,7 +113,7 @@ class JobServiceTest {
     @Test
     void triggerRunAndPollAreEmptyForUnknown(@TempDir Path dir) throws Exception {
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(), new BatchEventBus(), s, null, dir.resolve("audit").toString())) {
+             JobService js = new JobService(List.of(), new ConsignmentEventBus(), s, null, dir.resolve("audit").toString())) {
             js.start();
             assertTrue(js.triggerRun("ghost", null).isEmpty(), "no such job → no runId");
             assertTrue(js.runById("nope-1").isEmpty(), "unknown runId → empty");
@@ -127,7 +127,7 @@ class JobServiceTest {
         // throwing inside the job — the resolver gates the run path for every Job Type.
         JobConfig noConfig = new JobConfig("needs_config", JobType.ENRICH, null, null, true, false, Map.of());
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(noConfig), new BatchEventBus(), s, null,
+             JobService js = new JobService(List.of(noConfig), new ConsignmentEventBus(), s, null,
                      dir.resolve("audit").toString())) {
             js.start();
             assertTrue(js.trigger("needs_config"));
@@ -143,7 +143,7 @@ class JobServiceTest {
         // when the manual trigger supplies it as an explicit arg — proving trigger args reach the run path.
         JobConfig noConfig = new JobConfig("needs_config", JobType.ENRICH, null, null, true, false, Map.of());
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(noConfig), new BatchEventBus(), s, null,
+             JobService js = new JobService(List.of(noConfig), new ConsignmentEventBus(), s, null,
                      dir.resolve("audit").toString())) {
             js.start();
             assertTrue(js.triggerRun("needs_config", null,
@@ -164,7 +164,7 @@ class JobServiceTest {
         Path jar = buildPackJar(dir, packsDir.resolve("greet-1.jar"), "acme.greet", "GreetType", "acme-greet");
         System.setProperty("jobs.packs.dir", packsDir.toString());
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(), new BatchEventBus(), s, null,
+             JobService js = new JobService(List.of(), new ConsignmentEventBus(), s, null,
                      dir.resolve("audit").toString())) {
             js.start();
             js.upsertJob(new JobConfig("g1", "acme.greet", null, null, true, false, Map.of(), null, null));
@@ -205,7 +205,7 @@ class JobServiceTest {
         // memory_limit=2GB — an unbounded run count makes any per-instance memory cap meaningless.
         JobConfig hb = maintenance("hb", null, null, Map.of("task", "heartbeat"));
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(hb), new BatchEventBus(), s, null, dir.resolve("audit").toString())) {
+             JobService js = new JobService(List.of(hb), new ConsignmentEventBus(), s, null, dir.resolve("audit").toString())) {
             assertEquals(JobService.DEFAULT_MAX_CONCURRENT_RUNS, js.availableRunPermits(),
                 "no -Djobs.maxConcurrentRuns set → the on-by-default bound, not unbounded");
             assertEquals(4, js.maxConcurrentRuns(), "the D11 default is 4");
@@ -218,7 +218,7 @@ class JobServiceTest {
         // wants no ceiling sets 0, and -1 (not a permit count) is how that reads back.
         System.setProperty("jobs.maxConcurrentRuns", "0");
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(), new BatchEventBus(), s, null, dir.resolve("audit").toString())) {
+             JobService js = new JobService(List.of(), new ConsignmentEventBus(), s, null, dir.resolve("audit").toString())) {
             assertEquals(-1, js.availableRunPermits(), "0 → unbounded");
             assertEquals(0, js.maxConcurrentRuns());
         } finally {
@@ -230,7 +230,7 @@ class JobServiceTest {
     void concurrencyBoundIsHotResizableAndDrainsOnShrink(@TempDir Path dir) throws Exception {
         // The settings PUT installs a new ceiling live (no restart), mirroring ConcurrencyBroker.setSystemCap.
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(), new BatchEventBus(), s, null, dir.resolve("audit").toString())) {
+             JobService js = new JobService(List.of(), new ConsignmentEventBus(), s, null, dir.resolve("audit").toString())) {
             assertEquals(4, js.availableRunPermits());
             js.setMaxConcurrentRuns(8);
             assertEquals(8, js.availableRunPermits(), "a grow adds permits");
@@ -283,7 +283,7 @@ class JobServiceTest {
         try {
             JobService.installMaxConcurrentRuns(1);
             try (Scheduler s = new Scheduler();
-                 JobService js = new JobService(List.of(), new BatchEventBus(), s, null, dir.resolve("a").toString())) {
+                 JobService js = new JobService(List.of(), new ConsignmentEventBus(), s, null, dir.resolve("a").toString())) {
                 assertEquals(1, js.maxConcurrentRuns(), "a new instance starts on the installed bound");
             }
             JobService.installMaxConcurrentRuns(null);
@@ -304,7 +304,7 @@ class JobServiceTest {
         System.setProperty("jobs.packs.dir", packsDir.toString());
         System.setProperty("jobs.maxConcurrentRuns", "1");
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(), new BatchEventBus(), s, null, dir.resolve("audit").toString())) {
+             JobService js = new JobService(List.of(), new ConsignmentEventBus(), s, null, dir.resolve("audit").toString())) {
             js.start();
             assertEquals(1, js.availableRunPermits(), "bound of 1 → one free permit while idle");
             js.upsertJob(new JobConfig("s1", "acme.sleep", null, null, true, false, Map.of(), null, null));
@@ -419,7 +419,7 @@ class JobServiceTest {
         JobConfig clean = maintenance("clean", null, null,
                 Map.of("task", "cleanup", "dir", target.toString(), "retention_days", "1", "glob", "*.csv"));
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(clean), new BatchEventBus(), s, null,
+             JobService js = new JobService(List.of(clean), new ConsignmentEventBus(), s, null,
                      dir.resolve("audit").toString())) {
             js.start();
             js.trigger("clean");
@@ -435,7 +435,7 @@ class JobServiceTest {
     void cronTriggerFires(@TempDir Path dir) throws Exception {
         JobConfig tick = maintenance("tick", "* * * * * *", null, Map.of("task", "heartbeat"));
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(tick), new BatchEventBus(), s, null,
+             JobService js = new JobService(List.of(tick), new ConsignmentEventBus(), s, null,
                      dir.resolve("audit").toString())) {
             js.start();
             // An every-second cron can re-fire while the first run is still in flight; that
@@ -450,12 +450,12 @@ class JobServiceTest {
 
     @Test
     void eventTriggerFiresOnUpstreamCommit(@TempDir Path dir) throws Exception {
-        BatchEventBus bus = new BatchEventBus();
+        ConsignmentEventBus bus = new ConsignmentEventBus();
         JobConfig ev = maintenance("ev", null, "UPSTREAM", Map.of("task", "heartbeat"));
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(List.of(ev), bus, s, null, dir.resolve("audit").toString())) {
             js.start();
-            bus.publish(new BatchEvent("UPSTREAM", "b1", "SUCCESS", List.of("p=1"), 1L, 1L, 0));
+            bus.publish(new ConsignmentEvent("UPSTREAM", "b1", "SUCCESS", List.of("p=1"), 1L, 1L, 0));
             JobRun run = await(() -> js.lastRunOf("ev").orElse(null));
             assertTrue(run.trigger().startsWith("event:UPSTREAM"), "event trigger recorded: " + run.trigger());
         }
@@ -465,7 +465,7 @@ class JobServiceTest {
     void listingReportsScheduleAndNextFire(@TempDir Path dir) throws Exception {
         JobConfig nf = maintenance("nf", "0 2 * * *", null, Map.of("task", "heartbeat"));
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(nf), new BatchEventBus(), s, null,
+             JobService js = new JobService(List.of(nf), new ConsignmentEventBus(), s, null,
                      dir.resolve("audit").toString())) {
             js.start();
             List<JobService.JobView> views = js.jobs();
@@ -481,7 +481,7 @@ class JobServiceTest {
     @Test
     void unknownJobDoesNotTrigger(@TempDir Path dir) throws Exception {
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(), new BatchEventBus(), s, null,
+             JobService js = new JobService(List.of(), new ConsignmentEventBus(), s, null,
                      dir.resolve("audit").toString())) {
             js.start();
             assertFalse(js.trigger("nope"));
@@ -494,7 +494,7 @@ class JobServiceTest {
         JobConfig off = new JobConfig("off", JobType.MAINTENANCE, "* * * * * *", null, false, false,
                 Map.of("task", "heartbeat"));
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(off), new BatchEventBus(), s, null,
+             JobService js = new JobService(List.of(off), new ConsignmentEventBus(), s, null,
                      dir.resolve("audit").toString())) {
             js.start();
             assertFalse(js.has("off"), "disabled job is not registered");
@@ -522,7 +522,7 @@ class JobServiceTest {
         JobConfig nightly = new JobConfig("nightly", JobType.MAINTENANCE, "0 0 * * *", null, true, true,
                 Map.of("task", "heartbeat"));
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(nightly), new BatchEventBus(), s, null, auditDir.toString())) {
+             JobService js = new JobService(List.of(nightly), new ConsignmentEventBus(), s, null, auditDir.toString())) {
             js.start();   // a daily fire has elapsed since 2000 → catch-up runs once
             JobRun run = await(() -> js.lastRunOf("nightly").orElse(null));
             assertEquals("catch-up", run.trigger());
@@ -538,7 +538,7 @@ class JobServiceTest {
         java.util.concurrent.atomic.AtomicReference<java.util.Collection<String>> asked =
                 new java.util.concurrent.atomic.AtomicReference<>();
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(del), new BatchEventBus(), s, null,
+             JobService js = new JobService(List.of(del), new ConsignmentEventBus(), s, null,
                      dir.resolve("audit").toString())) {
             js.deletionGuard(stores -> { asked.set(stores); return List.of(); });
             js.start();
@@ -554,7 +554,7 @@ class JobServiceTest {
         JobConfig hb = maintenance("hb", null, null, Map.of("task", "heartbeat"));
         DbJobRunStore store = DbJobRunStore.open("jdbc:duckdb:");   // in-memory; closed by js.close()
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(hb), new BatchEventBus(), s, null,
+             JobService js = new JobService(List.of(hb), new ConsignmentEventBus(), s, null,
                      dir.resolve("audit").toString(), store)) {
             js.start();
             assertSame(store, js.runStore().orElseThrow(), "the store is exposed for the API");
@@ -572,7 +572,7 @@ class JobServiceTest {
         JobConfig fj = new JobConfig("fj", JobType.PIPELINE, null, null, true, false, Map.of("flow", "some_flow"));
         com.gamma.pipeline.PipelineStore store = new com.gamma.pipeline.PipelineStore(dir.resolve("flows"));
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(fj), new BatchEventBus(), s, null,
+             JobService js = new JobService(List.of(fj), new ConsignmentEventBus(), s, null,
                      dir.resolve("audit").toString(), null, store, dir.resolve("data").toString())) {
             js.start();
             assertTrue(js.has("fj"), "a flow job is built when a flow store is configured");
@@ -586,7 +586,7 @@ class JobServiceTest {
         // the 5-arg constructor leaves the flow store null → building a flow job must fail closed
         try (Scheduler s = new Scheduler()) {
             assertThrows(IllegalStateException.class, () ->
-                    new JobService(List.of(fj), new BatchEventBus(), s, null, dir.resolve("audit").toString()));
+                    new JobService(List.of(fj), new ConsignmentEventBus(), s, null, dir.resolve("audit").toString()));
         }
     }
 
@@ -600,7 +600,7 @@ class JobServiceTest {
 
         JobConfig fj = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
                 Map.of("flow", "evt_rollup", "data_dir", dataDir));
-        BatchEventBus bus = new BatchEventBus();
+        ConsignmentEventBus bus = new ConsignmentEventBus();
         AtomicReference<Set<String>> midRun = new AtomicReference<>();
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(List.of(fj), bus, s, null,
@@ -639,7 +639,7 @@ class JobServiceTest {
                 Map.of("flow", "evt_rollup", "data_dir", dataDir, "batch_id", "b1"));
         try (var registry = com.gamma.consignment.DbConsignmentOutputStore.open("jdbc:duckdb:");
              Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(fj), new BatchEventBus(), s, null,
+             JobService js = new JobService(List.of(fj), new ConsignmentEventBus(), s, null,
                      dir.resolve("audit").toString(), null, store, dataDir)) {
             com.gamma.consignment.ConsignmentOutputStores.use(registry);
             js.start();
@@ -678,7 +678,7 @@ class JobServiceTest {
         PipelineStore store = new PipelineStore(dir.resolve("flows"));
         writeRollupFlow(store, "evt_rollup");
 
-        BatchEventBus bus = new BatchEventBus();
+        ConsignmentEventBus bus = new ConsignmentEventBus();
         AtomicReference<Set<String>> midRun = new AtomicReference<>();
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(List.of(), bus, s, null,
@@ -705,7 +705,7 @@ class JobServiceTest {
     void adhocFlowRunWithoutAFlowStoreFailsClosed(@TempDir Path dir) throws Exception {
         // the 5-arg constructor leaves the flow store null → the ad-hoc path must fail closed too
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(), new BatchEventBus(), s, null, dir.resolve("audit").toString())) {
+             JobService js = new JobService(List.of(), new ConsignmentEventBus(), s, null, dir.resolve("audit").toString())) {
             js.start();
             assertThrows(IllegalStateException.class, () -> js.triggerPipelineRun("ghost", null));
         }
@@ -723,7 +723,7 @@ class JobServiceTest {
         JobConfig fj = new JobConfig("ticker", JobType.PIPELINE, "* * * * * *", null, true, false,
                 Map.of("flow", "evt_rollup", "data_dir", dataDir));
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(fj), new BatchEventBus(), s, null,
+             JobService js = new JobService(List.of(fj), new ConsignmentEventBus(), s, null,
                      dir.resolve("audit").toString(), null, store, dataDir)) {
             js.start();
             // an every-second cron can re-fire while in flight (→ SKIPPED); assert the first SUCCESS.
@@ -744,12 +744,12 @@ class JobServiceTest {
         writeRollupFlow(store, "evt_rollup");
         JobConfig fj = new JobConfig("rollup_job", JobType.PIPELINE, null, "events_etl", true, false,
                 Map.of("flow", "evt_rollup", "data_dir", dataDir));
-        BatchEventBus bus = new BatchEventBus();
+        ConsignmentEventBus bus = new ConsignmentEventBus();
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(List.of(fj), bus, s, null,
                      dir.resolve("audit").toString(), null, store, dataDir)) {
             js.start();
-            bus.publish(new BatchEvent("events_etl", "b1", "SUCCESS", List.of("p=1"), 1L, 1L, 0));
+            bus.publish(new ConsignmentEvent("events_etl", "b1", "SUCCESS", List.of("p=1"), 1L, 1L, 0));
             JobRun run = await(() -> js.lastRunOf("rollup_job").orElse(null));
             assertEquals("SUCCESS", run.status(), run.message());
             assertEquals("pipeline", run.type());
@@ -767,12 +767,12 @@ class JobServiceTest {
         JobConfig greeter = new JobConfig("greeter", "sample.hello", null, "UPSTREAM", true, false,
                 Map.of("raise_alert", "false"), null, null, Map.of(),
                 Map.of("audience", "$signal.batchId"));
-        BatchEventBus bus = new BatchEventBus();
+        ConsignmentEventBus bus = new ConsignmentEventBus();
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(List.of(greeter), bus, s, null,
                      dir.resolve("audit").toString())) {
             js.start();
-            bus.publish(new BatchEvent("UPSTREAM", "b_2026_0042", "SUCCESS", List.of("p=1"), 1L, 1L, 0));
+            bus.publish(new ConsignmentEvent("UPSTREAM", "b_2026_0042", "SUCCESS", List.of("p=1"), 1L, 1L, 0));
             JobRun run = await(() -> js.lastRunOf("greeter").orElse(null));
             assertEquals("SUCCESS", run.status(), run.message());
             assertTrue(run.trigger().startsWith("event:UPSTREAM"), run.trigger());
@@ -785,15 +785,15 @@ class JobServiceTest {
     void aCommaListOnPipelineFiresOnAnyUpstreamByDefault(@TempDir Path dir) throws Exception {
         // multiplicity Part B residual (a): several upstreams, default gate = any → each commit fires.
         JobConfig j = maintenance("merger", null, "a_etl, b_etl", Map.of("task", "heartbeat"));
-        BatchEventBus bus = new BatchEventBus();
+        ConsignmentEventBus bus = new ConsignmentEventBus();
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(List.of(j), bus, s, null,
                      dir.resolve("audit").toString(), null, null, null)) {
             js.start();
-            bus.publish(new BatchEvent("a_etl", "b1", "SUCCESS", List.of(), 1L, 1L, 0));
+            bus.publish(new ConsignmentEvent("a_etl", "b1", "SUCCESS", List.of(), 1L, 1L, 0));
             JobRun first = await(() -> js.lastRunOf("merger").orElse(null));
             assertTrue(first.trigger().startsWith("event:a_etl"), first.trigger());
-            bus.publish(new BatchEvent("b_etl", "b2", "SUCCESS", List.of(), 1L, 1L, 0));
+            bus.publish(new ConsignmentEvent("b_etl", "b2", "SUCCESS", List.of(), 1L, 1L, 0));
             JobRun second = await(() -> js.runsFor("merger").stream()
                     .filter(r -> r.trigger().startsWith("event:b_etl")).findFirst().orElse(null));
             assertEquals("SUCCESS", second.status());
@@ -806,22 +806,22 @@ class JobServiceTest {
         // so the next cycle needs the full roster again.
         JobConfig j = maintenance("merger", null, "a_etl, b_etl",
                 Map.of("task", "heartbeat", "on_pipeline_gate", "all"));
-        BatchEventBus bus = new BatchEventBus();
+        ConsignmentEventBus bus = new ConsignmentEventBus();
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(List.of(j), bus, s, null,
                      dir.resolve("audit").toString(), null, null, null)) {
             js.start();
-            bus.publish(new BatchEvent("a_etl", "b1", "SUCCESS", List.of(), 1L, 1L, 0));
-            bus.publish(new BatchEvent("a_etl", "b2", "SUCCESS", List.of(), 1L, 1L, 0));   // same source again
+            bus.publish(new ConsignmentEvent("a_etl", "b1", "SUCCESS", List.of(), 1L, 1L, 0));
+            bus.publish(new ConsignmentEvent("a_etl", "b2", "SUCCESS", List.of(), 1L, 1L, 0));   // same source again
             Thread.sleep(300);
             assertTrue(js.lastRunOf("merger").isEmpty(), "half the roster must not fire the job");
-            bus.publish(new BatchEvent("b_etl", "b3", "SUCCESS", List.of(), 1L, 1L, 0));
+            bus.publish(new ConsignmentEvent("b_etl", "b3", "SUCCESS", List.of(), 1L, 1L, 0));
             JobRun run = await(() -> js.lastRunOf("merger").orElse(null));
             assertEquals("SUCCESS", run.status(), run.message());
             assertTrue(run.trigger().startsWith("event:b_etl"), "the completing commit fires it: " + run.trigger());
 
             // re-armed: one more a_etl alone must not fire a second run
-            bus.publish(new BatchEvent("a_etl", "b4", "SUCCESS", List.of(), 1L, 1L, 0));
+            bus.publish(new ConsignmentEvent("a_etl", "b4", "SUCCESS", List.of(), 1L, 1L, 0));
             Thread.sleep(300);
             assertEquals(1, js.runsFor("merger").stream()
                     .filter(r -> r.trigger().startsWith("event:")).count(), "gate re-arms after firing");
@@ -830,7 +830,7 @@ class JobServiceTest {
 
     @Test
     void aFlowJobSuccessChainsADownstreamJob(@TempDir Path dir) throws Exception {
-        // chaining OUT of a flow: PipelineJobRunner publishes a BatchEvent(jobName) on success, so a
+        // chaining OUT of a flow: PipelineJobRunner publishes a ConsignmentEvent(jobName) on success, so a
         // downstream on_pipeline job fires — the flow job is a first-class upstream in the event graph.
         String dataDir = dir.resolve("data").toString();
         seedParquet(dataDir, "events", "(1,150),(2,50),(3,200)");
@@ -839,7 +839,7 @@ class JobServiceTest {
         JobConfig flowJob = new JobConfig("rollup_job", JobType.PIPELINE, null, null, true, false,
                 Map.of("flow", "evt_rollup", "data_dir", dataDir));
         JobConfig downstream = maintenance("after_rollup", null, "rollup_job", Map.of("task", "heartbeat"));
-        BatchEventBus bus = new BatchEventBus();
+        ConsignmentEventBus bus = new ConsignmentEventBus();
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(List.of(flowJob, downstream), bus, s, null,
                      dir.resolve("audit").toString(), null, store, dataDir)) {
@@ -862,7 +862,7 @@ class JobServiceTest {
                 Map.of("flow", "evt_rollup", "data_dir", dataDir));
         DbJobRunStore runStore = DbJobRunStore.open("jdbc:duckdb:");   // in-memory; closed by js.close()
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(fj), new BatchEventBus(), s, null,
+             JobService js = new JobService(List.of(fj), new ConsignmentEventBus(), s, null,
                      dir.resolve("audit").toString(), runStore, store, dataDir)) {
             js.start();
             js.trigger("nightly_rollup");
@@ -906,7 +906,7 @@ class JobServiceTest {
         JobConfig fresh  = new JobConfig("fresh", JobType.MAINTENANCE, "0 0 * * *", null, true, true,
                 Map.of("task", "heartbeat"));   // catch_up:true but no prior run in the audit → no baseline
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(noFlag, fresh), new BatchEventBus(), s, null, auditDir.toString())) {
+             JobService js = new JobService(List.of(noFlag, fresh), new ConsignmentEventBus(), s, null, auditDir.toString())) {
             js.start();
             Thread.sleep(300);   // give any erroneous catch-up submit time to surface
             assertTrue(js.runsFor("noflag").isEmpty(), "catch_up:false does not catch up");

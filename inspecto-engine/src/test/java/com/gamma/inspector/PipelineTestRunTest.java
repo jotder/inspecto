@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Step 5a — a bounded test run over real inbox files must parse through the real ingest path and
  * leave <b>zero</b> production side effects.
  *
- * <p>The contrast to hold in mind: {@code BatchProcessorTest.consolidatesGoodFilesQuarantinesBadOne}
+ * <p>The contrast to hold in mind: {@code ConsignmentIngestorTest.consolidatesGoodFilesQuarantinesBadOne}
  * asserts that a production run <em>consumes</em> the inbox — {@code assertFalse(Files.exists(a))},
  * markers written, ledgers written, the bad file moved to quarantine. <b>Every one of those
  * assertions is inverted here.</b> If a change makes this suite start agreeing with that one, the

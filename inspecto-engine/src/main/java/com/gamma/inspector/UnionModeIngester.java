@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Map;
 import com.gamma.consignment.EventTimeBounds;
 
-import static com.gamma.inspector.BatchIngestStrategy.*;
+import static com.gamma.inspector.ConsignmentIngestStrategy.*;
 
 /**
  * Union-mode execution for the streaming plugin-ingester path. Each batch member's records are
@@ -24,23 +24,23 @@ import static com.gamma.inspector.BatchIngestStrategy.*;
  * written → lineage-counted once for the whole batch. This amortises the fixed per-batch cost
  * across many small files and consolidates output rather than producing per-file fragments.
  *
- * <p>Selected by {@link StreamingPluginBatchStrategy} when no batch member meets
+ * <p>Selected by {@link StreamingPluginIngestStrategy} when no batch member meets
  * {@code processing.streaming.large_file_bytes}.
  */
 final class UnionModeIngester {
 
-    private static final Logger log = LoggerFactory.getLogger(StreamingPluginBatchStrategy.class);
+    private static final Logger log = LoggerFactory.getLogger(StreamingPluginIngestStrategy.class);
 
     private UnionModeIngester() {}
 
-    static IngestOutcome run(Batch batch, PipelineConfig cfg) {
+    static IngestOutcome run(Consignment batch, PipelineConfig cfg) {
         LocalDateTime batchStart = LocalDateTime.now();
         String batchStatus = "SUCCESS";
         String batchError  = "";
 
         StreamingFileIngester ingester = instantiate(cfg);
 
-        List<Batch.Member> survivors    = new ArrayList<>();
+        List<Consignment.Member> survivors    = new ArrayList<>();
         List<MemberAudit>  memberAudits = new ArrayList<>();
         List<PartitionOutput> allOutputs = new ArrayList<>();
         List<LineageRow>      allLineage = new ArrayList<>();
@@ -60,7 +60,7 @@ final class UnionModeIngester {
 
                 // ── ingest every member into its own raw tables ──────────────────
                 int memberIdx = 0;
-                for (Batch.Member m : batch.members()) {
+                for (Consignment.Member m : batch.members()) {
                     IngestProgress.track(cfg.identity().pipelineName(), batch.batchId(),
                             m.file().getName(), ++memberIdx, batch.members().size());
                     LocalDateTime mStart = LocalDateTime.now();
@@ -127,7 +127,7 @@ final class UnionModeIngester {
                         // through, so the batch is materialised once (transformed_<KEY>)
                         // instead of twice (raw_<KEY> + transformed_<KEY>) — peak scratch
                         // drops by ~1× the segment's data and the redundant copy is gone.
-                        // Mirrors the CSV streaming-UNION path (CsvBatchStrategy). The member
+                        // Mirrors the CSV streaming-UNION path (CsvIngestStrategy). The member
                         // tables must outlive the transform (the view reads them), so they're
                         // dropped only after the write/lineage below.
                         String unionTable = "raw_" + segKey;
@@ -166,7 +166,7 @@ final class UnionModeIngester {
         } catch (Exception e) {
             batchStatus = "FAILED";
             batchError  = msg(e);
-            log.error("Batch {} failed during streaming (union) processing", batch.batchId(), e);
+            log.error("Consignment {} failed during streaming (union) processing", batch.batchId(), e);
         } finally {
             if (tempDb != null) DuckDbUtil.deleteTempDb(tempDb);
         }

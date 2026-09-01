@@ -96,7 +96,7 @@ public record JobConfig(String name, String type, String cron, String onPipeline
 
     /**
      * The upstream name(s) in {@code on_pipeline} — one, or several comma-separated. Empty when
-     * {@link #hasEvent()} is false. Matching against {@code BatchEvent.pipeline()} stays the caller's
+     * {@link #hasEvent()} is false. Matching against {@code ConsignmentEvent.pipeline()} stays the caller's
      * concern, exactly as with the scalar accessor.
      */
     public java.util.List<String> onPipelines() {

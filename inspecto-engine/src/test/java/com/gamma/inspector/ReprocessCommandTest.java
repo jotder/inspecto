@@ -3,7 +3,7 @@ package com.gamma.inspector;
 import com.gamma.consignment.ConsignmentOutput;
 import com.gamma.consignment.ConsignmentOutputStores;
 import com.gamma.consignment.DbConsignmentOutputStore;
-import com.gamma.etl.BatchManifest;
+import com.gamma.etl.ConsignmentManifest;
 import com.gamma.etl.ManifestStore;
 import com.gamma.etl.PipelineConfig;
 import org.junit.jupiter.api.Test;
@@ -77,7 +77,7 @@ class ReprocessCommandTest {
             batchId = w.filter(p -> p.toString().endsWith(".json")).findFirst().orElseThrow()
                     .getFileName().toString().replace(".json", "");
         }
-        BatchManifest m = ManifestStore.read(cfg.dirs().manifestsDir(), batchId);
+        ConsignmentManifest m = ManifestStore.read(cfg.dirs().manifestsDir(), batchId);
         assertFalse(m.outputs.isEmpty(), "precondition: the run produced outputs to compact away");
 
         try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
@@ -122,7 +122,7 @@ class ReprocessCommandTest {
             batchId = w.filter(p -> p.toString().endsWith(".json")).findFirst().orElseThrow()
                     .getFileName().toString().replace(".json", "");
         }
-        BatchManifest m = ManifestStore.read(cfg.dirs().manifestsDir(), batchId);
+        ConsignmentManifest m = ManifestStore.read(cfg.dirs().manifestsDir(), batchId);
 
         try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
             store.record(m.outputs.stream()

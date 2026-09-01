@@ -411,10 +411,10 @@ class DelimitedGrammarTest {
         return out;
     }
 
-    private static Batch batch(PipelineConfig cfg, File f) {
+    private static Consignment batch(PipelineConfig cfg, File f) {
         SchemaSelector.Selection sel = new SchemaSelector.Selection(cfg.schemas().single(), null);
-        Batch.Member m = new Batch.Member(f, 0, f.length(), sel);
-        return new Batch("b1", "t", null, List.of(m));
+        Consignment.Member m = new Consignment.Member(f, 0, f.length(), sel);
+        return new Consignment("b1", "t", null, List.of(m));
     }
 
     private static Connection open() throws Exception {

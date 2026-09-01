@@ -119,7 +119,7 @@ class MaintenanceLibraryTest {
         store.add(new com.gamma.notify.Notification("n-new", now, "ops", null, null, "new", "b",
                 com.gamma.notify.NotificationState.UNREAD, null, null));
         try (com.gamma.util.Scheduler s = new com.gamma.util.Scheduler();
-             JobService js = new JobService(List.of(), new com.gamma.etl.BatchEventBus(), s, null, audit.toString())) {
+             JobService js = new JobService(List.of(), new com.gamma.etl.ConsignmentEventBus(), s, null, audit.toString())) {
             js.notificationStore(store);
             JobConfig cfg = job(Map.of("task", "notification_prune", "retention_days", "30"));
             // dry-run counts the aged entry but removes nothing
@@ -151,7 +151,7 @@ class MaintenanceLibraryTest {
         store.add(new com.gamma.notify.DeliveryReceipt("dold", "n-1", null, "a@x", old, null, null, false));
         store.add(new com.gamma.notify.DeliveryReceipt("dnew", "n-2", null, "b@x", now, null, null, false));
         try (com.gamma.util.Scheduler s = new com.gamma.util.Scheduler();
-             JobService js = new JobService(List.of(), new com.gamma.etl.BatchEventBus(), s, null, audit.toString())) {
+             JobService js = new JobService(List.of(), new com.gamma.etl.ConsignmentEventBus(), s, null, audit.toString())) {
             js.deliveryReceiptStore(store);
             JobConfig cfg = job(Map.of("task", "receipt_prune", "retention_days", "30"));
             JobResult dry = new MaintenanceJob(cfg, null, audit.toString(), null, js).run(dryCtx(audit));
@@ -197,7 +197,7 @@ class MaintenanceLibraryTest {
         String expired = archivedDaysAgo(ops, "expired", 400);
         String recent = archivedDaysAgo(ops, "recent", 10);
         try (com.gamma.util.Scheduler s = new com.gamma.util.Scheduler();
-             JobService js = new JobService(List.of(), new com.gamma.etl.BatchEventBus(), s, null, audit.toString())) {
+             JobService js = new JobService(List.of(), new com.gamma.etl.ConsignmentEventBus(), s, null, audit.toString())) {
             js.objects(ops.objects);
             JobConfig cfg = job(Map.of("task", "incident_purge", "retention_days", "90"));
 
@@ -224,7 +224,7 @@ class MaintenanceLibraryTest {
         ops.store.update(ops.store.get(held).orElseThrow().withAttributes(
                 Map.of(com.gamma.ops.ObjectService.ATTR_LEGAL_HOLD, "DPA-2026-14"), System.currentTimeMillis()));
         try (com.gamma.util.Scheduler s = new com.gamma.util.Scheduler();
-             JobService js = new JobService(List.of(), new com.gamma.etl.BatchEventBus(), s, null, audit.toString())) {
+             JobService js = new JobService(List.of(), new com.gamma.etl.ConsignmentEventBus(), s, null, audit.toString())) {
             js.objects(ops.objects);
             JobConfig cfg = job(Map.of("task", "incident_purge", "retention_days", "90"));
 
@@ -620,7 +620,7 @@ class MaintenanceLibraryTest {
         JobConfig auditJob  = new JobConfig("hygiene", JobType.MAINTENANCE, null, null, true, false, Map.of("task", "scheduler_audit"));
         try (com.gamma.util.Scheduler s = new com.gamma.util.Scheduler();
              JobService js = new JobService(List.of(disabled, twinA, twinB, orphanPipe, orphanSig, auditJob),
-                     new com.gamma.etl.BatchEventBus(), s, null, audit.toString())) {
+                     new com.gamma.etl.ConsignmentEventBus(), s, null, audit.toString())) {
             js.knownPipelines(() -> java.util.Set.of("real_pipeline"));
             String runId = js.triggerRun("hygiene", null).orElseThrow();
             JobRun run = await(() -> js.lastRunOf("hygiene").orElse(null));
@@ -648,7 +648,7 @@ class MaintenanceLibraryTest {
         JobConfig auditJob = new JobConfig("hygiene", JobType.MAINTENANCE, null, null, true, false, Map.of("task", "scheduler_audit"));
         try (com.gamma.util.Scheduler s = new com.gamma.util.Scheduler();
              JobService js = new JobService(List.of(covered, offShaper, auditJob),
-                     new com.gamma.etl.BatchEventBus(), s, null, audit.toString())) {
+                     new com.gamma.etl.ConsignmentEventBus(), s, null, audit.toString())) {
             js.pipelineOutputStores(() -> Map.of(
                     "covered", "covered_out",
                     "orphaned", "orphan_store",
@@ -675,7 +675,7 @@ class MaintenanceLibraryTest {
         JobConfig auditJob = new JobConfig("hygiene", JobType.MAINTENANCE, null, null, true, false, Map.of("task", "scheduler_audit"));
         try (com.gamma.util.Scheduler s = new com.gamma.util.Scheduler();
              JobService js = new JobService(List.of(ok, listener, auditJob),
-                     new com.gamma.etl.BatchEventBus(), s, null, audit.toString())) {
+                     new com.gamma.etl.ConsignmentEventBus(), s, null, audit.toString())) {
             js.knownPipelines(() -> java.util.Set.of());
             js.triggerRun("hygiene", null).orElseThrow();
             JobRun run = await(() -> js.lastRunOf("hygiene").orElse(null));
@@ -960,7 +960,7 @@ class MaintenanceLibraryTest {
         DuckDbUtil.loadDriver();
         try (DbJobRunStore runStore = DbJobRunStore.open("jdbc:duckdb:");
              com.gamma.util.Scheduler s = new com.gamma.util.Scheduler();
-             JobService js = new JobService(List.of(), new com.gamma.etl.BatchEventBus(), s, null,
+             JobService js = new JobService(List.of(), new com.gamma.etl.ConsignmentEventBus(), s, null,
                      audit.toString(), runStore)) {
             JobResult r = new MaintenanceJob(job(Map.of("task", "db_maintenance")),
                     null, null, runStore, js).run();

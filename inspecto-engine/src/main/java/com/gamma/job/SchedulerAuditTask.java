@@ -57,7 +57,7 @@ final class SchedulerAuditTask {
             for (JobConfig c : all) {
                 if (!c.enabled() || !c.hasEvent()) continue;
                 for (String up : c.onPipelines()) {             // on_pipeline may be a comma list
-                    String target = up.toLowerCase();           // BatchEvent.pipeline() is lowercased
+                    String target = up.toLowerCase();           // ConsignmentEvent.pipeline() is lowercased
                     if (!pipelines.contains(target) && !jobNames.contains(target))
                         findings.add("orphan trigger: job '" + c.name() + "' waits on unknown pipeline '"
                                 + up + "'");

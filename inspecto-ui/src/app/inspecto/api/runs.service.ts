@@ -7,7 +7,7 @@ import {
     DrainResult,
     RunResult,
     RunView,
-    BatchAuditReport,
+    ConsignmentAuditReport,
     ReportWindow,
     InboxStatus,
     RejectedRows,
@@ -119,8 +119,8 @@ export class RunsService {
     pending(name: string): Observable<InboxStatus> {
         return this.http.get<InboxStatus>(apiUrl(`/runs/${encodeURIComponent(name)}/pending`));
     }
-    report(name: string, window?: ReportWindow): Observable<BatchAuditReport> {
-        return this.http.get<BatchAuditReport>(apiUrl(`/runs/${encodeURIComponent(name)}/report`), {
+    report(name: string, window?: ReportWindow): Observable<ConsignmentAuditReport> {
+        return this.http.get<ConsignmentAuditReport>(apiUrl(`/runs/${encodeURIComponent(name)}/report`), {
             params: toParams({ ...window }),
         });
     }

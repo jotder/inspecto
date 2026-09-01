@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Process-wide, per-space {@link DbFileStageStore} accessor (Phase 4 Slice 2 wiring) — the same
- * global-registry idiom as {@link ConsignmentOutputStores}, so {@code BatchProcessor.finalizeSource}
+ * global-registry idiom as {@link ConsignmentOutputStores}, so {@code ConsignmentIngestor.finalizeSource}
  * can record stage transitions without threading a store through every call.
  *
  * <p><b>Pure registry — no backend resolution here.</b> {@code ServiceStores.openFileStageStore}

@@ -98,7 +98,7 @@ public final class ConfigSpecs {
                 FieldSpec.of("dirs.temp", "Temp directory", FieldType.FILEPATH, "Scratch space for a run."),
                 FieldSpec.of("dirs.status_dir", "Status directory", FieldType.FILEPATH,
                         "Directory for run audit CSVs; a timestamped status file is created here."),
-                FieldSpec.withDefault("processing.threads", "Batch concurrency", FieldType.INT, 4,
+                FieldSpec.withDefault("processing.threads", "Consignment concurrency", FieldType.INT, 4,
                         "Concurrent batches (semaphore permits over a virtual-thread executor)."),
                 FieldSpec.withDefault("processing.duckdb_threads", "DuckDB threads/batch", FieldType.INT, 0,
                         "Per-batch DuckDB parallelism (PRAGMA threads): 0 = auto (cores ÷ threads, avoids "
@@ -218,7 +218,7 @@ public final class ConfigSpecs {
                         "SQL predicate over the MAPPED, typed target columns, e.g. amount > 0 — applied "
                                 + "after parsing. Different moment from include_*/exclude_*, which are "
                                 + "regexes over one raw column before parsing. NULL rows are dropped."),
-                FieldSpec.withDefault("processing.batch.max_files", "Batch max files", FieldType.INT, 1,
+                FieldSpec.withDefault("processing.batch.max_files", "Consignment max files", FieldType.INT, 1,
                         "Files packed into one batch; raise above 1 for intra-batch parallelism."),
                 FieldSpec.withDefault("processing.priority", "Priority", FieldType.INT, 1,
                         "Share weight (1-3) for this pipeline's Consignments when execution slots are "

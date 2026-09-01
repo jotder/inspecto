@@ -29,7 +29,7 @@ import java.util.concurrent.Semaphore;
  * handed off with the work it guards.
  *
  * <p>Being non-reentrant is a second, deliberate gain. Under a reentrant lock, a run that re-entered its
- * own pipeline on the same thread — the shape a synchronous {@code BatchEventBus} delivery invites —
+ * own pipeline on the same thread — the shape a synchronous {@code ConsignmentEventBus} delivery invites —
  * would <em>silently succeed</em> and double-ingest the inbox. Here it blocks instead: loud, and
  * recoverable, rather than quietly wrong. No production path re-enters (every trigger hand-off goes
  * through {@code triggerWorkers}); this only decides what happens if one is ever introduced.

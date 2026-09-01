@@ -65,7 +65,7 @@ public final class AcquisitionLedgers {
 
     // ── checksum handoff (Phase C3) ────────────────────────────────────────────────
     // CHECKSUM dedup hashes each candidate once on the run path (in CollectorProcessor.collect); this transient
-    // cache hands that hash to BatchProcessor.commit so the post-commit ledger record reuses it instead of
+    // cache hands that hash to ConsignmentIngestor.commit so the post-commit ledger record reuses it instead of
     // re-reading the file. Keyed by absolute path; entries are removed on take. A batch that never commits
     // leaves a small orphan entry (harmless — recomputed on the next successful run). Stays process-wide
     // (NOT per-space): the absolute-path key never collides across spaces — each space polls its own dirs.poll.
@@ -87,7 +87,7 @@ public final class AcquisitionLedgers {
 
     // ── listing-identity handoff (ACQ-7) ───────────────────────────────────────────
     // Mirrors the checksum handoff: the connector's listing etag/version live on the RemoteFile, which
-    // BatchProcessor.commit never sees (it works on local Files) — so CollectorProcessor stashes them here at
+    // ConsignmentIngestor.commit never sees (it works on local Files) — so CollectorProcessor stashes them here at
     // dedup time and the post-commit ledger record picks them up. Same orphan semantics as above.
 
     /** A stashed listing identity: the connector-supplied {@code etag} and object {@code version} (either nullable). */
@@ -107,7 +107,7 @@ public final class AcquisitionLedgers {
 
     // ── DB-export row-level watermark handoff ──────────────────────────────────────
     // Mirrors the checksum handoff above: a DB-export connector computes the new max watermark while writing its
-    // CSV in fetchTo and stashes it here, keyed by the staged file. BatchProcessor.commit takes it AFTER the batch
+    // CSV in fetchTo and stashes it here, keyed by the staged file. ConsignmentIngestor.commit takes it AFTER the batch
     // is durable and persists it to the ledger (recordDbWatermark) — so the watermark advances only on commit
     // (a crash mid-ingest re-exports the slice; at-least-once / resumable). A batch that never commits leaves a
     // small orphan entry (harmless — recomputed on the next successful run). The connection-profile id travels

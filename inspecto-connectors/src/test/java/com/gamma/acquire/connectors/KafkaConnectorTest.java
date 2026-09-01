@@ -129,7 +129,7 @@ class KafkaConnectorTest {
                 && lines.get(1).contains("\"value\":\"{\\\"a\\\":1}\""), "JSON-in-JSON stays escaped: " + lines.get(1));
         assertTrue(lines.get(2).contains("\"value\":null"), lines.get(2));
 
-        // The frontier is stashed against the staged file — BatchProcessor persists it only after commit.
+        // The frontier is stashed against the staged file — ConsignmentIngestor persists it only after commit.
         var stashed = AcquisitionLedgers.takeDbWatermark(dest).orElseThrow();
         assertEquals("kafka:kafka-test:cdr:p0", stashed.key());
         assertEquals("3", stashed.value());

@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.gamma.inspector.BatchIngestStrategy.*;
+import static com.gamma.inspector.ConsignmentIngestStrategy.*;
 
 /**
  * Generation-mode execution for the streaming plugin-ingester path. Each batch member is streamed
@@ -21,23 +21,23 @@ import static com.gamma.inspector.BatchIngestStrategy.*;
  * so a single huge file is processed with bounded heap and scratch. No cross-member union is
  * performed — each member writes its own per-generation output files.
  *
- * <p>Selected by {@link StreamingPluginBatchStrategy} when the largest batch member meets or
+ * <p>Selected by {@link StreamingPluginIngestStrategy} when the largest batch member meets or
  * exceeds {@code processing.streaming.large_file_bytes}.
  */
 final class GenerationModeIngester {
 
-    private static final Logger log = LoggerFactory.getLogger(StreamingPluginBatchStrategy.class);
+    private static final Logger log = LoggerFactory.getLogger(StreamingPluginIngestStrategy.class);
 
     private GenerationModeIngester() {}
 
-    static IngestOutcome run(Batch batch, PipelineConfig cfg, long flushRows) {
+    static IngestOutcome run(Consignment batch, PipelineConfig cfg, long flushRows) {
         LocalDateTime batchStart = LocalDateTime.now();
         String batchStatus = "SUCCESS";
         String batchError  = "";
 
         StreamingFileIngester ingester = instantiate(cfg);
 
-        List<Batch.Member> survivors    = new ArrayList<>();
+        List<Consignment.Member> survivors    = new ArrayList<>();
         List<MemberAudit>  memberAudits = new ArrayList<>();
         List<PartitionOutput> allOutputs = new ArrayList<>();
         List<LineageRow>      allLineage = new ArrayList<>();
@@ -50,7 +50,7 @@ final class GenerationModeIngester {
                 configure(conn, cfg);
 
                 int memberIdx = 0;
-                for (Batch.Member m : batch.members()) {
+                for (Consignment.Member m : batch.members()) {
                     IngestProgress.track(cfg.identity().pipelineName(), batch.batchId(),
                             m.file().getName(), ++memberIdx, batch.members().size());
                     LocalDateTime mStart = LocalDateTime.now();
@@ -99,7 +99,7 @@ final class GenerationModeIngester {
         } catch (Exception e) {
             batchStatus = "FAILED";
             batchError  = msg(e);
-            log.error("Batch {} failed during streaming (generation) processing", batch.batchId(), e);
+            log.error("Consignment {} failed during streaming (generation) processing", batch.batchId(), e);
         } finally {
             if (tempDb != null) DuckDbUtil.deleteTempDb(tempDb);
         }
@@ -124,7 +124,7 @@ final class GenerationModeIngester {
      * <p>A delete that fails fails the <em>batch</em> ({@link SinkFlushException} propagates to
      * {@link #run}'s outer catch): an orphan we know about is worse than a batch an operator retries.
      */
-    private static void discardRevealed(DuckDbRecordSink sink, Batch.Member m) {
+    private static void discardRevealed(DuckDbRecordSink sink, Consignment.Member m) {
         List<PartitionOutput> revealed = sink.outputs();
         if (revealed.isEmpty()) return;
         for (PartitionOutput o : revealed) {

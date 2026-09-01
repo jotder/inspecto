@@ -33,7 +33,7 @@ class ConsignmentPlannerTest {
     void packsByFileCount(@TempDir Path dir) throws Exception {
         List<File> files = new ArrayList<>();
         for (int i = 0; i < 5; i++) files.add(file(dir, "t1_" + i + ".csv", 10));
-        List<Batch> batches = ConsignmentPlanner.plan(files, byPrefix(), 2, Long.MAX_VALUE, "TS");
+        List<Consignment> batches = ConsignmentPlanner.plan(files, byPrefix(), 2, Long.MAX_VALUE, "TS");
         assertEquals(3, batches.size());            // 2 + 2 + 1
         assertEquals(2, batches.get(0).members().size());
         assertEquals(1, batches.get(2).members().size());
@@ -45,7 +45,7 @@ class ConsignmentPlannerTest {
                 file(dir, "t1_a.csv", 100),
                 file(dir, "t1_b.csv", 100),
                 file(dir, "t1_c.csv", 100));
-        List<Batch> batches = ConsignmentPlanner.plan(files, byPrefix(), 100, 250, "TS");
+        List<Consignment> batches = ConsignmentPlanner.plan(files, byPrefix(), 100, 250, "TS");
         assertEquals(2, batches.size());            // 100+100 <=250, then 100
         assertEquals(2, batches.get(0).members().size());
         assertEquals(1, batches.get(1).members().size());
@@ -56,7 +56,7 @@ class ConsignmentPlannerTest {
         List<File> files = List.of(
                 file(dir, "t1_big.csv", 500),
                 file(dir, "t1_small.csv", 10));
-        List<Batch> batches = ConsignmentPlanner.plan(files, byPrefix(), 100, 100, "TS");
+        List<Consignment> batches = ConsignmentPlanner.plan(files, byPrefix(), 100, 100, "TS");
         assertEquals(2, batches.size());
         assertEquals(1, batches.get(0).members().size());
         assertEquals("t1_big.csv", batches.get(0).members().get(0).file().getName());
@@ -70,7 +70,7 @@ class ConsignmentPlannerTest {
         File b = file(dir, "t1_b.csv", 10);
         Files.setLastModifiedTime(a.toPath(), FileTime.fromMillis(2_000_000L));
         Files.setLastModifiedTime(b.toPath(), FileTime.fromMillis(1_000_000L));
-        List<Batch> batches = ConsignmentPlanner.plan(List.of(a, b), byPrefix(), 500, Long.MAX_VALUE, "TS");
+        List<Consignment> batches = ConsignmentPlanner.plan(List.of(a, b), byPrefix(), 500, Long.MAX_VALUE, "TS");
         assertEquals(List.of("t1_b.csv", "t1_a.csv"),
                 batches.get(0).members().stream().map(m -> m.file().getName()).toList(),
                 "arrival time (the default) must beat path order");
@@ -82,7 +82,7 @@ class ConsignmentPlannerTest {
         File b = file(dir, "t1_b.csv", 10);
         Files.setLastModifiedTime(a.toPath(), FileTime.fromMillis(2_000_000L));   // a is newer, still first
         Files.setLastModifiedTime(b.toPath(), FileTime.fromMillis(1_000_000L));
-        List<Batch> batches = ConsignmentPlanner.plan(List.of(b, a), byPrefix(),
+        List<Consignment> batches = ConsignmentPlanner.plan(List.of(b, a), byPrefix(),
                 500, Long.MAX_VALUE, "TS", ConsignmentPlanner.Order.NAME);
         assertEquals(List.of("t1_a.csv", "t1_b.csv"),
                 batches.get(0).members().stream().map(m -> m.file().getName()).toList(),
@@ -95,9 +95,9 @@ class ConsignmentPlannerTest {
                 file(dir, "t1_a.csv", 10),
                 file(dir, "t2_a.csv", 10),
                 file(dir, "t1_b.csv", 10));
-        List<Batch> batches = ConsignmentPlanner.plan(files, byPrefix(), 500, Long.MAX_VALUE, "TS");
+        List<Consignment> batches = ConsignmentPlanner.plan(files, byPrefix(), 500, Long.MAX_VALUE, "TS");
         assertEquals(2, batches.size());            // one per table
-        Batch t1 = batches.stream().filter(b -> "t1".equals(b.table())).findFirst().orElseThrow();
+        Consignment t1 = batches.stream().filter(b -> "t1".equals(b.table())).findFirst().orElseThrow();
         assertEquals(2, t1.members().size());
         assertEquals(0, t1.members().get(0).srcId());
         assertEquals(1, t1.members().get(1).srcId());

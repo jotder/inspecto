@@ -11,11 +11,11 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class BatchProcessorTest {
+class ConsignmentIngestorTest {
 
-    private Batch.Member member(PipelineConfig cfg, File f, int id) throws Exception {
+    private Consignment.Member member(PipelineConfig cfg, File f, int id) throws Exception {
         SchemaSelector.Selection sel = new SchemaSelector.Selection(cfg.schemas().single(), null);
-        return new Batch.Member(f, id, f.length(), sel);
+        return new Consignment.Member(f, id, f.length(), sel);
     }
 
     @Test
@@ -33,13 +33,13 @@ class BatchProcessorTest {
         // bad.csv: only 1 column on data lines -> all rows rejected -> QUARANTINED_MISMATCH
         Files.writeString(bad, "ID,AMT,EVENT_DATE\njustonecolumn\nanotherbadline\n");
 
-        List<Batch.Member> members = List.of(
+        List<Consignment.Member> members = List.of(
                 member(cfg, a.toFile(), 0), member(cfg, b.toFile(), 1), member(cfg, bad.toFile(), 2));
-        Batch batch = new Batch(cfg.identity().runTimestamp() + "_mini_0001", "mini", null, members);
+        Consignment batch = new Consignment(cfg.identity().runTimestamp() + "_mini_0001", "mini", null, members);
 
-        BatchAuditWriter audit = new BatchAuditWriter(
+        ConsignmentAuditWriter audit = new ConsignmentAuditWriter(
                 cfg.dirs().statusFilePath(), cfg.dirs().batchesFilePath(), cfg.dirs().lineageFilePath());
-        BatchProcessor.process(batch, cfg, audit);
+        ConsignmentIngestor.process(batch, cfg, audit);
 
         // Output: consolidated files named by batchId, two partitions (04/03 and 01/01)
         try (Stream<Path> w = Files.walk(Path.of(cfg.dirs().database()))) {
@@ -103,9 +103,9 @@ class BatchProcessorTest {
         Files.createDirectories(marker.getParent());
         Files.createFile(marker);
 
-        Batch batch = new Batch(cfg.identity().runTimestamp() + "_mini_0001", "mini", null,
+        Consignment batch = new Consignment(cfg.identity().runTimestamp() + "_mini_0001", "mini", null,
                 List.of(member(cfg, solo.toFile(), 0)));
-        BatchProcessor.process(batch, cfg, new BatchAuditWriter(
+        ConsignmentIngestor.process(batch, cfg, new ConsignmentAuditWriter(
                 cfg.dirs().statusFilePath(), cfg.dirs().batchesFilePath(), cfg.dirs().lineageFilePath()));
 
         // Output was produced and the input was backed up (side effects happened before the failure)...
@@ -141,10 +141,10 @@ class BatchProcessorTest {
         Files.writeString(b, "ID,AMT,EVENT_DATE\nb1,3.0,2020-04-03\nb2,4.0,2020-01-01\n");
         Files.writeString(c, "ID,AMT,EVENT_DATE\nc1,5.0,2020-04-03\n");
 
-        List<Batch.Member> members = List.of(
+        List<Consignment.Member> members = List.of(
                 member(cfg, a.toFile(), 0), member(cfg, b.toFile(), 1), member(cfg, c.toFile(), 2));
-        Batch batch = new Batch(cfg.identity().runTimestamp() + "_mini_0001", "mini", null, members);
-        BatchProcessor.process(batch, cfg, new BatchAuditWriter(
+        Consignment batch = new Consignment(cfg.identity().runTimestamp() + "_mini_0001", "mini", null, members);
+        ConsignmentIngestor.process(batch, cfg, new ConsignmentAuditWriter(
                 cfg.dirs().statusFilePath(), cfg.dirs().batchesFilePath(), cfg.dirs().lineageFilePath()));
 
         // Two partitions (04/03 and 01/01), both consolidated under the batch id.
@@ -194,10 +194,10 @@ class BatchProcessorTest {
         // Not valid gzip — DuckDB's read_csv gzip reader fails on the bad magic bytes.
         Files.write(corrupt, "this is not gzip-compressed data".getBytes());
 
-        List<Batch.Member> members = List.of(
+        List<Consignment.Member> members = List.of(
                 member(cfg, good1.toFile(), 0), member(cfg, good2.toFile(), 1), member(cfg, corrupt.toFile(), 2));
-        Batch batch = new Batch(cfg.identity().runTimestamp() + "_mini_0001", "mini", null, members);
-        BatchProcessor.process(batch, cfg, new BatchAuditWriter(
+        Consignment batch = new Consignment(cfg.identity().runTimestamp() + "_mini_0001", "mini", null, members);
+        ConsignmentIngestor.process(batch, cfg, new ConsignmentAuditWriter(
                 cfg.dirs().statusFilePath(), cfg.dirs().batchesFilePath(), cfg.dirs().lineageFilePath()));
 
         // The corrupt member is quarantined as UNREADABLE; the good members survive and consolidate.
@@ -225,10 +225,10 @@ class BatchProcessorTest {
         Path only = inbox.resolve("solo.csv");
         Files.writeString(only, "ID,AMT,EVENT_DATE\nx,9.0,2020-04-03\n");
 
-        Batch batch = new Batch(cfg.identity().runTimestamp() + "_mini_0001", "mini", null,
+        Consignment batch = new Consignment(cfg.identity().runTimestamp() + "_mini_0001", "mini", null,
                 List.of(member(cfg, only.toFile(), 0)));
-        BatchProcessor.process(batch, cfg,
-                new BatchAuditWriter(cfg.dirs().statusFilePath(), cfg.dirs().batchesFilePath(), cfg.dirs().lineageFilePath()));
+        ConsignmentIngestor.process(batch, cfg,
+                new ConsignmentAuditWriter(cfg.dirs().statusFilePath(), cfg.dirs().batchesFilePath(), cfg.dirs().lineageFilePath()));
 
         try (Stream<Path> w = Files.walk(Path.of(cfg.dirs().database()))) {
             assertTrue(w.anyMatch(p -> p.getFileName().toString().equals("solo_out.csv")));

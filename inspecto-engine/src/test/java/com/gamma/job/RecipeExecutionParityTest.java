@@ -3,7 +3,7 @@ package com.gamma.job;
 import com.gamma.config.io.ConfigCodec;
 import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.enrich.EnrichmentEngine;
-import com.gamma.etl.BatchEventBus;
+import com.gamma.etl.ConsignmentEventBus;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.RecipeCompiler;
 import com.gamma.pipeline.ViewDefinition;
@@ -146,7 +146,7 @@ class RecipeExecutionParityTest {
 
         JobConfig job = new JobConfig((String) recipe.get("name"), JobType.PIPELINE, null, null, true, false,
                 Map.of("pipeline_config", flat.toString(), "data_dir", dataDir));
-        JobResult res = new PipelineJobRunner(job, new BatchEventBus(), null, dataDir,
+        JobResult res = new PipelineJobRunner(job, new ConsignmentEventBus(), null, dataDir,
                 tmp.resolve("audit").toString()).run();
         assertTrue(res.success(), res.message());
     }

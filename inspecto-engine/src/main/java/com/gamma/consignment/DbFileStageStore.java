@@ -15,7 +15,7 @@ import java.util.List;
 
 /**
  * <b>Phase 4 Slice 2 — the durable per-file stage-progression registry.</b> Persists one row per
- * (file, {@link FileStage}) transition {@code BatchProcessor.finalizeSource} crosses, so "where is
+ * (file, {@link FileStage}) transition {@code ConsignmentIngestor.finalizeSource} crosses, so "where is
  * file X right now" is an append-only, queryable fact instead of a re-read of the manifest and a
  * guess about how far a crashed commit got.
  *

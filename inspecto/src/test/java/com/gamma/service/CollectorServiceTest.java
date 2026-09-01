@@ -1,6 +1,6 @@
 package com.gamma.service;
 
-import com.gamma.etl.BatchEvent;
+import com.gamma.etl.ConsignmentEvent;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
@@ -49,7 +49,7 @@ class CollectorServiceTest {
         Path a = source(dir.resolve("a"), "ID,AMT,EVENT_DATE\n1,10,2020-01-01\n2,20,2020-01-02\n", "ETL_A");
         Path b = source(dir.resolve("b"), "ID,AMT,EVENT_DATE\n3,30,2020-02-01\n", "ETL_B");
 
-        List<BatchEvent> events = Collections.synchronizedList(new ArrayList<>());
+        List<ConsignmentEvent> events = Collections.synchronizedList(new ArrayList<>());
         try (CollectorService svc = new CollectorService(List.of(a, b), 3600, 2)) {
             svc.eventBus().subscribe(events::add);
 

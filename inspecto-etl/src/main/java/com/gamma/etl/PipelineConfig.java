@@ -1429,9 +1429,9 @@ public final class PipelineConfig {
      *
      * <p>The commit-half destinations ({@code backup}, {@code markers}, the status/batches/lineage CSVs,
      * manifests, the commit log) are set to {@code null} — <b>defence in depth</b>. A test run reaches
-     * them only by calling {@code BatchProcessor.commit}/{@code writeAudit}, which it must never do; if
+     * them only by calling {@code ConsignmentIngestor.commit}/{@code writeAudit}, which it must never do; if
      * some future caller does anyway, {@code null} disables the writes rather than letting them land in
-     * production state. {@code backup == null} in particular is what makes {@code BatchProcessor}'s
+     * production state. {@code backup == null} in particular is what makes {@code ConsignmentIngestor}'s
      * source-file backup a no-op.
      *
      * <p>⚠ This does <b>not</b> contain the destinations that are resolved from JVM system properties
@@ -1583,7 +1583,7 @@ public final class PipelineConfig {
                             + "combining it with multiple sinks: destinations is not supported "
                             + "(see docs/superpower/sinks-config-format-plan.md)");
         }
-        // route: ARMS (branch-aware-executor arming plan S3, 2026-08-26): BatchGraphRunner is wired
+        // route: ARMS (branch-aware-executor arming plan S3, 2026-08-26): ConsignmentGraphRunner is wired
         // at the writeAndTrace choke point, so an active route: pipeline executes its branch tree.
         // Arming stays FAIL-CLOSED on every shape that would drop rows silently — the exact
         // silent-discard class this gate existed to prevent; each refusal names its fix.
@@ -1623,7 +1623,7 @@ public final class PipelineConfig {
         }
         // processing.dedup joins them 2026-08-11 (operator decision): record-grain dedup is a TRANSFORM
         // concern, so in ELT terms it belongs in the T and not the EL. It DID execute on this path — a
-        // ROW_NUMBER QUALIFY in BatchIngestStrategy, the one cross-record operation in the multiplexer —
+        // ROW_NUMBER QUALIFY in ConsignmentIngestStrategy, the one cross-record operation in the multiplexer —
         // and was removed so Stage-1 stays per-record work plus routing.
         // ⚠ This refusal is the whole point of that removal. Deleting the executor and leaving the key
         // parsing would mean a pipeline that arms, runs, writes — and silently keeps every duplicate it

@@ -40,7 +40,7 @@ export interface EnrichmentEditorValue {
  * `POST /config/write type=enrichment` **then** `POST /enrichment` (register: enrichments do not
  * hot-reload by mtime). ⚠ Never save through job creation: a `*_job.toon` `enrich` job is a FULL
  * recompute, while the registered path recomputes only the partitions each committed batch wrote
- * (`EnrichmentService.onBatchEvent`). Relocating authoring must not silently convert that
+ * (`EnrichmentService.onConsignmentEvent`). Relocating authoring must not silently convert that
  * incremental cost into a full rescan (plan §6).
  *
  * <p>Per-entry keys mirror `EnrichmentConfig.fromMap` exactly: `ref` | `path`+`format`, plus

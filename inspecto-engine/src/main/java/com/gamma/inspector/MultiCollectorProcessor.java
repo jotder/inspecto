@@ -121,13 +121,13 @@ public final class MultiCollectorProcessor {
     }
 
     /**
-     * As {@link #runAll(List, int)}, but emits a {@link com.gamma.etl.BatchEvent} to
+     * As {@link #runAll(List, int)}, but emits a {@link com.gamma.etl.ConsignmentEvent} to
      * {@code onCommit} after each SUCCESS batch (used by the service layer to feed its
      * event bus). {@code onCommit} may be {@code null}. Each config is loaded fresh
      * per call, so every cycle is a new run with its own run timestamp.
      */
     public static RunResult runAll(List<Path> configs, int maxConcurrent,
-                                   java.util.function.Consumer<com.gamma.etl.BatchEvent> onCommit) {
+                                   java.util.function.Consumer<com.gamma.etl.ConsignmentEvent> onCommit) {
         Semaphore permits   = new Semaphore(Math.max(1, maxConcurrent));
         AtomicInteger failed = new AtomicInteger();
         Map<String, String> mdc = MDC.getCopyOfContextMap();   // propagate the caller's space (MDC) onto each worker
@@ -143,7 +143,7 @@ public final class MultiCollectorProcessor {
                             PipelineConfig cfg = PipelineConfig.load(cfgPath.toString());
                             CollectorProcessor.run(cfg, onCommit);
                             log.info("Source '{}' completed", cfg.identity().pipelineName());
-                        } catch (CollectorProcessor.BatchProcessingException e) {
+                        } catch (CollectorProcessor.ConsignmentProcessingException e) {
                             failed.incrementAndGet();
                             log.error("Source {} had batch failures: {}", cfgPath, e.getMessage());
                         } catch (Exception e) {
@@ -179,7 +179,7 @@ public final class MultiCollectorProcessor {
      * failure accounting are identical to {@code runAll}.
      */
     public static RunResult runConfigs(List<PipelineConfig> configs, int maxConcurrent,
-                                       java.util.function.Consumer<com.gamma.etl.BatchEvent> onCommit) {
+                                       java.util.function.Consumer<com.gamma.etl.ConsignmentEvent> onCommit) {
         return runConfigs(configs, maxConcurrent, onCommit, true);
     }
 
@@ -191,7 +191,7 @@ public final class MultiCollectorProcessor {
      * for a self-contained acquire-then-ingest cycle.
      */
     public static RunResult runConfigs(List<PipelineConfig> configs, int maxConcurrent,
-                                       java.util.function.Consumer<com.gamma.etl.BatchEvent> onCommit,
+                                       java.util.function.Consumer<com.gamma.etl.ConsignmentEvent> onCommit,
                                        boolean acquireFirst) {
         Semaphore permits    = new Semaphore(Math.max(1, maxConcurrent));
         AtomicInteger failed = new AtomicInteger();
@@ -208,7 +208,7 @@ public final class MultiCollectorProcessor {
                             if (acquireFirst) CollectorProcessor.run(cfg, onCommit);
                             else CollectorProcessor.ingest(cfg, onCommit);
                             log.info("Source '{}' completed", cfg.identity().pipelineName());
-                        } catch (CollectorProcessor.BatchProcessingException e) {
+                        } catch (CollectorProcessor.ConsignmentProcessingException e) {
                             failed.incrementAndGet();
                             log.error("Source '{}' had batch failures: {}",
                                     cfg.identity().pipelineName(), e.getMessage());

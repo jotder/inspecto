@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * S3a (ELT amendment Phase 3, design of record 2026-08-06): a Dataset write publishes the
  * {@code dataset.write} Signal — the trigger substrate S3b's scheduler subscription matches on.
  * Additive to the three pipeline-shaped commit mechanisms, none of which carries a Dataset id.
- * Same per-test EventLog isolation idiom as {@link PipelineBatchSignalTest}.
+ * Same per-test EventLog isolation idiom as {@link PipelineConsignmentSignalTest}.
  */
 class DatasetWriteSignalTest {
 

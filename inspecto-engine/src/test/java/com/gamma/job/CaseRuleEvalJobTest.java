@@ -1,6 +1,6 @@
 package com.gamma.job;
 
-import com.gamma.etl.BatchEventBus;
+import com.gamma.etl.ConsignmentEventBus;
 import com.gamma.ops.InMemoryObjectStore;
 import com.gamma.ops.ObjectQuery;
 import com.gamma.ops.ObjectService;
@@ -125,7 +125,7 @@ class CaseRuleEvalJobTest {
     @Test
     void caseRuleEvaluateIsRegisteredAsABuiltInType() throws Exception {
         try (Scheduler s = new Scheduler();
-             JobService js = new JobService(List.of(), new BatchEventBus(), s, null,
+             JobService js = new JobService(List.of(), new ConsignmentEventBus(), s, null,
                      "audit", null, null, "data")) {
             assertTrue(js.jobType("caserule.evaluate").isPresent(), "caserule.evaluate registered as a built-in");
             assertEquals("Case Rule Evaluation", js.jobType("caserule.evaluate").get().title());

@@ -42,7 +42,7 @@ public final class NotificationRules {
         return new NotificationRules(List.of(
                 new NotificationRule("builtin-batch-failed", EventType.BATCH_FAILED, null, "pipeline",
                         "Pipeline {{pipeline}} failed",
-                        "Batch {{correlationId}} failed: {{message}}",
+                        "Consignment {{correlationId}} failed: {{message}}",
                         "batch-failed:{{pipeline}}", true),
                 new NotificationRule("builtin-file-quarantined", EventType.FILE_QUARANTINED, null, "pipeline",
                         "File quarantined in {{pipeline}}",

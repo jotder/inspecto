@@ -1,7 +1,7 @@
 package com.gamma.inspector;
 
-import com.gamma.etl.Batch;
-import com.gamma.etl.BatchManifest;
+import com.gamma.etl.Consignment;
+import com.gamma.etl.ConsignmentManifest;
 import com.gamma.etl.ManifestStore;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.SchemaSelector;
@@ -31,9 +31,9 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class UnpackManifestReportingTest {
 
-    private Batch.Member member(PipelineConfig cfg, File f, int id) {
+    private Consignment.Member member(PipelineConfig cfg, File f, int id) {
         SchemaSelector.Selection sel = new SchemaSelector.Selection(cfg.schemas().single(), null);
-        return new Batch.Member(f, id, f.length(), sel);
+        return new Consignment.Member(f, id, f.length(), sel);
     }
 
     @Test
@@ -54,12 +54,12 @@ class UnpackManifestReportingTest {
         UnpackOrigins.register(entry2, archive.toFile(), "more.csv");
         UnpackOrigins.registerSkipped(archive.toFile(), List.of("locked.csv"));
 
-        List<Batch.Member> survivors = List.of(member(cfg, entry.toFile(), 0));
-        Batch batch = new Batch(cfg.identity().runTimestamp() + "_mini_0007", "mini", null, survivors);
-        BatchProcessor.finalizeSource(batch, cfg, survivors, List.of(), List.of());
+        List<Consignment.Member> survivors = List.of(member(cfg, entry.toFile(), 0));
+        Consignment batch = new Consignment(cfg.identity().runTimestamp() + "_mini_0007", "mini", null, survivors);
+        ConsignmentIngestor.finalizeSource(batch, cfg, survivors, List.of(), List.of());
 
-        BatchManifest m = ManifestStore.read(cfg.dirs().manifestsDir(), batch.batchId());
-        BatchManifest.MemberEntry skipped = m.members.stream()
+        ConsignmentManifest m = ManifestStore.read(cfg.dirs().manifestsDir(), batch.batchId());
+        ConsignmentManifest.MemberEntry skipped = m.members.stream()
                 .filter(e -> "SKIPPED_UNREADABLE".equals(e.status())).findFirst()
                 .orElseThrow(() -> new AssertionError("no SKIPPED_UNREADABLE row in " + m.members));
         assertEquals("locked.csv", skipped.filename(), "the ENTRY name, there is no temp file to name");
@@ -70,10 +70,10 @@ class UnpackManifestReportingTest {
 
         // Drained exactly once: the archive's SECOND batch (max_files:1 spreads an archive's
         // members over batches) writes no second skip row.
-        List<Batch.Member> survivors2 = List.of(member(cfg, entry2.toFile(), 0));
-        Batch again = new Batch(cfg.identity().runTimestamp() + "_mini_0008", "mini", null, survivors2);
-        BatchProcessor.finalizeSource(again, cfg, survivors2, List.of(), List.of());
-        BatchManifest m2 = ManifestStore.read(cfg.dirs().manifestsDir(), again.batchId());
+        List<Consignment.Member> survivors2 = List.of(member(cfg, entry2.toFile(), 0));
+        Consignment again = new Consignment(cfg.identity().runTimestamp() + "_mini_0008", "mini", null, survivors2);
+        ConsignmentIngestor.finalizeSource(again, cfg, survivors2, List.of(), List.of());
+        ConsignmentManifest m2 = ManifestStore.read(cfg.dirs().manifestsDir(), again.batchId());
         assertTrue(m2.members.stream().noneMatch(e -> "SKIPPED_UNREADABLE".equals(e.status())),
                 "the skip record is drained by the FIRST finalizing batch only");
     }

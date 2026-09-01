@@ -10,7 +10,7 @@ import com.gamma.consignment.DbFileStageStore;
 import com.gamma.consignment.FileStage;
 import com.gamma.consignment.FileStageRecord;
 import com.gamma.consignment.FileStages;
-import com.gamma.etl.Batch;
+import com.gamma.etl.Consignment;
 import com.gamma.etl.MarkerManager;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.SchemaSelector;
@@ -36,8 +36,8 @@ import java.util.concurrent.Future;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * The concurrency harness for {@link BatchProcessor#finalizeSource} (BACKLOG §4, delimited-grammar
- * row (b)): the ledger's block contiguity was stress-pinned in {@code BatchAuditWriterTest}, but the
+ * The concurrency harness for {@link ConsignmentIngestor#finalizeSource} (BACKLOG §4, delimited-grammar
+ * row (b)): the ledger's block contiguity was stress-pinned in {@code ConsignmentAuditWriterTest}, but the
  * three DB stores the finalisation writes — {@link DbConsignmentOutputStore},
  * {@link DbAcquisitionLedger}, {@link DbFileStageStore} — and the marker fail-fast were, until this
  * class, argued only structurally ({@code synchronized} + one shared connection per store).
@@ -70,9 +70,9 @@ class FinalizeSourceConcurrencyTest {
         AcquisitionLedgers.use(null);
     }
 
-    private static Batch.Member member(PipelineConfig cfg, File f, int id) {
+    private static Consignment.Member member(PipelineConfig cfg, File f, int id) {
         SchemaSelector.Selection sel = new SchemaSelector.Selection(cfg.schemas().single(), null);
-        return new Batch.Member(f, id, f.length(), sel);
+        return new Consignment.Member(f, id, f.length(), sel);
     }
 
     /** A checksum-dedup pipeline (ledger records, markers skipped), one per worker directory. */
@@ -147,7 +147,7 @@ class FinalizeSourceConcurrencyTest {
             FileStages.use(stages);
             AcquisitionLedgers.use(ledger);
 
-            record Work(PipelineConfig cfg, Batch batch, String rel) {}
+            record Work(PipelineConfig cfg, Consignment batch, String rel) {}
             List<Work> work = new ArrayList<>();
             for (int i = 0; i < THREADS; i++) {
                 Path dir = Files.createDirectories(root.resolve("w" + i));
@@ -157,7 +157,7 @@ class FinalizeSourceConcurrencyTest {
                 // worker shares one sourceId, so a shared name would be one key written N times.
                 Path f = inbox.resolve("feed_" + i + ".csv");
                 Files.writeString(f, "ID,AMT,EVENT_DATE\nx" + i + ",9.0,2020-04-03\n");
-                Batch batch = new Batch("stress_batch_" + i, "mini", null,
+                Consignment batch = new Consignment("stress_batch_" + i, "mini", null,
                         List.of(member(cfg, f.toFile(), 0)));
                 work.add(new Work(cfg, batch, "feed_" + i + ".csv"));
             }
@@ -170,12 +170,12 @@ class FinalizeSourceConcurrencyTest {
                     futures.add(pool.submit(() -> {
                         File db = DuckDbUtil.tempDbFile("fin_stress_");
                         try (Connection conn = openWithTwoPartitions(db)) {
-                            BatchIngestStrategy.Written written = BatchIngestStrategy.writeAndTrace(
+                            ConsignmentIngestStrategy.Written written = ConsignmentIngestStrategy.writeAndTrace(
                                     conn, "transformed", List.of("year", "month", "day"), w.cfg(),
                                     w.cfg().dirs().database(), "b1", w.batch().batchId(),
                                     Map.of(1, w.rel()), "");
                             start.await(); // every worker has its outputs ready — finalize together
-                            BatchProcessor.finalizeSource(w.batch(), w.cfg(),
+                            ConsignmentIngestor.finalizeSource(w.batch(), w.cfg(),
                                     w.batch().members(), written.outputs(), written.lineage());
                             return null;
                         } finally {
@@ -277,7 +277,7 @@ class FinalizeSourceConcurrencyTest {
         Path inbox = Files.createDirectories(Path.of(cfg.dirs().poll()));
         Path f = inbox.resolve("contended.csv");
         Files.writeString(f, "ID,AMT,EVENT_DATE\nx,9.0,2020-04-03\n");
-        List<Batch.Member> survivors = List.of(member(cfg, f.toFile(), 0));
+        List<Consignment.Member> survivors = List.of(member(cfg, f.toFile(), 0));
 
         CountDownLatch start = new CountDownLatch(1);
         ExecutorService pool = Executors.newFixedThreadPool(2);
@@ -290,7 +290,7 @@ class FinalizeSourceConcurrencyTest {
                     try {
                         // Empty outputs/lineage: the registry leg is deliberately out of play — this
                         // test isolates the marker arbiter, the §11.3 leg is test 1's.
-                        BatchProcessor.finalizeSource(new Batch(batchId, "mini", null, survivors),
+                        ConsignmentIngestor.finalizeSource(new Consignment(batchId, "mini", null, survivors),
                                 cfg, survivors, List.of(), List.of());
                         return null;
                     } catch (Throwable t) {

@@ -135,7 +135,7 @@ export interface StatusReport {
     pipelines: RunStatus[];
 }
 
-export interface BatchAuditReport {
+export interface ConsignmentAuditReport {
     pipeline: string;
     totalBatches: number;
     success: number;
@@ -169,7 +169,7 @@ export interface ServiceReport {
     p99DurationMs: number;
     windowFrom: string;
     windowTo: string;
-    pipelines: BatchAuditReport[];
+    pipelines: ConsignmentAuditReport[];
 }
 
 /** Inclusive report window; blank strings mean "unbounded". */

@@ -62,7 +62,7 @@ public final class ReportService implements ReportRunner {
                                List<PipelineStatus> pipelines) {}
 
     /** Historical batch-audit rollup for one pipeline ({@code windowFrom}/{@code windowTo} echo the applied range, blank = unbounded). */
-    public record BatchAuditReport(String pipeline, long totalBatches, long success, long failed,
+    public record ConsignmentAuditReport(String pipeline, long totalBatches, long success, long failed,
                                    double errorRate, long totalInputRows, long totalOutputRows,
                                    long totalRejectedFiles, long totalOutputFiles, long totalOutputBytes,
                                    long avgDurationMs, long maxDurationMs,
@@ -75,7 +75,7 @@ public final class ReportService implements ReportRunner {
                                 double errorRate, long totalOutputRows,
                                 long p50DurationMs, long p95DurationMs, long p99DurationMs,
                                 String windowFrom, String windowTo,
-                                List<BatchAuditReport> pipelines) {}
+                                List<ConsignmentAuditReport> pipelines) {}
 
     /** Historical run-audit rollup for one Stage-2 enrichment job (mirrors the batch report). */
     public record EnrichmentRunReport(String job, long totalRuns, long success, long failed,
@@ -150,12 +150,12 @@ public final class ReportService implements ReportRunner {
     // ── historical batch-audit report ────────────────────────────────────────────
 
     /** Roll up the batch audit for one pipeline by name (unbounded window). */
-    public BatchAuditReport batchReport(String pipelineName) {
+    public ConsignmentAuditReport batchReport(String pipelineName) {
         return batchReport(pipelineName, Window.ALL);
     }
 
     /** Roll up the batch audit for one pipeline by name, scoped to {@code window}. */
-    public BatchAuditReport batchReport(String pipelineName, Window window) {
+    public ConsignmentAuditReport batchReport(String pipelineName, Window window) {
         PipelineConfig cfg = service.configFor(pipelineName).orElseThrow(
                 () -> new IllegalArgumentException("no pipeline named '" + pipelineName + "'"));
         return rollUp(pipelineName, service.statusStore().batches(cfg), window);
@@ -168,14 +168,14 @@ public final class ReportService implements ReportRunner {
 
     /** Service-wide batch-audit report scoped to {@code window}, with service-wide duration percentiles. */
     public ServiceReport serviceReport(Window window) {
-        List<BatchAuditReport> perPipeline = new ArrayList<>();
+        List<ConsignmentAuditReport> perPipeline = new ArrayList<>();
         List<Long> allDurations = new ArrayList<>();
         long batches = 0, success = 0, failed = 0, outRows = 0;
         for (PipelineView v : service.pipelines()) {
             PipelineConfig cfg = service.configFor(v.name()).orElse(null);
             if (cfg == null) continue;
             List<Map<String, String>> rows = service.statusStore().batches(cfg);
-            BatchAuditReport r = rollUp(v.name(), rows, window);
+            ConsignmentAuditReport r = rollUp(v.name(), rows, window);
             perPipeline.add(r);
             batches += r.totalBatches();
             success += r.success();
@@ -244,7 +244,7 @@ public final class ReportService implements ReportRunner {
 
     // ── helpers ──────────────────────────────────────────────────────────────────
 
-    private static BatchAuditReport rollUp(String pipeline, List<Map<String, String>> rows, Window window) {
+    private static ConsignmentAuditReport rollUp(String pipeline, List<Map<String, String>> rows, Window window) {
         long total = 0, success = 0, failed = 0;
         long inRows = 0, outRows = 0, rejected = 0, outFiles = 0, outBytes = 0;
         long durSum = 0, durMax = 0;
@@ -272,7 +272,7 @@ public final class ReportService implements ReportRunner {
         }
         long avgDur = total == 0 ? 0 : durSum / total;
         double errorRate = total == 0 ? 0.0 : round(failed / (double) total);
-        return new BatchAuditReport(pipeline, total, success, failed, errorRate,
+        return new ConsignmentAuditReport(pipeline, total, success, failed, errorRate,
                 inRows, outRows, rejected, outFiles, outBytes, avgDur, durMax,
                 percentile(durs, 50), percentile(durs, 95), percentile(durs, 99),
                 first, last, window.from(), window.to());

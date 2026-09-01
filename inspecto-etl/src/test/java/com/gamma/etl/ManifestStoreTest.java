@@ -14,21 +14,21 @@ class ManifestStoreTest {
     void writesReadsAndSupersedes(@TempDir Path dir) throws Exception {
         String manifestsDir = dir.resolve("manifests").toString();
 
-        BatchManifest m = new BatchManifest();
+        ConsignmentManifest m = new ConsignmentManifest();
         m.batchId = "B1";
         m.pipeline = "mini_etl";
         m.schemaName = "mini";
         m.outputTable = null;
         m.createdAt = "2026-05-27 10:30:00";
-        m.members = List.of(new BatchManifest.MemberEntry("a.csv", 0, "20200403/a.csv",
+        m.members = List.of(new ConsignmentManifest.MemberEntry("a.csv", 0, "20200403/a.csv",
                 dir.resolve("backup/20200403/a.csv").toString(), "SUCCESS"));
-        m.outputs = List.of(new BatchManifest.OutputEntry("year=2020/month=04/day=03",
+        m.outputs = List.of(new ConsignmentManifest.OutputEntry("year=2020/month=04/day=03",
                 dir.resolve("db/B1_out.csv").toString()));
         m.markers = List.of(dir.resolve("markers/20200403/a.csv.processed").toString());
 
         ManifestStore.write(manifestsDir, m);
 
-        BatchManifest back = ManifestStore.read(manifestsDir, "B1");
+        ConsignmentManifest back = ManifestStore.read(manifestsDir, "B1");
         assertEquals("B1", back.batchId);
         assertEquals(1, back.members.size());
         assertEquals("a.csv", back.members.get(0).filename());
@@ -58,7 +58,7 @@ class ManifestStoreTest {
              "members":[],"outputs":[{"partition":"year=2020","outputFile":"/db/B1_out.csv"}],"markers":[]}
             """);
 
-        BatchManifest back = ManifestStore.read(manifests.toString(), "B1");
+        ConsignmentManifest back = ManifestStore.read(manifests.toString(), "B1");
         assertEquals("B1", back.batchId, "the legacy camelCase key must still bind");
         assertEquals(1, back.outputs.size(), "and the rest of the manifest with it");
     }
@@ -67,7 +67,7 @@ class ManifestStoreTest {
     @Test
     void writesTheCanonicalConsignmentIdKey(@TempDir Path dir) throws Exception {
         String manifests = dir.resolve("manifests").toString();
-        BatchManifest m = new BatchManifest();
+        ConsignmentManifest m = new ConsignmentManifest();
         m.batchId = "C9";
         m.pipeline = "mini_etl";
         m.members = List.of();

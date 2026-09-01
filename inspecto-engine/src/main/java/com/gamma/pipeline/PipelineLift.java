@@ -361,7 +361,7 @@ public final class PipelineLift {
         }
 
         // Record-grain dedup (processing.dedup) sits between map and the sink(s) — exactly where the
-        // engine applies its QUALIFY (BatchIngestStrategy.writeAndTrace, before the partitioned write).
+        // engine applies its QUALIFY (ConsignmentIngestStrategy.writeAndTrace, before the partitioned write).
         if (cfg.dedup() != null) {
             String dedupId = "dedup" + suffix;
             Map<String, Object> dc = new LinkedHashMap<>();

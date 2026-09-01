@@ -45,7 +45,7 @@ import { nodeAttributesFor } from './node-attributes';
 /** What the HOST pipeline can tell an `enrichment` node about itself, so its wiring form seeds
  *  derived values instead of asking the author to retype them (definition-surface P6-c). */
 export interface EnrichmentHostPipeline {
-    /** The engine's normalized pipeline id — what `BatchEvent.pipeline()` carries. */
+    /** The engine's normalized pipeline id — what `ConsignmentEvent.pipeline()` carries. */
     pipelineId: string;
     /** Its output store, when exactly ONE destination could be resolved (see the editor's derivation). */
     inputDatabase?: string;

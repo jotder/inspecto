@@ -9,7 +9,7 @@ import com.gamma.assist.Diagnosis;
 import com.gamma.catalog.MetadataGraphService;
 import com.gamma.catalog.MetadataNode;
 import com.gamma.catalog.NodeKind;
-import com.gamma.etl.BatchEvent;
+import com.gamma.etl.ConsignmentEvent;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -57,7 +57,7 @@ public final class ModelDiagnoser implements FailureReactor.Diagnoser {
     }
 
     @Override
-    public Diagnosis diagnose(BatchEvent e) {
+    public Diagnosis diagnose(ConsignmentEvent e) {
         long now = clock.getAsLong();
         List<Citation> citations = groundPipeline(e.pipeline());
         Diagnosis heuristic = HeuristicDiagnoser.diagnose(e, now, citations);
@@ -76,7 +76,7 @@ public final class ModelDiagnoser implements FailureReactor.Diagnoser {
         }
     }
 
-    private String prompt(BatchEvent e, Diagnosis heuristic) {
+    private String prompt(ConsignmentEvent e, Diagnosis heuristic) {
         return "FAILED BATCH\n"
                 + "  pipeline:       " + e.pipeline() + "\n"
                 + "  batch id:       " + e.batchId() + "\n"

@@ -78,7 +78,7 @@ public final class DuckDbCsvIngester {
      *       only footer-line dropping ({@code skip_tail_lines}) still requires the Java parser.</li>
      * </ul>
      *
-     * <p>This is the cheap gate; {@link #decideNative(Batch, PipelineConfig)} additionally confirms,
+     * <p>This is the cheap gate; {@link #decideNative(Consignment, PipelineConfig)} additionally confirms,
      * per file, that the boundaries actually resolve before committing a batch to the native path.
      */
     public static boolean usesDuckDb(PipelineConfig cfg) {
@@ -104,7 +104,7 @@ public final class DuckDbCsvIngester {
      * <p>{@code engine: duckdb} is honoured verbatim (native regardless of scan); {@code engine: java}
      * is never native.
      */
-    public static boolean decideNative(Batch batch, PipelineConfig cfg) {
+    public static boolean decideNative(Consignment batch, PipelineConfig cfg) {
         if (cfg.fixedWidth() != null && !cfg.fixedWidth().binary()) return true;   // fixed-width text: native-only
         if (cfg.json() != null || cfg.textRegex() != null || cfg.xlsx() != null || cfg.parquet() != null) return true; // native-only frontends
         String engine = cfg.csv().engine() == null ? "auto" : cfg.csv().engine().toLowerCase();
@@ -114,7 +114,7 @@ public final class DuckDbCsvIngester {
         if (cfg.csv().skipTailLines() != 0) return false;                 // footer-drop stays Java
         boolean needsScan = cfg.csv().skipJunkLines() != 0 || cfg.csv().skipTailCols() != 0;
         if (!needsScan) return true;                                       // clean config → native
-        for (Batch.Member m : batch.members()) {
+        for (Consignment.Member m : batch.members()) {
             if (!BoundaryScanner.scan(m.file(), m.selection().schema(), cfg).resolved())
                 return false;                                             // unresolved member → Java
         }
@@ -164,7 +164,7 @@ public final class DuckDbCsvIngester {
     /**
      * Create a lazy {@code VIEW} over {@code read_csv} — projecting the schema columns plus a
      * constant {@code __src_id} — <em>without materialising any data</em>. Used by the
-     * single-member streaming path ({@code CsvBatchStrategy}) so the whole pipeline
+     * single-member streaming path ({@code CsvIngestStrategy}) so the whole pipeline
      * (read_csv → transform → partitioned COPY) runs in one streaming pass instead of copying
      * the data into {@code raw_f0} then {@code raw_input} before transforming.
      *

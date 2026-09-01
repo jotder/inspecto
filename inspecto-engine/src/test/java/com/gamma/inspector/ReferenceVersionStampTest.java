@@ -12,7 +12,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Reference Phase-2 P1 write-side verify: {@link BatchIngestStrategy#stampReferenceVersions} appends
+ * Reference Phase-2 P1 write-side verify: {@link ConsignmentIngestStrategy#stampReferenceVersions} appends
  * the §2.1 system columns ({@code __key_hash}/{@code __valid_from}/{@code __op}/{@code __batch_id}) and
  * folds out within-batch key duplicates (one version per key per batch).
  */
@@ -26,7 +26,7 @@ class ReferenceVersionStampTest {
             st.execute("CREATE TABLE transformed AS SELECT * FROM (VALUES "
                     + "('C1','NA'),('C1','NA'),('C2','EU')) t(customer_id, region)");
 
-            BatchIngestStrategy.stampReferenceVersions(c, "transformed", "__ref_versioned",
+            ConsignmentIngestStrategy.stampReferenceVersions(c, "transformed", "__ref_versioned",
                     List.of("customer_id"), "batch-42", null);
 
             // within-batch dedup: C1 collapses to one version → two rows total
@@ -68,12 +68,12 @@ class ReferenceVersionStampTest {
         try (Connection c = DuckDbUtil.openConnection(db); Statement st = c.createStatement()) {
             // batch 1 → the "existing store": C1→NA, C2→EU
             st.execute("CREATE TABLE b1 AS SELECT * FROM (VALUES ('C1','NA'),('C2','EU')) t(customer_id, region)");
-            BatchIngestStrategy.stampReferenceVersions(c, "b1", "store", List.of("customer_id"), "b1", null);
+            ConsignmentIngestStrategy.stampReferenceVersions(c, "b1", "store", List.of("customer_id"), "b1", null);
 
             // batch 2 re-delivers C1 unchanged, changes C2, adds C3
             st.execute("CREATE TABLE b2 AS SELECT * FROM (VALUES "
                     + "('C1','NA'),('C2','APAC'),('C3','SA')) t(customer_id, region)");
-            BatchIngestStrategy.stampReferenceVersions(c, "b2", "appended", List.of("customer_id"), "b2",
+            ConsignmentIngestStrategy.stampReferenceVersions(c, "b2", "appended", List.of("customer_id"), "b2",
                     "(SELECT * FROM store) AS _store");
 
             try (ResultSet rs = st.executeQuery(
@@ -94,7 +94,7 @@ class ReferenceVersionStampTest {
         try (Connection c = DuckDbUtil.openConnection(db); Statement st = c.createStatement()) {
             st.execute("CREATE TABLE transformed AS SELECT * FROM (VALUES ('C1')) t(customer_id)");
             assertThrows(IllegalStateException.class, () ->
-                    BatchIngestStrategy.stampReferenceVersions(c, "transformed", "__ref_versioned",
+                    ConsignmentIngestStrategy.stampReferenceVersions(c, "transformed", "__ref_versioned",
                             List.of(), "batch-1", null));
         } finally {
             DuckDbUtil.deleteTempDb(db);

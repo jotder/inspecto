@@ -202,7 +202,7 @@ public final class OpsMonitor implements AutoCloseable {
             if (s.type() != null && s.type().startsWith("agent.")) return;   // never chase own telemetry
             if (!TRIGGER_BATCH_FAILED.equals(s.type())) return;              // pilot trigger only
             String pipeline = s.subject() != null ? s.subject().id() : null;
-            String batchId = s.correlationId();                             // BatchAuditWriter sets this
+            String batchId = s.correlationId();                             // ConsignmentAuditWriter sets this
             if (pipeline == null || pipeline.isBlank() || batchId == null || batchId.isBlank()) return;
             synchronized (seen) {
                 if (!seen.add(batchId)) return;                             // one action per failed batch

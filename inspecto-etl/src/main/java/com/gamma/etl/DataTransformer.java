@@ -15,7 +15,7 @@ import java.util.*;
  * and the internal {@code __src_id} lineage tag.
  *
  * <p>The raw-ingestion table must already exist in {@code conn} and carry a trailing
- * {@code __src_id INTEGER} column added by {@link com.gamma.inspector.BatchProcessor}.
+ * {@code __src_id INTEGER} column added by {@link com.gamma.inspector.ConsignmentIngestor}.
  * Writing the partitioned output is the responsibility of {@link PartitionWriter};
  * computing lineage is {@link LineageCollector}.
  *

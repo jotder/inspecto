@@ -10,7 +10,7 @@ import java.util.List;
  *
  * <p>Plain mutable fields (not a record) for straightforward Gson (de)serialization.
  */
-public final class BatchManifest {
+public final class ConsignmentManifest {
 
     /**
      * The unit of work this manifest describes. Serialised as {@code "consignmentId"} and read from
@@ -20,7 +20,7 @@ public final class BatchManifest {
      * {@code "batchId"}. Renaming the field alone would have yielded {@code null} for every manifest already
      * on disk <b>with no exception thrown</b>, silently breaking {@code ReprocessCommand}. {@code alternate}
      * is what makes the old key keep working; the Java field name stays {@code batchId} because §3/§15 keep
-     * the {@code Batch*} internals and their accessors out of this slice's scope.
+     * the {@code Consignment*} internals and their accessors out of this slice's scope.
      */
     @SerializedName(value = "consignmentId", alternate = {"batchId"})
     public String batchId;

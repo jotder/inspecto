@@ -22,7 +22,7 @@ import java.util.Map;
  * commits here per call, and each branch writes to the {@code sinks[]} destination its route key was
  * paired with at lift time (the branch's declared {@code database}), with that destination's own
  * format / compression / {@code filename_column} — exactly the per-destination write
- * {@link BatchIngestStrategy#writeAndTrace} does for the flat path, minus the fan-out (a route branch
+ * {@link ConsignmentIngestStrategy#writeAndTrace} does for the flat path, minus the fan-out (a route branch
  * is one destination by construction).
  *
  * <p><b>Why not {@code PartitionSinkWriter}:</b> that writer is flow-job-shaped — it writes every
@@ -30,7 +30,7 @@ import java.util.Map;
  * {@code srcIdToFile} (so {@code filename_column} translation is lost), collects no lineage, and
  * registers §11.3 rows itself. The ingest path needs the opposite on every count: destination-rooted
  * writes, lineage per branch (the Run Detail input→output matrix), and <b>no registration here</b> —
- * {@code BatchProcessor.finalizeSource} registers from the returned lineage, the same code the flat
+ * {@code ConsignmentIngestor.finalizeSource} registers from the returned lineage, the same code the flat
  * path runs, so the graph path cannot drift from it (and cannot double-count).
  *
  * <p>Accumulates outputs / lineage / event-time bounds across branches; the caller drains them into

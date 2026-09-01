@@ -11,7 +11,7 @@ import java.util.concurrent.ConcurrentMap;
  * <p>The batch strategies report the member they are about to ingest ({@link #track}); the
  * Control API's inbox status reads it back ({@link #current}) so an operator can see
  * <em>which</em> file a mid-ingest pipeline is working through ("file 3 of 120: x.csv.gz") —
- * previously "Processing" was only a pipeline-level yes/no. {@link BatchProcessor} clears the
+ * previously "Processing" was only a pipeline-level yes/no. {@link ConsignmentIngestor} clears the
  * entry when the batch finishes, so a snapshot is only ever visible while ingest is live.
  *
  * <p>Deliberately a process-local, in-memory map (not durable): ingest is synchronous within a

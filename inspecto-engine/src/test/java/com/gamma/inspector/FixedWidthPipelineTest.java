@@ -53,10 +53,10 @@ class FixedWidthPipelineTest {
                 """, StandardCharsets.UTF_8);
 
         SchemaSelector.Selection sel = new SchemaSelector.Selection(cfg.schemas().single(), null);
-        Batch batch = new Batch(cfg.identity().runTimestamp() + "_fw_0001", "fw", null,
-                List.of(new Batch.Member(dat.toFile(), 0, dat.toFile().length(), sel)));
+        Consignment batch = new Consignment(cfg.identity().runTimestamp() + "_fw_0001", "fw", null,
+                List.of(new Consignment.Member(dat.toFile(), 0, dat.toFile().length(), sel)));
 
-        BatchProcessor.process(batch, cfg, new BatchAuditWriter(
+        ConsignmentIngestor.process(batch, cfg, new ConsignmentAuditWriter(
                 cfg.dirs().statusFilePath(), cfg.dirs().batchesFilePath(), cfg.dirs().lineageFilePath()));
 
         // Two day-partitions written (2020-04-03 and 2020-04-04).

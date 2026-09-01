@@ -109,7 +109,7 @@ public final class ConfigValidator {
         String srcPrefix = srcFactor > 1 ? "sources.max(" + srcFactor + ") × " : "";
 
         // (a) EXPLICIT positive duckdb_threads — the operator pinned a per-batch cap. The
-        // default (0) auto-derives cores ÷ threads in BatchIngestStrategy.configure and -1
+        // default (0) auto-derives cores ÷ threads in ConsignmentIngestStrategy.configure and -1
         // opts out, so the verbatim-product warning is scoped to explicit positive values.
         if (cfg.processing().duckdbThreads() > 0) {
             int total = srcFactor * cfg.processing().threads() * cfg.processing().duckdbThreads();

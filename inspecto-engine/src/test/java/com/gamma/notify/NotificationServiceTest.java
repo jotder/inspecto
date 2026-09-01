@@ -36,7 +36,7 @@ class NotificationServiceTest {
         assertEquals(1, feed.size(), "only the operational event produced a notification");
         Notification n = feed.get(0);
         assertEquals("Pipeline orders failed", n.title());
-        assertEquals("Batch b1 failed: boom", n.body());
+        assertEquals("Consignment b1 failed: boom", n.body());
         assertEquals("pipeline", n.category());
         assertEquals(NotificationState.UNREAD, n.state());
     }
@@ -221,7 +221,7 @@ class NotificationServiceTest {
         assertEquals(1, delivered.size());
         assertEquals("[BATCH_FAILED] boom", delivered.get(0),
                 "the channel's own template rendered instead of the rule's default body");
-        assertEquals("Batch b1 failed: boom", store.recent(10).get(0).body(),
+        assertEquals("Consignment b1 failed: boom", store.recent(10).get(0).body(),
                 "the stored/in-app copy is unaffected — only the channel delivery used the override");
     }
 

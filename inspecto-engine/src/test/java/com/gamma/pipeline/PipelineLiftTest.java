@@ -2,7 +2,7 @@ package com.gamma.pipeline;
 
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.PipelineConfigBatchTest;
-import com.gamma.pipeline.exec.BatchGraphRunner;
+import com.gamma.pipeline.exec.ConsignmentGraphRunner;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -107,7 +107,7 @@ class PipelineLiftTest {
         // (2026-08-02) as FLAT-path fan-out in writeAndTrace. Two plain-data-fed sinks are N
         // destinations of ONE branch; diverting them to the runner would drop writeAndTrace's
         // reference-versioning and decision rules. Only a second route:<key> relation is a second branch.
-        assertFalse(BatchGraphRunner.engages(g),
+        assertFalse(ConsignmentGraphRunner.engages(g),
                 "multi-destination is flat-path fan-out (one branch, N destinations) — never the runner");
     }
 

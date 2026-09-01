@@ -54,10 +54,10 @@ class JsonPipelineTest {
                 """, StandardCharsets.UTF_8);
 
         SchemaSelector.Selection sel = new SchemaSelector.Selection(cfg.schemas().single(), null);
-        Batch batch = new Batch(cfg.identity().runTimestamp() + "_js_0001", "js", null,
-                List.of(new Batch.Member(jsonl.toFile(), 0, jsonl.toFile().length(), sel)));
+        Consignment batch = new Consignment(cfg.identity().runTimestamp() + "_js_0001", "js", null,
+                List.of(new Consignment.Member(jsonl.toFile(), 0, jsonl.toFile().length(), sel)));
 
-        BatchProcessor.process(batch, cfg, new BatchAuditWriter(
+        ConsignmentIngestor.process(batch, cfg, new ConsignmentAuditWriter(
                 cfg.dirs().statusFilePath(), cfg.dirs().batchesFilePath(), cfg.dirs().lineageFilePath()));
 
         try (Stream<Path> w = Files.walk(Path.of(cfg.dirs().database()))) {
@@ -115,10 +115,10 @@ class JsonPipelineTest {
                 """, StandardCharsets.UTF_8);
 
         SchemaSelector.Selection sel = new SchemaSelector.Selection(cfg.schemas().single(), null);
-        Batch batch = new Batch(cfg.identity().runTimestamp() + "_js_0002", "js", null,
-                List.of(new Batch.Member(jsonl.toFile(), 0, jsonl.toFile().length(), sel)));
+        Consignment batch = new Consignment(cfg.identity().runTimestamp() + "_js_0002", "js", null,
+                List.of(new Consignment.Member(jsonl.toFile(), 0, jsonl.toFile().length(), sel)));
 
-        BatchProcessor.process(batch, cfg, new BatchAuditWriter(
+        ConsignmentIngestor.process(batch, cfg, new ConsignmentAuditWriter(
                 cfg.dirs().statusFilePath(), cfg.dirs().batchesFilePath(), cfg.dirs().lineageFilePath()));
 
         String out = readPartition(cfg, "year=2020", "month=04", "day=03");

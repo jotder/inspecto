@@ -78,7 +78,7 @@ class PerfDeepDiveBenchmark {
             long t = System.nanoTime();
             try {
                 CollectorProcessor.run(cfg);
-            } catch (CollectorProcessor.BatchProcessingException e) {
+            } catch (CollectorProcessor.ConsignmentProcessingException e) {
                 System.out.printf("  (warning: %s)%n", e.getMessage());
             }
             System.out.printf("%-46s %8.2fs%n", labels[v], secs(t));

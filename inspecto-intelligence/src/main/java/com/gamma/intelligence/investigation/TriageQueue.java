@@ -24,7 +24,7 @@ import java.util.function.Consumer;
 /**
  * Autonomous triage ingress (AGT-5 P1 slice E, D3): a live {@link EventLog} subscriber that turns an
  * error/critical Signal into an investigation, running the RCA playbook off the emitting thread. It
- * rides the canonical Signal bus (not the legacy {@code BatchEventBus}, which stays with
+ * rides the canonical Signal bus (not the legacy {@code ConsignmentEventBus}, which stays with
  * {@code FailureReactor}), parallel to {@link com.gamma.intelligence.context.SignalIngress} but with
  * dispatcher semantics: dedupe by correlationId, an {@code agent.*} exclusion (so the agent never
  * investigates its own telemetry — a feedback loop), and a kill-switch.

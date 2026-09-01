@@ -65,7 +65,7 @@ class RecordDedupExecutionTest {
                           ('b',  5.0, '2026', '07', '01', 0)
                         ) v(ID, AMT, year, month, day, __src_id)""");
             }
-            BatchIngestStrategy.Written written = BatchIngestStrategy.writeAndTrace(
+            ConsignmentIngestStrategy.Written written = ConsignmentIngestStrategy.writeAndTrace(
                     conn, "transformed", List.of("year", "month", "day"), cfg,
                     cfg.dirs().database(), "b1", "batch-1", Map.of(0, "solo.csv"), "");
 

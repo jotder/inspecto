@@ -5,8 +5,8 @@ import com.gamma.enrich.EnrichmentAuditReader;
 import com.gamma.enrich.EnrichmentAuditWriter;
 import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.enrich.EnrichmentEngine;
-import com.gamma.etl.BatchEvent;
-import com.gamma.etl.BatchEventBus;
+import com.gamma.etl.ConsignmentEvent;
+import com.gamma.etl.ConsignmentEventBus;
 import com.gamma.etl.PartitionOutput;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.metrics.MetricRegistry;
@@ -34,13 +34,13 @@ import java.util.function.Supplier;
  * Orchestrates Stage-2 {@link EnrichmentEngine} runs against the platform's two
  * triggers — the flagship "incremental + scheduled" model. It is the composition
  * point that binds the pure enrichment engine ({@code com.gamma.enrich}) to the
- * service's {@link BatchEventBus} (freshness) and {@link Scheduler} (completeness).
+ * service's {@link ConsignmentEventBus} (freshness) and {@link Scheduler} (completeness).
  *
  * <h3>Triggers</h3>
  * <ul>
  *   <li><b>Event (freshness)</b> — subscribes to the bus. When a batch commits for a
  *       job's {@code triggers.on_pipeline}, the job recomputes <em>only the partitions
- *       that batch wrote</em> ({@link BatchEvent#partitions()} → input filter). This is
+ *       that batch wrote</em> ({@link ConsignmentEvent#partitions()} → input filter). This is
  *       the cheap, near-real-time path.</li>
  *   <li><b>Scheduled (completeness)</b> — for jobs with {@code triggers.schedule_seconds},
  *       registers an interval job that recomputes the <em>full</em> window. Idempotent
@@ -48,7 +48,7 @@ import java.util.function.Supplier;
  * </ul>
  *
  * <h3>Chains</h3>
- * After a successful recompute a job publishes its own {@link BatchEvent} (pipeline =
+ * After a successful recompute a job publishes its own {@link ConsignmentEvent} (pipeline =
  * the job's {@code name}, partitions = what it wrote) back onto the bus. A downstream
  * job whose {@code on_pipeline} equals that name therefore fires automatically — Stage-2
  * → Stage-2 chains use the very same machinery. A job is never triggered by its own
@@ -71,7 +71,7 @@ public final class EnrichmentService implements AutoCloseable {
 
     /** Live, hot-registrable job list — iterated per bus event, mutated only by {@link #register}. */
     private final List<EnrichmentConfig> jobs;
-    private final BatchEventBus bus;
+    private final ConsignmentEventBus bus;
     private final Scheduler scheduler;
     /** Live view of the loaded Stage-1 pipelines — resolves by-name references per recompute. */
     private final Supplier<List<PipelineConfig>> pipelines;
@@ -85,7 +85,7 @@ public final class EnrichmentService implements AutoCloseable {
      *  restart. The task still resolves its config by name at fire time. */
     private final Map<String, ScheduledFuture<?>> scheduledFutures = new ConcurrentHashMap<>();
 
-    public EnrichmentService(List<EnrichmentConfig> jobs, BatchEventBus bus, Scheduler scheduler) {
+    public EnrichmentService(List<EnrichmentConfig> jobs, ConsignmentEventBus bus, Scheduler scheduler) {
         this(jobs, bus, scheduler, List::of);
     }
 
@@ -94,7 +94,7 @@ public final class EnrichmentService implements AutoCloseable {
      *                  by-name references ({@code references.<name>.ref:}) resolve against the
      *                  current registry (hot-reload safe); {@code List::of} disables by-name refs
      */
-    public EnrichmentService(List<EnrichmentConfig> jobs, BatchEventBus bus, Scheduler scheduler,
+    public EnrichmentService(List<EnrichmentConfig> jobs, ConsignmentEventBus bus, Scheduler scheduler,
                              Supplier<List<PipelineConfig>> pipelines) {
         this.jobs      = new CopyOnWriteArrayList<>(jobs);
         this.bus       = bus;
@@ -104,7 +104,7 @@ public final class EnrichmentService implements AutoCloseable {
 
     /** Wire the event subscriber and register scheduled completeness jobs. */
     public void start() {
-        bus.subscribe(this::onBatchEvent);
+        bus.subscribe(this::onConsignmentEvent);
         int events = 0, scheduled = 0;
         for (EnrichmentConfig job : jobs) {
             if (job.triggers().hasEvent()) events++;
@@ -155,7 +155,7 @@ public final class EnrichmentService implements AutoCloseable {
      * to {@link #register} for a deleted-on-disk job (the onboarding draft-discard path, 2026-07-20).
      * Without this, a removed job's completeness timer kept firing (`config(name)` would find nothing
      * and the fire was a no-op) until the next restart. Event triggers stop immediately either way,
-     * since {@link #onBatchEvent} iterates the live {@link #jobs} list.
+     * since {@link #onConsignmentEvent} iterates the live {@link #jobs} list.
      *
      * @return {@code true} if a job by that name was hosted (and is now removed), {@code false} if none was
      */
@@ -168,7 +168,7 @@ public final class EnrichmentService implements AutoCloseable {
     }
 
     /** Dispatch a committed-batch event to any job listening on its pipeline. */
-    private void onBatchEvent(BatchEvent event) {
+    private void onConsignmentEvent(ConsignmentEvent event) {
         if (!"SUCCESS".equals(event.status())) return;   // enrichment acts only on successful commits
         for (EnrichmentConfig job : jobs) {
             EnrichmentConfig.Triggers t = job.triggers();
@@ -222,7 +222,7 @@ public final class EnrichmentService implements AutoCloseable {
                     startTime, EnrichmentAuditWriter.now(), "SUCCESS",
                     parts.size(), outs.size(), res.totalRows(), bytes, durationMs, ""), outs);
             // chain: a successful enrichment is itself a commit downstream jobs can subscribe to
-            bus.publish(new BatchEvent(job.name(), runId, "SUCCESS", parts,
+            bus.publish(new ConsignmentEvent(job.name(), runId, "SUCCESS", parts,
                     res.totalRows(), durationMs, 0));
         } catch (Exception e) {
             long durationMs = (System.nanoTime() - startNanos) / 1_000_000L;

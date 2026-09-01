@@ -1,6 +1,6 @@
 package com.gamma.signal;
 
-import com.gamma.etl.BatchEvent;
+import com.gamma.etl.ConsignmentEvent;
 import com.gamma.event.EventLog;
 
 import java.time.Instant;
@@ -10,23 +10,23 @@ import java.util.Map;
 /**
  * Emits the canonical {@code pipeline.batch.committed|failed} Signal for a terminal batch onto the
  * current space's ledger. This is the observability tail formerly inlined in
- * {@code etl.BatchAuditWriter.emitBatchSignal}; it was lifted here — above {@code com.gamma.etl} — so
+ * {@code etl.ConsignmentAuditWriter.emitBatchSignal}; it was lifted here — above {@code com.gamma.etl} — so
  * the ETL layer stays free of the {@code event}/{@code signal} packages and can be a foundation layer.
  * The composition root wires it via
- * {@code BatchAuditWriter.setTerminalBatchSink(PipelineBatchSignal::emit)}.
+ * {@code ConsignmentAuditWriter.setTerminalBatchSink(PipelineConsignmentSignal::emit)}.
  *
  * <p>Uses {@link EventLog#current()} — the established ambient idiom for code with no injected
  * per-space handle (mirrors {@code ReportJob}'s {@code REPORT_READY} emission). It is additive to the
- * {@code BatchEventBus} fan-out and to {@code JobService.mirrorPipelineCommit}'s {@code pipeline.commit}
+ * {@code ConsignmentEventBus} fan-out and to {@code JobService.mirrorPipelineCommit}'s {@code pipeline.commit}
  * mirror (a different signal type); none of those are replaced.
  */
-public final class PipelineBatchSignal {
+public final class PipelineConsignmentSignal {
 
-    private PipelineBatchSignal() {
+    private PipelineConsignmentSignal() {
     }
 
-    /** Build the canonical Signal from a terminal {@link BatchEvent} and emit it onto the current ledger. */
-    public static void emit(BatchEvent event) {
+    /** Build the canonical Signal from a terminal {@link ConsignmentEvent} and emit it onto the current ledger. */
+    public static void emit(ConsignmentEvent event) {
         boolean success = "SUCCESS".equals(event.status());
         // A PARKED Consignment (Phase 4 S4b) is neither committed nor failed — it stopped at a
         // disabled Step by operator intent, so reporting it "failed" would teach operators something
@@ -35,7 +35,7 @@ public final class PipelineBatchSignal {
                 : "PARKED".equals(event.status()) ? "pipeline.batch.parked" : "pipeline.batch.failed";
 
         // Event's payload immutability (Map.copyOf, Event.java) rejects null values, so only put the
-        // optional error-detail fields when present — mirrors BatchEvent's own null-ability.
+        // optional error-detail fields when present — mirrors ConsignmentEvent's own null-ability.
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("status", event.status());
         payload.put("outputRows", event.outputRows());

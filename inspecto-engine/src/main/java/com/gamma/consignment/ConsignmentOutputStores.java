@@ -11,7 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Process-wide, per-space {@link DbConsignmentOutputStore} accessor (§11.3 slice 2 wiring) — the global-registry
  * idiom of {@link com.gamma.acquire.AcquisitionLedgers} / {@code MetricRegistry.global()}, so the <em>static</em>
- * write paths ({@code BatchProcessor.finalizeSource}, {@code EnrichmentEngine.runResult}) can record output files
+ * write paths ({@code ConsignmentIngestor.finalizeSource}, {@code EnrichmentEngine.runResult}) can record output files
  * without threading a store through every call.
  *
  * <p><b>Pure registry — no backend resolution here.</b> Unlike {@code AcquisitionLedgers}, this class never builds

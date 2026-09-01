@@ -22,36 +22,36 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 /**
- * Processes one {@link Batch} in a single pass.
+ * Processes one {@link Consignment} in a single pass.
  *
- * <p>This class is now a thin coordinator: it selects a {@link BatchIngestStrategy}
+ * <p>This class is now a thin coordinator: it selects a {@link ConsignmentIngestStrategy}
  * (CSV vs. plugin) based on config, runs it to produce an {@link IngestOutcome}, then
  * drives the shared, path-agnostic tail — {@link #commit} and {@link #writeAudit}.
  *
  * <h3>CSV path (default)</h3>
- * {@link CsvBatchStrategy} ingests each member into a per-file temp table, inserts accepted
+ * {@link CsvIngestStrategy} ingests each member into a per-file temp table, inserts accepted
  * rows into a shared {@code raw_input} tagged with {@code __src_id}, transforms once, writes
  * consolidated partition output, and computes the lineage matrix. Rejected members are
  * quarantined; their rows never reach {@code raw_input}.
  *
  * <h3>Plugin-ingester path</h3>
- * When {@link PipelineConfig.Schemas#ingesterClass()} is set, {@link StreamingPluginBatchStrategy}
+ * When {@link PipelineConfig.Schemas#ingesterClass()} is set, {@link StreamingPluginIngestStrategy}
  * runs the configured {@link StreamingFileIngester} and picks, per batch by file size, between
  * union mode (many small files → one transform/write) and generation mode (huge single files →
  * bounded scratch). All segment outputs aggregate into one batch audit entry.
  */
-public final class BatchProcessor {
+public final class ConsignmentIngestor {
 
-    private static final Logger log = LoggerFactory.getLogger(BatchProcessor.class);
+    private static final Logger log = LoggerFactory.getLogger(ConsignmentIngestor.class);
 
-    private BatchProcessor() {}
+    private ConsignmentIngestor() {}
 
     // ── entry point ───────────────────────────────────────────────────────────
 
-    public static void process(Batch batch, PipelineConfig cfg, BatchAuditWriter audit) {
-        BatchIngestStrategy strategy = (cfg.schemas().ingesterClass() == null)
-                ? new CsvBatchStrategy()
-                : new StreamingPluginBatchStrategy();
+    public static void process(Consignment batch, PipelineConfig cfg, ConsignmentAuditWriter audit) {
+        ConsignmentIngestStrategy strategy = (cfg.schemas().ingesterClass() == null)
+                ? new CsvIngestStrategy()
+                : new StreamingPluginIngestStrategy();
 
         IngestOutcome outcome;
         try {
@@ -77,8 +77,8 @@ public final class BatchProcessor {
                     status = "PARKED";
                 } catch (Exception e) {
                     status = "FAILED";
-                    error  = "park failed: " + BatchIngestStrategy.msg(e);
-                    log.error("Batch {} failed during park", batch.batchId(), e);
+                    error  = "park failed: " + ConsignmentIngestStrategy.msg(e);
+                    log.error("Consignment {} failed during park", batch.batchId(), e);
                 }
             } else {
                 try {
@@ -89,15 +89,15 @@ public final class BatchProcessor {
                     // to FAILED so the batch stays visible to audit/lineage/recovery instead of
                     // vanishing — a silently un-audited batch is the worst outcome for reprocessing.
                     status = "FAILED";
-                    error  = "commit failed: " + BatchIngestStrategy.msg(e);
-                    log.error("Batch {} failed during commit", batch.batchId(), e);
+                    error  = "commit failed: " + ConsignmentIngestStrategy.msg(e);
+                    log.error("Consignment {} failed during commit", batch.batchId(), e);
                 }
             }
         }
         try {   // audit is always written — even when commit failed above
             writeAudit(batch, cfg, audit, outcome, status, error);
         } catch (Exception e) {
-            log.error("Batch {} failed during audit", batch.batchId(), e);
+            log.error("Consignment {} failed during audit", batch.batchId(), e);
         }
         recordProvenance(cfg.identity().pipelineName(), batch, outcome, status);
     }
@@ -112,7 +112,7 @@ public final class BatchProcessor {
      * {@code data} edge. Default-off (no store registered ⇒ a map lookup) and best-effort like every
      * registry on this path. SUCCESS only — a failed batch wrote nothing durable to count.
      */
-    static void recordProvenance(String pipeline, Batch batch, IngestOutcome outcome, String status) {
+    static void recordProvenance(String pipeline, Consignment batch, IngestOutcome outcome, String status) {
         if (!"SUCCESS".equals(status) || com.gamma.pipeline.exec.ProvenanceStores.shared() == null) return;
         String ts = java.time.Instant.now().toString();
         long written = outcome.lineage().stream().mapToLong(LineageRow::rowCount).sum();
@@ -125,14 +125,14 @@ public final class BatchProcessor {
 
     // ── commit: register, manifest, markers, backup ────────────────────────────
 
-    private static void commit(Batch batch, PipelineConfig cfg, List<Batch.Member> survivors,
+    private static void commit(Consignment batch, PipelineConfig cfg, List<Consignment.Member> survivors,
                                List<PartitionOutput> outputs, List<LineageRow> lineage,
                                Map<String, EventTimeBounds> bounds, List<MemberAudit> audits)
             throws IOException {
         // lineage is persisted by writeAudit (from the outcome); it is passed on here too because it is the
         // only place a per-output-file row count exists (§11.3). The durable side effects —
         // register → manifest → backup → markers LAST → ledger / watermark — live in finalizeSource, which
-        // the branch-aware graph path (BatchGraphRunner's SourceFinalizer) reuses once every sink branch is
+        // the branch-aware graph path (ConsignmentGraphRunner's SourceFinalizer) reuses once every sink branch is
         // committed (Stage A), so both drivers share this one crash-ordered sequence.
         finalizeSource(batch, cfg, survivors, outputs, lineage, bounds, audits);
 
@@ -141,7 +141,7 @@ public final class BatchProcessor {
         // log: it IS the durable partial-commit record BranchCommitCoordinator resumes from. Absent
         // for flat-lane batches, so deleteIfExists is the right verb.
         java.nio.file.Files.deleteIfExists(
-                BatchIngestStrategy.branchCommitLogPath(cfg, batch.batchId()));
+                ConsignmentIngestStrategy.branchCommitLogPath(cfg, batch.batchId()));
     }
 
     /**
@@ -168,7 +168,7 @@ public final class BatchProcessor {
      *       committed before the park.</li>
      * </ol>
      */
-    private static void parkSource(Batch batch, PipelineConfig cfg, List<Batch.Member> survivors,
+    private static void parkSource(Consignment batch, PipelineConfig cfg, List<Consignment.Member> survivors,
                                    Map<String, java.nio.file.Path> parked,
                                    List<PartitionOutput> outputs, List<LineageRow> lineage,
                                    Map<String, EventTimeBounds> bounds) throws IOException {
@@ -176,8 +176,8 @@ public final class BatchProcessor {
         Path parkHome = Paths.get(cfg.dirs().backup(), "parked");
         Files.createDirectories(parkHome);
 
-        List<BatchManifest.MemberEntry> members = new ArrayList<>();
-        for (Batch.Member m : survivors) {
+        List<ConsignmentManifest.MemberEntry> members = new ArrayList<>();
+        for (Consignment.Member m : survivors) {
             File original = com.gamma.etl.unpack.UnpackOrigins.originalOr(m.file());
             Path op = original.toPath().toAbsolutePath().normalize();
             String rel = (op.startsWith(poll) ? poll.relativize(op).toString() : original.getName())
@@ -190,12 +190,12 @@ public final class BatchProcessor {
                 Files.move(op, dst, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                 parkedPath = dst.toString();
             }
-            members.add(new BatchManifest.MemberEntry(m.file().getName(), m.srcId(), rel,
+            members.add(new ConsignmentManifest.MemberEntry(m.file().getName(), m.srcId(), rel,
                     parkedPath, com.gamma.etl.MemberStatus.PARKED.name()));
         }
 
         if (cfg.dirs().manifestsDir() != null) {
-            BatchManifest manifest = new BatchManifest();
+            ConsignmentManifest manifest = new ConsignmentManifest();
             manifest.batchId     = batch.batchId();
             manifest.pipeline    = cfg.identity().pipelineName();
             manifest.schemaName  = batch.schemaName();
@@ -219,14 +219,14 @@ public final class BatchProcessor {
 
         recordStages(cfg.collector().id(), batch.batchId(), survivors, cfg,
                 com.gamma.consignment.FileStage.PARKED);
-        log.info("Batch {} PARKED at {} — park tables under {}, originals in the park home; "
+        log.info("Consignment {} PARKED at {} — park tables under {}, originals in the park home; "
                 + "re-enable the step and drain to complete", batch.batchId(), parked.keySet(), parkHome);
     }
 
     /**
      * The batch's durable source finalisation, in crash-safe order: DuckLake register → manifest → backup →
      * <b>markers LAST</b> → fingerprint ledger / DB-export watermark. Extracted from {@link #commit} so the
-     * branch-aware {@link com.gamma.pipeline.exec.BatchGraphRunner} can drive the identical sequence as its
+     * branch-aware {@link com.gamma.pipeline.exec.ConsignmentGraphRunner} can drive the identical sequence as its
      * {@code SourceFinalizer} — run once, only after every sink branch is durable (T11 commit-split). The
      * legacy single-output path calls it through {@code commit}; both share this one ordering invariant.
      *
@@ -235,14 +235,14 @@ public final class BatchProcessor {
      *                register"</b> — not "zero rows": the Pipeline-sink path counts per partition instead and
      *                registers its own files, so registering here as well would double-count them.
      */
-    static void finalizeSource(Batch batch, PipelineConfig cfg, List<Batch.Member> survivors,
+    static void finalizeSource(Consignment batch, PipelineConfig cfg, List<Consignment.Member> survivors,
                                List<PartitionOutput> outputs, List<LineageRow> lineage) throws IOException {
         finalizeSource(batch, cfg, survivors, outputs, lineage, Map.of());
     }
 
-    /** {@link #finalizeSource(Batch, PipelineConfig, List, List, List)} with §3.1's per-output-file
+    /** {@link #finalizeSource(Consignment, PipelineConfig, List, List, List)} with §3.1's per-output-file
      *  event-time bounds for the output registry. */
-    static void finalizeSource(Batch batch, PipelineConfig cfg, List<Batch.Member> survivors,
+    static void finalizeSource(Consignment batch, PipelineConfig cfg, List<Consignment.Member> survivors,
                                List<PartitionOutput> outputs, List<LineageRow> lineage,
                                Map<String, EventTimeBounds> bounds) throws IOException {
         finalizeSource(batch, cfg, survivors, outputs, lineage, bounds, List.of());
@@ -256,13 +256,13 @@ public final class BatchProcessor {
      * <p>Before this, only survivors became {@code MemberEntry} rows: a file that could not be parsed
      * existed in the audit CSV and the quarantine tree but was <b>absent from the manifest</b>, which
      * is the authoritative per-Consignment record. The branch-aware graph path
-     * ({@code BatchGraphRunner.SourceFinalizer}) uses the no-audits overload and is unchanged.
+     * ({@code ConsignmentGraphRunner.SourceFinalizer}) uses the no-audits overload and is unchanged.
      *
      * <p>⚠ The crash-safe ORDER is untouched — register → manifest → backup → markers LAST. A failed
      * member gets a manifest row and no backup/marker (it was moved to quarantine by the strategy,
      * and its file must not be marked processed), so nothing about recovery changes.
      */
-    static void finalizeSource(Batch batch, PipelineConfig cfg, List<Batch.Member> survivors,
+    static void finalizeSource(Consignment batch, PipelineConfig cfg, List<Consignment.Member> survivors,
                                List<PartitionOutput> outputs, List<LineageRow> lineage,
                                Map<String, EventTimeBounds> bounds,
                                List<MemberAudit> audits) throws IOException {
@@ -306,9 +306,9 @@ public final class BatchProcessor {
         String sourceId = cfg.collector().id();
         List<LedgerEntry> ledgerEntries = ledgerRecord ? new ArrayList<>() : null;
 
-        List<BatchManifest.MemberEntry> memberEntries = new ArrayList<>();
+        List<ConsignmentManifest.MemberEntry> memberEntries = new ArrayList<>();
         List<String> markerPaths = new ArrayList<>();
-        for (Batch.Member m : survivors) {
+        for (Consignment.Member m : survivors) {
             // ⚠ Every poll-relative computation below runs against the ORIGINAL inbox file
             // (unpack-stage plan §2.0): an unpack-expanded member lives in dirs.temp, and
             // poll.relativize on it walks out of the root (../..) — a marker outside the markers
@@ -352,7 +352,7 @@ public final class BatchProcessor {
                             System.currentTimeMillis(), LedgerEntry.PROCESSED));
                 } catch (IOException ignore) { /* vanished pre-backup — skip recording this member */ }
             }
-            memberEntries.add(new BatchManifest.MemberEntry(
+            memberEntries.add(new ConsignmentManifest.MemberEntry(
                     m.file().getName(), m.srcId(), rel, backupPath,
                     com.gamma.etl.MemberStatus.SUCCESS.name()));
         }
@@ -364,10 +364,10 @@ public final class BatchProcessor {
         // No backup and no marker for these: the strategy already moved the file to quarantine, and
         // marking it processed would hide a file that never landed.
         java.util.Set<Integer> survivorIds = new java.util.HashSet<>();
-        for (Batch.Member m : survivors) survivorIds.add(m.srcId());
+        for (Consignment.Member m : survivors) survivorIds.add(m.srcId());
         for (MemberAudit a : audits) {
             if (a.status() == com.gamma.etl.MemberStatus.SUCCESS || survivorIds.contains(a.srcId())) continue;
-            Batch.Member failed = batch.members().stream()
+            Consignment.Member failed = batch.members().stream()
                     .filter(m -> m.srcId() == a.srcId()).findFirst().orElse(null);
             String rel = a.filename();
             if (failed != null) {
@@ -379,7 +379,7 @@ public final class BatchProcessor {
                         rel = rel + "!" + failed.file().getName();
                 }
             }
-            memberEntries.add(new BatchManifest.MemberEntry(
+            memberEntries.add(new ConsignmentManifest.MemberEntry(
                     a.filename(), a.srcId(), rel, "", a.status().name()));
         }
 
@@ -392,7 +392,7 @@ public final class BatchProcessor {
         // actually be written, so a manifests-off run keeps the record for the WARN log alone.
         if (cfg.dirs().manifestsDir() != null) {
             java.util.Set<File> originals = new java.util.LinkedHashSet<>();
-            for (Batch.Member m : batch.members())
+            for (Consignment.Member m : batch.members())
                 originals.add(com.gamma.etl.unpack.UnpackOrigins.originalOr(m.file()));
             for (File original : originals) {
                 List<String> skipped = com.gamma.etl.unpack.UnpackOrigins.takeSkipped(original);
@@ -401,7 +401,7 @@ public final class BatchProcessor {
                 String archiveRel = fp.startsWith(poll)
                         ? poll.relativize(fp).toString().replace('\\', '/') : original.getName();
                 for (String entry : skipped)
-                    memberEntries.add(new BatchManifest.MemberEntry(
+                    memberEntries.add(new ConsignmentManifest.MemberEntry(
                             entry, -1, archiveRel + "!" + entry, "",
                             com.gamma.etl.MemberStatus.SKIPPED_UNREADABLE.name()));
             }
@@ -412,7 +412,7 @@ public final class BatchProcessor {
         String schemaFingerprint = schemaFingerprintFor(cfg, batch.schemaName());
 
         if (cfg.dirs().manifestsDir() != null) {
-            BatchManifest manifest = new BatchManifest();
+            ConsignmentManifest manifest = new ConsignmentManifest();
             manifest.batchId     = batch.batchId();
             manifest.pipeline    = cfg.identity().pipelineName();
             manifest.schemaName  = batch.schemaName();
@@ -421,7 +421,7 @@ public final class BatchProcessor {
             manifest.schemaFingerprint = schemaFingerprint;
             manifest.members     = memberEntries;
             manifest.outputs     = outputs.stream()
-                    .map(o -> new BatchManifest.OutputEntry(o.partition(), o.outputFile())).toList();
+                    .map(o -> new ConsignmentManifest.OutputEntry(o.partition(), o.outputFile())).toList();
             manifest.markers     = markerPaths;
             ManifestStore.write(cfg.dirs().manifestsDir(), manifest);
             recordStages(stageSourceId, batchIdForStages, survivors, cfg, FileStage.MANIFESTED);
@@ -443,7 +443,7 @@ public final class BatchProcessor {
         // method: its original may still have members in other batches, and backing it up (or
         // marking it) now would strand them.
         if (backup != null) {
-            for (Batch.Member m : survivors) {
+            for (Consignment.Member m : survivors) {
                 if (com.gamma.etl.unpack.UnpackOrigins.isExpanded(m.file())) continue;
                 try {
                     backupFile(m.file(), cfg);
@@ -455,7 +455,7 @@ public final class BatchProcessor {
                     // nothing will ever re-drive a file that is no longer there. Only the vanished case is
                     // tolerated: a genuine backup failure (unwritable destination, full disk) leaves the file in
                     // the inbox, where a FAILED batch is the honest answer and the rerun is idempotent.
-                    log.warn("Batch {} member {} vanished before backup; skipping its backup",
+                    log.warn("Consignment {} member {} vanished before backup; skipping its backup",
                             batch.batchId(), m.file().getName());
                 }
             }
@@ -465,7 +465,7 @@ public final class BatchProcessor {
         // Markers LAST — created only after every other side-effect is durable (PATH-mode dedup only;
         // content-based mode uses the ledger below — see writeMarkers above).
         if (writeMarkers) {
-            for (Batch.Member m : survivors) {
+            for (Consignment.Member m : survivors) {
                 if (com.gamma.etl.unpack.UnpackOrigins.isExpanded(m.file())) continue;   // deferred, below
                 MarkerManager.createMarkerFile(m.file(), cfg);
             }
@@ -483,8 +483,8 @@ public final class BatchProcessor {
         // new max watermark during fetchTo; advance it only now that the batch is durable (resumable). Source-type-
         // agnostic — takeDbWatermark is empty for any file no connector stashed.
         AcquisitionLedger wmLedger = null;
-        List<Batch.Member> watermarked = new ArrayList<>();
-        for (Batch.Member m : survivors) {
+        List<Consignment.Member> watermarked = new ArrayList<>();
+        for (Consignment.Member m : survivors) {
             Path filePath = m.file().toPath().toAbsolutePath().normalize();
             var wm = AcquisitionLedgers.takeDbWatermark(filePath);
             if (wm.isPresent()) {
@@ -505,14 +505,14 @@ public final class BatchProcessor {
         // run, in the same backup→marker order as above. Until then the original stays in the inbox:
         // if a sibling member's batch fails, no marker exists and the next cycle re-expands it whole,
         // which the OVERWRITE_OR_IGNORE outputs make idempotent.
-        for (Batch.Member m : survivors) {
+        for (Consignment.Member m : survivors) {
             File original = com.gamma.etl.unpack.UnpackStage.cleanup(m.file());
             if (original == null) continue;
             if (backup != null) {
                 try {
                     backupFile(original, cfg);
                 } catch (NoSuchFileException vanished) {
-                    log.warn("Batch {} unpack source {} vanished before backup; skipping its backup",
+                    log.warn("Consignment {} unpack source {} vanished before backup; skipping its backup",
                             batch.batchId(), original.getName());
                 }
             }
@@ -528,13 +528,13 @@ public final class BatchProcessor {
      * side effect: a file's real path is relativized against {@code dirs.poll}, the same key
      * {@code AcquisitionLedger} uses, so a stage row and a ledger row for the same file always agree.
      */
-    private static void recordStages(String sourceId, String batchId, List<Batch.Member> survivors,
+    private static void recordStages(String sourceId, String batchId, List<Consignment.Member> survivors,
                                       PipelineConfig cfg, FileStage stage) {
         if (FileStages.shared() == null) return;
         Path poll = Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
         String now = LocalDateTime.now().format(DuckDbUtil.DT_FMT);
         List<FileStageRecord> records = new ArrayList<>();
-        for (Batch.Member m : survivors) {
+        for (Consignment.Member m : survivors) {
             String rel = poll.relativize(m.file().toPath().toAbsolutePath().normalize())
                     .toString().replace('\\', '/');
             records.add(new FileStageRecord(sourceId, rel, batchId, stage, now));
@@ -618,7 +618,7 @@ public final class BatchProcessor {
      * {@code status}/{@code error} args are the <em>final</em> values (a post-write
      * commit failure demotes a SUCCESS outcome to FAILED).
      */
-    private static void writeAudit(Batch batch, PipelineConfig cfg, BatchAuditWriter audit,
+    private static void writeAudit(Consignment batch, PipelineConfig cfg, ConsignmentAuditWriter audit,
                                    IngestOutcome outcome, String status, String error) {
         if (audit == null) return;
         LocalDateTime end = LocalDateTime.now();
@@ -632,9 +632,9 @@ public final class BatchProcessor {
         // srcId -> the member's own file, for the rows that are NOT expansion products. Pure path
         // arithmetic below, so it does not matter that commit has already moved these to backup.
         Map<Integer, File> memberFiles = new HashMap<>();
-        for (Batch.Member m : batch.members()) memberFiles.put(m.srcId(), m.file());
+        for (Consignment.Member m : batch.members()) memberFiles.put(m.srcId(), m.file());
 
-        List<BatchAuditWriter.FileRow> fileRows = new ArrayList<>();
+        List<ConsignmentAuditWriter.FileRow> fileRows = new ArrayList<>();
         int rejected = 0;
         for (MemberAudit ma : outcome.memberAudits()) {
             if (ma.status() != com.gamma.etl.MemberStatus.SUCCESS) rejected++;
@@ -647,7 +647,7 @@ public final class BatchProcessor {
                         ma.status() == com.gamma.etl.MemberStatus.SUCCESS);
             List<String> paths = new ArrayList<>(
                     outBySrc.getOrDefault(ma.srcId(), new LinkedHashSet<>()));
-            fileRows.add(new BatchAuditWriter.FileRow(
+            fileRows.add(new ConsignmentAuditWriter.FileRow(
                     ma.start().format(DuckDbUtil.DT_FMT), end.format(DuckDbUtil.DT_FMT),
                     ma.filename(), ma.status().name(), ma.parsedRows(), ma.errorRows(),
                     paths, Collections.nCopies(paths.size(), 0L),
@@ -658,7 +658,7 @@ public final class BatchProcessor {
         long totalOutputRows  = lineage.stream().mapToLong(LineageRow::rowCount).sum();
         long totalOutputBytes = outputs.stream().mapToLong(PartitionOutput::bytes).sum();
 
-        BatchAuditWriter.BatchRow batchRow = new BatchAuditWriter.BatchRow(
+        ConsignmentAuditWriter.ConsignmentRow batchRow = new ConsignmentAuditWriter.ConsignmentRow(
                 batch.batchId(), cfg.identity().pipelineName(), outcome.schemaLabel(), batch.table(),
                 outcome.batchStart().format(DuckDbUtil.DT_FMT), end.format(DuckDbUtil.DT_FMT), status,
                 batch.members().size(), rejected, outcome.totalInputRows(), totalOutputRows,

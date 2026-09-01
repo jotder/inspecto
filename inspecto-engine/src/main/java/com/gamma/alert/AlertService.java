@@ -1,7 +1,7 @@
 package com.gamma.alert;
 
 import com.gamma.catalog.ConfigSource;
-import com.gamma.etl.BatchEvent;
+import com.gamma.etl.ConsignmentEvent;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.event.Event;
 import com.gamma.event.EventLevel;
@@ -38,7 +38,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * {@code .toon}, and THIS deterministic service (no model, lean core) executes it.
  *
  * <h3>Evaluation model</h3>
- * Event-driven: every terminal {@link BatchEvent} (SUCCESS and FAILED both fire — error rates need
+ * Event-driven: every terminal {@link ConsignmentEvent} (SUCCESS and FAILED both fire — error rates need
  * both) triggers evaluation of the rules scoped to that pipeline (plus unscoped rules) over the
  * ledger window. A manual sweep ({@link #evaluateAll}) backs {@code POST /alerts/evaluate}.
  *
@@ -141,7 +141,7 @@ public final class AlertService {
     }
 
     /** Bus subscriber: a terminal batch re-evaluates the rules scoped to its pipeline. */
-    public void onEvent(BatchEvent event) {
+    public void onEvent(ConsignmentEvent event) {
         try {
             evaluate(event.pipeline(), System.currentTimeMillis());
         } catch (RuntimeException e) {
@@ -374,7 +374,7 @@ public final class AlertService {
         }
         Duration span = rule.windowDuration();
         // ⛔ Stays systemDefault(), to match the writer — DECIDED 2026-08-15, do not "finish" the
-        // -Dops.timezone sweep here. BatchProcessor stamps the batches ledger's start_time/end_time with
+        // -Dops.timezone sweep here. ConsignmentIngestor stamps the batches ledger's start_time/end_time with
         // LocalDateTime.now() into a zone-NAIVE string; this cutoff is the read half of that pair. Moving
         // this side alone offsets every alert window by the gap between ops zone and host zone.
         LocalDateTime cutoff = LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(nowMs),

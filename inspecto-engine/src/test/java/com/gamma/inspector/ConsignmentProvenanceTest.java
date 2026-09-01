@@ -1,6 +1,6 @@
 package com.gamma.inspector;
 
-import com.gamma.etl.Batch;
+import com.gamma.etl.Consignment;
 import com.gamma.etl.LineageRow;
 import com.gamma.etl.SchemaSelector;
 import com.gamma.pipeline.exec.DbProvenanceStore;
@@ -25,21 +25,21 @@ import static org.junit.jupiter.api.Assertions.*;
  * ingest pipeline. Node ids are the editable lift's ({@code parse}/{@code sink}), which is what the
  * {@code GET /provenance} Sankey keys on.
  */
-class BatchProvenanceTest {
+class ConsignmentProvenanceTest {
 
     @AfterEach
     void clearRegistry() {
         ProvenanceStores.use(null);
     }
 
-    private static Batch batch(Path dir) throws Exception {
+    private static Consignment batch(Path dir) throws Exception {
         File f = dir.resolve("in.csv").toFile();
         Files.writeString(f.toPath(), "x");
-        return new Batch("TS_t1_0001", "s", "t1", List.of(new Batch.Member(
+        return new Consignment("TS_t1_0001", "s", "t1", List.of(new Consignment.Member(
                 f, 0, 1L, new SchemaSelector.Selection(Map.of("raw", Map.of("name", "t1")), "t1"))));
     }
 
-    private static IngestOutcome outcome(Batch batch, String status, long inputRows, List<LineageRow> lineage) {
+    private static IngestOutcome outcome(Consignment batch, String status, long inputRows, List<LineageRow> lineage) {
         return new IngestOutcome(LocalDateTime.now(), status, null,
                 batch.members(), List.of(), List.of(), lineage, inputRows, "s");
     }
@@ -48,9 +48,9 @@ class BatchProvenanceTest {
     void aSuccessfulBatchProjectsParseAndSinkCounts(@TempDir Path dir) throws Exception {
         try (DbProvenanceStore store = DbProvenanceStore.open("jdbc:duckdb:")) {
             ProvenanceStores.use(store);
-            Batch batch = batch(dir);
+            Consignment batch = batch(dir);
             // 13 rows parsed; 12 landed across two partition files (one row filtered en route)
-            BatchProcessor.recordProvenance("demo_etl", batch, outcome(batch, "SUCCESS", 13L, List.of(
+            ConsignmentIngestor.recordProvenance("demo_etl", batch, outcome(batch, "SUCCESS", 13L, List.of(
                     new LineageRow(batch.batchId(), 0, "in.csv", "out1.parquet", "day=1", 7L),
                     new LineageRow(batch.batchId(), 0, "in.csv", "out2.parquet", "day=2", 5L))), "SUCCESS");
 
@@ -70,8 +70,8 @@ class BatchProvenanceTest {
     void aFailedBatchRecordsNothing(@TempDir Path dir) throws Exception {
         try (DbProvenanceStore store = DbProvenanceStore.open("jdbc:duckdb:")) {
             ProvenanceStores.use(store);
-            Batch batch = batch(dir);
-            BatchProcessor.recordProvenance("demo_etl", batch, outcome(batch, "FAILED", 13L, List.of()), "FAILED");
+            Consignment batch = batch(dir);
+            ConsignmentIngestor.recordProvenance("demo_etl", batch, outcome(batch, "FAILED", 13L, List.of()), "FAILED");
             assertTrue(store.query("demo_etl", batch.batchId()).isEmpty());
         }
     }
@@ -79,8 +79,8 @@ class BatchProvenanceTest {
     /** Default-off: with no store registered the call is a map lookup, never a throw into the commit path. */
     @Test
     void noRegisteredStoreIsANoOp(@TempDir Path dir) throws Exception {
-        Batch batch = batch(dir);
-        assertDoesNotThrow(() -> BatchProcessor.recordProvenance(
+        Consignment batch = batch(dir);
+        assertDoesNotThrow(() -> ConsignmentIngestor.recordProvenance(
                 "demo_etl", batch, outcome(batch, "SUCCESS", 1L, List.of()), "SUCCESS"));
     }
 }

@@ -7,15 +7,15 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class BatchEventBusTest {
+class ConsignmentEventBusTest {
 
-    private static BatchEvent evt(String batchId) {
-        return new BatchEvent("p", batchId, "SUCCESS", List.of("year=2020/month=04/day=03"), 10, 5L, 0);
+    private static ConsignmentEvent evt(String batchId) {
+        return new ConsignmentEvent("p", batchId, "SUCCESS", List.of("year=2020/month=04/day=03"), 10, 5L, 0);
     }
 
     @Test
     void fansOutToAllSubscribers() {
-        BatchEventBus bus = new BatchEventBus();
+        ConsignmentEventBus bus = new ConsignmentEventBus();
         List<String> a = new ArrayList<>(), b = new ArrayList<>();
         bus.subscribe(e -> a.add(e.batchId()));
         bus.subscribe(e -> b.add(e.batchId()));
@@ -28,7 +28,7 @@ class BatchEventBusTest {
 
     @Test
     void aThrowingListenerDoesNotDropTheEventForOthers() {
-        BatchEventBus bus = new BatchEventBus();
+        ConsignmentEventBus bus = new ConsignmentEventBus();
         List<String> received = new ArrayList<>();
         bus.subscribe(e -> { throw new RuntimeException("boom"); });
         bus.subscribe(e -> received.add(e.batchId()));
@@ -39,7 +39,7 @@ class BatchEventBusTest {
 
     @Test
     void sinkPublishes() {
-        BatchEventBus bus = new BatchEventBus();
+        ConsignmentEventBus bus = new ConsignmentEventBus();
         List<String> received = new ArrayList<>();
         bus.subscribe(e -> received.add(e.batchId()));
         bus.sink().accept(evt("b3"));

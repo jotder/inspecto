@@ -135,7 +135,7 @@ final class ServiceStores {
      * three-value contract as {@link #openConsignmentOutputStore(SpaceRoot)} — {@code duckdb}, {@code postgres}/
      * {@code postgresql} ({@code -Dfile.stages.db.url}), or a raw {@code jdbc:} URL. Any other value ⇒
      * {@code null} ⇒ no per-file stage index is kept; the crash-safe commit ordering
-     * {@code BatchProcessor.finalizeSource} enforces is unchanged either way.
+     * {@code ConsignmentIngestor.finalizeSource} enforces is unchanged either way.
      */
     static com.gamma.consignment.DbFileStageStore openFileStageStore(SpaceRoot root) {
         String backend = System.getProperty("file.stages.backend", "none").trim().toLowerCase();

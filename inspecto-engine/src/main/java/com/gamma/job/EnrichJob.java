@@ -3,16 +3,16 @@ package com.gamma.job;
 import com.gamma.enrich.EnrichmentAuditWriter;
 import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.enrich.EnrichmentEngine;
-import com.gamma.etl.BatchEvent;
+import com.gamma.etl.ConsignmentEvent;
 import com.gamma.etl.PartitionOutput;
-import com.gamma.etl.BatchEventBus;
+import com.gamma.etl.ConsignmentEventBus;
 
 import java.util.List;
 
 /**
  * An {@link JobType#ENRICH} job: runs a Stage-2 enrichment once (full recompute),
  * writes run-level audit + lineage via {@link EnrichmentAuditWriter} (trigger {@code job}),
- * and publishes a chain {@link BatchEvent} so downstream jobs/enrichments fire — the same
+ * and publishes a chain {@link ConsignmentEvent} so downstream jobs/enrichments fire — the same
  * contract as {@code EnrichmentService} and the enrichment CLI.
  *
  * <p>Param: {@code config} — path to the enrichment {@code .toon}.
@@ -20,9 +20,9 @@ import java.util.List;
 final class EnrichJob implements Job {
 
     private final JobConfig cfg;
-    private final BatchEventBus bus;
+    private final ConsignmentEventBus bus;
 
-    EnrichJob(JobConfig cfg, BatchEventBus bus) {
+    EnrichJob(JobConfig cfg, ConsignmentEventBus bus) {
         this.cfg = cfg;
         this.bus = bus;
     }
@@ -53,7 +53,7 @@ final class EnrichJob implements Job {
                 parts.size(), outs.size(), res.totalRows(), bytes, ms, ""), outs);
 
         // chain: a successful enrichment is a commit downstream jobs can subscribe to
-        bus.publish(new BatchEvent(job.name(), runId, "SUCCESS", parts, res.totalRows(), ms, 0));
+        bus.publish(new ConsignmentEvent(job.name(), runId, "SUCCESS", parts, res.totalRows(), ms, 0));
 
         return JobResult.ok(outs.size() + " partition file(s), " + res.totalRows() + " row(s)", ms);
     }

@@ -1,7 +1,7 @@
 package com.gamma.ingester;
 
 import com.gamma.etl.*;
-import com.gamma.inspector.BatchProcessor;
+import com.gamma.inspector.ConsignmentIngestor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * End-to-end test for the {@link TypedRecordIngester} reference plugin.
  *
  * <p>Exercises the full plugin path: {@code PipelineConfig.load} →
- * {@code BatchProcessor.process} → {@code StreamingPluginBatchStrategy} (union mode) → {@code DataTransformer} →
+ * {@code ConsignmentIngestor.process} → {@code StreamingPluginIngestStrategy} (union mode) → {@code DataTransformer} →
  * {@code PartitionWriter} → on-disk Hive layout.  Acts as the working example
  * a real plugin author would copy from.
  */
@@ -81,7 +81,7 @@ class TypedRecordIngesterTest {
         // The known segments still produce output
         assertOutputFileCount(cfg, "CALL", 1);
         assertOutputFileCount(cfg, "SMS",  1);
-        // Batch is SUCCESS — junk lines don't fail the batch when at least one segment has rows
+        // Consignment is SUCCESS — junk lines don't fail the batch when at least one segment has rows
         assertTrue(Files.readString(Path.of(cfg.dirs().batchesFilePath())).contains(",SUCCESS,"));
     }
 
@@ -129,15 +129,15 @@ class TypedRecordIngesterTest {
     }
 
     private static void run(PipelineConfig cfg, File... files) {
-        List<Batch.Member> members = new ArrayList<>();
+        List<Consignment.Member> members = new ArrayList<>();
         for (int i = 0; i < files.length; i++) {
             SchemaSelector.Selection sel = new SchemaSelector.Selection(Map.of(), null);
-            members.add(new Batch.Member(files[i], i, files[i].length(), sel));
+            members.add(new Consignment.Member(files[i], i, files[i].length(), sel));
         }
-        Batch batch = new Batch(cfg.identity().runTimestamp() + "_events_0001", "events", null, members);
-        BatchAuditWriter audit = new BatchAuditWriter(
+        Consignment batch = new Consignment(cfg.identity().runTimestamp() + "_events_0001", "events", null, members);
+        ConsignmentAuditWriter audit = new ConsignmentAuditWriter(
                 cfg.dirs().statusFilePath(), cfg.dirs().batchesFilePath(), cfg.dirs().lineageFilePath());
-        BatchProcessor.process(batch, cfg, audit);
+        ConsignmentIngestor.process(batch, cfg, audit);
     }
 
     private static void assertOutputFileCount(PipelineConfig cfg, String segKey,

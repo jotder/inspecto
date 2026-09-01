@@ -8,7 +8,7 @@ import java.util.List;
  * Fired when a batch is committed — the trigger signal for downstream stages
  * (e.g. Stage-2 enrichment recomputing the partitions this batch wrote).
  *
- * <p>Emitted by {@link BatchAuditWriter} on a {@code SUCCESS} flush (after the audit
+ * <p>Emitted by {@link ConsignmentAuditWriter} on a {@code SUCCESS} flush (after the audit
  * rows and commit-log line are written, so the event implies durability). The
  * {@code service} layer owns the pub/sub bus; this record lives in {@code etl} so the
  * low layer can emit without depending on the higher one.
@@ -21,8 +21,8 @@ import java.util.List;
  * {@link #offendingFile()}, {@link #errorRows()}) so the optional assist agent's failure-diagnosis
  * reactor (M7) has something to reason about on a {@code FAILED} batch. These are operational
  * metadata (an error message / a filename / a count), never row content. The detail is populated at
- * the emission site ({@link BatchAuditWriter#flush}); the 7-arg {@linkplain
- * #BatchEvent(String, String, String, List, long, long, int) back-compat constructor} (used by the
+ * the emission site ({@link ConsignmentAuditWriter#flush}); the 7-arg {@linkplain
+ * #ConsignmentEvent(String, String, String, List, long, long, int) back-compat constructor} (used by the
  * Stage-2 enrichment emitters, which only ever announce {@code SUCCESS}) defaults them to
  * {@code null}/{@code null}/{@code 0}.
  *
@@ -41,7 +41,7 @@ import java.util.List;
  * @param errorRows     total rows that failed to parse across the batch's member files
  */
 @PublicApi(since = "4.0.0")
-public record BatchEvent(String pipeline, String batchId, String status,
+public record ConsignmentEvent(String pipeline, String batchId, String status,
                          List<String> partitions, long outputRows,
                          long durationMs, int rejectedCount,
                          String error, String offendingFile, long errorRows) {
@@ -51,7 +51,7 @@ public record BatchEvent(String pipeline, String batchId, String status,
      * {@code null}/{@code null}/{@code 0}. Used by the Stage-2 enrichment emitters
      * ({@code EnrichmentService}/{@code EnrichJob}), which announce only {@code SUCCESS} commits.
      */
-    public BatchEvent(String pipeline, String batchId, String status,
+    public ConsignmentEvent(String pipeline, String batchId, String status,
                       List<String> partitions, long outputRows,
                       long durationMs, int rejectedCount) {
         this(pipeline, batchId, status, partitions, outputRows, durationMs, rejectedCount,

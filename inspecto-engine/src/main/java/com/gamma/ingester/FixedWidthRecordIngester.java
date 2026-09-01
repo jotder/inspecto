@@ -43,7 +43,7 @@ import java.util.Map;
  */
 public final class FixedWidthRecordIngester implements StreamingFileIngester {
 
-    /** Public no-arg constructor required for reflective load by {@code BatchProcessor}. */
+    /** Public no-arg constructor required for reflective load by {@code ConsignmentIngestor}. */
     public FixedWidthRecordIngester() {}
 
     @SuppressWarnings("unchecked")

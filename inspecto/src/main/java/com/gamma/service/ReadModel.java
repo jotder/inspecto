@@ -2,7 +2,7 @@ package com.gamma.service;
 
 import com.gamma.catalog.ConfigSource;
 import com.gamma.catalog.MetadataGraphService;
-import com.gamma.etl.BatchEventBus;
+import com.gamma.etl.ConsignmentEventBus;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.StatusStore;
 import com.gamma.event.EventLog;
@@ -89,7 +89,7 @@ public interface ReadModel {
     EventStore events();
 
     /** The in-process batch event bus. */
-    BatchEventBus eventBus();
+    ConsignmentEventBus eventBus();
 
     /** The operational event/audit log (read side; agents subscribe and query, never emit through this). */
     EventLog eventLog();

@@ -77,22 +77,22 @@ class FlatVsGraphLaneParityTest {
         PipelineConfig graphCfg = config(dir.resolve("graph"), dir.resolve("db_graph").toString());
 
         // The admission itself: this shape is exactly what the narrow slice carries.
-        assertTrue(BatchIngestStrategy.graphLaneCarries(graphCfg),
+        assertTrue(ConsignmentIngestStrategy.graphLaneCarries(graphCfg),
                 "a single-destination non-route pipeline is what the graph lane now carries");
 
-        BatchIngestStrategy.Written flat;
-        BatchIngestStrategy.Written graph;
-        File flatDb = BatchIngestStrategy.openTempDb(flatCfg, "parity_flat_");
-        File graphDb = BatchIngestStrategy.openTempDb(graphCfg, "parity_graph_");
+        ConsignmentIngestStrategy.Written flat;
+        ConsignmentIngestStrategy.Written graph;
+        File flatDb = ConsignmentIngestStrategy.openTempDb(flatCfg, "parity_flat_");
+        File graphDb = ConsignmentIngestStrategy.openTempDb(graphCfg, "parity_graph_");
         try (Connection a = DuckDbUtil.openConnection(flatDb); Connection b = DuckDbUtil.openConnection(graphDb)) {
             seedTable(a);
             seedTable(b);
             // The flat lane, called directly — writeAndTrace would now divert this very config.
-            flat = BatchIngestStrategy.flatWriteAndTrace(a, "transformed", List.of(), flatCfg,
+            flat = ConsignmentIngestStrategy.flatWriteAndTrace(a, "transformed", List.of(), flatCfg,
                     flatCfg.dirs().database(), "feed", "b_0001", Map.of(0, "feed.csv", 1, "feed.csv"),
                     new com.gamma.query.DecisionRuleApplier.Result(List.of(), List.of()));
             // The graph lane, through the real fork (wholeBatchWrite = the batch's one write).
-            graph = BatchIngestStrategy.writeAndTrace(b, "transformed", List.of(), graphCfg,
+            graph = ConsignmentIngestStrategy.writeAndTrace(b, "transformed", List.of(), graphCfg,
                     graphCfg.dirs().database(), "feed", "b_0001", Map.of(0, "feed.csv", 1, "feed.csv"), "");
         } finally {
             DuckDbUtil.deleteTempDb(flatDb);
@@ -129,20 +129,20 @@ class FlatVsGraphLaneParityTest {
     void bothLanesFanOutTheSameRowsToEveryDestination(@TempDir Path dir) throws Exception {
         PipelineConfig flatCfg  = fanOutConfig(dir.resolve("flat"), dir.resolve("flat_out"));
         PipelineConfig graphCfg = fanOutConfig(dir.resolve("graph"), dir.resolve("graph_out"));
-        assertTrue(BatchIngestStrategy.graphLaneCarries(graphCfg),
+        assertTrue(ConsignmentIngestStrategy.graphLaneCarries(graphCfg),
                 "a fan-out is carried too: one sink node per destination, each fed off map");
 
-        BatchIngestStrategy.Written flat;
-        BatchIngestStrategy.Written graph;
-        File flatDb = BatchIngestStrategy.openTempDb(flatCfg, "parity_fanflat_");
-        File graphDb = BatchIngestStrategy.openTempDb(graphCfg, "parity_fangraph_");
+        ConsignmentIngestStrategy.Written flat;
+        ConsignmentIngestStrategy.Written graph;
+        File flatDb = ConsignmentIngestStrategy.openTempDb(flatCfg, "parity_fanflat_");
+        File graphDb = ConsignmentIngestStrategy.openTempDb(graphCfg, "parity_fangraph_");
         try (Connection a = DuckDbUtil.openConnection(flatDb); Connection b = DuckDbUtil.openConnection(graphDb)) {
             seedTable(a);
             seedTable(b);
-            flat = BatchIngestStrategy.flatWriteAndTrace(a, "transformed", List.of(), flatCfg,
+            flat = ConsignmentIngestStrategy.flatWriteAndTrace(a, "transformed", List.of(), flatCfg,
                     flatCfg.dirs().database(), "feed", "b_0002", Map.of(0, "feed.csv", 1, "feed.csv"),
                     new com.gamma.query.DecisionRuleApplier.Result(List.of(), List.of()));
-            graph = BatchIngestStrategy.writeAndTrace(b, "transformed", List.of(), graphCfg,
+            graph = ConsignmentIngestStrategy.writeAndTrace(b, "transformed", List.of(), graphCfg,
                     graphCfg.dirs().database(), "feed", "b_0002", Map.of(0, "feed.csv", 1, "feed.csv"), "");
         } finally {
             DuckDbUtil.deleteTempDb(flatDb);
@@ -171,23 +171,23 @@ class FlatVsGraphLaneParityTest {
     @Test
     void severalWritesInOneBatchEachLandWhenTheyCarryTheirOwnScope(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = config(dir.resolve("cfg"), dir.resolve("db").toString());
-        File db = BatchIngestStrategy.openTempDb(cfg, "parity_scope_");
+        File db = ConsignmentIngestStrategy.openTempDb(cfg, "parity_scope_");
         int firstFiles;
         int afterSecondScope;
         int afterRepeatedScope;
         try (Connection conn = DuckDbUtil.openConnection(db)) {
             seedTable(conn);
-            BatchIngestStrategy.Written a = BatchIngestStrategy.writeAndTrace(conn, "transformed", List.of(),
+            ConsignmentIngestStrategy.Written a = ConsignmentIngestStrategy.writeAndTrace(conn, "transformed", List.of(),
                     cfg, cfg.dirs().database(), "chunk_a", "b_same", Map.of(0, "feed.csv", 1, "feed.csv"), "chunk_a");
             firstFiles = a.outputs().size();
 
             // A DIFFERENT scope: the same batch, the same sink node, a second write that must land.
-            BatchIngestStrategy.Written b = BatchIngestStrategy.writeAndTrace(conn, "transformed", List.of(),
+            ConsignmentIngestStrategy.Written b = ConsignmentIngestStrategy.writeAndTrace(conn, "transformed", List.of(),
                     cfg, cfg.dirs().database(), "chunk_b", "b_same", Map.of(0, "feed.csv", 1, "feed.csv"), "chunk_b");
             afterSecondScope = b.outputs().size();
 
             // The SAME scope again: the coordinator's idempotent replay skips it, writing nothing.
-            BatchIngestStrategy.Written c = BatchIngestStrategy.writeAndTrace(conn, "transformed", List.of(),
+            ConsignmentIngestStrategy.Written c = ConsignmentIngestStrategy.writeAndTrace(conn, "transformed", List.of(),
                     cfg, cfg.dirs().database(), "chunk_b", "b_same", Map.of(0, "feed.csv", 1, "feed.csv"), "chunk_b");
             afterRepeatedScope = c.outputs().size();
         } finally {
@@ -212,20 +212,20 @@ class FlatVsGraphLaneParityTest {
     void bothLanesStampAndAppendAVersionedReferenceStore(@TempDir Path dir) throws Exception {
         PipelineConfig flatCfg  = referenceConfig(dir.resolve("flat_ref"));
         PipelineConfig graphCfg = referenceConfig(dir.resolve("graph_ref"));
-        assertTrue(BatchIngestStrategy.graphLaneCarries(graphCfg),
+        assertTrue(ConsignmentIngestStrategy.graphLaneCarries(graphCfg),
                 "a non-route versioned reference store is carried — the refusal was about BRANCHES");
 
-        BatchIngestStrategy.Written flat;
-        BatchIngestStrategy.Written graph;
-        File flatDb = BatchIngestStrategy.openTempDb(flatCfg, "parity_refflat_");
-        File graphDb = BatchIngestStrategy.openTempDb(graphCfg, "parity_refgraph_");
+        ConsignmentIngestStrategy.Written flat;
+        ConsignmentIngestStrategy.Written graph;
+        File flatDb = ConsignmentIngestStrategy.openTempDb(flatCfg, "parity_refflat_");
+        File graphDb = ConsignmentIngestStrategy.openTempDb(graphCfg, "parity_refgraph_");
         try (Connection a = DuckDbUtil.openConnection(flatDb); Connection b = DuckDbUtil.openConnection(graphDb)) {
             seedTable(a);
             seedTable(b);
-            flat = BatchIngestStrategy.flatWriteAndTrace(a, "transformed", List.of(), flatCfg,
+            flat = ConsignmentIngestStrategy.flatWriteAndTrace(a, "transformed", List.of(), flatCfg,
                     flatCfg.dirs().database(), "feed", "b_ref1", Map.of(0, "feed.csv", 1, "feed.csv"),
                     new com.gamma.query.DecisionRuleApplier.Result(List.of(), List.of()));
-            graph = BatchIngestStrategy.writeAndTrace(b, "transformed", List.of(), graphCfg,
+            graph = ConsignmentIngestStrategy.writeAndTrace(b, "transformed", List.of(), graphCfg,
                     graphCfg.dirs().database(), "feed", "b_ref1", Map.of(0, "feed.csv", 1, "feed.csv"), "");
         } finally {
             DuckDbUtil.deleteTempDb(flatDb);
@@ -310,7 +310,7 @@ class FlatVsGraphLaneParityTest {
     }
 
     /** Lineage reduced to what must match across roots: output file NAME → (srcId, rowCount). */
-    private static List<String> lineageKey(BatchIngestStrategy.Written w) {
+    private static List<String> lineageKey(ConsignmentIngestStrategy.Written w) {
         return w.lineage().stream()
                 .map(r -> Path.of(r.outputFile()).getFileName() + "|" + r.srcId() + "|" + r.rowCount())
                 .sorted().toList();

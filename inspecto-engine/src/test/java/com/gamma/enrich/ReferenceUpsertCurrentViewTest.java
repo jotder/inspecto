@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * system columns are stripped — not the raw append log.
  *
  * <p>Two batches are staged exactly as the write path lays them down (see
- * {@code BatchIngestStrategy.stampReferenceVersions}): batch 2 <em>changes</em> one key, re-delivers
+ * {@code ConsignmentIngestStrategy.stampReferenceVersions}): batch 2 <em>changes</em> one key, re-delivers
  * one <em>unchanged</em>, adds a <em>new</em> key, and <em>tombstones</em> a fourth.
  */
 class ReferenceUpsertCurrentViewTest {

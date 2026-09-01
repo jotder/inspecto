@@ -1,6 +1,6 @@
 package com.gamma.consignment;
 
-import com.gamma.etl.BatchManifest;
+import com.gamma.etl.ConsignmentManifest;
 import com.gamma.etl.ManifestStore;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.PipelineConfigBatchTest;
@@ -26,16 +26,16 @@ class ConsignmentStatusAccessTest {
     }
 
     private static void seedManifest(PipelineConfig cfg, String consignmentId, String createdAt) throws Exception {
-        BatchManifest m = new BatchManifest();
+        ConsignmentManifest m = new ConsignmentManifest();
         m.batchId = consignmentId;
         m.pipeline = cfg.identity().pipelineName();
         m.schemaName = "cdr";
         m.outputTable = "cdr";
         m.createdAt = createdAt;
         m.schemaFingerprint = "abc123";
-        m.members = List.of(new BatchManifest.MemberEntry("a.csv", 0, "in/a.csv", "bk/a.csv", "SUCCESS"),
-                new BatchManifest.MemberEntry("b.csv", 1, "in/b.csv", "bk/b.csv", "QUARANTINED_PARSE"));
-        m.outputs = List.of(new BatchManifest.OutputEntry("day=2026-08-09", "/w/cdr/day=2026-08-09/x.parquet"));
+        m.members = List.of(new ConsignmentManifest.MemberEntry("a.csv", 0, "in/a.csv", "bk/a.csv", "SUCCESS"),
+                new ConsignmentManifest.MemberEntry("b.csv", 1, "in/b.csv", "bk/b.csv", "QUARANTINED_PARSE"));
+        m.outputs = List.of(new ConsignmentManifest.OutputEntry("day=2026-08-09", "/w/cdr/day=2026-08-09/x.parquet"));
         m.markers = List.of();
         ManifestStore.write(cfg.dirs().manifestsDir(), m);
     }
@@ -46,7 +46,7 @@ class ConsignmentStatusAccessTest {
         seedManifest(cfg, "c-1", "2026-08-09 10:00:00");
         ConsignmentStatusAccess status = ConsignmentStatusAccess.over(() -> List.of(cfg));
 
-        BatchManifest m = status.consignment("c-1").orElseThrow();
+        ConsignmentManifest m = status.consignment("c-1").orElseThrow();
         assertEquals("mini_etl", m.pipeline, "the manifest carries the NORMALISED pipeline name");
         assertEquals("cdr", m.schemaName);
         assertEquals("abc123", m.schemaFingerprint, "the schema identity a Consignment was written with");

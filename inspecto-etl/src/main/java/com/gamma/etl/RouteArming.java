@@ -121,12 +121,12 @@ public final class RouteArming {
                     + "without it a row matching no branch is silently dropped");
         // (4) multi-schema stays authoring-only with route:. ⛔ Do NOT lift this by "fixing the branch
         //     count" — that was investigated 2026-08-26 and is the WRONG fix. The mechanism, grounded:
-        //     `BatchIngestStrategy.writeAndTrace` is called ONCE PER SEGMENT (see
+        //     `ConsignmentIngestStrategy.writeAndTrace` is called ONCE PER SEGMENT (see
         //     `UnionModeIngester`'s loop, destTable = "transformed_" + segKey), while the branch-aware
         //     divert inside it lifts `PipelineLift.lift(cfg)` — the WHOLE multi-schema graph. Arming
         //     would therefore execute EVERY schema's route tree against EVERY segment's table.
         //     A real fix needs a segment-scoped lift (only the current schema's subtree) — a design
-        //     change, not an unrefusal. `BatchGraphRunner.dataFedSinkCount`'s collapsing of identical
+        //     change, not an unrefusal. `ConsignmentGraphRunner.dataFedSinkCount`'s collapsing of identical
         //     route keys across schema branches is real but harmless: it feeds `engages()` (a `> 1`
         //     test, and any multi-schema+route count is already > 1) and one diagnostic log line.
         if (multiSchema)

@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Arming plan S1: engagement is computed off the LIFTED graph of a real flat config, not off a
- * flag — these pin that {@link PipelineLift#lift} and {@link BatchGraphRunner#engages} agree
+ * flag — these pin that {@link PipelineLift#lift} and {@link ConsignmentGraphRunner#engages} agree
  * with authored intent for the two shapes that matter:
  *
  * <ul>
@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *       branch, and S2's trigger would divert a config whose semantics the runner does not carry.</li>
  * </ul>
  */
-class BatchGraphRunnerLiftEngagementTest {
+class ConsignmentGraphRunnerLiftEngagementTest {
 
     @Test
     void anAuthoredRouteBlockLiftsToAnEngagingGraph(@TempDir Path dir) throws Exception {
@@ -42,9 +42,9 @@ class BatchGraphRunnerLiftEngagementTest {
         assertNotNull(cfg.routeConfig(), "fixture authored a route: block");
 
         PipelineGraph lifted = PipelineLift.lift(cfg);
-        assertEquals(2, BatchGraphRunner.dataFedSinkCount(lifted),
+        assertEquals(2, ConsignmentGraphRunner.dataFedSinkCount(lifted),
                 "each route branch feeds its paired sink");
-        assertTrue(BatchGraphRunner.engages(lifted),
+        assertTrue(ConsignmentGraphRunner.engages(lifted),
                 "an authored route: is exactly what the branch-aware executor exists for");
     }
 
@@ -58,11 +58,11 @@ class BatchGraphRunnerLiftEngagementTest {
         assertNull(cfg.routeConfig(), "no route: authored");
 
         PipelineGraph lifted = PipelineLift.lift(cfg);
-        assertFalse(BatchGraphRunner.engages(lifted),
+        assertFalse(ConsignmentGraphRunner.engages(lifted),
                 "sinks[2] is N destinations of ONE branch — flat-path fan-out, never the runner");
     }
 
-    /** The BatchProcessorSinksTest fixture shape, with the tail block parameterised. */
+    /** The ConsignmentIngestorSinksTest fixture shape, with the tail block parameterised. */
     private static String writePipeline(Path dir, String name, String tail) throws Exception {
         Path schema = dir.resolve("mini_schema.toon");
         Files.writeString(schema, com.gamma.etl.PipelineConfigBatchTest.miniSchema());

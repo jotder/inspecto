@@ -76,8 +76,8 @@ class DecisionRuleWiringTest {
         return conn;
     }
 
-    private BatchIngestStrategy.Written run(Connection conn, PipelineConfig cfg) throws Exception {
-        return BatchIngestStrategy.writeAndTrace(conn, "transformed", List.of("year", "month", "day"),
+    private ConsignmentIngestStrategy.Written run(Connection conn, PipelineConfig cfg) throws Exception {
+        return ConsignmentIngestStrategy.writeAndTrace(conn, "transformed", List.of("year", "month", "day"),
                 cfg, cfg.dirs().database(), "b1", "B1", Map.of(1, "f.csv"), "");
     }
 

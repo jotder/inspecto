@@ -2,7 +2,7 @@ package com.gamma.job;
 
 import com.gamma.api.PublicApi;
 import com.gamma.enrich.ReferenceReader;
-import com.gamma.etl.BatchEvent;
+import com.gamma.etl.ConsignmentEvent;
 import com.gamma.etl.PartitionOutput;
 import com.gamma.event.Event;
 import com.gamma.event.EventLevel;
@@ -27,7 +27,7 @@ import com.gamma.pipeline.exec.PipelineWatermarkStore;
 import com.gamma.pipeline.exec.ProvenanceRow;
 import com.gamma.pipeline.exec.RowShaper;
 import com.gamma.pipeline.exec.SourceStoreReader;
-import com.gamma.etl.BatchEventBus;
+import com.gamma.etl.ConsignmentEventBus;
 import com.gamma.query.ViewReaderSql;
 import com.gamma.sql.SqlViews;
 import com.gamma.util.DuckDbUtil;
@@ -67,7 +67,7 @@ import java.util.function.Supplier;
  *   <li>execute the {@code transform → sink} subgraph ({@link PipelineExecutor#execute}) with a
  *       {@link PartitionSinkWriter} and a {@link BranchCommitCoordinator} (idempotent multi-branch commit,
  *       T11) — a flow job has no acquisition to finalise, so the source-finalisation step is a no-op;</li>
- *   <li>publish a chain {@link BatchEvent} so downstream {@code on_pipeline} jobs fire.</li>
+ *   <li>publish a chain {@link ConsignmentEvent} so downstream {@code on_pipeline} jobs fire.</li>
  * </ol>
  *
  * <h3>Config ({@code *_job.toon})</h3>
@@ -98,7 +98,7 @@ public final class PipelineJobRunner implements Job {
     private static final String SEED_VIEW_PREFIX = "pipeline_src";
 
     private final JobConfig cfg;
-    private final BatchEventBus bus;
+    private final ConsignmentEventBus bus;
     private final PipelineStore pipelineStore;
     private final String dataDir;
     private final String auditDir;
@@ -110,8 +110,8 @@ public final class PipelineJobRunner implements Job {
      *  see the 8-arg constructor. */
     private final BooleanSupplier retireSupersededConfigured;
 
-    /** As {@link #PipelineJobRunner(JobConfig, BatchEventBus, PipelineStore, String, String, DbProvenanceStore)} with no provenance store. */
-    public PipelineJobRunner(JobConfig cfg, BatchEventBus bus, PipelineStore pipelineStore,
+    /** As {@link #PipelineJobRunner(JobConfig, ConsignmentEventBus, PipelineStore, String, String, DbProvenanceStore)} with no provenance store. */
+    public PipelineJobRunner(JobConfig cfg, ConsignmentEventBus bus, PipelineStore pipelineStore,
                          String dataDir, String auditDir) {
         this(cfg, bus, pipelineStore, dataDir, auditDir, null);
     }
@@ -124,7 +124,7 @@ public final class PipelineJobRunner implements Job {
      * @param auditDir   the directory for the branch-commit log
      * @param provenance the data-plane provenance store (T21), or {@code null} to not record per-edge counts
      */
-    public PipelineJobRunner(JobConfig cfg, BatchEventBus bus, PipelineStore pipelineStore,
+    public PipelineJobRunner(JobConfig cfg, ConsignmentEventBus bus, PipelineStore pipelineStore,
                          String dataDir, String auditDir, DbProvenanceStore provenance) {
         this(cfg, bus, pipelineStore, dataDir, auditDir, provenance, null);
     }
@@ -136,7 +136,7 @@ public final class PipelineJobRunner implements Job {
      *                 rather than held so each run scans live (a component edited between two runs takes
      *                 effect on the second) — the same per-call scan the dry-run route does.
      */
-    public PipelineJobRunner(JobConfig cfg, BatchEventBus bus, PipelineStore pipelineStore,
+    public PipelineJobRunner(JobConfig cfg, ConsignmentEventBus bus, PipelineStore pipelineStore,
                          String dataDir, String auditDir, DbProvenanceStore provenance,
                          Supplier<ComponentRegistry> registry) {
         this(cfg, bus, pipelineStore, dataDir, auditDir, provenance, registry, null);
@@ -148,7 +148,7 @@ public final class PipelineJobRunner implements Job {
      * the same reason as {@code registry}: each run reads live. {@code null} leaves by-name joins refusing
      * with the wiring named ({@link ReferenceReader#sqlFor}); a {@code path:} reference needs no context.
      */
-    public PipelineJobRunner(JobConfig cfg, BatchEventBus bus, PipelineStore pipelineStore,
+    public PipelineJobRunner(JobConfig cfg, ConsignmentEventBus bus, PipelineStore pipelineStore,
                          String dataDir, String auditDir, DbProvenanceStore provenance,
                          Supplier<ComponentRegistry> registry,
                          Supplier<List<com.gamma.etl.PipelineConfig>> pipelines) {
@@ -170,7 +170,7 @@ public final class PipelineJobRunner implements Job {
      *                                    without one, every full recompute leaves a permanent extra copy
      *                                    on disk, and today nothing says so)
      */
-    public PipelineJobRunner(JobConfig cfg, BatchEventBus bus, PipelineStore pipelineStore,
+    public PipelineJobRunner(JobConfig cfg, ConsignmentEventBus bus, PipelineStore pipelineStore,
                          String dataDir, String auditDir, DbProvenanceStore provenance,
                          Supplier<ComponentRegistry> registry,
                          Supplier<List<com.gamma.etl.PipelineConfig>> pipelines,
@@ -307,7 +307,7 @@ public final class PipelineJobRunner implements Job {
             List<String> srcStores = seeds.stream().map(Seed::store).toList();
             registerViews(g, pipelineId, srcStores, dir);              // T32 Phase C — sink.view → durable definition
             recordStoreArtifacts(artifacts, g, writer.rowsByStore());
-            bus.publish(new BatchEvent(cfg.name(), batchId, "SUCCESS", parts, writer.totalRows(), ms, 0));
+            bus.publish(new ConsignmentEvent(cfg.name(), batchId, "SUCCESS", parts, writer.totalRows(), ms, 0));
             log.info("[PIPELINEJOB] {} ran pipeline '{}' (source_store(s) {}): {} file(s), {} row(s) → {}",
                     cfg.name(), pipelineId, srcStores, writer.outputs().size(), writer.totalRows(),
                     PipelineStores.produced(g));

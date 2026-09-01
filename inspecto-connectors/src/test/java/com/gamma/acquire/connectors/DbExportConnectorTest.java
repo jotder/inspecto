@@ -155,7 +155,7 @@ class DbExportConnectorTest {
             assertTrue(AcquisitionLedgers.shared().dbWatermark("inc-db").isEmpty(),
                     "watermark must NOT advance before the batch commits");
 
-            // Simulate the post-commit hook in BatchProcessor.
+            // Simulate the post-commit hook in ConsignmentIngestor.
             AcquisitionLedgers.DbWatermark w1 = AcquisitionLedgers.takeDbWatermark(dest1).orElseThrow();
             assertEquals("inc-db", w1.key());
             assertEquals("3", w1.value());

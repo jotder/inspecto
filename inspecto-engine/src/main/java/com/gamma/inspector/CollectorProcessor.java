@@ -34,9 +34,9 @@ import java.util.stream.Collectors;
 
 /**
  * ETL entry point. Reads a {@code .toon} pipeline config, scans the inbox for
- * matching CSV/CSV.GZ files, groups them into {@link Batch}es by schema (packed
+ * matching CSV/CSV.GZ files, groups them into {@link Consignment}es by schema (packed
  * to {@code processing.batch.max_files}/{@code max_bytes}), and processes each
- * batch in one pass via {@link BatchProcessor}.
+ * batch in one pass via {@link ConsignmentIngestor}.
  *
  * <p>A batch of one file is the legacy single-file case and keeps the
  * {@code <basename>_out.<ext>} output name.
@@ -57,7 +57,7 @@ public class CollectorProcessor {
         LogSetup.configure(cfg.dirs().logDir(), cfg.identity().pipelineName(), cfg.identity().runTimestamp());
         try {
             run(cfg);
-        } catch (BatchProcessingException e) {
+        } catch (ConsignmentProcessingException e) {
             // Partial-failure run: at least one batch threw. We've already logged
             // the per-batch stack traces; exit non-zero so the wrapper script
             // (run.sh / run.bat / cron job) detects the failure without log scraping.
@@ -78,7 +78,7 @@ public class CollectorProcessor {
      * and ingest on separate timers with separate budgets (B3b), calling the two halves independently.
      * {@code onCommit} may be {@code null}.
      */
-    public static void run(PipelineConfig cfg, java.util.function.Consumer<BatchEvent> onCommit)
+    public static void run(PipelineConfig cfg, java.util.function.Consumer<ConsignmentEvent> onCommit)
             throws Exception {
         acquire(cfg);
         ingest(cfg, onCommit);
@@ -86,13 +86,13 @@ public class CollectorProcessor {
 
     /**
      * Ingest one poll cycle: plan the inbox files into batches and process them in parallel, emitting a
-     * {@link BatchEvent} to {@code onCommit} after each SUCCESS batch commits (the service layer passes a bus
+     * {@link ConsignmentEvent} to {@code onCommit} after each SUCCESS batch commits (the service layer passes a bus
      * sink here so downstream stages can react). Does <b>not</b> acquire — a remote collector's files must
      * already have been fetched and landed in the inbox by {@link #acquire}. {@code onCommit} may be
      * {@code null}.
      */
     @PublicApi(since = "1.0.0")
-    public static void ingest(PipelineConfig cfg, java.util.function.Consumer<BatchEvent> onCommit)
+    public static void ingest(PipelineConfig cfg, java.util.function.Consumer<ConsignmentEvent> onCommit)
             throws Exception {
         Path root           = Paths.get(cfg.dirs().poll()).toAbsolutePath();
         if (!Files.exists(root)) Files.createDirectories(root);
@@ -120,15 +120,15 @@ public class CollectorProcessor {
         // An authored route: block lifts to a graph with >1 data-fed sink. Engagement is computed
         // OFF THE LIFTED GRAPH (Stage A's rule: the predicate reads topology, never a flag) and
         // logged beside its inputs, so the lift and the predicate can be proven to agree with the
-        // authored intent BEFORE S2 wires BatchGraphRunner in. prepare() still refuses an active
+        // authored intent BEFORE S2 wires ConsignmentGraphRunner in. prepare() still refuses an active
         // route: pipeline, so this fires only for one-shot runs of an inactive config.
         if (cfg.routeConfig() != null) {
             com.gamma.pipeline.PipelineGraph lifted = com.gamma.pipeline.PipelineLift.lift(cfg);
-            long sinkCount = com.gamma.pipeline.exec.BatchGraphRunner.dataFedSinkCount(lifted);
+            long sinkCount = com.gamma.pipeline.exec.ConsignmentGraphRunner.dataFedSinkCount(lifted);
             log.info("route: authored on '{}' — lifted graph has {} data-fed sink(s), branch-aware executor {} "
                             + "(S1 observe-only: batches below still take the flat path)",
                     cfg.identity().pipelineName(), sinkCount,
-                    com.gamma.pipeline.exec.BatchGraphRunner.engages(lifted) ? "WOULD ENGAGE" : "would not engage");
+                    com.gamma.pipeline.exec.ConsignmentGraphRunner.engages(lifted) ? "WOULD ENGAGE" : "would not engage");
         }
 
         // ── plan batches ─────────────────────────────────────────────────────────
@@ -136,7 +136,7 @@ public class CollectorProcessor {
                 ? cfg.schemas().selector()::select
                 : f -> new SchemaSelector.Selection(cfg.schemas().single(), null);
 
-        List<Batch> batches = ConsignmentPlanner.plan(
+        List<Consignment> batches = ConsignmentPlanner.plan(
                 candidates, resolver, cfg.processing().batchMaxFiles(), cfg.processing().batchMaxBytes(),
                 cfg.identity().runTimestamp(),
                 ConsignmentPlanner.Order.valueOf(cfg.processing().batchOrder().toUpperCase(java.util.Locale.ROOT)));
@@ -144,15 +144,15 @@ public class CollectorProcessor {
                 batches.size(), candidates.size(), cfg.processing().threads());
 
         // ── process batches in parallel ────────────────────────────────────────
-        BatchAuditWriter audit = new BatchAuditWriter(
+        ConsignmentAuditWriter audit = new ConsignmentAuditWriter(
                 cfg.dirs().statusFilePath(), cfg.dirs().batchesFilePath(), cfg.dirs().lineageFilePath(),
                 cfg.dirs().commitLogPath());
         if (onCommit != null) audit.setCommitListener(onCommit);
         // Emit the canonical pipeline.batch.committed|failed Signal onto the ledger for every terminal
-        // batch. Formerly inlined in BatchAuditWriter; lifted to signal.PipelineBatchSignal so etl stays
-        // a foundation layer (no event/signal imports). Wired unconditionally — PipelineBatchSignal uses
+        // batch. Formerly inlined in ConsignmentAuditWriter; lifted to signal.PipelineConsignmentSignal so etl stays
+        // a foundation layer (no event/signal imports). Wired unconditionally — PipelineConsignmentSignal uses
         // the ambient EventLog.current(), a no-op when no space log is installed (e.g. one-shot CLI).
-        audit.setTerminalBatchSink(com.gamma.signal.PipelineBatchSignal::emit);
+        audit.setTerminalBatchSink(com.gamma.signal.PipelineConsignmentSignal::emit);
 
         // Virtual threads + the shared ConcurrencyBroker: a batch blocked on file I/O or DuckDB parks
         // its carrier cheaply instead of pinning a platform thread, while the broker bounds how many
@@ -173,13 +173,13 @@ public class CollectorProcessor {
         Map<String, String> mdc = MDC.getCopyOfContextMap();
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             List<Future<?>> futures = new ArrayList<>();
-            for (Batch b : batches) {
+            for (Consignment b : batches) {
                 futures.add(executor.submit(() -> {
                     if (mdc != null) MDC.setContextMap(mdc);
                     try {
                         try (ConcurrencyBroker.Permit permit =
                                      broker.admit(spaceId, pipelineId, maxConcurrent, priority)) {
-                            BatchProcessor.process(b, cfg, audit);
+                            ConsignmentIngestor.process(b, cfg, audit);
                         }
                     } finally {
                         MDC.clear();
@@ -194,7 +194,7 @@ public class CollectorProcessor {
                     f.get();
                 } catch (Exception e) {
                     failedBatches++;
-                    log.error("Batch processing failed", e);
+                    log.error("Consignment processing failed", e);
                 }
             }
         }   // try-with-resources close() shuts the executor down and awaits all virtual threads
@@ -220,7 +220,7 @@ public class CollectorProcessor {
         }
 
         if (failedBatches > 0) {
-            throw new BatchProcessingException(failedBatches, batches.size());
+            throw new ConsignmentProcessingException(failedBatches, batches.size());
         }
     }
 
@@ -453,7 +453,7 @@ public class CollectorProcessor {
      * Content-based duplicate filter (Phase C): for each candidate, look up its prior fingerprint in the
      * {@link AcquisitionLedger} by {@code (sourceId, relativePath)} and apply {@link DuplicatePolicy}. DUPLICATEs
      * are dropped; CHANGED files are reprocessed unless {@code on_change=ignore}; the fingerprint is recorded
-     * post-commit by {@code BatchProcessor}.
+     * post-commit by {@code ConsignmentIngestor}.
      *
      * <p><b>METADATA</b> compares size+mtime — a cheap {@code stat}, no file read, so it runs on both the run
      * cycle and the read-only {@code countPending} scan. <b>CHECKSUM</b> must read the file to hash it; that
@@ -634,10 +634,10 @@ public class CollectorProcessor {
      * {@link #main(String[])} catches this and exits with a non-zero status so
      * wrapper scripts can detect partial-failure runs without scraping logs.
      */
-    public static final class BatchProcessingException extends RuntimeException {
+    public static final class ConsignmentProcessingException extends RuntimeException {
         public final int failedBatches;
         public final int totalBatches;
-        BatchProcessingException(int failed, int total) {
+        ConsignmentProcessingException(int failed, int total) {
             super(failed + " of " + total + " batch(es) failed; see logs for details");
             this.failedBatches = failed;
             this.totalBatches  = total;

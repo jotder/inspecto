@@ -1,7 +1,7 @@
 package com.gamma.service;
 
-import com.gamma.etl.BatchEvent;
-import com.gamma.etl.BatchEventBus;
+import com.gamma.etl.ConsignmentEvent;
+import com.gamma.etl.ConsignmentEventBus;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.metrics.MetricRegistry;
 import org.slf4j.Logger;
@@ -11,7 +11,7 @@ import java.util.Map;
 
 /**
  * Wires observability (M4) onto a running {@link ReadModel}: it subscribes to the
- * batch-commit {@link BatchEventBus} to record throughput / latency / error metrics,
+ * batch-commit {@link ConsignmentEventBus} to record throughput / latency / error metrics,
  * registers scrape-time gauge collectors (inbox lag, committed batches, quarantine
  * depth), and emits one structured JSON event log per batch (correlated by
  * {@code run_id}/{@code batch_id}). Metrics land in the process-wide
@@ -44,11 +44,11 @@ public final class MetricsService {
 
     // ── eager metrics + structured log, per committed batch ──────────────────────
 
-    private void onBatch(BatchEvent e) {
+    private void onBatch(ConsignmentEvent e) {
         Map<String, String> byPipeline = Map.of("pipeline", e.pipeline());
         reg.inc("inspecto_batches_total", "Terminal batches by pipeline and status",
                 Map.of("pipeline", e.pipeline(), "status", e.status()));
-        reg.observe("inspecto_batch_duration_seconds", "Batch wall time", byPipeline, e.durationMs() / 1000.0);
+        reg.observe("inspecto_batch_duration_seconds", "Consignment wall time", byPipeline, e.durationMs() / 1000.0);
         if ("SUCCESS".equals(e.status())) {
             reg.inc("inspecto_output_rows_total", "Rows written by committed batches", byPipeline, e.outputRows());
             reg.inc("inspecto_partitions_written_total", "Output partitions written", byPipeline, e.partitions().size());

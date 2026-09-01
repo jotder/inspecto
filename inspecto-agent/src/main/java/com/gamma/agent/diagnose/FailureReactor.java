@@ -1,7 +1,7 @@
 package com.gamma.agent.diagnose;
 
 import com.gamma.assist.Diagnosis;
-import com.gamma.etl.BatchEvent;
+import com.gamma.etl.ConsignmentEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,7 +16,7 @@ import java.util.function.Consumer;
 
 /**
  * The event-driven failure-diagnosis reactor (v3.7.0, M7). It subscribes to the core
- * {@code BatchEventBus} (via {@code eventBus().subscribe(reactor::onEvent)}) and, for every
+ * {@code ConsignmentEventBus} (via {@code eventBus().subscribe(reactor::onEvent)}) and, for every
  * <em>FAILED</em> batch, produces a {@link Diagnosis} into a {@link DiagnosisStore}.
  *
  * <h3>Never block the ingest thread</h3>
@@ -45,12 +45,12 @@ public final class FailureReactor implements AutoCloseable {
     /** Turns a failed batch event into a diagnosis (heuristic, optionally model-enriched). */
     @FunctionalInterface
     public interface Diagnoser {
-        Diagnosis diagnose(BatchEvent event);
+        Diagnosis diagnose(ConsignmentEvent event);
     }
 
     private final Executor executor;
     private final ExecutorService ownedPool;   // non-null only when this reactor created the pool
-    private final BlockingQueue<BatchEvent> queue;
+    private final BlockingQueue<ConsignmentEvent> queue;
     private final Diagnoser diagnoser;
     private final DiagnosisStore store;
     private final Consumer<Diagnosis> onDiagnosed;   // audit sink; may be null
@@ -101,7 +101,7 @@ public final class FailureReactor implements AutoCloseable {
      * The bus subscriber. Non-blocking: filters non-FAILED events, enqueues, and schedules the
      * diagnosis on the executor — then returns immediately so the ingest thread is never held.
      */
-    public void onEvent(BatchEvent event) {
+    public void onEvent(ConsignmentEvent event) {
         if (event == null || !"FAILED".equalsIgnoreCase(event.status())) return;
         if (!queue.offer(event)) {
             log.warn("diagnosis queue full; dropped FAILED event for batch {} (total dropped={})",
@@ -117,7 +117,7 @@ public final class FailureReactor implements AutoCloseable {
 
     /** Diagnose exactly one queued event (runs on the executor, off the ingest thread). */
     private void drainOne() {
-        BatchEvent e = queue.poll();
+        ConsignmentEvent e = queue.poll();
         if (e == null) return;
         try {
             Diagnosis d = diagnoser.diagnose(e);

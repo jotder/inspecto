@@ -1,9 +1,9 @@
 package com.gamma.inspector;
 
 import com.gamma.consignment.EventTimeBounds;
-import com.gamma.etl.Batch;
-import com.gamma.etl.BatchAuditWriter;
-import com.gamma.etl.BatchManifest;
+import com.gamma.etl.Consignment;
+import com.gamma.etl.ConsignmentAuditWriter;
+import com.gamma.etl.ConsignmentManifest;
 import com.gamma.etl.LineageRow;
 import com.gamma.etl.ManifestStore;
 import com.gamma.etl.ParkedCommit;
@@ -37,7 +37,7 @@ import java.util.Set;
 /**
  * <b>Phase 4 S4c — the drain, D-13's resume half.</b> Reached through
  * {@code POST /runs/{name}/drain}, the structural sibling of {@code reprocess}. Completes a
- * Consignment that {@link BatchProcessor} PARKED at a disabled route-branch sink: it seeds the parked
+ * Consignment that {@link ConsignmentIngestor} PARKED at a disabled route-branch sink: it seeds the parked
  * branch's rows back from its durable park table, writes them to that branch's destination through the
  * ordinary {@link IngestSinkWriter}, and then runs the ordinary {@code finalizeSource} for the WHOLE
  * batch — register → manifest → backup → markers LAST → ledger / watermark.
@@ -81,7 +81,7 @@ public final class DrainCommand {
         if (cfg.dirs().manifestsDir() == null)
             throw new IllegalStateException("No manifests dir configured (set dirs.status_dir).");
 
-        BatchManifest m = ManifestStore.read(cfg.dirs().manifestsDir(), batchId);
+        ConsignmentManifest m = ManifestStore.read(cfg.dirs().manifestsDir(), batchId);
         if (m.parkedAt == null || m.parkedAt.isEmpty())
             throw new IllegalStateException("Refusing to drain " + batchId
                     + ": it is not a PARKED Consignment (its manifest records no parked step).");
@@ -132,25 +132,25 @@ public final class DrainCommand {
         SchemaSelector.Selection selection = soleSchema(cfg, batchId, m);
         Path poll = Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
 
-        List<Batch.Member> survivors = new ArrayList<>();
+        List<Consignment.Member> survivors = new ArrayList<>();
         Map<Integer, String> srcIdToFile = new LinkedHashMap<>();
-        for (BatchManifest.MemberEntry me : m.members) {
+        for (ConsignmentManifest.MemberEntry me : m.members) {
             File inbox = poll.resolve(me.originalRelPath()).toFile();
-            survivors.add(new Batch.Member(inbox, me.srcId(), inbox.length(), selection));
+            survivors.add(new Consignment.Member(inbox, me.srcId(), inbox.length(), selection));
             srcIdToFile.put(me.srcId(), me.filename());
         }
-        Batch batch = new Batch(batchId, m.schemaName, m.outputTable, List.copyOf(survivors));
+        Consignment batch = new Consignment(batchId, m.schemaName, m.outputTable, List.copyOf(survivors));
 
-        List<String> partCols = BatchIngestStrategy.partitionColumns(selection.schema());
-        String dbDir    = BatchIngestStrategy.databaseDir(batch, cfg);
-        String baseName = BatchIngestStrategy.consolidatedBaseName(survivors, batch);
+        List<String> partCols = ConsignmentIngestStrategy.partitionColumns(selection.schema());
+        String dbDir    = ConsignmentIngestStrategy.databaseDir(batch, cfg);
+        String baseName = ConsignmentIngestStrategy.consolidatedBaseName(survivors, batch);
 
         LocalDateTime start = LocalDateTime.now();
         IngestSinkWriter writer;
         BranchCommitCoordinator.Result committed;
-        File tempDb = BatchIngestStrategy.openTempDb(cfg, "drain_");
+        File tempDb = ConsignmentIngestStrategy.openTempDb(cfg, "drain_");
         try (Connection conn = DuckDbUtil.openConnection(tempDb)) {
-            BatchIngestStrategy.configure(conn, cfg);
+            ConsignmentIngestStrategy.configure(conn, cfg);
 
             Map<String, String> seeded = new LinkedHashMap<>();
             try (Statement st = conn.createStatement()) {
@@ -164,7 +164,7 @@ public final class DrainCommand {
 
             writer = new IngestSinkWriter(conn, cfg, partCols, dbDir, baseName, batchId, srcIdToFile);
             BranchCommitLog commitLog = new BranchCommitLog(
-                    BatchIngestStrategy.branchCommitLogPath(cfg, batchId).toString());
+                    ConsignmentIngestStrategy.branchCommitLogPath(cfg, batchId).toString());
             // Every branch this batch owes: the ones the park run already committed (durable in the log)
             // plus the parked ones. The coordinator skips the former and gates finalisation on both.
             Set<String> expected = new LinkedHashSet<>(commitLog.committedBranches(batchId));
@@ -172,11 +172,11 @@ public final class DrainCommand {
 
             IngestSinkWriter w = writer;
             // ⚠ The coordinator's SOURCE phase is NOT this lane's finalisation signal: on the ingest
-            // path BatchGraphRunner's SourceFinalizer is a deliberate no-op (finalisation belongs to
-            // BatchProcessor.commit, once the batch outcome exists), so the park run already recorded
+            // path ConsignmentGraphRunner's SourceFinalizer is a deliberate no-op (finalisation belongs to
+            // ConsignmentIngestor.commit, once the batch outcome exists), so the park run already recorded
             // a SOURCE row having finalised nothing. Drain therefore uses the coordinator for the part
             // that IS meaningful — the durable, idempotent per-BRANCH skip — and runs the real commit
-            // tail itself right after, exactly as BatchProcessor.commit does when the runner returns.
+            // tail itself right after, exactly as ConsignmentIngestor.commit does when the runner returns.
             committed = new BranchCommitCoordinator(commitLog).commit(batchId, expected,
                     branch -> w.write(byId.get(branch), seeded.get(branch)), () -> { });
 
@@ -194,7 +194,7 @@ public final class DrainCommand {
         // The batch is whole: the park artefacts and the resume record have served their purpose.
         for (Path table : parkTables.values()) Files.deleteIfExists(table);
         ParkedCommit.delete(parkHome, batchId);
-        Files.deleteIfExists(BatchIngestStrategy.branchCommitLogPath(cfg, batchId));
+        Files.deleteIfExists(ConsignmentIngestStrategy.branchCommitLogPath(cfg, batchId));
 
         writeDrainAudit(batch, cfg, m, writer, start);
         log.info("[DRAIN] {} complete — {} branch(es) drained, {} output file(s)",
@@ -209,7 +209,7 @@ public final class DrainCommand {
      * {@code schemas[]} selector or the legacy {@code schema_file}. A plugin ({@code segments}) path
      * never reaches the branch-aware lane, so it is refused rather than guessed at.
      */
-    private static SchemaSelector.Selection soleSchema(PipelineConfig cfg, String batchId, BatchManifest m) {
+    private static SchemaSelector.Selection soleSchema(PipelineConfig cfg, String batchId, ConsignmentManifest m) {
         PipelineConfig.Schemas schemas = cfg.schemas();
         if (schemas.selector() != null && schemas.selector().hasSchemas()) {
             List<SchemaSelector.Selection> entries = schemas.selector().entries();
@@ -226,21 +226,21 @@ public final class DrainCommand {
 
     /**
      * An unpack EXPANSION product's original deliberately stays in the inbox on park (moving a shared
-     * archive would strand its sibling batches — {@code BatchProcessor.parkSource}'s ⚠), so it re-expands
+     * archive would strand its sibling batches — {@code ConsignmentIngestor.parkSource}'s ⚠), so it re-expands
      * on the next poll cycle and re-parks as a NEW batch. Completing the old one would commit rows the
      * new batch is about to write again. Refused by name rather than half-handled.
      *
-     * <p>⚠ The test is the JAR-style {@code archive!entry} address {@code BatchProcessor} writes for a
+     * <p>⚠ The test is the JAR-style {@code archive!entry} address {@code ConsignmentIngestor} writes for a
      * 1→N expansion, and ONLY that. A blank {@code backupPath} was also treated as expansion here and
-     * is not: it means {@code dirs.backup} was unset ({@code BatchProcessor}'s {@code backup != null}
+     * is not: it means {@code dirs.backup} was unset ({@code ConsignmentIngestor}'s {@code backup != null}
      * ternary), which is a different condition with a different fix — and one this batch cannot be in,
      * because {@code StepDisableArming} now refuses to arm a park with no park home. Keeping it would
      * have reported that config error as an unpack problem the operator does not have.
      */
-    private static void refuseExpansionMembers(String batchId, BatchManifest m) {
+    private static void refuseExpansionMembers(String batchId, ConsignmentManifest m) {
         List<String> expansion = m.members.stream()
                 .filter(me -> me.originalRelPath().contains("!"))
-                .map(BatchManifest.MemberEntry::filename)
+                .map(ConsignmentManifest.MemberEntry::filename)
                 .toList();
         if (!expansion.isEmpty())
             throw new IllegalStateException("Refusing to drain " + batchId + ": member(s) " + expansion
@@ -250,8 +250,8 @@ public final class DrainCommand {
     }
 
     /** Move each member's original back from the park home to its inbox path — see the class note. */
-    private static void restoreOriginalsToInbox(BatchManifest m, Path poll) throws java.io.IOException {
-        for (BatchManifest.MemberEntry me : m.members) {
+    private static void restoreOriginalsToInbox(ConsignmentManifest m, Path poll) throws java.io.IOException {
+        for (ConsignmentManifest.MemberEntry me : m.members) {
             Path parked = Paths.get(me.backupPath());
             if (!Files.exists(parked)) continue;          // already restored by an interrupted drain
             Path dst = poll.resolve(me.originalRelPath());
@@ -264,7 +264,7 @@ public final class DrainCommand {
      * The batch's real {@code finalizeSource}, over the union of the park-time commit state and what this
      * drain just wrote — one register, one manifest, one §11.3 registration for the whole Consignment.
      */
-    private static void finalizeWholeBatch(Batch batch, PipelineConfig cfg, List<Batch.Member> survivors,
+    private static void finalizeWholeBatch(Consignment batch, PipelineConfig cfg, List<Consignment.Member> survivors,
                                            ParkedCommit pending, IngestSinkWriter writer)
             throws java.io.IOException {
         List<PartitionOutput> outputs = new ArrayList<>(pending.outputs());
@@ -275,7 +275,7 @@ public final class DrainCommand {
         pending.bounds().forEach((file, b) ->
                 bounds.put(file, new EventTimeBounds(b.min(), b.max(), b.spreadMs())));
         bounds.putAll(writer.bounds());
-        BatchProcessor.finalizeSource(batch, cfg, survivors, outputs, lineage, bounds);
+        ConsignmentIngestor.finalizeSource(batch, cfg, survivors, outputs, lineage, bounds);
     }
 
     /**
@@ -284,16 +284,16 @@ public final class DrainCommand {
      * rewritten: the park run already wrote them, and their parse-time counts are unchanged by a drain.
      * Only the lineage this drain produced is appended — the park run already recorded the rest.
      */
-    private static void writeDrainAudit(Batch batch, PipelineConfig cfg, BatchManifest m,
+    private static void writeDrainAudit(Consignment batch, PipelineConfig cfg, ConsignmentManifest m,
                                         IngestSinkWriter writer, LocalDateTime start) {
-        BatchAuditWriter audit = new BatchAuditWriter(
+        ConsignmentAuditWriter audit = new ConsignmentAuditWriter(
                 cfg.dirs().statusFilePath(), cfg.dirs().batchesFilePath(), cfg.dirs().lineageFilePath(),
                 cfg.dirs().commitLogPath());
-        audit.setTerminalBatchSink(com.gamma.signal.PipelineBatchSignal::emit);
+        audit.setTerminalBatchSink(com.gamma.signal.PipelineConsignmentSignal::emit);
         LocalDateTime end = LocalDateTime.now();
         long rows  = writer.lineage().stream().mapToLong(LineageRow::rowCount).sum();
         long bytes = writer.outputs().stream().mapToLong(PartitionOutput::bytes).sum();
-        audit.flush(new BatchAuditWriter.BatchRow(
+        audit.flush(new ConsignmentAuditWriter.ConsignmentRow(
                 batch.batchId(), cfg.identity().pipelineName(), m.schemaName, m.outputTable,
                 start.format(DuckDbUtil.DT_FMT), end.format(DuckDbUtil.DT_FMT), "SUCCESS",
                 m.members.size(), 0, 0L, rows, writer.outputs().size(), bytes,

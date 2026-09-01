@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * <i>N+1</i> for <em>every</em> pipeline. These tests pin the fix — a tick starts its runs and returns.
  *
  * <h3>How a run is made slow, and why the test cannot slow-pass</h3>
- * {@code BatchEventBus.publish} is synchronous on the runner thread, inside the claim, so a subscriber
+ * {@code ConsignmentEventBus.publish} is synchronous on the runner thread, inside the claim, so a subscriber
  * that parks on a latch stalls that pipeline's run mid-flight. That is a genuinely in-flight run, not a
  * held claim — a held claim would make the pipeline <em>skipped</em>, which is the B1 property, not this
  * one. The tick is then submitted to a separate executor and required to finish within a bound: a

@@ -50,7 +50,7 @@ public final class UnpackOrigins {
     /**
      * Entries an archive's expansion had to SKIP (encrypted / unsupported method — no readable
      * bytes, so nothing to plan or quarantine), keyed by ORIGINAL. Drained once by
-     * {@code BatchProcessor.finalizeSource} into the first finalising batch's manifest, so a partial
+     * {@code ConsignmentIngestor.finalizeSource} into the first finalising batch's manifest, so a partial
      * expansion never looks like a clean success (open item (4), honesty half). Same crash posture
      * as the rest of this registry: a crash loses the record, the WARN log keeps the trace.
      */
@@ -81,7 +81,7 @@ public final class UnpackOrigins {
      *
      * <p>⚠ FIVE call sites feed lineage a filename and every one must come through here, or the
      * {@code NNNNN_} temp name leaks back into DATA for whichever lane is missed: the three
-     * {@code srcIdToFile} puts ({@code CsvBatchStrategy}, {@code NativeCsvStreamingEngine},
+     * {@code srcIdToFile} puts ({@code CsvIngestStrategy}, {@code NativeCsvStreamingEngine},
      * {@code UnionModeIngester}) plus the two {@code DuckDbRecordSink} constructions that pass its
      * {@code lineageName} ({@code GenerationModeIngester}, {@code UnionModeIngester} — the wrap lane
      * names the file at construction, not per row).

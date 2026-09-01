@@ -4,7 +4,7 @@ import com.gamma.api.PublicApi;
 
 /**
  * <b>Phase 4 Slice 2 — Stage C's per-file stage progression (§2.4).</b> The crash-safe commit
- * ordering {@code BatchProcessor.finalizeSource} already enforces in code, made durable and
+ * ordering {@code ConsignmentIngestor.finalizeSource} already enforces in code, made durable and
  * queryable: one row per (file, stage) recorded as each real boundary is crossed, so "where is
  * file X right now" is answerable without re-reading the manifest.
  *
@@ -17,7 +17,7 @@ import com.gamma.api.PublicApi;
 public enum FileStage {
     /** DuckLake register attempted (optional, non-fatal). */
     REGISTERED,
-    /** {@code BatchManifest} written — the file's existence of record. */
+    /** {@code ConsignmentManifest} written — the file's existence of record. */
     MANIFESTED,
     /** §11.3 output-registry row(s) recorded for this batch's outputs. */
     OUTPUT_REGISTERED,

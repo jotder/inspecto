@@ -8,7 +8,7 @@ import java.util.Set;
  * <b>T11 — the commit-split.</b> Splits a batch commit into <b>per-branch</b> commit
  * (register + manifest, one branch at a time) and a single <b>source-finalisation</b>
  * (backup → markers LAST → ledger / watermark LAST) that runs <em>only after every branch is durable</em>
- * — generalising the legacy single-output {@code BatchProcessor.commit} to a branch-aware flow without
+ * — generalising the legacy single-output {@code ConsignmentIngestor.commit} to a branch-aware flow without
  * losing its crash-ordering invariant.
  *
  * <p>Driven by {@link BranchCommitLog} (partial-commit state), the coordinator is <b>idempotent and
@@ -59,7 +59,7 @@ public final class BranchCommitCoordinator {
      * <p>The scope qualifies only the LEDGER key — {@code branchCommit} still receives the bare branch id,
      * because that is the graph node the caller has to write. An empty scope (the whole-batch case, and
      * every route pipeline) records exactly the keys it always did, so the drain — which reads bare sink
-     * ids back out of the log — and {@code BatchProcessor.commit}'s single-log cleanup are untouched.
+     * ids back out of the log — and {@code ConsignmentIngestor.commit}'s single-log cleanup are untouched.
      */
     public BranchCommitCoordinator(BranchCommitLog log, String writeScope) {
         this.log = log;

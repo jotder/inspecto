@@ -41,7 +41,7 @@ class DataSourceBundleResolverTest {
         try (SpaceContext ctx = SpaceBootstrap.load(SpaceRoot.under(base))) {
             DataSourceBundleResolver resolver = new DataSourceBundleResolver(ctx.service(), ctx.root().config());
 
-            // The engine lowercases pipeline names (the BatchEvent.pipeline() convention), so the
+            // The engine lowercases pipeline names (the ConsignmentEvent.pipeline() convention), so the
             // data-source id is the lowercased form of the in-file name.
             assertEquals(java.util.List.of("other_etl", "voucher_etl"), resolver.dataSourceIds(),
                     "both pipelines are listed as data sources");

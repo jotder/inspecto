@@ -14,7 +14,7 @@ import com.gamma.pipeline.ViewStore;
 import com.gamma.pipeline.exec.DbProvenanceStore;
 import com.gamma.pipeline.exec.PipelineExecutor;
 import com.gamma.pipeline.exec.ProvenanceRow;
-import com.gamma.etl.BatchEventBus;
+import com.gamma.etl.ConsignmentEventBus;
 import com.gamma.sql.SqlViews;
 import com.gamma.util.DuckDbUtil;
 import com.gamma.util.RunLog;
@@ -60,7 +60,7 @@ class PipelineJobRunnerTest {
 
         JobConfig cfg = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
                 Map.of("flow", "evt_rollup", "data_dir", dataDir));
-        JobResult res = new PipelineJobRunner(cfg, new BatchEventBus(), store, dataDir, auditDir).run();
+        JobResult res = new PipelineJobRunner(cfg, new ConsignmentEventBus(), store, dataDir, auditDir).run();
 
         assertTrue(res.success(), res.message());
         assertEquals(List.of(1, 3), readIds(dataDir, "rollup"), "amt>=100 keeps id1(150) + id3(200), drops id2(50)");
@@ -92,13 +92,13 @@ class PipelineJobRunnerTest {
 
             JobConfig cfg1 = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
                     Map.of("flow", "evt_rollup2", "data_dir", dataDir, "batch_id", "b1"));
-            assertTrue(new PipelineJobRunner(cfg1, new BatchEventBus(), store, dataDir, auditDir,
+            assertTrue(new PipelineJobRunner(cfg1, new ConsignmentEventBus(), store, dataDir, auditDir,
                     null, null, null, notConfigured).run().success());
             assertEquals(0, asked.get(), "the first run superseded nothing — no reason to ask yet");
 
             JobConfig cfg2 = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
                     Map.of("flow", "evt_rollup2", "data_dir", dataDir, "batch_id", "b2"));
-            assertTrue(new PipelineJobRunner(cfg2, new BatchEventBus(), store, dataDir, auditDir,
+            assertTrue(new PipelineJobRunner(cfg2, new ConsignmentEventBus(), store, dataDir, auditDir,
                     null, null, null, notConfigured).run().success());
             assertEquals(1, asked.get(), "the second full recompute superseded the first — now it's asked");
         } finally {
@@ -124,11 +124,11 @@ class PipelineJobRunnerTest {
 
             JobConfig cfg1 = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
                     Map.of("flow", "evt_rollup3", "data_dir", dataDir, "batch_id", "b1"));
-            assertTrue(new PipelineJobRunner(cfg1, new BatchEventBus(), store, dataDir, auditDir).run().success());
+            assertTrue(new PipelineJobRunner(cfg1, new ConsignmentEventBus(), store, dataDir, auditDir).run().success());
 
             JobConfig cfg2 = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
                     Map.of("flow", "evt_rollup3", "data_dir", dataDir, "batch_id", "b2"));
-            assertTrue(new PipelineJobRunner(cfg2, new BatchEventBus(), store, dataDir, auditDir).run().success(),
+            assertTrue(new PipelineJobRunner(cfg2, new ConsignmentEventBus(), store, dataDir, auditDir).run().success(),
                     "the pre-existing 5-arg constructor (no supplier) must keep superseding without crashing");
         } finally {
             com.gamma.consignment.ConsignmentOutputStores.use(null);
@@ -158,7 +158,7 @@ class PipelineJobRunnerTest {
         JobConfig cfg = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
                 Map.of("pipeline", "evt_split", "data_dir", dataDir));
         RecordingContext ctx = new RecordingContext();
-        JobResult res = new PipelineJobRunner(cfg, new BatchEventBus(), store, dataDir, auditDir).run(ctx);
+        JobResult res = new PipelineJobRunner(cfg, new ConsignmentEventBus(), store, dataDir, auditDir).run(ctx);
 
         assertTrue(res.success(), res.message());
         assertEquals(Map.of("high", 2L, "low", 1L), ctx.rows,
@@ -182,7 +182,7 @@ class PipelineJobRunnerTest {
         JobConfig cfg = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
                 Map.of("pipeline", "evt", "data_dir", dataDir));
 
-        assertTrue(new PipelineJobRunner(cfg, new BatchEventBus(), store, dataDir,
+        assertTrue(new PipelineJobRunner(cfg, new ConsignmentEventBus(), store, dataDir,
                 tmp.resolve("audit").toString()).run().success());
     }
 
@@ -229,7 +229,7 @@ class PipelineJobRunnerTest {
 
         JobConfig cfg = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
                 Map.of("pipeline", "evt_rollup", "data_dir", dataDir));
-        JobResult res = new PipelineJobRunner(cfg, new BatchEventBus(), store, dataDir, auditDir).run();
+        JobResult res = new PipelineJobRunner(cfg, new ConsignmentEventBus(), store, dataDir, auditDir).run();
 
         assertTrue(res.success(), res.message());
         assertEquals(List.of(1, 2), readIds(dataDir, "rollup"));
@@ -248,7 +248,7 @@ class PipelineJobRunnerTest {
 
         JobConfig cfg = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
                 Map.of("flow", "evt_rollup", "data_dir", dataDir, "batch_id", "fixed-1"));
-        BatchEventBus bus = new BatchEventBus();
+        ConsignmentEventBus bus = new ConsignmentEventBus();
 
         JobResult first = new PipelineJobRunner(cfg, bus, store, dataDir, auditDir).run();
         assertTrue(first.message().contains("1 file"), first.message());
@@ -279,7 +279,7 @@ class PipelineJobRunnerTest {
 
         JobConfig cfg = new JobConfig("splitjob", JobType.PIPELINE, null, null, true, false,
                 Map.of("flow", "split_flow", "data_dir", dataDir));
-        JobResult res = new PipelineJobRunner(cfg, new BatchEventBus(), store, dataDir, auditDir).run();
+        JobResult res = new PipelineJobRunner(cfg, new ConsignmentEventBus(), store, dataDir, auditDir).run();
 
         assertTrue(res.success(), res.message());
         assertEquals(List.of(3), readIds(dataDir, "hi"), "amt>=200 → id3");
@@ -297,7 +297,7 @@ class PipelineJobRunnerTest {
 
         JobConfig cfg = new JobConfig("j", JobType.PIPELINE, null, null, true, false,
                 Map.of("flow", "no_src", "data_dir", dataDir));
-        PipelineJobRunner runner = new PipelineJobRunner(cfg, new BatchEventBus(), store, dataDir, tmp.resolve("audit").toString());
+        PipelineJobRunner runner = new PipelineJobRunner(cfg, new ConsignmentEventBus(), store, dataDir, tmp.resolve("audit").toString());
         assertThrows(IllegalArgumentException.class, runner::run);
     }
 
@@ -318,7 +318,7 @@ class PipelineJobRunnerTest {
 
         JobConfig cfg = new JobConfig("merge_job", JobType.PIPELINE, null, null, true, false,
                 Map.of("flow", "merged_flow", "data_dir", dataDir));
-        JobResult res = new PipelineJobRunner(cfg, new BatchEventBus(), store, dataDir, auditDir).run();
+        JobResult res = new PipelineJobRunner(cfg, new ConsignmentEventBus(), store, dataDir, auditDir).run();
 
         assertTrue(res.success(), res.message());
         assertEquals(List.of(1, 2, 3, 5), readIds(dataDir, "combined"),
@@ -341,7 +341,7 @@ class PipelineJobRunnerTest {
 
         JobConfig cfg = new JobConfig("kpi_job", JobType.PIPELINE, null, null, true, false,
                 Map.of("flow", "subs_kpi", "data_dir", dataDir));
-        JobResult res = new PipelineJobRunner(cfg, new BatchEventBus(), store, dataDir, auditDir).run();
+        JobResult res = new PipelineJobRunner(cfg, new ConsignmentEventBus(), store, dataDir, auditDir).run();
 
         assertTrue(res.success(), res.message());
         assertFalse(Files.exists(Path.of(dataDir, "active_subs")), "a sink.view writes no data bytes");
@@ -365,14 +365,14 @@ class PipelineJobRunnerTest {
         // run 1 — no prior watermark ⇒ reads all of batch1 (ids 1,2)
         JobConfig r1 = new JobConfig("incjob", JobType.PIPELINE, null, null, true, false,
                 Map.of("flow", "inc_flow", "data_dir", dataDir, "incremental_column", "id", "batch_id", "inc1"));
-        assertTrue(new PipelineJobRunner(r1, new BatchEventBus(), store, dataDir, auditDir).run().success());
+        assertTrue(new PipelineJobRunner(r1, new ConsignmentEventBus(), store, dataDir, auditDir).run().success());
         assertEquals(List.of(1, 2), readIds(dataDir, "rollup"), "first run reads the whole store");
 
         // new data arrives, then run 2 — watermark=2 ⇒ reads only ids 3,4 and appends (output accumulates)
         seedParquetFile(dataDir, "events", "batch2", "(3,200),(4,300)");
         JobConfig r2 = new JobConfig("incjob", JobType.PIPELINE, null, null, true, false,
                 Map.of("flow", "inc_flow", "data_dir", dataDir, "incremental_column", "id", "batch_id", "inc2"));
-        assertTrue(new PipelineJobRunner(r2, new BatchEventBus(), store, dataDir, auditDir).run().success());
+        assertTrue(new PipelineJobRunner(r2, new ConsignmentEventBus(), store, dataDir, auditDir).run().success());
         assertEquals(List.of(1, 2, 3, 4), readIds(dataDir, "rollup"), "second run appends only the new rows");
     }
 
@@ -394,7 +394,7 @@ class PipelineJobRunnerTest {
 
         JobConfig run1 = new JobConfig("inc_job", JobType.PIPELINE, null, null, true, false,
                 Map.of("flow", "inc_merge", "data_dir", dataDir, "incremental_column", "amt", "batch_id", "b1"));
-        new PipelineJobRunner(run1, new BatchEventBus(), store, dataDir, auditDir).run();
+        new PipelineJobRunner(run1, new ConsignmentEventBus(), store, dataDir, auditDir).run();
         assertEquals(List.of(1, 2, 3), readIds(dataDir, "combined"), "run 1 (no watermark) reads every source in full");
 
         // new rows arrive in BOTH sources, each past that source's OWN amt watermark (events_a:20, events_b:15)
@@ -402,7 +402,7 @@ class PipelineJobRunnerTest {
         seedParquetFile(dataDir, "events_b", "b2", "(5,25)");
         JobConfig run2 = new JobConfig("inc_job", JobType.PIPELINE, null, null, true, false,
                 Map.of("flow", "inc_merge", "data_dir", dataDir, "incremental_column", "amt", "batch_id", "b2"));
-        new PipelineJobRunner(run2, new BatchEventBus(), store, dataDir, auditDir).run();
+        new PipelineJobRunner(run2, new ConsignmentEventBus(), store, dataDir, auditDir).run();
 
         // run 2 appended only id4 (events_a amt 30>20) and id5 (events_b amt 25>15) — no re-read of 1,2,3
         assertEquals(List.of(1, 2, 3, 4, 5), readIds(dataDir, "combined"),
@@ -424,7 +424,7 @@ class PipelineJobRunnerTest {
                 List.of(PipelineEdge.data("src", "flt"), PipelineEdge.data("flt", "v"))));
         JobConfig cfg = new JobConfig("kpi_job", JobType.PIPELINE, null, null, true, false,
                 Map.of("flow", "subs_kpi", "data_dir", dataDir));
-        assertTrue(new PipelineJobRunner(cfg, new BatchEventBus(), store, dataDir, auditDir).run().success());
+        assertTrue(new PipelineJobRunner(cfg, new ConsignmentEventBus(), store, dataDir, auditDir).run().success());
 
         ViewDefinition def = new ViewStore(wr.resolve("views")).get("active_subs").orElseThrow();
         assertNotNull(def.derivedSql(), "a single-source linear filter path yields a derived_sql");
@@ -455,7 +455,7 @@ class PipelineJobRunnerTest {
                 List.of(PipelineEdge.data("src_a", "m"), PipelineEdge.data("src_b", "m"), PipelineEdge.data("m", "v"))));
         JobConfig cfg = new JobConfig("mv_job", JobType.PIPELINE, null, null, true, false,
                 Map.of("flow", "merge_view", "data_dir", dataDir));
-        assertTrue(new PipelineJobRunner(cfg, new BatchEventBus(), store, dataDir, auditDir).run().success());
+        assertTrue(new PipelineJobRunner(cfg, new ConsignmentEventBus(), store, dataDir, auditDir).run().success());
 
         ViewDefinition def = new ViewStore(wr.resolve("views")).get("merged").orElseThrow();
         assertNull(def.derivedSql(), "a merged (multi-source) view path is not single-SELECT expressible → null");
@@ -476,13 +476,13 @@ class PipelineJobRunnerTest {
                 List.of(PipelineEdge.data("src", "out"))));
         JobConfig r1 = new JobConfig("istr", JobType.PIPELINE, null, null, true, false,
                 Map.of("flow", "inc_str", "data_dir", dataDir, "incremental_column", "ts", "batch_id", "i1"));
-        new PipelineJobRunner(r1, new BatchEventBus(), store, dataDir, auditDir).run();
+        new PipelineJobRunner(r1, new ConsignmentEventBus(), store, dataDir, auditDir).run();
         assertEquals(List.of(1, 2), readIds(dataDir, "rollup"), "run 1 reads the whole store");
 
         seedTsFile(dataDir, "events", "a2", "(3,'2020-01-03')");
         JobConfig r2 = new JobConfig("istr", JobType.PIPELINE, null, null, true, false,
                 Map.of("flow", "inc_str", "data_dir", dataDir, "incremental_column", "ts", "batch_id", "i2"));
-        new PipelineJobRunner(r2, new BatchEventBus(), store, dataDir, auditDir).run();
+        new PipelineJobRunner(r2, new ConsignmentEventBus(), store, dataDir, auditDir).run();
         // truncated watermark '2020-01-' would re-admit ids 1,2 (lexically > the prefix) → [1,1,2,2,3];
         // the fix stores the true max '2020-01-02', so run 2 appends only id 3.
         assertEquals(List.of(1, 2, 3), readIds(dataDir, "rollup"), "run 2 appends only the row past the true watermark");
@@ -506,7 +506,7 @@ class PipelineJobRunnerTest {
 
         String url = "jdbc:duckdb:" + tmp.resolve("prov.duckdb").toString().replace("\\", "/");
         try (DbProvenanceStore prov = DbProvenanceStore.open(url)) {
-            assertTrue(new PipelineJobRunner(cfg, new BatchEventBus(), store, dataDir, auditDir, prov).run().success());
+            assertTrue(new PipelineJobRunner(cfg, new ConsignmentEventBus(), store, dataDir, auditDir, prov).run().success());
 
             Map<String, Long> counts = new java.util.LinkedHashMap<>();
             for (Map<String, Object> row : prov.query("prov_flow", "prov1"))
@@ -586,7 +586,7 @@ class PipelineJobRunnerTest {
 
         JobConfig cfg = new JobConfig("copyjob", JobType.PIPELINE, null, null, true, false,
                 Map.of("flow", "copy_flow", "data_dir", dataDir));
-        JobResult res = new PipelineJobRunner(cfg, new BatchEventBus(), store, dataDir, auditDir).run();
+        JobResult res = new PipelineJobRunner(cfg, new ConsignmentEventBus(), store, dataDir, auditDir).run();
 
         assertTrue(res.success(), res.message());
         assertEquals(List.of(1, 2), readIds(dataDir, "rollup"),
@@ -606,7 +606,7 @@ class PipelineJobRunnerTest {
 
         JobConfig cfg = new JobConfig("nestjob", JobType.PIPELINE, null, null, true, false,
                 Map.of("flow", "nest_flow", "data_dir", tmp.resolve("data").resolve("orders").toString()));
-        PipelineJobRunner runner = new PipelineJobRunner(cfg, new BatchEventBus(), store, dataDir,
+        PipelineJobRunner runner = new PipelineJobRunner(cfg, new ConsignmentEventBus(), store, dataDir,
                 tmp.resolve("audit").toString());
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, runner::run);
@@ -628,7 +628,7 @@ class PipelineJobRunnerTest {
         JobConfig cfg = new JobConfig("slashjob", JobType.PIPELINE, null, null, true, false,
                 Map.of("flow", "slash_flow", "data_dir", dataDir));
         assertThrows(IllegalArgumentException.class,
-                () -> new PipelineJobRunner(cfg, new BatchEventBus(), store, dataDir,
+                () -> new PipelineJobRunner(cfg, new ConsignmentEventBus(), store, dataDir,
                         tmp.resolve("audit").toString()).run());
     }
 
@@ -646,7 +646,7 @@ class PipelineJobRunnerTest {
 
         JobConfig cfg = new JobConfig("extjob", JobType.PIPELINE, null, null, true, false,
                 Map.of("flow", "ext_flow", "data_dir", external));
-        JobResult res = new PipelineJobRunner(cfg, new BatchEventBus(), store, dataDir,
+        JobResult res = new PipelineJobRunner(cfg, new ConsignmentEventBus(), store, dataDir,
                 tmp.resolve("audit").toString()).run();
 
         assertTrue(res.success(), res.message());
@@ -710,7 +710,7 @@ class PipelineJobRunnerTest {
 
         JobConfig cfg = new JobConfig("shaper", JobType.PIPELINE, null, null, true, false,
                 Map.of("pipeline_config", flat.toString(), "data_dir", dataDir));
-        JobResult res = new PipelineJobRunner(cfg, new BatchEventBus(), null, dataDir, auditDir).run();
+        JobResult res = new PipelineJobRunner(cfg, new ConsignmentEventBus(), null, dataDir, auditDir).run();
 
         assertTrue(res.success(), res.message());
         assertEquals(List.of(1, 2), readIds(dataDir, "shaped"),
@@ -746,7 +746,7 @@ class PipelineJobRunnerTest {
 
         JobConfig cfg = new JobConfig("j1", JobType.PIPELINE, null, null, true, false,
                 Map.of("pipeline_config", flat.toString(), "data_dir", dataDir));
-        JobResult res = new PipelineJobRunner(cfg, new BatchEventBus(), null, dataDir, auditDir).run();
+        JobResult res = new PipelineJobRunner(cfg, new ConsignmentEventBus(), null, dataDir, auditDir).run();
 
         assertTrue(res.success(), res.message());
         // LEFT JOIN: all three rows survive; id 3 has no dimension row and carries NULL
@@ -797,7 +797,7 @@ class PipelineJobRunnerTest {
 
         JobConfig cfg = new JobConfig("j2", JobType.PIPELINE, null, null, true, false,
                 Map.of("pipeline_config", flat.toString(), "data_dir", dataDir));
-        JobResult res = new PipelineJobRunner(cfg, new BatchEventBus(), null, dataDir, auditDir,
+        JobResult res = new PipelineJobRunner(cfg, new ConsignmentEventBus(), null, dataDir, auditDir,
                 null, null, () -> List.of(refCfg)).run();
 
         assertTrue(res.success(), res.message());
@@ -827,7 +827,7 @@ class PipelineJobRunnerTest {
         JobConfig cfg = new JobConfig("j3", JobType.PIPELINE, null, null, true, false,
                 Map.of("pipeline_config", flat.toString(), "data_dir", dataDir));
         var e = assertThrows(IllegalArgumentException.class, () ->
-                new PipelineJobRunner(cfg, new BatchEventBus(), null, dataDir,
+                new PipelineJobRunner(cfg, new ConsignmentEventBus(), null, dataDir,
                         tmp.resolve("audit").toString()).run());
         assertTrue(e.getMessage().contains("nowhere"), e.getMessage());
     }
@@ -837,7 +837,7 @@ class PipelineJobRunnerTest {
         String dataDir = tmp.resolve("data").toString();
         JobConfig cfg = new JobConfig("twosrc", JobType.PIPELINE, null, null, true, false,
                 Map.of("pipeline_config", "x.toon", "flow", "some_flow", "data_dir", dataDir));
-        PipelineJobRunner runner = new PipelineJobRunner(cfg, new BatchEventBus(), null,
+        PipelineJobRunner runner = new PipelineJobRunner(cfg, new ConsignmentEventBus(), null,
                 dataDir, tmp.resolve("audit").toString());
         var e = assertThrows(IllegalArgumentException.class, runner::run);
         assertTrue(e.getMessage().contains("pick one graph source"), e.getMessage());

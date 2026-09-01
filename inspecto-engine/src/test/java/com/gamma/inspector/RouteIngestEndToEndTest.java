@@ -224,7 +224,7 @@ class RouteIngestEndToEndTest {
 
     /**
      * The park home is {@code <dirs.backup>/parked}, and {@code dirs.backup} is OPTIONAL — so a pipeline
-     * that disables a step without one used to ARM, run, and die inside {@code BatchProcessor.parkSource}
+     * that disables a step without one used to ARM, run, and die inside {@code ConsignmentIngestor.parkSource}
      * on a raw NPE, once per batch, presenting to the operator as {@code park failed: null}. It refuses at
      * {@code prepare()} now, which is the same posture every other refusal in that gate takes: an
      * unrunnable config is an authoring-time answer, not a per-cycle failure. Pinned end to end (not just

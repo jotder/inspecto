@@ -13,12 +13,12 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Multi-destination ingest ({@code sinks:} slice 3): one batch driven through {@link BatchProcessor}
+ * Multi-destination ingest ({@code sinks:} slice 3): one batch driven through {@link ConsignmentIngestor}
  * against a pipeline that declares two {@code sinks:} destinations must land its output under <em>each</em>
  * destination's own {@code database}, while the source is finalised exactly <b>once</b> (one backup, one
  * marker, one batch-audit row) — backup/markers/ledger are per-source-file, not per-destination.
  */
-class BatchProcessorSinksTest {
+class ConsignmentIngestorSinksTest {
 
     /** A single-schema CSV pipeline that fans its output out to two destinations (hot + cold). */
     private static Path writeTwoSinkPipeline(Path dir) throws Exception {
@@ -58,9 +58,9 @@ class BatchProcessorSinksTest {
         return p;
     }
 
-    private Batch.Member member(PipelineConfig cfg, File f, int id) {
+    private Consignment.Member member(PipelineConfig cfg, File f, int id) {
         SchemaSelector.Selection sel = new SchemaSelector.Selection(cfg.schemas().single(), null);
-        return new Batch.Member(f, id, f.length(), sel);
+        return new Consignment.Member(f, id, f.length(), sel);
     }
 
     private static boolean hasCsvOutput(Path root) throws Exception {
@@ -80,9 +80,9 @@ class BatchProcessorSinksTest {
         Path a = inbox.resolve("a.csv");
         Files.writeString(a, "ID,AMT,EVENT_DATE\na1,1.0,2020-04-03\na2,2.0,2020-04-03\n");
 
-        Batch batch = new Batch(cfg.identity().runTimestamp() + "_fan_0001", "mini", null,
+        Consignment batch = new Consignment(cfg.identity().runTimestamp() + "_fan_0001", "mini", null,
                 List.of(member(cfg, a.toFile(), 0)));
-        BatchProcessor.process(batch, cfg, new BatchAuditWriter(
+        ConsignmentIngestor.process(batch, cfg, new ConsignmentAuditWriter(
                 cfg.dirs().statusFilePath(), cfg.dirs().batchesFilePath(), cfg.dirs().lineageFilePath()));
 
         // the batch output landed under BOTH destination databases (each its own copy)

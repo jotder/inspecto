@@ -23,7 +23,7 @@ import java.util.Map;
  *       -Dbench.rows=2000000 -Dbench.format=PARQUET test
  * </pre>
  *
- * <p>Times each stage of {@code BatchProcessor}'s CSV path separately —
+ * <p>Times each stage of {@code ConsignmentIngestor}'s CSV path separately —
  * ingest (univocity parse + DuckDB appender), tag (union/__src_id), transform
  * (CREATE TABLE AS SELECT with type casts + partition columns), write
  * (COPY ... PARTITION_BY + file reveal), and lineage (GROUP BY) — so the

@@ -20,7 +20,7 @@ import java.util.Optional;
  *
  * <h3>Canonical schemas (always present, even with no rows)</h3>
  * Each table's column list is fixed to the audit ledger's header contract (mirroring
- * {@code BatchAuditWriter} / {@code EnrichmentAuditWriter}) rather than inferred from whatever rows
+ * {@code ConsignmentAuditWriter} / {@code EnrichmentAuditWriter}) rather than inferred from whatever rows
  * happen to exist. That guarantees a freshly-started pipeline (zero batches) still presents a
  * queryable, correctly-shaped table — so the model's SQL plans, and the prompt can list exact
  * columns. Cells are pulled positionally by column key from the row maps (absent → {@code NULL}).
@@ -44,7 +44,7 @@ final class OperationalTables {
             "start_time", "end_time", "filename", "status", "parsed_rows", "error_rows",
             "output_paths", "output_sizes_bytes", "duration_ms", "error", "consignment_id", "origin",
             // The inbox file's extension-insensitive identity — what a report GROUPs on to unite a
-            // re-delivery with its earlier compression spelling (BatchAuditWriter.FileRow).
+            // re-delivery with its earlier compression spelling (ConsignmentAuditWriter.FileRow).
             "logical_name");
 
     static final List<String> LINEAGE = List.of(

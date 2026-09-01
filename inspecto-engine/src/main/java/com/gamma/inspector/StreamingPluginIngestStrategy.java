@@ -1,6 +1,6 @@
 package com.gamma.inspector;
 
-import com.gamma.etl.Batch;
+import com.gamma.etl.Consignment;
 import com.gamma.etl.PipelineConfig;
 
 /**
@@ -22,7 +22,7 @@ import com.gamma.etl.PipelineConfig;
  * {@code QUARANTINED_MISMATCH}. A framework-side flush failure ({@link SinkFlushException}) is not a
  * file fault, so it fails the batch instead of quarantining the input.
  */
-final class StreamingPluginBatchStrategy implements BatchIngestStrategy {
+final class StreamingPluginIngestStrategy implements ConsignmentIngestStrategy {
 
     /** Default per-generation row budget when {@code processing.streaming.flush_records} is unset. */
     static final long DEFAULT_FLUSH_ROWS = 5_000_000L;
@@ -31,15 +31,15 @@ final class StreamingPluginBatchStrategy implements BatchIngestStrategy {
     private final long forcedFlushRows;
 
     /** Production: read flush budget from config and pick mode by member size. */
-    StreamingPluginBatchStrategy() { this.forcedFlushRows = -1L; }
+    StreamingPluginIngestStrategy() { this.forcedFlushRows = -1L; }
 
     /** Test seam: force generation mode with a small {@code flushRows} so a tiny input flushes repeatedly. */
-    StreamingPluginBatchStrategy(long flushRows) { this.forcedFlushRows = flushRows; }
+    StreamingPluginIngestStrategy(long flushRows) { this.forcedFlushRows = flushRows; }
 
     @Override
-    public IngestOutcome ingest(Batch batch, PipelineConfig cfg) {
+    public IngestOutcome ingest(Consignment batch, PipelineConfig cfg) {
         long threshold = cfg.processing().largeFileBytes();
-        long maxMemberBytes = batch.members().stream().mapToLong(Batch.Member::bytes).max().orElse(0L);
+        long maxMemberBytes = batch.members().stream().mapToLong(Consignment.Member::bytes).max().orElse(0L);
         boolean generationMode = forcedFlushRows > 0 || (threshold > 0 && maxMemberBytes >= threshold);
 
         // Multi-destination fan-out (sinks:>1) writes through writeAndTrace, which UnionModeIngester uses but

@@ -150,7 +150,7 @@ public final class DbExportConnector implements CollectorConnector {
             Export e = (watermarkColumn != null)
                     ? exportIncremental(c, sql, dest)
                     : exportAll(c, sql, dest);
-            // Advance the watermark only after the batch commits — stash it for BatchProcessor to persist. Empty
+            // Advance the watermark only after the batch commits — stash it for ConsignmentIngestor to persist. Empty
             // result ⇒ no max ⇒ nothing stashed ⇒ watermark unchanged (correct: no rows past the frontier).
             if (watermarkColumn != null && e.rows() > 0 && e.maxWatermark() != null)
                 AcquisitionLedgers.stashDbWatermark(dest, profile.id(), e.maxWatermark());

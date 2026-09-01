@@ -9,8 +9,8 @@ import java.util.Map;
 /**
  * Builder for the pipeline / schema {@code .toon} fixture files used by the
  * integration test suite.  Replaces ~5 hand-rolled copy-pasted toon strings
- * scattered across {@code BatchProcessorPluginDeepTest},
- * {@code TypedRecordIngesterTest}, {@code BatchProcessorPluginTest}, etc.
+ * scattered across {@code ConsignmentIngestorPluginDeepTest},
+ * {@code TypedRecordIngesterTest}, {@code ConsignmentIngestorPluginTest}, etc.
  *
  * <p>Usage:
  * <pre>

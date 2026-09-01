@@ -1,7 +1,7 @@
 package com.gamma.consignment;
 
 import com.gamma.api.PublicApi;
-import com.gamma.etl.BatchManifest;
+import com.gamma.etl.ConsignmentManifest;
 import com.gamma.etl.ManifestStore;
 import com.gamma.etl.PipelineConfig;
 
@@ -23,7 +23,7 @@ import java.util.stream.Stream;
  *
  * <h3>What backs each answer</h3>
  * <ul>
- *   <li>{@link #consignment} / {@link #latestFor} — the JSON {@link BatchManifest} under a pipeline's
+ *   <li>{@link #consignment} / {@link #latestFor} — the JSON {@link ConsignmentManifest} under a pipeline's
  *       {@code manifestsDir}, which is authoritative for a Consignment's existence and carries
  *       per-member status, so no separate status-store read is needed.</li>
  *   <li>{@link #outputs} — {@link DbConsignmentOutputStore} via the per-space
@@ -41,10 +41,10 @@ import java.util.stream.Stream;
 public interface ConsignmentStatusAccess {
 
     /** The manifest of this Consignment, searched across the loaded pipelines, or empty when unknown. */
-    Optional<BatchManifest> consignment(String consignmentId);
+    Optional<ConsignmentManifest> consignment(String consignmentId);
 
     /** The newest Consignment manifest of {@code pipeline} (by {@code createdAt}), or empty when it has none. */
-    Optional<BatchManifest> latestFor(String pipeline);
+    Optional<ConsignmentManifest> latestFor(String pipeline);
 
     /** The registry's output-file rows for this Consignment, newest-first; empty when the registry is off. */
     List<ConsignmentOutput> outputs(String consignmentId);
@@ -57,7 +57,7 @@ public interface ConsignmentStatusAccess {
     static ConsignmentStatusAccess over(Supplier<List<PipelineConfig>> pipelines) {
         return new ConsignmentStatusAccess() {
 
-            @Override public Optional<BatchManifest> consignment(String consignmentId) {
+            @Override public Optional<ConsignmentManifest> consignment(String consignmentId) {
                 if (consignmentId == null || consignmentId.isBlank()) return Optional.empty();
                 for (String dir : manifestDirs(null)) {
                     if (Files.exists(Path.of(dir, consignmentId + ".json"))) return read(dir, consignmentId);
@@ -65,9 +65,9 @@ public interface ConsignmentStatusAccess {
                 return Optional.empty();
             }
 
-            @Override public Optional<BatchManifest> latestFor(String pipeline) {
+            @Override public Optional<ConsignmentManifest> latestFor(String pipeline) {
                 if (pipeline == null || pipeline.isBlank()) return Optional.empty();
-                List<BatchManifest> found = new ArrayList<>();
+                List<ConsignmentManifest> found = new ArrayList<>();
                 for (String dir : manifestDirs(pipeline)) {
                     try (Stream<Path> files = Files.list(Path.of(dir))) {
                         files.map(Path::getFileName).map(Path::toString)
@@ -105,7 +105,7 @@ public interface ConsignmentStatusAccess {
                 return dirs;
             }
 
-            private Optional<BatchManifest> read(String dir, String consignmentId) {
+            private Optional<ConsignmentManifest> read(String dir, String consignmentId) {
                 try {
                     return Optional.of(ManifestStore.read(dir, consignmentId));
                 } catch (IOException | RuntimeException unreadable) {

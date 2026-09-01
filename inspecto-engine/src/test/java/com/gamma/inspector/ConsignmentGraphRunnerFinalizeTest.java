@@ -1,6 +1,6 @@
 package com.gamma.inspector;
 
-import com.gamma.etl.Batch;
+import com.gamma.etl.Consignment;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.SchemaSelector;
 import com.gamma.pipeline.PipelineEdge;
@@ -8,7 +8,7 @@ import com.gamma.pipeline.PipelineGraph;
 import com.gamma.pipeline.PipelineNode;
 import com.gamma.pipeline.PipelineRel;
 import com.gamma.pipeline.PipelineStores;
-import com.gamma.pipeline.exec.BatchGraphRunner;
+import com.gamma.pipeline.exec.ConsignmentGraphRunner;
 import com.gamma.util.DuckDbUtil;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -25,17 +25,17 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Stage A step 2 — the re-homed {@link BatchProcessor#finalizeSource} drives the identical crash-ordered
+ * Stage A step 2 — the re-homed {@link ConsignmentIngestor#finalizeSource} drives the identical crash-ordered
  * source finalisation (register → manifest → backup → markers LAST → ledger) when it is the
- * {@link BatchGraphRunner}'s {@code SourceFinalizer}. A two-sink route batch writes both sinks, then the
+ * {@link ConsignmentGraphRunner}'s {@code SourceFinalizer}. A two-sink route batch writes both sinks, then the
  * source is finalised exactly once over the real inbox; a replay over the same {@code BranchCommitLog} does
  * <em>not</em> re-finalise — which is what keeps the marker-creating step from throwing on the second pass.
  */
-class BatchGraphRunnerFinalizeTest {
+class ConsignmentGraphRunnerFinalizeTest {
 
-    private Batch.Member member(PipelineConfig cfg, File f, int id) {
+    private Consignment.Member member(PipelineConfig cfg, File f, int id) {
         SchemaSelector.Selection sel = new SchemaSelector.Selection(cfg.schemas().single(), null);
-        return new Batch.Member(f, id, f.length(), sel);
+        return new Consignment.Member(f, id, f.length(), sel);
     }
 
     @Test
@@ -48,8 +48,8 @@ class BatchGraphRunnerFinalizeTest {
         Path solo = inbox.resolve("solo.csv");
         Files.writeString(solo, "ID,AMT,EVENT_DATE\nx,9.0,2020-04-03\n");
 
-        List<Batch.Member> survivors = List.of(member(cfg, solo.toFile(), 0));
-        Batch batch = new Batch(cfg.identity().runTimestamp() + "_mini_0001", "mini", null, survivors);
+        List<Consignment.Member> survivors = List.of(member(cfg, solo.toFile(), 0));
+        Consignment batch = new Consignment(cfg.identity().runTimestamp() + "_mini_0001", "mini", null, survivors);
 
         String store = PipelineStores.CONFIG_STORE;
         PipelineGraph g = new PipelineGraph("ROUTE_ETL", true,
@@ -69,15 +69,15 @@ class BatchGraphRunnerFinalizeTest {
 
         Path branchLog = dir.resolve("branch_commit.csv");
         int[] finalised = {0};
-        BatchGraphRunner.SourceFinalizer finalizer = sinkOutputs -> {
+        ConsignmentGraphRunner.SourceFinalizer finalizer = sinkOutputs -> {
             finalised[0]++;
             // Empty lineage: the sink writer owns registering its own files (it counts per partition), so
             // finalizeSource must not also register them — see its @param lineage contract.
-            BatchProcessor.finalizeSource(batch, cfg, survivors, sinkOutputs, List.of());
+            ConsignmentIngestor.finalizeSource(batch, cfg, survivors, sinkOutputs, List.of());
         };
 
         // run 1 — a poll cycle over a fresh per-batch connection: both sinks written, source finalised once
-        BatchGraphRunner.Result res = runCycle(cfg, g, batch, branchLog, finalizer, "1");
+        ConsignmentGraphRunner.Result res = runCycle(cfg, g, batch, branchLog, finalizer, "1");
         assertEquals(java.util.Set.of("sink_hi", "sink_lo"), res.exec().sinkInputs().keySet());
         assertTrue(res.exec().commit().sourceFinalized());
         assertEquals(1, finalised[0], "source finalised once, after both branches committed");
@@ -91,7 +91,7 @@ class BatchGraphRunnerFinalizeTest {
         // replay — a fresh poll cycle (new connection) over the SAME durable BranchCommitLog: the
         // coordinator sees the batch already finalised and skips it, so the marker-creating step never
         // runs twice (which would throw FileAlreadyExists on the already-created marker).
-        BatchGraphRunner.Result replay = runCycle(cfg, g, batch, branchLog, finalizer, "2");
+        ConsignmentGraphRunner.Result replay = runCycle(cfg, g, batch, branchLog, finalizer, "2");
         assertFalse(replay.exec().commit().sourceFinalized(), "source not re-finalised on replay");
         assertEquals(1, finalised[0], "finalize invoked exactly once across both cycles");
     }
@@ -110,25 +110,25 @@ class BatchGraphRunnerFinalizeTest {
         Path solo = inbox.resolve("solo.csv");
         Files.writeString(solo, "ID,AMT,EVENT_DATE\nx,9.0,2020-04-03\n");
 
-        List<Batch.Member> survivors = List.of(member(cfg, solo.toFile(), 0));
-        Batch batch = new Batch(cfg.identity().runTimestamp() + "_mini_0002", "mini", null, survivors);
+        List<Consignment.Member> survivors = List.of(member(cfg, solo.toFile(), 0));
+        Consignment batch = new Consignment(cfg.identity().runTimestamp() + "_mini_0002", "mini", null, survivors);
 
         Files.delete(solo);   // vanished between ingest and backup
 
         assertDoesNotThrow(() ->
-                BatchProcessor.finalizeSource(batch, cfg, survivors, List.of(), List.of()));
+                ConsignmentIngestor.finalizeSource(batch, cfg, survivors, List.of(), List.of()));
         assertTrue(Files.exists(Path.of(cfg.dirs().manifestsDir(), batch.batchId() + ".json")),
                 "the batch still finalises — the manifest is written and the batch is not demoted");
     }
 
     /** One poll cycle: a fresh per-batch DuckDB connection holding the parsed seed, run through the graph. */
-    private BatchGraphRunner.Result runCycle(PipelineConfig cfg, PipelineGraph g, Batch batch,
-                                             Path branchLog, BatchGraphRunner.SourceFinalizer finalizer,
+    private ConsignmentGraphRunner.Result runCycle(PipelineConfig cfg, PipelineGraph g, Consignment batch,
+                                             Path branchLog, ConsignmentGraphRunner.SourceFinalizer finalizer,
                                              String tag) throws Exception {
         File db = DuckDbUtil.tempDbFile("bgrf_" + tag + "_");
         try (Connection conn = DuckDbUtil.openConnection(db)) {
             sql(conn, "CREATE TABLE parsed AS SELECT * FROM (VALUES (1,150),(3,200)) t(id,amt)");
-            return BatchGraphRunner.run(new BatchGraphRunner.Input(conn, g, "parse", "parsed",
+            return ConsignmentGraphRunner.run(new ConsignmentGraphRunner.Input(conn, g, "parse", "parsed",
                     batch.batchId(), cfg.dirs().database(), "solo", branchLog), finalizer);
         } finally {
             DuckDbUtil.deleteTempDb(db);

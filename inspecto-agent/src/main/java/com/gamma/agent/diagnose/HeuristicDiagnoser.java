@@ -2,12 +2,12 @@ package com.gamma.agent.diagnose;
 
 import com.gamma.assist.AssistResult;
 import com.gamma.assist.Diagnosis;
-import com.gamma.etl.BatchEvent;
+import com.gamma.etl.ConsignmentEvent;
 
 import java.util.List;
 
 /**
- * The deterministic, model-free first pass over a failed {@link BatchEvent} (v3.7.0, M7). It maps the
+ * The deterministic, model-free first pass over a failed {@link ConsignmentEvent} (v3.7.0, M7). It maps the
  * event's error detail to a {@link Diagnosis.Severity} and a rule-of-thumb root cause using only the
  * fields on the event — no language model, no network.
  *
@@ -29,7 +29,7 @@ public final class HeuristicDiagnoser {
      * @param epochMillis the timestamp to stamp on the diagnosis (injected for deterministic tests)
      * @param citations   grounding sources to attach (e.g. the pipeline's catalog SOURCE node), may be empty
      */
-    public static Diagnosis diagnose(BatchEvent e, long epochMillis, List<AssistResult.Citation> citations) {
+    public static Diagnosis diagnose(ConsignmentEvent e, long epochMillis, List<AssistResult.Citation> citations) {
         Diagnosis.Severity severity = severityOf(e);
         String rootCause = rootCauseOf(e);
         return new Diagnosis(e.batchId(), e.pipeline(), severity, rootCause,
@@ -37,7 +37,7 @@ public final class HeuristicDiagnoser {
     }
 
     /** Severity from how much of the batch survived: nothing out on a failure is critical. */
-    public static Diagnosis.Severity severityOf(BatchEvent e) {
+    public static Diagnosis.Severity severityOf(ConsignmentEvent e) {
         boolean failed = "FAILED".equalsIgnoreCase(e.status());
         if (failed) {
             return e.outputRows() <= 0 ? Diagnosis.Severity.CRITICAL : Diagnosis.Severity.WARNING;
@@ -47,11 +47,11 @@ public final class HeuristicDiagnoser {
     }
 
     /** A plain-language root cause inferred from the error text, naming the offending file when known. */
-    public static String rootCauseOf(BatchEvent e) {
+    public static String rootCauseOf(ConsignmentEvent e) {
         String err = e.error() == null ? "" : e.error().toLowerCase();
         String base;
         if (err.isBlank()) {
-            base = "Batch failed with no error detail recorded; inspect the pipeline run logs.";
+            base = "Consignment failed with no error detail recorded; inspect the pipeline run logs.";
         } else if (err.contains("selector") || err.contains("schema") || err.contains("mismatch")
                 || err.contains("column")) {
             base = "Schema/selector mismatch: the input columns don't match the configured schema.";
@@ -66,7 +66,7 @@ public final class HeuristicDiagnoser {
         } else if (err.contains("permission") || err.contains("denied") || err.contains("access")) {
             base = "Access denied: the process lacks permission for an input or output path.";
         } else {
-            base = "Batch failed: " + truncate(e.error(), 200);
+            base = "Consignment failed: " + truncate(e.error(), 200);
         }
         StringBuilder sb = new StringBuilder(base);
         if (e.offendingFile() != null && !e.offendingFile().isBlank())

@@ -1,6 +1,6 @@
 package com.gamma.service;
 
-import com.gamma.etl.BatchAuditWriter;
+import com.gamma.etl.ConsignmentAuditWriter;
 import com.gamma.etl.LineageRow;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.PipelineConfigBatchTest;
@@ -21,7 +21,7 @@ class FileStatusStoreTest {
      * Regression: Windows output paths contain backslashes. The audit reader must preserve them.
      * OpenCSV's default parser treats '\' as an escape character and silently strips it
      * ("C:\\db\\out.csv" -> "C:dbout.csv"); the RFC4180 parser reads it literally. This writes a
-     * real audit row via BatchAuditWriter and reads it back through FileStatusStore end-to-end.
+     * real audit row via ConsignmentAuditWriter and reads it back through FileStatusStore end-to-end.
      */
     @Test
     void preservesBackslashesInWindowsOutputPaths(@TempDir Path dir) throws Exception {
@@ -36,11 +36,11 @@ class FileStatusStoreTest {
         String statusCsv  = statusDir.resolve(name + "_status_TEST.csv").toString();
         String batchesCsv = statusDir.resolve(name + "_batches_TEST.csv").toString();
         String lineageCsv = statusDir.resolve(name + "_lineage_TEST.csv").toString();
-        BatchAuditWriter w = new BatchAuditWriter(statusCsv, batchesCsv, lineageCsv);
+        ConsignmentAuditWriter w = new ConsignmentAuditWriter(statusCsv, batchesCsv, lineageCsv);
 
-        var fileRow = new BatchAuditWriter.FileRow("2026-06-09 08:00:00", "2026-06-09 08:00:01",
+        var fileRow = new ConsignmentAuditWriter.FileRow("2026-06-09 08:00:00", "2026-06-09 08:00:01",
                 "a.csv", "SUCCESS", 2, 0, List.of(winPath), List.of(120L), 1000, "", "B1");
-        var batchRow = new BatchAuditWriter.BatchRow("B1", name, "mini", "",
+        var batchRow = new ConsignmentAuditWriter.ConsignmentRow("B1", name, "mini", "",
                 "2026-06-09 08:00:00", "2026-06-09 08:00:02", "SUCCESS",
                 1, 0, 2, 2, 1, 120L, 2000, "");
         var lineage = List.of(new LineageRow("B1", 0, "a.csv", winPath, "year=2020/month=04/day=03", 2));

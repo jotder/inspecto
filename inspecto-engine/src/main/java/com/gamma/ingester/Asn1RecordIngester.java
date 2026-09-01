@@ -78,7 +78,7 @@ import java.util.Set;
  */
 public final class Asn1RecordIngester implements StreamingFileIngester {
 
-    /** Public no-arg constructor required for reflective load by {@code BatchProcessor}. */
+    /** Public no-arg constructor required for reflective load by {@code ConsignmentIngestor}. */
     public Asn1RecordIngester() {}
 
     /** The derived column carrying the segment key, appended to every segment. */

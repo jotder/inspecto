@@ -24,7 +24,7 @@ import java.util.function.Consumer;
 
 /**
  * Canonical-ledger ingress for triage (S5, additive-only — deliberately does NOT replace
- * {@code FailureReactor}, which stays on the legacy {@code BatchEventBus}): a live
+ * {@code FailureReactor}, which stays on the legacy {@code ConsignmentEventBus}): a live
  * {@link EventLog} subscriber that keeps a small in-memory window of recent <em>elevated</em>
  * signals (severity ≥ ERROR, or the failure types {@code pipeline.batch.failed} /
  * {@code job.run.failed}) for the deliberative layer to read via {@link #recent(int)}.

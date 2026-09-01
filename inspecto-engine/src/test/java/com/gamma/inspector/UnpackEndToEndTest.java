@@ -34,7 +34,7 @@ class UnpackEndToEndTest {
 
     private static final String ROWS = "ID,AMT,EVENT_DATE\nr1,1.0,2020-04-03\nr2,2.0,2020-04-03\n";
 
-    /** Batch caps that keep several members in ONE consignment (the default is max_files: 1). */
+    /** Consignment caps that keep several members in ONE consignment (the default is max_files: 1). */
     private static final String BATCH_10 = "  batch:\n    max_files: 10\n    max_bytes: 268435456\n";
 
     @Test
