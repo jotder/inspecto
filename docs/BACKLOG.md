@@ -810,7 +810,23 @@ non-blocking:**
   reprocess is a whole-Consignment supersede with **no row-level retraction**, so a ledger keyed only on
   "have I seen this key" would permanently suppress every re-ingested row.
 
-**LEDGER-OUTPUT-BYTES-1 — the per-file ledger reports `output_sizes_bytes` as 0 for a real file
+**~~LEDGER-OUTPUT-BYTES-1~~ — FIXED 2026-09-01 (`bd8e1887`).** The cause was one line in
+`ConsignmentIngestor.writeAudit`: `paths, Collections.nCopies(paths.size(), 0L)` — a literal list of
+zeros. This row's narrowing was exactly right (the writer was faithful; start at the caller), and the
+Consignment-level total was correct because it summed the real `PartitionOutput::bytes`.
+
+🔴 **The join is exact by construction, not by luck** — `LineageCollector` derives each row's
+`outputFile` from the SAME `PartitionOutput` list, so the two strings are the same value. A miss maps to
+**-1, never 0**: `-1` already means "not measured" here, so `0` positively asserted the output was EMPTY,
+which is what turned a cosmetic-looking column into a false audit record.
+
+⚠ **The -1 path is real, and it surfaced a second, separate thing worth knowing:** a plugin/segment
+ingest can produce a member row naming **no output at all** (its rows land under another member's
+`srcId`, and `LineageCollector` already defaults an unresolved partition to an empty `outputFile`). Such
+a row now reads `-1` instead of a fabricated `0`. That is correct reporting, but *why* those rows resolve
+no output is an open question nobody has asked — it is not a sizes bug and was not chased here.
+
+*(Original text, for the record:)* **the per-file ledger reports `output_sizes_bytes` as 0 for a real file
 (2026-08-31).** Found by driving two pipelines to SUCCESS and comparing the ledgers against the files on
 disk. Every row of `<pipeline>_status_<ts>.csv` carries `output_sizes_bytes` `"0"` while the parquet/CSV it
 names is non-zero (measured: 857 B, 785 B, 295 B, 130 B).
