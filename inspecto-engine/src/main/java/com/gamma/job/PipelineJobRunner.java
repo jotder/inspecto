@@ -291,8 +291,11 @@ public final class PipelineJobRunner implements Job {
                     ? PipelineExecutor.ProvenanceCollector.NONE
                     : (nodeId, rel, rowCount) -> provRows.add(new ProvenanceRow(pipelineId, batchId, nodeId, rel, rowCount, runTs));
 
+            // D-9: the at-rest run is the one path with real run context — pipeline id (the ledger's
+            // stable key, rename-proof like the watermark's producer), this run's batch id, and the
+            // space's dedup ledger — so a windowed transform.dedup can claim keys durably here.
             PipelineExecutor.execute(conn, g, seedViews, batchId, coordinator, writer, () -> {}, collector,
-                    references());
+                    references(), null, RowShaper.ExecutionContext.forRun(pipelineId, batchId));
 
             if (provenance != null) {
                 provenance.record(provRows);

@@ -68,6 +68,17 @@ public final class ReprocessCommand {
         ManifestStore.supersede(cfg.dirs().manifestsDir(), batchId);
         DbConsignmentOutputStore registry = ConsignmentOutputStores.shared();
         if (registry != null) registry.supersede(batchId);
+        // 4b. D-9: retract this Consignment's windowed-dedup claims BESIDE the supersede — a reprocess
+        // is a whole-Consignment supersede-and-re-ingest with no row-level retraction anywhere, so a
+        // ledger still holding these keys would answer "already seen" to every re-ingested row and
+        // drop the lot, silently and permanently (DbDedupLedger class doc).
+        com.gamma.consignment.DbDedupLedger dedupLedger = com.gamma.consignment.DedupLedgers.shared();
+        if (dedupLedger != null) {
+            int retracted = dedupLedger.retract(batchId);
+            if (retracted > 0)
+                log.info("[REPROCESS] {} — retracted {} windowed-dedup claim(s) so re-ingest can re-admit them",
+                        batchId, retracted);
+        }
 
         // 5. re-run a normal poll on the restored set (fresh batch id)
         CollectorProcessor.run(cfg);

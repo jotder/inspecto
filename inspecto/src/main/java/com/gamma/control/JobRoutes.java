@@ -75,6 +75,11 @@ final class JobRoutes implements RouteModule {
         // W5 async: poll one run by id (the id returned by the 202 trigger below). Single-segment after
         // /jobs/runs/, so it never collides with the exact /jobs/runs or the /jobs/{name}/runs history route.
         api.get("/jobs/runs/([^/]+)", (e, m) -> runById(api, ApiContext.name(m)));
+        // Replay a finished at-rest run (the /runs/{name}/reprocess analog for job runs): re-fires the
+        // same job/flow, linked to the original via trigger "replay:<runId>". Fixed /replay tail, so it
+        // never collides with the single-segment poll route above. Operating verb → canOperateRuns.
+        api.post("/jobs/runs/([^/]+)/replay", ApiContext.withCapability("canOperateRuns",
+                (e, m) -> replayRun(api, e, ApiContext.name(m))));
         // Single-job detail (the Scheduler's detail page). Registered AFTER every fixed /jobs/<sub-path>
         // above, so "types"/"packs"/"metrics"/"runs"/"failures" resolve to their own routes first.
         api.get("/jobs/([^/]+)", (e, m) -> jobDetail(api, ApiContext.name(m)));
@@ -136,6 +141,36 @@ final class JobRoutes implements RouteModule {
                     Map.of("runId", runId, "job", name, "status", "running", "dryRun", dryRun));
         }
         return Map.of("job", name, "status", "triggered");
+    }
+
+    /**
+     * {@code POST /jobs/runs/{runId}/replay} — re-fire the job (or ad-hoc flow) behind a finished run.
+     * 404 for an unknown/evicted runId; 409 while that job is currently running (the non-overlap guard,
+     * checked here so the caller gets a refusal instead of a silently-SKIPPED run) and when the job is
+     * no longer registered. ⚠ The ledger persists no firing parameters, so the replay re-triggers with
+     * the job's configured defaults — the response says so ({@code note}) and carries the
+     * {@code replayOf} linkage, which also rides the new run's {@code trigger} field.
+     */
+    private Object replayRun(ApiContext api, HttpExchange e, String runId) throws IOException {
+        JobService svc = jobs(api);
+        JobRun orig = svc.runById(runId)
+                .orElseThrow(() -> new ApiException(404, "no run '" + runId + "'"));
+        if (svc.isRunning(orig.job()))
+            throw new ApiException(409, "job '" + orig.job() + "' is currently running — replay refused");
+        String newId = svc.replayRun(runId, ApiContext.query(e, "actor"))
+                .orElseThrow(() -> new ApiException(409,
+                        "job '" + orig.job() + "' is no longer registered — cannot replay run '" + runId + "'"));
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("runId", newId);
+        body.put("replayOf", runId);
+        body.put("job", orig.job());
+        body.put("status", "running");
+        body.put("note", "run parameters are not persisted — replayed with the job's configured defaults");
+        if (ApiContext.v1(e)) {
+            e.getResponseHeaders().set("Location", "/api/v1/jobs/runs/" + newId);
+            return ApiContext.respondJson(e, 202, body);
+        }
+        return body;
     }
 
     /** Extract the optional {@code params:{}} object from a trigger body as string-valued trigger args (§7.2 layer 1). */

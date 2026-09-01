@@ -107,6 +107,42 @@ class MaintenanceLibraryTest {
                 com.gamma.consignment.ConsignmentOutput.State.SUPERSEDED);
     }
 
+    // ── dedup_prune (D-9) ────────────────────────────────────────────────────────
+
+    @Test
+    void dedupPruneAdvancesTheWindowByEventTimeAndRequiresRetention() throws Exception {
+        assertThrows(Exception.class,
+                () -> new MaintenanceJob(job(Map.of("task", "dedup_prune"))).run(),
+                "forgetting is deliberate — retention_days is required, as for ledger_prune");
+
+        try (var ledger = new com.gamma.consignment.DbDedupLedger(
+                DriverManager.getConnection("jdbc:duckdb:"))) {
+            com.gamma.consignment.DedupLedgers.use(ledger);
+            try {
+                ledger.claim("p", java.time.LocalDate.now().minusDays(30), "c-old", List.of("h-old"));
+                ledger.claim("p", java.time.LocalDate.now(), "c-new", List.of("h-new"));
+
+                JobResult dry = new MaintenanceJob(job(Map.of("task", "dedup_prune", "retention_days", "7")))
+                        .run(dryCtx(java.nio.file.Files.createTempDirectory("dp_audit")));
+                assertTrue(dry.message().contains("[dry-run]"), dry.message());
+                assertEquals(2, ledger.size(), "a preview must not delete");
+
+                JobResult r = new MaintenanceJob(job(Map.of("task", "dedup_prune", "retention_days", "7"))).run();
+                assertTrue(r.message().contains("removed 1"), r.message());
+                assertEquals(1, ledger.size(), "the elapsed window's claim is gone, the live one kept");
+            } finally {
+                com.gamma.consignment.DedupLedgers.use(null);
+            }
+        }
+    }
+
+    @Test
+    void dedupPruneDegradesWhenNoLedgerIsRegistered() throws Exception {
+        com.gamma.consignment.DedupLedgers.use(null);
+        JobResult r = new MaintenanceJob(job(Map.of("task", "dedup_prune", "retention_days", "7"))).run();
+        assertTrue(r.message().contains("no dedup ledger"), r.message());
+    }
+
     // ── notification_prune ───────────────────────────────────────────────────────
 
     @Test

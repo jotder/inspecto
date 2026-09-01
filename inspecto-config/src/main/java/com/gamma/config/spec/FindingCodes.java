@@ -42,6 +42,13 @@ public final class FindingCodes {
     /** The same disabled-steps refusal on an INACTIVE draft — it bites only at activation. */
     public static final String WARN_STEP_DISABLE_UNPARKABLE = "WARN_STEP_DISABLE_UNPARKABLE";
 
+    /** An ACTIVE windowed dedup ({@code scope: window(...)}) with no {@code order_by} tie-break, or a
+     *  malformed {@code scope:} value — a durable ledger must never record a non-deterministic winner (D-9). */
+    public static final String ERR_DEDUP_WINDOW_UNARMABLE = "ERR_DEDUP_WINDOW_UNARMABLE";
+
+    /** The same windowed-dedup refusal on an INACTIVE draft — it bites only at activation. */
+    public static final String WARN_DEDUP_WINDOW_UNARMABLE = "WARN_DEDUP_WINDOW_UNARMABLE";
+
     // ── Schema ───────────────────────────────────────────────────────────────────────────────
     // (schema-resolution / compatibility findings register here as they are wired)
 

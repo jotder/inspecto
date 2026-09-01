@@ -573,18 +573,27 @@ public final class JobService implements AutoCloseable {
      * {@link #armCron}. A disabled config ({@code enabled=false}) is recorded but not armed/built.
      */
     public synchronized void upsertJob(JobConfig c) {
-        removeJob(c.name());
+        removeJobInternal(c.name());
         configs.add(c);
-        if (!c.enabled()) return;
-        jobs.put(c.name(), build(c));
-        if (c.hasSignal()) signalCoalescers.put(c.name(), new TriggerCoalescer());
-        if (c.hasCron() && started) armCron(c);
+        if (c.enabled()) {
+            jobs.put(c.name(), build(c));
+            if (c.hasSignal()) signalCoalescers.put(c.name(), new TriggerCoalescer());
+            if (c.hasCron() && started) armCron(c);
+        }
+        auditOrphanOutputStores();   // a job change is an orphan transition source (e.g. disabling the runner)
     }
 
     /** Unregister a Job — {@code jobs}/{@code crons}/coalescer entries are removed so listings, manual
      *  trigger and dispatch loops stop seeing it, and its {@link Scheduler.CronHandle} (if any) is
      *  cancelled so the cron chain stops re-arming instead of ticking as an inert no-op forever. */
     public synchronized void removeJob(String name) {
+        removeJobInternal(name);
+        auditOrphanOutputStores();   // deleting a runner job can orphan a pipeline's Stage-2 chain
+    }
+
+    /** {@link #removeJob} minus the orphan audit — for {@link #upsertJob}, whose remove-then-re-add
+     *  must not emit a false orphan transition for the job it is about to re-register. */
+    private void removeJobInternal(String name) {
         configs.removeIf(c -> c.name().equals(name));
         jobs.remove(name);
         crons.remove(name);
@@ -896,6 +905,50 @@ public final class JobService implements AutoCloseable {
     /** A live or recently-finished run by its id, for polling; empty once evicted past the LRU cap. */
     public Optional<JobRun> runById(String runId) {
         return runId == null ? Optional.empty() : Optional.ofNullable(liveRuns.get(runId));
+    }
+
+    /** Whether any live run of {@code job} is currently {@code RUNNING} — the replay 409 precheck.
+     *  The per-name non-overlap lock still backstops the check-then-act race (a run admitted past this
+     *  check while another starts records {@code SKIPPED} instead of overlapping). */
+    public boolean isRunning(String job) {
+        synchronized (liveRuns) {
+            return liveRuns.values().stream()
+                    .anyMatch(r -> r.job().equals(job) && "RUNNING".equals(r.status()));
+        }
+    }
+
+    /**
+     * Replay a finished run: re-fire the same job (or ad-hoc authored flow) that produced
+     * {@code originalRunId}. ⚠ The run ledger persists no firing parameters ({@link JobRun} carries
+     * none), so a replay re-triggers with the job's CONFIGURED defaults — it is a re-trigger of the
+     * same unit of work as configured, not a byte-identical re-fire of ad-hoc trigger args. The new
+     * run's {@code trigger} is {@code replay:<originalRunId>[:actor]}, so the linkage rides the run
+     * record (ledger + poll) without a schema change and the trail is followable.
+     *
+     * @return the new {@code runId} to poll; empty when the original run is unknown/evicted, or when
+     *         its job is no longer registered (and was not an ad-hoc pipeline run)
+     */
+    public Optional<String> replayRun(String originalRunId, String actor) {
+        JobRun orig = runById(originalRunId).orElse(null);
+        if (orig == null) return Optional.empty();
+        String trigger = "replay:" + originalRunId
+                + (actor == null || actor.isBlank() ? "" : ":" + actor.trim());
+        if (jobs.containsKey(orig.job())) {
+            String runId = newRunId(orig.job());
+            submitRun(runId, orig.job(), trigger, runId, null, 0, Firing.NONE);
+            return Optional.of(runId);
+        }
+        if ("pipeline".equals(orig.type())) {
+            // The original was an ad-hoc authored-flow run (triggerPipelineRun) — rebuild the same
+            // synthetic config; buildPipelineJob fails closed without an authored-flow store.
+            JobConfig cfg = new JobConfig(orig.job(), "pipeline", null, null, true, false,
+                    Map.of("pipeline", orig.job()), null, null);
+            Job job = buildPipelineJob(cfg);
+            String runId = newRunId(orig.job());
+            submitAdhocRun(job, cfg, runId, trigger);
+            return Optional.of(runId);
+        }
+        return Optional.empty();
     }
 
     private String newRunId(String name) {
@@ -1374,6 +1427,42 @@ public final class JobService implements AutoCloseable {
     Map<String, String> pipelineOutputStores() {
         java.util.function.Supplier<Map<String, String>> s = pipelineOutputStores;
         return s == null ? null : s.get();
+    }
+
+    /** Kill switch for the default-on orphan {@code output_store:} audit — {@code -Djobs.orphan.audit=false}
+     *  disables it; default ON. The richer on-demand {@code scheduler_audit} maintenance task is unaffected. */
+    public static final String ORPHAN_AUDIT_FLAG = "jobs.orphan.audit";
+
+    /** The orphan findings already signalled, so the default-on audit emits once per orphan TRANSITION
+     *  (new orphan appears, or a resolved one reappears), never once per cycle. Replaced wholesale each
+     *  scan; a finding that disappears (the chain gained a runner) is forgotten, so a later regression
+     *  re-emits. */
+    private volatile Set<String> reportedOrphans = Set.of();
+
+    /**
+     * Default-on orphan {@code output_store:} detection (MNT-4 fail-closed follow-up): the same config
+     * scan the {@code scheduler_audit} maintenance task runs, hosted here so every space gets it without
+     * shipping that job. Invoked by the hosting service on pipeline-registry rebuilds and by
+     * {@link #upsertJob}/{@link #removeJob} (the two transition sources). Cheap — a registry snapshot
+     * scan, no data reads. Skips (like the task) when the host never wired
+     * {@link #pipelineOutputStores(java.util.function.Supplier)}. Emits one
+     * {@code maintenance.scheduler.findings} WARN signal carrying only the NEW findings.
+     *
+     * @return the freshly-emitted findings (empty when nothing new, when disabled, or when unwired)
+     */
+    public List<String> auditOrphanOutputStores() {
+        if (!Boolean.parseBoolean(System.getProperty(ORPHAN_AUDIT_FLAG, "true"))) return List.of();
+        Map<String, String> stores = pipelineOutputStores();
+        if (stores == null) return List.of();
+        List<String> findings = SchedulerAuditTask.orphanOutputStoreFindings(configSnapshot(), stores);
+        Set<String> previous = reportedOrphans;
+        reportedOrphans = Set.copyOf(findings);
+        List<String> fresh = findings.stream().filter(f -> !previous.contains(f)).toList();
+        if (!fresh.isEmpty())
+            emitSignal("maintenance.scheduler.findings", Severity.WARN, null, null,
+                    Ref.of("job", "orphan_audit"),
+                    Map.of("count", fresh.size(), "findings", fresh));
+        return fresh;
     }
 
     /** Immutable snapshot of every configured job, for the scheduler_audit task. */

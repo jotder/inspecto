@@ -68,19 +68,7 @@ final class SchedulerAuditTask {
         // Stage-2 chain on the promise that a `pipeline_config:` job runs it over the landed store —
         // with no such enabled job the chain quietly never runs (the prepare() silent-skip, deferred).
         Map<String, String> outputStores = host.pipelineOutputStores();   // null = host never wired them — skip, don't guess
-        if (outputStores != null) {
-            Set<String> shaped = new HashSet<>();
-            for (JobConfig c : all) {
-                if (!c.enabled()) continue;
-                String p = c.params().get("pipeline_config");
-                if (p != null && !p.isBlank()) shaped.add(pipelineNameOf(p));
-            }
-            outputStores.forEach((pipeline, store) -> {
-                if (!shaped.contains(pipeline))
-                    findings.add("orphan output_store: pipeline '" + pipeline + "' declares output_store '"
-                            + store + "' but no enabled pipeline_config job runs its chain");
-            });
-        }
+        if (outputStores != null) findings.addAll(orphanOutputStoreFindings(all, outputStores));
         Set<String> emitted = new LinkedHashSet<>(List.of("job.run.started", "job.run.completed",
                 "job.run.failed", "job.run.rejected", "job.chain.cut", "pipeline.commit"));
         for (JobTypeDescriptor d : host.jobTypes()) emitted.addAll(d.emits());
@@ -100,6 +88,27 @@ final class SchedulerAuditTask {
         return JobResult.ok("scheduler_audit: " + findings.size() + " finding(s) across " + all.size()
                 + " job(s)" + (findings.isEmpty() ? " — healthy" : ""),
                 (System.nanoTime() - t0) / 1_000_000L);
+    }
+
+    /**
+     * The orphan {@code output_store:} finding class on its own — shared by the {@code scheduler_audit}
+     * task above and the default-on host audit ({@link JobService#auditOrphanOutputStores()}), so the
+     * two can never drift. Pure: a config scan over the job registry snapshot, no data reads.
+     */
+    static List<String> orphanOutputStoreFindings(List<JobConfig> all, Map<String, String> outputStores) {
+        Set<String> shaped = new HashSet<>();
+        for (JobConfig c : all) {
+            if (!c.enabled()) continue;
+            String p = c.params().get("pipeline_config");
+            if (p != null && !p.isBlank()) shaped.add(pipelineNameOf(p));
+        }
+        List<String> findings = new ArrayList<>();
+        outputStores.forEach((pipeline, store) -> {
+            if (!shaped.contains(pipeline))
+                findings.add("orphan output_store: pipeline '" + pipeline + "' declares output_store '"
+                        + store + "' but no enabled pipeline_config job runs its chain");
+        });
+        return findings;
     }
 
     /** The pipeline name a {@code pipeline_config:} path refers to: the file basename, minus the

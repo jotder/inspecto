@@ -362,7 +362,7 @@ thing"* is a one-concept-two-words violation.
 | **1** | ~~decide the output contract~~ | ✅ **DECIDED**: arbitrary tables, registered as outputs |
 | **2** | ✅ **SHIPPED 2026-08-29** — `DerivedTableEmitter` / `DerivedTableWriter`, registered onto the same Consignment | no new state; the reprocess cascade is proven free by test. §7 |
 | **3** | ✅ **SHIPPED 2026-08-29** — an ordered chain, the registry re-read per step | §8 |
-| **4** | ✅ **SHIPPED 2026-08-29** — `GET /runs/{name}/outputs` + the Batch-detail section (`aa777782`) | authoring |
+| **4** | ⚠ **HALF: the read-only registered-outputs list SHIPPED 2026-08-29** (`GET /runs/{name}/outputs` + the Batch-detail section, `aa777782`); the **authoring** half — an ordered chain-authoring UX over the `processor`+`chain_config` param pair — is still hand-edited TOON (gate-register §4; corrected 2026-09-01 — this row's bare "SHIPPED" contradicted the prose and was called out by spec §10 item 12) | authoring |
 | **5** | ✅ **SHIPPED 2026-08-29** — a CONTRIBUTED step is authorable via `steps:` | §11 |
 | **6** | 🔴 **REFUTED 2026-08-29 — already shipped, nothing to build.** See §12 | n/a |
 

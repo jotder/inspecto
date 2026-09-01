@@ -733,7 +733,8 @@ final class PipelineConfigParser {
             List<String> keys = new ArrayList<>();
             if (recDedup.get("keys") instanceof List<?> ks)
                 for (Object k : ks) keys.add(String.valueOf(k));
-            b.dedup = new PipelineConfig.Dedup(keys, trimToNull(recDedup.get("order_by")));
+            b.dedup = new PipelineConfig.Dedup(keys, trimToNull(recDedup.get("order_by")),
+                    trimToNull(recDedup.get("scope")));   // D-9: window(<period>), validated where read
         }
 
         // ── per-Step disable list (Phase 4 S4 / D-13 — authoring/round-trip; arming refused until

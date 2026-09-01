@@ -317,8 +317,16 @@ const NODE_ATTRIBUTES: Record<string, AttributeSpec[]> = {
             label: 'Order by',
             type: 'string',
             tier: 'optional',
-            help: 'Which duplicate wins — SQL ordering over the typed columns; blank = input order.',
+            help: 'Which duplicate wins — SQL ordering over the typed columns; blank = input order. REQUIRED once Scope declares a window: a durable ledger must never record a non-deterministic winner.',
             placeholder: 'event_ts DESC',
+        },
+        {
+            key: 'scope',
+            label: 'Scope',
+            type: 'string',
+            tier: 'advanced',
+            help: 'How far back a key is a duplicate: blank/consignment = within this Consignment only; window(<ISO-8601 period>), e.g. window(P4D), also suppresses keys admitted by earlier Consignments inside that window via the durable dedup ledger (runs at rest).',
+            placeholder: 'window(P4D)',
         },
     ],
     // `transform.dedup.marker` is deliberately ABSENT: P5-a moved marker dedup onto the acquisition

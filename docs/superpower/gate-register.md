@@ -141,10 +141,10 @@ to obtain it".
 
 Ordered by what they unblock.
 
-1. **`open-dag` §9 Q1 — is a comma-separated `processor` string the authoring surface?** Blocks the
-   editor surface (§6.4 stage 4). The string is the smallest thing that works with the existing
-   `ParameterDecl` vocabulary (there is no `LIST` `ParamType`) and is honest about ordering, but it
-   **carries no per-step configuration** — a step needing parameters has nowhere to put them.
+1. ~~**`open-dag` §9 Q1 — is a comma-separated `processor` string the authoring surface?**~~
+   ✅ **DECIDED and SHIPPED 2026-08-29** (`chain_config` JSON param — this register's own §4
+   records it; corrected 2026-09-01, the two sections had drifted). What survives as open is the
+   **ordered chain-authoring UX** (a designed editor surface over the param pair), listed in §4.
 2. **`open-dag` §9 Q2 — should a mid-chain failure retire what earlier steps wrote?** Today: no
    (append-only, "a registered table is a fact"). The alternative is expressible with existing state
    but changes that contract to "a fact only if its chain finished".
@@ -277,16 +277,11 @@ Ordered by what they unblock.
   count source (`CommitLog`) was REFUTED on grounding — per-batch only, no day column — so the KPI
   reads the `consignment_outputs` registry (`record_day` + per-file `rows`, on by default). ✅ The
   histogram representation question is CLOSED (verified 2026-08-28) but is now moot for this row.
-- **ELT** D-9 windowed keyed dedup ledger (⛔ "never faked with unbounded history") ⛔ **DECIDED
-  2026-08-31 (pipeline-spec §13 D8): NOT SCHEDULABLE, and it stops being called a fast-follow** —
-  inviting an estimate for undesigned work is the actual defect. It returns only with three answers:
-  where the ledger persists, the winner policy, and how the window advances. 🔴 **GROUNDED 2026-08-30,
-  it is NAMED, not designed**: `scope: window(P4D)`
-  appears only in the deferral row and a BACKLOG label, with **no §-numbered design section anywhere**
-  for where the ledger persists, its winner policy, or how the window advances. ⚠ Nothing gates it —
-  the 2026-08-11 move of record dedup to Stage-2 (`BatchIngestStrategy.java:192-199`) is its enabling
-  precondition and already shipped — but it needs a design pass before any build. Today's dedup is
-  within-Consignment only (`RowShaper.dedup`, `QUALIFY ROW_NUMBER()`, `:212-230`) · **D-8 XLSX export**
+- ~~**ELT** D-9 windowed keyed dedup ledger — NOT SCHEDULABLE / named-not-designed~~ ✅ **STALE by
+  two revisions (corrected 2026-09-01): DESIGNED 2026-08-31** (`pipeline-waves-drain-plan.md` §3 —
+  the three answers D8 demanded), **🚧 HALF BUILT** (`DbDedupLedger` `8a3d2aae` + `DedupScope`
+  `5e43bcbf`), remainder building via the ExecutionContext seam; board of record = BACKLOG §6.
+  D8's refusal-to-estimate was correct at the time and stands as history · **D-8 XLSX export**
   ⚠ genuinely zero groundwork (no spreadsheet library in any pom) and gated only by a bare label — the
   operator call needs *stating as a question* before it can be answered · branch-commit-log
   housekeeping.

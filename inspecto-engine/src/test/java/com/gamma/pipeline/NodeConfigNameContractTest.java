@@ -124,6 +124,8 @@ class NodeConfigNameContractTest {
                         c -> c.dedup().keys(), List.of("EVENT_DATE")),
                 new Contract("transform.dedup", "order_by", "order_by", "EVENT_DATE DESC",
                         c -> c.dedup().orderBy(), "EVENT_DATE DESC"),
+                new Contract("transform.dedup", "scope", "scope", "window(P4D)",
+                        c -> c.dedup().scope(), "window(P4D)"),
 
                 // ── sink.persistent — the destination + the shared OUTPUT_ATTRIBUTES table ──────
                 // `database` is the key `lower` hard-requires on the primary sink (NO_PERSISTENT_SINK);

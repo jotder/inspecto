@@ -77,6 +77,7 @@ implementations are **plain JDBC over a single shared `Connection`**, with hand-
 | Acquisition / dedup ledger + export watermark | `acquire/AcquisitionLedger` | [`DbAcquisitionLedger`](../../../../inspecto-acquire/src/main/java/com/gamma/acquire/DbAcquisitionLedger.java) | `acquire.ledger.backend=memory\|db` *(via `AcquisitionLedgers`, not `ServiceStores`)* | `memory` |
 | Consignment output-file registry | *(class is the API)* | [`DbConsignmentOutputStore`](../../../../inspecto-engine/src/main/java/com/gamma/consignment/DbConsignmentOutputStore.java) | `consignment.outputs.backend=none\|duckdb\|postgres` | **`duckdb`** — the only default-on store; see below |
 | Per-file stage-progression registry (Phase 4 §2.4) | *(class is the API)* | [`DbFileStageStore`](../../../../inspecto-engine/src/main/java/com/gamma/consignment/DbFileStageStore.java) | `file.stages.backend=none\|duckdb\|postgres` | `none` |
+| Windowed record-dedup ledger (D-9) | *(class is the API)* | [`DbDedupLedger`](../../../../inspecto-engine/src/main/java/com/gamma/consignment/DbDedupLedger.java) | `dedup.ledger.backend=none\|duckdb\|postgres` | **`duckdb`** — default-on like `consignment_outputs`: a default-off dedup ledger silently emits the duplicates it was configured to drop; costs nothing while no pipeline declares `scope: window(...)` |
 | Ops escalation queues | `ops/queue/QueueStore` | **none** — in-memory only | — | — |
 | Pipeline execution watermarks | `pipeline/exec/PipelineWatermarkStore` | **none** — in-memory/file only | — | — |
 
@@ -407,6 +408,34 @@ called from `BatchProcessor.finalizeSource` after each of the six boundaries; de
 best-effort, same fail-open contract as `consignment_outputs` — absence means no index, never a
 change to the commit ordering itself. Read by `FileStages.stages(sourceId, relativePath)`, exposed
 at `GET /runs/{name}/files/stage?path=<relative>`.
+
+### 3.11 `inspecto_dedup_keys` — windowed record-dedup ledger (D-9)  · **M**
+File: `inspecto-dedup-ledger.db`
+
+```sql
+CREATE TABLE IF NOT EXISTS inspecto_dedup_keys (
+    pipeline        VARCHAR NOT NULL,
+    key_hash        VARCHAR NOT NULL,
+    window_start    DATE    NOT NULL,
+    consignment_id  VARCHAR NOT NULL,
+    first_seen      TIMESTAMP NOT NULL,
+    PRIMARY KEY (pipeline, key_hash, window_start)
+);
+```
+
+The `scope: window(<period>)` half of `transform.dedup` (D-9): one row per
+`(pipeline id, SHA-256 key hash, epoch-anchored window start)`. `claim()` is `INSERT … ON CONFLICT DO
+NOTHING` and returns only the hashes it won, so **first committed wins** — the database resolves two
+racing Consignments, not a check-then-insert. Keys are **hashed, never verbatim** (operator decision
+2026-09-01 — an MSISDN table is a data-protection surface the other ledgers don't have), so the table
+cannot say WHICH key collided; the losing rows still leave on the `duplicate` relation.
+`retract(consignment_id)` releases a superseded Consignment's claims (`ReprocessCommand` step 4b —
+without it a reprocess would re-ingest into "already seen" and drop every row permanently);
+`prune(cutoff)` advances the window by the claims' own `window_start` (event time, never mtime) via the
+`dedup_prune` maintenance task (`retention_days` required). Registered per space by `DedupLedgers`
+(the `ConsignmentOutputStores` idiom), opened by `ServiceStores.openDedupLedger`; **absence is
+fail-closed**, not fail-open — a windowed dedup with no ledger REFUSES at run
+(`RowShaper.ExecutionContext`).
 
 ---
 

@@ -89,7 +89,9 @@ same registry with a config shape + `deriveRefs` + (where composite) wiring — 
   first-class ("no abstraction without a second consumer"). Jobs joined the reuse-graph, the
   Metadata Bundle (runtime state — last status/run — never travels), and delete protection
   (deleting a pipeline a job triggers on now 409s; the pipelines mock handler gained the
-  referential check it lacked). Declared-but-unmodeled execution metadata (retry policy, emitted
+  referential check it lacked). *(Retry policy's live owner since 2026-09-01 is
+  [`execution-residuals-plan.md`](execution-residuals-plan.md) §X1 — this deferral row was its only
+  prior mention.)* Declared-but-unmodeled execution metadata (retry policy, emitted
   signals, produced datasets) lands with R4's signal contract; `params` references land with R3's
   parameter namespace.
 - **R3 — Query kind + Parameters + ResultSet descriptor — ✅ SHIPPED 2026-07-06** (§4). Three parts:

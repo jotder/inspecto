@@ -479,6 +479,7 @@ infra probes: `/health`, `/ready`, `/metrics`, `/metrics/acquisition`.
   - `POST /pipelines/authored/{n}/dry-run` — bounded sample on a throwaway DuckDB → [`pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md).
   - `GET /pipelines/authored[/{n}[/raw]]`, `DELETE /pipelines/authored/{n}` — read/delete of authored entries incl. grandfathered flows (the `*_flow.toon` CRUD surface is retired — no POST/PUT here) → [`pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md) §16.
   - `POST /runs/{n}/drain` *(canOperateRuns)* — complete a PARKED Consignment (also listed under ingest runs above) → [`step-park-drain.md`](okf/backend/pipeline-graph/step-park-drain.md).
+  - `POST /jobs/runs/{runId}/replay` *(canOperateRuns)* — re-fire a finished/failed at-rest job run (configured defaults; `replay:<runId>` linkage in the new run's trigger; 409 while running) → [`execution-lanes.md`](okf/backend/pipeline-graph/execution-lanes.md).
 - **Components:** `GET /components/{type}[/{id}]` *(single-GET carries a strong `ETag`=content hash; `If-None-Match`→304)*,
   `POST/PUT/DELETE` *(503; PUT honours `If-Match`→409 `CONFLICT_STALE_VERSION`; DELETE 409 if referenced)*,
   `POST /components/{transform|grammar|schema|sink}/{id}/test` *(503)*,

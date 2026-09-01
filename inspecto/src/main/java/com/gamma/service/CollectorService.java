@@ -382,6 +382,11 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // idiom as the output-file registry above, since ConsignmentIngestor.finalizeSource is static.
         com.gamma.consignment.FileStages.register(
                 spaceId, ServiceStores.openFileStageStore(root));
+        // This space's windowed record-dedup ledger (D-9) — same static-registry idiom, but default-ON
+        // (duckdb): a default-off dedup ledger silently emits the duplicates it was asked to drop.
+        // Costs nothing while no pipeline declares scope: window(...) — the table just stays empty.
+        com.gamma.consignment.DedupLedgers.register(
+                spaceId, ServiceStores.openDedupLedger(root));
         // This space's data-plane provenance projection (T21) — ONE instance shared by both lanes:
         // the ingest lane records via the same static per-space idiom as the two registries above
         // (ConsignmentIngestor is static), and the Job engine gets the identical instance ctor-injected
@@ -542,6 +547,9 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // Initial population so the read surface (catalog, pathFor, configFor, pipelines) is live
         // before the first poll cycle. Unloadable configs are warned and skipped.
         configRegistry.rebuild(this.registry);
+        // Default-on orphan output_store detection (MNT-4 fail-closed): every registry rebuild is a
+        // transition source; the JobService debounces, so this emits once per orphan, not per rebuild.
+        if (this.jobs != null) this.jobs.auditOrphanOutputStores();
 
         // The loop/event-driven ingest driver (M2 step 2). Passed the SAME runGuard/registryLock/bus/
         // triggerWorkers and the shared registry/config/paused/running state — never clones — plus the two
@@ -1099,6 +1107,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         } finally {
             registryLock.unlock();
         }
+        if (jobs != null) jobs.auditOrphanOutputStores();   // MNT-4 default-on: a new pipeline may arm an unrun chain
         armReferenceRefresh(cfg);   // Reference Phase-2 P3: refresh_seconds > 0 ⇒ periodic compaction
         log.info("Registered pipeline '{}' from {} ({} pipeline(s) now active)", id, norm, registry.size());
         this.eventLog.emit(Event.builder(EventType.PIPELINE_REGISTERED)
@@ -1151,10 +1160,11 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                     .source(CollectorService.class.getName()).pipeline(id.orElse(null))
                     .message("Pipeline unregistered" + id.map(i -> ": " + i).orElse(""))
                     .attr("configPath", norm.toString()).attr("activePipelines", registry.size()));
-            return true;
         } finally {
             registryLock.unlock();
         }
+        if (jobs != null) jobs.auditOrphanOutputStores();   // MNT-4 default-on: registry shrank — rescan (debounced)
+        return true;
     }
 
     /**
@@ -1663,6 +1673,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // Release the output-file registry this service registered (+ its DB handle); no-op when default-off.
         com.gamma.consignment.ConsignmentOutputStores.unregister(spaceId);
         com.gamma.consignment.FileStages.unregister(spaceId);
+        com.gamma.consignment.DedupLedgers.unregister(spaceId);
         com.gamma.pipeline.exec.ProvenanceStores.unregister(spaceId);
         if (status instanceof AutoCloseable c) {       // close a DB-backed store's connection
             try { c.close(); } catch (Exception e) { log.warn("Error closing status store: {}", e.getMessage()); }

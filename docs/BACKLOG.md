@@ -811,8 +811,8 @@ R1/R2/R4/R5/R6 SHIPPED 2026-09-01 same shift (as-built:
   collision recorded in `okf/frontend/features/onboarding.md` (the two collide on the word
   *schema*).
 
-**PIPELINE-WAVES-REMAINDER — the last two Pipeline Wave items, both unschedulable as engineering
-(2026-09-01).** The board is **16 of 17** after this shift; plan and evidence in
+**PIPELINE-WAVES-REMAINDER — one row left (2026-09-02: row 14 / D-9 shipped COMPLETE, so the
+board is 16 of 17 with only release-gated row 15 open).** Plan and evidence in
 [`superpower/pipeline-waves-drain-plan.md`](superpower/pipeline-waves-drain-plan.md).
 
 - **Row 15 — Phase 6's deletion half. ⛔ NOT closable by code.** ELT amendment §6 gives it four steps and
@@ -836,13 +836,23 @@ R1/R2/R4/R5/R6 SHIPPED 2026-09-01 same shift (as-built:
     non-deterministic, which is a latent bug inside one batch and unrepeatable data loss against a durable
     ledger). ⛔ No `window(all)`; a zero/negative period is refused.
 
-  🔴 **What remains is the wiring, and it has one real obstacle.** `RowShaper.dedup` is a **static shaper**
-  whose signature is `(conn, node, input, prefix)` — it has no consignment id, no pipeline name and no
-  ledger handle, and the ledger needs all three. Threading run context into `RowShaper` (or giving the
-  dedup step a context object) is the design question the next slice must answer; it is invasive and
-  should not be improvised. Also still to do: read `scope:` off the dedup config in the parser, mirror
-  the `order_by` refusal into `ConfigSpecs`/the UI so it lands at save time, hook `retract` to
-  `registry.supersede`, and add the `MaintenanceJob` prune task.
+  ✅ **The wiring shipped 2026-09-01 (this slice) — D-9 is COMPLETE.** The context obstacle was answered
+  with the `RowShaper.ReferenceResolver` idiom, operator-approved: `RowShaper.ExecutionContext`
+  (pipeline id · consignment id · ledger handle) threaded through a new `PipelineExecutor.execute`
+  overload, with a `NONE` default that **refuses a windowed scope loudly** (so every scratch/dry-run
+  path fails a `scope: window(...)` dedup rather than silently deduping one batch). The at-rest
+  `PipelineJobRunner` passes `ExecutionContext.forRun(pipelineId, batchId)` — grounded as the ONLY
+  production walk that can shape `transform.dedup` (the ingest lane seeds AT the node feeding the
+  write, so its walk never reaches a dedup node). Also shipped: `scope:` carried through the whole
+  vocabulary (parser `processing.dedup`, `steps[]` verbatim, both lowers Java+TS, `NodeAttributes` +
+  both regenerated contracts); the `order_by` refusal at **all four save gates**
+  (`ConfigRoutes.dedupWindowFindings` → /validate, /config/write, /config/patch,
+  `PipelineGraphRoutes.saveGraph`, + bundle import; codes `ERR/WARN_DEDUP_WINDOW_UNARMABLE`);
+  `retract` beside `registry.supersede` in `ReprocessCommand` step 4b; the `dedup_prune`
+  `MaintenanceJob` task (`retention_days` required, event-time cutoff); and per-space registration
+  (`DedupLedgers` + `ServiceStores.openDedupLedger`, family default `duckdb`). The windowed claim
+  hashes in SQL (`sha256(concat_ws(chr(31), …))` — same joiner as `DbDedupLedger.hash`) and files each
+  key under the window of its own event date, taken from the `order_by` tie-break's leading column.
 
 - ~~**D-9 cross-Consignment windowed dedup (wave row 14) — DESIGNED, not scheduled.**~~ D8's three conditions
   are answered in the plan's §3 (ledger = a new per-space `OperationalDb.Family`, default `duckdb` never

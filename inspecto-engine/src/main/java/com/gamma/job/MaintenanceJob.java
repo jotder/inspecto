@@ -22,6 +22,11 @@ import java.time.Instant;
  *       {@code retention_days} (required) ago, optionally scoped to one {@code source}. <b>Deliberate
  *       forgetting</b>: a pruned file still present at the source re-ingests as NEW — retention must
  *       exceed the source's own file lifetime. See {@link LedgerPruneTask}.</li>
+ *   <li>{@code dedup_prune} — advance the windowed record-dedup ledger (D-9): drop claims whose window
+ *       started more than {@code retention_days} (required) ago, aged by the record's <b>event time</b>
+ *       (the window each claim was filed under), never mtime. <b>Deliberate forgetting</b>: retention
+ *       must cover the longest {@code scope: window(...)} any pipeline declares. See
+ *       {@link DedupPruneTask}.</li>
  *   <li>{@code runlog_prune} — delete Run history older than {@code retention_days} (required): the per-run
  *       JSONL files under {@code <auditDir>/runlog/} and {@code <auditDir>/artifacts/}, plus rows of the
  *       optional {@code inspecto_job_runs} projection; optional {@code max_count} caps each JSONL dir to
@@ -136,6 +141,7 @@ final class MaintenanceJob implements Job {
         return switch (task) {
             case "cleanup"            -> CleanupTask.run(cfg, dryRun);
             case "ledger_prune"       -> LedgerPruneTask.run(cfg, dryRun);
+            case "dedup_prune"        -> DedupPruneTask.run(cfg, dryRun);
             case "runlog_prune"       -> RunlogPruneTask.run(cfg, auditDir, runStore, dryRun);
             case "notification_prune" -> NotificationPruneTask.run(cfg, host, dryRun);
             case "receipt_prune"      -> ReceiptPruneTask.run(cfg, host, dryRun);
@@ -160,7 +166,13 @@ final class MaintenanceJob implements Job {
             case "compact"            -> dryRun ? noPreview(task) : PartitionCompactor.run(cfg);
             case "reference_compact"  -> dryRun ? noPreview(task) : ReferenceCompactor.run(cfg);
             case "materialize"        -> dryRun ? noPreview(task) : MaterializeTask.run(cfg, dataDir);
-            case "heartbeat", "noop"  -> JobResult.ok("heartbeat", 0L);
+            // Liveness probe / test vehicle: optional sleep_ms holds the run RUNNING for a
+            // deterministic window, so in-flight behavior (non-overlap, replay 409) is testable.
+            case "heartbeat", "noop"  -> {
+                long ms = Long.parseLong(cfg.opt("sleep_ms", "0"));
+                if (ms > 0) Thread.sleep(ms);
+                yield JobResult.ok("heartbeat", ms);
+            }
             default -> throw new IllegalArgumentException("unknown maintenance task '" + task + "'");
         };
     }

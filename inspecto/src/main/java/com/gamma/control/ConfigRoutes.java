@@ -178,6 +178,53 @@ final class ConfigRoutes {
     }
 
     /**
+     * A windowed {@code dedup} ({@code scope: window(...)}) that would refuse to run (D-9) — either the
+     * {@code scope:} spelling is malformed, or the window lacks its REQUIRED {@code order_by} tie-break
+     * ({@link com.gamma.consignment.DedupScope#refusal}: against a <b>durable</b> ledger a
+     * non-deterministic winner is unrepeatable data loss, not merely a latent bug). Checked in both
+     * spellings a dedup config can take — the legacy {@code processing.dedup} block and each
+     * {@code steps[]} entry of kind {@code dedup} — with exactly {@link #routeArmingFindings}' severity
+     * split: ACTIVE ⇒ ERROR (the save is refused), inactive draft ⇒ WARNING (it saves; the refusal
+     * bites at activation and again at run, {@code RowShaper.dedup}'s backstop).
+     */
+    static List<Finding> dedupWindowFindings(String type, Map<String, Object> draft) {
+        if (!"pipeline".equals(type)) return List.of();
+        boolean active = Boolean.parseBoolean(String.valueOf(draft.getOrDefault("active", "false")));
+        Severity severity = active ? Severity.ERROR : Severity.WARNING;
+        List<Finding> out = new ArrayList<>();
+        Map<?, ?> proc = draft.get("processing") instanceof Map<?, ?> m ? m : Map.of();
+        if (proc.get("dedup") instanceof Map<?, ?> dd)
+            addDedupWindowFinding(out, severity, active, "processing.dedup", dd);
+        if (draft.get("steps") instanceof List<?> steps) {
+            for (int i = 0; i < steps.size(); i++) {
+                if (steps.get(i) instanceof Map<?, ?> entry && entry.get("dedup") instanceof Map<?, ?> dd)
+                    addDedupWindowFinding(out, severity, active, "steps[" + i + "].dedup", dd);
+            }
+        }
+        return out;
+    }
+
+    /** One dedup config block's windowed-scope refusal, if any, as a finding anchored at {@code field}. */
+    private static void addDedupWindowFinding(List<Finding> out, Severity severity, boolean active,
+                                              String field, Map<?, ?> dedup) {
+        Object scopeRaw = dedup.get("scope");
+        if (scopeRaw == null || String.valueOf(scopeRaw).isBlank()) return;
+        Object orderBy = dedup.get("order_by");
+        String refusal;
+        try {
+            refusal = com.gamma.consignment.DedupScope.refusal(
+                    com.gamma.consignment.DedupScope.parse(String.valueOf(scopeRaw)),
+                    orderBy == null ? null : String.valueOf(orderBy));
+        } catch (IllegalArgumentException malformed) {
+            refusal = malformed.getMessage();
+        }
+        if (refusal == null) return;
+        out.add(new Finding(severity, field, refusal,
+                active ? FindingCodes.ERR_DEDUP_WINDOW_UNARMABLE : FindingCodes.WARN_DEDUP_WINDOW_UNARMABLE,
+                active ? GUIDANCE_ACTIVE : GUIDANCE_INACTIVE));
+    }
+
+    /**
      * A <b>remote</b> collector whose {@code connection} names a profile this space does not have. Left
      * unchecked the dangling id reaches the poll cycle, where {@code CollectorConnectors.forConfig} resolves
      * it to {@code null} and the connector factory throws — on <em>every</em> cycle, never once, and never

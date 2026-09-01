@@ -362,6 +362,7 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
     if (processing['dedup'] != null) {
         const dc: Cfg = { keys: dedup['keys'] };
         if (dedup['order_by'] != null) dc['order_by'] = dedup['order_by'];
+        if (dedup['scope'] != null) dc['scope'] = dedup['scope']; // D-9: window(<period>) | consignment
         nodes.push({ id: 'dedup', type: 'transform.dedup', name: 'Dedup (record)', config: dc });
         edges.push({ from: sinkUpstream, rel: 'data', to: 'dedup' });
         sinkUpstream = 'dedup';
@@ -668,6 +669,7 @@ export function lowerGraph(
         const dd: Cfg = {};
         if (recordDedup.config?.['keys'] != null) dd['keys'] = recordDedup.config['keys'];
         if (recordDedup.config?.['order_by'] != null) dd['order_by'] = recordDedup.config['order_by'];
+        if (recordDedup.config?.['scope'] != null) dd['scope'] = recordDedup.config['scope']; // D-9
         processing['dedup'] = dd;
     } else if (strict) {
         delete processing['dedup'];
@@ -866,7 +868,7 @@ function stepConfig(g: AuthoredPipeline, n: AuthoredNode): Cfg {
     };
     switch (STEP_KIND[n.type]) {
         case 'dedup':
-            keep('keys', 'order_by');
+            keep('keys', 'order_by', 'scope');
             return c;
         case 'join':
             keep('reference', 'on');

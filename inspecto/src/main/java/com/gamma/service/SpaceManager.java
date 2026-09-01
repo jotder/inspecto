@@ -385,6 +385,7 @@ public final class SpaceManager implements AutoCloseable {
         // the purge below fail outright. unregister is idempotent, so the double call is free.
         com.gamma.consignment.ConsignmentOutputStores.unregister(id.value());
         com.gamma.consignment.FileStages.unregister(id.value());
+        com.gamma.consignment.DedupLedgers.unregister(id.value());
         com.gamma.pipeline.exec.ProvenanceStores.unregister(id.value());
         DiscoveredRoots.unregister(spacesRoot.resolve(id.value()));   // the root set must not only ever grow
         if (purge) {

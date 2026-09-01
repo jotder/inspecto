@@ -285,6 +285,7 @@ final class PipelineGraphRoutes implements RouteModule {
         findings.addAll(ConfigRoutes.armedWithoutSchemaFindings("pipeline", lowered));
         findings.addAll(ConfigRoutes.routeArmingFindings("pipeline", lowered));
         findings.addAll(ConfigRoutes.stepDisableFindings("pipeline", lowered));
+        findings.addAll(ConfigRoutes.dedupWindowFindings("pipeline", lowered));
         if (findings.stream().anyMatch(f -> f.severity() == Severity.ERROR))
             return ApiContext.respondJson(e, 422, Map.of("written", false,
                     "error", "config has ERROR-level findings; not written", "findings", findings));

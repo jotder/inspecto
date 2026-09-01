@@ -330,7 +330,9 @@ public final class NodeAttributes {
             NodeAttribute.of("keys", "Dedup keys", "list", "required").placeholder("call_id")
                     .help("Rows sharing these column values are duplicates; the first (per \"Order by\") is kept."),
             NodeAttribute.of("order_by", "Order by", "string", "optional").placeholder("event_ts DESC")
-                    .help("Which duplicate wins — SQL ordering over the typed columns; blank = input order."));
+                    .help("Which duplicate wins — SQL ordering over the typed columns; blank = input order. REQUIRED once Scope declares a window: a durable ledger must never record a non-deterministic winner."),
+            NodeAttribute.of("scope", "Scope", "string", "advanced").placeholder("window(P4D)")
+                    .help("How far back a key is a duplicate: blank/consignment = within this Consignment only; window(<ISO-8601 period>), e.g. window(P4D), also suppresses keys admitted by earlier Consignments inside that window via the durable dedup ledger (runs at rest)."));
 
     /**
      * {@code transform.summarize} (→ {@code processing.summarize}) — the group-by rollup, authoring-only

@@ -131,6 +131,12 @@ former root reference docs** (each index lists them):
   **ACTIVE for R3 only** (mid-branch `steps:` via flattening, ⛔ gated on the stage-2 execution
   analysis) + the UI-migration-onto-bundle follow-up; R7 is a future sketch. Prior art consulted
   from the sibling DataForge wiki (`C:\sandbox\incubetor\docs\wiki`).
+- [`superpower/execution-residuals-plan.md`](superpower/execution-residuals-plan.md) — **ACTIVE,
+  specified 2026-09-01**: the stage-2 execution solution spec (X1 persistent retry queue —
+  consignment-grain recommended · X2 cross-lane provenance link · X3 PARK-1(a) re-grounding ·
+  X4 record-replay shape · X5 StepInfo envelope feeding Phase 7 · X6 consignment-identity already
+  held), plus the R3 unblock verdict. The same-shift build package (default-on orphan gate · D-9
+  finish via the ExecutionContext seam · `POST /jobs/runs/{runId}/replay`) is recorded there.
 - [`superpower/gate-register.md`](superpower/gate-register.md) — the register of decision-gated
   rows: what each is waiting on and who owns the call.
 - [`superpower/pipeline-waves-drain-plan.md`](superpower/pipeline-waves-drain-plan.md) — **IN FLIGHT
@@ -159,7 +165,10 @@ former root reference docs** (each index lists them):
   (gap 6); the one item it opened rather than closed is **BUNDLE-SCHEMA-1** in `BACKLOG.md` §6.
 
 - [`superpower/completeness-kpi-plan.md`](superpower/completeness-kpi-plan.md) — **DECIDED
-  2026-08-30, ready to build**: a scheduled per-pipeline completeness KPI (gap/sequence analysis +
+  2026-08-30~~, ready to build~~ — ⏸ **ON HOLD by operator 2026-08-30 (corrected 2026-09-01: this
+  entry had drifted from the plan's own status)**: K4/K5 not to be picked up; two owed answers
+  (processed-filename source · `{seq}` scope) block the wiring. The plan describes: a scheduled
+  per-pipeline completeness KPI (gap/sequence analysis +
   file/record count deviation). 🔴 **This REPLACES Consignment §8 sealing and §11.4 `partition_state`,
   overriding §8's "no schedule anywhere" claim by explicit operator decision** — sealing is dropped,
   not deferred. 🔴 The operator's chosen count source (`CommitLog`) was REFUTED — it is per-batch with

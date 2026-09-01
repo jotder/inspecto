@@ -381,11 +381,15 @@ Two things close that gap, both as of 2026-09-01:
   `PipelineJobRunner` enforces "pick one" at run time. ⛔ Do not restore `required` on `pipeline`: that
   made the at-rest job unrepresentable (the contract demanded a key this path must not carry), and
   `JobServiceTest.thePipelineTypeDeclaresBothGraphSourcesAndRequiresNeither` now pins it.
-- **`SchedulerAuditTask` reports the orphan**: *"pipeline 'X' declares output_store 'Y' but no enabled
-  pipeline_config job runs its chain"*. ⚠ It only fires from a **`scheduler_audit` maintenance job**, and
-  until 2026-09-01 no shipped space contained one — the check existed, was wired
-  (`CollectorService.pipelineOutputStores`), and never ran. `spaces/demo/config/jobs/scheduler_audit_job.toon`
-  now ships it. A space without that job has no orphan detection at all.
+- **The orphan check is DEFAULT-ON in every space** (2026-09-01, fail-closed fix): the scan
+  (`SchedulerAuditTask.orphanOutputStoreFindings`, extracted — one statement, two hosts) runs from
+  `JobService.auditOrphanOutputStores()` after every registry rebuild and on job upsert/remove,
+  emitting one `maintenance.scheduler.findings` WARN signal per orphan **transition** (never per
+  cycle; resolved-then-regressed re-emits). Kill switch `-Djobs.orphan.audit=false`. The
+  `scheduler_audit` maintenance job remains the richer on-demand audit
+  (`spaces/demo/config/jobs/scheduler_audit_job.toon`). ⚠ History: until 2026-09-01 the check fired
+  ONLY from that job and no shipped space but `demo` had one — a fail-open gate; a stock space had
+  no orphan detection at all ("the one failure this split makes possible").
 
 **`output_store:` is the arming condition.** `prepare()` refuses to arm a pipeline carrying
 `summarize`/`dedup`/`join`/`steps:` *unless* `output_store:` is authored — with it, the file itself

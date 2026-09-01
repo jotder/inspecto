@@ -18,7 +18,7 @@ table says.** Each finding below is from the code, not from a note about the cod
 | **12** post-sync chain invisible in the editor | one surface serves both (D7) | The post-sync lane is **not the `steps:` model at all**: it is a `consignment.process` **Job Type** (`ConsignmentProcessJobType`, `TYPE_ID = "consignment.process"`), configured as **Job params** — `processor` (a comma-separated chain of `ConsignmentProcessor` ids) plus `chain_config`, *"array of `{"config": {…}}` objects **positionally aligned** with the `processor` chain"*. **That** is the hand-alignment pain. ⇒ Row 12 is real, and its home is the **Job** surface, not the pipeline canvas. |
 | **7** no plugin can add a Step type | *"the SPI is real but unused, and the deployment story is classpath-only"* | 🔴 **Two of three clauses refuted.** A plugin step type **is** authorable — `StepKindRegistry` (ServiceLoader seam, `inspecto-etl`, provider `NodeTypeStepKinds` in `inspecto-engine`) admits a contributed kind at parse time, and a CONTRIBUTED node type lowers to a `steps:` entry (open-dag §11 Stage 5, shipped 2026-08-29). "Unused" is false: `packs-dev/{acme.masker,acme.reconcile,acme.redact}` plus `tools/templates/{nodetype,processor,job}`. **The third clause was exactly true and was the whole remainder — now SHIPPED (§2.2):** `JobPackManager` (`-Djobs.packs.dir`, hot rescan via `POST /jobs/packs/rescan`) loads **only** `JobTypeProvider` and `ExpressionProvider`, and *rejects a pack carrying neither*. A node-type pack (`PipelineNodeType` + `PipelineNodeExecutor`, which `tools/templates/nodetype` scaffolds) therefore has **no hot-load path** and must sit on the classpath. |
 | **13** fan-in canvas-only | gated on §11 | **Decided, not open** — §13 **D6** keeps it canvas-only, and says a token model is *not* a reason to overturn it speculatively. ⇒ No work; a closed row. |
-| **1** `Batch`→`Consignment` · **15** Phase 6 deletion half | major-bump window | Unchanged and **operator-gated**. D5: one commit, 517 files, 39 `@PublicApi` types, in Phase 7's window. D2 puts the token *runtime* model and the Step SPI shape-change in the same window (they break two committed contracts). ⛔ Not a design gap — a release decision. |
+| ~~**1** `Batch`→`Consignment`~~ ✅ SHIPPED `ff33246a` (row E; corrected 2026-09-01 — this row and row D had drifted from E) · **15** Phase 6 deletion half | a **release event** (§2.3's correction of the vaguer "major-bump window") | Row 15 stays operator-gated. D2 puts the token *runtime* model and the Step SPI shape-change in the same release (they break two committed contracts). ⛔ Not a design gap — a release decision. |
 | **14** D-9 cross-Consignment dedup | Wave 3, named not designed | Confirmed: **nothing reads a `scope:`/`window()` key anywhere**. D8 says it returns with three answers. §3 below is that design pass. |
 
 ### ⛔ One thing deliberately NOT done
@@ -43,7 +43,7 @@ relabel it: the honest gap is *"no ITEM schema facility in FieldSpec"*, not *"ga
 | **E** | `Batch`→`Consignment` (row 1) | ✅ **SHIPPED 2026-08-31** (`ff33246a`) — see §2.4 | the codemod, one commit |
 | **B** | A structural editor for the post-sync chain — `processor` + `chain_config` aligned by construction (row 12) | ✅ **SHIPPED** — see §2.1 | the Job surface |
 | **C** | The D-9 design pass: where the ledger persists · winner policy · window advance (row 14) | **none** to *design*; building it is separate | §3 below |
-| **D** | `Batch`→`Consignment` (row 1) · Phase 6's deletion half (row 15) · D2's runtime token model + Step SPI | ⛔ **the major-bump window — operator** | — |
+| **D** | ~~`Batch`→`Consignment` (row 1)~~ (SHIPPED — row E) · Phase 6's deletion half (row 15) · D2's runtime token model + Step SPI | ⛔ **a release event — operator** (§2.3) | — |
 
 ### 2.1 B — SHIPPED: the post-sync chain is authored as ordered steps
 
@@ -337,18 +337,22 @@ a flag deletes nothing. It is the enabler for a release someone else must decide
 
 ---
 
-## 3. D-9 — cross-Consignment windowed record dedup, designed → 🚧 HALF BUILT
+## 3. D-9 — cross-Consignment windowed record dedup, designed → ✅ COMPLETE 2026-09-01
 
 > ✅ **2026-09-01: the operator approved both open answers** (§3.5) — **hashed keys** and **insert-wins on
 > a unique `(key, window)`** — and two slices shipped against this design: **`DbDedupLedger`**
 > (`8a3d2aae`) and **`DedupScope`** (`5e43bcbf`). The design below is what they implement; read it as
 > as-built for the persistence and vocabulary halves.
 >
-> 🔴 **The remaining wiring has one obstacle worth knowing before you start:** `RowShaper.dedup` is a
-> **static** shaper taking `(conn, node, input, prefix)` — no consignment id, no pipeline name, no ledger
-> handle, and `claim()` needs all three. Threading run context into `RowShaper` is invasive and is a
-> design decision, not a mechanical edit. Current state and the full remaining list live in
-> **`PIPELINE-WAVES-REMAINDER`** (`docs/BACKLOG.md` §6), which is the board of record.
+> ✅ **2026-09-01 (later shift): the wiring shipped and D-9 is COMPLETE.** The context obstacle was
+> answered with the `ReferenceResolver` idiom: `RowShaper.ExecutionContext` (pipeline id · consignment
+> id · ledger), threaded through a `PipelineExecutor.execute` overload, `NONE` default refusing a
+> windowed scope loudly; the at-rest `PipelineJobRunner` is the one caller with real context (grounded:
+> the ingest walk seeds at the node feeding the write and never shapes a dedup node). `scope:` rides the
+> whole vocabulary (parser + steps + both lowers + NodeAttributes + both contracts), the `order_by`
+> refusal fires at all four save gates (`ERR/WARN_DEDUP_WINDOW_UNARMABLE`), `retract` sits beside
+> `registry.supersede` in `ReprocessCommand`, and `dedup_prune` is a `MaintenanceJob` task. Evidence and
+> as-built detail in the **`PIPELINE-WAVES-REMAINDER`** D-9 row (`docs/BACKLOG.md` §6), the board of record.
 
 D8 required exactly three answers before this could return to the board. Here they are, each with the
 code constraint that forces it.

@@ -928,14 +928,25 @@ public final class PipelineConfig {
      * partition write — the winner per key survives, duplicates are counted.
      *
      * @param keys    the business-key columns (target/mapped names); never empty
-     * @param orderBy optional SQL order deciding the winner per key (blank ⇒ arbitrary/first seen)
+     * @param orderBy optional SQL order deciding the winner per key (blank ⇒ arbitrary/first seen —
+     *                but REQUIRED once {@code scope} declares a window; the engine and the save gates
+     *                both refuse the pair, see {@code DedupScope.refusal})
+     * @param scope   optional {@code scope:} spelling — {@code consignment} (default) or
+     *                {@code window(<ISO-8601 period>)} for cross-Consignment suppression (D-9). Carried
+     *                verbatim: this module sits below the engine's {@code DedupScope} vocabulary, so
+     *                the string is validated where it is read (RowShaper / the save-path findings).
      */
     @PublicApi(since = "4.0.0")
-    public record Dedup(List<String> keys, String orderBy) {
+    public record Dedup(List<String> keys, String orderBy, String scope) {
         public Dedup {
             if (keys == null || keys.isEmpty())
                 throw new IllegalArgumentException("processing.dedup needs a non-empty keys[] list");
             keys = List.copyOf(keys);
+        }
+
+        /** Pre-D-9 shape: no {@code scope:}, i.e. within-Consignment dedup. */
+        public Dedup(List<String> keys, String orderBy) {
+            this(keys, orderBy, null);
         }
     }
 
@@ -1503,7 +1514,8 @@ public final class PipelineConfig {
         if (join != null)
             out.add(new Step(Step.JOIN, cfg("reference", join.reference(), "on", join.on())));
         if (dedup != null)
-            out.add(new Step(Step.DEDUP, cfg("keys", dedup.keys(), "order_by", dedup.orderBy())));
+            out.add(new Step(Step.DEDUP, cfg("keys", dedup.keys(), "order_by", dedup.orderBy(),
+                    "scope", dedup.scope())));
         if (summarize != null)
             out.add(new Step(Step.SUMMARIZE,
                     cfg("group_by", summarize.groupBy(), "measures", summarize.measures())));
@@ -1517,6 +1529,12 @@ public final class PipelineConfig {
         Map<String, Object> m = new LinkedHashMap<>();
         if (v1 != null) m.put(k1, v1);
         if (v2 != null) m.put(k2, v2);
+        return m;
+    }
+
+    private static Map<String, Object> cfg(String k1, Object v1, String k2, Object v2, String k3, Object v3) {
+        Map<String, Object> m = cfg(k1, v1, k2, v2);
+        if (v3 != null) m.put(k3, v3);
         return m;
     }
 

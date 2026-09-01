@@ -74,6 +74,7 @@ final class ConfigWriteRoutes implements RouteModule {
         findings.addAll(ConfigRoutes.routeArmingFindings(type, draft));
         // ERROR (when active): disabled_steps cannot arm until park/drain ships (S4a gate).
         findings.addAll(ConfigRoutes.stepDisableFindings(type, draft));
+        findings.addAll(ConfigRoutes.dedupWindowFindings(type, draft));
         // ERROR: a collector bound to a connection this space does not have cannot acquire anything —
         // it throws once per poll cycle instead. Bundle import already refuses it; a save now agrees.
         findings.addAll(ConfigRoutes.unknownConnectionFindings(type, draft, api));
@@ -295,6 +296,7 @@ final class ConfigWriteRoutes implements RouteModule {
         findings.addAll(ConfigRoutes.armedWithoutSchemaFindings(type, merged));
         findings.addAll(ConfigRoutes.routeArmingFindings(type, merged));              // a patch can break arming too
         findings.addAll(ConfigRoutes.stepDisableFindings(type, merged));                // and can add disabled_steps too
+        findings.addAll(ConfigRoutes.dedupWindowFindings(type, merged));               // and a windowed dedup (D-9)
         findings.addAll(ConfigRoutes.unknownConnectionFindings(type, merged, api));   // a patch can introduce one too
         if (findings.stream().anyMatch(f -> f.severity() == Severity.ERROR)) {
             return ApiContext.respondJson(ex, 422, Map.of("type", type, "written", false,

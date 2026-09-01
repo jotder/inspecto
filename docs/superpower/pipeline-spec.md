@@ -730,7 +730,7 @@ recorded baseline, unmoved.
 | **12** post-sync chain invisible | ~~a UX design~~ | ✅ **SHIPPED 2026-08-31.** `<app-job-chain-editor>` in `JobFormDialog`: when the Job Type declares both `processor` and `chain_config`, they leave the generated form and the author edits **ordered steps** — one row per step with its own config, accessible move up/down — emitting the two params **aligned by construction**. 🔴 Grounding found the value contract too: `chainConfigsOf` stringifies every config value, so a nested one is **accepted and corrupted** (`{"columns":["a"]}` → `"[a]"`), and a null NPEs. Both refused at authoring time; the engine half is **CHAIN-CONFIG-1**. Details: `pipeline-waves-drain-plan.md` §2.1 |
 | **13** fan-in is canvas-only (D-6) | ~~§11~~ | ✅ **DECIDED, not open** — §13 **D6** keeps it canvas-only and says a token model is not a reason to overturn it speculatively. A closed row; no work |
 | **1** `Batch` → `Consignment` | §0 (Phase 7) | mechanical but wide: 517 files, 39 `@PublicApi` types. ⚠ Do it as **one** commit with a codemod plus both contract regens — dripping it leaves the codebase in the split state indefinitely, which is the current complaint |
-| **15** Phase 6's deletion half | the major-bump window | already decided; it just needs the window |
+| **15** Phase 6's deletion half | a **release event** (`pipeline-waves-drain-plan.md` §2.3 corrected the vaguer "major-bump window": under BRANCHING §0-A a breaking change landing on `master` is normal — the gate is the flagged verification minor + release) | already decided; it needs the release |
 
 🔴 **Wave 2 is down to two rows, on one gate.** Rows **7**, **11**, **12** and **13** are
 CLOSED (7 and 12 built 2026-08-31; 11 and 13 were already done and mis-recorded). **Rows 1 and 15
@@ -742,7 +742,7 @@ deletes.
 
 | Gap | Why |
 |---|---|
-| **14** D-9 cross-Consignment dedup | it is **named, not designed**: no spec for where the ledger persists, the winner policy, or how the window advances. ⛔ Not schedulable until someone writes that; the "designed fast-follow" label is wrong |
+| **14** D-9 cross-Consignment dedup | ~~named, not designed~~ ✅ **stale — DESIGNED 2026-08-31 (`pipeline-waves-drain-plan.md` §3), 🚧 HALF BUILT 2026-09-01 (ledger `8a3d2aae` + vocabulary `5e43bcbf`), remainder BUILDING 2026-09-01 via the ExecutionContext seam; board of record = BACKLOG §6** |
 
 ### The honest shape of it
 
@@ -870,6 +870,11 @@ post-sync lane a second-class citizen. ⚠ The visual design is genuinely open a
 ⛔ It is named, not designed: nothing states where the ledger persists, the winner policy, or how the
 window advances. **Calling it "a designed fast-follow" is the actual defect** — it invites someone to
 estimate work that has no design. It returns to the board only with those three answers.
+
+> ✅ **Superseded by events (2026-09-01):** the three answers were written
+> (`pipeline-waves-drain-plan.md` §3, 2026-08-31), two slices shipped (`DbDedupLedger` `8a3d2aae`,
+> `DedupScope` `5e43bcbf`), and the remainder is building via the ExecutionContext seam. D8's
+> refusal-to-estimate stands as the correct call at the time; the board of record is BACKLOG §6.
 
 > ✅ **The three answers were written 2026-08-31** — `pipeline-waves-drain-plan.md` §3. D8's condition is
 > therefore met and D-9 **is schedulable**, as a build with a named correctness risk: a reprocess is a

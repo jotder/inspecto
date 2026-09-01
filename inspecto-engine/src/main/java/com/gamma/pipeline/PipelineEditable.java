@@ -711,6 +711,7 @@ public final class PipelineEditable {
             Map<String, Object> dd = new LinkedHashMap<>();
             putIfPresent(dd, "keys", recordDedup.cfg("keys"));
             putIfPresent(dd, "order_by", recordDedup.cfg("order_by"));
+            putIfPresent(dd, "scope", recordDedup.cfg("scope"));   // D-9: window(<period>) | consignment
             processing.put("dedup", dd);
         } else if (strict) {
             processing.remove("dedup");
@@ -957,6 +958,7 @@ public final class PipelineEditable {
             case PipelineConfig.Step.DEDUP -> {
                 putIfPresent(c, "keys", n.cfg("keys"));
                 putIfPresent(c, "order_by", n.cfg("order_by"));
+                putIfPresent(c, "scope", n.cfg("scope"));   // D-9: window(<period>) | consignment
             }
             case PipelineConfig.Step.JOIN -> {
                 putIfPresent(c, "reference", n.cfg("reference"));

@@ -13,6 +13,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -98,6 +99,37 @@ public final class RowShaper {
     }
 
     /**
+     * <b>The run-context seam (D-9).</b> What a <em>windowed</em> {@code transform.dedup} node needs that
+     * the rest of the shaper does not: which pipeline and which Consignment are claiming keys, and the
+     * durable {@link DbDedupLedger} to claim them in. Same seam shape as {@link ReferenceResolver}: the
+     * caller that owns run context (the at-rest {@code PipelineJobRunner}) supplies one; everything else
+     * gets {@link #NONE}, which refuses a windowed scope rather than deduping wrongly — a windowed dedup
+     * that silently skipped the ledger would emit the very duplicates it was configured to drop.
+     *
+     * @param pipeline      the ledger's pipeline key — the stable pipeline <b>id</b>, not the display name
+     *                      (a rename must not re-admit every key)
+     * @param consignmentId the claiming Consignment/batch id ({@link DbDedupLedger#retract}'s key)
+     * @param ledger        the durable ledger; {@code null} means "none registered", which refuses too
+     */
+    public record ExecutionContext(String pipeline, String consignmentId,
+                                   com.gamma.consignment.DbDedupLedger ledger) {
+
+        /** The no-context default: a windowed {@code transform.dedup} refuses loudly (see class doc). */
+        public static final ExecutionContext NONE = new ExecutionContext(null, null, null);
+
+        /** A run's context, over whatever ledger the calling space registered (possibly none). */
+        public static ExecutionContext forRun(String pipeline, String consignmentId) {
+            return new ExecutionContext(pipeline, consignmentId,
+                    com.gamma.consignment.DedupLedgers.shared());
+        }
+
+        /** Whether this context can claim keys in a durable ledger. */
+        public boolean hasLedger() {
+            return ledger != null && pipeline != null && consignmentId != null;
+        }
+    }
+
+    /**
      * Shape a single-input {@code transform.*} node over {@code input}, creating its output tables under
      * {@code outPrefix}. {@code transform.merge} is multi-input — call {@link #merge} instead. This overload
      * carries no reference context, so a {@code transform.join} node refuses
@@ -111,6 +143,17 @@ public final class RowShaper {
     /** As {@link #shape(Connection, PipelineNode, String, String)}, with reference context for {@code transform.join}. */
     public static List<Relation> shape(Connection conn, PipelineNode node, String input, String outPrefix,
                                        ReferenceResolver references) throws SQLException {
+        return shape(conn, node, input, outPrefix, references, ExecutionContext.NONE);
+    }
+
+    /**
+     * As the {@link ReferenceResolver} overload, with run context: {@code ctx} lets a windowed
+     * {@code transform.dedup} claim keys in the durable {@link com.gamma.consignment.DbDedupLedger}
+     * (D-9). The default {@link ExecutionContext#NONE} refuses a windowed scope loudly, so a caller
+     * with no run context fails rather than deduping within one batch and pretending it was windowed.
+     */
+    public static List<Relation> shape(Connection conn, PipelineNode node, String input, String outPrefix,
+                                       ReferenceResolver references, ExecutionContext ctx) throws SQLException {
         String type = node.type();
         // The plugin seam's EXECUTION half. Consulted before the built-ins, deliberately, so a provider may
         // specialise a core verb as well as add a new one — the same rule PipelineNodeTypes applies to
@@ -122,7 +165,7 @@ public final class RowShaper {
         if (BuiltinNodeType.TRANSFORM_FILTER.type().equals(type))   return filter(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_VALIDATE.type().equals(type)) return validate(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_ROUTE.type().equals(type))    return route(conn, node, input, outPrefix);
-        if (type.startsWith("transform.dedup"))                      return dedup(conn, node, input, outPrefix);
+        if (type.startsWith("transform.dedup"))                      return dedup(conn, node, input, outPrefix, ctx);
         if (BuiltinNodeType.TRANSFORM_SPLIT.type().equals(type))    return split(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_SUMMARIZE.type().equals(type)) return summarize(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_MAP.type().equals(type)
@@ -212,12 +255,22 @@ public final class RowShaper {
     // ── dedup (QUALIFY) ──────────────────────────────────────────────────────────
 
     @SuppressWarnings("unchecked")
-    private static List<Relation> dedup(Connection conn, PipelineNode node, String input, String prefix) throws SQLException {
+    private static List<Relation> dedup(Connection conn, PipelineNode node, String input, String prefix,
+                                        ExecutionContext ctx) throws SQLException {
         Object keysRaw = node.cfg("keys");
         if (!(keysRaw instanceof List<?> keyList) || keyList.isEmpty())
             throw new IllegalArgumentException("transform.dedup node '" + node.id() + "' needs a non-empty 'keys' list");
-        String partition = String.join(", ", ((List<Object>) keysRaw).stream().map(k -> q(k.toString())).toList());
+        List<String> keys = ((List<Object>) keysRaw).stream().map(Object::toString).toList();
+        String partition = String.join(", ", keys.stream().map(RowShaper::q).toList());
         String order = strOrNull(node, "order_by");
+        // D-9: scope is parsed (and a window without order_by refused) BEFORE any table is written,
+        // so a misconfigured node fails whole rather than half-shaping. The same refusal fires at the
+        // save gates (ConfigRoutes.dedupWindowFindings); this one is the runtime backstop.
+        com.gamma.consignment.DedupScope scope =
+                com.gamma.consignment.DedupScope.parse(strOrNull(node, "scope"));
+        String refusal = com.gamma.consignment.DedupScope.refusal(scope, order);
+        if (refusal != null)
+            throw new IllegalArgumentException("transform.dedup node '" + node.id() + "': " + refusal);
         String window = "ROW_NUMBER() OVER (PARTITION BY " + partition
                 + (order == null ? "" : " ORDER BY " + order) + ")";
         String data = table(prefix, PipelineRel.DATA);
@@ -226,7 +279,109 @@ public final class RowShaper {
         String ranked = "(SELECT *, " + window + " AS __rn FROM " + q(input) + ")";
         exec(conn, "CREATE TABLE " + q(data) + " AS SELECT * EXCLUDE(__rn) FROM " + ranked + " WHERE __rn = 1");
         exec(conn, "CREATE TABLE " + q(dup)  + " AS SELECT * EXCLUDE(__rn) FROM " + ranked + " WHERE __rn > 1");
+        if (scope instanceof com.gamma.consignment.DedupScope.Window win)
+            windowedDedup(conn, node, win, keys, order, data, dup, prefix, ctx);
         return List.of(new Relation(PipelineRel.DATA, data), new Relation(PipelineRel.DUPLICATE, dup));
+    }
+
+    /**
+     * <b>D-9 — the cross-Consignment half of a windowed dedup.</b> Runs AFTER the in-batch
+     * {@code ROW_NUMBER} split, over the {@code data} winners only: each winner's hashed business key is
+     * claimed in the durable {@link com.gamma.consignment.DbDedupLedger} for the window its own
+     * <b>event time</b> falls in; rows whose claim was already held (an earlier Consignment inside the
+     * window) move from {@code data} to the {@code duplicate} relation — the same reject stream the
+     * in-batch losers ride, so downstream wiring is unchanged.
+     *
+     * <ul>
+     *   <li><b>Key hashing matches the ledger's contract</b>: SHA-256 over the key values joined by the
+     *       ASCII unit separator, computed in DuckDB ({@code sha256(concat_ws(chr(31), …))}) so hashes
+     *       are identical across every run that ever consulted this ledger. A NULL key value hashes as
+     *       {@code ''} — deterministic, which is all the ledger needs.</li>
+     *   <li><b>The event time is the {@code order_by} tie-break's leading column</b> — the one column a
+     *       windowed dedup is guaranteed to declare (the refusal above makes it mandatory), and in the
+     *       design's own vocabulary ({@code order_by: event_time DESC}) it IS the event time. Cast to
+     *       DATE with a plain {@code CAST}, so an unparseable value fails the run loudly; a NULL event
+     *       time is refused too — a row with no event time cannot be filed in any window.</li>
+     * </ul>
+     */
+    private static void windowedDedup(Connection conn, PipelineNode node,
+                                      com.gamma.consignment.DedupScope.Window win, List<String> keys,
+                                      String order, String data, String dup, String prefix,
+                                      ExecutionContext ctx) throws SQLException {
+        if (ctx == null || !ctx.hasLedger())
+            throw new IllegalStateException("transform.dedup node '" + node.id() + "' declares scope: "
+                    + "window(...) but no ExecutionContext with a dedup ledger was supplied — a windowed "
+                    + "dedup claims keys in the durable ledger and cannot run in this execution context "
+                    + "(scratch/dry-run paths, or a space with -Ddedup.ledger.backend=none)");
+        String eventCol = leadingOrderColumn(order);
+        String hashExpr = "sha256(concat_ws(chr(31), " + String.join(", ",
+                keys.stream().map(k -> "COALESCE(CAST(" + q(k) + " AS VARCHAR), '')").toList()) + "))";
+        String keyed = table(prefix, "keyed");
+        exec(conn, "CREATE TABLE " + q(keyed) + " AS SELECT *, " + hashExpr + " AS __kh, CAST("
+                + q(eventCol) + " AS DATE) AS __ed FROM " + q(data));
+        try {
+            // A row with no event time cannot be filed in any window — refuse rather than guess.
+            try (Statement st = conn.createStatement();
+                 java.sql.ResultSet rs = st.executeQuery(
+                         "SELECT count(*) FROM " + q(keyed) + " WHERE __ed IS NULL")) {
+                if (rs.next() && rs.getLong(1) > 0)
+                    throw new IllegalStateException("transform.dedup node '" + node.id() + "': " + rs.getLong(1)
+                            + " row(s) have a NULL event time in order_by column '" + eventCol
+                            + "' — a windowed dedup files each key under its record's event date and cannot "
+                            + "place a row that has none");
+            }
+            // Claim per window: group the distinct (hash, event-date) pairs by the epoch-anchored
+            // window each date falls in, claim each group, and collect the hashes that LOST (already
+            // claimed by an earlier Consignment inside the window).
+            Map<java.time.LocalDate, List<String>> byWindow = new LinkedHashMap<>();
+            try (Statement st = conn.createStatement();
+                 java.sql.ResultSet rs = st.executeQuery(
+                         "SELECT DISTINCT __kh, __ed FROM " + q(keyed))) {
+                while (rs.next())
+                    byWindow.computeIfAbsent(win.startFor(rs.getObject(2, java.time.LocalDate.class)),
+                            w -> new ArrayList<>()).add(rs.getString(1));
+            }
+            Set<String> lost = new java.util.LinkedHashSet<>();
+            for (Map.Entry<java.time.LocalDate, List<String>> w : byWindow.entrySet()) {
+                Set<String> won = ctx.ledger().claim(ctx.pipeline(), w.getKey(), ctx.consignmentId(), w.getValue());
+                for (String h : w.getValue()) if (!won.contains(h)) lost.add(h);
+            }
+            if (lost.isEmpty()) return;
+            String lostTbl = table(prefix, "lost");
+            exec(conn, "CREATE TABLE " + q(lostTbl) + " (kh VARCHAR)");
+            try (var ps = conn.prepareStatement("INSERT INTO " + q(lostTbl) + " VALUES (?)")) {
+                for (String h : lost) { ps.setString(1, h); ps.executeUpdate(); }
+            }
+            try {
+                exec(conn, "INSERT INTO " + q(dup) + " SELECT * EXCLUDE(__kh, __ed) FROM " + q(keyed)
+                        + " WHERE __kh IN (SELECT kh FROM " + q(lostTbl) + ")");
+                exec(conn, "CREATE OR REPLACE TABLE " + q(data) + " AS SELECT * EXCLUDE(__kh, __ed) FROM "
+                        + q(keyed) + " WHERE __kh NOT IN (SELECT kh FROM " + q(lostTbl) + ")");
+            } finally {
+                exec(conn, "DROP TABLE IF EXISTS " + q(lostTbl));
+            }
+        } finally {
+            exec(conn, "DROP TABLE IF EXISTS " + q(keyed));
+        }
+    }
+
+    /**
+     * The leading column of an {@code order_by} clause — {@code event_time DESC, id} → {@code event_time};
+     * a double-quoted first identifier keeps its inner name. This is the windowed dedup's event-time
+     * column (see {@link #windowedDedup}).
+     */
+    static String leadingOrderColumn(String orderBy) {
+        String s = orderBy.trim();
+        if (s.startsWith("\"")) {
+            int close = s.indexOf('"', 1);
+            if (close > 0) return s.substring(1, close);
+        }
+        int end = s.length();
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (Character.isWhitespace(c) || c == ',' || c == '(') { end = i; break; }
+        }
+        return s.substring(0, end);
     }
 
     // ── summarize (group-by rollup) ───────────────────────────────────────────────

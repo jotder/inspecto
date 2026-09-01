@@ -131,6 +131,30 @@ final class ServiceStores {
     }
 
     /**
+     * The per-space windowed record-dedup ledger (D-9), gated by {@code -Ddedup.ledger.backend}: same
+     * three-value contract as {@link #openConsignmentOutputStore(SpaceRoot)} — {@code duckdb} (the
+     * default: a default-off dedup ledger silently emits the duplicates it was configured to drop,
+     * this codebase's most repeated trap), {@code postgres}/{@code postgresql}
+     * ({@code -Ddedup.ledger.db.url}), or a raw {@code jdbc:} URL. Any other value ⇒ {@code null} ⇒
+     * a windowed {@code transform.dedup} REFUSES at run (RowShaper.ExecutionContext) rather than
+     * degrading — unlike the fail-open registries, absence here is not degraded correctness.
+     */
+    static com.gamma.consignment.DbDedupLedger openDedupLedger(SpaceRoot root) {
+        String backend = System.getProperty("dedup.ledger.backend", "duckdb").trim().toLowerCase();
+        boolean pg = "postgres".equals(backend) || "postgresql".equals(backend);
+        if (!"duckdb".equals(backend) && !pg && !backend.startsWith("jdbc:")) return null;
+        String url = backend.startsWith("jdbc:")
+                ? backend
+                : OperationalDb.urlFor(OperationalDb.Family.DEDUP_LEDGER, root.dedupLedgerDbUrl());
+        try {
+            return new com.gamma.consignment.DbDedupLedger(url);
+        } catch (Exception e) {
+            log.warn("Could not open dedup-ledger DB ({}) — windowed dedup will refuse: {}", url, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
      * Per-file stage-progression registry (Phase 4 §2.4), gated by {@code -Dfile.stages.backend}: same
      * three-value contract as {@link #openConsignmentOutputStore(SpaceRoot)} — {@code duckdb}, {@code postgres}/
      * {@code postgresql} ({@code -Dfile.stages.db.url}), or a raw {@code jdbc:} URL. Any other value ⇒

@@ -39,6 +39,19 @@ Two boundary rules the table encodes, worth stating once:
 - 🔴 **`…/run` vs `…/trigger` is the scratch/production boundary.** `…/run` is the simulate (scratch
   lane), `…/trigger` the operate (at-rest job lane). The verbs must never be merged.
 
+**Recovery affordances per lane (2026-09-02):** ingest lanes — `POST /runs/{name}/reprocess`
+(whole-Consignment redo; refuses when an output was compacted away; **retracts the run's dedup-ledger
+claims beside `registry.supersede`** so a windowed dedup re-admits the redone rows); parked —
+`POST /runs/{name}/drain`; at-rest job lane — `POST /jobs/runs/{runId}/replay` (canOperateRuns;
+re-fires the job through the normal lifecycle with its configured defaults — the run ledger persists
+no per-run params, and the response `note` says so; the new run's `trigger` field carries
+`replay:<originalRunId>` so the linkage is followable; 409 while the job is running or no longer
+registered). The persistent retry queue stays a spec item
+([`execution-residuals-plan.md`](../../../superpower/execution-residuals-plan.md) §X1). Also
+lane-wide since 2026-09-01: the Stage-2 **orphan-`output_store:` check is default-on** in every
+space (transition-debounced signal; `-Djobs.orphan.audit=false` to disable) — see
+[stage1-architecture](../engine/stage1-architecture.md) §Step 3.
+
 ## Identity and status, per lane
 
 (Supersedes the two-lane table that lived in

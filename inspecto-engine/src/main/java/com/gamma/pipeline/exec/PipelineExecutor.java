@@ -166,6 +166,26 @@ public final class PipelineExecutor {
                                      ProvenanceCollector prov,
                                      RowShaper.ReferenceResolver references,
                                      ParkWriter parkWriter) throws Exception {
+        return execute(conn, g, seeds, batchId, coordinator, sinkWriter, sourceFinalize, prov, references,
+                parkWriter, RowShaper.ExecutionContext.NONE);
+    }
+
+    /**
+     * As the {@link ParkWriter} overload, with run context (D-9): {@code ctx} carries the pipeline id,
+     * the Consignment/batch id and the durable dedup ledger a <b>windowed</b> {@code transform.dedup}
+     * claims keys in ({@link RowShaper.ExecutionContext}). The default
+     * {@link RowShaper.ExecutionContext#NONE} refuses a windowed scope loudly, so a caller with no run
+     * context (every scratch path) fails a windowed dedup rather than silently deduping one batch and
+     * calling it windowed.
+     */
+    public static ExecResult execute(Connection conn, PipelineGraph g, Map<String, String> seeds,
+                                     String batchId, BranchCommitCoordinator coordinator,
+                                     SinkWriter sinkWriter,
+                                     BranchCommitCoordinator.SourceFinalize sourceFinalize,
+                                     ProvenanceCollector prov,
+                                     RowShaper.ReferenceResolver references,
+                                     ParkWriter parkWriter,
+                                     RowShaper.ExecutionContext ctx) throws Exception {
         PipelineValidator.validateOrThrow(g);
         Map<String, PipelineNode> byId = g.byId();
 
@@ -210,7 +230,7 @@ public final class PipelineExecutor {
                 recordCounts(conn, prov, nodeId, rels);
             } else if (isShapeable(node.type())) {
                 Map<String, String> rels = index(RowShaper.shape(conn, node, tableOf(inbound.get(0), produced),
-                        nodeId, references));
+                        nodeId, references, ctx));
                 produced.put(nodeId, rels);
                 recordCounts(conn, prov, nodeId, rels);
             }

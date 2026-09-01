@@ -315,6 +315,7 @@ final class PipelineBundleRoutes implements RouteModule {
         findings.addAll(ConfigRoutes.armedWithoutSchemaFindings("pipeline", retargeted));
         findings.addAll(ConfigRoutes.routeArmingFindings("pipeline", retargeted));
         findings.addAll(ConfigRoutes.stepDisableFindings("pipeline", retargeted));
+        findings.addAll(ConfigRoutes.dedupWindowFindings("pipeline", retargeted));
         if (findings.stream().anyMatch(f -> f.severity() == Severity.ERROR)) {
             for (Path st : satellitePaths) Files.deleteIfExists(st);
             if (createdDir) {
