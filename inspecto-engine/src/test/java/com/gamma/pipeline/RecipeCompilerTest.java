@@ -330,8 +330,44 @@ class RecipeCompilerTest {
         assertNotNull(out.get("sinks"), "two destinations ⇒ the plural sinks: block");
     }
 
+    /** MIDBRANCH-1 (R3): the old "exactly one sink step for now" refusal is REPLACED by support —
+     *  mid-branch steps compile through the trunk's own builders into route.branches[].steps[]. */
     @Test
-    void aRouteBranchWithMoreThanASinkRefuses() {
+    @SuppressWarnings("unchecked")
+    void aRouteBranchWithMidBranchStepsCompilesThemIntoBranchSteps() {
+        Map<String, Object> recipe = new LinkedHashMap<>();
+        recipe.put("name", "orders");
+        recipe.put("active", false);
+        recipe.put("steps", List.of(
+                step("collect", new LinkedHashMap<>()),
+                step("parse", new LinkedHashMap<>()),
+                step("route", new LinkedHashMap<>(Map.of(
+                        "mode", "case",
+                        "branches", new LinkedHashMap<>(Map.of(
+                                "emea", new LinkedHashMap<>(Map.of(
+                                        "when", "region = 'DE'",
+                                        "default", true,
+                                        "steps", List.of(
+                                                step("transform", new LinkedHashMap<>(Map.of("filter", "x > 0"))),
+                                                step("dedup", new LinkedHashMap<>(Map.of("key", List.of("ID")))),
+                                                step("sink", new LinkedHashMap<>(Map.of(
+                                                        "database", "/data/emea")))))))))))));
+        Map<String, Object> out = RecipeCompiler.compile(recipe);
+        Map<String, Object> route = (Map<String, Object>) out.get("route");
+        Map<String, Object> emea = ((List<Map<String, Object>>) route.get("branches")).get(0);
+        assertEquals("/data/emea", emea.get("database"),
+                "the pairing follows the chain's TERMINAL sink");
+        List<Map<String, Object>> steps = (List<Map<String, Object>>) emea.get("steps");
+        assertEquals(List.of("filter", "dedup"),
+                steps.stream().map(s -> s.keySet().iterator().next()).toList(),
+                "mid-branch steps land in the branch's steps[], in authored order");
+        assertEquals("x > 0", ((Map<?, ?>) steps.get(0).get("filter")).get("where"));
+        assertEquals(List.of("ID"), ((Map<?, ?>) steps.get(1).get("dedup")).get("keys"));
+    }
+
+    /** …and the structural rules stay fail-closed: a branch must END at its sink. */
+    @Test
+    void aRouteBranchNotEndingAtASinkRefuses() {
         Map<String, Object> recipe = new LinkedHashMap<>();
         recipe.put("name", "orders");
         recipe.put("active", false);
@@ -340,12 +376,11 @@ class RecipeCompilerTest {
                 step("parse", new LinkedHashMap<>()),
                 step("route", new LinkedHashMap<>(Map.of("branches", new LinkedHashMap<>(Map.of(
                         "emea", new LinkedHashMap<>(Map.of("steps", List.of(
-                                step("transform", new LinkedHashMap<>(Map.of("filter", "x > 0"))),
-                                step("sink", new LinkedHashMap<>())))))))))));
+                                step("dedup", new LinkedHashMap<>(Map.of("key", List.of("ID"))))))))))))));
         PipelineCompileException e = assertThrows(PipelineCompileException.class,
                 () -> RecipeCompiler.compile(recipe));
         assertTrue(e.refusals().stream().anyMatch(r ->
-                RecipeCompiler.UNSUPPORTED_STEP.equals(r.code()) && r.nodeId().contains("emea")),
+                        r.message().contains("must end with a sink step")),
                 e.getMessage());
     }
 

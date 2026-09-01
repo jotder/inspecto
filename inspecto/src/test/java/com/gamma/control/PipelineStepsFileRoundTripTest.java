@@ -133,4 +133,126 @@ class PipelineStepsFileRoundTripTest {
         assertNotNull(cfg.dedup(), "the singular slot still holds it");
         assertEquals(List.of("ID"), cfg.dedup().keys());
     }
+
+    // ── MIDBRANCH-1 (R3): route.branches[].steps[] through the real file ─────────────────
+
+    private static PipelineNode node(String id, String type, String name, Map<String, Object> cfg) {
+        return new PipelineNode(id, type, name, null, cfg, null);
+    }
+
+    /** The flattened graph PipelineLift emits for a two-branch route whose hi branch carries a chain. */
+    private static PipelineGraph chainedRouteGraph(Path dir, List<com.gamma.pipeline.PipelineEdge> extraEdges,
+                                                   PipelineNode... chainNodes) {
+        List<PipelineNode> nodes = new ArrayList<>(List.of(
+                node("acq", "acquisition", Map.of("poll", dir.resolve("in").toString())),
+                node("parse", "parser", Map.of("schema_file", dir.resolve("s.toon").toString())),
+                node("route", "transform.route", new LinkedHashMap<>(Map.of(
+                        "mode", "case",
+                        "default", "lo",
+                        "branches", List.of(
+                                new LinkedHashMap<>(Map.of("key", "hi", "where", "AMT >= 200")),
+                                new LinkedHashMap<>(Map.of("key", "lo", "where", "AMT < 200")))))),
+                node("sink_hi", "sink.persistent", Map.of("database", dir.resolve("hi_db").toString())),
+                node("sink_lo", "sink.persistent", Map.of("database", dir.resolve("lo_db").toString()))));
+        nodes.addAll(List.of(chainNodes));
+        List<com.gamma.pipeline.PipelineEdge> edges = new ArrayList<>(List.of(
+                com.gamma.pipeline.PipelineEdge.data("acq", "parse"),
+                com.gamma.pipeline.PipelineEdge.data("parse", "route"),
+                new com.gamma.pipeline.PipelineEdge("route", com.gamma.pipeline.PipelineRel.route("lo"), "sink_lo")));
+        edges.addAll(extraEdges);
+        return new PipelineGraph("chain", false, nodes, edges);
+    }
+
+    /**
+     * The whole MIDBRANCH-1 loop through a real file: graph (flattened chain) → lower →
+     * {@code route.branches[].steps[]} → toToon → disk → load → lift → the SAME flattened chain,
+     * order preserved per branch — never a fromMap-only shortcut (the config-format lesson).
+     */
+    @Test
+    void aBranchChainRoundTripsThroughTheRealFile(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("s.toon"), com.gamma.etl.PipelineConfigBatchTest.miniSchema(),
+                StandardCharsets.UTF_8);
+        PipelineGraph g = chainedRouteGraph(dir,
+                List.of(new com.gamma.pipeline.PipelineEdge("route",
+                                com.gamma.pipeline.PipelineRel.route("hi"), "filter__hi"),
+                        com.gamma.pipeline.PipelineEdge.data("filter__hi", "dedup__hi"),
+                        com.gamma.pipeline.PipelineEdge.data("dedup__hi", "sink_hi")),
+                node("filter__hi", "transform.filter", "Row filter", Map.of("where", "AMT > 0")),
+                node("dedup__hi", "transform.dedup", null, Map.of("keys", List.of("ID"))));
+
+        Map<String, Object> lowered = PipelineEditable.lower(g, new LinkedHashMap<>(), true);
+
+        // the branch chain landed in the hi entry, in order, and the lo entry carries no steps key
+        Map<?, ?> route = (Map<?, ?>) lowered.get("route");
+        List<?> branches = (List<?>) route.get("branches");
+        Map<?, ?> hi = (Map<?, ?>) branches.get(0);
+        assertEquals(List.of("filter", "dedup"),
+                ((List<?>) hi.get("steps")).stream()
+                        .map(s -> ((Map<?, ?>) s).keySet().iterator().next().toString()).toList());
+        assertFalse(((Map<?, ?>) branches.get(1)).containsKey("steps"),
+                "a branch wired straight to its sink carries no steps key");
+        assertEquals(dir.resolve("hi_db").toString(), hi.get("database"),
+                "the branch pairs with its chain's TERMINAL sink, not the route edge's direct target");
+
+        // …through the codec, off disk, and lifted back to the same flattened shape
+        Path file = dir.resolve("chain_pipeline.toon");
+        Files.writeString(file, ConfigCodec.toToon(lowered), StandardCharsets.UTF_8);
+        PipelineConfig cfg = PipelineConfig.fromMap(ToonHelper.load(file.toString()));
+        PipelineGraph lifted = PipelineLift.lift(cfg);
+
+        assertEquals("transform.filter", lifted.byId().get("filter__hi").type());
+        assertEquals("transform.dedup", lifted.byId().get("dedup__hi").type());
+        assertEquals(List.of("ID"), lifted.byId().get("dedup__hi").cfg("keys"));
+        assertTrue(lifted.edges().contains(new com.gamma.pipeline.PipelineEdge("route",
+                        com.gamma.pipeline.PipelineRel.route("hi"), "filter__hi")),
+                "route:hi feeds the chain's first node");
+        assertTrue(lifted.edges().contains(com.gamma.pipeline.PipelineEdge.data("filter__hi", "dedup__hi")));
+        assertTrue(lifted.edges().stream().anyMatch(e -> e.from().equals("dedup__hi")
+                        && com.gamma.pipeline.PipelineRel.DATA.equals(e.rel())),
+                "the chain's last node feeds the branch sink by a plain data edge");
+
+        // …and a no-edit RE-SAVE over the loaded file is byte-identical: the loop is stable.
+        // (Deliberately the graph the editor holds, not the editable toMap projection — that
+        // projection has a PRE-EXISTING multi-destination database gap unrelated to branch steps.)
+        Map<String, Object> again = PipelineEditable.lower(g, ToonHelper.load(file.toString()), true);
+        assertEquals(ConfigCodec.toToon(lowered), ConfigCodec.toToon(again),
+                "no-edit round trip must not rewrite the file");
+    }
+
+    /** A branch WITHOUT steps stays byte-identical through a no-edit round trip (the R3 safety rail). */
+    @Test
+    void aBranchWithoutStepsStaysByteIdentical(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("s.toon"), com.gamma.etl.PipelineConfigBatchTest.miniSchema(),
+                StandardCharsets.UTF_8);
+        PipelineGraph g = chainedRouteGraph(dir,
+                List.of(new com.gamma.pipeline.PipelineEdge("route",
+                        com.gamma.pipeline.PipelineRel.route("hi"), "sink_hi")));
+        Map<String, Object> lowered = PipelineEditable.lower(g, new LinkedHashMap<>(), true);
+        String toon = ConfigCodec.toToon(lowered);
+        assertFalse(toon.contains("steps"), "no chain anywhere ⇒ no steps key anywhere:\n" + toon);
+
+        Path file = dir.resolve("plain_pipeline.toon");
+        Files.writeString(file, toon, StandardCharsets.UTF_8);
+        Map<String, Object> again = PipelineEditable.lower(g, ToonHelper.load(file.toString()), true);
+        assertEquals(toon, ConfigCodec.toToon(again), "byte-identical no-edit round trip");
+    }
+
+    /** A branch chain that dead-ends (no sink downstream) refuses by name at lower, never truncates. */
+    @Test
+    void aBranchChainNotEndingAtASinkRefuses(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("s.toon"), com.gamma.etl.PipelineConfigBatchTest.miniSchema(),
+                StandardCharsets.UTF_8);
+        PipelineGraph g = chainedRouteGraph(dir,
+                List.of(new com.gamma.pipeline.PipelineEdge("route",
+                                com.gamma.pipeline.PipelineRel.route("hi"), "dedup__hi"),
+                        com.gamma.pipeline.PipelineEdge.data("dedup__hi", "sink_hi"),
+                        // …and a second outgoing data edge — a branch chain is a LIST
+                        com.gamma.pipeline.PipelineEdge.data("dedup__hi", "sink_lo")),
+                node("dedup__hi", "transform.dedup", null, Map.of("keys", List.of("ID"))));
+        var ex = assertThrows(com.gamma.pipeline.PipelineCompileException.class,
+                () -> PipelineEditable.lower(g, new LinkedHashMap<>(), true));
+        assertTrue(ex.refusals().stream().anyMatch(r ->
+                        PipelineEditable.UNSUPPORTED_BRANCH_STEP.equals(r.code())),
+                ex.refusals().toString());
+    }
 }

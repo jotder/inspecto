@@ -311,6 +311,30 @@ public final class PipelineConfig {
         public Step {
             config = (config == null) ? Map.of() : Map.copyOf(config);
         }
+
+        /**
+         * The per-branch {@code steps[]} sub-chain of one {@code route:} branch entry (MIDBRANCH-1,
+         * R3) — the SAME single-key-map vocabulary as the top-level {@code steps:} list, typed.
+         * Lenient by design: the parser refuses a malformed entry at load
+         * ({@code PipelineConfigParser.parseStepEntries}), so a non-conforming element here (a
+         * hand-mangled map) is skipped rather than thrown — every caller of this accessor
+         * (lift / arming) sees only what the load gate admitted.
+         *
+         * @param branchEntry one entry of {@code route.branches[]}; absent/non-list {@code steps} ⇒ empty
+         */
+        @SuppressWarnings("unchecked")
+        public static List<Step> branchSteps(Map<?, ?> branchEntry) {
+            if (branchEntry == null || !(branchEntry.get("steps") instanceof List<?> raw)) return List.of();
+            List<Step> out = new ArrayList<>();
+            for (Object entry : raw) {
+                if (!(entry instanceof Map<?, ?> sm) || sm.size() != 1) continue;
+                Map.Entry<?, ?> only = sm.entrySet().iterator().next();
+                if (only.getValue() != null && !(only.getValue() instanceof Map<?, ?>)) continue;
+                out.add(new Step(String.valueOf(only.getKey()).trim(),
+                        (Map<String, Object>) only.getValue()));
+            }
+            return List.copyOf(out);
+        }
     }
 
     /**

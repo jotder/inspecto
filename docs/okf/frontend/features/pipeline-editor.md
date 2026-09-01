@@ -569,9 +569,13 @@ each fix live). Genuinely open:
 - ~~Single-slot inversion question~~ **STALE (corrected 2026-09-01)**: multiplicity was resolved
   2026-08-11 (ordered `steps:`; `MULTI_*` refusals deleted). Still deliberately last-one-wins:
   `acquisition`, `gap`, `dedup.marker` (`parser` refuses via `MULTI_PARSER`).
-- Mid-branch `steps:` sub-chains are refused today — **specified and scheduled** as
-  [`authoring-residuals-plan.md`](../../../superpower/authoring-residuals-plan.md) §R3 (flattening
-  pre-pass), gated on the stage-2 execution analysis.
+- ~~Mid-branch `steps:` sub-chains refused~~ **SHIPPED 2026-09-02 (R3)**: a route branch carries
+  `steps[]` in the shared step grammar — authorable on the canvas (wire `route:<key>` → step →
+  sink; the lift presents branch chains as ordinary flattened nodes, lower writes them back to the
+  branch), rendered in the Recipe view. Mid-branch kinds = the fork-executable set; `join`,
+  windowed `dedup` and nested `route` refuse by name at save. One-click insert-into-branch is
+  MIDBRANCH-UI-1 (BACKLOG). Backend:
+  [editable-round-trip §19](../../backend/pipeline-graph/editable-round-trip.md).
 - ~~TRANSFER-ARCH-1~~ **SHIPPED 2026-09-01** as the server-side pipeline bundle
   ([editable-round-trip §21](../../backend/pipeline-graph/editable-round-trip.md)); the residuals
   R1/R4/R5/R6 shipped the same shift. Small follow-up in BACKLOG: migrate Duplicate + the

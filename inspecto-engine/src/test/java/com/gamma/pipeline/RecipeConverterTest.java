@@ -105,6 +105,47 @@ class RecipeConverterTest {
         assertEquals(cfg, back);
     }
 
+    /** MIDBRANCH-1 (R3): a branch's steps[] sub-chain projects BEFORE its sink and round-trips —
+     *  through the same per-kind builders as the trunk, so the two chains cannot drift. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void aBranchStepsSubChainProjectsAndRoundTrips() {
+        Map<String, Object> cfg = new LinkedHashMap<>();
+        cfg.put("name", "orders");
+        cfg.put("active", false);
+        cfg.put("dirs", new LinkedHashMap<>(Map.of("poll", "/in", "database", "/data/emea")));
+        cfg.put("parsing", new LinkedHashMap<>(Map.of("grammar", "grammar/pipe")));
+        cfg.put("processing", new LinkedHashMap<>(Map.of("file_pattern", "glob:**/*.csv")));
+        cfg.put("output", new LinkedHashMap<>(Map.of("format", "PARQUET")));
+        cfg.put("route", new LinkedHashMap<>(Map.of(
+                "mode", "case",
+                "branches", List.of(
+                        new LinkedHashMap<>(Map.of("key", "emea",
+                                "where", "region IN ('DE','FR')", "database", "/data/emea",
+                                "steps", List.of(
+                                        new LinkedHashMap<>(Map.of("filter",
+                                                Map.of("where", "AMT > 0"))),
+                                        new LinkedHashMap<>(Map.of("dedup",
+                                                Map.of("keys", List.of("ORDER_ID"))))))),
+                        new LinkedHashMap<>(Map.of("key", "other", "database", "/data/other"))),
+                "default", "other")));
+        cfg.put("sinks", List.of(
+                new LinkedHashMap<>(Map.of("database", "/data/emea", "format", "PARQUET")),
+                new LinkedHashMap<>(Map.of("database", "/data/other", "format", "PARQUET"))));
+
+        Map<String, Object> recipe = RecipeConverter.toRecipe(cfg);
+        // the projection: the emea branch's recipe steps are transform → dedup → sink, in order
+        List<Map<String, Object>> steps = (List<Map<String, Object>>) recipe.get("steps");
+        Map<String, Object> route = (Map<String, Object>) steps.get(steps.size() - 1).get("route");
+        Map<String, Object> emea = (Map<String, Object>)
+                ((Map<String, Object>) route.get("branches")).get("emea");
+        assertEquals(List.of("transform", "dedup", "sink"),
+                ((List<Map<String, Object>>) emea.get("steps")).stream()
+                        .map(s -> s.keySet().iterator().next()).toList());
+
+        assertEquals(cfg, RecipeCompiler.compile(recipe, cfg, false));
+    }
+
     /** The dataset entry (P3 S3c-2/S3d): the converter re-emits the authored ref spelling —
      *  {@code collect: {dataset: datasets/<id>}} — never the compiled {@code connector: dataset} pair. */
     @Test

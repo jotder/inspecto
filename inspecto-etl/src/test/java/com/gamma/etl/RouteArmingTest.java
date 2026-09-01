@@ -132,6 +132,88 @@ class RouteArmingTest {
         assertTrue(refusals.get(0).contains("branch 'rest' has no where:"), refusals.get(0));
     }
 
+    // ── MIDBRANCH-1: per-branch steps[] sub-chains ───────────────────────────────
+
+    /** A complete branch carrying the given steps[] sub-chain. */
+    private static Map<String, Object> branchWithSteps(String key, String db, List<Object> steps) {
+        return Map.of("key", key, "database", db, "where", "ID LIKE '" + key.toUpperCase() + "%'",
+                "steps", steps);
+    }
+
+    @Test
+    @DisplayName("a branch chaining the executable kinds (filter/dedup/summarize) arms")
+    void executableBranchChainArms() {
+        Map<String, Object> route = Map.of(
+                "mode", "case",
+                "default", "apac",
+                "branches", List.of(
+                        branchWithSteps("emea", "emea_db", List.of(
+                                Map.of("filter", Map.of("where", "AMT > 0")),
+                                Map.of("dedup", Map.of("keys", List.of("ID"))),
+                                Map.of("summarize", Map.of("group_by", List.of("DAY"),
+                                        "measures", List.of("count"))))),
+                        branch("apac", "apac_db")));
+        assertEquals(List.of(), RouteArming.refusals(route, List.of("emea_db", "apac_db"), false));
+    }
+
+    @Test
+    @DisplayName("a mid-branch join is refused by name — the ingest walk has no reference resolver")
+    void midBranchJoinIsRefused() {
+        Map<String, Object> route = Map.of(
+                "default", "emea",
+                "branches", List.of(branchWithSteps("emea", "emea_db",
+                        List.of(Map.of("join", Map.of("reference", "reference/geo", "on", List.of("ID")))))));
+        List<String> refusals = RouteArming.refusals(route, List.of("emea_db"), false);
+        assertEquals(1, refusals.size(), refusals.toString());
+        assertTrue(refusals.get(0).contains("'join' step, which cannot execute mid-branch"), refusals.get(0));
+        assertTrue(refusals.get(0).contains("reference resolver"), refusals.get(0));
+    }
+
+    @Test
+    @DisplayName("a mid-branch WINDOWED dedup is refused — the walk carries no ledger context")
+    void midBranchWindowedDedupIsRefused() {
+        Map<String, Object> route = Map.of(
+                "default", "emea",
+                "branches", List.of(branchWithSteps("emea", "emea_db", List.of(
+                        Map.of("dedup", Map.of("keys", List.of("ID"), "order_by", "TS DESC",
+                                "scope", "window(P4D)"))))));
+        List<String> refusals = RouteArming.refusals(route, List.of("emea_db"), false);
+        assertEquals(1, refusals.size(), refusals.toString());
+        assertTrue(refusals.get(0).contains("windowed dedup"), refusals.get(0));
+        // …while an explicit consignment scope stays armable — it is the default spelled out.
+        Map<String, Object> ok = Map.of(
+                "default", "emea",
+                "branches", List.of(branchWithSteps("emea", "emea_db", List.of(
+                        Map.of("dedup", Map.of("keys", List.of("ID"), "scope", "consignment"))))));
+        assertEquals(List.of(), RouteArming.refusals(ok, List.of("emea_db"), false));
+    }
+
+    @Test
+    @DisplayName("a nested route and a filter without where: refuse, each by name")
+    void nestedRouteAndBlankFilterRefuse() {
+        Map<String, Object> route = Map.of(
+                "default", "emea",
+                "branches", List.of(branchWithSteps("emea", "emea_db", List.of(
+                        Map.of("route", Map.of("branches", List.of())),
+                        Map.of("filter", Map.of())))));
+        List<String> refusals = RouteArming.refusals(route, List.of("emea_db"), false);
+        assertEquals(2, refusals.size(), refusals.toString());
+        assertTrue(refusals.get(0).contains("'route' step, which cannot execute mid-branch"), refusals.get(0));
+        assertTrue(refusals.get(1).contains("filter with no where:"), refusals.get(1));
+    }
+
+    @Test
+    @DisplayName("a mid-branch filter carrying a pre-parse list key is refused — rows are already parsed")
+    void midBranchPreParseFilterKeyIsRefused() {
+        Map<String, Object> route = Map.of(
+                "default", "emea",
+                "branches", List.of(branchWithSteps("emea", "emea_db", List.of(
+                        Map.of("filter", Map.of("where", "AMT > 0", "include_regex", List.of("^E")))))));
+        List<String> refusals = RouteArming.refusals(route, List.of("emea_db"), false);
+        assertEquals(1, refusals.size(), refusals.toString());
+        assertTrue(refusals.get(0).contains("pre-parse key 'include_regex'"), refusals.get(0));
+    }
+
     // ── the draft-map readers (the save path's half) ─────────────────────────────
 
     @Test

@@ -1,8 +1,17 @@
 # Authoring residuals — solution specification (stage-1 close-out)
 
-**Status: R1 / R2 / R4 / R5 / R6 SHIPPED 2026-09-01 (same shift, GAUNTLET-verified); ACTIVE for
-R3 only (⛔ gated on the stage-2 execution analysis) + the small UI-migration-onto-R2 follow-up;
-R7 stays a future sketch.** As-built: `okf/frontend/features/pipeline-editor.md` (R4/R5/R6),
+**Status: FULLY DRAINED 2026-09-02 — R1/R2/R4/R5/R6 shipped 2026-09-01, R3 + the
+UI-migration-onto-R2 follow-up shipped 2026-09-02; only R7 (future sketch, unscheduled by design)
+remains, so this plan is ready to distill+archive at the next handoff.** R3 as-built:
+`route.branches[].steps[]` in the shared step grammar; lift flattening / lower reversal with
+terminal-sink branch pairing and `UNSUPPORTED_BRANCH_STEP`; mid-branch kinds = the fork-executable
+set (filter / consignment-scope dedup / summarize; join + windowed dedup + nested route REFUSE by
+name at all five gates); Recipe compiler/converter refusal sites replaced by support; TS mirror
+equal-never-stricter. 🔴 The R3 unblock verdict's named boundary was directionally wrong — route
+pipelines never reach `graphLaneCarries`; the real seam was `engages`/`dataFedSinkCount`, extended
+deliberately (recorded in `execution-residuals-plan.md` too). Bundle-UI migration: Duplicate + row
+export ride `GET /pipelines/{name}/bundle` / `POST /pipelines/import`; the legacy JSON export
+stays as the reader for old files. As-built: `okf/frontend/features/pipeline-editor.md` (R4/R5/R6),
 `okf/backend/pipeline-graph/editable-round-trip.md` §21 (R2) and §16 (R1's coded findings).
 Notable as-built deviations from this spec, all sound: R4's drag-coalescing was moot (node moves
 never touch the model); R2 writes satellites before the safety gate and deletes them on refusal

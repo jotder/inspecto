@@ -789,19 +789,21 @@ non-blocking:**
 
 ## 6. Engineering / tech-debt
 
-**AUTHORING-RESIDUALS — spec [`superpower/authoring-residuals-plan.md`](superpower/authoring-residuals-plan.md);
-R1/R2/R4/R5/R6 SHIPPED 2026-09-01 same shift (as-built:
-`okf/frontend/features/pipeline-editor.md` + `okf/backend/pipeline-graph/editable-round-trip.md`
-§21). Remaining queue:**
+**AUTHORING-RESIDUALS — FULLY DRAINED 2026-09-02** (spec
+[`superpower/authoring-residuals-plan.md`](superpower/authoring-residuals-plan.md), ready to
+archive; R1/R2/R4/R5/R6 shipped 2026-09-01, R3 mid-branch `steps:` + the bundle-UI migration
+shipped 2026-09-02; only R7 convert-to-composite remains, a future sketch by design). Two small
+rows R3's grounding opened:
 
-- **R3 MIDBRANCH-1 — per-branch `steps:` sub-chains** via the flattening pre-pass; ⛔ gated on the
-  stage-2 execution analysis landing first. Spec §R3 (supersedes
-  `superpower/mid-branch-transforms-design.md`'s open questions). R7 (convert-to-composite) is a
-  future sketch behind it.
-- **UI migration onto the R2 bundle** (small follow-up): the editor's Duplicate and the
-  Open-dialog row export still ride the client stream-bundle; migrate both onto
-  `GET /pipelines/{name}/bundle` / `POST /pipelines/import` per spec §R2 (the client bundle stays
-  as the reader for previously exported files). The metadata bundle's `authored-pipeline` kind still operates on the
+- **RECIPE-SCOPE-1 — the Recipe projection drops a dedup step's `scope:`** (trunk and branch
+  alike): `RecipeConverter`'s dedup builder projects `{keys, order_by}` only, so a D-9 windowed
+  `scope: window(...)` vanishes from the Pipeline Document / recipe round-trip while the file
+  keeps it. Pre-existing, found 2026-09-02 during R3. Add `scope` to the shared dedup builder
+  (both directions) + a round-trip pin.
+- **MIDBRANCH-UI-1 — insert-into-branch affordance** (polish): a branch chain is authorable on
+  the canvas (add node + wire `route:<key>` → step → sink) and renders in the Recipe view via the
+  converter, but the step-cards' branch rows have no one-click "insert step into this branch" the
+  way the trunk has insert-between. Small UX slice; the format/round-trip is done. The metadata bundle's `authored-pipeline` kind still operates on the
   RETIRED `*_flow.toon` `PipelineStore`; a canonical `*_pipeline.toon` transfers only via the
   whole-config-tree datasource zip (`GET /spaces/{id}/datasources/{ds}/export`) or the client-side
   stream-config bundle. Design wanted: one selective export/import for a canonical pipeline + its

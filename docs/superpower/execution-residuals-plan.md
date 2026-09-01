@@ -109,12 +109,14 @@ must read those spellings via the existing accessors, never new literals.
 
 ## R3 unblock (recorded verdict, 2026-09-01)
 
-MIDBRANCH-1's gate ("the stage-2 execution analysis landing first") is MET by this analysis. The
-real boundary is now named: `graphLaneCarries` admits a pipeline only when every sink hangs
-directly off the seed — an EXECUTED mid-branch Step is exactly the node the ingest walk never
-executes, so R3's flattening must extend that walk (shared interest with Platform Services S2-2's
-bridge spike: rows/s through a no-op EXECUTED Step). R3 is schedulable after this package;
-sequence the spike first if Platform Services Stage 2 moves in the same window.
+MIDBRANCH-1's gate ("the stage-2 execution analysis landing first") was MET by this analysis, and
+**R3 SHIPPED 2026-09-02**. ⚠ The boundary this verdict originally named was directionally wrong —
+route pipelines never reach `graphLaneCarries` (that predicate serves NON-route pipelines); the
+real seam was `ConsignmentGraphRunner.engages`/`dataFedSinkCount`, extended so a sink's feeding
+relation traces upstream through chain transforms to its `route:*` edge, and a route-fed chain
+always engages the fork. Kept as a worked example: an unblock verdict is itself a hypothesis —
+the builder must re-ground the named boundary before extending it. (Platform Services S2-2's
+bridge spike interest stands unchanged.)
 
 ---
 

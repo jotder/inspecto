@@ -325,8 +325,9 @@ A `route:` branch is `{key, where, database}`, and the three have different owne
 | key | owner | where it comes from |
 |---|---|---|
 | `key` | **derived** | the name of the node's `route:<key>` edge |
-| `database` | **derived** | stamped by `PipelineEditable.routeSection` from the sink that edge feeds — the branch↔sink JOIN KEY on both halves of the round-trip |
+| `database` | **derived** | stamped by `PipelineEditable.routeSection` from the sink the branch's chain TERMINATES at — the branch↔sink JOIN KEY on both halves of the round-trip. ⚠ Since MIDBRANCH-1 (2026-09-02) the pairing follows the chain, not the edge's direct target: with a `steps[]` sub-chain the `route:<key>` edge feeds the chain's first node |
 | `where` | **authored** | the branch's SQL predicate; no other home |
+| `steps` | **graph-owned** (MIDBRANCH-1, 2026-09-02) | the branch's ordered sub-chain — the SAME single-key-map vocabulary as the top-level `steps:` list (one entry grammar, `PipelineConfigParser.parseStepEntries`). `PipelineLift.emitSinks` flattens it into ordinary nodes (`<kind><schema-suffix>__<key>`, `__s<i>` for repeats) wired `route:<key> → step₁ → … → sink`; `PipelineEditable.branchChains`/`routeSection` reverse it, rebuilding `steps[]` from the walk through the shared `stepConfig` builders. A branch wired straight to its sink carries no `steps` key — byte-identical to pre-R3. Malformed chain shapes (fan-out, non-sink terminal, nested route) refuse `UNSUPPORTED_BRANCH_STEP`. Kinds allowed to ARM mid-branch: `filter`/`dedup`(consignment scope)/`summarize` (`RouteArming.BRANCH_STEP_KINDS`) — the ingest walk carries no `ReferenceResolver` and no `ExecutionContext`, so `join`, windowed `dedup`, and nested `route` refuse at save with the usual ERR/WARN_ROUTE_UNARMABLE split at all five gates. `ConsignmentGraphRunner.engages` traces a sink's feeding relation upstream through the chain and additionally engages on ANY route-fed chain (a chain node is executed by no other lane) |
 
 ### 19.2 BUILD — `RouteArming` now refuses a branch with no `where`
 

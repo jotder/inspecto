@@ -340,6 +340,24 @@ export interface PipelineSettingsResult {
     reference: PipelineReferenceSettings | null;
 }
 
+/**
+ * The receipt of POST /pipelines/import (R2, server bundle) — the zip landed as an inactive draft.
+ * `pipeline` is the REGISTERED id (after any `conflict=rename`), what tabs and follow-up routes key on.
+ */
+export interface PipelineBundleImportResult {
+    written: boolean;
+    pipeline: string;
+    path: string;
+    files: string[];
+    active: boolean;
+    /** Set only when `conflict=rename` had to pick a free name. */
+    renamedFrom?: string;
+    /** The manifest's environment requirements (e.g. a connection profile) — surface, never swallow. */
+    requirements?: Record<string, unknown>[];
+    notes?: string[];
+    findings: { severity: string; fieldPath?: string; message: string; code?: string; guidance?: string }[];
+}
+
 /** Read-only pipeline-graph projection + authored-pipeline CRUD/dry-run for the editor (CONTROL scope). */
 @Injectable({ providedIn: 'root' })
 export class PipelinesService {
@@ -477,6 +495,44 @@ export class PipelinesService {
             apiUrl(`/pipelines/${encodeURIComponent(name)}/settings`),
             settings,
         );
+    }
+
+    // ── the server bundle (R2): one pipeline + its file closure as a portable zip ──
+
+    /**
+     * Download one pipeline's server-composed bundle zip: manifest + pipeline toon + closure
+     * (schemas, segment schemas, grammar file, `_enrich` companion), secrets replaced by manifest
+     * `requirements[]`. Whole {@link HttpResponse} because the download filename rides the
+     * `Content-Disposition` header — read it via {@link bundleFilename}.
+     */
+    exportBundle(name: string): Observable<HttpResponse<Blob>> {
+        return this.http.get(apiUrl(`/pipelines/${encodeURIComponent(name)}/bundle`), {
+            observe: 'response',
+            responseType: 'blob',
+        });
+    }
+
+    /** The filename an {@link exportBundle} response was stamped with, else `<name>-bundle.zip`. */
+    bundleFilename(res: HttpResponse<Blob>, name: string): string {
+        const cd = res.headers.get('Content-Disposition') ?? '';
+        const m = /filename="?([^";]+)"?/i.exec(cd);
+        return m ? m[1] : `${name}-bundle.zip`;
+    }
+
+    /**
+     * Import a bundle zip under `name` (POST /pipelines/import — raw `application/zip` body; `name`
+     * and `conflict` travel as query params, never a JSON body). Always lands `active: false`.
+     * 409 on a taken name unless the policy says otherwise.
+     */
+    importBundle(
+        zip: Blob | ArrayBuffer,
+        name: string,
+        conflict: 'refuse' | 'overwrite' | 'rename' = 'refuse',
+    ): Observable<PipelineBundleImportResult> {
+        return this.http.post<PipelineBundleImportResult>(apiUrl('/pipelines/import'), zip, {
+            params: { name, conflict },
+            headers: { 'Content-Type': 'application/zip' },
+        });
     }
 
     // ── authored-pipeline CRUD + dry-run (editor; all writes 503 without -Dassist.write.root) ──

@@ -190,6 +190,93 @@ class ConsignmentGraphRunnerTest {
         assertTrue(ConsignmentGraphRunner.engages(multi), "multi-sink fan-out needs the branch executor");
     }
 
+    // ── MIDBRANCH-1: flattened per-branch steps[] sub-chains ────────────────────────
+
+    /** The flattened shape PipelineLift emits for a branch chain: route:<key> → step → … → sink. */
+    private static PipelineGraph chainedRouteGraph() {
+        String store = PipelineStores.CONFIG_STORE;
+        return new PipelineGraph("ROUTE_CHAIN_ETL", true,
+                List.of(
+                        PipelineNode.of("parse", "parser"),
+                        PipelineNode.of("r", "transform.route", Map.of(
+                                "mode", "case",
+                                "default", "lo",
+                                "branches", List.of(
+                                        Map.of("key", "hi", "where", "amt >= 200"),
+                                        Map.of("key", "lo", "where", "amt < 200")))),
+                        // the hi branch's flattened sub-chain: a record-grain dedup on amt
+                        PipelineNode.of("dedup__hi", "transform.dedup", Map.of("keys", List.of("amt"))),
+                        PipelineNode.of("sink_hi", "sink.persistent", Map.of(store, "hi")),
+                        PipelineNode.of("sink_lo", "sink.persistent", Map.of(store, "lo"))),
+                List.of(
+                        PipelineEdge.data("parse", "r"),
+                        new PipelineEdge("r", PipelineRel.route("hi"), "dedup__hi"),
+                        PipelineEdge.data("dedup__hi", "sink_hi"),
+                        new PipelineEdge("r", PipelineRel.route("lo"), "sink_lo")));
+    }
+
+    /**
+     * MIDBRANCH-1 end-to-end: a branch's flattened sub-chain transforms ONLY its own branch's rows.
+     * hi gets id3/id4 (both amt=300) and its dedup folds them to ONE row; lo keeps BOTH of its rows
+     * untouched — proof the chain executed inside the hi branch and nowhere else.
+     */
+    @Test
+    void aBranchChainTransformsOnlyItsBranchsRows() throws Exception {
+        sql("CREATE TABLE parsed AS SELECT * FROM (VALUES (1,150),(2,50),(3,300),(4,300)) t(id,amt)");
+
+        ConsignmentGraphRunner.Result res = ConsignmentGraphRunner.run(
+                new ConsignmentGraphRunner.Input(conn, chainedRouteGraph(), "parse", "parsed", "batch-chain-1",
+                        dir.resolve("data").toString(), "route_chain", dir.resolve("bc_chain.csv")),
+                sinkOutputs -> { });
+
+        assertEquals(java.util.Set.of("sink_hi", "sink_lo"), res.exec().sinkInputs().keySet(),
+                "both branch sinks commit — the chain does not change the commit contract");
+        assertTrue(res.exec().commit().sourceFinalized());
+        assertEquals(3L, res.totalRows(), "hi deduped 2→1, lo untouched at 2");
+        assertEquals(1L, count(res.exec().sinkInputs().get("sink_hi")),
+                "the hi branch's dedup folded its two amt=300 rows to one");
+        assertEquals(2L, count(res.exec().sinkInputs().get("sink_lo")),
+                "the lo branch's rows pass through untransformed");
+    }
+
+    @Test
+    void engagementTracesABranchChainBackToItsRouteEdge() {
+        PipelineGraph g = chainedRouteGraph();
+        assertEquals(2, ConsignmentGraphRunner.dataFedSinkCount(g),
+                "sink_hi's plain data edge traces upstream through the chain to route:hi");
+        assertTrue(ConsignmentGraphRunner.engages(g));
+        assertTrue(ConsignmentGraphRunner.hasRouteFedChain(g));
+    }
+
+    /** A single-branch route would not engage on count alone — the chain itself must force the walk,
+     *  or its steps are silently skipped by the flat lane. */
+    @Test
+    void aSingleBranchChainStillEngages() {
+        String store = PipelineStores.CONFIG_STORE;
+        PipelineGraph g = new PipelineGraph("ONE_BRANCH", true,
+                List.of(
+                        PipelineNode.of("parse", "parser"),
+                        PipelineNode.of("r", "transform.route", Map.of(
+                                "mode", "case", "default", "all",
+                                "branches", List.of(Map.of("key", "all", "where", "TRUE")))),
+                        PipelineNode.of("f__all", "transform.filter", Map.of("where", "amt > 0")),
+                        PipelineNode.of("sink", "sink.persistent", Map.of(store, "out"))),
+                List.of(
+                        PipelineEdge.data("parse", "r"),
+                        new PipelineEdge("r", PipelineRel.route("all"), "f__all"),
+                        PipelineEdge.data("f__all", "sink")));
+        assertEquals(1, ConsignmentGraphRunner.dataFedSinkCount(g), "one branch is one branch");
+        assertTrue(ConsignmentGraphRunner.engages(g), "the chain node is executed by NO other lane");
+    }
+
+    private long count(String table) throws SQLException {
+        try (Statement st = conn.createStatement();
+             var rs = st.executeQuery("SELECT count(*) FROM " + table)) {
+            rs.next();
+            return rs.getLong(1);
+        }
+    }
+
     private void sql(String s) throws SQLException {
         try (Statement st = conn.createStatement()) { st.execute(s); }
     }

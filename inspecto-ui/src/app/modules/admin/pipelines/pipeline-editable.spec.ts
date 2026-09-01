@@ -1097,3 +1097,99 @@ describe('mock pipeline-editable — an authored sinks: block IS the destination
         expect((out['dirs'] as Record<string, unknown>)['database']).toBe('/db');
     });
 });
+
+/**
+ * MIDBRANCH-1 (R3): per-branch `steps:` sub-chains. The mirror must flatten exactly as
+ * `PipelineLift.emitSinks` does (route:<key> → step₁ → … → branch sink, ids `<kind>__<key>`),
+ * lower them back into `route.branches[].steps[]` exactly as `PipelineEditable.routeSection`
+ * does (pairing by the chain's TERMINAL sink), and refuse the same malformed shapes
+ * (UNSUPPORTED_BRANCH_STEP) — the offline lower must produce what the server produces.
+ */
+describe('mock pipeline-editable — route branch steps (MIDBRANCH-1)', () => {
+    const branchStepsConfig = () => ({
+        name: 'RB',
+        active: false,
+        dirs: { poll: '/in', database: '/hi_db' },
+        collector: { connector: 'local' },
+        processing: { schema_file: 'rb_schema.toon' },
+        sinks: [{ database: '/hi_db' }, { database: '/lo_db' }],
+        route: {
+            mode: 'case',
+            default: 'lo',
+            branches: [
+                {
+                    key: 'hi',
+                    where: 'AMT >= 200',
+                    database: '/hi_db',
+                    steps: [{ filter: { where: 'AMT > 0' } }, { dedup: { keys: ['ID'] } }],
+                },
+                { key: 'lo', where: 'AMT < 200', database: '/lo_db' },
+            ],
+        },
+    });
+
+    it('lifts a branch chain into flattened nodes wired route:<key> → step → … → sink', () => {
+        const g = liftConfig(branchStepsConfig());
+
+        const filter = g.nodes.find((n) => n.id === 'filter__hi');
+        const dedup = g.nodes.find((n) => n.id === 'dedup__hi');
+        expect(filter?.type).toBe('transform.filter');
+        expect(filter?.config).toEqual({ where: 'AMT > 0' });
+        expect(dedup?.type).toBe('transform.dedup');
+        expect(dedup?.config).toEqual({ keys: ['ID'] });
+        expect(g.edges).toContainEqual({ from: 'route', rel: 'route:hi', to: 'filter__hi' });
+        expect(g.edges).toContainEqual({ from: 'filter__hi', rel: 'data', to: 'dedup__hi' });
+        expect(g.edges).toContainEqual({ from: 'dedup__hi', rel: 'data', to: 'sink__d0' });
+        // the branch without steps keeps the pre-R3 direct edge
+        expect(g.edges).toContainEqual({ from: 'route', rel: 'route:lo', to: 'sink__d1' });
+    });
+
+    it("lowers the chain back into that branch's steps[], in order, pairing by the terminal sink", () => {
+        const existing = branchStepsConfig();
+        const g = liftConfig(existing);
+
+        const res = lowerGraph(g, existing, true);
+
+        expect('refusals' in res).toBe(false);
+        const route = (res as { config: Record<string, unknown> }).config['route'] as Record<string, unknown>;
+        const branches = route['branches'] as Record<string, unknown>[];
+        expect(branches[0]['database']).toBe('/hi_db');
+        expect(branches[0]['steps']).toEqual([{ filter: { where: 'AMT > 0' } }, { dedup: { keys: ['ID'] } }]);
+        expect('steps' in branches[1]).toBe(false);
+    });
+
+    it('drops a stale steps key when the author deletes the chain nodes', () => {
+        const existing = branchStepsConfig();
+        const g = liftConfig(existing);
+        g.nodes = g.nodes.filter((n) => n.id !== 'filter__hi' && n.id !== 'dedup__hi');
+        g.edges = g.edges.filter((e) => !e.from.includes('__hi') && e.to !== 'filter__hi');
+        g.edges.push({ from: 'route', rel: 'route:hi', to: 'sink__d0' });
+
+        const res = lowerGraph(g, existing, true);
+
+        const route = (res as { config: Record<string, unknown> }).config['route'] as Record<string, unknown>;
+        const branches = route['branches'] as Record<string, unknown>[];
+        expect('steps' in branches[0]).toBe(false);
+    });
+
+    it("refuses a branch chain that does not end at a persistent sink — the server's code", () => {
+        const existing = branchStepsConfig();
+        const g = liftConfig(existing);
+        // sever the chain's tail so dedup__hi dead-ends
+        g.edges = g.edges.filter((e) => !(e.from === 'dedup__hi' && e.to === 'sink__d0'));
+
+        const res = lowerGraph(g, existing, true);
+
+        expect('refusals' in res).toBe(true);
+        expect((res as { refusals: { code: string }[] }).refusals.map((r) => r.code)).toContain(
+            'UNSUPPORTED_BRANCH_STEP',
+        );
+    });
+
+    it('a no-edit lift → lower round trip reproduces the file, branch steps included', () => {
+        const existing = branchStepsConfig();
+        const res = lowerGraph(liftConfig(existing), existing, true);
+        expect('config' in res).toBe(true);
+        expect((res as { config: Record<string, unknown> }).config['route']).toEqual(existing.route);
+    });
+});

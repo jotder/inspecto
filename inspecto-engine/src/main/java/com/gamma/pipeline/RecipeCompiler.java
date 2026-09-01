@@ -378,8 +378,9 @@ public final class RecipeCompiler {
 
     /**
      * {@code route:} — the one user-visible branching construct (§2.6). Named branches, each a linear
-     * sub-chain; <b>v1 restriction:</b> a branch's steps must be exactly one {@code sink} (mid-branch
-     * transforms land with the branch-aware executor). Compiles to a {@code transform.route} node
+     * sub-chain ending in its {@code sink} step; mid-branch transforms (MIDBRANCH-1, R3) compile
+     * through the same per-verb builders as the trunk and land in
+     * {@code route.branches[].steps[]}. Compiles to a {@code transform.route} node
      * (RowShaper's shape: {@code mode} / {@code branches:[{key,where}]} / top-level {@code default})
      * plus one sink node per branch fed by a {@code route:<key>} edge. Armed as of the
      * branch-aware-executor arming plan S3 (2026-08-26): an active {@code route:} pipeline
@@ -407,19 +408,75 @@ public final class RecipeCompiler {
             if (Boolean.TRUE.equals(bc.get("default"))) defaultKey = key;
             entries.add(entry);
 
+            // MIDBRANCH-1 (R3): a branch is a linear sub-chain ending at its sink. Every non-sink
+            // entry compiles through the SAME per-verb builders as the trunk (dedup / summarize /
+            // transform.{filter,join}) — one grammar, so the two chains cannot drift — wired
+            // route:<key> → step₁ → … → sink. Which kinds may ARM mid-branch is RouteArming's call
+            // (join / windowed dedup / nested route refuse at save); the compiler's own refusals stay
+            // structural: a branch with no steps, or whose LAST step is not the sink.
             Object steps = bc.get("steps");
-            if (!(steps instanceof List<?> l) || l.size() != 1
-                    || !(l.get(0) instanceof Map<?, ?> s) || s.size() != 1
-                    || !"sink".equals(String.valueOf(s.entrySet().iterator().next().getKey()))) {
-                refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_STEP, id + ":" + key,
-                        "a route branch compiles as exactly one sink step for now — "
-                                + "mid-branch transforms land with the branch-aware executor"));
+            if (!(steps instanceof List<?> l) || l.isEmpty()) {
+                refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id + ":" + key,
+                        "a route branch needs a steps: list ending in a sink step"));
                 continue;
             }
-            Map<String, Object> sinkCfg = configOf(((Map<?, ?>) l.get(0)).values().iterator().next());
-            PipelineNode sinkNode = sink("sink-" + key, sinkCfg);
-            branchSinks.add(sinkNode);
-            routeEdges.add(new PipelineEdge(id, PipelineRel.route(key), sinkNode.id()));
+            String upstream = id;
+            String rel = PipelineRel.route(key);
+            boolean sinkSeen = false;
+            for (int s = 0; s < l.size(); s++) {
+                Object rawStep = l.get(s);
+                if (!(rawStep instanceof Map<?, ?> sm) || sm.size() != 1) {
+                    refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id + ":" + key,
+                            "each branch step is a single-verb map, e.g. `- sink: {…}`"));
+                    continue;
+                }
+                Map.Entry<?, ?> be = sm.entrySet().iterator().next();
+                String verb = String.valueOf(be.getKey());
+                Map<String, Object> stepCfg = configOf(be.getValue());
+                String stepId = verb + "-" + key + "-" + (s + 1);
+                if (sinkSeen) {
+                    refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, stepId,
+                            "the sink ends branch '" + key + "' — steps after it have nowhere to feed"));
+                    continue;
+                }
+                PipelineNode stepNode;
+                switch (verb) {
+                    case "sink" -> {
+                        stepNode = sink("sink-" + key, stepCfg);
+                        sinkSeen = true;
+                    }
+                    case "dedup" -> stepNode = dedup(stepId, stepCfg, refusals);
+                    case "summarize" -> stepNode = summarize(stepId, stepCfg, refusals);
+                    case "transform" -> {
+                        List<PipelineNode> built = new ArrayList<>();
+                        transform(stepId, stepCfg, built, refusals);
+                        // transform may compile to two chained nodes (join + filter) — wire them in order
+                        stepNode = null;
+                        for (PipelineNode n : built) {
+                            branchSinks.add(n);
+                            routeEdges.add(new PipelineEdge(upstream, rel, n.id()));
+                            upstream = n.id();
+                            rel = PipelineRel.DATA;
+                        }
+                    }
+                    default -> {
+                        refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_STEP, stepId,
+                                "branch step verb '" + verb + "' does not compile mid-branch "
+                                        + "(only dedup / summarize / transform / sink)"));
+                        stepNode = null;
+                    }
+                }
+                if (stepNode != null) {
+                    branchSinks.add(stepNode);
+                    routeEdges.add(new PipelineEdge(upstream, rel, stepNode.id()));
+                    upstream = stepNode.id();
+                    rel = PipelineRel.DATA;
+                }
+            }
+            if (!sinkSeen)
+                refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id + ":" + key,
+                        "branch '" + key + "'s steps must end with a sink step — its rows have "
+                                + "nowhere to land otherwise"));
         }
         Map<String, Object> node = new LinkedHashMap<>();
         node.put("mode", mode);

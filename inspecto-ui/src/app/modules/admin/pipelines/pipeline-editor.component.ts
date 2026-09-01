@@ -64,7 +64,6 @@ import { InspectoSplitDirective } from 'app/inspecto/components/split.directive'
 import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
 import { grammarContentAsParsingBlock, nonDelimitedGrammarBlock } from 'app/inspecto/grammar';
 import { TransferMenuComponent } from 'app/inspecto/transfer';
-import { planStreamImport } from 'app/inspecto/transfer/stream-bundle';
 import { StreamTransferService } from 'app/inspecto/transfer/stream-transfer.service';
 import { G6GraphData } from 'app/modules/admin/catalog/catalog-graph';
 import { PipelineDryRunPanelComponent } from './pipeline-dry-run-panel.component';
@@ -390,6 +389,9 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     /** A stream-config export is in flight ({@link exportConfig}) — a separate flag from the document
      *  export, which is a different format on a different route. */
     readonly exportingConfig = signal(false);
+
+    /** Whether the server bundle-zip export (R2) is in flight — disables its menu item only. */
+    readonly exportingBundle = signal(false);
     readonly model = signal<AuthoredPipeline | null>(null);
 
     /**
@@ -1693,6 +1695,40 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     }
 
     /**
+     * Export this pipeline's SERVER bundle zip (`GET /pipelines/{name}/bundle`, R2): manifest +
+     * pipeline toon + file closure, secrets replaced by manifest requirements. The portable format
+     * going forward; {@link exportConfig}'s client JSON stays as the READER-compatible legacy export
+     * (the create-from-import dialog still reads that format).
+     *
+     * <p>Same rules as {@link exportConfig}: reads SERVER state (a dirty tab refuses), read-only so
+     * every lens gets it, and a failure toasts rather than latching the writes-disabled state.
+     */
+    exportBundle(): void {
+        const id = this.selectedId();
+        if (!id || this.exportingBundle()) return;
+        if (this.dirty()) {
+            this.toast.warning('Apply this pipeline before exporting — an export carries the saved configuration.');
+            return;
+        }
+        this.exportingBundle.set(true);
+        this.api.exportBundle(id).subscribe({
+            next: (res) => {
+                this.exportingBundle.set(false);
+                if (!res.body) {
+                    this.toast.error('The server returned an empty bundle.');
+                    return;
+                }
+                this.downloadBlob(res.body, this.api.bundleFilename(res, id));
+                this.toast.success(`Exported "${id}" bundle`);
+            },
+            error: (err) => {
+                this.exportingBundle.set(false);
+                this.toast.error(apiErrorMessage(err, 'Could not export the bundle.'));
+            },
+        });
+    }
+
+    /**
      * New pipeline via the guided Catalog onboarding — the compliant cheap version: a feature may not
      * import another feature's create dialog, but it may NAVIGATE there, and the onboarding flow
      * already redirects back into the guided editor after the create.
@@ -1702,11 +1738,11 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     }
 
     /**
-     * Duplicate the selected pipeline as a runnable (inactive) copy under a new name, reusing the
-     * proven stream-bundle retarget path end to end: {@link StreamTransferService.exportPipeline}
-     * builds the portable bundle (body + schema + per-segment schemas + enrich companion, identity
-     * stripped), {@link planStreamImport} retargets everything to the NEW name, and
-     * {@link StreamTransferService.applyImport} writes the satellites then the inactive draft.
+     * Duplicate the selected pipeline as a runnable (inactive) copy under a new name, through the R2
+     * server bundle round-trip: {@link PipelinesService.exportBundle} downloads the zip (pipeline +
+     * file closure, server-composed) and {@link PipelinesService.importBundle} lands it under the new
+     * name with `conflict=refuse` — the server retargets identities, re-derives directories and always
+     * writes `active: false`, so nothing is re-derived client-side any more.
      *
      * <p>⚠ Reads SERVER state, exactly like {@link exportConfig} — so a dirty tab refuses with the
      * same toast pattern rather than duplicating something other than what is on screen.
@@ -1726,25 +1762,23 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
             .afterClosed()
             .subscribe((res?: PipelineDuplicateResultData) => {
                 if (!res) return;
-                const newId = pipelineId(res.name);
-                this.transfer
-                    .exportPipeline(id)
-                    .pipe(
-                        switchMap(({ bundle, missing }) => {
-                            // A satellite that could not be read is named BEFORE the writes — the copy
-                            // still lands, but silently dropping a schema would be a trap.
-                            if (missing.length)
-                                this.toast.warning(`Duplicating without ${missing.join(', ')} — could not be read.`);
-                            return this.transfer.applyImport(
-                                planStreamImport(bundle, { name: res.name, space: this.spaces.currentSpaceId() }),
-                            );
-                        }),
-                    )
+                this.api
+                    .exportBundle(id)
+                    .pipe(switchMap((zip) => this.api.importBundle(zip.body ?? new Blob(), res.name, 'refuse')))
                     .subscribe({
-                        next: () => {
-                            this.toast.success(`Duplicated as '${res.name}' — an inactive draft.`);
+                        next: (r) => {
+                            // The manifest's requirements/notes are the operator's to act on (e.g. a
+                            // connection profile this space must hold) — surface, never swallow.
+                            const remarks = [
+                                ...(r.requirements ?? []).map((q) => `requires ${q['profile'] ?? q['kind'] ?? 'a connection'}`),
+                                ...(r.notes ?? []),
+                            ];
+                            this.toast.success(
+                                `Duplicated as '${res.name}' — an inactive draft.` +
+                                    (remarks.length ? ` ${remarks.join('; ')}` : ''),
+                            );
                             this.load(); // the new row, without disturbing open tabs
-                            this.select(newId);
+                            this.select(r.pipeline || pipelineId(res.name));
                         },
                         error: (err) => this.onWriteError(err, 'Duplicate failed'),
                     });

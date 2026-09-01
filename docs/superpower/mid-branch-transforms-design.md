@@ -1,6 +1,18 @@
 # Mid-branch transforms in a `route:` branch — design only
 
-**Status:** DESIGN, not scheduled (operator asked for a design pass only, 2026-08-26). No code.
+**Status: SUPERSEDED — BUILT 2026-09-02 (MIDBRANCH-1 / authoring-residuals R3).** The refusal table
+below is historical: both surfaces now SUPPORT `route.branches[].steps[]` — `RecipeCompiler.route`
+compiles branch sub-chains through the trunk's own builders, and `PipelineLift.emitSinks` flattens
+them into `route:<key> → step₁ → … → branch sink` (lower reverses it in
+`PipelineEditable.routeSection`/`branchChains`). Decisions taken: suffix grammar
+`<kind><schema-suffix>__<key>` (`__s<i>` for repeats); branch↔sink database pairing moved to the
+chain's TERMINAL node; kinds allowed mid-branch = filter / dedup(consignment) / summarize
+(`RouteArming.BRANCH_STEP_KINDS` — join needs a resolver, windowed dedup a ledger context the
+ingest walk does not carry; both refuse at save, all five gates, ERR/WARN_ROUTE_UNARMABLE);
+`ConsignmentGraphRunner.engages` extended (a route-fed chain forces the walk). Kept for the
+grounding record only.
+
+**Original status:** DESIGN, not scheduled (operator asked for a design pass only, 2026-08-26). No code.
 **Scope:** let a `route:` branch carry its own `steps:` sub-chain instead of exactly one `sink`.
 
 ## Today's refusal

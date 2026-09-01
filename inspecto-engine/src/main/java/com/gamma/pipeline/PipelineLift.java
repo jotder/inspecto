@@ -423,10 +423,45 @@ public final class PipelineLift {
             // The sink's display name is the store it produces — typically a business object/concept (§3.1).
             nodes.add(new PipelineNode(sinkId, BuiltinNodeType.SINK_PERSISTENT.type(), store, "Persistent store", sinkCfg, null));
             String branchKey = routeId == null ? null : branchKeyForDatabase(routeCfg, sinks.get(d).database());
-            edges.add(branchKey != null
-                    ? new PipelineEdge(routeId, PipelineRel.route(branchKey), sinkId)
-                    : PipelineEdge.data(sinkUpstream, sinkId));
+            if (branchKey == null) {
+                edges.add(PipelineEdge.data(sinkUpstream, sinkId));
+                continue;
+            }
+            // MIDBRANCH-1 (R3), the wiki's flattening pre-pass: a branch's steps[] sub-chain expands
+            // here into ordinary transform nodes wired route:<key> → step₁ → … → branch sink, so the
+            // executor and the graph consumers keep a flat DAG and never learn the concept.
+            // PipelineEditable.lower reverses it (chain nodes between a route:<key> edge and that
+            // branch's sink write back into the branch's steps[] in order). ⚠ The suffix grammar is
+            // decided ONCE, here: `<kind><schema-suffix>__<key>` for the first of a kind in a branch,
+            // `…__s<i>` appended for repeats (i = position in the branch chain) — the TS mirror
+            // (pipeline-editable.ts) must emit byte-identical ids. A branch with no steps keeps the
+            // pre-R3 direct edge, byte-for-byte.
+            List<PipelineConfig.Step> branchSteps =
+                    PipelineConfig.Step.branchSteps(branchEntryForKey(routeCfg, branchKey));
+            String upstream = routeId;
+            String rel = PipelineRel.route(branchKey);
+            Map<String, Integer> seen = new LinkedHashMap<>();
+            for (int i = 0; i < branchSteps.size(); i++) {
+                PipelineConfig.Step step = branchSteps.get(i);
+                String kind = step.kind();
+                int nth = seen.merge(kind, 1, Integer::sum);
+                String id = kind + suffix + "__" + branchKey + (nth == 1 ? "" : "__s" + i);
+                nodes.add(new PipelineNode(id, "transform." + kind, stepLabel(kind), null,
+                        new LinkedHashMap<>(step.config()), null));
+                edges.add(new PipelineEdge(upstream, rel, id));
+                upstream = id;
+                rel = PipelineRel.DATA;
+            }
+            edges.add(new PipelineEdge(upstream, rel, sinkId));
         }
+    }
+
+    /** The {@code route.branches[]} entry whose {@code key} is {@code key}, or {@code null}. */
+    private static Map<?, ?> branchEntryForKey(Map<String, Object> routeCfg, String key) {
+        if (routeCfg == null || !(routeCfg.get("branches") instanceof List<?> branches)) return null;
+        for (Object b : branches)
+            if (b instanceof Map<?, ?> m && key.equals(String.valueOf(m.get("key")))) return m;
+        return null;
     }
 
     /** A chain step's display name — {@code null} for every kind whose legacy emission gives it no name

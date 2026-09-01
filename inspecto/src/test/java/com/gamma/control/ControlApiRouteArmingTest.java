@@ -217,4 +217,82 @@ class ControlApiRouteArmingTest {
             assertFalse(r.body().contains("branch 'emea' has no where:"), r.body());
         }
     }
+
+    // ── MIDBRANCH-1 (R3): per-branch steps[] sub-chains at the same gate ─────────────────
+
+    private static String branchSteps(boolean active, String stepsJson) {
+        return """
+                {"type":"pipeline","config":{
+                   "name":"regional_cdr_chain",
+                   "active":%s,
+                   "dirs":{"poll":"in","database":"out"},
+                   "processing":{"threads":1,"schema_file":"cdr.toon"},
+                   "sinks":[{"database":"emea_db"},{"database":"apac_db"}],
+                   "route":{"mode":"case","default":"apac","branches":[
+                       {"key":"emea","database":"emea_db","where":"ID LIKE 'E%%'","steps":%s},
+                       {"key":"apac","database":"apac_db","where":"ID LIKE 'A%%'"}]}}}"""
+                .formatted(active, stepsJson);
+    }
+
+    @Test
+    @DisplayName("MIDBRANCH-1: an active branch chaining a disallowed kind (join) is refused — 422, coded")
+    void activeMidBranchJoinIsRefusedAtSave(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> r = post(c.port, "/config/write", branchSteps(true,
+                    "[{\"join\":{\"reference\":\"reference/geo\",\"on\":[\"ID\"]}}]"));
+            assertEquals(422, r.statusCode(), r.body());
+            JsonNode out = V1Body.envelope(r.body()).get("error").get("details");
+            assertFalse(out.get("written").asBoolean(), r.body());
+            String findings = out.get("findings").toString();
+            assertTrue(findings.contains("cannot execute mid-branch"), findings);
+            assertTrue(findings.contains("\"code\":\"ERR_ROUTE_UNARMABLE\""), findings);
+            assertTrue(findings.contains("\"guidance\":"), findings);
+        }
+    }
+
+    @Test
+    @DisplayName("MIDBRANCH-1: an active branch chaining an unarmable step (windowed dedup) is refused")
+    void activeMidBranchWindowedDedupIsRefusedAtSave(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> r = post(c.port, "/config/write", branchSteps(true,
+                    "[{\"dedup\":{\"keys\":[\"ID\"],\"order_by\":\"TS DESC\",\"scope\":\"window(P4D)\"}}]"));
+            assertEquals(422, r.statusCode(), r.body());
+            String findings = V1Body.envelope(r.body()).get("error").get("details")
+                    .get("findings").toString();
+            assertTrue(findings.contains("windowed dedup"), findings);
+            assertTrue(findings.contains("\"code\":\"ERR_ROUTE_UNARMABLE\""), findings);
+        }
+    }
+
+    @Test
+    @DisplayName("MIDBRANCH-1: the same disallowed kind on an INACTIVE draft saves with a WARNING")
+    void inactiveMidBranchJoinWarnsButSaves(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> r = post(c.port, "/config/write", branchSteps(false,
+                    "[{\"join\":{\"reference\":\"reference/geo\",\"on\":[\"ID\"]}}]"));
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode out = V1Body.of(r.body());
+            assertTrue(out.get("written").asBoolean(), r.body());
+            String findings = out.get("findings").toString();
+            assertTrue(findings.contains("cannot execute mid-branch"), findings);
+            assertFalse(findings.contains("\"severity\":\"ERROR\""), findings);
+            assertTrue(findings.contains("\"code\":\"WARN_ROUTE_UNARMABLE\""), findings);
+        }
+    }
+
+    @Test
+    @DisplayName("MIDBRANCH-1: a branch chaining the executable kinds saves clean while active")
+    void executableBranchChainSavesClean(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> r = post(c.port, "/config/write", branchSteps(true,
+                    "[{\"filter\":{\"where\":\"AMT > 0\"}},"
+                            + "{\"dedup\":{\"keys\":[\"ID\"]}},"
+                            + "{\"summarize\":{\"group_by\":[\"DAY\"],\"measures\":[\"count\"]}}]"));
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode out = V1Body.of(r.body());
+            assertTrue(out.get("written").asBoolean(), r.body());
+            assertFalse(out.get("findings").toString().contains("mid-branch"),
+                    out.get("findings").toString());
+        }
+    }
 }

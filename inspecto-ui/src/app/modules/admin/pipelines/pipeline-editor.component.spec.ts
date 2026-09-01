@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Router, provideRouter } from '@angular/router';
@@ -50,6 +51,9 @@ describe('PipelineEditorComponent', () => {
         document: ReturnType<typeof vi.fn>;
         documentFingerprint: ReturnType<typeof vi.fn>;
         settings: ReturnType<typeof vi.fn>;
+        exportBundle: ReturnType<typeof vi.fn>;
+        importBundle: ReturnType<typeof vi.fn>;
+        bundleFilename: ReturnType<typeof vi.fn>;
     };
     let config: {
         write: ReturnType<typeof vi.fn>;
@@ -145,6 +149,19 @@ describe('PipelineEditorComponent', () => {
             // P6-b: go-live reads stream-vs-reference from the D8 settings endpoint — NOT from
             // PipelineSummary.produces, which is the list of stores the pipeline produces.
             settings: vi.fn().mockReturnValue(of({ produces: 'stream', reference: null })),
+            // R2 server bundle: export is a zip HttpResponse, import lands an inactive draft.
+            exportBundle: vi.fn().mockReturnValue(of({ body: new Blob(['zip']) })),
+            importBundle: vi.fn().mockReturnValue(
+                of({
+                    written: true,
+                    pipeline: 'demo_copy',
+                    path: 'demo_copy/demo_copy_pipeline.toon',
+                    files: ['demo_copy_pipeline.toon'],
+                    active: false,
+                    findings: [],
+                }),
+            ),
+            bundleFilename: vi.fn().mockReturnValue('demo.pipeline-bundle.zip'),
         };
         config = {
             write: vi.fn().mockReturnValue(of({ written: true, path: 'x_pipeline.toon', name: 'x' })),
@@ -244,6 +261,35 @@ describe('PipelineEditorComponent', () => {
         });
     });
 
+    /** R2 — the SERVER bundle-zip export beside the legacy JSON one; same dirty rule. */
+    describe('export bundle (R2)', () => {
+        it('downloads the server zip under the Content-Disposition filename', () => {
+            URL.createObjectURL = vi.fn().mockReturnValue('blob:zip');
+            URL.revokeObjectURL = vi.fn();
+            const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+            click.mockClear();
+            const c = make();
+            c.select('demo');
+            c.exportBundle();
+
+            expect(api.exportBundle).toHaveBeenCalledWith('demo');
+            expect(api.bundleFilename).toHaveBeenCalledWith(expect.anything(), 'demo');
+            expect(click).toHaveBeenCalled();
+            expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('demo'));
+            expect(c.exportingBundle()).toBe(false);
+        });
+
+        it('refuses while the tab is dirty', () => {
+            const c = make();
+            c.select('demo');
+            c.dirty.set(true);
+            c.exportBundle();
+
+            expect(api.exportBundle).not.toHaveBeenCalled();
+            expect(toast.warning).toHaveBeenCalled();
+        });
+    });
+
     /** Item 1 (operator batch 2026-09-01): the compliant cheap create — navigate to Catalog
      *  onboarding (⛔ never import the other feature's dialog); it redirects back after the create. */
     describe('new pipeline via onboarding', () => {
@@ -258,35 +304,23 @@ describe('PipelineEditorComponent', () => {
     });
 
     /**
-     * Item 2 (operator batch 2026-09-01): Duplicate — a runnable copy through the PROVEN
-     * stream-bundle retarget path (export → planStreamImport under the new name → applyImport), so
-     * satellites, directories and the inactive-draft posture are the import planner's, not new code.
+     * Duplicate rides the R2 SERVER bundle round-trip (2026-09-02): `GET /pipelines/{id}/bundle` →
+     * `POST /pipelines/import?name=<new>&conflict=refuse`. The server retargets identities and
+     * directories and always lands `active: false`; the client no longer re-derives anything.
      */
     describe('duplicate pipeline', () => {
-        const BUNDLE = {
-            format: 'inspecto-stream-config',
-            version: 1,
-            exportedAt: '2026-09-01T00:00:00.000Z',
-            source: { space: null, name: 'demo', contentHash: 'x' },
-            kind: 'stream',
-            pipeline: { parsing: { frontend: 'delimited' } },
-            requires: [],
-        };
-
-        it('plans the import under the typed name and opens the copy as a tab', () => {
-            transfer.exportPipeline.mockReturnValue(of({ bundle: BUNDLE, missing: [] }));
+        it('posts the server zip under the typed name and opens the copy as a tab', () => {
             dialog.open.mockReturnValue({ afterClosed: () => of({ name: 'demo copy' }) });
             const c = make();
             c.select('demo');
             c.duplicatePipeline();
 
-            expect(transfer.exportPipeline).toHaveBeenCalledWith('demo');
-            const plan = transfer.applyImport.mock.calls[0][0];
-            // The planner stamps identity from the typed name exactly as a fresh create would.
-            expect(plan.pipeline['name']).toBe('demo copy');
-            expect(plan.pipeline['id']).toBe('demo_copy');
-            expect(plan.pipeline['active']).toBe(false);
-            // The copy opens as a tab under its registered id.
+            expect(api.exportBundle).toHaveBeenCalledWith('demo');
+            const [zip, name, conflict] = api.importBundle.mock.calls[0];
+            expect(zip).toBeInstanceOf(Blob);
+            expect(name).toBe('demo copy');
+            expect(conflict).toBe('refuse');
+            // The copy opens as a tab under the id the SERVER registered.
             expect(api.pipelineGraphRaw).toHaveBeenCalledWith('demo_copy');
             expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('demo copy'));
         });
@@ -299,19 +333,52 @@ describe('PipelineEditorComponent', () => {
             c.duplicatePipeline();
 
             expect(dialog.open).not.toHaveBeenCalled();
-            expect(transfer.exportPipeline).not.toHaveBeenCalled();
+            expect(api.exportBundle).not.toHaveBeenCalled();
             expect(toast.warning).toHaveBeenCalled();
         });
 
-        it('names an unreadable satellite but still writes the copy', () => {
-            transfer.exportPipeline.mockReturnValue(of({ bundle: BUNDLE, missing: ['schema "demo_schema"'] }));
+        it('surfaces the response requirements and notes in the success toast', () => {
+            api.importBundle.mockReturnValue(
+                of({
+                    written: true,
+                    pipeline: 'copy',
+                    path: 'copy/copy_pipeline.toon',
+                    files: [],
+                    active: false,
+                    requirements: [{ kind: 'connection', profile: 'prod_sftp', connector: 'sftp' }],
+                    notes: ['masked a literal secret-looking value'],
+                    findings: [],
+                }),
+            );
             dialog.open.mockReturnValue({ afterClosed: () => of({ name: 'copy' }) });
             const c = make();
             c.select('demo');
             c.duplicatePipeline();
 
-            expect(toast.warning).toHaveBeenCalledWith(expect.stringContaining('demo_schema'));
-            expect(transfer.applyImport).toHaveBeenCalled();
+            expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('prod_sftp'));
+            expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('masked'));
+        });
+
+        /** conflict=refuse: a taken name 409s and the server's own message reaches the operator. */
+        it('surfaces a 409 refuse-conflict through the write-error path', () => {
+            api.importBundle.mockReturnValue(
+                throwError(
+                    () =>
+                        new HttpErrorResponse({
+                            status: 409,
+                            error: {
+                                error: { message: "pipeline 'copy' already exists; re-send with ?conflict=overwrite" },
+                            },
+                        }),
+                ),
+            );
+            dialog.open.mockReturnValue({ afterClosed: () => of({ name: 'copy' }) });
+            const c = make();
+            c.select('demo');
+            c.duplicatePipeline();
+
+            expect(toast.success).not.toHaveBeenCalled();
+            expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('already exists'));
         });
     });
 

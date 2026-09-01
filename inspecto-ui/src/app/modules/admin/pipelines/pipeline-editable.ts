@@ -444,11 +444,37 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
     for (const d of sinkDefs) {
         nodes.push({ id: d.id, type: 'sink.persistent', name: d.name, description: 'Persistent store', config: d.cfg });
         const key = branchKeyFor(d.cfg['database']);
-        edges.push(
-            key != null
-                ? { from: 'route', rel: `route:${key}`, to: d.id }
-                : { from: sinkUpstream, rel: 'data', to: d.id },
-        );
+        if (key == null) {
+            edges.push({ from: sinkUpstream, rel: 'data', to: d.id });
+            continue;
+        }
+        // MIDBRANCH-1 (R3), the flattening pre-pass (mirrors PipelineLift.emitSinks): a branch's
+        // steps[] sub-chain expands into ordinary transform nodes wired route:<key> → step₁ → … →
+        // branch sink. The suffix grammar is the backend's, byte-identical: `<kind>__<key>` for the
+        // first of a kind in a branch, `__s<i>` appended for repeats (i = position in the chain).
+        // A branch with no steps keeps the pre-R3 direct edge.
+        const branchEntry = (routeCfg!['branches'] as Cfg[]).find((b) => String(b['key']) === key);
+        const branchSteps = Array.isArray(branchEntry?.['steps']) ? (branchEntry['steps'] as unknown[]) : [];
+        let upstream = 'route';
+        let rel = `route:${key}`;
+        const seen = new Map<string, number>();
+        branchSteps.forEach((raw, i) => {
+            if (raw == null || typeof raw !== 'object' || Array.isArray(raw) || Object.keys(raw).length !== 1) return;
+            const kind = Object.keys(raw as Cfg)[0];
+            const nth = (seen.get(kind) ?? 0) + 1;
+            seen.set(kind, nth);
+            const id = `${kind}__${key}${nth === 1 ? '' : `__s${i}`}`;
+            nodes.push({
+                id,
+                type: `transform.${kind}`,
+                name: kind === 'filter' ? 'Row filter' : undefined,
+                config: structuredClone(asMap((raw as Cfg)[kind])),
+            });
+            edges.push({ from: upstream, rel, to: id });
+            upstream = id;
+            rel = 'data';
+        });
+        edges.push({ from: upstream, rel, to: d.id });
     }
 
     // Phase 4 S4 (D-13): overlay processing.disabled_steps onto the lifted nodes — mirrors
@@ -585,15 +611,25 @@ export function lowerGraph(
                 'keep one of the two',
         });
 
+    // MIDBRANCH-1 (R3): pull each route node's flattened branch chain OUT of the trunk chain — those
+    // nodes lower into route.branches[].steps (routeSection), never into the trunk spellings.
+    // Malformed branch shapes refuse with the server's own code (mirrors PipelineEditable.lower).
+    const branchChainIds = new Set<string>();
+    for (const n of chain) {
+        if (n.type !== 'transform.route') continue;
+        for (const bc of branchChains(g, n, refusals).values()) for (const c of bc.steps) branchChainIds.add(c.id);
+    }
+    const trunkChain = branchChainIds.size ? chain.filter((n) => !branchChainIds.has(n.id)) : chain;
+
     // One spelling or the other, never both — the server's parser refuses a file carrying steps: next
     // to a singular transform block, so a legacy-shaped chain keeps the singular keys verbatim and only
     // a chain they cannot hold becomes a steps: list (mirrors PipelineEditable.isLegacyShaped).
-    const legacyShaped = isLegacyShaped(chain);
-    const recordDedup = legacyShaped ? chain.find((n) => n.type === 'transform.dedup') : undefined;
-    const routeNode = legacyShaped ? chain.find((n) => n.type === 'transform.route') : undefined;
-    const summarizeNode = legacyShaped ? chain.find((n) => n.type === 'transform.summarize') : undefined;
-    const joinNode = legacyShaped ? chain.find((n) => n.type === 'transform.join') : undefined;
-    const filters = legacyShaped ? chain.filter((n) => n.type === 'transform.filter') : [];
+    const legacyShaped = isLegacyShaped(trunkChain);
+    const recordDedup = legacyShaped ? trunkChain.find((n) => n.type === 'transform.dedup') : undefined;
+    const routeNode = legacyShaped ? trunkChain.find((n) => n.type === 'transform.route') : undefined;
+    const summarizeNode = legacyShaped ? trunkChain.find((n) => n.type === 'transform.summarize') : undefined;
+    const joinNode = legacyShaped ? trunkChain.find((n) => n.type === 'transform.join') : undefined;
+    const filters = legacyShaped ? trunkChain.filter((n) => n.type === 'transform.filter') : [];
 
     if (strict) {
         if (!acq) refusals.push({ code: 'NO_ACQUISITION', message: 'an active pipeline needs an acquisition node' });
@@ -756,7 +792,7 @@ export function lowerGraph(
         // two spellings collide on the next load.
         delete out['steps'];
     } else {
-        out['steps'] = chain.map((n) => ({ [STEP_KIND[n.type]]: stepConfig(g, n) }));
+        out['steps'] = trunkChain.map((n) => ({ [STEP_KIND[n.type]]: stepConfig(g, n) }));
         // Every singular transform key must go, in BOTH modes — not the usual strict-only rule. The
         // server's parser rejects steps: alongside a legacy block outright, so leaving one behind
         // writes config that can never be read back.
@@ -885,17 +921,86 @@ function stepConfig(g: AuthoredPipeline, n: AuthoredNode): Cfg {
     }
 }
 
-/** A route node's config with each branch stamped with the database its `route:<key>` edge feeds. */
+/** One branch's flattened sub-chain and its terminal node (mirrors PipelineEditable.BranchChain). */
+interface BranchChain {
+    steps: AuthoredNode[];
+    terminal?: AuthoredNode;
+}
+
+/**
+ * Walk each `route:<key>` edge of `routeNode` through the flattened chain to that branch's terminal
+ * (MIDBRANCH-1 — mirrors PipelineEditable.branchChains). `refusals` (optional) collects the shapes
+ * the flat file cannot hold, each as the server's UNSUPPORTED_BRANCH_STEP.
+ */
+function branchChains(g: AuthoredPipeline, routeNode: AuthoredNode, refusals?: Refusal[]): Map<string, BranchChain> {
+    const byId = new Map(g.nodes.map((n) => [n.id, n]));
+    const out = new Map<string, BranchChain>();
+    for (const e of g.edges) {
+        if (e.from !== routeNode.id || !e.rel.startsWith('route:')) continue;
+        const key = e.rel.slice('route:'.length);
+        const steps: AuthoredNode[] = [];
+        let cur = byId.get(e.to);
+        let broken = false;
+        while (cur && STEP_KIND[cur.type]) {
+            if (cur.type === 'transform.route') {
+                refusals?.push({
+                    code: 'UNSUPPORTED_BRANCH_STEP',
+                    nodeId: cur.id,
+                    message: `a route cannot nest inside branch '${key}'`,
+                });
+                broken = true;
+                break;
+            }
+            steps.push(cur);
+            const outbound = g.edges.filter((oe) => oe.from === cur!.id && oe.rel === 'data');
+            if (outbound.length !== 1) {
+                refusals?.push({
+                    code: 'UNSUPPORTED_BRANCH_STEP',
+                    nodeId: cur.id,
+                    message:
+                        `branch '${key}'s chain node has ${outbound.length} outgoing data edges — a ` +
+                        'branch chain is a LIST, each node feeding exactly the next',
+                });
+                broken = true;
+                break;
+            }
+            cur = byId.get(outbound[0].to);
+        }
+        if (!broken && steps.length && (!cur || cur.type !== 'sink.persistent')) {
+            refusals?.push({
+                code: 'UNSUPPORTED_BRANCH_STEP',
+                nodeId: cur?.id,
+                message: `branch '${key}'s chain must end at a persistent sink` + (cur ? ` — found '${cur.type}'` : ''),
+            });
+            broken = true;
+        }
+        out.set(key, { steps, terminal: broken ? undefined : cur });
+    }
+    return out;
+}
+
+/**
+ * A route node's config with each branch stamped with the database its chain's TERMINAL sink carries
+ * (MIDBRANCH-1: with a steps[] sub-chain the route:<key> edge feeds the chain's first node, so the
+ * pairing follows the chain), and the graph-owned sub-chain written back as that branch's steps[]
+ * through the same per-kind builders as the top-level steps: list. A branch wired straight to its
+ * sink carries no steps key — byte-identical to pre-R3 (mirrors PipelineEditable.routeSection).
+ */
 function routeSection(g: AuthoredPipeline, routeNode: AuthoredNode): Cfg {
     const rc = structuredClone(routeNode.config ?? {}) as Cfg;
     if (Array.isArray(rc['branches'])) {
-        const byId = new Map(g.nodes.map((n) => [n.id, n]));
-        for (const e of g.edges) {
-            if (e.from !== routeNode.id || !e.rel.startsWith('route:')) continue;
-            const key = e.rel.slice('route:'.length);
-            const db = byId.get(e.to)?.config?.['database'];
-            if (db == null) continue;
-            for (const b of rc['branches'] as Cfg[]) if (String(b['key']) === key) b['database'] = db;
+        const chains = branchChains(g, routeNode);
+        for (const b of rc['branches'] as Cfg[]) {
+            const key = String(b['key']);
+            const bc = chains.get(key);
+            if (!bc) continue;
+            const db = bc.terminal?.config?.['database'];
+            if (db != null) b['database'] = db;
+            if (bc.steps.length) {
+                b['steps'] = bc.steps.map((n) => ({ [STEP_KIND[n.type]]: stepConfig(g, n) }));
+            } else {
+                delete b['steps']; // the graph shows no chain — a stale steps key must not survive
+            }
         }
     }
     return rc;

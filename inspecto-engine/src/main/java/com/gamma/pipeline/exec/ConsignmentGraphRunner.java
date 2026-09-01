@@ -3,7 +3,9 @@ package com.gamma.pipeline.exec;
 import com.gamma.api.PublicApi;
 import com.gamma.etl.PartitionOutput;
 import com.gamma.pipeline.NodeCategory;
+import com.gamma.pipeline.PipelineEdge;
 import com.gamma.pipeline.PipelineGraph;
+import com.gamma.pipeline.PipelineNode;
 import com.gamma.pipeline.PipelineNodeTypes;
 import com.gamma.pipeline.PipelineRel;
 
@@ -132,7 +134,27 @@ public final class ConsignmentGraphRunner {
      * <em>distinct route keys feeding sinks, plus one for the trunk if any sink is plain-data-fed</em>.
      */
     public static boolean engages(PipelineGraph g) {
-        return dataFedSinkCount(g) > 1;
+        // MIDBRANCH-1 (R3): a route:<key> edge feeding a NON-sink node is a flattened branch
+        // sub-chain (PipelineLift's expansion) — a node ONLY this walk executes, so the graph must
+        // engage even when the branch count alone would not (a single-branch route whose chain would
+        // otherwise be silently skipped by the flat lane). This is the deliberate extension of the
+        // boundary the R3 unblock verdict names.
+        return dataFedSinkCount(g) > 1 || hasRouteFedChain(g);
+    }
+
+    /** Whether any {@code route:*} edge feeds a non-sink node — i.e. a flattened branch sub-chain exists. */
+    public static boolean hasRouteFedChain(PipelineGraph g) {
+        var byId = g.byId();
+        for (var e : g.edges()) {
+            if (!PipelineRel.isRoute(e.rel())) continue;
+            var target = byId.get(e.to());
+            // Only a transform.route node's branches are chains — a multi-schema parser's route:<key>
+            // dispatch edges also feed transforms, and those are the flat lane's own per-schema trees.
+            var from = byId.get(e.from());
+            if (from == null || !"transform.route".equals(from.type())) continue;
+            if (target != null && !PipelineNodeTypes.isCategory(target.type(), NodeCategory.SINK)) return true;
+        }
+        return false;
     }
 
     /**
@@ -140,16 +162,50 @@ public final class ConsignmentGraphRunner {
      * {@code SINK}-category node, plus one for the trunk when any sink is reached by a plain
      * {@code data} edge. (N plain-data-fed sinks are one branch with N destinations — see
      * {@link #engages}.)
+     *
+     * <p>MIDBRANCH-1: a branch whose sub-chain is flattened between the {@code route:<key>} edge and
+     * its sink reaches that sink by a plain {@code data} edge — so the count traces each sink's
+     * feeding relation UPSTREAM through chain transforms to the route edge (or to the trunk). Without
+     * the trace, every chained branch would collapse into the one trunk {@code data} bucket and a
+     * two-branch route with chains would stop engaging.
      */
     public static long dataFedSinkCount(PipelineGraph g) {
+        var byId = g.byId();
         java.util.Set<String> branches = new java.util.HashSet<>();
         for (var n : g.nodes()) {
             if (!PipelineNodeTypes.isCategory(n.type(), NodeCategory.SINK)) continue;
             for (var e : g.edgesTo(n.id())) {
-                if (PipelineRel.isRoute(e.rel())) branches.add(e.rel());
-                else if (PipelineRel.DATA.equals(e.rel())) branches.add(PipelineRel.DATA);
+                String rel = branchRelOf(g, byId, e, 0);
+                if (rel != null) branches.add(rel);
             }
         }
         return branches.size();
+    }
+
+    /** The branch identity of edge {@code e}: its own {@code route:*} rel, or — for a {@code data}
+     *  edge — the {@code route:*} rel found walking upstream through transform chain nodes, else the
+     *  trunk {@code data}. {@code null} for control edges (they carry no seeded relation). */
+    private static String branchRelOf(PipelineGraph g, java.util.Map<String, PipelineNode> byId,
+                                      PipelineEdge e, int depth) {
+        if (PipelineRel.isRoute(e.rel())) return e.rel();
+        if (!PipelineRel.DATA.equals(e.rel())) return null;
+        if (depth > g.nodes().size()) return PipelineRel.DATA;   // defensive: the validator owns acyclicity
+        PipelineNode from = byId.get(e.from());
+        if (from != null && from.type().startsWith("transform.") && !"transform.route".equals(from.type())) {
+            for (PipelineEdge up : g.edgesTo(from.id())) {
+                // ⚠ Only a transform.route node's route:<key> edges are BRANCHES; a multi-schema
+                // parser's route:<key> dispatch edges feed the flat lane's own per-schema trees and
+                // counted as trunk before R3 — the trace must not change that (engagement, not
+                // topology, is the question here).
+                if (PipelineRel.isRoute(up.rel())) {
+                    PipelineNode upFrom = byId.get(up.from());
+                    if (upFrom != null && "transform.route".equals(upFrom.type())) return up.rel();
+                    continue;
+                }
+                String rel = branchRelOf(g, byId, up, depth + 1);
+                if (rel != null) return rel;
+            }
+        }
+        return PipelineRel.DATA;
     }
 }

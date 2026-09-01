@@ -553,38 +553,7 @@ final class PipelineConfigParser {
                     got: """ + rawSteps);
         }
         if (rawSteps instanceof List<?> stepList) {
-            for (Object entry : stepList) {
-                if (!(entry instanceof Map<?, ?> sm) || sm.size() != 1) {
-                    throw new IllegalArgumentException(
-                            "each steps[] entry must be a single-key map of kind to its config, e.g. "
-                                    + "'- dedup:' followed by an indented 'keys[1]: MSISDN' — got " + entry);
-                }
-                Map.Entry<?, ?> only = sm.entrySet().iterator().next();
-                String kind = String.valueOf(only.getKey()).trim();
-                // A CONTRIBUTED step kind (a plugin node type's suffix) is admitted on SHAPE here and
-                // checked for existence where the node-type registry lives. ⚠ This module sits BELOW
-                // inspecto-engine and cannot see PipelineNodeTypes, so a closed list here would make a
-                // plugin step unreadable — and the file must stay readable, or the editor could write a
-                // graph it can never load back. The type's existence is enforced at SAVE
-                // (PipelineEditable.isLowerable refuses an unregistered type with UNSUPPORTED_NODE) and
-                // again at run (RowShaper names the missing provider).
-                // A CONTRIBUTED kind (a plugin node type's suffix) is admitted when this deployment
-                // actually registers that type. ⚠ The check is inverted through StepKindRegistry because
-                // this module sits BELOW inspecto-engine and cannot see PipelineNodeTypes — but the
-                // refusal stays HERE, at load, where a typo is still caught before anything runs.
-                if (!PipelineConfig.Step.KINDS.contains(kind)
-                        && !(SAFE_STEP_KIND.matcher(kind).matches()
-                             && StepKindRegistry.current().isKnown(kind))) {
-                    throw new IllegalArgumentException("unknown steps[] kind '" + kind + "' — expected one of "
-                            + PipelineConfig.Step.KINDS + ", or the suffix of a registered node type "
-                            + "(a kind 'k' names 'transform.k')");
-                }
-                if (only.getValue() != null && !(only.getValue() instanceof Map<?, ?>)) {
-                    throw new IllegalArgumentException("steps[] entry '" + kind
-                            + "' must map to a config block, got " + only.getValue());
-                }
-                b.steps.add(new PipelineConfig.Step(kind, (Map<String, Object>) only.getValue()));
-            }
+            b.steps.addAll(parseStepEntries(stepList, "steps[]"));
             // Mutually exclusive with the legacy spellings: there is no non-arbitrary position at which a
             // legacy block would join an authored sequence, and choosing one silently is the reordering
             // this whole change exists to remove.
@@ -599,6 +568,52 @@ final class PipelineConfigParser {
                         + legacy + ", or drop steps: and keep them; carrying both leaves the order undefined");
             }
         }
+    }
+
+    /**
+     * Validate and decode one ordered-step list — the SHARED entry grammar of the top-level
+     * {@code steps:} chain and each {@code route.branches[].steps[]} sub-chain (MIDBRANCH-1). One
+     * method on purpose: two hand-mirrored copies of this grammar is how a chain spelling drifts
+     * (the {@code RecipeConverter} lesson), and the refusal messages below are pinned by tests.
+     *
+     * <p>Entry rules (verbatim from the original {@code parseSteps} body — see its comments for why
+     * each silent-skip alternative dropped authored transforms):
+     * <ul>
+     *   <li>each entry is a single-key map of kind → an (optional) config MAP;</li>
+     *   <li>the kind is one of {@link PipelineConfig.Step#KINDS}, or a registered contributed node
+     *       type's suffix. ⚠ The registry check is inverted through {@link StepKindRegistry} because
+     *       this module sits BELOW inspecto-engine and cannot see {@code PipelineNodeTypes} — but the
+     *       refusal stays HERE, at load, where a typo is still caught before anything runs.</li>
+     * </ul>
+     *
+     * @param context the fieldPath rendered in refusals, e.g. {@code steps[]} or
+     *                {@code route.branches[2].steps[]}
+     */
+    @SuppressWarnings("unchecked")
+    private static List<PipelineConfig.Step> parseStepEntries(List<?> stepList, String context) {
+        List<PipelineConfig.Step> out = new ArrayList<>();
+        for (Object entry : stepList) {
+            if (!(entry instanceof Map<?, ?> sm) || sm.size() != 1) {
+                throw new IllegalArgumentException(
+                        "each " + context + " entry must be a single-key map of kind to its config, e.g. "
+                                + "'- dedup:' followed by an indented 'keys[1]: MSISDN' — got " + entry);
+            }
+            Map.Entry<?, ?> only = sm.entrySet().iterator().next();
+            String kind = String.valueOf(only.getKey()).trim();
+            if (!PipelineConfig.Step.KINDS.contains(kind)
+                    && !(SAFE_STEP_KIND.matcher(kind).matches()
+                         && StepKindRegistry.current().isKnown(kind))) {
+                throw new IllegalArgumentException("unknown " + context + " kind '" + kind + "' — expected one of "
+                        + PipelineConfig.Step.KINDS + ", or the suffix of a registered node type "
+                        + "(a kind 'k' names 'transform.k')");
+            }
+            if (only.getValue() != null && !(only.getValue() instanceof Map<?, ?>)) {
+                throw new IllegalArgumentException(context + " entry '" + kind
+                        + "' must map to a config block, got " + only.getValue());
+            }
+            out.add(new PipelineConfig.Step(kind, (Map<String, Object>) only.getValue()));
+        }
+        return out;
     }
 
     /**
@@ -787,6 +802,25 @@ final class PipelineConfigParser {
         if (raw.get("route") instanceof Map<?, ?> routeBlock) {
             Map<String, Object> copy = new LinkedHashMap<>();
             for (Map.Entry<?, ?> e : routeBlock.entrySet()) copy.put(String.valueOf(e.getKey()), e.getValue());
+            // MIDBRANCH-1 (R3): a branch may carry its own ordered steps[] sub-chain — the SAME entry
+            // grammar as the top-level steps: list, validated by the SAME method so the two spellings
+            // cannot drift. The block itself still travels verbatim (the validated result is discarded
+            // here; PipelineLift/RouteArming re-read it typed via PipelineConfig.Step.branchSteps).
+            // ⚠ A branch steps: written without the [N] arity decodes as a map — refused loudly with
+            // the spelling that works, exactly like the top-level rule above.
+            if (copy.get("branches") instanceof List<?> branches) {
+                for (int i = 0; i < branches.size(); i++) {
+                    if (!(branches.get(i) instanceof Map<?, ?> branch)) continue;
+                    Object branchSteps = branch.get("steps");
+                    if (branchSteps == null) continue;
+                    String context = "route.branches[" + i + "].steps[]";
+                    if (!(branchSteps instanceof List<?> stepList))
+                        throw new IllegalArgumentException(context.replace("[]", "") + " must be a LIST — "
+                                + "in .toon that needs an explicit element count (steps[N]:) plus a block "
+                                + "per entry; got: " + branchSteps);
+                    parseStepEntries(stepList, context);
+                }
+            }
             b.route = copy;
         }
     }

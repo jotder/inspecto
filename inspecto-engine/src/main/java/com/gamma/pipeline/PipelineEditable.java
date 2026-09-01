@@ -65,6 +65,14 @@ public final class PipelineEditable {
     public static final String MULTI_PARSER = "MULTI_PARSER";
     /** A {@code parser.delimited} node whose {@code parsing.frontend} names a DIFFERENT frontend. */
     public static final String PARSER_FRONTEND_MISMATCH = "PARSER_FRONTEND_MISMATCH";
+    /**
+     * A route branch's flattened sub-chain has a shape {@code route.branches[].steps[]} cannot hold
+     * (MIDBRANCH-1): a chain node that fans out, a chain ending anywhere but a persistent sink, or a
+     * nested {@code transform.route}. The flat file stores a branch chain as an ordered LIST between
+     * the {@code route:<key>} edge and that branch's one sink — anything else refuses by name here
+     * rather than lowering a topology the next lift cannot reproduce.
+     */
+    public static final String UNSUPPORTED_BRANCH_STEP = "UNSUPPORTED_BRANCH_STEP";
 
     /**
      * The map-node config keys an author owns — they lower to {@code processing.map} verbatim and lift
@@ -620,6 +628,19 @@ public final class PipelineEditable {
             else if (BuiltinNodeType.TRANSFORM_MAP.type().equals(t)) mapNodes.add(n);
             // enrichment: companion-persisted — nothing to lower
         }
+        // MIDBRANCH-1 (R3): pull each route node's flattened branch chain OUT of the trunk chain —
+        // those nodes lower into route.branches[].steps (routeSection), never into the trunk
+        // spellings, or a mid-branch dedup would masquerade as processing.dedup and change which
+        // lane executes it. Malformed branch shapes (fan-out, non-sink terminal, nested route)
+        // refuse here by name, while the author is present.
+        java.util.Set<String> branchChainIds = new java.util.LinkedHashSet<>();
+        for (PipelineNode n : chain) {
+            if (!BuiltinNodeType.TRANSFORM_ROUTE.type().equals(n.type())) continue;
+            for (BranchChain bc : branchChains(g, n, refusals).values())
+                for (PipelineNode c : bc.steps()) branchChainIds.add(c.id());
+        }
+        if (!branchChainIds.isEmpty()) chain.removeIf(n -> branchChainIds.contains(n.id()));
+
         // The authored half of the map nodes → processing.map. Until AUTHOR-1(a) this loop skipped
         // transform.map entirely, so anything typed into its dialog was answered `written: true` and
         // dropped. Refusals raised here, config returned for the emission below.
@@ -1000,14 +1021,16 @@ public final class PipelineEditable {
         Map<String, Object> rc = deepCopy(routeNode.config());
         List<RouteBranch> branches = RouteBranch.listFrom(rc);
         if (branches == null) return rc;
-        Map<String, PipelineNode> byId = new LinkedHashMap<>();
-        for (PipelineNode n : g.nodes()) byId.put(n.id(), n);
+        // MIDBRANCH-1: the branch↔sink pairing is by the chain's TERMINAL node, not the route edge's
+        // direct target — with a steps[] sub-chain the route:<key> edge feeds the chain's first node
+        // and the last node feeds the sink, so reading the edge target alone would stamp no database
+        // and arming's pairing check would pass a branch whose rows land nowhere.
+        Map<String, BranchChain> chains = branchChains(g, routeNode, null);
         Map<String, String> databaseByKey = new LinkedHashMap<>();
-        for (PipelineEdge e : g.edges()) {
-            if (!e.from().equals(routeNode.id()) || !PipelineRel.isRoute(e.rel())) continue;
-            PipelineNode sink = byId.get(e.to());
-            if (sink == null || sink.cfg("database") == null) continue;
-            databaseByKey.put(PipelineRel.routeKey(e.rel()), String.valueOf(sink.cfg("database")));
+        for (Map.Entry<String, BranchChain> e : chains.entrySet()) {
+            PipelineNode terminal = e.getValue().terminal();
+            if (terminal != null && terminal.cfg("database") != null)
+                databaseByKey.put(e.getKey(), String.valueOf(terminal.cfg("database")));
         }
         List<?> original = (List<?>) rc.get("branches");
         List<Object> lowered = new ArrayList<>(branches.size());
@@ -1015,10 +1038,88 @@ public final class PipelineEditable {
             RouteBranch b = branches.get(i);
             if (b == null) { lowered.add(original.get(i)); continue; }   // malformed entry: verbatim
             String database = b.key() == null ? null : databaseByKey.get(b.key());
-            lowered.add((database != null ? b.withDatabase(database) : b).toMap());
+            Map<String, Object> entry = (database != null ? b.withDatabase(database) : b).toMap();
+            // The graph owns the branch's sub-chain: chain nodes between the route:<key> edge and the
+            // terminal sink write back as this branch's steps[], in walk order, through the SAME
+            // per-kind stepConfig builders the top-level steps: list uses (one grammar, no drift).
+            // A branch wired straight to its sink carries no steps key — byte-identical to pre-R3.
+            BranchChain bc = b.key() == null ? null : chains.get(b.key());
+            if (bc != null && !bc.steps().isEmpty()) {
+                List<Map<String, Object>> steps = new ArrayList<>();
+                for (PipelineNode n : bc.steps()) {
+                    String kind = stepKindOf(n.type());
+                    Map<String, Object> step = new LinkedHashMap<>();
+                    step.put(kind, stepConfig(g, n, kind));
+                    steps.add(step);
+                }
+                entry.put("steps", steps);
+            } else if (bc != null) {
+                entry.remove("steps");   // the graph shows no chain — a stale steps key must not survive
+            }
+            lowered.add(entry);
         }
         rc.put("branches", lowered);
         return rc;
+    }
+
+    /** One branch's flattened sub-chain: the ordered chain-step nodes between the {@code route:<key>}
+     *  edge and the branch's terminal node (empty for a direct-wired branch), plus that terminal —
+     *  the sink whose {@code database} stamps the branch. {@code terminal} is {@code null} only for
+     *  a shape that already raised a refusal (or a dangling edge). */
+    record BranchChain(List<PipelineNode> steps, PipelineNode terminal) {}
+
+    /**
+     * Walk each {@code route:<key>} edge of {@code routeNode} through the flattened chain to that
+     * branch's terminal (MIDBRANCH-1) — the reverse of {@code PipelineLift}'s branch expansion.
+     * {@code refusals} (nullable) collects the shapes the flat file cannot hold, each as
+     * {@link #UNSUPPORTED_BRANCH_STEP}: a chain node fanning out (a branch is a LIST), a chain ending
+     * anywhere but a persistent sink, and a nested {@code transform.route}.
+     */
+    private static Map<String, BranchChain> branchChains(PipelineGraph g, PipelineNode routeNode,
+                                                         List<PipelineCompileException.Refusal> refusals) {
+        Map<String, PipelineNode> byId = new LinkedHashMap<>();
+        for (PipelineNode n : g.nodes()) byId.put(n.id(), n);
+        Map<String, BranchChain> out = new LinkedHashMap<>();
+        for (PipelineEdge e : g.edges()) {
+            if (!e.from().equals(routeNode.id()) || !PipelineRel.isRoute(e.rel())) continue;
+            String key = PipelineRel.routeKey(e.rel());
+            List<PipelineNode> steps = new ArrayList<>();
+            PipelineNode cur = byId.get(e.to());
+            boolean broken = false;
+            while (cur != null && stepKindOf(cur.type()) != null) {
+                if (BuiltinNodeType.TRANSFORM_ROUTE.type().equals(cur.type())) {
+                    if (refusals != null) refusals.add(new PipelineCompileException.Refusal(
+                            UNSUPPORTED_BRANCH_STEP, cur.id(),
+                            "a route cannot nest inside branch '" + key + "'"));
+                    broken = true;
+                    break;
+                }
+                steps.add(cur);
+                List<PipelineEdge> outbound = new ArrayList<>();
+                for (PipelineEdge oe : g.edges())
+                    if (oe.from().equals(cur.id()) && PipelineRel.DATA.equals(oe.rel())) outbound.add(oe);
+                if (outbound.size() != 1) {
+                    if (refusals != null) refusals.add(new PipelineCompileException.Refusal(
+                            UNSUPPORTED_BRANCH_STEP, cur.id(),
+                            "branch '" + key + "'s chain node has " + outbound.size()
+                                    + " outgoing data edges — a branch chain is a LIST, each node "
+                                    + "feeding exactly the next"));
+                    broken = true;
+                    break;
+                }
+                cur = byId.get(outbound.get(0).to());
+            }
+            if (!broken && !steps.isEmpty() && (cur == null
+                    || !BuiltinNodeType.SINK_PERSISTENT.type().equals(cur.type()))) {
+                if (refusals != null) refusals.add(new PipelineCompileException.Refusal(
+                        UNSUPPORTED_BRANCH_STEP, cur == null ? null : cur.id(),
+                        "branch '" + key + "'s chain must end at a persistent sink"
+                                + (cur == null ? "" : " — found '" + cur.type() + "'")));
+                broken = true;
+            }
+            out.put(key, new BranchChain(steps, broken ? null : cur));
+        }
+        return out;
     }
 
     /** Legacy files may spell the block {@code source:}; write back whichever key the file uses. */

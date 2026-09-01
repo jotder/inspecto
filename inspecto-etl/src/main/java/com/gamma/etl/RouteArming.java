@@ -104,6 +104,15 @@ public final class RouteArming {
             if (m.get("where") == null || String.valueOf(m.get("where")).isBlank())
                 out.add("route: branch '" + m.get("key") + "' has no where: predicate — every armed "
                         + "branch needs one (the run fails on the first row otherwise)");
+            // (2c) MIDBRANCH-1 (R3): a branch's steps[] sub-chain executes on the INGEST graph walk
+            //      (ConsignmentGraphRunner → PipelineExecutor → RowShaper), flattened by PipelineLift.
+            //      That walk carries NO ReferenceResolver and NO ExecutionContext (both NONE at the
+            //      ConsignmentGraphRunner.run seam), so kinds needing either would throw MID-RUN —
+            //      after the route registered and armed. Refuse them here instead, by name, exactly
+            //      the authoring-time conversion rule (2b) exists for. Grounded allowed set = what
+            //      RowShaper can shape with NONE context: filter (where-predicate split), dedup with
+            //      a consignment (batch) scope, summarize. Everything else fails closed.
+            branchStepRefusals(m, out);
             String db = String.valueOf(m.get("database"));
             if (!sinkDbs.contains(db))
                 out.add("route: branch '" + m.get("key") + "' names database '" + db + "', which matches "
@@ -133,6 +142,70 @@ public final class RouteArming {
             out.add("route: on a multi-schema pipeline (selector/segments) is authoring-only — arm it "
                     + "on a single-schema pipeline");
         return out;
+    }
+
+    /** The steps[] kinds a route branch may arm with — what the ingest walk can actually run with
+     *  its NONE reference/execution context (see {@code branchStepRefusals}). */
+    public static final Set<String> BRANCH_STEP_KINDS = Set.of(
+            PipelineConfig.Step.FILTER, PipelineConfig.Step.DEDUP, PipelineConfig.Step.SUMMARIZE);
+
+    /**
+     * Every reason one branch's {@code steps[]} sub-chain would refuse to arm (MIDBRANCH-1). Empty
+     * list = the chain arms. The rules mirror what the ingest graph walk can execute:
+     * <ul>
+     *   <li>{@code join} — {@code RowShaper.join} needs a {@code ReferenceResolver}; the ingest walk
+     *       passes {@code NONE} (it refuses loudly), so the step would throw on the first batch;</li>
+     *   <li>{@code dedup} with a windowed {@code scope:} — the durable ledger needs an
+     *       {@code ExecutionContext}; the ingest walk passes {@code NONE};</li>
+     *   <li>{@code route} — a nested branch tree inside a branch;</li>
+     *   <li>a {@code filter} with no {@code where:} (or one carrying a pre-parse list key) — mid-branch
+     *       filters run POST-map; {@code RowShaper.filter} reads only {@code where} and throws on a
+     *       blank predicate;</li>
+     *   <li>any other kind (contributed included) — fail-closed until its mid-branch execution is
+     *       proven, the same posture {@code route:} itself shipped with.</li>
+     * </ul>
+     *
+     * <p>⚠ The windowed-scope test is textual ({@code scope} present and not {@code consignment}) —
+     * this module sits below {@code inspecto-engine} and cannot see {@code DedupScope}, whose parse
+     * treats exactly null/blank/{@code consignment} as within-consignment and every other spelling as
+     * a window (or malformed, which is unarmable too). Both sides of that contract are pinned by
+     * {@code DedupScopeTest} and {@code RouteArmingTest}.
+     */
+    private static void branchStepRefusals(Map<?, ?> branch, List<String> out) {
+        List<PipelineConfig.Step> steps = PipelineConfig.Step.branchSteps(branch);
+        Object key = branch.get("key");
+        for (PipelineConfig.Step s : steps) {
+            String kind = s.kind();
+            if (!BRANCH_STEP_KINDS.contains(kind)) {
+                out.add("route: branch '" + key + "' chains a '" + kind + "' step, which cannot execute "
+                        + "mid-branch — the ingest walk runs " + new java.util.TreeSet<>(BRANCH_STEP_KINDS)
+                        + " only" + (PipelineConfig.Step.JOIN.equals(kind)
+                                ? " (join needs a reference resolver the ingest lane does not carry; "
+                                        + "run the join at rest via output_store:)"
+                                : PipelineConfig.Step.ROUTE.equals(kind)
+                                        ? " (a route cannot nest inside its own branch)" : ""));
+                continue;
+            }
+            if (PipelineConfig.Step.DEDUP.equals(kind)) {
+                Object scope = s.config().get("scope");
+                if (scope != null && !String.valueOf(scope).isBlank()
+                        && !"consignment".equalsIgnoreCase(String.valueOf(scope).trim()))
+                    out.add("route: branch '" + key + "' chains a dedup with scope '" + scope + "' — a "
+                            + "windowed dedup needs the durable ledger context the ingest walk does not "
+                            + "carry; drop scope: (consignment-grain) or run it at rest via output_store:");
+            }
+            if (PipelineConfig.Step.FILTER.equals(kind)) {
+                Object where = s.config().get("where");
+                if (where == null || String.valueOf(where).isBlank())
+                    out.add("route: branch '" + key + "' chains a filter with no where: predicate — a "
+                            + "mid-branch filter runs post-map and needs one (the run fails otherwise)");
+                for (String k : List.of("filter_target_column", "include_prefixes", "include_regex",
+                        "exclude_prefixes", "exclude_regex"))
+                    if (s.config().containsKey(k))
+                        out.add("route: branch '" + key + "' chains a filter carrying pre-parse key '" + k
+                                + "', which cannot execute mid-branch (rows are already parsed and mapped)");
+            }
+        }
     }
 
     /**

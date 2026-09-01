@@ -5,8 +5,7 @@ import { Router, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
-import { PipelineSummary } from 'app/inspecto/api';
-import { StreamTransferService } from 'app/inspecto/transfer/stream-transfer.service';
+import { PipelineSummary, PipelinesService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { PipelineOpenDialog, PipelineOpenData } from './pipeline-open.dialog';
 
@@ -25,18 +24,23 @@ describe('PipelineOpenDialog', () => {
 
     function make(data: Partial<PipelineOpenData> = {}) {
         const ref = { close: vi.fn() };
-        const transfer = {
-            exportPipeline: vi.fn().mockReturnValue(of({ bundle: { source: { name: 'a' } }, missing: [] })),
-            download: vi.fn(),
+        // R2: the row export downloads the SERVER-composed bundle zip, not a client-built JSON.
+        const api = {
+            exportBundle: vi.fn().mockReturnValue(of({ body: new Blob(['zip']) })),
+            bundleFilename: vi.fn().mockReturnValue('a.pipeline-bundle.zip'),
         };
         const toast = { success: vi.fn(), error: vi.fn(), warning: vi.fn() };
+        URL.createObjectURL = vi.fn().mockReturnValue('blob:bundle');
+        URL.revokeObjectURL = vi.fn();
+        const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+        click.mockClear();
         TestBed.configureTestingModule({
             imports: [PipelineOpenDialog],
             providers: [
                 provideNoopAnimations(),
                 provideRouter([]),
                 { provide: MatDialogRef, useValue: ref },
-                { provide: StreamTransferService, useValue: transfer },
+                { provide: PipelinesService, useValue: api },
                 { provide: ToastrService, useValue: toast },
                 {
                     provide: MAT_DIALOG_DATA,
@@ -46,7 +50,7 @@ describe('PipelineOpenDialog', () => {
         });
         const fixture = TestBed.createComponent(PipelineOpenDialog);
         fixture.detectChanges();
-        return { fixture, c: fixture.componentInstance, ref, transfer, toast };
+        return { fixture, c: fixture.componentInstance, ref, api, toast, click };
     }
 
     /** Item 1: the footer create — the dialog CLOSES first, then navigates to Catalog onboarding
@@ -63,14 +67,16 @@ describe('PipelineOpenDialog', () => {
         expect(ref.close).toHaveBeenCalledWith();
     });
 
-    /** Item 4: the per-row export — a READ of the saved server config, no tab needed. */
-    it('exports a row through the shared by-name seam without touching the open set', () => {
-        const { c, transfer, toast } = make();
+    /** Item 4 / R2: the per-row export — downloads the SERVER bundle zip, no tab needed. */
+    it('exports a row as the server bundle zip without touching the open set', () => {
+        const { c, api, toast, click } = make();
 
         c.exportRow(ROW('a'), new Event('click'));
 
-        expect(transfer.exportPipeline).toHaveBeenCalledWith('a');
-        expect(transfer.download).toHaveBeenCalled();
+        expect(api.exportBundle).toHaveBeenCalledWith('a');
+        // The download uses the server's Content-Disposition filename when present.
+        expect(api.bundleFilename).toHaveBeenCalledWith(expect.anything(), 'a');
+        expect(click).toHaveBeenCalled();
         expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('a'));
         expect(c.picked().has('a')).toBe(false); // the click must not tick the row's checkbox
     });
@@ -78,21 +84,22 @@ describe('PipelineOpenDialog', () => {
     /** A row that IS open with unsaved edits keeps the editor's refusal — the export would quietly
      *  disagree with that tab's screen. A closed row has no edits to disagree with, so no gate. */
     it('refuses a dirty OPEN row with the same toast pattern the editor uses', () => {
-        const { c, transfer, toast } = make({ dirty: ['b'] });
+        const { c, api, toast } = make({ dirty: ['b'] });
 
         c.exportRow(ROW('b'), new Event('click'));
 
-        expect(transfer.exportPipeline).not.toHaveBeenCalled();
+        expect(api.exportBundle).not.toHaveBeenCalled();
         expect(toast.warning).toHaveBeenCalled();
     });
 
-    it('names an unreadable satellite and surfaces an export error as a toast', () => {
-        const { c, transfer, toast } = make();
-        transfer.exportPipeline.mockReturnValue(of({ bundle: {}, missing: ['schema "a_schema"'] }));
+    it('surfaces an empty body and an export error as toasts', () => {
+        const { c, api, toast, click } = make();
+        api.exportBundle.mockReturnValue(of({ body: null }));
         c.exportRow(ROW('a'), new Event('click'));
-        expect(toast.warning).toHaveBeenCalledWith(expect.stringContaining('a_schema'));
+        expect(click).not.toHaveBeenCalled();
+        expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('empty'));
 
-        transfer.exportPipeline.mockReturnValue(throwError(() => ({ status: 500 })));
+        api.exportBundle.mockReturnValue(throwError(() => ({ status: 500 })));
         c.exportRow(ROW('a'), new Event('click'));
         expect(toast.error).toHaveBeenCalled();
         expect(c.exporting().has('a')).toBe(false); // in-flight marker cleared on error

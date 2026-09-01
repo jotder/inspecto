@@ -247,8 +247,31 @@ public final class RecipeConverter {
                 else if (db != null)
                     for (Map<String, Object> extra : extraSinks)
                         if (db.equals(extra.get("database"))) branchSink = extra;
-                branch.put("steps", List.of(step("sink",
-                        branchSink != null ? branchSink : new LinkedHashMap<>())));
+                // MIDBRANCH-1 (R3): a branch's own steps[] sub-chain projects BEFORE its sink,
+                // through the SAME per-kind builders as the trunk (they cannot drift), and an
+                // unmodelled kind travels verbatim so compile() refuses it by name rather than the
+                // projection quietly shortening the chain — the standing rule.
+                List<Object> branchSteps = new ArrayList<>();
+                if (m.get("steps") instanceof List<?> subChain) {
+                    for (Object raw : subChain) {
+                        if (!(raw instanceof Map<?, ?> sm) || sm.size() != 1) {
+                            branchSteps.add(raw);
+                            continue;
+                        }
+                        Map.Entry<?, ?> se = sm.entrySet().iterator().next();
+                        String kind = String.valueOf(se.getKey());
+                        Map<String, Object> cfg = mapOf(se.getValue());
+                        switch (kind) {
+                            case PipelineConfig.Step.FILTER -> branchSteps.add(step("transform", filterStep(cfg)));
+                            case PipelineConfig.Step.JOIN -> branchSteps.add(step("transform", joinStep(cfg)));
+                            case PipelineConfig.Step.DEDUP -> branchSteps.add(step("dedup", dedupStep(cfg)));
+                            case PipelineConfig.Step.SUMMARIZE -> branchSteps.add(step("summarize", summarizeStep(cfg)));
+                            default -> branchSteps.add(step(kind, cfg));
+                        }
+                    }
+                }
+                branchSteps.add(step("sink", branchSink != null ? branchSink : new LinkedHashMap<>()));
+                branch.put("steps", branchSteps);
                 branches.put(key, branch);
             }
         }

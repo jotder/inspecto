@@ -7,9 +7,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Router } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
-import { PipelineSummary, apiErrorMessage } from 'app/inspecto/api';
+import { PipelineSummary, PipelinesService, apiErrorMessage } from 'app/inspecto/api';
 import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-resize.directive';
-import { StreamTransferService } from 'app/inspecto/transfer/stream-transfer.service';
 
 export interface PipelineOpenData {
     /** Every pipeline the server lists — names only; no graph is fetched to build this. */
@@ -183,7 +182,7 @@ export class PipelineOpenDialog {
 
     private ref = inject(MatDialogRef<PipelineOpenDialog, string[]>);
     private router = inject(Router);
-    private transfer = inject(StreamTransferService);
+    private api = inject(PipelinesService);
     private toast = inject(ToastrService);
     readonly data = inject<PipelineOpenData>(MAT_DIALOG_DATA);
 
@@ -258,10 +257,10 @@ export class PipelineOpenDialog {
     }
 
     /**
-     * Export THIS row's stream-config bundle without opening it — the same
-     * {@link StreamTransferService.exportPipeline} seam the editor's menu item uses, reading the
-     * SERVER-held config. A row that is open with unsaved edits refuses (same rule as the editor):
-     * the file would quietly disagree with that tab's screen.
+     * Export THIS row's SERVER bundle zip without opening it ({@link PipelinesService.exportBundle},
+     * R2) — the server composes the pipeline + its file closure, so no client read-back is needed.
+     * A row that is open with unsaved edits refuses (same rule as the editor): the file would
+     * quietly disagree with that tab's screen.
      */
     exportRow(p: PipelineSummary, event: Event): void {
         // Inside the row's <label>: without this the click also toggles the open checkbox.
@@ -279,18 +278,31 @@ export class PipelineOpenDialog {
                 next.delete(p.name);
                 return next;
             });
-        this.transfer.exportPipeline(p.name).subscribe({
-            next: ({ bundle, missing }) => {
+        this.api.exportBundle(p.name).subscribe({
+            next: (res) => {
                 done();
-                this.transfer.download(bundle);
-                if (missing.length) this.toast.warning(`Exported without ${missing.join(', ')} — could not be read.`);
-                else this.toast.success(`Exported "${p.name}" configuration`);
+                if (!res.body) {
+                    this.toast.error('The server returned an empty bundle.');
+                    return;
+                }
+                this.downloadBlob(res.body, this.api.bundleFilename(res, p.name));
+                this.toast.success(`Exported "${p.name}" configuration`);
             },
             error: (err) => {
                 done();
                 this.toast.error(apiErrorMessage(err, 'Could not export the configuration.'));
             },
         });
+    }
+
+    /** Trigger a browser download for the fetched zip (object URL, revoked after the click). */
+    private downloadBlob(blob: Blob, filename: string): void {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
     }
 
     /** Returns the full desired open set, in the listed order so tabs are stable across re-opens. */

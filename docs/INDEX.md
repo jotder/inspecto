@@ -124,13 +124,14 @@ former root reference docs** (each index lists them):
   [`archived-documents/retired-concepts/mock-backends.md`](archived-documents/retired-concepts/mock-backends.md).
   Still open: **MOCK-DEAD-COMPUTE-1** in `BACKLOG.md` (four dead in-browser compute blocks).
 
-- [`superpower/authoring-residuals-plan.md`](superpower/authoring-residuals-plan.md) — **R1/R2/R4/
-  R5/R6 SHIPPED 2026-09-01 same shift** (diagnostics codes+guidance incl. COLLECTOR-ERRMSG-1 ·
-  the pipeline bundle routes closing TRANSFER-ARCH-1 · snapshot undo/redo · Open-dialog MRU+pins ·
-  Dataset-hop retry banner — as-built in `pipeline-editor.md` + `editable-round-trip.md` §21).
-  **ACTIVE for R3 only** (mid-branch `steps:` via flattening, ⛔ gated on the stage-2 execution
-  analysis) + the UI-migration-onto-bundle follow-up; R7 is a future sketch. Prior art consulted
-  from the sibling DataForge wiki (`C:\sandbox\incubetor\docs\wiki`).
+- [`superpower/authoring-residuals-plan.md`](superpower/authoring-residuals-plan.md) — **FULLY
+  DRAINED 2026-09-02, ready to distill+archive**: R1/R2/R4/R5/R6 shipped 2026-09-01 (diagnostics
+  codes+guidance incl. COLLECTOR-ERRMSG-1 · the pipeline bundle routes closing TRANSFER-ARCH-1 ·
+  snapshot undo/redo · Open-dialog MRU+pins · Dataset-hop retry banner); **R3 mid-branch
+  `steps:` + the bundle-UI migration shipped 2026-09-02** (as-built: `editable-round-trip.md`
+  §19/§21, `pipeline-editor.md`). Only R7 (convert-to-composite) remains — a future sketch by
+  design; two small rows R3 opened live in BACKLOG (RECIPE-SCOPE-1, MIDBRANCH-UI-1). Prior art:
+  the sibling DataForge wiki (`C:\sandbox\incubetor\docs\wiki`).
 - [`superpower/execution-residuals-plan.md`](superpower/execution-residuals-plan.md) — **ACTIVE,
   specified 2026-09-01**: the stage-2 execution solution spec (X1 persistent retry queue —
   consignment-grain recommended · X2 cross-lane provenance link · X3 PARK-1(a) re-grounding ·

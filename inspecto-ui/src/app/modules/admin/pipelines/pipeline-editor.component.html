@@ -315,9 +315,15 @@
                         <mat-icon svgIcon="heroicons_outline:document-text"></mat-icon>
                         <span>Export document</span>
                     </button>
+                    <!-- R2: the server-composed zip is the portable format going forward; the client
+                         JSON stays as the READER-compatible legacy export (create-from-import reads it). -->
+                    <button mat-menu-item [disabled]="!selectedId() || exportingBundle()" (click)="exportBundle()">
+                        <mat-icon svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
+                        <span>Export configuration (bundle .zip)</span>
+                    </button>
                     <button mat-menu-item [disabled]="!selectedId() || exportingConfig()" (click)="exportConfig()">
                         <mat-icon svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
-                        <span>Export configuration</span>
+                        <span>Export configuration (legacy JSON)</span>
                     </button>
                 </ng-container>
             </inspecto-transfer-menu>
