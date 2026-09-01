@@ -68,7 +68,7 @@ class ControlApiSystemRoutesTest {
             JsonNode body = json(get(c.port, "/system/operational-db"));
             assertEquals("duckdb", body.get("engine").asText());
             JsonNode families = body.get("families");
-            assertEquals(10, families.size(), "the roster is ten families — " + families);
+            assertEquals(11, families.size(), "the roster is eleven families — " + families);
             for (JsonNode f : families) {
                 assertNotNull(f.get("source"), "every family reports where its value came from");
                 assertTrue(f.has("backendProperty") && f.has("urlProperty"),

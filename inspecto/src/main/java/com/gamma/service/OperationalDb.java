@@ -79,6 +79,14 @@ final class OperationalDb {
                 "consignment.outputs.db.url", null, null, SpaceRoot::consignmentOutputsDbUrl),
         FILE_STAGES("File stages", "file.stages.backend", "none", Mode.URL_OR_ENGINE,
                 "file.stages.db.url", null, null, SpaceRoot::fileStagesDbUrl),
+        // D-9. ⛔ Default "duckdb", never "none": a dedup ledger that silently does nothing is WORSE than
+        // an absent one — the pipeline reports success while emitting the duplicates the author asked it
+        // to drop. Default-off is this codebase's most repeated trap (provenance, file_stages, the
+        // acquisition ledger each look fine in a test and produce nothing on a stock deployment), and it
+        // is the one shape this family must not take. ⚠ It costs nothing when unused: no `scope:` window
+        // is declared ⇒ nothing ever claims a key ⇒ the table stays empty.
+        DEDUP_LEDGER("Record dedup ledger", "dedup.ledger.backend", "duckdb", Mode.URL_OR_ENGINE,
+                "dedup.ledger.db.url", null, null, SpaceRoot::dedupLedgerDbUrl),
         OBJECTS("Objects", "objects.backend", "memory", Mode.DB_FLAG,
                 "objects.db.url", "objects.db.user", "objects.db.password", SpaceRoot::objectsDbUrl),
         LINKS("Links", "objects.backend", "memory", Mode.DB_FLAG,

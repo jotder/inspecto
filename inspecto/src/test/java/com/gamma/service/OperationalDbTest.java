@@ -50,7 +50,7 @@ class OperationalDbTest {
                     // Named once, honoured by every family — the space's DuckDB default is not consulted.
                     // ⚠ Iterates the ROSTER rather than a hand-listed copy (2026-08-15): a family added
                     // to Family without honouring the shared URL now fails here instead of going unnoticed.
-                    assertEquals(10, OperationalDb.Family.values().length, "the roster is ten families");
+                    assertEquals(11, OperationalDb.Family.values().length, "the roster is eleven families");
                     for (OperationalDb.Family family : OperationalDb.Family.values()) {
                         assertEquals("jdbc:postgresql://db:5432/inspecto",
                                 OperationalDb.urlFor(family, "jdbc:duckdb:/spaces/a/duckdb/x.db"),

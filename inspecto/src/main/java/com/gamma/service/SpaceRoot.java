@@ -77,6 +77,9 @@ public interface SpaceRoot {
     /** Default JDBC URL for the Consignment output-file registry, when {@code -Dconsignment.outputs.backend} is set. */
     String consignmentOutputsDbUrl();
 
+    /** Default JDBC URL for the D-9 cross-Consignment record-dedup ledger. */
+    String dedupLedgerDbUrl();
+
     /** Default JDBC URL for the per-file stage-progression registry (Phase 4 §2.4), when
      *  {@code -Dfile.stages.backend} is set. */
     String fileStagesDbUrl();
@@ -144,6 +147,9 @@ final class LegacySpaceRoot implements SpaceRoot {
 
     public String consignmentOutputsDbUrl() { return "jdbc:duckdb:inspecto-consignment-outputs.db"; }
 
+    @Override
+    public String dedupLedgerDbUrl() { return "jdbc:duckdb:inspecto-dedup-ledger.db"; }
+
     public String fileStagesDbUrl() { return "jdbc:duckdb:inspecto-file-stages.db"; }
 }
 
@@ -201,6 +207,9 @@ final class DirSpaceRoot implements SpaceRoot {
     public String acquisitionLedgerDbUrl() { return duckdb("inspecto-acquisition.db"); }
 
     public String consignmentOutputsDbUrl() { return duckdb("inspecto-consignment-outputs.db"); }
+
+        @Override
+        public String dedupLedgerDbUrl() { return duckdb("inspecto-dedup-ledger.db"); }
 
     public String fileStagesDbUrl() { return duckdb("inspecto-file-stages.db"); }
 }
