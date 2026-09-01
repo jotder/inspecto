@@ -629,6 +629,14 @@ public final class ConsignmentIngestor {
         for (LineageRow r : lineage)
             outBySrc.computeIfAbsent(r.srcId(), k -> new LinkedHashSet<>()).add(r.outputFile());
 
+        // Per-output byte counts for the FILE ledger (LEDGER-OUTPUT-BYTES-1). The join is exact by
+        // construction: LineageCollector derives each row's outputFile from THIS same list
+        // (partToFile.put(o.partition(), o.outputFile())), so the two strings are the same object's value.
+        // ⚠ A miss maps to -1 = "not measured", never 0 — 0 asserts the output was EMPTY, and this column
+        // is an audit record (see the failure-audit convention).
+        Map<String, Long> bytesByOutput = new HashMap<>();
+        for (PartitionOutput o : outputs) bytesByOutput.put(o.outputFile(), o.bytes());
+
         // srcId -> the member's own file, for the rows that are NOT expansion products. Pure path
         // arithmetic below, so it does not matter that commit has already moved these to backup.
         Map<Integer, File> memberFiles = new HashMap<>();
@@ -650,7 +658,7 @@ public final class ConsignmentIngestor {
             fileRows.add(new ConsignmentAuditWriter.FileRow(
                     ma.start().format(DuckDbUtil.DT_FMT), end.format(DuckDbUtil.DT_FMT),
                     ma.filename(), ma.status().name(), ma.parsedRows(), ma.errorRows(),
-                    paths, Collections.nCopies(paths.size(), 0L),
+                    paths, paths.stream().map(pth -> bytesByOutput.getOrDefault(pth, -1L)).toList(),
                     Duration.between(ma.start(), end).toMillis(), ma.error(), batch.batchId(),
                     ma.origin(), logicalNameOf(ma, memberFiles, cfg)));
         }

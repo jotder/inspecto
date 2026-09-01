@@ -82,6 +82,59 @@ class ConsignmentIngestorTest {
     }
 
     /**
+     * The per-file ledger must report the REAL size of every output it names (LEDGER-OUTPUT-BYTES-1).
+     *
+     * 🔴 It reported {@code 0} for every output until 2026-09-01: {@code writeAudit} passed
+     * {@code Collections.nCopies(paths.size(), 0L)} — a literal list of zeros — while the CONSIGNMENT-level
+     * {@code total_output_bytes} summed the real {@code PartitionOutput::bytes}. That asymmetry is what made
+     * it look like a serialisation bug; the writer was faithful all along.
+     *
+     * ⚠ {@code 0} is not a harmless placeholder in an AUDIT column: {@code -1} already means "not measured"
+     * here, so {@code 0} positively asserts the output was EMPTY — false for every file. Hence the assertion
+     * is on the VALUE, and against the bytes actually on disk rather than merely non-zero.
+     */
+    @Test
+    void theFileLedgerReportsEachOutputsRealSize(@TempDir Path dir) throws Exception {
+        Path toon = PipelineConfigBatchTestRef.writePipeline(dir, "");
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+        Path inbox = Files.createDirectories(Path.of(cfg.dirs().poll()));
+        Path f = inbox.resolve("sized.csv");
+        Files.writeString(f, "ID,AMT,EVENT_DATE\ns1,1.0,2020-04-03\ns2,2.0,2020-01-01\n");
+
+        Consignment batch = new Consignment(cfg.identity().runTimestamp() + "_sized_0001", "mini", null,
+                List.of(member(cfg, f.toFile(), 0)));
+        ConsignmentAuditWriter audit = new ConsignmentAuditWriter(
+                cfg.dirs().statusFilePath(), cfg.dirs().batchesFilePath(), cfg.dirs().lineageFilePath());
+        ConsignmentIngestor.process(batch, cfg, audit);
+
+        String status = Files.readString(Path.of(cfg.dirs().statusFilePath()));
+        // …,parsed_rows,error_rows,"paths","sizes",duration_ms,… — both list fields are ;-joined.
+        var m = java.util.regex.Pattern
+                .compile(",(\\d+),(\\d+),\"([^\"]*)\",\"([^\"]*)\",(\\d+),")
+                .matcher(status);
+        // ⚠ Check EVERY row that NAMES an output. A row naming none is legitimate (its rows landed under
+        // another member's srcId) and carries -1 = not-measured, which is the correct answer there.
+        int checked = 0;
+        while (m.find()) {
+            String paths = m.group(3), sizes = m.group(4);
+            if (paths.isBlank()) continue;
+            checked++;
+            List<String> sizeList = List.of(sizes.split(";"));
+            assertEquals(paths.split(";").length, sizeList.size(),
+                    "one size per named output, positionally aligned — paths=" + paths + " sizes=" + sizes);
+            for (String each : sizeList)
+                assertTrue(Long.parseLong(each) > 0,
+                        "a named output must report its real size; 0 asserts an EMPTY file and -1 means "
+                                + "not-measured. sizes=" + sizes + " paths=" + paths);
+            long onDisk = 0L;
+            for (String pth : paths.split(";")) onDisk += Files.size(Path.of(pth));
+            assertEquals(onDisk, sizeList.stream().mapToLong(Long::parseLong).sum(),
+                    "reported bytes must equal the bytes actually written — paths=" + paths);
+        }
+        assertTrue(checked > 0, "no per-file row named any output, so the column was never exercised:\n" + status);
+    }
+
+    /**
      * Regression for the "ghost batch" defect: if {@code commit()} throws <em>after</em> the
      * output is written and inputs are backed up (e.g. a marker step fails), the batch must
      * still be audited — as FAILED — rather than vanishing from the audit/lineage/recovery
