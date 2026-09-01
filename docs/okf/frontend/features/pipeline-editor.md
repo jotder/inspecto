@@ -57,6 +57,15 @@ backend on :4204.
 - ⚠ **`select()` is a load, not an idempotent setter** — re-running it refetches the graph and
   discards that tab's unsaved edits. The `?open=` effect fires once per id for this reason, and
   `?open=` also switches the pane to Edit (guided chips are no-ops in View).
+- **Unsaved work is guarded at the browser edge too** (2026-09-01): a `beforeunload` handler arms
+  when the active tab's `dirty()` OR any parked dirty flag is set — it checks the signal directly
+  as well as the per-tab set, because the mirror effect runs on Angular's schedule and
+  `beforeunload` fires on the browser's clock. **The open-tab set persists** across reloads
+  (`localStorage 'inspecto.pipelines.openTabs'`, `{open, selected}`): restored names are filtered
+  against the served list, tabs re-lift lazily, the `?open=` deep link wins selection, and ⚠ a
+  failed list fetch does not arm the persist mirror — a backend-down reload must not wipe the
+  stored set with `[]`. Dirty edits are deliberately NOT persisted (the guard owns that).
+  **Ctrl/Cmd+S saves** (preventDefault always; `save()` only when `canAuthor() && dirty()`).
 
 **Edit mode is a full-bleed editor shell, not an admin page** — `pipelines.component.html` branches
 on `mode()`; no page header, no `p-6 sm:p-10`; the mode toggle and `<inspecto-ai-explain>` project
@@ -441,19 +450,51 @@ Save lowers the graph to the flat `*_pipeline.toon` (`PUT /pipelines/{name}/grap
 refusals all land in the Validation dock** (persistent, click-to-select-Step), never a first-only
 toast. Apply (drawer) patches in memory; Save persists; the per-tab dirty flag guards both.
 
+**The save route runs the arming pre-checks** (2026-09-01): `armedWithoutSchema` / `routeArming` /
+`stepDisable` findings, same severity split as `/config/write` (ERROR ⇒ 422 when `active: true`,
+WARNING on a draft) — before this, the editor's Save could 200 a pipeline that silently failed to
+arm at the next registry rebuild. Backend detail:
+[editable-round-trip](../../backend/pipeline-graph/editable-round-trip.md) §16.
+
+**Validation is live while dirty** (2026-09-01): a debounced (~1.5s) pass recomputes `findings()`
+after graph mutations (drawer keystrokes live outside the model until Apply, so they never
+trigger it) — the dock badge updates live, and the Save button shows a WARNING state (icon +
+tooltip naming the error count) while staying **enabled**: drafts may save with problems.
+🔴 The debounced pass runs `refreshFindings()`, never the dock-opening `validate()` — auto-popping
+the dock 1.5s after every edit is intrusive. ⚠ The debounce timer goes through an overridable seam
+(`armValidateTimer`) on the zone-UNPATCHED `setTimeout`: a zone-patched macrotask armed from an
+effect re-enters `ApplicationRef.tick` (NG0101), and neither fakeAsync nor `vi.useFakeTimers()`
+survives it in this runner — specs capture the armed callback and fire it deterministically.
+
 Known save-path defects are tracked in [BACKLOG](../../../BACKLOG.md) — see *Known gaps* below
 before trusting a described save.
 
 ## Pipeline-level surfaces (not the graph)
 
-- **Settings** (⋮ menu → `PipelineSettingsDialog`): `produces` select; when `reference`, load-mode +
-  comma-separated key + refresh seconds. Dedicated `GET/POST /pipelines/{name}/settings` — NOT
-  `PUT .../graph`; `PipelineEditable` deliberately never models non-node keys. A hand-built form:
-  `fieldSpecsToAttributes` deliberately skips served `LIST`. Backend:
+- **Settings** (⋮ menu → `PipelineSettingsDialog`): a Description textarea (first field, optional),
+  the `produces` select; when `reference`, load-mode + comma-separated key + refresh seconds.
+  Dedicated `GET/POST /pipelines/{name}/settings` — NOT `PUT .../graph`; `PipelineEditable`
+  deliberately never models non-node keys. A hand-built form: `fieldSpecsToAttributes` deliberately
+  skips served `LIST`. Backend:
   [editable-round-trip §17](../../backend/pipeline-graph/editable-round-trip.md).
 - **`description`** is declared (`ConfigSpecs.pipeline()`), parsed, projected conditionally by
-  `GET /pipelines`, and rendered as the open-dialog row subtitle. ⛔ Display only. ⚠ Settable at
-  creation only — the settings dialog has no control for it yet.
+  `GET /pipelines`, and rendered as the open-dialog row subtitle. ⛔ Display only. Editable
+  post-creation via the settings surface since 2026-09-01 (trimmed on write; **blank clears the
+  key from the file** rather than persisting an empty string).
+- **New pipeline** from the editor (⋮ menu and the Open dialog's footer) navigates to the Catalog
+  onboarding entry (`/catalog?onboard=stream`) — ⛔ never an import of the catalog create dialog
+  (a feature may not import a feature); onboarding redirects back into the guided editor.
+- **Duplicate…** (⋮ menu, canAuthor, refuses a dirty tab): a RUNNABLE copy via the proven
+  stream-bundle retarget path — `StreamTransferService.exportPipeline` → `planStreamImport` under
+  the new name → `applyImport` — so satellites (schema(s), per-segment schemas, enrich companion)
+  come along, dirs re-derive, and the copy lands `active: false`, then opens as a tab. Distinct
+  from save-as-template (non-runnable). The name dialog mirrors onboarding's unique-name rule
+  locally.
+- **Export from the list**: `StreamTransferService.exportPipeline(name)` owns the bundle build
+  (reads server state via `GET /config/pipeline`; stream-vs-reference from that config's own
+  `produces`), so the Open dialog's per-row download action exports WITHOUT opening a tab and the
+  editor's menu item delegates to the same function. Un-gated (export is a read); an OPEN dirty
+  row keeps the refusal toast, a closed row exports freely.
 - 🔴 **`produces` names two different things**: `PipelineSummary.produces` = the list of STORES;
   stream-vs-reference is the config-level `produces` behind the settings endpoint. Deciding the
   Dataset hop off the summary field is silently wrong; when the read fails, register nothing and
@@ -504,20 +545,21 @@ Enrich → Publish — each with a status word and finding count, each click ope
 
 ## Known gaps (owners: [BACKLOG](../../../BACKLOG.md))
 
-The behavior described above is the intended-and-mostly-actual state. Open defects that contradict
-it, owned by BACKLOG (do not trust a save/refusal path without checking these):
+The behavior described above is the intended-and-actual state. ⚠ **Corrected 2026-09-01**: this
+section previously listed AUTHOR-1, DRYRUN-1, the §5 UI residuals and BUILDER-2 #8 as open — all
+were verified FIXED in code (the BACKLOG rows are struck through; the grounding sweep confirmed
+each fix live). Genuinely open:
 
-- **AUTHOR-1** (§1): an authored `transform.map` binding is **silently dropped on save** while the
-  route answers `200 written:true`.
-- **DRYRUN-1** (§1) and the §5 UI residuals: line-level defects in
-  `pipeline-editor.component.ts`, `grammar-editor.dialog.ts`,
-  `pipeline-parse-definition.component.ts` — among them the Load drawer's header labeling a
-  `transform.map` Step "PARSER" (`kindLabel` is an acquisition/else ternary; cosmetic).
-- **BUILDER-2 #8** (§1): a Recipe-editor branch silently destroyed on save — the editor-side face
-  of the mid-branch refusal ([`mid-branch-transforms-design.md`](../../../superpower/mid-branch-transforms-design.md)).
-- Single-slot inversion question (§4): whether `recordDedup`/`routeNode`/`summarizeNode` should
-  refuse instead of last-one-wins.
-- `description` is not editable post-creation (settings dialog gap, this file §Pipeline-level).
+- ~~Single-slot inversion question~~ **STALE (corrected 2026-09-01)**: multiplicity was resolved
+  2026-08-11 (ordered `steps:`; `MULTI_*` refusals deleted). Still deliberately last-one-wins:
+  `acquisition`, `gap`, `dedup.marker` (`parser` refuses via `MULTI_PARSER`).
+- Mid-branch `steps:` sub-chains are refused today — **specified and scheduled** as
+  [`authoring-residuals-plan.md`](../../../superpower/authoring-residuals-plan.md) §R3 (flattening
+  pre-pass), gated on the stage-2 execution analysis.
+- **TRANSFER-ARCH-1**: no selective dependency-closure export for canonical pipelines — direction
+  decided, spec at [`authoring-residuals-plan.md`](../../../superpower/authoring-residuals-plan.md)
+  §R2. Also queued there: diagnostic upgrade (§R1), undo/redo (§R4), Open-dialog MRU (§R5),
+  Dataset-hop retry banner (§R6).
 
 ## Verification culture (why this file reads the way it does)
 

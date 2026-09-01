@@ -123,7 +123,14 @@ speaks the **config-file vocabulary end to end**, so nothing typed crosses the H
   `GET /pipelines/{name}/graph/raw` (lift + a synthesized node per registered enrichment companion whose
   `triggers.on_pipeline` names this pipeline) and `PUT /pipelines/{name}/graph` (lower over the existing
   file, then the **same** `ConfigSpecs.pipeline()` + `ConfigSafetyValidator` gate + atomic write that
-  `POST /config/write` runs — the editor is a *caller*, not a second write pipe). The `*_flow.toon`
+  `POST /config/write` runs — the editor is a *caller*, not a second write pipe). **Since 2026-09-01 the
+  graph route also runs the three arming pre-checks** (`armedWithoutSchemaFindings` ·
+  `routeArmingFindings` · `stepDisableFindings`) that `/config/write`/`/config/patch`/`/validate` gained
+  2026-08-26 — before that, the editor's own Save answered `200 written:true` for a config that then
+  failed to arm at the next `ConfigRegistry.rebuild` (one WARN log, silently skipped every cycle).
+  Severity split unchanged: ERROR (422, nothing written) when `active: true`, WARNING on an inactive
+  draft. Pinned over real HTTP by `ControlApiGraphSaveArmingTest`; ⚠ its fixture lesson: a node's
+  `enabled` rides INSIDE `config` — a top-level node key is silently dropped by the codec. The `*_flow.toon`
   authoring writes (`POST /pipelines/authored`, `PUT`, `/nodes`, `/edges`) **retired**; grandfathered
   flows stay readable / runnable / deletable, never newly written (`CapabilityManifest` updated to match).
 
@@ -227,6 +234,11 @@ Full `-Pedition-enterprise -fae` reactor 3458/0/0/5 at `f72f7fc8`.*
 ---
 
 ## 17. Pipeline-level settings — a dedicated surface for what the graph editor never models (2026-08-13)
+
+> **Extended 2026-09-01:** the settings pair also carries the optional top-level `description`
+> (display-only; nothing in the engine reads it) — its one post-creation write path. Trimmed on
+> write; a blank clears the key from the file rather than persisting an empty string. Pinned by
+> `ControlApiPipelineSettingsTest.descriptionRoundTripsAndBlankClearsIt`.
 
 The `produces`/`reference` block (`produces: stream|reference`; `reference: {load, key, refresh_seconds}`)
 is a **pipeline-level** property, not a node's — it names what the whole pipeline outputs (an ordinary

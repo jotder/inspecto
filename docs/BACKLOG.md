@@ -789,8 +789,35 @@ non-blocking:**
 
 ## 6. Engineering / tech-debt
 
-- **COLLECTOR-ERRMSG-1 — parser error messages still say `source.dataset` for `collector:` keys
-  (2026-09-01).** `PipelineConfigParser` reads only the top-level `collector:` block (a `source:`
+**AUTHORING-RESIDUALS — solution spec written 2026-09-01, operator-decided directions:
+[`superpower/authoring-residuals-plan.md`](superpower/authoring-residuals-plan.md)** (sequenced
+R1→R2→R3→R4→R5/R6; R7 future sketch). Rows below are its queue:
+
+- **R1 DIAG-1 — diagnostic upgrade** (stable `ERR_`/`WARN_` code catalog + separate `guidance`
+  field on `Finding` + `fieldPath` as the one key citation; closes COLLECTOR-ERRMSG-1 inside the
+  slice). Spec §R1.
+- **R3 MIDBRANCH-1 — per-branch `steps:` sub-chains** via the flattening pre-pass; ⛔ gated on the
+  stage-2 execution analysis landing first. Spec §R3 (supersedes
+  `superpower/mid-branch-transforms-design.md`'s open questions).
+- **R4 UNDO-1 — snapshot-stack undo/redo per tab** (bounded 50, local restore — ⛔ never via
+  `select()`). Spec §R4.
+- **R5 — Open-dialog MRU + pins** · **R6 — Dataset-hop persistent retry banner** (small, any
+  shift). Spec §R5/§R6.
+
+- **TRANSFER-ARCH-1 (= spec §R2) — canonical pipelines have no selective dependency-closure export
+  (DIRECTION DECIDED 2026-09-01: server-side `GET /pipelines/{name}/bundle` +
+  `POST /pipelines/import` with refuse|overwrite|rename; see the spec).** The metadata bundle's `authored-pipeline` kind still operates on the
+  RETIRED `*_flow.toon` `PipelineStore`; a canonical `*_pipeline.toon` transfers only via the
+  whole-config-tree datasource zip (`GET /spaces/{id}/datasources/{ds}/export`) or the client-side
+  stream-config bundle. Design wanted: one selective export/import for a canonical pipeline + its
+  dependency closure (schema(s), per-segment schemas, grammar/enrichment companions, Connection as
+  a secret-free requirement), and retire/repoint the bundle's `authored-pipeline` kind. ⚠ Do not
+  bolt this onto `BundleRoutes.WRITABLE_TYPES` without deciding the config-namespace vs registry-id
+  collision recorded in `okf/frontend/features/onboarding.md` (the two collide on the word
+  *schema*).
+
+- **COLLECTOR-ERRMSG-1 (folds into spec §R1's message sweep) — parser error messages still say
+  `source.dataset` for `collector:` keys (2026-09-01).** `PipelineConfigParser` reads only the top-level `collector:` block (a `source:`
   block is silently ignored), but its own error/refusal messages for those keys still spell the
   retired `source.*` path — an operator fixing the named key edits a block nothing reads. Sweep the
   parser's message strings to the `collector.*` spelling. Found during the 2026-09-01 backend-docs
