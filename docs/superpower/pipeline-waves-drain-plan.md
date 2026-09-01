@@ -40,6 +40,7 @@ relabel it: the honest gap is *"no ITEM schema facility in FieldSpec"*, not *"ga
 | # | Work | Gate | Where |
 |---|---|---|---|
 | **A** | Node-type packs load through the packs dir (row 7's true remainder) | ✅ **SHIPPED** — the gate was my error, see §2.2 | `JobPackManager` + both node registries |
+| **E** | `Batch`→`Consignment` (row 1) | ✅ **SHIPPED 2026-08-31** (`ff33246a`) — see §2.4 | the codemod, one commit |
 | **B** | A structural editor for the post-sync chain — `processor` + `chain_config` aligned by construction (row 12) | ✅ **SHIPPED** — see §2.1 | the Job surface |
 | **C** | The D-9 design pass: where the ledger persists · winner policy · window advance (row 14) | **none** to *design*; building it is separate | §3 below |
 | **D** | `Batch`→`Consignment` (row 1) · Phase 6's deletion half (row 15) · D2's runtime token model + Step SPI | ⛔ **the major-bump window — operator** | — |
@@ -294,6 +295,32 @@ edited one at a time within a session without a real risk of stopping half-way, 
 after which the verification chain is already determined — rename → regen **both** committed contracts →
 UI `.ts` mirrors → routes with the `Csv.LEGACY_HEADERS`-style alias → GLOSSARY/§13 → vocabulary guard →
 full reactor. Everything except the sweep itself is settled in this section.
+
+### 2.4 Row 1 SHIPPED — and what the dry run caught
+
+`ff33246a`, one commit as D5 required, executed by `tools/rename-batch-to-consignment.mjs`: **24 files
+renamed** (via `git mv`, so history follows) and **1092 occurrences across 155 files**. Full reactor
+**3841 / 0 / 0 / 5** — the baseline, unmoved; both committed contracts passed **untouched** (they derive
+from a static table and node TYPE names, so no regen was needed); vocabulary guard, all three tsconfigs,
+`lint:tokens`, prettier and the UI suite (2591 passed) all green.
+
+🔴 **All three recorded scope figures were wrong, and the dry run is what found it.** Not 517 files/39
+`@PublicApi`, not the 81/29/8 re-measure — **155 files**. Over half the apparent blast radius was
+`PipelineConfigBatchTest`, a shared TEST FIXTURE imported by 165 test classes, which is **not** "the
+entity with an id and a status" and was deliberately left alone. Scoping by string would have doubled the
+commit for zero vocabulary gain; this is what §13's *"scope by CONCEPT, not by string"* buys.
+
+⚠ Two things the word-boundary sweep could not see, both handled by hand: `onBatchEvent` (no boundary
+after `on`, and it took a `ConsignmentEvent` afterwards) and the UI's own `BatchAuditReport` mirror.
+✅ And one it correctly did NOT touch, verified after the fact: `ps.addBatch()` in all three call sites.
+
+### ✅ Row 15 — the block is now MEASURED, not inferred
+
+D-2 requires *converter + one flagged verification minor, then* deletion. The converter landed
+**2026-08-18** (`f72f7fc8`). The newest tag, **`v3.12.0`, shipped 2026-06-05** — ten weeks earlier — and
+is **not an ancestor of `master`**. So no release has ever carried the flagged legacy path, the
+verification window D-2 exists to provide has never opened, and deleting the readers now would skip it
+entirely. ⇒ **Not closable by writing code, by anyone.**
 
 ---
 

@@ -124,9 +124,10 @@ former root reference docs** (each index lists them):
   (fan-in, decided by D6) were already **CLOSED** and mis-recorded; rows **12** (an ordered-step editor
   for the post-sync chain) and **7** (node-type packs hot-load through an owner-keyed pack overlay) were
   **BUILT the same day**, and Wave 3's row **14** (D-9) is **DESIGNED**, satisfying D8's three
-  conditions. Still in flight for exactly **two rows on one gate**: **1** (`Batch`→`Consignment`) and
-  **15** (Phase 6's deletion half) both wait on the **major-bump window** — a release call, not a design
-  gap. See [`superpower/pipeline-waves-drain-plan.md`](superpower/pipeline-waves-drain-plan.md). As-built facts from the drain live in
+  conditions. **Row 1 (`Batch`→`Consignment`) SHIPPED 2026-08-31** (`ff33246a`) — one commit, 155 files, reactor
+  unmoved at 3841/0/0/5. That leaves **one row: 15** (Phase 6's deletion half), and its block is now
+  measured rather than inferred — D-2 needs a *flagged verification minor* to have shipped, and the
+  newest tag `v3.12.0` predates the converter by ten weeks. **Not closable by code.** See [`superpower/pipeline-waves-drain-plan.md`](superpower/pipeline-waves-drain-plan.md). As-built facts from the drain live in
   [`okf/backend/control-plane/pipeline-related.md`](okf/backend/control-plane/pipeline-related.md)
   (gap 5) and [`okf/backend/control-plane/metadata-bundle.md`](okf/backend/control-plane/metadata-bundle.md)
   (gap 6); the one item it opened rather than closed is **BUNDLE-SCHEMA-1** in `BACKLOG.md` §6.
