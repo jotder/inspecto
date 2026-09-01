@@ -316,11 +316,24 @@ after `on`, and it took a `ConsignmentEvent` afterwards) and the UI's own `Batch
 
 ### ✅ Row 15 — the block is now MEASURED, not inferred
 
-D-2 requires *converter + one flagged verification minor, then* deletion. The converter landed
-**2026-08-18** (`f72f7fc8`). The newest tag, **`v3.12.0`, shipped 2026-06-05** — ten weeks earlier — and
-is **not an ancestor of `master`**. So no release has ever carried the flagged legacy path, the
-verification window D-2 exists to provide has never opened, and deleting the readers now would skip it
-entirely. ⇒ **Not closable by writing code, by anyone.**
+D-2 requires *converter + one flagged verification minor, then* deletion. The amendment's §6 spells the
+sequence out in four steps, and **two of them are unmet**:
+
+| §6 step | State |
+|---|---|
+| 1. one-shot converter (`inspecto migrate-configs`) | ✅ exists (amended **2026-08-18**, `f72f7fc8`) |
+| 2. parity gate — the full suite green **through the compiled-recipe path** before any legacy path goes | ⚠ unverified here |
+| 3. legacy read path **kept behind a flag** for one verification minor | 🔴 **THE FLAG DOES NOT EXIST.** `legacy` appears 242× in main source as identifiers and prose; there is no system property or gate anywhere that disables the legacy read path |
+| 4. the release | 🔴 newest tag **`v3.12.0` shipped 2026-06-05** — ten weeks BEFORE the converter — and is **not an ancestor of `master`** |
+
+⇒ **Two independent reasons row 15 cannot close by writing code**: no release has ever carried a flagged
+legacy path (step 4), and the flag that would make such a release meaningful was never built (step 3).
+
+⛔ **And building the flag is explicitly warned against**: the amendment's own §8 says of this work
+*"Do not start it on momentum."* Building it would also not close row 15 — **row 15 IS the deletion**, and
+a flag deletes nothing. It is the enabler for a release someone else must decide to cut.
+
+⇒ **Not closable by writing code, by anyone, and the intermediate step is fenced by its own plan.**
 
 ---
 
