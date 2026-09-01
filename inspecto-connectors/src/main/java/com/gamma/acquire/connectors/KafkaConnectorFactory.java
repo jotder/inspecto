@@ -28,7 +28,7 @@ public final class KafkaConnectorFactory implements CollectorConnectorFactory {
     public CollectorConnector create(PipelineConfig cfg, ConnectionProfile profile) {
         if (profile == null)
             throw new IllegalArgumentException("kafka source '" + cfg.collector().id()
-                    + "' requires source.connection to reference a *_connection.toon profile (brokers/topic)");
+                    + "' requires collector.connection to reference a *_connection.toon profile (brokers/topic)");
         return new KafkaConnector(profile, KafkaConsumer::new);
     }
 

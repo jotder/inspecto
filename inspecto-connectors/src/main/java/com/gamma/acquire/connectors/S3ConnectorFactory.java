@@ -27,7 +27,7 @@ public final class S3ConnectorFactory implements CollectorConnectorFactory {
     public CollectorConnector create(PipelineConfig cfg, ConnectionProfile profile) {
         if (profile == null)
             throw new IllegalArgumentException("s3 source '" + cfg.collector().id()
-                    + "' requires source.connection to reference a *_connection.toon profile (endpoint/credentials)");
+                    + "' requires collector.connection to reference a *_connection.toon profile (endpoint/credentials)");
         return new S3Connector(profile);
     }
 

@@ -16,6 +16,7 @@ import {
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -156,6 +157,12 @@ const nativeClearTimeout: typeof clearTimeout =
  * counts rather than listing every id: the dialog has to be readable, and the operator only needs
  * to know the shape of what breaks before deciding. (From the onboarding shell, P6-e.)
  */
+/** Whether a key event originated in a text-entry surface — its own native Ctrl+Z must stay native. */
+function isTextEntry(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false;
+    return target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+}
+
 function describeDependents(impact: ConfigImpact): string {
     return Object.entries(impact.dependents)
         .map(([kind, items]) => `${items.length} ${kind}${items.length === 1 ? '' : 's'}`)
@@ -182,12 +189,19 @@ function describeDependents(impact: ConfigImpact): string {
  */
 const TABBED_PANE_WIDTH = 420;
 
+/**
+ * Undo/redo history depth per tab (R4 / UNDO-1). A snapshot is the serialized editable graph — the
+ * SAME serialization the save path PUTs — so 50 of them is small, and beyond it the OLDEST drops.
+ */
+const UNDO_CAP = 50;
+
 @Component({
     selector: 'app-pipeline-editor',
     standalone: true,
     imports: [
         ReactiveFormsModule,
         MatButtonModule,
+        MatButtonToggleModule,
         MatFormFieldModule,
         MatIconModule,
         MatInputModule,
@@ -304,6 +318,43 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
      */
     private pendingSelect: string | null = null;
     private readonly dirtyIds = signal<ReadonlySet<string>>(new Set());
+
+    // ── undo/redo (R4 / UNDO-1) — bounded per-tab snapshot stacks over the SAVE serialization ──────
+    /**
+     * Per-tab history, beside {@link cachedModels} and dropped by the same {@link forgetTab}. A
+     * snapshot is `JSON.stringify` of the {@link AuthoredPipeline} MODEL — exactly what
+     * {@link save} PUTs — never the G6 scene, so a restored state is by construction a shape the
+     * save path accepts. Undo pops into `redo`; a FRESH mutation clears `redo` (history forks).
+     */
+    private readonly undoStacks = new Map<string, string[]>();
+    private readonly redoStacks = new Map<string, string[]>();
+    /**
+     * The last LOADED or successfully SAVED serialization per tab. Dirty after an undo/redo is
+     * recomputed against this, so undoing back to the saved state clears the flag honestly — and
+     * undoing PAST a save re-arms it.
+     */
+    private readonly historyBaselines = new Map<string, string>();
+    /** Maps are not reactive — bumped on every stack change so the toolbar buttons re-derive. */
+    private readonly historyEpoch = signal(0);
+    /**
+     * Bumped to rebuild the canvas IN PLACE from the restored model (the same rebuild-from-data
+     * path a tab switch takes, minus the tab switch). ⛔ Never restore via {@link select} — that is
+     * a server load, and it discards every other unsaved edit in the tab.
+     */
+    readonly canvasEpoch = signal(0);
+
+    /** Whether the active tab has anything to undo — drives the toolbar button. */
+    readonly canUndo = computed(() => {
+        this.historyEpoch();
+        const id = this.selectedId();
+        return !!id && (this.undoStacks.get(id)?.length ?? 0) > 0;
+    });
+    /** Whether the active tab has anything to redo. */
+    readonly canRedo = computed(() => {
+        this.historyEpoch();
+        const id = this.selectedId();
+        return !!id && (this.redoStacks.get(id)?.length ?? 0) > 0;
+    });
     /**
      * The sample thread, ONE PER TAB (operator-decided 2026-08-16; the wizard's D5 thread re-homed
      * after P6-e). 🔴 It is a Map here rather than a `providers: []` entry for the reason
@@ -427,6 +478,13 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
      */
     private readonly typeRules = signal<Map<string, EdgeRules>>(new Map());
     readonly findings = signal<PipelineFinding[]>([]);
+    /** Severity filter for the Validation dock's list (R1 UI half) — 'all' renders every finding. */
+    readonly findingFilter = signal<'all' | 'error' | 'warning'>('all');
+    /** The findings the dock renders — the tab badge deliberately stays counting the FULL list. */
+    readonly visibleFindings = computed(() => {
+        const sev = this.findingFilter();
+        return sev === 'all' ? this.findings() : this.findings().filter((f) => f.severity === sev);
+    });
     readonly activating = signal(false);
     readonly statusLabel = statusLabel;
     readonly findingIcon = findingIcon;
@@ -617,6 +675,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
                 );
                 return;
             }
+            this.captureUndo(); // R4: the PRE-mutation state, once the mutation is certain
             this.model.set(next);
             this.dirty.set(true);
             return;
@@ -627,6 +686,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
             this.toast.warning('Cannot insert here — this Step is wired beyond the linear chain. Use the Canvas.');
             return;
         }
+        this.captureUndo();
         this.model.set(next);
         this.dirty.set(true);
         this.openNodeConfig(node);
@@ -642,6 +702,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
             this.toast.warning('Cannot remove here — this Step is wired beyond the linear chain. Use the Canvas.');
             return;
         }
+        this.captureUndo();
         this.model.set(next);
         this.clearSelection();
         this.dirty.set(true);
@@ -654,6 +715,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         if (!m) return;
         const next = moveStepInChain(m, e.id, e.dir);
         if (!next) return;
+        this.captureUndo();
         this.model.set(next);
         this.dirty.set(true);
     }
@@ -670,6 +732,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
             this.toast.warning(`Cannot add branch '${e.key}' — a branch with that key already exists.`);
             return;
         }
+        this.captureUndo();
         this.model.set(next);
         this.dirty.set(true);
     }
@@ -684,6 +747,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
             this.toast.warning('Cannot remove this branch — its Steps are wired beyond the branch. Use the Canvas.');
             return;
         }
+        this.captureUndo();
         this.model.set(next);
         this.clearSelection();
         this.dirty.set(true);
@@ -696,6 +760,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         if (!m) return;
         const next = setRouteBranchWhere(m, e.routeId, e.key, e.where);
         if (!next) return;
+        this.captureUndo();
         this.model.set(next);
         this.dirty.set(true);
     }
@@ -707,6 +772,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         if (!m) return;
         const next = setRouteDefault(m, e.routeId, e.key);
         if (!next) return;
+        this.captureUndo();
         this.model.set(next);
         this.dirty.set(true);
     }
@@ -717,6 +783,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         const m = this.model();
         const route = m?.nodes.find((n) => n.id === e.routeId);
         if (!m || !route) return;
+        this.captureUndo();
         this.model.set(applyNodePatchInModel(m, { ...route, config: { ...route.config, mode: e.mode } }));
         this.dirty.set(true);
     }
@@ -941,9 +1008,25 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
      */
     @HostListener('keydown', ['$event'])
     onHostKeydown(event: KeyboardEvent): void {
-        if (!(event.ctrlKey || event.metaKey) || event.altKey || event.key.toLowerCase() !== 's') return;
-        event.preventDefault();
-        if (this.canAuthor() && this.dirty() && !this.saving()) void this.save();
+        if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+        const key = event.key.toLowerCase();
+        if (key === 's') {
+            event.preventDefault();
+            if (this.canAuthor() && this.dirty() && !this.saving()) void this.save();
+            return;
+        }
+        // R4: Ctrl/Cmd+Z undoes, Ctrl/Cmd+Y (or Ctrl/Cmd+Shift+Z) redoes — same canAuthor gate as
+        // Ctrl+S. ⚠ Unlike Save, a text-entry surface keeps the gesture: its NATIVE undo is the
+        // right answer inside an input, and hijacking it would preventDefault the field's own
+        // edit history.
+        if (isTextEntry(event.target)) return;
+        if (key === 'z' && !event.shiftKey) {
+            event.preventDefault();
+            if (this.canAuthor()) void this.undo();
+        } else if (key === 'y' || (key === 'z' && event.shiftKey)) {
+            event.preventDefault();
+            if (this.canAuthor()) void this.redo();
+        }
     }
 
     // ── open-tab persistence — the tab SET survives a reload; edits do not (beforeunload's job) ────
@@ -1079,6 +1162,12 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         // The thread is session state about a tab that no longer exists — reopening starts clean, the
         // same way the graph is refetched rather than restored.
         this.sampleThreads.delete(id);
+        // History and the Dataset-hop notice are tab state too — a reopened tab starts clean.
+        this.undoStacks.delete(id);
+        this.redoStacks.delete(id);
+        this.historyBaselines.delete(id);
+        this.historyEpoch.update((e) => e + 1);
+        this.setDatasetIssue(id, null);
         this.dirtyIds.update((s) => {
             const next = new Set(s);
             next.delete(id);
@@ -1108,6 +1197,94 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         if (m) this.cachedModels.set(current, m);
     }
 
+    // ── undo/redo mechanics (R4 / UNDO-1) ──────────────────────────────────────────────────────────
+
+    /**
+     * Push the PRE-mutation model onto the active tab's undo stack. Called at every mutation choke
+     * point (the paths that set `dirty`), BEFORE the mutation's new state replaces the old — so the
+     * stack always holds the state an undo should return to. A fresh mutation clears redo: the
+     * timeline forked, and redoing someone else's future over it would be a lie.
+     *
+     * <p>⚠ Node position drags never come through here — authored flows store no coordinates
+     * (see {@link PipelineEditorGraphComponent}), so a drag mutates nothing undo could restore.
+     */
+    private captureUndo(): void {
+        const id = this.selectedId();
+        const m = this.model();
+        if (!id || !m) return;
+        const stack = this.undoStacks.get(id) ?? [];
+        stack.push(JSON.stringify(m));
+        if (stack.length > UNDO_CAP) stack.shift(); // bounded — the OLDEST edit falls off
+        this.undoStacks.set(id, stack);
+        this.redoStacks.delete(id);
+        this.historyEpoch.update((e) => e + 1);
+    }
+
+    /** Stamp the tab's dirty baseline — at load and after each successful save (see {@link historyBaselines}). */
+    private stampBaseline(id: string, m: AuthoredPipeline): void {
+        this.historyBaselines.set(id, JSON.stringify(m));
+    }
+
+    /**
+     * A DIRTY definition drawer holds edits that live OUTSIDE the model until Apply — restoring
+     * another model state closes the drawer, so it gets the same courtesy every other transition
+     * gives it: confirm first, and declining aborts the undo/redo entirely.
+     */
+    private async confirmHistoryRestore(): Promise<boolean> {
+        if (!this.definitionDirty()) return true;
+        return this.confirm.confirmDestructive(
+            'The open definition has edits that have not been applied. Restoring another state discards them.',
+            { title: 'Discard unapplied edits?', confirmText: 'Discard' },
+        );
+    }
+
+    /** Undo the active tab's most recent mutation (toolbar button + Ctrl/Cmd+Z). */
+    async undo(): Promise<void> {
+        if (!this.canAuthor()) return; // same gate as Ctrl+S — defense in depth, not just the button
+        const id = this.selectedId();
+        const m = this.model();
+        if (!id || !m || !(this.undoStacks.get(id)?.length ?? 0)) return;
+        if (!(await this.confirmHistoryRestore())) return;
+        if (this.selectedId() !== id) return; // the operator moved on while the confirm was up
+        const snapshot = this.undoStacks.get(id)!.pop()!;
+        const redo = this.redoStacks.get(id) ?? [];
+        redo.push(JSON.stringify(this.model()!));
+        this.redoStacks.set(id, redo);
+        this.restoreSnapshot(id, snapshot);
+    }
+
+    /** Redo the active tab's most recently undone mutation (toolbar button + Ctrl/Cmd+Y, Ctrl+Shift+Z). */
+    async redo(): Promise<void> {
+        if (!this.canAuthor()) return;
+        const id = this.selectedId();
+        const m = this.model();
+        if (!id || !m || !(this.redoStacks.get(id)?.length ?? 0)) return;
+        if (!(await this.confirmHistoryRestore())) return;
+        if (this.selectedId() !== id) return;
+        const snapshot = this.redoStacks.get(id)!.pop()!;
+        const undoStack = this.undoStacks.get(id) ?? [];
+        undoStack.push(JSON.stringify(this.model()!));
+        this.undoStacks.set(id, undoStack);
+        this.restoreSnapshot(id, snapshot);
+    }
+
+    /**
+     * Replace the tab's model with a history snapshot and re-render LOCALLY: the canvas rebuilds
+     * from the new `g6Data` via {@link canvasEpoch} — the same rebuild-from-model path a tab switch
+     * takes — ⛔ never through {@link select}, which is a server load that discards edits. The
+     * drawer and selection belong to the outgoing state, so both close/clear (the drawer's dirty
+     * case was confirmed before this ran).
+     */
+    private restoreSnapshot(id: string, snapshot: string): void {
+        this.closeDefinition();
+        this.clearSelection();
+        this.model.set(JSON.parse(snapshot) as AuthoredPipeline);
+        // Honest dirty: back at the last loaded/saved state = clean; anywhere else = unsaved.
+        this.dirty.set(snapshot !== this.historyBaselines.get(id));
+        this.canvasEpoch.update((e) => e + 1);
+        this.historyEpoch.update((e) => e + 1);
+    }
+
     /** Fetch and open a pipeline's graph, adding a tab for it if it is not already open. */
     select(id: string): void {
         if (this.selectedId() !== id) {
@@ -1132,6 +1309,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
                 this.model.set(flow);
                 this.selectedId.set(id); // drives the host rebuild (graphKey)
                 this.dirty.set(false);
+                this.stampBaseline(id, flow); // what undo-to-the-bottom compares against
             },
             error: (err) => {
                 if (this.pendingSelect === id) this.toast.error(apiErrorMessage(err, 'Could not load the pipeline'));
@@ -1305,6 +1483,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         const flow = draft.config as unknown as AuthoredPipeline;
         if (!flow?.nodes || !flow?.edges) return;
         const current = this.model();
+        this.captureUndo(); // R4: adopting a draft replaces the whole graph — very much worth an undo
         // Keep the open pipeline's identity and active state — the tool echoes the graph, not the
         // lifecycle, and adopting a draft must never silently activate or rename a live pipeline.
         this.model.set({ ...flow, name: current?.name ?? flow.name, active: current?.active ?? false });
@@ -1337,6 +1516,8 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
             next: () => {
                 this.saving.set(false);
                 this.dirty.set(false);
+                // The stack SURVIVES a save (undoing past it re-arms dirty against this new baseline).
+                this.stampBaseline(id, m);
                 this.toast.success(`Saved pipeline '${id}'`);
             },
             error: (err) => {
@@ -1347,26 +1528,48 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     }
 
     /**
-     * Surface named lower-refusals (UNSUPPORTED_NODE / MULTI_PARSER / NO_*) in the Validation dock, or
-     * false if the error carried none. Every refusal is listed and stays put — a first-only transient
-     * toast turned an n-problem graph into n save→fix→save cycles.
+     * Surface named lower-refusals (UNSUPPORTED_NODE / MULTI_PARSER / NO_*) OR findings-shaped 422s
+     * (the spec/safety/arming gate — `error.details.findings`) in the Validation dock, or false if
+     * the error carried neither. Every problem is listed and stays put — a first-only transient
+     * toast turned an n-problem graph into n save→fix→save cycles. Without the findings arm, the
+     * arming pre-checks' 422 fell through to a generic toast and never reached the dock.
      */
     private showRefusals(err: unknown): boolean {
-        const refusals = (err as { error?: { error?: { details?: { refusals?: PipelineRefusal[] } } } })?.error?.error
-            ?.details?.refusals;
-        if (!refusals?.length) return false;
-        this.findings.set(
-            refusals.map((r) => ({
-                severity: 'error' as const,
-                nodeId: r.nodeId,
-                message: r.message,
-            })),
-        );
+        const details = (
+            err as {
+                error?: {
+                    error?: {
+                        details?: {
+                            refusals?: PipelineRefusal[];
+                            findings?: { severity?: string; fieldPath?: string; message: string;
+                                         code?: string; guidance?: string }[];
+                        };
+                    };
+                };
+            }
+        )?.error?.error?.details;
+        const refusals = details?.refusals;
+        const errorFindings = (details?.findings ?? []).filter((f) => f.severity === 'ERROR');
+        const rows: PipelineFinding[] = refusals?.length
+            ? refusals.map((r) => ({
+                  severity: 'error' as const,
+                  nodeId: r.nodeId,
+                  message: r.message,
+                  code: r.code,
+              }))
+            : errorFindings.map((f) => ({
+                  severity: 'error' as const,
+                  message: f.fieldPath ? `${f.fieldPath}: ${f.message}` : f.message,
+                  code: f.code,
+                  guidance: f.guidance,
+              }));
+        if (!rows.length) return false;
+        this.findings.set(rows);
         this.bottomTab.set('validation');
         this.toast.error(
-            refusals.length === 1
+            rows.length === 1
                 ? 'Cannot save: 1 problem — see Validation.'
-                : `Cannot save: ${refusals.length} problems — see Validation.`,
+                : `Cannot save: ${rows.length} problems — see Validation.`,
         );
         return true;
     }
@@ -2314,6 +2517,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         const label = labels.get(type) ?? type;
         const generic = !held.name?.trim() || held.name.trim() === (labels.get(held.type) ?? 'Parser');
         const retyped: AuthoredNode = { ...held, type, ...(generic ? { name: label } : {}) };
+        this.captureUndo();
         this.model.update((m) => (m ? applyNodePatchInModel(m, retyped) : m));
         this.toast.info(`Set the Parse Step '${held.id}' to ${label}.`);
         this.selectNewNode(retyped);
@@ -2327,6 +2531,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     private insertNode(type: string): AuthoredNode {
         const id = uniqueNodeId(this.model(), type);
         const node: AuthoredNode = { id, type };
+        this.captureUndo();
         this.model.update((m) => (m ? addNodeToModel(m, node) : m));
         return node;
     }
@@ -2381,6 +2586,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         const n = node && this.model()?.nodes.find((x) => x.id === node.id);
         if (!n || !this.canAuthor()) return;
         const updated: AuthoredNode = { ...n, name: v.name || undefined, description: v.description || undefined };
+        this.captureUndo();
         this.model.update((m) => (m ? applyNodePatchInModel(m, updated) : m));
         if (this.selectedNode()?.id === updated.id) this.selectedNode.set(updated);
         this.definitionNode.update((d) =>
@@ -2431,6 +2637,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         if (enabled) delete config['enabled'];
         else config['enabled'] = false;
         const updated: AuthoredNode = { ...n, config };
+        this.captureUndo();
         this.model.update((m) => (m ? applyNodePatchInModel(m, updated) : m));
         if (this.selectedNode()?.id === updated.id) this.selectedNode.set(updated);
         this.definitionNode.update((d) => (d && d.id === updated.id ? { ...d, config } : d));
@@ -2449,6 +2656,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     private applyNodePatch(updated: AuthoredNode): void {
         const m = this.model();
         if (!m) return;
+        this.captureUndo();
         this.model.set(applyNodePatchInModel(m, updated));
         if (this.selectedNode()?.id === updated.id) this.selectedNode.set(updated);
         this.canvas?.updateNodeLabel(updated.id, updated.name || updated.id);
@@ -2484,6 +2692,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         if (!id || !m || !p) return;
         const next = setEdgeRelInModel(m, p.from, p.to, p.rel, rel);
         if (!next) return; // unchanged or would collide with an existing edge
+        this.captureUndo();
         this.model.set(next);
         this.canvas?.removeElement(id);
         const newId = encodeEdgeId(p.from, p.to, rel);
@@ -2657,6 +2866,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
                 this.activating.set(false);
                 this.model.set(updated);
                 this.dirty.set(false);
+                this.stampBaseline(id, updated); // this write IS a save — same baseline rule
                 // The list row carries the `active` chip the Open dialog shows, and it is loaded once —
                 // without this a pipeline activated in this session still read "inactive" everywhere but
                 // the toolbar until a reload. Same in-place list patch as rename and delete.
@@ -2683,23 +2893,79 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         const store = derivedPipelineId(id);
         this.api.settings(id).subscribe({
             next: (settings) => {
-                if (settings.produces === 'reference') return;
+                if (settings.produces === 'reference') {
+                    this.retryingDataset.set(false);
+                    this.setDatasetIssue(id, null); // nothing to register — nothing left to retry
+                    return;
+                }
                 this.datasets.ensure(store, display).subscribe((res) => {
+                    this.retryingDataset.set(false);
+                    // R6: a failed hop is a PERSISTENT, actionable banner, not a transient toast —
+                    // the registration is idempotent by physicalRef, so Retry is always safe.
+                    if (res.status === 'failed') {
+                        this.setDatasetIssue(id, {
+                            display,
+                            message: `The pipeline is live, but its Dataset could not be registered — ${datasetManualHint(store)}`,
+                        });
+                        return;
+                    }
+                    this.setDatasetIssue(id, null); // success (created or already there) clears the banner
                     if (res.status === 'created')
                         this.toast.success(`Dataset "${store}" registered — queryable under Catalog ▸ Datasets`);
-                    else if (res.status === 'failed')
-                        this.toast.warning(
-                            `The pipeline is live, but its Dataset could not be registered — ${datasetManualHint(store)}`,
-                        );
                 });
             },
             // Unknown kind ⇒ do NOT guess. Registering a Dataset over a Reference's store would put a
             // row set in the Catalog that nothing should query there.
-            error: () =>
-                this.toast.warning(
-                    `The pipeline is live, but its kind could not be read, so no Dataset was registered — ${datasetManualHint(store)}`,
-                ),
+            error: () => {
+                this.retryingDataset.set(false);
+                this.setDatasetIssue(id, {
+                    display,
+                    message: `The pipeline is live, but its kind could not be read, so no Dataset was registered — ${datasetManualHint(store)}`,
+                });
+            },
         });
+    }
+
+    // ── Dataset-hop failure banner (R6) — per tab, persistent, dismissible ─────────────────────────
+
+    /**
+     * The activation Dataset-hop failures, PER TAB (same Map-not-signal-per-tab shape as
+     * {@link cachedModels}, but reactive because the template renders it). An entry means the tab's
+     * pipeline went live and its Dataset hop failed; it stays until a retry succeeds, the operator
+     * dismisses it, or the tab closes ({@link forgetTab}).
+     */
+    private readonly datasetIssues = signal<ReadonlyMap<string, { display: string; message: string }>>(new Map());
+    /** The ACTIVE tab's Dataset-hop failure, or null — what the banner renders. */
+    readonly datasetIssue = computed(() => {
+        const id = this.selectedId();
+        return id ? (this.datasetIssues().get(id) ?? null) : null;
+    });
+    /** A retry is in flight — disables the banner's Retry button. */
+    readonly retryingDataset = signal(false);
+
+    private setDatasetIssue(id: string, issue: { display: string; message: string } | null): void {
+        this.datasetIssues.update((m) => {
+            if (issue === null && !m.has(id)) return m; // no-op keeps the signal from re-notifying
+            const next = new Map(m);
+            if (issue) next.set(id, issue);
+            else next.delete(id);
+            return next;
+        });
+    }
+
+    /** Banner Retry: re-invoke the registration — idempotent by `physicalRef`, so always safe. */
+    retryDatasetRegistration(): void {
+        const id = this.selectedId();
+        const issue = id ? this.datasetIssues().get(id) : null;
+        if (!id || !issue || this.retryingDataset()) return;
+        this.retryingDataset.set(true);
+        this.ensureDataset(id, issue.display);
+    }
+
+    /** Banner Dismiss: the operator has read it — the manual path stays in the Catalog docs. */
+    dismissDatasetIssue(): void {
+        const id = this.selectedId();
+        if (id) this.setDatasetIssue(id, null);
     }
 
     // ── helpers ──
@@ -2717,6 +2983,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         }
         const next = addEdgeToModel(m, from, to, rel);
         if (!next) return; // duplicate — no-op
+        this.captureUndo();
         this.model.set(next);
         if (!opts.skipCanvas) this.canvas?.addEdge(encodeEdgeId(from, to, rel), from, to, rel);
         this.dirty.set(true);
@@ -2725,6 +2992,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     private removeNode(id: string): void {
         const m = this.model();
         if (!m) return;
+        this.captureUndo();
         this.model.set(removeNodeFromModel(m, id));
         this.canvas?.removeElement(id);
         // ⚠ `clearSelection()` touches selectedNode/selectedEdgeId/connectFrom only, so the definition
@@ -2740,6 +3008,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         const m = this.model();
         const p = decodeEdgeId(g6EdgeId);
         if (m && p) {
+            this.captureUndo();
             this.model.set(removeEdgeFromModel(m, p.from, p.to, p.rel));
             this.dirty.set(true);
         }

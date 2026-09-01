@@ -26,7 +26,7 @@ public final class SftpConnectorFactory implements CollectorConnectorFactory {
     public CollectorConnector create(PipelineConfig cfg, ConnectionProfile profile) {
         if (profile == null)
             throw new IllegalArgumentException("sftp source '" + cfg.collector().id()
-                    + "' requires source.connection to reference a *_connection.toon profile (host/credentials)");
+                    + "' requires collector.connection to reference a *_connection.toon profile (host/credentials)");
         return new SftpConnector(profile, cfg.collector().stability().readyMarker());
     }
 

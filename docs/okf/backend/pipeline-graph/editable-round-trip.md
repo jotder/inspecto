@@ -451,3 +451,36 @@ declaring its spellings and nothing else.
   test is where that shows up first.
 
 UI side: [Grammar configuration](../../frontend/features/grammar-config.md).
+
+## 21. The pipeline bundle — selective export/import with dependency closure (R2, 2026-09-01)
+
+`PipelineBundleRoutes` closes TRANSFER-ARCH-1: canonical `*_pipeline.toon` transfer with closure.
+
+- **`GET /pipelines/{name}/bundle`** (ungated read — the export posture every transfer surface
+  shares; secrets never travel): an `application/zip` of `manifest.toon` (format
+  `inspecto-pipeline-bundle` v1, satellites `{path, sha256}`, `requirements[]`, `notes[]`), the
+  pipeline toon, every satellite byte-verbatim under its bare basename, and each `*_enrich.toon`
+  companion. **Closure = `PipelineConfig.referencedFiles()`** — the engine's own resolution
+  (config-relative first, W1b); ⛔ no second resolver exists. `collector.connection` travels as a
+  secret-free `requirements[]` entry; a literal secret-looking value is masked to `***` + noted.
+- **`POST /pipelines/import?name=&conflict=refuse|overwrite|rename`** (`canAuthorWorkbench`; raw
+  zip body + query params — the codebase has no multipart parser, matching
+  `POST /spaces/{id}/import`). Gate order: write-root 503 → manifest/spec/sha256 422 → zip-slip
+  jail 403 (checked against BOTH the requested and final destination) → conflict 409 unless the
+  policy says otherwise (`overwrite` lands on the REGISTERED file — the saveGraph anti-shadow
+  rule; `rename` takes the first free `<id>_2`…) → retarget inside each body (name/id/stream/
+  collector.id; `active: false` always; dirs re-derived from the space convention; enrichment
+  re-pointed on `name`/`triggers.on_pipeline`/`input.database`/`output.database`) → the FULL
+  saveGraph gate (spec + safety + the three arming findings) → atomic writes, satellites before
+  the pipeline, then register.
+- ⚠ **Satellites are written before the safety gate and deleted on an ERROR verdict** —
+  deliberate: `resolveSchemaRef`/`ConfigSafetyValidator.resolveRef` accept a config-relative
+  candidate only when it exists on disk, so validating rewritten bare-basename refs against an
+  empty directory would false-422 every bundle. A refused import leaves nothing written.
+- Pinned over real HTTP by `ControlApiPipelineBundleTest` (round-trip with byte-compared
+  satellites · conflict matrix · zip-slip · requirement-no-secret · 503/404/422 triple). ⚠ The
+  capability-manifest drift guard fires on any new gated route — declare it in
+  `CapabilityManifest` in the same change (only the FULL reactor showed it).
+- The UI's Duplicate + row export still ride the client stream-bundle — migration onto these
+  routes is the BACKLOG follow-up; the metadata bundle's `authored-pipeline` kind stays serving
+  grandfathered flows only.

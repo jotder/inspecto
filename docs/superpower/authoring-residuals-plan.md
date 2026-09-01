@@ -1,6 +1,14 @@
 # Authoring residuals — solution specification (stage-1 close-out)
 
-**Status: ACTIVE PLAN, specified 2026-09-01 (operator-decided directions).** The stage-1
+**Status: R1 / R2 / R4 / R5 / R6 SHIPPED 2026-09-01 (same shift, GAUNTLET-verified); ACTIVE for
+R3 only (⛔ gated on the stage-2 execution analysis) + the small UI-migration-onto-R2 follow-up;
+R7 stays a future sketch.** As-built: `okf/frontend/features/pipeline-editor.md` (R4/R5/R6),
+`okf/backend/pipeline-graph/editable-round-trip.md` §21 (R2) and §16 (R1's coded findings).
+Notable as-built deviations from this spec, all sound: R4's drag-coalescing was moot (node moves
+never touch the model); R2 writes satellites before the safety gate and deletes them on refusal
+(config-relative refs only validate against files that exist — net behavior unchanged); R2's
+import transport is a raw `application/zip` body with query params (no multipart parser exists in
+the codebase, matching `POST /spaces/{id}/import`). The stage-1
 authoring-lifecycle analysis shipped its 9-item package the same day
 (`okf/frontend/features/pipeline-editor.md` + `okf/backend/pipeline-graph/editable-round-trip.md`
 record the as-built); this plan is the solution spec for what was FILED rather than built. Prior

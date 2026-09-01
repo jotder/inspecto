@@ -86,6 +86,9 @@ class ControlApiRouteArmingTest {
             assertTrue(findings.contains("matches no sinks[] destination"), findings);
             assertTrue(findings.contains("needs default:"), findings);
             assertTrue(findings.contains("ERROR"), findings);
+            // R1: every arming refusal carries a stable code and split-out guidance.
+            assertTrue(findings.contains("\"code\":\"ERR_ROUTE_UNARMABLE\""), findings);
+            assertTrue(findings.contains("\"guidance\":"), findings);
         }
     }
 
@@ -102,7 +105,9 @@ class ControlApiRouteArmingTest {
             assertTrue(findings.contains("WARNING"), findings);
             assertFalse(findings.contains("\"severity\":\"ERROR\""), findings);
             // The warning has to say when it bites, or it reads as a problem with the draft as saved.
+            // (Since R1 that half lives in the finding's guidance, not fused into the message.)
             assertTrue(findings.contains("only once it is activated"), findings);
+            assertTrue(findings.contains("\"code\":\"WARN_ROUTE_UNARMABLE\""), findings);
         }
     }
 
@@ -129,6 +134,8 @@ class ControlApiRouteArmingTest {
             String findings = out.get("findings").toString();
             assertTrue(findings.contains("park"), findings);
             assertTrue(findings.contains("ERROR"), findings);
+            assertTrue(findings.contains("\"code\":\"ERR_STEP_DISABLE_UNPARKABLE\""), findings);
+            assertTrue(findings.contains("\"guidance\":"), findings);
         }
     }
 
@@ -144,6 +151,7 @@ class ControlApiRouteArmingTest {
             assertTrue(findings.contains("park"), findings);
             assertFalse(findings.contains("\"severity\":\"ERROR\""), findings);
             assertTrue(findings.contains("only once it is activated"), findings);
+            assertTrue(findings.contains("\"code\":\"WARN_STEP_DISABLE_UNPARKABLE\""), findings);
         }
     }
 

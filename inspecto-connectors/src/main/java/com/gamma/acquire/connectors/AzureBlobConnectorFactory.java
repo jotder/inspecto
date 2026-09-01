@@ -27,7 +27,7 @@ public final class AzureBlobConnectorFactory implements CollectorConnectorFactor
     public CollectorConnector create(PipelineConfig cfg, ConnectionProfile profile) {
         if (profile == null)
             throw new IllegalArgumentException("azure source '" + cfg.collector().id()
-                    + "' requires source.connection to reference a *_connection.toon profile (account/key/container)");
+                    + "' requires collector.connection to reference a *_connection.toon profile (account/key/container)");
         return new AzureBlobConnector(profile);
     }
 

@@ -7,6 +7,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { PipelineEditorComponent } from './pipeline-editor.component';
 import { AuthoredPipeline, ComponentsService, ConfigService, LensService, PipelinesService } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { lowerGraph } from './pipeline-editable';
 import { StreamTransferService } from 'app/inspecto/transfer/stream-transfer.service';
 import { ToastrService } from 'ngx-toastr';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
@@ -603,15 +604,17 @@ describe('PipelineEditorComponent', () => {
             expect(components.create).not.toHaveBeenCalled();
         });
 
-        /** ⛔ Unknown kind ⇒ do not guess: registering over a Reference's store pollutes the Catalog. */
-        it('warns and registers nothing when the kind cannot be read', async () => {
+        /** ⛔ Unknown kind ⇒ do not guess: registering over a Reference's store pollutes the Catalog.
+         *  R6 upgraded the surface: a persistent banner for the tab, no longer a transient toast. */
+        it('raises the persistent banner and registers nothing when the kind cannot be read', async () => {
             api.settings.mockReturnValue(throwError(() => new Error('boom')));
             const c = make();
             c.select('demo');
             await c.activate();
 
             expect(components.create).not.toHaveBeenCalled();
-            expect(toast.warning).toHaveBeenCalled();
+            expect(toast.warning).not.toHaveBeenCalled();
+            expect(c.datasetIssue()?.message).toContain('kind could not be read');
         });
 
         /**
@@ -2132,6 +2135,77 @@ describe('PipelineEditorComponent', () => {
         });
     });
 
+    /** R1 (authoring residuals) — the dock renders the server's coded diagnostics. */
+    describe('Validation dock — guidance, code chip, severity filter', () => {
+        function openDockWith(findings: Parameters<PipelineEditorComponent['findings']['set']>[0]) {
+            const { fixture, c } = makeRendered();
+            c.select('demo');
+            c.findings.set(findings);
+            c.bottomTab.set('validation');
+            fixture.detectChanges();
+            return { fixture, c };
+        }
+
+        it("renders a finding's guidance as its own line and its code as a mono chip — nothing when absent", () => {
+            const { fixture } = openDockWith([
+                {
+                    severity: 'error',
+                    nodeId: 'x',
+                    message: 'boom',
+                    code: 'ERR_ROUTE_UNARMABLE',
+                    guidance: 'add a where: to the branch',
+                },
+                { severity: 'warning', message: 'meh' },
+            ]);
+            const items = Array.from(
+                fixture.nativeElement.querySelectorAll('#pipe-panel-output li'),
+            ) as HTMLElement[];
+            expect(items).toHaveLength(2);
+            expect(items[0].querySelector('code')!.textContent!.trim()).toBe('ERR_ROUTE_UNARMABLE');
+            const guidance = items[0].querySelector('[data-finding-guidance]')!;
+            expect(guidance.textContent).toContain('add a where: to the branch');
+            // An uncoded finding renders neither the chip nor a guidance line.
+            expect(items[1].querySelector('code')).toBeNull();
+            expect(items[1].querySelector('[data-finding-guidance]')).toBeNull();
+        });
+
+        it('the All / Errors / Warnings toggle narrows the rendered list; the tab badge keeps the full count', () => {
+            const { fixture } = openDockWith([
+                { severity: 'error', message: 'boom' },
+                { severity: 'warning', message: 'meh 1' },
+                { severity: 'warning', message: 'meh 2' },
+            ]);
+            const rendered = () =>
+                Array.from(fixture.nativeElement.querySelectorAll('#pipe-panel-output li')).map(
+                    (li) => (li as HTMLElement).textContent!,
+                );
+            expect(rendered()).toHaveLength(3);
+
+            const toggles = Array.from(
+                fixture.nativeElement.querySelectorAll('mat-button-toggle-group[aria-label="Filter findings by severity"] mat-button-toggle button'),
+            ) as HTMLButtonElement[];
+            expect(toggles).toHaveLength(3); // All / Errors / Warnings
+
+            toggles[1].click(); // Errors
+            fixture.detectChanges();
+            expect(rendered()).toHaveLength(1);
+            expect(rendered()[0]).toContain('boom');
+            // The tab badge stays the FULL count — the filter narrows the list, never the tally.
+            expect(
+                fixture.nativeElement.querySelector('#pipe-tab-validation span')!.textContent!.trim(),
+            ).toBe('3');
+
+            toggles[2].click(); // Warnings
+            fixture.detectChanges();
+            expect(rendered()).toHaveLength(2);
+            expect(rendered().every((t) => t.includes('meh'))).toBe(true);
+
+            toggles[0].click(); // back to All
+            fixture.detectChanges();
+            expect(rendered()).toHaveLength(3);
+        });
+    });
+
     it('readOnly withholds authoring even when the lens would allow it', () => {
         const c = make();
         c.readOnly = true;
@@ -2276,6 +2350,42 @@ describe('PipelineEditorComponent', () => {
         expect(c.findings()).toHaveLength(3);
         expect(c.findings().every((f) => f.severity === 'error')).toBe(true);
         expect(c.findings().map((f) => f.nodeId)).toEqual(['a', 'b', undefined]);
+        expect(c.bottomTab()).toBe('validation');
+    });
+
+    it('a findings-shaped 422 (the arming/spec gate) lands in the dock too, guidance carried', () => {
+        const c = make();
+        c.selectedId.set('demo');
+        c.model.set(structuredClone(FLOW));
+        api.savePipelineGraph.mockReturnValue(
+            throwError(() => ({
+                status: 422,
+                error: {
+                    error: {
+                        details: {
+                            findings: [
+                                {
+                                    severity: 'ERROR',
+                                    fieldPath: 'route',
+                                    message: "branch 'apac' has no where:",
+                                    code: 'ERR_ROUTE_UNARMABLE',
+                                    guidance: 'Type the branch predicate in the Recipe view, or keep the draft inactive.',
+                                },
+                                { severity: 'WARNING', fieldPath: 'processing.threads', message: 'noise' },
+                            ],
+                        },
+                    },
+                },
+            })),
+        );
+
+        c.save();
+
+        // Only the ERROR finding lands (warnings on a 422 body are noise here), guidance intact.
+        expect(c.findings()).toHaveLength(1);
+        expect(c.findings()[0].code).toBe('ERR_ROUTE_UNARMABLE');
+        expect(c.findings()[0].guidance).toContain('inactive');
+        expect(c.findings()[0].message).toContain('route:');
         expect(c.bottomTab()).toBe('validation');
     });
 
@@ -2786,6 +2896,318 @@ describe('PipelineEditorComponent', () => {
 
         expect(toast.error).toHaveBeenCalled();
         expect(c.flows().some((f) => f.name === 'taken')).toBe(false);
+    });
+
+    /**
+     * R4 / UNDO-1 — bounded per-tab snapshot undo/redo. A snapshot is the serialized MODEL (the
+     * same serialization the save PUTs), captured at every mutation choke point BEFORE the new
+     * state replaces the old; restore is LOCAL (never a select(), which is a server load that
+     * discards edits) and dirty recomputes against the last loaded/saved baseline.
+     */
+    describe('undo/redo (R4)', () => {
+        function confirmOf() {
+            return TestBed.inject(InspectoConfirmService) as unknown as {
+                confirmDestructive: ReturnType<typeof vi.fn>;
+            };
+        }
+
+        it('undo restores the pre-mutation model, LOCALLY, and dirty clears at the baseline', async () => {
+            const c = make();
+            c.select('demo');
+            const before = structuredClone(c.model()!);
+            c.setNodeEnabled(c.model()!.nodes[1], false);
+            expect(c.dirty()).toBe(true);
+            expect(c.canUndo()).toBe(true);
+
+            await c.undo();
+
+            expect(c.model()).toEqual(before);
+            expect(c.dirty(), 'back at the loaded state — honestly clean').toBe(false);
+            expect(c.canUndo()).toBe(false);
+            expect(c.canRedo()).toBe(true);
+            // ⛔ The restore is local: no server reload, or every OTHER unsaved edit would be gone.
+            expect(api.pipelineGraphRaw).toHaveBeenCalledTimes(1);
+        });
+
+        it('redo restores the undone mutation and re-arms dirty', async () => {
+            const c = make();
+            c.select('demo');
+            c.setNodeEnabled(c.model()!.nodes[1], false);
+            await c.undo();
+
+            await c.redo();
+
+            expect(c.model()!.nodes[1].config?.['enabled']).toBe(false);
+            expect(c.dirty()).toBe(true);
+            expect(c.canRedo()).toBe(false);
+            expect(c.canUndo()).toBe(true);
+        });
+
+        it('a fresh mutation clears redo — the timeline forked', async () => {
+            const c = make();
+            c.select('demo');
+            c.setNodeEnabled(c.model()!.nodes[1], false);
+            await c.undo();
+            expect(c.canRedo()).toBe(true);
+
+            c.renameNode(c.model()!.nodes[1], { name: 'Renamed', description: '' });
+
+            expect(c.canRedo()).toBe(false);
+        });
+
+        it('the stack is bounded at 50 — the OLDEST snapshot drops, and the floor is not the baseline', async () => {
+            const c = make();
+            c.select('demo');
+            for (let i = 1; i <= 52; i++) c.renameNode(c.model()!.nodes[1], { name: `n${i}`, description: '' });
+
+            let undone = 0;
+            while (c.canUndo()) {
+                await c.undo();
+                undone++;
+            }
+
+            expect(undone).toBe(50);
+            // 52 snapshots were pushed (the state BEFORE each rename); the two oldest were evicted,
+            // so the deepest undo lands on the state before rename #3 — the node named 'n2'.
+            expect(c.model()!.nodes[1].name).toBe('n2');
+            expect(c.dirty(), 'the evicted floor is NOT the loaded baseline').toBe(true);
+        });
+
+        it('a DIRTY definition drawer confirms first — declining aborts the undo', async () => {
+            const c = make();
+            c.select('demo');
+            c.setNodeEnabled(c.model()!.nodes[1], false);
+            await c.openDefinition(c.model()!.nodes[0]);
+            c.definitionDirty.set(true);
+
+            confirmOf().confirmDestructive.mockResolvedValueOnce(false);
+            await c.undo();
+            expect(c.model()!.nodes[1].config?.['enabled'], 'declined — nothing restored').toBe(false);
+            expect(c.canUndo()).toBe(true);
+            expect(c.definitionNode()).not.toBeNull();
+
+            confirmOf().confirmDestructive.mockResolvedValueOnce(true);
+            await c.undo();
+            expect(c.model()!.nodes[1].config?.['enabled']).toBeUndefined();
+            expect(c.definitionNode(), 'the drawer belonged to the discarded state').toBeNull();
+        });
+
+        it('the stack survives a save — undoing past it re-arms dirty against the NEW baseline', async () => {
+            const c = make();
+            c.select('demo');
+            const before = structuredClone(c.model()!);
+            c.setNodeEnabled(c.model()!.nodes[1], false);
+            await c.save();
+            expect(c.dirty()).toBe(false);
+            expect(c.canUndo()).toBe(true);
+
+            await c.undo();
+
+            expect(c.model()).toEqual(before);
+            expect(c.dirty(), 'the pre-save state is UNSAVED now').toBe(true);
+        });
+
+        it('history is per tab, and closing a tab drops it', async () => {
+            const c = make();
+            c.select('demo');
+            c.setNodeEnabled(c.model()!.nodes[1], false);
+            TestBed.tick(); // flush the per-tab dirty mirror before parking
+
+            api.pipelineGraphRaw.mockReturnValue(of({ name: 'other', active: false, nodes: [], edges: [] }));
+            c.select('other');
+            expect(c.canUndo(), 'the other tab has its own, empty history').toBe(false);
+
+            await c.activateTab('demo');
+            expect(c.canUndo()).toBe(true);
+
+            await c.closeTab('demo'); // the confirm mock approves the discard
+            c.select('demo');
+            expect(c.canUndo(), 'a reopened tab starts with no history').toBe(false);
+        });
+
+        /** The snapshot is the SAVE serialization, so a restored graph must lower without refusals. */
+        it('a restored graph passes the TS lower (pipeline-editable) without refusals', async () => {
+            const c = make();
+            c.select('demo');
+            c.onDropAdd({ type: 'transform.filter', x: 5, y: 5 });
+            c.renameNode(c.model()!.nodes[1], { name: 'Filter A', description: '' });
+
+            await c.undo();
+            await c.undo();
+
+            const res = lowerGraph(c.model()!, { name: 'demo' }, false);
+            expect('config' in res, JSON.stringify(res)).toBe(true);
+        });
+
+        /** R4 keyboard layer — extends the SAME host keydown handler Ctrl+S lives on. */
+        describe('Ctrl+Z / Ctrl+Y', () => {
+            function press(el: HTMLElement, key: string, init: KeyboardEventInit = {}): KeyboardEvent {
+                const e = new KeyboardEvent('keydown', {
+                    key,
+                    ctrlKey: true,
+                    cancelable: true,
+                    bubbles: true,
+                    ...init,
+                });
+                el.dispatchEvent(e);
+                return e;
+            }
+            /** undo()/redo() resolve their (clean-drawer) confirm on a microtask chain. */
+            const settle = () => new Promise((r) => setTimeout(r));
+
+            it('Ctrl+Z undoes and Ctrl+Y redoes the last graph mutation', async () => {
+                const { fixture, c } = makeRendered();
+                c.select('demo');
+                c.setNodeEnabled(c.model()!.nodes[1], false);
+
+                const z = press(fixture.nativeElement as HTMLElement, 'z');
+                await settle();
+                expect(z.defaultPrevented).toBe(true);
+                expect(c.model()!.nodes[1].config?.['enabled']).toBeUndefined();
+
+                const y = press(fixture.nativeElement as HTMLElement, 'y');
+                await settle();
+                expect(y.defaultPrevented).toBe(true);
+                expect(c.model()!.nodes[1].config?.['enabled']).toBe(false);
+            });
+
+            it('Cmd+Shift+Z is redo too', async () => {
+                const { fixture, c } = makeRendered();
+                c.select('demo');
+                c.setNodeEnabled(c.model()!.nodes[1], false);
+                press(fixture.nativeElement as HTMLElement, 'z');
+                await settle();
+
+                press(fixture.nativeElement as HTMLElement, 'z', { ctrlKey: false, metaKey: true, shiftKey: true });
+                await settle();
+
+                expect(c.model()!.nodes[1].config?.['enabled']).toBe(false);
+            });
+
+            /** ⚠ A text field keeps its NATIVE undo — the editor must not hijack its edit history. */
+            it('leaves Ctrl+Z alone inside a text-entry surface', async () => {
+                const { fixture, c } = makeRendered();
+                c.select('demo');
+                c.setNodeEnabled(c.model()!.nodes[1], false);
+                const input = document.createElement('input');
+                (fixture.nativeElement as HTMLElement).appendChild(input);
+
+                const e = press(input, 'z');
+                await settle();
+
+                expect(e.defaultPrevented).toBe(false);
+                expect(c.model()!.nodes[1].config?.['enabled'], 'nothing undone').toBe(false);
+            });
+
+            it('never undoes in View mode — the same canAuthor gate as Ctrl+S', async () => {
+                const { fixture, c } = makeRendered();
+                c.select('demo');
+                c.setNodeEnabled(c.model()!.nodes[1], false);
+                c.readOnly = true;
+
+                press(fixture.nativeElement as HTMLElement, 'z');
+                await settle();
+
+                expect(c.model()!.nodes[1].config?.['enabled'], 'nothing undone').toBe(false);
+            });
+        });
+
+        it('the toolbar buttons disable by stack emptiness', () => {
+            const { fixture, c } = makeRendered();
+            c.select('demo');
+            fixture.detectChanges();
+            const el = fixture.nativeElement as HTMLElement;
+            const undoBtn = el.querySelector('[aria-label="Undo the last edit"]') as HTMLButtonElement;
+            const redoBtn = el.querySelector('[aria-label="Redo the last undone edit"]') as HTMLButtonElement;
+            expect(undoBtn.disabled).toBe(true);
+            expect(redoBtn.disabled).toBe(true);
+
+            c.setNodeEnabled(c.model()!.nodes[1], false);
+            fixture.detectChanges();
+            expect(undoBtn.disabled).toBe(false);
+            expect(redoBtn.disabled, 'nothing undone yet').toBe(true);
+        });
+
+        it('the toolbar buttons are withheld from the Business lens with the other author verbs', () => {
+            TestBed.inject(LensService).selectLens('business');
+            const { fixture } = makeRendered();
+            const el = fixture.nativeElement as HTMLElement;
+            expect(el.querySelector('[aria-label="Undo the last edit"]')).toBeNull();
+            expect(el.querySelector('[aria-label="Redo the last undone edit"]')).toBeNull();
+        });
+    });
+
+    /**
+     * R6 — the Dataset-hop failure surface: activation's registration stays fire-and-forget
+     * (idempotent by physicalRef, never reverses a go-live), but a failure is now a PERSISTENT,
+     * actionable, tab-scoped banner with a Retry — never a transient toast.
+     */
+    describe('dataset-hop banner (R6)', () => {
+        it('a failed registration raises the persistent banner instead of a toast', async () => {
+            const { fixture, c } = makeRendered();
+            c.select('demo');
+            // components.create returns undefined → the ensure folds it to 'failed'.
+            await c.activate();
+            fixture.detectChanges();
+
+            expect(c.datasetIssue()?.message).toContain('could not be registered');
+            expect(toast.warning).not.toHaveBeenCalled();
+            const banner = (fixture.nativeElement as HTMLElement).querySelector('[role="alert"]');
+            expect(banner?.textContent).toContain('Dataset registration failed');
+            expect(banner?.textContent).toContain('could not be registered');
+        });
+
+        it('Retry re-invokes the registration and clears the banner on success', async () => {
+            const c = make();
+            c.select('demo');
+            await c.activate();
+            expect(c.datasetIssue()).not.toBeNull();
+
+            components.create.mockReturnValue(of({ id: 'demo' }));
+            c.retryDatasetRegistration();
+
+            expect(c.datasetIssue()).toBeNull();
+            expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('Dataset'));
+        });
+
+        it('a failed retry keeps the banner up', async () => {
+            const c = make();
+            c.select('demo');
+            await c.activate();
+
+            c.retryDatasetRegistration(); // create still folds to 'failed'
+
+            expect(c.datasetIssue()).not.toBeNull();
+        });
+
+        it('Dismiss hides it without registering anything', async () => {
+            const c = make();
+            c.select('demo');
+            await c.activate();
+            expect(c.datasetIssue()).not.toBeNull();
+
+            c.dismissDatasetIssue();
+
+            expect(c.datasetIssue()).toBeNull();
+        });
+
+        it('is tab-scoped, and cleared when its tab closes', async () => {
+            const c = make();
+            c.select('demo');
+            await c.activate();
+            expect(c.datasetIssue()).not.toBeNull();
+
+            api.pipelineGraphRaw.mockReturnValue(of({ name: 'other', active: false, nodes: [], edges: [] }));
+            c.select('other');
+            expect(c.datasetIssue(), 'the other tab never failed').toBeNull();
+
+            await c.activateTab('demo');
+            expect(c.datasetIssue()).not.toBeNull();
+
+            await c.closeTab('demo');
+            c.select('demo');
+            expect(c.datasetIssue(), 'a reopened tab starts clean').toBeNull();
+        });
     });
 });
 

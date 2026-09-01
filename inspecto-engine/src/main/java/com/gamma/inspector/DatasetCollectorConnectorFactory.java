@@ -51,7 +51,7 @@ public final class DatasetCollectorConnectorFactory implements CollectorConnecto
     public CollectorConnector create(PipelineConfig cfg) {
         String dataset = cfg.collector().dataset();
         if (dataset == null || dataset.isBlank())
-            throw new IllegalArgumentException("connector 'dataset' requires source.dataset: <dataset id>");
+            throw new IllegalArgumentException("connector 'dataset' requires collector.dataset: <dataset id>");
         Path sourceDir = resolveDatasetDir(dataset);
         // Delegate to the built-in local connector POINTED AT the resolved snapshot dir: its
         // discover/readiness/open/fetchTo/post already do exactly what a same-host copy needs.
@@ -77,7 +77,7 @@ public final class DatasetCollectorConnectorFactory implements CollectorConnecto
         if (ref == null)
             throw new IllegalArgumentException("dataset '" + dataset + "' has no physicalRef — a view-backed "
                     + "Dataset has no files to collect (materialize it first)");
-        Path base = DataRef.requireUnder(Path.of(dd), ref, "source.dataset");
+        Path base = DataRef.requireUnder(Path.of(dd), ref, "collector.dataset");
         return Path.of(SqlViews.storeReadRoot(base.normalize().toString().replace('\\', '/')));
     }
 

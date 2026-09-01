@@ -79,6 +79,26 @@
                         "
                     ></mat-icon>
                 </button>
+                <!-- R4: per-tab snapshot undo/redo (Ctrl/Cmd+Z · Ctrl/Cmd+Y). Disabled by stack
+                     emptiness, never hidden — a stable slot, like the selection cluster. -->
+                <button
+                    mat-icon-button
+                    [disabled]="!canUndo()"
+                    (click)="undo()"
+                    matTooltip="Undo (Ctrl+Z)"
+                    aria-label="Undo the last edit"
+                >
+                    <mat-icon svgIcon="heroicons_outline:arrow-uturn-left"></mat-icon>
+                </button>
+                <button
+                    mat-icon-button
+                    [disabled]="!canRedo()"
+                    (click)="redo()"
+                    matTooltip="Redo (Ctrl+Y)"
+                    aria-label="Redo the last undone edit"
+                >
+                    <mat-icon svgIcon="heroicons_outline:arrow-uturn-right"></mat-icon>
+                </button>
             }
 
             <!-- Dry-run left this menu for the toolbar (2026-08-23), so everything remaining is an
@@ -360,6 +380,40 @@
         </div>
     }
 
+    <!-- R6: the Dataset-hop failure surface — a PERSISTENT, actionable banner for the affected tab
+         (the shared inline-alert pattern, never a transient toast). Retry re-invokes the
+         registration, which is idempotent by physicalRef; success clears it, and so does closing
+         the tab. -->
+    @if (datasetIssue(); as issue) {
+        <div
+            class="shrink-0 border-b px-3 py-1.5"
+            style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
+        >
+            <inspecto-alert variant="warning" title="Dataset registration failed">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="min-w-0 flex-auto">{{ issue.message }}</span>
+                    <button
+                        mat-stroked-button
+                        type="button"
+                        [disabled]="retryingDataset()"
+                        (click)="retryDatasetRegistration()"
+                    >
+                        Retry
+                    </button>
+                    <button
+                        mat-icon-button
+                        type="button"
+                        matTooltip="Dismiss"
+                        aria-label="Dismiss the Dataset registration notice"
+                        (click)="dismissDatasetIssue()"
+                    >
+                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:x-mark"></mat-icon>
+                    </button>
+                </div>
+            </inspecto-alert>
+        </div>
+    }
+
     <!-- ── tab strip — one tab per open pipeline; the active one is what every action acts on ────── -->
     @if (tabs().length) {
         <div
@@ -538,6 +592,7 @@
                         class="absolute inset-0"
                         [data]="g6Data()"
                         [graphKey]="selectedId()"
+                        [rebuildEpoch]="canvasEpoch()"
                         (nodeSelected)="onNodeSelected($event)"
                         (edgeSelected)="onEdgeSelected($event)"
                         (backgroundClick)="onBackgroundClick()"
@@ -871,24 +926,59 @@
                                 No issues — ready to activate.
                             </p>
                         } @else {
-                            <ul class="flex flex-col gap-0.5">
-                                @for (f of findings(); track $index) {
-                                    <li>
-                                        <button
-                                            type="button"
-                                            class="flex w-full items-start gap-2 rounded px-1 py-0.5 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
-                                            (click)="selectFinding(f.nodeId)"
-                                        >
-                                            <mat-icon
-                                                class="icon-size-4 mt-0.5 shrink-0"
-                                                [svgIcon]="findingIcon(f.severity)"
-                                                [style.color]="findingTint(f.severity)"
-                                            ></mat-icon>
-                                            <span>{{ f.message }}</span>
-                                        </button>
-                                    </li>
-                                }
-                            </ul>
+                            <mat-button-toggle-group
+                                class="mb-2"
+                                [value]="findingFilter()"
+                                (change)="findingFilter.set($event.value)"
+                                aria-label="Filter findings by severity"
+                                hideSingleSelectionIndicator
+                            >
+                                <mat-button-toggle value="all">All</mat-button-toggle>
+                                <mat-button-toggle value="error">Errors</mat-button-toggle>
+                                <mat-button-toggle value="warning">Warnings</mat-button-toggle>
+                            </mat-button-toggle-group>
+                            @if (!visibleFindings().length) {
+                                <p class="text-sm opacity-70">
+                                    No {{ findingFilter() === 'error' ? 'error' : 'warning' }} findings.
+                                </p>
+                            } @else {
+                                <ul class="flex flex-col gap-0.5">
+                                    @for (f of visibleFindings(); track $index) {
+                                        <li>
+                                            <button
+                                                type="button"
+                                                class="flex w-full items-start gap-2 rounded px-1 py-0.5 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                (click)="selectFinding(f.nodeId)"
+                                            >
+                                                <mat-icon
+                                                    class="icon-size-4 mt-0.5 shrink-0"
+                                                    [svgIcon]="findingIcon(f.severity)"
+                                                    [style.color]="findingTint(f.severity)"
+                                                ></mat-icon>
+                                                <span class="min-w-0">
+                                                    <span>
+                                                        {{ f.message }}
+                                                        @if (f.code) {
+                                                            <code
+                                                                class="ml-1 rounded px-1 align-middle font-mono text-[10px]"
+                                                                style="background: var(--gamma-bg-default)"
+                                                                >{{ f.code }}</code
+                                                            >
+                                                        }
+                                                    </span>
+                                                    @if (f.guidance) {
+                                                        <span
+                                                            data-finding-guidance
+                                                            class="mt-0.5 block text-xs italic opacity-70"
+                                                            >{{ f.guidance }}</span
+                                                        >
+                                                    }
+                                                </span>
+                                            </button>
+                                        </li>
+                                    }
+                                </ul>
+                            }
                         }
                     }
                 </div>

@@ -124,12 +124,13 @@ former root reference docs** (each index lists them):
   [`archived-documents/retired-concepts/mock-backends.md`](archived-documents/retired-concepts/mock-backends.md).
   Still open: **MOCK-DEAD-COMPUTE-1** in `BACKLOG.md` (four dead in-browser compute blocks).
 
-- [`superpower/authoring-residuals-plan.md`](superpower/authoring-residuals-plan.md) — **ACTIVE,
-  specified 2026-09-01**: the solution spec for the stage-1 authoring residuals (R1 diagnostics
-  upgrade incl. COLLECTOR-ERRMSG-1 · R2 canonical-pipeline server-side bundle (TRANSFER-ARCH-1) ·
-  R3 mid-branch `steps:` via flattening · R4 snapshot undo/redo · R5 MRU · R6 Dataset-hop banner ·
-  R7 composite sketch). Directions operator-decided; prior art consulted from the sibling
-  DataForge wiki (`C:\sandbox\incubetor\docs\wiki`).
+- [`superpower/authoring-residuals-plan.md`](superpower/authoring-residuals-plan.md) — **R1/R2/R4/
+  R5/R6 SHIPPED 2026-09-01 same shift** (diagnostics codes+guidance incl. COLLECTOR-ERRMSG-1 ·
+  the pipeline bundle routes closing TRANSFER-ARCH-1 · snapshot undo/redo · Open-dialog MRU+pins ·
+  Dataset-hop retry banner — as-built in `pipeline-editor.md` + `editable-round-trip.md` §21).
+  **ACTIVE for R3 only** (mid-branch `steps:` via flattening, ⛔ gated on the stage-2 execution
+  analysis) + the UI-migration-onto-bundle follow-up; R7 is a future sketch. Prior art consulted
+  from the sibling DataForge wiki (`C:\sandbox\incubetor\docs\wiki`).
 - [`superpower/gate-register.md`](superpower/gate-register.md) — the register of decision-gated
   rows: what each is waiting on and who owns the call.
 - [`superpower/pipeline-waves-drain-plan.md`](superpower/pipeline-waves-drain-plan.md) — **IN FLIGHT

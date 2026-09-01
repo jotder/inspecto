@@ -3,7 +3,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { Router, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
 import { PipelineSummary } from 'app/inspecto/api';
 import { StreamTransferService } from 'app/inspecto/transfer/stream-transfer.service';
@@ -13,7 +13,16 @@ import { PipelineOpenDialog, PipelineOpenData } from './pipeline-open.dialog';
 const ROW = (name: string): PipelineSummary =>
     ({ name, active: false, nodeCount: 0, edgeCount: 0, produces: [], consumes: [] }) as unknown as PipelineSummary;
 
+const MRU_KEY = 'inspecto.pipelines.mru';
+const PINNED_KEY = 'inspecto.pipelines.pinned';
+
 describe('PipelineOpenDialog', () => {
+    // Storage state leaks across specs (the LensService lesson) — start each spec clean.
+    beforeEach(() => {
+        localStorage.removeItem(MRU_KEY);
+        localStorage.removeItem(PINNED_KEY);
+    });
+
     function make(data: Partial<PipelineOpenData> = {}) {
         const ref = { close: vi.fn() };
         const transfer = {
@@ -96,7 +105,92 @@ describe('PipelineOpenDialog', () => {
         expect(ref.close).toHaveBeenCalledWith(['a', 'b']);
     });
 
+    // ── R5: MRU + pins ──────────────────────────────────────────────────────────────────────────
+
+    /** The per-row star: toggling persists the set and the Pinned section appears/disappears. */
+    it('pin toggle persists to localStorage and renders the Pinned section', () => {
+        const { fixture, c } = make();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.textContent).not.toContain('Pinned');
+
+        c.togglePin('a', new Event('click'));
+        fixture.detectChanges();
+        expect(JSON.parse(localStorage.getItem(PINNED_KEY)!)).toEqual(['a']);
+        expect(el.textContent).toContain('Pinned');
+        expect(c.pinnedRows().map((p) => p.name)).toEqual(['a']);
+        // One extra render of row 'a' (the Pinned section) on top of the full list's two rows.
+        expect(el.querySelectorAll('mat-checkbox').length).toBe(3);
+
+        c.togglePin('a', new Event('click'));
+        fixture.detectChanges();
+        expect(JSON.parse(localStorage.getItem(PINNED_KEY)!)).toEqual([]);
+        expect(el.textContent).not.toContain('Pinned');
+    });
+
+    /** Confirm records only NEWLY-ticked ids, most-recent-first, capped at 8. */
+    it('confirm updates the MRU: new ids first, prior entries deduped, capped at 8', () => {
+        localStorage.setItem(MRU_KEY, JSON.stringify(['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'p1']));
+        const pipelines = ['p1', 'p2', 'p3', 'b'].map(ROW);
+        const { c } = make({ pipelines, open: ['b'] });
+
+        c.toggle('p1');
+        c.toggle('p2');
+        c.toggle('p3');
+        c.confirm();
+
+        // p1..p3 newly ticked (b was already open — NOT recent); prior list follows, p1 deduped, cap 8.
+        expect(JSON.parse(localStorage.getItem(MRU_KEY)!)).toEqual([
+            'p1', 'p2', 'p3', 'm1', 'm2', 'm3', 'm4', 'm5',
+        ]);
+    });
+
+    /** Confirming with nothing newly ticked (or only unticks) leaves the stored MRU alone. */
+    it('confirm without newly-ticked ids leaves the MRU untouched', () => {
+        localStorage.setItem(MRU_KEY, JSON.stringify(['m1']));
+        const { c } = make();
+        c.toggle('b'); // untick the already-open row — a close, not an open
+        c.confirm();
+        expect(JSON.parse(localStorage.getItem(MRU_KEY)!)).toEqual(['m1']);
+    });
+
+    /** Stored ids the server no longer lists never render — dropped on render, not scrubbed. */
+    it('drops stale MRU and pinned names against the served list', () => {
+        localStorage.setItem(MRU_KEY, JSON.stringify(['ghost', 'a']));
+        localStorage.setItem(PINNED_KEY, JSON.stringify(['ghost2', 'b']));
+        const { fixture, c } = make();
+
+        expect(c.pinnedRows().map((p) => p.name)).toEqual(['b']);
+        expect(c.recentRows().map((p) => p.name)).toEqual(['a']);
+        expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('ghost');
+        // Storage itself keeps the raw entries (another space may still serve them).
+        expect(JSON.parse(localStorage.getItem(MRU_KEY)!)).toEqual(['ghost', 'a']);
+    });
+
+    /** A pinned row must not repeat in Recent, and search filters every section. */
+    it('dedupes pinned rows out of Recent and search filters across sections', () => {
+        localStorage.setItem(MRU_KEY, JSON.stringify(['a', 'b']));
+        localStorage.setItem(PINNED_KEY, JSON.stringify(['a']));
+        const { fixture, c } = make();
+
+        expect(c.pinnedRows().map((p) => p.name)).toEqual(['a']);
+        expect(c.recentRows().map((p) => p.name)).toEqual(['b']); // 'a' pinned — not repeated
+
+        c.query.set('a');
+        fixture.detectChanges();
+        expect(c.pinnedRows().map((p) => p.name)).toEqual(['a']);
+        expect(c.recentRows()).toEqual([]); // 'b' filtered out of Recent too
+        expect(c.filtered().map((p) => p.name)).toEqual(['a']);
+        expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Recent');
+    });
+
     it('renders accessibly', async () => {
+        const { fixture } = make();
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('renders accessibly with Pinned and Recent sections shown', async () => {
+        localStorage.setItem(MRU_KEY, JSON.stringify(['b']));
+        localStorage.setItem(PINNED_KEY, JSON.stringify(['a']));
         const { fixture } = make();
         await expectNoA11yViolations(fixture.nativeElement);
     });

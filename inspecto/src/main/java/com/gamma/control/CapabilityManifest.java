@@ -101,6 +101,9 @@ final class CapabilityManifest {
             // *_flow.toon authoring writes (POST/PUT authored, /nodes, /edges) retired. DELETE + the
             // ad-hoc trigger stay for grandfathered flows.
             new Entry("PUT", "/pipelines/([^/]+)/graph", Roles.CAN_AUTHOR_WORKBENCH),
+            // PipelineBundleRoutes — TRANSFER-ARCH-1: the selective-bundle import writes config
+            // (the export half is a read and carries no gate, like /bundle/export).
+            new Entry("POST", "/pipelines/import", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/pipelines/([^/]+)/save-as-template", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/pipelines/([^/]+)/label", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/pipelines/([^/]+)/settings", Roles.CAN_AUTHOR_WORKBENCH),

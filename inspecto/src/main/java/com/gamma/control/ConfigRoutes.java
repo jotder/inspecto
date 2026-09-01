@@ -1,6 +1,7 @@
 package com.gamma.control;
 
 import com.gamma.config.spec.Finding;
+import com.gamma.config.spec.FindingCodes;
 import com.gamma.config.spec.Severity;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.RouteArming;
@@ -24,6 +25,16 @@ import java.util.Map;
 final class ConfigRoutes {
 
     private ConfigRoutes() {}
+
+    /** Guidance for an arming refusal on an ACTIVE config — the save itself is refused. */
+    private static final String GUIDANCE_ACTIVE =
+            "apply the fix the message names, or set active: false to keep authoring — an active "
+                    + "config that cannot arm is refused at the save";
+
+    /** Guidance for the same refusal on an INACTIVE draft — it saved; the refusal bites at activation. */
+    private static final String GUIDANCE_INACTIVE =
+            "the draft saved as a work in progress; apply the fix the message names before "
+                    + "activating — the draft is inactive, so this refuses only once it is activated";
 
     /**
      * Pre-flight check that a pipeline draft's schema reference(s) resolve on <em>this server's</em>
@@ -87,10 +98,13 @@ final class ConfigRoutes {
                 || (proc.get("ingester") instanceof String i && !i.isBlank())
                 || (plugin instanceof String p && !p.isBlank());
         if (hasSchema) return List.of();
+        // The message says what is WRONG (naming the schema sources checked); guidance says what to
+        // DO — split, not duplicated, per R1's diagnostic contract.
         return List.of(new Finding(Severity.ERROR, "active",
                 "active: true but no schema is configured (processing.schema_file, "
-                        + "processing.schemas[], or a plugin ingester) — keep the draft inactive "
-                        + "until its schema is attached"));
+                        + "processing.schemas[], or a plugin ingester)",
+                FindingCodes.ERR_ARMED_WITHOUT_SCHEMA,
+                "keep the draft inactive until its schema is attached"));
     }
 
     /**
@@ -125,9 +139,12 @@ final class ConfigRoutes {
         for (String refusal : RouteArming.refusals(route,
                 RouteArming.draftSinkDatabases(draft.get("sinks")),
                 RouteArming.draftIsMultiSchema(proc, parsing))) {
-            out.add(new Finding(severity, "route", active
-                    ? refusal
-                    : refusal + " (the draft is inactive, so this refuses only once it is activated)"));
+            // The RouteArming message names the offending entities AND its own fix (shared verbatim
+            // with prepare()'s throw); guidance carries the save-time what-to-do half that used to
+            // ride fused into the inactive message.
+            out.add(new Finding(severity, "route", refusal,
+                    active ? FindingCodes.ERR_ROUTE_UNARMABLE : FindingCodes.WARN_ROUTE_UNARMABLE,
+                    active ? GUIDANCE_ACTIVE : GUIDANCE_INACTIVE));
         }
         return out;
     }
@@ -152,9 +169,10 @@ final class ConfigRoutes {
         List<Finding> out = new ArrayList<>();
         for (String refusal : com.gamma.etl.StepDisableArming.refusals(disabled, parkable,
                 com.gamma.etl.StepDisableArming.draftHasParkHome(dirs))) {
-            out.add(new Finding(severity, "disabled_steps", active
-                    ? refusal
-                    : refusal + " (the draft is inactive, so this refuses only once it is activated)"));
+            out.add(new Finding(severity, "disabled_steps", refusal,
+                    active ? FindingCodes.ERR_STEP_DISABLE_UNPARKABLE
+                           : FindingCodes.WARN_STEP_DISABLE_UNPARKABLE,
+                    active ? GUIDANCE_ACTIVE : GUIDANCE_INACTIVE));
         }
         return out;
     }

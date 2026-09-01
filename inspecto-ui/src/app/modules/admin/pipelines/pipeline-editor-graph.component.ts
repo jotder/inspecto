@@ -55,6 +55,12 @@ export class PipelineEditorGraphComponent implements AfterViewInit, OnChanges, O
     @Input() data: G6GraphData | null = null;
     /** Rebuild the canvas only when this changes (the selected flow id). Never rebuild on in-place edits. */
     @Input() graphKey: string | null = null;
+    /**
+     * Bump to force a rebuild from [data] WITHOUT a graphKey change — the undo/redo restore (R4),
+     * where the whole model was replaced in place and the mutation methods have nothing to mutate.
+     * Inputs settle before ngOnChanges, so [data] is already the restored graph when this lands.
+     */
+    @Input() rebuildEpoch = 0;
 
     @Output() nodeSelected = new EventEmitter<string>();
     /** Double-click a node to open its configuration popup (NiFi "Configure"). */
@@ -110,8 +116,9 @@ export class PipelineEditorGraphComponent implements AfterViewInit, OnChanges, O
     }
 
     ngOnChanges(changes: SimpleChanges): void {
-        // Rebuild only on a flow switch — in-place edits must not re-run layout (it discards positions).
-        if (this.ready && changes['graphKey']) this.rebuild();
+        // Rebuild only on a flow switch (or an explicit undo/redo restore) — in-place edits must
+        // not re-run layout (it discards positions).
+        if (this.ready && (changes['graphKey'] || changes['rebuildEpoch'])) this.rebuild();
     }
 
     ngOnDestroy(): void {

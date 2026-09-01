@@ -470,6 +470,8 @@ infra probes: `/health`, `/ready`, `/metrics`, `/metrics/acquisition`.
   - `GET|POST /pipelines/{n}/settings` — pipeline settings read/write → [`pipeline-identity.md`](okf/backend/control-plane/pipeline-identity.md).
   - `POST /pipelines/{n}/label` — display label → [`pipeline-identity.md`](okf/backend/control-plane/pipeline-identity.md).
   - `POST /pipelines/{n}/save-as-template` — clone into a template → [`pipeline-identity.md`](okf/backend/control-plane/pipeline-identity.md).
+  - `GET /pipelines/{n}/bundle` — selective export zip (pipeline + dependency closure + secret-free requirements) → [`editable-round-trip.md` §21](okf/backend/pipeline-graph/editable-round-trip.md).
+  - `POST /pipelines/import?name=&conflict=refuse|overwrite|rename` *(canAuthorWorkbench, raw zip body)* — import a bundle as an inactive retargeted draft → same owner.
   - `POST /pipelines/{n}/rename`, `POST /pipelines/rename/resume` — two-phase rename + crash resume → [`pipeline-identity.md`](okf/backend/control-plane/pipeline-identity.md).
   - `GET /pipelines/{n}/related` — cross-entity neighbourhood → [`pipeline-related.md`](okf/backend/control-plane/pipeline-related.md).
   - `POST /pipelines/authored/{n}/run?to={nodeId}` *(canAuthorWorkbench)* — scratch-only run-to-here over real inbox files; never a production run → [`pipeline-test-run.md`](okf/backend/engine/pipeline-test-run.md).

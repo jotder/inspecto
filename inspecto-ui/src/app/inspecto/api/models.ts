@@ -370,6 +370,10 @@ export interface Finding {
     severity: Severity;
     fieldPath: string;
     message: string;
+    /** Stable `ERR_`/`WARN_` diagnostic code (authoring-residuals R1) — absent on an uncoded finding. */
+    code?: string;
+    /** What to DO about it, split out from what is WRONG (R1) — absent when the server has none. */
+    guidance?: string;
 }
 
 export interface ValidateResult {

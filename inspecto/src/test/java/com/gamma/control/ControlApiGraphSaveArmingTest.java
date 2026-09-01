@@ -108,6 +108,9 @@ class ControlApiGraphSaveArmingTest {
             String findings = out.get("findings").toString();
             assertTrue(findings.contains("branch 'apac' has no where:"), findings);
             assertFalse(findings.contains("branch 'emea' has no where:"), findings);
+            // R1: the graph route's findings carry the same stable code + split-out guidance.
+            assertTrue(findings.contains("\"code\":\"ERR_ROUTE_UNARMABLE\""), findings);
+            assertTrue(findings.contains("\"guidance\":"), findings);
             assertFalse(Files.exists(wr.resolve("arming_a_pipeline.toon")),
                     "an unarmable active graph must not reach disk");
         }
@@ -127,6 +130,7 @@ class ControlApiGraphSaveArmingTest {
             assertTrue(findings.contains("WARNING"), findings);
             assertFalse(findings.contains("\"severity\":\"ERROR\""), findings);
             assertTrue(findings.contains("only once it is activated"), findings);
+            assertTrue(findings.contains("\"code\":\"WARN_ROUTE_UNARMABLE\""), findings);
             assertTrue(Files.exists(wr.resolve("arming_b_pipeline.toon")), "a WIP draft must save");
         }
     }
@@ -153,6 +157,8 @@ class ControlApiGraphSaveArmingTest {
             String findings = out.get("findings").toString();
             assertTrue(findings.contains("park"), findings);
             assertTrue(findings.contains("ERROR"), findings);
+            assertTrue(findings.contains("\"code\":\"ERR_STEP_DISABLE_UNPARKABLE\""), findings);
+            assertTrue(findings.contains("\"guidance\":"), findings);
             assertFalse(Files.exists(wr.resolve("arming_c_pipeline.toon")), r.body());
         }
     }

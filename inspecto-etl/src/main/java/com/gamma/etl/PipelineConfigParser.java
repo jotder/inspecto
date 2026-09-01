@@ -386,10 +386,10 @@ final class PipelineConfigParser {
         String dataset        = opt(src, "dataset", null);
         if (dataset != null && dataset.startsWith("datasets/")) dataset = dataset.substring("datasets/".length());
         if ("dataset".equals(connector) && (dataset == null || dataset.isBlank()))
-            throw new IllegalArgumentException("connector 'dataset' requires source.dataset: <dataset id>");
+            throw new IllegalArgumentException("connector 'dataset' requires collector.dataset: <dataset id>");
         if (dataset != null && !"dataset".equals(connector))
             throw new IllegalArgumentException(
-                    "source.dataset is only honored with connector: dataset (got connector '" + connector + "')");
+                    "collector.dataset is only honored with connector: dataset (got connector '" + connector + "')");
         // ACQ-6 push discovery: poll (default) | watch (filesystem events on a local poll root).
         String discovery      = opt(src, "discovery", "poll");
 
@@ -432,9 +432,9 @@ final class PipelineConfigParser {
         // A stronger-than-best-effort guarantee needs the fingerprint ledger to actually hold; without it
         // the engine falls back to commit-log replay + markers. Say so rather than silently over-promising.
         if (guarantee.requiresLedger() && !duplicate.contentBased())
-            log.warn("[CONFIG] source.guarantee={} needs a fingerprint ledger, but source.duplicate.mode "
+            log.warn("[CONFIG] collector.guarantee={} needs a fingerprint ledger, but collector.duplicate.mode "
                     + "is 'path' (marker-only) — behaving as best-effort + commit-log replay. Set "
-                    + "source.duplicate.mode to metadata, checksum or etag to enforce it.", guarantee);
+                    + "collector.duplicate.mode to metadata, checksum or etag to enforce it.", guarantee);
 
         // ── retrieval tuning: parallel fetch + rate limit (Phase E/F; additive, absent ⇒ sequential/unthrottled) ──
         Fetch fetch = Fetch.DEFAULT;
@@ -487,9 +487,9 @@ final class PipelineConfigParser {
         if (incBlock != null)
             incremental = new Incremental(opt(incBlock, "watermark", null));
         if (incremental.enabled() && !duplicate.contentBased())
-            log.warn("[CONFIG] source.incremental.watermark is set but source.duplicate.mode is 'path' "
+            log.warn("[CONFIG] collector.incremental.watermark is set but collector.duplicate.mode is 'path' "
                     + "(marker-only) — the watermark is derived from the fingerprint ledger, which path mode "
-                    + "does not populate, so incremental filtering will not engage. Set source.duplicate.mode "
+                    + "does not populate, so incremental filtering will not engage. Set collector.duplicate.mode "
                     + "to metadata, checksum or etag.");
 
         return new Collector(id, connector, includes, excludes, recursiveDepth, stability, connection,
@@ -1354,7 +1354,7 @@ final class PipelineConfigParser {
     }
 
     /**
-     * Parse a transfer-rate string to <b>bytes per second</b> (Phase F {@code source.fetch.rate_limit}). Accepts a
+     * Parse a transfer-rate string to <b>bytes per second</b> (Phase F {@code collector.fetch.rate_limit}). Accepts a
      * size with an optional {@code /s} or {@code ps} suffix: {@code "50MBps"}, {@code "50MB/s"}, {@code "1GBps"},
      * {@code "512KBps"}, or a bare number (bytes/s). KB/MB/GB are binary (1024-based). {@code null}/blank ⇒ 0
      * (unlimited).

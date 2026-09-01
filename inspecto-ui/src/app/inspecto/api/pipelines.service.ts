@@ -193,7 +193,7 @@ export interface PipelineGraphWriteResult {
     written: boolean;
     path: string;
     name: string;
-    findings: { severity: string; fieldPath?: string; message: string }[];
+    findings: { severity: string; fieldPath?: string; message: string; code?: string; guidance?: string }[];
 }
 
 /** One produced relation at a node in a dry-run (exact count + a bounded row sample). */

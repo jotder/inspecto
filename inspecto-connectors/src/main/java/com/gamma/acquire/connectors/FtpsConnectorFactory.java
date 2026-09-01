@@ -27,7 +27,7 @@ public final class FtpsConnectorFactory implements CollectorConnectorFactory {
     public CollectorConnector create(PipelineConfig cfg, ConnectionProfile profile) {
         if (profile == null)
             throw new IllegalArgumentException("ftps source '" + cfg.collector().id()
-                    + "' requires source.connection to reference a *_connection.toon profile (host/credentials)");
+                    + "' requires collector.connection to reference a *_connection.toon profile (host/credentials)");
         return new FtpConnector(profile, cfg.collector().stability().readyMarker(), TlsMode.EXPLICIT);
     }
 

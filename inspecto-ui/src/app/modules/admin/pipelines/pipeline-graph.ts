@@ -123,6 +123,10 @@ export interface PipelineFinding {
     severity: 'error' | 'warning' | 'info';
     nodeId?: string;
     message: string;
+    /** Stable `ERR_`/`WARN_` diagnostic code (authoring-residuals R1) — server findings only, absent when uncoded. */
+    code?: string;
+    /** What to DO about it, split out from what is WRONG (R1) — absent when the server sent none. */
+    guidance?: string;
 }
 
 /**

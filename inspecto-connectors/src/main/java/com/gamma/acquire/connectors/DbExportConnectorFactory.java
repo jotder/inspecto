@@ -26,7 +26,7 @@ public final class DbExportConnectorFactory implements CollectorConnectorFactory
     public CollectorConnector create(PipelineConfig cfg, ConnectionProfile profile) {
         if (profile == null)
             throw new IllegalArgumentException("db source '" + cfg.collector().id()
-                    + "' requires source.connection to reference a *_connection.toon profile (jdbc_url/query/export_name)");
+                    + "' requires collector.connection to reference a *_connection.toon profile (jdbc_url/query/export_name)");
         return new DbExportConnector(profile);
     }
 

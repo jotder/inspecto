@@ -66,6 +66,20 @@ backend on :4204.
   failed list fetch does not arm the persist mirror — a backend-down reload must not wipe the
   stored set with `[]`. Dirty edits are deliberately NOT persisted (the guard owns that).
   **Ctrl/Cmd+S saves** (preventDefault always; `save()` only when `canAuthor() && dirty()`).
+- **Undo/redo per tab** (R4, 2026-09-01): bounded snapshot stacks (50) beside `cachedModels`,
+  capturing the PRE-mutation model JSON (the save-path serialization) at every mutation choke
+  point — the same paths that arm dirty. Ctrl/Cmd+Z · Ctrl/Cmd+Y / Cmd+Shift+Z on the one keydown
+  handler; ⚠ text-entry targets keep their NATIVE undo (deliberate). Restore is LOCAL —
+  `model.set` + a `canvasEpoch` bump driving the graph host's `rebuildEpoch` input (the same
+  `rebuild()` a tab switch takes) — ⛔ never `select()`, which refetches and discards. Dirty
+  recomputes against a per-tab baseline stamped at load and after each save/activate write, so
+  undoing to baseline clears it honestly; the stack survives a save (undo past it re-arms dirty)
+  and dies with `forgetTab`. A dirty drawer confirms before an undo (declining aborts). ⚠ Node
+  drags never snapshot — moves are purely visual and touch no model state.
+- **Open dialog MRU + pins** (R5): `inspecto.pipelines.mru` (cap 8, recorded inside the dialog's
+  own `confirm()` from newly-ticked ids) + `inspecto.pipelines.pinned` (per-row star,
+  `aria-pressed`); Pinned/Recent sections render above the full list from ONE shared row
+  template, stale ids dropped on render, search filters across sections.
 
 **Edit mode is a full-bleed editor shell, not an admin page** — `pipelines.component.html` branches
 on `mode()`; no page header, no `p-6 sm:p-10`; the mode toggle and `<inspecto-ai-explain>` project
@@ -501,8 +515,10 @@ before trusting a described save.
   warn.
 - **Go-live registers the Dataset** through the shared `DatasetRegistrationService`
   (`inspecto/api`) — idempotent by `physicalRef`, `sourceName` = the store (blank falls through to
-  a default naming nothing), never reverses a succeeded activation; every failure is a warning.
-  Streams only. ⚠ `InspectoConfirmService.confirm(message, title)` takes a title **string**; only
+  a default naming nothing), never reverses a succeeded activation. Streams only. **A failure or
+  unknown kind raises a persistent per-tab retry banner** (R6, the shared `<inspecto-alert
+  variant="warning">` explained-panel — never a toast); Retry re-invokes the registration (safe —
+  idempotent), success clears it, and the issue dies with the tab. ⚠ `InspectoConfirmService.confirm(message, title)` takes a title **string**; only
   `confirmDestructive` takes options.
 - **Delete pipeline** reads impact first, names dependents in the confirm, sends `force` only after
   showing them, and **cascades** the `<id>_schema` / `<id>_enrich` companions and per-segment
@@ -556,10 +572,10 @@ each fix live). Genuinely open:
 - Mid-branch `steps:` sub-chains are refused today — **specified and scheduled** as
   [`authoring-residuals-plan.md`](../../../superpower/authoring-residuals-plan.md) §R3 (flattening
   pre-pass), gated on the stage-2 execution analysis.
-- **TRANSFER-ARCH-1**: no selective dependency-closure export for canonical pipelines — direction
-  decided, spec at [`authoring-residuals-plan.md`](../../../superpower/authoring-residuals-plan.md)
-  §R2. Also queued there: diagnostic upgrade (§R1), undo/redo (§R4), Open-dialog MRU (§R5),
-  Dataset-hop retry banner (§R6).
+- ~~TRANSFER-ARCH-1~~ **SHIPPED 2026-09-01** as the server-side pipeline bundle
+  ([editable-round-trip §21](../../backend/pipeline-graph/editable-round-trip.md)); the residuals
+  R1/R4/R5/R6 shipped the same shift. Small follow-up in BACKLOG: migrate Duplicate + the
+  row export onto the bundle routes (both still ride the client stream-bundle).
 
 ## Verification culture (why this file reads the way it does)
 

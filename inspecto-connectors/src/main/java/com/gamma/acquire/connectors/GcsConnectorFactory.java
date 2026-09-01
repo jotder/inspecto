@@ -30,7 +30,7 @@ public final class GcsConnectorFactory implements CollectorConnectorFactory {
     public CollectorConnector create(PipelineConfig cfg, ConnectionProfile profile) {
         if (profile == null)
             throw new IllegalArgumentException("gcs source '" + cfg.collector().id()
-                    + "' requires source.connection to reference a *_connection.toon profile (bucket + service-account key)");
+                    + "' requires collector.connection to reference a *_connection.toon profile (bucket + service-account key)");
         return new GcsConnector(profile);
     }
 
