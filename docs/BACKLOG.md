@@ -839,7 +839,14 @@ names is non-zero (measured: 857 B, 785 B, 295 B, 130 B).
 - ⚠ Cosmetic today, but it is an **audit** column, and `-1` already means "not measured" here (see
   `failure-audit-holes-closed`) — so `0` is an assertion that the output was empty, which is false.
 
-**CHAIN-CONFIG-1 — a post-sync step's config is stringified, and a null value NPEs (2026-08-31).** Found
+**~~CHAIN-CONFIG-1~~ — FIXED 2026-09-01.** Both cases are now refused **by name** at parse time, so the
+client and the engine finally agree (the chain editor already refused them). ⚠ The operator call this row
+asked for was **taken as "refuse", not "document"**, on the ground that the alternative was leaving a run
+that reports SUCCESS on parameters the author never wrote: a stringified `["a","b"]` reaches the processor
+as the literal `[a, b]`, and nothing in any ledger shows it. A loud failure naming the key beats silent
+corruption. ⚠ Nothing in the reactor relied on the old behaviour — no fixture passed a nested or null
+value. *(Original text:)* **a post-sync step's config is stringified, and a null value NPEs
+(2026-08-31).** Found
 while building the `consignment.process` chain editor (pipeline spec gap 12); **the UI now refuses both
 cases at authoring time**, so this row is about the ENGINE still accepting them from a hand-authored job.
 `ConsignmentProcessJobType.chainConfigsOf` reads each entry into a `Map<String,String>` with

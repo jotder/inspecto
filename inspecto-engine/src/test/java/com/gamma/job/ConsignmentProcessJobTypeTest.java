@@ -563,6 +563,44 @@ class ConsignmentProcessJobTypeTest {
                 ConsignmentProcessJobType.chainConfigsOf("[{\"config\":{\"a\":\"1\"}},{}]"));
     }
 
+    /**
+     * A config value is carried as TEXT, so a nested list/object has no faithful representation and must
+     * be refused rather than stringified (CHAIN-CONFIG-1).
+     *
+     * 🔴 Until 2026-09-01 this SUCCEEDED and corrupted quietly: {@code String.valueOf} on a parsed JSON
+     * container yields a Java {@code toString}, so {@code {"columns":["a","b"]}} reached the processor as
+     * the literal {@code "[a, b]"}. The run reported success on parameters the author never wrote — the
+     * worst shape of failure, and invisible in every ledger.
+     */
+    @Test
+    void refusesAConfigValueThatCannotSurviveBeingStoredAsText() {
+        var nested = assertThrows(IllegalArgumentException.class, () -> ConsignmentProcessJobType
+                .chainConfigsOf("[{\"config\":{\"columns\":[\"a\",\"b\"]}}]"));
+        assertTrue(nested.getMessage().contains("columns"), nested.getMessage());
+        assertTrue(nested.getMessage().contains("nested list"), nested.getMessage());
+
+        var obj = assertThrows(IllegalArgumentException.class, () -> ConsignmentProcessJobType
+                .chainConfigsOf("[{\"config\":{\"opts\":{\"deep\":1}}}]"));
+        assertTrue(obj.getMessage().contains("opts"), obj.getMessage());
+
+        // Scalars are exactly what this carries, and they still work.
+        assertEquals(List.of(Map.of("s", "x", "n", "2", "b", "true")), ConsignmentProcessJobType
+                .chainConfigsOf("[{\"config\":{\"s\":\"x\",\"n\":2,\"b\":true}}]"));
+    }
+
+    /**
+     * A null config value is refused BY NAME. 🔴 It previously reached {@code Map.copyOf}, which rejects
+     * null values with a bare NullPointerException naming neither the key nor the reason — a stack trace
+     * where a message belonged.
+     */
+    @Test
+    void refusesANullConfigValueByName() {
+        var e = assertThrows(IllegalArgumentException.class,
+                () -> ConsignmentProcessJobType.chainConfigsOf("[{\"config\":{\"x\":null}}]"));
+        assertTrue(e.getMessage().contains("'x'"), e.getMessage());
+        assertTrue(e.getMessage().contains("omit the key"), e.getMessage());
+    }
+
     /** The legacy no-arg entry point cannot carry parameters, so it must refuse rather than half-run. */
     @Test
     void refusesTheNoArgEntryPoint() throws Exception {

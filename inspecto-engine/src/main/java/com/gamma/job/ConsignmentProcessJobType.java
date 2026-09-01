@@ -132,7 +132,24 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
                 if (!(cfg instanceof Map<?, ?>))
                     throw new IllegalArgumentException(
                             "chain_config entry's \"config\" must be an object, got: " + cfg);
-                ((Map<?, ?>) cfg).forEach((k, v) -> m.put(String.valueOf(k), v == null ? null : String.valueOf(v)));
+                // 🔴 A config value is carried as TEXT (ProcessorContext.config() is Map<String,String>),
+                // so a nested list/object has no faithful representation here. String.valueOf on a parsed
+                // JSON container yields a Java toString — {"columns":["a","b"]} would reach the processor
+                // as the literal "[a, b]" — i.e. the run SUCCEEDS on quietly wrong input. Refusing is the
+                // only honest option: silent corruption of a step's parameters is worse than a failed run
+                // that names the key (CHAIN-CONFIG-1).
+                ((Map<?, ?>) cfg).forEach((k, v) -> {
+                    if (v instanceof Map<?, ?> || v instanceof Iterable<?> || (v != null && v.getClass().isArray()))
+                        throw new IllegalArgumentException("chain_config: value for '" + k + "' must be text, a "
+                                + "number or true/false — every config value is stored as text, so a nested list "
+                                + "or object would reach the processor mangled (got: " + v + ")");
+                    // ⚠ And null must be refused HERE, by name: Map.copyOf below rejects null values with a
+                    // bare NullPointerException that names neither the key nor the reason.
+                    if (v == null)
+                        throw new IllegalArgumentException("chain_config: value for '" + k + "' is null — omit "
+                                + "the key instead; a config value cannot be null");
+                    m.put(String.valueOf(k), String.valueOf(v));
+                });
             }
             out.add(Map.copyOf(m));
         }
