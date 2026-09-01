@@ -800,7 +800,29 @@ non-blocking:**
   *before* the converter landed (`f72f7fc8`, 2026-08-18), and is **not an ancestor of `master`**.
   ⛔ The amendment's §8 also says of this work *"Do not start it on momentum."* Deleting the readers now
   would destroy the verification window D-2 exists to provide. **Returns only with a release decision.**
-- **D-9 cross-Consignment windowed dedup (wave row 14) — DESIGNED, not scheduled.** D8's three conditions
+- **D-9 cross-Consignment windowed dedup (wave row 14) — 🚧 HALF BUILT 2026-09-01.** The operator took
+  both recommended answers (**hashed keys**, **insert-wins on a unique `(key, window)`**), so the design
+  is settled and two slices shipped:
+  - ✅ **`DbDedupLedger`** (`8a3d2aae`) — its own per-space `OperationalDb.Family`, **default `duckdb`,
+    never `none`**; `claim()` inserts `ON CONFLICT DO NOTHING` and returns only what it won, so the
+    DATABASE resolves the race rather than a check-then-insert; `retract(consignmentId)` exists because a
+    reprocess is a whole-Consignment supersede with **no row-level retraction anywhere** — without it,
+    re-ingested rows are answered "already seen" and dropped permanently; `prune(cutoff)` advances the
+    window by **event time, never mtime**. Keys are SHA-256, never stored verbatim.
+  - ✅ **`DedupScope`** (`5e43bcbf`) — the `scope: window(P4D)` vocabulary, epoch-anchored windows, and
+    the rule that **`order_by` is REQUIRED once a window is declared** (without a tie-break the winner is
+    non-deterministic, which is a latent bug inside one batch and unrepeatable data loss against a durable
+    ledger). ⛔ No `window(all)`; a zero/negative period is refused.
+
+  🔴 **What remains is the wiring, and it has one real obstacle.** `RowShaper.dedup` is a **static shaper**
+  whose signature is `(conn, node, input, prefix)` — it has no consignment id, no pipeline name and no
+  ledger handle, and the ledger needs all three. Threading run context into `RowShaper` (or giving the
+  dedup step a context object) is the design question the next slice must answer; it is invasive and
+  should not be improvised. Also still to do: read `scope:` off the dedup config in the parser, mirror
+  the `order_by` refusal into `ConfigSpecs`/the UI so it lands at save time, hook `retract` to
+  `registry.supersede`, and add the `MaintenanceJob` prune task.
+
+- ~~**D-9 cross-Consignment windowed dedup (wave row 14) — DESIGNED, not scheduled.**~~ D8's three conditions
   are answered in the plan's §3 (ledger = a new per-space `OperationalDb.Family`, default `duckdb` never
   off · winner = a **required** `order_by` once `scope:` is a window · window advance = a `MaintenanceJob`
   task aged by **event time, not mtime**). Two answers remain **operator-owned** before any build:
