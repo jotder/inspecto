@@ -395,9 +395,23 @@ public final class JobService implements AutoCloseable {
                         "maintenance.backup.verify_failed", "maintenance.restore.completed",
                         "maintenance.metadata.findings", "maintenance.filerepo.findings"), List.of()),
                 c -> new MaintenanceJob(c, dataDir, auditDir, ledger.runStore().orElse(null), this)));
+        // ⚠ `pipeline` and `pipeline_config` are the TWO graph sources, mutually exclusive, exactly one
+        // required — a constraint no single declaration can express, so both are optional here and
+        // PipelineJobRunner enforces the "pick one" at run time. Declaring `pipeline` as required (as this
+        // did until 2026-09-01) made the A5-at-rest job — the ONLY way a pipeline's `steps:` chain ever
+        // executes — unrepresentable: the published contract demanded a key that path must not carry.
         registry.register(JobTypeProvider.of(new JobTypeDescriptor("pipeline", "Pipeline",
-                "Runs an authored Pipeline over data at rest; emits a commit downstream jobs can chain on.",
-                List.of(ParameterDecl.required("pipeline", ParamType.STRING, "Authored Pipeline id to run"),
+                "Runs a Pipeline over data at rest; emits a commit downstream jobs can chain on. Name EITHER "
+                        + "an authored Pipeline (pipeline:) OR a flat *_pipeline.toon whose Stage-2 chain is "
+                        + "lifted at run time (pipeline_config:) — exactly one, never both.",
+                List.of(ParameterDecl.optional("pipeline", ParamType.STRING, null,
+                                "Authored Pipeline id to run. Mutually exclusive with pipeline_config."),
+                        ParameterDecl.optional("pipeline_config", ParamType.STRING, null,
+                                "Path to a flat *_pipeline.toon. Its at-rest chain (steps:/summarize/dedup/join, "
+                                        + "which need a top-level output_store:) is lifted at RUN time, so the flat "
+                                        + "file stays the single truth. This is how a pipeline's transform half "
+                                        + "executes — pair it with on_pipeline: <that pipeline> to run after each "
+                                        + "commit. Mutually exclusive with pipeline."),
                         ParameterDecl.optional("incremental_column", ParamType.STRING, null, "Watermark column for incremental runs")),
                 List.of("pipeline.commit"), List.of()),
                 this::buildPipelineJob));

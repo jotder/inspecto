@@ -1,0 +1,6 @@
+job:
+  name: scheduler_audit
+  type: maintenance
+  cron: 45 3 * * *
+  enabled: true
+  task: scheduler_audit

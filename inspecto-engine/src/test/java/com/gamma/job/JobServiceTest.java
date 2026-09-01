@@ -59,6 +59,40 @@ class JobServiceTest {
         return r;
     }
 
+    /**
+     * The `pipeline` type's TWO graph sources must both be declared and both be optional.
+     *
+     * 🔴 Regression guard for a real hole (2026-09-01): `pipeline` was declared REQUIRED and
+     * `pipeline_config` was not declared at all — so the A5-at-rest job, the ONLY way a pipeline's
+     * `steps:`/summarize/dedup/join chain ever executes, was **unrepresentable in the published
+     * contract**: it must not carry `pipeline:`, and the key it does carry was invisible to every
+     * consumer of the descriptor (the generated Jobs form included). Exactly-one-of is a constraint no
+     * single declaration can express, so `PipelineJobRunner` enforces "pick one" at run time and both
+     * stay optional here.
+     */
+    @Test
+    void thePipelineTypeDeclaresBothGraphSourcesAndRequiresNeither(@TempDir Path dir) throws Exception {
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(), new ConsignmentEventBus(), s, null,
+                     dir.resolve("audit").toString())) {
+            JobTypeDescriptor pipeline = js.jobTypes().stream().filter(d -> "pipeline".equals(d.id()))
+                    .findFirst().orElseThrow(() -> new AssertionError("the pipeline job type is not registered"));
+
+            var byName = pipeline.parameters().stream()
+                    .collect(java.util.stream.Collectors.toMap(ParameterDecl::name, d -> d));
+            assertTrue(byName.containsKey("pipeline"), "the authored-Pipeline source must be declared");
+            assertTrue(byName.containsKey("pipeline_config"),
+                    "the at-rest source must be declared — it is how a Stage-2 chain executes, and an "
+                            + "undeclared param cannot be authored through the generated form");
+            assertFalse(byName.get("pipeline").required(),
+                    "pipeline must NOT be required — a pipeline_config: job must not carry it");
+            assertFalse(byName.get("pipeline_config").required(),
+                    "pipeline_config must NOT be required — an authored-Pipeline job does not carry it");
+            assertTrue(byName.get("pipeline_config").description().contains("output_store"),
+                    "the description must name the key the chain needs, or an author cannot act on it");
+        }
+    }
+
     @Test
     void manualTriggerRunsRecordsAndAudits(@TempDir Path dir) throws Exception {
         JobConfig hb = maintenance("hb", null, null, Map.of("task", "heartbeat"));
