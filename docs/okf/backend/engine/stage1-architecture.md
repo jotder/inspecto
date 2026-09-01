@@ -368,6 +368,25 @@ job:
 resolves its Reference Dataset through the shared `ReferenceReader` — the same resolution the Stage-2
 enrichment uses, so a versioned reference store's current/as-of view is derived identically on both routes.
 
+🔴 **The job is not optional, and nothing runs the chain without it.** `output_store:` arms the chain on
+the *declared promise* that a `pipeline_config:` job exists; it does not create one. Author the chain,
+skip the job, and the pipeline ingests forever while the transform never runs — the one failure this
+split makes possible.
+
+Two things close that gap, both as of 2026-09-01:
+
+- **`pipeline_config` is a declared parameter of the `pipeline` Job Type**, so the generated Jobs form can
+  author it. ⚠ It and `pipeline:` are the two graph sources — **mutually exclusive, exactly one
+  required** — a constraint no single declaration expresses, so **both are optional** in the descriptor and
+  `PipelineJobRunner` enforces "pick one" at run time. ⛔ Do not restore `required` on `pipeline`: that
+  made the at-rest job unrepresentable (the contract demanded a key this path must not carry), and
+  `JobServiceTest.thePipelineTypeDeclaresBothGraphSourcesAndRequiresNeither` now pins it.
+- **`SchedulerAuditTask` reports the orphan**: *"pipeline 'X' declares output_store 'Y' but no enabled
+  pipeline_config job runs its chain"*. ⚠ It only fires from a **`scheduler_audit` maintenance job**, and
+  until 2026-09-01 no shipped space contained one — the check existed, was wired
+  (`CollectorService.pipelineOutputStores`), and never ran. `spaces/demo/config/jobs/scheduler_audit_job.toon`
+  now ships it. A space without that job has no orphan detection at all.
+
 **`output_store:` is the arming condition.** `prepare()` refuses to arm a pipeline carrying
 `summarize`/`dedup`/`join`/`steps:` *unless* `output_store:` is authored — with it, the file itself
 declares the EL/T split; without it the keys have no execution route and arming would silently run
