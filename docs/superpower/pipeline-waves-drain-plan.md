@@ -337,9 +337,20 @@ a flag deletes nothing. It is the enabler for a release someone else must decide
 
 ---
 
-## 3. D-9 — cross-Consignment windowed record dedup, designed
+## 3. D-9 — cross-Consignment windowed record dedup, designed → 🚧 HALF BUILT
 
-D8 requires exactly three answers before this returns to the board. Here they are, each with the
+> ✅ **2026-09-01: the operator approved both open answers** (§3.5) — **hashed keys** and **insert-wins on
+> a unique `(key, window)`** — and two slices shipped against this design: **`DbDedupLedger`**
+> (`8a3d2aae`) and **`DedupScope`** (`5e43bcbf`). The design below is what they implement; read it as
+> as-built for the persistence and vocabulary halves.
+>
+> 🔴 **The remaining wiring has one obstacle worth knowing before you start:** `RowShaper.dedup` is a
+> **static** shaper taking `(conn, node, input, prefix)` — no consignment id, no pipeline name, no ledger
+> handle, and `claim()` needs all three. Threading run context into `RowShaper` is invasive and is a
+> design decision, not a mechanical edit. Current state and the full remaining list live in
+> **`PIPELINE-WAVES-REMAINDER`** (`docs/BACKLOG.md` §6), which is the board of record.
+
+D8 required exactly three answers before this could return to the board. Here they are, each with the
 code constraint that forces it.
 
 ### 3.0 What exists today (measured, not assumed)
