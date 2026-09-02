@@ -156,6 +156,28 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
         return out;
     }
 
+    /**
+     * The save-time half of the chain contract (CHAIN-CONFIG-1, third bullet): a hand-authored job whose
+     * {@code chain_config} does not align with its {@code processor} chain used to be accepted by every
+     * API save gate and discovered only when the next Consignment committed. {@link JobConfig#fromMap}
+     * calls this for every {@code consignment.process} job, so the API refuses at save (422) and the boot
+     * loader refuses at load (logged, skipped) — the same run-time check stays for a file edited on disk.
+     * Only the {@code params:} block is examined: a chain named through {@code args:}/{@code bind:} is a
+     * trigger-time value this cannot see, and the run-time check still covers it.
+     */
+    static void requireAlignedChain(Map<String, String> params) {
+        String chainConfig = params.get(P_CHAIN_CONFIG);
+        if (chainConfig == null || chainConfig.isBlank()) return;
+        List<Map<String, String>> configs = chainConfigsOf(chainConfig);   // nested/null refusals fire here too
+        String processor = params.get(P_PROCESSOR);
+        if (processor == null || processor.isBlank()) return;               // may arrive via args:/bind:
+        int chain = chainOf(processor).size();
+        if (!configs.isEmpty() && configs.size() != chain)
+            throw new IllegalArgumentException(P_CHAIN_CONFIG + " has " + configs.size() + " entr"
+                    + (configs.size() == 1 ? "y" : "ies") + " but the chain names " + chain
+                    + " step(s) — one config entry per chain step, in order");
+    }
+
     @Override
     public JobTypeDescriptor descriptor() {
         return new JobTypeDescriptor(TYPE_ID, "Consignment Processor",

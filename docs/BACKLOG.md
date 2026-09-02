@@ -790,7 +790,19 @@ non-blocking:**
 
 ## 6. Engineering / tech-debt
 
-- **TEST-CWD-DB-1 — `inspecto/inspecto-status.db` is still minted at the module root by
+- **~~TEST-CWD-DB-1~~ — SHIPPED 2026-09-02.** Neither option (a) nor (b): `ServiceStores.openStatusStore`
+  now reads a raw `jdbc:` **backend** value as "db, at exactly this URL" (the same first-class source the
+  `URL_OR_ENGINE` families accept), so the root pom pins `-Dstatus.backend=jdbc:duckdb:` beside the other
+  two — in-memory, still the real `DbStatusStore`, `db` default untouched, `-Dstatus.db.url` untouched
+  (so `OperationalDbTest`'s roster invariant holds). Verified: a narrowed run and the full reactor mint
+  no `.db` at any module root — but only after a SECOND trap fell: the narrowed run stayed clean while the
+  full reactor still minted the file, because `ControlApiSystemRoutesTest`'s `@AfterEach` blanket-**cleared**
+  `status.backend` (one of its TOUCHED keys), erasing surefire's pin for every class that ran after it in
+  the same fork. It now snapshots and restores. 🔴 A test that `clearProperty`s a pinned family key
+  silently un-pins the whole fork. ⚠ `StatusProjectionFreshnessTest:73`'s comment WAS stale in a different
+  way than the row guessed: that test uses the store-less constructor, which always hands out
+  `FileStatusStore` regardless of any property — corrected in place. *(Original text:)*
+  **`inspecto/inspecto-status.db` is still minted at the module root by
   `mvn -o test`.** Same mechanism as the dedup-ledger/consignment-outputs leak fixed 2026-09-02: a
   default-ON operational family plus `SpaceRoot.legacy()`'s CWD-relative resolution, so every test
   booting a `CollectorService` writes a real DuckDB file into whichever module surefire forked in.
@@ -811,7 +823,11 @@ archive; R1/R2/R4/R5/R6 shipped 2026-09-01, R3 mid-branch `steps:` + the bundle-
 shipped 2026-09-02; only R7 convert-to-composite remains, a future sketch by design). Two small
 rows R3's grounding opened:
 
-- **RECIPE-SCOPE-1 — the Recipe projection drops a dedup step's `scope:`** (trunk and branch
+- **~~RECIPE-SCOPE-1~~ — SHIPPED 2026-09-02.** `scope` now travels through the shared dedup builder in
+  both directions (`RecipeConverter.dedupStep` + `RecipeCompiler.dedup`, which serve trunk and branch
+  alike), the compiler's "only key / keep / order_by" refusal lists it, and
+  `RecipeConverterTest.aWindowedDedupScopeSurvivesTheRecipeRoundTrip` pins the round-trip.
+  *(Original text:)* **the Recipe projection drops a dedup step's `scope:`** (trunk and branch
   alike): `RecipeConverter`'s dedup builder projects `{keys, order_by}` only, so a D-9 windowed
   `scope: window(...)` vanishes from the Pipeline Document / recipe round-trip while the file
   keeps it. Pre-existing, found 2026-09-02 during R3. Add `scope` to the shared dedup builder
@@ -840,7 +856,7 @@ board is 16 of 17 with only release-gated row 15 open).** Plan and evidence in
   *before* the converter landed (`f72f7fc8`, 2026-08-18), and is **not an ancestor of `master`**.
   ⛔ The amendment's §8 also says of this work *"Do not start it on momentum."* Deleting the readers now
   would destroy the verification window D-2 exists to provide. **Returns only with a release decision.**
-- **D-9 cross-Consignment windowed dedup (wave row 14) — 🚧 HALF BUILT 2026-09-01.** The operator took
+- **D-9 cross-Consignment windowed dedup (wave row 14) — ✅ COMPLETE 2026-09-01 (see wiring paragraph below).** The operator took
   both recommended answers (**hashed keys**, **insert-wins on a unique `(key, window)`**), so the design
   is settled and two slices shipped:
   - ✅ **`DbDedupLedger`** (`8a3d2aae`) — its own per-space `OperationalDb.Family`, **default `duckdb`,
@@ -911,7 +927,14 @@ names is non-zero (measured: 857 B, 785 B, 295 B, 130 B).
 - ⚠ Cosmetic today, but it is an **audit** column, and `-1` already means "not measured" here (see
   `failure-audit-holes-closed`) — so `0` is an assertion that the output was empty, which is false.
 
-**~~CHAIN-CONFIG-1~~ — FIXED 2026-09-01.** Both cases are now refused **by name** at parse time, so the
+**~~CHAIN-CONFIG-1~~ — FIXED 2026-09-01; third bullet (alignment at SAVE) SHIPPED 2026-09-02.**
+`JobConfig.fromMap` — the one choke point every API job write (`JobRoutes`, `BundleRoutes`) and the boot
+loader pass through — calls `ConsignmentProcessJobType.requireAlignedChain(params)` for a
+`consignment.process` job, so a `chain_config` that does not align with the `processor` chain (or carries
+a nested/null value) is a 422 at save and a logged skip at boot, not a failed run at the next commit.
+⚠ Only the `params:` block is examined: a chain named through `args:`/`bind:` is trigger-time and keeps
+the unchanged run-time check. Pinned by `JobConfigTest.aMisalignedConsignmentProcessChainIsRefusedAtSave`.
+Both cases are now refused **by name** at parse time, so the
 client and the engine finally agree (the chain editor already refused them). ⚠ The operator call this row
 asked for was **taken as "refuse", not "document"**, on the ground that the alternative was leaving a run
 that reports SUCCESS on parameters the author never wrote: a stringified `["a","b"]` reaches the processor
@@ -1911,7 +1934,12 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   `BundleImporter.writeConfig` only ever writes bytes. So the attacker-controlled input — an uploaded
   bundle, the one path that would have made this urgent — cannot plant the link the hole needs.
   ⇒ What is left is genuinely untidy-only. If it is ever picked up, the value is in the missing **pins**,
-  not in the code. |
+  not in the code. **→ Archive-family pins landed 2026-09-02:** `TarUtilTest` pins the tar-slip refusal
+  (an escaping entry throws before a byte lands) AND the one-frame comparison (a `work/./out` destDir
+  still admits a safe entry — the fail-closed direction the 2026-08-27 grounding named). `BundleImporter`
+  was already pinned (`BundleImporterTest`, `../evil.toon`). `BackupTask.restore`'s zip-slip branch stays
+  unpinned: its guard sits behind a sidecar-manifest + hash verification, so a pin needs a whole backup
+  fixture — schedule by value, not on momentum. |
   `okf/backend/config/config-safety.md`
   - **Tier 1 (silent-success) SHIPPED 2026-08-14.** `MetadataValidateTask` now emits an *unsafe physical
     reference* finding instead of `continue`-ing — an escaping ref is a **worse** finding than a merely

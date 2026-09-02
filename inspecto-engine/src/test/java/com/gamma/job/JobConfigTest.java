@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -124,5 +125,26 @@ class JobConfigTest {
                   cron: "not a cron"
                 """);
         assertThrows(RuntimeException.class, () -> JobConfig.fromMap(badCron));
+    }
+
+    /** CHAIN-CONFIG-1 (third bullet): a consignment.process chain whose chain_config does not align is
+     *  refused AT SAVE — every API write and the boot loader pass through fromMap — not at the next commit. */
+    @Test
+    void aMisalignedConsignmentProcessChainIsRefusedAtSave() {
+        Map<String, Object> job = new LinkedHashMap<>();
+        job.put("name", "post-sync");
+        job.put("type", "consignment.process");
+        job.put("processor", "a, b");
+        job.put("chain_config", "[{\"config\":{\"x\":\"1\"}}]");
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> JobConfig.fromMap(Map.of("job", job)));
+        assertTrue(ex.getMessage().contains("1 entry") && ex.getMessage().contains("2 step"), ex.getMessage());
+
+        job.put("chain_config", "[{\"config\":{\"x\":\"1\"}},{\"config\":{}}]");
+        assertDoesNotThrow(() -> JobConfig.fromMap(Map.of("job", job)), "an aligned chain saves");
+
+        // A nested value is refused here too — the run-time refusal (c2a07aeb) now also fires at save.
+        job.put("chain_config", "[{\"config\":{\"cols\":[\"a\"]}},{\"config\":{}}]");
+        assertThrows(IllegalArgumentException.class, () -> JobConfig.fromMap(Map.of("job", job)));
     }
 }

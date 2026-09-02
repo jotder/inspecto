@@ -302,11 +302,14 @@ public final class RecipeConverter {
         return join;
     }
 
-    /** {@code dedup: {keys, order_by}} → the recipe's {@code key:} spelling. */
+    /** {@code dedup: {keys, order_by, scope}} → the recipe's {@code key:} spelling. {@code scope} (D-9's
+     *  {@code window(P4D)}) travels verbatim — RECIPE-SCOPE-1: dropping it here made a windowed dedup
+     *  silently collapse to one batch on the Recipe round-trip while the file still declared the window. */
     private static Map<String, Object> dedupStep(Map<String, Object> cfg) {
         Map<String, Object> dedup = new LinkedHashMap<>();
         putIfPresent(dedup, "key", cfg.get("keys"));
         putIfPresent(dedup, "order_by", cfg.get("order_by"));
+        putIfPresent(dedup, "scope", cfg.get("scope"));
         return dedup;
     }
 

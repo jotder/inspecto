@@ -168,6 +168,9 @@ public record JobConfig(String name, String type, String cron, String onPipeline
                 default -> { if (e.getValue() != null) params.put(e.getKey(), e.getValue().toString()); }
             }
         }
+        // CHAIN-CONFIG-1: a consignment.process chain and its per-step config must align AT SAVE — every
+        // API write and the boot loader funnel through here, so the refusal is not left to the next commit.
+        if (ConsignmentProcessJobType.TYPE_ID.equals(type)) ConsignmentProcessJobType.requireAlignedChain(params);
         return new JobConfig(name, type, cron, onPipeline, enabled, catchUp, params, onSignal, when, args, bind);
     }
 

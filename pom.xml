@@ -374,6 +374,12 @@
                                  default-ON URL_OR_ENGINE too, so it minted an
                                  inspecto-consignment-outputs.db at four different module roots. -->
                             <consignment.outputs.backend>jdbc:duckdb:</consignment.outputs.backend>
+                            <!-- STATUS is a DB_FLAG family (`db` | `file`), so it could not take the
+                                 backend=jdbc: hatch until ServiceStores.openStatusStore learned to read a
+                                 raw jdbc: value as "db at this URL" (TEST-CWD-DB-1). Same shape, same
+                                 reason: the `db` default (an operator decision) minted
+                                 inspecto/inspecto-status.db at the module root on every test boot. -->
+                            <status.backend>jdbc:duckdb:</status.backend>
                         </systemPropertyVariables>
                     </configuration>
                 </plugin>

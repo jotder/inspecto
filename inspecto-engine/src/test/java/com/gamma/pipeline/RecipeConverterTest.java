@@ -105,6 +105,32 @@ class RecipeConverterTest {
         assertEquals(cfg, back);
     }
 
+    /** RECIPE-SCOPE-1: a D-9 windowed dedup's {@code scope:} survives the Recipe round-trip (trunk),
+     *  instead of the file keeping the window while the Pipeline Document silently lost it. */
+    @Test
+    void aWindowedDedupScopeSurvivesTheRecipeRoundTrip() {
+        Map<String, Object> cfg = new LinkedHashMap<>();
+        cfg.put("name", "orders");
+        cfg.put("active", false);
+        cfg.put("dirs", new LinkedHashMap<>(Map.of("poll", "/in", "database", "/db")));
+        cfg.put("parsing", new LinkedHashMap<>(Map.of("grammar", "grammar/pipe")));
+        cfg.put("processing", new LinkedHashMap<>(Map.of(
+                "file_pattern", "glob:**/*.csv",
+                "dedup", new LinkedHashMap<>(Map.of(
+                        "keys", List.of("ORDER_ID"), "order_by", "EVENT_TS DESC", "scope", "window(P4D)")))));
+        cfg.put("output", new LinkedHashMap<>(Map.of("format", "PARQUET")));
+
+        Map<String, Object> recipe = RecipeConverter.toRecipe(cfg);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> steps = (List<Map<String, Object>>) recipe.get("steps");
+        Map<?, ?> dedup = (Map<?, ?>) steps.stream().filter(s -> s.containsKey("dedup")).findFirst()
+                .orElseThrow().get("dedup");
+        assertEquals("window(P4D)", dedup.get("scope"), "the recipe carries the window");
+
+        Map<String, Object> back = RecipeCompiler.compile(recipe, cfg, false);
+        assertEquals(cfg, back);
+    }
+
     /** MIDBRANCH-1 (R3): a branch's steps[] sub-chain projects BEFORE its sink and round-trips —
      *  through the same per-kind builders as the trunk, so the two chains cannot drift. */
     @Test

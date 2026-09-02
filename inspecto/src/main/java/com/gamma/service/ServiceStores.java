@@ -314,9 +314,14 @@ final class ServiceStores {
         String requested = System.getProperty(OperationalDb.Family.STATUS.backendProperty);
         boolean explicit = requested != null && !requested.isBlank();
         String backend = explicit ? requested : OperationalDb.Family.STATUS.backendDefault;
-        if (!"db".equalsIgnoreCase(backend)) return new FileStatusStore();
+        // TEST-CWD-DB-1: a raw jdbc: value is "db, at exactly this URL" — the same first-class source the
+        // URL_OR_ENGINE families accept. It exists so the test reactor can pin the family to an in-memory
+        // DuckDB (-Dstatus.backend=jdbc:duckdb:) without touching -Dstatus.db.url, which would break the
+        // shared -Dinspecto.db roster OperationalDbTest pins; the `db` default is untouched.
+        boolean rawUrl = backend.startsWith("jdbc:");
+        if (!rawUrl && !"db".equalsIgnoreCase(backend)) return new FileStatusStore();
 
-        String url = OperationalDb.urlFor(OperationalDb.Family.STATUS, root.statusDbUrl());
+        String url = rawUrl ? backend : OperationalDb.urlFor(OperationalDb.Family.STATUS, root.statusDbUrl());
         try {
             StatusStore db = DbStatusStore.open(url,
                     OperationalDb.userFor(OperationalDb.Family.STATUS), OperationalDb.passwordFor(OperationalDb.Family.STATUS));

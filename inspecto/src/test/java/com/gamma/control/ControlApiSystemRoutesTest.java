@@ -6,6 +6,7 @@ import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
 import com.gamma.service.CollectorService;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -16,7 +17,9 @@ import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -37,14 +40,27 @@ class ControlApiSystemRoutesTest {
     private static final ObjectMapper JSON = new ObjectMapper();
     private final HttpClient client = HttpClient.newHttpClient();
 
-    /** Every property these tests set, cleared after each so one test cannot colour the next. */
+    /** Every property these tests set, RESTORED after each so one test cannot colour the next. */
     private static final List<String> TOUCHED = List.of(
             "inspecto.db", "inspecto.db.url", "inspecto.db.user", "jobs.backend", "jobs.db.url",
             "objects.backend", "objects.db.url", "status.backend");
 
+    // ⚠ Restore, never clear (TEST-CWD-DB-1): surefire pins -Dstatus.backend=jdbc:duckdb: for the whole
+    // forked JVM, and a blanket clearProperty here erased it — so every class that ran AFTER this one in
+    // the same fork booted on the `db` default and minted inspecto/inspecto-status.db at the module root.
+    private final Map<String, String> before = new HashMap<>();
+
+    @BeforeEach
+    void snapshotProperties() {
+        TOUCHED.forEach(k -> before.put(k, System.getProperty(k)));
+    }
+
     @AfterEach
-    void clearProperties() {
-        TOUCHED.forEach(System::clearProperty);
+    void restoreProperties() {
+        TOUCHED.forEach(k -> {
+            String v = before.get(k);
+            if (v == null) System.clearProperty(k); else System.setProperty(k, v);
+        });
     }
 
     private record Ctx(CollectorService svc, ControlApi api, int port) implements AutoCloseable {

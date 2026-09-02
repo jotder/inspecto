@@ -331,8 +331,9 @@ public final class RecipeCompiler {
         return PipelineNode.of(id, BuiltinNodeType.SINK_PERSISTENT.type(), new LinkedHashMap<>(cfg));
     }
 
-    /** {@code dedup: {key: […], order_by: …}} → the record-grain dedup node ({@code processing.dedup}).
-     *  {@code keep:} other than {@code first} is refused — the winner is {@code order_by}'s job. */
+    /** {@code dedup: {key: […], order_by: …, scope: …}} → the record-grain dedup node ({@code processing.dedup}).
+     *  {@code keep:} other than {@code first} is refused — the winner is {@code order_by}'s job. {@code scope}
+     *  is D-9's window vocabulary and compiles verbatim; whether it may ARM is the save gates' call. */
     private static PipelineNode dedup(String id, Map<String, Object> cfg,
                                       List<PipelineCompileException.Refusal> refusals) {
         Map<String, Object> c = new LinkedHashMap<>(cfg);
@@ -343,15 +344,17 @@ public final class RecipeCompiler {
             refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_STEP, id,
                     "dedup keep: '" + keep + "' — only 'first' compiles; pick the winner with order_by"));
         Object orderBy = c.remove("order_by");
+        Object scope = c.remove("scope");
         if (keys == null)
             refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id,
                     "dedup needs a key: […] list (the business-key columns)"));
         for (String other : c.keySet())
             refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_STEP, id,
-                    "dedup does not understand '" + other + "' (only key / keep / order_by)"));
+                    "dedup does not understand '" + other + "' (only key / keep / order_by / scope)"));
         Map<String, Object> node = new LinkedHashMap<>();
         if (keys != null) node.put("keys", keys);
         if (orderBy != null) node.put("order_by", orderBy);
+        if (scope != null) node.put("scope", scope);
         return PipelineNode.of(id, BuiltinNodeType.TRANSFORM_DEDUP.type(), node);
     }
 

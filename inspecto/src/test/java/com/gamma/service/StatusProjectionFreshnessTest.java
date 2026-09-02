@@ -70,7 +70,9 @@ class StatusProjectionFreshnessTest {
     @Test
     void theFileStoreSeesTheSameCommit(@TempDir Path dir) throws Exception {
         Path toon = seed(dir);
-        // No -Dstatus.backend ⇒ the file store; syncStatus() is a no-op and must stay harmless.
+        // The store-less constructor always hands out the file store (no -Dstatus.backend is consulted —
+        // the family default is `db` since 2026-08-31, and the reactor pins jdbc:duckdb:); syncStatus() is
+        // a no-op there and must stay harmless.
         try (CollectorService svc = new CollectorService(List.of(toon), 3600, 1)) {
             assertInstanceOf(FileStatusStore.class, svc.statusStore());
             PipelineConfig cfg = PipelineConfig.load(toon.toString());

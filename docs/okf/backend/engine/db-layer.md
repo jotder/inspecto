@@ -482,9 +482,11 @@ value, not the per-family `*.db.url`: a raw `jdbc:` backend is a first-class sou
 `ServiceStores` and `OperationalDb.resolve` short-circuit on, so `urlFor` is never consulted —
 setting `-Ddedup.ledger.db.url` instead defeats the shared `-Dinspecto.db` selection that
 `OperationalDbTest` pins across all eleven families (it fails that test). Tests needing durable dedup
-state construct `DbDedupLedger` on an explicit `@TempDir` URL. `STATUS` cannot use this escape hatch —
-it is `DB_FLAG` mode, so `inspecto/inspecto-status.db` is still minted at that module root
-(`.gitignore`-masked, unfixed).
+state construct `DbDedupLedger` on an explicit `@TempDir` URL. `STATUS` is `DB_FLAG` mode (`db` |
+`file`) and could not take the hatch until 2026-09-02: `ServiceStores.openStatusStore` now also reads a
+raw `jdbc:` backend value as "db, at exactly this URL", so the root pom pins `-Dstatus.backend=jdbc:duckdb:`
+too and `inspecto/inspecto-status.db` is no longer minted (TEST-CWD-DB-1). The `db` default and
+`-Dstatus.db.url` are untouched.
 
 ---
 
