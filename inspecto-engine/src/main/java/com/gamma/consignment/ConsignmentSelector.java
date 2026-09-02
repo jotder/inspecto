@@ -71,8 +71,28 @@ public final class ConsignmentSelector {
      * @param hive   whether to enable Hive partitioning, passed straight through
      */
     public static String resolve(Connection conn, String format, String glob, boolean hive) {
+        return resolveWithFiles(conn, format, glob, hive).reader();
+    }
+
+    /**
+     * What {@link #resolve} decided, plus the files it decided on.
+     *
+     * @param reader the SQL source the read should use
+     * @param kept   the files the reader will actually scan, or {@code null} when the selector had nothing
+     *               to say (no output registry, or the enumeration failed) and the glob is read UNFILTERED —
+     *               the set of files is then genuinely unknown to the caller and must be recorded as
+     *               unknown, never as empty
+     */
+    public record Resolution(String reader, List<String> kept) {}
+
+    /**
+     * As {@link #resolve}, exposing the kept file list — the seam cross-lane provenance (X2) reads: the
+     * at-rest run records the Consignments whose files it actually scanned, which is exactly this list
+     * mapped back through the output registry, not "every Consignment under the store".
+     */
+    public static Resolution resolveWithFiles(Connection conn, String format, String glob, boolean hive) {
         List<String> kept = select(conn, glob);
-        return kept == null ? SqlViews.reader(format, glob, hive) : SqlViews.reader(format, kept, hive);
+        return new Resolution(kept == null ? SqlViews.reader(format, glob, hive) : SqlViews.reader(format, kept, hive), kept);
     }
 
     /**

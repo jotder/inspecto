@@ -186,10 +186,62 @@ class PipelineJobRunnerTest {
                 tmp.resolve("audit").toString()).run().success());
     }
 
+    /**
+     * X2 cross-lane provenance, end to end: with the output registry on, a run reports the Consignments behind
+     * the files its source view scanned — LIVE rows only — and with the registry OFF it reports NOTHING,
+     * because an unfiltered read has an unknown file set and unknown must never be recorded as empty.
+     */
+    @Test
+    void reportsTheConsignmentsItReadWhenTheRegistryCanNameThem() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        String auditDir = tmp.resolve("audit").toString();
+        seedParquetFile(dataDir, "events", "c-live", "(1,150),(2,50)");
+        seedParquetFile(dataDir, "events", "c-old", "(3,200)");
+        PipelineStore store = new PipelineStore(tmp.resolve("flows"));
+        store.write("evt_copy", new PipelineGraph("evt_copy", true,
+                List.of(PipelineNode.of("src", "acquisition", Map.of("source_store", "events")),
+                        new PipelineNode("out", "sink.persistent", "Copy", null, Map.of("store", "copy"), null)),
+                List.of(PipelineEdge.data("src", "out"))));
+        JobConfig cfg = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline", "evt_copy", "data_dir", dataDir));
+
+        // registry OFF: the read is unfiltered, the file set unknown — nothing reported
+        RecordingContext blind = new RecordingContext();
+        assertTrue(new PipelineJobRunner(cfg, new ConsignmentEventBus(), store, dataDir, auditDir).run(blind).success());
+        assertEquals(List.of(), blind.read, "no registry ⇒ unknown, and unknown is not reported as []");
+
+        try (com.gamma.consignment.DbConsignmentOutputStore registry =
+                     com.gamma.consignment.DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            String live = Path.of(dataDir, "events", "c-live.parquet").toString();   // stored with the OS separator
+            String old  = Path.of(dataDir, "events", "c-old.parquet").toString();
+            registry.record(List.of(
+                    new com.gamma.consignment.ConsignmentOutput("c-live", "run-0", "events", "", null, live,
+                            2, 200, "2026-09-01T00:00:00Z", 0, com.gamma.consignment.ConsignmentOutput.State.LIVE),
+                    new com.gamma.consignment.ConsignmentOutput("c-old", "run-0", "events", "", null, old,
+                            1, 100, "2026-08-01T00:00:00Z", 0, com.gamma.consignment.ConsignmentOutput.State.SUPERSEDED)));
+            com.gamma.consignment.ConsignmentOutputStores.use(registry);
+            try {
+                RecordingContext ctx = new RecordingContext();
+                assertTrue(new PipelineJobRunner(cfg, new ConsignmentEventBus(), store, dataDir, auditDir).run(ctx).success());
+                assertEquals(List.of("c-live"),
+                        ctx.read.stream().map(com.gamma.consignment.ConsignmentSource::consignmentId).toList(),
+                        "the LIVE Consignment behind the scanned file; the superseded one is excluded from the read AND the trail");
+                assertEquals("events", ctx.read.get(0).tableName());
+            } finally {
+                com.gamma.consignment.ConsignmentOutputStores.use(null);
+            }
+        }
+    }
+
     /** A {@link JobContext} that only captures what the runner records — the rest is never touched here. */
     private static final class RecordingContext implements JobContext {
         private final Map<String, Long> rows = new java.util.LinkedHashMap<>();
         private final Map<String, String> refs = new java.util.LinkedHashMap<>();
+        private final List<com.gamma.consignment.ConsignmentSource> read = new ArrayList<>();
+
+        @Override public void readConsignments(List<com.gamma.consignment.ConsignmentSource> sources) {
+            read.addAll(sources);
+        }
 
         @Override public ArtifactRecorder artifacts() {
             return new ArtifactRecorder() {

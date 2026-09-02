@@ -1162,6 +1162,9 @@ public final class JobService implements AutoCloseable {
             JobRun run = new JobRun(runId, name, job.type(), trigger, start,
                     LocalDateTime.now().format(TS), res.status(), res.durationMs(), res.message());
             record(run);
+            // X2: the Consignments this run READ, beside its row. Only the DB projection carries it (the
+            // CSV ledger is the nine-column record of the run); nothing to write when the job said nothing.
+            runStore().ifPresent(rs -> rs.recordSources(runId, ctx.consignmentsRead()));
             MetricRegistry.global().inc("inspecto_jobs_total", "Config-driven job executions",
                     Map.of("job", name, "type", job.type(), "status", res.status()));
             MetricRegistry.global().observe("inspecto_job_duration_seconds", "Job wall time",

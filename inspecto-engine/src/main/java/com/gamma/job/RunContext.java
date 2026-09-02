@@ -32,6 +32,9 @@ final class RunContext implements JobContext {
     private volatile Map<String, String> params = Map.of();   // resolved by the framework before run (P3a)
     private volatile boolean dryRun;                          // installed by the framework before run (MNT-1)
     private volatile PlatformServices services = PlatformServices.none();   // grant-filtered by the framework (S1-1)
+    /** X2: what the job reported reading — drained by JobService into the run store after the run. */
+    private final java.util.List<com.gamma.consignment.ConsignmentSource> consignmentsRead =
+            java.util.Collections.synchronizedList(new java.util.ArrayList<>());
 
     RunContext(String runId, String spaceId, String jobName, String trigger, String correlationId,
                String causationId,
@@ -57,6 +60,15 @@ final class RunContext implements JobContext {
     @Override public ArtifactRecorder artifacts() { return artifacts; }
     @Override public boolean dryRun()              { return dryRun; }
     @Override public PlatformServices services()   { return services; }
+
+    @Override public void readConsignments(java.util.List<com.gamma.consignment.ConsignmentSource> sources) {
+        if (sources != null) consignmentsRead.addAll(sources);
+    }
+
+    /** The Consignments the job reported reading, in report order (a snapshot). */
+    java.util.List<com.gamma.consignment.ConsignmentSource> consignmentsRead() {
+        return java.util.List.copyOf(consignmentsRead);
+    }
 
     /** The framework installs the resolved Parameter Context (§7.2) just before {@code Job.run(ctx)}. */
     void params(Map<String, String> resolved) { this.params = Map.copyOf(resolved); }

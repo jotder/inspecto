@@ -198,7 +198,41 @@ CREATE TABLE IF NOT EXISTS inspecto_job_runs (
   duration_ms BIGINT,
   message     VARCHAR
 );
+
+-- X2 cross-lane provenance (2026-09-02): which Consignments an at-rest run READ.
+CREATE TABLE IF NOT EXISTS inspecto_job_run_sources (
+  run_id         VARCHAR,
+  consignment_id VARCHAR,
+  pipeline       VARCHAR,   -- the producer, from consignment_outputs.producer; NULL when it had none
+  table_name     VARCHAR    -- the source_store the view read
+);
+CREATE INDEX IF NOT EXISTS inspecto_job_run_sources_by_consignment ON inspecto_job_run_sources (consignment_id);
 ```
+
+**`inspecto_job_run_sources` — one Consignment, one trail across the Stage-1 → Stage-2 boundary.** Until
+X2 the `pipeline_config:` job's run was linked to its input Consignments only by convention
+(`output_store:` + the store path); an operator could not ask *which chain runs consumed consignment X*.
+Now the at-rest readers (`PipelineJobRunner`, `SqlTemplateJob`) report, per `source_store` view, the
+Consignments behind the files the **selector actually kept** — `SourceStoreReader.registerView` returns
+`ConsignmentSelector.Resolution.kept()`, mapped through `DbConsignmentOutputStore.sourcesForPaths`
+(LIVE rows only, `norm()` on both sides) — via `JobContext.readConsignments`; `RunContext` collects and
+`JobService` writes them here beside the run row. Read both ways: `GET /jobs/runs/{runId}` gains
+`derivedFrom[]` (`{consignmentId, pipeline, tableName}`), and `GET /runs/{name}/outputs?consignmentId=`
+gains `derivedRuns[]` (the same nine-column projection `recentRuns` serves).
+
+Three decisions worth keeping: (1) **a child table, not a column on the run row** — the linkage is a
+LIST, `JobRun` is nine scalars built at seven call sites, and the reverse question is one indexed lookup
+here rather than a `LIKE` over a joined string (the shipped `replay:<runId>` linkage could ride the
+`trigger` column only because it is one scalar). (2) **The registry, not the rows, is the source.** The
+plan assumed `DISTINCT __batch_id` over the rows read; grounding showed ordinary output files carry NO
+per-row batch id (only the SCD2/reference write path stamps `__batch_id`) — the file-level
+`consignment_outputs` registry is the only place the identity exists for a general store, which is also
+what makes retire/supersede honest (a SUPERSEDED file is excluded from the read AND the trail).
+(3) **Unknown is not empty.** With the registry off the selector reads the raw glob and `kept` is `null`;
+the readers then report NOTHING and both routes omit the key rather than serving `[]` — the plan's
+"analyses nothing" precondition, applied: a deployment that cannot know must never read as "derived from
+nothing". The CSV `jobs_runs` ledger is untouched (still the nine-column record of the run); only the DB
+projection carries provenance.
 
 ### 3.6 `inspecto_pipeline_provenance` — per-edge row counts  · **A**
 File: `provenance.duckdb`

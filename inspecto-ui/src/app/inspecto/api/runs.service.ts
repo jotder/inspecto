@@ -1,4 +1,5 @@
 import { Injectable, inject } from '@angular/core';
+import { JobRunRow } from './jobs.service';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { apiUrl, toParams } from './api-base';
@@ -33,6 +34,12 @@ export interface ConsignmentOutputsPage {
     enabled: boolean;
     consignmentId: string;
     outputs: ConsignmentOutputRow[];
+    /**
+     * X2 cross-lane provenance, reverse half: the at-rest job runs that READ this Consignment. ABSENT (not
+     * `[]`) when the backend has no run store — a deployment that cannot know must not read as "nothing
+     * derived from this".
+     */
+    derivedRuns?: JobRunRow[];
 }
 
 /** Ingest run lifecycle + audit queries (CONTROL scope). */

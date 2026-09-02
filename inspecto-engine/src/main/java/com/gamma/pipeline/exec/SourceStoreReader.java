@@ -6,6 +6,7 @@ import com.gamma.sql.SqlViews;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
 
 /**
  * <b>T32 Phase A — seed a flow job's {@code source_store} as a DuckDB view.</b> A flow run as a
@@ -33,10 +34,12 @@ public final class SourceStoreReader {
      * @param dataDir  the data root under which each store is a sub-directory
      * @param store    the {@code source_store} name to read
      * @param format   {@code "PARQUET"} or {@code "CSV"} (the at-rest store format)
+     * @return the files the view will scan, or {@code null} when the read is unfiltered and the set is
+     *         unknown (see {@link com.gamma.consignment.ConsignmentSelector.Resolution#kept()})
      */
-    public static void registerView(Connection conn, String viewName, String dataDir,
-                                    String store, String format) throws SQLException {
-        registerView(conn, viewName, dataDir, store, format, null);
+    public static List<String> registerView(Connection conn, String viewName, String dataDir,
+                                            String store, String format) throws SQLException {
+        return registerView(conn, viewName, dataDir, store, format, null);
     }
 
     /**
@@ -44,8 +47,8 @@ public final class SourceStoreReader {
      * {@code WHERE} predicate to the view — used by incremental flow jobs (T32 Phase C) to read only rows
      * past the stored watermark (e.g. {@code "ts" > '2026-06-01'}). {@code null}/blank ⇒ the full store.
      */
-    public static void registerView(Connection conn, String viewName, String dataDir,
-                                    String store, String format, String wherePredicate) throws SQLException {
+    public static List<String> registerView(Connection conn, String viewName, String dataDir,
+                                            String store, String format, String wherePredicate) throws SQLException {
         String glob = SqlViews.storeReadRoot(dataDir.replace("\\", "/") + "/" + store)
                 + "/**/*." + SqlViews.ext(format);
         String where = wherePredicate == null || wherePredicate.isBlank() ? "" : " WHERE " + wherePredicate;
@@ -53,9 +56,12 @@ public final class SourceStoreReader {
         // back when it has nothing to say. The live case this closes is a reprocess whose delete failed (a
         // Windows lock is enough): ReprocessCommand supersedes the row either way, so without this the file
         // stays on disk, stays in the glob, and its rows are counted twice after the re-ingest.
-        String read = com.gamma.consignment.ConsignmentSelector.resolve(conn, format, glob, true);
+        // X2: keep the files the view scans — the run records the Consignments behind them.
+        com.gamma.consignment.ConsignmentSelector.Resolution read =
+                com.gamma.consignment.ConsignmentSelector.resolveWithFiles(conn, format, glob, true);
         try (Statement st = conn.createStatement()) {
-            st.execute("CREATE VIEW \"" + viewName + "\" AS SELECT * FROM " + read + where);
+            st.execute("CREATE VIEW \"" + viewName + "\" AS SELECT * FROM " + read.reader() + where);
         }
+        return read.kept();
     }
 }

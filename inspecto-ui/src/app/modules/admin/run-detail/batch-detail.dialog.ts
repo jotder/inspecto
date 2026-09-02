@@ -5,9 +5,10 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { RouterLink } from '@angular/router';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
-import { AuditRow, CatalogService, ConsignmentOutputRow, RunsService } from 'app/inspecto/api';
+import { AuditRow, CatalogService, ConsignmentOutputRow, JobRunRow, RunsService } from 'app/inspecto/api';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 
 /** Batch detail — summary + member files + input→output lineage for one batch. */
 @Component({
@@ -19,6 +20,7 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
         MatProgressSpinnerModule,
         DataTableComponent,
         InspectoAlertComponent,
+        StatusBadgeComponent,
         RouterLink,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -117,6 +119,27 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
                         noRowsTitle="No registered outputs"
                     />
                 }
+
+                <!-- X2 cross-lane provenance, reverse half: which at-rest job runs READ this Consignment.
+                     Rendered only when the backend could answer — an absent list is "unknown", and unknown
+                     must never look like "no run ever consumed this". -->
+                @if (derivedRuns(); as runs) {
+                    <div class="mt-4 font-semibold" data-testid="derived-runs">Derived runs ({{ runs.length }})</div>
+                    @if (runs.length) {
+                        <ul class="mt-1 space-y-1 text-xs">
+                            @for (run of runs; track run.runId) {
+                                <li class="flex flex-wrap items-baseline gap-x-2">
+                                    <inspecto-status-badge [value]="run.status" />
+                                    <span class="font-mono">{{ run.job }}</span>
+                                    <span class="text-secondary font-mono">{{ run.runId }}</span>
+                                    <span class="text-secondary">{{ run.startTime }}</span>
+                                </li>
+                            }
+                        </ul>
+                    } @else {
+                        <p class="text-secondary text-sm">No at-rest run has read this Consignment.</p>
+                    }
+                }
             }
         </mat-dialog-content>
         <mat-dialog-actions align="end">
@@ -143,6 +166,8 @@ export class BatchDetailDialog implements OnInit {
      * table, is authoritative for a file's existence.
      */
     readonly outputsNote = signal<string | null>(null);
+    /** The at-rest runs that read this Consignment; `null` = the backend could not say (no run store). */
+    readonly derivedRuns = signal<JobRunRow[] | null>(null);
 
     /** The store this batch wrote, and the catalog node it resolved to — blank/null when unresolvable. */
     readonly outputTable = signal('');
@@ -200,6 +225,7 @@ export class BatchDetailDialog implements OnInit {
         this.api.consignmentOutputs(pipeline, batchId).subscribe({
             next: (page) => {
                 this.batchOutputs.set(page.outputs ?? []);
+                this.derivedRuns.set(page.derivedRuns ?? null);
                 this.outputsNote.set(
                     page.enabled
                         ? null

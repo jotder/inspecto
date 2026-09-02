@@ -244,6 +244,20 @@ export interface JobRunRow {
     status: string;
     durationMs: number;
     message: string;
+    /**
+     * X2 cross-lane provenance — the source Consignments an at-rest run READ, served only by the single-run
+     * read (`GET /jobs/runs/{runId}`), never by the list. `pipeline` is the producer when the registry knew
+     * it and `null` otherwise: the UI links a Consignment only by its `(pipeline, id)` pair, so a source
+     * with no pipeline is listed but not linked (an unprovable link is worse than none).
+     */
+    derivedFrom?: JobRunSource[];
+}
+
+/** One Consignment an at-rest job run read (see {@link JobRunRow.derivedFrom}). */
+export interface JobRunSource {
+    consignmentId: string;
+    pipeline: string | null;
+    tableName: string;
 }
 
 /** One recorded Run Artifact (R7) — a produced Dataset or file, from `/jobs/{name}/artifacts/latest`. */

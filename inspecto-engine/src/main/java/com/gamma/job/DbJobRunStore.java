@@ -1,5 +1,6 @@
 package com.gamma.job;
 
+import com.gamma.consignment.ConsignmentSource;
 import com.gamma.api.PublicApi;
 import com.gamma.util.JdbcDrivers;
 import com.gamma.util.JdbcRows;
@@ -35,6 +36,7 @@ public final class DbJobRunStore implements AutoCloseable, com.gamma.util.Browsa
 
     private static final Logger log = LoggerFactory.getLogger(DbJobRunStore.class);
     private static final String T_RUNS = "inspecto_job_runs";
+    private static final String T_SOURCES = "inspecto_job_run_sources";
 
     private final Connection conn;
 
@@ -78,8 +80,68 @@ public final class DbJobRunStore implements AutoCloseable, com.gamma.util.Browsa
                     + "run_id VARCHAR, job VARCHAR, type VARCHAR, \"trigger\" VARCHAR, "
                     + "start_time VARCHAR, end_time VARCHAR, status VARCHAR, "
                     + "duration_ms BIGINT, message VARCHAR)");
+            // X2 cross-lane provenance: which Consignments an at-rest run READ. A child table rather than a
+            // column on the run row — the linkage is a LIST, the run record is nine scalars built at seven
+            // call sites, and the reverse question ("which runs consumed consignment X") is one indexed
+            // lookup here instead of a LIKE over a joined string.
+            st.execute("CREATE TABLE IF NOT EXISTS " + T_SOURCES + " ("
+                    + "run_id VARCHAR, consignment_id VARCHAR, pipeline VARCHAR, table_name VARCHAR)");
+            st.execute("CREATE INDEX IF NOT EXISTS " + T_SOURCES + "_by_consignment ON " + T_SOURCES + " (consignment_id)");
         } catch (SQLException e) {
             throw new IllegalStateException("Could not initialise job-run DB schema", e);
+        }
+    }
+
+    /**
+     * Record the Consignments {@code runId} read (X2). Best-effort like {@link #record}: the run row is the
+     * record of the run, this is its provenance — a failure here is logged, never thrown into the job.
+     */
+    public synchronized void recordSources(String runId, List<ConsignmentSource> sources) {
+        if (runId == null || sources == null || sources.isEmpty()) return;
+        try (PreparedStatement ps = conn.prepareStatement("INSERT INTO " + T_SOURCES
+                + " (run_id, consignment_id, pipeline, table_name) VALUES (?,?,?,?)")) {
+            for (ConsignmentSource src : sources) {
+                ps.setString(1, runId);
+                ps.setString(2, src.consignmentId());
+                ps.setString(3, src.pipeline());
+                ps.setString(4, src.tableName());
+                ps.addBatch();
+            }
+            ps.executeBatch();
+        } catch (SQLException e) {
+            log.warn("Could not record {} source consignment(s) for run {}: {}", sources.size(), runId, e.getMessage());
+        }
+    }
+
+    /** The Consignments {@code runId} read, in recorded order — empty when none were recorded. */
+    public synchronized List<ConsignmentSource> sources(String runId) {
+        List<ConsignmentSource> out = new ArrayList<>();
+        if (runId == null) return out;
+        try (PreparedStatement ps = conn.prepareStatement("SELECT consignment_id, pipeline, table_name FROM "
+                + T_SOURCES + " WHERE run_id = ? ORDER BY rowid")) {
+            ps.setString(1, runId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) out.add(new ConsignmentSource(rs.getString(1), rs.getString(2), rs.getString(3)));
+            }
+        } catch (SQLException e) {
+            log.warn("run sources query failed for {}: {}", runId, e.getMessage());
+        }
+        return out;
+    }
+
+    /** The reverse link: every run that read {@code consignmentId}, newest first — the same projection as {@link #recentRuns}. */
+    public synchronized List<Map<String, Object>> runsDerivedFrom(String consignmentId) {
+        if (consignmentId == null || consignmentId.isBlank()) return new ArrayList<>();
+        String sql = "SELECT r.run_id AS \"runId\", r.job, r.type, r.\"trigger\", r.start_time AS \"startTime\","
+                + " r.end_time AS \"endTime\", r.status, r.duration_ms AS \"durationMs\", r.message"
+                + " FROM " + T_SOURCES + " s JOIN " + T_RUNS + " r ON r.run_id = s.run_id"
+                + " WHERE s.consignment_id = ? ORDER BY r.start_time DESC, r.run_id DESC";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, consignmentId);
+            return JdbcRows.query(ps);
+        } catch (SQLException e) {
+            log.warn("runs-derived-from query failed for {}: {}", consignmentId, e.getMessage());
+            return new ArrayList<>();
         }
     }
 

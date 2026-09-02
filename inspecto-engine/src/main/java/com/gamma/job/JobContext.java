@@ -42,6 +42,15 @@ public interface JobContext {
     ArtifactRecorder artifacts();
 
     /**
+     * X2 cross-lane provenance — a Job reports the source Consignments it READ (the at-rest readers call
+     * this per {@code source_store} view with the files the selector kept, mapped through the output
+     * registry). The framework persists them beside the run row so the trail crosses the Stage-1 →
+     * Stage-2 boundary by recorded identity instead of by store-path convention. Default no-op: a harness
+     * or a job that reads no store has nothing to say, and silence here means "unknown", never "none".
+     */
+    default void readConsignments(java.util.List<com.gamma.consignment.ConsignmentSource> sources) {}
+
+    /**
      * Whether this Run is a <b>dry run</b> (System Maintenance MNT-1, "Safe by Default"): a preview
      * fire that must mutate nothing. A destructive Job Type honours it by reporting the affected
      * objects and estimated impact instead of acting; one that cannot preview must do nothing and

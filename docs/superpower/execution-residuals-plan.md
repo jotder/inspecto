@@ -53,7 +53,19 @@ nothing distinguishes transient from fatal at the throw site.
 - ⛔ Do NOT adopt the wiki's `remainingStepsCount` barrier (redundant second completion signal) or
   its untyped `Map<String,Object>` step metadata.
 
-## X2. Cross-lane provenance — one Consignment, one trail
+## X2. Cross-lane provenance — one Consignment, one trail — ✅ SHIPPED 2026-09-02
+
+**As-built:** `inspecto_job_run_sources` (child table beside the run row, both directions indexed);
+`JobContext.readConsignments` → `RunContext` → `JobService` → `DbJobRunStore.recordSources`; readers
+`PipelineJobRunner`/`SqlTemplateJob` report from `SourceStoreReader.registerView`'s kept files via
+`DbConsignmentOutputStore.sourcesForPaths`. Routes: `GET /jobs/runs/{runId}.derivedFrom[]`,
+`GET /runs/{name}/outputs.derivedRuns[]`; UI: job Run detail "derived from" (linked only where the
+producer pipeline is known), Batch detail "Derived runs". ⚠ Two of this section's premises were REFUTED
+by grounding: ordinary output files carry NO `__batch_id` (only the SCD2/reference path stamps it), so the
+registry — not the rows — is the source; and neither the run record nor the outputs row has a free-form
+field to reuse the way `replay:<runId>` rode `trigger`, so the linkage needed a real (additive) home.
+Detail: `okf/backend/engine/db-layer.md` §3.5. The original section follows for provenance.
+
 
 **Problem.** The trail breaks at the Stage-1 → Stage-2 boundary: the `pipeline_config:` job's run
 is linked to its input consignments by convention (`output_store:` + the store path), not by

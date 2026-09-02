@@ -203,11 +203,25 @@ public final class PipelineJobRunner implements Job {
      */
     @Override
     public JobResult run(JobContext ctx) throws Exception {
-        return execute(ctx == null ? null : ctx.artifacts());
+        return execute(ctx);
     }
 
     /** @param artifacts where to record this run's produced stores, or {@code null} to record none. */
-    private JobResult execute(ArtifactRecorder artifacts) throws Exception {
+    /**
+     * X2 cross-lane provenance: tell the framework which Consignments a source view reads. {@code read} is
+     * the selector's kept list — {@code null} when the read was unfiltered (no output registry), in which
+     * case the file set is unknown and NOTHING is reported: an unknown trail must not be recorded as an
+     * empty one. Shared with {@link SqlTemplateJob}, the other at-rest store reader.
+     */
+    static void reportSources(JobContext ctx, String store, List<String> read) {
+        if (ctx == null || read == null || read.isEmpty()) return;
+        com.gamma.consignment.DbConsignmentOutputStore registry = com.gamma.consignment.ConsignmentOutputStores.shared();
+        if (registry == null) return;
+        ctx.readConsignments(registry.sourcesForPaths(store, read));
+    }
+
+    private JobResult execute(JobContext ctx) throws Exception {
+        ArtifactRecorder artifacts = ctx == null ? null : ctx.artifacts();
         // A5-at-rest slice 2: `pipeline_config:` names the flat *_pipeline.toon file (a path, like the
         // enrich job's `config:`); the Stage-2 remainder is lifted at RUN time (PipelineLift.stageTwo),
         // so the flat file stays the single truth — no derived graph is persisted to the flow store.
@@ -262,7 +276,8 @@ public final class PipelineJobRunner implements Job {
                         ? watermarks.get(pipelineId, seed.store())
                             .map(wm -> "\"" + incCol + "\" > '" + wm.replace("'", "''") + "'").orElse(null)
                         : null;
-                SourceStoreReader.registerView(conn, view, dir, seed.store(), seed.format(), predicate);
+                List<String> read = SourceStoreReader.registerView(conn, view, dir, seed.store(), seed.format(), predicate);
+                reportSources(ctx, seed.store(), read);
                 seedViews.put(seed.node(), view);
             }
 

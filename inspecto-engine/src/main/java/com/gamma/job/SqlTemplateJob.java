@@ -90,7 +90,8 @@ final class SqlTemplateJob implements Job {
         try (Connection conn = DriverManager.getConnection("jdbc:duckdb:");
              Statement st = conn.createStatement()) {
             for (String store : sources)
-                SourceStoreReader.registerView(conn, safe(store, "source store"), dataDir, store, "PARQUET");
+                PipelineJobRunner.reportSources(ctx, store,
+                        SourceStoreReader.registerView(conn, safe(store, "source store"), dataDir, store, "PARQUET"));
             st.execute("CREATE TABLE " + OUT_TABLE + " AS " + sql);
             // Decision Rules targeting this job check the materialized result before it becomes the
             // snapshot (tag/route/quarantine/drop): route lands as a snapshot Parquet Dataset under

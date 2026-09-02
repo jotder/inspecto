@@ -69,6 +69,13 @@ gauges, ledgers, quarantine, audit drill-down.)
 Both provenance-writing lanes share **one** `DbProvenanceStore` per space (`ProvenanceStores` —
 DuckDB is single-writer). Default-off (`-Dprovenance.backend=duckdb`).
 
+**Across the lanes (X2, 2026-09-02):** the at-rest lane records which ingest-lane Consignments it READ
+— `inspecto_job_run_sources` beside the run row, fed from the files the Consignment selector kept and
+mapped through the default-ON `consignment_outputs` registry, never from the rows (ordinary output files
+carry no per-row batch id). `GET /jobs/runs/{runId}` → `derivedFrom[]`; `GET /runs/{name}/outputs` →
+`derivedRuns[]`. Absent when the registry or run store is off — unknown is not empty. Schema and the
+three decisions behind it: [db-layer §3.5](../engine/db-layer.md).
+
 ## The Stage-2 chain is a job, not a sixth lane
 
 A flat `*_pipeline.toon` carrying `steps:` + `output_store:` arms on the *declared promise* that a

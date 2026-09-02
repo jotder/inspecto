@@ -164,6 +164,37 @@ describe('BatchDetailDialog', () => {
         expect(fixture.nativeElement.querySelector('[data-testid="parked-table"]')).toBeNull();
     });
 
+    it('lists the at-rest runs that derived from this Consignment when the backend can say', () => {
+        const { fixture } = create(null, 'b-1', {
+            enabled: true,
+            consignmentId: 'b-1',
+            outputs: OUTPUTS,
+            derivedRuns: [
+                {
+                    runId: 'r-9',
+                    job: 'rollup',
+                    type: 'PIPELINE',
+                    trigger: 'schedule',
+                    startTime: '2026-09-02 10:00:00',
+                    endTime: '2026-09-02 10:00:05',
+                    status: 'SUCCESS',
+                    durationMs: 5000,
+                    message: 'ok',
+                },
+            ],
+        });
+        const el: HTMLElement = fixture.nativeElement;
+        expect(el.querySelector('[data-testid="derived-runs"]')?.textContent).toContain('Derived runs (1)');
+        expect(el.textContent).toContain('rollup');
+        expect(el.textContent).toContain('r-9');
+    });
+
+    it('shows no derived-runs section when the backend cannot answer (absent, not empty)', () => {
+        const { fixture } = create();
+        expect(fixture.componentInstance.derivedRuns()).toBeNull();
+        expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="derived-runs"]')).toBeNull();
+    });
+
     it('renders with no a11y violations', async () => {
         const { fixture } = create();
         await expectNoA11yViolations(fixture.nativeElement);

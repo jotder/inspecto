@@ -68,7 +68,7 @@ final class RunRoutes implements RouteModule {
         // The Consignment output registry, scoped to one Consignment: every file it wrote, INCLUDING the
         // derived tables and summaries a post-sync step registered onto it. Until this the lane was
         // real and invisible — a chain could derive a table and nothing in the UI could show it.
-        api.get("/runs/([^/]+)/outputs", (e, m) -> consignmentOutputs(ApiContext.query(e, "consignmentId")));
+        api.get("/runs/([^/]+)/outputs", (e, m) -> consignmentOutputs(api, ApiContext.query(e, "consignmentId")));
         // The rejected ROWS behind an error_rows count (audit hole 2): the audit ledgers carry counts,
         // filenames and an error string, never row content — which existed all along in the companion
         // `<base>_errors.csv` but only on disk, so an operator without filesystem access could see
@@ -444,12 +444,22 @@ final class RunRoutes implements RouteModule {
      * against ("an absent store means no readable relations, NOT that the Consignment wrote nothing"; the
      * manifest stays authoritative for existence). So the caller is told which of the two it is.
      */
-    private static Object consignmentOutputs(String consignmentId) {
+    private static Object consignmentOutputs(ApiContext api, String consignmentId) {
         if (consignmentId == null || consignmentId.isBlank())
             throw new ApiException(400, "consignmentId is required");
         DbConsignmentOutputStore store = ConsignmentOutputStores.shared();
-        if (store == null)
-            return Map.of("enabled", false, "consignmentId", consignmentId, "outputs", List.of());
+        Map<String, Object> page = new LinkedHashMap<>();
+        page.put("enabled", store != null);
+        page.put("consignmentId", consignmentId);
+        // X2 cross-lane provenance, the reverse half: the at-rest runs that READ this Consignment. Independent
+        // of the outputs registry (it lives beside the job-run ledger), and present only when a run store
+        // exists — absent ≠ empty: a deployment without the DB projection cannot know.
+        api.service().jobService().flatMap(com.gamma.job.JobService::runStore)
+                .ifPresent(runs -> page.put("derivedRuns", runs.runsDerivedFrom(consignmentId)));
+        if (store == null) {
+            page.put("outputs", List.of());
+            return page;
+        }
 
         List<Map<String, Object>> rows = new ArrayList<>();
         for (ConsignmentOutput o : store.outputs(consignmentId)) {
@@ -465,7 +475,8 @@ final class RunRoutes implements RouteModule {
             r.put("path", o.path());
             rows.add(r);
         }
-        return Map.of("enabled", true, "consignmentId", consignmentId, "outputs", rows);
+        page.put("outputs", rows);
+        return page;
     }
 
     private static ApiException notFound(String name) {

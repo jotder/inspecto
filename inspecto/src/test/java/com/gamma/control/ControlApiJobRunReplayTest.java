@@ -74,6 +74,60 @@ class ControlApiJobRunReplayTest {
         return fail("run " + runId + " did not reach a terminal status within 10s");
     }
 
+    /**
+     * X2 cross-lane provenance over real HTTP: a run's recorded source Consignments come back as
+     * {@code derivedFrom[]} on the single-run read, and the Consignment's outputs page answers the reverse
+     * question as {@code derivedRuns[]}. A run that recorded nothing carries NO key — absent, not [] —
+     * because a run store that knows nothing is not the same as a run that read nothing.
+     *
+     * <p>The heartbeat job reads no store, so the sources are recorded through the run store directly:
+     * what is under test HERE is the route contract; the reader → framework → store path is pinned by
+     * {@code PipelineJobRunnerTest} and {@code DbJobRunStoreTest}.
+     */
+    @Test
+    void aRunsSourceConsignmentsAreReadableBothWays(@TempDir Path dir) throws Exception {
+        System.setProperty("jobs.backend", "duckdb");
+        System.setProperty("jobs.db.url", "jdbc:duckdb:");
+        try (Ctx c = open(dir)) {
+            HttpResponse<String> fire = send(c.port, "POST", "/jobs/hb/trigger", null);
+            assertEquals(202, fire.statusCode(), fire.body());
+            String runId = json(fire).get("runId").asText();
+            awaitTerminal(c.port, runId);
+
+            JsonNode before = json(send(c.port, "GET", "/jobs/runs/" + runId, null));
+            assertFalse(before.has("derivedFrom"), "nothing recorded ⇒ no key, never []: " + before);
+
+            var store = c.svc.jobService().orElseThrow().runStore().orElseThrow();
+            store.recordSources(runId, List.of(
+                    new com.gamma.consignment.ConsignmentSource("c-a", "cdr_etl", "cdr"),
+                    new com.gamma.consignment.ConsignmentSource("c-b", null, "cdr")));
+
+            JsonNode run = json(send(c.port, "GET", "/jobs/runs/" + runId, null));
+            JsonNode derived = run.get("derivedFrom");
+            assertNotNull(derived, run.toString());
+            assertEquals(2, derived.size());
+            assertEquals("c-a", derived.get(0).get("consignmentId").asText());
+            assertEquals("cdr_etl", derived.get(0).get("pipeline").asText());
+            assertEquals("cdr", derived.get(0).get("tableName").asText());
+            assertTrue(derived.get(1).get("pipeline").isNull(), "an unknown producer stays null, not invented");
+
+            // the reverse half rides the Consignment's outputs page, beside (not gated by) the registry rows
+            JsonNode page = json(send(c.port, "GET", "/runs/test_etl/outputs?consignmentId=c-b", null));
+            JsonNode readers = page.get("derivedRuns");
+            assertNotNull(readers, page.toString());
+            assertEquals(1, readers.size());
+            assertEquals(runId, readers.get(0).get("runId").asText());
+            assertEquals("hb", readers.get(0).get("job").asText());
+
+            JsonNode nobody = json(send(c.port, "GET", "/runs/test_etl/outputs?consignmentId=c-unread", null));
+            assertTrue(nobody.has("derivedRuns") && nobody.get("derivedRuns").isEmpty(),
+                    "a run store that exists answers an unread Consignment with [] — that IS known: " + nobody);
+        } finally {
+            System.clearProperty("jobs.backend");
+            System.clearProperty("jobs.db.url");
+        }
+    }
+
     @Test
     void unknownRunIdIs404(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {

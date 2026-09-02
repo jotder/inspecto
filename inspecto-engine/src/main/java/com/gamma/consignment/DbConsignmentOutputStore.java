@@ -266,6 +266,41 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
      * <p>⚠ Compares the path <b>as stored</b>. A caller holding a path in another spelling (a different
      * separator, a relative form) must normalise before asking; this method does not guess.
      */
+    /**
+     * The Consignments behind {@code readPaths} under {@code tableName} — LIVE rows only, one entry per
+     * consignment (X2 cross-lane provenance: the at-rest run records what it READ, mapped from the files
+     * the selector kept, not every Consignment ever written to the store).
+     *
+     * <p>Paths are matched through {@link #norm}, on BOTH sides: the selector hands back DuckDB's glob
+     * spelling and the registry stores whatever the writer passed, so a raw string compare would miss on
+     * a separator or a relative form and silently under-report the sources — which reads exactly like
+     * "this run derived from nothing". {@code null}/empty {@code readPaths} ⇒ empty result; the caller
+     * decides what an unknown file set means (it must not be recorded as "no sources").
+     */
+    public synchronized List<ConsignmentSource> sourcesForPaths(String tableName, java.util.Collection<String> readPaths) {
+        List<ConsignmentSource> out = new ArrayList<>();
+        if (tableName == null || readPaths == null || readPaths.isEmpty()) return out;
+        java.util.Set<String> wanted = new java.util.HashSet<>();
+        for (String p : readPaths) if (p != null) wanted.add(norm(p));
+        String sql = "SELECT consignment_id, producer, path FROM " + T
+                + " WHERE table_name = ? AND coalesce(state, 'LIVE') = 'LIVE'";
+        java.util.LinkedHashMap<String, ConsignmentSource> byId = new java.util.LinkedHashMap<>();
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, tableName);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    if (!wanted.contains(norm(rs.getString(3)))) continue;
+                    byId.putIfAbsent(rs.getString(1),
+                            new ConsignmentSource(rs.getString(1), rs.getString(2), tableName));
+                }
+            }
+        } catch (SQLException e) {
+            log.warn("[CONSIGNMENT-OUTPUTS] source lookup failed for {}: {}", tableName, e.getMessage());
+        }
+        out.addAll(byId.values());
+        return out;
+    }
+
     public synchronized boolean isReadable(String path) {
         if (path == null || path.isBlank()) return false;
         String sql = "SELECT 1 FROM " + T + " WHERE path = ? AND coalesce(state, 'LIVE') = 'LIVE' LIMIT 1";

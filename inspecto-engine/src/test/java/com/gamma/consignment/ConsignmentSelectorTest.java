@@ -278,4 +278,32 @@ class ConsignmentSelectorTest {
                     ConsignmentSelector.resolve(conn, "PARQUET", glob(dir), true));
         }
     }
+
+    /**
+     * X2: resolveWithFiles hands back what the reader will scan. Without a registry it has nothing to say and
+     * kept is NULL (unknown) — never an empty list, which would read as "no sources".
+     */
+    @Test
+    void resolveWithFilesReportsKeptFilesOrUnknown(@TempDir Path dir) throws Exception {
+        try (Connection conn = JdbcDrivers.connect("jdbc:duckdb:")) {
+            String a = parquet(conn, dir, "a", 1);
+            String b = parquet(conn, dir, "b", 2);
+
+            ConsignmentSelector.Resolution none = ConsignmentSelector.resolveWithFiles(conn, "PARQUET", glob(dir), false);
+            assertNull(none.kept(), "no registry ⇒ the file set is UNKNOWN, not empty");
+            assertEquals(List.of(1, 2), idsFrom(conn, none.reader()), "and the read is the unfiltered glob");
+            assertEquals(none.reader(), ConsignmentSelector.resolve(conn, "PARQUET", glob(dir), false),
+                    "resolve() is the same decision");
+
+            try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+                ConsignmentOutputStores.use(db);
+                db.record(List.of(row(a, State.LIVE), row(b, State.SUPERSEDED)));
+                ConsignmentSelector.Resolution some = ConsignmentSelector.resolveWithFiles(conn, "PARQUET", glob(dir), false);
+                assertNotNull(some.kept());
+                assertEquals(1, some.kept().size(), "b is excluded, a is kept: " + some.kept());
+                assertTrue(some.kept().get(0).replace("\\", "/").endsWith("/a.parquet"), some.kept().toString());
+                assertEquals(List.of(1), idsFrom(conn, some.reader()));
+            }
+        }
+    }
 }

@@ -127,4 +127,36 @@ class DbJobRunStoreTest {
             assertTrue(db.failureTrend(30).isEmpty());
         }
     }
+
+    /** X2 cross-lane provenance: the Consignments a run READ ride a child table, queryable both ways. */
+    @Test
+    void recordsWhichConsignmentsARunReadAndAnswersBothDirections() throws Exception {
+        try (DbJobRunStore db = DbJobRunStore.open("jdbc:duckdb:")) {
+            db.record(run("r1", "rollup", "SUCCESS", 10, "2026-09-02 10:00:00"));
+            db.record(run("r2", "rollup", "SUCCESS", 12, "2026-09-02 11:00:00"));
+            db.recordSources("r1", List.of(
+                    new com.gamma.consignment.ConsignmentSource("c-a", "cdr_etl", "cdr"),
+                    new com.gamma.consignment.ConsignmentSource("c-b", null, "cdr")));   // producer unknown
+            db.recordSources("r2", List.of(new com.gamma.consignment.ConsignmentSource("c-b", null, "cdr")));
+
+            // run -> consignments, in recorded order, the null producer preserved (not invented)
+            var r1 = db.sources("r1");
+            assertEquals(List.of("c-a", "c-b"), r1.stream().map(s -> s.consignmentId()).toList());
+            assertEquals("cdr_etl", r1.get(0).pipeline());
+            assertNull(r1.get(1).pipeline());
+            assertEquals(List.of(), db.sources("never-ran"), "no rows is an empty list, never null");
+
+            // consignment -> runs, newest first, the same projection recentRuns serves
+            var readers = db.runsDerivedFrom("c-b");
+            assertEquals(List.of("r2", "r1"), readers.stream().map(m -> m.get("runId")).toList());
+            assertEquals("rollup", readers.get(0).get("job"));
+            assertEquals(1, db.runsDerivedFrom("c-a").size());
+            assertEquals(List.of(), db.runsDerivedFrom("  "));
+
+            // empty/null inputs are no-ops, not rows
+            db.recordSources("r1", List.of());
+            db.recordSources(null, List.of(new com.gamma.consignment.ConsignmentSource("x", null, "cdr")));
+            assertEquals(2, db.sources("r1").size());
+        }
+    }
 }

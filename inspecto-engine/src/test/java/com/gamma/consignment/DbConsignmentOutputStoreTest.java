@@ -628,4 +628,35 @@ class DbConsignmentOutputStoreTest {
         db.close();
         assertTrue(db.producerHighWater("cdr").isEmpty());
     }
+
+    /**
+     * X2: the Consignments behind the files a read actually scanned — LIVE only, one per consignment, matched
+     * through norm() on both sides so a separator or relative spelling cannot silently drop a source.
+     */
+    @Test
+    void mapsReadPathsBackToTheirLiveConsignments() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.record(List.of(
+                    out("c1", "/w/cdr/dt=2026-08-04/c1-a.parquet", 10, State.LIVE),
+                    out("c1", "/w/cdr/dt=2026-08-04/c1-b.parquet", 10, State.LIVE),     // two files, ONE consignment
+                    out("c2", "/w/cdr/dt=2026-08-04/c2.parquet",   20, State.LIVE),
+                    out("c3", "/w/cdr/dt=2026-08-04/c3.parquet",   30, State.SUPERSEDED), // not LIVE: never a source
+                    out("c4", "/w/cdr/dt=2026-08-04/c4.parquet",   40, State.LIVE)));    // LIVE but not read
+
+            // the selector hands back DuckDB's glob spelling; c2 arrives with the other separator
+            List<ConsignmentSource> sources = db.sourcesForPaths("cdr", List.of(
+                    "/w/cdr/dt=2026-08-04/c1-a.parquet",
+                    "/w/cdr/dt=2026-08-04/c1-b.parquet",
+                    "\\w\\cdr\\dt=2026-08-04\\c2.parquet",
+                    "/w/cdr/dt=2026-08-04/c3.parquet"));
+            assertEquals(List.of("c1", "c2"), sources.stream().map(ConsignmentSource::consignmentId).toList(),
+                    "c1 once (two files), c2 despite the separator, c3 superseded, c4 unread");
+            assertEquals("cdr", sources.get(0).tableName());
+
+            assertEquals(List.of(), db.sourcesForPaths("cdr", List.of()), "no files read ⇒ no sources");
+            assertEquals(List.of(), db.sourcesForPaths("cdr", null));
+            assertEquals(List.of(), db.sourcesForPaths("other_table", List.of("/w/cdr/dt=2026-08-04/c1-a.parquet")),
+                    "scoped to the store that was read");
+        }
+    }
 }

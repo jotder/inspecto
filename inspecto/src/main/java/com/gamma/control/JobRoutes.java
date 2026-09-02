@@ -14,6 +14,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -264,6 +266,22 @@ final class JobRoutes implements RouteModule {
         m.put("finishedAt", r.endTime());
         m.put("durationMs", r.durationMs());
         m.put("message", r.message());
+        // X2 cross-lane provenance: the Consignments an at-rest run READ. Only on the single-run read (the
+        // list stays nine scalars); absent — not [] — when the run store is off or recorded nothing, so a
+        // deployment that cannot know is not shown as "derived from nothing".
+        jobs(api).runStore().ifPresent(store -> {
+            List<com.gamma.consignment.ConsignmentSource> sources = store.sources(runId);
+            if (sources.isEmpty()) return;
+            List<Map<String, Object>> derived = new ArrayList<>();
+            for (com.gamma.consignment.ConsignmentSource src : sources) {
+                Map<String, Object> d = new LinkedHashMap<>();
+                d.put("consignmentId", src.consignmentId());
+                d.put("pipeline", src.pipeline());
+                d.put("tableName", src.tableName());
+                derived.add(d);
+            }
+            m.put("derivedFrom", derived);
+        });
         return m;
     }
 
