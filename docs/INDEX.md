@@ -132,9 +132,11 @@ former root reference docs** (each index lists them):
   §19/§21, `pipeline-editor.md`). Only R7 (convert-to-composite) remains — a future sketch by
   design; two small rows R3 opened live in BACKLOG (RECIPE-SCOPE-1, MIDBRANCH-UI-1). Prior art:
   the sibling DataForge wiki (`C:\sandbox\incubetor\docs\wiki`).
-- [`superpower/execution-residuals-plan.md`](superpower/execution-residuals-plan.md) — **X1/X2/X3 BUILT
-  2026-09-02 on branch `claude/execution-residuals`, awaiting integration onto master (archive in that
-  merge, not before)**; originally specified 2026-09-01: the stage-2 execution solution spec (X1 persistent retry queue —
+- [`archived-documents/plans-archive/execution-residuals-plan.md`](archived-documents/plans-archive/execution-residuals-plan.md) — **DRAINED, INTEGRATED
+  onto master and ARCHIVED 2026-09-02** (X3 `ca3e885c` · X2 `452fdc7a` · X1 `d54772f8`; as-built in
+  `okf/backend/engine/db-layer.md` §3.5, `okf/backend/pipeline-graph/execution-lanes.md`,
+  `okf/backend/pipeline-graph/step-park-drain.md`, `okf/backend/build-run/operations-reference.md`;
+  X4/X5 sketches → BACKLOG §4 `EXECUTION-RESIDUALS-SKETCHES`); originally specified 2026-09-01: the stage-2 execution solution spec (X1 persistent retry queue —
   consignment-grain recommended · X2 cross-lane provenance link · X3 PARK-1(a) re-grounding ·
   X4 record-replay shape · X5 StepInfo envelope feeding Phase 7 · X6 consignment-identity already
   held), plus the R3 unblock verdict. The same-shift build package (default-on orphan gate · D-9

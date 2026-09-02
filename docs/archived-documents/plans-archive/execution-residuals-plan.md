@@ -1,6 +1,8 @@
 # Execution residuals — solution specification (stage-2 close-out)
 
-**Status: X1 / X2 / X3 BUILT 2026-09-02 on worktree branch `claude/execution-residuals`
+**Status: ARCHIVED 2026-09-02 — DRAINED and INTEGRATED onto `master`** (X3 `ca3e885c` · X2 `452fdc7a` · X1 `d54772f8`, operator-directed push). As-built lives in the OKF concepts each section names; X4/X5 sketches are BACKLOG §4 `EXECUTION-RESIDUALS-SKETCHES`. Kept for provenance, never maintained. Pre-integration status line follows.**
+
+**Status (historical): X1 / X2 / X3 BUILT 2026-09-02 on worktree branch `claude/execution-residuals`
 (`ca3e885c` · `452fdc7a` · `d54772f8`, base `b3aa12d8`) — AWAITING the operator's integration onto
 `master`.** Operator-directed (the shift's `/goal`; X1's shape — bound the COMMIT re-encounter, not the
 queue sketched below — was the operator's explicit pick of three options). ⛔ Not yet on the trunk:
