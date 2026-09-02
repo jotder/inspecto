@@ -517,6 +517,7 @@
                     </div>
                     <app-pipeline-palette
                         [groups]="paletteGroups()"
+                        [processors]="paletteProcessors()"
                         (pick)="addFromPalette($event)"
                     ></app-pipeline-palette>
                 } @else {

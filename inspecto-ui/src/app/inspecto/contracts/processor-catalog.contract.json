@@ -1,0 +1,989 @@
+{
+  "families" : [ {
+    "code" : "ACQ",
+    "label" : "Collectors & Ingestion",
+    "icon" : "heroicons_outline:arrow-down-tray"
+  }, {
+    "code" : "PRS",
+    "label" : "Extraction & Format Parsers",
+    "icon" : "heroicons_outline:document-text"
+  }, {
+    "code" : "DQ",
+    "label" : "Data Quality, Validation & Cleansing",
+    "icon" : "heroicons_outline:shield-check"
+  }, {
+    "code" : "XFM",
+    "label" : "Transformers & Dimensional Modeling",
+    "icon" : "heroicons_outline:adjustments-horizontal"
+  }, {
+    "code" : "BI",
+    "label" : "Analytics, Time-Series & Semantic Modeling",
+    "icon" : "heroicons_outline:chart-bar"
+  }, {
+    "code" : "ENR",
+    "label" : "Enrichment, Entity Resolution & AI/ML",
+    "icon" : "heroicons_outline:sparkles"
+  }, {
+    "code" : "CTL",
+    "label" : "Control, Governance & Sequence Integrity",
+    "icon" : "heroicons_outline:signal"
+  }, {
+    "code" : "SNK",
+    "label" : "Sinks, Storage & Destinations",
+    "icon" : "heroicons_outline:archive-box"
+  } ],
+  "processors" : [ {
+    "id" : "acquisition.file.local",
+    "family" : "ACQ",
+    "label" : "Local / NFS directory watcher",
+    "emoji" : "📁",
+    "status" : "delivered",
+    "nodeType" : "acquisition",
+    "note" : "LocalFileSystemConnector — the default collector",
+    "addable" : true
+  }, {
+    "id" : "acquisition.file.sftp",
+    "family" : "ACQ",
+    "label" : "SFTP / FTPS remote ingest",
+    "emoji" : "🔒",
+    "status" : "delivered",
+    "nodeType" : "acquisition",
+    "note" : "inspecto-connectors (sftp, ftps; key auth, bastion tunnel, host-key pinning)",
+    "addable" : true
+  }, {
+    "id" : "acquisition.db.jdbc",
+    "family" : "ACQ",
+    "label" : "JDBC / SQL query batch reader",
+    "emoji" : "🗄️",
+    "status" : "delivered",
+    "nodeType" : "acquisition",
+    "note" : "the db-export connector (`connector: db`, watermark column)",
+    "addable" : true
+  }, {
+    "id" : "acquisition.dataset",
+    "family" : "ACQ",
+    "label" : "Dataset entry (re-ingest a registered Dataset)",
+    "emoji" : "🧱",
+    "status" : "delivered",
+    "nodeType" : "acquisition",
+    "note" : "UI-S7: `connector: dataset` + `on:dataset` trigger",
+    "addable" : true
+  }, {
+    "id" : "acquisition.file.excel",
+    "family" : "ACQ",
+    "label" : "Multi-sheet Excel workbook ingest",
+    "emoji" : "📑",
+    "status" : "partial",
+    "nodeType" : "parser.xlsx",
+    "note" : "the xlsx PARSER is delivered; per-sheet workbook fan-out as an acquisition is not",
+    "addable" : true
+  }, {
+    "id" : "acquisition.file.s3",
+    "family" : "ACQ",
+    "label" : "AWS S3 object ingest",
+    "emoji" : "☁️",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "acquisition.file.azure",
+    "family" : "ACQ",
+    "label" : "Azure Blob & ADLS Gen2 ingest",
+    "emoji" : "🌐",
+    "status" : "partial",
+    "nodeType" : "acquisition",
+    "note" : "Connection kind exists (azure blob connector); ADLS Gen2 semantics not proven",
+    "addable" : true
+  }, {
+    "id" : "acquisition.file.gcs",
+    "family" : "ACQ",
+    "label" : "Google Cloud Storage ingest",
+    "emoji" : "🪣",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "acquisition.stream.kafka",
+    "family" : "ACQ",
+    "label" : "Apache Kafka consumer",
+    "emoji" : "📤",
+    "status" : "partial",
+    "nodeType" : "acquisition",
+    "note" : "Connection kind exists (kafka); consumer-group ingest as a Collector not proven",
+    "addable" : true
+  }, {
+    "id" : "acquisition.stream.pulsar",
+    "family" : "ACQ",
+    "label" : "Apache Pulsar consumer",
+    "emoji" : "📨",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "acquisition.stream.kinesis",
+    "family" : "ACQ",
+    "label" : "AWS Kinesis / SQS ingest",
+    "emoji" : "📬",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "acquisition.stream.rabbitmq",
+    "family" : "ACQ",
+    "label" : "RabbitMQ AMQP subscriber",
+    "emoji" : "🐰",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "acquisition.stream.mqtt",
+    "family" : "ACQ",
+    "label" : "MQTT IoT telemetry ingest",
+    "emoji" : "📡",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "acquisition.cdc.debezium",
+    "family" : "ACQ",
+    "label" : "Change Data Capture (Debezium)",
+    "emoji" : "🔄",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "acquisition.lake.delta",
+    "family" : "ACQ",
+    "label" : "Delta Lake table reader",
+    "emoji" : "💾",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "acquisition.lake.iceberg",
+    "family" : "ACQ",
+    "label" : "Apache Iceberg table ingest",
+    "emoji" : "🧊",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "acquisition.db.cloud",
+    "family" : "ACQ",
+    "label" : "Snowflake / BigQuery ingest",
+    "emoji" : "❄️",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "acquisition.api.rest",
+    "family" : "ACQ",
+    "label" : "REST API poller & paged ingest",
+    "emoji" : "🌐",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "acquisition.api.webhook",
+    "family" : "ACQ",
+    "label" : "HTTP webhook listener endpoint",
+    "emoji" : "🪝",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "acquisition.api.grpc",
+    "family" : "ACQ",
+    "label" : "gRPC stream receiver",
+    "emoji" : "🔌",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "parser.delimited",
+    "family" : "PRS",
+    "label" : "Delimited / CSV / TSV / PSV parser",
+    "emoji" : "📄",
+    "status" : "delivered",
+    "nodeType" : "parser.delimited",
+    "addable" : true
+  }, {
+    "id" : "parser.fixedwidth",
+    "family" : "PRS",
+    "label" : "Fixed-width column slicer",
+    "emoji" : "📦",
+    "status" : "delivered",
+    "nodeType" : "parser.fixedwidth",
+    "note" : "text (`record: line`) and fixed-length binary (`record: bytes`)",
+    "addable" : true
+  }, {
+    "id" : "parser.json",
+    "family" : "PRS",
+    "label" : "JSON object & JSON Lines (NDJSON) parser",
+    "emoji" : "🧬",
+    "status" : "delivered",
+    "nodeType" : "parser.json",
+    "addable" : true
+  }, {
+    "id" : "parser.excel",
+    "family" : "PRS",
+    "label" : "Excel workbook parser",
+    "emoji" : "📑",
+    "status" : "delivered",
+    "nodeType" : "parser.xlsx",
+    "note" : "needs the DuckDB `excel` extension in the bundle (multiformat X1)",
+    "addable" : true
+  }, {
+    "id" : "parser.xml",
+    "family" : "PRS",
+    "label" : "XML / XPath / DOM unpacker",
+    "emoji" : "📑",
+    "status" : "partial",
+    "nodeType" : "parser.plugin",
+    "note" : "tree→segments bridge ships XML ingests; no XPath selector grammar yet",
+    "addable" : true
+  }, {
+    "id" : "parser.asn1.ber",
+    "family" : "PRS",
+    "label" : "ASN.1 BER telecom CDR decoder",
+    "emoji" : "📡",
+    "status" : "delivered",
+    "capability" : "parser.asn1",
+    "note" : "asn-parser reactor (decoders, vendor plugins)",
+    "addable" : false
+  }, {
+    "id" : "parser.pattern.regex",
+    "family" : "PRS",
+    "label" : "Named-group regex extractor",
+    "emoji" : "🔎",
+    "status" : "delivered",
+    "nodeType" : "parser.text_regex",
+    "addable" : true
+  }, {
+    "id" : "parser.plugin",
+    "family" : "PRS",
+    "label" : "Custom ingester plugin (segments, multi-event)",
+    "emoji" : "🧩",
+    "status" : "delivered",
+    "nodeType" : "parser.plugin",
+    "note" : "ParserPlugin SPI; `segments: {CALL, SMS}`",
+    "addable" : true
+  }, {
+    "id" : "parser.keyvalue",
+    "family" : "PRS",
+    "label" : "Key-value / logfmt parser",
+    "emoji" : "🏷️",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "parser.yaml",
+    "family" : "PRS",
+    "label" : "YAML document slicer",
+    "emoji" : "📜",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "parser.asn1.per",
+    "family" : "PRS",
+    "label" : "ASN.1 PER / XER / DER decoder",
+    "emoji" : "📜",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "parser.mainframe.ebcdic",
+    "family" : "PRS",
+    "label" : "Mainframe EBCDIC & COBOL copybook",
+    "emoji" : "📠",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "parser.binary.protobuf",
+    "family" : "PRS",
+    "label" : "Protocol Buffers decoder",
+    "emoji" : "⚡",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "parser.binary.avro",
+    "family" : "PRS",
+    "label" : "Apache Avro binary decoder",
+    "emoji" : "🦅",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "parser.binary.pcap",
+    "family" : "PRS",
+    "label" : "PCAP network packet slicer",
+    "emoji" : "🌐",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "parser.pattern.grok",
+    "family" : "PRS",
+    "label" : "Grok / Logstash expression matcher",
+    "emoji" : "📜",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "parser.pattern.syslog",
+    "family" : "PRS",
+    "label" : "Syslog RFC 5424 / RFC 3164 parser",
+    "emoji" : "🖥️",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "quality.schema.validator",
+    "family" : "DQ",
+    "label" : "Schema validator & type coercion",
+    "emoji" : "🛡️",
+    "status" : "delivered",
+    "nodeType" : "transform.map",
+    "note" : "the schema registry: typed fields, TRY_CAST, structural rejects → quarantine",
+    "addable" : true
+  }, {
+    "id" : "quality.constraint.check",
+    "family" : "DQ",
+    "label" : "Constraint & range checker (Expectations)",
+    "emoji" : "⚠️",
+    "status" : "delivered",
+    "capability" : "expectation",
+    "note" : "Expectations evaluated per Dataset (`ExpectationEvaluator`); not a mid-chain step",
+    "addable" : false
+  }, {
+    "id" : "quality.dedup.exact",
+    "family" : "DQ",
+    "label" : "Exact-key deduplicator (within a Consignment)",
+    "emoji" : "🧼",
+    "status" : "delivered",
+    "nodeType" : "transform.dedup",
+    "note" : "`scope: consignment` (default)",
+    "addable" : true
+  }, {
+    "id" : "quality.dedup.windowed",
+    "family" : "DQ",
+    "label" : "Sliding time-window deduplicator",
+    "emoji" : "⏱️",
+    "status" : "delivered",
+    "nodeType" : "transform.dedup",
+    "note" : "D-9: `scope: window(P4D)` + the durable dedup ledger",
+    "addable" : true
+  }, {
+    "id" : "quality.dedup.file",
+    "family" : "DQ",
+    "label" : "File-grain duplicate guard (path / checksum / metadata / marker)",
+    "emoji" : "🗂️",
+    "status" : "delivered",
+    "nodeType" : "acquisition",
+    "note" : "Collector `duplicate:` policy + marker dedup — a Guarantee, rides the Collector",
+    "addable" : true
+  }, {
+    "id" : "quality.schema.drift",
+    "family" : "DQ",
+    "label" : "Schema drift & new-field detector",
+    "emoji" : "🧬",
+    "status" : "partial",
+    "capability" : "expectation",
+    "note" : "multi-schema dispatch refuses unknown shapes; no drift REPORT yet",
+    "addable" : false
+  }, {
+    "id" : "quality.cluster.edit",
+    "family" : "DQ",
+    "label" : "Cluster & edit value normalizer",
+    "emoji" : "🔍",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "quality.match.fuzzy",
+    "family" : "DQ",
+    "label" : "Fuzzy string (Jaro-Winkler) matcher",
+    "emoji" : "🔍",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "quality.cleanse.trim",
+    "family" : "DQ",
+    "label" : "Whitespace & string sanitizer",
+    "emoji" : "🧹",
+    "status" : "partial",
+    "nodeType" : "transform.map",
+    "note" : "any `EXPR` rule does it today; no dedicated step",
+    "addable" : true
+  }, {
+    "id" : "quality.profiler.inline",
+    "family" : "DQ",
+    "label" : "Inline stream profiler & statistics",
+    "emoji" : "🧮",
+    "status" : "partial",
+    "capability" : "storage_report",
+    "note" : "storage/completeness KPIs exist; no per-column profile step",
+    "addable" : false
+  }, {
+    "id" : "quality.sample.reservoir",
+    "family" : "DQ",
+    "label" : "Statistical & reservoir sampler",
+    "emoji" : "📊",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "quality.cleanse.transcode",
+    "family" : "DQ",
+    "label" : "Character map & code page transcoder",
+    "emoji" : "🔤",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "quality.pii.mask",
+    "family" : "DQ",
+    "label" : "PII masking & tokenization",
+    "emoji" : "🔒",
+    "status" : "planned",
+    "note" : "board SEC-08 — Enterprise only",
+    "addable" : false
+  }, {
+    "id" : "quality.crypto.hash",
+    "family" : "DQ",
+    "label" : "One-way salted cryptographic hasher",
+    "emoji" : "🔑",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "quality.compliance.redact",
+    "family" : "DQ",
+    "label" : "GDPR / CCPA field redactor",
+    "emoji" : "🛡️",
+    "status" : "planned",
+    "note" : "board SEC-08 — Enterprise only",
+    "addable" : false
+  }, {
+    "id" : "transform.expression",
+    "family" : "XFM",
+    "label" : "Expression builder & computed columns",
+    "emoji" : "🧮",
+    "status" : "delivered",
+    "nodeType" : "transform.map",
+    "note" : "the `EXPR` / `CONCAT_DT` / `FILENAME_DATE` rules",
+    "addable" : true
+  }, {
+    "id" : "transform.cast",
+    "family" : "XFM",
+    "label" : "Field type cast & renamer matrix",
+    "emoji" : "🔄",
+    "status" : "delivered",
+    "nodeType" : "transform.map",
+    "note" : "the mapping rows (`DIRECT` + typed target)",
+    "addable" : true
+  }, {
+    "id" : "transform.filter",
+    "family" : "XFM",
+    "label" : "Row filter (pre-parse regex / post-map predicate)",
+    "emoji" : "🔽",
+    "status" : "delivered",
+    "nodeType" : "transform.filter",
+    "addable" : true
+  }, {
+    "id" : "transform.route",
+    "family" : "XFM",
+    "label" : "Router — case / clone branches with mid-branch steps",
+    "emoji" : "🔀",
+    "status" : "delivered",
+    "nodeType" : "transform.route",
+    "addable" : true
+  }, {
+    "id" : "transform.summarize",
+    "family" : "XFM",
+    "label" : "Group-by summarizer (measures grammar)",
+    "emoji" : "∑",
+    "status" : "delivered",
+    "nodeType" : "transform.summarize",
+    "addable" : true
+  }, {
+    "id" : "transform.join",
+    "family" : "XFM",
+    "label" : "Reference-store join (versioned references)",
+    "emoji" : "🤝",
+    "status" : "delivered",
+    "nodeType" : "transform.join",
+    "note" : "at rest only — refused mid-branch (no reference resolver on the ingest lane)",
+    "addable" : true
+  }, {
+    "id" : "transform.lookup",
+    "family" : "XFM",
+    "label" : "Lookup & static map transcoder",
+    "emoji" : "🗺️",
+    "status" : "partial",
+    "nodeType" : "transform.join",
+    "note" : "a reference join covers it; no inline static map",
+    "addable" : true
+  }, {
+    "id" : "transform.matrix.pivot",
+    "family" : "XFM",
+    "label" : "Dynamic pivot / transpose",
+    "emoji" : "🔀",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "transform.matrix.unpivot",
+    "family" : "XFM",
+    "label" : "Unpivot / column flattener",
+    "emoji" : "🔄",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "transform.analytics.rank",
+    "family" : "XFM",
+    "label" : "Rank & Top-N pruner",
+    "emoji" : "🏆",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "transform.explode",
+    "family" : "XFM",
+    "label" : "Array / object exploder & flattener",
+    "emoji" : "💥",
+    "status" : "planned",
+    "note" : "the grandfathered `transform.split` node type is the read-only ancestor",
+    "addable" : false
+  }, {
+    "id" : "transform.join.merge",
+    "family" : "XFM",
+    "label" : "Presorted stream merge joiner",
+    "emoji" : "🤝",
+    "status" : "planned",
+    "note" : "the grandfathered `transform.merge` node type is the read-only ancestor",
+    "addable" : false
+  }, {
+    "id" : "transform.dim.scd2",
+    "family" : "XFM",
+    "label" : "Slowly changing dimension (SCD Type 2)",
+    "emoji" : "🏛️",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "transform.key.surrogate",
+    "family" : "XFM",
+    "label" : "Monotonic surrogate key generator",
+    "emoji" : "🔑",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "transform.dml.strategy",
+    "family" : "XFM",
+    "label" : "DML row-action strategy flagger",
+    "emoji" : "🏷️",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "transform.diff.compare",
+    "family" : "XFM",
+    "label" : "Dataset differ & change compare",
+    "emoji" : "⚖️",
+    "status" : "partial",
+    "capability" : "recon",
+    "note" : "Reconciliation boards compare Datasets; not a chain step",
+    "addable" : false
+  }, {
+    "id" : "transform.builder.xml",
+    "family" : "XFM",
+    "label" : "Hierarchical XML / JSON document builder",
+    "emoji" : "🏗️",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "transform.fintech.ifrs",
+    "family" : "XFM",
+    "label" : "IFRS 15 / IFRS 9 revenue recognition engine",
+    "emoji" : "📊",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "transform.telecom.simbox",
+    "family" : "XFM",
+    "label" : "SIM box & bypass fraud detector",
+    "emoji" : "📱",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "transform.telecom.rating",
+    "family" : "XFM",
+    "label" : "Tariff, rating & usage billing engine",
+    "emoji" : "💵",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "transform.telecom.roaming",
+    "family" : "XFM",
+    "label" : "Roaming TAP3 / CIBER surcharger",
+    "emoji" : "🌍",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "transform.fintech.velocity",
+    "family" : "XFM",
+    "label" : "Velocity & impossible-travel anomaly",
+    "emoji" : "🚨",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "transform.analytics.lod",
+    "family" : "BI",
+    "label" : "Level-of-detail (LOD) fixed aggregator",
+    "emoji" : "🏛️",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "transform.analytics.lod_context",
+    "family" : "BI",
+    "label" : "LOD include / exclude context aggregator",
+    "emoji" : "🏛️",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "transform.timeseries.resample",
+    "family" : "BI",
+    "label" : "Time-grain resampler & gap imputer",
+    "emoji" : "⏱️",
+    "status" : "partial",
+    "capability" : "measure-grammar",
+    "note" : "time grains exist in Studio queries (`QuerySpec.grains`); no resampling step",
+    "addable" : false
+  }, {
+    "id" : "transform.timeseries.shift",
+    "family" : "BI",
+    "label" : "Period-over-period (YoY / MoM / WoW) shift",
+    "emoji" : "📈",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "transform.analytics.running",
+    "family" : "BI",
+    "label" : "Running calculations & moving averages",
+    "emoji" : "📊",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "transform.timeseries.forecast",
+    "family" : "BI",
+    "label" : "Time-series forecaster (Holt-Winters)",
+    "emoji" : "🔮",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "transform.semantic.metric",
+    "family" : "BI",
+    "label" : "Semantic KPI calculator & Measure formulas",
+    "emoji" : "📐",
+    "status" : "partial",
+    "capability" : "measure-grammar",
+    "note" : "the Measure grammar (`count | agg(field)`) serves Studio + summarize; no named-KPI layer",
+    "addable" : false
+  }, {
+    "id" : "transform.param.jinja",
+    "family" : "BI",
+    "label" : "Template & runtime parameter injector",
+    "emoji" : "🏷️",
+    "status" : "partial",
+    "capability" : "sql.template",
+    "note" : "the `sql.template` job resolves `$name` tokens; no Jinja",
+    "addable" : false
+  }, {
+    "id" : "transform.data.binning",
+    "family" : "BI",
+    "label" : "Histogram & quantile binner",
+    "emoji" : "📦",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "transform.string.smart_split",
+    "family" : "BI",
+    "label" : "Smart custom string splitter",
+    "emoji" : "✂️",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "transform.geo.h3",
+    "family" : "BI",
+    "label" : "H3 hexagonal & geohash grid indexer",
+    "emoji" : "🗺️",
+    "status" : "planned",
+    "note" : "needs the DuckDB `spatial`/`h3` extension — board CP-09 gate",
+    "addable" : false
+  }, {
+    "id" : "transform.geo.spatial_join",
+    "family" : "BI",
+    "label" : "Spatial polygon & point-in-polygon intersect",
+    "emoji" : "📍",
+    "status" : "planned",
+    "note" : "needs the DuckDB `spatial` extension — deliberately not loaded (SqlSandbox)",
+    "addable" : false
+  }, {
+    "id" : "transform.stats.outlier",
+    "family" : "BI",
+    "label" : "Outlier detector & IQR boxplot fencer",
+    "emoji" : "🚨",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "transform.stats.correlation",
+    "family" : "BI",
+    "label" : "Pearson & Spearman correlation matrix",
+    "emoji" : "🧮",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "enrichment.reference",
+    "family" : "ENR",
+    "label" : "Reference-table enrichment (`*_enrich.toon`, Stage-2)",
+    "emoji" : "📚",
+    "status" : "delivered",
+    "nodeType" : "enrichment",
+    "note" : "the shipped enrichment job + versioned references",
+    "addable" : true
+  }, {
+    "id" : "enrichment.geoip",
+    "family" : "ENR",
+    "label" : "GeoIP & ISP geolocation enricher",
+    "emoji" : "🌍",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "enrichment.redis",
+    "family" : "ENR",
+    "label" : "Redis / in-memory cache lookup",
+    "emoji" : "⚡",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "enrichment.rest",
+    "family" : "ENR",
+    "label" : "Dynamic microservice REST enricher",
+    "emoji" : "🌐",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "transform.db.procedure",
+    "family" : "ENR",
+    "label" : "Parameterized stored-procedure caller",
+    "emoji" : "🗄️",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "enrichment.entity.link",
+    "family" : "ENR",
+    "label" : "Master entity resolution & record linkage",
+    "emoji" : "🔗",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "enrichment.graph.cluster",
+    "family" : "ENR",
+    "label" : "Graph cluster & connected-component tagger",
+    "emoji" : "🕸️",
+    "status" : "partial",
+    "capability" : "link-analysis",
+    "note" : "link-analysis VIEW ships (projection); no tagging step",
+    "addable" : false
+  }, {
+    "id" : "ml.inference.onnx",
+    "family" : "ENR",
+    "label" : "ONNX Runtime embedded inference",
+    "emoji" : "🤖",
+    "status" : "planned",
+    "note" : "the optional `inspecto-intelligence` module carries onnxruntime; never bundled",
+    "addable" : false
+  }, {
+    "id" : "ml.llm.classify",
+    "family" : "ENR",
+    "label" : "LLM zero-shot classifier & tagging",
+    "emoji" : "🏷️",
+    "status" : "planned",
+    "note" : "assist/intelligence agents are never bundled (CP-14)",
+    "addable" : false
+  }, {
+    "id" : "ml.embedding.vector",
+    "family" : "ENR",
+    "label" : "Text embeddings & vector generator",
+    "emoji" : "📐",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "control.file.sequence_analyzer",
+    "family" : "CTL",
+    "label" : "File sequence & gap integrity analyzer",
+    "emoji" : "🕳️",
+    "status" : "delivered",
+    "nodeType" : "gap",
+    "note" : "Collector `gap_detection: {sequence}` → the gap node + SEQUENCE_GAP events",
+    "addable" : true
+  }, {
+    "id" : "control.gap.detector",
+    "family" : "CTL",
+    "label" : "Sequence-gap & data-loss watchdog",
+    "emoji" : "🕳️",
+    "status" : "delivered",
+    "nodeType" : "gap",
+    "note" : "same detector; gaps raise ALERT objects via the EventObjectBridge",
+    "addable" : true
+  }, {
+    "id" : "control.audit.stamp",
+    "family" : "CTL",
+    "label" : "Audit metadata & lineage stamper",
+    "emoji" : "🏷️",
+    "status" : "delivered",
+    "nodeType" : "sink.persistent",
+    "note" : "`filename_column` + the per-file/batch/lineage ledgers + `__batch_id` provenance",
+    "addable" : true
+  }, {
+    "id" : "control.throttle",
+    "family" : "CTL",
+    "label" : "Throttle & rate limiter",
+    "emoji" : "⏳",
+    "status" : "delivered",
+    "nodeType" : "acquisition",
+    "note" : "Collector `fetch.rate_limit` + intake caps + the concurrency broker",
+    "addable" : true
+  }, {
+    "id" : "control.circuitbreaker",
+    "family" : "CTL",
+    "label" : "Circuit breaker & fallback switch",
+    "emoji" : "🚦",
+    "status" : "delivered",
+    "nodeType" : "acquisition",
+    "note" : "Collector `circuit_breaker` + `retry`",
+    "addable" : true
+  }, {
+    "id" : "control.transaction.commit",
+    "family" : "CTL",
+    "label" : "Transaction & commit controller",
+    "emoji" : "🏁",
+    "status" : "partial",
+    "capability" : "engine",
+    "note" : "the BranchCommitCoordinator ledger + bounded COMMIT retry are engine-internal, not authorable",
+    "addable" : false
+  }, {
+    "id" : "control.alert.dispatch",
+    "family" : "CTL",
+    "label" : "Alert rule dispatcher",
+    "emoji" : "🚨",
+    "status" : "delivered",
+    "capability" : "alert-rule",
+    "note" : "Alert Rules over the ledgers → Alerts → channels; board CP-11/CP-15",
+    "addable" : false
+  }, {
+    "id" : "control.sla.monitor",
+    "family" : "CTL",
+    "label" : "SLA timeout & heartbeat monitor",
+    "emoji" : "⏱️",
+    "status" : "partial",
+    "capability" : "completeness-kpi",
+    "note" : "completeness KPI + `heartbeat` maintenance task; no SLA object",
+    "addable" : false
+  }, {
+    "id" : "sink.file.parquet",
+    "family" : "SNK",
+    "label" : "Parquet (snappy / zstd / gzip) partitioned store",
+    "emoji" : "📁",
+    "status" : "delivered",
+    "nodeType" : "sink.persistent",
+    "note" : "Hive `year=/month=/day=` partitions",
+    "addable" : true
+  }, {
+    "id" : "sink.file.csv",
+    "family" : "SNK",
+    "label" : "CSV partitioned store",
+    "emoji" : "📄",
+    "status" : "delivered",
+    "nodeType" : "sink.persistent",
+    "note" : "`output.format: CSV`",
+    "addable" : true
+  }, {
+    "id" : "sink.ducklake",
+    "family" : "SNK",
+    "label" : "DuckLake catalog (PostgreSQL) sink",
+    "emoji" : "🦆",
+    "status" : "delivered",
+    "nodeType" : "sink.persistent",
+    "note" : "`output.ducklake` — needs the postgresql sidecar (Standard+)",
+    "addable" : true
+  }, {
+    "id" : "sink.view",
+    "family" : "SNK",
+    "label" : "Derived view (no bytes, registered SQL)",
+    "emoji" : "👁️",
+    "status" : "partial",
+    "nodeType" : "sink.view",
+    "note" : "grandfathered node type; the Dataset/View surface replaced it",
+    "addable" : false
+  }, {
+    "id" : "sink.quarantine",
+    "family" : "SNK",
+    "label" : "Quarantine error-log store",
+    "emoji" : "☣️",
+    "status" : "delivered",
+    "capability" : "sink.quarantine",
+    "note" : "structural rejects + `errors/<base>_errors.csv`",
+    "addable" : false
+  }, {
+    "id" : "sink.archive",
+    "family" : "SNK",
+    "label" : "Long-term compliance archive",
+    "emoji" : "📜",
+    "status" : "delivered",
+    "nodeType" : "acquisition",
+    "note" : "Collector `post_action: MOVE archive_path` + the `backup` maintenance task",
+    "addable" : true
+  }, {
+    "id" : "sink.lake.delta",
+    "family" : "SNK",
+    "label" : "Delta Lake persistent table sink",
+    "emoji" : "🗄️",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "sink.lake.iceberg",
+    "family" : "SNK",
+    "label" : "Apache Iceberg append / upsert sink",
+    "emoji" : "🧊",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "sink.db.clickhouse",
+    "family" : "SNK",
+    "label" : "ClickHouse / StarRocks analytical sink",
+    "emoji" : "📊",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "sink.file.excel",
+    "family" : "SNK",
+    "label" : "Excel multi-tab report sink",
+    "emoji" : "📑",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "sink.stream.kafka",
+    "family" : "SNK",
+    "label" : "Apache Kafka topic producer",
+    "emoji" : "📤",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "sink.stream.aws",
+    "family" : "SNK",
+    "label" : "AWS SQS / SNS event publisher",
+    "emoji" : "📨",
+    "status" : "planned",
+    "addable" : false
+  }, {
+    "id" : "sink.notify.email",
+    "family" : "SNK",
+    "label" : "Email & report dispatcher",
+    "emoji" : "📧",
+    "status" : "partial",
+    "capability" : "mail.send",
+    "note" : "the `mail.send` JOB + mail channels; not a chain sink",
+    "addable" : false
+  }, {
+    "id" : "sink.api.webhook",
+    "family" : "SNK",
+    "label" : "Outbound webhook dispatcher",
+    "emoji" : "🪝",
+    "status" : "partial",
+    "capability" : "channel",
+    "note" : "webhook notification channel exists; not a chain sink",
+    "addable" : false
+  }, {
+    "id" : "sink.dlq",
+    "family" : "SNK",
+    "label" : "Dead-letter queue",
+    "emoji" : "🕳️",
+    "status" : "planned",
+    "addable" : false
+  } ]
+}

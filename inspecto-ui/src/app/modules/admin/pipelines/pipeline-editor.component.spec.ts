@@ -41,6 +41,7 @@ describe('PipelineEditorComponent', () => {
         list: ReturnType<typeof vi.fn>;
         nodeTypes: ReturnType<typeof vi.fn>;
         stepTypes: ReturnType<typeof vi.fn>;
+        processorCatalog: ReturnType<typeof vi.fn>;
         pipelineGraphRaw: ReturnType<typeof vi.fn>;
         savePipelineGraph: ReturnType<typeof vi.fn>;
         provenanceBatches: ReturnType<typeof vi.fn>;
@@ -111,6 +112,7 @@ describe('PipelineEditorComponent', () => {
             ),
             // S4 dual-read: an "old server" by default — the editor must fall back to RECIPE_VERBS.
             stepTypes: vi.fn().mockReturnValue(throwError(() => new Error('404'))),
+            processorCatalog: vi.fn().mockReturnValue(throwError(() => new Error('404'))),
             pipelineGraphRaw: vi.fn().mockReturnValue(of(structuredClone(FLOW))),
             savePipelineGraph: vi
                 .fn()
@@ -3283,6 +3285,7 @@ describe('PipelineEditorComponent recipe view (UI plan §1, S1)', () => {
         list: ReturnType<typeof vi.fn>;
         nodeTypes: ReturnType<typeof vi.fn>;
         stepTypes: ReturnType<typeof vi.fn>;
+        processorCatalog: ReturnType<typeof vi.fn>;
         pipelineGraphRaw: ReturnType<typeof vi.fn>;
         provenanceBatches: ReturnType<typeof vi.fn>;
         provenance: ReturnType<typeof vi.fn>;
@@ -3296,6 +3299,7 @@ describe('PipelineEditorComponent recipe view (UI plan §1, S1)', () => {
             list: vi.fn().mockReturnValue(of([])),
             nodeTypes: vi.fn().mockReturnValue(of([])),
             stepTypes: vi.fn().mockReturnValue(throwError(() => new Error('404'))),
+            processorCatalog: vi.fn().mockReturnValue(throwError(() => new Error('404'))),
             pipelineGraphRaw: vi.fn().mockReturnValue(of(structuredClone(FLOW))),
             provenanceBatches: vi.fn().mockReturnValue(of([])),
             provenance: vi.fn().mockReturnValue(of([])),

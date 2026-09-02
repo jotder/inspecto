@@ -29,6 +29,9 @@ final class PipelineListRoutes implements RouteModule {
         // The recipe-verb palette (ELT amendment Phase 5): seven verbs + route + discovered plugins,
         // each with served attribute specs. node-types stays for the canvas + old-server fallback.
         api.get("/pipelines/step-types", (e, m) -> PipelineProjection.stepCatalog());
+        // The full Step Processor taxonomy incl. undelivered entries (2026-09-02): the palettes show every
+        // processor and render the non-addable ones inactive. Read-only, like the two catalogs above.
+        api.get("/pipelines/processor-catalog", (e, m) -> PipelineProjection.processorCatalog());
         api.get("/pipelines/combined", (e, m) -> combinedPipelines(api));
         // *_flow.toon is GRANDFATHERED (W5, plan U-A): existing files stay readable / runnable /
         // deletable, but are never newly written — the authoring write routes are gone; the graph

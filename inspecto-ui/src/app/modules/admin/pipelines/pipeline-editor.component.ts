@@ -134,6 +134,8 @@ import {
     validatePipeline,
     BRANCH_STEP_TYPES,
     insertBranchHead,
+    groupByFamily,
+    ProcessorGroup,
 } from './pipeline-graph';
 import { PipelineChecklistComponent } from './pipeline-checklist.component';
 import { incompleteStages, pipelineLifecycle, PipelineStageId, StageChip, stageChecklist } from './pipeline-stages';
@@ -419,6 +421,8 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         return id ? [{ kind: 'authored-pipeline' as const, id }] : [];
     });
     readonly paletteGroups = signal<NodeTypeGroup[]>([]);
+    /** The served Step Processor taxonomy for the palette (2026-09-02); `null` = old server → node-type groups. */
+    readonly paletteProcessors = signal<ProcessorGroup[] | null>(null);
     /** Public (template use only, e.g. the recipe view's category label): not otherwise part of the API. */
     readonly typeCat = signal<Map<string, string>>(new Map());
     /** node-type → per-type display label, so a Step card can say 'Join' rather than 'Transformer'. */
@@ -952,6 +956,12 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
                 );
             },
             error: () => this.paletteGroups.set([]),
+        });
+        // The full Step Processor taxonomy (delivered + planned) — the palette renders it when served,
+        // inactive entries included; an old server (404) leaves the node-type groups in place.
+        this.api.processorCatalog().subscribe({
+            next: (c) => this.paletteProcessors.set(groupByFamily(c)),
+            error: () => this.paletteProcessors.set(null),
         });
         // S4 dual-read: the served recipe-verb palette, falling back to the client verb map
         // (RECIPE_VERBS) on an old server — mirroring how typeAttributes tolerates one.

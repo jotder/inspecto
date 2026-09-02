@@ -86,6 +86,24 @@ public final class PipelineProjection {
     }
 
     /**
+     * The Step Processor catalog for {@code GET /pipelines/processor-catalog}: {@link ProcessorCatalog}
+     * plus, per processor, {@code addable} — true only for a processor that maps onto a node type the
+     * editor may author ({@link PipelineEditable#isAuthorable}). A PARTIAL processor mapped onto an
+     * authorable node type is addable (it adds THAT node); a capability-mapped or PLANNED one is not,
+     * and renders inactive in the palettes.
+     */
+    public static Map<String, Object> processorCatalog() {
+        Map<String, Object> out = ProcessorCatalog.asMap();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> procs = (List<Map<String, Object>>) out.get("processors");
+        for (Map<String, Object> m : procs) {
+            Object nodeType = m.get("nodeType");
+            m.put("addable", nodeType instanceof String t && PipelineEditable.isAuthorable(t));
+        }
+        return out;
+    }
+
+    /**
      * verb → the node type it authors as, in pipeline order (collect first, sink last).
      * <p>⚠ A verb may appear more than once: {@code transform} authors both {@code transform.filter} and
      * {@code transform.join}, because the recipe spells a join as {@code transform: {join: …}} — there is no

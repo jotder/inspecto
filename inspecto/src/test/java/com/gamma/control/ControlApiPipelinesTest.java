@@ -122,6 +122,26 @@ class ControlApiPipelinesTest {
 
     /** ELT amendment Phase 5: the recipe-verb palette is served beside node-types (S4 dual-read). */
     @Test
+    void processorCatalogServesEveryProcessorWithAStatus(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            JsonNode body = V1Body.of(get(c.port, "/pipelines/processor-catalog").body());
+            assertEquals(8, body.get("families").size(), "the eight processor families");
+            JsonNode procs = body.get("processors");
+            assertTrue(procs.size() >= 100, "the full taxonomy, undelivered entries included: " + procs.size());
+            int planned = 0, addable = 0;
+            for (JsonNode p : procs) {
+                assertTrue(p.has("status") && p.has("addable"), p.toString());
+                if ("planned".equals(p.get("status").asText())) {
+                    planned++;
+                    assertFalse(p.get("addable").asBoolean(), p.get("id").asText() + " is planned yet addable");
+                }
+                if (p.get("addable").asBoolean()) addable++;
+            }
+            assertTrue(planned > 0 && addable > 0, "both kinds present: planned=" + planned + " addable=" + addable);
+        }
+    }
+
+    @Test
     void stepTypesCatalogServesTheRecipeVerbs(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
             JsonNode arr = V1Body.of(get(c.port, "/pipelines/step-types").body());

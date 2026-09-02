@@ -1,9 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, expect, it, vi } from 'vitest';
-import { PipelineNodeType } from 'app/inspecto/api';
+import { PipelineNodeType, StepProcessor } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
-import { NodeTypeGroup } from './pipeline-graph';
+import { NodeTypeGroup, ProcessorGroup } from './pipeline-graph';
 import { PipelinePaletteComponent } from './pipeline-palette.component';
 
 const type = (t: string, category: string, label: string, lowerable = true): PipelineNodeType => ({
@@ -144,5 +144,94 @@ describe('PipelinePaletteComponent', () => {
         c.query.set('writer');
         fixture.detectChanges();
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    // ── the served Step Processor taxonomy (2026-09-02): everything visible, undelivered inactive ──
+
+    const proc = (
+        id: string,
+        family: string,
+        label: string,
+        status: StepProcessor['status'],
+        extra: Partial<StepProcessor> = {},
+    ): StepProcessor => ({
+        id,
+        family,
+        label,
+        emoji: '•',
+        status,
+        addable: false,
+        ...extra,
+    });
+    const PROCESSORS: ProcessorGroup[] = [
+        {
+            family: { code: 'PRS', label: 'Extraction & Format Parsers', icon: 'heroicons_outline:document-text' },
+            processors: [
+                proc('parser.delimited', 'PRS', 'Delimited parser', 'delivered', {
+                    nodeType: 'parser.delimited',
+                    addable: true,
+                }),
+                proc('parser.yaml', 'PRS', 'YAML document slicer', 'planned'),
+            ],
+        },
+        {
+            family: { code: 'CTL', label: 'Control', icon: 'heroicons_outline:signal' },
+            processors: [
+                proc('control.throttle', 'CTL', 'Throttle & rate limiter', 'delivered', {
+                    capability: 'acquisition',
+                    note: 'Collector fetch.rate_limit',
+                }),
+            ],
+        },
+    ];
+
+    it('renders the served taxonomy by family: addable entries add their node type, the rest are inactive', async () => {
+        const { fixture, c } = create();
+        const picked: string[] = [];
+        c.pick.subscribe((t) => picked.push(t));
+        fixture.componentRef.setInput('processors', PROCESSORS);
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        const text = el.textContent ?? '';
+        expect(text).toContain('Extraction & Format Parsers');
+        expect(text).toContain('YAML document slicer'); // planned — still VISIBLE
+        expect(text).toContain('Throttle & rate limiter'); // capability — visible too
+        expect(text).toContain('1/2'); // the family header counts addable / total
+
+        // the addable one behaves like a node-type entry — click adds the NODE TYPE it maps to
+        const add = el.querySelector('button[aria-label="Add Delimited parser"]') as HTMLButtonElement;
+        expect(add).toBeTruthy();
+        add.click();
+        expect(picked).toEqual(['parser.delimited']);
+
+        // the planned one is inactive: no add button, a disabled role with the reason, a "soon" chip
+        expect(el.querySelector('button[aria-label="Add YAML document slicer"]')).toBeNull();
+        const planned = el.querySelector('[data-processor="parser.yaml"]') as HTMLElement;
+        expect(planned.getAttribute('aria-disabled')).toBe('true');
+        expect(planned.getAttribute('aria-label')).toContain('Not yet available');
+        expect(planned.textContent).toContain('soon');
+        planned.click();
+        expect(picked).toEqual(['parser.delimited']); // nothing more was emitted
+
+        // a capability-delivered processor says where it lives instead
+        const cap = el.querySelector('[data-processor="control.throttle"]') as HTMLElement;
+        expect(cap.getAttribute('aria-label')).toContain('delivered as acquisition');
+        expect(cap.textContent).toContain('via acquisition');
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('searches the taxonomy on label, id and mapped node type, and falls back to node-type groups when not served', () => {
+        const { fixture, c } = create();
+        fixture.componentRef.setInput('processors', PROCESSORS);
+        c.onSearch({ target: { value: 'yaml' } } as unknown as Event);
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.textContent).toContain('YAML document slicer');
+        expect(el.textContent).not.toContain('Throttle');
+
+        fixture.componentRef.setInput('processors', null);
+        c.onSearch({ target: { value: '' } } as unknown as Event);
+        fixture.detectChanges();
+        expect(el.textContent).toContain('File writer'); // the GROUPS fixture renders again
     });
 });

@@ -111,6 +111,20 @@ widens the dock to 420px (`InspectoSplitDirective.ensureAtLeast` — never persi
 
 ## The Step-type vocabulary is the engine's, and only the engine's
 
+**Since 2026-09-02 the palette renders the served Step Processor TAXONOMY when it is available**
+(`GET /pipelines/processor-catalog`, `ProcessorCatalog` in `inspecto-engine`, pinned by
+`processor-catalog.contract.json`): eight families (Collectors & Ingestion · Extraction & Format Parsers ·
+Data Quality · Transformers & Dimensional Modeling · Analytics/Time-Series · Enrichment & AI/ML · Control &
+Governance · Sinks), 121 processors, **every one visible**. A processor whose `addable` flag is true (it maps
+onto an authorable node type) is an ordinary add/drag entry for THAT node type; a planned processor, or a
+capability that is not a Step (a Collector guarantee, a job type, a Studio surface), renders **inactive** —
+`role=button aria-disabled`, tooltip and accessible name carrying why, a `soon` / `via <capability>` chip —
+and never emits `pick`. Family headers count `addable/total`. The node-type groups below remain the
+fallback for a server that does not serve the taxonomy (404 → `paletteProcessors` stays `null`). The
+taxonomy is the operator's product board (`EDITIONS.md` §Step Processors) rendered in-product; the engine's
+executable vocabulary is still exactly what follows.
+
+
 The palette is a **faithful port of the backend enum `BuiltinNodeType`** as served by
 `GET /pipelines/node-types`: `acquisition`/`adapter` (SOURCE), `parser` and the `parser.*`
 per-format family (PARSE), the `transform.*` family + `enrichment` (TRANSFORM),

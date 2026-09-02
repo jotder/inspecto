@@ -231,8 +231,8 @@ E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for P
 | SP-XFM-08 | 🔀 Dynamic pivot / transpose (`transform.matrix.pivot`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
 | SP-XFM-09 | 🔄 Unpivot / column flattener (`transform.matrix.unpivot`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
 | SP-XFM-10 | 🏆 Rank & Top-N pruner (`transform.analytics.rank`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
-| SP-XFM-11 | 💥 Array / object exploder & flattener (`transform.explode`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — | the grandfathered `transform.split` flow node is the read-only ancestor |
-| SP-XFM-12 | 🤝 Presorted stream merge joiner (`transform.join.merge`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — | the grandfathered `transform.merge` flow node is the read-only ancestor |
+| SP-XFM-11 | 💥 Array / object exploder & flattener (`transform.explode`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — | the grandfathered `transform.split` node type is the read-only ancestor |
+| SP-XFM-12 | 🤝 Presorted stream merge joiner (`transform.join.merge`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — | the grandfathered `transform.merge` node type is the read-only ancestor |
 | SP-XFM-13 | 🏛️ Slowly changing dimension (SCD Type 2) (`transform.dim.scd2`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
 | SP-XFM-14 | 🔑 Monotonic surrogate key generator (`transform.key.surrogate`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
 | SP-XFM-15 | 🏷️ DML row-action strategy flagger (`transform.dml.strategy`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
@@ -278,7 +278,7 @@ E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for P
 | SP-SNK-01 | 📁 Parquet (snappy / zstd / gzip) partitioned store (`sink.file.parquet`) | Sinks, Storage & Destinations | ✅ | ✅ | ✅ | `sink.persistent` | Hive `year=/month=/day=` partitions |
 | SP-SNK-02 | 📄 CSV partitioned store (`sink.file.csv`) | Sinks, Storage & Destinations | ✅ | ✅ | ✅ | `sink.persistent` | `output.format: CSV` |
 | SP-SNK-03 | 🦆 DuckLake catalog (PostgreSQL) sink (`sink.ducklake`) | Sinks, Storage & Destinations | ✅ | ✅ | ✅ | `sink.persistent` | `output.ducklake` — needs the postgresql sidecar (Standard+) |
-| SP-SNK-04 | 👁️ Derived view (no bytes, registered SQL) (`sink.view`) | Sinks, Storage & Destinations | 🟡 | 🟡 | 🟡 | `sink.view` | grandfathered flow node; the Dataset/View surface replaced it |
+| SP-SNK-04 | 👁️ Derived view (no bytes, registered SQL) (`sink.view`) | Sinks, Storage & Destinations | 🟡 | 🟡 | 🟡 | `sink.view` | grandfathered node type; the Dataset/View surface replaced it |
 | SP-SNK-05 | ☣️ Quarantine error-log store (`sink.quarantine`) | Sinks, Storage & Destinations | ✅ | ✅ | ✅ | `sink.quarantine` | structural rejects + `errors/<base>_errors.csv` |
 | SP-SNK-06 | 📜 Long-term compliance archive (`sink.archive`) | Sinks, Storage & Destinations | — | ✅ | ✅ | `acquisition` | Collector `post_action: MOVE archive_path` + the `backup` maintenance task |
 | SP-SNK-07 | 🗄️ Delta Lake persistent table sink (`sink.lake.delta`) | Sinks, Storage & Destinations | 🔲 | 🔲 | 🔲 | — |  |
@@ -291,7 +291,7 @@ E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for P
 | SP-SNK-14 | 🪝 Outbound webhook dispatcher (`sink.api.webhook`) | Sinks, Storage & Destinations | — | 🟡 | 🟡 | `channel` | webhook notification channel exists; not a chain sink |
 | SP-SNK-15 | 🕳️ Dead-letter queue (`sink.dlq`) | Sinks, Storage & Destinations | 🔲 | 🔲 | 🔲 | — |  |
 
-**Count:** 121 processors — 34 delivered, 18 partial, 69 planned (2026-09-02).
+**Count:** 121 processors — 34 delivered, 18 partial, 69 planned.
 
 ### Control plane & authoring
 

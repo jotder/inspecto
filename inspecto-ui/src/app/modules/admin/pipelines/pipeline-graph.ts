@@ -1,4 +1,4 @@
-import { NodeKind } from 'app/inspecto/api';
+import { NodeKind, ProcessorCatalog, ProcessorFamily, StepProcessor } from 'app/inspecto/api';
 import {
     AuthoredPipeline,
     AuthoredNode,
@@ -393,6 +393,41 @@ export const COMBINED_CATEGORY_ORDER: readonly string[] = [...CATEGORY_ORDER, 'S
 export interface NodeTypeGroup {
     category: string;
     types: PipelineNodeType[];
+}
+
+/** One palette section of the served Step Processor taxonomy: a family and its processors, in catalog order. */
+export interface ProcessorGroup {
+    family: ProcessorFamily;
+    processors: StepProcessor[];
+}
+
+/**
+ * Group the served processor catalog by family, in the catalog's family order. A processor naming an
+ * unknown family is dropped rather than invented a section for — the server's roster is the truth.
+ */
+export function groupByFamily(catalog: ProcessorCatalog): ProcessorGroup[] {
+    return catalog.families
+        .map((family) => ({ family, processors: catalog.processors.filter((p) => p.family === family.code) }))
+        .filter((g) => g.processors.length > 0);
+}
+
+/**
+ * The node CATEGORY a processor family tints as — so a family section reuses the category palette
+ * (`categoryColor`) instead of inventing colours. The four transform-shaped families share TRANSFORM.
+ */
+export function familyCategory(code: string): string {
+    switch (code) {
+        case 'ACQ':
+            return 'SOURCE';
+        case 'PRS':
+            return 'PARSE';
+        case 'CTL':
+            return 'CONTROL';
+        case 'SNK':
+            return 'SINK';
+        default:
+            return 'TRANSFORM';
+    }
 }
 
 /** Group node types by category for the palette, in {@link CATEGORY_ORDER} (unknown categories last). */

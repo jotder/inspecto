@@ -131,6 +131,35 @@ export interface RecipeStepType {
 }
 
 /** A node in the combined topology: a pipeline node (with its owning `flow`) or a synthetic `STORE` join node. */
+/** One of the eight Step Processor families (the palette's sections). `icon` is a heroicons id. */
+export interface ProcessorFamily {
+    code: string;
+    label: string;
+    icon: string;
+}
+
+/**
+ * One Step Processor from the served taxonomy (`GET /pipelines/processor-catalog`, 2026-09-02) — the
+ * product's FULL processor list, undelivered entries included. `addable` is the server's verdict (the
+ * processor maps onto an authorable node type); the palettes render everything else inactive.
+ */
+export interface StepProcessor {
+    id: string;
+    family: string;
+    label: string;
+    emoji: string;
+    status: 'delivered' | 'partial' | 'planned';
+    nodeType?: string;
+    capability?: string;
+    note?: string;
+    addable: boolean;
+}
+
+export interface ProcessorCatalog {
+    families: ProcessorFamily[];
+    processors: StepProcessor[];
+}
+
 export interface CombinedNode extends PipelineNode {
     flow?: string; // the owning flow (absent on synthetic store nodes)
 }
@@ -381,6 +410,11 @@ export class PipelinesService {
     /** The recipe-verb palette (Phase 5). 404 on an old server — callers fall back to the client verb map. */
     stepTypes(): Observable<RecipeStepType[]> {
         return this.http.get<RecipeStepType[]>(apiUrl('/pipelines/step-types'));
+    }
+
+    /** The full Step Processor taxonomy incl. undelivered entries. 404 on an old server — callers keep the node-type palette. */
+    processorCatalog(): Observable<ProcessorCatalog> {
+        return this.http.get<ProcessorCatalog>(apiUrl('/pipelines/processor-catalog'));
     }
 
     /**
