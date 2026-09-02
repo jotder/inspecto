@@ -1338,6 +1338,18 @@ could regress.
   compile with `-Dmaven.compiler.showWarnings=true` and confirm no file reports *"uses unchecked or
   unsafe operations"*. ⚠ **Falsify it first** — temporarily delete a suppression you know is needed and
   confirm the warning appears; a silently-ineffective lint flag looks exactly like clean code.
+- **✅ CONSIGNMENT-HOME-1 — SHIPPED 2026-09-02 (operator-decided, A+A).** The ConsignmentPlanner caps
+  moved from the sink node's `processing.batch:` to **`collector.consignment: {max_files, max_bytes, order}`**
+  on the Collector node, under a "Consignment" group heading at `optional` tier. Why: the plan runs in the
+  poll cycle before any sink exists, a two-sink pipeline has ONE policy, and the file had no home for
+  "how are Consignments cut". Parser dual-reads (canonical first); `PipelineEditable` heals the legacy map
+  AND the write-only flat pair on save; `ConfigSpecs` + `ConfigSafetyValidator` bound both homes;
+  `NodeAttribute` gained `group` (the UI's `AttributeSpec.group`, wire key `group`); contract regenerated;
+  the one committed fixture (`voucher`) migrated. 🔴 **This REVERSED a recorded glossary rule** ("a grouping
+  knob is a batch") — the amendment is in GLOSSARY §Consignment + §13, not implied. ⚠ Grounding surprise:
+  I first called the `batch` key a vocabulary violation; the glossary said the opposite — read the entry, not
+  the ban list. Left alone by design: `Processing.batchMaxFiles()` accessors, `Consignment.batchId`, the
+  `_batches_` ledger filenames (wire/persisted identifiers).
 - **JAVA-SIMP-2 — typed records at config seams: per-seam and operator-visible, NOT a sweep.**
   ⛔ Any record introduced on a config path must carry the unmodelled-keys remainder or stay
   read-only — this repo's recurring data-loss mode is an "obviously equivalent" restructuring
@@ -3217,6 +3229,7 @@ on such configs, not a broken Dataset.
 | Item | Status |
 |---|---|
 | Parser required-vs-advanced field tiers | **Parked by decision (D13, 2026-07-25)** — needs a real onboarding-observation session (interview #2); explicitly NOT an engineering guess. **Session kit READY 2026-08-28**: [`superpower/parser-field-tiers-interview-plan.md`](superpower/parser-field-tiers-interview-plan.md) — protocol, per-lane capture sheets, grounded field inventory, pre-agreed analysis rule. Remaining blocker is purely scheduling a real user. 🔴 Grounding fact for the session: every `tier:'required'` field ships `required:false` validators — 'required' is disclosure-only today, and whether it should validate is the session's second question |
+| **Feature × edition board** (`EDITIONS.md` §Feature × edition matrix, opened 2026-09-02) | Working board, cell-addressed (`<row>/<P\|S\|E>`); ❓ cells to decide first: SEC-07 secrets providers per edition, SEC-08 classification-driven masking. Deliver cell-wise; a scheduled 🔲 cell cites its row |
 | Template seed-pack enrichment (frontend C7) | Ongoing, continuous — not a discrete item. **2026-09-02:** the Studio gallery (`BiTemplates`) grew its first TEMPORAL starter, `trend-monitor` (two `line` widgets over `event_date` at `month` grain + a total KPI), beside `kpi-overview` and `quality-monitor`; `ControlApiBiTemplatesTest` pins the listing. Graph tool sync (GRAPHIFY-1) re-checked the same day: tool 0.9.34, 399 docs indexed, 0 stale |
 | Reconciliation explicit **non-goals** (N>3, non-additive aggs, fuzzy keys) | Recorded, not open work — `okf/frontend/features/reconciliation.md` |
 | ~~`csv_demo` residuals (SAMPLE-1)~~ | **✅ CLOSED 2026-08-27 — but almost nothing this row said was true.** 🔴 **There is no `csv_demo` config.** It was RETIRED 2026-08-20 along with subscriber/gwlog/cdr, replaced by the format-example pack (`FEATURE_INVENTORY.md` §2); `csv_demo` survives only as untracked runtime dirs (`data/csv_demo/`, `data/inbox/csv_demo`) and was **never tracked in git**. So `csv_demo_schema.toon` does not exist and its `QUANTITY,"3",INTEGER` defect could not be reproduced — and the replacement `csv_example_schema.toon` declares only VARCHAR/DATE/DOUBLE, i.e. types `DIRECT` actually coerces, so that defect is **absent** from the shipped feed. ⚠ The "confirm with its author, untracked operator work" warning is therefore moot. **What WAS real is far bigger than the row:** `seed-inbox.{sh,ps1}` were never updated for the 2026-08-20 retirement, so they seeded **four feeds that have no pipeline at all** (subscriber/events/cdr/gwlog) and **none of the four that do** — leaving every shipped example pipeline's poll dir uncreated and unseeded, i.e. the documented run path in `stakeholders/TESTING_GUIDE.md` produced nothing runnable. **Fixed:** both scripts now seed csv/fixedwidth/excel/json — inbox + all 8 `dirs.*` each (`PipelineConfig.prepare()` creates ONLY the status dir, so the script must make the rest). Verified by running **both** scripts and diffing the result: identical, 4 inboxes seeded, 8 dirs each. ⚠ The retired arms are **left in place and labelled**, not deleted — their sample corpora (`samples/{subscriber,cdr,gwlog,events}/`) are still committed, and retiring arms + corpora together is an operator call. |

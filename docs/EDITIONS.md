@@ -115,3 +115,123 @@ Already fits: stateless stage-1 engine, **stateless JWT auth** (no server sessio
 pluggable `DbStatusStore` (Postgres) / `ObjectStore` db backend / `ParquetEventStore`, `SecretsProvider`.
 Will need later (don't preclude now): distributed scheduler coordination, all state on shared backends
 (Postgres + object store for Parquet + shared secrets), work distribution.
+
+## Feature × edition matrix (working board, opened 2026-09-02)
+
+**How to read and work this board.** One row per product feature, one cell per edition. A cell is
+addressed as `<row-id>/<P|S|E>` (e.g. `SEC-03/S`) so we can decide, build and deliver **cell-wise**.
+Rows are grouped by the FEATURE_INVENTORY §1 areas plus the control-plane / UI / security / compliance
+surfaces EDITIONS.md §Matrix already splits. **Editions are build flavors of one codebase** — a core
+feature is in every edition by construction, so most Personal/Standard/Enterprise cells agree; the
+board exists for the cells that *differ* or are *undecided*.
+
+| Cell | Meaning |
+|---|---|
+| ✅ | shipped in this edition (the feature is in the bundle and exercised) |
+| 🟡 | partial — shipped with a stated gap (see Notes) |
+| 🔲 | planned for this edition, not built |
+| — | deliberately not in this edition (a decision, not a gap) |
+| ❓ | undecided — needs an operator call before anyone builds |
+
+⚠ Keep the row IDs stable once referenced; append new rows at the end of their area. A cell that
+changes state carries the date in Notes. Source of truth for *what* a feature is stays
+[`FEATURE_INVENTORY.md`](FEATURE_INVENTORY.md) §1; this table only answers *which edition*.
+
+### Core engine (identical across editions by construction)
+
+| ID | Feature | P | S | E | Notes |
+|---|---|---|---|---|---|
+| ING-01 | Multi-pipeline poll cycle (`active:` gate, M..N parallelism, file-pattern glob) | ✅ | ✅ | ✅ | FEATURE_INVENTORY §A |
+| ING-02 | Consignment formation (`collector.consignment: max_files / max_bytes / order`) | ✅ | ✅ | ✅ | moved to the Collector 2026-09-02 (CONSIGNMENT-HOME-1); legacy `processing.batch` dual-read |
+| ING-03 | Local inbox acquisition (stability gate, ready marker, PATH/CHECKSUM/METADATA dedup, incremental watermark, gap detection, post-action, retry, circuit breaker) | ✅ | ✅ | ✅ | §I |
+| ING-04 | Remote acquisition connectors (SFTP, FTPS, DB-export) — `inspecto-connectors` | ✅ | ✅ | ✅ | ServiceLoader module; bundled by `package.ps1` in every edition |
+| ING-05 | Unpack stage (zip/tar/gz/bz2/Z, nested archives) | ✅ | ✅ | ✅ | |
+| PRS-01 | Delimited parser (DuckDB + Java engines, header/tail/junk handling) | ✅ | ✅ | ✅ | §B |
+| PRS-02 | Fixed-width text + fixed-length binary | ✅ | ✅ | ✅ | |
+| PRS-03 | JSON / NDJSON | ✅ | ✅ | ✅ | |
+| PRS-04 | `text_regex` | ✅ | ✅ | ✅ | |
+| PRS-05 | Excel (`xlsx`) | 🟡 | 🟡 | 🟡 | needs the `excel` DuckDB extension file in the bundle; air-gapped installs fall back to a networked INSTALL if it is missing (multiformat X1) |
+| PRS-06 | ASN.1 (`asn-parser` reactor) | ✅ | ✅ | ✅ | |
+| PRS-07 | Plugin ingesters / segments (multi-event-type) | ✅ | ✅ | ✅ | |
+| PRS-08 | Multi-schema dispatch (selector / segments) | ✅ | ✅ | ✅ | route: on multi-schema is authoring-only (refused to arm) |
+| SCH-01 | Schema registry: field types (all DuckDB scalars, fail-closed), rules (`DIRECT`/`EXPR`/`CONCAT_DT`/`FILENAME_DATE`), multi-format dates | ✅ | ✅ | ✅ | §C |
+| SCH-02 | Quarantine / reject routing | ✅ | ✅ | ✅ | |
+| SCH-03 | Field classification metadata (PII / INTERNAL) | ✅ | ✅ | ✅ | metadata only — no edition enforces masking on it (see SEC-08) |
+| XFM-01 | Stage-1 transforms (map, filter, partitions) | ✅ | ✅ | ✅ | §D |
+| XFM-02 | At-rest steps: `dedup` (incl. D-9 windowed scope), `join`, `summarize`, `route` branches with mid-branch steps | ✅ | ✅ | ✅ | branch-aware ingest lane; flat lane behind `-Dingest.lane` (Phase 6 D-2) |
+| XFM-03 | Stage-2 enrichment (`*_enrich.toon`, reference joins, versioned references) | ✅ | ✅ | ✅ | |
+| XFM-04 | Decision Rules (space-registry, rule-routed outputs) | ✅ | ✅ | ✅ | keep a pipeline on the flat lane when they route rows |
+| OUT-01 | Parquet (snappy/zstd/gzip) + CSV output, Hive partitioning | ✅ | ✅ | ✅ | §E |
+| OUT-02 | Multi-destination `sinks[]` fan-out | ✅ | ✅ | ✅ | |
+| OUT-03 | DuckLake catalog (PostgreSQL) | 🟡 | ✅ | ✅ | Personal ships no PG driver — `postgresql.jar` sidecar is Standard+ (PG-1) |
+| OUT-04 | Auto-chunking of huge files, DuckDB scratch/memory tuning | ✅ | ✅ | ✅ | |
+| JOB-01 | Job framework (`enrich`, `report`, `maintenance`, `pipeline`, `sql.template`, `consignment.process`, `recon.run`, `caserule.evaluate`, `objects.analytics`, `mail.send`) | ✅ | ✅ | ✅ | §F |
+| JOB-02 | Triggers: cron, `on_pipeline`, `on_signal` + `when` guards, `catch_up`, manual | ✅ | ✅ | ✅ | |
+| JOB-03 | Maintenance task library (cleanup, ledger/runlog/notification/receipt/dedup/event prune, incident_purge, backup/restore/verify, storage report/trend, compact, materialize, db_maintenance) | ✅ | ✅ | ✅ | `event_prune` added 2026-09-02 (COMPLY-3) |
+| JOB-04 | Consignment concurrency broker (priority shares, intake caps) | ✅ | ✅ | ✅ | |
+
+### Control plane & authoring
+
+| ID | Feature | P | S | E | Notes |
+|---|---|---|---|---|---|
+| CP-01 | Control API v1 (JDK HttpServer, envelope, ETag/If-Match, idempotency keys) | ✅ | ✅ | ✅ | |
+| CP-02 | Pipeline authoring: graph editor + Recipe view (insert-between, insert-into-branch, undo/redo, snapshots, save-as-template) | ✅ | ✅ | ✅ | insert-into-branch 2026-09-02 |
+| CP-03 | Pipeline lifecycle: validate → save → arm/activate → test-run → run → replay; run-level ledgers | ✅ | ✅ | ✅ | |
+| CP-04 | Pipeline bundle export/import (server-side, dependency closure) | ✅ | ✅ | ✅ | selective pipeline export/import for the canonical file is a BACKLOG design item |
+| CP-05 | Onboarding wizard (Collection → Parse → Schema → Sink) | ✅ | ✅ | ✅ | |
+| CP-06 | Component registry (schemas, grammars, mappings, connections, enrichments, findings-spec, policies…) with `.history/` | ✅ | ✅ | ✅ | |
+| CP-07 | Spaces: per-tenant isolation of config, stores, scheduler, event log | ✅ | ✅ | ✅ | isolation is a *layout* in P/S; **enforced** by seeded policies only in E (SEC-06) |
+| CP-08 | Studio: Datasets, Queries, Widgets, Dashboards, Viz Library, curated templates | ✅ | ✅ | ✅ | `trend-monitor` template 2026-09-02 |
+| CP-09 | Geo map + link analysis views | ✅ | ✅ | ✅ | DuckDB `spatial` extension deliberately not loaded (SqlSandbox lockdown) — BACKLOG gated |
+| CP-10 | Reconciliation (recon boards, break sets) | ✅ | ✅ | ✅ | explicit non-goals: N>3, non-additive aggs, fuzzy keys |
+| CP-11 | Operational objects: Alerts → Incidents → Cases → Tasks, notes/links/tags, findings, RCA, postmortems | ✅ | ✅ | ✅ | §J |
+| CP-12 | Notifications + delivery channels (mail, webhooks, delivery-status receipts) | 🟡 | 🟡 | 🟡 | bounce suppression / soft-bounce retry / SES-SNS adapter are deliberate deferrals (D8) |
+| CP-13 | Metrics (`/metrics` Prometheus), events feed, audit CSV export | ✅ | ✅ | ✅ | |
+| CP-14 | Assist / Intelligence agents (`/assist/*`) | — | — | — | never bundled by design; routes answer 503 in every bundle (build-test.md) |
+
+### Security & identity
+
+| ID | Feature | P | S | E | Notes |
+|---|---|---|---|---|---|
+| SEC-01 | Transport: HTTPS (keystore; FIPS provider option) | — | ✅ | ✅ | P is plain HTTP; `-Dcontrol.bind` restricts the listen address in every edition |
+| SEC-02 | Authentication — OIDC resource server (`inspecto-security`, Nimbus JWKS) | — | ✅ | ✅ | P is auth-free by design |
+| SEC-03 | Authorization — RBAC from token claims (`roles.toon` seed) | — | ✅ | ✅ | |
+| SEC-04 | Authorization — ABAC policy engine (`inspecto-policy`, `access-policies.toon`, route + row scope) | — | — | ✅ | |
+| SEC-05 | Policy authoring UX (matrix/create editor beyond hand-authored TOON) | — | — | 🔲 | seed visibility, "why denied?" explain, read-only Policies tab shipped; editor is BACKLOG |
+| SEC-06 | Per-tenant space isolation enforced by seeded policies | — | — | ✅ | engages once a `space` claim is mapped |
+| SEC-07 | Secrets: `${ENV}` / `${SYS}` references, `SecretsProvider` SPI (file, OS keystore, Vault) | ✅ | ✅ | ✅ | Vault / cloud provider impls: ❓ which ship where |
+| SEC-08 | Data masking / row scoping driven by field classification | — | ❓ | ❓ | classification exists (SCH-03); row scope exists (SEC-04); nothing joins them |
+| SEC-09 | Actor-attributed, tamper-evident audit log | 🟡 | ✅ | ✅ | P has no actor (auth-free) — events carry `actor=anonymous` |
+| SEC-10 | Exchange / sharing grants between spaces | ✅ | ✅ | ✅ | attributes private by default, not by guarantee (SEC-EXCHANGE-ATTRS) |
+| SEC-11 | X-Actor header removal (API v1 sunset) | 🔲 | 🔲 | 🔲 | client-migration-gated |
+| SEC-12 | OIDC end-session redirect (`bootstrap.auth.endSessionUrl`) | — | 🔲 | 🔲 | nobody has asked; "new capability, not a gap" |
+
+### State, scale & operations
+
+| ID | Feature | P | S | E | Notes |
+|---|---|---|---|---|---|
+| OPS-01 | Operational stores on DuckDB (status, objects, jobs, dedup ledger, outputs, provenance) | ✅ | ✅ | ✅ | |
+| OPS-02 | Operational stores on PostgreSQL (`-Dinspecto.db=postgres`, shared roster) | — | ✅ | ✅ | driver sidecar Standard+ |
+| OPS-03 | Multi-user Postgres deployment (shared state, several operators) | — | 🔲 | 🔲 | plan exists (`postgres-multi-user-plan.md`), operator-deferred |
+| OPS-04 | Distributed scheduler coordination (leader election / locks) | — | — | 🔲 | EDITIONS §Enterprise "will need later" |
+| OPS-05 | Shared object store for Parquet | — | — | 🔲 | same |
+| OPS-06 | Backup / restore (zip + sidecar manifest, hash-verified) | ✅ | ✅ | ✅ | |
+| OPS-07 | Embedded trimmed JVM runtime in the bundle (jlink) | ✅ | ✅ | ✅ | `-NoRuntime` builds need Java 24+ on the target; the CI release uses `-NoRuntime` |
+| OPS-08 | Timezones: `-Dops.timezone` + per-source `parsing.source_timezone` | ✅ | ✅ | ✅ | |
+
+### Compliance & supply chain
+
+| ID | Feature | P | S | E | Notes |
+|---|---|---|---|---|---|
+| CMP-01 | SBOM per bundle (CycloneDX + SPDX inside the zip) | ✅ | ✅ | ✅ | 2026-09-02 (COMPLY-1) |
+| CMP-02 | Signed releases (CI-held key, `.sha256` + `.asc`, fail-closed `-Sign`) | ✅ | ✅ | ✅ | 2026-09-02 (COMPLY-2); workflow unexercised until the first `v*` tag |
+| CMP-03 | Dependency-review guard (`tools/dependencies.lock` in CI) | ✅ | ✅ | ✅ | reactor-wide, not per bundle — a review baseline, not an SBOM |
+| CMP-04 | Audit retention (`event_prune`, one-year window) | ✅ | ✅ | ✅ | 2026-09-02 (COMPLY-3); operator-scheduled |
+| CMP-05 | Control matrix + auditor evidence (`compliance/`) | — | ✅ | ✅ | P has no compliance scope by definition |
+| CMP-06 | FIPS mode (G9) | — | 🔲 | 🔲 | matrix gap G9, open |
+| CMP-07 | RBAC R5 residual (G8) | — | 🔲 | 🔲 | matrix gap G8, open |
+| CMP-08 | Certifications (SOC 2 Type II, ISO 27001, FedRAMP…) | — | 🔲 | 🔲 | org-paced (NFR-7); C1 scope statement is org-gated |
+
+**Open ❓ cells to decide first:** SEC-07 (which secrets providers ship in which edition), SEC-08
+(classification-driven masking — is it a feature at all, and for whom). Everything 🔲 already has a
+BACKLOG home; a 🔲 cell that gets scheduled should cite its row here.
