@@ -437,6 +437,21 @@ without it a reprocess would re-ingest into "already seen" and drop every row pe
 fail-closed**, not fail-open — a windowed dedup with no ledger REFUSES at run
 (`RowShaper.ExecutionContext`).
 
+⚠ **A default-ON `URL_OR_ENGINE` family plus `SpaceRoot.legacy()` writes into the working
+directory.** `legacy()` resolves every store's file CWD-relative by design (the pre-spaces
+single-tenant layout), so any test booting a `CollectorService` minted this ledger — and
+`inspecto-consignment-outputs.db` — at whichever *module root* surefire was forked in. Both are now
+pinned to in-memory DuckDB in the **root pom's surefire `systemPropertyVariables`**
+(`-Ddedup.ledger.backend=jdbc:duckdb:`, `-Dconsignment.outputs.backend=jdbc:duckdb:`), which keeps
+the ledger armed against the real `DbDedupLedger` while writing nothing. It is set as the **backend**
+value, not the per-family `*.db.url`: a raw `jdbc:` backend is a first-class source that both
+`ServiceStores` and `OperationalDb.resolve` short-circuit on, so `urlFor` is never consulted —
+setting `-Ddedup.ledger.db.url` instead defeats the shared `-Dinspecto.db` selection that
+`OperationalDbTest` pins across all eleven families (it fails that test). Tests needing durable dedup
+state construct `DbDedupLedger` on an explicit `@TempDir` URL. `STATUS` cannot use this escape hatch —
+it is `DB_FLAG` mode, so `inspecto/inspecto-status.db` is still minted at that module root
+(`.gitignore`-masked, unfixed).
+
 ---
 
 ## 4. File topology (per space)

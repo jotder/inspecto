@@ -789,6 +789,21 @@ non-blocking:**
 
 ## 6. Engineering / tech-debt
 
+- **TEST-CWD-DB-1 — `inspecto/inspecto-status.db` is still minted at the module root by
+  `mvn -o test`.** Same mechanism as the dedup-ledger/consignment-outputs leak fixed 2026-09-02: a
+  default-ON operational family plus `SpaceRoot.legacy()`'s CWD-relative resolution, so every test
+  booting a `CollectorService` writes a real DuckDB file into whichever module surefire forked in.
+  Those two were pinned to in-memory via the root pom's surefire `systemPropertyVariables`
+  (`-D<family>.backend=jdbc:duckdb:`) — see `okf/backend/engine/db-layer.md` §3.11. ⛔ **`STATUS`
+  cannot take that escape hatch**: it is `Mode.DB_FLAG`, which only accepts `db`, and its only
+  other global lever is `-Dstatus.db.url` — setting that per-family URL breaks the shared
+  `-Dinspecto.db` roster invariant `OperationalDbTest` pins (verified: it fails that test).
+  Options: (a) give `openStatusStore` a test-scope in-memory seam, (b) set
+  `-Dstatus.backend=file` in surefire — ⚠ this flips the read surface off for ~933 tests and the
+  `db` default was a 2026-08-31 **operator decision**, so it needs sign-off, not a judgment call;
+  `StatusProjectionFreshnessTest:73`'s "No `-Dstatus.backend` ⇒ the file store" comment is stale
+  against that flip and should be checked either way. File is `.gitignore`-masked meanwhile.
+
 **AUTHORING-RESIDUALS — FULLY DRAINED 2026-09-02** (spec
 [`archived-documents/plans-archive/authoring-residuals-plan.md`](archived-documents/plans-archive/authoring-residuals-plan.md), ready to
 archive; R1/R2/R4/R5/R6 shipped 2026-09-01, R3 mid-branch `steps:` + the bundle-UI migration

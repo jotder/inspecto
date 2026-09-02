@@ -353,6 +353,27 @@
                               property still exercises the user.dir default.
                             -->
                             <assist.safety.roots>${session.executionRootDirectory};${java.io.tmpdir}</assist.safety.roots>
+                            <!--
+                              The D-9 record-dedup ledger is default-ON (ServiceStores.openDedupLedger),
+                              and SpaceRoot.legacy() resolves its file CWD-relative — so every test that
+                              boots a CollectorService minted an inspecto-dedup-ledger.db at that module's
+                              root. An in-memory DuckDB keeps the ledger ARMED (registration + the arming
+                              gates still exercise the real DbDedupLedger) while writing nothing to the
+                              working directory.
+
+                              ⚠ Set as the BACKEND value, not -Ddedup.ledger.db.url: a raw 'jdbc:' backend
+                              is a first-class source that ServiceStores.openDedupLedger and
+                              OperationalDb.resolve both short-circuit on, so OperationalDb.urlFor is never
+                              consulted. Setting the per-family URL property instead would defeat the shared
+                              -Dinspecto.db selection that OperationalDbTest pins for all eleven families.
+                              Tests needing durable dedup state build DbDedupLedger on an explicit @TempDir
+                              URL and never read this.
+                            -->
+                            <dedup.ledger.backend>jdbc:duckdb:</dedup.ledger.backend>
+                            <!-- Same shape, same reason: the Consignment output-file registry is
+                                 default-ON URL_OR_ENGINE too, so it minted an
+                                 inspecto-consignment-outputs.db at four different module roots. -->
+                            <consignment.outputs.backend>jdbc:duckdb:</consignment.outputs.backend>
                         </systemPropertyVariables>
                     </configuration>
                 </plugin>
