@@ -1,6 +1,15 @@
 # Execution residuals — solution specification (stage-2 close-out)
 
-**Status: ACTIVE (X-items); the build package SHIPPED 2026-09-02** — the default-on orphan gate
+**Status: X1 / X2 / X3 BUILT 2026-09-02 on worktree branch `claude/execution-residuals`
+(`ca3e885c` · `452fdc7a` · `d54772f8`, base `b3aa12d8`) — AWAITING the operator's integration onto
+`master`.** Operator-directed (the shift's `/goal`; X1's shape — bound the COMMIT re-encounter, not the
+queue sketched below — was the operator's explicit pick of three options). ⛔ Not yet on the trunk:
+distill+archive this plan in the SAME change that integrates the branch, not before (a plan archived
+ahead of the merge would assert shipped work the trunk does not have). Each section carries its
+as-built note; X4/X5 sketches are BACKLOG §4 `EXECUTION-RESIDUALS-SKETCHES`; X6 was already held.
+Original status line follows.
+
+**Status (historical): ACTIVE (X-items); the build package SHIPPED 2026-09-02** — the default-on orphan gate
 (`JobService.auditOrphanOutputStores`, transition-debounced, `-Djobs.orphan.audit` kill switch),
 the D-9 remainder (wave row 14 COMPLETE: `RowShaper.ExecutionContext` seam · `scope:` parse ·
 `ERR/WARN_DEDUP_WINDOW_UNARMABLE` at all four save gates + bundle import · retract-on-supersede ·
