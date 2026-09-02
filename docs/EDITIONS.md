@@ -182,12 +182,13 @@ changes state carries the date in Notes. Source of truth for *what* a feature is
 | CP-06 | Component registry (schemas, grammars, mappings, connections, enrichments, findings-spec, policies…) with `.history/` | ✅ | ✅ | ✅ | |
 | CP-07 | Spaces: per-tenant isolation of config, stores, scheduler, event log | ✅ | ✅ | ✅ | isolation is a *layout* in P/S; **enforced** by seeded policies only in E (SEC-06) |
 | CP-08 | Studio: Datasets, Queries, Widgets, Dashboards, Viz Library, curated templates | ✅ | ✅ | ✅ | `trend-monitor` template 2026-09-02 |
-| CP-09 | Geo map + link analysis views | ✅ | ✅ | ✅ | DuckDB `spatial` extension deliberately not loaded (SqlSandbox lockdown) — BACKLOG gated |
+| CP-09 | Geo map + link analysis views | — | ✅ | ✅ | DuckDB `spatial` extension deliberately not loaded (SqlSandbox lockdown) — BACKLOG gated; **decided 2026-09-02 (operator): not for Personal** — core code ships it in every bundle today, so the cell is a product decision awaiting gating (EDG-01) |
 | CP-10 | Reconciliation (recon boards, break sets) | ✅ | ✅ | ✅ | explicit non-goals: N>3, non-additive aggs, fuzzy keys |
-| CP-11 | Operational objects: Alerts → Incidents → Cases → Tasks, notes/links/tags, findings, RCA, postmortems | ✅ | ✅ | ✅ | §J |
-| CP-12 | Notifications + delivery channels (mail, webhooks, delivery-status receipts) | 🟡 | 🟡 | 🟡 | bounce suppression / soft-bounce retry / SES-SNS adapter are deliberate deferrals (D8) |
-| CP-13 | Metrics (`/metrics` Prometheus), events feed, audit CSV export | ✅ | ✅ | ✅ | |
+| CP-11 | Operational objects: Alerts → Incidents → Cases → Tasks, notes/links/tags, findings, RCA, postmortems | — | ✅ | ✅ | §J; **decided 2026-09-02 (operator): not for Personal** — core code ships it in every bundle today, so the cell is a product decision awaiting gating (EDG-01) |
+| CP-12 | In-app notifications | ✅ | ✅ | ✅ | split 2026-09-02 — the feed stays in every edition; delivery channels are CP-15 |
+| CP-13 | Metrics (`/metrics` Prometheus), events feed, audit CSV export | — | ✅ | ✅ | **decided 2026-09-02 (operator): not for Personal** — core code ships it in every bundle today, so the cell is a product decision awaiting gating (EDG-01) |
 | CP-14 | Assist / Intelligence agents (`/assist/*`) | — | — | — | never bundled by design; routes answer 503 in every bundle (build-test.md) |
+| CP-15 | Delivery channels (mail, webhooks, delivery-status receipts) | — | 🟡 | 🟡 | bounce suppression / soft-bounce retry / SES-SNS adapter are deliberate deferrals (D8); **decided 2026-09-02 (operator): not for Personal** — core code ships it in every bundle today, so the cell is a product decision awaiting gating (EDG-01) |
 
 ### Security & identity
 
@@ -200,9 +201,9 @@ changes state carries the date in Notes. Source of truth for *what* a feature is
 | SEC-05 | Policy authoring UX (matrix/create editor beyond hand-authored TOON) | — | — | 🔲 | seed visibility, "why denied?" explain, read-only Policies tab shipped; editor is BACKLOG |
 | SEC-06 | Per-tenant space isolation enforced by seeded policies | — | — | ✅ | engages once a `space` claim is mapped |
 | SEC-07 | Secrets: `${ENV}` / `${SYS}` references, `SecretsProvider` SPI (file, OS keystore, Vault) | ✅ | ✅ | ✅ | Vault / cloud provider impls: ❓ which ship where |
-| SEC-08 | Data masking / row scoping driven by field classification | — | ❓ | ❓ | classification exists (SCH-03); row scope exists (SEC-04); nothing joins them |
+| SEC-08 | Data masking / row scoping driven by field classification | — | — | 🔲 | **decided 2026-09-02 (operator): Enterprise only.** Classification exists (SCH-03), row scope exists (SEC-04); the join is E-only build work |
 | SEC-09 | Actor-attributed, tamper-evident audit log | 🟡 | ✅ | ✅ | P has no actor (auth-free) — events carry `actor=anonymous` |
-| SEC-10 | Exchange / sharing grants between spaces | ✅ | ✅ | ✅ | attributes private by default, not by guarantee (SEC-EXCHANGE-ATTRS) |
+| SEC-10 | Exchange / sharing grants between spaces | — | ✅ | ✅ | attributes private by default, not by guarantee (SEC-EXCHANGE-ATTRS); **decided 2026-09-02 (operator): not for Personal** — core code ships it in every bundle today, so the cell is a product decision awaiting gating (EDG-01) |
 | SEC-11 | X-Actor header removal (API v1 sunset) | 🔲 | 🔲 | 🔲 | client-migration-gated |
 | SEC-12 | OIDC end-session redirect (`bootstrap.auth.endSessionUrl`) | — | 🔲 | 🔲 | nobody has asked; "new capability, not a gap" |
 
@@ -214,8 +215,8 @@ changes state carries the date in Notes. Source of truth for *what* a feature is
 | OPS-02 | Operational stores on PostgreSQL (`-Dinspecto.db=postgres`, shared roster) | — | ✅ | ✅ | driver sidecar Standard+ |
 | OPS-03 | Multi-user Postgres deployment (shared state, several operators) | — | 🔲 | 🔲 | plan exists (`postgres-multi-user-plan.md`), operator-deferred |
 | OPS-04 | Distributed scheduler coordination (leader election / locks) | — | — | 🔲 | EDITIONS §Enterprise "will need later" |
-| OPS-05 | Shared object store for Parquet | — | — | 🔲 | same |
-| OPS-06 | Backup / restore (zip + sidecar manifest, hash-verified) | ✅ | ✅ | ✅ | |
+| OPS-05 | Shared object store for Parquet | — | — | 🔲 | EDITIONS §Enterprise "will need later"; **P: decided 2026-09-02, not for Personal** |
+| OPS-06 | Backup / restore (zip + sidecar manifest, hash-verified) | — | ✅ | ✅ | **decided 2026-09-02 (operator): not for Personal** — core code ships it in every bundle today, so the cell is a product decision awaiting gating (EDG-01) |
 | OPS-07 | Embedded trimmed JVM runtime in the bundle (jlink) | ✅ | ✅ | ✅ | `-NoRuntime` builds need Java 24+ on the target; the CI release uses `-NoRuntime` |
 | OPS-08 | Timezones: `-Dops.timezone` + per-source `parsing.source_timezone` | ✅ | ✅ | ✅ | |
 
@@ -230,8 +231,14 @@ changes state carries the date in Notes. Source of truth for *what* a feature is
 | CMP-05 | Control matrix + auditor evidence (`compliance/`) | — | ✅ | ✅ | P has no compliance scope by definition |
 | CMP-06 | FIPS mode (G9) | — | 🔲 | 🔲 | matrix gap G9, open |
 | CMP-07 | RBAC R5 residual (G8) | — | 🔲 | 🔲 | matrix gap G8, open |
-| CMP-08 | Certifications (SOC 2 Type II, ISO 27001, FedRAMP…) | — | 🔲 | 🔲 | org-paced (NFR-7); C1 scope statement is org-gated |
+| CMP-08 | Certifications (SOC 2 Type II, ISO 27001, FedRAMP…) | — | — | 🔲 | **decided 2026-09-02 (operator): Enterprise only.** Org-paced (NFR-7); C1 scope statement is org-gated |
 
-**Open ❓ cells to decide first:** SEC-07 (which secrets providers ship in which edition), SEC-08
-(classification-driven masking — is it a feature at all, and for whom). Everything 🔲 already has a
-BACKLOG home; a 🔲 cell that gets scheduled should cite its row here.
+**Open ❓ cell to decide:** SEC-07 (which secrets providers ship in which edition). SEC-08 and CMP-08 were
+decided Enterprise-only on 2026-09-02. Everything 🔲 already has a BACKLOG home; a 🔲 cell that gets
+scheduled should cite its row here.
+
+### Edition-gating debt (opened by the 2026-09-02 decisions)
+
+| ID | Work | Cells | Notes |
+|---|---|---|---|
+| EDG-01 | Gate the "not for Personal" features out of the Personal bundle: backup/restore tasks (OPS-06), exchange/sharing (SEC-10), geo map + link analysis (CP-09), operational objects (CP-11), delivery channels (CP-15), metrics/events feed/audit export (CP-13) | the — cells those rows carry under P | ⚠ All of these are CORE code today, reachable in every bundle. The house mechanism for an edition difference is a ServiceLoader module or a `-D` flag decided by the BUILD, never `if (edition == …)` (EDITIONS §Assembly). So this is a design slice first: which of the six become optional modules the Personal profile omits, which become a `-D` capability switch `serve.*` sets per edition, and what the UI shows for an absent capability (the 503-panel convention, never a toast). Until it ships, the P cells are a **stated product decision the code does not apply** — say so, do not describe them as absent. |
