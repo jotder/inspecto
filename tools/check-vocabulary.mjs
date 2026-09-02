@@ -124,10 +124,6 @@ const DOC_TREES_LABEL = `{${[...DOC_TREES, 'root canon'].join(', ')}}`;
 // Anything else is a stale doc and must be FIXED — that is how this pass found the `sources.md`/
 // "Source Connectors" residue of the shipped Source→Collector rename.
 const DOC_ALLOW = {
-    'docs/okf/backend/pipeline-graph/pipeline-graph-design.md::bare-flow':
-        'Historical design narrative: "Flow IR"/"Flow document"/"Flows pane" record the pre-rename design and its shipped phase log. The IR types themselves are already `PipelineGraph`/`PipelineNode`; rewriting the narrative would falsify the history. Residual `*_flow.toon`/`flows/` mentions are Tier-3 debt (plan §4).',
-    'docs/okf/backend/pipeline-graph/pipeline-graph-design.md::data-store':
-        'Sanctioned sense: "the two share the data store" is the physical backend, not a Dataset (GLOSSARY §6-B).',
     'docs/okf/backend/engine/db-layer.md::data-store':
         'Sanctioned sense: "Business-data stores" read via a DuckDB sandbox is the physical backend, not a Dataset.',
     // The vocabulary-and-config-contract plan's two entries were RETIRED 2026-08-04 when the plan shipped

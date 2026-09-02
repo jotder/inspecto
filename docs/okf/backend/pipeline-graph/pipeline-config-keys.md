@@ -127,7 +127,7 @@ file by design:
 - **`version:`** — present in the worked examples (configuration.md §3, pipeline spec §3); the parser
   never reads it. Inert.
 - **`source:`** — configuration.md's acquisition section still documents a top-level `source:` block;
-  the parser reads only `collector:` (GLOSSARY: Source→Collector, 2026-07-14). A `source:` block is
+  the parser reads only `collector:` (GLOSSARY: Source→Collector, 2026-07-14). A `source:` block is <!-- vocab-allow: cites the rename + the literal legacy config key -->
   silently ignored. (Parser error messages still *say* `source.dataset` for collector keys — message-level
   vocabulary drift, not a second read path.)
 
