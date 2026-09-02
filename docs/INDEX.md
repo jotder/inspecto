@@ -35,7 +35,7 @@
 - [`ADVANCED_GUIDE.md`](ADVANCED_GUIDE.md) — **Advanced Operations & Internals Guide** (the production
   investigation hub): per-component process, events, metrics, persisted state, `-D` flags, full Control
   API, troubleshooting playbooks. **Living doc.**
-- [`EDITIONS.md`](EDITIONS.md) — edition model (Personal/Standard/Enterprise = build flavors, never branches).
+- [`EDITIONS.md`](EDITIONS.md) — edition model (Personal/Standard/Enterprise = build flavors, never branches) + the **feature × edition board** and the generated **Step Processors** table (`tools/render-processor-board.mjs` from `processor-catalog.contract.json`).
 - [`BRANCHING.md`](BRANCHING.md) — branch & release policy (versions = branches; merge-forward; SemVer + CC).
 
 ## The knowledge bundle — OKF (current as-built truth)
