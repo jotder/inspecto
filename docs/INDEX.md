@@ -265,10 +265,14 @@ former root reference docs** (each index lists them):
   (route modules, `RouteErrors`, `SpiSlot`) and
   [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md) (the `inspecto-util` helper
   homes); residuals → `BACKLOG.md` §6 **JAVA-SIMP-1/2**.
-- [`superpower/mid-branch-transforms-design.md`](superpower/mid-branch-transforms-design.md) — **DESIGN
-  ONLY, not scheduled** (2026-08-26). The last branch-aware-executor residual that is genuinely unbuilt:
-  letting a `route:` branch carry its own `steps:` sub-chain. Records the four decisions it needs and the
-  recommendation to leave the refusal in place until a pipeline needs it.
+- ~~`superpower/mid-branch-transforms-design.md`~~ — **BUILT and ARCHIVED 2026-09-02**
+  ([archive copy](archived-documents/plans-archive/mid-branch-transforms-design.md), kept for the
+  refusal-era decisions). Shipped as authoring-residuals **R3** (`ce2fe675`): a `route:` branch
+  carries its own `steps:` sub-chain in the shared step grammar, flattened by `PipelineLift` and
+  reversed by `PipelineEditable`. As-built:
+  [`okf/backend/pipeline-graph/editable-round-trip.md`](okf/backend/pipeline-graph/editable-round-trip.md)
+  §19 + [`okf/frontend/features/pipeline-editor.md`](okf/frontend/features/pipeline-editor.md);
+  the one residual is **MIDBRANCH-UI-1** in `BACKLOG.md` (insert-into-branch affordance).
 - ~~`superpower/d11-resource-caps-plan.md`~~ — **COMPLETE and ARCHIVED 2026-08-26**
   (`archived-documents/plans-archive/d11-resource-caps-plan.md`). Shipped BACKLOG **D11**: the measured
   resource pair `memory_limit=2GB` + `maxConcurrentRuns=4`, both on by default and both owned by the server

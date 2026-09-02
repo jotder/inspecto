@@ -2269,7 +2269,7 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   · **mid-branch transforms in the recipe route verb** — genuinely unbuilt, and the largest: there is
     **no per-branch transform scaffolding on either surface** (`RecipeCompiler.route()` refuses a branch
     whose `steps:` isn't exactly one `sink`; `PipelineLift.branch()` puts transforms only on the shared
-    trunk). Design pass written: [`superpower/mid-branch-transforms-design.md`](superpower/mid-branch-transforms-design.md).
+    trunk). Design pass written: [`archived-documents/plans-archive/mid-branch-transforms-design.md`](archived-documents/plans-archive/mid-branch-transforms-design.md).
   ~~a save-time arming pre-check in the editor~~ — **SHIPPED 2026-08-26**, and this row's own reason
   for deferring it ("arming validates at engine load on both server and mock — UX polish") was
   wrong: neither `/validate` nor `/config/write` calls `prepare()`, so a save returned

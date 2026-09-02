@@ -919,7 +919,7 @@ the deep design incl. its §14 backlog), `live-execution.md`, `multi-location-in
 `consignment-concurrency.md`, `parser-plugins.md`, `output-sinks.md`, `transforms-seams.md`,
 `unpack-stage.md`, `pipeline-test-run.md` · `superpower/` — `elt-final-amendment-plan.md` (114 KB),
 `consignment-elt-architecture.md` (87 KB), `open-dag-pipeline-design.md`, `step-workbench-design.md`,
-`mid-branch-transforms-design.md`.
+`mid-branch-transforms-design.md` (BUILT 2026-09-02 as R3 → `archived-documents/plans-archive/`).
 
 ⚠ **Retirement is deliberately NOT done yet.** Those files describe what is live; they should be
 archived only as the rewrite replaces each area, not in advance of it.
