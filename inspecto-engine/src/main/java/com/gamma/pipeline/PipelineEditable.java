@@ -523,11 +523,25 @@ public final class PipelineEditable {
             } else {
                 putIfPresent(c, PipelineStores.CONFIG_STORE, n.cfg(PipelineStores.CONFIG_STORE));
                 putIfPresent(c, "table", n.cfg("table"));
-                putIfPresent(c, "format", output.get("format"));
-                putIfPresent(c, "compression", output.get("compression"));
-                putIfPresent(c, "ducklake", output.get("ducklake"));
-                putIfPresent(c, "filename_column", output.get("filename_column"));
-                putIfPresent(c, "database", dirs.get("database"));
+                // Destination keys: a file with a plural sinks: list gives EACH lifted sink node its
+                // own entry's spelling (matched by database — the lift's join key), because the
+                // output:/dirs.database shorthand is only the FIRST destination's. Stamping the
+                // shorthand on every node made lower collapse destByDatabase to one entry and drop
+                // the plural block on the next save. (Mirrors sinkDefs in pipeline-editable.ts.)
+                Map<?, ?> entry = sinkEntryForDatabase(raw, n.cfg("database"));
+                if (entry != null) {
+                    putIfPresent(c, "format", entry.get("format"));
+                    putIfPresent(c, "compression", entry.get("compression"));
+                    putIfPresent(c, "ducklake", entry.get("ducklake"));
+                    putIfPresent(c, "filename_column", entry.get("filename_column"));
+                    putIfPresent(c, "database", entry.get("database"));
+                } else {
+                    putIfPresent(c, "format", output.get("format"));
+                    putIfPresent(c, "compression", output.get("compression"));
+                    putIfPresent(c, "ducklake", output.get("ducklake"));
+                    putIfPresent(c, "filename_column", output.get("filename_column"));
+                    putIfPresent(c, "database", dirs.get("database"));
+                }
                 putIfPresent(c, "backup", dirs.get("backup"));
                 putIfPresent(c, "temp", dirs.get("temp"));
                 for (String k : SINK_PROC_OWNED) putIfPresent(c, k, processing.get(k));
@@ -553,6 +567,16 @@ public final class PipelineEditable {
             c.putAll(n.config());
         }
         return c;
+    }
+
+    /** The raw top-level {@code sinks[]} entry whose {@code database} equals {@code database}, or
+     *  {@code null} — absent list or no match means the single-{@code output:} shorthand applies. */
+    private static Map<?, ?> sinkEntryForDatabase(Map<String, Object> raw, Object database) {
+        if (database == null || !(raw.get("sinks") instanceof List<?> sinks)) return null;
+        for (Object o : sinks)
+            if (o instanceof Map<?, ?> m
+                    && String.valueOf(database).equals(String.valueOf(m.get("database")))) return m;
+        return null;
     }
 
     // ═════════════════════════════ editable lower ═════════════════════════════

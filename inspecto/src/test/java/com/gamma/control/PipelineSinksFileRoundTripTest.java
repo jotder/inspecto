@@ -151,6 +151,48 @@ class PipelineSinksFileRoundTripTest {
     }
 
     /**
+     * The full editor open/save cycle over a multi-destination FILE: load → {@code toMap} (editable
+     * lift) → codec shape → strict {@code lower} == the original raw map, sinks: block included.
+     *
+     * <p>⚠ Pins the editableConfig defect where every non-quarantine sink node was stamped with the
+     * {@code output:}/{@code dirs.database} shorthand — the FIRST destination's spelling — so lower
+     * collapsed {@code destByDatabase} to one entry and the plural {@code sinks:} block vanished on
+     * the first editor save. Each lifted sink node must instead carry ITS OWN {@code sinks[]}
+     * entry's database/format/compression/ducklake/filename_column, matched by database.
+     */
+    @Test
+    void aMultiDestinationFileSurvivesTheEditorRoundTripVerbatim(@TempDir Path dir) throws Exception {
+        String hot = dir.resolve("hot").toString(), cold = dir.resolve("cold").toString();
+        String toon = throughTheCodec(dir,
+                node("hot", "sink.persistent", Map.of(
+                        "database", hot, "format", "parquet", "compression", "snappy")),
+                node("cold", "sink.persistent", Map.of("database", cold, "format", "csv")));
+        Path file = dir.resolve("fanout_pipeline.toon");
+        Files.writeString(file, toon, StandardCharsets.UTF_8);
+        Map<String, Object> raw = ToonHelper.load(file.toString());
+        PipelineConfig cfg = PipelineConfig.fromMap(raw);
+
+        Map<String, Object> editable = PipelineEditable.toMap(cfg, raw);
+        // each lifted sink node owns its OWN destination's spelling, not the shorthand's
+        List<Map<?, ?>> sinkNodes = ((List<?>) editable.get("nodes")).stream()
+                .<Map<?, ?>>map(n -> (Map<?, ?>) n)
+                .filter(n -> "sink.persistent".equals(n.get("type"))).toList();
+        assertEquals(2, sinkNodes.size());
+        Map<?, ?> coldCfg = (Map<?, ?>) sinkNodes.get(1).get("config");
+        assertEquals(cold, coldCfg.get("database"),
+                "the second sink node must carry ITS sinks[] entry's database, not the shorthand's");
+        assertEquals("csv", coldCfg.get("format"));
+        assertNull(coldCfg.get("compression"),
+                "the first destination's compression must not bleed onto the second");
+
+        Map<String, Object> lowered = PipelineEditable.lower(
+                com.gamma.pipeline.PipelineCodec.fromMap(editable), raw, true);
+        assertEquals(raw, lowered,
+                "an open/save of a multi-destination file must reproduce it verbatim — "
+                        + "sinks: block included");
+    }
+
+    /**
      * The safety property that lets this ship: a pipeline with one destination is written exactly as
      * before, with no {@code sinks:} block at all. Every pipeline in existence takes this path.
      */
