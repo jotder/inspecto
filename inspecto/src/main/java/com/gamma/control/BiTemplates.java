@@ -58,7 +58,26 @@ final class BiTemplates {
                             widget(P_PREFIX + "distincts", "kpi", "Distinct keys",
                                     Map.of("value", List.of(measure("countDistinct", "id")))),
                             dashboard(P_PREFIX + "quality_board", "Data quality",
-                                    tile(P_PREFIX + "volume", 2), tile(P_PREFIX + "distincts", 1)))));
+                                    tile(P_PREFIX + "volume", 2), tile(P_PREFIX + "distincts", 1)))),
+            // Seed-pack enrichment (BACKLOG §7 C7, 2026-09-02): the first TEMPORAL starter. `line` is the
+            // Studio's temporal plugin and a dimension channel may carry a `grain` (day|week|month —
+            // viz-types.ts TimeGrain), which the widget compiles into QuerySpec.grains. Curated over the
+            // conventional `event_date` starter column, like region/amount/id above.
+            new Template("trend-monitor", "Trend monitor",
+                    "Records and amount per month as two lines, plus a total-amount KPI — the starting "
+                            + "point for watching a feed over time (edit the date column and grain to fit).",
+                    List.of(
+                            widget(P_PREFIX + "records_over_time", "line", "Records per month",
+                                    Map.of("x", List.of(temporal("event_date", "month")),
+                                            "y", List.of(measure("count", "id")))),
+                            widget(P_PREFIX + "amount_over_time", "line", "Amount per month",
+                                    Map.of("x", List.of(temporal("event_date", "month")),
+                                            "y", List.of(measure("sum", "amount")))),
+                            widget(P_PREFIX + "amount_total", "kpi", "Total amount",
+                                    Map.of("value", List.of(measure("sum", "amount")))),
+                            dashboard(P_PREFIX + "trend_board", "Trend monitor",
+                                    tile(P_PREFIX + "records_over_time", 2), tile(P_PREFIX + "amount_total", 1),
+                                    tile(P_PREFIX + "amount_over_time", 2)))));
 
     private BiTemplates() {}
 
@@ -144,6 +163,11 @@ final class BiTemplates {
     /** One dimension channel value (no aggregation). */
     private static Map<String, Object> dimension(String field) {
         return Map.of("field", field);
+    }
+
+    /** A temporal dimension channel: the field plus the time bucket ({@code day|week|month}) it groups into. */
+    private static Map<String, Object> temporal(String field, String grain) {
+        return Map.of("field", field, "grain", grain);
     }
 
     private static String substitute(String s, String dataset, String prefix) {

@@ -23,6 +23,11 @@ configured instance bound to a Dataset's Result Set; a **Dashboard** is a layout
 * **Persistence is real** — datasets/widgets/dashboards/queries are writable component kinds since W3/W4
   (`/components` + ETag/If-Match; [backend registry](../../backend/components/component-registry.md));
   query execution runs on DuckDB via [`POST /queries/{id}/run`](../../backend/control-plane/queries.md).
+* **Curated starter templates** — `GET /bi/templates` lists the seed pack (`BiTemplates`): `kpi-overview`,
+  `quality-monitor` and, since 2026-09-02, the temporal `trend-monitor` (two `line` widgets over
+  `event_date` at `month` grain + a KPI); `POST /bi/templates/{id}/apply` writes them as ordinary
+  components bound to the caller's Dataset (409 on an id collision, `prefix` to disambiguate). Enrichment
+  is the continuous BACKLOG §7 C7 item.
 * **Widgets are library citizens** — identity + tags, the browsable Viz Library gallery, a standalone
   `WidgetHost` render path, and one shared `DatasetResultService` result layer: live it runs
   `POST /bi/query` (DuckDB), offline the same specs run byte-identically on AlaSQL; unmappable specs

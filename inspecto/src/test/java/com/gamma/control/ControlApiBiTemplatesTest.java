@@ -59,7 +59,8 @@ class ControlApiBiTemplatesTest {
                     BodyHandlers.ofString());
             assertEquals(200, gallery.statusCode());
             JsonNode list = V1Body.of(gallery.body());
-            assertTrue(list.size() >= 2, "curated gallery ships at least two templates");
+            assertTrue(list.size() >= 3, "curated gallery ships at least three templates");
+            assertTrue(gallery.body().contains("\"trend-monitor\""), "the temporal starter is listed: " + gallery.body());
 
             HttpResponse<String> applied = post(c.port, "/bi/templates/kpi-overview/apply",
                     "{\"dataset\":\"sales_ds\"}");
