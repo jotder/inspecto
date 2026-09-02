@@ -502,4 +502,58 @@ class ControlApiTest {
             assertTrue(r.body().contains("not a PARKED Consignment"), r.body());
         }
     }
+
+    /**
+     * PARK-1(a) (execution residuals X3) — a PARKED row on {@code GET /runs/{name}/batches} carries its
+     * manifest's {@code parkedAt} + {@code parkedTables}, so the UI can say WHICH branch parked and WHERE
+     * the rows sit, not just the word PARKED. Non-parked rows are untouched, and a parked row whose
+     * manifest is gone keeps its ledger fields rather than failing the list.
+     *
+     * <p>The ledger row + manifest are written by hand here: a real PARKED Consignment needs a route:
+     * pipeline with a disabled branch sink and is pinned end to end by {@code RouteIngestEndToEndTest};
+     * what belongs here is the ROUTE-layer merge over the same {@code dirs.manifestsDir} the drain reads.
+     */
+    @Test
+    void parkedBatchRowsCarryTheirManifestsParkDetail(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            Path status = dir.resolve("status");
+            Files.createDirectories(status.resolve("manifests"));
+            String header = "consignment_id,pipeline,schema_name,output_table,start_time,end_time,status,"
+                    + "member_count,rejected_count,total_input_rows,total_output_rows,"
+                    + "output_file_count,total_output_bytes,duration_ms,error,cast_failures\n";
+            String row = "%s,test_etl,mini,mini,2026-09-02T00:00:00,2026-09-02T00:00:01,%s,1,0,3,3,0,0,10,,0\n";
+            Files.writeString(status.resolve("test_etl_batches_20260902000000.csv"),
+                    header + row.formatted("parked_01", "PARKED") + row.formatted("orphan_02", "PARKED")
+                            + row.formatted("done_03", "SUCCESS"));
+            // parked_01 has a manifest; orphan_02 (PARKED, no manifest) must not break the list.
+            Files.writeString(status.resolve("manifests").resolve("parked_01.json"), """
+                    {"consignmentId":"parked_01","pipeline":"test_etl","members":[],"outputs":[],
+                     "parkedAt":["sink__d1"],
+                     "parkedTables":{"sink__d1":"status/park/parked_01__sink__d1.parquet"}}
+                    """);
+
+            JsonNode rows = json(send(c.port, "GET", "/runs/" + c.name + "/batches", null));
+            JsonNode parked = null, orphan = null, done = null;
+            for (JsonNode r : rows) {
+                switch (r.get("consignment_id").asText()) {
+                    case "parked_01" -> parked = r;
+                    case "orphan_02" -> orphan = r;
+                    case "done_03" -> done = r;
+                    default -> { }
+                }
+            }
+            assertNotNull(parked); assertNotNull(orphan); assertNotNull(done);
+
+            assertEquals("sink__d1", parked.get("parkedAt").get(0).asText(), parked.toString());
+            assertEquals("status/park/parked_01__sink__d1.parquet",
+                    parked.get("parkedTables").get("sink__d1").asText(), parked.toString());
+            assertEquals("PARKED", parked.get("status").asText(), "the ledger fields are still there");
+
+            assertFalse(orphan.has("parkedAt"), "no manifest ⇒ the row stays as the ledger wrote it: " + orphan);
+            assertEquals("PARKED", orphan.get("status").asText());
+
+            assertFalse(done.has("parkedAt"), "a non-parked row is never enriched: " + done);
+            assertFalse(done.has("parkedTables"));
+        }
+    }
 }

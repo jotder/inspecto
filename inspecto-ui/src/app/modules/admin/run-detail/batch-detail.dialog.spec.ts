@@ -13,6 +13,16 @@ import { BatchDetailDialog } from './batch-detail.dialog';
 const BATCHES: AuditRow[] = [
     { consignment_id: 'b-1', status: 'SUCCESS', member_count: '2', output_table: 'cdr_output' },
     { consignment_id: 'b-2', status: 'FAILED', member_count: '1', output_table: '' },
+    // PARK-1(a): the route merges the manifest's STRUCTURED park detail onto a PARKED ledger row —
+    // the one place an AuditRow carries a list and a map, hence the cast.
+    {
+        consignment_id: 'b-3',
+        status: 'PARKED',
+        member_count: '1',
+        output_table: '',
+        parkedAt: ['sink__d1'],
+        parkedTables: { sink__d1: 'status/park/b-3__sink__d1.parquet' },
+    } as unknown as AuditRow,
 ];
 const FILES: AuditRow[] = [
     { consignment_id: 'b-1', file: 'a.csv', rows: '10' },
@@ -132,6 +142,26 @@ describe('BatchDetailDialog', () => {
         fixture.detectChanges();
         expect(catalog.resolveTable).not.toHaveBeenCalled();
         expect(fixture.componentInstance.catalogNodeId()).toBeNull();
+    });
+
+    it('lists which Step a PARKED Consignment parked at and where its rows sit', () => {
+        const { fixture } = create(null, 'b-3', { enabled: true, consignmentId: 'b-3', outputs: [] });
+        const c = fixture.componentInstance;
+        expect(c.parked()).toEqual([{ step: 'sink__d1', table: 'status/park/b-3__sink__d1.parquet' }]);
+        // the structured keys render in their own table, never as "[object Object]" summary cells
+        expect(c.batchSummary.map((kv) => kv.key)).not.toContain('parkedAt');
+        expect(c.batchSummary.map((kv) => kv.key)).not.toContain('parkedTables');
+        const el: HTMLElement = fixture.nativeElement;
+        const table = el.querySelector('[data-testid="parked-table"]');
+        expect(table?.textContent).toContain('sink__d1');
+        expect(table?.textContent).toContain('status/park/b-3__sink__d1.parquet');
+        expect(el.textContent).not.toContain('[object Object]');
+    });
+
+    it('shows no park section on a Consignment that did not park', () => {
+        const { fixture } = create();
+        expect(fixture.componentInstance.parked()).toEqual([]);
+        expect(fixture.nativeElement.querySelector('[data-testid="parked-table"]')).toBeNull();
     });
 
     it('renders with no a11y violations', async () => {

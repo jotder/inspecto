@@ -158,9 +158,24 @@ concurrent poll or a crash inside that window re-ingests the file — the same i
 - **Operating** — a **Drain** row action on Run detail's Batches tab, visible only on a `PARKED` row (the
   engine refuses every other state, so offering it elsewhere would be an affordance that predictably fails).
   The 409 reason reaches the operator verbatim, because "re-enable the Step first" *is* the next step.
+- **Inspecting** (PARK-1(a), execution residuals X3, 2026-09-02) — a `PARKED` row on
+  `GET /runs/{name}/batches` carries the manifest's `parkedAt` (the Step ids it parked at) and
+  `parkedTables` (Step id → durable park-table path), and the Batch detail dialog renders them as a
+  *Parked at* table under a warning that the Consignment is uncommitted. **Merged at the ROUTE
+  (`RunRoutes.withParkDetail`), not the ledger**, deliberately: the `_batches_` header has five mirrors
+  and is projected by two status backends (file + db), so a new column there is a ledger-format change
+  across every writer and reader; the manifest is already the authoritative park record and the route
+  reads it by the same `dirs.manifestsDir` + batch id the drain does. Non-parked rows are untouched; a
+  parked row whose manifest is missing/corrupt keeps its ledger fields — the drain's 404/409 already
+  names that gap, and one broken Consignment must not fail the list. ⚠ `AuditRow` is typed
+  `Record<string, string>` because a ledger row IS strings; these two keys are the one structured
+  exception, narrowed locally in the dialog and excluded from its key/value summary (they rendered as
+  `[object Object]` otherwise). ⚠ The BACKLOG row's own remedy — “needs a new read route” — was wrong;
+  the premise (nothing served) was right. Pinned by `ControlApiTest.parkedBatchRowsCarryTheirManifestsParkDetail`
+  (real HTTP, hand-written ledger row + manifest, incl. the missing-manifest case) and
+  `batch-detail.dialog.spec.ts`.
 - **Deliberately not built:** re-enabling a Step does **not** auto-drain (operator decision, 2026-08-29) — a
-  config save must not start batch work as a side effect. And no manifest-level `parkedAt`/`parkedTables`
-  read is exposed: the ledger's `status=PARKED` plus the drain's result is what the operator acts on.
+  config save must not start batch work as a side effect.
 
 ## See also
 

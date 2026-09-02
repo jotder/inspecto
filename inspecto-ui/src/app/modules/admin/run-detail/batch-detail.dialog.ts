@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -54,6 +54,33 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
                             View {{ outputTable() }} in the Catalog
                         </a>
                     }
+                }
+
+                <!-- PARK-1(a): a PARKED Consignment says WHICH Step it parked at and WHERE its rows sit,
+                     straight from the manifest the drain will read — before this the dialog could only
+                     show the word PARKED. Absent on every non-parked row, so nothing else changes. -->
+                @if (parked().length) {
+                    <div class="mt-4 font-semibold">Parked at ({{ parked().length }})</div>
+                    <inspecto-alert variant="warning">
+                        This Consignment is uncommitted: its rows for the Steps below are held durably in the
+                        park tables listed. Re-enable the Step, then drain it from the Batches tab.
+                    </inspecto-alert>
+                    <table class="mt-1 text-sm" data-testid="parked-table">
+                        <thead>
+                            <tr>
+                                <th scope="col" class="pr-4 text-left">Step</th>
+                                <th scope="col" class="text-left">Park table</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (p of parked(); track p.step) {
+                                <tr>
+                                    <td class="pr-4 align-top font-mono">{{ p.step }}</td>
+                                    <td class="break-all font-mono">{{ p.table || '—' }}</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
                 }
 
                 <div class="mt-4 font-semibold">Member files ({{ batchFiles().length }})</div>
@@ -121,9 +148,31 @@ export class BatchDetailDialog implements OnInit {
     readonly outputTable = signal('');
     readonly catalogNodeId = signal<string | null>(null);
 
+    /** The two keys `/runs/{name}/batches` adds to a PARKED row. They are STRUCTURED (a list and a map),
+     *  not ledger strings, so they render in their own table below rather than as `[object Object]`. */
+    private static readonly PARK_KEYS = new Set(['parkedAt', 'parkedTables']);
+
     get batchSummary(): { key: string; value: string }[] {
-        return this.batchRow() ? Object.entries(this.batchRow()).map(([key, value]) => ({ key, value })) : [];
+        const row = this.batchRow();
+        return row
+            ? Object.entries(row)
+                  .filter(([key]) => !BatchDetailDialog.PARK_KEYS.has(key))
+                  .map(([key, value]) => ({ key, value: String(value) }))
+            : [];
     }
+
+    /**
+     * One row per Step this Consignment parked at, with the durable park table holding its rows.
+     * ⚠ `AuditRow` is typed `Record<string, string>` because a ledger row IS all strings; these two
+     * keys are the deliberate exception (route-merged from the manifest), hence the local narrowing.
+     */
+    readonly parked = computed<{ step: string; table: string }[]>(() => {
+        const row = this.batchRow() as Record<string, unknown> | null;
+        if (!row || row['status'] !== 'PARKED') return [];
+        const at = Array.isArray(row['parkedAt']) ? (row['parkedAt'] as string[]) : [];
+        const tables = (row['parkedTables'] ?? {}) as Record<string, string>;
+        return at.map((step) => ({ step, table: tables[step] ?? '' }));
+    });
 
     ngOnInit(): void {
         const { pipeline, batchId } = this.data;

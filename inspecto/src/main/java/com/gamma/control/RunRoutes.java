@@ -9,6 +9,8 @@ import com.gamma.config.spec.Severity;
 import com.gamma.consignment.ConsignmentOutput;
 import com.gamma.consignment.ConsignmentOutputStores;
 import com.gamma.consignment.DbConsignmentOutputStore;
+import com.gamma.etl.ConsignmentManifest;
+import com.gamma.etl.ManifestStore;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.inspector.DrainCommand;
 import com.gamma.inspector.ReprocessCommand;
@@ -59,7 +61,7 @@ final class RunRoutes implements RouteModule {
         }));
 
         api.get("/runs/([^/]+)/commits",    (e, m) -> api.service().statusStore().committedBatches(cfg(api, m)));
-        api.get("/runs/([^/]+)/batches",    (e, m) -> api.service().statusStore().batches(cfg(api, m)));
+        api.get("/runs/([^/]+)/batches",    (e, m) -> withParkDetail(cfg(api, m), api.service().statusStore().batches(cfg(api, m))));
         api.get("/runs/([^/]+)/files",      (e, m) -> api.service().statusStore().files(cfg(api, m)));
         api.get("/runs/([^/]+)/lineage",    (e, m) -> api.service().statusStore().lineage(cfg(api, m), ApiContext.query(e, "batchId")));
         api.get("/runs/([^/]+)/quarantine", (e, m) -> api.service().statusStore().quarantine(cfg(api, m)));
@@ -392,6 +394,41 @@ final class RunRoutes implements RouteModule {
     private static String errMsg(Exception e) {
         String m = e.getMessage();
         return m == null || m.isBlank() ? e.getClass().getSimpleName() : m;
+    }
+
+    /**
+     * PARK-1(a) (execution residuals X3): a PARKED Consignment's batch row gains {@code parkedAt} (the
+     * disabled Step/sink node ids it parked at) and {@code parkedTables} (nodeId → durable park-table
+     * path) from its manifest, so the operator sees WHICH branch parked and WHERE the rows sit before
+     * deciding to drain — until this the UI could only show the word PARKED and a Drain button.
+     *
+     * <p>Merged HERE, at the route, deliberately: the batches row is a {@code _batches_} ledger line
+     * whose header has five mirrors (a column added there is a ledger-format change across every
+     * writer/reader), and the ledger is projected by TWO status backends (file + db). The manifest is
+     * already the authoritative park record ({@code ConsignmentIngestor} writes it, {@code DrainCommand}
+     * reads it by the same {@code dirs.manifestsDir} + batch id), so this reads the same file the drain
+     * will. Non-parked rows pass through untouched; a parked row whose manifest is missing or unreadable
+     * keeps its ledger fields — the drain route's 404/409 already names that gap precisely, and a read
+     * surface must not fail a whole list over one Consignment.
+     */
+    static List<Map<String, Object>> withParkDetail(PipelineConfig cfg, List<Map<String, String>> rows) {
+        String manifests = cfg.dirs().manifestsDir();
+        List<Map<String, Object>> out = new ArrayList<>(rows.size());
+        for (Map<String, String> r : rows) {
+            Map<String, Object> row = new LinkedHashMap<>(r);
+            String id = r.get("consignment_id");
+            if (manifests != null && id != null && "PARKED".equals(r.get("status"))) {
+                try {
+                    ConsignmentManifest mf = ManifestStore.read(manifests, id);
+                    if (mf.parkedAt != null)     row.put("parkedAt", mf.parkedAt);
+                    if (mf.parkedTables != null) row.put("parkedTables", mf.parkedTables);
+                } catch (IOException | RuntimeException missingOrCorrupt) {
+                    // see the Javadoc — the row stays as the ledger wrote it
+                }
+            }
+            out.add(row);
+        }
+        return out;
     }
 
     private PipelineConfig cfg(ApiContext api, Matcher m) {

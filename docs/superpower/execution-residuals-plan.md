@@ -67,7 +67,10 @@ it scans; ground the cheapest source before building). The replay route's `repla
 the Run Detail lineage tab follows the link both ways. ⚠ Subject to the shared precondition — the
 registry (`consignment_outputs`) is the one default-ON store, which is why it is the carrier.
 
-## X3. PARK-1(a) — manifest park detail, premise re-grounded first
+## X3. PARK-1(a) — manifest park detail, premise re-grounded first — ✅ SHIPPED 2026-09-02
+
+**As-built:** premise re-driven and TRUE (`parkedAt`/`parkedTables` written by `ConsignmentIngestor`, exposed by NO read route; the `GET /runs/{name}` the row named does not exist — the real surface is `/runs/{name}/batches`). Closed with no new route: `RunRoutes.withParkDetail` merges the manifest onto PARKED rows; `BatchDetailDialog` renders a *Parked at* table. As-built detail in `okf/backend/pipeline-graph/step-park-drain.md`. The original section follows for provenance.
+
 
 The row predates this shift's read routes. Before designing a NEW route, re-drive the premise
 (PARK-1(c)'s closure found a real defect exactly this way): check whether `GET /runs/{name}`'s
