@@ -137,38 +137,161 @@ board exists for the cells that *differ* or are *undecided*.
 changes state carries the date in Notes. Source of truth for *what* a feature is stays
 [`FEATURE_INVENTORY.md`](FEATURE_INVENTORY.md) §1; this table only answers *which edition*.
 
-### Core engine (identical across editions by construction)
+### Core engine — platform capabilities (identical across editions by construction)
+
+> Split 2026-09-02: the per-processor rows (parsers, transforms, sinks, acquisition adapters — the former
+> ING-03/04, PRS-*, XFM-01..03, OUT-01..03) moved to the **Step Processors** table below; this table keeps
+> the platform capabilities no single processor owns.
 
 | ID | Feature | P | S | E | Notes |
 |---|---|---|---|---|---|
 | ING-01 | Multi-pipeline poll cycle (`active:` gate, M..N parallelism, file-pattern glob) | ✅ | ✅ | ✅ | FEATURE_INVENTORY §A |
 | ING-02 | Consignment formation (`collector.consignment: max_files / max_bytes / order`) | ✅ | ✅ | ✅ | moved to the Collector 2026-09-02 (CONSIGNMENT-HOME-1); legacy `processing.batch` dual-read |
-| ING-03 | Local inbox acquisition (stability gate, ready marker, PATH/CHECKSUM/METADATA dedup, incremental watermark, gap detection, post-action, retry, circuit breaker) | ✅ | ✅ | ✅ | §I |
-| ING-04 | Remote acquisition connectors (SFTP, FTPS, DB-export) — `inspecto-connectors` | ✅ | ✅ | ✅ | ServiceLoader module; bundled by `package.ps1` in every edition |
 | ING-05 | Unpack stage (zip/tar/gz/bz2/Z, nested archives) | ✅ | ✅ | ✅ | |
-| PRS-01 | Delimited parser (DuckDB + Java engines, header/tail/junk handling) | ✅ | ✅ | ✅ | §B |
-| PRS-02 | Fixed-width text + fixed-length binary | ✅ | ✅ | ✅ | |
-| PRS-03 | JSON / NDJSON | ✅ | ✅ | ✅ | |
-| PRS-04 | `text_regex` | ✅ | ✅ | ✅ | |
-| PRS-05 | Excel (`xlsx`) | 🟡 | 🟡 | 🟡 | needs the `excel` DuckDB extension file in the bundle; air-gapped installs fall back to a networked INSTALL if it is missing (multiformat X1) |
-| PRS-06 | ASN.1 (`asn-parser` reactor) | ✅ | ✅ | ✅ | |
-| PRS-07 | Plugin ingesters / segments (multi-event-type) | ✅ | ✅ | ✅ | |
-| PRS-08 | Multi-schema dispatch (selector / segments) | ✅ | ✅ | ✅ | route: on multi-schema is authoring-only (refused to arm) |
 | SCH-01 | Schema registry: field types (all DuckDB scalars, fail-closed), rules (`DIRECT`/`EXPR`/`CONCAT_DT`/`FILENAME_DATE`), multi-format dates | ✅ | ✅ | ✅ | §C |
 | SCH-02 | Quarantine / reject routing | ✅ | ✅ | ✅ | |
 | SCH-03 | Field classification metadata (PII / INTERNAL) | ✅ | ✅ | ✅ | metadata only — no edition enforces masking on it (see SEC-08) |
-| XFM-01 | Stage-1 transforms (map, filter, partitions) | ✅ | ✅ | ✅ | §D |
-| XFM-02 | At-rest steps: `dedup` (incl. D-9 windowed scope), `join`, `summarize`, `route` branches with mid-branch steps | ✅ | ✅ | ✅ | branch-aware ingest lane; flat lane behind `-Dingest.lane` (Phase 6 D-2) |
-| XFM-03 | Stage-2 enrichment (`*_enrich.toon`, reference joins, versioned references) | ✅ | ✅ | ✅ | |
 | XFM-04 | Decision Rules (space-registry, rule-routed outputs) | ✅ | ✅ | ✅ | keep a pipeline on the flat lane when they route rows |
-| OUT-01 | Parquet (snappy/zstd/gzip) + CSV output, Hive partitioning | ✅ | ✅ | ✅ | §E |
-| OUT-02 | Multi-destination `sinks[]` fan-out | ✅ | ✅ | ✅ | |
-| OUT-03 | DuckLake catalog (PostgreSQL) | 🟡 | ✅ | ✅ | Personal ships no PG driver — `postgresql.jar` sidecar is Standard+ (PG-1) |
 | OUT-04 | Auto-chunking of huge files, DuckDB scratch/memory tuning | ✅ | ✅ | ✅ | |
 | JOB-01 | Job framework (`enrich`, `report`, `maintenance`, `pipeline`, `sql.template`, `consignment.process`, `recon.run`, `caserule.evaluate`, `objects.analytics`, `mail.send`) | ✅ | ✅ | ✅ | §F |
 | JOB-02 | Triggers: cron, `on_pipeline`, `on_signal` + `when` guards, `catch_up`, manual | ✅ | ✅ | ✅ | |
 | JOB-03 | Maintenance task library (cleanup, ledger/runlog/notification/receipt/dedup/event prune, incident_purge, backup/restore/verify, storage report/trend, compact, materialize, db_maintenance) | ✅ | ✅ | ✅ | `event_prune` added 2026-09-02 (COMPLY-3) |
 | JOB-04 | Consignment concurrency broker (priority shares, intake caps) | ✅ | ✅ | ✅ | |
+
+### Step Processors (one row per processor; the board's authoring surface)
+
+Generated from the processor catalog (`ProcessorCatalog`, served on `GET /pipelines/processor-catalog`, mirrored to
+`processor-catalog.contract.json`) — edit the catalog, regenerate this table; do not hand-edit rows. **Status**: ✅ delivered
+(maps onto an existing node type / engine capability, named in *Maps to*), 🟡 partial (a neighbour capability covers part
+of it — the gap is in Notes), 🔲 planned. Every processor is VISIBLE in the editor palettes; 🔲 and 🟡-without-node entries
+render inactive. Edition cells default to the same value in all three unless a board decision says otherwise (SEC-08 →
+E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for Personal). Row ids are `SP-<family>-<nn>`.
+
+| ID | Processor | Family | P | S | E | Maps to | Notes |
+|---|---|---|---|---|---|---|---|
+| SP-ACQ-01 | 📁 Local / NFS directory watcher (`acquisition.file.local`) | Collectors & Ingestion | ✅ | ✅ | ✅ | `acquisition` | LocalFileSystemConnector — the default collector |
+| SP-ACQ-02 | 🔒 SFTP / FTPS remote ingest (`acquisition.file.sftp`) | Collectors & Ingestion | ✅ | ✅ | ✅ | `acquisition` | inspecto-connectors (sftp, ftps; key auth, bastion tunnel, host-key pinning) |
+| SP-ACQ-03 | 🗄️ JDBC / SQL query batch reader (`acquisition.db.jdbc`) | Collectors & Ingestion | ✅ | ✅ | ✅ | `acquisition` | the db-export connector (`connector: db`, watermark column) |
+| SP-ACQ-04 | 🧱 Dataset entry (re-ingest a registered Dataset) (`acquisition.dataset`) | Collectors & Ingestion | ✅ | ✅ | ✅ | `acquisition` | UI-S7: `connector: dataset` + `on:dataset` trigger |
+| SP-ACQ-05 | 📑 Multi-sheet Excel workbook ingest (`acquisition.file.excel`) | Collectors & Ingestion | 🟡 | 🟡 | 🟡 | `parser.xlsx` | the xlsx PARSER is delivered; per-sheet workbook fan-out as an acquisition is not |
+| SP-ACQ-06 | ☁️ AWS S3 object ingest (`acquisition.file.s3`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ACQ-07 | 🌐 Azure Blob & ADLS Gen2 ingest (`acquisition.file.azure`) | Collectors & Ingestion | 🟡 | 🟡 | 🟡 | `acquisition` | Connection kind exists (azure blob connector); ADLS Gen2 semantics not proven |
+| SP-ACQ-08 | 🪣 Google Cloud Storage ingest (`acquisition.file.gcs`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ACQ-09 | 📤 Apache Kafka consumer (`acquisition.stream.kafka`) | Collectors & Ingestion | 🟡 | 🟡 | 🟡 | `acquisition` | Connection kind exists (kafka); consumer-group ingest as a Collector not proven |
+| SP-ACQ-10 | 📨 Apache Pulsar consumer (`acquisition.stream.pulsar`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ACQ-11 | 📬 AWS Kinesis / SQS ingest (`acquisition.stream.kinesis`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ACQ-12 | 🐰 RabbitMQ AMQP subscriber (`acquisition.stream.rabbitmq`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ACQ-13 | 📡 MQTT IoT telemetry ingest (`acquisition.stream.mqtt`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ACQ-14 | 🔄 Change Data Capture (Debezium) (`acquisition.cdc.debezium`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ACQ-15 | 💾 Delta Lake table reader (`acquisition.lake.delta`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ACQ-16 | 🧊 Apache Iceberg table ingest (`acquisition.lake.iceberg`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ACQ-17 | ❄️ Snowflake / BigQuery ingest (`acquisition.db.cloud`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ACQ-18 | 🌐 REST API poller & paged ingest (`acquisition.api.rest`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ACQ-19 | 🪝 HTTP webhook listener endpoint (`acquisition.api.webhook`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ACQ-20 | 🔌 gRPC stream receiver (`acquisition.api.grpc`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
+| SP-PRS-01 | 📄 Delimited / CSV / TSV / PSV parser (`parser.delimited`) | Extraction & Format Parsers | ✅ | ✅ | ✅ | `parser.delimited` |  |
+| SP-PRS-02 | 📦 Fixed-width column slicer (`parser.fixedwidth`) | Extraction & Format Parsers | ✅ | ✅ | ✅ | `parser.fixedwidth` | text (`record: line`) and fixed-length binary (`record: bytes`) |
+| SP-PRS-03 | 🧬 JSON object & JSON Lines (NDJSON) parser (`parser.json`) | Extraction & Format Parsers | ✅ | ✅ | ✅ | `parser.json` |  |
+| SP-PRS-04 | 📑 Excel workbook parser (`parser.excel`) | Extraction & Format Parsers | ✅ | ✅ | ✅ | `parser.xlsx` | needs the DuckDB `excel` extension in the bundle (multiformat X1) |
+| SP-PRS-05 | 📑 XML / XPath / DOM unpacker (`parser.xml`) | Extraction & Format Parsers | 🟡 | 🟡 | 🟡 | `parser.plugin` | tree→segments bridge ships XML ingests; no XPath selector grammar yet |
+| SP-PRS-06 | 📡 ASN.1 BER telecom CDR decoder (`parser.asn1.ber`) | Extraction & Format Parsers | ✅ | ✅ | ✅ | `parser.asn1` | asn-parser reactor (decoders, vendor plugins) |
+| SP-PRS-07 | 🔎 Named-group regex extractor (`parser.pattern.regex`) | Extraction & Format Parsers | ✅ | ✅ | ✅ | `parser.text_regex` |  |
+| SP-PRS-08 | 🧩 Custom ingester plugin (segments, multi-event) (`parser.plugin`) | Extraction & Format Parsers | ✅ | ✅ | ✅ | `parser.plugin` | ParserPlugin SPI; `segments: {CALL, SMS}` |
+| SP-PRS-09 | 🏷️ Key-value / logfmt parser (`parser.keyvalue`) | Extraction & Format Parsers | 🔲 | 🔲 | 🔲 | — |  |
+| SP-PRS-10 | 📜 YAML document slicer (`parser.yaml`) | Extraction & Format Parsers | 🔲 | 🔲 | 🔲 | — |  |
+| SP-PRS-11 | 📜 ASN.1 PER / XER / DER decoder (`parser.asn1.per`) | Extraction & Format Parsers | 🔲 | 🔲 | 🔲 | — |  |
+| SP-PRS-12 | 📠 Mainframe EBCDIC & COBOL copybook (`parser.mainframe.ebcdic`) | Extraction & Format Parsers | 🔲 | 🔲 | 🔲 | — |  |
+| SP-PRS-13 | ⚡ Protocol Buffers decoder (`parser.binary.protobuf`) | Extraction & Format Parsers | 🔲 | 🔲 | 🔲 | — |  |
+| SP-PRS-14 | 🦅 Apache Avro binary decoder (`parser.binary.avro`) | Extraction & Format Parsers | 🔲 | 🔲 | 🔲 | — |  |
+| SP-PRS-15 | 🌐 PCAP network packet slicer (`parser.binary.pcap`) | Extraction & Format Parsers | 🔲 | 🔲 | 🔲 | — |  |
+| SP-PRS-16 | 📜 Grok / Logstash expression matcher (`parser.pattern.grok`) | Extraction & Format Parsers | 🔲 | 🔲 | 🔲 | — |  |
+| SP-PRS-17 | 🖥️ Syslog RFC 5424 / RFC 3164 parser (`parser.pattern.syslog`) | Extraction & Format Parsers | 🔲 | 🔲 | 🔲 | — |  |
+| SP-DQ-01 | 🛡️ Schema validator & type coercion (`quality.schema.validator`) | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `transform.map` | the schema registry: typed fields, TRY_CAST, structural rejects → quarantine |
+| SP-DQ-02 | ⚠️ Constraint & range checker (Expectations) (`quality.constraint.check`) | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `expectation` | Expectations evaluated per Dataset (`ExpectationEvaluator`); not a mid-chain step |
+| SP-DQ-03 | 🧼 Exact-key deduplicator (within a Consignment) (`quality.dedup.exact`) | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `transform.dedup` | `scope: consignment` (default) |
+| SP-DQ-04 | ⏱️ Sliding time-window deduplicator (`quality.dedup.windowed`) | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `transform.dedup` | D-9: `scope: window(P4D)` + the durable dedup ledger |
+| SP-DQ-05 | 🗂️ File-grain duplicate guard (path / checksum / metadata / marker) (`quality.dedup.file`) | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `acquisition` | Collector `duplicate:` policy + marker dedup — a Guarantee, rides the Collector |
+| SP-DQ-06 | 🧬 Schema drift & new-field detector (`quality.schema.drift`) | Data Quality, Validation & Cleansing | 🟡 | 🟡 | 🟡 | `expectation` | multi-schema dispatch refuses unknown shapes; no drift REPORT yet |
+| SP-DQ-07 | 🔍 Cluster & edit value normalizer (`quality.cluster.edit`) | Data Quality, Validation & Cleansing | 🔲 | 🔲 | 🔲 | — |  |
+| SP-DQ-08 | 🔍 Fuzzy string (Jaro-Winkler) matcher (`quality.match.fuzzy`) | Data Quality, Validation & Cleansing | 🔲 | 🔲 | 🔲 | — |  |
+| SP-DQ-09 | 🧹 Whitespace & string sanitizer (`quality.cleanse.trim`) | Data Quality, Validation & Cleansing | 🟡 | 🟡 | 🟡 | `transform.map` | any `EXPR` rule does it today; no dedicated step |
+| SP-DQ-10 | 🧮 Inline stream profiler & statistics (`quality.profiler.inline`) | Data Quality, Validation & Cleansing | 🟡 | 🟡 | 🟡 | `storage_report` | storage/completeness KPIs exist; no per-column profile step |
+| SP-DQ-11 | 📊 Statistical & reservoir sampler (`quality.sample.reservoir`) | Data Quality, Validation & Cleansing | 🔲 | 🔲 | 🔲 | — |  |
+| SP-DQ-12 | 🔤 Character map & code page transcoder (`quality.cleanse.transcode`) | Data Quality, Validation & Cleansing | 🔲 | 🔲 | 🔲 | — |  |
+| SP-DQ-13 | 🔒 PII masking & tokenization (`quality.pii.mask`) | Data Quality, Validation & Cleansing | — | — | 🔲 | — | board SEC-08 — Enterprise only |
+| SP-DQ-14 | 🔑 One-way salted cryptographic hasher (`quality.crypto.hash`) | Data Quality, Validation & Cleansing | 🔲 | 🔲 | 🔲 | — |  |
+| SP-DQ-15 | 🛡️ GDPR / CCPA field redactor (`quality.compliance.redact`) | Data Quality, Validation & Cleansing | — | — | 🔲 | — | board SEC-08 — Enterprise only |
+| SP-XFM-01 | 🧮 Expression builder & computed columns (`transform.expression`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.map` | the `EXPR` / `CONCAT_DT` / `FILENAME_DATE` rules |
+| SP-XFM-02 | 🔄 Field type cast & renamer matrix (`transform.cast`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.map` | the mapping rows (`DIRECT` + typed target) |
+| SP-XFM-03 | 🔽 Row filter (pre-parse regex / post-map predicate) (`transform.filter`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.filter` |  |
+| SP-XFM-04 | 🔀 Router — case / clone branches with mid-branch steps (`transform.route`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.route` |  |
+| SP-XFM-05 | ∑ Group-by summarizer (measures grammar) (`transform.summarize`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.summarize` |  |
+| SP-XFM-06 | 🤝 Reference-store join (versioned references) (`transform.join`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.join` | at rest only — refused mid-branch (no reference resolver on the ingest lane) |
+| SP-XFM-07 | 🗺️ Lookup & static map transcoder (`transform.lookup`) | Transformers & Dimensional Modeling | 🟡 | 🟡 | 🟡 | `transform.join` | a reference join covers it; no inline static map |
+| SP-XFM-08 | 🔀 Dynamic pivot / transpose (`transform.matrix.pivot`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-XFM-09 | 🔄 Unpivot / column flattener (`transform.matrix.unpivot`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-XFM-10 | 🏆 Rank & Top-N pruner (`transform.analytics.rank`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-XFM-11 | 💥 Array / object exploder & flattener (`transform.explode`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — | the grandfathered `transform.split` flow node is the read-only ancestor |
+| SP-XFM-12 | 🤝 Presorted stream merge joiner (`transform.join.merge`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — | the grandfathered `transform.merge` flow node is the read-only ancestor |
+| SP-XFM-13 | 🏛️ Slowly changing dimension (SCD Type 2) (`transform.dim.scd2`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-XFM-14 | 🔑 Monotonic surrogate key generator (`transform.key.surrogate`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-XFM-15 | 🏷️ DML row-action strategy flagger (`transform.dml.strategy`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-XFM-16 | ⚖️ Dataset differ & change compare (`transform.diff.compare`) | Transformers & Dimensional Modeling | 🟡 | 🟡 | 🟡 | `recon` | Reconciliation boards compare Datasets; not a chain step |
+| SP-XFM-17 | 🏗️ Hierarchical XML / JSON document builder (`transform.builder.xml`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-XFM-18 | 📊 IFRS 15 / IFRS 9 revenue recognition engine (`transform.fintech.ifrs`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-XFM-19 | 📱 SIM box & bypass fraud detector (`transform.telecom.simbox`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-XFM-20 | 💵 Tariff, rating & usage billing engine (`transform.telecom.rating`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-XFM-21 | 🌍 Roaming TAP3 / CIBER surcharger (`transform.telecom.roaming`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-XFM-22 | 🚨 Velocity & impossible-travel anomaly (`transform.fintech.velocity`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-BI-01 | 🏛️ Level-of-detail (LOD) fixed aggregator (`transform.analytics.lod`) | Analytics, Time-Series & Semantic Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-BI-02 | 🏛️ LOD include / exclude context aggregator (`transform.analytics.lod_context`) | Analytics, Time-Series & Semantic Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-BI-03 | ⏱️ Time-grain resampler & gap imputer (`transform.timeseries.resample`) | Analytics, Time-Series & Semantic Modeling | 🟡 | 🟡 | 🟡 | `measure-grammar` | time grains exist in Studio queries (`QuerySpec.grains`); no resampling step |
+| SP-BI-04 | 📈 Period-over-period (YoY / MoM / WoW) shift (`transform.timeseries.shift`) | Analytics, Time-Series & Semantic Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-BI-05 | 📊 Running calculations & moving averages (`transform.analytics.running`) | Analytics, Time-Series & Semantic Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-BI-06 | 🔮 Time-series forecaster (Holt-Winters) (`transform.timeseries.forecast`) | Analytics, Time-Series & Semantic Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-BI-07 | 📐 Semantic KPI calculator & Measure formulas (`transform.semantic.metric`) | Analytics, Time-Series & Semantic Modeling | 🟡 | 🟡 | 🟡 | `measure-grammar` | the Measure grammar (`count | agg(field)`) serves Studio + summarize; no named-KPI layer |
+| SP-BI-08 | 🏷️ Template & runtime parameter injector (`transform.param.jinja`) | Analytics, Time-Series & Semantic Modeling | 🟡 | 🟡 | 🟡 | `sql.template` | the `sql.template` job resolves `$name` tokens; no Jinja |
+| SP-BI-09 | 📦 Histogram & quantile binner (`transform.data.binning`) | Analytics, Time-Series & Semantic Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-BI-10 | ✂️ Smart custom string splitter (`transform.string.smart_split`) | Analytics, Time-Series & Semantic Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-BI-11 | 🗺️ H3 hexagonal & geohash grid indexer (`transform.geo.h3`) | Analytics, Time-Series & Semantic Modeling | — | 🔲 | 🔲 | — | needs the DuckDB `spatial`/`h3` extension — board CP-09 gate |
+| SP-BI-12 | 📍 Spatial polygon & point-in-polygon intersect (`transform.geo.spatial_join`) | Analytics, Time-Series & Semantic Modeling | — | 🔲 | 🔲 | — | needs the DuckDB `spatial` extension — deliberately not loaded (SqlSandbox) |
+| SP-BI-13 | 🚨 Outlier detector & IQR boxplot fencer (`transform.stats.outlier`) | Analytics, Time-Series & Semantic Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-BI-14 | 🧮 Pearson & Spearman correlation matrix (`transform.stats.correlation`) | Analytics, Time-Series & Semantic Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ENR-01 | 📚 Reference-table enrichment (`*_enrich.toon`, Stage-2) (`enrichment.reference`) | Enrichment, Entity Resolution & AI/ML | ✅ | ✅ | ✅ | `enrichment` | the shipped enrichment job + versioned references |
+| SP-ENR-02 | 🌍 GeoIP & ISP geolocation enricher (`enrichment.geoip`) | Enrichment, Entity Resolution & AI/ML | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ENR-03 | ⚡ Redis / in-memory cache lookup (`enrichment.redis`) | Enrichment, Entity Resolution & AI/ML | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ENR-04 | 🌐 Dynamic microservice REST enricher (`enrichment.rest`) | Enrichment, Entity Resolution & AI/ML | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ENR-05 | 🗄️ Parameterized stored-procedure caller (`transform.db.procedure`) | Enrichment, Entity Resolution & AI/ML | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ENR-06 | 🔗 Master entity resolution & record linkage (`enrichment.entity.link`) | Enrichment, Entity Resolution & AI/ML | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ENR-07 | 🕸️ Graph cluster & connected-component tagger (`enrichment.graph.cluster`) | Enrichment, Entity Resolution & AI/ML | — | 🟡 | 🟡 | `link-analysis` | link-analysis VIEW ships (projection); no tagging step |
+| SP-ENR-08 | 🤖 ONNX Runtime embedded inference (`ml.inference.onnx`) | Enrichment, Entity Resolution & AI/ML | 🔲 | 🔲 | 🔲 | — | the optional `inspecto-intelligence` module carries onnxruntime; never bundled |
+| SP-ENR-09 | 🏷️ LLM zero-shot classifier & tagging (`ml.llm.classify`) | Enrichment, Entity Resolution & AI/ML | 🔲 | 🔲 | 🔲 | — | assist/intelligence agents are never bundled (CP-14) |
+| SP-ENR-10 | 📐 Text embeddings & vector generator (`ml.embedding.vector`) | Enrichment, Entity Resolution & AI/ML | 🔲 | 🔲 | 🔲 | — |  |
+| SP-CTL-01 | 🕳️ File sequence & gap integrity analyzer (`control.file.sequence_analyzer`) | Control, Governance & Sequence Integrity | ✅ | ✅ | ✅ | `gap` | Collector `gap_detection: {sequence}` → the gap node + SEQUENCE_GAP events |
+| SP-CTL-02 | 🕳️ Sequence-gap & data-loss watchdog (`control.gap.detector`) | Control, Governance & Sequence Integrity | ✅ | ✅ | ✅ | `gap` | same detector; gaps raise ALERT objects via the EventObjectBridge |
+| SP-CTL-03 | 🏷️ Audit metadata & lineage stamper (`control.audit.stamp`) | Control, Governance & Sequence Integrity | ✅ | ✅ | ✅ | `sink.persistent` | `filename_column` + the per-file/batch/lineage ledgers + `__batch_id` provenance |
+| SP-CTL-04 | ⏳ Throttle & rate limiter (`control.throttle`) | Control, Governance & Sequence Integrity | ✅ | ✅ | ✅ | `acquisition` | Collector `fetch.rate_limit` + intake caps + the concurrency broker |
+| SP-CTL-05 | 🚦 Circuit breaker & fallback switch (`control.circuitbreaker`) | Control, Governance & Sequence Integrity | ✅ | ✅ | ✅ | `acquisition` | Collector `circuit_breaker` + `retry` |
+| SP-CTL-06 | 🏁 Transaction & commit controller (`control.transaction.commit`) | Control, Governance & Sequence Integrity | 🟡 | 🟡 | 🟡 | `engine` | the BranchCommitCoordinator ledger + bounded COMMIT retry are engine-internal, not authorable |
+| SP-CTL-07 | 🚨 Alert rule dispatcher (`control.alert.dispatch`) | Control, Governance & Sequence Integrity | — | ✅ | ✅ | `alert-rule` | Alert Rules over the ledgers → Alerts → channels; board CP-11/CP-15 |
+| SP-CTL-08 | ⏱️ SLA timeout & heartbeat monitor (`control.sla.monitor`) | Control, Governance & Sequence Integrity | 🟡 | 🟡 | 🟡 | `completeness-kpi` | completeness KPI + `heartbeat` maintenance task; no SLA object |
+| SP-SNK-01 | 📁 Parquet (snappy / zstd / gzip) partitioned store (`sink.file.parquet`) | Sinks, Storage & Destinations | ✅ | ✅ | ✅ | `sink.persistent` | Hive `year=/month=/day=` partitions |
+| SP-SNK-02 | 📄 CSV partitioned store (`sink.file.csv`) | Sinks, Storage & Destinations | ✅ | ✅ | ✅ | `sink.persistent` | `output.format: CSV` |
+| SP-SNK-03 | 🦆 DuckLake catalog (PostgreSQL) sink (`sink.ducklake`) | Sinks, Storage & Destinations | ✅ | ✅ | ✅ | `sink.persistent` | `output.ducklake` — needs the postgresql sidecar (Standard+) |
+| SP-SNK-04 | 👁️ Derived view (no bytes, registered SQL) (`sink.view`) | Sinks, Storage & Destinations | 🟡 | 🟡 | 🟡 | `sink.view` | grandfathered flow node; the Dataset/View surface replaced it |
+| SP-SNK-05 | ☣️ Quarantine error-log store (`sink.quarantine`) | Sinks, Storage & Destinations | ✅ | ✅ | ✅ | `sink.quarantine` | structural rejects + `errors/<base>_errors.csv` |
+| SP-SNK-06 | 📜 Long-term compliance archive (`sink.archive`) | Sinks, Storage & Destinations | — | ✅ | ✅ | `acquisition` | Collector `post_action: MOVE archive_path` + the `backup` maintenance task |
+| SP-SNK-07 | 🗄️ Delta Lake persistent table sink (`sink.lake.delta`) | Sinks, Storage & Destinations | 🔲 | 🔲 | 🔲 | — |  |
+| SP-SNK-08 | 🧊 Apache Iceberg append / upsert sink (`sink.lake.iceberg`) | Sinks, Storage & Destinations | 🔲 | 🔲 | 🔲 | — |  |
+| SP-SNK-09 | 📊 ClickHouse / StarRocks analytical sink (`sink.db.clickhouse`) | Sinks, Storage & Destinations | 🔲 | 🔲 | 🔲 | — |  |
+| SP-SNK-10 | 📑 Excel multi-tab report sink (`sink.file.excel`) | Sinks, Storage & Destinations | 🔲 | 🔲 | 🔲 | — |  |
+| SP-SNK-11 | 📤 Apache Kafka topic producer (`sink.stream.kafka`) | Sinks, Storage & Destinations | 🔲 | 🔲 | 🔲 | — |  |
+| SP-SNK-12 | 📨 AWS SQS / SNS event publisher (`sink.stream.aws`) | Sinks, Storage & Destinations | 🔲 | 🔲 | 🔲 | — |  |
+| SP-SNK-13 | 📧 Email & report dispatcher (`sink.notify.email`) | Sinks, Storage & Destinations | — | 🟡 | 🟡 | `mail.send` | the `mail.send` JOB + mail channels; not a chain sink |
+| SP-SNK-14 | 🪝 Outbound webhook dispatcher (`sink.api.webhook`) | Sinks, Storage & Destinations | — | 🟡 | 🟡 | `channel` | webhook notification channel exists; not a chain sink |
+| SP-SNK-15 | 🕳️ Dead-letter queue (`sink.dlq`) | Sinks, Storage & Destinations | 🔲 | 🔲 | 🔲 | — |  |
+
+**Count:** 121 processors — 34 delivered, 18 partial, 69 planned (2026-09-02).
 
 ### Control plane & authoring
 
