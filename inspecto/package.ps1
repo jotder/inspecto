@@ -273,6 +273,21 @@ if ($Edition -ne 'Personal') {
     Write-Host "Bundled PostgreSQL JDBC driver $pgVersion → postgresql.jar" -ForegroundColor Green
 }
 
+# ── step 3a-bis: SBOM per PACKAGED BUNDLE — CycloneDX + SPDX from ONE resolution (COMPLY-1, matrix G1) ──
+# Generated here, after the jars are staged and BEFORE the zip, so the SBOM ships inside the bundle
+# (bundle/sbom/) and is covered by the zip's checksum + signature. Per bundle, never per reactor: the
+# reactor resolves the optional AI stack a Personal bundle does not carry (controls-matrix CC9). Both
+# documents are two serialisations of one component list — they cannot drift (tools/sbom.mjs). Node is
+# already a packaging prerequisite (the UI build); a missing SBOM is a packaging FAILURE, not a warning —
+# a bundle without one is a bundle an auditor cannot accept.
+Write-Host "Generating SBOM for the $Edition bundle (CycloneDX + SPDX)..." -ForegroundColor Cyan
+$sbomVersion = ([xml](Get-Content (Join-Path $sandboxRoot 'pom.xml'))).project.version
+Push-Location $sandboxRoot
+& node (Join-Path $sandboxRoot 'tools\sbom.mjs') --edition $Edition --bundle $bundleDir --version $sbomVersion
+$sbomExit = $LASTEXITCODE
+Pop-Location
+if ($sbomExit -ne 0) { throw "SBOM generation failed (exit $sbomExit) — a bundle ships with its SBOM or not at all" }
+
 # ── step 3b: copy the built UI dist → bundle/ui (served by ControlApi via -Dui.dir=./ui) ──
 # Angular emits to ui/dist/<app>[/browser]; locate the folder that actually holds index.html.
 #
@@ -876,14 +891,16 @@ function New-ReleaseIntegrity {
     Write-Host "  SHA-256  $name = $hash" -ForegroundColor DarkGray
 
     if ($Sign) {
+        # COMPLY-2 (matrix G3): -Sign is a PROMISE, not a preference. It used to downgrade to a warning
+        # when gpg or the key was missing, so a release could ship unsigned while the log said "-Sign".
+        # A missing .asc must now be impossible to produce by accident — the release workflow relies on
+        # it (.github/workflows/release.yml), and so does a verifier reading "no .asc = not signed".
         $gpg = (Get-Command gpg -ErrorAction SilentlyContinue).Source
         if (-not $gpg) {
-            Write-Warning "  -Sign requested but 'gpg' not found on PATH — skipping signature for $name."
-            return
+            throw "-Sign requested but 'gpg' is not on PATH — cannot sign $name (install gpg, or drop -Sign for an explicitly UNSIGNED build)"
         }
         if (-not $SigningKey) {
-            Write-Warning "  -Sign requested but no signing key (pass -SigningKey or set INSPECTO_SIGNING_KEY) — skipping signature for $name."
-            return
+            throw "-Sign requested but no signing key (pass -SigningKey or set INSPECTO_SIGNING_KEY) — cannot sign $name"
         }
         $ascFile = "$ArtifactPath.asc"
         if (Test-Path $ascFile) { Remove-Item $ascFile -Force }

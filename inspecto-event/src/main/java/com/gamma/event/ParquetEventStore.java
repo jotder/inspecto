@@ -8,6 +8,7 @@ import com.gamma.util.JsonAttributes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -333,6 +334,69 @@ public final class ParquetEventStore implements EventStore {
             return w.anyMatch(p -> p.getFileName().toString().endsWith(".parquet"));
         } catch (Exception e) {
             return false;
+        }
+    }
+
+    /**
+     * Delete every {@code level=X/year=YYYY/month=MM/day=DD} partition whose day is before {@code before}
+     * (UTC — the same clock {@link #flushLocked()} partitions by). The buffer is flushed first so an aged
+     * event still in memory is judged on disk like every other, and a partition directory is only ever
+     * removed whole — the reader's {@code read_parquet} glob simply stops seeing it. Empty {@code month=}
+     * / {@code year=} parents left behind are removed too, so a long-lived store does not accrete
+     * hundreds of empty directories.
+     */
+    @Override
+    public synchronized int prune(LocalDate before, boolean dryRun) {
+        flushLocked();
+        if (!Files.isDirectory(root)) return 0;
+        int removed = 0;
+        try (Stream<Path> days = Files.walk(root, 4)) {
+            for (Path day : days.filter(ParquetEventStore::isDayPartition).toList()) {
+                LocalDate d = partitionDate(day);
+                if (d == null || !d.isBefore(before)) continue;
+                removed++;
+                if (dryRun) continue;
+                deleteTree(day);
+                removeIfEmpty(day.getParent());               // month=
+                removeIfEmpty(day.getParent().getParent());   // year=
+                removeIfEmpty(day.getParent().getParent().getParent());   // level=
+            }
+        } catch (IOException e) {
+            throw new IllegalStateException("event prune failed under " + root + ": " + e.getMessage(), e);
+        }
+        return removed;
+    }
+
+    /** {@code <root>/level=X/year=YYYY/month=MM/day=DD} — depth 4 under the root with the Hive prefixes. */
+    private static boolean isDayPartition(Path p) {
+        return Files.isDirectory(p) && p.getFileName().toString().startsWith("day=")
+                && p.getParent() != null && p.getParent().getFileName().toString().startsWith("month=")
+                && p.getParent().getParent() != null
+                && p.getParent().getParent().getFileName().toString().startsWith("year=");
+    }
+
+    /** The partition's UTC day, or {@code null} for a directory that only looks like one. */
+    private static LocalDate partitionDate(Path day) {
+        try {
+            int d = Integer.parseInt(day.getFileName().toString().substring("day=".length()));
+            int m = Integer.parseInt(day.getParent().getFileName().toString().substring("month=".length()));
+            int y = Integer.parseInt(day.getParent().getParent().getFileName().toString().substring("year=".length()));
+            return LocalDate.of(y, m, d);
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private static void deleteTree(Path dir) throws IOException {
+        try (Stream<Path> w = Files.walk(dir)) {
+            for (Path p : w.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(p);
+        }
+    }
+
+    private static void removeIfEmpty(Path dir) throws IOException {
+        if (dir == null || !Files.isDirectory(dir)) return;
+        try (Stream<Path> s = Files.list(dir)) {
+            if (s.findAny().isEmpty()) Files.deleteIfExists(dir);
         }
     }
 

@@ -16,6 +16,7 @@ import {
     statusIcon,
     statusLabel,
     statusTint,
+    BRANCH_STEP_TYPES,
 } from './pipeline-graph';
 
 /**
@@ -26,8 +27,11 @@ import {
  * that needs). With {@link editable} the cards gain: click/Configure → {@link open} (the host routes
  * it to the EXISTING dialogs — no new dialog kinds), an Add-Step affordance between trunk cards
  * offering the {@link RECIPE_VERBS} (→ {@link insertStep}), remove (→ {@link remove}) and
- * move up/down (→ {@link move}). Nested Step cards (depth > 0) configure but don't splice — that
- * stays canvas work. S3 adds the branch editor on top: a route Step card gains a `case|clone` mode
+ * move up/down (→ {@link move}). Nested Step cards (depth > 0) configure, and since MIDBRANCH-UI-1 the
+ * branch itself is insertable-into: each branch header offers "add a Step at the start of this branch"
+ * and each in-branch card (except the branch's tail — its sink) offers insert-after, both from a palette
+ * limited to {@link BRANCH_STEP_TYPES}; remove/move inside a branch stay canvas work. S3 adds the
+ * branch editor on top: a route Step card gains a `case|clone` mode
  * toggle and an add-branch draft input; each branch row gains an inline `when` predicate input, a
  * default toggle, and remove — all emitted to the host, which applies the pure reducers.
  */
@@ -43,7 +47,7 @@ import {
                     <button
                         mat-icon-button
                         [matMenuTriggerFor]="verbMenu"
-                        (click)="insertAfterId = null"
+                        (click)="insertAfterId = null; insertBranch = null"
                         matTooltip="Add a Step at the start"
                         aria-label="Add a Step at the start"
                     >
@@ -51,7 +55,7 @@ import {
                     </button>
                 </li>
             }
-            @for (row of rows; track row.rowId) {
+            @for (row of rows; track row.rowId; let i = $index) {
                 @if (row.kind === 'node') {
                     <li
                         class="flex flex-col gap-1 rounded border p-2.5"
@@ -186,9 +190,21 @@ import {
                             <button
                                 mat-icon-button
                                 [matMenuTriggerFor]="verbMenu"
-                                (click)="insertAfterId = row.node.id"
+                                (click)="insertAfterId = row.node.id; insertBranch = null"
                                 [matTooltip]="'Add a Step after ' + row.node.id"
                                 [attr.aria-label]="'Add a Step after ' + row.node.id"
+                            >
+                                <mat-icon class="icon-size-4" svgIcon="heroicons_outline:plus"></mat-icon>
+                            </button>
+                        </li>
+                    } @else if (editable && hasBranchSuccessor(i)) {
+                        <li class="flex justify-center" [style.margin-left.px]="row.depth * 24">
+                            <button
+                                mat-icon-button
+                                [matMenuTriggerFor]="branchVerbMenu"
+                                (click)="insertAfterId = row.node.id; insertBranch = branchOf(i)"
+                                [matTooltip]="'Add a Step after ' + row.node.id + ' in this branch'"
+                                [attr.aria-label]="'Add a Step after ' + row.node.id + ' in this branch'"
                             >
                                 <mat-icon class="icon-size-4" svgIcon="heroicons_outline:plus"></mat-icon>
                             </button>
@@ -237,6 +253,15 @@ import {
                             >
                                 <mat-icon class="icon-size-4" svgIcon="heroicons_outline:trash"></mat-icon>
                             </button>
+                            <button
+                                mat-icon-button
+                                [matMenuTriggerFor]="branchVerbMenu"
+                                (click)="insertAfterId = null; insertBranch = { routeId: row.routeId, key: row.key }"
+                                [matTooltip]="'Add a Step at the start of branch ' + row.key"
+                                [attr.aria-label]="'Add a Step at the start of branch ' + row.key"
+                            >
+                                <mat-icon class="icon-size-4" svgIcon="heroicons_outline:plus"></mat-icon>
+                            </button>
                         } @else {
                             @if (row.where) {
                                 <span class="font-normal normal-case opacity-80">when {{ row.where }}</span>
@@ -253,6 +278,24 @@ import {
         <mat-menu #verbMenu="matMenu">
             @for (v of verbs; track v.type) {
                 <button mat-menu-item (click)="insertStep.emit({ type: v.type, afterId: insertAfterId })">
+                    <mat-icon
+                        [svgIcon]="typeHeroIcon(v.type, typeCat.get(v.type) ?? '')"
+                        [style.color]="categoryColor(typeCat.get(v.type) ?? '')"
+                    ></mat-icon>
+                    <span>{{ v.label }}</span>
+                </button>
+            }
+        </mat-menu>
+
+        <!-- MIDBRANCH-UI-1: the in-branch palette — only what the ingest walk can run mid-branch -->
+        <mat-menu #branchVerbMenu="matMenu">
+            @for (v of branchVerbs(); track v.type) {
+                <button
+                    mat-menu-item
+                    (click)="
+                        insertStep.emit({ type: v.type, afterId: insertAfterId, branch: insertBranch ?? undefined })
+                    "
+                >
                     <mat-icon
                         [svgIcon]="typeHeroIcon(v.type, typeCat.get(v.type) ?? '')"
                         [style.color]="categoryColor(typeCat.get(v.type) ?? '')"
@@ -282,8 +325,16 @@ export class PipelineStepCardsComponent {
 
     /** Open the Step's config dialog (the host routes parse → GrammarEditorDialog, rest → NodeConfigDialog). */
     @Output() readonly open = new EventEmitter<AuthoredNode>();
-    /** Insert a new Step of `type` after the trunk node `afterId` (`null` = as the new entry). */
-    @Output() readonly insertStep = new EventEmitter<{ type: string; afterId: string | null }>();
+    /**
+     * Insert a new Step of `type` after node `afterId` (`null` = as the new entry). With `branch` set
+     * (MIDBRANCH-UI-1) the insert targets that route branch: `afterId === null` means at the branch's
+     * head (the `route:<key>` edge), otherwise after the named in-branch Step.
+     */
+    @Output() readonly insertStep = new EventEmitter<{
+        type: string;
+        afterId: string | null;
+        branch?: { routeId: string; key: string };
+    }>();
     /** Remove a trunk Step by node id. */
     @Output() readonly remove = new EventEmitter<string>();
     /** Move a trunk Step one place up/down the chain. */
@@ -301,6 +352,36 @@ export class PipelineStepCardsComponent {
 
     /** Where the open verb menu will insert (set by the clicked "+" before the menu opens). */
     insertAfterId: string | null = null;
+    /** The branch the open palette inserts into (MIDBRANCH-UI-1), or `null` for the trunk. */
+    insertBranch: { routeId: string; key: string } | null = null;
+
+    /** The palette for an in-branch insert: the served/fallback verbs narrowed to {@link BRANCH_STEP_TYPES}. */
+    branchVerbs(): readonly { type: string; label: string }[] {
+        return this.verbs.filter((v) => BRANCH_STEP_TYPES.has(v.type));
+    }
+
+    /**
+     * Whether the node row at `i` (depth > 0) has a successor inside its own branch — i.e. it is not
+     * the branch's tail (its sink). The tail gets no insert-after: a Step behind a sink is a chain the
+     * compiler refuses ("a branch's LAST step must be the sink"), so the affordance would only author a
+     * refusal.
+     */
+    hasBranchSuccessor(i: number): boolean {
+        const row = this.rows[i];
+        const next = this.rows[i + 1];
+        return row?.kind === 'node' && row.depth > 0 && next?.kind === 'node' && next.depth === row.depth;
+    }
+
+    /** The branch header the in-branch node row at `i` belongs to: the nearest preceding header one level up. */
+    branchOf(i: number): { routeId: string; key: string } | null {
+        const row = this.rows[i];
+        if (row?.kind !== 'node') return null;
+        for (let j = i - 1; j >= 0; j--) {
+            const r = this.rows[j];
+            if (r.kind === 'branch' && r.depth === row.depth - 1) return { routeId: r.routeId, key: r.key };
+        }
+        return null;
+    }
 
     /** What KIND of Step this card is: the type's own label, else its category group. */
     stepTypeLabel(type: string): string {

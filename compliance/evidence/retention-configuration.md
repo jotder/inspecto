@@ -27,7 +27,7 @@ each task `require()`s the value at run time).
 
 | Store | State | Standing |
 |---|---|---|
-| **Event store (Parquet) — including AUDIT events and Signals** | append-only, Hive-partitioned by `level/year/month/day`; **no age or size bound exists** (`ParquetEventStore` implements no prune; Signals are Events in the same store) | Partly a **stated decision** (MNT-14 G3, recorded on `IncidentPurgeTask`): the audit trail survives the records it describes — a purged Incident's history, purge record included, is deliberately retained. The upper bound, previously undecided, is now **STATED: one year (operator, 2026-08-30)** — so the store no longer grows forever by policy, though it still does **in code** until the prune task is built. ⚠ The MNT-14 G3 stance is unaffected: a purged Incident's history is still deliberately retained *within* the window. The partition layout means retention is a **file delete by partition, not a SQL DELETE**. |
+| **Event store (Parquet) — including AUDIT events and Signals** | append-only, Hive-partitioned by `level/year/month/day`; **age bound = the `event_prune` task** (since 2026-09-02; Signals are Events in the same store, so the same window applies), no size bound | Partly a **stated decision** (MNT-14 G3, recorded on `IncidentPurgeTask`): the audit trail survives the records it describes — a purged Incident's history, purge record included, is deliberately retained. The upper bound, previously undecided, is now **STATED: one year (operator, 2026-08-30)** — so the store no longer grows forever by policy, though it still does **in code** until the prune task is built. ⚠ The MNT-14 G3 stance is unaffected: a purged Incident's history is still deliberately retained *within* the window. The partition layout means retention is a **file delete by partition, not a SQL DELETE**. |
 | Alerts, Cases, Tasks (`ObjectType` ≠ INCIDENT) | no purge path | **Stated decision** on `IncidentPurgeTask`: "inventing retention policy for Cases and Alerts now would be policy without a requirement" — reopen on requirement, not by sweep. |
 | In-memory event ring | bounded by `capacity` (process-lifetime heap bound) | not durable retention; listed to avoid double-counting. |
 
@@ -35,11 +35,14 @@ each task `require()`s the value at run time).
 
 Retention **is configurable** for the operational stores (§1) and the configuration is evidence: the
 authored `maintenance` job `.toon`s in the space's `config/jobs/` ARE the deployment's retention
-policy, reviewable and diffable. The audit log is **not yet** retention-managed in code, but it is no longer unbounded by policy:
-the org has **stated a one-year audit-retention window (2026-08-30)**. Of G5's two remaining halves,
-(a) the org stating the window is **DONE**; (b) the event-store prune task built against it is
-**owed engineering work**, tracked in the controls matrix. ⛔ Until (b) ships, do not tell an auditor
-the window is enforced — it is stated policy that the code does not yet apply.
+policy, reviewable and diffable. The audit log is retention-manageable in code since **2026-09-02**:
+the org **stated a one-year audit-retention window (2026-08-30)** and the `event_prune` maintenance
+task (COMPLY-3) applies it — `EventStore.prune` deletes whole `day=` partitions of the Parquet event store
+older than `retention_days` (UTC, the store's own partition frame), never a row inside the window, so the
+MNT-14 G3 stance holds by construction. Both of G5's halves are done: (a) the window is stated; (b) the
+task exists. ⛔ It is still **operator-authored** like every prune here — a deployment enforces the window
+only once a `maintenance` job with `task: event_prune` and `retention_days: 365` is scheduled. Tell an
+auditor "enforced" only after checking that job exists in the space's `config/jobs/`.
 
 ## 4. Review triggers
 

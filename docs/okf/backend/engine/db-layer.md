@@ -276,9 +276,13 @@ CREATE TABLE IF NOT EXISTS inspecto_acquisition_db_watermark (
 
 ### 3.8 Events — append-only, Parquet (not a SQL table)  · **A**
 
-`ParquetEventStore` writes rolling **Hive-partitioned Parquet** under `<eventsDir>/year=/month=/day=/`,
-read back through an in-memory DuckDB connection (`evt_buf` is only a transient write buffer). The event
-record shape:
+`ParquetEventStore` writes rolling **Hive-partitioned Parquet** under
+`<eventsDir>/level=/year=/month=/day=/` (level FIRST — the severity filter is partition-pruned; an earlier
+version of this line omitted `level=`), read back through an in-memory DuckDB connection (`evt_buf` is only a
+transient write buffer). **Retention (COMPLY-3, 2026-09-02):** `EventStore.prune(before, dryRun)` deletes
+whole `day=` partitions older than the cutoff (UTC, the flush's own frame) and collapses emptied parents; the
+`event_prune` maintenance task drives it with a required `retention_days` (operator window: one year). The
+in-memory backend answers `-1` — nothing durable. The event record shape:
 
 ```
 event_id, ts_ms (BIGINT), type, source, pipeline, correlation_id,

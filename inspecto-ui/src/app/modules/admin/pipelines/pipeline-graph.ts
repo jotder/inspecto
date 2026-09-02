@@ -741,6 +741,49 @@ export const RECIPE_VERBS: readonly { type: string; label: string }[] = [
 ];
 
 /**
+ * The Step types a route BRANCH may be given from the recipe cards (MIDBRANCH-UI-1) — the client mirror
+ * of `RouteArming.BRANCH_STEP_KINDS` (filter / dedup / summarize): what the ingest walk can execute
+ * mid-branch with its NONE reference/execution context. `join` (needs a reference resolver) and a nested
+ * `route` are refused at save with `ERR_ROUTE_UNARMABLE`, so the palette never offers them; a windowed
+ * dedup `scope:` is refused at save too, but that is a config value, not a kind — the dialog is where it
+ * is said. ⚠ Keep in step with the Java set: the server is the authority, this only front-runs its 422.
+ */
+export const BRANCH_STEP_TYPES: ReadonlySet<string> = new Set([
+    'transform.filter',
+    'transform.dedup',
+    'transform.summarize',
+]);
+
+/**
+ * Splice a new node in at the HEAD of a route branch (MIDBRANCH-UI-1): the `route:<key>` edge
+ * `route → first` becomes `route → node` (still `route:<key>`) plus `node → first` (`data`), so the
+ * branch keeps its key and the node becomes the branch's first Step. Returns `null` when the node id is
+ * taken or no such branch edge exists — the caller treats that as "not insertable", never a no-op.
+ * Inserting AFTER an existing branch Step is plain {@link insertStepAfter}: inside a branch the chain is
+ * linear `data` edges like the trunk.
+ */
+export function insertBranchHead(
+    model: AuthoredPipeline,
+    node: AuthoredNode,
+    routeId: string,
+    key: string,
+): AuthoredPipeline | null {
+    if (model.nodes.some((n) => n.id === node.id)) return null;
+    const rel = `route:${key}`;
+    const edge = model.edges.find((e) => e.from === routeId && e.rel === rel);
+    if (!edge) return null;
+    return {
+        ...model,
+        nodes: [...model.nodes, node],
+        edges: [
+            ...model.edges.filter((e) => e !== edge),
+            { from: routeId, rel, to: node.id },
+            { from: node.id, rel: 'data', to: edge.to },
+        ],
+    };
+}
+
+/**
  * Splice a new node into the trunk after `afterId` (or as the new entry when `null`), rewiring the
  * `data` edges: `after → next` becomes `after → node → next`. Returns `null` when `afterId` names a
  * node with anything other than exactly one outgoing `data` edge (a route/branch point — S2 edits the

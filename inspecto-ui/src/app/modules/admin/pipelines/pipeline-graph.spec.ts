@@ -13,6 +13,7 @@ import {
     addEdgeToModel,
     addNodeToModel,
     addRouteBranch,
+    insertBranchHead,
     insertRouteAfter,
     removeRouteBranch,
     setRouteBranchWhere,
@@ -1038,6 +1039,33 @@ describe('insertRouteAfter', () => {
         const route = an('route-1', 'transform.route', { mode: 'case', branches: [{ key: 'branch_1' }] });
         expect(insertRouteAfter(linearPipeline(), route, 'sink-1')).toBeNull();
         expect(insertRouteAfter(linearPipeline(), an('route-2', 'transform.route'), 'parse-1')).toBeNull();
+    });
+});
+
+describe('insertBranchHead (MIDBRANCH-UI-1)', () => {
+    it("makes the node the branch's first Step, keeping the route:<key> edge on the route side", () => {
+        const next = insertBranchHead(routedPipeline(), an('filter-emea'), 'route-1', 'emea')!;
+        expect(next).not.toBeNull();
+        expect(next.edges).toContainEqual({ from: 'route-1', rel: 'route:emea', to: 'filter-emea' });
+        expect(next.edges).toContainEqual({ from: 'filter-emea', rel: 'data', to: 'sink-emea' });
+        expect(next.edges).not.toContainEqual({ from: 'route-1', rel: 'route:emea', to: 'sink-emea' });
+        const chain = detectStepChain(next)!;
+        const emea = chain.branches!.find((b) => b.key === 'emea')!;
+        expect(emea.chain.trunk.map((n) => n.id)).toEqual(['filter-emea', 'sink-emea']);
+        // the other branch is untouched
+        expect(chain.branches!.find((b) => b.key === 'other')!.chain.trunk.map((n) => n.id)).toEqual(['sink-other']);
+    });
+
+    it('then inserting AFTER an in-branch Step is plain insertStepAfter, and the tail refuses nothing new', () => {
+        const headed = insertBranchHead(routedPipeline(), an('filter-emea'), 'route-1', 'emea')!;
+        const next = insertStepAfter(headed, an('dedup-emea', 'transform.dedup'), 'filter-emea')!;
+        const emea = detectStepChain(next)!.branches!.find((b) => b.key === 'emea')!;
+        expect(emea.chain.trunk.map((n) => n.id)).toEqual(['filter-emea', 'dedup-emea', 'sink-emea']);
+    });
+
+    it('refuses an unknown branch or a taken node id', () => {
+        expect(insertBranchHead(routedPipeline(), an('x'), 'route-1', 'nope')).toBeNull();
+        expect(insertBranchHead(routedPipeline(), an('sink-emea'), 'route-1', 'emea')).toBeNull();
     });
 });
 

@@ -99,6 +99,8 @@ public final class JobService implements AutoCloseable {
     /** This space's in-app notification feed, attached post-construction by the host (the feed is created
      *  after this service); read at run time by the {@code notification_prune} maintenance task. */
     private volatile com.gamma.notify.NotificationStore notificationStore;
+    /** This space's durable event store — the {@code event_prune} maintenance task's target (COMPLY-3). */
+    private volatile com.gamma.event.EventStore eventStore;
     /** This space's delivery receipts (D8), attached post-construction like the feed above; read at run
      *  time by the {@code receipt_prune} maintenance task. */
     private volatile com.gamma.notify.DeliveryReceiptStore deliveryReceiptStore;
@@ -1201,6 +1203,17 @@ public final class JobService implements AutoCloseable {
     /** Attach this space's notification feed post-construction (the feed is created after this service). */
     public void notificationStore(com.gamma.notify.NotificationStore store) {
         this.notificationStore = store;
+    }
+
+    /** The durable event store the {@code event_prune} maintenance task ages out (COMPLY-3), or empty when
+     *  the host never attached one. Distinct from {@link #eventLog}, which is the emit side. */
+    public Optional<com.gamma.event.EventStore> eventStore() {
+        return Optional.ofNullable(eventStore);
+    }
+
+    /** Attach this space's event store post-construction (opened by the host after this service exists). */
+    public void eventStore(com.gamma.event.EventStore store) {
+        this.eventStore = store;
     }
 
     /** The delivery receipts the {@code receipt_prune} maintenance task prunes, or empty when the host

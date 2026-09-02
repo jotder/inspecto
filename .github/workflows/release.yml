@@ -1,0 +1,121 @@
+name: Release
+# Release pipeline (compliance matrix G3 / COMPLY-2): a tagged release is built, SBOM'd, checksummed and
+# SIGNED here — and only here. The operator decision of 2026-08-30 put the release key in the CI secret
+# store, held by no shift locally, so signing is a mandatory step of THIS pipeline rather than an optional
+# `package.ps1 -Sign` flag someone remembers to pass. Two accepted consequences, stated rather than
+# discovered: a release cut OUTSIDE CI cannot be signed at all, and custody of the key (who can read the
+# secret, rotation, CI-provider compromise) is a CC6 access-control item —
+# compliance/evidence/release-verification.md §4.
+#
+# Secrets (repository → Settings → Secrets → Actions):
+#   INSPECTO_SIGNING_KEY_ASC  — the ASCII-armoured PRIVATE key (gpg --armor --export-secret-keys <id>)
+#   INSPECTO_SIGNING_KEY_ID   — the key id / fingerprint package.ps1 passes to gpg --local-user
+#   INSPECTO_SIGNING_KEY_PASSPHRASE — optional; empty for a passphrase-less CI key
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write   # gh release create / upload
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # inspecto-agent depends on the pre-release eoiagent (same arrangement as ci.yml)
+      - name: Checkout eoiagent (jotder/inspect-agent, pre-release — no packages yet)
+        uses: actions/checkout@v4
+        with:
+          repository: jotder/inspect-agent
+          path: eoiagent-src
+      - name: Build & install eoiagent into local .m2
+        run: mvn --batch-mode --no-transfer-progress -DskipTests install
+        working-directory: eoiagent-src
+
+      - name: Install UI dependencies
+        run: npm ci
+        working-directory: inspecto-ui
+
+      # The key never touches the checkout: imported into the runner's ephemeral keyring, used, gone
+      # with the runner. Fail-closed: an empty/missing secret stops the release before anything builds.
+      - name: Import the release signing key
+        env:
+          KEY_ASC: ${{ secrets.INSPECTO_SIGNING_KEY_ASC }}
+          KEY_ID: ${{ secrets.INSPECTO_SIGNING_KEY_ID }}
+          KEY_PASSPHRASE: ${{ secrets.INSPECTO_SIGNING_KEY_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEY_ASC" ] || [ -z "$KEY_ID" ]; then
+            echo "::error::INSPECTO_SIGNING_KEY_ASC / INSPECTO_SIGNING_KEY_ID are not set — a release cannot be signed, so it is not cut."
+            exit 1
+          fi
+          printf '%s' "$KEY_ASC" | gpg --batch --import
+          # a passphrase-protected key needs the agent primed for non-interactive signing
+          if [ -n "$KEY_PASSPHRASE" ]; then
+            echo "allow-preset-passphrase" >> ~/.gnupg/gpg-agent.conf
+            gpg-connect-agent reloadagent /bye
+            for keygrip in $(gpg --batch --with-keygrip --list-secret-keys "$KEY_ID" | awk '/Keygrip/ {print $3}'); do
+              /usr/lib/gnupg/gpg-preset-passphrase --preset --passphrase "$KEY_PASSPHRASE" "$keygrip"
+            done
+          fi
+          gpg --batch --list-secret-keys "$KEY_ID" > /dev/null
+
+      # Every edition, signed. -NoRuntime: the jlink runtime needs the GraalVM jmods cache this runner
+      # does not carry; the bundle then requires Java 24+ on the target (documented in package.ps1).
+      - name: Package + SBOM + sign — Personal
+        env:
+          INSPECTO_SIGNING_KEY: ${{ secrets.INSPECTO_SIGNING_KEY_ID }}
+        run: pwsh -NoProfile -File inspecto/package.ps1 -Edition Personal -NoRuntime -Sign
+      - name: Collect Personal artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          for f in inspecto-deploy.zip inspecto-deploy.zip.sha256 inspecto-deploy.zip.asc; do
+            test -f "$f" || { echo "::error::$f missing — the bundle was not signed/checksummed"; exit 1; }
+            cp "$f" "release/inspecto-deploy-personal${f#inspecto-deploy}"
+          done
+          cp inspecto-deploy/sbom/inspecto-personal.cdx.json inspecto-deploy/sbom/inspecto-personal.spdx.json release/
+      - name: Package + SBOM + sign — Enterprise (superset of Standard)
+        env:
+          INSPECTO_SIGNING_KEY: ${{ secrets.INSPECTO_SIGNING_KEY_ID }}
+        run: pwsh -NoProfile -File inspecto/package.ps1 -Edition Enterprise -NoRuntime -Sign
+      - name: Collect Enterprise artifacts
+        run: |
+          set -euo pipefail
+          for f in inspecto-deploy.zip inspecto-deploy.zip.sha256 inspecto-deploy.zip.asc; do
+            test -f "$f" || { echo "::error::$f missing — the bundle was not signed/checksummed"; exit 1; }
+            cp "$f" "release/inspecto-deploy-enterprise${f#inspecto-deploy}"
+          done
+          cp inspecto-deploy/sbom/inspecto-enterprise.cdx.json inspecto-deploy/sbom/inspecto-enterprise.spdx.json release/
+
+      # Verify what we are about to publish with the PUBLIC half only — the same check a customer runs.
+      - name: Verify checksums and signatures
+        run: |
+          set -euo pipefail
+          cd release
+          for zip in *.zip; do
+            (sha256sum -c "$zip.sha256" | grep -q ': OK') || { echo "::error::checksum mismatch for $zip"; exit 1; }
+            gpg --batch --verify "$zip.asc" "$zip"
+          done
+          ls -la
+
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes release/*

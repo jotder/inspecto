@@ -514,6 +514,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // the emit/ingest thread (which may hold ingestLock inside the synchronous bus publish).
         this.notifications = ServiceStores.openNotificationStore(root);
         if (this.jobs != null) this.jobs.notificationStore(notifications);   // notification_prune maintenance task
+        if (this.jobs != null) this.jobs.eventStore(events);                  // event_prune maintenance task (COMPLY-3)
         this.notificationPreferences = new com.gamma.notify.NotificationPreferences();
         // Persisted channel destinations (admin CRUD) live under <write-root>/registry as `channel`
         // components — the same per-space write root the channel routes write to (this space's config dir,
@@ -1303,6 +1304,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             created.pipelineOutputStores(this::pipelineOutputStoresForAudit);   // MNT-4: orphan output_store detection
             created.componentRegistry(this::componentRegistry);    // resolve `use:` bindings before a run
             created.notificationStore(notifications);              // notification_prune maintenance task
+            created.eventStore(events);                            // event_prune maintenance task (COMPLY-3)
             created.objects(this.objects);                         // recon.run promotion + incident_purge (MNT-14)
             created.start();
             jobs = created;

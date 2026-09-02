@@ -171,6 +171,10 @@ git commit -am "chore(release): vX.Y.Z"
 git tag -a vX.Y.Z -m "vX.Y.Z — <summary>"
 git push origin <branch> --tags
 
+# ⚠ Since 2026-09-02 the tag push is the release: .github/workflows/release.yml builds every edition,
+# generates the SBOMs, checksums, SIGNS with the key held in the CI secret store, verifies, and creates
+# the GitHub release. The manual block below is the pre-pipeline procedure, kept for an air-gapped
+# emergency only — and note it cannot produce a pipeline-signed release (the key is not held locally).
 # Build + publish both edition artifacts from the tagged commit:
 #   mvn -Pedition-personal package   → inspecto-processor-X.Y.Z-personal.jar
 #   mvn -Pedition-standard package   → inspecto-processor-X.Y.Z-standard.jar

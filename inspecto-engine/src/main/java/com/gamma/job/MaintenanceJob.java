@@ -27,6 +27,10 @@ import java.time.Instant;
  *       (the window each claim was filed under), never mtime. <b>Deliberate forgetting</b>: retention
  *       must cover the longest {@code scope: window(...)} any pipeline declares. See
  *       {@link DedupPruneTask}.</li>
+ *   <li>{@code event_prune} — apply the audit-retention window (COMPLY-3, one year by operator decision) to
+ *       the durable event store: delete the {@code level/year/month/day} Parquet partitions whose UTC day is
+ *       older than {@code retention_days} (required). A file delete by partition, never a SQL DELETE; the
+ *       in-memory backend reports nothing to prune. See {@link EventPruneTask}.</li>
  *   <li>{@code runlog_prune} — delete Run history older than {@code retention_days} (required): the per-run
  *       JSONL files under {@code <auditDir>/runlog/} and {@code <auditDir>/artifacts/}, plus rows of the
  *       optional {@code inspecto_job_runs} projection; optional {@code max_count} caps each JSONL dir to
@@ -144,6 +148,7 @@ final class MaintenanceJob implements Job {
             case "dedup_prune"        -> DedupPruneTask.run(cfg, dryRun);
             case "runlog_prune"       -> RunlogPruneTask.run(cfg, auditDir, runStore, dryRun);
             case "notification_prune" -> NotificationPruneTask.run(cfg, host, dryRun);
+            case "event_prune"        -> EventPruneTask.run(cfg, host, dryRun);
             case "receipt_prune"      -> ReceiptPruneTask.run(cfg, host, dryRun);
             case "incident_purge"     -> IncidentPurgeTask.run(cfg, host, dryRun);
             // Read-only observers: a dry run and a real run observe the same thing. (storage_report

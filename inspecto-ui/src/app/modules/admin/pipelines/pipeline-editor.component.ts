@@ -132,6 +132,8 @@ import {
     typeLabelMap,
     uniqueNodeId,
     validatePipeline,
+    BRANCH_STEP_TYPES,
+    insertBranchHead,
 } from './pipeline-graph';
 import { PipelineChecklistComponent } from './pipeline-checklist.component';
 import { incompleteStages, pipelineLifecycle, PipelineStageId, StageChip, stageChecklist } from './pipeline-stages';
@@ -654,10 +656,32 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     // ── Recipe editing (S2) — pure reducers over the same model; Save is the unchanged PUT ─────────
 
     /** Insert a new Step of `type` after `afterId` (null = new entry), then open its config dialog. */
-    onRecipeInsert(e: { type: string; afterId: string | null }): void {
+    onRecipeInsert(e: { type: string; afterId: string | null; branch?: { routeId: string; key: string } }): void {
         if (!this.canAuthor()) return; // defense in depth, not just the hidden affordance
         const m = this.model();
         if (!m) return;
+        // MIDBRANCH-UI-1: an insert INTO a route branch. The palette is already narrowed to what arms
+        // mid-branch; the check here is defense in depth mirroring RouteArming.BRANCH_STEP_KINDS.
+        if (e.branch) {
+            if (!BRANCH_STEP_TYPES.has(e.type)) {
+                this.toast.warning('Only filter, dedup and summarize Steps can run inside a branch.');
+                return;
+            }
+            const node: AuthoredNode = { id: uniqueNodeId(m, e.type), type: e.type };
+            const next =
+                e.afterId === null
+                    ? insertBranchHead(m, node, e.branch.routeId, e.branch.key)
+                    : insertStepAfter(m, node, e.afterId);
+            if (!next) {
+                this.toast.warning('Cannot insert here — this branch is wired beyond a linear chain. Use the Canvas.');
+                return;
+            }
+            this.captureUndo();
+            this.model.set(next);
+            this.dirty.set(true);
+            this.openNodeConfig(node);
+            return;
+        }
         // A route Step splices differently (S3): its downstream edge becomes its first branch, so it
         // needs a downstream to route to — never insertable at the tail or as the entry.
         if (e.type === 'transform.route') {

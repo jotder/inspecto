@@ -29,6 +29,19 @@ public interface EventStore extends AutoCloseable {
     /** Append one immutable event. Never blocks on durability — see {@link #flush()}. */
     void append(Event event);
 
+    /**
+     * Audit retention (COMPLY-3): drop the durable events whose UTC day is strictly <em>before</em>
+     * {@code before}, whole day-partitions at a time — retention on this store is a file delete by
+     * partition, never a row-level {@code DELETE}. Returns the number of day-partitions removed (or that
+     * <em>would</em> be removed when {@code dryRun}), or {@code -1} when this backend keeps nothing durable
+     * to prune (the in-memory store self-caps and forgets on restart). Deliberately does <b>not</b> touch
+     * anything inside the window: a purged Incident's history, purge record included, stays retained for the
+     * full window (the MNT-14 G3 stance).
+     *
+     * @since 5.x
+     */
+    default int prune(java.time.LocalDate before, boolean dryRun) { return -1; }
+
     /** Matching events, newest-first, paged per {@code query}. */
     List<Event> query(EventQuery query);
 

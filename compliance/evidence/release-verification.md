@@ -73,9 +73,20 @@ doing all the work.
 **Evidence an auditor can sample:** the `.sha256` (and `.asc`) files published beside each release
 artifact, and the `package.ps1` source above.
 
-## 4. Known limitation — signing is possible, not yet routine
+## 4. Signing is routine — the release pipeline signs, and only it can
 
-Signing today depends on whoever runs `package.ps1` supplying a key, so a release can ship
+**Wired 2026-09-02 (COMPLY-2).** `.github/workflows/release.yml` runs on every `v*` tag: it imports
+the release key from the CI secret store (`INSPECTO_SIGNING_KEY_ASC` / `_ID`), packages every edition
+with `package.ps1 -Sign`, **refuses to publish** if any zip lacks its `.sha256` or `.asc`, verifies
+both with the public half exactly as §1–§2 describe, and only then creates the GitHub release with the
+zips, checksums, signatures and SBOMs attached. `package.ps1 -Sign` itself became **fail-closed** the
+same day: a missing `gpg` or key is now a hard error, where before it downgraded to a warning and
+shipped an unsigned artifact under a log line that said `-Sign`. A release with no `.asc` therefore
+means "not cut by the pipeline", which is the honest reading. Accepted consequences, restated for a
+verifier: a release cut **outside CI cannot be signed at all**, and key custody (who can read the
+secret, rotation, CI-provider compromise) is a **CC6 access-control** item, not a personal one.
+
+*(History, kept for provenance:)* signing used to depend on whoever ran `package.ps1` supplying a key, so a release could ship
 unsigned without anything failing. The key-custody question (compliance plan §6 Q3, gap **G3**) is
 now **ANSWERED — 2026-08-30, operator: the release key lives in the CI secret store**, held by no
 individual locally. Signing therefore becomes a **mandatory step of the release pipeline**, and what
@@ -85,3 +96,17 @@ remains is engineering, not a decision.
 "this release was not signed", never as "signatures are not offered". 🔴 One accepted consequence of
 the custody choice, worth stating to a verifier: a release cut **outside CI cannot be signed at
 all**.
+
+## 5. SBOM — what each bundle attests it contains (G1)
+
+**Generated per packaged bundle since 2026-09-02 (COMPLY-1).** `package.ps1` runs `tools/sbom.mjs`
+after the jars are staged and before the zip, so every bundle carries `sbom/inspecto-<edition>.cdx.json`
+(CycloneDX 1.5) **and** `sbom/inspecto-<edition>.spdx.json` (SPDX 2.3), covered by the zip's checksum and
+signature and also attached loose to the GitHub release. Both documents are rendered from **one**
+component list produced by **one** `mvn dependency:list` over the modules that edition ships — they
+cannot drift, because neither is derived from the other or from a second resolution. Each third-party
+component carries its purl, the **SHA-256 of the resolved artifact**, and the licence declared in its POM
+chain (`NOASSERTION` when none is declared); the bundle's own jars are listed as first-party components
+hashed **as shipped**. ⚠ Per bundle, never per reactor: the reactor resolves the optional AI stack a
+Personal bundle does not carry (CC9). ⚠ `tools/dependencies.lock` remains the *review* baseline
+(coordinates only, every module, diffed in CI) — it is not the SBOM and is not offered as one.

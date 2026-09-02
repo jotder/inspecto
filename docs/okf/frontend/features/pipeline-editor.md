@@ -573,8 +573,13 @@ each fix live). Genuinely open:
   `steps[]` in the shared step grammar — authorable on the canvas (wire `route:<key>` → step →
   sink; the lift presents branch chains as ordinary flattened nodes, lower writes them back to the
   branch), rendered in the Recipe view. Mid-branch kinds = the fork-executable set; `join`,
-  windowed `dedup` and nested `route` refuse by name at save. One-click insert-into-branch is
-  MIDBRANCH-UI-1 (BACKLOG). Backend:
+  windowed `dedup` and nested `route` refuse by name at save. ~~One-click insert-into-branch is
+  MIDBRANCH-UI-1 (BACKLOG)~~ **SHIPPED 2026-09-02**: each branch header offers "add a Step at the
+  start of branch <key>" (→ `insertBranchHead`, which keeps the `route:<key>` edge on the route side)
+  and every in-branch card except the branch's tail offers insert-after (plain `insertStepAfter`);
+  both open a palette narrowed to `BRANCH_STEP_TYPES` (filter / dedup / summarize — the client mirror
+  of `RouteArming.BRANCH_STEP_KINDS`, so it front-runs the 422 rather than offering `join`/`route`).
+  Remove/move inside a branch stay canvas work. Backend:
   [editable-round-trip §19](../../backend/pipeline-graph/editable-round-trip.md).
 - ~~TRANSFER-ARCH-1~~ **SHIPPED 2026-09-01** as the server-side pipeline bundle
   ([editable-round-trip §21](../../backend/pipeline-graph/editable-round-trip.md)); the residuals

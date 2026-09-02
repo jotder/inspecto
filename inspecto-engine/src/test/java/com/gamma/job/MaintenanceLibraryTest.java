@@ -143,6 +143,53 @@ class MaintenanceLibraryTest {
         assertTrue(r.message().contains("no dedup ledger"), r.message());
     }
 
+    // ── event_prune (COMPLY-3) ───────────────────────────────────────────────────
+
+    @Test
+    void eventPruneAppliesTheRetentionWindowToTheParquetStore(@TempDir Path audit, @TempDir Path events)
+            throws Exception {
+        assertThrows(Exception.class,
+                () -> new MaintenanceJob(job(Map.of("task", "event_prune"))).run(),
+                "forgetting is deliberate — retention_days is required");
+
+        long aged = System.currentTimeMillis() - Duration.ofDays(400).toMillis();
+        try (var store = new com.gamma.event.ParquetEventStore(events, 1000, 0, 100);
+             com.gamma.util.Scheduler s = new com.gamma.util.Scheduler();
+             JobService js = new JobService(List.of(), new com.gamma.etl.ConsignmentEventBus(), s, null, audit.toString())) {
+            store.append(com.gamma.event.Event.builder(com.gamma.event.EventType.LOG).ts(aged)
+                    .level(com.gamma.event.EventLevel.INFO).source("t").message("aged").build());
+            store.append(com.gamma.event.Event.builder(com.gamma.event.EventType.LOG).ts(System.currentTimeMillis())
+                    .level(com.gamma.event.EventLevel.INFO).source("t").message("fresh").build());
+            store.flush();
+            js.eventStore(store);
+            JobConfig cfg = job(Map.of("task", "event_prune", "retention_days", "365"));
+
+            JobResult dry = new MaintenanceJob(cfg, null, audit.toString(), null, js).run(dryCtx(audit));
+            assertTrue(dry.message().contains("would remove 1 day-partition(s)"), dry.message());
+            assertEquals(2, store.query(com.gamma.event.EventQuery.recent(10)).size(), "dry run must not delete");
+
+            JobResult real = new MaintenanceJob(cfg, null, audit.toString(), null, js).run();
+            assertTrue(real.message().contains("removed 1 day-partition(s)"), real.message());
+            var left = store.query(com.gamma.event.EventQuery.recent(10));
+            assertEquals(1, left.size());
+            assertEquals("fresh", left.get(0).message(), "inside the window nothing is touched");
+        }
+    }
+
+    @Test
+    void eventPruneReportsWhenNothingDurableIsAttached(@TempDir Path audit) throws Exception {
+        JobResult none = new MaintenanceJob(job(Map.of("task", "event_prune", "retention_days", "365"))).run();
+        assertTrue(none.message().contains("no event store attached"), none.message());
+
+        try (com.gamma.util.Scheduler s = new com.gamma.util.Scheduler();
+             JobService js = new JobService(List.of(), new com.gamma.etl.ConsignmentEventBus(), s, null, audit.toString())) {
+            js.eventStore(new com.gamma.event.InMemoryEventStore());
+            JobResult mem = new MaintenanceJob(job(Map.of("task", "event_prune", "retention_days", "365")),
+                    null, audit.toString(), null, js).run();
+            assertTrue(mem.message().contains("keeps nothing durable"), mem.message());
+        }
+    }
+
     // ── notification_prune ───────────────────────────────────────────────────────
 
     @Test

@@ -205,6 +205,53 @@ describe('PipelineStepCardsComponent', () => {
         await expectNoA11yViolations(fixture.nativeElement);
     });
 
+    it('MIDBRANCH-UI-1: a branch is insertable-into — at its head and after each non-tail Step, from a narrowed palette', async () => {
+        const rows: StepRow[] = [
+            { kind: 'node', rowId: 'route-1', node: { id: 'route-1', type: 'transform.route' }, depth: 0 },
+            { kind: 'branch', rowId: 'branch:emea:0', routeId: 'route-1', key: 'emea', isDefault: false, depth: 0 },
+            { kind: 'node', rowId: 'filter-emea', node: { id: 'filter-emea', type: 'transform.filter' }, depth: 1 },
+            { kind: 'node', rowId: 'sink-emea', node: { id: 'sink-emea', type: 'sink.persistent' }, depth: 1 },
+        ];
+        const typeCat = new Map([
+            ['transform.route', 'TRANSFORM'],
+            ['transform.filter', 'TRANSFORM'],
+            ['sink.persistent', 'SINK'],
+        ]);
+        const { fixture, c } = create({ rows, typeCat, editable: true });
+        const inserted: unknown[] = [];
+        c.insertStep.subscribe((e) => inserted.push(e));
+        const el = fixture.nativeElement as HTMLElement;
+        const btn = (label: string): HTMLButtonElement | undefined =>
+            Array.from(el.querySelectorAll('button')).find((b) => b.getAttribute('aria-label') === label);
+
+        // head-of-branch insert arms the palette for that branch
+        expect(btn('Add a Step at the start of branch emea')).toBeTruthy();
+        btn('Add a Step at the start of branch emea')!.click();
+        expect(c.insertAfterId).toBeNull();
+        expect(c.insertBranch).toEqual({ routeId: 'route-1', key: 'emea' });
+
+        // the in-branch card that has a successor inserts after itself; the tail (its sink) does not
+        expect(btn('Add a Step after filter-emea in this branch')).toBeTruthy();
+        expect(btn('Add a Step after sink-emea in this branch')).toBeUndefined();
+        expect(btn('Add a Step after sink-emea')).toBeUndefined(); // and it never gets the TRUNK affordance
+        btn('Add a Step after filter-emea in this branch')!.click();
+        expect(c.insertAfterId).toBe('filter-emea');
+        expect(c.insertBranch).toEqual({ routeId: 'route-1', key: 'emea' });
+
+        // the branch palette is the served/fallback palette narrowed to what arms mid-branch
+        expect(c.branchVerbs().map((v) => v.type)).toEqual([
+            'transform.dedup',
+            'transform.filter',
+            'transform.summarize',
+        ]);
+
+        // a trunk "+" clears the branch context again, so the trunk palette inserts on the trunk
+        btn('Add a Step after route-1')!.click();
+        expect(c.insertBranch).toBeNull();
+
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
     it('S2: hides every editing affordance when not editable', () => {
         const rows: StepRow[] = [{ kind: 'node', rowId: COLLECT.id, node: COLLECT, depth: 0 }];
         const { fixture } = create({ rows, typeCat: new Map([['acquisition', 'SOURCE']]), editable: false });

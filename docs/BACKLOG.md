@@ -832,7 +832,11 @@ rows R3's grounding opened:
   `scope: window(...)` vanishes from the Pipeline Document / recipe round-trip while the file
   keeps it. Pre-existing, found 2026-09-02 during R3. Add `scope` to the shared dedup builder
   (both directions) + a round-trip pin.
-- **MIDBRANCH-UI-1 — insert-into-branch affordance** (polish): a branch chain is authorable on
+- **~~MIDBRANCH-UI-1~~ — SHIPPED 2026-09-02.** Branch header → "add a Step at the start of branch"
+  (`insertBranchHead`, keeps `route:<key>` on the route side); in-branch cards except the tail →
+  insert-after (`insertStepAfter`); palette narrowed to `BRANCH_STEP_TYPES` (client mirror of
+  `RouteArming.BRANCH_STEP_KINDS`). Pinned in `pipeline-step-cards.component.spec` + `pipeline-graph.spec`.
+  *(Original text:)* **insert-into-branch affordance** (polish): a branch chain is authorable on
   the canvas (add node + wire `route:<key>` → step → sink) and renders in the Recipe view via the
   converter, but the step-cards' branch rows have no one-click "insert step into this branch" the
   way the trunk has insert-between. Small UX slice; the format/round-trip is done. The metadata bundle's `authored-pipeline` kind still operates on the
@@ -1177,7 +1181,17 @@ was rewritten to assert the invariant that actually matters — **exactly one bu
 group classified `ops:*`/operational** — rather than an incidental total. ⚠ Only the full reactor caught
 this; the targeted runs on the status tests were all green. Decision record: `pipeline-spec.md` §13 D4.
 
-**COMPLY-1/2/3 — three compliance gaps that became BUILD WORK on 2026-08-30.** Filed together because
+**~~COMPLY-1/2/3~~ — ALL THREE SHIPPED 2026-09-02.** COMPLY-1: `tools/sbom.mjs` (zero-dep Node, same
+`dependency:list` grammar as the G7 guard) run by `package.ps1` per bundle → CycloneDX 1.5 + SPDX 2.3 from ONE
+resolution of the shipped modules, per-component SHA-256 + POM licence + purl, first-party jars hashed as
+shipped; ⚠ no CycloneDX/SPDX Maven plugin exists in the offline `.m2`, which is why it is a script and not a
+plugin. COMPLY-2: `.github/workflows/release.yml` on `v*` tags (key from the CI secret store, per-edition
+`package.ps1 -Sign`, publish refused without `.sha256`+`.asc`, public-half verify, `gh release create`);
+`package.ps1 -Sign` is now fail-closed (a missing gpg/key THROWS — it used to warn and ship unsigned).
+⚠ The workflow is unexercised until the first `v*` tag after this lands; the local half (SBOM step, -Sign
+refusal) is what was verified here. COMPLY-3: `event_prune` maintenance task + `EventStore.prune`
+(whole-day-partition delete, UTC) — see §6 db-layer/jobs docs; still operator-scheduled like every prune.
+*(Original text:)* **three compliance gaps that became BUILD WORK on 2026-08-30.** Filed together because
 one operator sitting answered all three decisions (gate-register §2 cluster C); none is decision-gated
 any more, and each has an auditor-facing consequence if it is left as stated-but-unbuilt policy.
 
