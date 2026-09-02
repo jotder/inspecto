@@ -402,7 +402,7 @@ database; the lift rebuilds pairing from the stamp.
   `routeNode`, `summarizeNode` are last-one-wins, silently): the discard behavior is PINNED per
   slot in `PipelineEditableTest`; inverting it is an operator call (BACKLOG §4). Mid-branch
   `steps:` sub-chains are refused by both authoring surfaces — design:
-  [`superpower/mid-branch-transforms-design.md`](../../../superpower/mid-branch-transforms-design.md).
+  [`archived-documents/plans-archive/mid-branch-transforms-design.md`](../../../archived-documents/plans-archive/mid-branch-transforms-design.md).
 
 ## The Recipe view and the step cards
 
