@@ -159,6 +159,7 @@ describe('PipelinePaletteComponent', () => {
         family,
         label,
         emoji: '•',
+        icon: 'heroicons_outline:cube',
         status,
         addable: false,
         ...extra,

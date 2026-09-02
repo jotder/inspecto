@@ -37,6 +37,7 @@
     "family" : "ACQ",
     "label" : "Local / NFS directory watcher",
     "emoji" : "📁",
+    "icon" : "heroicons_outline:folder-open",
     "status" : "delivered",
     "nodeType" : "acquisition",
     "note" : "LocalFileSystemConnector — the default collector",
@@ -46,6 +47,7 @@
     "family" : "ACQ",
     "label" : "SFTP / FTPS remote ingest",
     "emoji" : "🔒",
+    "icon" : "heroicons_outline:lock-closed",
     "status" : "delivered",
     "nodeType" : "acquisition",
     "note" : "inspecto-connectors (sftp, ftps; key auth, bastion tunnel, host-key pinning)",
@@ -55,6 +57,7 @@
     "family" : "ACQ",
     "label" : "JDBC / SQL query batch reader",
     "emoji" : "🗄️",
+    "icon" : "heroicons_outline:circle-stack",
     "status" : "delivered",
     "nodeType" : "acquisition",
     "note" : "the db-export connector (`connector: db`, watermark column)",
@@ -64,6 +67,7 @@
     "family" : "ACQ",
     "label" : "Dataset entry (re-ingest a registered Dataset)",
     "emoji" : "🧱",
+    "icon" : "heroicons_outline:square-3-stack-3d",
     "status" : "delivered",
     "nodeType" : "acquisition",
     "note" : "UI-S7: `connector: dataset` + `on:dataset` trigger",
@@ -73,6 +77,7 @@
     "family" : "ACQ",
     "label" : "Multi-sheet Excel workbook ingest",
     "emoji" : "📑",
+    "icon" : "heroicons_outline:table-cells",
     "status" : "partial",
     "nodeType" : "parser.xlsx",
     "note" : "the xlsx PARSER is delivered; per-sheet workbook fan-out as an acquisition is not",
@@ -82,6 +87,7 @@
     "family" : "ACQ",
     "label" : "AWS S3 object ingest",
     "emoji" : "☁️",
+    "icon" : "heroicons_outline:cloud-arrow-down",
     "status" : "planned",
     "addable" : false
   }, {
@@ -89,6 +95,7 @@
     "family" : "ACQ",
     "label" : "Azure Blob & ADLS Gen2 ingest",
     "emoji" : "🌐",
+    "icon" : "heroicons_outline:cloud",
     "status" : "partial",
     "nodeType" : "acquisition",
     "note" : "Connection kind exists (azure blob connector); ADLS Gen2 semantics not proven",
@@ -98,6 +105,7 @@
     "family" : "ACQ",
     "label" : "Google Cloud Storage ingest",
     "emoji" : "🪣",
+    "icon" : "heroicons_outline:cloud-arrow-down",
     "status" : "planned",
     "addable" : false
   }, {
@@ -105,6 +113,7 @@
     "family" : "ACQ",
     "label" : "Apache Kafka consumer",
     "emoji" : "📤",
+    "icon" : "heroicons_outline:queue-list",
     "status" : "partial",
     "nodeType" : "acquisition",
     "note" : "Connection kind exists (kafka); consumer-group ingest as a Collector not proven",
@@ -114,6 +123,7 @@
     "family" : "ACQ",
     "label" : "Apache Pulsar consumer",
     "emoji" : "📨",
+    "icon" : "heroicons_outline:paper-airplane",
     "status" : "planned",
     "addable" : false
   }, {
@@ -121,6 +131,7 @@
     "family" : "ACQ",
     "label" : "AWS Kinesis / SQS ingest",
     "emoji" : "📬",
+    "icon" : "heroicons_outline:inbox-stack",
     "status" : "planned",
     "addable" : false
   }, {
@@ -128,6 +139,7 @@
     "family" : "ACQ",
     "label" : "RabbitMQ AMQP subscriber",
     "emoji" : "🐰",
+    "icon" : "heroicons_outline:inbox-arrow-down",
     "status" : "planned",
     "addable" : false
   }, {
@@ -135,6 +147,7 @@
     "family" : "ACQ",
     "label" : "MQTT IoT telemetry ingest",
     "emoji" : "📡",
+    "icon" : "heroicons_outline:signal",
     "status" : "planned",
     "addable" : false
   }, {
@@ -142,6 +155,7 @@
     "family" : "ACQ",
     "label" : "Change Data Capture (Debezium)",
     "emoji" : "🔄",
+    "icon" : "heroicons_outline:arrow-path",
     "status" : "planned",
     "addable" : false
   }, {
@@ -149,6 +163,7 @@
     "family" : "ACQ",
     "label" : "Delta Lake table reader",
     "emoji" : "💾",
+    "icon" : "heroicons_outline:server-stack",
     "status" : "planned",
     "addable" : false
   }, {
@@ -156,6 +171,7 @@
     "family" : "ACQ",
     "label" : "Apache Iceberg table ingest",
     "emoji" : "🧊",
+    "icon" : "heroicons_outline:cube",
     "status" : "planned",
     "addable" : false
   }, {
@@ -163,6 +179,7 @@
     "family" : "ACQ",
     "label" : "Snowflake / BigQuery ingest",
     "emoji" : "❄️",
+    "icon" : "heroicons_outline:server",
     "status" : "planned",
     "addable" : false
   }, {
@@ -170,6 +187,7 @@
     "family" : "ACQ",
     "label" : "REST API poller & paged ingest",
     "emoji" : "🌐",
+    "icon" : "heroicons_outline:globe-alt",
     "status" : "planned",
     "addable" : false
   }, {
@@ -177,6 +195,7 @@
     "family" : "ACQ",
     "label" : "HTTP webhook listener endpoint",
     "emoji" : "🪝",
+    "icon" : "heroicons_outline:link",
     "status" : "planned",
     "addable" : false
   }, {
@@ -184,6 +203,7 @@
     "family" : "ACQ",
     "label" : "gRPC stream receiver",
     "emoji" : "🔌",
+    "icon" : "heroicons_outline:bolt",
     "status" : "planned",
     "addable" : false
   }, {
@@ -191,6 +211,7 @@
     "family" : "PRS",
     "label" : "Delimited / CSV / TSV / PSV parser",
     "emoji" : "📄",
+    "icon" : "heroicons_outline:table-cells",
     "status" : "delivered",
     "nodeType" : "parser.delimited",
     "addable" : true
@@ -199,6 +220,7 @@
     "family" : "PRS",
     "label" : "Fixed-width column slicer",
     "emoji" : "📦",
+    "icon" : "heroicons_outline:view-columns",
     "status" : "delivered",
     "nodeType" : "parser.fixedwidth",
     "note" : "text (`record: line`) and fixed-length binary (`record: bytes`)",
@@ -208,6 +230,7 @@
     "family" : "PRS",
     "label" : "JSON object & JSON Lines (NDJSON) parser",
     "emoji" : "🧬",
+    "icon" : "heroicons_outline:code-bracket",
     "status" : "delivered",
     "nodeType" : "parser.json",
     "addable" : true
@@ -216,6 +239,7 @@
     "family" : "PRS",
     "label" : "Excel workbook parser",
     "emoji" : "📑",
+    "icon" : "heroicons_outline:table-cells",
     "status" : "delivered",
     "nodeType" : "parser.xlsx",
     "note" : "needs the DuckDB `excel` extension in the bundle (multiformat X1)",
@@ -225,6 +249,7 @@
     "family" : "PRS",
     "label" : "XML / XPath / DOM unpacker",
     "emoji" : "📑",
+    "icon" : "heroicons_outline:code-bracket-square",
     "status" : "partial",
     "nodeType" : "parser.plugin",
     "note" : "tree→segments bridge ships XML ingests; no XPath selector grammar yet",
@@ -234,6 +259,7 @@
     "family" : "PRS",
     "label" : "ASN.1 BER telecom CDR decoder",
     "emoji" : "📡",
+    "icon" : "heroicons_outline:cpu-chip",
     "status" : "delivered",
     "capability" : "parser.asn1",
     "note" : "asn-parser reactor (decoders, vendor plugins)",
@@ -243,6 +269,7 @@
     "family" : "PRS",
     "label" : "Named-group regex extractor",
     "emoji" : "🔎",
+    "icon" : "heroicons_outline:magnifying-glass",
     "status" : "delivered",
     "nodeType" : "parser.text_regex",
     "addable" : true
@@ -251,6 +278,7 @@
     "family" : "PRS",
     "label" : "Custom ingester plugin (segments, multi-event)",
     "emoji" : "🧩",
+    "icon" : "heroicons_outline:puzzle-piece",
     "status" : "delivered",
     "nodeType" : "parser.plugin",
     "note" : "ParserPlugin SPI; `segments: {CALL, SMS}`",
@@ -260,6 +288,7 @@
     "family" : "PRS",
     "label" : "Key-value / logfmt parser",
     "emoji" : "🏷️",
+    "icon" : "heroicons_outline:tag",
     "status" : "planned",
     "addable" : false
   }, {
@@ -267,6 +296,7 @@
     "family" : "PRS",
     "label" : "YAML document slicer",
     "emoji" : "📜",
+    "icon" : "heroicons_outline:document-text",
     "status" : "planned",
     "addable" : false
   }, {
@@ -274,6 +304,7 @@
     "family" : "PRS",
     "label" : "ASN.1 PER / XER / DER decoder",
     "emoji" : "📜",
+    "icon" : "heroicons_outline:cpu-chip",
     "status" : "planned",
     "addable" : false
   }, {
@@ -281,6 +312,7 @@
     "family" : "PRS",
     "label" : "Mainframe EBCDIC & COBOL copybook",
     "emoji" : "📠",
+    "icon" : "heroicons_outline:computer-desktop",
     "status" : "planned",
     "addable" : false
   }, {
@@ -288,6 +320,7 @@
     "family" : "PRS",
     "label" : "Protocol Buffers decoder",
     "emoji" : "⚡",
+    "icon" : "heroicons_outline:bolt",
     "status" : "planned",
     "addable" : false
   }, {
@@ -295,6 +328,7 @@
     "family" : "PRS",
     "label" : "Apache Avro binary decoder",
     "emoji" : "🦅",
+    "icon" : "heroicons_outline:document-duplicate",
     "status" : "planned",
     "addable" : false
   }, {
@@ -302,6 +336,7 @@
     "family" : "PRS",
     "label" : "PCAP network packet slicer",
     "emoji" : "🌐",
+    "icon" : "heroicons_outline:wifi",
     "status" : "planned",
     "addable" : false
   }, {
@@ -309,6 +344,7 @@
     "family" : "PRS",
     "label" : "Grok / Logstash expression matcher",
     "emoji" : "📜",
+    "icon" : "heroicons_outline:command-line",
     "status" : "planned",
     "addable" : false
   }, {
@@ -316,6 +352,7 @@
     "family" : "PRS",
     "label" : "Syslog RFC 5424 / RFC 3164 parser",
     "emoji" : "🖥️",
+    "icon" : "heroicons_outline:bars-3-bottom-left",
     "status" : "planned",
     "addable" : false
   }, {
@@ -323,6 +360,7 @@
     "family" : "DQ",
     "label" : "Schema validator & type coercion",
     "emoji" : "🛡️",
+    "icon" : "heroicons_outline:shield-check",
     "status" : "delivered",
     "nodeType" : "transform.map",
     "note" : "the schema registry: typed fields, TRY_CAST, structural rejects → quarantine",
@@ -332,6 +370,7 @@
     "family" : "DQ",
     "label" : "Constraint & range checker (Expectations)",
     "emoji" : "⚠️",
+    "icon" : "heroicons_outline:exclamation-triangle",
     "status" : "delivered",
     "capability" : "expectation",
     "note" : "Expectations evaluated per Dataset (`ExpectationEvaluator`); not a mid-chain step",
@@ -341,6 +380,7 @@
     "family" : "DQ",
     "label" : "Exact-key deduplicator (within a Consignment)",
     "emoji" : "🧼",
+    "icon" : "heroicons_outline:document-duplicate",
     "status" : "delivered",
     "nodeType" : "transform.dedup",
     "note" : "`scope: consignment` (default)",
@@ -350,6 +390,7 @@
     "family" : "DQ",
     "label" : "Sliding time-window deduplicator",
     "emoji" : "⏱️",
+    "icon" : "heroicons_outline:clock",
     "status" : "delivered",
     "nodeType" : "transform.dedup",
     "note" : "D-9: `scope: window(P4D)` + the durable dedup ledger",
@@ -359,6 +400,7 @@
     "family" : "DQ",
     "label" : "File-grain duplicate guard (path / checksum / metadata / marker)",
     "emoji" : "🗂️",
+    "icon" : "heroicons_outline:folder-minus",
     "status" : "delivered",
     "nodeType" : "acquisition",
     "note" : "Collector `duplicate:` policy + marker dedup — a Guarantee, rides the Collector",
@@ -368,6 +410,7 @@
     "family" : "DQ",
     "label" : "Schema drift & new-field detector",
     "emoji" : "🧬",
+    "icon" : "heroicons_outline:arrow-trending-up",
     "status" : "partial",
     "capability" : "expectation",
     "note" : "multi-schema dispatch refuses unknown shapes; no drift REPORT yet",
@@ -377,6 +420,7 @@
     "family" : "DQ",
     "label" : "Cluster & edit value normalizer",
     "emoji" : "🔍",
+    "icon" : "heroicons_outline:squares-2x2",
     "status" : "planned",
     "addable" : false
   }, {
@@ -384,6 +428,7 @@
     "family" : "DQ",
     "label" : "Fuzzy string (Jaro-Winkler) matcher",
     "emoji" : "🔍",
+    "icon" : "heroicons_outline:magnifying-glass-circle",
     "status" : "planned",
     "addable" : false
   }, {
@@ -391,6 +436,7 @@
     "family" : "DQ",
     "label" : "Whitespace & string sanitizer",
     "emoji" : "🧹",
+    "icon" : "heroicons_outline:scissors",
     "status" : "partial",
     "nodeType" : "transform.map",
     "note" : "any `EXPR` rule does it today; no dedicated step",
@@ -400,6 +446,7 @@
     "family" : "DQ",
     "label" : "Inline stream profiler & statistics",
     "emoji" : "🧮",
+    "icon" : "heroicons_outline:chart-bar-square",
     "status" : "partial",
     "capability" : "storage_report",
     "note" : "storage/completeness KPIs exist; no per-column profile step",
@@ -409,6 +456,7 @@
     "family" : "DQ",
     "label" : "Statistical & reservoir sampler",
     "emoji" : "📊",
+    "icon" : "heroicons_outline:beaker",
     "status" : "planned",
     "addable" : false
   }, {
@@ -416,6 +464,7 @@
     "family" : "DQ",
     "label" : "Character map & code page transcoder",
     "emoji" : "🔤",
+    "icon" : "heroicons_outline:language",
     "status" : "planned",
     "addable" : false
   }, {
@@ -423,6 +472,7 @@
     "family" : "DQ",
     "label" : "PII masking & tokenization",
     "emoji" : "🔒",
+    "icon" : "heroicons_outline:eye-slash",
     "status" : "planned",
     "note" : "board SEC-08 — Enterprise only",
     "addable" : false
@@ -431,6 +481,7 @@
     "family" : "DQ",
     "label" : "One-way salted cryptographic hasher",
     "emoji" : "🔑",
+    "icon" : "heroicons_outline:finger-print",
     "status" : "planned",
     "addable" : false
   }, {
@@ -438,6 +489,7 @@
     "family" : "DQ",
     "label" : "GDPR / CCPA field redactor",
     "emoji" : "🛡️",
+    "icon" : "heroicons_outline:shield-exclamation",
     "status" : "planned",
     "note" : "board SEC-08 — Enterprise only",
     "addable" : false
@@ -446,6 +498,7 @@
     "family" : "XFM",
     "label" : "Expression builder & computed columns",
     "emoji" : "🧮",
+    "icon" : "heroicons_outline:variable",
     "status" : "delivered",
     "nodeType" : "transform.map",
     "note" : "the `EXPR` / `CONCAT_DT` / `FILENAME_DATE` rules",
@@ -455,6 +508,7 @@
     "family" : "XFM",
     "label" : "Field type cast & renamer matrix",
     "emoji" : "🔄",
+    "icon" : "heroicons_outline:arrows-right-left",
     "status" : "delivered",
     "nodeType" : "transform.map",
     "note" : "the mapping rows (`DIRECT` + typed target)",
@@ -464,6 +518,7 @@
     "family" : "XFM",
     "label" : "Row filter (pre-parse regex / post-map predicate)",
     "emoji" : "🔽",
+    "icon" : "heroicons_outline:funnel",
     "status" : "delivered",
     "nodeType" : "transform.filter",
     "addable" : true
@@ -472,6 +527,7 @@
     "family" : "XFM",
     "label" : "Router — case / clone branches with mid-branch steps",
     "emoji" : "🔀",
+    "icon" : "heroicons_outline:arrows-pointing-out",
     "status" : "delivered",
     "nodeType" : "transform.route",
     "addable" : true
@@ -480,6 +536,7 @@
     "family" : "XFM",
     "label" : "Group-by summarizer (measures grammar)",
     "emoji" : "∑",
+    "icon" : "heroicons_outline:calculator",
     "status" : "delivered",
     "nodeType" : "transform.summarize",
     "addable" : true
@@ -488,6 +545,7 @@
     "family" : "XFM",
     "label" : "Reference-store join (versioned references)",
     "emoji" : "🤝",
+    "icon" : "heroicons_outline:link",
     "status" : "delivered",
     "nodeType" : "transform.join",
     "note" : "at rest only — refused mid-branch (no reference resolver on the ingest lane)",
@@ -497,6 +555,7 @@
     "family" : "XFM",
     "label" : "Lookup & static map transcoder",
     "emoji" : "🗺️",
+    "icon" : "heroicons_outline:map",
     "status" : "partial",
     "nodeType" : "transform.join",
     "note" : "a reference join covers it; no inline static map",
@@ -506,6 +565,7 @@
     "family" : "XFM",
     "label" : "Dynamic pivot / transpose",
     "emoji" : "🔀",
+    "icon" : "heroicons_outline:arrows-up-down",
     "status" : "planned",
     "addable" : false
   }, {
@@ -513,6 +573,7 @@
     "family" : "XFM",
     "label" : "Unpivot / column flattener",
     "emoji" : "🔄",
+    "icon" : "heroicons_outline:bars-4",
     "status" : "planned",
     "addable" : false
   }, {
@@ -520,6 +581,7 @@
     "family" : "XFM",
     "label" : "Rank & Top-N pruner",
     "emoji" : "🏆",
+    "icon" : "heroicons_outline:trophy",
     "status" : "planned",
     "addable" : false
   }, {
@@ -527,6 +589,7 @@
     "family" : "XFM",
     "label" : "Array / object exploder & flattener",
     "emoji" : "💥",
+    "icon" : "heroicons_outline:squares-plus",
     "status" : "planned",
     "note" : "the grandfathered `transform.split` node type is the read-only ancestor",
     "addable" : false
@@ -535,6 +598,7 @@
     "family" : "XFM",
     "label" : "Presorted stream merge joiner",
     "emoji" : "🤝",
+    "icon" : "heroicons_outline:arrows-pointing-in",
     "status" : "planned",
     "note" : "the grandfathered `transform.merge` node type is the read-only ancestor",
     "addable" : false
@@ -543,6 +607,7 @@
     "family" : "XFM",
     "label" : "Slowly changing dimension (SCD Type 2)",
     "emoji" : "🏛️",
+    "icon" : "heroicons_outline:building-library",
     "status" : "planned",
     "addable" : false
   }, {
@@ -550,6 +615,7 @@
     "family" : "XFM",
     "label" : "Monotonic surrogate key generator",
     "emoji" : "🔑",
+    "icon" : "heroicons_outline:key",
     "status" : "planned",
     "addable" : false
   }, {
@@ -557,6 +623,7 @@
     "family" : "XFM",
     "label" : "DML row-action strategy flagger",
     "emoji" : "🏷️",
+    "icon" : "heroicons_outline:tag",
     "status" : "planned",
     "addable" : false
   }, {
@@ -564,6 +631,7 @@
     "family" : "XFM",
     "label" : "Dataset differ & change compare",
     "emoji" : "⚖️",
+    "icon" : "heroicons_outline:scale",
     "status" : "partial",
     "capability" : "recon",
     "note" : "Reconciliation boards compare Datasets; not a chain step",
@@ -573,6 +641,7 @@
     "family" : "XFM",
     "label" : "Hierarchical XML / JSON document builder",
     "emoji" : "🏗️",
+    "icon" : "heroicons_outline:code-bracket-square",
     "status" : "planned",
     "addable" : false
   }, {
@@ -580,6 +649,7 @@
     "family" : "XFM",
     "label" : "IFRS 15 / IFRS 9 revenue recognition engine",
     "emoji" : "📊",
+    "icon" : "heroicons_outline:banknotes",
     "status" : "planned",
     "addable" : false
   }, {
@@ -587,6 +657,7 @@
     "family" : "XFM",
     "label" : "SIM box & bypass fraud detector",
     "emoji" : "📱",
+    "icon" : "heroicons_outline:device-phone-mobile",
     "status" : "planned",
     "addable" : false
   }, {
@@ -594,6 +665,7 @@
     "family" : "XFM",
     "label" : "Tariff, rating & usage billing engine",
     "emoji" : "💵",
+    "icon" : "heroicons_outline:receipt-percent",
     "status" : "planned",
     "addable" : false
   }, {
@@ -601,6 +673,7 @@
     "family" : "XFM",
     "label" : "Roaming TAP3 / CIBER surcharger",
     "emoji" : "🌍",
+    "icon" : "heroicons_outline:globe-americas",
     "status" : "planned",
     "addable" : false
   }, {
@@ -608,6 +681,7 @@
     "family" : "XFM",
     "label" : "Velocity & impossible-travel anomaly",
     "emoji" : "🚨",
+    "icon" : "heroicons_outline:rocket-launch",
     "status" : "planned",
     "addable" : false
   }, {
@@ -615,6 +689,7 @@
     "family" : "BI",
     "label" : "Level-of-detail (LOD) fixed aggregator",
     "emoji" : "🏛️",
+    "icon" : "heroicons_outline:building-library",
     "status" : "planned",
     "addable" : false
   }, {
@@ -622,6 +697,7 @@
     "family" : "BI",
     "label" : "LOD include / exclude context aggregator",
     "emoji" : "🏛️",
+    "icon" : "heroicons_outline:rectangle-group",
     "status" : "planned",
     "addable" : false
   }, {
@@ -629,6 +705,7 @@
     "family" : "BI",
     "label" : "Time-grain resampler & gap imputer",
     "emoji" : "⏱️",
+    "icon" : "heroicons_outline:clock",
     "status" : "partial",
     "capability" : "measure-grammar",
     "note" : "time grains exist in Studio queries (`QuerySpec.grains`); no resampling step",
@@ -638,6 +715,7 @@
     "family" : "BI",
     "label" : "Period-over-period (YoY / MoM / WoW) shift",
     "emoji" : "📈",
+    "icon" : "heroicons_outline:presentation-chart-line",
     "status" : "planned",
     "addable" : false
   }, {
@@ -645,6 +723,7 @@
     "family" : "BI",
     "label" : "Running calculations & moving averages",
     "emoji" : "📊",
+    "icon" : "heroicons_outline:arrow-trending-up",
     "status" : "planned",
     "addable" : false
   }, {
@@ -652,6 +731,7 @@
     "family" : "BI",
     "label" : "Time-series forecaster (Holt-Winters)",
     "emoji" : "🔮",
+    "icon" : "heroicons_outline:light-bulb",
     "status" : "planned",
     "addable" : false
   }, {
@@ -659,6 +739,7 @@
     "family" : "BI",
     "label" : "Semantic KPI calculator & Measure formulas",
     "emoji" : "📐",
+    "icon" : "heroicons_outline:chart-pie",
     "status" : "partial",
     "capability" : "measure-grammar",
     "note" : "the Measure grammar (`count | agg(field)`) serves Studio + summarize; no named-KPI layer",
@@ -668,6 +749,7 @@
     "family" : "BI",
     "label" : "Template & runtime parameter injector",
     "emoji" : "🏷️",
+    "icon" : "heroicons_outline:hashtag",
     "status" : "partial",
     "capability" : "sql.template",
     "note" : "the `sql.template` job resolves `$name` tokens; no Jinja",
@@ -677,6 +759,7 @@
     "family" : "BI",
     "label" : "Histogram & quantile binner",
     "emoji" : "📦",
+    "icon" : "heroicons_outline:chart-bar",
     "status" : "planned",
     "addable" : false
   }, {
@@ -684,6 +767,7 @@
     "family" : "BI",
     "label" : "Smart custom string splitter",
     "emoji" : "✂️",
+    "icon" : "heroicons_outline:scissors",
     "status" : "planned",
     "addable" : false
   }, {
@@ -691,6 +775,7 @@
     "family" : "BI",
     "label" : "H3 hexagonal & geohash grid indexer",
     "emoji" : "🗺️",
+    "icon" : "heroicons_outline:globe-europe-africa",
     "status" : "planned",
     "note" : "needs the DuckDB `spatial`/`h3` extension — board CP-09 gate",
     "addable" : false
@@ -699,6 +784,7 @@
     "family" : "BI",
     "label" : "Spatial polygon & point-in-polygon intersect",
     "emoji" : "📍",
+    "icon" : "heroicons_outline:map-pin",
     "status" : "planned",
     "note" : "needs the DuckDB `spatial` extension — deliberately not loaded (SqlSandbox)",
     "addable" : false
@@ -707,6 +793,7 @@
     "family" : "BI",
     "label" : "Outlier detector & IQR boxplot fencer",
     "emoji" : "🚨",
+    "icon" : "heroicons_outline:exclamation-circle",
     "status" : "planned",
     "addable" : false
   }, {
@@ -714,6 +801,7 @@
     "family" : "BI",
     "label" : "Pearson & Spearman correlation matrix",
     "emoji" : "🧮",
+    "icon" : "heroicons_outline:squares-2x2",
     "status" : "planned",
     "addable" : false
   }, {
@@ -721,6 +809,7 @@
     "family" : "ENR",
     "label" : "Reference-table enrichment (`*_enrich.toon`, Stage-2)",
     "emoji" : "📚",
+    "icon" : "heroicons_outline:book-open",
     "status" : "delivered",
     "nodeType" : "enrichment",
     "note" : "the shipped enrichment job + versioned references",
@@ -730,6 +819,7 @@
     "family" : "ENR",
     "label" : "GeoIP & ISP geolocation enricher",
     "emoji" : "🌍",
+    "icon" : "heroicons_outline:globe-alt",
     "status" : "planned",
     "addable" : false
   }, {
@@ -737,6 +827,7 @@
     "family" : "ENR",
     "label" : "Redis / in-memory cache lookup",
     "emoji" : "⚡",
+    "icon" : "heroicons_outline:bolt",
     "status" : "planned",
     "addable" : false
   }, {
@@ -744,6 +835,7 @@
     "family" : "ENR",
     "label" : "Dynamic microservice REST enricher",
     "emoji" : "🌐",
+    "icon" : "heroicons_outline:globe-alt",
     "status" : "planned",
     "addable" : false
   }, {
@@ -751,6 +843,7 @@
     "family" : "ENR",
     "label" : "Parameterized stored-procedure caller",
     "emoji" : "🗄️",
+    "icon" : "heroicons_outline:circle-stack",
     "status" : "planned",
     "addable" : false
   }, {
@@ -758,6 +851,7 @@
     "family" : "ENR",
     "label" : "Master entity resolution & record linkage",
     "emoji" : "🔗",
+    "icon" : "heroicons_outline:user-group",
     "status" : "planned",
     "addable" : false
   }, {
@@ -765,6 +859,7 @@
     "family" : "ENR",
     "label" : "Graph cluster & connected-component tagger",
     "emoji" : "🕸️",
+    "icon" : "heroicons_outline:share",
     "status" : "partial",
     "capability" : "link-analysis",
     "note" : "link-analysis VIEW ships (projection); no tagging step",
@@ -774,6 +869,7 @@
     "family" : "ENR",
     "label" : "ONNX Runtime embedded inference",
     "emoji" : "🤖",
+    "icon" : "heroicons_outline:cpu-chip",
     "status" : "planned",
     "note" : "the optional `inspecto-intelligence` module carries onnxruntime; never bundled",
     "addable" : false
@@ -782,6 +878,7 @@
     "family" : "ENR",
     "label" : "LLM zero-shot classifier & tagging",
     "emoji" : "🏷️",
+    "icon" : "heroicons_outline:sparkles",
     "status" : "planned",
     "note" : "assist/intelligence agents are never bundled (CP-14)",
     "addable" : false
@@ -790,6 +887,7 @@
     "family" : "ENR",
     "label" : "Text embeddings & vector generator",
     "emoji" : "📐",
+    "icon" : "heroicons_outline:viewfinder-circle",
     "status" : "planned",
     "addable" : false
   }, {
@@ -797,6 +895,7 @@
     "family" : "CTL",
     "label" : "File sequence & gap integrity analyzer",
     "emoji" : "🕳️",
+    "icon" : "heroicons_outline:list-bullet",
     "status" : "delivered",
     "nodeType" : "gap",
     "note" : "Collector `gap_detection: {sequence}` → the gap node + SEQUENCE_GAP events",
@@ -806,6 +905,7 @@
     "family" : "CTL",
     "label" : "Sequence-gap & data-loss watchdog",
     "emoji" : "🕳️",
+    "icon" : "heroicons_outline:bell-alert",
     "status" : "delivered",
     "nodeType" : "gap",
     "note" : "same detector; gaps raise ALERT objects via the EventObjectBridge",
@@ -815,6 +915,7 @@
     "family" : "CTL",
     "label" : "Audit metadata & lineage stamper",
     "emoji" : "🏷️",
+    "icon" : "heroicons_outline:clipboard-document-check",
     "status" : "delivered",
     "nodeType" : "sink.persistent",
     "note" : "`filename_column` + the per-file/batch/lineage ledgers + `__batch_id` provenance",
@@ -824,6 +925,7 @@
     "family" : "CTL",
     "label" : "Throttle & rate limiter",
     "emoji" : "⏳",
+    "icon" : "heroicons_outline:pause-circle",
     "status" : "delivered",
     "nodeType" : "acquisition",
     "note" : "Collector `fetch.rate_limit` + intake caps + the concurrency broker",
@@ -833,6 +935,7 @@
     "family" : "CTL",
     "label" : "Circuit breaker & fallback switch",
     "emoji" : "🚦",
+    "icon" : "heroicons_outline:bolt-slash",
     "status" : "delivered",
     "nodeType" : "acquisition",
     "note" : "Collector `circuit_breaker` + `retry`",
@@ -842,6 +945,7 @@
     "family" : "CTL",
     "label" : "Transaction & commit controller",
     "emoji" : "🏁",
+    "icon" : "heroicons_outline:check-badge",
     "status" : "partial",
     "capability" : "engine",
     "note" : "the BranchCommitCoordinator ledger + bounded COMMIT retry are engine-internal, not authorable",
@@ -851,6 +955,7 @@
     "family" : "CTL",
     "label" : "Alert rule dispatcher",
     "emoji" : "🚨",
+    "icon" : "heroicons_outline:megaphone",
     "status" : "delivered",
     "capability" : "alert-rule",
     "note" : "Alert Rules over the ledgers → Alerts → channels; board CP-11/CP-15",
@@ -860,6 +965,7 @@
     "family" : "CTL",
     "label" : "SLA timeout & heartbeat monitor",
     "emoji" : "⏱️",
+    "icon" : "heroicons_outline:clock",
     "status" : "partial",
     "capability" : "completeness-kpi",
     "note" : "completeness KPI + `heartbeat` maintenance task; no SLA object",
@@ -869,6 +975,7 @@
     "family" : "SNK",
     "label" : "Parquet (snappy / zstd / gzip) partitioned store",
     "emoji" : "📁",
+    "icon" : "heroicons_outline:archive-box",
     "status" : "delivered",
     "nodeType" : "sink.persistent",
     "note" : "Hive `year=/month=/day=` partitions",
@@ -878,6 +985,7 @@
     "family" : "SNK",
     "label" : "CSV partitioned store",
     "emoji" : "📄",
+    "icon" : "heroicons_outline:document-text",
     "status" : "delivered",
     "nodeType" : "sink.persistent",
     "note" : "`output.format: CSV`",
@@ -887,6 +995,7 @@
     "family" : "SNK",
     "label" : "DuckLake catalog (PostgreSQL) sink",
     "emoji" : "🦆",
+    "icon" : "heroicons_outline:server-stack",
     "status" : "delivered",
     "nodeType" : "sink.persistent",
     "note" : "`output.ducklake` — needs the postgresql sidecar (Standard+)",
@@ -896,6 +1005,7 @@
     "family" : "SNK",
     "label" : "Derived view (no bytes, registered SQL)",
     "emoji" : "👁️",
+    "icon" : "heroicons_outline:eye",
     "status" : "partial",
     "nodeType" : "sink.view",
     "note" : "grandfathered node type; the Dataset/View surface replaced it",
@@ -905,6 +1015,7 @@
     "family" : "SNK",
     "label" : "Quarantine error-log store",
     "emoji" : "☣️",
+    "icon" : "heroicons_outline:shield-exclamation",
     "status" : "delivered",
     "capability" : "sink.quarantine",
     "note" : "structural rejects + `errors/<base>_errors.csv`",
@@ -914,6 +1025,7 @@
     "family" : "SNK",
     "label" : "Long-term compliance archive",
     "emoji" : "📜",
+    "icon" : "heroicons_outline:archive-box-arrow-down",
     "status" : "delivered",
     "nodeType" : "acquisition",
     "note" : "Collector `post_action: MOVE archive_path` + the `backup` maintenance task",
@@ -923,6 +1035,7 @@
     "family" : "SNK",
     "label" : "Delta Lake persistent table sink",
     "emoji" : "🗄️",
+    "icon" : "heroicons_outline:server-stack",
     "status" : "planned",
     "addable" : false
   }, {
@@ -930,6 +1043,7 @@
     "family" : "SNK",
     "label" : "Apache Iceberg append / upsert sink",
     "emoji" : "🧊",
+    "icon" : "heroicons_outline:cube",
     "status" : "planned",
     "addable" : false
   }, {
@@ -937,6 +1051,7 @@
     "family" : "SNK",
     "label" : "ClickHouse / StarRocks analytical sink",
     "emoji" : "📊",
+    "icon" : "heroicons_outline:chart-bar-square",
     "status" : "planned",
     "addable" : false
   }, {
@@ -944,6 +1059,7 @@
     "family" : "SNK",
     "label" : "Excel multi-tab report sink",
     "emoji" : "📑",
+    "icon" : "heroicons_outline:table-cells",
     "status" : "planned",
     "addable" : false
   }, {
@@ -951,6 +1067,7 @@
     "family" : "SNK",
     "label" : "Apache Kafka topic producer",
     "emoji" : "📤",
+    "icon" : "heroicons_outline:queue-list",
     "status" : "planned",
     "addable" : false
   }, {
@@ -958,6 +1075,7 @@
     "family" : "SNK",
     "label" : "AWS SQS / SNS event publisher",
     "emoji" : "📨",
+    "icon" : "heroicons_outline:paper-airplane",
     "status" : "planned",
     "addable" : false
   }, {
@@ -965,6 +1083,7 @@
     "family" : "SNK",
     "label" : "Email & report dispatcher",
     "emoji" : "📧",
+    "icon" : "heroicons_outline:envelope",
     "status" : "partial",
     "capability" : "mail.send",
     "note" : "the `mail.send` JOB + mail channels; not a chain sink",
@@ -974,6 +1093,7 @@
     "family" : "SNK",
     "label" : "Outbound webhook dispatcher",
     "emoji" : "🪝",
+    "icon" : "heroicons_outline:link",
     "status" : "partial",
     "capability" : "channel",
     "note" : "webhook notification channel exists; not a chain sink",
@@ -983,6 +1103,7 @@
     "family" : "SNK",
     "label" : "Dead-letter queue",
     "emoji" : "🕳️",
+    "icon" : "heroicons_outline:archive-box-x-mark",
     "status" : "planned",
     "addable" : false
   } ]

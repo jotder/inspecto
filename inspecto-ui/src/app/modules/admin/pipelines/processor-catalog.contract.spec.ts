@@ -31,6 +31,12 @@ describe('processor-catalog contract', () => {
         expect(catalog.processors.filter((p) => p.status === 'planned').length).toBeGreaterThan(50);
     });
 
+    it('every processor carries its own heroicons_outline icon', () => {
+        for (const p of catalog.processors) expect(p.icon, p.id).toMatch(/^heroicons_outline:[a-z0-9-]+$/);
+        // meaningful, not a family placeholder: the catalog uses many distinct glyphs
+        expect(new Set(catalog.processors.map((p) => p.icon)).size).toBeGreaterThan(40);
+    });
+
     it('groups into non-empty family sections in catalog order', () => {
         const groups = groupByFamily(catalog);
         expect(groups.map((g) => g.family.code)).toEqual(catalog.families.map((f) => f.code));

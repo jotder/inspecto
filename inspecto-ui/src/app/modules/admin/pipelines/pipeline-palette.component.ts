@@ -94,7 +94,9 @@ import {
                                     >
                                         <mat-icon
                                             class="icon-size-4 shrink-0"
-                                            [svgIcon]="typeHeroIcon(p.nodeType, familyCategory(g.family.code))"
+                                            [svgIcon]="
+                                                p.icon || typeHeroIcon(p.nodeType, familyCategory(g.family.code))
+                                            "
                                             [style.color]="categoryColor(familyCategory(g.family.code))"
                                         ></mat-icon>
                                         <span class="truncate">{{ p.label }}</span>
@@ -111,7 +113,10 @@ import {
                                         [attr.aria-label]="p.label + ' — ' + inactiveReason(p)"
                                         [attr.data-processor]="p.id"
                                     >
-                                        <mat-icon class="icon-size-4 shrink-0" [svgIcon]="g.family.icon"></mat-icon>
+                                        <mat-icon
+                                            class="icon-size-4 shrink-0"
+                                            [svgIcon]="p.icon || g.family.icon"
+                                        ></mat-icon>
                                         <span class="truncate">{{ p.label }}</span>
                                         <inspecto-chip class="ml-auto shrink-0" variant="soft" tone="neutral">
                                             {{

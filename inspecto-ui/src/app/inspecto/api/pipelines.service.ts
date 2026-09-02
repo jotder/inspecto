@@ -148,6 +148,8 @@ export interface StepProcessor {
     family: string;
     label: string;
     emoji: string;
+    /** The heroicons id the palette draws for this processor (e.g. `heroicons_outline:funnel`). */
+    icon: string;
     status: 'delivered' | 'partial' | 'planned';
     nodeType?: string;
     capability?: string;
