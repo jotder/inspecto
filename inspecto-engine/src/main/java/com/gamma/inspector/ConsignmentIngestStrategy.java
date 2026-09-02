@@ -149,6 +149,31 @@ interface ConsignmentIngestStrategy {
         DecisionRuleApplier.Result applied = DecisionRuleApplier.apply(
                 conn, table, cfg, dbDir, baseName, partCols, batchId, srcIdToFile);
 
+        com.gamma.pipeline.PipelineGraph lifted = admittedLift(cfg, applied);
+        return lifted != null
+                ? graphWriteAndTrace(conn, table, partCols, cfg, dbDir, baseName, batchId, srcIdToFile,
+                        lifted, applied, writeScope)
+                : flatWriteAndTrace(conn, table, partCols, cfg, dbDir, baseName, batchId, srcIdToFile,
+                        applied);
+    }
+
+    /**
+     * ELT amendment §6 step 3 / decision D-2: the legacy FLAT lane sits <b>behind a flag</b> for one
+     * verification minor before its readers are deleted. {@code -Dingest.lane=auto} (default) is the
+     * admission as designed; {@code graph} DISABLES the flat lane — a write the graph lane cannot carry
+     * fails the batch loudly, naming why, instead of quietly falling back (that is the whole point of the
+     * verification minor: every remaining dependency on the flat lane surfaces as a refusal, not a
+     * silent divert); {@code flat} is the kill switch that never diverts. Any other value is refused.
+     */
+    static final String LANE_PROPERTY = "ingest.lane";
+
+    /**
+     * The lane fork's decision, pure and testable: the lifted graph the write runs through, or
+     * {@code null} for the flat lane. Route pipelines divert when their lift ENGAGES; non-route
+     * pipelines divert when the graph lane provably CARRIES the same write and no Decision Rule routed
+     * rows. Then {@link #LANE_PROPERTY} is honoured on top.
+     */
+    static com.gamma.pipeline.PipelineGraph admittedLift(PipelineConfig cfg, DecisionRuleApplier.Result applied) {
         com.gamma.pipeline.PipelineGraph lifted = null;
         if (cfg.routeConfig() != null) {
             com.gamma.pipeline.PipelineGraph routed = com.gamma.pipeline.PipelineLift.lift(cfg);
@@ -156,11 +181,38 @@ interface ConsignmentIngestStrategy {
         } else if (applied.outputs().isEmpty() && graphLaneCarries(cfg)) {
             lifted = com.gamma.pipeline.PipelineLift.lift(cfg);
         }
-        return lifted != null
-                ? graphWriteAndTrace(conn, table, partCols, cfg, dbDir, baseName, batchId, srcIdToFile,
-                        lifted, applied, writeScope)
-                : flatWriteAndTrace(conn, table, partCols, cfg, dbDir, baseName, batchId, srcIdToFile,
-                        applied);
+        String mode = System.getProperty(LANE_PROPERTY, "auto").trim().toLowerCase(java.util.Locale.ROOT);
+        return switch (mode) {
+            case "auto" -> lifted;
+            case "flat" -> null;   // the kill switch: the legacy lane, by name, whatever the admission said
+            case "graph" -> {
+                if (lifted == null)
+                    throw new IllegalStateException("-D" + LANE_PROPERTY + "=graph: the graph lane cannot carry "
+                            + "pipeline '" + cfg.identity().pipelineName() + "' (" + flatReason(cfg, applied)
+                            + ") and the legacy flat lane is disabled by the flag — ELT Phase 6 verification. "
+                            + "Drop the flag (auto) to let this pipeline write flat.");
+                yield lifted;
+            }
+            default -> throw new IllegalArgumentException("-D" + LANE_PROPERTY + " must be auto | graph | flat, got '"
+                    + mode + "'");
+        };
+    }
+
+    /** Why the admission kept this write FLAT — the message a {@code graph}-only run refuses with. */
+    static String flatReason(PipelineConfig cfg, DecisionRuleApplier.Result applied) {
+        if (cfg.routeConfig() != null) return "the authored route does not engage the graph lane";
+        if (!applied.outputs().isEmpty()) return "a Decision Rule routed rows, which the graph lane does not implement";
+        if (scratchDir(cfg) == null) return "no scratch dir (dirs.temp / duckdb.temp_directory) for the branch-commit ledger";
+        com.gamma.pipeline.PipelineGraph lifted = com.gamma.pipeline.PipelineLift.lift(cfg);
+        List<com.gamma.pipeline.PipelineNode> sinks = lifted.nodes().stream()
+                .filter(n -> PipelineNodeTypes.isCategory(n.type(), NodeCategory.SINK)).toList();
+        if (sinks.size() != cfg.sinks().size() || sinks.isEmpty())
+            return "the lifted graph's sink count (" + sinks.size() + ") differs from sinks[] (" + cfg.sinks().size() + ")";
+        String seed = seedFeedingTheWrite(lifted);
+        if (!"transform.map".equals(lifted.byId().get(seed).type()))
+            return "a node between map and the write (" + lifted.byId().get(seed).type()
+                    + ") would have to EXECUTE at rest — Stage-2 work";
+        return "a sink is fed through another node rather than directly off map";
     }
 
     /**

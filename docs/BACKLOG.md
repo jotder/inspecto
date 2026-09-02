@@ -854,9 +854,12 @@ board is 16 of 17 with only release-gated row 15 open).** Plan and evidence in
 [`superpower/pipeline-waves-drain-plan.md`](superpower/pipeline-waves-drain-plan.md).
 
 - **Row 15 — Phase 6's deletion half. ⛔ NOT closable by code.** ELT amendment §6 gives it four steps and
-  **two are unmet**: (3) the legacy read path must be *kept behind a flag* for one verification minor —
+  **one is unmet** (2026-09-02: step 3 BUILT — `-Dingest.lane=auto|graph|flat` in
+  `ConsignmentIngestStrategy.admittedLift`; `graph` disables the legacy flat lane and refuses loudly with
+  `flatReason`, `flat` is the kill switch; `IngestLaneFlagTest`; doc in `okf/backend/engine/branch-aware-ingest.md`):
+  ~~(3) the legacy read path must be *kept behind a flag* for one verification minor —
   🔴 **that flag was never built** (no system property or gate disables the legacy read path anywhere in
-  main source); and (4) that minor must ship — the newest tag **`v3.12.0` is 2026-06-05**, ten weeks
+  main source)~~; and (4) that minor must ship — the newest tag **`v3.12.0` is 2026-06-05**, ten weeks
   *before* the converter landed (`f72f7fc8`, 2026-08-18), and is **not an ancestor of `master`**.
   ⛔ The amendment's §8 also says of this work *"Do not start it on momentum."* Deleting the readers now
   would destroy the verification window D-2 exists to provide. **Returns only with a release decision.**

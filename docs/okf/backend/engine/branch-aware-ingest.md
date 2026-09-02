@@ -48,6 +48,16 @@ Refused, and left flat by name: a node BETWEEN map and sink (`dedup`/`join`/`sum
 them means EXECUTING them at rest, which is Stage-2 work), and a pipeline with **no configured
 scratch dir**.
 
+**The flag (ELT amendment §6 step 3 / D-2, built 2026-09-02).** `-Dingest.lane=auto|graph|flat`, read
+in `ConsignmentIngestStrategy.admittedLift` (the fork's decision, extracted pure so it is testable).
+`auto` (default) is the admission above. `graph` **disables the legacy flat lane**: a write the graph lane
+cannot carry fails the batch with an `IllegalStateException` naming the pipeline and the reason
+(`flatReason` — no scratch dir, a Decision Rule routed rows, a node between map and the write, …) rather
+than quietly diverting flat. That is what the "one verification minor" runs with: every remaining
+dependency on the flat lane surfaces as a refusal. `flat` is the kill switch (never divert). Any other
+value is refused. Pinned by `IngestLaneFlagTest`. ⚠ The deletion of the flat readers stays release-gated
+(BACKLOG row 15, D-2) — the flag is its precondition, not its trigger.
+
 Three mechanisms a change here must respect:
 
 1. 🔴 **`writeAndTrace` has four callers and two write a batch in SEVERAL calls** (one per chunk, one

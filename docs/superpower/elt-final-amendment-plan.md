@@ -1363,7 +1363,9 @@ already-materialised table, so it performs the WRITE and never re-runs parse/map
 if the graph lane is ever asked to execute the map node itself.
 
 **What remains of Phase 6 is the deletion half, and it is release-gated** (D-2: converter + one flagged
-verification minor, then the legacy readers are deleted). ⛔ Do not start it on momentum. Only once those are carried does item (1) — moving `withMappingContext` into
+verification minor, then the legacy readers are deleted). **The flag exists since 2026-09-02**
+(`-Dingest.lane=graph` disables the flat lane; `ConsignmentIngestStrategy.admittedLift`) — the verification
+minor can now be cut; the deletion still waits for it to ship. ⛔ Do not start the deletion on momentum. Only once those are carried does item (1) — moving `withMappingContext` into
 `PipelineLift` — come due, and only because the graph would then execute the map node itself.
 
 ---
