@@ -46,7 +46,7 @@ import java.util.Set;
  */
 public record NodeAttribute(String key, String label, String type, String tier, Boolean required,
                             Object defaultValue, List<Option> options, Double min, Double max,
-                            String help, String placeholder, DependsOn dependsOn) {
+                            String help, String placeholder, DependsOn dependsOn, String group) {
 
     /**
      * Renderer-supported control types — the {@code AttributeType} union in {@code attribute-spec.ts}.
@@ -93,38 +93,44 @@ public record NodeAttribute(String key, String label, String type, String tier, 
     // ── terse builders, so the tables below read as data rather than constructor noise ──────────
 
     static NodeAttribute of(String key, String label, String type, String tier) {
-        return new NodeAttribute(key, label, type, tier, null, null, List.of(), null, null, null, null, null);
+        return new NodeAttribute(key, label, type, tier, null, null, List.of(), null, null, null, null, null, null);
     }
 
     NodeAttribute help(String help) {
-        return new NodeAttribute(key, label, type, tier, required, defaultValue, options, min, max, help, placeholder, dependsOn);
+        return new NodeAttribute(key, label, type, tier, required, defaultValue, options, min, max, help, placeholder, dependsOn, group);
     }
 
     NodeAttribute placeholder(String placeholder) {
-        return new NodeAttribute(key, label, type, tier, required, defaultValue, options, min, max, help, placeholder, dependsOn);
+        return new NodeAttribute(key, label, type, tier, required, defaultValue, options, min, max, help, placeholder, dependsOn, group);
     }
 
     /** Explicitly decouple validation from visibility (an always-visible but optional field). */
     NodeAttribute required(boolean required) {
-        return new NodeAttribute(key, label, type, tier, required, defaultValue, options, min, max, help, placeholder, dependsOn);
+        return new NodeAttribute(key, label, type, tier, required, defaultValue, options, min, max, help, placeholder, dependsOn, group);
     }
 
     NodeAttribute defaultValue(Object defaultValue) {
-        return new NodeAttribute(key, label, type, tier, required, defaultValue, options, min, max, help, placeholder, dependsOn);
+        return new NodeAttribute(key, label, type, tier, required, defaultValue, options, min, max, help, placeholder, dependsOn, group);
     }
 
     NodeAttribute min(double min) {
-        return new NodeAttribute(key, label, type, tier, required, defaultValue, options, min, max, help, placeholder, dependsOn);
+        return new NodeAttribute(key, label, type, tier, required, defaultValue, options, min, max, help, placeholder, dependsOn, group);
     }
 
     NodeAttribute max(double max) {
-        return new NodeAttribute(key, label, type, tier, required, defaultValue, options, min, max, help, placeholder, dependsOn);
+        return new NodeAttribute(key, label, type, tier, required, defaultValue, options, min, max, help, placeholder, dependsOn, group);
     }
 
     /** Show (and validate) only while attribute {@code key} holds {@code equalsValue} — see the class doc. */
     NodeAttribute dependsOn(String key, Object equalsValue) {
         return new NodeAttribute(this.key, label, type, tier, required, defaultValue, options, min, max, help,
-                placeholder, new DependsOn(key, equalsValue));
+                placeholder, new DependsOn(key, equalsValue), group);
+    }
+
+    /** Section heading this attribute sits under WITHIN its tier ({@code AttributeSpec.group}): specs
+     *  sharing a group render beneath one heading, in declaration order. Never crosses a tier. */
+    NodeAttribute group(String group) {
+        return new NodeAttribute(key, label, type, tier, required, defaultValue, options, min, max, help, placeholder, dependsOn, group);
     }
 
     /** {@code value, label, value, label, …} — the option list, kept inline so a table stays one line per key. */
@@ -133,7 +139,7 @@ public record NodeAttribute(String key, String label, String type, String tier, 
         List<Option> opts = new ArrayList<>();
         for (int i = 0; i < valueLabelPairs.length; i += 2)
             opts.add(new Option(valueLabelPairs[i], valueLabelPairs[i + 1]));
-        return new NodeAttribute(key, label, type, tier, required, defaultValue, opts, min, max, help, placeholder, dependsOn);
+        return new NodeAttribute(key, label, type, tier, required, defaultValue, opts, min, max, help, placeholder, dependsOn, group);
     }
 
     /**
@@ -147,6 +153,7 @@ public record NodeAttribute(String key, String label, String type, String tier, 
         m.put("label", label);
         m.put("type", type);
         m.put("tier", tier);
+        if (group != null) m.put("group", group);
         if (required != null) m.put("required", required);
         if (defaultValue != null) m.put("default", defaultValue);
         if (!options.isEmpty()) {

@@ -390,10 +390,11 @@ public final class PipelineEditable {
 
     /**
      * Sink-owned FLAT processing keys (write tuning carried on the persistent sink node). Consignment
-     * grouping is deliberately not here: the engine reads it as the nested {@code processing.batch:}
-     * map ({@code PipelineConfigParser}), so the sink node owns that map wholesale instead — the flat
-     * {@code batch_max_files}/{@code batch_max_bytes} spellings were write-only (G3,
-     * {@code consignment-chain-plan.md}) and lower removes them.
+     * formation is NOT here since 2026-09-02 (CONSIGNMENT-HOME-1): it is a collector-block key
+     * ({@code collector.consignment:}), owned by the acquisition node — the planner runs in the poll
+     * cycle, before any sink exists. The legacy {@code processing.batch:} map and the flat
+     * {@code batch_max_files}/{@code batch_max_bytes} spellings (write-only, G3) are healed by lift and
+     * removed by lower.
      */
     private static final Set<String> SINK_PROC_OWNED = Set.of("threads", "duckdb_threads", "priority");
 
@@ -496,6 +497,20 @@ public final class PipelineEditable {
             // Unpack stage: the nested processing.unpack map, owned wholesale like the sink's intake
             // (its keys surface as the unpack__* specs). No legacy flat spellings to heal.
             if (processing.get("unpack") instanceof Map<?, ?> up) c.put("unpack", up);
+            // Consignment formation (CONSIGNMENT-HOME-1): collector.consignment is a collector-block key,
+            // so the loop above already carried it. A file still on the legacy processing.batch: map —
+            // or the older flat spellings, written by the editor before G3 and read by nothing — heals
+            // into the node's `consignment` map here and lands in the new home on the next save.
+            if (!c.containsKey("consignment")) {
+                if (processing.get("batch") instanceof Map<?, ?> b) {
+                    c.put("consignment", b);
+                } else {
+                    Map<String, Object> legacy = new LinkedHashMap<>();
+                    putIfPresent(legacy, "max_files", processing.get("batch_max_files"));
+                    putIfPresent(legacy, "max_bytes", processing.get("batch_max_bytes"));
+                    if (!legacy.isEmpty()) c.put("consignment", legacy);
+                }
+            }
         } else if (isParserType(t)) {
             for (String k : PARSER_OWNED) putIfPresent(c, k, processing.get(k));
             // The unified top-level parsing: block is parser-owned too, carried VERBATIM under its own
@@ -545,18 +560,8 @@ public final class PipelineEditable {
                 putIfPresent(c, "backup", dirs.get("backup"));
                 putIfPresent(c, "temp", dirs.get("temp"));
                 for (String k : SINK_PROC_OWNED) putIfPresent(c, k, processing.get(k));
-                // Consignment grouping: the nested processing.batch map, owned wholesale (its keys
-                // surface as the batch__* specs). A file carrying only the legacy flat spellings —
-                // written by the editor before G3 was fixed, read by nothing — heals into the nested
-                // shape on its next save.
-                if (processing.get("batch") instanceof Map<?, ?> b) {
-                    c.put("batch", b);
-                } else {
-                    Map<String, Object> batch = new LinkedHashMap<>();
-                    putIfPresent(batch, "max_files", processing.get("batch_max_files"));
-                    putIfPresent(batch, "max_bytes", processing.get("batch_max_bytes"));
-                    if (!batch.isEmpty()) c.put("batch", batch);
-                }
+                // (Consignment formation left this node 2026-09-02 — it rides the acquisition node as
+                // collector.consignment now; see editableConfig's ACQUISITION branch.)
                 // Intake admission control: the nested processing.intake map, owned wholesale like
                 // batch (its keys surface as the intake__* specs). No legacy flat spellings to heal.
                 if (processing.get("intake") instanceof Map<?, ?> in) c.put("intake", in);
@@ -748,6 +753,13 @@ public final class PipelineEditable {
             replaceOrRemove(processing, "file_pattern", acq.cfg("file_pattern"));
             // Unpack lowers back as the nested processing.unpack: map the parser reads.
             replaceOrRemove(processing, "unpack", acq.cfg("unpack"));
+            // Consignment formation lowered above INTO collector.consignment (a collector-block key, not
+            // a foreign one). The legacy spellings go unconditionally — processing.batch: was the
+            // pre-2026-09-02 home and the flat pair was read by nothing (G3); leaving any behind would
+            // keep two spellings of one knob in one file, and the parser reads the canonical one first.
+            processing.remove("batch");
+            processing.remove("batch_max_files");
+            processing.remove("batch_max_bytes");
         }
         overlayOwned(collector, "gap_detection", gap == null ? null : gapSection(gap), strict);
 
@@ -900,12 +912,6 @@ public final class PipelineEditable {
             replaceOrRemove(dirs, "backup", primarySink.cfg("backup"));
             replaceOrRemove(dirs, "temp", primarySink.cfg("temp"));
             for (String k : SINK_PROC_OWNED) replaceOrRemove(processing, k, primarySink.cfg(k));
-            // Consignment grouping lowers as the nested processing.batch: map the parser reads. The
-            // flat spellings go unconditionally — they were read by nothing (G3), and leaving one
-            // behind would keep two spellings of the same knob in one file.
-            replaceOrRemove(processing, "batch", primarySink.cfg("batch"));
-            processing.remove("batch_max_files");
-            processing.remove("batch_max_bytes");
             // Intake admission control lowers as the nested processing.intake: map the parser reads.
             replaceOrRemove(processing, "intake", primarySink.cfg("intake"));
         }

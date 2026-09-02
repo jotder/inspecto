@@ -235,7 +235,7 @@ default 256 MB):
 - **Union mode** (many small files) — members accumulate into per-member raw tables, which are then
   consolidated through a lazy `UNION ALL` **view** (since v3.12.0) that one transform/write pulls
   through per batch. Output is **consolidated** (one set of partition files), and the fixed per-batch
-  cost is amortised across all packed files (raise `processing.batch.max_files`). The view replaced an
+  cost is amortised across all packed files (raise `collector.consignment.max_files`). The view replaced an
   intermediate physical `raw_<KEY>` table that every member's rows were copied into before transform,
   so the batch now materialises once (`transformed_<KEY>`) instead of twice — peak scratch drops by
   ~1× the segment's data and a full copy pass is gone. Mirrors the native CSV streaming-UNION path.

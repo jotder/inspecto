@@ -42,8 +42,9 @@ Selectors (parsed in `PipelineConfigParser`): `processing.streaming.large_file_b
   entry point, split into two halves (B3b): **`acquire(cfg)`** runs the [acquisition](../acquisition/framework.md)
   phases (remote fetch-and-land; a no-op for a `local` collector), and **`ingest(cfg, onCommit)`** scans the
   inbox → groups into `Consignment`s via `ConsignmentPlanner` (bounded by
-  `processing.batch.max_files`/`max_bytes`, ordered by `processing.batch.order` — the `.toon` keys keep the
-  pre-rename `batch.` spelling, a deferred residual (BACKLOG §4), as does `Consignment.batchId` — **default `mtime`
+  `collector.consignment.max_files`/`max_bytes`, ordered by `collector.consignment.order` — the canonical home
+  since 2026-09-02 (CONSIGNMENT-HOME-1; `processing.batch.*` is the dual-read legacy spelling, healed on save);
+  `Consignment.batchId` keeps its wire spelling — **default `mtime`
   (file arrival)**, operator decision 2026-08-12; `name` is the opt-in for feeds whose stamps are
   unreliable, and any other value is refused at parse) → submits to a
   virtual-thread executor bounded by `Semaphore(processing.threads)`. `run()` = `acquire` then `ingest`, the

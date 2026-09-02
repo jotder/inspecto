@@ -72,7 +72,7 @@ input; the rest of this section details each block.
 | **Binary / proprietary / multi-event-type** (CDR blobs, fixed-length binary, anything one parser splits into several record types) | [plugin](../engine/plugins.md#plugin-ingester) | `processing.ingester` + `processing.segments` + optional `processing.ingester_config` | `ingester` (FQCN), per-segment schema files, free-form `ingester_config` map for format-specific settings (`record_length`, `byte_order`, …) |
 
 Common to **all** formats: `dirs.*`, `output.format` (`CSV`/`PARQUET`),
-`processing.batch.*`, `processing.threads`, the `partitions[]` declaration in
+`collector.consignment.*` (legacy `processing.batch.*`), `processing.threads`, the `partitions[]` declaration in
 each schema, and the audit/manifest machinery. Format-specific blocks only
 cover *how the bytes become rows* — once rows exist, the M..N partition-and-write
 path is identical regardless of source format.

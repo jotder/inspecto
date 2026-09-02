@@ -209,8 +209,18 @@ final class PipelineConfigParser {
             throw new IllegalArgumentException(
                     "processing.priority must be 1..3, got " + b.priority);
 
-        // ── batch caps ──────────────────────────────────────────────────────────
-        Map<String, Object> batch = castMapAt(proc, "batch");
+        // ── consignment caps (CONSIGNMENT-HOME-1, 2026-09-02) ──────────────────
+        // Canonical home: collector.consignment: {max_files, max_bytes, order} — the ConsignmentPlanner
+        // runs in the poll cycle, so the Collector owns how files are cut into Consignments. The
+        // pre-move spelling processing.batch: is dual-read (it wins nothing: canonical first) and
+        // healed into the new home by the editor on the next save; nothing writes it any more.
+        Map<String, Object> collectorBlock = castMapAt(raw, "collector");
+        Map<String, Object> batch = collectorBlock == null ? null : castMapAt(collectorBlock, "consignment");
+        String batchHome = "collector.consignment";
+        if (batch == null) {
+            batch = castMapAt(proc, "batch");
+            batchHome = "processing.batch";
+        }
         if (batch != null) {
             b.batchMaxFiles = toInt(batch.getOrDefault("max_files", 1));
             Object mb = batch.get("max_bytes");
@@ -222,7 +232,7 @@ final class PipelineConfigParser {
             String order = String.valueOf(batch.getOrDefault("order", "mtime"));
             if (!"name".equals(order) && !"mtime".equals(order))
                 throw new IllegalArgumentException(
-                        "processing.batch.order must be 'name' or 'mtime', got '" + order + "'");
+                        batchHome + ".order must be 'name' or 'mtime', got '" + order + "'");
             b.batchOrder = order;
         }
 

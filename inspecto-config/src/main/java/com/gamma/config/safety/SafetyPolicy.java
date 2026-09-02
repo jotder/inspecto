@@ -24,8 +24,8 @@ import java.util.Set;
  *
  * @param allowedRoots       filesystem roots a config's paths must resolve under (absolute, normalised)
  * @param maxThreads         upper bound for {@code processing.threads} / {@code duckdb_threads}
- * @param maxBatchFiles      upper bound for {@code processing.batch.max_files}
- * @param maxBatchBytes      upper bound for {@code processing.batch.max_bytes}
+ * @param maxBatchFiles      upper bound for {@code collector.consignment.max_files} (and the legacy {@code processing.batch.max_files})
+ * @param maxBatchBytes      upper bound for {@code collector.consignment.max_bytes} (and the legacy {@code processing.batch.max_bytes})
  * @param allowedFormats     permitted {@code output.format} values (upper-case)
  * @param allowedCompression permitted {@code output.compression} codecs (lower-case)
  * @since 3.5.0

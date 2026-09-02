@@ -15,7 +15,7 @@ purely-static, zero-dependency hard-fail gate (since v3.5.0). `check(configType,
 
 * **Path jail** — every `dirs.*` field + `output.ducklake.data_path` must resolve under the policy's
   `allowedRoots`; rejects `..` escapes, UNC paths, and symlink escapes (real-path re-checked).
-* **Numeric bounds** — `processing.threads`, `processing.duckdb_threads`, `processing.batch.max_files`, and
+* **Numeric bounds** — `processing.threads`, `processing.duckdb_threads`, `collector.consignment.max_files` (and the legacy `processing.batch.max_files`), and
   the `skip_*` values against policy limits; `retention_days >= 1` when duplicate-check is on.
 * **Output allow-list** — `output.format`/`output.compression` restricted to known values; DuckLake requires
   its connection fields when enabled.

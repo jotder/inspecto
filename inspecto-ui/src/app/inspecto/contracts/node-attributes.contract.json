@@ -145,6 +145,37 @@
     "help" : "Remote Collectors only. Cap this pipeline's download bandwidth — a rate like 512KB/s, 10MB/s, or a bare number (bytes/s). Blank = unlimited.",
     "placeholder" : "10MB/s"
   }, {
+    "key" : "consignment__max_files",
+    "label" : "Max files per consignment",
+    "type" : "number",
+    "tier" : "optional",
+    "group" : "Consignment",
+    "min" : 1.0,
+    "help" : "Pack inbox files into one consignment until this many files. Blank = 1 (each file is its own consignment)."
+  }, {
+    "key" : "consignment__max_bytes",
+    "label" : "Max bytes per consignment",
+    "type" : "number",
+    "tier" : "optional",
+    "group" : "Consignment",
+    "min" : 1.0,
+    "help" : "Or until their summed size would exceed this many bytes. Whichever cap trips first ends the consignment; a single larger file forms a consignment of one."
+  }, {
+    "key" : "consignment__order",
+    "label" : "Consignment order",
+    "type" : "select",
+    "tier" : "optional",
+    "group" : "Consignment",
+    "default" : "mtime",
+    "options" : [ {
+      "value" : "mtime",
+      "label" : "By arrival (file time)"
+    }, {
+      "value" : "name",
+      "label" : "By name (path order)"
+    } ],
+    "help" : "How inbox files are ordered before packing. Arrival (file time) is the default; name order is the opt-in for feeds whose stamps are unreliable — a copy resets mtime."
+  }, {
     "key" : "duplicate_check",
     "label" : "Marker dedup",
     "type" : "boolean",
@@ -419,34 +450,6 @@
     "tier" : "advanced",
     "help" : "Adds a column of this name carrying each row’s source file. New pipelines default to file_name; blank = no column (lineage stays in the ledger only).",
     "placeholder" : "file_name"
-  }, {
-    "key" : "batch__max_files",
-    "label" : "Max files per consignment",
-    "type" : "number",
-    "tier" : "advanced",
-    "min" : 1.0,
-    "help" : "Pack inbox files into one consignment until this many files. Blank = 1 (each file is its own consignment)."
-  }, {
-    "key" : "batch__max_bytes",
-    "label" : "Max bytes per consignment",
-    "type" : "number",
-    "tier" : "advanced",
-    "min" : 1.0,
-    "help" : "Or until their summed size would exceed this many bytes. Whichever cap trips first ends the consignment; a single larger file forms a consignment of one."
-  }, {
-    "key" : "batch__order",
-    "label" : "Consignment order",
-    "type" : "select",
-    "tier" : "advanced",
-    "default" : "mtime",
-    "options" : [ {
-      "value" : "mtime",
-      "label" : "By arrival (file time)"
-    }, {
-      "value" : "name",
-      "label" : "By name (path order)"
-    } ],
-    "help" : "How inbox files are ordered before packing. Arrival (file time) is the default; name order is the opt-in for feeds whose stamps are unreliable — a copy resets mtime."
   }, {
     "key" : "priority",
     "label" : "Priority",

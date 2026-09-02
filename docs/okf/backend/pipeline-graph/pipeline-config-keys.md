@@ -50,8 +50,8 @@ same day (gap 8). The 17 current entries are exactly `UNDECLARED_BLOCKS`.
 ⚠ **Granularity is the block, deliberately.** Leaf drift *inside* a declared block is not covered —
 the known case: `dirs` is declared (poll, database, backup, temp, status_dir have `FieldSpec`s) while
 `dirs.errors` / `dirs.quarantine` / `dirs.markers` / `dirs.log_dir` are engine-read and undeclared.
-Likewise `processing.batch` is declared only via `max_files` (`max_bytes` / `order` are parser-only
-leaves), and cross-field rules reference `parsing.source_timezone` / `parsing.delimited.*` with no
+Likewise `collector.consignment` (canonical since 2026-09-02, CONSIGNMENT-HOME-1; `processing.batch` is its
+dual-read legacy) is declared only via `max_files` (`max_bytes` / `order` are parser-only leaves), and cross-field rules reference `parsing.source_timezone` / `parsing.delimited.*` with no
 matching `FieldSpec`.
 
 ## Top-level blocks
@@ -94,7 +94,8 @@ Rules that cut across blocks:
 
 Declared (14): `threads`, `duckdb_threads`, `file_pattern`, `schema_file`, `ingester`,
 `grammar` (deprecated alias — `parsing.grammar` wins, WARNING at save), `csv_settings`, `unpack`,
-`batch` (via `max_files`), `priority`, `duckdb`, `chunking`, `intake`, `streaming`.
+`batch` (deprecated alias — `collector.consignment` is canonical, healed on save), `priority`, `duckdb`,
+`chunking`, `intake`, `streaming`.
 
 Parser-only (10):
 

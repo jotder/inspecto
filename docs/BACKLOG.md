@@ -1349,7 +1349,14 @@ could regress.
   knob is a batch") — the amendment is in GLOSSARY §Consignment + §13, not implied. ⚠ Grounding surprise:
   I first called the `batch` key a vocabulary violation; the glossary said the opposite — read the entry, not
   the ban list. Left alone by design: `Processing.batchMaxFiles()` accessors, `Consignment.batchId`, the
-  `_batches_` ledger filenames (wire/persisted identifiers).
+  `_batches_` ledger filenames (wire/persisted identifiers). ⚠ Three ratchets moved while landing it:
+  `PipelineKeyCoverageContractTest` (one `collector.*` FieldSpec makes the block "declared" — 16 undeclared
+  blocks remain), and BOTH `node-attributes` and `step-types` contracts had to be regenerated (the step
+  catalog embeds the same attributes). Also surfaced, unrelated: `ControlApiProblemFilesTest` is
+  ORDER-DEPENDENT under the `db` status default — it hand-writes ledgers AFTER boot and reads a projection
+  that refreshes on the poll tick; 2 of 8 cases read 0 rows once in a full run, green in isolation and on
+  re-run. Now bounded-awaits the expected total (test-side; production ledgers are engine-written and
+  synced after each run, so the race is the test's).
 - **JAVA-SIMP-2 — typed records at config seams: per-seam and operator-visible, NOT a sweep.**
   ⛔ Any record introduced on a config path must carry the unmodelled-keys remainder or stay
   read-only — this repo's recurring data-loss mode is an "obviously equivalent" restructuring

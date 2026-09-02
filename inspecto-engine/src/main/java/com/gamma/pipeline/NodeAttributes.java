@@ -88,7 +88,26 @@ public final class NodeAttributes {
                     .help("Remote Collectors only — a local inbox has nothing to download (files are pushed in by the producer). Files this pipeline downloads concurrently in one acquisition, each on its own connector session. Blank = 1 (sequential). The next acquisition starts on the following acquire tick, so fetching stays continuous."),
             NodeAttribute.of("fetch__rate_limit", "Download rate limit", "string", "advanced")
                     .placeholder("10MB/s")
-                    .help("Remote Collectors only. Cap this pipeline's download bandwidth — a rate like 512KB/s, 10MB/s, or a bare number (bytes/s). Blank = unlimited."));
+                    .help("Remote Collectors only. Cap this pipeline's download bandwidth — a rate like 512KB/s, 10MB/s, or a bare number (bytes/s). Blank = unlimited."),
+            // Consignment formation (CONSIGNMENT-HOME-1, 2026-09-02): the ConsignmentPlanner caps, homed
+            // on the Collector because that is where the plan runs — in the poll cycle, before any sink
+            // exists. Declared consignment__* so the dialog's nestKeys lands them on the node's nested
+            // `consignment` map, which lowers VERBATIM into collector.consignment: (the block the parser
+            // reads first; the legacy processing.batch: spelling is dual-read and healed on save). ⚠ Never
+            // spec a flat spelling — the flat batch_max_files was write-only for weeks (G3).
+            NodeAttribute.of("consignment__max_files", "Max files per consignment", "number", "optional")
+                    .group("Consignment")
+                    .min(1)
+                    .help("Pack inbox files into one consignment until this many files. Blank = 1 (each file is its own consignment)."),
+            NodeAttribute.of("consignment__max_bytes", "Max bytes per consignment", "number", "optional")
+                    .group("Consignment")
+                    .min(1)
+                    .help("Or until their summed size would exceed this many bytes. Whichever cap trips first ends the consignment; a single larger file forms a consignment of one."),
+            NodeAttribute.of("consignment__order", "Consignment order", "select", "optional")
+                    .group("Consignment")
+                    .defaultValue("mtime")
+                    .options("mtime", "By arrival (file time)", "name", "By name (path order)")
+                    .help("How inbox files are ordered before packing. Arrival (file time) is the default; name order is the opt-in for feeds whose stamps are unreliable — a copy resets mtime."));
 
     /**
      * Marker dedup (file-grain, → {@code processing.duplicate_check} + {@code dirs.markers}) — the
@@ -237,20 +256,10 @@ public final class NodeAttributes {
                 .placeholder("data/<pipeline>/database")
                 .help("Directory where committed batches land. The pipeline's primary sink must set this; a quarantine sink writes unmatched files to 'dir' instead."));
         attrs.addAll(OUTPUT);
-        // Consignment Generation (the ConsignmentPlanner caps). Declared batch__* so the dialog's
-        // nestKeys lands them on the node's nested `batch` map, which lowers to the processing.batch:
-        // block the engine reads. ⚠ Never spec the flat batch_max_files spelling — it was write-only
-        // (G3, consignment-chain-plan.md).
-        attrs.add(NodeAttribute.of("batch__max_files", "Max files per consignment", "number", "advanced")
-                .min(1)
-                .help("Pack inbox files into one consignment until this many files. Blank = 1 (each file is its own consignment)."));
-        attrs.add(NodeAttribute.of("batch__max_bytes", "Max bytes per consignment", "number", "advanced")
-                .min(1)
-                .help("Or until their summed size would exceed this many bytes. Whichever cap trips first ends the consignment; a single larger file forms a consignment of one."));
-        attrs.add(NodeAttribute.of("batch__order", "Consignment order", "select", "advanced")
-                .defaultValue("mtime")
-                .options("mtime", "By arrival (file time)", "name", "By name (path order)")
-                .help("How inbox files are ordered before packing. Arrival (file time) is the default; name order is the opt-in for feeds whose stamps are unreliable — a copy resets mtime."));
+        // Consignment formation used to be specced HERE as batch__* (lowering to processing.batch:). It
+        // moved to the collector block on 2026-09-02 — the ConsignmentPlanner runs in the poll cycle,
+        // before any sink exists, and a two-sink pipeline has ONE policy. See COLLECTOR's "Consignment"
+        // group and CONSIGNMENT-HOME-1 (BACKLOG).
         // Concurrency (scheduler-system-config plan Part B): priority is SINK_PROC_OWNED (a flat
         // processing key, like threads); the intake__* keys nest to the node's `intake` map, which
         // lowers to the processing.intake: block the IntakeGovernor reads.

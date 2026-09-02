@@ -138,20 +138,23 @@ public final class ConfigSafetyValidator {
 
         checkIntBound(raw, "processing.threads", 1, p.maxThreads(), out);
         checkIntBound(raw, "processing.duckdb_threads", -1, p.maxThreads(), out);
-        checkIntBound(raw, "processing.batch.max_files", 1, p.maxBatchFiles(), out);
-        checkIntBound(raw, "processing.priority", 1, 3, out);
-
-        Object maxBytes = RawConfig.at(raw, "processing.batch.max_bytes");
-        if (maxBytes != null) {
-            long v = longOr(raw, "processing.batch.max_bytes", 1);
-            if (v <= 0) {
-                out.add(Finding.error("processing.batch.max_bytes",
-                        "batch.max_bytes must be > 0 (got " + v + ")"));
-            } else if (v > p.maxBatchBytes()) {
-                out.add(Finding.error("processing.batch.max_bytes",
-                        "batch.max_bytes " + v + " exceeds the safety cap " + p.maxBatchBytes()));
+        // Consignment caps: canonical home collector.consignment.* (CONSIGNMENT-HOME-1, 2026-09-02); the
+        // legacy processing.batch.* spelling is still dual-read by the parser, so it stays bounded too.
+        for (String home : List.of("collector.consignment", "processing.batch")) {
+            checkIntBound(raw, home + ".max_files", 1, p.maxBatchFiles(), out);
+            Object maxBytes = RawConfig.at(raw, home + ".max_bytes");
+            if (maxBytes != null) {
+                long v = longOr(raw, home + ".max_bytes", 1);
+                if (v <= 0) {
+                    out.add(Finding.error(home + ".max_bytes",
+                            "max_bytes must be > 0 (got " + v + ")"));
+                } else if (v > p.maxBatchBytes()) {
+                    out.add(Finding.error(home + ".max_bytes",
+                            "max_bytes " + v + " exceeds the safety cap " + p.maxBatchBytes()));
+                }
             }
         }
+        checkIntBound(raw, "processing.priority", 1, 3, out);
 
         for (String f : PIPELINE_SKIPS) {
             if (RawConfig.at(raw, f) != null && RawConfig.intOr(raw, f, 0) < 0) {

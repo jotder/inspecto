@@ -218,8 +218,15 @@ public final class ConfigSpecs {
                         "SQL predicate over the MAPPED, typed target columns, e.g. amount > 0 — applied "
                                 + "after parsing. Different moment from include_*/exclude_*, which are "
                                 + "regexes over one raw column before parsing. NULL rows are dropped."),
-                FieldSpec.withDefault("processing.batch.max_files", "Consignment max files", FieldType.INT, 1,
-                        "Files packed into one batch; raise above 1 for intra-batch parallelism."),
+                // ── consignment caps: one concept, two spellings — `collector.consignment` is CANONICAL ──
+                // Moved 2026-09-02 (CONSIGNMENT-HOME-1): the ConsignmentPlanner runs in the poll cycle, so
+                // the Collector owns how files are cut into Consignments. The legacy spelling keeps
+                // working (a deployed config must not start failing) and the editor heals it on save.
+                FieldSpec.withDefault("collector.consignment.max_files", "Consignment max files", FieldType.INT, 1,
+                        "CANONICAL. Files packed into one Consignment; raise above 1 for intra-consignment parallelism."),
+                FieldSpec.withDefault("processing.batch.max_files", "Consignment max files (deprecated)", FieldType.INT, 1,
+                        "DEPRECATED alias of collector.consignment.max_files, read only when the canonical block is "
+                                + "absent; the editor rewrites it into collector.consignment on the next save."),
                 FieldSpec.withDefault("processing.priority", "Priority", FieldType.INT, 1,
                         "Share weight (1-3) for this pipeline's Consignments when execution slots are "
                                 + "contended: 3 gets ~3x the throughput share of 1. Shares, never "

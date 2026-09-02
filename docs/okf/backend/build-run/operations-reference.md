@@ -233,8 +233,9 @@ processing:
 
 | Key | Default | Description |
 |---|---|---|
-| `processing.batch.max_files` | `1` | Maximum number of input files consolidated into one batch |
-| `processing.batch.max_bytes` | `Long.MAX_VALUE` | Maximum total uncompressed size of files in one batch (bytes) |
+| `collector.consignment.max_files` | `1` | Maximum number of input files consolidated into one Consignment (legacy spelling `processing.batch.max_files`, dual-read, healed on save) |
+| `collector.consignment.max_bytes` | `Long.MAX_VALUE` | Maximum total uncompressed size of files in one Consignment (bytes) |
+| `collector.consignment.order` | `mtime` | `mtime` (arrival) or `name` — how inbox files are ordered before packing |
 
 Files are grouped greedily in poll order; a new batch starts whenever either limit would be exceeded by the next candidate.
 

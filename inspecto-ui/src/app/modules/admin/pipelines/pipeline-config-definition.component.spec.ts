@@ -164,7 +164,8 @@ describe('PipelineConfigDefinitionComponent', () => {
 
     /**
      * D4: spec keys are FLAT (`__` = nesting) while the engine reads nested MAPS, so the apply has to run
-     * `nestKeys` — and sub-keys with no AttributeSpec must survive it. Pinned here on a SINK (`batch__*`);
+     * `nestKeys` — and sub-keys with no AttributeSpec must survive it. Pinned here on a SINK (`intake__*`;
+     * it was `batch__*` until the consignment caps moved to the collector, CONSIGNMENT-HOME-1);
      * the acquisition `collector:` blocks are pinned on the Collector pane.
      */
     it('nests flat `__` spec keys before they reach node.config, keeping unmodeled sub-keys', async () => {
@@ -172,27 +173,31 @@ describe('PipelineConfigDefinitionComponent', () => {
             node: {
                 id: 'w',
                 type: 'sink.persistent',
-                config: { batch: { max_files: 5, on_partial: 'HOLD' } },
+                config: { intake: { max_files_per_cycle: 5, on_partial: 'HOLD' } },
             },
         });
         const c = fixture.componentInstance;
-        expect(c.split().schemaInitial['batch__max_files']).toBe(5);
+        expect(c.split().schemaInitial['intake__max_files_per_cycle']).toBe(5);
         const out = applied(fixture);
         c.submit();
         const cfg = out()?.config as Record<string, unknown>;
         // The flat forms must be gone — they are form-transport spellings, never config keys.
         expect(Object.keys(cfg).filter((k) => k.includes('__'))).toEqual([]);
-        expect(cfg['batch']).toMatchObject({ max_files: 5, on_partial: 'HOLD' });
+        expect(cfg['intake']).toMatchObject({ max_files_per_cycle: 5, on_partial: 'HOLD' });
     });
 
     /** The nested block must reach the schema form, not the free-form escape hatch (D4, load half). */
     it('seeds the schema form from a nested block instead of stringifying it into free-form', async () => {
         const c = (
             await create({
-                node: { id: 'w', type: 'sink.persistent', config: { batch: { max_files: 2 }, mystery: { a: 1 } } },
+                node: {
+                    id: 'w',
+                    type: 'sink.persistent',
+                    config: { intake: { max_files_per_cycle: 2 }, mystery: { a: 1 } },
+                },
             })
         ).componentInstance;
-        expect(c.split().schemaInitial['batch__max_files']).toBe(2);
+        expect(c.split().schemaInitial['intake__max_files_per_cycle']).toBe(2);
         // Only the genuinely unknown root lands in the extra editor — TYPED, never stringified.
         expect(c.split().extraRows).toEqual([{ key: 'mystery', value: { a: 1 } }]);
     });
@@ -337,9 +342,6 @@ describe('PipelineConfigDefinitionComponent', () => {
             'format',
             'compression',
             'filename_column',
-            'batch__max_files',
-            'batch__max_bytes',
-            'batch__order',
             'priority',
             'intake__max_files_per_cycle',
             'intake__min_files_per_cycle',

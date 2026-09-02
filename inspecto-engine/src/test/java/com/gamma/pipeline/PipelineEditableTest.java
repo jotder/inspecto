@@ -53,6 +53,63 @@ class PipelineEditableTest {
                 "single-schema quarantine dir has no owning node and must be preserved");
     }
 
+    // ── CONSIGNMENT-HOME-1 (2026-09-02): the planner caps moved from the sink to the collector ──
+
+    /** A file still on the legacy processing.batch: map lifts onto the acquisition node's `consignment`
+     *  map and lowers into collector.consignment: — the legacy spellings gone, the values intact. */
+    @Test
+    void legacyBatchCapsHealIntoCollectorConsignment(@TempDir Path dir) throws Exception {
+        Path toon = writeRichPipeline(dir);
+        Map<String, Object> raw = decode(toon);
+        Map<String, Object> processing = (Map<String, Object>) raw.get("processing");
+        Map<String, Object> batch = new LinkedHashMap<>();
+        batch.put("max_files", 40);
+        batch.put("max_bytes", 1024L);
+        batch.put("on_partial", "HOLD");          // unmodeled sub-key — must survive the move
+        processing.put("batch", batch);
+        processing.put("batch_max_files", 7);     // the write-only flat spelling, read by nothing
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+
+        PipelineGraph g = PipelineCodec.fromMap(PipelineEditable.toMap(cfg, raw));
+        PipelineNode acq = g.node("acq").orElseThrow();
+        Map<?, ?> onNode = (Map<?, ?>) acq.cfg("consignment");
+        assertEquals(40, ((Number) onNode.get("max_files")).intValue(), "healed onto the collector node");
+        assertEquals("HOLD", onNode.get("on_partial"));
+        assertNull(g.node("sink").map(n -> n.cfg("batch")).orElse(null), "the sink no longer carries it");
+
+        Map<String, Object> lowered = PipelineEditable.lower(g, raw, true);
+        Map<?, ?> collector = (Map<?, ?>) lowered.get("collector");
+        Map<?, ?> consignment = (Map<?, ?>) collector.get("consignment");
+        assertEquals(40, ((Number) consignment.get("max_files")).intValue());
+        assertEquals(1024L, ((Number) consignment.get("max_bytes")).longValue());
+        assertEquals("HOLD", consignment.get("on_partial"), "unmodeled sub-key survives");
+        Map<?, ?> proc = (Map<?, ?>) lowered.get("processing");
+        for (String k : List.of("batch", "batch_max_files", "batch_max_bytes"))
+            assertFalse(proc.containsKey(k), k + " must not survive the heal — one spelling per knob");
+    }
+
+    /** The canonical home round-trips verbatim, and the parser reads it FIRST when both are present. */
+    @Test
+    void collectorConsignmentIsCanonicalAndWinsOverTheLegacyBlock(@TempDir Path dir) throws Exception {
+        Path toon = writeRichPipeline(dir);
+        Map<String, Object> raw = decode(toon);
+        Map<String, Object> collector = (Map<String, Object>) raw.computeIfAbsent("collector", k -> new LinkedHashMap<>());
+        collector.put("consignment", new LinkedHashMap<>(Map.of("max_files", 12, "order", "name")));
+        ((Map<String, Object>) raw.get("processing")).put("batch", new LinkedHashMap<>(Map.of("max_files", 3)));
+        Path both = dir.resolve("both_pipeline.toon");
+        Files.writeString(both, com.gamma.config.io.ConfigCodec.toToon(raw));
+        PipelineConfig cfg = PipelineConfig.load(both.toString());
+        assertEquals(12, cfg.processing().batchMaxFiles(), "collector.consignment wins over processing.batch");
+        assertEquals("name", cfg.processing().batchOrder());
+
+        PipelineGraph g = PipelineCodec.fromMap(PipelineEditable.toMap(cfg, raw));
+        Map<String, Object> lowered = PipelineEditable.lower(g, raw, true);
+        Map<?, ?> out = (Map<?, ?>) ((Map<?, ?>) lowered.get("collector")).get("consignment");
+        assertEquals(12, ((Number) out.get("max_files")).intValue());
+        assertEquals("name", out.get("order"));
+        assertFalse(((Map<?, ?>) lowered.get("processing")).containsKey("batch"), "the legacy block is healed away");
+    }
+
     // ── P5-a: marker dedup moved from its own node onto acquisition ─────────────────────
     // The keys live in processing.duplicate_check + dirs.markers and are only BORROWED by the
     // acquisition node, so the two hazards worth pinning are (a) leaking them into collector:,

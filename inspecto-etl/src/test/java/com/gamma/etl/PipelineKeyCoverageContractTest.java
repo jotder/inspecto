@@ -63,12 +63,15 @@ class PipelineKeyCoverageContractTest {
      * Each entry is a key the engine honours and no generated form can show.
      *
      * <p>18 when this landed (2026-08-31); <b>17</b> after gap 8 declared {@code output_store} the same
-     * day — the ratchet caught that one for real, not in a probe.
+     * day — the ratchet caught that one for real, not in a probe; <b>16</b> after CONSIGNMENT-HOME-1
+     * declared {@code collector.consignment.max_files} (2026-09-02).
      */
     private static final Set<String> UNDECLARED_BLOCKS = Set.of(
             // ── top-level ────────────────────────────────────────────────────────
             "active",              // the arming switch itself — authored on every runnable pipeline
-            "collector",           // the acquisition block (GLOSSARY: Collector)
+            // "collector" left the list 2026-09-02: CONSIGNMENT-HOME-1 declared collector.consignment.max_files
+            // (16 remain). ⚠ Only ONE leaf of the block is declared — the rest of collector.* is still
+            // form-invisible, which the BLOCK granularity cannot express; that residue is gap-10 debt too.
             "route",               // gap 9's block — the branch-aware ingest lane
             "sinks",               // the plural destination block
             "steps",               // the ordered Stage-2 chain (gap 11)

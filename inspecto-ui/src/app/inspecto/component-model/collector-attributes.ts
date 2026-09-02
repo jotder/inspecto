@@ -150,6 +150,41 @@ export const COLLECTOR_ATTRIBUTES: AttributeSpec[] = [
         placeholder: '10MB/s',
         help: "Remote Collectors only. Cap this pipeline's download bandwidth — a rate like 512KB/s, 10MB/s, or a bare number (bytes/s). Blank = unlimited.",
     },
+    // Consignment formation (CONSIGNMENT-HOME-1, 2026-09-02): the ConsignmentPlanner caps, homed on the
+    // Collector because the plan runs in the poll cycle before any sink exists. consignment__* nests to
+    // `collector.consignment: {max_files, max_bytes, order}` — the block the parser reads FIRST; the
+    // pre-move `processing.batch:` spelling is dual-read and healed on save. Mirrors NodeAttributes.COLLECTOR.
+    {
+        key: 'consignment__max_files',
+        label: 'Max files per consignment',
+        type: 'number',
+        tier: 'optional',
+        group: 'Consignment',
+        min: 1,
+        help: 'Pack inbox files into one consignment until this many files. Blank = 1 (each file is its own consignment).',
+    },
+    {
+        key: 'consignment__max_bytes',
+        label: 'Max bytes per consignment',
+        type: 'number',
+        tier: 'optional',
+        group: 'Consignment',
+        min: 1,
+        help: 'Or until their summed size would exceed this many bytes. Whichever cap trips first ends the consignment; a single larger file forms a consignment of one.',
+    },
+    {
+        key: 'consignment__order',
+        label: 'Consignment order',
+        type: 'select',
+        tier: 'optional',
+        group: 'Consignment',
+        default: 'mtime',
+        options: [
+            { value: 'mtime', label: 'By arrival (file time)' },
+            { value: 'name', label: 'By name (path order)' },
+        ],
+        help: 'How inbox files are ordered before packing. Arrival (file time) is the default; name order is the opt-in for feeds whose stamps are unreliable — a copy resets mtime.',
+    },
 ];
 
 /**

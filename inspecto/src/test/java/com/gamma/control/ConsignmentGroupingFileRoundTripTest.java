@@ -20,7 +20,8 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Consignment grouping ({@code processing.batch:}) through the <b>real file</b>: graph → {@code lower}
+ * Consignment formation ({@code collector.consignment:} — the home since CONSIGNMENT-HOME-1, 2026-09-02;
+ * {@code processing.batch:} before) through the <b>real file</b>: graph → {@code lower}
  * → {@code ConfigCodec.toToon} → disk → {@code ToonHelper.load} → {@code PipelineConfig}.
  *
  * <p>⚠ <b>Why this exists — G3</b> ({@code docs/superpower/consignment-chain-plan.md}). The editor
@@ -29,8 +30,9 @@ import static org.junit.jupiter.api.Assertions.*;
  * with no overlap, each side individually tested, so no UI path could configure Consignment Generation
  * in a shape the engine honours. Third instance of the standing rule: <b>a config-format slice is NOT
  * verified by a {@code fromMap} test.</b> The forward key contract now lives in
- * {@code NodeConfigNameContractTest} ({@code batch__max_files} → {@code processing().batchMaxFiles()});
- * this class pins the file shape, the healing of the legacy spelling, and the wholesale-map ownership.
+ * {@code NodeConfigNameContractTest} ({@code consignment__max_files} → {@code processing().batchMaxFiles()});
+ * this class pins the file shape, the healing of BOTH legacy spellings (the flat pair and the
+ * {@code processing.batch:} map) into the collector block, and the wholesale-map ownership.
  */
 class ConsignmentGroupingFileRoundTripTest {
 
@@ -38,15 +40,17 @@ class ConsignmentGroupingFileRoundTripTest {
         return new PipelineNode(id, type, null, null, cfg, null);
     }
 
-    /** Lower an acq→parse→sink graph (sink carrying {@code extraSinkCfg}) — the editor's save. */
-    private static Map<String, Object> lowered(Path dir, Map<String, Object> extraSinkCfg) throws Exception {
+    /** Lower an acq→parse→sink graph (the acquisition node carrying {@code extraAcqCfg}) — the editor's save. */
+    private static Map<String, Object> lowered(Path dir, Map<String, Object> extraAcqCfg) throws Exception {
         Files.writeString(dir.resolve("s.toon"), com.gamma.etl.PipelineConfigBatchTest.miniSchema(),
                 StandardCharsets.UTF_8);
         Map<String, Object> sinkCfg = new LinkedHashMap<>();
         sinkCfg.put("database", dir.resolve("db").toString());
-        sinkCfg.putAll(extraSinkCfg);
+        Map<String, Object> acqCfg = new LinkedHashMap<>();
+        acqCfg.put("poll", dir.resolve("in").toString());
+        acqCfg.putAll(extraAcqCfg);
         return PipelineEditable.lower(new PipelineGraph("grouping", false, List.of(
-                node("acq", "acquisition", Map.of("poll", dir.resolve("in").toString())),
+                node("acq", "acquisition", acqCfg),
                 node("parse", "parser", Map.of("schema_file", dir.resolve("s.toon").toString())),
                 node("sink", "sink.persistent", sinkCfg)),
                 List.of()), new LinkedHashMap<>(), true);
@@ -64,19 +68,22 @@ class ConsignmentGroupingFileRoundTripTest {
         return PipelineCodec.fromMap(PipelineEditable.toMap(cfg, ToonHelper.load(toon.toString())));
     }
 
-    /** The caps a node declares land in the file as the nested block, and the engine reads them. */
+    /** The caps the collector node declares land in the file as {@code collector.consignment:}, and the engine reads them. */
     @Test
     void groupingCapsSurviveTheCodecNested(@TempDir Path dir) throws Exception {
-        Map<String, Object> batch = new LinkedHashMap<>();
-        batch.put("max_files", 500);
-        batch.put("max_bytes", 1_000_000);
-        Map<String, Object> lowered = lowered(dir, Map.of("batch", batch));
+        Map<String, Object> caps = new LinkedHashMap<>();
+        caps.put("max_files", 500);
+        caps.put("max_bytes", 1_000_000);
+        Map<String, Object> lowered = lowered(dir, Map.of("consignment", caps));
         String toon = ConfigCodec.toToon(lowered);
 
-        assertFalse(toon.contains("batch_max_files"),
-                "the flat spelling is the G3 defect — it must never be written again:\n" + toon);
-        assertTrue(toon.contains("batch:"),
-                "the caps must lower to the nested block the parser reads:\n" + toon);
+        assertFalse(toon.contains("batch"),
+                "no batch spelling of any kind may be written any more (flat = G3; the map = pre-move):\n" + toon);
+        assertTrue(toon.contains("consignment:"),
+                "the caps must lower to the collector.consignment: block the parser reads first:\n" + toon);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> collector = (Map<String, Object>) lowered.get("collector");
+        assertNotNull(collector.get("consignment"), "homed on the collector block, not processing:");
 
         PipelineConfig cfg = PipelineConfig.fromMap(
                 ToonHelper.load(write(dir, "grouping_pipeline.toon", lowered).toString()));
@@ -103,17 +110,18 @@ class ConsignmentGroupingFileRoundTripTest {
         Map<String, Object> resaved = PipelineEditable.lower(
                 lift(file), ToonHelper.load(file.toString()), true);
         String toon = ConfigCodec.toToon(resaved);
-        assertFalse(toon.contains("batch_max_files"), "the dead spelling must be gone after a save:\n" + toon);
+        assertFalse(toon.contains("batch"), "every dead spelling must be gone after a save:\n" + toon);
 
         PipelineConfig healed = PipelineConfig.fromMap(
                 ToonHelper.load(write(dir, "healed_pipeline.toon", resaved).toString()));
         assertEquals(500, healed.processing().batchMaxFiles(),
-                "the value the user authored must survive the healing, now in the readable shape");
+                "the value the user authored must survive the healing, now in collector.consignment");
     }
 
     /**
-     * The sink node owns the {@code batch} map WHOLESALE, so a key this editor does not model
-     * (e.g. a future {@code order:}) rides through a lift → save untouched instead of being dropped.
+     * The collector node owns the {@code consignment} map WHOLESALE, so a key this editor does not model
+     * rides through a lift → save untouched instead of being dropped — including across the MOVE: a file
+     * still on {@code processing.batch:} heals into {@code collector.consignment:} with every key intact.
      */
     @Test
     void unmodeledBatchKeysSurviveTheSave(@TempDir Path dir) throws Exception {
@@ -130,11 +138,14 @@ class ConsignmentGroupingFileRoundTripTest {
                 lift(file), ToonHelper.load(file.toString()), true);
         Path out = write(dir, "keyed_resaved_pipeline.toon", resaved);
 
+        Map<String, Object> reloaded = ToonHelper.load(out.toString());
         @SuppressWarnings("unchecked")
         Map<String, Object> batchBack = (Map<String, Object>)
-                ((Map<String, Object>) ToonHelper.load(out.toString()).get("processing")).get("batch");
+                ((Map<String, Object>) reloaded.get("collector")).get("consignment");
         assertEquals("mtime", batchBack.get("order"),
-                "an editor-unmodeled key inside processing.batch was dropped by a save — wholesale ownership broke");
+                "an editor-unmodeled key inside the consignment map was dropped by the move — wholesale ownership broke");
+        assertFalse(((Map<?, ?>) reloaded.get("processing")).containsKey("batch"),
+                "the legacy map must not survive beside the canonical block");
         PipelineConfig cfg = PipelineConfig.fromMap(ToonHelper.load(out.toString()));
         assertEquals(5, cfg.processing().batchMaxFiles());
         assertEquals("mtime", cfg.processing().batchOrder(),
@@ -155,10 +166,11 @@ class ConsignmentGroupingFileRoundTripTest {
         assertTrue(ex.getMessage().contains("order"), ex.getMessage());
     }
 
-    /** The safety property: a pipeline with no grouping is written with no batch block at all. */
+    /** The safety property: a pipeline with no grouping is written with no consignment or batch block at all. */
     @Test
     void noGroupingMeansNoBatchBlock(@TempDir Path dir) throws Exception {
         String toon = ConfigCodec.toToon(lowered(dir, Map.of()));
         assertFalse(toon.contains("batch"), "no grouping configured, no batch spelling of any kind:\n" + toon);
+        assertFalse(toon.contains("consignment"), "…and no empty consignment block either:\n" + toon);
     }
 }

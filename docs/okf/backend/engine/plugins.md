@@ -74,7 +74,7 @@ Tuning knobs (both optional, under `processing.streaming`):
 | `large_file_bytes` | `268435456` (256 MB) | A batch whose largest member is `>=` this runs in generation mode; smaller batches use union mode. `0` forces union mode always. |
 | `flush_records` | `5000000` | Rows per generation flush (generation mode only); bounds scratch per generation. |
 
-To make many-small-files efficient, also raise `processing.batch.max_files` so the planner packs many files into each union batch.
+To make many-small-files efficient, also raise `collector.consignment.max_files` so the planner packs many files into each union Consignment.
 
 ### Segment schema toon (`partitions[]`) {#segment-schema-toon-partitions}
 

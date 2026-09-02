@@ -64,15 +64,13 @@ describe('node-attributes', () => {
         for (const [i, shared] of OUTPUT_ATTRIBUTES.entries()) expect(specs[i + 1]).toBe(shared);
     });
 
-    /** G3 fix: the persistent sink appends the Consignment Generation caps AFTER the shared block —
-     *  they are sink-owned processing.batch keys, not part of the output: vocabulary, so they must
-     *  never migrate into OUTPUT_ATTRIBUTES (the other sink kinds have no ConsignmentPlanner). */
-    it('appends the consignment grouping caps after the shared output block', () => {
+    /** The persistent sink appends its concurrency knobs AFTER the shared output block. The consignment
+     *  caps used to sit here (G3) and moved to the collector block 2026-09-02 (CONSIGNMENT-HOME-1) —
+     *  they must never come back onto a sink, and never into OUTPUT_ATTRIBUTES. */
+    it('appends the concurrency knobs after the shared output block, with no consignment caps', () => {
         const keys = nodeAttributesFor('sink.persistent')!.map((s) => s.key);
-        expect(keys.slice(-7)).toEqual([
-            'batch__max_files',
-            'batch__max_bytes',
-            'batch__order',
+        expect(keys.filter((k) => k.startsWith('batch__') || k.startsWith('consignment__'))).toEqual([]);
+        expect(keys.slice(-4)).toEqual([
             'priority',
             'intake__max_files_per_cycle',
             'intake__min_files_per_cycle',
@@ -124,6 +122,18 @@ describe('node-attributes', () => {
         // stage renders that one whole, and these are not `collector:` keys.
         expect(COLLECTOR_ATTRIBUTES.map((s) => s.key)).not.toContain('duplicate_check');
         expect(COLLECTOR_ATTRIBUTES.map((s) => s.key)).not.toContain('trigger__every');
+        // CONSIGNMENT-HOME-1: the planner caps ARE collector-block keys (collector.consignment), so they
+        // belong in the shared table — grouped under one heading, visible (optional tier), never advanced.
+        const caps = COLLECTOR_ATTRIBUTES.filter((s) => s.key.startsWith('consignment__'));
+        expect(caps.map((s) => s.key)).toEqual([
+            'consignment__max_files',
+            'consignment__max_bytes',
+            'consignment__order',
+        ]);
+        for (const c of caps) {
+            expect(c.group).toBe('Consignment');
+            expect(c.tier).toBe('optional');
+        }
     });
 
     /**

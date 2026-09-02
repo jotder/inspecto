@@ -246,8 +246,24 @@ class ConfigSafetyValidatorTest {
 
         List<Finding> f = ConfigSafetyValidator.check("pipeline", raw, SafetyPolicy.withRoots(root));
         assertTrue(hasError(f, "processing.threads"));
-        assertTrue(hasError(f, "processing.batch.max_files"));
+        assertTrue(hasError(f, "processing.batch.max_files"), "the legacy spelling stays bounded");
         assertTrue(hasError(f, "retention_days"));
+    }
+
+    /** CONSIGNMENT-HOME-1: the canonical home collector.consignment.* is bounded like the legacy one. */
+    @Test
+    void collectorConsignmentCapsAreBounded(@TempDir Path root) throws Exception {
+        Map<String, Object> raw = new LinkedHashMap<>();
+        raw.put("name", "caps");
+        Map<String, Object> collector = new LinkedHashMap<>();
+        Map<String, Object> consignment = new LinkedHashMap<>();
+        consignment.put("max_files", 0);
+        consignment.put("max_bytes", -5);
+        collector.put("consignment", consignment);
+        raw.put("collector", collector);
+        List<Finding> f = ConfigSafetyValidator.check("pipeline", raw, SafetyPolicy.withRoots(root));
+        assertTrue(hasError(f, "collector.consignment.max_files"), f.toString());
+        assertTrue(hasError(f, "collector.consignment.max_bytes"), f.toString());
     }
 
     @Test

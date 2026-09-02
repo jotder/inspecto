@@ -102,6 +102,24 @@ class ControlApiProblemFilesTest {
         return V1Body.of(r.body());
     }
 
+    /**
+     * Read the problem-files route until it reports {@code expectedTotal} rows, bounded. ⚠ The status
+     * read surface is a DB PROJECTION of the on-disk ledgers since the {@code db} default (2026-08-31),
+     * refreshed after every run and on each poll tick — so a ledger this test hand-writes AFTER boot is
+     * visible only once the next tick has synced it. In production nothing but the engine writes the
+     * ledger, and the engine syncs after each run; the race is this test's, not the product's. Observed
+     * order-dependent in a full reactor run (2026-09-02: 2 of 8 cases read 0 rows), green in isolation.
+     */
+    private JsonNode awaitTotal(int port, String path, int expectedTotal) throws Exception {
+        long deadline = System.nanoTime() + java.time.Duration.ofSeconds(10).toNanos();
+        JsonNode d = data(port, path);
+        while (d.get("total").asInt() != expectedTotal && System.nanoTime() < deadline) {
+            Thread.sleep(100);
+            d = data(port, path);
+        }
+        return d;
+    }
+
     private static List<String> names(JsonNode rows) {
         List<String> out = new ArrayList<>();
         for (JsonNode r : rows) out.add(r.get("filename").asText());
@@ -158,7 +176,7 @@ class ControlApiProblemFilesTest {
                             + "0,0,,,10,boom,c-1,bundle.zip,\"east/bundle\"\n",
                     StandardCharsets.UTF_8);
 
-            JsonNode row = data(c.port, "/spaces/s1/status/problem-files").get("rows").get(0);
+            JsonNode row = awaitTotal(c.port, "/spaces/s1/status/problem-files", 1).get("rows").get(0);
             assertEquals("bundle.zip", row.get("origin").asText(),
                     "the operator sees what they actually DROPPED");
             assertEquals("east/bundle", row.get("logicalName").asText(),
@@ -173,7 +191,7 @@ class ControlApiProblemFilesTest {
             ledger(root, "alpha", "a-bad.csv,QUARANTINED_EMPTY,0,0,2026-08-20 01:00:00");
             ledger(root, "beta",  "b-partial.csv,SUCCESS,5,5,2026-08-20 09:00:00");
 
-            JsonNode d = data(c.port, "/spaces/s1/status/problem-files");
+            JsonNode d = awaitTotal(c.port, "/spaces/s1/status/problem-files", 2);
             assertEquals(2, d.get("total").asInt(), d.toString());
             assertEquals(2, d.get("pipelinesWithProblems").asInt());
             // Newest first puts beta's row on top, proving the sort spans pipelines rather than

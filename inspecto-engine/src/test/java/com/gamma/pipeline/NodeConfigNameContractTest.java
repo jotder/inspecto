@@ -140,13 +140,14 @@ class NodeConfigNameContractTest {
                 new Contract("sink.persistent", "filename_column", "filename_column", "src_file",
                         c -> c.output().filenameColumn(), "src_file"),
 
-                // ── Consignment grouping — the nested batch map (G3). The dialog's nestKeys turns
-                // batch__max_files into node cfg batch.max_files; lower writes processing.batch:,
-                // which is the ONLY spelling the parser reads. These two entries are exactly the
-                // contract whose absence let the flat write-only spelling ship.
-                new Contract("sink.persistent", "batch__max_files", "batch.max_files", 500,
+                // ── Consignment formation — the nested consignment map on the COLLECTOR (CONSIGNMENT-HOME-1,
+                // 2026-09-02; was batch__* on the sink). The dialog's nestKeys turns consignment__max_files
+                // into node cfg consignment.max_files; lower writes collector.consignment:, the spelling the
+                // parser reads FIRST. These entries are exactly the contract whose absence let the flat
+                // write-only spelling ship (G3).
+                new Contract("acquisition", "consignment__max_files", "consignment.max_files", 500,
                         c -> c.processing().batchMaxFiles(), 500),
-                new Contract("sink.persistent", "batch__max_bytes", "batch.max_bytes", 268_435_456L,
+                new Contract("acquisition", "consignment__max_bytes", "consignment.max_bytes", 268_435_456L,
                         c -> c.processing().batchMaxBytes(), 268_435_456L),
 
                 // ── Concurrency (scheduler-system-config plan Part B). priority is SINK_PROC_OWNED
