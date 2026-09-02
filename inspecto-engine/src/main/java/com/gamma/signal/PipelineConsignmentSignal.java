@@ -55,4 +55,26 @@ public final class PipelineConsignmentSignal {
             // an observability sink must never break the batch commit it is announcing
         }
     }
+
+    /**
+     * X1: a Consignment exhausted its bounded COMMIT retries and its files were quarantined under
+     * {@code retry_exhausted}. CRITICAL, once per exhausted Consignment — the "poison never drops
+     * silently" handoff: this is the one Signal an alert rule needs to catch a batch that will never
+     * commit on its own. Correlated on the batch id like every other {@code pipeline.batch.*} Signal.
+     */
+    public static void emitRetryExhausted(String pipeline, String batchId, int attempts,
+                                          java.util.List<String> files, String lastError) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("attempts", attempts);
+        payload.put("files", java.util.List.copyOf(files));
+        if (lastError != null && !lastError.isBlank()) payload.put("error", lastError);
+        Signal signal = new Signal(null, "pipeline.batch.retry_exhausted", Instant.now(), Severity.CRITICAL,
+                Ref.of("pipeline", pipeline), Ref.of("pipeline", pipeline),
+                batchId, null, null, null, "pipeline.batch.retry_exhausted", payload, 1);
+        try {
+            EventLog.current().emit(signal.toEvent());
+        } catch (RuntimeException ignored) {
+            // an observability sink must never break the recovery bookkeeping it is announcing
+        }
+    }
 }

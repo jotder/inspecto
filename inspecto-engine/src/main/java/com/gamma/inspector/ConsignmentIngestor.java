@@ -100,6 +100,11 @@ public final class ConsignmentIngestor {
             log.error("Consignment {} failed during audit", batch.batchId(), e);
         }
         recordProvenance(cfg.identity().pipelineName(), batch, outcome, status);
+        // X1: a FAILED Consignment's files stay in the inbox and re-encounter next cycle — that retry is
+        // now BOUNDED (attempt record, backoff, exhaustion → quarantine + CRITICAL Signal). A committed
+        // or parked one has spent its record. After the audit, so the attempt is on the record first.
+        if ("FAILED".equals(status)) CommitRetry.recordFailure(batch, cfg, error);
+        else CommitRetry.clear(batch, cfg);
     }
 
     // ── data-plane provenance (T21 — consignment-chain-plan.md S3) ─────────────

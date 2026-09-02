@@ -53,7 +53,9 @@ untracked rather than reported falsely.
 ## Auditing a failed file or record
 
 **Files.** A bad input is moved to `<quarantine>/<poll-subpath>/<reason>/<file>` (reasons:
-`field_mismatch`, `unreadable`, `empty`, `corrupt_download`) — the tree itself is evidence, organised by
+`field_mismatch`, `unreadable`, `empty`, `corrupt_download`, and since X1 `retry_exhausted` — a file whose
+Consignment failed at COMMIT `-Dingest.retry.max` times; see the bounded-retry note in
+[operations-reference](../build-run/operations-reference.md)) — the tree itself is evidence, organised by
 why. The status ledger carries a row per member file (`filename, status, parsed_rows, error_rows,
 error, consignment_id`), the batches ledger the per-Consignment roll-up, the lineage ledger the
 output↔input join. UI: **Run Detail** tabs (Batches / Files / Lineage / Quarantine / Commits), drill-in

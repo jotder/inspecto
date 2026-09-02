@@ -179,7 +179,14 @@ public class CollectorProcessor {
                     try {
                         try (ConcurrencyBroker.Permit permit =
                                      broker.admit(spaceId, pipelineId, maxConcurrent, priority)) {
-                            ConsignmentIngestor.process(b, cfg, audit);
+                            try {
+                                ConsignmentIngestor.process(b, cfg, audit);
+                            } catch (Exception thrown) {
+                                // X1: a THROWN ingest (framework/schema fault) also leaves its files for the
+                                // next cycle — count the attempt, then let the failure surface as before.
+                                CommitRetry.recordFailure(b, cfg, ConsignmentIngestStrategy.msg(thrown));
+                                throw thrown;
+                            }
                         }
                     } finally {
                         MDC.clear();
@@ -341,6 +348,9 @@ public class CollectorProcessor {
         if (ready.isEmpty()) return List.of();
 
         List<File> candidates = dedupLocal(cfg, ready, emitSignals);
+        // X1: files waiting out a COMMIT-retry backoff are skipped on the run path only — they are still
+        // pending, so the read-only count keeps reporting them.
+        if (emitSignals) candidates = CommitRetry.due(cfg, candidates);
         // T15 admission control: bound what ONE cycle admits (§3.5). Applied only on the run path — a
         // read-only pending scan must keep reporting the true backlog — and only when an operator set
         // -Dingest.maxFilesPerCycle or the pipeline's own processing.intake block (per-flow override),

@@ -46,8 +46,14 @@ claims beside `registry.supersede`** so a windowed dedup re-admits the redone ro
 re-fires the job through the normal lifecycle with its configured defaults — the run ledger persists
 no per-run params, and the response `note` says so; the new run's `trigger` field carries
 `replay:<originalRunId>` so the linkage is followable; 409 while the job is running or no longer
-registered). The persistent retry queue stays a spec item
-([`execution-residuals-plan.md`](../../../superpower/execution-residuals-plan.md) §X1). Also
+registered). **Bounded COMMIT retry (X1, 2026-09-02):** the ingest lane's retry is the next cycle's
+re-encounter of a FAILED Consignment's files; `CommitRetry` bounds it — durable per-file attempt sidecars
+under `<status_dir>/retries/`, exponential backoff honoured on the run path only (a waiting file is still
+pending), exhaustion ⇒ quarantine under `retry_exhausted` + one CRITICAL `pipeline.batch.retry_exhausted`
+Signal. ⚠ Grounding refuted the plan's queue: nothing on the ingest lane classifies transient vs fatal
+(the catch sites collapse every read failure into a permanent `unreadable` quarantine, duplicated across
+four strategies), "DuckDB lock" as a trigger was aspirational, and the real gap was the OPPOSITE of the
+plan's fear — poison never stopped. Member-level `unreadable` stays as it is. Also
 lane-wide since 2026-09-01: the Stage-2 **orphan-`output_store:` check is default-on** in every
 space (transition-debounced signal; `-Djobs.orphan.audit=false` to disable) — see
 [stage1-architecture](../engine/stage1-architecture.md) §Step 3.

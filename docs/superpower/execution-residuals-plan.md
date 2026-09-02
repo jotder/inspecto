@@ -24,7 +24,24 @@ its default-off behavior explicitly; flipping any default is an operator decisio
 
 ---
 
-## X1. Persistent retry queue (the recovery architecture)
+## X1. Persistent retry queue (the recovery architecture) — ✅ SHIPPED 2026-09-02 as the BOUNDED COMMIT RE-ENCOUNTER
+
+**As-built (operator decision 2026-09-02, consignment-grain):** not the queue below. Grounding found the
+ingest lane already retries — a Consignment that fails at COMMIT (or whose ingest throws) leaves its files
+in the inbox and the next poll cycle re-ingests them — but unboundedly: no cap, no backoff, no exhaustion,
+no handoff; poison never STOPPED. `CommitRetry` (inspecto-engine) adds exactly the missing half: a durable
+per-file attempt record under `<status_dir>/retries/` (a sidecar beside the other per-file records, not a
+DB table — the catch sites live in the engine while the status DB lives in the control plane), `-Dingest.retry.max`
+(default 5; 0 = pre-X1 behaviour) with `min(initial × 2ⁿ⁻¹, max) ± 10%` backoff honoured on the run path only
+(a waiting file is still PENDING), and on exhaustion a quarantine under `retry_exhausted` plus ONE CRITICAL
+`pipeline.batch.retry_exhausted` Signal (the alert hook). A commit/park spends the record. ⚠ Refuted premises:
+no transient/fatal classification exists or is reachable on the ingest lane (every read failure is a permanent
+`unreadable` quarantine, duplicated across four strategy classes); "DuckDB lock" as a trigger is unobserved;
+member-level classification stays out by decision. Deferred, filed: a per-pipeline `processing.retry` block
+(rides two committed contracts); an operator "cancel/retry now" affordance (today: delete the sidecar, or
+`reprocess`). Pinned by `CommitRetryTest` (exhaustion + Signal, backoff vs pending, spend-on-commit, max=0).
+The original section follows for provenance.
+
 
 **Problem.** Recovery is binary today: crash-idempotent commits + manual whole-Consignment
 `reprocess` (ingest) / `drain` (parked) / `replay` (at-rest runs, shipped this shift). Transient

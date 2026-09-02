@@ -186,6 +186,20 @@ Files that cannot be processed at all are moved out of the inbox into `quarantin
 | `QUARANTINED_MISMATCH` | 0 valid rows parsed — every row fails field validation | `quarantine/<source_path>/field_mismatch/` |
 | `QUARANTINED_UNREADABLE` | `IOException` thrown while opening or streaming the file | `quarantine/<source_path>/unreadable/` |
 | *(corrupt download)* | a fetched remote file fails its integrity check (size/checksum) | `quarantine/<source_path>/corrupt_download/` |
+| *(retry exhausted)* | the file's Consignment failed at COMMIT (or its ingest threw) `-Dingest.retry.max` times — X1, 2026-09-02 | `quarantine/<source_path>/retry_exhausted/` |
+
+The `retry_exhausted` reason is the ingest lane's **bounded retry** (execution residuals X1). A Consignment
+that fails at COMMIT leaves its files in the inbox and the next poll cycle re-ingests them — that IS the
+retry, idempotent by the commit model. It used to be unbounded (a poison Consignment failed every cycle
+forever). Now each member file carries an attempt record under `<status_dir>/retries/` (mirrored by
+poll-relative path like the markers); a file waiting out its exponential backoff
+(`-Dingest.retry.backoff.initialMs` 60000 × 2ⁿ⁻¹, capped at `-Dingest.retry.backoff.maxMs` 3600000, ±10%
+jitter) is skipped on the run path but still counted as **pending**; on the `-Dingest.retry.max`-th
+failure (default 5) the file is quarantined here and ONE CRITICAL `pipeline.batch.retry_exhausted` Signal
+names the Consignment, its files and the last error — the Signal an alert rule should watch for a batch
+that will never commit on its own. `-Dingest.retry.max=0` restores the pre-X1 unbounded behaviour. A
+commit (or park) spends the record. ⚠ The outputs an exhausted Consignment wrote before its failed commit
+are on disk but uncommitted — exactly as they were after every failed attempt; `reprocess` is the redo.
 
 The `corrupt_download` reason is the acquisition-stage **dead-letter** (Data Acquisition Phase F): a fetched file
 whose bytes don't match the listing size or server checksum is quarantined for inspection rather than ingested or
