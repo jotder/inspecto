@@ -205,12 +205,12 @@ describe('PipelinePaletteComponent', () => {
         add.click();
         expect(picked).toEqual(['parser.delimited']);
 
-        // the planned one is inactive: no add button, a disabled role with the reason, a "soon" chip
+        // the planned one is inactive: no add button, a disabled role with the reason, no status chip
         expect(el.querySelector('button[aria-label="Add YAML document slicer"]')).toBeNull();
         const planned = el.querySelector('[data-processor="parser.yaml"]') as HTMLElement;
         expect(planned.getAttribute('aria-disabled')).toBe('true');
         expect(planned.getAttribute('aria-label')).toContain('Not yet available');
-        expect(planned.textContent).toContain('soon');
+        expect(planned.textContent).not.toContain('soon');
         planned.click();
         expect(picked).toEqual(['parser.delimited']); // nothing more was emitted
 
