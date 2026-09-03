@@ -6,6 +6,7 @@ import {
     categoryColor,
     categoryLabel,
     familyCategory,
+    familyColor,
     NodeTypeGroup,
     ProcessorGroup,
     typeHeroIcon,
@@ -59,22 +60,18 @@ import {
                     <div class="mb-1">
                         <button
                             type="button"
-                            class="flex w-full items-center gap-1.5 rounded px-1.5 py-1 text-xs font-semibold uppercase hover:bg-black/5 dark:hover:bg-white/10"
+                            class="flex w-full items-center gap-2.5 rounded px-1.5 py-2 text-base font-semibold uppercase hover:bg-black/5 dark:hover:bg-white/10"
                             [attr.aria-expanded]="isOpen(g.family.code)"
                             (click)="toggleGroup(g.family.code)"
                         >
                             <mat-icon
-                                class="icon-size-4 shrink-0 opacity-60"
+                                class="icon-size-5 shrink-0 opacity-60"
                                 [svgIcon]="
                                     isOpen(g.family.code)
                                         ? 'heroicons_outline:chevron-down'
                                         : 'heroicons_outline:chevron-right'
                                 "
                             ></mat-icon>
-                            <span
-                                class="h-2 w-2 shrink-0 rounded-full"
-                                [style.background]="categoryColor(familyCategory(g.family.code))"
-                            ></span>
                             <span class="truncate opacity-70">{{ g.family.label }}</span>
                             <span class="ml-auto text-xs font-normal opacity-40">
                                 {{ addableCount(g) }}/{{ g.processors.length }}
@@ -85,7 +82,7 @@ import {
                                 @if (p.addable && p.nodeType) {
                                     <button
                                         type="button"
-                                        class="flex w-full cursor-grab items-center gap-1.5 rounded py-1 pl-7 pr-2 text-left text-xs hover:bg-black/5 dark:hover:bg-white/10"
+                                        class="flex w-full cursor-grab items-center gap-2.5 rounded py-2 pl-8 pr-2 text-left text-base hover:bg-black/5 dark:hover:bg-white/10"
                                         draggable="true"
                                         [matTooltip]="p.note || p.label"
                                         [attr.aria-label]="'Add ' + p.label"
@@ -93,11 +90,11 @@ import {
                                         (dragstart)="$event.dataTransfer?.setData('text/flow-node-type', p.nodeType)"
                                     >
                                         <mat-icon
-                                            class="icon-size-4 shrink-0"
+                                            class="icon-size-6 shrink-0"
                                             [svgIcon]="
                                                 p.icon || typeHeroIcon(p.nodeType, familyCategory(g.family.code))
                                             "
-                                            [style.color]="categoryColor(familyCategory(g.family.code))"
+                                            [style.color]="familyColor(g.family.code)"
                                         ></mat-icon>
                                         <span class="truncate">{{ p.label }}</span>
                                     </button>
@@ -106,7 +103,7 @@ import {
                                          pointer events (so no tooltip) — a span with the disabled semantics
                                          carries the "why" instead. -->
                                     <span
-                                        class="flex w-full cursor-not-allowed items-center gap-1.5 rounded py-1 pl-7 pr-2 text-left text-xs opacity-50"
+                                        class="flex w-full cursor-not-allowed items-center gap-2.5 rounded py-2 pl-8 pr-2 text-left text-base opacity-50"
                                         role="button"
                                         aria-disabled="true"
                                         [matTooltip]="inactiveReason(p)"
@@ -114,15 +111,16 @@ import {
                                         [attr.data-processor]="p.id"
                                     >
                                         <mat-icon
-                                            class="icon-size-4 shrink-0"
+                                            class="icon-size-6 shrink-0"
                                             [svgIcon]="p.icon || g.family.icon"
+                                            [style.color]="familyColor(g.family.code)"
                                         ></mat-icon>
                                         <span class="truncate">{{ p.label }}</span>
-                                        <inspecto-chip class="ml-auto shrink-0" variant="soft" tone="neutral">
-                                            {{
-                                                p.status === 'planned' ? 'soon' : 'via ' + (p.capability || p.nodeType)
-                                            }}
-                                        </inspecto-chip>
+                                        @if (p.status !== 'planned') {
+                                            <inspecto-chip class="ml-auto shrink-0" variant="soft" tone="neutral">
+                                                via {{ p.capability || p.nodeType }}
+                                            </inspecto-chip>
+                                        }
                                     </span>
                                 }
                             }
@@ -136,22 +134,18 @@ import {
                     <div class="mb-1">
                         <button
                             type="button"
-                            class="flex w-full items-center gap-1.5 rounded px-1.5 py-1 text-xs font-semibold uppercase hover:bg-black/5 dark:hover:bg-white/10"
+                            class="flex w-full items-center gap-2.5 rounded px-1.5 py-2 text-base font-semibold uppercase hover:bg-black/5 dark:hover:bg-white/10"
                             [attr.aria-expanded]="isOpen(group.category)"
                             (click)="toggleGroup(group.category)"
                         >
                             <mat-icon
-                                class="icon-size-4 shrink-0 opacity-60"
+                                class="icon-size-6 shrink-0 opacity-60"
                                 [svgIcon]="
                                     isOpen(group.category)
                                         ? 'heroicons_outline:chevron-down'
                                         : 'heroicons_outline:chevron-right'
                                 "
                             ></mat-icon>
-                            <span
-                                class="h-2 w-2 shrink-0 rounded-full"
-                                [style.background]="categoryColor(group.category)"
-                            ></span>
                             <span class="truncate opacity-70">{{ categoryLabel(group.category) }}</span>
                             <span class="ml-auto text-xs font-normal opacity-40">{{ group.types.length }}</span>
                         </button>
@@ -162,7 +156,7 @@ import {
                                  every entry is addable — no disabled state to draw. -->
                                 <button
                                     type="button"
-                                    class="flex w-full cursor-grab items-center gap-1.5 rounded py-1 pl-7 pr-2 text-left text-xs hover:bg-black/5 dark:hover:bg-white/10"
+                                    class="flex w-full cursor-grab items-center gap-2.5 rounded py-2 pl-8 pr-2 text-left text-base hover:bg-black/5 dark:hover:bg-white/10"
                                     draggable="true"
                                     [matTooltip]="t.description"
                                     [attr.aria-label]="'Add ' + t.label"
@@ -172,7 +166,7 @@ import {
                                     <!-- Each item carries its OWN glyph; the category is the TINT
                                      (matching the header dot), never a shared glyph per group. -->
                                     <mat-icon
-                                        class="icon-size-4 shrink-0"
+                                        class="icon-size-6 shrink-0"
                                         [svgIcon]="typeHeroIcon(t.type, group.category)"
                                         [style.color]="categoryColor(group.category)"
                                     ></mat-icon>
@@ -237,6 +231,7 @@ export class PipelinePaletteComponent {
     readonly categoryColor = categoryColor;
     readonly categoryLabel = categoryLabel;
     readonly familyCategory = familyCategory;
+    readonly familyColor = familyColor;
     readonly typeHeroIcon = typeHeroIcon;
 
     addableCount(g: ProcessorGroup): number {

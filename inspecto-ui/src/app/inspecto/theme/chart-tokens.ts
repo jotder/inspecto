@@ -102,6 +102,22 @@ export const NODE_KIND_COLORS: Record<NodeKind, string> = {
 
 export const NODE_KIND_FALLBACK = '#9AA0A6';
 
+/**
+ * Vivid, mutually-distinct accent per Step Processor family (`ProcessorCatalog.Family.code`) — the
+ * palette's group icons. `NODE_KIND_COLORS` collapses four families (DQ/XFM/BI/ENR) onto one TRANSFORM
+ * hue via `familyCategory`; this gives each of the 8 families its own colour instead.
+ */
+export const FAMILY_CODE_COLORS: Record<string, string> = {
+    ACQ: '#5B8FF9',
+    PRS: '#61DDAA',
+    DQ: '#F6BD16',
+    XFM: '#F6903D',
+    BI: '#7262FD',
+    ENR: '#E8618C',
+    CTL: '#13C2C2',
+    SNK: '#65789B',
+};
+
 /** Curated colour palette offered in the configurable-icon picker (the kind accents + a few extras). */
 export const ICON_COLOR_SWATCHES: readonly string[] = [
     '#5B8FF9',

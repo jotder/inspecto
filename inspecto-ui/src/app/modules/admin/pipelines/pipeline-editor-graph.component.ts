@@ -229,9 +229,10 @@ export class PipelineEditorGraphComponent implements AfterViewInit, OnChanges, O
             autoFit: 'view',
             // G6 defaults to [0.01, 10] — 1% (nodes vanish to specks) up to 1000% (one tile fills the
             // canvas). Neither end is a state anyone wants to land in, and scroll-wheel zoom reaches
-            // both in a flick. Floor stays well under any `autoFit: 'view'` a real pipeline needs so
-            // the fit is never clipped.
-            zoomRange: [0.25, 3],
+            // both in a flick. Floor raised two notches (0.25 → 0.75, operator ask) — below that the
+            // node labels stop being legible; still well under any `autoFit: 'view'` a real pipeline
+            // needs so the fit is never clipped.
+            zoomRange: [0.75, 3],
             node: {
                 // Uniform rounded "processor" tile (NiFi style); the category icon + outline distinguish kinds.
                 type: 'rect',

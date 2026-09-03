@@ -13,6 +13,7 @@ import {
 } from 'app/inspecto/api';
 import { pipelineHome, storeDirs } from 'app/inspecto/component-model/pipeline-scaffold';
 import { GLYPH_LIBRARY, G6GraphData, iconDataUri, nodeColor, nodeIcon } from 'app/modules/admin/catalog/catalog-graph';
+import { FAMILY_CODE_COLORS } from 'app/inspecto/theme/chart-tokens';
 
 /**
  * Pure mappers that turn the flow-graph projection (GET /pipelines/{id}/graph) into AntV G6 data for the
@@ -225,6 +226,13 @@ export function categoryVisualKind(category: string): NodeKind {
 /** The accent colour for a category (via the catalog token palette) — for the legend / palette dot. */
 export function categoryColor(category: string): string {
     return nodeColor(categoryVisualKind(category));
+}
+
+/** The accent colour for a Step Processor FAMILY — distinct per family (unlike {@link categoryColor},
+ *  which collapses several families onto one category hue). Falls back to the category colour for a
+ *  family code the palette doesn't recognise. */
+export function familyColor(code: string): string {
+    return FAMILY_CODE_COLORS[code] ?? categoryColor(familyCategory(code));
 }
 
 /** Friendly palette group name per category — the user-facing processor taxonomy. */
