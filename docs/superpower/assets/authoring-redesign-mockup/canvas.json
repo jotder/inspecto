@@ -1,0 +1,13 @@
+{
+  "artboards": [
+    { "file": "Steps.dc.html", "x": 0, "y": 0, "w": 1400, "h": 400, "title": "The five steps" },
+    { "file": "Main.dc.html", "x": 0, "y": 560, "w": 1080, "h": 1240, "title": "Parse step — Delimited", "is_interactive": true },
+    { "file": "Transform.dc.html", "x": 1180, "y": 560, "w": 1080, "h": 1260, "title": "Transform step — Simple / Advanced", "is_interactive": true }
+  ],
+  "annotations": [
+    { "id": "note-steps", "x": 1500, "y": 0, "w": 380, "text": "Business-user vocabulary throughout:\nCollect · Parse · Transform · Filter · Store.\nEach step answers one question. Filter keeps its dropped rows in a review bin — that is why it stays its own step instead of hiding inside the SQL." },
+    { "id": "note-parse", "x": -560, "y": 560, "w": 460, "text": "Parse: everything you settled.\n• Name + description back on the pane (pencil) — renaming never un-tests the step.\n• Only two tabs left: Sample and Parsed. Upload / Paste / Import / Export sit on the Sample tab.\n• Properties are collapsible sections, one row each, with the value the sample resolves to shown underneath. Two columns at full width. Change one and the section header counts it; the arrow resets it.\n• No Options tab, no Row filter, no Files & metadata. Files → Collector step; descriptions → Transform; partitioning → Store.\n• Filename column: one checkbox, on by default." },
+    { "id": "note-transform", "x": 2360, "y": 560, "w": 460, "text": "Transform — decided:\n• Simple = a table that GENERATES the SQL, one row per field, five plain verbs (Keep · Remove extra spaces · UPPERCASE · Change type · Calculate). Table → SQL needs no parser.\n• Advanced = the SQL itself. Edit it by hand and the step LOCKS: the table greys out until you 'start over from the table'.\n• Built for 600+ columns: search, view-only filters with counts, a fixed # = output position (page 2 starts at #11), pages of 10 / 20 / 100, and a sample preview that shows only the fields on the current page.\nTry it: search 'attr_01', click 'Changed', remove a field, then open Advanced and type anything into the SQL." }
+  ],
+  "launch": { "view": "canvas" }
+}

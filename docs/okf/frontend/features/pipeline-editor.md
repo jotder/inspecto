@@ -15,6 +15,9 @@ timestamp: 2026-09-01T00:00:00Z
 > - [Grammar configuration](grammar-config.md) — the Parse pane and everything Grammar;
 > - [Collector configuration](collector-config.md) — the `acquisition` Step surface;
 > - [Inline AI authoring](inline-ai-authoring.md) — the `<inspecto-ai-assist>` adoption;
+> - [Schema, Mapping & Transformation authoring](schema-mapping-authoring.md) — the schema editor, the
+>   `transform.map` rule grid, `EXPR` free-text, and `transform.join` lookup config, plus the confirmed UX
+>   gaps against a complete authoring experience;
 > - [`okf/backend/pipeline-graph/`](../../backend/pipeline-graph/index.md) — the backend Pipeline model (lift/lower/validator/executor);
 > - [`superpower/pipeline-spec.md`](../../../superpower/pipeline-spec.md) — the ACTIVE redesign plan (distills here when it drains).
 >

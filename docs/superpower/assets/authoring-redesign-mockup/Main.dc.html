@@ -1,0 +1,298 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; color: #0f172a; background: #ffffff; -webkit-font-smoothing: antialiased; font-size: 14px; }
+    a { color: #4f46e5; } a:hover { color: #4338ca; }
+    input, select, textarea, button { font-family: inherit; font-size: inherit; color: inherit; }
+    input:focus, select:focus, textarea:focus { outline: 2px solid #4f46e5; outline-offset: -1px; }
+    button { cursor: pointer; }
+    .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+  </style>
+</helmet>
+<div style="width: 1080px; min-height: 1240px; background: #ffffff; display: flex; flex-direction: column; box-sizing: border-box;">
+
+  <!-- drawer header (matches inspecto-definition-drawer) -->
+  <div style="display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #e2e8f0; padding: 8px 12px;">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4zM4 10h16M9 10v9"></path></svg>
+    <div style="display: flex; flex-direction: column; min-width: 0;">
+      <div style="font-size: 14px; font-weight: 600; line-height: 1.3;">Parse</div>
+      <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.6; line-height: 1.3;">Delimited file (CSV)</div>
+    </div>
+    <div style="margin-left: auto; display: flex; align-items: center; gap: 6px;">
+      <span style="font-size: 12px; color: #059669; display: flex; align-items: center; gap: 4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"></path></svg>Tested on sample</span>
+      <button style="background: #4f46e5; color: #ffffff; border: none; border-radius: 6px; height: 32px; padding: 0 14px; font-weight: 600; font-size: 13px;">Apply</button>
+      <button style="background: transparent; border: none; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 6px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 16px; padding: 12px 12px 24px;">
+
+    <!-- Name + description single row (D1) -->
+    <sc-if value="{{ editingName }}" hint-placeholder-val="{{ false }}">
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: end; padding: 10px 12px; border: 1px solid #c7d2fe; background: #eef2ff; border-radius: 6px;">
+        <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #475569;">Name<input type="text" value="Orders (daily CSV)" style="height: 36px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0 10px; background: #ffffff; font-weight: 600;"></label>
+        <div style="display: flex; gap: 8px; align-items: end;">
+          <label style="flex: 1 1 0; display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #475569;">Description<input type="text" value="Daily order export from the shop system" style="height: 36px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0 10px; background: #ffffff;"></label>
+          <button onClick="{{ toggleName }}" style="height: 36px; padding: 0 12px; border: 1px solid #4f46e5; color: #4f46e5; background: #ffffff; border-radius: 6px; font-weight: 600; font-size: 13px;">Done</button>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ notEditingName }}" hint-placeholder-val="{{ true }}">
+      <div style="display: flex; align-items: center; gap: 10px; padding: 6px 4px;">
+        <div style="font-size: 16px; font-weight: 600;">Orders (daily CSV)</div>
+        <div style="font-size: 13px; color: #64748b;">Daily order export from the shop system</div>
+        <button onClick="{{ toggleName }}" title="Rename" style="margin-left: 2px; background: transparent; border: none; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 6px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4l10-10-4-4L4 16zM13 7l4 4"></path></svg></button>
+      </div>
+    </sc-if>
+
+    <!-- Source | Parsed -->
+    <div style="display: flex; flex-direction: column; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+      <div style="display: flex; align-items: center; gap: 0; border-bottom: 1px solid #e2e8f0; background: #f8fafc;">
+        <button onClick="{{ showSource }}" style="height: 40px; padding: 0 18px; border: none; background: transparent; font-size: 13px; font-weight: 600; color: {{ sourceTab.color }}; border-bottom: 2px solid {{ sourceTab.border }}; margin-bottom: -1px;">Sample</button>
+        <button onClick="{{ showParsed }}" style="height: 40px; padding: 0 18px; border: none; background: transparent; font-size: 13px; font-weight: 600; color: {{ parsedTab.color }}; border-bottom: 2px solid {{ parsedTab.border }}; margin-bottom: -1px;">Parsed</button>
+        <div style="margin-left: auto; display: flex; align-items: center; gap: 6px; padding-right: 10px;">
+          <button style="height: 30px; padding: 0 10px; border: 1px solid #cbd5e1; background: #ffffff; border-radius: 6px; font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"></path></svg>Upload file</button>
+          <button style="height: 30px; padding: 0 10px; border: 1px solid #cbd5e1; background: #ffffff; border-radius: 6px; font-size: 12px; font-weight: 500;">Paste</button>
+          <button style="height: 30px; padding: 0 10px; border: 1px solid #cbd5e1; background: #ffffff; border-radius: 6px; font-size: 12px; font-weight: 500;">Import</button>
+          <button style="height: 30px; padding: 0 10px; border: 1px solid #cbd5e1; background: #ffffff; border-radius: 6px; font-size: 12px; font-weight: 500;">Export</button>
+        </div>
+      </div>
+
+      <sc-if value="{{ isSource }}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; flex-direction: column; gap: 8px; padding: 12px;">
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #64748b;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z M14 3v4h4"></path></svg>
+            orders_2024-03-15.csv · 4.2 KB · first 200 lines shown · one representative file is enough
+          </div>
+          <div class="mono" style="height: 150px; overflow: hidden; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 12px; background: #f8fafc; font-size: 12px; line-height: 1.6; white-space: pre; color: #334155;">order_id,customer,amount,order_date,status,notes,internal_ref
+10231, Anna Kowalski ,149.90,15/03/2024,shipped,,A-77
+10232,Ben Okafor,  32.00,15/03/2024,pending,gift wrap,A-78
+10233,"Chen, Li",1240.50,15/03/2024,shipped,,A-79
+10234,Dana Weiss,abc,15/03/2024,cancelled,refund requested,A-80
+10235,Eli Marsh,58.25,15/03/2024,shipped,,A-81</div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isParsed }}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; flex-direction: column; gap: 0;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <thead>
+              <tr style="text-align: left; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b;">
+                <th style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0;">order_id</th>
+                <th style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0;">customer</th>
+                <th style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0;">amount</th>
+                <th style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0;">order_date</th>
+                <th style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0;">status</th>
+                <th style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0;">notes</th>
+                <th style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0;">internal_ref</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">10231</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">&nbsp;Anna Kowalski&nbsp;</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">149.90</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">2024-03-15</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">shipped</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #94a3b8;">—</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">A-77</td></tr>
+              <tr><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">10232</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">Ben Okafor</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">32.00</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">2024-03-15</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">pending</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">gift wrap</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">A-78</td></tr>
+              <tr><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">10233</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">Chen, Li</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">1240.50</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">2024-03-15</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">shipped</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #94a3b8;">—</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">A-79</td></tr>
+              <tr><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">10234</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">Dana Weiss</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;"><span style="display: inline-flex; align-items: center; gap: 4px; color: #b45309; background: #fffbeb; border: 1px solid #fde68a; border-radius: 4px; padding: 1px 6px; font-size: 12px;" title="'abc' is not a number — will be left empty">abc</span></td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">2024-03-15</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">cancelled</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">refund requested</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">A-80</td></tr>
+              <tr><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">10235</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">Eli Marsh</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">58.25</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">2024-03-15</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">shipped</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #94a3b8;">—</td><td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9;">A-81</td></tr>
+            </tbody>
+          </table>
+          <div style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; font-size: 12px; color: #64748b; background: #f8fafc;">
+            <span style="display: inline-flex; align-items: center; gap: 4px; color: #b45309;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#b45309" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9L2.5 18a2 2 0 001.7 3h15.6a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"></path></svg>1 value could not be read as a number</span>
+            <span style="margin-left: auto;">Rows per page</span>
+            <select style="height: 28px; border: 1px solid #cbd5e1; border-radius: 6px; background: #ffffff; padding: 0 6px; font-size: 12px;"><option>10</option><option>25</option><option>50</option><option>100</option></select>
+            <span>1–5 of 5</span>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+
+    <!-- Collapsible sections -->
+    <sc-for list="{{ sections }}" as="s" hint-placeholder-count="3">
+      <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+        <button onClick="{{ s.toggle }}" style="width: 100%; display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 12px; border: none; background: #ffffff; text-align: left;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate({{ s.chevron }}deg); transition: transform 150ms;"><path d="M9 6l6 6-6 6"></path></svg>
+          <span style="font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.7;">{{ s.title }}</span>
+          <span style="font-size: 12px; color: #64748b;">{{ s.subtitle }}</span>
+          <sc-if value="{{ s.changed }}" hint-placeholder-val="{{ false }}">
+            <span style="margin-left: auto; font-size: 10px; font-weight: 600; color: #4f46e5; background: #eef2ff; border-radius: 999px; padding: 2px 8px;">{{ s.changedLabel }}</span>
+          </sc-if>
+        </button>
+        <sc-if value="{{ s.open }}" hint-placeholder-val="{{ true }}">
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 24px; padding: 4px 12px 14px; border-top: 1px solid #f1f5f9;">
+            <sc-for list="{{ s.rows }}" as="r" hint-placeholder-count="6">
+              <div style="display: grid; grid-template-columns: 170px minmax(0, 1fr) 24px; align-items: center; gap: 10px; min-height: 40px;">
+                <div style="font-size: 13px; color: #334155;">{{ r.label }}</div>
+                <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+                  <sc-if value="{{ r.isSelect }}" hint-placeholder-val="{{ false }}">
+                    <select onChange="{{ r.setValue }}" style="height: 34px; border: 1px solid #cbd5e1; border-radius: 6px; background: #ffffff; padding: 0 8px; font-size: 13px;">
+                      <sc-for list="{{ r.choices }}" as="ch" hint-placeholder-count="2"><option value="{{ ch.value }}" selected="{{ ch.selected }}">{{ ch.value }}</option></sc-for>
+                    </select>
+                  </sc-if>
+                  <sc-if value="{{ r.isText }}" hint-placeholder-val="{{ true }}">
+                    <input type="text" value="{{ r.value }}" onInput="{{ r.setValue }}" style="height: 34px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0 10px; background: #ffffff; font-size: 13px;">
+                  </sc-if>
+                  <div style="font-size: 11px; color: #64748b; display: flex; align-items: center; gap: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ r.sample }}</div>
+                </div>
+                <button onClick="{{ r.reset }}" title="Reset to default" style="width: 24px; height: 24px; border: none; background: transparent; display: flex; align-items: center; justify-content: center; border-radius: 4px; opacity: {{ r.resetOpacity }};"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1015-6.7L15 8M3 3v5h5"></path></svg></button>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+    </sc-for>
+
+    <!-- Output schema -->
+    <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+      <div style="display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 12px; background: #ffffff;">
+        <span style="font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.7;">Columns that come out</span>
+        <span style="font-size: 12px; color: #64748b;">{{ columnCount }} columns · types detected from the sample</span>
+        <div style="margin-left: auto; position: relative; display: flex; align-items: center;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position: absolute; left: 9px;"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+          <input type="search" value="{{ colQuery }}" onInput="{{ setColQuery }}" placeholder="Find a column…" style="height: 30px; width: 200px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0 10px 0 28px; background: #ffffff; font-size: 12px;">
+        </div>
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #334155;">
+          <input type="checkbox" checked="{{ filenameOn }}" onChange="{{ toggleFilename }}" style="width: 16px; height: 16px; accent-color: #4f46e5;">
+          Add a column with the source file name
+          <input type="text" value="filename" style="height: 30px; width: 120px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0 8px; font-size: 12px; opacity: {{ filenameFieldOpacity }};">
+        </label>
+      </div>
+      <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+        <thead>
+          <tr style="text-align: left; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; background: #f8fafc;">
+            <th style="padding: 8px 12px; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; width: 44px;">Use</th>
+            <th style="padding: 8px 12px; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; width: 32px;">#</th>
+            <th style="padding: 8px 12px; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">Name</th>
+            <th style="padding: 8px 12px; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; width: 140px;">Type</th>
+            <th style="padding: 8px 12px; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">Sample value</th>
+            <th style="padding: 8px 12px; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; width: 200px;">Also known as</th>
+          </tr>
+        </thead>
+        <tbody>
+          <sc-for list="{{ visibleColumns }}" as="c" hint-placeholder-count="6">
+            <tr style="background: {{ c.bg }};">
+              <td style="padding: 6px 12px; border-bottom: 1px solid #f1f5f9;"><input type="checkbox" checked="{{ c.on }}" onChange="{{ c.toggle }}" style="width: 16px; height: 16px; accent-color: #4f46e5;"></td>
+              <td style="padding: 6px 12px; border-bottom: 1px solid #f1f5f9; color: #94a3b8; font-size: 12px;">{{ c.n }}</td>
+              <td style="padding: 6px 12px; border-bottom: 1px solid #f1f5f9;"><input type="text" value="{{ c.name }}" onInput="{{ c.rename }}" style="height: 32px; width: 100%; max-width: 260px; border: 1px solid transparent; border-radius: 6px; padding: 0 8px; background: transparent; font-weight: 500; opacity: {{ c.opacity }};"></td>
+              <td style="padding: 6px 12px; border-bottom: 1px solid #f1f5f9;">
+                <span style="display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border-radius: 6px; background: #f1f5f9; color: #334155; font-size: 12px; font-weight: 500;"><span class="mono" style="font-size: 11px; color: #4f46e5; font-weight: 500;">{{ c.glyph }}</span>{{ c.type }}</span>
+              </td>
+              <td class="mono" style="padding: 6px 12px; border-bottom: 1px solid #f1f5f9; font-size: 12px; color: #475569;">{{ c.sample }}</td>
+              <td style="padding: 6px 12px; border-bottom: 1px solid #f1f5f9;"><input type="text" value="{{ c.alias }}" onInput="{{ c.setAlias }}" placeholder="optional" style="height: 32px; width: 100%; border: 1px solid transparent; border-radius: 6px; padding: 0 8px; background: transparent; font-size: 12px; color: #64748b;"></td>
+            </tr>
+          </sc-for>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":1080,"height":1240}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      tab: 'source', editingName: false, open: { dialect: true, robustness: false, types: false }, filenameOn: true, colQuery: '',
+      overrides: { 'dialect:Ignore lines starting with': '#' },
+      columns: [
+        { n: 1, name: 'order_id', type: 'Whole number', glyph: '#', sample: '10231', alias: '', on: true },
+        { n: 2, name: 'customer', type: 'Text', glyph: 'Aa', sample: ' Anna Kowalski ', alias: 'buyer', on: true },
+        { n: 3, name: 'amount', type: 'Decimal', glyph: '0.0', sample: '149.90', alias: '', on: true },
+        { n: 4, name: 'order_date', type: 'Date', glyph: 'd', sample: '2024-03-15', alias: '', on: true },
+        { n: 5, name: 'status', type: 'Text', glyph: 'Aa', sample: 'shipped', alias: '', on: true },
+        { n: 6, name: 'notes', type: 'Text', glyph: 'Aa', sample: 'gift wrap', alias: '', on: true },
+        { n: 7, name: 'internal_ref', type: 'Text', glyph: 'Aa', sample: 'A-77', alias: '', on: true },
+      ],
+    };
+  }
+  renderVals() {
+    const st = this.state;
+    const active = { color: '#4f46e5', border: '#4f46e5' };
+    const idle = { color: '#64748b', border: 'transparent' };
+    // A property row: label, default value, the value the sample resolves to, and (for selects) the choices.
+    const row = (label, def, sample, choices) => ({ label, def, sample, choices: choices || null });
+    const defs = [
+      { key: 'dialect', title: 'How the file is written', subtitle: 'separator, quotes, header', rows: [
+        row('Column separator', 'Comma  ,', 'Detected in sample:  ,', ['Comma  ,', 'Semicolon  ;', 'Tab', 'Pipe  |']),
+        row('Text quote', '"', 'Sample:  "Chen, Li"  stays one value'),
+        row('First row is the header', 'Yes', 'Sample: order_id, customer, amount…', ['Yes', 'No']),
+        row('Skip lines at the top', '0', 'Nothing skipped'),
+        row('Ignore lines starting with', '', 'No such lines in sample'),
+        row('Text encoding', 'UTF-8', 'Detected: UTF-8', ['UTF-8', 'Windows-1252', 'ISO-8859-1']),
+      ]},
+      { key: 'robustness', title: 'When a row looks wrong', subtitle: 'too many columns, unreadable values', rows: [
+        row('A row has extra columns', 'Ignore the extras', 'Sample: none', ['Ignore the extras', 'Put the row in the review bin']),
+        row('A row has missing columns', 'Fill with empty', 'Sample: none', ['Fill with empty', 'Put the row in the review bin']),
+        row('A value cannot be read as its type', 'Leave it empty, keep the row', 'Sample: amount "abc" on row 4 → empty', ['Leave it empty, keep the row', 'Put the row in the review bin']),
+        row('A row cannot be read at all', 'Put it in the review bin', 'Sample: none', ['Put it in the review bin', 'Skip it silently']),
+        row('Blank lines', 'Skip', 'Sample: none', ['Skip', 'Treat as a row']),
+        row('Stop after this many bad rows', '100', 'Per file'),
+      ]},
+      { key: 'types', title: 'How values are understood', subtitle: 'dates, numbers, yes/no', rows: [
+        row('Detect column types', 'Automatically from the sample', '5 of 7 columns typed with confidence', ['Automatically from the sample', 'I will set them myself']),
+        row('Date format', 'Day / Month / Year', 'Sample: 15/03/2024 → 2024-03-15', ['Day / Month / Year', 'Month / Day / Year', 'Year-Month-Day']),
+        row('Decimal separator', '.', 'Sample: 149.90', ['.', ',']),
+        row('Thousands separator', 'None', 'Sample: 1240.50', ['None', ',', '.', 'Space']),
+        row('An empty cell means', 'Missing', 'Sample: notes on rows 1, 3, 5', ['Missing', 'Empty text']),
+        row('Words for yes / no', 'yes, no, true, false, 1, 0', 'Not used in sample'),
+      ]},
+    ];
+    const setOverride = (k, v) => { const o = { ...st.overrides }; if (v === undefined) delete o[k]; else o[k] = v; this.setState({ overrides: o }); };
+    const sections = defs.map((d) => {
+      const rows = d.rows.map((r) => {
+        const k = d.key + ':' + r.label;
+        const has = Object.prototype.hasOwnProperty.call(st.overrides, k);
+        const value = has ? st.overrides[k] : r.def;
+        return {
+          label: r.label, sample: r.sample, value,
+          isSelect: !!r.choices, isText: !r.choices,
+          choices: (r.choices || []).map((c) => ({ value: c, selected: c === value })),
+          resetOpacity: has ? 1 : 0.25,
+          setValue: (e) => setOverride(k, e.target.value),
+          reset: () => setOverride(k, undefined),
+        };
+      });
+      const changedCount = rows.filter((r) => r.resetOpacity === 1).length;
+      return {
+        title: d.title, subtitle: d.subtitle, rows,
+        open: !!st.open[d.key], chevron: st.open[d.key] ? 90 : 0,
+        changed: changedCount > 0, changedLabel: changedCount + ' changed',
+        toggle: () => this.setState({ open: { ...st.open, [d.key]: !st.open[d.key] } }),
+      };
+    });
+    const patchCol = (n, patch) => this.setState({ columns: st.columns.map((c) => (c.n === n ? { ...c, ...patch } : c)) });
+    const base = st.columns.map((c) => ({
+      ...c, bg: '#ffffff', opacity: c.on ? 1 : 0.4,
+      toggle: () => patchCol(c.n, { on: !c.on }),
+      rename: (e) => patchCol(c.n, { name: e.target.value }),
+      setAlias: (e) => patchCol(c.n, { alias: e.target.value }),
+    }));
+    const noop = () => {};
+    const columns = st.filenameOn
+      ? base.concat([{ n: 8, name: 'filename', type: 'Text', glyph: 'Aa', sample: 'orders_2024-03-15.csv', alias: '', on: true, bg: '#f5f3ff', opacity: 1, toggle: () => this.setState({ filenameOn: false }), rename: noop, setAlias: noop }])
+      : base;
+    return {
+      editingName: st.editingName, notEditingName: !st.editingName,
+      toggleName: () => this.setState({ editingName: !st.editingName }),
+      isSource: st.tab === 'source', isParsed: st.tab === 'parsed',
+      sourceTab: st.tab === 'source' ? active : idle, parsedTab: st.tab === 'parsed' ? active : idle,
+      showSource: () => this.setState({ tab: 'source' }), showParsed: () => this.setState({ tab: 'parsed' }),
+      sections,
+      columns, columnCount: columns.filter((c) => c.on).length,
+      visibleColumns: columns.filter((c) => !st.colQuery.trim() || c.name.toLowerCase().includes(st.colQuery.trim().toLowerCase()) || (c.alias || '').toLowerCase().includes(st.colQuery.trim().toLowerCase())),
+      colQuery: st.colQuery, setColQuery: (e) => this.setState({ colQuery: e.target.value }),
+      filenameOn: st.filenameOn, filenameFieldOpacity: st.filenameOn ? 1 : 0.35,
+      toggleFilename: () => this.setState({ filenameOn: !st.filenameOn }),
+    };
+  }
+}
+</script>
+</body>
+</html>

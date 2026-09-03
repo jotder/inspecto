@@ -112,6 +112,18 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- [`superpower/parse-pane-redesign-plan.md`](superpower/parse-pane-redesign-plan.md) — **DECIDED
+  2026-09-03, not started.** Delimited Parse pane: tabs → collapsible sections of single-row property
+  edits with sample values (deletes the R9 hidden-panel hack), Sample | Parsed tabs, filename column,
+  Files & metadata dissolved (Collection pointer → Collector, column metadata → Transformation,
+  partitioning → Sink), Name/Description back on the pane via `renameSelected`.
+- [`superpower/sql-transform-v1-plan.md`](superpower/sql-transform-v1-plan.md) — **DECIDED 2026-09-03,
+  not started.** New `transform.sql` Step: one SELECT over the TYPED source (`FROM input`),
+  `DESCRIBE`-derived output schema with editable target names, filter stays a separate Step (rejected
+  rows preserved), audit-boundary WARNING. Typing stays declarative on Parse (the all-VARCHAR raw fact —
+  see `sql-only-transform-feasibility.md`). v2 AST smart table + v3 macros parked; `json` extension
+  under the seal needs a probe first. Supersedes `author-schema-1-plan.md` (archived same day).
+
 - ~~`superpower/mock-backend-removal-plan.md`~~ — **COMPLETE and ARCHIVED 2026-08-31** →
   [`archived-documents/plans-archive/mock-backend-removal-plan.md`](archived-documents/plans-archive/mock-backend-removal-plan.md).
   The offline UI mock backend is gone (`f1553136`): `inspecto-ui/src/app/inspecto/mock/` (~22k LOC),

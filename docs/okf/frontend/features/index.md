@@ -26,6 +26,7 @@ documented as concepts.
 * [Collectors](collectors.md) - configured collection tasks.
 * [Collector configuration](collector-config.md) - the ONE surface + store behind both collector-authoring screens.
 * [Pipeline editor](pipeline-editor.md) - the authored-Pipeline (DAG) editor; the Grammar/Parse surface is [grammar-config](grammar-config.md).
+* [Schema, Mapping & Transformation authoring](schema-mapping-authoring.md) - the schema editor, the `transform.map` rule grid, `EXPR` free-text, and `transform.join` lookup config as they exist today, plus 8 confirmed UX gaps (no EXPR validation/preview, no expression builder, no reference-existence check, no schema-drift detection into mapping, opt-in stale-prone previews, no drag-drop, silent stale-column fallback, disconnected test mechanisms) — baseline for a planned authoring-UX pass (2026-09-03).
 * Expectations · Decision rules *(not yet documented)*.
 
 # Platform — Studio
