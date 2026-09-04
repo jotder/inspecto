@@ -296,6 +296,56 @@ path.
    canvas-level `RunToHereDialog`) with no cross-linking, so an author working inside a drawer has no path
    to the more powerful real-run capability without leaving the drawer and finding it manually.
 
+## 7. Wide-feed decisions (D8–D10, decided 2026-09-04 — NOT yet built)
+
+Three decisions taken after the redesign shipped, from driving the clickable mockup
+(Artifact *Pipeline Authoring Redesign*, `b5e7ec6c-5bb2-467a-a513-93bfda987f3d`; working artboards in the
+session scratchpad `design/`). They are **design decisions with no code behind them yet** — tracked in
+BACKLOG as `AUTHORING-WIDE-1`.
+
+🔴 **What prompted them: the mockup's sample was chosen to flatter the design.** Both boards were drawn
+over a 7-column orders CSV, where "one row per field" reads as clarity. This product's real feeds are not
+that shape — ASN.1, fixed-width and network sources routinely carry hundreds of fields — and at 600 the
+same table is a wall. The evidence was already in the repo (the parser lanes, the 121-processor catalog)
+and was not applied. Both mockup boards now carry 65 columns instead of 7.
+
+### D8 — Parse does NOT drop columns; Transform owns exclusion
+
+The Parse pane settles **what a column is**: that it exists, its name, its type, its synonym. It does
+**not** offer include/exclude. Leaving a field out of the output is `transform.sql`'s job and only its
+job, so an author hunting a missing field has exactly one place to look.
+
+⚠ **The reason is cost, not tidiness.** The two affordances looked identical and were not: excluding in
+Parse edits the **schema**, which `SchemaCompatibility` gates on a BACKWARD contract (§1) — so undoing it
+can be *refused*, or force a re-test. Excluding in Transform is a clause in the SELECT: reversible for
+free. The expensive one is simply not offered.
+
+🔴 **Knock-on, deliberate:** the stored schema is now always the full column set, so the Catalog will list
+columns that never reach a sink. Anything reading the schema as "what lands in storage" is reading it
+wrongly — the schema describes the **file**, the SELECT describes the **output**.
+
+### D9 — Both field tables are built for a wide feed
+
+Search over name and synonym; view-only filter chips **with counts**; a page-size choice that reaches
+down to 10. ⚠ The two grids deliberately **do not** share a default: Transform pages at 10 because its
+rows are tall (a function select plus per-parameter controls), Parse at 50 because its rows are dense
+one-liners and a type sweep wants many at once. Symmetry here would cost more than it buys. 🔴 **`#`
+is the position in the FULL list, never the row's index in the current view** — on Parse it is the
+physical column position in the file, so renumbering it under a filter would be a lie; page 2 starts at
+#11. The sample preview renders only the fields on the current page and says so.
+
+### D10 — Transform opens on *Changed*, not *All*
+
+Default filter is `changed`, with a banner stating what is implied — *"N other fields pass through
+unchanged — nothing to do for them"* — and a **Show them** action. A wide feed becomes three rows to
+read instead of six hundred.
+
+⚠ **This inverts the Simple-vs-SQL argument** that justified the fields grid (§0). The grid is **O(n) in
+fields**; SQL is **O(1) in fields and O(k) in changes**. For wide data `SELECT *` with three overrides is
+genuinely the simpler surface — which is why the grid's model must be *"everything passes through; show
+me what I changed"* rather than *"enumerate every field"*. Keep this in view before adding any feature
+that requires the grid to list all fields.
+
 ## Grounding
 
 Direct reads of `schema-editor.dialog.ts`, `pipeline-load-definition.component.ts`,

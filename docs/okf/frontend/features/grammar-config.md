@@ -19,6 +19,13 @@ One surface authors how raw bytes become rows — a **Grammar** (`docs/GLOSSARY.
 and the dialog are the only two adopters of `<inspecto-grammar-editor>` today. Earlier sections below
 that mention the stage describe history, not a live host.
 
+> ⚠ **Amended 2026-09-04 by D8–D10 (decided, NOT built)** — see
+> [schema-mapping-authoring.md §7](schema-mapping-authoring.md). In short: **Parse does not drop
+> columns** (it settles existence/name/type/synonym; exclusion is `transform.sql`'s job only, because
+> excluding here edits the schema and `SchemaCompatibility` gates that BACKWARD), and the columns table
+> must carry the wide-feed treatment (search · filter chips with counts · 10/20/100 paging · `#` = the
+> position in the FULL file, never the filtered row index). Tracked as BACKLOG `AUTHORING-WIDE-1`.
+
 ## The sectioned Parse pane (parse-pane-redesign plan, SHIPPED `d012f721` 2026-09-04)
 
 The operator's verdict (2026-09-03): authoring must be *simpler, less clumsy* — a UI to play with
