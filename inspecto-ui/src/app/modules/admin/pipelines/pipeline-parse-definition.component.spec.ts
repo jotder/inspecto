@@ -257,7 +257,9 @@ async function create(
                                   config: {
                                       raw: {
                                           name: 'record',
-                                          fields: [{ name: 'IMSI', selector: 'imsi', type: 'VARCHAR', ...savedFieldExtras }],
+                                          fields: [
+                                              { name: 'IMSI', selector: 'imsi', type: 'VARCHAR', ...savedFieldExtras },
+                                          ],
                                       },
                                       ...(savedPartitions ? { partitions: savedPartitions } : {}),
                                       ...(savedLegacyPartitionKey ? { partitionKey: savedLegacyPartitionKey } : {}),
@@ -436,7 +438,7 @@ describe('PipelineParseDefinitionComponent', () => {
 
     it('seeds the editor from the node’s inline parsing: block', async () => {
         const fixture = await create();
-        expect(editor(fixture).value()['delimited']).toMatchObject({ delimiter: '|', has_header: false }) // + engine defaults (R4);
+        expect(editor(fixture).value()['delimited']).toMatchObject({ delimiter: '|', has_header: false }); // + engine defaults (R4);
     });
 
     it('Apply rebuilds the node with the edited Grammar in parsing:, frontend stamped', async () => {
@@ -1183,7 +1185,9 @@ describe('PipelineParseDefinitionComponent', () => {
             expect(p.schemaSeed().map((r) => r.type)).toEqual(['BIGINT', 'DATE', 'VARCHAR']);
             const text = fixture.nativeElement.textContent as string;
             expect(text).not.toContain('Apply suggested types');
-            expect(fixture.nativeElement.querySelector('mat-button-toggle-group[aria-label="Data types mode"]')).toBeNull();
+            expect(
+                fixture.nativeElement.querySelector('mat-button-toggle-group[aria-label="Data types mode"]'),
+            ).toBeNull();
             // …and the mode is ONE property row, in the mockup's words.
             expect(text).toContain('Detect column types');
             expect(text).toContain('I will set them myself');
@@ -1202,11 +1206,13 @@ describe('PipelineParseDefinitionComponent', () => {
             const headers = Array.from(el.querySelectorAll('inspecto-schema-fields-editor thead th')).map((h) =>
                 (h as HTMLElement).textContent?.trim(),
             );
-            expect(headers).toEqual(['Use', '#', 'Name', 'Type', 'Sample value', 'Also known as']);
+            // D8: no 'Use' column — Parse settles what a column IS and emits every row; leaving a
+            // field out of the output is transform.sql's job.
+            expect(headers).toEqual(['#', 'Name', 'Type', 'Sample value', 'Also known as']);
             expect(el.textContent).toContain('Columns that come out');
-            const samples = Array.from(el.querySelectorAll('inspecto-schema-fields-editor tbody tr td:nth-child(5)')).map(
-                (td) => (td as HTMLElement).textContent?.trim(),
-            );
+            const samples = Array.from(
+                el.querySelectorAll('inspecto-schema-fields-editor tbody tr td:nth-child(4)'),
+            ).map((td) => (td as HTMLElement).textContent?.trim());
             expect(samples).toEqual(['1', '2026-07-15', 'london']);
         });
 
@@ -1344,9 +1350,7 @@ describe('PipelineParseDefinitionComponent', () => {
         });
 
         it('picks up concurrent partitions[] updates from disk upon submit', async () => {
-            savedPartitions = [
-                { column: 'year', source: 'TXN_DATE', type: 'DATE_YEAR' },
-            ];
+            savedPartitions = [{ column: 'year', source: 'TXN_DATE', type: 'DATE_YEAR' }];
             try {
                 const fixture = await create(delimitedNode(), [], 0, null, 'cdr');
                 fixture.detectChanges();
@@ -1584,7 +1588,9 @@ describe('PipelineParseDefinitionComponent', () => {
             const fixture = await create();
             fixture.componentInstance.filenameColumnTarget.set({ value: '', target: 'Warehouse' });
             fixture.detectChanges();
-            let checkbox = fixture.nativeElement.querySelector('mat-checkbox input[type="checkbox"]') as HTMLInputElement;
+            let checkbox = fixture.nativeElement.querySelector(
+                'mat-checkbox input[type="checkbox"]',
+            ) as HTMLInputElement;
             expect(checkbox.checked).toBe(false);
 
             fixture.componentInstance.filenameColumnTarget.set({ value: 'src_file', target: 'Warehouse' });

@@ -127,7 +127,19 @@ export class PipelineTransformSqlDefinitionComponent {
 
     // ── view state: search, filter, paging. None of this is persisted or written. ───────────────────
     readonly query = signal('');
-    readonly filter = signal<FieldFilter>('all');
+    /**
+     * D10 (2026-09-04): a Step that changes something opens on CHANGED, not ALL — the grid's model is
+     * *everything passes through; show me what I changed*, so on a wide feed that is a few rows to read
+     * instead of hundreds, with {@link passthroughNote} stating the rest rather than listing them.
+     * {@link seedFrom} picks the opening value; a Step that changes nothing opens on ALL, because an
+     * empty table is a worse first screen than the fields themselves.
+     *
+     * <p>⚠ Worth keeping in view: this inverts the argument for having a grid at all. The grid is
+     * O(n) in fields where SQL is O(1) in fields and O(k) in changes, so for wide data `SELECT *`
+     * with three overrides is genuinely the simpler surface. Anything that forces the grid to
+     * enumerate every field is pushing it back toward the shape that does not scale.
+     */
+    readonly filter = signal<FieldFilter>('changed');
     readonly pageSize = signal<number>(PAGE_SIZES[0]);
     readonly page = signal(0);
     readonly pageSizes = PAGE_SIZES;
@@ -180,6 +192,18 @@ export class PipelineTransformSqlDefinitionComponent {
             active: this.filter() === key,
         })),
     );
+
+    /**
+     * The "N others pass through unchanged" line, or `null` when there is nothing to say — shown only
+     * on the unsearched `changed` view, where the rows NOT on screen are exactly the untouched ones.
+     */
+    readonly passthroughNote = computed<string | null>(() => {
+        if (this.filter() !== 'changed' || this.query().trim()) return null;
+        const untouched = this.counts().all - this.counts().changed;
+        if (untouched <= 0) return null;
+        const plural = untouched === 1 ? 'field passes' : 'fields pass';
+        return `${untouched} other ${plural} through unchanged — nothing to do for them.`;
+    });
 
     /** Search over the output name and the source column; then the active filter. Order is preserved. */
     readonly visibleRows = computed<FieldRow[]>(() => {
@@ -329,7 +353,6 @@ export class PipelineTransformSqlDefinitionComponent {
         this.preview.set(null);
         this.previewError.set(null);
         this.query.set('');
-        this.filter.set('all');
         this.page.set(0);
         this.leftOut.set([]);
 
@@ -347,6 +370,11 @@ export class PipelineTransformSqlDefinitionComponent {
             this.storedSql.set('');
             this.fields.set(seedFields(this.upstreamColumns()));
         }
+        // D10: land on Changed when there IS something changed — on a wide feed that is a few rows to
+        // read instead of hundreds. ⛔ Never on a Step that changes nothing: "show me what I changed"
+        // over an all-passthrough Step is an empty table, which is a worse first screen than the
+        // fields themselves. The note under the toolbar carries the count either way.
+        this.filter.set(this.allRows().some((r) => r.changed) ? 'changed' : 'all');
         this.loaded = this.snapshot();
     }
 

@@ -132,6 +132,38 @@ describe('Transform pane: seeding', () => {
         expect(c.generatedSql()).toBe('SELECT\n  order_id AS order_id,\n  customer AS customer\nFROM input');
     });
 
+    // D10 (2026-09-04): the grid opens on CHANGED and STATES the pass-through rest rather than listing
+    // it — on a wide feed that is a few rows to read instead of hundreds.
+    // ⛔ A Step that changes nothing opens on ALL: "show me what I changed" over an all-passthrough
+    // Step is an empty table, a worse first screen than the fields themselves.
+    it('opens a Step that changes nothing on All, with no pass-through note', async () => {
+        const fresh = await create(sqlNode(), [{ order_id: '1', customer: 'A', amount: '2' }]);
+        expect(comp(fresh).filter()).toBe('all');
+        expect(comp(fresh).passthroughNote()).toBeNull();
+    });
+
+    it('opens a Step with an authored change on Changed, and states the pass-through rest', async () => {
+        const authored = await create(
+            sqlNode({
+                sql: 'SELECT\n  TRIM(order_id) AS order_ref,\n  customer AS customer,\n  amount AS amount\nFROM input',
+                fields: [
+                    { name: 'order_ref', from: 'order_id', fn: 'trim', args: {} },
+                    { name: 'customer', from: 'customer', fn: 'keep', args: {} },
+                    { name: 'amount', from: 'amount', fn: 'keep', args: {} },
+                ],
+            }),
+            [{ order_id: '1', customer: 'A', amount: '2' }],
+        );
+        const c = comp(authored);
+        expect(c.filter()).toBe('changed');
+        expect(c.visibleRows().map((r) => r.field.name)).toEqual(['order_ref']);
+        expect(c.passthroughNote()).toContain('2 other fields pass through unchanged');
+
+        // The note is about what the CHANGED view hides; it has nothing to say once everything shows.
+        c.setFilter('all');
+        expect(c.passthroughNote()).toBeNull();
+    });
+
     it('seeds fields from upstreamColumns when sampleRows is undefined', async () => {
         const fixture = await create(sqlNode(), undefined, ['user_id', 'email']);
         const c = comp(fixture);

@@ -80,15 +80,16 @@ describe('InspectoSchemaFieldsEditorComponent', () => {
         expect(c.ariaSort('name')).toBe('descending');
     });
 
-    it('master checkbox includes/excludes exactly the filtered rows', async () => {
-        const { c } = await create(rows(20));
-        c.setSearch('col_1'); // 11 of 20
-        c.toggleAllVisible(false);
-        expect(c.includedNames().length).toBe(9); // only the matching rows were excluded
-        expect(c.visibleIncludeState()).toBe('none');
-        c.setSearch('');
-        expect(c.visibleIncludeState()).toBe('some');
-        expect(c.form.dirty).toBe(true);
+    // D8 (2026-09-04): this grid excludes nothing. Parse settles what a column IS; leaving a field out
+    // of the output is transform.sql's job, because excluding here edited the SCHEMA — which
+    // SchemaCompatibility gates BACKWARD, so the undo could be refused — while a SELECT clause is free
+    // to reverse. The master checkbox, the per-row checkbox and their state are gone with it.
+    it('offers no include/exclude control — every column it holds is emitted', async () => {
+        const { fixture, c } = await create(rows(20));
+        expect(fixture.nativeElement.querySelectorAll('mat-checkbox').length).toBe(0);
+        expect(c.includedNames().length).toBe(20);
+        c.setSearch('col_1'); // a view lens over 11 of 20 …
+        expect(c.value().length).toBe(20); // … never a filter on what is written
     });
 
     it('validate reveals the page holding an invalid row hidden by search + paging', async () => {
@@ -110,18 +111,21 @@ describe('InspectoSchemaFieldsEditorComponent', () => {
         expect(String(c.problem())).toContain('Duplicate field name "DUP"');
     });
 
-    it('refuses an empty inclusion, naming the reason for the host', async () => {
+    it('refuses an empty grid, naming the reason for the host', async () => {
         const { c } = await create(rows(3));
-        c.toggleAllVisible(false);
+        c.fieldRows.clear();
         expect(c.validate()).toBe(false);
-        expect(String(c.problem())).toContain('Include at least one field');
+        expect(String(c.problem())).toContain('Add at least one field');
     });
 
-    it('value() returns the included rows only', async () => {
-        const { c } = await create(rows(3));
-        c.fieldRows.at(1).get('include')?.setValue(false);
+    it('value() returns every row, including one a stored include=false would once have dropped', async () => {
+        const { c } = await create([
+            { include: true, name: 'col_0', selector: '0', type: 'VARCHAR' },
+            { include: false, name: 'col_1', selector: '1', type: 'VARCHAR' },
+            { include: true, name: 'col_2', selector: '2', type: 'VARCHAR' },
+        ]);
         expect(c.validate()).toBe(true);
-        expect(c.value().map((r) => r.name)).toEqual(['col_0', 'col_2']);
+        expect(c.value().map((r) => r.name)).toEqual(['col_0', 'col_1', 'col_2']);
     });
 
     it('renders each type with its data-format icon', async () => {
@@ -142,8 +146,8 @@ describe('InspectoSchemaFieldsEditorComponent', () => {
     it('re-seeding rebuilds the grid and returns it to pristine', async () => {
         const { fixture, c } = await create(rows(3));
         // `setValue` alone does NOT dirty a control — only interaction (or an explicit mark) does,
-        // which is why `toggleAllVisible` marks the form itself.
-        c.toggleAllVisible(false);
+        // so dirty the form the way an edit does before checking the re-seed clears it.
+        c.setType(c.fieldRows.at(0), 'DOUBLE');
         expect(c.form.dirty).toBe(true);
         fixture.componentRef.setInput('rows', rows(2));
         fixture.detectChanges();
@@ -196,18 +200,18 @@ describe('InspectoSchemaFieldsEditorComponent', () => {
 
     // ── §4.3 redesign (delimited-grammar-properties U2): ①–⑤ order, icon type menu, synonym ──
 
-    it('renders the mockup\'s column order (R11): Use, #, Name, Type, Sample value, Also known as', async () => {
+    it("renders the mockup's column order (R11): Use, #, Name, Type, Sample value, Also known as", async () => {
         const { fixture } = await create(rows(2));
         const el = fixture.nativeElement as HTMLElement;
         const headers = Array.from(el.querySelectorAll('thead th')).map((h) => (h as HTMLElement).textContent?.trim());
-        // Header ① is the master checkbox (sr-only "Use"); no Selector column for positional frontends.
-        expect(headers).toHaveLength(6);
-        expect(headers[0]).toContain('Use');
-        expect(headers[1]).toContain('#');
-        expect(headers[2]).toContain('Name');
-        expect(headers[3]).toContain('Type');
-        expect(headers[4]).toContain('Sample value');
-        expect(headers[5]).toContain('Also known as');
+        // D8: no master-checkbox header — the grid excludes nothing. No Selector column for
+        // positional frontends.
+        expect(headers).toHaveLength(5);
+        expect(headers[0]).toContain('#');
+        expect(headers[1]).toContain('Name');
+        expect(headers[2]).toContain('Type');
+        expect(headers[3]).toContain('Sample value');
+        expect(headers[4]).toContain('Also known as');
         expect(el.textContent).toContain('Columns that come out');
         expect(el.textContent).toContain('2 columns');
     });
@@ -228,8 +232,7 @@ describe('InspectoSchemaFieldsEditorComponent', () => {
             expect(f.querySelector('mat-label')).toBeNull();
             expect(f.querySelector('mat-hint')).toBeNull();
         }
-        expect(row.querySelector('td:nth-child(5) span')?.classList.contains('sf-value')).toBe(true);
-        expect(row.querySelector('mat-checkbox')?.classList.contains('sf-dense-check')).toBe(true);
+        expect(row.querySelector('td:nth-child(4) span')?.classList.contains('sf-value')).toBe(true);
         expect(row.querySelector('[aria-label^="Column type"]')?.classList.contains('sf-dense-button')).toBe(true);
     });
 
@@ -237,12 +240,12 @@ describe('InspectoSchemaFieldsEditorComponent', () => {
         const { fixture } = await create(rows(2));
         fixture.componentRef.setInput('sampleValues', { col_0: ' Anna Kowalski ' });
         fixture.detectChanges();
-        const samples = Array.from(fixture.nativeElement.querySelectorAll('tbody tr td:nth-child(5)')).map((td) =>
+        const samples = Array.from(fixture.nativeElement.querySelectorAll('tbody tr td:nth-child(4)')).map((td) =>
             (td as HTMLElement).textContent?.trim(),
         );
         expect(samples).toEqual(['Anna Kowalski', '—']);
         // The full value survives in the title (the cell truncates).
-        expect(fixture.nativeElement.querySelector('tbody tr td:nth-child(5) span')?.getAttribute('title')).toBe(
+        expect(fixture.nativeElement.querySelector('tbody tr td:nth-child(4) span')?.getAttribute('title')).toBe(
             ' Anna Kowalski ',
         );
     });
@@ -273,8 +276,8 @@ describe('InspectoSchemaFieldsEditorComponent', () => {
         const headers = Array.from(fixture.nativeElement.querySelectorAll('thead th')).map((h) =>
             (h as HTMLElement).textContent?.trim(),
         );
-        expect(headers).toHaveLength(7);
-        expect(headers[6]).toContain('Selector');
+        expect(headers).toHaveLength(6);
+        expect(headers[5]).toContain('Selector');
     });
 
     it('replaces the type dropdown with an icon-only menu button, labelled and operable', async () => {

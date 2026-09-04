@@ -42,20 +42,12 @@
          canonical key is the honest label, and GLOSSARY reserves "Source".) -->
     <!-- Cells are PROPERTY ROWS (operator ask 2026-09-04): 32px rows (`.sf-row`), values in the flat
          schema-form's `.sf-value` text (mono, text-sm), editable cells as the same dense outline
-         `.sf-dense` input (no floating label, no hint), the Use checkbox and Type menu sized to the row. -->
+         `.sf-dense` input (no floating label, no hint), the Type menu sized to the row.
+         D8 (2026-09-04): there is no Use/include column — Parse settles what a column IS and emits
+         every row; leaving a field out of the output is transform.sql's job, and only its job. -->
     <table class="w-full border-collapse">
         <thead>
             <tr class="text-secondary text-left text-xs font-semibold uppercase tracking-wider">
-                <th scope="col" class="w-12 pb-1">
-                    <span class="sr-only">Use</span>
-                    <mat-checkbox
-                        class="sf-dense-check"
-                        [checked]="visibleIncludeState() === 'all'"
-                        [indeterminate]="visibleIncludeState() === 'some'"
-                        (change)="toggleAllVisible($event.checked)"
-                        aria-label="Use every column matching the current search and filter"
-                    ></mat-checkbox>
-                </th>
                 <th scope="col" class="w-16 pb-1" [attr.aria-sort]="ariaSort('selector')">
                     <button
                         type="button"
@@ -114,13 +106,6 @@
         <tbody>
             @for (e of pagedEntries(); track e.index) {
                 <tr [formGroup]="e.group" class="sf-row border-t align-middle">
-                    <td class="py-0">
-                        <mat-checkbox
-                            class="sf-dense-check"
-                            formControlName="include"
-                            [aria-label]="'Use ' + (e.group.get('name')?.value || 'column ' + (e.index + 1))"
-                        ></mat-checkbox>
-                    </td>
                     <td class="w-16 py-0 pr-2">
                         <span
                             class="sf-value text-secondary block max-w-16 truncate font-mono text-sm tabular-nums"
@@ -275,12 +260,16 @@
                             ></mat-checkbox>
                         </td>
                         <td class="w-16 py-0 pr-2">
-                            <span class="sf-value text-secondary block font-mono text-sm tabular-nums">{{ totalCount() }}</span>
+                            <span class="sf-value text-secondary block font-mono text-sm tabular-nums">{{
+                                totalCount()
+                            }}</span>
                         </td>
                         <td class="py-0 pr-2">
-                            <span class="sf-value px-1 font-mono text-sm" matTooltip="Added by the sink at write time — each row's source file">{{
-                                f.name
-                            }}</span>
+                            <span
+                                class="sf-value px-1 font-mono text-sm"
+                                matTooltip="Added by the sink at write time — each row's source file"
+                                >{{ f.name }}</span
+                            >
                         </td>
                         <td class="w-14 py-0">
                             <span [matTooltip]="'VARCHAR — ' + typeMeta['VARCHAR'].hint">
@@ -317,7 +306,7 @@
         [length]="filteredEntries().length"
         [pageIndex]="pageIndex()"
         [pageSize]="pageSize()"
-        [pageSizeOptions]="[25, 50, 100]"
+        [pageSizeOptions]="[10, 25, 50, 100]"
         [showFirstLastButtons]="true"
         (page)="onPage($event)"
         aria-label="Column table pages"

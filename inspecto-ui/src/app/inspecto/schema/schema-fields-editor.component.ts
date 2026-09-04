@@ -128,7 +128,21 @@ export function narrowToSchemaType(serverType: string): string {
  *  alias; `description`/`unit`/`classification` (D1(b)) are edited on the Files & metadata tab's
  *  `<inspecto-schema-metadata-grid>` — all four are Catalog-facing metadata, never read by the ETL. */
 export interface SchemaFieldRow {
-    include: boolean;
+    /**
+     * ⛔ LEGACY, no longer honoured by this grid (D8, 2026-09-04). Parse settles what a column IS —
+     * that it exists, its name, its type, its synonym — and every row it holds is emitted. Leaving a
+     * field out of the output is `transform.sql`'s job and only its job.
+     *
+     * <p>The reason is COST, not tidiness: excluding here edited the SCHEMA, which
+     * `SchemaCompatibility` gates BACKWARD, so undoing it could be refused outright or force a
+     * re-test — while the same intent expressed in Transform is a clause in the SELECT, free to
+     * reverse. Two affordances that looked identical had very different costs, so the expensive one
+     * is no longer offered.
+     *
+     * <p>Kept on the interface so a Grammar CSV exported with an `include` column still round-trips
+     * (`grammar-csv.ts`) instead of failing an import; nothing reads it to decide what is emitted.
+     */
+    include?: boolean;
     name: string;
     selector: string;
     type: string;
@@ -247,7 +261,8 @@ export class InspectoSchemaFieldsEditorComponent {
         return this.form.controls['fields'] as FormArray<FormGroup>;
     }
 
-    /** The included rows' names — hosts bind partition-key style pickers to this. */
+    /** Every row's name — hosts bind partition-key style pickers to this. Since D8 the grid excludes
+     *  nothing, so this is simply the full column list. */
     readonly includedNames = signal<string[]>([]);
     /** Why {@link validate} last refused, or `null`. The host renders it. */
     readonly problem = signal<string | null>(null);
@@ -333,15 +348,6 @@ export class InspectoSchemaFieldsEditorComponent {
         return this.sampleValues()[String(group.get('selector')?.value ?? '')] ?? '';
     }
 
-    /** Header master-checkbox state over the FILTERED set (not just the visible page). */
-    readonly visibleIncludeState = computed<'all' | 'none' | 'some'>(() => {
-        this.includedNames(); // any row edit re-evaluates
-        const entries = this.filteredEntries();
-        if (entries.length === 0) return 'none';
-        const on = entries.filter((e) => (e.group.getRawValue() as SchemaFieldRow).include).length;
-        return on === 0 ? 'none' : on === entries.length ? 'all' : 'some';
-    });
-
     constructor() {
         effect(() => {
             const seed = this.rows();
@@ -385,16 +391,8 @@ export class InspectoSchemaFieldsEditorComponent {
         this.pageSize.set(e.pageSize);
     }
 
-    /** Include/exclude every row matching the current search + type filter, across all pages. */
-    toggleAllVisible(checked: boolean): void {
-        for (const e of this.filteredEntries()) e.group.get('include')?.setValue(checked, { emitEvent: false });
-        this.form.markAsDirty();
-        this.syncIncludedNames();
-    }
-
     private addRow(row: SchemaFieldRow): void {
         const g = this.fb.group({
-            include: [row.include],
             name: [row.name, [Validators.required, Validators.pattern(IDENTIFIER_RE)]],
             selector: [{ value: row.selector, disabled: true }],
             type: [row.type],
@@ -488,12 +486,7 @@ export class InspectoSchemaFieldsEditorComponent {
     }
 
     private syncIncludedNames(): void {
-        this.includedNames.set(
-            this.fieldRows.controls
-                .map((g) => g.getRawValue() as SchemaFieldRow)
-                .filter((r) => r.include)
-                .map((r) => r.name.trim()),
-        );
+        this.includedNames.set(this.fieldRows.controls.map((g) => (g.getRawValue() as SchemaFieldRow).name.trim()));
     }
 
     /** Clear the view filters and jump to the page holding the given row — with 500 columns a
@@ -525,11 +518,13 @@ export class InspectoSchemaFieldsEditorComponent {
             );
             return false;
         }
-        const included = this.fieldRows.controls
-            .map((g, index) => ({ index, v: g.getRawValue() as SchemaFieldRow }))
-            .filter((e) => e.v.include);
+        // D8: every row the grid holds is emitted, so "at least one" is a row count, not an include count.
+        const included = this.fieldRows.controls.map((g, index) => ({
+            index,
+            v: g.getRawValue() as SchemaFieldRow,
+        }));
         if (included.length === 0) {
-            this.problem.set('Include at least one field.');
+            this.problem.set('Add at least one field.');
             return false;
         }
         const seen = new Set<string>();
@@ -574,7 +569,6 @@ export class InspectoSchemaFieldsEditorComponent {
         const seed = this.rows();
         return this.fieldRows.controls
             .map((g, i) => ({ seed: seed[i], v: g.getRawValue() as SchemaFieldRow }))
-            .filter(({ v }) => v.include)
             .map(({ seed: original, v }) => {
                 const synonym = String(v.synonym ?? '').trim();
                 const zone = String(v.timezone ?? '').trim();

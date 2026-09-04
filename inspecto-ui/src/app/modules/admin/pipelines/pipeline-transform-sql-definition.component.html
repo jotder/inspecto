@@ -58,6 +58,15 @@
         <span class="text-secondary ml-auto text-xs">{{ showing() }}</span>
     </div>
 
+    <!-- D10: the grid opens on Changed, so say what is NOT on screen instead of listing it. -->
+    @if (passthroughNote(); as note) {
+        <div class="text-secondary mb-2 flex items-center gap-2 text-xs">
+            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrow-right"></mat-icon>
+            <span>{{ note }}</span>
+            <button type="button" class="underline" (click)="setFilter('all')">Show them</button>
+        </div>
+    }
+
     @if (binderError()) {
         <inspecto-alert class="mb-2 block" variant="warning" title="This does not run yet">
             <div class="font-mono text-xs whitespace-pre-wrap">{{ binderError() }}</div>
@@ -248,6 +257,10 @@
                                 } @else {
                                     Test the parse step first, then the columns it produces appear here as fields.
                                 }
+                            } @else if (filter() === 'changed' && !query()) {
+                                Nothing is changed yet — every field passes through as it is. Pick a row from
+                                <button type="button" class="underline" (click)="setFilter('all')">All</button>
+                                to change one.
                             } @else {
                                 No field matches this search or filter.
                             }
