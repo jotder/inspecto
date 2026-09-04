@@ -12,10 +12,10 @@ raw:
 mapping:
   canonicalName: json_example
   rawName: json_example
-  rules[6]{targetColumn,sourceExpression,transformType}:
-    SHIPMENT_ID,SHIPMENT_ID,DIRECT
-    ORIGIN,ORIGIN,DIRECT
-    DEST,DEST,DIRECT
-    WEIGHT_KG,WEIGHT_KG,DIRECT
-    SHIPPED_AT,SHIPPED_AT,DIRECT
-    CARRIER_NAME,CARRIER_NAME,DIRECT
+  fields[6]{name,from,fn}:
+    SHIPMENT_ID,SHIPMENT_ID,keep
+    ORIGIN,ORIGIN,keep
+    DEST,DEST,keep
+    WEIGHT_KG,WEIGHT_KG,keep
+    SHIPPED_AT,SHIPPED_AT,keep
+    CARRIER_NAME,CARRIER_NAME,keep

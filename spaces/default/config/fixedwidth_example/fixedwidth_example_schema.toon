@@ -10,8 +10,8 @@ raw:
 mapping:
   canonicalName: fixedwidth_example
   rawName: fixedwidth_example
-  rules[4]{targetColumn,sourceExpression,transformType}:
-    ACCT,ACCT,DIRECT
-    TXN_DATE,TXN_DATE,DIRECT
-    AMOUNT,AMOUNT,DIRECT
-    TXN_TYPE,TXN_TYPE,DIRECT
+  fields[4]{name,from,fn}:
+    ACCT,ACCT,keep
+    TXN_DATE,TXN_DATE,keep
+    AMOUNT,AMOUNT,keep
+    TXN_TYPE,TXN_TYPE,keep

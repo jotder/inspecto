@@ -10,8 +10,8 @@ raw:
 mapping:
   canonicalName: excel_example
   rawName: excel_example
-  rules[4]{targetColumn,sourceExpression,transformType}:
-    ITEM_NAME,ITEM_NAME,DIRECT
-    QTY_ON_HAND,QTY_ON_HAND,DIRECT
-    UNIT_PRICE,UNIT_PRICE,DIRECT
-    CATEGORY,CATEGORY,DIRECT
+  fields[4]{name,from,fn}:
+    ITEM_NAME,ITEM_NAME,keep
+    QTY_ON_HAND,QTY_ON_HAND,keep
+    UNIT_PRICE,UNIT_PRICE,keep
+    CATEGORY,CATEGORY,keep
