@@ -1,0 +1,256 @@
+[ {
+  "id" : "keep",
+  "label" : "Keep as it is",
+  "category" : "Keep",
+  "template" : "{source}",
+  "help" : "The value is copied through unchanged."
+}, {
+  "id" : "text.trim",
+  "label" : "Remove spaces around the value",
+  "category" : "Text",
+  "template" : "TRIM({source})",
+  "help" : "Leading and trailing spaces are removed. \" Anna \" becomes \"Anna\"."
+}, {
+  "id" : "text.upper",
+  "label" : "Make UPPERCASE",
+  "category" : "Text",
+  "template" : "UPPER({source})"
+}, {
+  "id" : "text.lower",
+  "label" : "Make lowercase",
+  "category" : "Text",
+  "template" : "LOWER({source})"
+}, {
+  "id" : "text.replace",
+  "label" : "Replace text",
+  "category" : "Text",
+  "template" : "REPLACE({source}, {find}, {replacement})",
+  "params" : [ {
+    "name" : "find",
+    "label" : "Find",
+    "type" : "text",
+    "placeholder" : "-"
+  }, {
+    "name" : "replacement",
+    "label" : "Replace with",
+    "type" : "text",
+    "default" : "",
+    "placeholder" : "leave blank to delete",
+    "optional" : true
+  } ]
+}, {
+  "id" : "text.substring",
+  "label" : "Take part of the text",
+  "category" : "Text",
+  "template" : "SUBSTRING({source}, {start}, {length})",
+  "params" : [ {
+    "name" : "start",
+    "label" : "Start at character",
+    "type" : "number",
+    "default" : "1"
+  }, {
+    "name" : "length",
+    "label" : "How many characters",
+    "type" : "number",
+    "default" : "10"
+  } ],
+  "help" : "Counting starts at 1."
+}, {
+  "id" : "text.split_part",
+  "label" : "Take one part after splitting",
+  "category" : "Text",
+  "template" : "SPLIT_PART({source}, {delimiter}, {index})",
+  "params" : [ {
+    "name" : "delimiter",
+    "label" : "Split on",
+    "type" : "text",
+    "default" : ","
+  }, {
+    "name" : "index",
+    "label" : "Which part",
+    "type" : "number",
+    "default" : "1"
+  } ]
+}, {
+  "id" : "text.join",
+  "label" : "Join with another column",
+  "category" : "Text",
+  "template" : "CONCAT({source}, {separator}, {other})",
+  "params" : [ {
+    "name" : "separator",
+    "label" : "Separator",
+    "type" : "text",
+    "default" : " "
+  }, {
+    "name" : "other",
+    "label" : "Other column",
+    "type" : "column"
+  } ]
+}, {
+  "id" : "text.pad_left",
+  "label" : "Pad on the left",
+  "category" : "Text",
+  "template" : "LPAD({source}, {length}, {pad})",
+  "params" : [ {
+    "name" : "length",
+    "label" : "Total length",
+    "type" : "number",
+    "default" : "10"
+  }, {
+    "name" : "pad",
+    "label" : "Pad with",
+    "type" : "text",
+    "default" : "0"
+  } ],
+  "help" : "Useful for account or reference numbers that lost their leading zeros."
+}, {
+  "id" : "num.round",
+  "label" : "Round",
+  "category" : "Numbers",
+  "template" : "ROUND({source}, {decimals})",
+  "params" : [ {
+    "name" : "decimals",
+    "label" : "Decimal places",
+    "type" : "number",
+    "default" : "0"
+  } ]
+}, {
+  "id" : "num.multiply",
+  "label" : "Multiply by",
+  "category" : "Numbers",
+  "template" : "({source} * {factor})",
+  "params" : [ {
+    "name" : "factor",
+    "label" : "Factor",
+    "type" : "number",
+    "default" : "100"
+  } ],
+  "help" : "Multiplying by 100 turns an amount into cents."
+}, {
+  "id" : "num.divide",
+  "label" : "Divide by",
+  "category" : "Numbers",
+  "template" : "({source} / NULLIF({divisor}, 0))",
+  "params" : [ {
+    "name" : "divisor",
+    "label" : "Divide by",
+    "type" : "number",
+    "default" : "100"
+  } ],
+  "help" : "Dividing by zero gives an empty value rather than failing the batch."
+}, {
+  "id" : "num.abs",
+  "label" : "Absolute value",
+  "category" : "Numbers",
+  "template" : "ABS({source})"
+}, {
+  "id" : "date.parse",
+  "label" : "Read text as a date",
+  "category" : "Dates",
+  "template" : "TRY_STRPTIME({source}, {format})",
+  "params" : [ {
+    "name" : "format",
+    "label" : "Format it is written in",
+    "type" : "text",
+    "default" : "%d/%m/%Y"
+  } ],
+  "help" : "%d day, %m month, %Y four-digit year. 15/03/2024 is %d/%m/%Y."
+}, {
+  "id" : "date.format",
+  "label" : "Write a date as text",
+  "category" : "Dates",
+  "template" : "STRFTIME({source}, {format})",
+  "params" : [ {
+    "name" : "format",
+    "label" : "Format to write",
+    "type" : "text",
+    "default" : "%Y-%m-%d"
+  } ]
+}, {
+  "id" : "date.part",
+  "label" : "Take part of a date",
+  "category" : "Dates",
+  "template" : "EXTRACT({part} FROM {source})",
+  "params" : [ {
+    "name" : "part",
+    "label" : "Part",
+    "type" : "enum",
+    "default" : "YEAR",
+    "options" : [ "YEAR", "QUARTER", "MONTH", "WEEK", "DAY", "HOUR", "MINUTE", "SECOND" ]
+  } ]
+}, {
+  "id" : "date.truncate",
+  "label" : "Start of the period",
+  "category" : "Dates",
+  "template" : "DATE_TRUNC({unit}, {source})",
+  "params" : [ {
+    "name" : "unit",
+    "label" : "Period",
+    "type" : "text",
+    "default" : "month"
+  } ],
+  "help" : "A date in March with period \"month\" becomes the 1st of March."
+}, {
+  "id" : "logic.default_if_empty",
+  "label" : "Use a default when empty",
+  "category" : "Logic",
+  "template" : "COALESCE(NULLIF({source}, ''), {fallback})",
+  "params" : [ {
+    "name" : "fallback",
+    "label" : "Default value",
+    "type" : "text",
+    "default" : "unknown"
+  } ]
+}, {
+  "id" : "logic.if_then_else",
+  "label" : "If … then … otherwise …",
+  "category" : "Logic",
+  "template" : "CASE WHEN {source} {comparison} {value} THEN {then} ELSE {otherwise} END",
+  "params" : [ {
+    "name" : "comparison",
+    "label" : "Is",
+    "type" : "enum",
+    "default" : "=",
+    "options" : [ "=", "<>", ">", ">=", "<", "<=", "LIKE" ]
+  }, {
+    "name" : "value",
+    "label" : "This value",
+    "type" : "text",
+    "placeholder" : "shipped"
+  }, {
+    "name" : "then",
+    "label" : "Then use",
+    "type" : "text",
+    "placeholder" : "Y"
+  }, {
+    "name" : "otherwise",
+    "label" : "Otherwise use",
+    "type" : "text",
+    "placeholder" : "N"
+  } ]
+}, {
+  "id" : "convert.type",
+  "label" : "Change the type",
+  "category" : "Convert",
+  "template" : "TRY_CAST({source} AS {type})",
+  "params" : [ {
+    "name" : "type",
+    "label" : "New type",
+    "type" : "enum",
+    "default" : "VARCHAR",
+    "options" : [ "VARCHAR", "BIGINT", "DOUBLE", "DECIMAL(18,2)", "BOOLEAN", "DATE", "TIMESTAMP", "TIME" ]
+  } ],
+  "help" : "A value that cannot be converted becomes empty; the row is kept."
+}, {
+  "id" : "custom",
+  "label" : "Write my own expression",
+  "category" : "Custom",
+  "template" : "{expression}",
+  "params" : [ {
+    "name" : "expression",
+    "label" : "SQL expression",
+    "type" : "sql",
+    "placeholder" : "ROUND(amount * 100)"
+  } ],
+  "help" : "Written into the SQL exactly as typed. Column names are used as they appear in the input."
+} ]
