@@ -763,6 +763,7 @@
                                             [node]="dn"
                                             [sampleRows]="sampleThread()?.parsedRows()"
                                             [upstreamColumns]="upstreamSchemaColumns()"
+                                            [upstreamColumnTypes]="upstreamColumnTypes()"
                                             (applied)="onDefinitionApplied($event)"
                                             (dirtyChange)="definitionDirty.set($event)"
                                         />

@@ -41,6 +41,7 @@ const previewAnswer: RelationsPreview = {
             [node]="node"
             [sampleRows]="sampleRows"
             [upstreamColumns]="upstreamColumns"
+            [upstreamColumnTypes]="upstreamColumnTypes"
             (applied)="applied = $event"
             (dirtyChange)="dirty = $event"
         />
@@ -50,6 +51,7 @@ class HostComponent {
     node: AuthoredNode = sqlNode();
     sampleRows?: Record<string, unknown>[];
     upstreamColumns?: string[];
+    upstreamColumnTypes: Record<string, string> = {};
     applied?: AuthoredNode;
     dirty = false;
 }
@@ -66,6 +68,7 @@ async function create(
     node: AuthoredNode = sqlNode(),
     sampleRows?: Record<string, unknown>[],
     upstreamColumns?: string[],
+    upstreamColumnTypes: Record<string, string> = {},
 ) {
     TestBed.configureTestingModule({
         imports: [HostComponent],
@@ -100,6 +103,7 @@ async function create(
     fixture.componentInstance.node = node;
     fixture.componentInstance.sampleRows = sampleRows;
     fixture.componentInstance.upstreamColumns = upstreamColumns;
+    fixture.componentInstance.upstreamColumnTypes = upstreamColumnTypes;
     fixture.detectChanges();
     return fixture;
 }
@@ -316,6 +320,23 @@ describe('Transform pane: live schema derivation', () => {
         expect(c.allRows()[0].outType).toBe('VARCHAR');
         expect(c.binderError()).toBeNull();
         expect(c.canApply()).toBe(true);
+    });
+
+    /**
+     * ⚠ The types are the whole point. Assuming VARCHAR for every upstream column made DuckDB refuse
+     * valid SQL — `AMOUNT * 2` over a declared DOUBLE came back "No function matches … *(VARCHAR,
+     * INTEGER)" — and that refusal blocked Apply. Declared types win over the sample's shape.
+     */
+    it('describes with the DECLARED upstream types, not VARCHAR-for-everything', async () => {
+        const fixture = await create(sqlNode(), [{ AMOUNT: '10', NOTE: 'x' }], undefined, {
+            AMOUNT: 'DOUBLE',
+            NOTE: 'VARCHAR',
+        });
+        await settleDescribe(fixture);
+        expect(describeCalls.at(-1)!.inputColumns).toEqual([
+            { name: 'AMOUNT', type: 'DOUBLE' },
+            { name: 'NOTE', type: 'VARCHAR' },
+        ]);
     });
 
     it('shows a 422 binder refusal and blocks Apply', async () => {

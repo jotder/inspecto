@@ -93,6 +93,12 @@ export class PipelineTransformSqlDefinitionComponent {
     readonly sampleRows = input<Record<string, unknown>[] | undefined>(undefined);
     /** Upstream column names from the upstream schema or step, allowing authoring without parsed sample rows. */
     readonly upstreamColumnsInput = input<string[] | undefined>(undefined, { alias: 'upstreamColumns' });
+    /**
+     * The DECLARED type per upstream column, keyed by name. ⚠ Load-bearing for the zero-row `DESCRIBE`:
+     * assuming VARCHAR everywhere made DuckDB REFUSE valid SQL (`AMOUNT * 2` over a declared DOUBLE →
+     * "No function matches … *(VARCHAR, INTEGER)") and that refusal blocked Apply.
+     */
+    readonly upstreamColumnTypes = input<Record<string, string>>({});
 
     readonly applied = output<AuthoredNode>();
     readonly dirtyChange = output<boolean>();
@@ -275,9 +281,11 @@ export class PipelineTransformSqlDefinitionComponent {
             this.isDeriving.set(true);
             this.describeTimer = setTimeout(() => {
                 const sample = this.sampleRows()?.[0] ?? {};
+                const declared = this.upstreamColumnTypes();
                 const inputCols = cols.map((c) => ({
+                    // Declared first (the ETL's real type), then the sample's shape, then VARCHAR.
                     name: c,
-                    type: typeof sample[c] === 'number' ? 'DOUBLE' : 'VARCHAR',
+                    type: declared[c] || (typeof sample[c] === 'number' ? 'DOUBLE' : 'VARCHAR'),
                 }));
                 this.components.describeTransform(inputCols, sql).subscribe({
                     next: (res) => {

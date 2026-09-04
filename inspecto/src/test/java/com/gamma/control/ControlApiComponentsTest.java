@@ -534,6 +534,11 @@ class ControlApiComponentsTest {
             HttpResponse<String> res = send(c.port, "POST", "/components/transform/describe", body);
             assertEquals(422, res.statusCode(), res.body());
             assertTrue(res.body().contains("NONEXISTENT") || res.body().contains("not found"), res.body());
+            // The author reads this message in the pane's alert, so the JDBC wrapper line that DuckDB's
+            // driver puts in front of every failed DESCRIBE is stripped: it says nothing about the SQL,
+            // and it used to be the FIRST thing on screen.
+            assertFalse(res.body().contains("closed pending query result"), res.body());
+            assertTrue(res.body().contains("Binder Error"), res.body());
         }
     }
 

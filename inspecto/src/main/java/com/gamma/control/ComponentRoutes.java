@@ -147,8 +147,23 @@ final class ComponentRoutes implements RouteModule {
             }
             return Map.of("columns", cols);
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
+            throw new ApiException(422, duckDbMessage(e.getMessage()));
         }
+    }
+
+    /**
+     * DuckDB's own message, without the JDBC wrapper line in front of it. A failed {@code DESCRIBE}
+     * arrives as {@code Invalid Input Error: Attempting to execute an unsuccessful or closed pending
+     * query result}, a newline, then {@code Error: Binder Error: Referenced column "X" not found…}.
+     * That first line is driver plumbing which says nothing about the SQL, and it was the FIRST thing
+     * the author read in the pane's alert. Everything from the real error onward is kept verbatim: it
+     * names the column and lists the candidate bindings, which IS the validation. Only a wrapper at
+     * the very start is removed, so a long message keeps its tail.
+     */
+    private static String duckDbMessage(String message) {
+        if (message == null) return "the SQL could not be described";
+        int marker = message.indexOf("\nError: ");
+        return marker >= 0 && marker < 200 ? message.substring(marker + "\nError: ".length()) : message;
     }
 
     /** The registry root under the write root, or {@code null} when writes are disabled (no write root). */

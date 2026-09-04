@@ -2396,27 +2396,31 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         return String(parser?.config?.['schema_file'] ?? '').trim();
     });
 
-    private readonly parserSchemaColumns = signal<string[]>([]);
+    /** The parser companion schema's declared fields — `{name, type}`, the types the ETL really produces. */
+    private readonly parserSchemaFields = signal<{ name: string; type: string }[]>([]);
 
     private readonly loadParserSchemaColumns = effect(() => {
         const path = this.parserSchemaFile();
         if (!path) {
-            this.parserSchemaColumns.set([]);
+            this.parserSchemaFields.set([]);
             return;
         }
         const name = schemaNameFromPath(path);
         if (!name) {
-            this.parserSchemaColumns.set([]);
+            this.parserSchemaFields.set([]);
             return;
         }
         this.configApi.read('schema', name, this.configSubdir().trim() || undefined).subscribe({
             next: (r) => {
                 const raw = (r.config?.['raw'] ?? {}) as Record<string, unknown>;
                 const fields = Array.isArray(raw['fields']) ? (raw['fields'] as Record<string, unknown>[]) : [];
-                const names = fields.map((f) => String(f['name'] ?? '')).filter((n) => n !== '');
-                this.parserSchemaColumns.set(names);
+                this.parserSchemaFields.set(
+                    fields
+                        .map((f) => ({ name: String(f['name'] ?? ''), type: String(f['type'] ?? '') }))
+                        .filter((f) => f.name !== ''),
+                );
             },
-            error: () => this.parserSchemaColumns.set([]),
+            error: () => this.parserSchemaFields.set([]),
         });
     });
 
@@ -2424,7 +2428,21 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     readonly upstreamSchemaColumns = computed<string[]>(() => {
         const rows = this.sampleThread()?.parsedRows();
         if (rows && rows.length > 0) return Object.keys(rows[0]);
-        return this.parserSchemaColumns();
+        return this.parserSchemaFields().map((f) => f.name);
+    });
+
+    /**
+     * The DECLARED type per upstream column, for the SQL pane's zero-row `DESCRIBE`.
+     *
+     * ⚠ Without this the pane assumed VARCHAR for every column, and `DESCRIBE` then REFUSED valid SQL:
+     * `AMOUNT * 2` over a declared DOUBLE came back as "No function matches … *(VARCHAR, INTEGER)" and
+     * blocked Apply. A false refusal in an authoring pane is worse than no derivation at all. Keyed by
+     * name, so it applies whether the column list came from the sample rows or from the schema.
+     */
+    readonly upstreamColumnTypes = computed<Record<string, string>>(() => {
+        const out: Record<string, string> = {};
+        for (const f of this.parserSchemaFields()) if (f.type) out[f.name] = f.type;
+        return out;
     });
 
     /**
