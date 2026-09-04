@@ -137,6 +137,55 @@ describe('PipelineLoadDefinitionComponent', () => {
     });
 
     /**
+     * The migration action (Phase 4, 2026-09-05). ⛔ Converting re-types the projection slot, so it is a
+     * DELIBERATE click and must never be a side effect of Apply — a legacy pipeline opened and applied
+     * must still emit `rules`.
+     */
+    it('converts a legacy mapping to Record Transformer fields only when asked', async () => {
+        const fixture = await create(mapNode({ rules: [{ targetColumn: 'msisdn', sourceExpression: 'A_NUMBER' }] }));
+
+        pane(fixture).submit();
+        fixture.detectChanges();
+        expect(fixture.componentInstance.applied!.config!['rules']).toBeDefined();
+        expect(fixture.componentInstance.applied!.config!['fields']).toBeUndefined();
+
+        pane(fixture).convertToRecordTransformer();
+        fixture.detectChanges();
+
+        const applied = fixture.componentInstance.applied!;
+        expect(applied.config!['fields']).toEqual([{ name: 'msisdn', from: 'A_NUMBER', fn: 'keep' }]);
+        expect(applied.config!['rules']).toBeUndefined();
+        expect(applied.config!['columns']).toBeUndefined();
+    });
+
+    /** EXPR carries its author SQL into `custom` — the same mapping RecordTransform.fromMappingRules makes. */
+    it('converts an EXPR rule to a custom field carrying its expression', async () => {
+        const fixture = await create(
+            mapNode({ rules: [{ targetColumn: 'cents', sourceExpression: 'amt * 100', transformType: 'EXPR' }] }),
+        );
+        pane(fixture).convertToRecordTransformer();
+        fixture.detectChanges();
+
+        expect(fixture.componentInstance.applied!.config!['fields']).toEqual([
+            { name: 'cents', from: '', fn: 'custom', args: { expression: 'amt * 100' } },
+        ]);
+    });
+
+    /**
+     * ⛔ CONCAT_DT / FILENAME_DATE have no catalog equivalent, and approximating them as `custom` would
+     * move those columns out of the cast-failure audit — so the action is withheld rather than offered
+     * and then refused.
+     */
+    it('withholds the conversion when a rule has no faithful equivalent', async () => {
+        const fixture = await create(
+            mapNode({
+                rules: [{ targetColumn: 'EVENT_TIME', sourceExpression: 'D|T', transformType: 'CONCAT_DT' }],
+            }),
+        );
+        expect(pane(fixture).canConvert()).toBe(false);
+    });
+
+    /**
      * ⚠ Applying rules REPLACES `columns`. `RowShaper.columnsOf` returns `columns` before it ever looks at
      * rules, so a node keeping both would run the old projection over the operator's saved edit — the
      * write would be real and dead at the same time.

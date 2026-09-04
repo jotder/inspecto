@@ -93,16 +93,26 @@ interface RuleRow {
         <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-1">
             <!-- S2/principle 5: identity is asked ONCE, on the inspector's rename pencil — never
                  re-asked inside a definition pane. -->
-            <!-- Deprecation notice (Phase 4, 2026-09-05). Informational, never blocking: this pane still
-                 authors every stored pipeline, and mapping.rules[] stays readable permanently. -->
-            <div class="text-secondary mb-2 flex items-center gap-2 text-xs">
+            <!-- Deprecation notice + the migration action (Phase 4, 2026-09-05). Informational, never
+                 blocking: this pane still authors every stored pipeline, and mapping.rules[] stays
+                 readable permanently. ⛔ Converting is a DELIBERATE click, never a side effect of Apply —
+                 it re-types the node (the projection slot becomes a Record Transformer) and its next edit
+                 therefore opens in the Transform pane, which must not happen by accident. -->
+            <div class="text-secondary mb-2 flex flex-wrap items-center gap-2 text-xs">
                 <mat-icon class="icon-size-4" svgIcon="heroicons_outline:information-circle"></mat-icon>
                 <span>
-                    This is the legacy mapping. New pipelines shape fields in the
-                    <strong>Record Transformer</strong> Step, which offers the same work as named functions — and can
-                    also rename, calculate and change types in one place.
+                    This is the legacy mapping. The <strong>Record Transformer</strong> does the same work as named
+                    functions, and can also rename, calculate and change types in one place.
                 </span>
+                @if (canConvert()) {
+                    <button type="button" mat-stroked-button class="ml-1" (click)="convertToRecordTransformer()">
+                        Convert to a Record Transformer
+                    </button>
+                }
             </div>
+            @if (convertProblem(); as p) {
+                <p class="text-warn m-0 mb-2 text-xs" role="alert">{{ p }}</p>
+            }
             <div class="mb-1 flex items-center gap-2">
                 <span class="text-xs font-semibold uppercase opacity-70">Mapping</span>
                 @if (loading()) {
@@ -693,5 +703,73 @@ export class PipelineLoadDefinitionComponent {
         this.form.markAsPristine();
         this.emitDirty();
         this.applied.emit(node);
+    }
+
+    /** Why the grid cannot be converted, or `null`. Rendered under the notice. */
+    readonly convertProblem = signal<string | null>(null);
+
+    /**
+     * Whether every rule in the grid has a faithful Record Transformer equivalent — the same rule the
+     * engine's {@code RecordTransform.fromMappingRules} applies. `CONCAT_DT`/`FILENAME_DATE` do not:
+     * neither has a catalog function, and hand-writing them as `custom` would move those columns out of
+     * the cast-failure audit. So the action is hidden rather than offered-then-refused.
+     */
+    canConvert(): boolean {
+        if (!this.ruleRows.length) return false;
+        return this.ruleRows.controls.every((g) => {
+            const t = String(g.get('transformType')?.value ?? '')
+                .trim()
+                .toUpperCase();
+            return t === '' || t === 'DIRECT' || t === 'EXPR';
+        });
+    }
+
+    /**
+     * Convert this legacy mapping into the Record Transformer spelling and apply it.
+     *
+     * <p>⚠ The mapping of rule → field mirrors `RecordTransform.fromMappingRules` (Java) exactly, and the
+     * engine proves the equivalence by compiling both to the same SQL — a migration test compares the
+     * compiled projection for every stored schema, and the csv_example ingest run produced byte-identical
+     * parquet either way. Keep the two in step: a divergence here authors a pipeline the engine compiles
+     * differently.
+     *
+     * <p>⛔ Deliberately NOT part of `submit()`: writing `fields` re-types the projection slot, so the
+     * node's next edit opens in the Transform pane. That is the intended destination, but it must be a
+     * choice the author made.
+     */
+    convertToRecordTransformer(): void {
+        this.convertProblem.set(null);
+        const fields: Record<string, unknown>[] = [];
+        for (const g of this.ruleRows.controls) {
+            const r = g.getRawValue() as RuleRow;
+            const target = r.targetColumn.trim();
+            const source = r.sourceExpression.trim();
+            const type = String(r.transformType ?? '')
+                .trim()
+                .toUpperCase();
+            if (type === '' || type === 'DIRECT') {
+                fields.push({ name: target, from: source, fn: 'keep' });
+            } else if (type === 'EXPR') {
+                fields.push({ name: target, from: '', fn: 'custom', args: { expression: source } });
+            } else {
+                this.convertProblem.set(
+                    `"${target}" uses ${type}, which has no Record Transformer equivalent — ` +
+                        `converting it would move the column out of the cast-failure audit. This mapping stays as it is.`,
+                );
+                return;
+            }
+        }
+
+        const n = this.node();
+        // `columns` and `rules` are the same projection in older spellings; `fields` replaces both, or
+        // the engine would run the one that wins (RowShaper.columnsOf prefers columns, then fields).
+        const config = { ...(n.config ?? {}) };
+        config['fields'] = fields;
+        delete config['rules'];
+        delete config['columns'];
+
+        this.form.markAsPristine();
+        this.emitDirty();
+        this.applied.emit({ ...n, config });
     }
 }
