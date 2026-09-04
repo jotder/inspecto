@@ -341,6 +341,27 @@ public final class RecordTransform {
         return SchemaFieldTypes.coerces(declared) ? from : null;
     }
 
+    /**
+     * Whether a {@code fields[]} list is a RECORD TRANSFORMER field list — every row naming a catalog
+     * function in {@code fn} — as opposed to some other list that happens to live under the same key.
+     *
+     * <p>🔴 <b>Presence of {@code fields[]} is NOT the marker, and assuming it was is a real bug this
+     * caught.</b> A hand-authored {@code sql} step may carry {@code fields[]} rows shaped
+     * {@code {name, expr}} (a pre-rendered column list, the {@code columns} shape) — see
+     * {@code PipelineJobRunnerTest.runsAFlatConfigsSqlStepOverItsLandedStore}. Those rows have no
+     * {@code fn}, cannot compile through this catalog, and must keep running the author's stored
+     * {@code sql} exactly as before. So the diversion is gated on the marker, never on the key.
+     */
+    public static boolean isFieldList(List<?> fields) {
+        if (fields == null || fields.isEmpty()) return false;
+        for (Object row : fields) {
+            if (!(row instanceof Map<?, ?> m)) return false;
+            Object fn = m.get("fn");
+            if (fn == null || String.valueOf(fn).isBlank()) return false;
+        }
+        return true;
+    }
+
     /** The catalog as plain maps, for the committed contract the TS suite asserts against. */
     public static List<Map<String, Object>> toContract() {
         List<Map<String, Object>> out = new ArrayList<>();

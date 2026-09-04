@@ -260,11 +260,17 @@ public final class PipelineValidator {
                 issues.add(new Issue(Severity.WARNING, UNKNOWN_TYPE,
                         "Node '" + n.id() + "' has unregistered type '" + n.type() + "' — wiring not validated."));
             }
-            if (BuiltinNodeType.TRANSFORM_SQL.type().equals(n.type())) {
+            // ⚠ Conditional since 2026-09-05: a node authored as FIELDS compiles through
+            // RecordTransform, so its coercing columns ARE counted by the cast-failure audit. Only
+            // hand-written `sql` is unaudited, and warning on both would tell an author the opposite
+            // of what now happens.
+            if (BuiltinNodeType.TRANSFORM_SQL.type().equals(n.type())
+                    && !(n.cfg("fields") instanceof List<?> rtFields && !rtFields.isEmpty())) {
                 issues.add(new Issue(Severity.WARNING, SQL_STEP_UNAUDITED,
                         "Node '" + n.id() + "' (transform.sql): its 'sql' attribute runs author-owned SQL "
                         + "verbatim over the typed source and is not covered by the batch's cast-failure "
-                        + "audit — a row this produces NULL for will not be counted."));
+                        + "audit — a row this produces NULL for will not be counted. A field list "
+                        + "authored in the Record Transformer grid IS audited."));
             }
             if (n.hasUse()) {
                 String use = n.use();

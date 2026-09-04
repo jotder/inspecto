@@ -170,11 +170,30 @@ public final class DataTransformer {
             fieldTypes.put((String) f.get("name"), (String) f.get("type"));
         SourceZones zones = SourceZones.of(schemaConfig, cfg.csv().sourceTimezone());
 
-        List<Map<String, String>> rules = (List<Map<String, String>>)
-                ((Map<String, Object>) schemaConfig.get("mapping")).get("rules");
+        // 🔴 This method reads the mapping DIRECTLY — it does not go through selectFor — so the Record
+        // Transformer spelling needs its own branch here. Without it a fields[]-authored pipeline would
+        // iterate an empty rule list and report 0 cast failures forever: a silent loss of the audit,
+        // which is precisely the property this whole seam exists to preserve.
+        List<Map<String, Object>> fieldRows = recordFields(schemaConfig);
 
         List<String> targets = new ArrayList<>();
         StringBuilder select = new StringBuilder("SELECT ");
+        if (fieldRows != null) {
+            for (Map<String, Object> field : fieldRows) {
+                String raw = RecordTransform.auditedSourceColumn(field, fieldTypes);
+                if (raw == null) continue;   // custom / no source / VARCHAR pass-through — see that method
+                String col = "\"" + sourceTable + "\".\"" + raw + '"';
+                String expr = RecordTransform.compile(List.of(field), fieldTypes, cfg.csv(), zones,
+                        sourceTable, false).get(0).get("expr").toString();
+                if (!targets.isEmpty()) select.append(", ");
+                select.append("SUM(CASE WHEN NULLIF(TRIM(CAST(").append(col).append(" AS VARCHAR)), '') IS NOT NULL")
+                        .append(" AND (").append(expr).append(") IS NULL THEN 1 ELSE 0 END)");
+                targets.add(String.valueOf(field.get("name")));
+            }
+        } else {
+        List<Map<String, String>> rules = (List<Map<String, String>>)
+                ((Map<String, Object>) schemaConfig.get("mapping")).get("rules");
+
         for (Map<String, String> rule : rules) {
             String raw = coercedSourceColumn(rule, fieldTypes);
             if (raw == null) continue;
@@ -184,6 +203,7 @@ public final class DataTransformer {
             select.append("SUM(CASE WHEN NULLIF(TRIM(CAST(").append(col).append(" AS VARCHAR)), '') IS NOT NULL")
                     .append(" AND (").append(expr).append(") IS NULL THEN 1 ELSE 0 END)");
             targets.add(rule.get("targetColumn"));
+        }
         }
         if (targets.isEmpty()) return 0;   // nothing coercing — no failure is possible
         select.append(" FROM \"").append(sourceTable).append('"');
@@ -254,6 +274,14 @@ public final class DataTransformer {
             fieldTypes.put((String) f.get("name"), (String) f.get("type"));
         SourceZones zones = SourceZones.of(schemaConfig, csv.sourceTimezone());
 
+        // The Record Transformer spelling wins when present — the same "authored beats derived" shape
+        // RowShaper.columnsOf already uses. `typedSource=false`: this compiles over the RAW relation,
+        // which is deliberately ALL-VARCHAR, so a `keep` field must cast to its declared type exactly as
+        // a DIRECT rule does (RecordTransform.compile carries that, and a test pins the equality).
+        List<Map<String, Object>> fieldRows = recordFields(schemaConfig);
+        if (fieldRows != null)
+            return RecordTransform.compile(fieldRows, fieldTypes, csv, zones, sourceTable, false);
+
         List<Map<String, String>> rules =
                 (List<Map<String, String>>) ((Map<String, Object>) schemaConfig.get("mapping")).get("rules");
 
@@ -262,5 +290,19 @@ public final class DataTransformer {
             cols.add(Map.of("name", rule.get("targetColumn"),
                     "expr", TransformCompiler.dataColumn(rule, fieldTypes, sourceTable, csv, zones)));
         return cols;
+    }
+
+    /**
+     * The schema's {@code mapping.fields[]} — the Record Transformer projection — or {@code null} when
+     * the schema is authored the legacy way. Empty is treated as absent: an empty list must not silently
+     * project zero columns where a mapping would have projected the schema.
+     */
+    @SuppressWarnings("unchecked")
+    static List<Map<String, Object>> recordFields(Map<String, Object> schemaConfig) {
+        if (!(schemaConfig.get("mapping") instanceof Map<?, ?> mapping)) return null;
+        if (!(mapping.get("fields") instanceof List<?> fields)) return null;
+        // Gated on the MARKER (every row names a catalog `fn`), never on the key's presence — a stored
+        // sql step may carry {name, expr} rows under the same key. See RecordTransform.isFieldList.
+        return RecordTransform.isFieldList(fields) ? (List<Map<String, Object>>) fields : null;
     }
 }

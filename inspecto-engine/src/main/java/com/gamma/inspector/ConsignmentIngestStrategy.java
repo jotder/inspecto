@@ -209,8 +209,13 @@ interface ConsignmentIngestStrategy {
         if (sinks.size() != cfg.sinks().size() || sinks.isEmpty())
             return "the lifted graph's sink count (" + sinks.size() + ") differs from sinks[] (" + cfg.sinks().size() + ")";
         String seed = seedFeedingTheWrite(lifted);
-        if (!"transform.map".equals(lifted.byId().get(seed).type()))
-            return "a node between map and the write (" + lifted.byId().get(seed).type()
+        String seedType = lifted.byId().get(seed).type();
+        // The projection slot may be authored either way since 2026-09-05: a Record Transformer
+        // (transform.sql over fields[]) compiles through the SAME [{name, expr}] seam transform.map
+        // does, so it is the projection too, not "a node between map and the write". Only a node that
+        // genuinely cannot run on this lane keeps the graph fork closed.
+        if (!"transform.map".equals(seedType) && !"transform.sql".equals(seedType))
+            return "a node between the projection and the write (" + seedType
                     + ") would have to EXECUTE at rest — Stage-2 work";
         return "a sink is fed through another node rather than directly off map";
     }

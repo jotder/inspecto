@@ -3,6 +3,7 @@ package com.gamma.pipeline.exec;
 import com.gamma.api.PublicApi;
 import com.gamma.etl.DataTransformer;
 import com.gamma.etl.PipelineConfig;
+import com.gamma.etl.RecordTransform;
 import com.gamma.pipeline.BuiltinNodeType;
 import com.gamma.pipeline.PipelineNode;
 import com.gamma.pipeline.PipelineNodeTypes;
@@ -74,7 +75,8 @@ public final class RowShaper {
      * below. ⚠ A key that becomes executable here without joining the lowering allow-list is silently
      * dropped on save — the failure this constant exists to make impossible.
      */
-    public static final Set<String> MAP_NODE_CONFIG_KEYS = Set.of("columns", "rules", "schema", "csv");
+    public static final Set<String> MAP_NODE_CONFIG_KEYS =
+            Set.of("columns", "rules", "fields", "schema", "csv");
 
     /** A produced relation: the {@link PipelineRel} an outbound edge carries + the DuckDB table holding it. */
     public record Relation(String rel, String table) {}
@@ -171,7 +173,13 @@ public final class RowShaper {
         if (BuiltinNodeType.TRANSFORM_MAP.type().equals(type)
                 || BuiltinNodeType.TRANSFORM_SELECT.type().equals(type)
                 || BuiltinNodeType.TRANSFORM_DERIVE.type().equals(type)) return project(conn, node, input, outPrefix);
-        if (BuiltinNodeType.TRANSFORM_SQL.type().equals(type))      return sql(conn, node, input, outPrefix);
+        // A Record Transformer authored as FIELDS compiles through the same [{name, expr}] seam the map
+        // projection uses, so both lanes run one compiler (RecordTransform) rather than the browser's
+        // rendering and the engine's diverging. Only a HAND-WRITTEN sql node takes the opaque-string
+        // path — which is also the only one the SQL_STEP_UNAUDITED warning still applies to.
+        if (BuiltinNodeType.TRANSFORM_SQL.type().equals(type))
+            return hasRecordFields(node) ? project(conn, node, input, outPrefix)
+                                         : sql(conn, node, input, outPrefix);
         // ⚠ Name the seam in the message: a CONTRIBUTED node type reaches here having rendered in the
         // palette, validated and lifted, so "cannot shape" alone reads as a core bug rather than a
         // missing provider — which was the whole shape of the descriptor-only gap.
@@ -563,9 +571,19 @@ public final class RowShaper {
      *
      * <p>Returns {@code null} when neither is available, leaving the caller to raise its own error.
      */
+    /**
+     * Whether this node carries a Record Transformer field list — every row naming a catalog `fn` — as
+     * opposed to hand-written `sql`, or a {@code {name, expr}} list stored under the same key.
+     */
+    static boolean hasRecordFields(PipelineNode node) {
+        return node.cfg("fields") instanceof List<?> f && RecordTransform.isFieldList(f);
+    }
+
     private static List<?> columnsOf(PipelineNode node, String sourceTable) {
         if (node.cfg("columns") instanceof List<?> authored && !authored.isEmpty()) return authored;
-        if (!BuiltinNodeType.TRANSFORM_MAP.type().equals(node.type())) return null;
+        if (!BuiltinNodeType.TRANSFORM_MAP.type().equals(node.type())
+                && !(BuiltinNodeType.TRANSFORM_SQL.type().equals(node.type()) && hasRecordFields(node)))
+            return null;
         Map<String, Object> schema = mappingSchemaOf(node);
         if (schema == null) return null;
         return DataTransformer.dataColumns(schema, csvSettingsOf(node), sourceTable);
@@ -611,8 +629,12 @@ public final class RowShaper {
     private static Map<String, Object> mappingSchemaOf(PipelineNode node) {
         if (node.cfg("schema") instanceof Map<?, ?> s
                 && s.get("mapping") instanceof Map<?, ?> m
-                && m.get("rules") instanceof List<?> schemaRules && !schemaRules.isEmpty())
+                && ((m.get("rules") instanceof List<?> schemaRules && !schemaRules.isEmpty())
+                    || (m.get("fields") instanceof List<?> schemaFields && !schemaFields.isEmpty())))
             return (Map<String, Object>) s;
+        // The Record Transformer spelling, carried on the node itself the way `rules` is.
+        if (node.cfg("fields") instanceof List<?> fields && RecordTransform.isFieldList(fields))
+            return Map.of("raw", Map.of("fields", List.of()), "mapping", Map.of("fields", fields));
         if (node.cfg("rules") instanceof List<?> rules && !rules.isEmpty())
             return Map.of("raw", Map.of("fields", List.of()), "mapping", Map.of("rules", rules));
         return null;

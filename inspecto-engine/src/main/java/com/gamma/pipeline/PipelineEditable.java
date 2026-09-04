@@ -82,7 +82,11 @@ public final class PipelineEditable {
      * the (free-form) map dialog can type, and {@code MapNodeKeyContractTest} pins the two together.
      * A new executable key joins this set in the same change that makes it executable.
      */
-    static final Set<String> MAP_AUTHORED = Set.of("columns", "rules");
+    // `fields` joined 2026-09-05 with the Record Transformer projection: it is executable in RowShaper
+    // (MAP_NODE_CONFIG_KEYS), so it MUST be lowerable too — a key that becomes executable without
+    // joining this allow-list is silently dropped on save, which is the failure both constants exist
+    // to make impossible.
+    static final Set<String> MAP_AUTHORED = Set.of("columns", "rules", "fields");
 
     /**
      * Map-node config keys that are DERIVED, not authored: they are put on the node by the read side and
