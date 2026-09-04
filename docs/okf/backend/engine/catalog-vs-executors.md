@@ -16,6 +16,17 @@ three [node types](node-types.md): `transform.map` (2), `transform.sql` (2 — r
 SQL transformer v1 shipped, see below) and `transform.join` (1). There is no dedicated Java class, config
 schema, or dispatch path per catalog id.
 
+> **Update 2026-09-05 — the Record Transformer now RUNS where Map does.** Four phases shipped
+> (`dd4b8c37` · `7927d703` · `2f000e22` · `7b7c7a5e`, plan archived): `RecordTransform` (inspecto-etl)
+> is a Java mirror of `sql-functions.ts` that compiles `fields[]` into the same `[{name, expr}]` seam
+> `DataTransformer.dataColumns` returns — **the one seam both lanes already read** — so a Record
+> Transformer executes on the ingest lane and at rest through one compiler. `processing.map.fields[]`
+> is its flat-file home, and `PipelineLift` puts a `transform.sql` node in the projection slot when it
+> is authored. 🔴 **`fields[]` is now ENGINE-READ**; the four comments saying otherwise moved with it.
+> ⛔ `transform.map` is DEPRECATED, not deleted — it still lifts, executes and round-trips, and
+> `mapping.rules[]` stays readable permanently (~20 readers). Migration is proven by comparing compiled
+> SQL: *byte-identical projection for 14 stored schemas, 795 rules across three spaces*.
+
 ## The fold — five entries became three (2026-09-04, operator call)
 
 The catalog was advertising **four processors that are one grid**. Once `transform.sql`'s fields grid

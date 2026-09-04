@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: Record Transformer replaces transform.map — one authoring model for the projection slot
-status: ACTIVE — approved 2026-09-04, Phase 1 in progress
+status: SHIPPED 2026-09-05 — all four phases (dd4b8c37 · 7927d703 · 2f000e22 · 7b7c7a5e)
 timestamp: 2026-09-04T00:00:00Z
 ---
 
