@@ -119,6 +119,7 @@ public final class RecipeCompiler {
                     mapStepId = id;
                 }
                 case "transform" -> transform(id, cfg, nodes, refusals);
+                case "sql" -> nodes.add(sql(id, cfg, refusals));
                 case "sink" -> nodes.add(sink(id, cfg));
                 case "dedup" -> nodes.add(dedup(id, cfg, refusals));
                 case "route" -> {
@@ -379,6 +380,17 @@ public final class RecipeCompiler {
         return PipelineNode.of(id, BuiltinNodeType.TRANSFORM_SUMMARIZE.type(), node);
     }
 
+    /** {@code sql: {sql: "...", fields: [...]}} → the SQL expression node ({@code transform.sql}). */
+    private static PipelineNode sql(String id, Map<String, Object> cfg,
+                                    List<PipelineCompileException.Refusal> refusals) {
+        Object sql = cfg.get("sql");
+        if (!(sql instanceof String s) || s.isBlank()) {
+            refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id,
+                    "sql step needs a non-blank sql: expression"));
+        }
+        return PipelineNode.of(id, BuiltinNodeType.TRANSFORM_SQL.type(), new LinkedHashMap<>(cfg));
+    }
+
     /**
      * {@code route:} — the one user-visible branching construct (§2.6). Named branches, each a linear
      * sub-chain ending in its {@code sink} step; mid-branch transforms (MIDBRANCH-1, R3) compile
@@ -450,6 +462,7 @@ public final class RecipeCompiler {
                     }
                     case "dedup" -> stepNode = dedup(stepId, stepCfg, refusals);
                     case "summarize" -> stepNode = summarize(stepId, stepCfg, refusals);
+                    case "sql" -> stepNode = sql(stepId, stepCfg, refusals);
                     case "transform" -> {
                         List<PipelineNode> built = new ArrayList<>();
                         transform(stepId, stepCfg, built, refusals);
@@ -465,7 +478,7 @@ public final class RecipeCompiler {
                     default -> {
                         refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_STEP, stepId,
                                 "branch step verb '" + verb + "' does not compile mid-branch "
-                                        + "(only dedup / summarize / transform / sink)"));
+                                        + "(only dedup / summarize / sql / transform / sink)"));
                         stepNode = null;
                     }
                 }

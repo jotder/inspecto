@@ -509,6 +509,78 @@ class ControlApiComponentsTest {
         }
     }
 
+    @Test
+    void describeDerivesOutputColumnsWithoutExecutingRows(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, null)) {
+            String body = "{\"inputColumns\":[{\"name\":\"ID\",\"type\":\"VARCHAR\"},{\"name\":\"AMT\",\"type\":\"VARCHAR\"}],"
+                    + "\"sql\":\"SELECT TRIM(ID) AS order_id, TRY_CAST(AMT AS DOUBLE) AS amount FROM input\"}";
+            HttpResponse<String> res = send(c.port, "POST", "/components/transform/describe", body);
+            assertEquals(200, res.statusCode(), res.body());
+            JsonNode cols = json(res).get("columns");
+            assertNotNull(cols);
+            assertEquals(2, cols.size());
+            assertEquals("order_id", cols.get(0).get("name").asText());
+            assertEquals("VARCHAR", cols.get(0).get("type").asText());
+            assertEquals("amount", cols.get(1).get("name").asText());
+            assertEquals("DOUBLE", cols.get(1).get("type").asText());
+        }
+    }
+
+    @Test
+    void describeReturns422OnBinderError(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, null)) {
+            String body = "{\"inputColumns\":[{\"name\":\"ID\",\"type\":\"VARCHAR\"}],"
+                    + "\"sql\":\"SELECT NONEXISTENT FROM input\"}";
+            HttpResponse<String> res = send(c.port, "POST", "/components/transform/describe", body);
+            assertEquals(422, res.statusCode(), res.body());
+            assertTrue(res.body().contains("NONEXISTENT") || res.body().contains("not found"), res.body());
+        }
+    }
+
+    /**
+     * The describe route binds author SQL, and DuckDB's binder OPENS a {@code read_csv('…')} target to
+     * infer its schema — so without {@link com.gamma.sql.SqlGuard} this route reads any file the process
+     * can reach. The probe is a CSV that really exists: un-guarded it describes cleanly (200 + its
+     * columns), which is exactly what makes the 422 below evidence of the guard and not of a broken query.
+     */
+    @Test
+    void describeRefusesFileReadingSqlTheExecutorWouldAlsoRefuse(@TempDir Path dir) throws Exception {
+        Path leak = dir.resolve("leak.csv");
+        Files.writeString(leak, "secret,amount\nacme,42\n");
+        try (Ctx c = open(dir, null)) {
+            String body = "{\"inputColumns\":[{\"name\":\"ID\",\"type\":\"VARCHAR\"}],"
+                    + "\"sql\":\"SELECT * FROM read_csv('" + leak.toString().replace("\\", "/") + "')\"}";
+            HttpResponse<String> res = send(c.port, "POST", "/components/transform/describe", body);
+            assertEquals(422, res.statusCode(), res.body());
+            assertTrue(res.body().contains("read_csv"), res.body());
+            assertFalse(res.body().contains("secret"), "the refusal must not echo the file's contents");
+        }
+    }
+
+    /** A second statement is refused before DuckDB ever sees it — same allow-list as the executor. */
+    @Test
+    void describeRefusesMultipleStatements(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, null)) {
+            String body = "{\"inputColumns\":[{\"name\":\"ID\",\"type\":\"VARCHAR\"}],"
+                    + "\"sql\":\"SELECT ID FROM input; DROP TABLE input\"}";
+            HttpResponse<String> res = send(c.port, "POST", "/components/transform/describe", body);
+            assertEquals(422, res.statusCode(), res.body());
+        }
+    }
+
+    @Test
+    void describeReturns400OnInvalidBody(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, null)) {
+            // Missing sql
+            HttpResponse<String> r1 = send(c.port, "POST", "/components/transform/describe", "{\"inputColumns\":[{\"name\":\"ID\"}]}");
+            assertEquals(400, r1.statusCode());
+
+            // Missing inputColumns
+            HttpResponse<String> r2 = send(c.port, "POST", "/components/transform/describe", "{\"sql\":\"SELECT 1\"}");
+            assertEquals(400, r2.statusCode());
+        }
+    }
+
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));

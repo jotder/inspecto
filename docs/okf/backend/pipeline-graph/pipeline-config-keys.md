@@ -114,8 +114,13 @@ Parser-only (10):
 
 ### Node-config keys that are not `processing.*` blocks — `transform.sql` (2026-09-04)
 
-A `transform.sql` Step is graph-authored only (no recipe verb, no `processing.*` block, not lowerable to
-the flat config). Its node config carries **`sql`** — the one declared attribute (`NodeAttributes.TRANSFORM_SQL`,
+A `transform.sql` Step has **no `processing.*` block** — its flat-config home is an explicit `steps:` entry
+of kind `sql` (`PipelineEditable` LOWERABLE + STEP_KIND, `c119a6af`), and since 2026-09-04 it is also a
+**recipe verb** (`sql`, between `transform` and `summarize`; `RecipeCompiler`/`RecipeConverter`
+round-trip it, see [`catalog-vs-executors.md`](../engine/catalog-vs-executors.md)). Like any explicit
+chain, an ACTIVE pipeline carrying one must declare top-level `output_store:`
+(`PipelineConfig.prepare()`), and mid-branch inside `route:` it compiles but does not arm
+(`RouteArming.BRANCH_STEP_KINDS` excludes it — a save-time finding, deliberate). Its node config carries **`sql`** — the one declared attribute (`NodeAttributes.TRANSFORM_SQL`,
 `multiline`, required): a single `SELECT` whose input relation is the fixed alias **`input`** (`FROM
 input`), rewritten to the real relation at execution; DDL/DML/multi-statement refused. The Angular pane
 stores **`fields[]`** beside it — the Simple-mode rows that generated the SQL. `fields[]` is an authoring

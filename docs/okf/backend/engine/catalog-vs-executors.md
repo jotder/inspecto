@@ -71,9 +71,19 @@ As built:
   scratch table literally named `input` shaped by the **upstream Step's typed schema**, then `DESCRIBE
   <sql>` → `[{name, type}]`. A binder/parse failure surfaces as `IllegalArgumentException` carrying
   DuckDB's message verbatim (it names the offending column — that IS the validation). No rows are ever
-  read. ⚠ **No HTTP route exposes it yet** — the planned `POST /pipelines/authored/{id}/nodes/{nodeId}/describe`
-  was not built; the pane derives its output schema by reusing `POST /components/transform/preview`
-  (`previewTransform`) over the tab's sample rows instead (BACKLOG AUTHORING-REDESIGN-1).
+  read. **Exposed since 2026-09-04 as `POST /components/transform/describe`**
+  (`ComponentRoutes.describeTransform`) — body `{ sql, inputColumns: [{name, type}] }` → `{ columns:
+  [{name, type}] }`, 400 on a malformed body, 422 on the guard's reason or DuckDB's binder message. It
+  sits with the other `/components` previews (un-gated: reads nothing, writes nothing) rather than at the
+  planned `POST /pipelines/authored/{id}/nodes/{nodeId}/describe`, because it needs no pipeline and no
+  node — the pane has the SQL and the upstream columns in hand. ⚠ **`TypeFlow.describe` opens a plain
+  in-memory DuckDB connection, NOT the sealed [`SqlSandbox`](duckdb.md) the executor and the preview run
+  on**, so the route applies `SqlGuard.check` itself before calling it: `DESCRIBE` never executes the
+  plan, but the binder still OPENS a `read_csv('…')` target to infer its schema, which would have made
+  this the one author-SQL entry point that reads arbitrary files. Guarding at the route also keeps
+  describe and execute agreeing — SQL refused at run time is refused while it is being written
+  (`ControlApiComponentsTest.describeRefusesFileReadingSqlTheExecutorWouldAlsoRefuse`, whose probe is a
+  CSV that really exists, so an un-guarded route would answer 200).
 * **Audit honesty at the boundary:** `transform.sql` is, by construction, outside the cast-failure audit
   (the same reason `EXPR` is). `PipelineValidator.validate` emits one WARNING `SQL_STEP_UNAUDITED`
   (`PipelineValidator.java:86, 263-267`) per `transform.sql` node, naming the node id and its `sql`
@@ -81,8 +91,16 @@ As built:
   `PipelineValidator.Result.ok()` and `PipelineGraphRoutes.saveGraph`'s findings gate already keyed off
   `Severity.ERROR` only — proven, not trusted, by `PipelineValidatorTest`
   (`theUnauditedSqlWarningAloneDoesNotBlockSave`, `anActualErrorOnAGraphWithASqlStepStillBlocksSave`).
-* **Recipe view:** `transform.sql` is not a `PipelineProjection.RECIPE_VERBS` entry — it is authored on the
-  graph/drawer only (same footing as `select`/`derive` for lowering; see [node-types.md](node-types.md)).
+* **Recipe view:** since 2026-09-04 `transform.sql` IS a recipe verb — `sql`, ordered between `transform`
+  and `summarize` in `PipelineProjection.RECIPE_VERBS` and in the UI's `RECIPE_VERBS` and generated
+  `step-types.contract.json` (regenerate with `mvn -o test -Dstep.types.write=true`, pinned by
+  `StepTypesContractTest`). `RecipeCompiler` compiles `sql: {sql, fields}` on the trunk and inside a
+  `route:` branch; `RecipeConverter.sqlStep` converts it back, so a config carrying a sql step round-trips
+  through the Recipe view instead of failing with `UNSUPPORTED_STEP`. ⚠ **Mid-branch, `sql` compiles but
+  does not ARM:** `RouteArming.BRANCH_STEP_KINDS` is `{FILTER, DEDUP, SUMMARIZE}`, so a route branch
+  chaining a sql step is a save-time finding and an `IllegalStateException` from
+  `PipelineConfig.prepare()` once active — deliberate (fail-closed until the branch walker runs it), and
+  the compiler still accepts it so the round-trip of an inactive draft stays lossless.
 
 **Where the catalog's processors land after v1** (operator's question, answered):
 

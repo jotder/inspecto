@@ -298,6 +298,38 @@ class RecipeCompilerTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    void sqlStepCompilesToCanonicalStepsList() {
+        Map<String, Object> recipe = linearRecipe("/data/db");
+        List<Map<String, Object>> steps = (List<Map<String, Object>>) (List<?>) recipe.get("steps");
+        steps.add(steps.size() - 1,
+                step("sql", new LinkedHashMap<>(Map.of(
+                        "sql", "SELECT TRIM(NAME) AS customer, TRY_CAST(AMT AS DOUBLE) FROM input",
+                        "fields", List.of(Map.of("name", "customer", "expression", "TRIM(NAME)"))))));
+
+        Map<String, Object> out = RecipeCompiler.compile(recipe);
+        assertNotNull(out.get("steps"), "sql step forces the explicit steps: chain");
+        List<Map<String, Object>> compiledSteps = (List<Map<String, Object>>) out.get("steps");
+        Map<String, Object> sqlStep = compiledSteps.stream()
+                .filter(s -> s.containsKey("sql"))
+                .findFirst()
+                .orElseThrow();
+        Map<String, Object> sqlCfg = (Map<String, Object>) sqlStep.get("sql");
+        assertEquals("SELECT TRIM(NAME) AS customer, TRY_CAST(AMT AS DOUBLE) FROM input", sqlCfg.get("sql"));
+        assertNotNull(sqlCfg.get("fields"), "fields[] travels intact");
+    }
+
+    @Test
+    void sqlStepWithBlankSqlRefuses() {
+        Map<String, Object> recipe = linearRecipe("/data/db");
+        ((List<Map<String, Object>>) (List<?>) recipe.get("steps")).add(
+                step("sql", new LinkedHashMap<>(Map.of("sql", "   "))));
+        PipelineCompileException e = assertThrows(PipelineCompileException.class,
+                () -> RecipeCompiler.compile(recipe));
+        assertTrue(e.refusals().stream().anyMatch(r -> r.message().contains("non-blank sql")), e.getMessage());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     void routeCompilesToARouteSectionWithBranchStampedDestinations() {
         Map<String, Object> recipe = new LinkedHashMap<>();
         recipe.put("name", "orders");

@@ -57,8 +57,10 @@ interface RuleRow {
  *
  * <p><b>Scope is exactly `processing.map`'s authored keys.</b> `MAP_AUTHORED` is `{columns, rules}` and
  * nothing else (pinned in `PipelineEditable.java` and mirrored in the mock); `schema` and `csv` on a map
- * node are `MAP_DERIVED`, resolved by the engine and dropped by `lower`. This pane therefore authors
- * `rules` and leaves `columns` untouched.
+ * node are `MAP_DERIVED`, resolved by the engine and dropped by `lower`. This pane authors `rules`; it
+ * READS `columns` (a legacy-lifted node's projection) to seed the grid, and an Apply that writes rules
+ * REPLACES `columns`, because `RowShaper.columnsOf` prefers `columns` and would otherwise run the old
+ * projection over the operator's saved edit.
  *
  * <p><b>Where the fields come from.</b> ⛔ Not from the sample: the rules map FROM the schema the Parse
  * drawer authored, so the host passes that node's `schema_file` in as read-only context and this pane
@@ -378,19 +380,35 @@ export class PipelineLoadDefinitionComponent {
     /** The rules already authored on this node, if any. */
     private authoredRules = computed<RuleRow[]>(() => {
         const rules = this.node().config?.['rules'];
-        if (!Array.isArray(rules)) return [];
-        return rules
-            .filter((r): r is Record<string, unknown> => !!r && typeof r === 'object')
-            .map((r) => ({
-                targetColumn: String(r['targetColumn'] ?? ''),
-                sourceExpression: String(r['sourceExpression'] ?? ''),
-                // Blank/omitted IS DIRECT — TransformCompiler's own default, mirrored so a legacy
-                // rule does not render as an empty select.
-                transformType:
-                    String(r['transformType'] ?? '')
-                        .trim()
-                        .toUpperCase() || 'DIRECT',
-            }));
+        if (Array.isArray(rules)) {
+            return rules
+                .filter((r): r is Record<string, unknown> => !!r && typeof r === 'object')
+                .map((r) => ({
+                    targetColumn: String(r['targetColumn'] ?? ''),
+                    sourceExpression: String(r['sourceExpression'] ?? ''),
+                    // Blank/omitted IS DIRECT — TransformCompiler's own default, mirrored so a legacy
+                    // rule does not render as an empty select.
+                    transformType:
+                        String(r['transformType'] ?? '')
+                            .trim()
+                            .toUpperCase() || 'DIRECT',
+                }));
+        }
+        // A node lifted from a legacy config carries its projection as `columns: [{name, expr}]` and no
+        // rules; before 2026-09-04 this pane showed it as an EMPTY grid, so the operator saw no mapping
+        // where the engine ran one. Read them as DIRECT rules — `submit()` writes them back as rules.
+        const columns = this.node().config?.['columns'];
+        if (Array.isArray(columns)) {
+            return columns
+                .filter((c): c is Record<string, unknown> => !!c && typeof c === 'object')
+                .map((c) => ({
+                    targetColumn: String(c['name'] ?? c['targetColumn'] ?? ''),
+                    sourceExpression: String(c['expr'] ?? c['sourceExpression'] ?? c['name'] ?? ''),
+                    transformType: 'DIRECT',
+                }))
+                .filter((r) => r.targetColumn.trim().length > 0);
+        }
+        return [];
     });
 
     private lastDirty = false;
@@ -401,7 +419,8 @@ export class PipelineLoadDefinitionComponent {
             this.form.markAsPristine();
             this.error.set(null);
             this.seedRules(this.authoredRules());
-            this.emitDirty();
+            this.lastDirty = false;
+            this.dirtyChange.emit(false);
             this.loadSchemaFields();
         });
         // Any rule edit invalidates a mapped preview taken from the rules as they were.
@@ -649,11 +668,18 @@ export class PipelineLoadDefinitionComponent {
             };
         });
         const n = this.node();
-        const node: AuthoredNode = {
-            ...n,
-            // `columns` is left exactly as it was: this pane authors `rules` and nothing else.
-            config: { ...(n.config ?? {}), ...(rules.length ? { rules } : {}) },
-        };
+        // ⚠ `columns` and `rules` are the SAME projection, and `columns` WINS at execution
+        // (`RowShaper.columnsOf` returns it before it ever looks at rules). This pane seeds its grid from
+        // `columns` when a node carries no rules, so writing rules while leaving `columns` in place would
+        // save an edit the engine never runs — the "written but never read" trap. Applying real rules
+        // therefore takes ownership: the equivalent rules replace `columns`. An EMPTY grid deletes
+        // nothing — a stray Apply must not wipe an authored projection.
+        const config = { ...(n.config ?? {}) };
+        if (rules.length) {
+            config['rules'] = rules;
+            delete config['columns'];
+        }
+        const node: AuthoredNode = { ...n, config };
         this.form.markAsPristine();
         this.emitDirty();
         this.applied.emit(node);

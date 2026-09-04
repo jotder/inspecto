@@ -762,6 +762,7 @@
                                         <app-pipeline-transform-sql-definition
                                             [node]="dn"
                                             [sampleRows]="sampleThread()?.parsedRows()"
+                                            [upstreamColumns]="upstreamSchemaColumns()"
                                             (applied)="onDefinitionApplied($event)"
                                             (dirtyChange)="definitionDirty.set($event)"
                                         />

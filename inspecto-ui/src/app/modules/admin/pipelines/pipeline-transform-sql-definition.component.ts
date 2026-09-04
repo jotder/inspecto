@@ -1,7 +1,18 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    DestroyRef,
+    computed,
+    effect,
+    inject,
+    input,
+    output,
+    signal,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { AuthoredNode, ComponentsService, RelationsPreview } from 'app/inspecto/api';
+import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { StepPreviewResultComponent } from 'app/inspecto/components/step-preview-result.component';
 import { SqlCodemirrorComponent } from 'app/inspecto/data-table/sql/sql-codemirror.component';
 import {
@@ -65,7 +76,13 @@ export interface FieldRow extends CompiledField {
     selector: 'app-pipeline-transform-sql-definition',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [MatButtonModule, MatIconModule, StepPreviewResultComponent, SqlCodemirrorComponent],
+    imports: [
+        MatButtonModule,
+        MatIconModule,
+        StepPreviewResultComponent,
+        InspectoAlertComponent,
+        SqlCodemirrorComponent,
+    ],
     templateUrl: './pipeline-transform-sql-definition.component.html',
 })
 export class PipelineTransformSqlDefinitionComponent {
@@ -74,6 +91,8 @@ export class PipelineTransformSqlDefinitionComponent {
     readonly node = input.required<AuthoredNode>();
     /** The rows the tab's sample thread parsed — seeds a NEW step and feeds "Try it on the sample". */
     readonly sampleRows = input<Record<string, unknown>[] | undefined>(undefined);
+    /** Upstream column names from the upstream schema or step, allowing authoring without parsed sample rows. */
+    readonly upstreamColumnsInput = input<string[] | undefined>(undefined, { alias: 'upstreamColumns' });
 
     readonly applied = output<AuthoredNode>();
     readonly dirtyChange = output<boolean>();
@@ -92,6 +111,13 @@ export class PipelineTransformSqlDefinitionComponent {
     private loaded = '';
     private lastDirty = false;
     private seededFor: string | null = null;
+    private describeTimer: ReturnType<typeof setTimeout> | null = null;
+    private readonly destroyRef = inject(DestroyRef);
+
+    // ── live schema derivation and binder error detection ──────────────────────────────────────────
+    readonly isDeriving = signal(false);
+    readonly binderError = signal<string | null>(null);
+    readonly derivedColumnTypes = signal<Record<string, string>>({});
 
     // ── view state: search, filter, paging. None of this is persisted or written. ───────────────────
     readonly query = signal('');
@@ -101,13 +127,18 @@ export class PipelineTransformSqlDefinitionComponent {
     readonly pageSizes = PAGE_SIZES;
     readonly functionGroups = sqlFunctionsByCategory();
 
-    /** The upstream columns a row may read, from the parsed sample. */
-    readonly upstreamColumns = computed(() => Object.keys(this.sampleRows()?.[0] ?? {}));
+    /** The upstream columns a row may read, from upstreamColumns input or the parsed sample. */
+    readonly upstreamColumns = computed(() => {
+        const fromInput = this.upstreamColumnsInput();
+        if (fromInput && fromInput.length > 0) return fromInput;
+        return Object.keys(this.sampleRows()?.[0] ?? {});
+    });
 
     /** Every row, compiled, with its stable `#`. This is the list search and filters are lenses over. */
     readonly allRows = computed<FieldRow[]>(() => {
         const compiled = compileFields(this.fields());
         const previewTypes = this.previewTypesByName();
+        const derived = this.derivedColumnTypes();
         const sample = this.sampleRows()?.[0] ?? {};
         const previewRow = (this.preview()?.relations?.[0]?.rows?.[0] ?? {}) as Record<string, unknown>;
         return compiled.map((c, i) => {
@@ -120,7 +151,7 @@ export class PipelineTransformSqlDefinitionComponent {
                 seq: i + 1,
                 changed: c.field.fn !== 'keep' || c.field.name !== c.field.from,
                 sample: shown === undefined || shown === null ? '' : String(shown),
-                outType: previewTypes[name] ?? '',
+                outType: derived[name] || previewTypes[name] || '',
             };
         });
     });
@@ -184,8 +215,16 @@ export class PipelineTransformSqlDefinitionComponent {
         return parts.join(' · ');
     });
 
-    /** Apply is refused while any row cannot compile — an incomplete row must never save silently. */
-    readonly canApply = computed(() => this.counts().problems === 0 && !this.sqlOnly());
+    /**
+     * Apply is refused while any row cannot compile or the SQL fails to bind — an incomplete row must
+     * never save silently.
+     *
+     * <p>⚠ `sqlOnly` is NOT a refusal. It was, while the hand-written SQL was read-only; once CodeMirror
+     * made it editable the drawer's Apply armed on the first keystroke and `submit()` then returned
+     * early, so editing hand-written SQL saved NOTHING and said nothing. The binder check above already
+     * guards what is typed there.
+     */
+    readonly canApply = computed(() => this.counts().problems === 0 && !this.binderError());
 
     // ── preview ─────────────────────────────────────────────────────────────────────────────────────
     readonly preview = signal<RelationsPreview | null>(null);
@@ -208,6 +247,71 @@ export class PipelineTransformSqlDefinitionComponent {
             // Seeding is not an edit: the Step opens clean, never pre-armed for an Apply nobody asked for.
             this.lastDirty = false;
             this.dirtyChange.emit(false);
+        });
+
+        effect(() => {
+            const cols = this.upstreamColumns();
+            // If the node was loaded with no configured fields and cols were empty at the time,
+            // seed once cols become available.
+            if (cols.length > 0 && this.fields().length === 0 && !this.sqlOnly() && !this.storedSql()) {
+                this.fields.set(seedFields(cols));
+                this.loaded = this.snapshot();
+                this.lastDirty = false;
+                this.dirtyChange.emit(false);
+            }
+        });
+
+        // Live DuckDB zero-row schema derivation and binder error detection
+        effect(() => {
+            const sql = this.generatedSql();
+            const cols = this.upstreamColumns();
+            if (this.describeTimer) clearTimeout(this.describeTimer);
+            if (!sql.trim() || cols.length === 0) {
+                this.derivedColumnTypes.set({});
+                this.binderError.set(null);
+                this.isDeriving.set(false);
+                return;
+            }
+            this.isDeriving.set(true);
+            this.describeTimer = setTimeout(() => {
+                const sample = this.sampleRows()?.[0] ?? {};
+                const inputCols = cols.map((c) => ({
+                    name: c,
+                    type: typeof sample[c] === 'number' ? 'DOUBLE' : 'VARCHAR',
+                }));
+                this.components.describeTransform(inputCols, sql).subscribe({
+                    next: (res) => {
+                        this.isDeriving.set(false);
+                        const map: Record<string, string> = {};
+                        for (const c of res.columns) map[c.name] = c.type;
+                        this.derivedColumnTypes.set(map);
+                        this.binderError.set(null);
+                    },
+                    error: (e) => {
+                        this.isDeriving.set(false);
+                        this.derivedColumnTypes.set({});
+                        // Only DuckDB's own refusal (422 from /components/transform/describe) is a
+                        // statement the operator can act on — and only that one blocks Apply. Any other
+                        // failure (offline, 404 on an older control plane, 503) says nothing about the
+                        // SQL, so it must never lock the pane out of saving.
+                        if ((e as { status?: number })?.status !== 422) {
+                            this.binderError.set(null);
+                            return;
+                        }
+                        const msg =
+                            e?.error?.error?.message ??
+                            e?.error?.message ??
+                            e?.message ??
+                            'SQL expression failed to bind.';
+                        this.binderError.set(msg);
+                    },
+                });
+            }, 300);
+        });
+
+        // A drawer closed mid-debounce must not fire a describe at a dead component.
+        this.destroyRef.onDestroy(() => {
+            if (this.describeTimer) clearTimeout(this.describeTimer);
         });
     }
 
@@ -249,6 +353,16 @@ export class PipelineTransformSqlDefinitionComponent {
         if (dirty === this.lastDirty) return;
         this.lastDirty = dirty;
         this.dirtyChange.emit(dirty);
+    }
+
+    /**
+     * A keystroke in the hand-written SQL editor. ⚠ It must go through {@link touched} like every row
+     * edit: binding `valueChange` straight to the signal changed the value but emitted no
+     * `dirtyChange`, so the drawer's Apply never armed and the edit could not be saved at all.
+     */
+    onSqlEdited(sql: string): void {
+        this.storedSql.set(sql);
+        this.touched();
     }
 
     // ── row edits ───────────────────────────────────────────────────────────────────────────────────
@@ -294,6 +408,28 @@ export class PipelineTransformSqlDefinitionComponent {
             { id: newFieldId(), name: '', from: '', fn: 'custom', args: { expression: '' } },
         ]);
         this.page.set(this.pageCount() - 1);
+        this.touched();
+    }
+
+    moveUp(id: string): void {
+        const rows = [...this.fields()];
+        const idx = rows.findIndex((f) => f.id === id);
+        if (idx <= 0) return;
+        const temp = rows[idx];
+        rows[idx] = rows[idx - 1];
+        rows[idx - 1] = temp;
+        this.fields.set(rows);
+        this.touched();
+    }
+
+    moveDown(id: string): void {
+        const rows = [...this.fields()];
+        const idx = rows.findIndex((f) => f.id === id);
+        if (idx < 0 || idx >= rows.length - 1) return;
+        const temp = rows[idx];
+        rows[idx] = rows[idx + 1];
+        rows[idx + 1] = temp;
+        this.fields.set(rows);
         this.touched();
     }
 

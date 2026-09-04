@@ -1343,6 +1343,32 @@ describe('PipelineParseDefinitionComponent', () => {
             }
         });
 
+        it('picks up concurrent partitions[] updates from disk upon submit', async () => {
+            savedPartitions = [
+                { column: 'year', source: 'TXN_DATE', type: 'DATE_YEAR' },
+            ];
+            try {
+                const fixture = await create(delimitedNode(), [], 0, null, 'cdr');
+                fixture.detectChanges();
+
+                // Simulate concurrent update on disk from the Sink pane
+                savedPartitions = [
+                    { column: 'year', source: 'TXN_DATE', type: 'DATE_YEAR' },
+                    { column: 'month', source: 'TXN_DATE', type: 'DATE_MONTH' },
+                ];
+
+                pane(fixture).submit();
+                fixture.detectChanges();
+                expect(schemaWrites).toHaveLength(1);
+                expect(schemaWrites[0].config['partitions']).toEqual([
+                    { column: 'year', source: 'TXN_DATE', type: 'DATE_YEAR' },
+                    { column: 'month', source: 'TXN_DATE', type: 'DATE_MONTH' },
+                ]);
+            } finally {
+                savedPartitions = null;
+            }
+        });
+
         it('surfaces a legacy partitionKey as the trio the engine synthesises from it', async () => {
             savedLegacyPartitionKey = 'TXN_DATE';
             try {

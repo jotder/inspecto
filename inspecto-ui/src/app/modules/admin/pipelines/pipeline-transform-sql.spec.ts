@@ -3,6 +3,7 @@ import {
     SqlField,
     applyFunction,
     compileField,
+    compileFields,
     generateSql,
     readFields,
     seedFields,
@@ -28,9 +29,7 @@ describe('sql-functions: the catalog', () => {
 
     it('every parameter a template mentions is declared, and every declared parameter is used', () => {
         for (const fn of SQL_FUNCTIONS) {
-            const inTemplate = [...fn.template.matchAll(/\{(\w+)\}/g)]
-                .map((m) => m[1])
-                .filter((n) => n !== 'source');
+            const inTemplate = [...fn.template.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).filter((n) => n !== 'source');
             const declared = (fn.params ?? []).map((p) => p.name);
             expect(new Set(inTemplate), `${fn.id} template placeholders`).toEqual(new Set(declared));
         }
@@ -77,8 +76,9 @@ describe('sql-functions: rendering parameters', () => {
 
     it('renders a number parameter verbatim and refuses a non-number', () => {
         expect(expr(field({ name: 'x', from: 'amt', fn: 'num.round', args: { decimals: '2' } }))).toBe('ROUND(amt, 2)');
-        expect(compileField(field({ name: 'x', from: 'amt', fn: 'num.round', args: { decimals: 'two' } })).problem)
-            .toMatch(/needs a number/);
+        expect(
+            compileField(field({ name: 'x', from: 'amt', fn: 'num.round', args: { decimals: 'two' } })).problem,
+        ).toMatch(/needs a number/);
     });
 
     it('renders a column parameter as a quoted identifier, not a literal', () => {
@@ -207,5 +207,15 @@ describe('pipeline-transform-sql: reading persisted fields', () => {
         expect(generateSql(read)).toBe(
             'SELECT\n  TRIM(customer) AS buyer,\n  TRY_CAST(amt AS DOUBLE) AS amount,\n  amount * 100 AS cents\nFROM input',
         );
+    });
+
+    it('flags duplicate output field names as problems', () => {
+        const fields = [
+            field({ name: 'dup', from: 'col1', fn: 'keep' }),
+            field({ name: 'dup', from: 'col2', fn: 'keep' }),
+        ];
+        const compiled = compileFields(fields);
+        expect(compiled[0].problem).toContain('Duplicate field name “dup”');
+        expect(compiled[1].problem).toContain('Duplicate field name “dup”');
     });
 });

@@ -158,6 +158,7 @@ public final class RecipeConverter {
                     case PipelineConfig.Step.JOIN -> steps.add(step("transform", joinStep(cfg)));
                     case PipelineConfig.Step.DEDUP -> steps.add(step("dedup", dedupStep(cfg)));
                     case PipelineConfig.Step.SUMMARIZE -> steps.add(step("summarize", summarizeStep(cfg)));
+                    case PipelineConfig.Step.SQL -> steps.add(step("sql", sqlStep(cfg)));
                     case PipelineConfig.Step.ROUTE -> {
                         steps.add(step("route", routeStep(cfg, sink, extraSinks, dirs)));
                         routed = true;
@@ -266,6 +267,7 @@ public final class RecipeConverter {
                             case PipelineConfig.Step.JOIN -> branchSteps.add(step("transform", joinStep(cfg)));
                             case PipelineConfig.Step.DEDUP -> branchSteps.add(step("dedup", dedupStep(cfg)));
                             case PipelineConfig.Step.SUMMARIZE -> branchSteps.add(step("summarize", summarizeStep(cfg)));
+                            case PipelineConfig.Step.SQL -> branchSteps.add(step("sql", sqlStep(cfg)));
                             default -> branchSteps.add(step(kind, cfg));
                         }
                     }
@@ -319,6 +321,19 @@ public final class RecipeConverter {
         putIfPresent(summarize, "group_by", cfg.get("group_by"));
         putIfPresent(summarize, "measures", cfg.get("measures"));
         return summarize;
+    }
+
+    /** {@code sql: {sql, fields}} → the recipe's step of the same name. */
+    private static Map<String, Object> sqlStep(Map<String, Object> cfg) {
+        Map<String, Object> sql = new LinkedHashMap<>();
+        putIfPresent(sql, "sql", cfg.get("sql"));
+        putIfPresent(sql, "fields", cfg.get("fields"));
+        for (Map.Entry<String, Object> e : cfg.entrySet()) {
+            if (!"sql".equals(e.getKey()) && !"fields".equals(e.getKey())) {
+                sql.put(e.getKey(), e.getValue());
+            }
+        }
+        return sql;
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────────

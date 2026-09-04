@@ -150,10 +150,10 @@ const GRAMMAR_REF_PREFIX = 'grammar/';
  * patched setTimeout cannot be used there.
  */
 const nativeSetTimeout: typeof setTimeout =
-    (globalThis as Record<string, unknown>)['__zone_symbol__setTimeout'] as typeof setTimeout | undefined ??
+    ((globalThis as Record<string, unknown>)['__zone_symbol__setTimeout'] as typeof setTimeout | undefined) ??
     setTimeout;
 const nativeClearTimeout: typeof clearTimeout =
-    (globalThis as Record<string, unknown>)['__zone_symbol__clearTimeout'] as typeof clearTimeout | undefined ??
+    ((globalThis as Record<string, unknown>)['__zone_symbol__clearTimeout'] as typeof clearTimeout | undefined) ??
     clearTimeout;
 
 /**
@@ -1581,8 +1581,13 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
                     error?: {
                         details?: {
                             refusals?: PipelineRefusal[];
-                            findings?: { severity?: string; fieldPath?: string; message: string;
-                                         code?: string; guidance?: string }[];
+                            findings?: {
+                                severity?: string;
+                                fieldPath?: string;
+                                message: string;
+                                code?: string;
+                                guidance?: string;
+                            }[];
                         };
                     };
                 };
@@ -1808,7 +1813,9 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
                             // The manifest's requirements/notes are the operator's to act on (e.g. a
                             // connection profile this space must hold) — surface, never swallow.
                             const remarks = [
-                                ...(r.requirements ?? []).map((q) => `requires ${q['profile'] ?? q['kind'] ?? 'a connection'}`),
+                                ...(r.requirements ?? []).map(
+                                    (q) => `requires ${q['profile'] ?? q['kind'] ?? 'a connection'}`,
+                                ),
                                 ...(r.notes ?? []),
                             ];
                             this.toast.success(
@@ -2387,6 +2394,37 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     readonly parserSchemaFile = computed(() => {
         const parser = (this.model()?.nodes ?? []).find((n) => isParseNodeType(n.type));
         return String(parser?.config?.['schema_file'] ?? '').trim();
+    });
+
+    private readonly parserSchemaColumns = signal<string[]>([]);
+
+    private readonly loadParserSchemaColumns = effect(() => {
+        const path = this.parserSchemaFile();
+        if (!path) {
+            this.parserSchemaColumns.set([]);
+            return;
+        }
+        const name = schemaNameFromPath(path);
+        if (!name) {
+            this.parserSchemaColumns.set([]);
+            return;
+        }
+        this.configApi.read('schema', name, this.configSubdir().trim() || undefined).subscribe({
+            next: (r) => {
+                const raw = (r.config?.['raw'] ?? {}) as Record<string, unknown>;
+                const fields = Array.isArray(raw['fields']) ? (raw['fields'] as Record<string, unknown>[]) : [];
+                const names = fields.map((f) => String(f['name'] ?? '')).filter((n) => n !== '');
+                this.parserSchemaColumns.set(names);
+            },
+            error: () => this.parserSchemaColumns.set([]),
+        });
+    });
+
+    /** Upstream columns for the SQL Transform pane: from the parsed sample rows if available, or companion schema. */
+    readonly upstreamSchemaColumns = computed<string[]>(() => {
+        const rows = this.sampleThread()?.parsedRows();
+        if (rows && rows.length > 0) return Object.keys(rows[0]);
+        return this.parserSchemaColumns();
     });
 
     /**

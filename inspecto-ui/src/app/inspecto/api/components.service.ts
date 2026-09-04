@@ -247,4 +247,18 @@ export class ComponentsService {
     validateMapping(rules: Record<string, unknown>[]): Observable<MappingValidation> {
         return this.http.post<MappingValidation>(apiUrl('/components/mapping/validate'), { rules });
     }
+
+    /**
+     * Derive output column schema and types for a SQL transform step via DuckDB's zero-row DESCRIBE
+     * — `POST /components/transform/describe`. Catches syntax and binder errors live.
+     */
+    describeTransform(
+        inputColumns: { name: string; type?: string }[],
+        sql: string,
+    ): Observable<{ columns: DerivedColumn[] }> {
+        return this.http.post<{ columns: DerivedColumn[] }>(apiUrl('/components/transform/describe'), {
+            inputColumns,
+            sql,
+        });
+    }
 }

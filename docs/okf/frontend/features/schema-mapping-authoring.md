@@ -72,14 +72,38 @@ catalog and by persisting `fields[]`.
 - **Hand-written SQL is honest, not overwritten.** A node carrying `sql` with no `fields` opens in
   `sqlOnly` mode: the SQL is shown read-write in CodeMirror and the pane says it cannot be shown as a
   field list. "Start a field list from the incoming columns" replaces it — explicit, never automatic.
+  ⚠ **Editing it saves — since 2026-09-04.** When the SQL became editable (CodeMirror, item (b)) two
+  seams were left behind: `valueChange` was bound straight to the signal, so no `dirtyChange` was ever
+  emitted and the drawer's Apply never armed; and `canApply()` still refused `sqlOnly` outright, so even
+  an armed Apply would have returned early. Both are closed — the editor goes through `onSqlEdited` →
+  `touched()`, and `sqlOnly` is no longer a refusal (the binder check is what guards what is typed).
+  An Apply from this mode writes `{ sql, fields: [] }`, so the node reopens in `sqlOnly` — no grid is
+  invented behind the author's back.
 - **Opening a Step never arms Apply.** Seeding emits `dirtyChange(false)`; dirty is a real comparison of
   `{sql, fields}` against what was loaded. ⚠ This was a live defect on the legacy `transform.map` pane
   (a Step showed "unapplied" from a single click with no edit); the grid has a regression test for it.
 - **Test against sample** reuses "Test this Step" verbatim: `ComponentsService.previewTransform({type,
   sql}, sampleRows)` with the GENERATED sql — `transform.sql` qualifies by the `transform.*` prefix. The
-  run fills each row's **Comes out as** type and **Sample** value. ⚠ Types therefore come from a preview
-  run, **not** from `TypeFlow.describe`'s execution-free `DESCRIBE` — the `/describe` route is still not
-  built (BACKLOG (a)), which is the remaining as-you-type validation gap.
+  run fills each row's **Sample** value.
+- **Types now arrive without a run (2026-09-04, BACKLOG (a) closed).** A 300ms-debounced effect posts the
+  generated SQL and the upstream columns to `POST /components/transform/describe`
+  (`ComponentsService.describeTransform`, over `TypeFlow.describe`'s execution-free `DESCRIBE`) and fills
+  **Comes out as** from the answer; a preview run's types are the fallback, not the source. The debounce
+  timer is cleared on `DestroyRef.onDestroy` so a drawer closed mid-keystroke fires nothing.
+- **Binder errors are as-you-type, and ONLY a 422 blocks Apply.** DuckDB's message renders in a warning
+  alert above the grid and clears `canApply()`. Any other failure — offline, a 404 on an older control
+  plane, a 503 — says nothing about the SQL, so it clears the alert and leaves Apply available: a pane
+  that locks the author out because the backend is unreachable is worse than one that saves unverified
+  SQL (three specs in `Transform pane: live schema derivation` pin all three arms).
+- **Authoring without sample rows.** The grid seeds from `[upstreamColumns]`, passed by the editor
+  (`upstreamSchemaColumns()`): the parsed sample's keys when a Test-Parse has run, else the field names
+  read from the parser's companion schema. Before this, a Step opened with an empty grid until the
+  operator ran a parse.
+- **Duplicate output names refuse.** `compileFields` marks every row sharing a trimmed name with a
+  problem ("Output column names must be unique"), which blocks Apply — DuckDB would otherwise accept the
+  SELECT and hand the sink two columns of the same name.
+- **Row order is the output order** — ▲/▼ per row reorder `fields[]`, and `generateSql` emits in that
+  order.
 - **Not built, on purpose:** the "Describe the fields" metadata section (description · unit ·
   sensitivity) — the backend does not carry column metadata on a `transform.sql` node; until it lands
   (BACKLOG (e)), metadata rides through the Parse pane's by-selector carry-through
@@ -128,9 +152,16 @@ catalog and by persisting `fields[]`.
 > `transform.map` and its `EXPR`/`CONCAT_DT`/`FILENAME_DATE` rules remain for stored pipelines and are
 > still authored here, unchanged.
 
-- Rule rows are a `FormArray`, seeded from the node's already-authored `rules` if present, or — if the node
-  has none — one straight-through identity rule per schema field, auto-seeded as a pending "proposal" that
+- Rule rows are a `FormArray`, seeded from the node's already-authored `rules` if present, else from a
+  legacy `columns: [{name, expr}]` projection read as DIRECT rules (2026-09-04 — before that a
+  columns-authored node showed an EMPTY grid, so the operator saw no mapping where the engine ran one),
+  else one straight-through identity rule per schema field, auto-seeded as a pending "proposal" that
   arms Apply (`:483-546`). This is the only auto-map-by-name behavior; it is not a re-invocable action.
+- ⚠ **Applying rules REPLACES `columns`.** `MAP_AUTHORED` holds both keys and `RowShaper.columnsOf` returns
+  `columns` before it looks at rules, so a node keeping both would execute the old projection over the
+  operator's saved edit — a write that is real and dead at once. `submit()` therefore deletes `columns`
+  whenever it writes a non-empty `rules` (pinned by `emits rules and drops the columns key they replace`).
+  An empty grid deletes nothing: a stray Apply must not wipe an authored projection.
 - **Per row:**
   - Target column: free-text input, pattern-validated (`:127-133`).
   - Rule: `mat-select` of `transformType` (`DIRECT` / `EXPR` / `CONCAT_DT` / `FILENAME_DATE`, from

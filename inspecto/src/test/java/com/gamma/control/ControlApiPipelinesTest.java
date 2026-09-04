@@ -157,7 +157,7 @@ class ControlApiPipelinesTest {
             // `verb`. ⚠ Asserted as the DISTINCT sequence for the same reason as
             // StepTypesContractTest: the multiplicity is expected to change, the pipeline ORDER is not,
             // and pinning the flat list made a deliberate widening read as a regression.
-            assertEquals(java.util.List.of("collect", "parse", "map", "dedup", "transform", "summarize",
+            assertEquals(java.util.List.of("collect", "parse", "map", "dedup", "transform", "sql", "summarize",
                     "route", "sink"), verbs.stream().distinct().toList(), "verbs in order: " + verbs);
             // dedup serves its specs (§5: specs reach the verbs, not just the raw node-type catalog)
             for (JsonNode t : arr)

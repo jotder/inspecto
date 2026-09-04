@@ -778,6 +778,7 @@ export const RECIPE_VERBS: readonly { type: string; label: string }[] = [
     { type: 'transform.dedup', label: 'Dedup' },
     { type: 'transform.filter', label: 'Transform (filter)' },
     { type: 'transform.join', label: 'Transform (join)' },
+    { type: 'transform.sql', label: 'Transform (SQL)' },
     { type: 'transform.summarize', label: 'Summarize' },
     { type: 'transform.route', label: 'Route' },
     { type: 'sink.persistent', label: 'Sink' },

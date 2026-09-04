@@ -91,10 +91,15 @@ this is what renders now, and why. Grounding: `grammar-editor.component.{ts,html
   Step (D3), the lift/lower's `csv.where` shorthand keeps working for stored configs; the Collection
   pointer is read-only on Parse ("Reads: … from the … collector step") and edited on the Collector;
   **partitioning moved to the Sink pane** — a pure UI relocation, the `partitions[]` storage contract on
-  the schema companion is untouched (two deliberate contracts, `ingest-wrap-spi.md`). ⚠ The Sink pane
-  reads/writes `partitions[]` on the same companion toon directly, while the Parse pane still seeds it on
-  load and carries it through its `overwrite: true` write — a Parse Apply over a stale seed can clobber a
-  Sink edit; flagged in BACKLOG, not fixed here.
+  the schema companion is untouched (two deliberate contracts, `ingest-wrap-spi.md`). The Sink pane
+  reads/writes `partitions[]` on the same companion toon directly, while the Parse pane carries it through
+  its `overwrite: true` write. That race (a Parse Apply over a load-time seed clobbering a Sink edit made
+  since) was **closed 2026-09-04**: `writeSchemaThenApply` re-READS the companion immediately before
+  writing and takes `partitions[]` plus every unmodeled top-level key from that read, falling back to the
+  load-time `partitionSeed()`/`schemaExtras` only when the read fails (`catchError(() => of(null))`) — the
+  fields and mapping blocks the pane owns are still written from the on-screen grid, so a concurrent edit
+  to a key this pane does NOT own survives, and one to a key it does own still loses (last write wins, by
+  design).
 - **One disclosure idiom across Parser · Map · Sink** (R6): uppercase section header → fields, single
   column; Sink's schema-forms went `flat` and its "Additional config" is a plain header, no chevron
   (`pipeline-config-definition.component.ts:154-160`). The Collector pane still has its own chevron —

@@ -13,11 +13,10 @@
     <!-- Forward-only: rows compile to SQL, SQL is never parsed back into rows. Say so, never fake a grid. -->
     <div class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
         <p class="m-0 text-sm">
-            This Step's SQL was written by hand, so it cannot be shown as a field list. Editing it here keeps it as
-            SQL.
+            This Step's SQL was written by hand, so it cannot be shown as a field list. Editing it here keeps it as SQL.
         </p>
         <div class="mt-2 rounded-lg border border-gray-200 dark:border-gray-700">
-            <inspecto-sql-codemirror [value]="storedSql()" (valueChange)="storedSql.set($event)" />
+            <inspecto-sql-codemirror [value]="storedSql()" (valueChange)="onSqlEdited($event)" />
         </div>
         <button type="button" class="mt-2" mat-stroked-button (click)="startGridFromColumns()">
             <mat-icon class="icon-size-5" svgIcon="heroicons_outline:table-cells"></mat-icon>
@@ -59,11 +58,17 @@
         <span class="text-secondary ml-auto text-xs">{{ showing() }}</span>
     </div>
 
+    @if (binderError()) {
+        <inspecto-alert class="mb-2 block" variant="warning" title="DuckDB Syntax / Binder Notice">
+            <div class="font-mono text-xs whitespace-pre-wrap">{{ binderError() }}</div>
+        </inspecto-alert>
+    }
+
     <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
         <table class="w-full border-collapse">
             <thead>
                 <tr class="text-secondary text-left text-xs font-semibold uppercase tracking-wider">
-                    <th class="w-10 px-2 py-1">#</th>
+                    <th class="w-12 px-2 py-1">#</th>
                     <th class="px-2 py-1">Field name</th>
                     <th class="px-2 py-1">From</th>
                     <th class="px-2 py-1">What to do</th>
@@ -75,7 +80,34 @@
             <tbody>
                 @for (row of pagedRows(); track row.field.id) {
                     <tr class="border-t align-top">
-                        <td class="text-secondary px-2 py-1 font-mono text-xs">{{ row.seq }}</td>
+                        <td class="text-secondary px-2 py-1 font-mono text-xs">
+                            <div class="flex items-center gap-1">
+                                <span>{{ row.seq }}</span>
+                                <div class="inline-flex flex-col">
+                                    <button
+                                        type="button"
+                                        class="h-3 w-3 flex items-center justify-center p-0 text-secondary hover:text-primary disabled:opacity-20"
+                                        [attr.aria-label]="'Move up ' + row.field.name"
+                                        [disabled]="row.seq === 1"
+                                        (click)="moveUp(row.field.id)"
+                                    >
+                                        <mat-icon class="icon-size-3" svgIcon="heroicons_outline:chevron-up"></mat-icon>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="h-3 w-3 flex items-center justify-center p-0 text-secondary hover:text-primary disabled:opacity-20"
+                                        [attr.aria-label]="'Move down ' + row.field.name"
+                                        [disabled]="row.seq === allRows().length"
+                                        (click)="moveDown(row.field.id)"
+                                    >
+                                        <mat-icon
+                                            class="icon-size-3"
+                                            svgIcon="heroicons_outline:chevron-down"
+                                        ></mat-icon>
+                                    </button>
+                                </div>
+                            </div>
+                        </td>
                         <td class="px-2 py-1">
                             <input
                                 type="text"
@@ -128,7 +160,9 @@
                                                 <select
                                                     class="h-7 rounded-md border border-gray-300 bg-transparent px-1 text-xs dark:border-gray-600"
                                                     [value]="row.field.args[param.name] ?? param.default ?? ''"
-                                                    (change)="setArg(row.field.id, param.name, $any($event.target).value)"
+                                                    (change)="
+                                                        setArg(row.field.id, param.name, $any($event.target).value)
+                                                    "
                                                 >
                                                     @for (opt of param.options ?? []; track opt) {
                                                         <option
@@ -145,7 +179,9 @@
                                                 <select
                                                     class="h-7 rounded-md border border-gray-300 bg-transparent px-1 text-xs dark:border-gray-600"
                                                     [value]="row.field.args[param.name] ?? ''"
-                                                    (change)="setArg(row.field.id, param.name, $any($event.target).value)"
+                                                    (change)="
+                                                        setArg(row.field.id, param.name, $any($event.target).value)
+                                                    "
                                                 >
                                                     <option value="">Pick…</option>
                                                     @for (col of upstreamColumns(); track col) {
@@ -164,7 +200,9 @@
                                                     [class.w-56]="param.type === 'sql'"
                                                     [placeholder]="param.placeholder ?? ''"
                                                     [value]="row.field.args[param.name] ?? param.default ?? ''"
-                                                    (input)="setArg(row.field.id, param.name, $any($event.target).value)"
+                                                    (input)="
+                                                        setArg(row.field.id, param.name, $any($event.target).value)
+                                                    "
                                                 />
                                             }
                                         </label>
@@ -179,9 +217,12 @@
                         </td>
                         <td class="px-2 py-1">
                             @if (row.outType) {
-                                <span class="rounded bg-gray-100 px-2 py-1 text-xs dark:bg-gray-800">{{
-                                    row.outType
-                                }}</span>
+                                <span
+                                    class="rounded bg-gray-100 px-2 py-0.5 font-mono text-xs font-medium dark:bg-gray-800"
+                                    >{{ row.outType }}</span
+                                >
+                            } @else if (isDeriving()) {
+                                <span class="text-secondary text-xs italic">deriving…</span>
                             } @else {
                                 <span class="text-secondary text-xs">after a test</span>
                             }

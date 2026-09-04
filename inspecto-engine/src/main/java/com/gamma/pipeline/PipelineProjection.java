@@ -130,6 +130,7 @@ public final class PipelineProjection {
             new String[] {"dedup", BuiltinNodeType.TRANSFORM_DEDUP.type()},
             new String[] {"transform", BuiltinNodeType.TRANSFORM_FILTER.type()},
             new String[] {"transform", BuiltinNodeType.TRANSFORM_JOIN.type()},
+            new String[] {"sql", BuiltinNodeType.TRANSFORM_SQL.type()},
             new String[] {"summarize", BuiltinNodeType.TRANSFORM_SUMMARIZE.type()},
             new String[] {"route", BuiltinNodeType.TRANSFORM_ROUTE.type()},
             new String[] {"sink", BuiltinNodeType.SINK_PERSISTENT.type()});

@@ -8,6 +8,7 @@ import com.gamma.config.spec.ConfigSpec;
 import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.config.spec.Finding;
 import com.gamma.config.spec.Severity;
+import com.gamma.etl.TypeFlow;
 import com.gamma.ops.findings.FindingsSpec;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.MappingRules;
@@ -15,6 +16,7 @@ import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.PipelineNode;
 import com.gamma.pipeline.PipelineReferences;
 import com.gamma.pipeline.exec.ComponentPreview;
+import com.gamma.sql.SqlGuard;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,6 +64,8 @@ final class ComponentRoutes implements RouteModule {
         // S6b: validate mapping rules WITHOUT writing — the import loop's gate. Un-gated like the
         // /test previews (it reads nothing and writes nothing) and never touches the registry.
         api.post("/components/mapping/validate", (e, m) -> validateMapping(api.body(e)));
+        // Live zero-row output column derivation via DuckDB DESCRIBE query over scratch input table.
+        api.post("/components/transform/describe", (e, m) -> describeTransform(api.body(e)));
     }
 
     /**
@@ -87,6 +91,64 @@ final class ComponentRoutes implements RouteModule {
         // ERROR blocks save, matching the schema-findings gate below and Finding's own contract.
         r.put("clean", findings.stream().noneMatch(f -> f.severity() == Severity.ERROR));
         return r;
+    }
+
+    /**
+     * {@code POST /components/transform/describe} — the output columns of a {@code transform.sql} step,
+     * derived WITHOUT reading a row: {@link TypeFlow#describe} runs DuckDB's {@code DESCRIBE <sql>} over an
+     * empty scratch table named {@code input} on a throwaway in-memory database. Body
+     * {@code { sql, inputColumns: [{name, type}] }} → {@code { columns: [{name, type}] }}.
+     *
+     * <p>Un-gated like the other {@code /components} previews (it reads nothing and writes nothing), but
+     * the author SQL is untrusted, so it passes the SAME lexical allow-list the executor applies before
+     * running it ({@link SqlGuard}, via {@code RowShaper.sql}) — single read-only statement, no DDL/DML,
+     * no file/extension/system functions. Without it this route would be the one author-SQL entry point
+     * where {@code read_csv('…')} still binds: {@code DESCRIBE} never executes the plan, but the binder
+     * opens the file to infer its schema. Guarding here also keeps describe and execute agreeing — SQL
+     * that would be refused at run time is refused while it is being written.
+     *
+     * <p>400 on a missing/invalid body, 422 with the guard's reason or DuckDB's own binder/syntax error.
+     */
+    private Object describeTransform(Map<String, Object> body) {
+        if (body == null) throw new ApiException(400, "body must not be empty");
+        Object rawSql = body.get("sql");
+        if (!(rawSql instanceof String sql) || sql.isBlank()) {
+            throw new ApiException(400, "body must include non-blank 'sql'");
+        }
+        Object rawCols = body.get("inputColumns");
+        if (!(rawCols instanceof List<?> list) || list.isEmpty()) {
+            throw new ApiException(400, "body must include non-empty 'inputColumns'");
+        }
+        List<Finding> violations = SqlGuard.check(sql);
+        if (!violations.isEmpty()) {
+            throw new ApiException(422, violations.get(0).message());
+        }
+        List<TypeFlow.Column> inputColumns = new java.util.ArrayList<>();
+        for (Object item : list) {
+            if (item instanceof Map<?, ?> m) {
+                Object name = m.get("name");
+                Object type = m.get("type");
+                if (name != null) {
+                    inputColumns.add(new TypeFlow.Column(
+                            String.valueOf(name),
+                            type != null && !String.valueOf(type).isBlank() ? String.valueOf(type) : "VARCHAR"));
+                }
+            } else if (item instanceof String name) {
+                inputColumns.add(new TypeFlow.Column(name, "VARCHAR"));
+            }
+        }
+        if (inputColumns.isEmpty()) {
+            throw new ApiException(400, "inputColumns must contain at least one column definition");
+        }
+        try {
+            List<Map<String, String>> cols = new java.util.ArrayList<>();
+            for (TypeFlow.Column c : TypeFlow.describe(inputColumns, sql)) {
+                cols.add(Map.of("name", c.name(), "type", c.type()));
+            }
+            return Map.of("columns", cols);
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(422, e.getMessage());
+        }
     }
 
     /** The registry root under the write root, or {@code null} when writes are disabled (no write root). */

@@ -136,17 +136,44 @@ describe('PipelineLoadDefinitionComponent', () => {
         expect(pane(fixture).ruleRows.at(0).get('transformType')?.value).toBe('DIRECT');
     });
 
-    it('emits the node carrying only rules, leaving columns untouched', async () => {
+    /**
+     * ⚠ Applying rules REPLACES `columns`. `RowShaper.columnsOf` returns `columns` before it ever looks at
+     * rules, so a node keeping both would run the old projection over the operator's saved edit — the
+     * write would be real and dead at the same time.
+     */
+    it('emits rules and drops the columns key they replace', async () => {
         const fixture = await create(mapNode({ columns: ['keep', 'me'] }));
         pane(fixture).submit();
         fixture.detectChanges();
 
         const applied = fixture.componentInstance.applied!;
-        expect(applied.config!['columns']).toEqual(['keep', 'me']);
+        expect(applied.config!['columns']).toBeUndefined();
         expect(applied.config!['rules']).toEqual([
             { targetColumn: 'A_NUMBER', sourceExpression: 'A_NUMBER', transformType: 'DIRECT' },
             { targetColumn: 'DURATION', sourceExpression: 'DURATION', transformType: 'DIRECT' },
         ]);
+    });
+
+    /** A legacy `columns: [{name, expr}]` projection is what the grid shows — not an empty pane. */
+    it('seeds the grid from a legacy columns projection when the node has no rules', async () => {
+        const fixture = await create(
+            mapNode({
+                columns: [
+                    { name: 'msisdn', expr: 'A_NUMBER' },
+                    { name: 'secs', expr: 'DURATION' },
+                ],
+            }),
+        );
+        expect(
+            pane(fixture).ruleRows.controls.map((g) => [
+                g.get('targetColumn')?.value,
+                g.get('sourceExpression')?.value,
+            ]),
+        ).toEqual([
+            ['msisdn', 'A_NUMBER'],
+            ['secs', 'DURATION'],
+        ]);
+        expect(fixture.componentInstance.dirty).toBe(false);
     });
 
     it('refuses a duplicate target column — one rule per output column', async () => {
@@ -419,6 +446,11 @@ describe('PipelineLoadDefinitionComponent — mapped output (B1)', () => {
         cell.dispatchEvent(new Event('input'));
         fixture.detectChanges();
         expect(fixture.componentInstance.dirty).toBe(true);
+    });
+
+    it('loads clean when node carries legacy columns list in config', async () => {
+        const fixture = await create(mapNode({ columns: [{ name: 'A_NUMBER', expr: 'A_NUMBER' }] }));
+        expect(fixture.componentInstance.dirty).toBe(false);
     });
 
     /**

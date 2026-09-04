@@ -51,7 +51,25 @@ export function compileField(field: SqlField): CompiledField {
 }
 
 export function compileFields(fields: readonly SqlField[]): CompiledField[] {
-    return fields.map(compileField);
+    const namesCount = new Map<string, number>();
+    for (const f of fields) {
+        const trimmed = f.name.trim();
+        if (trimmed) {
+            namesCount.set(trimmed, (namesCount.get(trimmed) ?? 0) + 1);
+        }
+    }
+    return fields.map((field) => {
+        const base = compileField(field);
+        if (base.problem) return base;
+        const trimmed = field.name.trim();
+        if (trimmed && (namesCount.get(trimmed) ?? 0) > 1) {
+            return {
+                ...base,
+                problem: `Duplicate field name “${trimmed}”. Output column names must be unique.`,
+            };
+        }
+        return base;
+    });
 }
 
 /**

@@ -475,6 +475,21 @@
     "placeholder" : "currency"
   } ]
 }, {
+  "verb" : "sql",
+  "type" : "transform.sql",
+  "category" : "TRANSFORM",
+  "label" : "SQL",
+  "description" : "Transforms rows with one author SELECT over the typed input (FROM input).",
+  "lowerable" : true,
+  "attributes" : [ {
+    "key" : "sql",
+    "label" : "SQL",
+    "type" : "multiline",
+    "tier" : "required",
+    "help" : "One SELECT statement over the typed input relation, addressed by the fixed alias 'input' (FROM input) — the engine rewrites it to the real relation at execution. No DDL/DML, no multiple statements.",
+    "placeholder" : "SELECT TRIM(name) AS customer, TRY_CAST(amt AS DOUBLE) FROM input"
+  } ]
+}, {
   "verb" : "summarize",
   "type" : "transform.summarize",
   "category" : "TRANSFORM",

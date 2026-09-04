@@ -429,10 +429,7 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                     -->
                     @if (filenameColumnTarget(); as t) {
                         <div class="mb-3 mt-3">
-                            <mat-checkbox
-                                [checked]="!!t.value"
-                                (change)="onFilenameColumnToggle($event.checked)"
-                            >
+                            <mat-checkbox [checked]="!!t.value" (change)="onFilenameColumnToggle($event.checked)">
                                 Add a column with the source file name
                             </mat-checkbox>
                             <mat-form-field class="mt-1 w-full" subscriptSizing="dynamic">
@@ -452,8 +449,8 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                                  raw.fields[]. -->
                             <p class="text-secondary m-0 mt-1 text-xs">
                                 Written by {{ t.target }} as a lineage column, stamped at write with each row's source
-                                file — not one of the parsed columns. Unchecked = no column (lineage stays in the
-                                ledger only).
+                                file — not one of the parsed columns. Unchecked = no column (lineage stays in the ledger
+                                only).
                             </p>
                         </div>
                     }
@@ -1026,7 +1023,8 @@ export class PipelineParseDefinitionComponent {
             if (!seed) return r;
             const out: SchemaFieldRow = { ...r };
             for (const k of CARRIED_FIELD_KEYS) {
-                if ((out[k] === undefined || out[k] === '') && seed[k] !== undefined && seed[k] !== '') out[k] = seed[k];
+                if ((out[k] === undefined || out[k] === '') && seed[k] !== undefined && seed[k] !== '')
+                    out[k] = seed[k];
             }
             return out;
         });
@@ -1485,10 +1483,9 @@ export class PipelineParseDefinitionComponent {
         // The editing CONTROL moved to the Sink pane (redesign S5, D4) — this pane no longer validates
         // or reads a live `InspectoSchemaPartitionsEditorComponent`, but the rows still travel through
         // this SAME write (before 2026-08-22 the draft carried raw+mapping only, so overwrite:true
-        // silently DROPPED a hand-authored partitions[] on every Apply): `partitionSeed` is the last
-        // value read from disk (by `loadSavedSchema`, re-run whenever this pane is (re)opened), which
-        // is exactly what the Sink pane's own write updates.
-        const partitions = this.partitionSeed();
+        // silently DROPPED a hand-authored partitions[] on every Apply).
+        // Stale-Apply race fix: re-read the schema immediately before writing so any partitions[]
+        // or top-level extras written concurrently by the Sink pane survive this write.
         const fields = this.withMetadata(grid.value());
         const name = this.schemaName();
         // The declared names: what the stored schema says, else the PIPELINE name — never the schema
@@ -1499,59 +1496,88 @@ export class PipelineParseDefinitionComponent {
         const rawBlockName = this.schemaIdentity.rawName ?? identity;
         const canonicalName = this.schemaIdentity.canonicalName ?? identity;
         const mappingRawName = this.schemaIdentity.mappingRawName ?? rawBlockName;
-        const draft = {
-            // Unmodeled stored keys ride along first, so every modeled key below wins.
-            ...this.schemaExtras,
-            ...(partitions.length ? { partitions } : {}),
-            raw: {
-                name: rawBlockName,
-                format: 'CSV',
-                // §4.4: the Auto/Declared marker rides the schema companion (additive, ETL-ignored);
-                // in Auto the written types ARE the inferred snapshot — declared = inferred by
-                // construction, so downstream stays deterministic.
-                types: this.typesMode(),
-                fields: fields.map((f) => ({
-                    name: f.name,
-                    selector: f.selector,
-                    type: f.type,
-                    ...(f.synonym ? { synonym: f.synonym } : {}),
-                    ...(f.description ? { description: f.description } : {}),
-                    ...(f.unit ? { unit: f.unit } : {}),
-                    ...(f.classification ? { classification: f.classification } : {}),
-                })),
-            },
-            mapping: {
-                canonicalName,
-                rawName: mappingRawName,
-                rules: fields.map((f) => ({ targetColumn: f.name, sourceExpression: f.name })),
-            },
-        };
+
         this.writing.set(true);
         this.schemaReplaceNeeded.set(false);
-        this.configApi
-            .write('schema', draft, {
-                overwrite: true,
-                subdir: this.satelliteSubdir(),
-                ...(replace ? { compatibility: 'none' as const } : {}),
-            })
-            .subscribe({
-                next: () => {
-                    this.writing.set(false);
-                    // ⚠ Clear the refusal this write just answered. Without it the BACKWARD message
-                    // ("schema edit is not BACKWARD-compatible; not written") stayed on screen after
-                    // the operator took the override and the write SUCCEEDED — the pane reporting a
-                    // failure for a schema it had just replaced.
-                    this.editor?.error.set('');
-                    grid.markPristine();
-                    this.applyWith(this.parsingValue(), portableConfigRef(name));
+
+        const performWrite = (partitionsToWrite: unknown[], extrasToWrite: Record<string, unknown>) => {
+            const draft = {
+                ...extrasToWrite,
+                ...(Array.isArray(partitionsToWrite) && partitionsToWrite.length
+                    ? { partitions: partitionsToWrite }
+                    : {}),
+                raw: {
+                    name: rawBlockName,
+                    format: 'CSV',
+                    // §4.4: the Auto/Declared marker rides the schema companion (additive, ETL-ignored);
+                    // in Auto the written types ARE the inferred snapshot — declared = inferred by
+                    // construction, so downstream stays deterministic.
+                    types: this.typesMode(),
+                    fields: fields.map((f) => ({
+                        name: f.name,
+                        selector: f.selector,
+                        type: f.type,
+                        ...(f.synonym ? { synonym: f.synonym } : {}),
+                        ...(f.description ? { description: f.description } : {}),
+                        ...(f.unit ? { unit: f.unit } : {}),
+                        ...(f.classification ? { classification: f.classification } : {}),
+                    })),
                 },
-                error: (e) => {
-                    this.writing.set(false);
-                    // Nothing is applied: a node naming a schema that failed to write is the state this
-                    // ordering exists to prevent, and the pane stays dirty so the edits survive.
-                    this.editor?.error.set(apiErrorMessage(e, 'Could not save the output schema.'));
-                    // …but a BACKWARD refusal is recoverable, so offer the override instead of a dead end.
-                    if (isBackwardRefusal(e)) this.schemaReplaceNeeded.set(true);
+                mapping: {
+                    canonicalName,
+                    rawName: mappingRawName,
+                    rules: fields.map((f) => ({ targetColumn: f.name, sourceExpression: f.name })),
+                },
+            };
+
+            this.configApi
+                .write('schema', draft, {
+                    overwrite: true,
+                    subdir: this.satelliteSubdir(),
+                    ...(replace ? { compatibility: 'none' as const } : {}),
+                })
+                .subscribe({
+                    next: () => {
+                        this.writing.set(false);
+                        // ⚠ Clear the refusal this write just answered. Without it the BACKWARD message
+                        // ("schema edit is not BACKWARD-compatible; not written") stayed on screen after
+                        // the operator took the override and the write SUCCEEDED — the pane reporting a
+                        // failure for a schema it had just replaced.
+                        this.editor?.error.set('');
+                        grid.markPristine();
+                        this.applyWith(this.parsingValue(), portableConfigRef(name));
+                    },
+                    error: (e) => {
+                        this.writing.set(false);
+                        // Nothing is applied: a node naming a schema that failed to write is the state this
+                        // ordering exists to prevent, and the pane stays dirty so the edits survive.
+                        this.editor?.error.set(apiErrorMessage(e, 'Could not save the output schema.'));
+                        // …but a BACKWARD refusal is recoverable, so offer the override instead of a dead end.
+                        if (isBackwardRefusal(e)) this.schemaReplaceNeeded.set(true);
+                    },
+                });
+        };
+
+        this.configApi
+            .read('schema', name, this.satelliteSubdir())
+            .pipe(catchError(() => of(null)))
+            .subscribe({
+                next: (r) => {
+                    let latestPartitions: unknown[] = this.partitionSeed();
+                    let latestExtras = this.schemaExtras;
+                    if (r?.config) {
+                        const cfg = r.config as Record<string, unknown>;
+                        if (Array.isArray(cfg['partitions'])) {
+                            latestPartitions = cfg['partitions'];
+                        }
+                        const extras = { ...cfg };
+                        delete extras['raw'];
+                        delete extras['mapping'];
+                        delete extras['partitions'];
+                        delete extras['partitionKey'];
+                        latestExtras = extras;
+                    }
+                    performWrite(latestPartitions, latestExtras);
                 },
             });
     }

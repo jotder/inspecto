@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of } from 'rxjs';
+import { throwError } from 'rxjs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { AuthoredNode, ComponentsService, RelationsPreview } from 'app/inspecto/api';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from 'app/inspecto/grid';
@@ -11,6 +12,13 @@ import { PipelineTransformSqlDefinitionComponent } from './pipeline-transform-sq
 import { SqlField } from './pipeline-transform-sql';
 
 let previewCalls: { config: Record<string, unknown>; rows: Record<string, unknown>[] }[] = [];
+let describeCalls: { inputColumns: { name: string; type: string }[]; sql: string }[] = [];
+let describeError: string | null = null;
+let describeStatus = 422;
+let describeAnswer: { columns: { name: string; type: string }[] } = {
+    columns: [{ name: 'buyer', type: 'VARCHAR' }],
+};
+
 const previewAnswer: RelationsPreview = {
     inputColumns: ['customer'],
     relations: [
@@ -32,6 +40,7 @@ const previewAnswer: RelationsPreview = {
         <app-pipeline-transform-sql-definition
             [node]="node"
             [sampleRows]="sampleRows"
+            [upstreamColumns]="upstreamColumns"
             (applied)="applied = $event"
             (dirtyChange)="dirty = $event"
         />
@@ -40,6 +49,7 @@ const previewAnswer: RelationsPreview = {
 class HostComponent {
     node: AuthoredNode = sqlNode();
     sampleRows?: Record<string, unknown>[];
+    upstreamColumns?: string[];
     applied?: AuthoredNode;
     dirty = false;
 }
@@ -52,7 +62,11 @@ function field(partial: Partial<SqlField> & Pick<SqlField, 'name' | 'fn'>): SqlF
     return { id: partial.name, from: '', args: {}, ...partial };
 }
 
-async function create(node: AuthoredNode = sqlNode(), sampleRows?: Record<string, unknown>[]) {
+async function create(
+    node: AuthoredNode = sqlNode(),
+    sampleRows?: Record<string, unknown>[],
+    upstreamColumns?: string[],
+) {
     TestBed.configureTestingModule({
         imports: [HostComponent],
         providers: [
@@ -66,6 +80,17 @@ async function create(node: AuthoredNode = sqlNode(), sampleRows?: Record<string
                         previewCalls.push({ config, rows });
                         return of(previewAnswer);
                     },
+                    describeTransform: (inputColumns: { name: string; type: string }[], sql: string) => {
+                        describeCalls.push({ inputColumns, sql });
+                        if (describeError) {
+                            // The real envelope: HttpErrorResponse.status + the API's { error: { message } } body.
+                            return throwError(() => ({
+                                status: describeStatus,
+                                error: { error: { message: describeError } },
+                            }));
+                        }
+                        return of(describeAnswer);
+                    },
                 },
             },
         ],
@@ -74,6 +99,7 @@ async function create(node: AuthoredNode = sqlNode(), sampleRows?: Record<string
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.node = node;
     fixture.componentInstance.sampleRows = sampleRows;
+    fixture.componentInstance.upstreamColumns = upstreamColumns;
     fixture.detectChanges();
     return fixture;
 }
@@ -85,6 +111,10 @@ function comp(fixture: ReturnType<typeof TestBed.createComponent<HostComponent>>
 
 beforeEach(() => {
     previewCalls = [];
+    describeCalls = [];
+    describeError = null;
+    describeStatus = 422;
+    describeAnswer = { columns: [{ name: 'buyer', type: 'VARCHAR' }] };
 });
 
 describe('Transform pane: seeding', () => {
@@ -96,6 +126,16 @@ describe('Transform pane: seeding', () => {
             ['customer', 'customer', 'keep'],
         ]);
         expect(c.generatedSql()).toBe('SELECT\n  order_id AS order_id,\n  customer AS customer\nFROM input');
+    });
+
+    it('seeds fields from upstreamColumns when sampleRows is undefined', async () => {
+        const fixture = await create(sqlNode(), undefined, ['user_id', 'email']);
+        const c = comp(fixture);
+        expect(c.fields().map((f) => [f.name, f.from, f.fn])).toEqual([
+            ['user_id', 'user_id', 'keep'],
+            ['email', 'email', 'keep'],
+        ]);
+        expect(c.generatedSql()).toBe('SELECT\n  user_id AS user_id,\n  email AS email\nFROM input');
     });
 
     /** The defect the operator hit: a Step was armed for Apply merely by being opened. */
@@ -170,6 +210,19 @@ describe('Transform pane: editing', () => {
         expect(added.fn).toBe('custom');
         expect(added.from).toBe('');
     });
+
+    it('moveUp and moveDown reorder fields and regenerate the SQL', async () => {
+        const fixture = await create(sqlNode(), [{ a: '1', b: '2', c: '3' }]);
+        const compInstance = comp(fixture);
+        const bId = compInstance.fields()[1].id;
+        compInstance.moveUp(bId);
+        expect(compInstance.fields().map((f) => f.name)).toEqual(['b', 'a', 'c']);
+        expect(compInstance.generatedSql()).toBe('SELECT\n  b AS b,\n  a AS a,\n  c AS c\nFROM input');
+        expect(fixture.componentInstance.dirty).toBe(true);
+
+        compInstance.moveDown(bId);
+        expect(compInstance.fields().map((f) => f.name)).toEqual(['a', 'b', 'c']);
+    });
 });
 
 describe('Transform pane: Apply', () => {
@@ -206,6 +259,85 @@ describe('Transform pane: Apply', () => {
         expect(fixture.componentInstance.dirty).toBe(true);
         c.submit();
         expect(fixture.componentInstance.dirty).toBe(false);
+    });
+
+    it('detects duplicate field names and blocks Apply', async () => {
+        const fixture = await create(sqlNode(), [{ a: '1', b: '2' }]);
+        const c = comp(fixture);
+        c.rename(c.fields()[1].id, 'a'); // duplicate name 'a'
+        expect(c.allRows()[0].problem).toContain('Duplicate field name');
+        expect(c.allRows()[1].problem).toContain('Duplicate field name');
+        expect(c.canApply()).toBe(false);
+    });
+
+    /**
+     * ⚠ The drawer's Apply is armed by `dirtyChange`, and CodeMirror made the hand-written SQL editable —
+     * so while `canApply()` also refused `sqlOnly`, typing there armed the button and `submit()` returned
+     * early: a real edit, a live button, and nothing saved.
+     */
+    it('arms Apply on a hand-written SQL edit and saves it', async () => {
+        const fixture = await create(sqlNode({ sql: 'SELECT weird FROM input' }), [{ a: '1' }]);
+        const c = comp(fixture);
+        expect(c.sqlOnly()).toBe(true);
+        expect(fixture.componentInstance.dirty).toBe(false);
+        c.onSqlEdited('SELECT weird, 1 AS one FROM input');
+        fixture.detectChanges();
+        expect(fixture.componentInstance.dirty).toBe(true);
+        expect(c.canApply()).toBe(true);
+        c.submit();
+        fixture.detectChanges();
+        expect(fixture.componentInstance.applied!.config?.['sql']).toBe('SELECT weird, 1 AS one FROM input');
+        expect(fixture.componentInstance.applied!.config?.['fields']).toEqual([]);
+        expect(fixture.componentInstance.dirty).toBe(false);
+    });
+
+    it('surfaces DuckDB binder errors and blocks Apply', async () => {
+        const fixture = await create(sqlNode(), [{ a: '1' }]);
+        const c = comp(fixture);
+        c.binderError.set('Binder Error: Referenced column "x" not found');
+        expect(c.canApply()).toBe(false);
+    });
+});
+
+/** The describe effect debounces 300ms before it calls the route — wait it out, then settle the view. */
+async function settleDescribe(fixture: { detectChanges: () => void }): Promise<void> {
+    await new Promise((r) => setTimeout(r, 350));
+    fixture.detectChanges();
+}
+
+describe('Transform pane: live schema derivation', () => {
+    it('fills the output type from the describe route, without a test run', async () => {
+        describeAnswer = { columns: [{ name: 'order_id', type: 'VARCHAR' }] };
+        const fixture = await create(sqlNode(), [{ order_id: '1' }]);
+        const c = comp(fixture);
+        await settleDescribe(fixture);
+        expect(describeCalls.length).toBeGreaterThan(0);
+        expect(describeCalls.at(-1)!.inputColumns.map((col) => col.name)).toEqual(['order_id']);
+        expect(c.allRows()[0].outType).toBe('VARCHAR');
+        expect(c.binderError()).toBeNull();
+        expect(c.canApply()).toBe(true);
+    });
+
+    it('shows a 422 binder refusal and blocks Apply', async () => {
+        describeError = 'Binder Error: Referenced column "x" not found';
+        describeStatus = 422;
+        const fixture = await create(sqlNode(), [{ order_id: '1' }]);
+        const c = comp(fixture);
+        await settleDescribe(fixture);
+        expect(c.binderError()).toContain('Binder Error');
+        expect(c.canApply()).toBe(false);
+    });
+
+    it('a failure that is NOT a binder refusal never locks Apply', async () => {
+        // Offline, a 404 on an older control plane, a 503 — none of them say anything about the SQL,
+        // so the pane must keep saving. Blocking here would strand the author with no way out.
+        describeError = 'Http failure response: 0 Unknown Error';
+        describeStatus = 0;
+        const fixture = await create(sqlNode(), [{ order_id: '1' }]);
+        const c = comp(fixture);
+        await settleDescribe(fixture);
+        expect(c.binderError()).toBeNull();
+        expect(c.canApply()).toBe(true);
     });
 });
 
@@ -285,6 +417,15 @@ describe('Transform pane: Test this Step', () => {
     it('is disabled with no sample rows', async () => {
         const fixture = await create(sqlNode(), []);
         expect(comp(fixture).canTest()).toBe(false);
+    });
+});
+
+describe('Transform pane: live schema derivation', () => {
+    it('populates outType from derivedColumnTypes without running a sample test', async () => {
+        const fixture = await create(sqlNode(), [{ customer: 'Anna' }]);
+        const c = comp(fixture);
+        c.derivedColumnTypes.set({ customer: 'VARCHAR' });
+        expect(c.allRows()[0].outType).toBe('VARCHAR');
     });
 });
 

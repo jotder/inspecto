@@ -105,6 +105,25 @@ class RecipeConverterTest {
         assertEquals(cfg, back);
     }
 
+    @Test
+    void aConfigWithSqlStepRoundTrips() {
+        Map<String, Object> cfg = new LinkedHashMap<>();
+        cfg.put("name", "orders");
+        cfg.put("active", false);
+        cfg.put("dirs", new LinkedHashMap<>(Map.of("poll", "/in", "database", "/db")));
+        cfg.put("parsing", new LinkedHashMap<>(Map.of("grammar", "grammar/pipe")));
+        cfg.put("processing", new LinkedHashMap<>(Map.of("file_pattern", "glob:**/*.csv")));
+        cfg.put("output", new LinkedHashMap<>(Map.of("format", "PARQUET")));
+        cfg.put("steps", List.of(
+                Map.of("sql", new LinkedHashMap<>(Map.of(
+                        "sql", "SELECT TRIM(NAME) AS customer FROM input",
+                        "fields", List.of(Map.of("name", "customer", "expression", "TRIM(NAME)")))))));
+
+        Map<String, Object> recipe = RecipeConverter.toRecipe(cfg);
+        Map<String, Object> back = RecipeCompiler.compile(recipe, cfg, false);
+        assertEquals(cfg, back);
+    }
+
     /** RECIPE-SCOPE-1: a D-9 windowed dedup's {@code scope:} survives the Recipe round-trip (trunk),
      *  instead of the file keeping the window while the Pipeline Document silently lost it. */
     @Test

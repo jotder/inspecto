@@ -118,7 +118,7 @@ breaks two committed contracts); the full runtime edge model converges at **Phas
 | `transform.filter` | `DATA` + **`DROPPED`** | ✅ (verb `transform`) |
 | `transform.select` | `DATA` | ❌ |
 | `transform.derive` | `DATA` | ❌ |
-| `transform.sql` (2026-09-04) | `DATA` — one author `SELECT … FROM input` over the TYPED upstream relation; a `project()`-class verb, never a split | ❌ recipe verb — graph/drawer-authored only; one attribute `sql` ([catalog-vs-executors](catalog-vs-executors.md)) |
+| `transform.sql` (2026-09-04) | `DATA` — one author `SELECT … FROM input` over the TYPED upstream relation; a `project()`-class verb, never a split | ✅ recipe verb `sql` since 2026-09-04 (between `transform` and `summarize`; mid-branch it compiles but does not arm); one attribute `sql` ([catalog-vs-executors](catalog-vs-executors.md)) |
 | `transform.validate` | `DATA` + **`INVALID`** | ❌ |
 | `transform.dedup` | `DATA` + **`DUPLICATE`** | ✅ (verb `dedup`) |
 | `transform.dedup.marker` | `DATA` + `DUPLICATE` | ❌ — read/lower-compat only |

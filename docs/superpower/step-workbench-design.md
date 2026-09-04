@@ -1,6 +1,18 @@
 # The Step workbench — publish the derived schema instead of asking for it
 
-**Status:** DESIGN, not scheduled (operator asked to "fill up the gap", 2026-08-29). No code.
+**Status:** DESIGN, not scheduled (operator asked to "fill up the gap", 2026-08-29). **PARTLY
+SUPERSEDED 2026-09-04 — read §0's table as history, not as current state.** The authoring redesign
+shipped the Transform Step (`transform.sql`) with a fields grid over a function catalog, a sample test
+run, and — since 2026-09-04 — the derived-schema half of this design: `POST
+/components/transform/describe` over `TypeFlow.describe` fills "Comes out as" and surfaces DuckDB's
+binder message as-you-type, WITHOUT executing rows. So "TypeFlow's DESCRIBE path has zero production
+callers" is no longer true. What remains unbuilt is the *one-surface workbench* itself (input-relation
+picker, column filter and grouping alongside the field list) and `RowShaper.fuse` (still caller-less,
+still untested). As-built truth:
+[`catalog-vs-executors.md`](../okf/backend/engine/catalog-vs-executors.md) ·
+[`schema-mapping-authoring.md`](../okf/frontend/features/schema-mapping-authoring.md) §0. ⚠ Whether this
+file is archived (lifecycle: a plan lives here only while in flight) is an open operator call —
+BACKLOG `AUTHORING-REDESIGN-1`.
 **Follows:** [`sql-only-transform-feasibility.md`](../archived-documents/plans-archive/sql-only-transform-feasibility.md) (archived 2026-09-04) — this is that
 analysis's recommended step 2, designed. **Concept home on build:**
 `okf/backend/engine/etl-transform.md` (file to be created when this ships) +
