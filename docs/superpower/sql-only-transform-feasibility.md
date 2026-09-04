@@ -133,6 +133,16 @@ it stopped being finding-free.** Both `ComponentRoutes.validateMapping`'s `clean
 adjacent schema-findings check already used. `countCastFailures` itself is untouched — the exclusion
 stays, only the boundary is now visible before a batch runs, not discovered from it.
 
+**§6 step 1 extended to `transform.sql` 2026-09-03 (sql-transform-v1-plan.md B5).** The same
+audited/unaudited boundary now applies to the whole-node SQL Step, not just the `EXPR` mapping rule:
+`PipelineValidator.validate` emits one WARNING `Issue` (`SQL_STEP_UNAUDITED`) for every
+`transform.sql` node, naming the node id and its `sql` attribute — *"runs author-owned SQL verbatim
+over the typed source and is not covered by the batch's cast-failure audit…"*. Unlike the `EXPR` fix,
+no `clean`/gate bug was found alongside it: `PipelineValidator.Result.ok()` already keyed off
+`Severity.ERROR` only, and so did `PipelineGraphRoutes.saveGraph`'s own findings gate — a WARNING on a
+`transform.sql` node saves cleanly, verified by test (`PipelineValidatorTest`,
+`theUnauditedSqlWarningAloneDoesNotBlockSave` / `anActualErrorOnAGraphWithASqlStepStillBlocksSave`).
+
 **⚠ Feasible but a real project: SQL macros as the UDF surface.** Measured to work under the seal.
 Needs a component kind, a registry, and re-registration on every scratch connection.
 

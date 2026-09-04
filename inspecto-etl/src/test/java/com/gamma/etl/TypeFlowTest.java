@@ -144,6 +144,37 @@ class TypeFlowTest {
         assertTrue(e.getMessage().contains("NO_SUCH_FIELD"), e.getMessage());
     }
 
+    // ── SQL transformer v1 (sql-transform-v1-plan.md, B2) ──────────────────────────
+
+    @Test
+    void describeReturnsColumnsForASelectOverGivenInputColumns() {
+        List<TypeFlow.Column> input = List.of(
+                new TypeFlow.Column("name", "VARCHAR"), new TypeFlow.Column("amt", "DOUBLE"));
+        Map<String, String> types = new LinkedHashMap<>();
+        for (TypeFlow.Column c : TypeFlow.describe(input, "SELECT TRIM(name) AS customer, amt * 100 AS cents FROM input"))
+            types.put(c.name(), c.type());
+        assertEquals("VARCHAR", types.get("customer"));
+        assertEquals("DOUBLE", types.get("cents"));
+    }
+
+    @Test
+    void describeNeverExecutesARow() {
+        // A SELECT that would throw on any row (division by zero) must still DESCRIBE cleanly: the
+        // scratch table is empty, so no row is ever evaluated.
+        List<TypeFlow.Column> input = List.of(new TypeFlow.Column("amt", "DOUBLE"));
+        List<TypeFlow.Column> out = TypeFlow.describe(input, "SELECT amt / 0 AS ratio FROM input");
+        assertEquals(1, out.size());
+        assertEquals("ratio", out.get(0).name());
+    }
+
+    @Test
+    void describeThrowsIllegalArgumentWithDuckDbsBinderMessageForANonexistentColumn() {
+        List<TypeFlow.Column> input = List.of(new TypeFlow.Column("amt", "DOUBLE"));
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> TypeFlow.describe(input, "SELECT NO_SUCH_COLUMN FROM input"));
+        assertTrue(e.getMessage().contains("NO_SUCH_COLUMN"), e.getMessage());
+    }
+
     /**
      * <b>The Phase-2 verify gate:</b> the derived sink schema equals what the written Parquet file actually
      * carries. The footer holds the sink columns minus the partition columns — Hive {@code PARTITION_BY}

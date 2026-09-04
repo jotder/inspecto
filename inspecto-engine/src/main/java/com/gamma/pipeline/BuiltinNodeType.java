@@ -112,6 +112,12 @@ public enum BuiltinNodeType implements PipelineNodeType {
     TRANSFORM_DERIVE("transform.derive", NodeCategory.TRANSFORM, "Derive",
             "Adds computed columns (SQL-expression registry).",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),
+    // SQL transformer v1 (sql-transform-v1-plan.md, B1): one author SELECT over the typed input,
+    // addressed by the fixed alias `input`. A project()-class verb like map/select/derive — one
+    // `data` relation, never a split (filtering stays transform.filter, D3).
+    TRANSFORM_SQL("transform.sql", NodeCategory.TRANSFORM, "SQL",
+            "Transforms rows with one author SELECT over the typed input (FROM input).",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),
     TRANSFORM_VALIDATE("transform.validate", NodeCategory.TRANSFORM, "Validate",
             "Splits rows into valid / invalid by rule.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.INVALID), false),

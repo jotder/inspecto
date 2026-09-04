@@ -79,6 +79,45 @@ public final class TypeFlow {
                 .filter(c -> !TransformCompiler.EVENT_TIME_COL.equals(c.name())).toList();
     }
 
+    /**
+     * <b>SQL transformer v1 (sql-transform-v1-plan.md, B2):</b> derive {@code sql}'s output schema by
+     * running {@code DESCRIBE} against a scratch table named {@code input}, shaped by
+     * {@code inputColumns} — the <em>upstream Step's typed output schema</em>, not the raw ingest schema
+     * (that distinction is what separates this from {@link #transformedColumns}, which always shapes the
+     * raw table). Authoring-time only: no row is ever read.
+     *
+     * @throws IllegalArgumentException wrapping DuckDB's own binder/parse message verbatim (it names the
+     *                                  offending column) when {@code sql} does not compile against that shape
+     */
+    public static List<Column> describe(List<Column> inputColumns, String sql) {
+        if (inputColumns == null || inputColumns.isEmpty())
+            throw new IllegalArgumentException("describe needs a non-empty inputColumns (the upstream Step's typed output schema)");
+        try {
+            com.gamma.util.DuckDbUtil.loadDriver();
+        } catch (ClassNotFoundException e) {
+            throw new IllegalStateException("DuckDB JDBC driver not on the classpath", e);
+        }
+        try (Connection conn = DriverManager.getConnection("jdbc:duckdb:");
+             Statement st = conn.createStatement()) {
+            st.execute(inputScratchTableDdl(inputColumns));
+            List<Column> out = new ArrayList<>();
+            try (ResultSet rs = st.executeQuery("DESCRIBE " + sql)) {
+                while (rs.next()) out.add(new Column(rs.getString("column_name"), rs.getString("column_type")));
+            }
+            return out;
+        } catch (SQLException e) {
+            throw new IllegalArgumentException(e.getMessage(), e);
+        }
+    }
+
+    /** Empty scratch table named {@code input}, shaped by the given upstream output columns. */
+    private static String inputScratchTableDdl(List<Column> inputColumns) {
+        StringBuilder ddl = new StringBuilder("CREATE TABLE \"input\" (");
+        for (Column c : inputColumns) ddl.append('"').append(c.name()).append("\" ").append(c.type()).append(", ");
+        ddl.setLength(ddl.length() - 2);
+        return ddl.append(")").toString();
+    }
+
     /** Empty scratch table shaped like the raw ingest table: field columns + the {@code __src_id} tag. */
     @SuppressWarnings("unchecked")
     private static String scratchTableDdl(Map<String, Object> schemaConfig, String table, boolean typedSource) {

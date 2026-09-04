@@ -171,6 +171,7 @@ public final class RowShaper {
         if (BuiltinNodeType.TRANSFORM_MAP.type().equals(type)
                 || BuiltinNodeType.TRANSFORM_SELECT.type().equals(type)
                 || BuiltinNodeType.TRANSFORM_DERIVE.type().equals(type)) return project(conn, node, input, outPrefix);
+        if (BuiltinNodeType.TRANSFORM_SQL.type().equals(type))      return sql(conn, node, input, outPrefix);
         // ⚠ Name the seam in the message: a CONTRIBUTED node type reaches here having rendered in the
         // palette, validated and lifted, so "cannot shape" alone reads as a core bug rather than a
         // missing provider — which was the whole shape of the descriptor-only gap.
@@ -471,6 +472,42 @@ public final class RowShaper {
         String data = table(prefix, PipelineRel.DATA);
         exec(conn, "CREATE TABLE " + q(data) + " AS SELECT * EXCLUDE(" + q(col) + "), UNNEST(" + q(col)
                 + ") AS " + q(as) + " FROM " + q(input));
+        return List.of(new Relation(PipelineRel.DATA, data));
+    }
+
+    // ── SQL transformer (one author SELECT over the typed input) ──────────────────
+
+    /**
+     * {@code transform.sql} (sql-transform-v1-plan.md, B1) — one author {@code SELECT} over {@code input},
+     * addressed by the fixed alias {@code input}: {@code CREATE TABLE <out> AS <sql>}, with {@code input}
+     * bound to the real relation via a scoped temp view (works whether or not the author's own SQL opens
+     * with a {@code WITH} clause). Refuses — naming the node — any SQL that is not a single, read-only
+     * {@code SELECT}/{@code WITH} statement ({@link SqlGuard}, the same allow-list {@code EXPR}-adjacent
+     * SQL is checked against elsewhere in the engine): no DDL/DML, no multiple statements. Emits exactly
+     * one {@code data} relation, like {@code map}/{@code select}/{@code derive} — never a split.
+     *
+     * <p>Runs on whatever connection the caller supplies: production shares the batch's own connection
+     * (author-owned SQL is already trusted there, same as {@code EXPR}); {@link ComponentPreview} runs
+     * this through a sealed {@link com.gamma.sql.SqlSandbox} (no file/network access, no extension
+     * autoload) before ever reaching this method — the sandbox is the caller's concern, not this one's.
+     */
+    private static List<Relation> sql(Connection conn, PipelineNode node, String input, String prefix) throws SQLException {
+        String query = str(node, "sql");
+        requireExpr(query, "sql");
+        List<com.gamma.config.spec.Finding> violations = com.gamma.sql.SqlGuard.check(query);
+        if (!violations.isEmpty()) {
+            List<String> messages = new ArrayList<>();
+            for (com.gamma.config.spec.Finding f : violations) messages.add(f.message());
+            throw new IllegalArgumentException("transform.sql node '" + node.id()
+                    + "' refused: " + String.join("; ", messages));
+        }
+        String data = table(prefix, PipelineRel.DATA);
+        exec(conn, "CREATE OR REPLACE TEMP VIEW input AS SELECT * FROM " + q(input));
+        try {
+            exec(conn, "CREATE TABLE " + q(data) + " AS " + query);
+        } finally {
+            exec(conn, "DROP VIEW IF EXISTS input");
+        }
         return List.of(new Relation(PipelineRel.DATA, data));
     }
 

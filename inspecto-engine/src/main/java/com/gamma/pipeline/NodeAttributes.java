@@ -365,11 +365,25 @@ public final class NodeAttributes {
             NodeAttribute.of("on", "Join keys", "list", "required").placeholder("currency")
                     .help("Column(s) equated between the rows and the Reference."));
 
+    /**
+     * {@code transform.sql} (sql-transform-v1-plan.md, B1) — one author {@code SELECT} over the typed
+     * input, executed by {@code RowShaper.sql}. No {@code where}/filter attribute here on purpose (D3):
+     * filtering stays a separate {@code transform.filter} Step so rejected rows keep feeding
+     * quarantine/audit, instead of disappearing inside free SQL.
+     */
+    public static final List<NodeAttribute> TRANSFORM_SQL = List.of(
+            NodeAttribute.of("sql", "SQL", "multiline", "required")
+                    .placeholder("SELECT TRIM(name) AS customer, TRY_CAST(amt AS DOUBLE) FROM input")
+                    .help("One SELECT statement over the typed input relation, addressed by the fixed "
+                            + "alias 'input' (FROM input) — the engine rewrites it to the real relation at "
+                            + "execution. No DDL/DML, no multiple statements."));
+
     private static final Map<String, List<NodeAttribute>> BY_TYPE = byType();
 
     private static Map<String, List<NodeAttribute>> byType() {
         for (List<NodeAttribute> table : List.of(COLLECTOR, TRIGGER, MARKER_DEDUP, OUTPUT, SINK_PERSISTENT,
-                TRANSFORM_FILTER, TRANSFORM_ROUTE, TRANSFORM_DEDUP, TRANSFORM_SUMMARIZE, TRANSFORM_JOIN))
+                TRANSFORM_FILTER, TRANSFORM_ROUTE, TRANSFORM_DEDUP, TRANSFORM_SUMMARIZE, TRANSFORM_JOIN,
+                TRANSFORM_SQL))
             for (NodeAttribute a : table) a.validate();   // whole-spec checks, once the builders are done
         Map<String, List<NodeAttribute>> m = new LinkedHashMap<>();
         // The acquisition node authors the WHOLE collector block, duplicate__* included — fingerprint
@@ -382,6 +396,7 @@ public final class NodeAttributes {
         m.put(BuiltinNodeType.TRANSFORM_DEDUP.type(), TRANSFORM_DEDUP);
         m.put(BuiltinNodeType.TRANSFORM_SUMMARIZE.type(), TRANSFORM_SUMMARIZE);
         m.put(BuiltinNodeType.TRANSFORM_JOIN.type(), TRANSFORM_JOIN);
+        m.put(BuiltinNodeType.TRANSFORM_SQL.type(), TRANSFORM_SQL);
         m.put(BuiltinNodeType.SINK_PERSISTENT.type(), SINK_PERSISTENT);
         m.put(BuiltinNodeType.SINK_MATERIALIZED.type(), OUTPUT);
         m.put(BuiltinNodeType.SINK_VIEW.type(), OUTPUT);

@@ -324,6 +324,50 @@ class PipelineValidatorTest {
                 "one typo must not read as two separate faults");
     }
 
+    // ── B5: transform.sql is legal-but-flagged, same spirit as the EXPR mapping-rule warning ──────
+
+    @Test
+    void transformSqlNodeGetsExactlyOneUnauditedWarningAnchoredToTheNode() {
+        PipelineGraph g = new PipelineGraph("sql-step", true,
+                List.of(PipelineNode.of("acq", "acquisition"), PipelineNode.of("s", "transform.sql"),
+                        PipelineNode.of("sink", "sink.persistent")),
+                List.of(PipelineEdge.data("acq", "s"), PipelineEdge.data("s", "sink")));
+        PipelineValidator.Result r = PipelineValidator.validate(g);
+
+        List<PipelineValidator.Issue> sqlWarnings = r.issues().stream()
+                .filter(i -> i.code().equals(PipelineValidator.SQL_STEP_UNAUDITED)).toList();
+        assertEquals(1, sqlWarnings.size(), () -> "" + r.issues());
+        PipelineValidator.Issue warning = sqlWarnings.get(0);
+        assertEquals(PipelineValidator.Severity.WARNING, warning.severity());
+        assertTrue(warning.message().contains("'s'"), warning.message());
+        assertTrue(warning.message().contains("'sql'"), warning.message());
+        assertTrue(warning.message().contains("cast-failure audit"), warning.message());
+    }
+
+    @Test
+    void theUnauditedSqlWarningAloneDoesNotBlockSave() {
+        PipelineGraph g = new PipelineGraph("sql-step", true,
+                List.of(PipelineNode.of("acq", "acquisition"), PipelineNode.of("s", "transform.sql"),
+                        PipelineNode.of("sink", "sink.persistent")),
+                List.of(PipelineEdge.data("acq", "s"), PipelineEdge.data("s", "sink")));
+        PipelineValidator.Result r = PipelineValidator.validate(g);
+        assertTrue(r.ok(), () -> "a WARNING-only result must still validate ok, got " + r.issues());
+        assertTrue(r.errors().isEmpty());
+        assertEquals(1, r.warnings().size());
+    }
+
+    @Test
+    void anActualErrorOnAGraphWithASqlStepStillBlocksSave() {
+        // the transform.sql node's own WARNING must not mask an unrelated ERROR elsewhere in the graph
+        PipelineGraph g = new PipelineGraph("sql-step-plus-error", true,
+                List.of(PipelineNode.of("acq", "acquisition"), PipelineNode.of("s", "transform.sql")),
+                List.of(PipelineEdge.data("acq", "s"), PipelineEdge.data("s", "ghost")));
+        PipelineValidator.Result r = PipelineValidator.validate(g);
+        assertFalse(r.ok(), () -> "a dangling edge must still refuse, got " + r.issues());
+        assertTrue(codes(r).contains(PipelineValidator.DANGLING_TO));
+        assertTrue(codes(r).contains(PipelineValidator.SQL_STEP_UNAUDITED));
+    }
+
     @Test
     void aRealLiftedPipelineValidatesClean(@TempDir Path dir) throws Exception {
         // the ultimate gate: every edge the legacy lift produces honours the node-output contract

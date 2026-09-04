@@ -123,6 +123,47 @@ class RowShaperTest {
         assertTrue(columns(der.table(PipelineRel.DATA)).containsAll(List.of("id", "grp", "amt", "amt2")));
     }
 
+    // ── SQL transformer (one author SELECT over the typed input, aliased `input`) ────
+
+    @Test
+    void sqlExecutesOneSelectOverTheFixedInputAlias() throws Exception {
+        seedSrc();
+        var out = run(PipelineNode.of("x", "transform.sql",
+                Map.of("sql", "SELECT id, amt * 2 AS amt2 FROM input WHERE grp = 'a'")));
+        String t = out.table(PipelineRel.DATA);
+        assertEquals(List.of("amt2", "id"), columns(t).stream().sorted().toList());
+        assertEquals(List.of(1, 3), ids(t, "id"));
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT amt2 FROM \"" + t + "\" ORDER BY id")) {
+            assertTrue(rs.next()); assertEquals(300, rs.getInt(1));
+            assertTrue(rs.next()); assertEquals(400, rs.getInt(1));
+            assertFalse(rs.next());
+        }
+    }
+
+    @Test
+    void sqlRefusesNonSelectAndMultiStatement_namingTheNode() throws Exception {
+        seedSrc();
+        IllegalArgumentException ddl = assertThrows(IllegalArgumentException.class, () -> RowShaper.shape(conn,
+                PipelineNode.of("bad-node", "transform.sql", Map.of("sql", "DROP TABLE src")), "src", "bad"));
+        assertTrue(ddl.getMessage().contains("bad-node"), ddl.getMessage());
+
+        IllegalArgumentException multi = assertThrows(IllegalArgumentException.class, () -> RowShaper.shape(conn,
+                PipelineNode.of("bad-node", "transform.sql",
+                        Map.of("sql", "SELECT * FROM input; DROP TABLE src;")), "src", "bad"));
+        assertTrue(multi.getMessage().contains("bad-node"), multi.getMessage());
+    }
+
+    /** Mirrors the sandboxed-agent-SQL test elsewhere: file/extension/system surfaces stay blocked. */
+    @Test
+    void sqlCannotReachOutsideTheInputRelation() throws Exception {
+        seedSrc();
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> RowShaper.shape(conn,
+                PipelineNode.of("esc", "transform.sql",
+                        Map.of("sql", "SELECT * FROM read_csv('/etc/passwd')")), "src", "esc"));
+        assertTrue(e.getMessage().contains("esc"), e.getMessage());
+    }
+
     // ── summarize (group-by rollup through MeasureCompiler) ─────────────────────
 
     @Test

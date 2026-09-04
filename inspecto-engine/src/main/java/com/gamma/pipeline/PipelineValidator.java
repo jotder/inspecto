@@ -77,6 +77,13 @@ public final class PipelineValidator {
      */
     public static final String ILLEGAL_PAIRING = "ILLEGAL_PAIRING";
     public static final String UNKNOWN_TYPE = "UNKNOWN_TYPE";
+    /**
+     * A {@code transform.sql} node — legal, not broken (sql-transform-v1-plan.md B5, mirroring the
+     * {@code EXPR} mapping-rule warning shipped 2026-08-29): its {@code sql} attribute runs
+     * author-owned SQL verbatim and is deliberately excluded from the batch's cast-failure audit, the
+     * same reason {@code EXPR} is. WARNING only — this must never block save.
+     */
+    public static final String SQL_STEP_UNAUDITED = "SQL_STEP_UNAUDITED";
     public static final String UNKNOWN_USE_KIND = "UNKNOWN_USE_KIND";
     /**
      * A {@code use:} binding whose kind is recognized but whose NAMED component does not exist in the
@@ -252,6 +259,12 @@ public final class PipelineValidator {
             if (!PipelineNodeTypes.isKnown(n.type())) {
                 issues.add(new Issue(Severity.WARNING, UNKNOWN_TYPE,
                         "Node '" + n.id() + "' has unregistered type '" + n.type() + "' — wiring not validated."));
+            }
+            if (BuiltinNodeType.TRANSFORM_SQL.type().equals(n.type())) {
+                issues.add(new Issue(Severity.WARNING, SQL_STEP_UNAUDITED,
+                        "Node '" + n.id() + "' (transform.sql): its 'sql' attribute runs author-owned SQL "
+                        + "verbatim over the typed source and is not covered by the batch's cast-failure "
+                        + "audit — a row this produces NULL for will not be counted."));
             }
             if (n.hasUse()) {
                 String use = n.use();
