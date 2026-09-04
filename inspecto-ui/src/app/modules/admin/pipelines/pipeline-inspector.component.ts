@@ -1,11 +1,13 @@
 import {
     ChangeDetectionStrategy,
     Component,
+    ElementRef,
     EventEmitter,
     Input,
     OnChanges,
     Output,
     SimpleChanges,
+    ViewChild,
     inject,
     signal,
 } from '@angular/core';
@@ -77,18 +79,58 @@ import {
             }
 
             @if (compact && !readOnly) {
-                <!-- Identity fields ON the config page (operator ask 2026-08-22): Name/Description are
-                     always-visible fields above every definition pane, committed on blur — the pencil
-                     round-trip survives only in the (rare) non-compact summary. -->
-                <form [formGroup]="renameForm" class="mb-2 space-y-1">
-                    <mat-form-field class="w-full" subscriptSizing="dynamic">
-                        <mat-label>Name</mat-label>
-                        <input matInput formControlName="name" [placeholder]="node.id" (change)="commitIdentity()" />
-                    </mat-form-field>
-                    <mat-form-field class="w-full" subscriptSizing="dynamic">
-                        <mat-label>Description</mat-label>
-                        <input matInput formControlName="description" (change)="commitIdentity()" />
-                    </mat-form-field>
+                <!-- Identity ON the config page (operator ask 2026-08-22, restyled 2026-09-04): Name is a
+                     PROPERTY ROW above every definition pane — the same .sf-row anatomy as a schema-form
+                     flat row (label · value · pencil → dense inline input; Enter/blur commit, Escape
+                     cancels). Description is no longer authored here (operator ask 2026-09-04); the model
+                     field is carried through the rename event unchanged. -->
+                <form
+                    [formGroup]="renameForm"
+                    class="sf-row mb-2 flex min-h-8 min-w-0 items-center gap-2"
+                    data-key="name"
+                    (ngSubmit)="commitIdentity()"
+                    (keydown.escape)="cancelNameEdit()"
+                >
+                    <span class="text-secondary flex w-40 shrink-0 items-center gap-1 text-sm">
+                        <span class="truncate" id="pipeline-inspector-name-label" title="Name">Name</span>
+                    </span>
+                    <div class="flex min-w-0 flex-1 items-center">
+                        @if (editingName()) {
+                            <mat-form-field class="sf-dense w-full" appearance="outline" subscriptSizing="dynamic">
+                                <input
+                                    matInput
+                                    #nameInput
+                                    formControlName="name"
+                                    [placeholder]="node.id"
+                                    aria-labelledby="pipeline-inspector-name-label"
+                                    (blur)="commitIdentity()"
+                                />
+                            </mat-form-field>
+                        } @else {
+                            <button
+                                type="button"
+                                class="sf-value hover:bg-hover min-w-0 flex-1 truncate rounded px-1 py-0.5 text-left font-mono text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                                [class.text-secondary]="!node.name"
+                                [attr.aria-label]="'Name: ' + (node.name || node.id)"
+                                [title]="node.name || node.id"
+                                (click)="startNameEdit()"
+                            >
+                                {{ node.name || node.id }}
+                            </button>
+                        }
+                    </div>
+                    <button
+                        type="button"
+                        class="sf-pencil text-secondary hover:bg-hover flex h-7 w-7 shrink-0 items-center justify-center rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                        [attr.aria-label]="editingName() ? 'Done editing Name' : 'Edit Name'"
+                        (mousedown)="$event.preventDefault()"
+                        (click)="editingName() ? commitIdentity() : startNameEdit()"
+                    >
+                        <mat-icon
+                            class="icon-size-4"
+                            [svgIcon]="editingName() ? 'heroicons_outline:check' : 'heroicons_outline:pencil'"
+                        ></mat-icon>
+                    </button>
                 </form>
                 @if (parkable) {
                     <!--
@@ -119,10 +161,6 @@ import {
                     <mat-form-field class="w-full" subscriptSizing="dynamic">
                         <mat-label>Name</mat-label>
                         <input matInput formControlName="name" [placeholder]="node.id" />
-                    </mat-form-field>
-                    <mat-form-field class="w-full" subscriptSizing="dynamic">
-                        <mat-label>Description</mat-label>
-                        <input matInput formControlName="description" />
                     </mat-form-field>
                     <div class="flex gap-2">
                         <button mat-flat-button color="primary" type="submit">Save</button>
@@ -227,8 +265,8 @@ export class PipelineInspectorComponent implements OnChanges {
      * selected Step opens its configuration directly (operator ask, re-flipped 2026-08-22) and the
      * full summary panel would duplicate what the drawer header and the pane already show. Keeps
      * what the pane does not carry: the status chip, the last-run overlay, and the Step's identity —
-     * Name/Description as always-visible fields, committed on blur (the ONE rename path for
-     * definition-pane nodes).
+     * Name as a property row (label · value · pencil → dense inline input), the ONE rename path for
+     * definition-pane nodes. Description is not authored here (operator ask 2026-09-04).
      */
     @Input() compact = false;
     /**
@@ -241,48 +279,71 @@ export class PipelineInspectorComponent implements OnChanges {
     @Output() configure = new EventEmitter<AuthoredNode>();
     @Output() edgeRelChange = new EventEmitter<string>();
     /**
-     * The node's display name/description, edited in place (the canvas rename affordance — the ONLY
-     * rename path for drawer-parse nodes since the Parse pane dropped its Name/Description fields).
-     * The host patches the model; identity (`id`/`type`) stays fixed.
+     * The node's display name, edited in place (the canvas rename affordance — the ONLY rename path
+     * for drawer-parse nodes since the Parse pane dropped its Name/Description fields). `description`
+     * is the node's stored value passed through UNCHANGED (no properties panel edits it since
+     * 2026-09-04) so the host contract is unchanged. The host patches the model; identity
+     * (`id`/`type`) stays fixed.
      */
     @Output() rename = new EventEmitter<{ name: string; description: string }>();
 
     /** The per-Step switch (see {@link parkable}); the host patches `config.enabled` on the model. */
     @Output() enabledChange = new EventEmitter<boolean>();
 
-    /** Whether the inline Name/Description editor is open. Reset whenever the selection changes. */
+    /** Whether the (non-compact) inline Name editor is open. Reset whenever the selection changes. */
     readonly renaming = signal(false);
+    /** Compact mode: whether the Name property row shows its inline input instead of the value text. */
+    readonly editingName = signal(false);
+    /**
+     * Name only — Description left every properties panel (operator ask 2026-09-04). The rename event
+     * still carries the node's stored description UNCHANGED so the host contract stays as it was.
+     */
     readonly renameForm = this.fb.group({
         name: this.fb.control(''),
-        description: this.fb.control(''),
     });
+
+    @ViewChild('nameInput') private nameInput?: ElementRef<HTMLInputElement>;
 
     ngOnChanges(changes: SimpleChanges): void {
         // A different selection makes any in-progress rename stale — never carry one node's draft
-        // onto another node. In compact mode the fields are always live, so reseed them instead.
+        // onto another node. In compact mode reseed the row from the new node instead.
         if (changes['node']) {
             this.renaming.set(false);
+            this.editingName.set(false);
             if (this.compact && this.node) {
-                this.renameForm.setValue({
-                    name: this.node.name ?? '',
-                    description: this.node.description ?? '',
-                });
+                this.renameForm.setValue({ name: this.node.name ?? '' });
             }
         }
     }
 
+    /** Compact mode: open the Name row's inline input, seeded from the node, and focus it. */
+    startNameEdit(): void {
+        const n = this.node;
+        if (!n) return;
+        this.renameForm.setValue({ name: n.name ?? '' });
+        this.editingName.set(true);
+        // The input renders on the next change detection; focus it once it exists.
+        setTimeout(() => this.nameInput?.nativeElement.focus());
+    }
+
+    /** Compact mode: Escape — discard the draft and show the stored name again. */
+    cancelNameEdit(): void {
+        this.renameForm.setValue({ name: this.node?.name ?? '' });
+        this.editingName.set(false);
+    }
+
     /**
-     * Compact-mode commit (on blur): emit only when the trimmed values actually differ from the
-     * node's, so tabbing through the fields never patches the model or dirties the pipeline.
+     * Compact-mode commit (Enter / blur / the check button): close the row and emit only when the
+     * trimmed name actually differs from the node's, so tabbing through never patches the model or
+     * dirties the pipeline. Description travels through unchanged.
      */
     commitIdentity(): void {
         const n = this.node;
         if (!n) return;
-        const v = this.renameForm.getRawValue();
-        const name = (v.name ?? '').trim();
-        const description = (v.description ?? '').trim();
-        if (name === (n.name ?? '') && description === (n.description ?? '')) return;
-        this.rename.emit({ name, description });
+        this.editingName.set(false);
+        const name = (this.renameForm.getRawValue().name ?? '').trim();
+        if (name === (n.name ?? '')) return;
+        this.rename.emit({ name, description: n.description ?? '' });
     }
 
     setEnabled(enabled: boolean): void {
@@ -292,14 +353,14 @@ export class PipelineInspectorComponent implements OnChanges {
     startRename(): void {
         const n = this.node;
         if (!n) return;
-        this.renameForm.setValue({ name: n.name ?? '', description: n.description ?? '' });
+        this.renameForm.setValue({ name: n.name ?? '' });
         this.renaming.set(true);
     }
 
     commitRename(): void {
         const v = this.renameForm.getRawValue();
         this.renaming.set(false);
-        this.rename.emit({ name: (v.name ?? '').trim(), description: (v.description ?? '').trim() });
+        this.rename.emit({ name: (v.name ?? '').trim(), description: this.node?.description ?? '' });
     }
 
     readonly categoryColor = categoryColor;

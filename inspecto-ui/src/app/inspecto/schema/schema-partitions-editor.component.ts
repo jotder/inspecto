@@ -67,18 +67,18 @@ const DATE_TYPES = new Set(['DATE_YEAR', 'DATE_MONTH', 'DATE_DAY']);
                 </thead>
                 <tbody>
                     @for (g of partitionRows.controls; track g) {
-                        <tr [formGroup]="g" class="border-t align-middle">
-                            <td class="py-1 pr-2">
+                        <tr [formGroup]="g" class="sf-row border-t align-middle">
+                            <td class="py-0 pr-2">
                                 <input
-                                    class="w-full bg-transparent font-mono text-sm"
+                                    class="sf-value w-full bg-transparent px-1 font-mono text-sm"
                                     formControlName="column"
                                     placeholder="year"
                                     [attr.aria-label]="'Partition segment name'"
                                     (change)="emitChanged()"
                                 />
                             </td>
-                            <td class="py-1 pr-2">
-                                <mat-form-field class="w-full" subscriptSizing="dynamic">
+                            <td class="py-0 pr-2">
+                                <mat-form-field class="sf-dense w-full" appearance="outline" subscriptSizing="dynamic">
                                     <mat-select
                                         formControlName="source"
                                         aria-label="Partition source field"
@@ -91,8 +91,8 @@ const DATE_TYPES = new Set(['DATE_YEAR', 'DATE_MONTH', 'DATE_DAY']);
                                     </mat-select>
                                 </mat-form-field>
                             </td>
-                            <td class="py-1 pr-2">
-                                <mat-form-field class="w-full" subscriptSizing="dynamic">
+                            <td class="py-0 pr-2">
+                                <mat-form-field class="sf-dense w-full" appearance="outline" subscriptSizing="dynamic">
                                     <mat-select
                                         formControlName="type"
                                         aria-label="Partition derivation type"
@@ -104,10 +104,11 @@ const DATE_TYPES = new Set(['DATE_YEAR', 'DATE_MONTH', 'DATE_DAY']);
                                     </mat-select>
                                 </mat-form-field>
                             </td>
-                            <td class="py-1 text-right">
+                            <td class="py-0 text-right">
                                 <button
                                     mat-icon-button
                                     type="button"
+                                    class="sf-dense-button"
                                     aria-label="Remove this partition segment"
                                     (click)="removeRow(g)"
                                 >

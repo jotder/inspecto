@@ -212,6 +212,27 @@ describe('InspectoSchemaFieldsEditorComponent', () => {
         expect(el.textContent).toContain('2 columns');
     });
 
+    /**
+     * 2026-09-04 (operator ask): every cell reads like a schema-form flat property row — 32px `.sf-row`
+     * rows, `.sf-value` text, editable cells as the dense `.sf-dense` outline input with no floating label.
+     */
+    it('styles its cells as property rows: sf-row rows, sf-dense inputs, sf-value text', async () => {
+        const { fixture } = await create(rows(2));
+        const el = fixture.nativeElement as HTMLElement;
+        const row = el.querySelector('tbody tr') as HTMLElement;
+        expect(row.classList.contains('sf-row')).toBe(true);
+        const fields = Array.from(row.querySelectorAll('mat-form-field'));
+        expect(fields).toHaveLength(2); // Name + Also known as
+        for (const f of fields) {
+            expect(f.classList.contains('sf-dense')).toBe(true);
+            expect(f.querySelector('mat-label')).toBeNull();
+            expect(f.querySelector('mat-hint')).toBeNull();
+        }
+        expect(row.querySelector('td:nth-child(5) span')?.classList.contains('sf-value')).toBe(true);
+        expect(row.querySelector('mat-checkbox')?.classList.contains('sf-dense-check')).toBe(true);
+        expect(row.querySelector('[aria-label^="Column type"]')?.classList.contains('sf-dense-button')).toBe(true);
+    });
+
     it('shows the first parsed value per column by selector, "—" when the sample has none', async () => {
         const { fixture } = await create(rows(2));
         fixture.componentRef.setInput('sampleValues', { col_0: ' Anna Kowalski ' });

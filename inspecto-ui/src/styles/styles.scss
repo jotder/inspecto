@@ -172,3 +172,55 @@ body.dark {
 .inspecto-cell-warning {
     box-shadow: inset 0 0 0 1px var(--gamma-warn);
 }
+
+/* Property rows — the ONE dense "label · value · pencil" geometry (operator ask 2026-09-04: every properties
+   panel and every schema table cell reads like a schema-form flat row). Shared by `schema-form`'s flat mode,
+   the pipeline inspector's Name row and the schema fields/partitions tables, so the geometry lives here, not
+   in a component's `:host ::ng-deep`. Geometry only — no colours (the token guard stays green). Material's
+   outline field is 56px tall with a floating label; without one, 32px is enough for the text.
+   ⚠ Material injects its component CSS at runtime AFTER this sheet, so an equal-specificity rule here LOSES
+   on source order — every selector below carries one extra class (`.mat-mdc-form-field.sf-dense`,
+   `.mat-mdc-button-base`) to outrank Material's own (0,2,0) rules. Measured in the preview, not guessed. */
+.sf-row {
+    min-height: 32px;
+}
+.mat-mdc-form-field.sf-dense .mat-mdc-text-field-wrapper {
+    padding: 0 8px;
+}
+.mat-mdc-form-field.sf-dense .mat-mdc-form-field-infix {
+    min-height: 32px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+}
+.mat-mdc-form-field.sf-dense .mat-mdc-form-field-icon-suffix {
+    padding: 0;
+}
+.mat-mdc-form-field.sf-dense .mat-mdc-form-field-icon-suffix .mat-mdc-icon-button.mat-mdc-button-base,
+.mat-mdc-icon-button.mat-mdc-button-base.sf-dense-button {
+    /* Material 22 sizes off `--mat-*` (the `--mdc-*` twins are legacy); gamma's override pins the icon
+       button at `width: 40px !important` / `padding: 0 !important`, so the two are re-pinned here. */
+    --mdc-icon-button-state-layer-size: 28px;
+    --mat-icon-button-state-layer-size: 28px;
+    width: 28px !important;
+    height: 28px;
+    min-height: 28px;
+    max-height: 28px;
+    padding: 2px !important;
+}
+.mat-mdc-form-field.sf-dense .mat-mdc-form-field-icon-suffix .mat-mdc-icon-button.mat-mdc-button-base .mat-icon,
+.mat-mdc-icon-button.mat-mdc-button-base.sf-dense-button .mat-icon {
+    width: 20px;
+    height: 20px;
+    line-height: 20px;
+}
+.mat-mdc-form-field.sf-dense .mat-mdc-select {
+    font-size: 0.875rem;
+}
+.sf-toggle .mdc-switch.mdc-switch {
+    --mdc-switch-state-layer-size: 28px;
+}
+/* A checkbox in a property row: Material's 40px touch box would stretch the 32px row. */
+.mat-mdc-checkbox.sf-dense-check {
+    --mdc-checkbox-state-layer-size: 28px;
+    --mat-checkbox-state-layer-size: 28px;
+}

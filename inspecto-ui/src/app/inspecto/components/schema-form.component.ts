@@ -571,35 +571,8 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
             </ng-template>
         </form>
     `,
-    // Dense field geometry for the flat rows only (no colors — the token guard stays green). Material's
-    // outline field is 56px tall with a floating label; without one, 32px is enough for the text.
-    styles: `
-        :host ::ng-deep .sf-dense .mat-mdc-text-field-wrapper {
-            padding: 0 8px;
-        }
-        :host ::ng-deep .sf-dense .mat-mdc-form-field-infix {
-            min-height: 32px;
-            padding-top: 4px;
-            padding-bottom: 4px;
-        }
-        :host ::ng-deep .sf-dense .mat-mdc-form-field-icon-suffix {
-            padding: 0;
-        }
-        :host ::ng-deep .sf-dense .mat-mdc-form-field-icon-suffix .mat-mdc-icon-button {
-            --mdc-icon-button-state-layer-size: 28px;
-            width: 28px;
-            height: 28px;
-            padding: 2px;
-        }
-        :host ::ng-deep .sf-dense .mat-mdc-form-field-icon-suffix .mat-mdc-icon-button .mat-icon {
-            width: 20px;
-            height: 20px;
-            line-height: 20px;
-        }
-        :host ::ng-deep .sf-toggle .mdc-switch {
-            --mdc-switch-state-layer-size: 28px;
-        }
-    `,
+    // The dense field geometry for the flat rows (`.sf-row` / `.sf-dense` / `.sf-toggle`) lives in
+    // `src/styles/styles.scss`, shared with every other property-row surface (2026-09-04).
 })
 export class InspectoSchemaFormComponent implements AfterViewInit, OnDestroy {
     private fb = inject(FormBuilder);

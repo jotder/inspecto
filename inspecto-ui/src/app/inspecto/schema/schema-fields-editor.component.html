@@ -40,12 +40,16 @@
          column only for name-based frontends (positional frontends: # IS the selector).
          (Headed "Source" until 2026-08-26: it renders `raw.fields[].selector` verbatim, so the
          canonical key is the honest label, and GLOSSARY reserves "Source".) -->
+    <!-- Cells are PROPERTY ROWS (operator ask 2026-09-04): 32px rows (`.sf-row`), values in the flat
+         schema-form's `.sf-value` text (mono, text-sm), editable cells as the same dense outline
+         `.sf-dense` input (no floating label, no hint), the Use checkbox and Type menu sized to the row. -->
     <table class="w-full border-collapse">
         <thead>
             <tr class="text-secondary text-left text-xs font-semibold uppercase tracking-wider">
                 <th scope="col" class="w-12 pb-1">
                     <span class="sr-only">Use</span>
                     <mat-checkbox
+                        class="sf-dense-check"
                         [checked]="visibleIncludeState() === 'all'"
                         [indeterminate]="visibleIncludeState() === 'some'"
                         (change)="toggleAllVisible($event.checked)"
@@ -109,16 +113,17 @@
         </thead>
         <tbody>
             @for (e of pagedEntries(); track e.index) {
-                <tr [formGroup]="e.group" class="border-t align-middle">
-                    <td class="py-1">
+                <tr [formGroup]="e.group" class="sf-row border-t align-middle">
+                    <td class="py-0">
                         <mat-checkbox
+                            class="sf-dense-check"
                             formControlName="include"
                             [aria-label]="'Use ' + (e.group.get('name')?.value || 'column ' + (e.index + 1))"
                         ></mat-checkbox>
                     </td>
-                    <td class="w-16 py-1 pr-2">
+                    <td class="w-16 py-0 pr-2">
                         <span
-                            class="text-secondary block max-w-16 truncate text-xs tabular-nums"
+                            class="sf-value text-secondary block max-w-16 truncate font-mono text-sm tabular-nums"
                             [matTooltip]="
                                 nameBasedSelectors()
                                     ? 'Position in the parsed record'
@@ -127,15 +132,15 @@
                             >{{ nameBasedSelectors() ? e.index : e.group.get('selector')?.value }}</span
                         >
                     </td>
-                    <td class="py-1 pr-2">
-                        <mat-form-field class="w-full" subscriptSizing="dynamic">
+                    <td class="py-0 pr-2">
+                        <mat-form-field class="sf-dense w-full" appearance="outline" subscriptSizing="dynamic">
                             <input matInput formControlName="name" aria-label="Column name" />
                             @if (e.group.get('name')?.hasError('pattern') && e.group.get('name')?.touched) {
                                 <mat-error>Letters, digits, _ — start with a letter or _.</mat-error>
                             }
                         </mat-form-field>
                     </td>
-                    <td class="w-14 py-1">
+                    <td class="w-14 py-0">
                         <span
                             [matTooltip]="
                                 autoTypes()
@@ -147,6 +152,7 @@
                             <button
                                 mat-icon-button
                                 type="button"
+                                class="sf-dense-button"
                                 [matMenuTriggerFor]="typeMenu"
                                 [matMenuTriggerData]="{ group: e.group }"
                                 [disabled]="autoTypes()"
@@ -185,15 +191,15 @@
                     </td>
                     <!-- Sample value (R11): the first parsed row, read-only — what the type above was
                          detected from. "—" when the sample has no such column or nothing parsed yet. -->
-                    <td class="py-1 pr-2">
+                    <td class="py-0 pr-2">
                         <span
-                            class="text-secondary block max-w-40 truncate font-mono text-xs"
+                            class="sf-value text-secondary block max-w-40 truncate font-mono text-sm"
                             [attr.title]="sampleFor(e.group) || null"
                             >{{ sampleFor(e.group) || '—' }}</span
                         >
                     </td>
-                    <td class="py-1 pr-2">
-                        <mat-form-field class="w-full" subscriptSizing="dynamic">
+                    <td class="py-0 pr-2">
+                        <mat-form-field class="sf-dense w-full" appearance="outline" subscriptSizing="dynamic">
                             <input
                                 matInput
                                 formControlName="synonym"
@@ -214,11 +220,11 @@
                          A datalist rather than a select — ~418 zones need filtering, and free text
                          keeps a legacy alias (Asia/Calcutta) editable instead of blanking it. -->
                     @if (anyTemporal()) {
-                        <td class="w-44 py-1 pr-2">
+                        <td class="w-44 py-0 pr-2">
                             @if (isTemporal(e.group)) {
                                 @if (zoneColumnOf(e.group, e.index)) {
                                     <span
-                                        class="text-secondary text-xs"
+                                        class="sf-value text-secondary font-mono text-sm"
                                         [matTooltip]="
                                             'This column takes its zone per row from ' + zoneColumnOf(e.group, e.index)
                                         "
@@ -226,7 +232,7 @@
                                     >
                                 } @else {
                                     <input
-                                        class="w-full bg-transparent text-sm"
+                                        class="sf-value w-full bg-transparent font-mono text-sm"
                                         list="inspecto-iana-zones"
                                         formControlName="timezone"
                                         placeholder="Inherit"
@@ -245,9 +251,9 @@
                         </td>
                     }
                     @if (nameBasedSelectors()) {
-                        <td class="w-24 py-1">
+                        <td class="w-24 py-0">
                             <span
-                                class="text-secondary block max-w-24 truncate text-xs"
+                                class="sf-value text-secondary block max-w-24 truncate font-mono text-sm"
                                 [matTooltip]="'Selector: ' + $safeNavigationMigration(e.group.get('selector')?.value)"
                                 >{{ e.group.get('selector')?.value }}</span
                             >
@@ -259,23 +265,24 @@
                  of this table learns the column exists. Not a form row — it is never part of value(). -->
             @if (showFilenameRow()) {
                 @if (filenameColumn(); as f) {
-                    <tr class="bg-hover border-t align-middle" data-filename-row>
-                        <td class="py-1">
+                    <tr class="sf-row bg-hover border-t align-middle" data-filename-row>
+                        <td class="py-0">
                             <mat-checkbox
+                                class="sf-dense-check"
                                 [checked]="true"
                                 [disabled]="true"
                                 [aria-label]="'Use ' + f.name + ' (always on while the file-name column is enabled)'"
                             ></mat-checkbox>
                         </td>
-                        <td class="w-16 py-1 pr-2">
-                            <span class="text-secondary block text-xs tabular-nums">{{ totalCount() }}</span>
+                        <td class="w-16 py-0 pr-2">
+                            <span class="sf-value text-secondary block font-mono text-sm tabular-nums">{{ totalCount() }}</span>
                         </td>
-                        <td class="py-1 pr-2">
-                            <span class="font-mono text-sm" matTooltip="Added by the sink at write time — each row's source file">{{
+                        <td class="py-0 pr-2">
+                            <span class="sf-value px-1 font-mono text-sm" matTooltip="Added by the sink at write time — each row's source file">{{
                                 f.name
                             }}</span>
                         </td>
-                        <td class="w-14 py-1">
+                        <td class="w-14 py-0">
                             <span [matTooltip]="'VARCHAR — ' + typeMeta['VARCHAR'].hint">
                                 <mat-icon
                                     class="icon-size-4 mx-3 align-middle"
@@ -284,14 +291,14 @@
                                 ></mat-icon>
                             </span>
                         </td>
-                        <td class="py-1 pr-2">
+                        <td class="py-0 pr-2">
                             <span
-                                class="text-secondary block max-w-40 truncate font-mono text-xs"
+                                class="sf-value text-secondary block max-w-40 truncate font-mono text-sm"
                                 [attr.title]="f.sample || null"
                                 >{{ f.sample || '—' }}</span
                             >
                         </td>
-                        <td class="text-secondary py-1 pr-2 text-xs">—</td>
+                        <td class="sf-value text-secondary py-0 pr-2 font-mono text-sm">—</td>
                         @if (anyTemporal()) {
                             <td></td>
                         }

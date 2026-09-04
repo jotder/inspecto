@@ -20,6 +20,7 @@ const NODE: AuthoredNode = {
     id: 'parse',
     type: 'parser.dsv',
     name: 'Parse CSV',
+    description: 'the daily feed',
     use: 'grammar/cdr_csv',
     config: { delimiter: ',' },
 };
@@ -111,7 +112,7 @@ describe('PipelineInspectorComponent', () => {
         expect(buttons.some((b) => b.textContent?.includes('Configure'))).toBe(false);
     });
 
-    it('renames in place: pencil opens the form seeded from the node, Save emits the trimmed values', () => {
+    it('renames in place: pencil opens the Name form seeded from the node, Save emits the trimmed name', () => {
         const { fixture, c } = create({ node: NODE, status: 'configured', category: 'PARSE' });
         const el = fixture.nativeElement as HTMLElement;
         const rename = vi.fn();
@@ -119,12 +120,15 @@ describe('PipelineInspectorComponent', () => {
 
         (el.querySelector('[aria-label="Rename Step"]') as HTMLButtonElement).click();
         fixture.detectChanges();
-        expect(c.renameForm.getRawValue()).toEqual({ name: 'Parse CSV', description: '' });
+        expect(c.renameForm.getRawValue()).toEqual({ name: 'Parse CSV' });
+        // 2026-09-04 (operator ask): no Description field on any properties panel.
+        expect(el.querySelector('form [formcontrolname="description"]')).toBeNull();
 
-        c.renameForm.setValue({ name: '  Delimited CDRs ', description: ' pipe-delimited feed ' });
+        c.renameForm.setValue({ name: '  Delimited CDRs ' });
         (el.querySelector('form button[type="submit"]') as HTMLButtonElement).click();
         fixture.detectChanges();
-        expect(rename).toHaveBeenCalledWith({ name: 'Delimited CDRs', description: 'pipe-delimited feed' });
+        // The stored description travels through UNCHANGED — the host contract is the same.
+        expect(rename).toHaveBeenCalledWith({ name: 'Delimited CDRs', description: 'the daily feed' });
         expect(c.renaming()).toBe(false);
     });
 
@@ -182,12 +186,31 @@ describe('PipelineInspectorComponent', () => {
         });
 
         /**
-         * 2026-08-22 (operator ask): identity lives ON the config page — Name/Description are
-         * always-visible fields seeded from the node, committed on blur. No pencil round-trip.
+         * 2026-08-22 (operator ask): identity lives ON the config page. 2026-09-04 (operator ask):
+         * Name renders as a PROPERTY ROW — the schema-form flat row's anatomy (`.sf-row`: label ·
+         * value text · pencil → dense `.sf-dense` inline input) — and Description is gone from every
+         * properties panel.
          */
-        it('renders Name/Description as live fields seeded from the node, committing trimmed edits', () => {
+        it('renders Name as a property row (value text + pencil) and no Description field', () => {
             // ⚠ setInput, not the Object.assign helper — the seed runs in ngOnChanges, which only
             // template/setInput input writes fire (exactly how the editor binds [node]).
+            const { fixture } = create({ status: 'configured', category: 'PARSE' });
+            fixture.componentRef.setInput('compact', true);
+            fixture.componentRef.setInput('node', NODE);
+            fixture.detectChanges();
+            const el = fixture.nativeElement as HTMLElement;
+            const row = el.querySelector('.sf-row[data-key="name"]') as HTMLElement;
+            expect(row).not.toBeNull();
+            expect(row.classList.contains('min-h-8')).toBe(true); // 32px, like a schema-form flat row
+            expect(row.querySelector('.sf-value')?.textContent?.trim()).toBe('Parse CSV');
+            expect(row.querySelector('.sf-pencil')?.getAttribute('aria-label')).toBe('Edit Name');
+            expect(row.querySelector('input')).toBeNull(); // no input until the pencil
+            expect(el.querySelector('[formcontrolname="description"]')).toBeNull();
+            expect(el.textContent).not.toContain('Description');
+            expect(el.querySelector('[aria-label="Rename Step"]')).toBeNull(); // the summary's pencil is not this one
+        });
+
+        it('pencil opens the dense inline input; Enter emits the new name with the description unchanged', () => {
             const { fixture, c } = create({ status: 'configured', category: 'PARSE' });
             fixture.componentRef.setInput('compact', true);
             fixture.componentRef.setInput('node', NODE);
@@ -195,17 +218,53 @@ describe('PipelineInspectorComponent', () => {
             const el = fixture.nativeElement as HTMLElement;
             const rename = vi.fn();
             c.rename.subscribe(rename);
-            expect(el.querySelector('[aria-label="Rename Step"]')).toBeNull(); // the pencil is gone here
-            expect(c.renameForm.getRawValue()).toEqual({ name: 'Parse CSV', description: '' });
-            c.renameForm.setValue({ name: '  CDR parse ', description: ' the daily feed ' });
-            c.commitIdentity();
-            expect(rename).toHaveBeenCalledWith({ name: 'CDR parse', description: 'the daily feed' });
 
-            // a blur with nothing further changed emits no second rename (no phantom dirty)
-            fixture.componentRef.setInput('node', { ...NODE, name: 'CDR parse', description: 'the daily feed' });
+            (el.querySelector('.sf-pencil') as HTMLButtonElement).click();
+            fixture.detectChanges();
+            const input = el.querySelector('.sf-row[data-key="name"] input') as HTMLInputElement;
+            expect(input).not.toBeNull();
+            expect(input.closest('mat-form-field')?.classList.contains('sf-dense')).toBe(true);
+            expect(input.closest('mat-form-field')?.querySelector('mat-label')).toBeNull(); // no floating label
+            expect(c.renameForm.getRawValue()).toEqual({ name: 'Parse CSV' });
+
+            input.value = '  CDR parse ';
+            input.dispatchEvent(new Event('input'));
+            (el.querySelector('.sf-row[data-key="name"]') as HTMLFormElement).dispatchEvent(new Event('submit'));
+            fixture.detectChanges();
+            expect(rename).toHaveBeenCalledWith({ name: 'CDR parse', description: 'the daily feed' });
+            expect(c.editingName()).toBe(false);
+            expect(el.querySelector('.sf-row[data-key="name"] input')).toBeNull();
+
+            // a commit with nothing further changed emits no second rename (no phantom dirty)
+            fixture.componentRef.setInput('node', { ...NODE, name: 'CDR parse' });
             fixture.detectChanges();
             c.commitIdentity();
             expect(rename).toHaveBeenCalledTimes(1);
+        });
+
+        it('Escape cancels the Name edit without emitting and restores the stored name', () => {
+            const { fixture, c } = create({ status: 'configured', category: 'PARSE' });
+            fixture.componentRef.setInput('compact', true);
+            fixture.componentRef.setInput('node', NODE);
+            fixture.detectChanges();
+            const el = fixture.nativeElement as HTMLElement;
+            const rename = vi.fn();
+            c.rename.subscribe(rename);
+
+            c.startNameEdit();
+            fixture.detectChanges();
+            const input = el.querySelector('.sf-row[data-key="name"] input') as HTMLInputElement;
+            input.value = 'abandoned';
+            input.dispatchEvent(new Event('input'));
+            input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+            fixture.detectChanges();
+            expect(rename).not.toHaveBeenCalled();
+            expect(c.editingName()).toBe(false);
+            expect(c.renameForm.getRawValue()).toEqual({ name: 'Parse CSV' });
+            expect(el.querySelector('.sf-value')?.textContent?.trim()).toBe('Parse CSV');
+            // a blur firing AFTER the cancel (browsers differ on removal) must not emit either
+            c.commitIdentity();
+            expect(rename).not.toHaveBeenCalled();
         });
 
         /**
