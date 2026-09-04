@@ -801,8 +801,9 @@ final class PipelineConfigParser {
         if (recMap != null) {
             List<Map<String, Object>> columns = listOfMapsAt(recMap, "columns", "processing.map.columns");
             List<Map<String, Object>> rules   = listOfMapsAt(recMap, "rules",   "processing.map.rules");
-            if (!columns.isEmpty() || !rules.isEmpty())
-                b.mapConfig = new PipelineConfig.MapConfig(columns, rules);
+            List<Map<String, Object>> fields  = listOfMapsAt(recMap, "fields",  "processing.map.fields");
+            if (!columns.isEmpty() || !rules.isEmpty() || !fields.isEmpty())
+                b.mapConfig = new PipelineConfig.MapConfig(columns, rules, fields);
         }
 
         // ── route: block (ELT amendment §2.6) — carried VERBATIM; authoring/round-trip only. ──

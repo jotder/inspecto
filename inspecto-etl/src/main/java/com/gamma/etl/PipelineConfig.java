@@ -1021,18 +1021,29 @@ public final class PipelineConfig {
      *
      * @param columns explicit projection entries ({@code [{name, expr}]}); empty when unauthored
      * @param rules   mapping-component rules, field types undeclared; empty when unauthored
+     * @param fields  Record Transformer rows ({@code [{name, from, fn, args}]}) — the spelling that
+     *                supersedes {@code rules} for NEW authoring (2026-09-05); empty when unauthored.
+     *                Compiled by {@code RecordTransform}; see {@code DataTransformer.dataColumns}.
      */
     @PublicApi(since = "4.0.0")
-    public record MapConfig(List<Map<String, Object>> columns, List<Map<String, Object>> rules) {
+    public record MapConfig(List<Map<String, Object>> columns, List<Map<String, Object>> rules,
+                            List<Map<String, Object>> fields) {
         public MapConfig {
             columns = columns == null ? List.of() : List.copyOf(columns);
             rules   = rules   == null ? List.of() : List.copyOf(rules);
-            if (columns.isEmpty() && rules.isEmpty())
-                throw new IllegalArgumentException("processing.map needs a non-empty columns[] or rules[] list");
+            fields  = fields  == null ? List.of() : List.copyOf(fields);
+            if (columns.isEmpty() && rules.isEmpty() && fields.isEmpty())
+                throw new IllegalArgumentException(
+                        "processing.map needs a non-empty columns[], rules[] or fields[] list");
         }
 
-        /** True when neither half carries anything the executor would read. */
-        public boolean isEmpty() { return columns.isEmpty() && rules.isEmpty(); }
+        /** The pre-{@code fields} spelling, kept so existing callers compile unchanged. */
+        public MapConfig(List<Map<String, Object>> columns, List<Map<String, Object>> rules) {
+            this(columns, rules, List.of());
+        }
+
+        /** True when no half carries anything the executor would read. */
+        public boolean isEmpty() { return columns.isEmpty() && rules.isEmpty() && fields.isEmpty(); }
     }
 
     /**

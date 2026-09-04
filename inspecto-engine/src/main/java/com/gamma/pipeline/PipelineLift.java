@@ -306,12 +306,26 @@ public final class PipelineLift {
         // drops that one and lowers only these two. One processing.map serves every branch's map node;
         // lower refuses a graph whose map nodes have drifted apart, since the file cannot express it.
         PipelineConfig.MapConfig authored = cfg.mapConfig();
+        boolean recordTransformer = false;
         if (authored != null) {
             if (!authored.columns().isEmpty()) mapCfg.put("columns", authored.columns());
             if (!authored.rules().isEmpty())   mapCfg.put("rules",   authored.rules());
+            if (!authored.fields().isEmpty()) {
+                mapCfg.put("fields", authored.fields());
+                recordTransformer = true;
+            }
         }
-        String mapName = (table != null && !table.isBlank()) ? "Map " + table : "Map";
-        nodes.add(new PipelineNode(mapId, BuiltinNodeType.TRANSFORM_MAP.type(), mapName, null, mapCfg, null));
+        // The projection SLOT takes either spelling: authored `fields[]` make it a Record Transformer
+        // (transform.sql), anything else keeps the legacy Map. Both compile through the same
+        // [{name, expr}] seam in RowShaper, so this changes the node's IDENTITY, not its execution.
+        // ⛔ The slot stays a slot — neither type gets a STEP_KIND entry, because that would change
+        // when `steps:` is emitted at all (AUTHOR-1's ⛔).
+        String mapType = recordTransformer
+                ? BuiltinNodeType.TRANSFORM_SQL.type() : BuiltinNodeType.TRANSFORM_MAP.type();
+        String mapName = recordTransformer
+                ? ((table != null && !table.isBlank()) ? "Shape " + table : "Record Transformer")
+                : ((table != null && !table.isBlank()) ? "Map " + table : "Map");
+        nodes.add(new PipelineNode(mapId, mapType, mapName, null, mapCfg, null));
         edges.add(new PipelineEdge(mapUpstream, mapUpstreamRel, mapId));
 
         String sinkUpstream = mapId;

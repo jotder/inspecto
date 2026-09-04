@@ -89,6 +89,32 @@ public final class PipelineEditable {
     static final Set<String> MAP_AUTHORED = Set.of("columns", "rules", "fields");
 
     /**
+     * Whether a node occupies the <b>projection slot</b> — the position {@code PipelineLift} fills
+     * between parser and sink, whose authored half lives in {@code processing.map} rather than in the
+     * {@code steps:} chain.
+     *
+     * <p>🔴 <b>Why the id and not the type.</b> Since 2026-09-05 the slot may hold either a
+     * {@code transform.map} or a {@code transform.sql} (a Record Transformer), and {@code transform.sql}
+     * is ALSO a legitimate chain kind with a {@code STEP_KIND} entry — a Simple-authored chain step
+     * carries {@code fields[]} exactly like a slot node does, so neither the type nor the presence of
+     * {@code fields[]} can tell them apart. What distinguishes them is POSITION, and the flat file has
+     * no edges to read position from at lower() time. So the discriminator is {@code PipelineLift}'s own
+     * id grammar for the slot — {@code "map" + suffix}, where the suffix is {@code ""} or
+     * {@code "_" + key} for a multi-schema lift ({@code PipelineLift:289,301}) — the same coupling the
+     * {@code sink__d<i>} handling already relies on.
+     *
+     * <p>⛔ A chain step never takes an id in that grammar: {@code RecipeCompiler} names chain nodes for
+     * their kind ({@code sql}, {@code sql__s2}) and {@code stageTwo} does the same.
+     */
+    static boolean isProjectionSlot(PipelineNode n) {
+        String t = n.type();
+        if (!BuiltinNodeType.TRANSFORM_MAP.type().equals(t)
+                && !BuiltinNodeType.TRANSFORM_SQL.type().equals(t)) return false;
+        String id = n.id();
+        return "map".equals(id) || id.startsWith("map_");
+    }
+
+    /**
      * Map-node config keys that are DERIVED, not authored: they are put on the node by the read side and
      * are never lowered. {@code schema} is the legacy config's schema map, carried wholesale by
      * {@link PipelineLift} — ⛔ lowering it would write a derived block back as authored config, and
@@ -653,9 +679,17 @@ public final class PipelineEditable {
             else if (BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type().equals(t)) marker = n;
             // The five chain kinds. Each used to claim a single slot and refuse a second (MULTI_*); they
             // now join an ordered chain, and how many there are stops being the question — see stepsOf.
+            // ⚠ The projection SLOT is checked BEFORE the chain kinds, because since 2026-09-05 the slot
+            // may be a transform.sql node (a Record Transformer) and that type also has a STEP_KIND.
+            // Without this order such a node would lower into `steps:` instead of back into
+            // processing.map, i.e. the projection would migrate into the chain on every save.
+            else if (isProjectionSlot(n)) mapNodes.add(n);
+            // The five chain kinds. Each used to claim a single slot and refuse a second (MULTI_*); they
+            // now join an ordered chain, and how many there are stops being the question — see stepsOf.
             else if (stepKindOf(t) != null) {
-                // sql is the step's only load-bearing key (fields[] is an authoring artifact the engine
-                // never reads) — a blank one would save, load, and throw at the first run.
+                // For a CHAIN sql step `sql` is the load-bearing key — a blank one would save, load and
+                // throw at the first run. (In the projection slot `fields[]` is load-bearing instead,
+                // which is why that case is handled above rather than here.)
                 if (BuiltinNodeType.TRANSFORM_SQL.type().equals(t)
                         && !(n.cfg("sql") instanceof String sql && !sql.isBlank()))
                     refusals.add(new PipelineCompileException.Refusal(SQL_STEP_EMPTY, n.id(),
@@ -671,7 +705,7 @@ public final class PipelineEditable {
                         primarySink = n;
                 }
             }
-            else if (BuiltinNodeType.TRANSFORM_MAP.type().equals(t)) mapNodes.add(n);
+            // (transform.map reaches mapNodes through isProjectionSlot above.)
             // enrichment: companion-persisted — nothing to lower
         }
         // MIDBRANCH-1 (R3): pull each route node's flattened branch chain OUT of the trunk chain —
@@ -1209,7 +1243,7 @@ public final class PipelineEditable {
                             "a map node has no home for '" + k + "' in the flat pipeline config; it accepts "
                                     + new TreeSet<>(MAP_AUTHORED)));
             Map<String, Object> mine = new LinkedHashMap<>();
-            for (String k : List.of("columns", "rules")) putIfPresent(mine, k, n.cfg(k));
+            for (String k : List.of("columns", "rules", "fields")) putIfPresent(mine, k, n.cfg(k));
             if (mine.isEmpty()) continue;
             if (authored == null) {
                 authored = mine;
