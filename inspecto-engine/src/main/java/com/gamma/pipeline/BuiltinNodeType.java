@@ -101,7 +101,8 @@ public enum BuiltinNodeType implements PipelineNodeType {
 
     // ── transform family (§3.4 + §15) ─────────────────────────────────────────────
     TRANSFORM_MAP("transform.map", NodeCategory.TRANSFORM, "Map",
-            "Maps raw fields onto the canonical schema.",
+            "Maps raw fields onto the canonical schema. SUPERSEDED by the Record Transformer "
+            + "(transform.sql over processing.map.fields) — authored the legacy way via mapping.rules[].",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),
     TRANSFORM_FILTER("transform.filter", NodeCategory.TRANSFORM, "Filter",
             "Keeps/drops rows by predicate; index-anchored CSV row-filter (G1).",

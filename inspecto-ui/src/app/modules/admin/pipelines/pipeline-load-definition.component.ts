@@ -93,6 +93,16 @@ interface RuleRow {
         <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-1">
             <!-- S2/principle 5: identity is asked ONCE, on the inspector's rename pencil — never
                  re-asked inside a definition pane. -->
+            <!-- Deprecation notice (Phase 4, 2026-09-05). Informational, never blocking: this pane still
+                 authors every stored pipeline, and mapping.rules[] stays readable permanently. -->
+            <div class="text-secondary mb-2 flex items-center gap-2 text-xs">
+                <mat-icon class="icon-size-4" svgIcon="heroicons_outline:information-circle"></mat-icon>
+                <span>
+                    This is the legacy mapping. New pipelines shape fields in the
+                    <strong>Record Transformer</strong> Step, which offers the same work as named functions — and can
+                    also rename, calculate and change types in one place.
+                </span>
+            </div>
             <div class="mb-1 flex items-center gap-2">
                 <span class="text-xs font-semibold uppercase opacity-70">Mapping</span>
                 @if (loading()) {

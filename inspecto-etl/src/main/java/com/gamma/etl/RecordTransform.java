@@ -362,6 +362,61 @@ public final class RecordTransform {
         return true;
     }
 
+    /**
+     * Convert a legacy {@code mapping.rules[]} list into the equivalent {@code fields[]} — the Phase 4
+     * migration off {@code transform.map}.
+     *
+     * <p>The equivalence is exact for the two spellings that exist in practice, and a test asserts the
+     * COMPILED SQL is byte-identical for every stored schema, which is the migration's whole safety
+     * argument:
+     * <ul>
+     *   <li>{@code DIRECT} (or a blank/absent type) → {@link #KEEP}. On the raw source both compile
+     *       through {@link SchemaFieldTypes#castSql} against the declared type.</li>
+     *   <li>{@code EXPR} → {@link #CUSTOM}. Both emit the author's SQL verbatim, and both are excluded
+     *       from the cast-failure audit for the same reason — so the conversion neither gains nor loses
+     *       coverage.</li>
+     * </ul>
+     *
+     * <p>⛔ {@code CONCAT_DT} and {@code FILENAME_DATE} are REFUSED rather than approximated: neither has
+     * a faithful catalog equivalent ({@code text.join} concatenates text, it does not build a timestamp
+     * from a {@code |}-delimited pair, and nothing renders {@code FILENAME_DATE}'s
+     * {@code regexp_extract} over the source filename). Converting them by hand-writing {@code custom}
+     * SQL would silently move those columns OUT of the audit. Measured 2026-09-05 across every stored
+     * schema in {@code spaces/}: 799 DIRECT, 6 EXPR, zero of either — so nothing is stranded by this,
+     * and a pipeline that ever needs one keeps its {@code rules[]}, which stay readable permanently.
+     *
+     * @throws IllegalArgumentException naming the rule when it has no faithful equivalent
+     */
+    public static List<Map<String, Object>> fromMappingRules(List<Map<String, Object>> rules) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> rule : rules) {
+            String target = str(rule, "targetColumn");
+            String source = str(rule, "sourceExpression");
+            String type = str(rule, "transformType");
+            String norm = type == null ? "" : type.trim().toUpperCase(java.util.Locale.ROOT);
+
+            Map<String, Object> field = new LinkedHashMap<>();
+            field.put("name", target);
+            switch (norm) {
+                case "", "DIRECT" -> {
+                    field.put("from", source);
+                    field.put("fn", KEEP);
+                }
+                case "EXPR" -> {
+                    field.put("from", "");
+                    field.put("fn", CUSTOM);
+                    field.put("args", Map.of("expression", source == null ? "" : source));
+                }
+                default -> throw new IllegalArgumentException(
+                        "rule '" + target + "' uses transformType '" + type + "', which has no faithful "
+                        + "Record Transformer equivalent — approximating it would move the column out of "
+                        + "the cast-failure audit. Keep this schema on mapping.rules[]; they stay readable.");
+            }
+            out.add(field);
+        }
+        return out;
+    }
+
     /** The catalog as plain maps, for the committed contract the TS suite asserts against. */
     public static List<Map<String, Object>> toContract() {
         List<Map<String, Object>> out = new ArrayList<>();
