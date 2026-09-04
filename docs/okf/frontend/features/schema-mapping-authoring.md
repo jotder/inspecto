@@ -1,7 +1,7 @@
 ---
 type: Feature
 title: Schema, Mapping & Transformation Authoring
-description: End-user authoring path for a dataset's schema (the redesigned Parse pane), the new transform.sql Simple/Advanced pane, the legacy transform.map rule grid, and transform.join lookup config — with the 2026-09-03 gap list annotated by what the redesign closed, absorbed or dropped.
+description: End-user authoring path for a dataset's schema (the redesigned Parse pane), the SQL-first transform.sql pane, the legacy transform.map rule grid, and transform.join lookup config — with the 2026-09-03 gap list annotated by what the redesign closed, absorbed or dropped.
 resource: inspecto-ui/src/app/modules/admin/pipelines/pipeline-load-definition.component.ts
 tags: [feature, pipelines, authoring, schema, mapping, transform, gap-analysis]
 timestamp: 2026-09-04T00:00:00Z
@@ -26,48 +26,53 @@ timestamp: 2026-09-04T00:00:00Z
 > were NOT removed; `transform.map` is now the legacy mapping path beside `transform.sql`. §6's gap list
 > is annotated with what the redesign closed, absorbed, or dropped as premature.
 
-## 0. The Transform Step pane — `transform.sql` (as built, `7e13dd82`)
+## 0. The Transform Step pane — `transform.sql` (as built; SQL-first since 2026-09-04)
 
 `PipelineTransformSqlDefinitionComponent` (`pipeline-transform-sql-definition.component.ts`), a bespoke
-pane beside the map grid — NOT the generic schema-form — reached from the editor's routing arm for
-`dn.type === 'transform.sql'` (`pipeline-editor.component.html:755-767`). Two modes behind a segmented
-toggle in the drawer header; operator decisions D5–D7 are binding, do not re-ask:
+pane reached from the editor's routing arm for `dn.type === 'transform.sql'`
+(`pipeline-editor.component.html:755-767`). **One mode: the SQL IS the transformation** — operator
+instruction 2026-09-04 ("revisit field transformation capabilities. and Go for Advanced(SQL) based
+transformation"), which **supersedes** the 2026-09-03 decisions D5 (a Simple five-verb fields grid that
+generated the SQL) and D6 (the lock-on-hand-edit rule). D3 (no `where` — filtering stays
+`transform.filter`), D4 (never parse SQL back into rows) and D7 (600+ columns must stay usable) still hold.
 
-- **Simple (default) — a Fields table that GENERATES the SQL.** One row per output field: `#` (output
-  position in the FULL ordered list — computed before filtering/paging, so page 2 starts at #11) · Field
-  name (editable — the alias) · From (source column; "— calculated —" for formulas) · What to do ·
-  Comes out as (derived type chip) · Sample (the verb applied to the sample value) · leave-out (×).
-  Exactly **five plain-language verbs** (`:20-24`, `SqlFieldVerb`): `keep` Keep as it is · `trim` Remove
-  extra spaces · `upper` Make UPPERCASE · `cast` Change type to… · `formula` Calculate…. ⛔ Adding a
-  sixth verb is a product decision, not a dev convenience. Above the grid: search (name + source) and
-  view-only filter chips with counts; below: a pager, **10 / 20 / 100 rows (default 10)**
-  (`PAGE_SIZES`, `:27`), "Add a calculated field", and **Left out** chips (click to restore, `:109,
-  290-305`). Filters and search are a lens — they never change the output; changing either resets to
-  page 1. 600+ columns is the design point. Seed for a new Step: one `keep` row per upstream column
-  (`seedFields`, `pipeline-transform-sql.ts:68-75`).
-- **The generator is a pure, unit-tested function** `generateSql(fields) → SELECT`
-  (`pipeline-transform-sql.ts:39-65`): `keep → col`, `trim → TRIM(col)`, `upper → UPPER(col)`,
-  `cast → TRY_CAST(col AS T)` — **always `TRY_`, never `CAST`** (the forgiving semantic, `:49`) —
-  `formula → <text verbatim>`; every row `AS name`; fixed `FROM input`; an empty list is `SELECT * FROM
-  input`. Table → SQL is forward-only generation: **no parser, no AST** (D4 — that is v2, parked in
-  BACKLOG). The engine only ever sees the SQL.
-- **Advanced — the SQL** in a plain `<textarea>` (CodeMirror is in `package.json` but wiring it is a
-  BACKLOG follow-on) plus the derived output schema. It reflects Simple read-only until the author types
-  into it; **the first hand edit LOCKS the Step** (D6): `handWritten` non-null ⇔ `locked` (`:110,117`),
-  Simple greys out behind a banner with a "start over from the table" action that discards the
-  hand-written SQL. Hand-written SQL is never parsed back into rows.
-- **Persisted shape** (`submit()`, `:378-386`): `{ sql }` always; `fields[]` added **only when unlocked**
-  — so a node config without `fields[]` IS a locked, hand-written node. `sql` is the single declared
-  attribute (`node-attributes.ts:347-353`, no `where` — filtering stays `transform.filter`, D3);
-  `fields[]` is an authoring artifact the engine never reads.
+- **The pane** = a "Transform" section header, a plain `<textarea>` for the SQL (mono, dense, resizable —
+  CodeMirror is a BACKLOG follow-on, now higher priority), one help line (input relation is `input`; write
+  one SELECT; `TRY_CAST` for a forgiving cast), the **Columns that come out** table, and **Try it on the
+  sample** (Test this Step).
+- **Seed for a NEW Step** (`seedSql`, exported): an explicit column list over the upstream columns —
+  the keys of the first parsed sample row the host passes as `sampleRows` — `SELECT
+    a,
+    b
+FROM
+  input`, names that are not plain identifiers double-quoted; with no sample it is `SELECT * FROM input`.
+  A stored `sql` loads verbatim.
+- **Columns that come out** reuses `<inspecto-schema-fields-editor>` — the SAME table the Parse pane shows
+  — fed from the preview's DESCRIBE-derived `columnTypes` (one positional row per column, selector =
+  1-based position, `autoTypes` true so the type icons are read-only, `sampleValues` from the first
+  previewed row; no Selector column, no filename row). Before the first test the section reads "Test this
+  Step to see the columns that come out" — no fabricated types. ⚠ The editor has no read-only Name input
+  and this pane deliberately never reads its `value()` back: renaming a column there does nothing in v1;
+  the help line under the table says to change the SQL. Wiring a table edit back into the SQL is the v2
+  AST work (BACKLOG (c)).
+- **Persisted shape** (`submit()`): **`{ sql }` only.** A node saved by the retired grid may still carry a
+  `fields[]` key beside `sql`; the pane never reads it and does not write it back, so it is dropped on the
+  next Apply (the engine never read it either — `sql` is the single declared attribute,
+  `node-attributes.ts`). `dirty` ⇔ the textarea differs from the loaded/seeded text.
 - **Test against sample** reuses "Test this Step" verbatim: `ComponentsService.previewTransform({type,
-  sql}, sampleRows)` (`:348`) — `transform.sql` qualifies by the `transform.*` prefix, nothing new was
-  built. ⚠ The output schema is therefore derived from the preview's rows, **not** from
-  `TypeFlow.describe`'s execution-free `DESCRIBE` — the `/describe` route was not built (BACKLOG).
+  sql}, sampleRows)` — `transform.sql` qualifies by the `transform.*` prefix. ⚠ The output schema is
+  therefore derived from the preview run, **not** from `TypeFlow.describe`'s execution-free `DESCRIBE` —
+  the `/describe` route was not built (BACKLOG (a)).
+- **What went (2026-09-04) and why:** the Simple grid (`#` / Field name / From / five verbs Keep · Remove
+  extra spaces · Make UPPERCASE · Change type to… · Calculate… / Comes out as / Sample / leave-out, search,
+  filter chips with counts, a 10/20/100 pager, a Left-out tray, "Add a calculated field"), its pure
+  generator `pipeline-transform-sql.ts` (`generateSql`/`seedFields`/`exprFor`, unit-tested), the
+  Simple/Advanced toggle and the `handWritten` lock with "start over from the table". It was a second
+  authoring model over the same SQL, and the operator chose the SQL itself as the one surface; the grid's
+  reason to exist (a no-SQL path) went with it. Nothing engine-side changed.
 - **Not built, on purpose:** the "Describe the fields" metadata section (description · unit ·
-  sensitivity) the plan sketched — the backend does not carry column metadata on a `transform.sql` node,
-  and faking a home for it would have been a second owner of `raw.fields[]` keys. Until it lands here
-  (BACKLOG), metadata rides through the Parse pane's by-selector carry-through
+  sensitivity) — the backend does not carry column metadata on a `transform.sql` node; until it lands
+  (BACKLOG (e)), metadata rides through the Parse pane's by-selector carry-through
   ([grammar-config.md](grammar-config.md)).
 - **Audit boundary:** saving a `transform.sql` node yields one WARNING `SQL_STEP_UNAUDITED` from the
   validator; a WARNING never blocks save (proven by test — `catalog-vs-executors.md`).
@@ -209,9 +214,11 @@ toggle in the drawer header; operator decisions D5–D7 are binding, do not re-a
 ## 6. Concrete gaps (confirmed absent 2026-09-03 — annotated 2026-09-04 with what the redesign did)
 
 Status per gap after the two plans shipped (AUTHOR-SCHEMA-1 is CLOSED in BACKLOG; what survives is
-AUTHORING-REDESIGN-1): **1 — absorbed** by `transform.sql` (Simple mode never shows SQL; Advanced still
-has no as-you-type validation — a DESCRIBE-backed `/describe` route is the follow-on). **2 — absorbed**
-(the Fields grid IS the expression builder for the five verbs; CodeMirror wiring stays open). **3 — still
+AUTHORING-REDESIGN-1): **1 — partially absorbed** by `transform.sql` (Test this Step reports binder errors
+after the fact; there is still no as-you-type validation — a DESCRIBE-backed `/describe` route is the
+follow-on). **2 — re-opened 2026-09-04**: the five-verb Fields grid that briefly served as the expression
+builder was retired with the SQL-first rebuild (§0); the SQL textarea is the builder, so CodeMirror (BACKLOG
+(b)) is now the nearest improvement and the v2 AST table (c) the structured surface. **3 — still
 valid** small follow-on (join reference-existence). **4 — partially absorbed**: the drift-into-mapping
 check stays valid *because* Layer 1 remains a rule table; still open. **5, 6, 8 — dropped as premature**
 for a surface that was redesigned (async validators, auto-recompute, drag-and-drop, RunToHere

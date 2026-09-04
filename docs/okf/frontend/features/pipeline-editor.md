@@ -380,22 +380,24 @@ The Parse surface itself — tabs, options, columns grid, Grammar CSV round-trip
   launcher pre-picks a date field only when exactly ONE exists; ⚠ native `<select>` in `@for`:
   bind `[selected]` per option, never `[value]` on the select.
 
-## Transform: the `transform.sql` Step pane (SHIPPED `7e13dd82`, 2026-09-04)
+## Transform: the `transform.sql` Step pane (SHIPPED `7e13dd82`; SQL-first rebuild 2026-09-04)
 
 - **Routing arm:** the definition dock has one more type-specific arm — `dn.type === 'transform.sql'` →
   `<app-pipeline-transform-sql-definition>` (`pipeline-editor.component.html:755-767`), beside the
   `transform.map` arm (`:736-754`) that projects `<app-pipeline-load-definition>`; every other
   `transform.*` kind stays on the generic `pipeline-config-definition` schema-form. A node TYPE routes to
   its own pane — the rule that already held for map/parse/sink.
-- **The pane:** Simple (a Fields table with five plain-language verbs that GENERATES the SQL) /
-  Advanced (the SQL textarea + derived output schema). A hand edit in Advanced **locks** the Step; the
-  persisted config is `{ sql, fields? }` — `fields[]` present only while unlocked. Test-against-sample
-  reuses `ComponentsService.previewTransform` (the existing "Test this Step" path — `transform.sql`
-  qualifies by prefix). Full as-built, decisions D3–D7 and what was deliberately not built:
+- **The pane (SQL-first, operator instruction 2026-09-04 — supersedes D5/D6):** one SQL `<textarea>`
+  seeded for a new Step with an explicit column list over the upstream sample columns (else `SELECT *
+  FROM input`), "Columns that come out" in the same `<inspecto-schema-fields-editor>` the Parse pane
+  uses (fed from the test run's DESCRIBE `columnTypes`, read-only types), and Test this Step over
+  `ComponentsService.previewTransform` (the existing path — `transform.sql` qualifies by prefix). The
+  persisted config is **`{ sql }` only**; a legacy `fields[]` from the retired Simple grid is dropped on
+  the next Apply. Full as-built, what the grid did and why it went:
   [schema-mapping-authoring.md](schema-mapping-authoring.md) §0; engine half:
   [`catalog-vs-executors.md`](../../backend/engine/catalog-vs-executors.md).
-- ⚠ The pane's `fields[]` is an authoring artifact, not a `NodeAttributes` entry — do not add it to the
-  contract; the engine reads `sql` only. Its absence is meaningful (locked/hand-written).
+- ⚠ `sql` is the single `NodeAttributes` entry; the engine reads nothing else. Do not add an authoring
+  artifact beside it — the retired `fields[]` is exactly that, and its presence no longer means anything.
 - **Parse pane companions (`d012f721`, same shift):** the Parse drawer is sectioned (not tabbed), flat
   compact rows, one "Columns that come out" table; **partitioning moved from Parse to the Sink pane** and
   the Collection pointer is read-only on Parse — see [grammar-config.md](grammar-config.md). The
