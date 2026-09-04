@@ -407,7 +407,8 @@ The Parse surface itself — tabs, options, columns grid, Grammar CSV round-trip
 ## Load: mapping on the map Step, schema on the parser
 
 > 2026-09-04: `transform.map` is the **legacy** mapping path. New computed columns / renames go through
-> `transform.sql` (the catalog's `transform.expression`/`transform.cast` point there); the facts below are
+> `transform.sql` (the catalog's single `transform.record` — *Record Transformer* — points there, folded
+> 2026-09-04 from `transform.expression` + `transform.cast` + `quality.cleanse.trim`); the facts below are
 > unchanged for stored pipelines.
 
 - **`processing.schema_file` is the PARSER Step's key** (where `PipelineLift` puts it and

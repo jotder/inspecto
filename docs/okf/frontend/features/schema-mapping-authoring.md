@@ -156,7 +156,11 @@ catalog and by persisting `fields[]`.
 
 ## 2. Mapping authoring (`pipeline-load-definition.component.ts` — `transform.map`, legacy path since 2026-09-04)
 
-> The catalog's `transform.expression` and `transform.cast` entries now point at `transform.sql` (§0);
+> The catalog now carries ONE entry for this surface — `transform.record`, *Record Transformer*, folded
+> 2026-09-04 from `transform.expression` + `transform.cast` + `quality.cleanse.trim` — pointing at
+> `transform.sql` (§0). Type *coercion* folded in with it; the schema *contract* stayed on Parse as
+> `quality.schema.validator`, re-scoped, because the declared types are the cast-failure audit's
+> denominator (see [`catalog-vs-executors.md`](../../backend/engine/catalog-vs-executors.md)).
 > `transform.map` and its `EXPR`/`CONCAT_DT`/`FILENAME_DATE` rules remain for stored pipelines and are
 > still authored here, unchanged.
 

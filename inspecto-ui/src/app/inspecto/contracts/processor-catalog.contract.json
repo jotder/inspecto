@@ -358,13 +358,13 @@
   }, {
     "id" : "quality.schema.validator",
     "family" : "DQ",
-    "label" : "Schema validator & type coercion",
+    "label" : "Schema registry & structural rejects",
     "emoji" : "🛡️",
     "icon" : "heroicons_outline:shield-check",
     "status" : "delivered",
-    "nodeType" : "transform.map",
-    "note" : "the schema registry: typed fields, TRY_CAST, structural rejects → quarantine",
-    "addable" : true
+    "nodeType" : "parser",
+    "note" : "the declared schema on the Parse Step: typed fields, TRY_CAST at ingest, structural rejects → quarantine. ⛔ Only HALF of the old \"Schema validator & type coercion\" — coercion as an AUTHORING act folded into `transform.record` (2026-09-04). What cannot fold is the schema CONTRACT: the declared source column + target type are the cast-failure audit's denominator, and `SchemaCompatibility` gates edits to them BACKWARD",
+    "addable" : false
   }, {
     "id" : "quality.constraint.check",
     "family" : "DQ",
@@ -432,16 +432,6 @@
     "status" : "planned",
     "addable" : false
   }, {
-    "id" : "quality.cleanse.trim",
-    "family" : "DQ",
-    "label" : "Whitespace & string sanitizer",
-    "emoji" : "🧹",
-    "icon" : "heroicons_outline:scissors",
-    "status" : "partial",
-    "nodeType" : "transform.map",
-    "note" : "any `EXPR` rule does it today; no dedicated step",
-    "addable" : true
-  }, {
     "id" : "quality.profiler.inline",
     "family" : "DQ",
     "label" : "Inline stream profiler & statistics",
@@ -494,24 +484,14 @@
     "note" : "board SEC-08 — Enterprise only",
     "addable" : false
   }, {
-    "id" : "transform.expression",
+    "id" : "transform.record",
     "family" : "XFM",
-    "label" : "Expression builder & computed columns",
+    "label" : "Record Transformer",
     "emoji" : "🧮",
     "icon" : "heroicons_outline:variable",
     "status" : "delivered",
     "nodeType" : "transform.sql",
-    "note" : "computed columns as SELECT expressions in the SQL Step (`transform.sql`); the `EXPR` / `CONCAT_DT` / `FILENAME_DATE` map rules remain",
-    "addable" : true
-  }, {
-    "id" : "transform.cast",
-    "family" : "XFM",
-    "label" : "Field type cast & renamer matrix",
-    "emoji" : "🔄",
-    "icon" : "heroicons_outline:arrows-right-left",
-    "status" : "delivered",
-    "nodeType" : "transform.sql",
-    "note" : "type casts stay on the Parse step's Types section (declarative typing); renames/aliases via the SQL Step (`transform.sql`)",
+    "note" : "ONE Step that shapes a record: sanitize (trim/pad/replace/case), cast, rename and computed columns — one row per output field over a typed function catalog, generating the SELECT it saves. Folded 2026-09-04 from `transform.expression` + `transform.cast` + `quality.cleanse.trim`, which were three catalog labels over this one grid. The legacy `EXPR` / `CONCAT_DT` / `FILENAME_DATE` map rules remain on `transform.map`",
     "addable" : true
   }, {
     "id" : "transform.filter",

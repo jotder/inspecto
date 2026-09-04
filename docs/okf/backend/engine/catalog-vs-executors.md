@@ -1,7 +1,7 @@
 ---
 type: Concept
 title: Step Processor catalog vs. real node executors — the mapping/transform family
-description: Why 5 catalog "processors" (schema validator, whitespace sanitizer, expression builder, cast/rename matrix, lookup transcoder) collapse onto three node types (transform.map, transform.sql, transform.join) with no per-processor Java class — and the transform.sql executor, TypeFlow.describe and the SQL_STEP_UNAUDITED boundary.
+description: Why 5 catalog "processors" collapsed onto three node types with no per-processor Java class, and how 3.5 of them were then FOLDED into one entry — Record Transformer (transform.record → transform.sql) — with the schema-contract half that could not fold; plus the transform.sql executor, TypeFlow.describe and the SQL_STEP_UNAUDITED boundary.
 resource: inspecto-engine/src/main/java/com/gamma/pipeline/ProcessorCatalog.java
 tags: [engine, catalog, transform, node-types, gotcha]
 timestamp: 2026-09-04T00:00:00Z
@@ -16,18 +16,40 @@ three [node types](node-types.md): `transform.map` (2), `transform.sql` (2 — r
 SQL transformer v1 shipped, see below) and `transform.join` (1). There is no dedicated Java class, config
 schema, or dispatch path per catalog id.
 
-## The five entries
+## The fold — five entries became three (2026-09-04, operator call)
 
-| Catalog id | Family | Status | `nodeType` | Catalog note |
+The catalog was advertising **four processors that are one grid**. Once `transform.sql`'s fields grid
+shipped over a typed function catalog (`sql-functions.ts` — `text.trim`, `convert.type`, `custom`, and
+rename via the Field-name alias), *Whitespace & string sanitizer*, *Expression builder & computed columns*
+and *Field type cast & renamer matrix* were three labels for three columns of the same table. They are now
+**one entry**:
+
+| Catalog id | Family | Status | `nodeType` | What it is |
 |---|---|---|---|---|
-| `quality.schema.validator` | DQ | DELIVERED | `transform.map` | "the schema registry: typed fields, TRY_CAST, structural rejects → quarantine" |
-| `quality.cleanse.trim` | DQ | PARTIAL | `transform.map` | "any `EXPR` rule does it today; no dedicated step" |
-| `transform.expression` | XFM | DELIVERED | `transform.sql` | "computed columns as SELECT expressions in the SQL Step; the `EXPR` / `CONCAT_DT` / `FILENAME_DATE` map rules remain" |
-| `transform.cast` | XFM | DELIVERED | `transform.sql` | "type casts stay on the Parse step's Types section (declarative typing); renames/aliases via the SQL Step" |
-| `transform.lookup` | XFM | PARTIAL | `transform.join` | "a reference join covers it; no inline static map" |
+| **`transform.record`** — *Record Transformer* | XFM | DELIVERED | `transform.sql` | One Step that shapes a record: sanitize · cast · rename · computed columns, one row per output field over the function catalog, generating the SELECT it saves. **Folded from `transform.expression` + `transform.cast` + `quality.cleanse.trim`.** |
+| `quality.schema.validator` — *Schema registry & structural rejects* | DQ | DELIVERED | `parser` (⇒ `addable: false`) | The half that could NOT fold — see below. |
+| `transform.lookup` | XFM | PARTIAL | `transform.join` | "a reference join covers it; no inline static map" (untouched) |
 
-(`ProcessorCatalog.java:98,106,113,114,119`; the two `transform.sql` rows and their mirror in
-`processor-catalog.contract.json` were repointed on 2026-09-04 — the catalog contract test pins the pair.)
+🔴 **Only HALF of "Schema validator & type coercion" folded, and the half that stayed is the load-bearing
+one.** Type coercion as an *authoring act* is now a Record Transformer row (`convert.type` → `TRY_CAST`).
+What cannot move is the schema **contract**: the declared source column + target type are the
+cast-failure audit's *denominator* (`countCastFailures` counts "source non-blank AND result IS NULL" per
+rule — with no declared pair there is nothing to count against, which is exactly why `EXPR` is excluded by
+definition), and `SchemaCompatibility` gates edits to those declarations BACKWARD. Fold the declaration
+away and the audit's coverage goes to zero silently. So the DQ entry was re-scoped and re-pointed at
+`parser` rather than deleted.
+
+⚠ **Its `addable` flipped `true` → `false`** as a consequence, and that is a fix, not a regression: it
+previously pointed at `transform.map`, so clicking "Schema validator" in the palette added a **Map** step.
+`parser` is not authorable (you add `parser.delimited`, never bare `parser`), so the entry now reads as a
+*capability of the Parse Step* — the same shape as `quality.constraint.check`, which is a capability of
+Expectations rather than a step.
+
+⛔ **The fold is a taxonomy change only** — no engine code, no node type, no config key moved. The
+executor set is unchanged; `addable` is computed from `PipelineEditable.isAuthorable(nodeType)`, so the
+contract test's "only an authorable processor is addable" invariant holds by construction.
+Contract mirror: `processor-catalog.contract.json`, regenerated with
+`mvn -o test -Dprocessor.catalog.write=true` and pinned by `ProcessorCatalogContractTest`.
 
 ## `transform.sql` — the SQL transformer v1 (SHIPPED 2026-09-04, `98ffc90b` engine · `7e13dd82` pane)
 
@@ -180,12 +202,12 @@ the actual execution:
   routed to quarantine: `TRY_CAST` returns SQL `NULL` inline, in the same query, with no per-row branch
   point for Java to intercept — the NULL count is only measured after the query returns
   (`DataTransformer.java:202-204`).
-* **Whitespace sanitizing / expression building** (`quality.cleanse.trim`, `transform.expression`) are raw
-  SQL fragments (`TRIM(col)`, `CONCAT`, date functions) spliced verbatim into the generated column list by
-  `TransformCompiler` — DuckDB parses and runs them like any other SQL expression, not a distinct transform
-  pipeline stage.
-* **Cast & rename** (`transform.cast`) is column aliasing in the same generated `SELECT` — `SELECT
-  src_col AS target_col` — no separate rename mechanism.
+* **Sanitizing, casting, renaming and computing** — all four of the acts now folded into
+  `transform.record` — are SQL fragments in the generated column list: `TRIM(col)`,
+  `TRY_CAST(col AS …)`, `expr AS target_col`, any scalar expression. DuckDB parses and runs them like
+  any other SQL, so none of them is a distinct transform pipeline stage; on `transform.sql` the fields
+  grid *generates* those fragments from typed function definitions, and on the legacy `transform.map`
+  path `TransformCompiler` splices an `EXPR` rule's text verbatim.
 * **Lookup** (`transform.lookup`) is a DuckDB `LEFT JOIN` between the row relation and the resolved
   Reference dataset's relation (`RowShaper.join()`), keyed on `on`. DuckDB executes the join; Java only
   resolves which reference table to bind and builds the join SQL.
@@ -204,8 +226,10 @@ naturally expressible as a join against a stored relation.
   (`transform.sql` at `:174`), else throws. No per-catalog-id branch exists; several catalog ids fan into
   the same `transform.map` or `transform.sql` branch.
 * **Palette activity is gated on `Status.PLANNED` only** — `DELIVERED` and `PARTIAL` both render as
-  active/addable in the palette (`ProcessorCatalog.java:12-14`). So `quality.cleanse.trim` and
-  `transform.lookup` look fully live in the UI despite being partial implementations.
-* Searched broadly for a class named for any of these 5 processors ("schema validator", "whitespace
+  active in the palette (`ProcessorCatalog.java:12-14`), so `transform.lookup` looks fully live despite
+  being a partial implementation. ⚠ *Addable* is a separate flag, computed from
+  `PipelineEditable.isAuthorable(nodeType)`: `quality.schema.validator` is DELIVERED but **not addable**,
+  because it now points at `parser` (a capability of the Parse Step, not a step you add).
+* Searched broadly for a class named for any of these processors ("schema validator", "whitespace
   sanitizer", "expression builder", "cast matrix", "lookup transcoder") — none exist. This is a confirmed
   gap, not an unexplored one.

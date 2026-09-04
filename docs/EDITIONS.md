@@ -206,7 +206,7 @@ E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for P
 | SP-PRS-15 | 🌐 PCAP network packet slicer (`parser.binary.pcap`) | Extraction & Format Parsers | 🔲 | 🔲 | 🔲 | — |  |
 | SP-PRS-16 | 📜 Grok / Logstash expression matcher (`parser.pattern.grok`) | Extraction & Format Parsers | 🔲 | 🔲 | 🔲 | — |  |
 | SP-PRS-17 | 🖥️ Syslog RFC 5424 / RFC 3164 parser (`parser.pattern.syslog`) | Extraction & Format Parsers | 🔲 | 🔲 | 🔲 | — |  |
-| SP-DQ-01 | 🛡️ Schema validator & type coercion (`quality.schema.validator`) | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `transform.map` | the schema registry: typed fields, TRY_CAST, structural rejects → quarantine |
+| SP-DQ-01 | 🛡️ Schema registry & structural rejects (`quality.schema.validator`) | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `parser` (not addable) | **Re-scoped 2026-09-04:** type *coercion* folded into SP-XFM-01; what stays is the schema CONTRACT on the Parse Step — the declared source column + target type are the cast-failure audit's denominator, and `SchemaCompatibility` gates them BACKWARD |
 | SP-DQ-02 | ⚠️ Constraint & range checker (Expectations) (`quality.constraint.check`) | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `expectation` | Expectations evaluated per Dataset (`ExpectationEvaluator`); not a mid-chain step |
 | SP-DQ-03 | 🧼 Exact-key deduplicator (within a Consignment) (`quality.dedup.exact`) | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `transform.dedup` | `scope: consignment` (default) |
 | SP-DQ-04 | ⏱️ Sliding time-window deduplicator (`quality.dedup.windowed`) | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `transform.dedup` | D-9: `scope: window(P4D)` + the durable dedup ledger |
@@ -214,15 +214,15 @@ E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for P
 | SP-DQ-06 | 🧬 Schema drift & new-field detector (`quality.schema.drift`) | Data Quality, Validation & Cleansing | 🟡 | 🟡 | 🟡 | `expectation` | multi-schema dispatch refuses unknown shapes; no drift REPORT yet |
 | SP-DQ-07 | 🔍 Cluster & edit value normalizer (`quality.cluster.edit`) | Data Quality, Validation & Cleansing | 🔲 | 🔲 | 🔲 | — |  |
 | SP-DQ-08 | 🔍 Fuzzy string (Jaro-Winkler) matcher (`quality.match.fuzzy`) | Data Quality, Validation & Cleansing | 🔲 | 🔲 | 🔲 | — |  |
-| SP-DQ-09 | 🧹 Whitespace & string sanitizer (`quality.cleanse.trim`) | Data Quality, Validation & Cleansing | 🟡 | 🟡 | 🟡 | `transform.map` | any `EXPR` rule does it today; no dedicated step |
+| ~~SP-DQ-09~~ | ~~🧹 Whitespace & string sanitizer (`quality.cleanse.trim`)~~ | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `transform.sql` | **FOLDED into SP-XFM-01 (Record Transformer) 2026-09-04** — it is the `text.trim` / `text.pad_left` / `text.replace` rows of that grid, no longer a separate catalog entry |
 | SP-DQ-10 | 🧮 Inline stream profiler & statistics (`quality.profiler.inline`) | Data Quality, Validation & Cleansing | 🟡 | 🟡 | 🟡 | `storage_report` | storage/completeness KPIs exist; no per-column profile step |
 | SP-DQ-11 | 📊 Statistical & reservoir sampler (`quality.sample.reservoir`) | Data Quality, Validation & Cleansing | 🔲 | 🔲 | 🔲 | — |  |
 | SP-DQ-12 | 🔤 Character map & code page transcoder (`quality.cleanse.transcode`) | Data Quality, Validation & Cleansing | 🔲 | 🔲 | 🔲 | — |  |
 | SP-DQ-13 | 🔒 PII masking & tokenization (`quality.pii.mask`) | Data Quality, Validation & Cleansing | — | — | 🔲 | — | board SEC-08 — Enterprise only |
 | SP-DQ-14 | 🔑 One-way salted cryptographic hasher (`quality.crypto.hash`) | Data Quality, Validation & Cleansing | 🔲 | 🔲 | 🔲 | — |  |
 | SP-DQ-15 | 🛡️ GDPR / CCPA field redactor (`quality.compliance.redact`) | Data Quality, Validation & Cleansing | — | — | 🔲 | — | board SEC-08 — Enterprise only |
-| SP-XFM-01 | 🧮 Expression builder & computed columns (`transform.expression`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.sql` | computed columns as SELECT expressions in the SQL Step (`transform.sql`); the `EXPR` / `CONCAT_DT` / `FILENAME_DATE` map rules remain |
-| SP-XFM-02 | 🔄 Field type cast & renamer matrix (`transform.cast`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.sql` | type casts stay on the Parse step's Types section (declarative typing); renames/aliases via the SQL Step (`transform.sql`) |
+| SP-XFM-01 | 🧮 **Record Transformer** (`transform.record`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.sql` | **Folded 2026-09-04** from SP-XFM-01 + SP-XFM-02 + SP-DQ-09, which were three labels over one grid: sanitize · cast · rename · computed columns, one row per output field over a typed function catalog, generating the SELECT it saves. Legacy `EXPR` / `CONCAT_DT` / `FILENAME_DATE` map rules remain on `transform.map` |
+| ~~SP-XFM-02~~ | ~~🔄 Field type cast & renamer matrix (`transform.cast`)~~ | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.sql` | **FOLDED into SP-XFM-01 2026-09-04** — cast is the `convert.type` row, rename is the Field-name alias |
 | SP-XFM-03 | 🔽 Row filter (pre-parse regex / post-map predicate) (`transform.filter`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.filter` |  |
 | SP-XFM-04 | 🔀 Router — case / clone branches with mid-branch steps (`transform.route`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.route` |  |
 | SP-XFM-05 | ∑ Group-by summarizer (measures grammar) (`transform.summarize`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.summarize` |  |
