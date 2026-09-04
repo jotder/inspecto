@@ -90,8 +90,16 @@ catalog and by persisting `fields[]`.
   (`ComponentsService.describeTransform`, over `TypeFlow.describe`'s execution-free `DESCRIBE`) and fills
   **Comes out as** from the answer; a preview run's types are the fallback, not the source. The debounce
   timer is cleared on `DestroyRef.onDestroy` so a drawer closed mid-keystroke fires nothing.
+- ⚠ **The DESCRIBE is sent the DECLARED upstream types** (`[upstreamColumnTypes]`, read off the parser
+  companion's `raw.fields[]` by the editor and keyed by name). Assuming VARCHAR for every column made
+  DuckDB REFUSE valid SQL — `AMOUNT * 2` over a declared DOUBLE answered "No function matches … 
+  *(VARCHAR, INTEGER_LITERAL)" — and that refusal blocked Apply. A false refusal in an authoring pane is
+  worse than no derivation at all. Declared type wins; the sample row's shape is the fallback.
 - **Binder errors are as-you-type, and ONLY a 422 blocks Apply.** DuckDB's message renders in a warning
-  alert above the grid and clears `canApply()`. Any other failure — offline, a 404 on an older control
+  alert above the grid ("This does not run yet") and clears `canApply()`. The route strips the JDBC
+  wrapper line the driver puts in front of every failed `DESCRIBE` ("Attempting to execute an
+  unsuccessful or closed pending query result"), which was otherwise the FIRST thing the author read;
+  everything from the real error on is verbatim, because it names the column and lists the candidates. Any other failure — offline, a 404 on an older control
   plane, a 503 — says nothing about the SQL, so it clears the alert and leaves Apply available: a pane
   that locks the author out because the backend is unreachable is worse than one that saves unverified
   SQL (three specs in `Transform pane: live schema derivation` pin all three arms).

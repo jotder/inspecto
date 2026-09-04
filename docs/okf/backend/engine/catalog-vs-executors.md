@@ -73,7 +73,10 @@ As built:
   DuckDB's message verbatim (it names the offending column — that IS the validation). No rows are ever
   read. **Exposed since 2026-09-04 as `POST /components/transform/describe`**
   (`ComponentRoutes.describeTransform`) — body `{ sql, inputColumns: [{name, type}] }` → `{ columns:
-  [{name, type}] }`, 400 on a malformed body, 422 on the guard's reason or DuckDB's binder message. It
+  [{name, type}] }`, 400 on a malformed body, 422 on the guard's reason or DuckDB's binder message (with the
+  driver's "closed pending query result" wrapper line stripped — `duckDbMessage`, pinned by test).
+  ⚠ Callers must send the DECLARED input types: VARCHAR-for-everything makes the binder refuse valid
+  arithmetic over a typed column. It
   sits with the other `/components` previews (un-gated: reads nothing, writes nothing) rather than at the
   planned `POST /pipelines/authored/{id}/nodes/{nodeId}/describe`, because it needs no pipeline and no
   node — the pane has the SQL and the upstream columns in hand. ⚠ **`TypeFlow.describe` opens a plain
