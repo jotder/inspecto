@@ -112,6 +112,17 @@ Parser-only (10):
 | `processing.ingester_config` | free-form map handed to the plugin ingester | hand-authored only |
 | `processing.mapping_file` | `RowShaper` — a *declared* mapping reference; authored `processing.map.columns` beside it refuses `MAPPING_CONFLICT` | hand-authored only |
 
+### Node-config keys that are not `processing.*` blocks — `transform.sql` (2026-09-04)
+
+A `transform.sql` Step is graph-authored only (no recipe verb, no `processing.*` block, not lowerable to
+the flat config). Its node config carries **`sql`** — the one declared attribute (`NodeAttributes.TRANSFORM_SQL`,
+`multiline`, required): a single `SELECT` whose input relation is the fixed alias **`input`** (`FROM
+input`), rewritten to the real relation at execution; DDL/DML/multi-statement refused. The Angular pane
+stores **`fields[]`** beside it — the Simple-mode rows that generated the SQL. `fields[]` is an authoring
+artifact the engine never reads (its absence means the SQL was hand-written and the Simple table is
+locked); it is not a declared attribute and must not be added to the contract as one. Details:
+[`catalog-vs-executors.md`](../engine/catalog-vs-executors.md).
+
 ## Utility-only sections (neither authority)
 
 Read by the pre-ETL tools in `inspecto-util`, never by the parser or the spec — they coexist in the same

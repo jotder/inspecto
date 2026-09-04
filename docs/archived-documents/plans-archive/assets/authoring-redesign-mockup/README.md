@@ -3,7 +3,12 @@
 Working files for the design canvas **"Pipeline Authoring Redesign"**
 (https://claude.ai/code/artifact/b5e7ec6c-5bb2-467a-a513-93bfda987f3d), the visual companion to
 [`parse-pane-redesign-plan.md`](../../parse-pane-redesign-plan.md) and
-[`sql-transform-v1-plan.md`](../../sql-transform-v1-plan.md). Decided 2026-09-03.
+[`sql-transform-v1-plan.md`](../../sql-transform-v1-plan.md). Decided 2026-09-03; both plans SHIPPED 2026-09-04
+(`98ffc90b` · `7e13dd82` · `d012f721`) and this folder moved into the archive with them — it is the
+editable source of an as-built design, kept for provenance. What was built diverges from the artboards
+where the plans' review rows say so (parse-pane R1–R12; the Transform pane has no "Describe the fields"
+section). The as-built truth is `docs/okf/frontend/features/grammar-config.md`,
+`schema-mapping-authoring.md` and `pipeline-editor.md`, never these files.
 
 | File | Artboard |
 |---|---|

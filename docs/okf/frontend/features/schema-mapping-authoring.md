@@ -1,10 +1,10 @@
 ---
 type: Feature
 title: Schema, Mapping & Transformation Authoring
-description: Current end-user authoring path for a dataset's schema, the transform.map rule grid, and transform.join lookup config — and the concrete gaps against a complete authoring experience.
+description: End-user authoring path for a dataset's schema (the redesigned Parse pane), the new transform.sql Simple/Advanced pane, the legacy transform.map rule grid, and transform.join lookup config — with the 2026-09-03 gap list annotated by what the redesign closed, absorbed or dropped.
 resource: inspecto-ui/src/app/modules/admin/pipelines/pipeline-load-definition.component.ts
 tags: [feature, pipelines, authoring, schema, mapping, transform, gap-analysis]
-timestamp: 2026-09-03T00:00:00Z
+timestamp: 2026-09-04T00:00:00Z
 ---
 
 # Schema, Mapping & Transformation Authoring
@@ -16,13 +16,66 @@ timestamp: 2026-09-03T00:00:00Z
 > which covers the engine side of the same two node types. Written 2026-09-03 as a baseline for a planned
 > authoring-UX pass — **current truth, not aspirational**.
 >
-> **The pass is now two ACTIVE plans (decided 2026-09-03):**
-> [`superpower/parse-pane-redesign-plan.md`](../../../superpower/parse-pane-redesign-plan.md) (schema side)
-> and [`superpower/sql-transform-v1-plan.md`](../../../superpower/sql-transform-v1-plan.md) (mapping /
-> transformation side — a new `transform.sql` Step over the typed source; typing stays declarative on
-> Parse). §6 below is what they were scoped against; when they ship, rewrite §2–§4 here as-built.
+> **The pass SHIPPED 2026-09-04** as two plans, both archived:
+> [`parse-pane-redesign-plan.md`](../../../archived-documents/plans-archive/parse-pane-redesign-plan.md)
+> (`d012f721`; as-built in [grammar-config.md](grammar-config.md) § "The sectioned Parse pane") and
+> [`sql-transform-v1-plan.md`](../../../archived-documents/plans-archive/sql-transform-v1-plan.md)
+> (`98ffc90b` engine + `7e13dd82` pane; as-built in §0 below and
+> [`catalog-vs-executors.md`](../../backend/engine/catalog-vs-executors.md)). §1–§5 describe the surfaces
+> that still exist — `SchemaEditorDialog`, the `transform.map` rule grid and the `transform.join` form
+> were NOT removed; `transform.map` is now the legacy mapping path beside `transform.sql`. §6's gap list
+> is annotated with what the redesign closed, absorbed, or dropped as premature.
+
+## 0. The Transform Step pane — `transform.sql` (as built, `7e13dd82`)
+
+`PipelineTransformSqlDefinitionComponent` (`pipeline-transform-sql-definition.component.ts`), a bespoke
+pane beside the map grid — NOT the generic schema-form — reached from the editor's routing arm for
+`dn.type === 'transform.sql'` (`pipeline-editor.component.html:755-767`). Two modes behind a segmented
+toggle in the drawer header; operator decisions D5–D7 are binding, do not re-ask:
+
+- **Simple (default) — a Fields table that GENERATES the SQL.** One row per output field: `#` (output
+  position in the FULL ordered list — computed before filtering/paging, so page 2 starts at #11) · Field
+  name (editable — the alias) · From (source column; "— calculated —" for formulas) · What to do ·
+  Comes out as (derived type chip) · Sample (the verb applied to the sample value) · leave-out (×).
+  Exactly **five plain-language verbs** (`:20-24`, `SqlFieldVerb`): `keep` Keep as it is · `trim` Remove
+  extra spaces · `upper` Make UPPERCASE · `cast` Change type to… · `formula` Calculate…. ⛔ Adding a
+  sixth verb is a product decision, not a dev convenience. Above the grid: search (name + source) and
+  view-only filter chips with counts; below: a pager, **10 / 20 / 100 rows (default 10)**
+  (`PAGE_SIZES`, `:27`), "Add a calculated field", and **Left out** chips (click to restore, `:109,
+  290-305`). Filters and search are a lens — they never change the output; changing either resets to
+  page 1. 600+ columns is the design point. Seed for a new Step: one `keep` row per upstream column
+  (`seedFields`, `pipeline-transform-sql.ts:68-75`).
+- **The generator is a pure, unit-tested function** `generateSql(fields) → SELECT`
+  (`pipeline-transform-sql.ts:39-65`): `keep → col`, `trim → TRIM(col)`, `upper → UPPER(col)`,
+  `cast → TRY_CAST(col AS T)` — **always `TRY_`, never `CAST`** (the forgiving semantic, `:49`) —
+  `formula → <text verbatim>`; every row `AS name`; fixed `FROM input`; an empty list is `SELECT * FROM
+  input`. Table → SQL is forward-only generation: **no parser, no AST** (D4 — that is v2, parked in
+  BACKLOG). The engine only ever sees the SQL.
+- **Advanced — the SQL** in a plain `<textarea>` (CodeMirror is in `package.json` but wiring it is a
+  BACKLOG follow-on) plus the derived output schema. It reflects Simple read-only until the author types
+  into it; **the first hand edit LOCKS the Step** (D6): `handWritten` non-null ⇔ `locked` (`:110,117`),
+  Simple greys out behind a banner with a "start over from the table" action that discards the
+  hand-written SQL. Hand-written SQL is never parsed back into rows.
+- **Persisted shape** (`submit()`, `:378-386`): `{ sql }` always; `fields[]` added **only when unlocked**
+  — so a node config without `fields[]` IS a locked, hand-written node. `sql` is the single declared
+  attribute (`node-attributes.ts:347-353`, no `where` — filtering stays `transform.filter`, D3);
+  `fields[]` is an authoring artifact the engine never reads.
+- **Test against sample** reuses "Test this Step" verbatim: `ComponentsService.previewTransform({type,
+  sql}, sampleRows)` (`:348`) — `transform.sql` qualifies by the `transform.*` prefix, nothing new was
+  built. ⚠ The output schema is therefore derived from the preview's rows, **not** from
+  `TypeFlow.describe`'s execution-free `DESCRIBE` — the `/describe` route was not built (BACKLOG).
+- **Not built, on purpose:** the "Describe the fields" metadata section (description · unit ·
+  sensitivity) the plan sketched — the backend does not carry column metadata on a `transform.sql` node,
+  and faking a home for it would have been a second owner of `raw.fields[]` keys. Until it lands here
+  (BACKLOG), metadata rides through the Parse pane's by-selector carry-through
+  ([grammar-config.md](grammar-config.md)).
+- **Audit boundary:** saving a `transform.sql` node yields one WARNING `SQL_STEP_UNAUDITED` from the
+  validator; a WARNING never blocks save (proven by test — `catalog-vs-executors.md`).
 
 ## 1. Schema authoring
+
+> 2026-09-04: the Parse pane's own columns table ("Columns that come out"), its sections and defaults are
+> in [grammar-config.md](grammar-config.md); the standalone `SchemaEditorDialog` below is unchanged.
 
 - **Component:** `SchemaEditorDialog` (`schema-editor.dialog.ts:48-118`) — a flat grid over
   `<inspecto-editable-grid>` with columns name / selector / **type** / description / unit / classification
@@ -54,7 +107,11 @@ timestamp: 2026-09-03T00:00:00Z
   button). This fires on a *parser format* change, never on a manual edit made through `SchemaEditorDialog`,
   and never names which mapping rules would break.
 
-## 2. Mapping authoring (`pipeline-load-definition.component.ts` — `transform.map`)
+## 2. Mapping authoring (`pipeline-load-definition.component.ts` — `transform.map`, legacy path since 2026-09-04)
+
+> The catalog's `transform.expression` and `transform.cast` entries now point at `transform.sql` (§0);
+> `transform.map` and its `EXPR`/`CONCAT_DT`/`FILENAME_DATE` rules remain for stored pipelines and are
+> still authored here, unchanged.
 
 - Rule rows are a `FormArray`, seeded from the node's already-authored `rules` if present, or — if the node
   has none — one straight-through identity rule per schema field, auto-seeded as a pending "proposal" that
@@ -149,7 +206,18 @@ timestamp: 2026-09-03T00:00:00Z
   out-of-range cast) surfaces only at Test-time or full run-time — never at keystroke time, and never as a
   blocking save-time gate (all of the above are bypassable or simply don't exist as checks).
 
-## 6. Concrete gaps (confirmed absent, not speculative)
+## 6. Concrete gaps (confirmed absent 2026-09-03 — annotated 2026-09-04 with what the redesign did)
+
+Status per gap after the two plans shipped (AUTHOR-SCHEMA-1 is CLOSED in BACKLOG; what survives is
+AUTHORING-REDESIGN-1): **1 — absorbed** by `transform.sql` (Simple mode never shows SQL; Advanced still
+has no as-you-type validation — a DESCRIBE-backed `/describe` route is the follow-on). **2 — absorbed**
+(the Fields grid IS the expression builder for the five verbs; CodeMirror wiring stays open). **3 — still
+valid** small follow-on (join reference-existence). **4 — partially absorbed**: the drift-into-mapping
+check stays valid *because* Layer 1 remains a rule table; still open. **5, 6, 8 — dropped as premature**
+for a surface that was redesigned (async validators, auto-recompute, drag-and-drop, RunToHere
+cross-link). **7 — absorbed**: a `transform.sql` binder error names the stale column (DuckDB's message
+verbatim) instead of defaulting to VARCHAR; the `DIRECT`-rule fallback itself is unchanged on the legacy
+path.
 
 1. **No live/as-you-type validation or preview for `EXPR`** — a bare `<input matInput>` with zero syntax
    checking (`pipeline-load-definition.component.ts:218-225`).

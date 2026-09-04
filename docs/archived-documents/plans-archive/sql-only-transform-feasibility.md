@@ -1,7 +1,6 @@
 # "Drop the mapping, keep only SQL Map+Filter" — feasibility, grounded
 
-**Status:** ANALYSIS ONLY, nothing built, nothing scheduled (operator asked for a feasibility pass,
-2026-08-29). **Concept home if any of it is ever built:** `okf/backend/engine/duckdb.md` +
+**Status:** ARCHIVED 2026-09-04 — analysis of 2026-08-29 whose de-risking order (§6) is now done or parked with a recorded decision: step 1 SHIPPED 2026-08-29 (`EXPR` WARNING) and extended to `transform.sql` in `98ffc90b`; step 2 SHIPPED as `transform.sql`'s `DESCRIBE`-derived output schema (`TypeFlow.describe`, same commit); step 3 ("does the rule table still earn its place") was ANSWERED by the two-layer split — typing stays declarative on Parse, transforming is one SQL over the typed source (`sql-transform-v1-plan.md`, archived beside this file). The two still-live threads (§3 macros-as-UDFs, the `json`-extension-under-the-seal probe for the v2 AST table) are BACKLOG rows (AUTHORING-REDESIGN-1), not this file. Durable facts distilled into `okf/backend/engine/catalog-vs-executors.md`. **Concept home if any of it is ever built:** `okf/backend/engine/duckdb.md` +
 `okf/backend/engine/etl-transform.md`.
 
 **The idea, as put:** Extract parses the data, generates a schema, and visualises it for testing. The

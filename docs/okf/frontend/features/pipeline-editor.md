@@ -367,7 +367,10 @@ The Parse surface itself — tabs, options, columns grid, Grammar CSV round-trip
   engine default (which would silently grow every existing store). The lineage column is shown
   read-only in the Types tab and Column metadata list (it IS an output column, stamped at write
   time) — never as a fake `schemaSeed` row, which risks being written back as authored.
-- **Partitioning** (`<inspecto-schema-partitions-editor>`, `inspecto/schema/`): rows derive Hive
+- **Partitioning** (`<inspecto-schema-partitions-editor>`, `inspecto/schema/`; **rendered on the Sink
+  pane since 2026-09-04**, which reads/writes the SAME companion schema toon's `partitions[]` key directly;
+  ⚠ the Parse pane still seeds `partitions[]` on load and carries it through its `overwrite: true` write, so
+  a Parse Apply over a stale seed can clobber a Sink edit made meanwhile — BACKLOG): rows derive Hive
   segments `{column, source, type}` from schema fields, rendered where the pane owns the schema
   toon (`authorsSchema()`). 🔴 The read half is a data-loss fix — `partitions[]` is top-level in
   the schema toon and the pane's `overwrite: true` write DROPPED hand-authored blocks until the
@@ -377,7 +380,33 @@ The Parse surface itself — tabs, options, columns grid, Grammar CSV round-trip
   launcher pre-picks a date field only when exactly ONE exists; ⚠ native `<select>` in `@for`:
   bind `[selected]` per option, never `[value]` on the select.
 
+## Transform: the `transform.sql` Step pane (SHIPPED `7e13dd82`, 2026-09-04)
+
+- **Routing arm:** the definition dock has one more type-specific arm — `dn.type === 'transform.sql'` →
+  `<app-pipeline-transform-sql-definition>` (`pipeline-editor.component.html:755-767`), beside the
+  `transform.map` arm (`:736-754`) that projects `<app-pipeline-load-definition>`; every other
+  `transform.*` kind stays on the generic `pipeline-config-definition` schema-form. A node TYPE routes to
+  its own pane — the rule that already held for map/parse/sink.
+- **The pane:** Simple (a Fields table with five plain-language verbs that GENERATES the SQL) /
+  Advanced (the SQL textarea + derived output schema). A hand edit in Advanced **locks** the Step; the
+  persisted config is `{ sql, fields? }` — `fields[]` present only while unlocked. Test-against-sample
+  reuses `ComponentsService.previewTransform` (the existing "Test this Step" path — `transform.sql`
+  qualifies by prefix). Full as-built, decisions D3–D7 and what was deliberately not built:
+  [schema-mapping-authoring.md](schema-mapping-authoring.md) §0; engine half:
+  [`catalog-vs-executors.md`](../../backend/engine/catalog-vs-executors.md).
+- ⚠ The pane's `fields[]` is an authoring artifact, not a `NodeAttributes` entry — do not add it to the
+  contract; the engine reads `sql` only. Its absence is meaningful (locked/hand-written).
+- **Parse pane companions (`d012f721`, same shift):** the Parse drawer is sectioned (not tabbed), flat
+  compact rows, one "Columns that come out" table; **partitioning moved from Parse to the Sink pane** and
+  the Collection pointer is read-only on Parse — see [grammar-config.md](grammar-config.md). The
+  *Cross-Step fields* facts above still hold (`output.filename_column` lives on the SINK; the Parse
+  checkbox that appends a read-only `file_name` row is default OFF for exactly that reason).
+
 ## Load: mapping on the map Step, schema on the parser
+
+> 2026-09-04: `transform.map` is the **legacy** mapping path. New computed columns / renames go through
+> `transform.sql` (the catalog's `transform.expression`/`transform.cast` point there); the facts below are
+> unchanged for stored pipelines.
 
 - **`processing.schema_file` is the PARSER Step's key** (where `PipelineLift` puts it and
   `PARSER_NO_SCHEMA` checks it) — the Parse drawer authors the output schema.

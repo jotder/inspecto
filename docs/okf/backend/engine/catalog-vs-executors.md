@@ -1,10 +1,10 @@
 ---
 type: Concept
 title: Step Processor catalog vs. real node executors — the mapping/transform family
-description: Why 5 catalog "processors" (schema validator, whitespace sanitizer, expression builder, cast/rename matrix, lookup transcoder) collapse onto only two node types (transform.map, transform.join) with no per-processor Java class.
+description: Why 5 catalog "processors" (schema validator, whitespace sanitizer, expression builder, cast/rename matrix, lookup transcoder) collapse onto three node types (transform.map, transform.sql, transform.join) with no per-processor Java class — and the transform.sql executor, TypeFlow.describe and the SQL_STEP_UNAUDITED boundary.
 resource: inspecto-engine/src/main/java/com/gamma/pipeline/ProcessorCatalog.java
 tags: [engine, catalog, transform, node-types, gotcha]
-timestamp: 2026-09-03T00:00:00Z
+timestamp: 2026-09-04T00:00:00Z
 ---
 
 # Step Processor catalog vs. real node executors
@@ -12,8 +12,9 @@ timestamp: 2026-09-03T00:00:00Z
 The [Step Processor catalog](../../frontend/features/pipeline-editor.md) (121 entries, 8 families,
 `ProcessorCatalog.java`) is a **taxonomy/palette layer**, not a 1:1 map to engine code. Five catalog entries
 that read like a "Mapping and Transformer" family — spanning the `DQ` and `XFM` families — all resolve to
-just two [node types](node-types.md): `transform.map` (4 of them) and `transform.join` (1 of them). There is
-no dedicated Java class, config schema, or dispatch path per catalog id.
+three [node types](node-types.md): `transform.map` (2), `transform.sql` (2 — repointed 2026-09-04 when the
+SQL transformer v1 shipped, see below) and `transform.join` (1). There is no dedicated Java class, config
+schema, or dispatch path per catalog id.
 
 ## The five entries
 
@@ -21,13 +22,91 @@ no dedicated Java class, config schema, or dispatch path per catalog id.
 |---|---|---|---|---|
 | `quality.schema.validator` | DQ | DELIVERED | `transform.map` | "the schema registry: typed fields, TRY_CAST, structural rejects → quarantine" |
 | `quality.cleanse.trim` | DQ | PARTIAL | `transform.map` | "any `EXPR` rule does it today; no dedicated step" |
-| `transform.expression` | XFM | DELIVERED | `transform.map` | "the `EXPR` / `CONCAT_DT` / `FILENAME_DATE` rules" |
-| `transform.cast` | XFM | DELIVERED | `transform.map` | "the mapping rows (`DIRECT` + typed target)" |
+| `transform.expression` | XFM | DELIVERED | `transform.sql` | "computed columns as SELECT expressions in the SQL Step; the `EXPR` / `CONCAT_DT` / `FILENAME_DATE` map rules remain" |
+| `transform.cast` | XFM | DELIVERED | `transform.sql` | "type casts stay on the Parse step's Types section (declarative typing); renames/aliases via the SQL Step" |
 | `transform.lookup` | XFM | PARTIAL | `transform.join` | "a reference join covers it; no inline static map" |
 
-(`ProcessorCatalog.java:98,106,113,114,119`)
+(`ProcessorCatalog.java:98,106,113,114,119`; the two `transform.sql` rows and their mirror in
+`processor-catalog.contract.json` were repointed on 2026-09-04 — the catalog contract test pins the pair.)
 
-## `transform.map` group (4 of the 5)
+## `transform.sql` — the SQL transformer v1 (SHIPPED 2026-09-04, `98ffc90b` engine · `7e13dd82` pane)
+
+**The one fact that shaped it:** the raw relation is deliberately **ALL-VARCHAR** (`read_csv` is issued with
+explicit `columns={'c0':'VARCHAR',…}` so the Java and DuckDB ingest paths agree on types), so `SELECT * FROM
+raw` carries no types until something casts — and whatever casts *is* the mapping. It has to stay a
+declarative rule table for three non-stylistic reasons: the cast-failure audit counts `source non-blank AND
+result IS NULL` per rule and needs a declared source column + target type as its denominator (`EXPR` is
+excluded by definition); `TRY_CAST`/`TRY_STRPTIME` null one cell where a hand-written `CAST` kills the whole
+batch; and `SchemaCompatibility`'s BACKWARD contract needs a stable schema to diff against. Hence the
+**two-layer split**, decided 2026-09-03 (`sql-transform-v1-plan.md`, archived; grounding in
+`sql-only-transform-feasibility.md`, archived beside it):
+
+- **Layer 1 — typing** stays on the Parse step (Types section, declarative, `TRY_CAST` audit). Unchanged
+  mechanism — this IS the "Schema validator & type coercion" processor.
+- **Layer 2 — transforming** is ONE SQL `SELECT` over the **typed** output of Layer 1, where resultset
+  metadata is finally meaningful. That is `transform.sql`.
+
+As built:
+
+* **Node type:** `BuiltinNodeType.TRANSFORM_SQL("transform.sql", TRANSFORM, "SQL")`
+  (`BuiltinNodeType.java:118`) — `DATA` in, `DATA` out, single-input; a `project()`-class verb like
+  `map`/`select`/`derive`, never a split. ⛔ **Filtering stays `transform.filter`** (operator D3): a `WHERE`
+  buried in free SQL would discard rows silently, where `transform.filter` emits them as `DROPPED` for
+  quarantine/audit. There is deliberately no `where` attribute on this node.
+* **Attributes:** exactly one — `sql` (`multiline`, required; `NodeAttributes.java:374-379`, mirrored in
+  `node-attributes.ts:347-353`, pinned by `NodeAttributesContractTest`). Help text pins the convention: the
+  input relation is addressed by the fixed alias **`input`** (`FROM input`); no DDL/DML, no multiple
+  statements. The Angular pane also stores a `fields[]` block beside `sql` (the Simple-mode rows that
+  *generated* the SQL) — an **authoring artifact, not an engine contract**: the engine reads only `sql`,
+  and a node without `fields[]` is a hand-written ("locked") one. See
+  [pipeline-editor.md](../../frontend/features/pipeline-editor.md) for the pane.
+* **Executor:** `RowShaper.shape()` gains one branch (`RowShaper.java:174`) → `sql(conn, node, input,
+  outPrefix)` (`:494-512`): the statement passes `SqlGuard.check` (allow-list — anything that is not a
+  single `SELECT` throws naming the node), then `CREATE OR REPLACE TEMP VIEW input AS SELECT * FROM <in>`
+  binds the alias, `CREATE TABLE <out> AS <sql>` materializes exactly one relation (`PipelineRel.DATA`),
+  and the view is dropped in a `finally`. It runs on the same sealed [`SqlSandbox`](duckdb.md) connection
+  `EXPR` uses — no file/network access, no extension autoload.
+* **Derived output schema without execution:** `TypeFlow.describe(List<Column> inputColumns, String sql)`
+  (`inspecto-etl/.../TypeFlow.java:92-111`) generalizes `transformedColumns`: an in-memory connection, a
+  scratch table literally named `input` shaped by the **upstream Step's typed schema**, then `DESCRIBE
+  <sql>` → `[{name, type}]`. A binder/parse failure surfaces as `IllegalArgumentException` carrying
+  DuckDB's message verbatim (it names the offending column — that IS the validation). No rows are ever
+  read. ⚠ **No HTTP route exposes it yet** — the planned `POST /pipelines/authored/{id}/nodes/{nodeId}/describe`
+  was not built; the pane derives its output schema by reusing `POST /components/transform/preview`
+  (`previewTransform`) over the tab's sample rows instead (BACKLOG AUTHORING-REDESIGN-1).
+* **Audit honesty at the boundary:** `transform.sql` is, by construction, outside the cast-failure audit
+  (the same reason `EXPR` is). `PipelineValidator.validate` emits one WARNING `SQL_STEP_UNAUDITED`
+  (`PipelineValidator.java:86, 263-267`) per `transform.sql` node, naming the node id and its `sql`
+  attribute. Unlike the 2026-08-29 `EXPR` fix, **no `clean`/gate bug was found alongside it**:
+  `PipelineValidator.Result.ok()` and `PipelineGraphRoutes.saveGraph`'s findings gate already keyed off
+  `Severity.ERROR` only — proven, not trusted, by `PipelineValidatorTest`
+  (`theUnauditedSqlWarningAloneDoesNotBlockSave`, `anActualErrorOnAGraphWithASqlStepStillBlocksSave`).
+* **Recipe view:** `transform.sql` is not a `PipelineProjection.RECIPE_VERBS` entry — it is authored on the
+  graph/drawer only (same footing as `select`/`derive` for lowering; see [node-types.md](node-types.md)).
+
+**Where the catalog's processors land after v1** (operator's question, answered):
+
+| Catalog entry | Home |
+|---|---|
+| Schema validator & type coercion | Parse step, Types section (Layer 1, declarative, unchanged) |
+| Whitespace & string sanitizer | `TRIM(x)` in the SQL — the Simple mode's "Remove extra spaces" verb |
+| Expression builder & computed columns | **is** `transform.sql` |
+| Field type cast & renamer matrix | splits: cast → Layer 1; rename → the editable Name (alias) in the Simple grid |
+| Lookup & static map | `transform.join` stays for Reference datasets (v2 may allow `JOIN` inside the SQL) |
+| Summarizer | same shape — `transform.sql` with `GROUP BY`; `transform.summarize` keeps its `measures`/`group_by` validators for the structured form, not deleted |
+
+**Parked with a recorded decision (BACKLOG AUTHORING-REDESIGN-1, not this file):** v2 smart table over the
+AST (`json_serialize_sql`/`json_deserialize_sql`) — 🔴 it lives in the `json` extension and
+`SqlSandbox.seal()` sets `autoload_known_extensions=false`; `json` is *normally* statically linked in the
+JDBC jar, but so was assumed of `excel`, which is NOT — measure on the sealed connection before designing.
+v3 macros as the UDF registry — measured 2026-08-29 on `duckdb_jdbc 1.5.2.1`: `CREATE MACRO` (scalar and
+table) works and **survives the seal**, but `DuckDBConnection` exposes **no** Java-side scalar-UDF API, so
+"UDF" can only ever mean a SQL macro, per-connection, re-created on every scratch connection
+(`EnrichmentEngine`, `PipelineJobRunner`, `BatchIngestStrategy`, preview) and needing a component kind +
+registry that do not exist. Dynamic/environment values — none in v1; when needed, render at read time
+(the standing rule) or `SET VARIABLE`/`getvariable()`.
+
+## `transform.map` group (2 of the 5 today; 4 before 2026-09-04)
 
 * **No `NodeAttributes`/`AttributeSpec` entry exists for `transform.map`** — deliberately absent
   (`NodeAttributes.java:28-31`, and `PipelineEditable.java:115`: "the lift emits it as the schema"). Its
@@ -100,9 +179,9 @@ naturally expressible as a join against a stored relation.
 ## Cross-cutting
 
 * **Dispatch architecture:** `RowShaper.shape()` (`RowShaper.java:155-183`) — SPI seam
-  (`PipelineNodeExecutors.get(type)`) first, then a hardcoded `if (BuiltinNodeType.X.equals(type))` chain,
-  else throws. No per-catalog-id branch exists; several catalog ids fan into the same `transform.map`
-  branch.
+  (`PipelineNodeExecutors.get(type)`) first, then a hardcoded `if (BuiltinNodeType.X.equals(type))` chain
+  (`transform.sql` at `:174`), else throws. No per-catalog-id branch exists; several catalog ids fan into
+  the same `transform.map` or `transform.sql` branch.
 * **Palette activity is gated on `Status.PLANNED` only** — `DELIVERED` and `PARTIAL` both render as
   active/addable in the palette (`ProcessorCatalog.java:12-14`). So `quality.cleanse.trim` and
   `transform.lookup` look fully live in the UI despite being partial implementations.

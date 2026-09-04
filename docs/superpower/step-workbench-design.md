@@ -1,7 +1,7 @@
 # The Step workbench — publish the derived schema instead of asking for it
 
 **Status:** DESIGN, not scheduled (operator asked to "fill up the gap", 2026-08-29). No code.
-**Follows:** [`sql-only-transform-feasibility.md`](sql-only-transform-feasibility.md) — this is that
+**Follows:** [`sql-only-transform-feasibility.md`](../archived-documents/plans-archive/sql-only-transform-feasibility.md) (archived 2026-09-04) — this is that
 analysis's recommended step 2, designed. **Concept home on build:**
 `okf/backend/engine/etl-transform.md` (file to be created when this ships) +
 `okf/frontend/features/pipeline-editor.md`.

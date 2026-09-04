@@ -118,6 +118,7 @@ breaks two committed contracts); the full runtime edge model converges at **Phas
 | `transform.filter` | `DATA` + **`DROPPED`** | ✅ (verb `transform`) |
 | `transform.select` | `DATA` | ❌ |
 | `transform.derive` | `DATA` | ❌ |
+| `transform.sql` (2026-09-04) | `DATA` — one author `SELECT … FROM input` over the TYPED upstream relation; a `project()`-class verb, never a split | ❌ recipe verb — graph/drawer-authored only; one attribute `sql` ([catalog-vs-executors](catalog-vs-executors.md)) |
 | `transform.validate` | `DATA` + **`INVALID`** | ❌ |
 | `transform.dedup` | `DATA` + **`DUPLICATE`** | ✅ (verb `dedup`) |
 | `transform.dedup.marker` | `DATA` + `DUPLICATE` | ❌ — read/lower-compat only |
@@ -134,6 +135,12 @@ breaks two committed contracts); the full runtime edge model converges at **Phas
 **`transform.*` has nothing to do with CSV** — every verb is `CREATE TABLE <out> AS SELECT … FROM <input>`
 over a DuckDB relation, so they operate on the previous node's output metadata, not on a file.
 
+* ✅ **The fold has since happened for the projection half — as an ADDITIVE node, not a merge
+  (2026-09-04).** `transform.sql` is one author `SELECT` over the typed input (`RowShaper.sql`,
+  `RowShaper.java:494-512`); `map`/`select`/`derive` were NOT retired (their type strings are a committed
+  contract in stored `*_pipeline.toon`, see below). Typing stays declarative on Parse because the raw
+  relation is all-VARCHAR — the split and its reasons live in
+  [catalog-vs-executors.md](catalog-vs-executors.md).
 * ✅ **`map` / `select` / `derive` already ARE one construct in the executor** — one method,
   `RowShaper.projectionSelectFrom`, serves all three (`derive` just prepends `*`). And
   `RowShaper.fuse` already fuses a projection plus filters into a **single** `SELECT … WHERE`.

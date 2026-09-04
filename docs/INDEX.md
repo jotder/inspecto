@@ -112,17 +112,28 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
-- [`superpower/parse-pane-redesign-plan.md`](superpower/parse-pane-redesign-plan.md) — **DECIDED
-  2026-09-03, not started.** Delimited Parse pane: tabs → collapsible sections of single-row property
-  edits with sample values (deletes the R9 hidden-panel hack), Sample | Parsed tabs, filename column,
-  Files & metadata dissolved (Collection pointer → Collector, column metadata → Transformation,
-  partitioning → Sink), Name/Description back on the pane via `renameSelected`.
-- [`superpower/sql-transform-v1-plan.md`](superpower/sql-transform-v1-plan.md) — **DECIDED 2026-09-03,
-  not started.** New `transform.sql` Step: one SELECT over the TYPED source (`FROM input`),
-  `DESCRIBE`-derived output schema with editable target names, filter stays a separate Step (rejected
-  rows preserved), audit-boundary WARNING. Typing stays declarative on Parse (the all-VARCHAR raw fact —
-  see `sql-only-transform-feasibility.md`). v2 AST smart table + v3 macros parked; `json` extension
-  under the seal needs a probe first. Supersedes `author-schema-1-plan.md` (archived same day).
+- ~~`superpower/parse-pane-redesign-plan.md`~~ + ~~`superpower/sql-transform-v1-plan.md`~~ — **SHIPPED
+  and ARCHIVED 2026-09-04** →
+  [`archived-documents/plans-archive/parse-pane-redesign-plan.md`](archived-documents/plans-archive/parse-pane-redesign-plan.md)
+  (`d012f721`) and
+  [`archived-documents/plans-archive/sql-transform-v1-plan.md`](archived-documents/plans-archive/sql-transform-v1-plan.md)
+  (`98ffc90b` engine · `7e13dd82` pane), with their grounding
+  [`sql-only-transform-feasibility.md`](archived-documents/plans-archive/sql-only-transform-feasibility.md)
+  and the clickable mockup's editable source
+  (`archived-documents/plans-archive/assets/authoring-redesign-mockup/`). **The truth now lives in the
+  OKF:** the sectioned Parse pane (sections not tabs, R9 hack deleted with a mounting proof, compact flat
+  rows + the 560px ResizeObserver rule, plain-language labels, grounded defaults, ONE "Columns that come
+  out" table with the by-selector metadata carry-through, Files & metadata dissolved) →
+  [`okf/frontend/features/grammar-config.md`](okf/frontend/features/grammar-config.md); the `transform.sql`
+  Simple/Advanced pane (five verbs, generator, lock rule, `{ sql, fields? }`) →
+  [`okf/frontend/features/schema-mapping-authoring.md`](okf/frontend/features/schema-mapping-authoring.md) §0
+  + [`pipeline-editor.md`](okf/frontend/features/pipeline-editor.md); the engine (`RowShaper.sql`,
+  `TypeFlow.describe`, `SQL_STEP_UNAUDITED`, the two-layer typing/transform split and why the raw relation
+  is all-VARCHAR, the parked v2 AST / v3 macro facts) →
+  [`okf/backend/engine/catalog-vs-executors.md`](okf/backend/engine/catalog-vs-executors.md),
+  [`node-types.md`](okf/backend/engine/node-types.md), [`pipeline-config-keys.md`](okf/backend/pipeline-graph/pipeline-config-keys.md).
+  Open follow-ons: **AUTHORING-REDESIGN-1** in `BACKLOG.md` §4 (`/describe` route, CodeMirror, v2 AST
+  table behind the `json`-under-the-seal probe, v3 macros, partitions stale-Apply race, …).
 
 - ~~`superpower/mock-backend-removal-plan.md`~~ — **COMPLETE and ARCHIVED 2026-08-31** →
   [`archived-documents/plans-archive/mock-backend-removal-plan.md`](archived-documents/plans-archive/mock-backend-removal-plan.md).
@@ -204,22 +215,24 @@ former root reference docs** (each index lists them):
   is whether a post-sync step may create an arbitrary table or must stay in the summary guardrail.
 
 - [`superpower/step-workbench-design.md`](superpower/step-workbench-design.md) — **DESIGN, not
-  scheduled** (2026-08-29): one Step editor where the author builds a query (named fields, functions,
+  scheduled** (2026-08-29; ⚠ 2026-09-04: most of its ask — free SQL, derived output schema, test on
+  sample — shipped as the `transform.sql` pane; re-read against `schema-mapping-authoring.md` §0 before
+  reviving it): one Step editor where the author builds a query (named fields, functions,
   filter, grouping), sees the **generated SQL**, tests it on sample rows, and gets the **output schema
   derived** instead of restating it. 🔴 Grounded finding: this is mostly WIRING — `TypeFlow` (schema by
   `DESCRIBE`, no execution) and `RowShaper.fuse` are both written with **no production caller**, and the
   shipped preview already computes rows the UI discards. ⛔ `fuse` is deliberately NOT used (dead,
   untested, and only a perf win on a bounded sample). Five slices, S1+S2 deliver most of it.
 
-- [`superpower/sql-only-transform-feasibility.md`](superpower/sql-only-transform-feasibility.md) —
-  **ANALYSIS ONLY, nothing built or scheduled** (operator idea, 2026-08-29): drop the mapping and keep
-  only SQL Map+Filter, with the Parquet schema taken from the query's resultset metadata. Verdict: the
-  mechanism is **already built** (`TypeFlow` derives the output schema by `DESCRIBE` over the identical
-  SELECT), but the strong form is refuted — 🔴 the raw relation is **deliberately all-VARCHAR**, so
-  resultset metadata carries no types until something casts, and whatever casts *is* the mapping.
-  Measured: `CREATE MACRO` works and survives the `SqlSandbox` seal, but duckdb_jdbc exposes **no**
-  Java-side UDF API. Carries the four guarantees a declarative mapping buys (cast-failure audit,
-  forgiving coercion, per-field metadata, the BACKWARD compatibility contract).
+- ~~`superpower/sql-only-transform-feasibility.md`~~ — **ARCHIVED 2026-09-04** →
+  [`archived-documents/plans-archive/sql-only-transform-feasibility.md`](archived-documents/plans-archive/sql-only-transform-feasibility.md).
+  The 2026-08-29 analysis ("drop the mapping, keep only SQL") whose de-risking order is done: step 1 (the
+  audited/unaudited WARNING) shipped 2026-08-29 and extended to `transform.sql`; step 2 (publish the
+  `DESCRIBE`-derived schema) shipped as `transform.sql`; step 3 was answered by the two-layer split —
+  typing stays declarative on Parse because the raw relation is all-VARCHAR. Its measured facts (macros
+  survive the seal, no Java UDF API; the four guarantees a declarative mapping buys) are distilled into
+  [`okf/backend/engine/catalog-vs-executors.md`](okf/backend/engine/catalog-vs-executors.md). Still-live
+  threads (v2 `json` probe, v3 macros) are BACKLOG AUTHORING-REDESIGN-1.
 
 - ~~`superpower/source-timezone-plan.md`~~ — **COMPLETE and ARCHIVED 2026-08-29** →
   [`archived-documents/plans-archive/source-timezone-plan.md`](archived-documents/plans-archive/source-timezone-plan.md).
@@ -802,6 +815,18 @@ api-contract-design, component-model, the vocabulary renames, and ~60 more),
 `user-guide-audit.md`), the `consolidated-2026-06-13/` stakeholder snapshot, and the pre-4.x planning sets.
 Move a doc back up and re-list it here if it becomes current again.
 
+Archived 2026-09-04: [`plans-archive/parse-pane-redesign-plan.md`](archived-documents/plans-archive/parse-pane-redesign-plan.md),
+[`plans-archive/sql-transform-v1-plan.md`](archived-documents/plans-archive/sql-transform-v1-plan.md),
+[`plans-archive/sql-only-transform-feasibility.md`](archived-documents/plans-archive/sql-only-transform-feasibility.md)
+and the mockup source `plans-archive/assets/authoring-redesign-mockup/` — the authoring redesign, SHIPPED
+`98ffc90b` · `7e13dd82` · `d012f721`. As-built distilled into
+[`okf/frontend/features/grammar-config.md`](okf/frontend/features/grammar-config.md),
+[`okf/frontend/features/schema-mapping-authoring.md`](okf/frontend/features/schema-mapping-authoring.md),
+[`okf/frontend/features/pipeline-editor.md`](okf/frontend/features/pipeline-editor.md) and
+[`okf/backend/engine/catalog-vs-executors.md`](okf/backend/engine/catalog-vs-executors.md); open items are
+BACKLOG **AUTHORING-REDESIGN-1**. Retained as the record of the operator decisions (Parse D1–D4, SQL
+D3–D7) and the R1–R12 build review — what was deliberately NOT built, and why.
+
 Archived 2026-08-10: [`plans-archive/platform-services-plan.md`](archived-documents/plans-archive/platform-services-plan.md)
 — **Stage 1 COMPLETE (S1-0…S1-8, 2026-08-09/10)**: the `PlatformServices` seam, `requires:` grants
 validated at registration, the whole v1 menu (`notifications` · `incidents` · `schema` ·
@@ -828,4 +853,4 @@ the **blast-radius and failure taxonomy** behind the migration.
 
 ---
 
-**Last Updated**: 2026-07-25
+**Last Updated**: 2026-09-04

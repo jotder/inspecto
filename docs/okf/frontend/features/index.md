@@ -26,7 +26,7 @@ documented as concepts.
 * [Collectors](collectors.md) - configured collection tasks.
 * [Collector configuration](collector-config.md) - the ONE surface + store behind both collector-authoring screens.
 * [Pipeline editor](pipeline-editor.md) - the authored-Pipeline (DAG) editor; the Grammar/Parse surface is [grammar-config](grammar-config.md).
-* [Schema, Mapping & Transformation authoring](schema-mapping-authoring.md) - the schema editor, the `transform.map` rule grid, `EXPR` free-text, and `transform.join` lookup config as they exist today, plus 8 confirmed UX gaps (no EXPR validation/preview, no expression builder, no reference-existence check, no schema-drift detection into mapping, opt-in stale-prone previews, no drag-drop, silent stale-column fallback, disconnected test mechanisms) — baseline for a planned authoring-UX pass (2026-09-03).
+* [Schema, Mapping & Transformation authoring](schema-mapping-authoring.md) - §0 the `transform.sql` Transform pane as built 2026-09-04 (Simple fields grid with five verbs that GENERATES the SQL, Advanced SQL that locks the Step, `{ sql, fields? }`, preview reuse — and what was deliberately not built), then the schema editor, the legacy `transform.map` rule grid and `transform.join` form; the 2026-09-03 gap list annotated with what the redesign closed/absorbed/dropped. The redesigned Parse pane itself is in [grammar-config](grammar-config.md).
 * Expectations · Decision rules *(not yet documented)*.
 
 # Platform — Studio

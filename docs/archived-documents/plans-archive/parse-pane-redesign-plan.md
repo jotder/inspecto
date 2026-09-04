@@ -1,13 +1,14 @@
 ---
 type: Plan
 title: Parse pane redesign — Delimited first (metadata + sample-driven authoring)
-status: ACTIVE — decided 2026-09-03, not started
+status: SHIPPED 2026-09-04 — S1–S5 built 2026-09-03, S6 found already shipped, reviewed R1–R12 and landed as `d012f721`; archived 2026-09-04. As-built truth: okf/frontend/features/grammar-config.md, okf/frontend/features/schema-mapping-authoring.md, okf/frontend/features/pipeline-editor.md; open follow-ons in docs/BACKLOG.md §4 (AUTHORING-REDESIGN-1).
 timestamp: 2026-09-03T00:00:00Z
 ---
 
 # Parse pane redesign — Delimited first
 
 **Sibling plan:** [`sql-transform-v1-plan.md`](sql-transform-v1-plan.md) (the transformation half).
+**Mockup source:** [`assets/authoring-redesign-mockup/`](assets/authoring-redesign-mockup/README.md) (archived beside this plan).
 **Supersedes:** `author-schema-1-plan.md` (archived — its validation gates were the wrong lever; see the
 sibling plan for what survived). **As-built truth to update when this ships:**
 `okf/frontend/features/grammar-config.md` + `okf/frontend/features/schema-mapping-authoring.md`.

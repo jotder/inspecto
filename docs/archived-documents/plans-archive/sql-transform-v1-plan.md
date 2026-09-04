@@ -1,7 +1,7 @@
 ---
 type: Plan
 title: SQL transformer v1 — one SELECT over the typed source, DESCRIBE-derived output schema
-status: ACTIVE — decided 2026-09-03, not started
+status: SHIPPED 2026-09-04 — B1+B2+B5 engine `98ffc90b`, B3+B4 Transform pane `7e13dd82`; archived 2026-09-04. As-built truth: okf/backend/engine/catalog-vs-executors.md, okf/frontend/features/pipeline-editor.md, okf/frontend/features/schema-mapping-authoring.md; open follow-ons in docs/BACKLOG.md §4 (AUTHORING-REDESIGN-1). Parked v2/v3 items are BACKLOG rows, not this plan.
 timestamp: 2026-09-03T00:00:00Z
 ---
 
@@ -11,6 +11,7 @@ timestamp: 2026-09-03T00:00:00Z
 **Grounding it rests on:** [`sql-only-transform-feasibility.md`](sql-only-transform-feasibility.md)
 (2026-08-29 — read §2 and §4 before touching anything here) and
 `okf/backend/engine/catalog-vs-executors.md`.
+**Mockup source:** [`assets/authoring-redesign-mockup/`](assets/authoring-redesign-mockup/README.md) (archived beside this plan).
 **Supersedes:** `author-schema-1-plan.md` (archived).
 
 ## Context

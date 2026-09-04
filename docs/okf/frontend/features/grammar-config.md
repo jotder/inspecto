@@ -4,7 +4,7 @@ title: Grammar configuration (the one surface)
 description: The single shared surface and single store contract behind both Grammar-authoring screens.
 resource: inspecto-ui/src/app/inspecto/grammar/grammar-editor.component.ts
 tags: [feature, parsing, onboarding, pipelines, grammar]
-timestamp: 2026-08-19T00:00:00Z
+timestamp: 2026-09-04T00:00:00Z
 ---
 
 # Grammar configuration
@@ -19,9 +19,108 @@ One surface authors how raw bytes become rows — a **Grammar** (`docs/GLOSSARY.
 and the dialog are the only two adopters of `<inspecto-grammar-editor>` today. Earlier sections below
 that mention the stage describe history, not a live host.
 
-## The 4-tab delimited surface (U1–U5, delimited-grammar-properties plan, 2026-08-19)
+## The sectioned Parse pane (parse-pane-redesign plan, SHIPPED `d012f721` 2026-09-04)
 
-The delimited Grammar renders as **four tabs** — *Dialect / parsing* · *Types & columns* ·
+The operator's verdict (2026-09-03): authoring must be *simpler, less clumsy* — a UI to play with
+metadata, tested against a sample, in plain language. The 4-tab `mat-tab-group` below is **history**;
+this is what renders now, and why. Grounding: `grammar-editor.component.{ts,html}`,
+`parsing-attributes.ts`, `schema-form.component.ts`, `schema-fields-editor.component.{ts,html}`.
+
+- **Sections, not tabs.** `AttributeSpec.tab` is renamed `section` (frontend-only,
+  `attribute-spec.ts:87-92`). The grammar editor renders one `<mat-expansion-panel>` per section, each
+  hosting ONE `<inspecto-schema-form [flat]>`. 🔴 **The R9 `[hidden]`-panels-outside-tab-bodies hack is
+  deleted** — panels stay mounted, so a value typed into a never-opened section is visible to `value()`.
+  ⛔ Deleted with a proof, never on the assumption: `grammar-editor.component.spec.ts:425` ("a value typed
+  into a COLLAPSED, never-opened section survives value() and a save round-trip") is the exact defect R9
+  existed to prevent. The "steer to the first failing tab" logic went with it; an invalid section shows a
+  warn dot and the header counts "N changed". Panel content is mounted directly — never
+  `matExpansionPanelContent` (lazy), which would reintroduce R9.
+- **Plain language** (R12): section ids keep their engine-facing names, labels take the approved mockup's
+  vocabulary (`parsing-attributes.ts:101-103`): `dialect` = **How the file is written** (Column separator ·
+  Text quote · Escape character · First row is the header · Skip lines at the top · Ignore lines starting
+  with · Text encoding · Compression), `types` = **How values are understood** (Detect column types · Date
+  formats to try · Timestamp formats to try · Source time zone · Words that mean "no value"), `robustness` <!-- vocab-allow: quotes the existing UI label "Source time zone" (the data-origin zone sense, not the acquisition entity) -->
+  = **When a row looks wrong** (Rows that cannot be read → review bin · Fill missing columns with empty ·
+  Keep rejected rows for review · Stop after this many bad rows · …). Mockup rows with NO engine key
+  (decimal/thousands separator, "an empty cell means", "words for yes/no", extra-columns handling, a
+  Day/Month/Year picker) were **not built — nothing is faked**.
+- **Compact flat rows** (R10): `<inspecto-schema-form [flat]>` (`schema-form.component.ts:748`) renders
+  label · current value · pencil on one ~32px line; help becomes an info-icon tooltip; the row shows the
+  real default for an untouched grammar as text and the pencil opens the dense inline control (booleans
+  keep their toggle, selects use the option picker inline). **Two columns when the form's OWN measured
+  width ≥ 560px** (`TWO_COLUMN_MIN_WIDTH`, ResizeObserver, `:615-629`) — the drawer's "Full width" button
+  makes the host wide; ⛔ Tailwind `sm:` prefixes key on the VIEWPORT and are wrong inside a ~300px
+  drawer (R3). The tiered (non-flat) path used by jobs/alert dialogs is byte-identical.
+  ⚠ `<inspecto-property-rows>` (the first build's per-property wrapper) is **deleted** — mounting every
+  property in its own schema-form produced seven separate "Optional settings (1)" toggles and broke
+  cross-spec `dependsOn` (R1); its dead sample column and per-row reset went with it (R2).
+- **Grounded defaults** (R4, against `PipelineConfigParser.java:955-1043` + `DuckDbCsvIngester.java`; every
+  option reaches `read_csv` ONLY when set, so "absent" = DuckDB's own default). A suggestion that IS the
+  engine default became a real `default` — writing it is a no-op: `quote` `"` · `encoding` `utf-8` ·
+  `compression` `auto` · `skip_header_lines`/`skip_junk_lines`/`skip_tail_lines`/`skip_tail_columns` `0` ·
+  `store_rejects` / `ignore_errors` `true` · `rejects_table` `reject_errors` · `rejects_scan` `reject_scans`
+  · `filter_target_column` · `null_padding` = `padsShortRowsByDefault` (`false` delimited, `true` line
+  readers). A suggestion that would CHANGE parsing if written moved to `help` with **no default**: `comment`
+  (absent = no comment skipping; `#` would newly drop lines) · `date_formats`/`timestamp_formats` (absent =
+  flexible `TRY_CAST`; a list RESTRICTS to `TRY_STRPTIME` of exactly those) · `null_strings` (absent = only
+  `""` is null). Left alone deliberately: `escape` (engine auto-fills escape = quote), `strict_mode`
+  (tri-state), `engine` (blank = `auto`, recorded code decision — `parsing-attributes.ts:301`),
+  `rejects_limit`.
+- **Sample | Parsed — the ONLY tabs** (`grammar-editor.component.html:48,93`): paste and upload merge into
+  one textarea (typing clears captured bytes — the xlsx `sample.b64` rule kept); Import/Export (the Grammar
+  CSV round-trip, unchanged) sit beside it; the parsed rows get a 10 · 25 · 50 · 100 page size (default
+  10). Safe from R9 because neither tab hosts a form.
+- **ONE columns table — "Columns that come out"** (R11; `schema-fields-editor.component.html`): Use · `#` ·
+  Name · Type · **Sample value** (first parsed row) · Also known as (the synonym), a search box; Selector
+  only for name-based frontends (`#` IS the selector for positional ones); Source zone only when a <!-- vocab-allow: quotes the UI column label "Source zone" (the data-origin zone sense, not the acquisition entity) -->
+  `TIMESTAMP(TZ)` row exists. "Add a column with the source file name" appends a read-only **`file_name`**
+  row that is never saved into `raw.fields[]` — the real mechanism is the SINK's `output.filename_column`
+  (write-time), so the checkbox is **default OFF** (R8: ON would write a new column into every saved
+  pipeline) and the name is the codebase's one spelling `file_name`, not the plan's `filename` (R9).
+  The Auto/Declared toggle + "Apply suggested types" chip became one Types-section property, **Detect
+  column types**; declared mode pre-fills the detected types.
+- 🔴 **Column metadata left this pane — and its save path had to change.** The
+  `<inspecto-schema-metadata-grid>` (description / unit / classification) is gone from Parse (D2: it
+  belongs to the Transform Step once the backend carries it — BACKLOG). The old save merged those three
+  keys FROM the grid; without it a hydrated schema's metadata would have been dropped on Apply. Now
+  `value()` rebuilds each output row over its original seed (`schema-fields-editor.component.ts:563-587`),
+  so `description`/`unit`/`classification`/`timezone_column` **carry through by selector** from the loaded
+  schema, invisibly, and Apply + the Grammar CSV export never drop them (specs prove both).
+- **Files & metadata dissolved** (D2/D4/R5): `compression`/`encoding` joined the first section for every
+  format; the row-filter property (`delimited__where`) is **removed** — filtering is the `transform.filter`
+  Step (D3), the lift/lower's `csv.where` shorthand keeps working for stored configs; the Collection
+  pointer is read-only on Parse ("Reads: … from the … collector step") and edited on the Collector;
+  **partitioning moved to the Sink pane** — a pure UI relocation, the `partitions[]` storage contract on
+  the schema companion is untouched (two deliberate contracts, `ingest-wrap-spi.md`). ⚠ The Sink pane
+  reads/writes `partitions[]` on the same companion toon directly, while the Parse pane still seeds it on
+  load and carries it through its `overwrite: true` write — a Parse Apply over a stale seed can clobber a
+  Sink edit; flagged in BACKLOG, not fixed here.
+- **One disclosure idiom across Parser · Map · Sink** (R6): uppercase section header → fields, single
+  column; Sink's schema-forms went `flat` and its "Additional config" is a plain header, no chevron
+  (`pipeline-config-definition.component.ts:154-160`). The Collector pane still has its own chevron —
+  left as is, flagged in BACKLOG, not decided here.
+- **Name + Description** (D1): NOT re-added to the pane — found already shipped 2026-08-22 one layer up:
+  `<app-pipeline-inspector [compact]>` above every definition pane, routing through `renameSelected`
+  (never `applyNodePatch`, so a rename never invalidates a green test outcome). A second identity editor
+  inside the pane would have conflicted with it.
+- **Dialog custody unchanged** (R7): `openNodeConfig` (`pipeline-editor.component.ts:2126-2154`) already
+  sends every drawer-capable delimited node to the drawer; `GrammarEditorDialog` remains ONLY for a
+  grammar-bound (`use: grammar/x`) node, a dangling binding, or binary fixed-width. Removing it is a
+  Components-registry decision — BACKLOG, not made here.
+- Fixed in passing: `schema-form.validate()` treated a `dependsOn`-disabled sole control as invalid
+  (`form.valid || form.disabled`).
+
+The mockup that drove this (editable `.dc.html` source) is archived beside the plan:
+`docs/archived-documents/plans-archive/assets/authoring-redesign-mockup/`. Where the build diverges from
+the artboards, the plan's review rows R1–R12 say why.
+
+## History — the 4-tab delimited surface (U1–U5, delimited-grammar-properties plan, 2026-08-19; replaced 2026-09-04)
+
+> ⚠ Superseded by the sectioned pane above: tabs, `AttributeSpec.tab`, the R9 hidden-panel rule, the
+> Files & metadata tab and the metadata grid on Parse are all gone. Kept because the columns-table,
+> Auto/Declared, Grammar CSV and drawer-maximize facts below are still live.
+
+The delimited Grammar rendered as **four tabs** — *Dialect / parsing* · *Types & columns* ·
 *Robustness / error handling* · *Files & metadata* — driven by a new frontend-only
 `AttributeSpec.tab` field (distinct from `group`, which is a heading within a tier). A spec set
 naming ≥ 2 tabs renders a `mat-tab-group` with one `<inspecto-schema-form>` per tab, count badges
@@ -75,7 +174,12 @@ What else the redesign shipped, all §-referenced to the plan (in `superpower/` 
   verbatim. ⚠ The host's `renameSelected` deliberately bypasses `applyNodePatch`: a rename is not
   a config edit and must not invalidate the node's test outcome.
 
-## Every DuckDB-native format is a tabbed lane now (multiformat plan, 2026-08-19/20)
+## Every DuckDB-native format shares the shell (multiformat plan, 2026-08-19/20)
+
+> ⚠ 2026-09-04: "tab" below means *section* now — `grammarTabsFor` still supplies the per-format
+> first-section language, rendered as expansion panels. The **`files` section no longer exists** for any
+> format (it was dissolved with the Parse redesign above); the Collection pointer is read-only on Parse.
+
 
 The delimited redesign's shell generalized: **xlsx** (new, DuckDB `read_xlsx` via the `excel`
 extension — see `okf/backend/config/parsing-options-reference.md` §6.4b for the engine lane and
