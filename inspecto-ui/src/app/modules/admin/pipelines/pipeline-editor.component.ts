@@ -80,6 +80,7 @@ import {
 } from './pipeline-parse-definition.component';
 import { EnrichmentHostPipeline, PipelineConfigDefinitionComponent } from './pipeline-config-definition.component';
 import { PipelineLoadDefinitionComponent } from './pipeline-load-definition.component';
+import { PipelineTransformSqlDefinitionComponent } from './pipeline-transform-sql-definition.component';
 import { GrammarEditorDialog } from './grammar-editor.dialog';
 import { PipelineDuplicateDialog, PipelineDuplicateResultData } from './pipeline-duplicate.dialog';
 import { PipelineOpenDialog } from './pipeline-open.dialog';
@@ -217,6 +218,7 @@ const UNDO_CAP = 50;
         PipelineParseDefinitionComponent,
         PipelineConfigDefinitionComponent,
         PipelineLoadDefinitionComponent,
+        PipelineTransformSqlDefinitionComponent,
         PipelineDryRunPanelComponent,
         PipelineEditorGraphComponent,
         PipelineChecklistComponent,
@@ -544,6 +546,8 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     @ViewChild(PipelineParseDefinitionComponent) private parseDefinitionPane?: PipelineParseDefinitionComponent;
     @ViewChild(PipelineLoadDefinitionComponent) private loadDefinitionPane?: PipelineLoadDefinitionComponent;
     @ViewChild(PipelineConfigDefinitionComponent) private configDefinitionPane?: PipelineConfigDefinitionComponent;
+    @ViewChild(PipelineTransformSqlDefinitionComponent)
+    private sqlDefinitionPane?: PipelineTransformSqlDefinitionComponent;
     /** The properties dock's resize handle — S4 asks it for room when a TABBED pane opens. */
     @ViewChild('inspectorSplit') private inspectorSplitRef?: InspectoSplitDirective;
 
@@ -2427,6 +2431,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     /** U5: the drawer's full-width state, mirrored from `(maximizedChange)` — the dock binds its
      *  width to 100% over the canvas while set; the split handle stays MOUNTED, only hidden. */
     readonly drawerMaximized = signal(false);
+            this.sqlDefinitionPane ??
 
     /** Close the drawer (the shell already dirty-confirmed); the inspector summary returns. */
     closeDefinition(): void {

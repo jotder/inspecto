@@ -752,6 +752,20 @@
                                             (applied)="onDefinitionApplied($event)"
                                             (dirtyChange)="definitionDirty.set($event)"
                                         />
+                                    } @else if (dn.type === 'transform.sql') {
+                                        <!--
+                                            SQL transformer v1 (sql-transform-v1-plan.md B3/B4). A
+                                            distinct node KIND (like transform.map above), with its own
+                                            bespoke Simple/Advanced pane rather than the generic schema
+                                            form — the Fields grid needs per-row verb controls the
+                                            declarative AttributeSpec model can't express.
+                                        -->
+                                        <app-pipeline-transform-sql-definition
+                                            [node]="dn"
+                                            [sampleRows]="sampleThread()?.parsedRows()"
+                                            (applied)="onDefinitionApplied($event)"
+                                            (dirtyChange)="definitionDirty.set($event)"
+                                        />
                                     } @else if (isParseNode(dn)) {
                                         <!--
                                             ONE pane serves every parse format: it reads its own format

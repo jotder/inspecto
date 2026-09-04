@@ -413,6 +413,14 @@
     "help" : "Column(s) equated between the rows and the Reference.",
     "placeholder" : "currency"
   } ],
+  "transform.sql" : [ {
+    "key" : "sql",
+    "label" : "SQL",
+    "type" : "multiline",
+    "tier" : "required",
+    "help" : "One SELECT statement over the typed input relation, addressed by the fixed alias 'input' (FROM input) — the engine rewrites it to the real relation at execution. No DDL/DML, no multiple statements.",
+    "placeholder" : "SELECT TRIM(name) AS customer, TRY_CAST(amt AS DOUBLE) FROM input"
+  } ],
   "sink.persistent" : [ {
     "key" : "database",
     "label" : "Database directory",

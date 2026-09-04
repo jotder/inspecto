@@ -341,6 +341,18 @@ const NODE_ATTRIBUTES: Record<string, AttributeSpec[]> = {
             placeholder: 'currency',
         },
     ],
+    // SQL transformer v1 (sql-transform-v1-plan.md, B1) — one author SELECT over the typed input.
+    // No `where` here on purpose (D3): filtering stays a separate transform.filter Step.
+    'transform.sql': [
+        {
+            key: 'sql',
+            label: 'SQL',
+            type: 'multiline',
+            tier: 'required',
+            help: "One SELECT statement over the typed input relation, addressed by the fixed alias 'input' (FROM input) — the engine rewrites it to the real relation at execution. No DDL/DML, no multiple statements.",
+            placeholder: 'SELECT TRIM(name) AS customer, TRY_CAST(amt AS DOUBLE) FROM input',
+        },
+    ],
 };
 
 /**
