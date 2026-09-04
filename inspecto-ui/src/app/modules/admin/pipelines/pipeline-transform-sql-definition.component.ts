@@ -1,105 +1,201 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { AuthoredNode, ComponentsService, RelationsPreview } from 'app/inspecto/api';
-import { InspectoSchemaFieldsEditorComponent, SchemaFieldRow } from 'app/inspecto/schema/schema-fields-editor.component';
 import { StepPreviewResultComponent } from 'app/inspecto/components/step-preview-result.component';
+import { SqlCodemirrorComponent } from 'app/inspecto/data-table/sql/sql-codemirror.component';
+import {
+    CompiledField,
+    SqlField,
+    applyFunction,
+    compileFields,
+    generateSql,
+    newFieldId,
+    readFields,
+    seedFields,
+} from './pipeline-transform-sql';
+import { SqlFunction, sqlFunctionsByCategory, usesSource } from './sql-functions';
 
 /** How many rows an inline "Try it on the sample" test posts (mirrors the config pane's cap). */
 const MAX_TEST_ROWS = 50;
 
-/** The fixed input relation every `transform.sql` SELECT reads from (the engine's own name). */
-const INPUT_RELATION = 'input';
+/** Page sizes the operator pinned on 2026-09-03 for tables that can run past 600 columns. */
+export const PAGE_SIZES = [10, 20, 100] as const;
 
-/**
- * Seed SQL for a NEW Step: an explicit column list over the upstream columns when the host knows them
- * (the first parsed sample row's keys), else `SELECT * FROM input`. Exported for the spec.
- */
-export function seedSql(upstreamColumns: string[]): string {
-    if (!upstreamColumns.length) return `SELECT * FROM ${INPUT_RELATION}`;
-    return `SELECT\n    ${upstreamColumns.map(quoteIdentifier).join(',\n    ')}\nFROM ${INPUT_RELATION}`;
+/** The view-only lenses over the grid. They never change what is written — only what is on screen. */
+export type FieldFilter = 'all' | 'changed' | 'calculated' | 'problems';
+
+const FILTER_LABELS: Record<FieldFilter, string> = {
+    all: 'All',
+    changed: 'Changed',
+    calculated: 'Calculated',
+    problems: 'Needs attention',
+};
+
+/** One grid row as the template consumes it: the field, its compilation, and its display-only extras. */
+export interface FieldRow extends CompiledField {
+    /** 1-based position in the FULL field list — stable across search, filter and paging. */
+    readonly seq: number;
+    readonly definition: SqlFunction | undefined;
+    /** True when this row is not a straight passthrough of an identically-named column. */
+    readonly changed: boolean;
+    readonly sample: string;
+    readonly outType: string;
 }
 
-/** Double-quote a column name unless it is already a plain identifier — parsed headers may carry spaces. */
-function quoteIdentifier(name: string): string {
-    return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? name : `"${name.replace(/"/g, '""')}"`;
-}
-
 /**
- * The **SQL-first Transform Step pane** for `transform.sql` (operator instruction 2026-09-04: "Go for
- * Advanced (SQL) based transformation" — this SUPERSEDES the 2026-09-03 D5/D6 Simple-grid + lock design).
- * The SQL IS the transformation: one `<textarea>`, a Test this Step run, and the derived output columns
- * shown in the SAME `<inspecto-schema-fields-editor>` the Parse pane uses.
+ * The **Fields-grid Transform pane** for `transform.sql`.
  *
- * <p><b>Persisted shape.</b> `node.config` is `{ sql }` — the single declared attribute. A node saved by
- * the retired grid may still carry a `fields` key beside `sql`; {@link submit} deliberately does NOT
- * write it back, so the legacy key is dropped on the next Apply (the engine never read it).
+ * <p><b>Why a grid.</b> The Step shipped SQL-only on 2026-09-04 and the operator rejected that the same
+ * day: a raw SQL box is not an authoring surface for a non-technical user, and the legacy `transform.map`
+ * rule grid — four constants, two of which pack arguments into a delimited string — is not a mapping
+ * model either. This pane restores the fields grid with a real {@link SqlFunction} catalog: one row per
+ * output column, a function per row, and a form control per declared parameter, with the row's source
+ * column bound to the function's `{source}` automatically.
  *
- * <p><b>Derived columns.</b> There is no live `describe` endpoint yet (BACKLOG AUTHORING-REDESIGN-1 (a)).
- * The columns table is fed from `ComponentsService.previewTransform`'s DESCRIBE-derived `columnTypes`,
- * so before the first test the section says so rather than fabricating types.
+ * <p><b>Persisted shape.</b> `{ sql, fields }`. The engine declares and reads only `sql`; `fields` rides
+ * the `steps:` chain opaquely and exists so reopening rebuilds the grid exactly. Nothing ever parses SQL
+ * back into rows, so a node whose `sql` was hand-written (or authored by the SQL-only pane) opens in
+ * {@link sqlOnly} mode and says so rather than inventing a grid that would silently rewrite it.
+ *
+ * <p><b>Wide tables.</b> Search, view-only filters with counts, a `#` that is the position in the full
+ * list, and paging at 10 / 20 / 100 — the operator's 2026-09-03 requirement for 600+ column sources.
  */
 @Component({
     selector: 'app-pipeline-transform-sql-definition',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [
-        FormsModule,
-        MatButtonModule,
-        MatIconModule,
-        InspectoSchemaFieldsEditorComponent,
-        StepPreviewResultComponent,
-    ],
+    imports: [MatButtonModule, MatIconModule, StepPreviewResultComponent, SqlCodemirrorComponent],
     templateUrl: './pipeline-transform-sql-definition.component.html',
 })
 export class PipelineTransformSqlDefinitionComponent {
     private components = inject(ComponentsService);
 
     readonly node = input.required<AuthoredNode>();
-    /** The rows the tab's sample thread parsed — seeds a NEW step's column list and feeds "Try it on the sample". */
+    /** The rows the tab's sample thread parsed — seeds a NEW step and feeds "Try it on the sample". */
     readonly sampleRows = input<Record<string, unknown>[] | undefined>(undefined);
 
     readonly applied = output<AuthoredNode>();
     readonly dirtyChange = output<boolean>();
 
-    readonly sql = signal('');
-    /** The SQL as loaded (or seeded) — dirty ⇔ `sql() !== loadedSql`. */
-    private loadedSql = '';
+    // ── the authored model ──────────────────────────────────────────────────────────────────────────
+    readonly fields = signal<SqlField[]>([]);
+    readonly leftOut = signal<string[]>([]);
+    /** Set when the node carries `sql` we did not generate: the grid cannot be rebuilt from it. */
+    readonly sqlOnly = signal(false);
+    /** The hand-written SQL shown in `sqlOnly` mode. */
+    readonly storedSql = signal('');
+
+    readonly generatedSql = computed(() => (this.sqlOnly() ? this.storedSql() : generateSql(this.fields())));
+
+    /** What was loaded, so dirty is a real comparison rather than "something rendered". */
+    private loaded = '';
     private lastDirty = false;
     private seededFor: string | null = null;
 
-    // ── derived columns, from the same preview call Test this Step makes ──
+    // ── view state: search, filter, paging. None of this is persisted or written. ───────────────────
+    readonly query = signal('');
+    readonly filter = signal<FieldFilter>('all');
+    readonly pageSize = signal<number>(PAGE_SIZES[0]);
+    readonly page = signal(0);
+    readonly pageSizes = PAGE_SIZES;
+    readonly functionGroups = sqlFunctionsByCategory();
+
+    /** The upstream columns a row may read, from the parsed sample. */
+    readonly upstreamColumns = computed(() => Object.keys(this.sampleRows()?.[0] ?? {}));
+
+    /** Every row, compiled, with its stable `#`. This is the list search and filters are lenses over. */
+    readonly allRows = computed<FieldRow[]>(() => {
+        const compiled = compileFields(this.fields());
+        const previewTypes = this.previewTypesByName();
+        const sample = this.sampleRows()?.[0] ?? {};
+        const previewRow = (this.preview()?.relations?.[0]?.rows?.[0] ?? {}) as Record<string, unknown>;
+        return compiled.map((c, i) => {
+            const name = c.field.name;
+            const previewed = previewRow[name];
+            const raw = c.field.from ? sample[c.field.from] : undefined;
+            const shown = previewed !== undefined && previewed !== null ? previewed : raw;
+            return {
+                ...c,
+                seq: i + 1,
+                changed: c.field.fn !== 'keep' || c.field.name !== c.field.from,
+                sample: shown === undefined || shown === null ? '' : String(shown),
+                outType: previewTypes[name] ?? '',
+            };
+        });
+    });
+
+    readonly counts = computed(() => {
+        const rows = this.allRows();
+        return {
+            all: rows.length,
+            changed: rows.filter((r) => r.changed).length,
+            calculated: rows.filter((r) => r.definition && !usesSource(r.definition)).length,
+            problems: rows.filter((r) => !!r.problem).length,
+        };
+    });
+
+    readonly filterChips = computed(() =>
+        (Object.keys(FILTER_LABELS) as FieldFilter[]).map((key) => ({
+            key,
+            label: FILTER_LABELS[key],
+            count: this.counts()[key],
+            active: this.filter() === key,
+        })),
+    );
+
+    /** Search over the output name and the source column; then the active filter. Order is preserved. */
+    readonly visibleRows = computed<FieldRow[]>(() => {
+        const q = this.query().trim().toLowerCase();
+        const f = this.filter();
+        return this.allRows().filter((r) => {
+            if (q && !r.field.name.toLowerCase().includes(q) && !r.field.from.toLowerCase().includes(q)) return false;
+            if (f === 'changed') return r.changed;
+            if (f === 'calculated') return !!r.definition && !usesSource(r.definition);
+            if (f === 'problems') return !!r.problem;
+            return true;
+        });
+    });
+
+    readonly pageCount = computed(() => Math.max(1, Math.ceil(this.visibleRows().length / this.pageSize())));
+    /** Clamped, so deleting rows or narrowing a filter can never strand the view on an empty page. */
+    readonly currentPage = computed(() => Math.min(this.page(), this.pageCount() - 1));
+    readonly pagedRows = computed(() => {
+        const start = this.currentPage() * this.pageSize();
+        return this.visibleRows().slice(start, start + this.pageSize());
+    });
+    readonly pageLabel = computed(() => {
+        const total = this.visibleRows().length;
+        if (!total) return '0 of 0';
+        const start = this.currentPage() * this.pageSize();
+        return `${start + 1}–${start + this.pagedRows().length} of ${total}`;
+    });
+    readonly showing = computed(() => {
+        const shown = this.visibleRows().length;
+        const total = this.allRows().length;
+        return shown === total ? `${total} fields` : `Showing ${shown} of ${total} fields`;
+    });
+
+    readonly summary = computed(() => {
+        const c = this.counts();
+        const parts = [`${c.all} fields out`, `${c.changed} changed`, `${c.calculated} calculated`];
+        if (this.leftOut().length) parts.push(`${this.leftOut().length} left out`);
+        if (c.problems) parts.push(`${c.problems} need attention`);
+        return parts.join(' · ');
+    });
+
+    /** Apply is refused while any row cannot compile — an incomplete row must never save silently. */
+    readonly canApply = computed(() => this.counts().problems === 0 && !this.sqlOnly());
+
+    // ── preview ─────────────────────────────────────────────────────────────────────────────────────
     readonly preview = signal<RelationsPreview | null>(null);
     readonly previewPending = signal(false);
     readonly previewError = signal<string | null>(null);
+    readonly showSql = signal(false);
 
-    /**
-     * Rows for the shared columns table, built from the preview's DESCRIBE `columnTypes` — positional
-     * (selector = 1-based position, no name-based Selector column), all included, types read-only via
-     * `autoTypes`. The editor has no read-only Name input and another agent owns it, so edits made in
-     * the table are simply never read back here (renaming a column is done in the SQL — v1).
-     */
-    readonly derivedRows = computed<SchemaFieldRow[]>(() => {
-        const rel = this.preview()?.relations?.[0];
-        return (rel?.columnTypes ?? []).map((c, i) => ({
-            include: true,
-            name: c.name,
-            selector: String(i + 1),
-            type: c.type,
-        }));
-    });
-
-    /** First previewed row's value per column, keyed by the positional selector above. */
-    readonly derivedSamples = computed<Record<string, string>>(() => {
-        const rel = this.preview()?.relations?.[0];
-        const row = rel?.rows?.[0];
+    private previewTypesByName = computed<Record<string, string>>(() => {
         const out: Record<string, string> = {};
-        if (!row) return out;
-        (rel?.columnTypes ?? []).forEach((c, i) => {
-            const v = (row as Record<string, unknown>)[c.name];
-            if (v !== undefined && v !== null) out[String(i + 1)] = String(v);
-        });
+        for (const c of this.preview()?.relations?.[0]?.columnTypes ?? []) out[c.name] = c.type;
         return out;
     });
 
@@ -109,34 +205,132 @@ export class PipelineTransformSqlDefinitionComponent {
             if (this.seededFor === n.id) return;
             this.seededFor = n.id;
             this.seedFrom(n);
+            // Seeding is not an edit: the Step opens clean, never pre-armed for an Apply nobody asked for.
             this.lastDirty = false;
             this.dirtyChange.emit(false);
         });
     }
 
-    /** Load the node's `sql`, or seed a fresh Step from the upstream sample columns. */
     private seedFrom(node: AuthoredNode): void {
-        const stored = node.config?.['sql'];
-        const text =
-            typeof stored === 'string' && stored.trim()
-                ? stored
-                : seedSql(Object.keys(this.sampleRows()?.[0] ?? {}));
-        this.loadedSql = text;
-        this.sql.set(text);
+        const storedFields = readFields(node.config?.['fields']);
+        const storedSql = typeof node.config?.['sql'] === 'string' ? (node.config['sql'] as string) : '';
         this.preview.set(null);
         this.previewError.set(null);
+        this.query.set('');
+        this.filter.set('all');
+        this.page.set(0);
+        this.leftOut.set([]);
+
+        if (storedFields) {
+            this.sqlOnly.set(false);
+            this.storedSql.set('');
+            this.fields.set(storedFields);
+        } else if (storedSql.trim()) {
+            // Hand-written (or SQL-only-pane) SQL: forward-only means we cannot rebuild rows from it.
+            this.sqlOnly.set(true);
+            this.storedSql.set(storedSql);
+            this.fields.set([]);
+        } else {
+            this.sqlOnly.set(false);
+            this.storedSql.set('');
+            this.fields.set(seedFields(this.upstreamColumns()));
+        }
+        this.loaded = this.snapshot();
     }
 
-    editSql(text: string): void {
-        this.sql.set(text);
+    /** The comparison dirty is computed from — the generated SQL plus the authored rows. */
+    private snapshot(): string {
+        return JSON.stringify({ sql: this.generatedSql(), fields: this.fields() });
+    }
+
+    private touched(): void {
         this.preview.set(null);
-        const dirty = text !== this.loadedSql;
+        const dirty = this.snapshot() !== this.loaded;
         if (dirty === this.lastDirty) return;
         this.lastDirty = dirty;
         this.dirtyChange.emit(dirty);
     }
 
-    // ── Test this Step — the SAME route every other transform.* node type tests against ──
+    // ── row edits ───────────────────────────────────────────────────────────────────────────────────
+
+    private patch(id: string, change: (f: SqlField) => SqlField): void {
+        this.fields.update((rows) => rows.map((f) => (f.id === id ? change(f) : f)));
+        this.touched();
+    }
+
+    rename(id: string, name: string): void {
+        this.patch(id, (f) => ({ ...f, name }));
+    }
+
+    setSource(id: string, from: string): void {
+        this.patch(id, (f) => ({ ...f, from }));
+    }
+
+    setFunction(id: string, fnId: string): void {
+        this.patch(id, (f) => applyFunction(f, fnId));
+    }
+
+    setArg(id: string, param: string, value: string): void {
+        this.patch(id, (f) => ({ ...f, args: { ...f.args, [param]: value } }));
+    }
+
+    /** Leave a field out. Its source column is remembered so it can be put back with one click. */
+    removeField(id: string): void {
+        const row = this.fields().find((f) => f.id === id);
+        this.fields.update((rows) => rows.filter((f) => f.id !== id));
+        if (row?.from) this.leftOut.update((names) => (names.includes(row.from) ? names : [...names, row.from]));
+        this.touched();
+    }
+
+    restore(column: string): void {
+        this.leftOut.update((names) => names.filter((n) => n !== column));
+        this.fields.update((rows) => [...rows, { id: newFieldId(), name: column, from: column, fn: 'keep', args: {} }]);
+        this.touched();
+    }
+
+    addCalculated(): void {
+        this.fields.update((rows) => [
+            ...rows,
+            { id: newFieldId(), name: '', from: '', fn: 'custom', args: { expression: '' } },
+        ]);
+        this.page.set(this.pageCount() - 1);
+        this.touched();
+    }
+
+    /** Replace hand-written SQL with a grid seeded from the upstream columns. Explicit, never automatic. */
+    startGridFromColumns(): void {
+        this.sqlOnly.set(false);
+        this.storedSql.set('');
+        this.fields.set(seedFields(this.upstreamColumns()));
+        this.touched();
+    }
+
+    // ── view controls ───────────────────────────────────────────────────────────────────────────────
+
+    setQuery(q: string): void {
+        this.query.set(q);
+        this.page.set(0);
+    }
+
+    setFilter(f: FieldFilter): void {
+        this.filter.set(f);
+        this.page.set(0);
+    }
+
+    setPageSize(size: number): void {
+        this.pageSize.set(size);
+        this.page.set(0);
+    }
+
+    prevPage(): void {
+        this.page.set(Math.max(0, this.currentPage() - 1));
+    }
+
+    nextPage(): void {
+        this.page.set(Math.min(this.pageCount() - 1, this.currentPage() + 1));
+    }
+
+    // ── test ────────────────────────────────────────────────────────────────────────────────────────
 
     readonly testRows = computed(() => (this.sampleRows() ?? []).slice(0, MAX_TEST_ROWS));
     readonly canTest = computed(() => this.testRows().length > 0);
@@ -145,24 +339,27 @@ export class PipelineTransformSqlDefinitionComponent {
         if (!this.canTest()) return;
         this.previewPending.set(true);
         this.previewError.set(null);
-        this.components.previewTransform({ type: this.node().type, sql: this.sql() }, this.testRows()).subscribe({
-            next: (result) => {
-                this.previewPending.set(false);
-                this.preview.set(result);
-            },
-            error: (e) => {
-                this.previewPending.set(false);
-                this.preview.set(null);
-                this.previewError.set(e?.error?.error?.message ?? e?.message ?? 'The test failed.');
-            },
-        });
+        this.components
+            .previewTransform({ type: this.node().type, sql: this.generatedSql() }, this.testRows())
+            .subscribe({
+                next: (result) => {
+                    this.previewPending.set(false);
+                    this.preview.set(result);
+                },
+                error: (e) => {
+                    this.previewPending.set(false);
+                    this.preview.set(null);
+                    this.previewError.set(e?.error?.error?.message ?? e?.message ?? 'The test failed.');
+                },
+            });
     }
 
     submit(): void {
+        if (!this.canApply()) return;
         const n = this.node();
-        // `{ sql }` only — a legacy `fields` key (written by the retired Simple grid) is dropped here on purpose.
-        const config: Record<string, unknown> = { sql: this.sql() };
-        this.loadedSql = this.sql();
+        // `fields` is the authoring artifact; `sql` is what the engine reads. Both are written together.
+        const config: Record<string, unknown> = { sql: this.generatedSql(), fields: this.fields() };
+        this.loaded = this.snapshot();
         this.lastDirty = false;
         this.dirtyChange.emit(false);
         this.applied.emit({ id: n.id, type: n.type, name: n.name, description: n.description, use: n.use, config });

@@ -6,9 +6,9 @@ import { of } from 'rxjs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { AuthoredNode, ComponentsService, RelationsPreview } from 'app/inspecto/api';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from 'app/inspecto/grid';
-import { InspectoSchemaFieldsEditorComponent } from 'app/inspecto/schema/schema-fields-editor.component';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
-import { PipelineTransformSqlDefinitionComponent, seedSql } from './pipeline-transform-sql-definition.component';
+import { PipelineTransformSqlDefinitionComponent } from './pipeline-transform-sql-definition.component';
+import { SqlField } from './pipeline-transform-sql';
 
 let previewCalls: { config: Record<string, unknown>; rows: Record<string, unknown>[] }[] = [];
 const previewAnswer: RelationsPreview = {
@@ -17,14 +17,11 @@ const previewAnswer: RelationsPreview = {
         {
             rel: 'DATA',
             rowCount: 1,
-            rows: [{ buyer: 'Anna', n: 1 }],
-            columnTypes: [
-                { name: 'buyer', type: 'VARCHAR' },
-                { name: 'n', type: 'INTEGER' },
-            ],
+            rows: [{ buyer: 'Anna' }],
+            columnTypes: [{ name: 'buyer', type: 'VARCHAR' }],
         },
     ],
-    sql: ['SELECT TRIM(customer) AS buyer, 1 AS n FROM input'],
+    sql: ['SELECT TRIM(customer) AS buyer FROM input'],
 };
 
 @Component({
@@ -49,6 +46,10 @@ class HostComponent {
 
 function sqlNode(config: Record<string, unknown> = {}): AuthoredNode {
     return { id: 'sql1', type: 'transform.sql', name: 'Clean up orders', config };
+}
+
+function field(partial: Partial<SqlField> & Pick<SqlField, 'name' | 'fn'>): SqlField {
+    return { id: partial.name, from: '', args: {}, ...partial };
 }
 
 async function create(node: AuthoredNode = sqlNode(), sampleRows?: Record<string, unknown>[]) {
@@ -86,92 +87,199 @@ beforeEach(() => {
     previewCalls = [];
 });
 
-describe('seedSql', () => {
-    it('lists the upstream columns explicitly, quoting names that are not plain identifiers', () => {
-        expect(seedSql(['order_id', 'Order Date'])).toBe('SELECT\n    order_id,\n    "Order Date"\nFROM input');
-    });
-    it('falls back to SELECT * when no columns are known', () => {
-        expect(seedSql([])).toBe('SELECT * FROM input');
-    });
-});
-
-describe('PipelineTransformSqlDefinitionComponent: seeding', () => {
-    it('seeds a fresh Step with an explicit column list from the sample row', async () => {
+describe('Transform pane: seeding', () => {
+    it('seeds one "keep" row per upstream column', async () => {
         const fixture = await create(sqlNode(), [{ order_id: '1', customer: 'A' }]);
         const c = comp(fixture);
-        expect(c.sql()).toBe('SELECT\n    order_id,\n    customer\nFROM input');
+        expect(c.fields().map((f) => [f.name, f.from, f.fn])).toEqual([
+            ['order_id', 'order_id', 'keep'],
+            ['customer', 'customer', 'keep'],
+        ]);
+        expect(c.generatedSql()).toBe('SELECT\n  order_id AS order_id,\n  customer AS customer\nFROM input');
+    });
+
+    /** The defect the operator hit: a Step was armed for Apply merely by being opened. */
+    it('opens CLEAN — merely rendering the Step never arms Apply', async () => {
+        const fixture = await create(sqlNode(), [{ order_id: '1' }]);
         expect(fixture.componentInstance.dirty).toBe(false);
-        const textarea = fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
-        expect(textarea.value).toBe(c.sql());
     });
 
-    it('seeds SELECT * FROM input when there is no sample', async () => {
-        const fixture = await create(sqlNode());
-        expect(comp(fixture).sql()).toBe('SELECT * FROM input');
+    it('rebuilds the grid from persisted fields rather than re-seeding', async () => {
+        const stored = [field({ name: 'buyer', from: 'customer', fn: 'text.trim' })];
+        const fixture = await create(sqlNode({ sql: 'anything', fields: stored }), [{ customer: 'A', extra: 'x' }]);
+        const c = comp(fixture);
+        expect(c.fields().map((f) => f.name)).toEqual(['buyer']);
+        expect(c.sqlOnly()).toBe(false);
     });
 
-    it('loads a stored sql verbatim', async () => {
-        const fixture = await create(sqlNode({ sql: 'SELECT 1 AS one FROM input' }), [{ a: '1' }]);
-        expect(comp(fixture).sql()).toBe('SELECT 1 AS one FROM input');
+    it('opens hand-written SQL read-only rather than inventing a grid that would rewrite it', async () => {
+        const fixture = await create(sqlNode({ sql: 'SELECT weird FROM input' }), [{ a: '1' }]);
+        const c = comp(fixture);
+        expect(c.sqlOnly()).toBe(true);
+        expect(c.storedSql()).toBe('SELECT weird FROM input');
+        expect(c.generatedSql()).toBe('SELECT weird FROM input');
+        expect(fixture.nativeElement.textContent).toContain('cannot be shown as a field list');
     });
 
-    it('says to test first instead of fabricating column types', async () => {
-        const fixture = await create(sqlNode(), [{ a: '1' }]);
-        expect(fixture.nativeElement.textContent).toContain('Test this Step to see the columns that come out');
-        expect(fixture.debugElement.query(By.directive(InspectoSchemaFieldsEditorComponent))).toBeNull();
+    it('can start a grid from the incoming columns, replacing hand-written SQL only when asked', async () => {
+        const fixture = await create(sqlNode({ sql: 'SELECT weird FROM input' }), [{ a: '1' }]);
+        const c = comp(fixture);
+        c.startGridFromColumns();
+        fixture.detectChanges();
+        expect(c.sqlOnly()).toBe(false);
+        expect(c.generatedSql()).toBe('SELECT\n  a AS a\nFROM input');
+        expect(fixture.componentInstance.dirty).toBe(true);
     });
 });
 
-describe('PipelineTransformSqlDefinitionComponent: dirty tracking + Apply', () => {
-    it('dirty ⇔ the SQL differs from the loaded value', async () => {
-        const fixture = await create(sqlNode({ sql: 'SELECT a FROM input' }), [{ a: '1' }]);
+describe('Transform pane: editing', () => {
+    it('picking a function seeds its parameter defaults and regenerates the SQL', async () => {
+        const fixture = await create(sqlNode(), [{ amount: '1' }]);
         const c = comp(fixture);
-        c.editSql('SELECT b FROM input');
+        const id = c.fields()[0].id;
+        c.setFunction(id, 'num.round');
+        expect(c.fields()[0].args).toEqual({ decimals: '0' });
+        c.setArg(id, 'decimals', '2');
+        expect(c.generatedSql()).toBe('SELECT\n  ROUND(amount, 2) AS amount\nFROM input');
         expect(fixture.componentInstance.dirty).toBe(true);
-        c.editSql('SELECT a FROM input');
-        expect(fixture.componentInstance.dirty).toBe(false);
     });
 
-    it('Apply emits { sql } only and drops a legacy fields key', async () => {
-        const fixture = await create(
-            sqlNode({
-                sql: 'SELECT order_id FROM input',
-                fields: [{ id: 'a', name: 'order_id', from: 'order_id', verb: 'keep' }],
-            }),
-        );
+    it('renaming a field changes only its alias', async () => {
+        const fixture = await create(sqlNode(), [{ customer: 'A' }]);
         const c = comp(fixture);
-        c.editSql('SELECT order_id AS id FROM input');
+        c.rename(c.fields()[0].id, 'buyer');
+        expect(c.generatedSql()).toBe('SELECT\n  customer AS buyer\nFROM input');
+    });
+
+    it('leaving a field out remembers its column so it can be put back', async () => {
+        const fixture = await create(sqlNode(), [{ a: '1', b: '2' }]);
+        const c = comp(fixture);
+        c.removeField(c.fields()[0].id);
+        expect(c.leftOut()).toEqual(['a']);
+        expect(c.generatedSql()).toBe('SELECT\n  b AS b\nFROM input');
+        c.restore('a');
+        expect(c.leftOut()).toEqual([]);
+        expect(c.fields().map((f) => f.name)).toEqual(['b', 'a']);
+    });
+
+    it('adds a calculated field with no source column', async () => {
+        const fixture = await create(sqlNode(), [{ a: '1' }]);
+        const c = comp(fixture);
+        c.addCalculated();
+        const added = c.fields()[1];
+        expect(added.fn).toBe('custom');
+        expect(added.from).toBe('');
+    });
+});
+
+describe('Transform pane: Apply', () => {
+    it('writes BOTH the generated sql and the fields that produced it', async () => {
+        const fixture = await create(sqlNode(), [{ customer: 'A' }]);
+        const c = comp(fixture);
+        c.setFunction(c.fields()[0].id, 'text.trim');
+        c.rename(c.fields()[0].id, 'buyer');
         c.submit();
         fixture.detectChanges();
         const applied = fixture.componentInstance.applied!;
-        expect(applied.config).toEqual({ sql: 'SELECT order_id AS id FROM input' });
-        expect(applied.id).toBe('sql1');
+        expect(applied.config?.['sql']).toBe('SELECT\n  TRIM(customer) AS buyer\nFROM input');
+        expect((applied.config?.['fields'] as SqlField[]).map((f) => [f.name, f.from, f.fn])).toEqual([
+            ['buyer', 'customer', 'text.trim'],
+        ]);
+        expect(fixture.componentInstance.dirty).toBe(false);
+    });
+
+    it('refuses to Apply while a row cannot compile', async () => {
+        const fixture = await create(sqlNode(), [{ amount: '1' }]);
+        const c = comp(fixture);
+        c.setFunction(c.fields()[0].id, 'num.round');
+        c.setArg(c.fields()[0].id, 'decimals', 'lots');
+        expect(c.canApply()).toBe(false);
+        c.submit();
+        fixture.detectChanges();
+        expect(fixture.componentInstance.applied).toBeUndefined();
+    });
+
+    it('re-Applying the same content clears dirty', async () => {
+        const fixture = await create(sqlNode(), [{ a: '1' }]);
+        const c = comp(fixture);
+        c.rename(c.fields()[0].id, 'b');
+        expect(fixture.componentInstance.dirty).toBe(true);
+        c.submit();
         expect(fixture.componentInstance.dirty).toBe(false);
     });
 });
 
-describe('PipelineTransformSqlDefinitionComponent: Test this Step', () => {
-    it('posts the current sql through previewTransform and renders the derived columns table', async () => {
+describe('Transform pane: wide tables', () => {
+    const wide = () => [Object.fromEntries(Array.from({ length: 65 }, (_, i) => [`col_${i + 1}`, String(i)]))];
+
+    it('pages at 10 by default and # stays the position in the FULL list', async () => {
+        const fixture = await create(sqlNode(), wide());
+        const c = comp(fixture);
+        expect(c.allRows().length).toBe(65);
+        expect(c.pagedRows().length).toBe(10);
+        expect(c.pageLabel()).toBe('1–10 of 65');
+        c.nextPage();
+        expect(c.pagedRows()[0].seq).toBe(11);
+        expect(c.pageLabel()).toBe('11–20 of 65');
+    });
+
+    it('offers 10 / 20 / 100 and resets to the first page', async () => {
+        const fixture = await create(sqlNode(), wide());
+        const c = comp(fixture);
+        expect([...c.pageSizes]).toEqual([10, 20, 100]);
+        c.nextPage();
+        c.setPageSize(100);
+        expect(c.currentPage()).toBe(0);
+        expect(c.pagedRows().length).toBe(65);
+    });
+
+    it('search narrows the view without changing what is written', async () => {
+        const fixture = await create(sqlNode(), wide());
+        const c = comp(fixture);
+        const sqlBefore = c.generatedSql();
+        c.setQuery('col_64');
+        expect(c.visibleRows().map((r) => r.field.name)).toEqual(['col_64']);
+        expect(c.visibleRows()[0].seq).toBe(64);
+        expect(c.showing()).toBe('Showing 1 of 65 fields');
+        expect(c.generatedSql()).toBe(sqlBefore);
+    });
+
+    it('filters are view-only lenses with counts', async () => {
+        const fixture = await create(sqlNode(), [{ a: '1', b: '2' }]);
+        const c = comp(fixture);
+        c.setFunction(c.fields()[0].id, 'text.upper');
+        expect(c.counts().changed).toBe(1);
+        c.setFilter('changed');
+        expect(c.visibleRows().map((r) => r.field.name)).toEqual(['a']);
+        expect(c.generatedSql()).toContain('b AS b');
+    });
+
+    it('never strands the view on a page that no longer exists', async () => {
+        const fixture = await create(sqlNode(), wide());
+        const c = comp(fixture);
+        c.nextPage();
+        c.nextPage();
+        c.setQuery('col_1');
+        expect(c.currentPage()).toBe(0);
+        expect(c.pagedRows().length).toBeGreaterThan(0);
+    });
+});
+
+describe('Transform pane: Test this Step', () => {
+    it('posts the GENERATED sql and fills "Comes out as" from the run', async () => {
         const fixture = await create(sqlNode(), [{ customer: ' Anna ' }]);
         const c = comp(fixture);
-        c.editSql('SELECT TRIM(customer) AS buyer, 1 AS n FROM input');
+        c.setFunction(c.fields()[0].id, 'text.trim');
+        c.rename(c.fields()[0].id, 'buyer');
         c.runTest();
         fixture.detectChanges();
         expect(previewCalls.length).toBe(1);
         expect(previewCalls[0].config).toEqual({
             type: 'transform.sql',
-            sql: 'SELECT TRIM(customer) AS buyer, 1 AS n FROM input',
+            sql: 'SELECT\n  TRIM(customer) AS buyer\nFROM input',
         });
-        expect(previewCalls[0].rows).toEqual([{ customer: ' Anna ' }]);
-        expect(c.derivedRows()).toEqual([
-            { include: true, name: 'buyer', selector: '1', type: 'VARCHAR' },
-            { include: true, name: 'n', selector: '2', type: 'INTEGER' },
-        ]);
-        expect(c.derivedSamples()).toEqual({ '1': 'Anna', '2': '1' });
-        const editor = fixture.debugElement.query(By.directive(InspectoSchemaFieldsEditorComponent));
-        expect(editor).not.toBeNull();
-        expect((editor.componentInstance as InspectoSchemaFieldsEditorComponent).autoTypes()).toBe(true);
-        expect(fixture.nativeElement.textContent).toContain('buyer');
+        expect(c.allRows()[0].outType).toBe('VARCHAR');
+        expect(c.allRows()[0].sample).toBe('Anna');
     });
 
     it('is disabled with no sample rows', async () => {
@@ -180,9 +288,9 @@ describe('PipelineTransformSqlDefinitionComponent: Test this Step', () => {
     });
 });
 
-describe('PipelineTransformSqlDefinitionComponent: accessibility', () => {
+describe('Transform pane: accessibility', () => {
     it('has no axe-core violations', async () => {
-        const fixture = await create(sqlNode(), [{ order_id: '1' }]);
+        const fixture = await create(sqlNode(), [{ order_id: '1', customer: 'A' }]);
         comp(fixture).runTest();
         fixture.detectChanges();
         await expectNoA11yViolations(fixture.nativeElement);

@@ -26,50 +26,60 @@ timestamp: 2026-09-04T00:00:00Z
 > were NOT removed; `transform.map` is now the legacy mapping path beside `transform.sql`. §6's gap list
 > is annotated with what the redesign closed, absorbed, or dropped as premature.
 
-## 0. The Transform Step pane — `transform.sql` (as built; SQL-first since 2026-09-04)
+## 0. The Transform Step pane — `transform.sql` (as built; a fields grid over a function catalog)
 
 `PipelineTransformSqlDefinitionComponent` (`pipeline-transform-sql-definition.component.ts`), a bespoke
 pane reached from the editor's routing arm for `dn.type === 'transform.sql'`
-(`pipeline-editor.component.html:755-767`). **One mode: the SQL IS the transformation** — operator
-instruction 2026-09-04 ("revisit field transformation capabilities. and Go for Advanced(SQL) based
-transformation"), which **supersedes** the 2026-09-03 decisions D5 (a Simple five-verb fields grid that
-generated the SQL) and D6 (the lock-on-hand-edit rule). D3 (no `where` — filtering stays
-`transform.filter`), D4 (never parse SQL back into rows) and D7 (600+ columns must stay usable) still hold.
+(`pipeline-editor.component.html:755-767`).
 
-- **The pane** = a "Transform" section header, a plain `<textarea>` for the SQL (mono, dense, resizable —
-  CodeMirror is a BACKLOG follow-on, now higher priority), one help line (input relation is `input`; write
-  one SELECT; `TRY_CAST` for a forgiving cast), the **Columns that come out** table, and **Try it on the
-  sample** (Test this Step).
-- **Seed for a NEW Step** (`seedSql`, exported): an explicit column list over the upstream columns —
-  the keys of the first parsed sample row the host passes as `sampleRows` — `SELECT
-    a,
-    b
-FROM
-  input`, names that are not plain identifiers double-quoted; with no sample it is `SELECT * FROM input`.
-  A stored `sql` loads verbatim.
-- **Columns that come out** reuses `<inspecto-schema-fields-editor>` — the SAME table the Parse pane shows
-  — fed from the preview's DESCRIBE-derived `columnTypes` (one positional row per column, selector =
-  1-based position, `autoTypes` true so the type icons are read-only, `sampleValues` from the first
-  previewed row; no Selector column, no filename row). Before the first test the section reads "Test this
-  Step to see the columns that come out" — no fabricated types. ⚠ The editor has no read-only Name input
-  and this pane deliberately never reads its `value()` back: renaming a column there does nothing in v1;
-  the help line under the table says to change the SQL. Wiring a table edit back into the SQL is the v2
-  AST work (BACKLOG (c)).
-- **Persisted shape** (`submit()`): **`{ sql }` only.** A node saved by the retired grid may still carry a
-  `fields[]` key beside `sql`; the pane never reads it and does not write it back, so it is dropped on the
-  next Apply (the engine never read it either — `sql` is the single declared attribute,
-  `node-attributes.ts`). `dirty` ⇔ the textarea differs from the loaded/seeded text.
+🔴 **This surface flipped twice on 2026-09-04. The SQL-only middle state is NOT current.** The Step
+shipped SQL-only that morning (`24171333`, which deleted the 2026-09-03 fields grid), and the operator
+rejected it the same day: *"mapping with functions and parameters is not realistic"* — a raw SQL box is
+not an authoring surface for a non-technical user, and the legacy `transform.map` rule grid (four
+`transformType` constants, two of which pack their arguments into a `|`-delimited string) is not a
+mapping model either. The grid is back, and its verb enum is replaced by a **function catalog with typed
+parameters**. D3 (no `where` — filtering stays `transform.filter`), D4 (never parse SQL back into rows)
+and D7 (600+ columns stay usable) still hold; D5's five-verb list and D6's lock are superseded by the
+catalog and by persisting `fields[]`.
+
+- **The function catalog** (`sql-functions.ts`) is the vocabulary and the ONE place a function's plain
+  label, its typed parameters and its SQL template live together. `SqlFunction = {id, label, category,
+  template, params}`; `SqlFunctionParam = {name, label, type, default, options, optional}` where `type`
+  drives BOTH the rendered control and the escaping: `column` → quoted identifier, `text` → single-quoted
+  literal with quotes doubled, `number` → validated then verbatim, `enum` → one of `options` verbatim,
+  `sql` → verbatim (the deliberate escape hatch, `custom` only). ~20 functions across Keep · Text ·
+  Numbers · Dates · Logic · Convert · Custom. A row's source column binds to the template's `{source}`
+  automatically — that IS the operator's "auto map parameters against sql functions".
+  ⚠ **Every conversion is `TRY_CAST`, never bare `CAST`, and division guards with `NULLIF`** — a
+  catalog-wide unit test asserts it, because a bad cell must null one cell, not kill the batch.
+  ⚠ **A `text` parameter is deliberately not trimmed** — a single space is a legitimate separator for
+  "Join with another column"; trimming reported a valid row as missing its separator (caught by a test).
+- **The grid** (mockup layout verbatim): `#` · Field name · From · What to do · Comes out as · Sample ·
+  leave-out, over a search box and view-only filter chips with counts (All · Changed · Calculated ·
+  Needs attention), under a 10/20/100 pager, with "Add a calculated field" and a **Left out** tray whose
+  chips put a column back. `#` is the position in the FULL ordered list, computed before filtering and
+  paging, so page 2 starts at 11 — search, filters and paging are lenses that never change what is
+  written. A function's parameters render as controls beneath its picker on the same row.
+- **Compilation** (`pipeline-transform-sql.ts`, pure, unit-tested): `compileField` → `{expr}` or
+  `{problem}`; `generateSql` emits `<expr> AS <name>` per complete row over the fixed `input` relation
+  and **skips a row with a problem so the generated SQL always parses**, while `canApply()` is false
+  until every problem is cleared — an incomplete row can never be saved silently.
+- **Persisted shape** (`submit()`): **`{ sql, fields }`.** The engine declares and reads only `sql`
+  (`node-attributes.ts`); `fields` is the authoring artifact and rides the `steps:` chain opaquely, which
+  is what lets the grid round-trip exactly without ever parsing SQL. **This is why D6's lock is gone:**
+  nothing has to reconstruct rows from text. `readFields` also opens a node written by the retired
+  five-verb grid, mapping `verb`/`castType`/`formula` onto catalog ids.
+- **Hand-written SQL is honest, not overwritten.** A node carrying `sql` with no `fields` opens in
+  `sqlOnly` mode: the SQL is shown read-write in CodeMirror and the pane says it cannot be shown as a
+  field list. "Start a field list from the incoming columns" replaces it — explicit, never automatic.
+- **Opening a Step never arms Apply.** Seeding emits `dirtyChange(false)`; dirty is a real comparison of
+  `{sql, fields}` against what was loaded. ⚠ This was a live defect on the legacy `transform.map` pane
+  (a Step showed "unapplied" from a single click with no edit); the grid has a regression test for it.
 - **Test against sample** reuses "Test this Step" verbatim: `ComponentsService.previewTransform({type,
-  sql}, sampleRows)` — `transform.sql` qualifies by the `transform.*` prefix. ⚠ The output schema is
-  therefore derived from the preview run, **not** from `TypeFlow.describe`'s execution-free `DESCRIBE` —
-  the `/describe` route was not built (BACKLOG (a)).
-- **What went (2026-09-04) and why:** the Simple grid (`#` / Field name / From / five verbs Keep · Remove
-  extra spaces · Make UPPERCASE · Change type to… · Calculate… / Comes out as / Sample / leave-out, search,
-  filter chips with counts, a 10/20/100 pager, a Left-out tray, "Add a calculated field"), its pure
-  generator `pipeline-transform-sql.ts` (`generateSql`/`seedFields`/`exprFor`, unit-tested), the
-  Simple/Advanced toggle and the `handWritten` lock with "start over from the table". It was a second
-  authoring model over the same SQL, and the operator chose the SQL itself as the one surface; the grid's
-  reason to exist (a no-SQL path) went with it. Nothing engine-side changed.
+  sql}, sampleRows)` with the GENERATED sql — `transform.sql` qualifies by the `transform.*` prefix. The
+  run fills each row's **Comes out as** type and **Sample** value. ⚠ Types therefore come from a preview
+  run, **not** from `TypeFlow.describe`'s execution-free `DESCRIBE` — the `/describe` route is still not
+  built (BACKLOG (a)), which is the remaining as-you-type validation gap.
 - **Not built, on purpose:** the "Describe the fields" metadata section (description · unit ·
   sensitivity) — the backend does not carry column metadata on a `transform.sql` node; until it lands
   (BACKLOG (e)), metadata rides through the Parse pane's by-selector carry-through
