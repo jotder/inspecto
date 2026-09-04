@@ -500,8 +500,8 @@
     "emoji" : "🧮",
     "icon" : "heroicons_outline:variable",
     "status" : "delivered",
-    "nodeType" : "transform.map",
-    "note" : "the `EXPR` / `CONCAT_DT` / `FILENAME_DATE` rules",
+    "nodeType" : "transform.sql",
+    "note" : "computed columns as SELECT expressions in the SQL Step (`transform.sql`); the `EXPR` / `CONCAT_DT` / `FILENAME_DATE` map rules remain",
     "addable" : true
   }, {
     "id" : "transform.cast",
@@ -510,8 +510,8 @@
     "emoji" : "🔄",
     "icon" : "heroicons_outline:arrows-right-left",
     "status" : "delivered",
-    "nodeType" : "transform.map",
-    "note" : "the mapping rows (`DIRECT` + typed target)",
+    "nodeType" : "transform.sql",
+    "note" : "type casts stay on the Parse step's Types section (declarative typing); renames/aliases via the SQL Step (`transform.sql`)",
     "addable" : true
   }, {
     "id" : "transform.filter",

@@ -769,6 +769,40 @@ class PipelineJobRunnerTest {
                 "dedup by amt keeps the first per key — id 3's amt=150 is the duplicate");
     }
 
+    /** A stored {@code kind: sql} step executes: RowShaper.sql runs the author's SELECT over the typed landed store. */
+    @Test
+    void runsAFlatConfigsSqlStepOverItsLandedStore() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        String auditDir = tmp.resolve("audit").toString();
+        Path flat = tmp.resolve("sql_pipeline.toon");
+        Files.writeString(flat, """
+                name: sql_etl
+                active: false
+                output_store: doubled
+                dirs:
+                  poll: in
+                  database: out
+                processing:
+                  threads: 1
+                steps[1]:
+                  - sql:
+                      sql: SELECT id, amt * 2 AS amt FROM input WHERE amt > 60
+                      fields[1]:
+                        - name: amt
+                          expr: amt * 2
+                """);
+        String landed = com.gamma.etl.PipelineConfig.load(flat.toString()).identity().pipelineName();
+        seedParquet(dataDir, landed, "(1,150),(2,50),(3,100)");
+
+        JobConfig cfg = new JobConfig("sqler", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline_config", flat.toString(), "data_dir", dataDir));
+        JobResult res = new PipelineJobRunner(cfg, new ConsignmentEventBus(), null, dataDir, auditDir).run();
+
+        assertTrue(res.success(), res.message());
+        assertEquals(List.of(1, 3), readIds(dataDir, "doubled"), "the WHERE dropped id 2");
+        assertEquals(List.of("300", "200"), readColumn(dataDir, "doubled", "amt"), "the SELECT doubled amt");
+    }
+
     // ── A5-at-rest slice 5: transform.join resolves its Reference Dataset for real ──
 
     /** A path-form reference needs no pipeline context at all — the file is self-describing. */

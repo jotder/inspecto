@@ -221,8 +221,8 @@ E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for P
 | SP-DQ-13 | 🔒 PII masking & tokenization (`quality.pii.mask`) | Data Quality, Validation & Cleansing | — | — | 🔲 | — | board SEC-08 — Enterprise only |
 | SP-DQ-14 | 🔑 One-way salted cryptographic hasher (`quality.crypto.hash`) | Data Quality, Validation & Cleansing | 🔲 | 🔲 | 🔲 | — |  |
 | SP-DQ-15 | 🛡️ GDPR / CCPA field redactor (`quality.compliance.redact`) | Data Quality, Validation & Cleansing | — | — | 🔲 | — | board SEC-08 — Enterprise only |
-| SP-XFM-01 | 🧮 Expression builder & computed columns (`transform.expression`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.map` | the `EXPR` / `CONCAT_DT` / `FILENAME_DATE` rules |
-| SP-XFM-02 | 🔄 Field type cast & renamer matrix (`transform.cast`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.map` | the mapping rows (`DIRECT` + typed target) |
+| SP-XFM-01 | 🧮 Expression builder & computed columns (`transform.expression`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.sql` | computed columns as SELECT expressions in the SQL Step (`transform.sql`); the `EXPR` / `CONCAT_DT` / `FILENAME_DATE` map rules remain |
+| SP-XFM-02 | 🔄 Field type cast & renamer matrix (`transform.cast`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.sql` | type casts stay on the Parse step's Types section (declarative typing); renames/aliases via the SQL Step (`transform.sql`) |
 | SP-XFM-03 | 🔽 Row filter (pre-parse regex / post-map predicate) (`transform.filter`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.filter` |  |
 | SP-XFM-04 | 🔀 Router — case / clone branches with mid-branch steps (`transform.route`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.route` |  |
 | SP-XFM-05 | ∑ Group-by summarizer (measures grammar) (`transform.summarize`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.summarize` |  |

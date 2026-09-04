@@ -287,8 +287,8 @@ public final class PipelineConfig {
      * channel is a second source of truth, and the two disagree the first time someone hand-edits the file.
      *
      * @param kind   one of {@link #FILTER}, {@link #JOIN}, {@link #DEDUP}, {@link #SUMMARIZE},
-     *               {@link #ROUTE} — the node type's own word, minus its {@code transform.} prefix, so
-     *               one concept keeps one name across the graph, the file and the palette.
+     *               {@link #ROUTE}, {@link #SQL} — the node type's own word, minus its {@code transform.}
+     *               prefix, so one concept keeps one name across the graph, the file and the palette.
      * @param config the step's own keys, verbatim — the same shape the corresponding legacy block held.
      */
     public record Step(String kind, Map<String, Object> config) {
@@ -304,9 +304,16 @@ public final class PipelineConfig {
         public static final String SUMMARIZE = "summarize";
         /** Branch tree. Legacy spelling: the top-level {@code route:} block. */
         public static final String ROUTE = "route";
+        /**
+         * One author {@code SELECT} over the typed input ({@code transform.sql}). Keys: {@code sql}
+         * (required) and, when Simple-authored, an opaque {@code fields[]} list the engine never reads.
+         * ⚠ No legacy singular spelling — a chain holding one always takes the {@code steps:} form.
+         */
+        public static final String SQL = "sql";
 
-        /** Every kind a {@code steps:} entry may name, in the order the legacy projection emits them. */
-        public static final List<String> KINDS = List.of(FILTER, JOIN, DEDUP, SUMMARIZE, ROUTE);
+        /** Every kind a {@code steps:} entry may name, in the order the legacy projection emits them
+         *  ({@link #SQL} last: it has no legacy projection at all). */
+        public static final List<String> KINDS = List.of(FILTER, JOIN, DEDUP, SUMMARIZE, ROUTE, SQL);
 
         public Step {
             config = (config == null) ? Map.of() : Map.copyOf(config);

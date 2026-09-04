@@ -368,6 +368,34 @@ class PipelineValidatorTest {
         assertTrue(codes(r).contains(PipelineValidator.SQL_STEP_UNAUDITED));
     }
 
+    /** The warning fires for a LIFTED sql step too — the stored {@code kind: sql} spelling, not only a hand-built graph. */
+    @Test
+    void aLiftedSqlStepStillGetsTheUnauditedWarning(@TempDir Path dir) throws Exception {
+        Path schema = dir.resolve("s.toon");
+        Files.writeString(schema, PipelineConfigBatchTest.miniSchema());
+        Path toon = dir.resolve("sq_pipeline.toon");
+        Files.writeString(toon, """
+                name: sq
+                active: false
+                dirs:
+                  poll: %s
+                  database: %s
+                processing:
+                  schema_file: %s
+                steps[1]:
+                  - sql:
+                      sql: SELECT * FROM input
+                """.formatted(slash(dir.resolve("in")), slash(dir.resolve("db")), slash(schema)));
+        PipelineValidator.Result r = PipelineValidator.validate(PipelineLift.lift(PipelineConfig.load(toon.toString())));
+        assertTrue(r.ok(), () -> "a sql step is legal: " + r.errors());
+        assertEquals(1, r.issues().stream().filter(i -> i.code().equals(PipelineValidator.SQL_STEP_UNAUDITED)).count(),
+                () -> "" + r.issues());
+    }
+
+    private static String slash(Path p) {
+        return p.toString().replace('\\', '/');
+    }
+
     @Test
     void aRealLiftedPipelineValidatesClean(@TempDir Path dir) throws Exception {
         // the ultimate gate: every edge the legacy lift produces honours the node-output contract

@@ -73,6 +73,8 @@ public final class PipelineEditable {
      * rather than lowering a topology the next lift cannot reproduce.
      */
     public static final String UNSUPPORTED_BRANCH_STEP = "UNSUPPORTED_BRANCH_STEP";
+    /** A {@code transform.sql} node whose {@code sql} is absent or blank — the one key the step cannot do without. */
+    public static final String SQL_STEP_EMPTY = "SQL_STEP_EMPTY";
 
     /**
      * The map-node config keys an author owns — they lower to {@code processing.map} verbatim and lift
@@ -108,11 +110,13 @@ public final class PipelineEditable {
             BuiltinNodeType.TRANSFORM_SUMMARIZE.type(), // group-by rollup → processing.summarize (ELT P3), authoring-only
             BuiltinNodeType.TRANSFORM_JOIN.type(),      // reference join → processing.join (ELT P3 S2), authoring-only
             BuiltinNodeType.TRANSFORM_FILTER.type(), BuiltinNodeType.TRANSFORM_MAP.type(),
+            BuiltinNodeType.TRANSFORM_SQL.type(),       // one SELECT over the typed input → steps: kind sql
             BuiltinNodeType.SINK_PERSISTENT.type(), BuiltinNodeType.ENRICHMENT.type());
 
     /**
-     * Node type → the {@code steps:} kind it lowers to: the five kinds the flat file's transform chain
-     * can hold. {@code transform.map} is deliberately absent — the lift emits it as the schema
+     * Node type → the {@code steps:} kind it lowers to: the six kinds the flat file's transform chain
+     * can hold. {@code transform.sql} is a real chain step like filter — it has no singular block, so a
+     * chain carrying one always lowers to {@code steps:} (see {@link #isLegacyShaped}). {@code transform.map} is deliberately absent — the lift emits it as the schema
      * projection between parser and sink, so it never enters the chain, and giving it a {@code steps:}
      * entry would change <b>when {@code steps:} is emitted at all</b> (AUTHOR-1's ⛔).
      *
@@ -127,7 +131,8 @@ public final class PipelineEditable {
             BuiltinNodeType.TRANSFORM_JOIN.type(),      PipelineConfig.Step.JOIN,
             BuiltinNodeType.TRANSFORM_DEDUP.type(),     PipelineConfig.Step.DEDUP,
             BuiltinNodeType.TRANSFORM_SUMMARIZE.type(), PipelineConfig.Step.SUMMARIZE,
-            BuiltinNodeType.TRANSFORM_ROUTE.type(),     PipelineConfig.Step.ROUTE);
+            BuiltinNodeType.TRANSFORM_ROUTE.type(),     PipelineConfig.Step.ROUTE,
+            BuiltinNodeType.TRANSFORM_SQL.type(),       PipelineConfig.Step.SQL);
 
     /**
      * Whether a save can lower this node type back to the flat config. The palette reads this so a
@@ -644,7 +649,15 @@ public final class PipelineEditable {
             else if (BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type().equals(t)) marker = n;
             // The five chain kinds. Each used to claim a single slot and refuse a second (MULTI_*); they
             // now join an ordered chain, and how many there are stops being the question — see stepsOf.
-            else if (stepKindOf(t) != null) chain.add(n);
+            else if (stepKindOf(t) != null) {
+                // sql is the step's only load-bearing key (fields[] is an authoring artifact the engine
+                // never reads) — a blank one would save, load, and throw at the first run.
+                if (BuiltinNodeType.TRANSFORM_SQL.type().equals(t)
+                        && !(n.cfg("sql") instanceof String sql && !sql.isBlank()))
+                    refusals.add(new PipelineCompileException.Refusal(SQL_STEP_EMPTY, n.id(),
+                            "a transform.sql node needs a non-blank 'sql' SELECT"));
+                chain.add(n);
+            }
             else if (BuiltinNodeType.SINK_PERSISTENT.type().equals(t)) {
                 if (isQuarantine(n)) {
                     quarantineSink = n;
@@ -983,7 +996,10 @@ public final class PipelineEditable {
             // A CONTRIBUTED kind is not in KINDS, so indexOf gives -1 and the chain is not legacy-shaped
             // — which is correct and not incidental: the singular blocks have one fixed key each and
             // cannot hold a step type they have never heard of. Such a chain must take `steps:`.
-            int position = PipelineConfig.Step.KINDS.indexOf(STEP_KIND.get(n.type()));
+            // `sql` IS in KINDS (the parser accepts it standalone) but has no singular block either.
+            String kind = STEP_KIND.get(n.type());
+            if (PipelineConfig.Step.SQL.equals(kind)) return false;
+            int position = PipelineConfig.Step.KINDS.indexOf(kind);
             if (position <= previous) return false;
             previous = position;
         }
@@ -1024,6 +1040,8 @@ public final class PipelineEditable {
             // filter: verbatim. Its keys are two different things fused into one node — the post-parse
             // `where` predicate, and the pre-parse include/exclude lists — and a chain step keeps both
             // so the round-trip is lossless. Only `where` has a legacy singular spelling.
+            // sql: verbatim too — `sql` plus, when Simple-authored, the opaque `fields[]` list the UI
+            // reads back to re-open its builder; the engine only ever reads `sql`.
             default -> c.putAll(deepCopy(n.config()));
         }
         return c;

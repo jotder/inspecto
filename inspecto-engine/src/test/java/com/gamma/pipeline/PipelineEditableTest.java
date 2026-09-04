@@ -415,6 +415,99 @@ class PipelineEditableTest {
         assertEquals(Map.of("group_by", List.of("day")), processing.get("summarize"));
     }
 
+    // ── transform.sql: a chain step with no singular block, so it always takes the steps: spelling ──
+
+    private static final Map<String, Object> SIMPLE_AUTHORED_SQL = Map.of(
+            "sql", "SELECT id, amt * 2 AS amt2 FROM input",
+            // an opaque authoring artifact — its PRESENCE means "Simple-authored"; the engine never reads it
+            "fields", List.of(Map.of("name", "amt2", "expr", "amt * 2")));
+
+    /** One sql node lowers to a {@code kind: sql} step carrying {@code sql} AND {@code fields} verbatim. */
+    @Test
+    void aSqlNodeLowersToASqlStepCarryingSqlAndFieldsVerbatim() {
+        Map<String, Object> out = PipelineEditable.lower(graphWith(
+                node("s1", "transform.sql", SIMPLE_AUTHORED_SQL)), new LinkedHashMap<>(), true);
+
+        Object steps = out.get("steps");
+        assertInstanceOf(List.class, steps, "sql has no singular block, so even one node takes steps:");
+        assertEquals(1, ((List<?>) steps).size());
+        Map<?, ?> entry = (Map<?, ?>) ((List<?>) steps).get(0);
+        assertEquals(java.util.Set.of("sql"), entry.keySet());
+        assertEquals(SIMPLE_AUTHORED_SQL, entry.get("sql"));
+    }
+
+    /** A hand-written node (no {@code fields}) lowers to a step with only {@code sql} — no invented key. */
+    @Test
+    void aHandWrittenSqlNodeLowersWithoutAFieldsKey() {
+        Map<String, Object> out = PipelineEditable.lower(graphWith(
+                node("s1", "transform.sql", Map.of("sql", "SELECT * FROM input"))), new LinkedHashMap<>(), true);
+        Map<?, ?> entry = (Map<?, ?>) ((List<?>) out.get("steps")).get(0);
+        assertEquals(Map.of("sql", "SELECT * FROM input"), entry.get("sql"));
+    }
+
+    /** sql sits in an authored chain like any other step, in node order. */
+    @Test
+    void aSqlStepKeepsItsPlaceInTheChain() {
+        assertChain(List.of("dedup", "sql", "summarize"),
+                node("dd1", "transform.dedup", Map.of("keys", List.of("msisdn"))),
+                node("s1", "transform.sql", Map.of("sql", "SELECT * FROM input")),
+                node("sm", "transform.summarize", Map.of("group_by", List.of("day"))));
+    }
+
+    @Test
+    void aBlankSqlRefusesWithNamedCode() {
+        for (Map<String, Object> cfg : List.<Map<String, Object>>of(Map.of(), Map.of("sql", "   "))) {
+            PipelineCompileException ex = assertThrows(PipelineCompileException.class,
+                    () -> PipelineEditable.lower(graphWith(node("s1", "transform.sql", cfg)),
+                            new LinkedHashMap<>(), true));
+            assertEquals(1, ex.refusals().size(), ex.getMessage());
+            assertEquals(PipelineEditable.SQL_STEP_EMPTY, ex.refusals().get(0).code());
+            assertEquals("s1", ex.refusals().get(0).nodeId());
+        }
+    }
+
+    @Test
+    void transformSqlIsAuthorable() {
+        assertTrue(PipelineEditable.isLowerable("transform.sql"));
+        assertTrue(PipelineEditable.isAuthorable("transform.sql"));
+    }
+
+    /**
+     * A stored {@code kind: sql} step lifts to a {@code transform.sql} node carrying {@code {sql, fields}},
+     * and the file that node lowers back to is byte-identical — the opaque {@code fields[]} list included,
+     * through the real codec.
+     */
+    @Test
+    void aSqlStepRoundTripsByteIdenticalThroughTheFile(@TempDir Path dir) throws Exception {
+        Path schema = dir.resolve("s.toon");
+        Files.writeString(schema, com.gamma.etl.PipelineConfigBatchTest.miniSchema());
+        Map<String, Object> lowered = PipelineEditable.lower(new PipelineGraph("sq", false, List.of(   // inactive: an ACTIVE steps: file demands output_store: at load
+                node("acq", "acquisition", Map.of("poll", dir.resolve("in").toString())),
+                node("parse", "parser", Map.of("schema_file", schema.toString())),
+                node("s1", "transform.sql", SIMPLE_AUTHORED_SQL),
+                node("sink", "sink.persistent", Map.of("database", dir.resolve("db").toString()))),
+                List.of()), new LinkedHashMap<>(), true);
+        Path toon = dir.resolve("sq_pipeline.toon");
+        Files.writeString(toon, com.gamma.config.io.ConfigCodec.toToon(lowered));
+        Map<String, Object> raw = decode(toon);
+
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+        assertTrue(cfg.hasExplicitSteps());
+        assertEquals(List.of("sql"), cfg.steps().stream().map(PipelineConfig.Step::kind).toList());
+
+        PipelineGraph lifted = PipelineLift.lift(cfg);
+        PipelineNode sqlNode = lifted.nodes().stream()
+                .filter(n -> BuiltinNodeType.TRANSFORM_SQL.type().equals(n.type()))
+                .findFirst().orElseThrow(() -> new AssertionError("no transform.sql node lifted: " + lifted.nodes()));
+        assertEquals(SIMPLE_AUTHORED_SQL, sqlNode.config(), "the node carries sql + the opaque fields list");
+
+        Map<String, Object> relowered = PipelineEditable.lower(
+                PipelineCodec.fromMap(PipelineEditable.toMap(cfg, raw)), raw, true);
+        assertEquals(raw, relowered);
+        assertEquals(Files.readString(toon), com.gamma.config.io.ConfigCodec.toToon(relowered),
+                "lift -> lower reproduces the stored file byte for byte");
+    }
+
     /** Lower {@code extra} and assert the {@code steps:} kinds it produced, in order. */
     private static void assertChain(List<String> expected, PipelineNode... extra) {
         Map<String, Object> out = PipelineEditable.lower(graphWith(extra), new LinkedHashMap<>(), true);
