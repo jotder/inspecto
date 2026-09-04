@@ -29,6 +29,7 @@ import { PipelineParseDefinitionComponent } from './pipeline-parse-definition.co
             [pipelineName]="pipelineName()"
             [sample]="sample"
             [filenameColumnTarget]="filenameColumnTarget()"
+            [collectorInclude]="collectorInclude()"
             (filenameColumnChange)="filenameColumnChange = $event"
             (applied)="applied = $event"
             (dirtyChange)="dirty = $event"
@@ -44,6 +45,8 @@ class HostComponent {
     sample: DefinitionStateService | null = null;
     /** null = the host's cross-node lineage field is not offered (ambiguous/no sink) — most specs. */
     filenameColumnTarget = signal<{ value: string; target: string } | null>(null);
+    /** null = no single upstream Collector node — most specs (D2 redesign 2026-09-03). */
+    collectorInclude = signal<{ value: string; source: string } | null>(null);
     filenameColumnChange?: string | null;
     applied?: AuthoredNode;
     dirty = false;
@@ -188,6 +191,8 @@ let savedLegacyPartitionKey: string | null = null;
 let savedForeignKeys: Record<string, unknown> | null = null;
 /** A stored `mapping:` block, so a test can pin that its declared names survive an Apply. */
 let savedMapping: Record<string, unknown> | null = null;
+/** Extra keys on the saved field (description / unit / classification …) — the R11 carry-through fixture. */
+let savedFieldExtras: Record<string, unknown> = {};
 /** S4/D7: what the destructive re-derive confirm answers. */
 let confirmAnswer = true;
 
@@ -252,7 +257,7 @@ async function create(
                                   config: {
                                       raw: {
                                           name: 'record',
-                                          fields: [{ name: 'IMSI', selector: 'imsi', type: 'VARCHAR' }],
+                                          fields: [{ name: 'IMSI', selector: 'imsi', type: 'VARCHAR', ...savedFieldExtras }],
                                       },
                                       ...(savedPartitions ? { partitions: savedPartitions } : {}),
                                       ...(savedLegacyPartitionKey ? { partitionKey: savedLegacyPartitionKey } : {}),
@@ -299,6 +304,7 @@ describe('PipelineParseDefinitionComponent', () => {
     beforeEach(() => {
         localStorage.removeItem('inspecto.currentLens');
         confirmAnswer = true;
+        savedFieldExtras = {};
     });
 
     /**
@@ -430,12 +436,12 @@ describe('PipelineParseDefinitionComponent', () => {
 
     it('seeds the editor from the node’s inline parsing: block', async () => {
         const fixture = await create();
-        expect(editor(fixture).value()['delimited']).toEqual({ delimiter: '|', has_header: false });
+        expect(editor(fixture).value()['delimited']).toMatchObject({ delimiter: '|', has_header: false }) // + engine defaults (R4);
     });
 
     it('Apply rebuilds the node with the edited Grammar in parsing:, frontend stamped', async () => {
         const fixture = await create();
-        editor(fixture).schemaForm!.form.patchValue({ delimited__delimiter: ';' });
+        editor(fixture).controlFor('delimited__delimiter')?.setValue(';');
         fixture.detectChanges();
 
         pane(fixture).submit();
@@ -477,14 +483,14 @@ describe('PipelineParseDefinitionComponent', () => {
      */
     it('hosts a palette-fresh node with no config and Applies a complete delimited block', async () => {
         const fixture = await create({ id: 'parser_delimited_1', type: 'parser.delimited' });
-        expect(editor(fixture).value()['delimited']).toEqual({ delimiter: ',', has_header: true });
+        expect(editor(fixture).value()['delimited']).toMatchObject({ delimiter: ',', has_header: true });
 
         pane(fixture).submit();
 
         const applied = fixture.componentInstance.applied!;
         const parsing = applied.config!['parsing'] as Record<string, unknown>;
         expect(parsing['frontend']).toBe('delimited');
-        expect(parsing['delimited']).toEqual({ delimiter: ',', has_header: true });
+        expect(parsing['delimited']).toMatchObject({ delimiter: ',', has_header: true, quote: '"' }); // + engine defaults (R4)
     });
 
     /**
@@ -515,8 +521,8 @@ describe('PipelineParseDefinitionComponent', () => {
 
     it('reports dirty on an edit, and pristine again after Apply', async () => {
         const fixture = await create();
-        editor(fixture).schemaForm!.form.patchValue({ delimited__delimiter: ';' });
-        editor(fixture).schemaForm!.form.markAsDirty();
+        editor(fixture).controlFor('delimited__delimiter')?.setValue(';');
+        editor(fixture).controlFor('delimited__delimiter')?.markAsDirty();
         fixture.debugElement
             .query(By.directive(PipelineParseDefinitionComponent))
             .nativeElement.dispatchEvent(new Event('input', { bubbles: true }));
@@ -560,7 +566,7 @@ describe('PipelineParseDefinitionComponent', () => {
             const fixture = await create(asn1Node(), [ASN1_DEF]);
             fixture.componentInstance.pipelineName.set('asn1_cdr');
             fixture.detectChanges();
-            editor(fixture).schemaForm!.form.patchValue({ asn1__root_type: 'CallEventRecord' });
+            editor(fixture).controlFor('asn1__root_type')?.setValue('CallEventRecord');
             fixture.detectChanges();
 
             pane(fixture).submit();
@@ -635,7 +641,7 @@ describe('PipelineParseDefinitionComponent', () => {
             await new Promise((r) => setTimeout(r, 30));
             fixture.detectChanges();
 
-            const values = editor(fixture).schemaForm!.form.getRawValue() as Record<string, unknown>;
+            const values = editor(fixture).rawValue() as Record<string, unknown>;
             expect(String(values['asn1__grammar'] ?? '')).toContain('DEFINITIONS');
             expect(values['asn1__root_type']).toBe('Record');
         });
@@ -688,7 +694,7 @@ describe('PipelineParseDefinitionComponent', () => {
          */
         it('Apply writes segment schemas then assembles ingester + ingester_config from the served schema', async () => {
             const fixture = await create(pluginNode(), [ACME_DEF]);
-            editor(fixture).schemaForm!.form.patchValue({ ingester_config__mode: 'lenient' });
+            editor(fixture).controlFor('ingester_config__mode')?.setValue('lenient');
             fixture.detectChanges();
             const segments = segmentsEditor(fixture);
             vi.spyOn(segments, 'validate').mockReturnValue(true);
@@ -739,7 +745,7 @@ describe('PipelineParseDefinitionComponent', () => {
 
         it('Apply stamps the frontend and keeps the rest of the node config', async () => {
             const fixture = await create(jsonNode());
-            editor(fixture).schemaForm!.form.patchValue({ json__format: 'auto' });
+            editor(fixture).controlFor('json__format')?.setValue('auto');
             fixture.detectChanges();
 
             pane(fixture).submit();
@@ -899,34 +905,54 @@ describe('PipelineParseDefinitionComponent', () => {
         });
 
         /**
-         * D1(b): the Files & metadata tab's column-metadata grid — description/unit/classification
-         * are merged onto the columns table's rows by selector at submit, so the schema write
-         * carries them; the columns table's own form never holds those keys.
+         * R11: the metadata grid LEFT this pane (description / unit / classification belong to
+         * Transform), but the save path used to merge those keys FROM the grid — so without a
+         * replacement a hydrated schema's metadata would be silently dropped on Apply. The
+         * carry-through now comes from the loaded rows, by selector, with no grid on screen.
          */
-        it('persists the metadata grid’s values into the schema write, merged by selector', async () => {
+        it('carries a hydrated schema’s metadata through Apply unchanged, with no metadata grid present', async () => {
+            savedFieldExtras = { description: 'subscriber id', unit: 'E.164', classification: 'PII' };
             const n = unschemadNode();
             (n.config as Record<string, unknown>)['schema_file'] = 'parse_schema.toon';
             const fixture = await create(n); // hydrates the one-field saved schema (IMSI)
             fixture.detectChanges();
-
-            const metaInputs = Array.from(
-                fixture.nativeElement.querySelectorAll('inspecto-schema-metadata-grid input'),
-            ) as HTMLInputElement[];
-            expect(metaInputs.length).toBe(3); // one row × description/unit/classification
-            metaInputs[0].value = 'subscriber id';
-            metaInputs[0].dispatchEvent(new Event('input', { bubbles: true }));
-            metaInputs[2].value = 'PII';
-            metaInputs[2].dispatchEvent(new Event('input', { bubbles: true }));
+            expect(fixture.nativeElement.querySelector('inspecto-schema-metadata-grid')).toBeNull();
+            expect(fixture.nativeElement.textContent).not.toContain('Column metadata');
 
             pane(fixture).submit();
             fixture.detectChanges();
 
             const raw = schemaWrites[0].config['raw'] as Record<string, unknown>;
             const fields = raw['fields'] as Record<string, unknown>[];
-            expect(fields[0]['name']).toBe('IMSI');
-            expect(fields[0]['description']).toBe('subscriber id');
-            expect(fields[0]['classification']).toBe('PII');
-            expect(fields[0]['unit']).toBeUndefined();
+            expect(fields).toHaveLength(1);
+            expect(fields[0]).toEqual({
+                name: 'IMSI',
+                selector: 'imsi',
+                type: 'VARCHAR',
+                description: 'subscriber id',
+                unit: 'E.164',
+                classification: 'PII',
+            });
+        });
+
+        it('the Grammar CSV export still carries the hydrated metadata (the same carry-through)', async () => {
+            savedFieldExtras = { description: 'subscriber id', classification: 'PII' };
+            const n = unschemadNode();
+            (n.config as Record<string, unknown>)['schema_file'] = 'parse_schema.toon';
+            const fixture = await create(n);
+            fixture.detectChanges();
+            const p = pane(fixture);
+            // Replay exactly what exportCsv() serializes, without the browser download.
+            const csv = grammarToCsv(
+                { format: 'delimited', pipeline: 'parse', types: p.typesMode() },
+                parsingAttributesFor('delimited'),
+                {},
+                (p as unknown as { withMetadata(r: unknown[]): unknown[] }).withMetadata(
+                    (p as unknown as { currentSchemaRows(): unknown[] }).currentSchemaRows(),
+                ) as never,
+            );
+            expect(csv).toContain('column,imsi,description,subscriber id');
+            expect(csv).toContain('column,imsi,classification,PII');
         });
 
         /**
@@ -958,26 +984,27 @@ describe('PipelineParseDefinitionComponent', () => {
         });
 
         /**
-         * S4 — the FIRST derivation is revealed: it lands on the Types & columns tab, which on a tabbed
-         * format is not the tab the operator is looking at, so the parse used to look like it did
-         * nothing. Later parses must NOT yank the tab out from under someone editing another one.
+         * S4 — the FIRST derivation is revealed: it expands the Types & columns section, which on a
+         * sectioned format is not necessarily open, so the parse used to look like it did nothing.
+         * Later parses must NOT collapse a section the operator has open for something else — S2
+         * panels stay mounted and independently expandable, so "the tab stays where they put it"
+         * becomes "the section the operator opened stays open".
          */
-        it('reveals the Types tab on the first derivation only', async () => {
+        it('reveals the Types section on the first derivation only', async () => {
             const fixture = await create(unschemadNode());
             const ed = editor(fixture);
-            expect(ed.tabbed).toBe(true); // delimited renders as tabs
+            expect(ed.tabbed).toBe(true); // delimited renders as sections
             ed.showTab('dialect');
 
             pane(fixture).onPreviewed(TABLE_PREVIEW);
             fixture.detectChanges();
-            expect(ed.activeTab()).toBe(1); // 'types'
+            expect(ed.isExpanded('types')).toBe(true);
 
-            // The operator moves to another tab and re-parses: the tab stays where they put it.
+            // The operator opens another section and re-parses: it stays open too.
             ed.showTab('robustness');
-            const parked = ed.activeTab();
             pane(fixture).onPreviewed(TABLE_PREVIEW);
             fixture.detectChanges();
-            expect(ed.activeTab()).toBe(parked);
+            expect(ed.isExpanded('robustness')).toBe(true);
         });
 
         /**
@@ -1145,15 +1172,42 @@ describe('PipelineParseDefinitionComponent', () => {
             expect('synonym' in fields[0]).toBe(false);
         });
 
-        it('Declared mode keeps VARCHAR until "Apply suggested types" stamps the inferred set', async () => {
+        it('Declared mode is pre-filled from the detected types too (R11 — no "Apply suggested types" chip)', async () => {
             const fixture = await create(unschemadNode());
             const p = pane(fixture);
             p.setTypesMode('declared');
             p.onPreviewed(typedPreview);
-            expect(p.schemaSeed().map((r) => r.type)).toEqual(['VARCHAR', 'VARCHAR', 'VARCHAR']);
-
-            p.applySuggestedTypes();
+            fixture.detectChanges();
+            await fixture.whenStable(); // ngModel writes the picker's value asynchronously
+            fixture.detectChanges();
             expect(p.schemaSeed().map((r) => r.type)).toEqual(['BIGINT', 'DATE', 'VARCHAR']);
+            const text = fixture.nativeElement.textContent as string;
+            expect(text).not.toContain('Apply suggested types');
+            expect(fixture.nativeElement.querySelector('mat-button-toggle-group[aria-label="Data types mode"]')).toBeNull();
+            // …and the mode is ONE property row, in the mockup's words.
+            expect(text).toContain('Detect column types');
+            expect(text).toContain('I will set them myself');
+            // The type menu is editable in Declared mode.
+            const typeButton = fixture.nativeElement.querySelector(
+                'inspecto-schema-fields-editor button[aria-label^="Column type"]',
+            ) as HTMLButtonElement;
+            expect(typeButton.disabled).toBe(false);
+        });
+
+        it('shows the first parsed row as the Sample value column (R11)', async () => {
+            const fixture = await create(unschemadNode());
+            pane(fixture).onPreviewed(typedPreview);
+            fixture.detectChanges();
+            const el = fixture.nativeElement as HTMLElement;
+            const headers = Array.from(el.querySelectorAll('inspecto-schema-fields-editor thead th')).map((h) =>
+                (h as HTMLElement).textContent?.trim(),
+            );
+            expect(headers).toEqual(['Use', '#', 'Name', 'Type', 'Sample value', 'Also known as']);
+            expect(el.textContent).toContain('Columns that come out');
+            const samples = Array.from(el.querySelectorAll('inspecto-schema-fields-editor tbody tr td:nth-child(5)')).map(
+                (td) => (td as HTMLElement).textContent?.trim(),
+            );
+            expect(samples).toEqual(['1', '2026-07-15', 'london']);
         });
 
         it('a hydrated schema without the raw.types marker loads as Declared', async () => {
@@ -1487,8 +1541,10 @@ describe('PipelineParseDefinitionComponent', () => {
             expect(text).toContain('src_file');
             expect(text).toContain('lineage column');
             expect(text).toContain('Warehouse');
-            // …and in the Column metadata list too (operator ask 2026-08-22), read-only.
             expect(text).toContain('stamped at write');
+            // R11: the column is also the columns table's read-only last row, the mockup's wording on the box.
+            expect(fixture.nativeElement.querySelector('[data-filename-row]')?.textContent).toContain('src_file');
+            expect(text).toContain('Add a column with the source file name');
             // Read-only: never one of the editable schema rows.
             expect(
                 pane(fixture)
@@ -1496,5 +1552,103 @@ describe('PipelineParseDefinitionComponent', () => {
                     .map((r) => r.name),
             ).not.toContain('src_file');
         });
+
+        // S4 (redesign 2026-09-03): the checkbox half of the control.
+        it('checkbox is checked exactly when a name is set', async () => {
+            const fixture = await create();
+            fixture.componentInstance.filenameColumnTarget.set({ value: '', target: 'Warehouse' });
+            fixture.detectChanges();
+            let checkbox = fixture.nativeElement.querySelector('mat-checkbox input[type="checkbox"]') as HTMLInputElement;
+            expect(checkbox.checked).toBe(false);
+
+            fixture.componentInstance.filenameColumnTarget.set({ value: 'src_file', target: 'Warehouse' });
+            fixture.detectChanges();
+            checkbox = fixture.nativeElement.querySelector('mat-checkbox input[type="checkbox"]') as HTMLInputElement;
+            expect(checkbox.checked).toBe(true);
+        });
+
+        it('unchecking emits null (clears the column)', async () => {
+            const fixture = await create();
+            fixture.componentInstance.filenameColumnTarget.set({ value: 'src_file', target: 'Warehouse' });
+            fixture.detectChanges();
+            const checkbox = fixture.nativeElement.querySelector('mat-checkbox') as HTMLElement;
+            checkbox.querySelector('input')!.click();
+            fixture.detectChanges();
+            expect(fixture.componentInstance.filenameColumnChange).toBeNull();
+        });
+
+        it('checking with no name yet writes the default name "filename"', async () => {
+            const fixture = await create();
+            fixture.componentInstance.filenameColumnTarget.set({ value: '', target: 'Warehouse' });
+            fixture.detectChanges();
+            const checkbox = fixture.nativeElement.querySelector('mat-checkbox') as HTMLElement;
+            checkbox.querySelector('input')!.click();
+            fixture.detectChanges();
+            expect(fixture.componentInstance.filenameColumnChange).toBe('file_name');
+        });
+
+        it('checking with an existing name keeps it (never clobbers a real edit)', async () => {
+            const fixture = await create();
+            fixture.componentInstance.filenameColumnTarget.set({ value: 'src_file', target: 'Warehouse' });
+            fixture.detectChanges();
+            // Uncheck then re-check — the target signal (host-owned) still reports 'src_file' since
+            // the host in this spec does not react to the emitted change, matching how a real host
+            // (which DOES apply the emit to the model before the next re-render) would re-seed it.
+            const checkbox = fixture.nativeElement.querySelector('mat-checkbox') as HTMLElement;
+            checkbox.querySelector('input')!.click();
+            fixture.detectChanges();
+            checkbox.querySelector('input')!.click();
+            fixture.detectChanges();
+            expect(fixture.componentInstance.filenameColumnChange).toBe('src_file');
+        });
+    });
+
+    /**
+     * `collectorInclude` (redesign D2, 2026-09-03) — the read-only "Reads: …" display sourced from the
+     * upstream Collector node. This pane never edits it; the host derives the value and hands it in,
+     * exactly the `filenameColumnTarget` contract mirrored upstream.
+     */
+    describe('collectorInclude (read-only display)', () => {
+        it('renders nothing when the host has no target (ambiguous/no collector)', async () => {
+            const fixture = await create();
+            expect(fixture.nativeElement.textContent).not.toContain('collector step');
+        });
+
+        it('renders the pattern and source seeded from the host', async () => {
+            const fixture = await create();
+            fixture.componentInstance.collectorInclude.set({ value: '*.csv', source: 'Inbox' });
+            fixture.detectChanges();
+            const text = fixture.nativeElement.textContent as string;
+            expect(text).toContain('*.csv');
+            expect(text).toContain('Inbox');
+            expect(text).toContain('collector step');
+        });
+
+        it('renders a friendly placeholder for a blank pattern rather than an empty span', async () => {
+            const fixture = await create();
+            fixture.componentInstance.collectorInclude.set({ value: '', source: 'Inbox' });
+            fixture.detectChanges();
+            expect(fixture.nativeElement.textContent).toContain('(all files)');
+        });
+
+        it('never renders an editable control for it — display only', async () => {
+            const fixture = await create();
+            fixture.componentInstance.collectorInclude.set({ value: '*.csv', source: 'Inbox' });
+            fixture.detectChanges();
+            expect(fixture.nativeElement.querySelector('input[aria-label*="Reads" i]')).toBeNull();
+            expect(fixture.nativeElement.querySelector('input[value="*.csv"]')).toBeNull();
+        });
+    });
+
+    /**
+     * Partitioning moved to the Sink pane (redesign S5, D4) — this pane no longer renders a live
+     * `<inspecto-schema-partitions-editor>`; see the "partitions round-trip" describe above for proof
+     * the schema-write storage contract (`partitionSeed` carried through `submitWithSchema`) is
+     * untouched, and `pipeline-config-definition.component.spec.ts` for the new Sink-pane control.
+     */
+    it('renders no live partitions editor (moved to the Sink pane)', async () => {
+        const fixture = await create(delimitedNode(), [], 0, null, 'cdr');
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('inspecto-schema-partitions-editor')).toBeNull();
     });
 });

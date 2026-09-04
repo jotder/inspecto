@@ -1,5 +1,18 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, Input, output, signal } from '@angular/core';
+import {
+    AfterViewInit,
+    ChangeDetectionStrategy,
+    ChangeDetectorRef,
+    Component,
+    DestroyRef,
+    ElementRef,
+    inject,
+    Input,
+    OnDestroy,
+    output,
+    signal,
+    ViewChild,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AbstractControl, FormBuilder, FormGroup, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
@@ -58,11 +71,38 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
-        <form [formGroup]="form" class="flex flex-col gap-1" (ngSubmit)="submitted.emit()">
+        <form #formEl [formGroup]="form" class="flex flex-col gap-1" (ngSubmit)="submitted.emit()">
             <!-- Invisible submit target so Enter in any field triggers ngSubmit (implicit submission
                  requires a rendered submit control — display:none is skipped by Chrome, so sr-only,
                  not "hidden"; hosts keep their visible Save button outside). -->
             <button type="submit" class="sr-only" aria-hidden="true" tabindex="-1"></button>
+            @if (flat) {
+                <!-- flat: a compact PROPERTY LIST (operator ask 2026-09-04). Every tier in one list
+                     (required → optional → advanced), group headings kept, no Optional/Advanced
+                     disclosure — for hosts that own their own sectioning (the Grammar editor's
+                     expansion panels, the Sink pane). Each spec is ONE ~32px row: label · current
+                     value · pencil; the real control appears inline only while the row is being
+                     edited, so defaults read as values and help hides behind an info tooltip. Two
+                     columns once the HOST is ≥ 560px wide (measured, not a viewport breakpoint — the
+                     drawer is narrow inside a wide viewport until it is maximized). -->
+                <div [class]="columns() === 2 ? 'grid grid-cols-2 gap-x-6 gap-y-0.5' : 'flex flex-col gap-0.5'">
+                    @for (g of groupsOf(flatSpecs()); track g.name) {
+                        @if (g.name) {
+                            <div
+                                class="text-secondary pb-1 pt-2 text-sm font-medium"
+                                [class.col-span-2]="columns() === 2"
+                                role="heading"
+                                aria-level="3"
+                            >
+                                {{ g.name }}
+                            </div>
+                        }
+                        @for (spec of g.specs; track spec.key) {
+                            <ng-container *ngTemplateOutlet="row; context: { spec }"></ng-container>
+                        }
+                    }
+                </div>
+            } @else {
             @if (tiers().advanced.length) {
                 <div class="flex justify-end">
                     <button
@@ -132,6 +172,7 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
                         <ng-container *ngTemplateOutlet="field; context: { spec }"></ng-container>
                     }
                 }
+            }
             }
 
             <ng-template #field let-spec="spec" let-first="first">
@@ -320,17 +361,391 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
                     }
                 }
             </ng-template>
+
+            <!-- flat mode's property row. Its controls carry NO mat-label (the row label is the label,
+                 wired through aria-labelledby) and NO mat-error/mat-hint (help is the info tooltip;
+                 the error is the explicit role="alert" line below, like a list field's). -->
+            <ng-template #row let-spec="spec">
+                @if (isVisible(spec)) {
+                    <div
+                        class="sf-row flex min-h-8 min-w-0 items-center gap-2"
+                        [attr.data-key]="spec.key"
+                        (focusin)="onRowFocusIn(spec)"
+                        (focusout)="onRowFocusOut(spec, $event)"
+                        (keydown.escape)="stopEditing()"
+                    >
+                        <span class="text-secondary flex w-40 shrink-0 items-center gap-1 text-sm">
+                            <span class="truncate" [id]="labelId(spec)" [title]="spec.label"
+                                >{{ spec.label }}@if (isRequiredSpec(spec)) {<span class="text-warn" aria-hidden="true">*</span>}</span
+                            >
+                            @if (spec.help) {
+                                <mat-icon
+                                    class="icon-size-4 shrink-0"
+                                    svgIcon="heroicons_outline:information-circle"
+                                    role="img"
+                                    tabindex="0"
+                                    [matTooltip]="spec.help"
+                                    [attr.aria-label]="spec.help"
+                                ></mat-icon>
+                            }
+                        </span>
+                        <div class="flex min-w-0 flex-1 items-center">
+                            @switch (spec.type) {
+                                @case ('boolean') {
+                                    <!-- A toggle IS its own editor: no display/edit split, no pencil. -->
+                                    <mat-slide-toggle
+                                        class="sf-toggle"
+                                        [formControlName]="spec.key"
+                                        [aria-labelledby]="labelId(spec)"
+                                    ></mat-slide-toggle>
+                                }
+                                @case ('select') {
+                                    <!-- The shared picker is already a click-to-pick property row (label ·
+                                         value ▾), so it renders inline as the value control with its own
+                                         label visually hidden (still the trigger's accessible name) and
+                                         its help suppressed — the info icon covers it. It keeps its own
+                                         error line, so the row renders none. -->
+                                    <inspecto-option-picker
+                                        class="block w-full"
+                                        [formControlName]="spec.key"
+                                        [label]="spec.label"
+                                        [hideLabel]="true"
+                                        [options]="spec.options ?? []"
+                                        [required]="!!spec.required"
+                                    />
+                                }
+                                @case ('list') {
+                                    @if (isEditing(spec)) {
+                                        <div class="flex min-w-0 flex-1 flex-col gap-1">
+                                            <mat-form-field class="sf-dense w-full" appearance="outline" subscriptSizing="dynamic">
+                                                <input
+                                                    matInput
+                                                    type="text"
+                                                    [value]="listDraft(spec.key)"
+                                                    [placeholder]="spec.placeholder ?? ''"
+                                                    [attr.aria-labelledby]="labelId(spec)"
+                                                    (input)="setListDraft(spec.key, $any($event.target).value)"
+                                                    (keydown.enter)="addListItem(spec, $event)"
+                                                    (blur)="addListItem(spec)"
+                                                />
+                                                <button
+                                                    mat-icon-button
+                                                    matSuffix
+                                                    type="button"
+                                                    [attr.aria-label]="'Add entry to ' + spec.label"
+                                                    [disabled]="!listDraft(spec.key).trim()"
+                                                    (click)="addListItem(spec)"
+                                                >
+                                                    <mat-icon svgIcon="heroicons_outline:plus" />
+                                                </button>
+                                                <inspecto-token-picker
+                                                    matSuffix
+                                                    [fieldLabel]="spec.label"
+                                                    [tokens]="tokensFor(spec)"
+                                                    (picked)="applyToken(spec, $event)"
+                                                />
+                                            </mat-form-field>
+                                            @if (listValue(spec.key).length) {
+                                                <div class="flex flex-wrap gap-1">
+                                                    @for (item of listValue(spec.key); track $index) {
+                                                        <inspecto-chip
+                                                            variant="soft"
+                                                            [removable]="true"
+                                                            [removeLabel]="'Remove ' + item + ' from ' + spec.label"
+                                                            (removed)="removeListItem(spec, $index)"
+                                                        >
+                                                            <span class="font-mono">{{ item }}</span>
+                                                        </inspecto-chip>
+                                                    }
+                                                </div>
+                                            }
+                                        </div>
+                                    } @else {
+                                        <button
+                                            type="button"
+                                            class="sf-value hover:bg-hover flex min-w-0 flex-1 flex-wrap items-center gap-1 rounded px-1 py-0.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                                            [attr.aria-label]="'Edit ' + spec.label"
+                                            (click)="startEditing(spec)"
+                                        >
+                                            @for (item of listValue(spec.key); track $index) {
+                                                <inspecto-chip variant="soft"><span class="font-mono">{{ item }}</span></inspecto-chip>
+                                            } @empty {
+                                                <span class="text-secondary font-mono text-sm">—</span>
+                                            }
+                                        </button>
+                                    }
+                                }
+                                @default {
+                                    @if (isEditing(spec)) {
+                                        <mat-form-field class="sf-dense w-full" appearance="outline" subscriptSizing="dynamic">
+                                            @switch (spec.type) {
+                                                @case ('autocomplete') {
+                                                    <input
+                                                        matInput
+                                                        [formControlName]="spec.key"
+                                                        [placeholder]="spec.placeholder ?? ''"
+                                                        [matAutocomplete]="ac"
+                                                        [attr.aria-labelledby]="labelId(spec)"
+                                                        (focus)="loadOptionsFor(spec)"
+                                                        (keydown.enter)="stopEditing()"
+                                                    />
+                                                    <mat-autocomplete #ac="matAutocomplete" (optionSelected)="stopEditing()">
+                                                        @for (opt of filteredOptions(spec); track opt.value) {
+                                                            <mat-option [value]="opt.value">{{ opt.label }}</mat-option>
+                                                        }
+                                                    </mat-autocomplete>
+                                                }
+                                                @case ('multiline') {
+                                                    <textarea
+                                                        matInput
+                                                        rows="3"
+                                                        [formControlName]="spec.key"
+                                                        [placeholder]="spec.placeholder ?? ''"
+                                                        [attr.aria-labelledby]="labelId(spec)"
+                                                    ></textarea>
+                                                }
+                                                @case ('number') {
+                                                    <input
+                                                        matInput
+                                                        type="number"
+                                                        [formControlName]="spec.key"
+                                                        [placeholder]="spec.placeholder ?? ''"
+                                                        [attr.aria-labelledby]="labelId(spec)"
+                                                        (keydown.enter)="stopEditing()"
+                                                    />
+                                                }
+                                                @default {
+                                                    <input
+                                                        matInput
+                                                        [type]="spec.secret ? 'password' : 'text'"
+                                                        [attr.autocomplete]="spec.secret ? 'new-password' : null"
+                                                        [formControlName]="spec.key"
+                                                        [placeholder]="spec.placeholder ?? ''"
+                                                        [attr.aria-labelledby]="labelId(spec)"
+                                                        (keydown.enter)="stopEditing()"
+                                                    />
+                                                }
+                                            }
+                                            @if (spec.type !== 'number') {
+                                                <inspecto-token-picker
+                                                    matSuffix
+                                                    [fieldLabel]="spec.label"
+                                                    [tokens]="tokensFor(spec)"
+                                                    (picked)="applyToken(spec, $event)"
+                                                />
+                                            }
+                                        </mat-form-field>
+                                    } @else {
+                                        <button
+                                            type="button"
+                                            class="sf-value hover:bg-hover min-w-0 flex-1 truncate rounded px-1 py-0.5 text-left font-mono text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                                            [class.text-secondary]="displayValue(spec) === '—'"
+                                            [attr.aria-label]="spec.label + ': ' + displayValue(spec)"
+                                            [title]="displayValue(spec)"
+                                            (click)="startEditing(spec)"
+                                        >
+                                            {{ displayValue(spec) }}
+                                        </button>
+                                    }
+                                }
+                            }
+                        </div>
+                        @if (hasPencil(spec)) {
+                            <button
+                                type="button"
+                                class="sf-pencil text-secondary hover:bg-hover flex h-7 w-7 shrink-0 items-center justify-center rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                                [attr.aria-label]="(isEditing(spec) ? 'Done editing ' : 'Edit ') + spec.label"
+                                (click)="isEditing(spec) ? stopEditing() : startEditing(spec)"
+                            >
+                                <mat-icon
+                                    class="icon-size-4"
+                                    [svgIcon]="isEditing(spec) ? 'heroicons_outline:check' : 'heroicons_outline:pencil'"
+                                ></mat-icon>
+                            </button>
+                        }
+                    </div>
+                    @if (spec.type !== 'select' && rowError(spec)) {
+                        <p class="text-warn m-0 pl-40 text-xs" role="alert">{{ rowError(spec) }}</p>
+                    }
+                }
+            </ng-template>
         </form>
     `,
+    // Dense field geometry for the flat rows only (no colors — the token guard stays green). Material's
+    // outline field is 56px tall with a floating label; without one, 32px is enough for the text.
+    styles: `
+        :host ::ng-deep .sf-dense .mat-mdc-text-field-wrapper {
+            padding: 0 8px;
+        }
+        :host ::ng-deep .sf-dense .mat-mdc-form-field-infix {
+            min-height: 32px;
+            padding-top: 4px;
+            padding-bottom: 4px;
+        }
+        :host ::ng-deep .sf-dense .mat-mdc-form-field-icon-suffix {
+            padding: 0;
+        }
+        :host ::ng-deep .sf-dense .mat-mdc-form-field-icon-suffix .mat-mdc-icon-button {
+            --mdc-icon-button-state-layer-size: 28px;
+            width: 28px;
+            height: 28px;
+            padding: 2px;
+        }
+        :host ::ng-deep .sf-dense .mat-mdc-form-field-icon-suffix .mat-mdc-icon-button .mat-icon {
+            width: 20px;
+            height: 20px;
+            line-height: 20px;
+        }
+        :host ::ng-deep .sf-toggle .mdc-switch {
+            --mdc-switch-state-layer-size: 28px;
+        }
+    `,
 })
-export class InspectoSchemaFormComponent {
+export class InspectoSchemaFormComponent implements AfterViewInit, OnDestroy {
     private fb = inject(FormBuilder);
     private destroyRef = inject(DestroyRef);
+    private cdr = inject(ChangeDetectorRef);
+    private host = inject<ElementRef<HTMLElement>>(ElementRef);
+
+    @ViewChild('formEl') private formEl?: ElementRef<HTMLElement>;
+
+    // ---- flat mode: property rows -------------------------------------------------------------
+
+    /** Host width (in px) at or above which the flat rows lay out in two columns. */
+    static readonly TWO_COLUMN_MIN_WIDTH = 560;
+
+    /**
+     * Flat-mode column count, driven by a `ResizeObserver` on the form element (NOT a viewport
+     * breakpoint: the definition drawer is ~390px wide inside a wide viewport, and only its
+     * "Full width" button makes the host wide). Public so a spec can force it — jsdom has no
+     * `ResizeObserver`, which the constructor guards, so tests always start at one column.
+     */
+    readonly columns = signal<1 | 2>(1);
+
+    private resizeObserver?: ResizeObserver;
+
+    ngAfterViewInit(): void {
+        if (!this.flat || typeof ResizeObserver === 'undefined' || !this.formEl) return;
+        this.resizeObserver = new ResizeObserver((entries) => {
+            const width = entries[0]?.contentRect.width ?? 0;
+            const next = width >= InspectoSchemaFormComponent.TWO_COLUMN_MIN_WIDTH ? 2 : 1;
+            if (next !== this.columns()) {
+                this.columns.set(next);
+                this.cdr.markForCheck();
+            }
+        });
+        this.resizeObserver.observe(this.formEl.nativeElement);
+    }
+
+    ngOnDestroy(): void {
+        this.resizeObserver?.disconnect();
+        clearTimeout(this.exitTimer);
+    }
+
+    private static seq = 0;
+    private readonly uid = `sf-${InspectoSchemaFormComponent.seq++}`;
+
+    /** The id of a flat row's label span — the accessible name of the row's control. */
+    labelId(spec: AttributeSpec): string {
+        return `${this.uid}-${spec.key}`;
+    }
+
+    isRequiredSpec(spec: AttributeSpec): boolean {
+        return isRequired(spec);
+    }
+
+    /** The key of the ONE flat row currently in edit mode (its real control rendered inline). */
+    readonly editingKey = signal<string | null>(null);
+    private exitTimer?: ReturnType<typeof setTimeout>;
+
+    isEditing(spec: AttributeSpec): boolean {
+        return this.editingKey() === spec.key;
+    }
+
+    /** Booleans and selects are their own editors (toggle / click-to-pick), so no pencil. */
+    hasPencil(spec: AttributeSpec): boolean {
+        return spec.type !== 'boolean' && spec.type !== 'select';
+    }
+
+    /** Switch a flat row to edit mode and focus its control. */
+    startEditing(spec: AttributeSpec): void {
+        clearTimeout(this.exitTimer);
+        this.editingKey.set(spec.key);
+        this.cdr.detectChanges();
+        const row = this.rowElement(spec.key);
+        const control = row?.querySelector<HTMLElement>('input, textarea');
+        control?.focus();
+    }
+
+    /** Return the editing row (if any) to display mode. The control's value is already committed. */
+    stopEditing(): void {
+        clearTimeout(this.exitTimer);
+        if (this.editingKey() === null) return;
+        this.editingKey.set(null);
+        this.cdr.markForCheck();
+    }
+
+    onRowFocusIn(spec: AttributeSpec): void {
+        if (this.isEditing(spec)) clearTimeout(this.exitTimer);
+    }
+
+    /**
+     * Leave edit mode once focus has left the row. Deferred a beat rather than on the blur itself,
+     * because an autocomplete option (an overlay, so outside the row) is chosen by a click whose
+     * mousedown blurs the input first — removing the control on that blur would lose the pick.
+     */
+    onRowFocusOut(spec: AttributeSpec, event: FocusEvent): void {
+        if (!this.isEditing(spec)) return;
+        const row = event.currentTarget as HTMLElement | null;
+        const next = event.relatedTarget as Node | null;
+        if (next && row?.contains(next)) return;
+        clearTimeout(this.exitTimer);
+        this.exitTimer = setTimeout(() => {
+            if (this.isEditing(spec) && !this.rowElement(spec.key)?.contains(document.activeElement)) {
+                this.stopEditing();
+            }
+        }, 200);
+    }
+
+    private rowElement(key: string): HTMLElement | null {
+        const escaped = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(key) : key.replace(/"/g, '\\"');
+        return this.host.nativeElement.querySelector<HTMLElement>(`.sf-row[data-key="${escaped}"]`);
+    }
+
+    /**
+     * The read-only text of a flat row: the control's CURRENT value — for an untouched form that is
+     * the spec's `default`, so defaults show as real values, never as placeholders. Nothing ⇒ "—".
+     */
+    displayValue(spec: AttributeSpec): string {
+        const v = this.form.get(spec.key)?.value;
+        if (v === null || v === undefined || v === '') return '—';
+        if (spec.secret) return '••••••';
+        if (spec.type === 'autocomplete') {
+            const opt = (this.loadedOptions()[spec.key] ?? spec.options ?? []).find((o) => o.value === String(v));
+            if (opt) return opt.label;
+        }
+        if (Array.isArray(v)) return v.join(', ');
+        return String(v);
+    }
+
+    /** A flat row's error line — the same touched-gated rule as {@link listError}, for every type. */
+    rowError(spec: AttributeSpec): string {
+        return this.listError(spec);
+    }
+
+    // ---- shared -----------------------------------------------------------------------------
 
     readonly form: FormGroup = this.fb.group({});
     /** Fires on Enter in any field (native form submission). Hosts bind their save action here so
      *  keyboard submit and the visible Save button share one path. */
     readonly submitted = output<void>();
+    /**
+     * Render every tier in ONE flat list (required → optional → advanced, `group` headings kept) with no
+     * "Optional settings" button and no advanced gear — for a host that owns its own sectioning
+     * (Grammar editor sections, the Sink pane). Default `false` keeps the three-tier disclosure
+     * byte-identical for every other adopter.
+     */
+    @Input() flat = false;
     readonly showOptional = signal(false);
     readonly showAdvanced = signal(false);
     readonly tiers = signal<ReturnType<typeof byTier>>({ required: [], optional: [], advanced: [] });
@@ -553,6 +968,12 @@ export class InspectoSchemaFormComponent {
         return [...byName].map(([name, grouped]) => ({ name, specs: grouped }));
     }
 
+    /** The `flat` render order: every tier concatenated required → optional → advanced. */
+    flatSpecs(): AttributeSpec[] {
+        const t = this.tiers();
+        return [...t.required, ...t.optional, ...t.advanced];
+    }
+
     /** True while `spec` should render (its `dependsOn` matches the current values). */
     isVisible(spec: AttributeSpec): boolean {
         return !spec.dependsOn || dependsOnMatches(spec.dependsOn, this.formValue());
@@ -571,6 +992,14 @@ export class InspectoSchemaFormComponent {
      * field left behind its collapsed disclosure blocked the save with **no visible reason anywhere** —
      * the submit button simply did nothing. That is worse than a wrong value, because there is nothing
      * on screen to correct. Applies to every validator, not just the JSON one that surfaced it.
+     *
+     * <p>⚠ Returns `this.form.disabled` as well as `.valid`: when EVERY control in this form is
+     * currently `dependsOn`-hidden (disabled), Angular gives the FormGroup itself the status
+     * `DISABLED` rather than `VALID` — so `.valid` (`status === 'VALID'`) is spuriously `false` for a
+     * form with nothing wrong in it. Harmless for a normal multi-spec form (some control usually stays
+     * enabled), but a small per-section form (the Grammar editor's sections) can be wholly disabled by
+     * its controls' `dependsOn`, and this makes wholly-disabled read as valid, matching Angular's
+     * own "disabled = not part of validity" semantics rather than fighting it.
      */
     validate(): boolean {
         if (this.form.invalid) {
@@ -578,7 +1007,7 @@ export class InspectoSchemaFormComponent {
             if (this.hasInvalidIn('optional')) this.showOptional.set(true);
             if (this.hasInvalidIn('advanced')) this.showAdvanced.set(true);
         }
-        return this.form.valid;
+        return this.form.valid || this.form.disabled;
     }
 
     /** Whether any control in `tier`'s (rendered) specs is currently invalid. */

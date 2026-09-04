@@ -1,12 +1,26 @@
+import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { ParserDef, ParserPreview, ParsersService } from 'app/inspecto/api';
-import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
+import { DataTableComponent } from 'app/inspecto/data-table';
+import { INSPECTO_GRID_DARK, InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { GrammarEditorComponent } from './grammar-editor.component';
+
+/** Minimal host for asserting content projected into [sampleCsvActions] (S3). */
+@Component({
+    standalone: true,
+    imports: [GrammarEditorComponent],
+    template: `
+        <inspecto-grammar-editor [initial]="{}">
+            <button id="export-btn" sampleCsvActions type="button">Export</button>
+        </inspecto-grammar-editor>
+    `,
+})
+class ProjectionHost {}
 
 const XML: ParserDef = {
     id: 'xml',
@@ -52,6 +66,9 @@ function create(
                     ),
                 },
             },
+            // The Parsed tab's <inspecto-data-table tier="pro"> injects the real grid theme service —
+            // only needed when a test actually renders a preview (grammar-editor.dialog.spec.ts precedent).
+            { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } },
         ],
     });
     const fixture = TestBed.createComponent(GrammarEditorComponent);
@@ -265,58 +282,69 @@ describe('GrammarEditorComponent', () => {
         await expectNoA11yViolations(fixture.nativeElement);
     });
 
-    // ── the 4-tab delimited surface (delimited-grammar-properties plan §4.1, U1) ──
+    // ── the collapsible delimited surface (parse-pane-redesign-plan S2, replacing the 4-tab §4.1 U1) ──
 
-    it('renders the delimited spec set as 4 tabs', () => {
+    it('renders the delimited spec set as 3 collapsible sections, each ONE flat schema-form', () => {
         const fixture = create({ frontend: 'delimited' });
-        const labels = Array.from(fixture.nativeElement.querySelectorAll('.mat-mdc-tab')).map((e) =>
+        const el = fixture.nativeElement as HTMLElement;
+        const labels = Array.from(el.querySelectorAll('mat-panel-title')).map((e) =>
             (e as HTMLElement).textContent?.trim(),
         );
-        expect(labels).toHaveLength(4);
-        expect(labels[0]).toContain('Dialect');
-        expect(labels[1]).toContain('Types');
-        expect(labels[2]).toContain('Robustness');
-        expect(labels[3]).toContain('Files & MetaData');
+        // Files & metadata is dissolved (redesign D2/R5): compression lives on Dialect now.
+        expect(labels).toHaveLength(3);
+        // R12: the sections speak the approved mockup's language, not the engine's.
+        expect(labels[0]).toContain('How the file is written');
+        expect(labels[1]).toContain('How values are understood');
+        expect(labels[2]).toContain('When a row looks wrong');
+        expect(labels.join(' ')).not.toContain('Files');
+        // R1: one schema-form per section, flat — no tier disclosures, no per-row reset/sample column.
+        expect(el.querySelectorAll('inspecto-schema-form')).toHaveLength(3);
+        expect(el.textContent).not.toContain('Optional settings');
+        expect(el.querySelector('[aria-label="Show advanced settings"]')).toBeNull();
+        expect(el.querySelector('[aria-label^="Reset "]')).toBeNull();
+        // R5: the Row filter (SQL) is a transform.filter Step, not a parse property.
+        expect(el.textContent).not.toContain('Row filter');
+        expect(fixture.componentInstance.controlFor('delimited__where')).toBeNull();
+        // …while the moved Files key is still authored, on Dialect.
+        expect(fixture.componentInstance.controlFor('compression')).toBeTruthy();
     });
 
-    it('renders the xlsx spec set as 4 tabs, files anchored despite carrying no xlsx option', () => {
-        // multiformat X4: the first tab speaks the format's own language (grammarTabsFor), and the
-        // 'files' tab renders even with zero specs — it anchors the Collection pointer and the
-        // host's [tabFiles] projection (the column-metadata grid).
+    it('renders the xlsx spec set as 3 sections', () => {
+        // multiformat X4: the first section speaks the format's own language (grammarTabsFor).
         const fixture = create({ frontend: 'xlsx', xlsx: { sheet: 'Data' } });
-        const labels = Array.from(fixture.nativeElement.querySelectorAll('.mat-mdc-tab')).map((e) =>
+        const labels = Array.from(fixture.nativeElement.querySelectorAll('mat-panel-title')).map((e) =>
             (e as HTMLElement).textContent?.trim(),
         );
-        expect(labels).toHaveLength(4);
+        expect(labels).toHaveLength(3);
         expect(labels[0]).toContain('Sheet & range');
-        expect(labels[1]).toContain('Types');
-        expect(labels[2]).toContain('Robustness');
-        expect(labels[3]).toContain('Files & MetaData');
-        // The seeded sheet survives value() from tab 1 (the R9 mounted-panels rule, xlsx edition).
+        expect(labels[1]).toContain('How values are understood');
+        expect(labels[2]).toContain('When a row looks wrong');
+        // The seeded sheet survives value() from the (collapsed) first section (S2's mounted-panels
+        // rule, xlsx edition).
         const xlsx = fixture.componentInstance.value()['xlsx'] as Record<string, unknown>;
         expect(xlsx['sheet']).toBe('Data');
     });
 
     /**
-     * S4 — the derived schema lands on the Types tab, which on a tabbed format is not the tab the
-     * operator is looking at. `showTab` is how the host reveals it, and it must be a NO-OP for an
-     * untabbed format so a host may ask without first knowing which formats are tabbed.
+     * S4 — the derived schema lands on the Types section, which on a sectioned format is not
+     * necessarily open. `showTab` is how the host reveals (expands) it, and it must be a NO-OP for an
+     * unsectioned format so a host may ask without first knowing which formats are sectioned.
      */
-    it('showTab steers a tabbed set by id, and ignores an unknown one', () => {
+    it('showTab expands a sectioned set by id, and ignores an unknown one', () => {
         const c = create({ frontend: 'delimited' }).componentInstance;
         expect(c.tabbed).toBe(true);
         c.showTab('types');
-        expect(c.activeTab()).toBe(1);
+        expect(c.isExpanded('types')).toBe(true);
         c.showTab('nope');
-        expect(c.activeTab()).toBe(1); // an unknown id changes nothing
+        expect(c.isExpanded('types')).toBe(true); // an unknown id changes nothing
     });
 
-    /** ⚠ One TestBed per test, so the untabbed arm is its own case. */
-    it('showTab is a no-op for an untabbed format', () => {
+    /** ⚠ One TestBed per test, so the unsectioned arm is its own case. */
+    it('showTab is a no-op for an unsectioned format', () => {
         const c = create({ frontend: 'text_regex' }).componentInstance;
         expect(c.tabbed).toBe(false);
         c.showTab('types');
-        expect(c.activeTab()).toBe(0);
+        expect(c.isExpanded('types')).toBe(false);
     });
 
     /**
@@ -339,78 +367,116 @@ describe('GrammarEditorComponent', () => {
         expect(button()).toBeUndefined();
     });
 
-    it('renders an untabbed spec set (text_regex) flat, exactly as before', () => {
+    it('renders an unsectioned spec set (text_regex) flat, exactly as before', () => {
         const flat = create({ frontend: 'text_regex' });
-        expect(flat.nativeElement.querySelector('mat-tab-group')).toBeNull();
+        expect(flat.nativeElement.querySelector('mat-accordion')).toBeNull();
         expect(flat.nativeElement.querySelectorAll('inspecto-schema-form')).toHaveLength(1);
     });
 
-    it('tabs the json spec set with Format & records first (J1)', () => {
+    it('sections the json spec set with Format & records first (J1)', () => {
         const json = create({ frontend: 'json', json: { format: 'auto' } });
-        const jsonLabels = Array.from(json.nativeElement.querySelectorAll('.mat-mdc-tab')).map((e) =>
+        const jsonLabels = Array.from(json.nativeElement.querySelectorAll('mat-panel-title')).map((e) =>
             (e as HTMLElement).textContent?.trim(),
         );
         expect(jsonLabels[0]).toContain('Format & records');
     });
 
-    it('tabs fixedwidth with Record layout first, the slice table homed into tab 1 (F1)', () => {
+    it('sections fixedwidth with Record layout first, the slice table homed into section 1 (F1)', () => {
         const fw = create({
             frontend: 'fixedwidth',
             fixedwidth: { fields: [{ name: 'ID', start: 0, length: 6 }] },
         });
-        const fwLabels = Array.from(fw.nativeElement.querySelectorAll('.mat-mdc-tab')).map((e) =>
+        const fwLabels = Array.from(fw.nativeElement.querySelectorAll('mat-panel-title')).map((e) =>
             (e as HTMLElement).textContent?.trim(),
         );
         expect(fwLabels[0]).toContain('Record layout');
-        // The slice table renders INSIDE the tabbed shell now (one template, two mounts) — and stays
-        // readable by value() since panels are [hidden]-mounted, never MatTab bodies (the R9 rule).
-        // ⚠ mat-tab-group renders its own (empty) [role="tabpanel"] bodies first — OUR panels are the
-        // [hidden]-toggled divs labelled by tab, so select by the label or the assertion tests Material.
-        const panel = fw.nativeElement.querySelector('[role="tabpanel"][aria-label="Record layout"]');
+        // The slice table renders INSIDE the first mat-expansion-panel (one template, two mounts) —
+        // and stays readable by value() because panel content is mounted directly, never behind
+        // `matExpansionPanelContent`'s lazy template (S2's replacement for the old R9 rule).
+        const panel = fw.nativeElement.querySelector('mat-expansion-panel');
         expect(panel?.querySelector('[formarrayname="fields"], [formArrayName="fields"]')).not.toBeNull();
         const fwValue = fw.componentInstance.value()['fixedwidth'] as Record<string, unknown>;
         expect((fwValue['fields'] as unknown[]).length).toBe(1);
     });
 
-    it('keeps every tab panel MOUNTED so value() sees unvisited tabs', () => {
-        // MatTab bodies instantiate on first activation — the panels live OUTSIDE them, [hidden]-
-        // toggled (the R9 rule). A save from tab 1 must still carry tab 3's seeded values.
+    it('keeps every section MOUNTED so value() sees an unopened section', () => {
+        // mat-expansion-panel content is placed directly (not via matExpansionPanelContent), so it
+        // stays in the DOM whether open or collapsed — a save must still carry a never-opened
+        // section's seeded values.
         const fixture = create({
             frontend: 'delimited',
-            delimited: { delimiter: '|', where: 'amount > 0' },
+            delimited: { delimiter: '|', rejects_limit: 5 },
         });
 
-        expect(fixture.nativeElement.querySelectorAll('inspecto-schema-form')).toHaveLength(4);
+        expect(fixture.nativeElement.querySelectorAll('inspecto-schema-form')).toHaveLength(3);
         const delimited = fixture.componentInstance.value()['delimited'] as Record<string, unknown>;
         expect(delimited['delimiter']).toBe('|');
-        expect(delimited['where']).toBe('amount > 0');
+        expect(delimited['rejects_limit']).toBe(5); // seeded on the collapsed Robustness section
     });
 
-    it('validate() steers to the first failing tab', () => {
+    /**
+     * 🔴 LOAD-BEARING (S2) — the exact defect R9 existed to prevent, now proven WITHOUT the hack.
+     * `mat-expansion-panel` content is placed directly in this template (never wrapped in
+     * `<ng-template matExpansionPanelContent>`, Material's own lazy-mount mechanism), so Angular
+     * Material keeps it mounted whether the panel is expanded or collapsed. This test types a value
+     * into a section that is NEVER opened and confirms it survives `value()` — the read every host's
+     * save goes through — proving the mounting theory rather than assuming it.
+     */
+    it('a value typed into a COLLAPSED, never-opened section survives value() and a save round-trip', () => {
         const fixture = create({ frontend: 'delimited' });
         const c = fixture.componentInstance;
-        const forms = fixture.debugElement
-            .queryAll(By.directive(InspectoSchemaFormComponent))
-            .map((d) => d.componentInstance as InspectoSchemaFormComponent);
-        // filter_target_column lives on the Robustness tab (index 2); min is 0.
-        forms[2].form.get('delimited__filter_target_column')?.setValue(-1);
 
+        // Only Dialect (the first section) opens by default — Robustness is never expanded.
+        expect(c.isExpanded('robustness')).toBe(false);
+
+        // rejects_limit lives on Robustness; controlFor resolves it through that section's schema-form.
+        const control = c.controlFor('delimited__rejects_limit');
+        expect(control).toBeTruthy();
+        control!.setValue(25);
+        control!.markAsDirty();
+
+        expect(c.isExpanded('robustness')).toBe(false); // still collapsed — nothing opened it
+
+        // value() is exactly what a host reads to persist (the "save").
+        const delimited = c.value()['delimited'] as Record<string, unknown>;
+        expect(delimited['rejects_limit']).toBe(25);
+    });
+
+    it('validate() expands every failing section, not just the first', () => {
+        const fixture = create({ frontend: 'delimited' });
+        const c = fixture.componentInstance;
+        // filter_target_column lives on Robustness; min is 0.
+        c.controlFor('delimited__filter_target_column')?.setValue(-1);
+
+        expect(c.isExpanded('robustness')).toBe(false);
         expect(c.validate()).toBe(false);
-        expect(c.activeTab()).toBe(2);
+        expect(c.isExpanded('robustness')).toBe(true);
+    });
+
+    it('shows a warn indicator on a section header holding a validation failure', () => {
+        const fixture = create({ frontend: 'delimited' });
+        const c = fixture.componentInstance;
+        c.controlFor('delimited__filter_target_column')?.setValue(-1);
+        c.validate();
+        fixture.detectChanges();
+
+        expect(c.sectionBadges()[2].invalid).toBe(true); // Robustness is section index 2
+        const warn = fixture.nativeElement.querySelector('[aria-label="This section has an invalid value"]');
+        expect(warn).not.toBeNull();
     });
 
     it('shows a count badge for values set away from default', () => {
         const fixture = create({ frontend: 'delimited', delimited: { quote: "'" } });
         fixture.detectChanges();
 
-        // quote has no default, so seeding it counts as one set value on the Dialect tab.
-        expect(fixture.componentInstance.tabBadges()[0].set).toBeGreaterThanOrEqual(1);
+        // quote has no default, so seeding it counts as one set value on the Dialect section.
+        expect(fixture.componentInstance.sectionBadges()[0].set).toBeGreaterThanOrEqual(1);
         // delimiter ',' and has_header true ARE the defaults — they must not inflate the count.
-        expect(fixture.componentInstance.tabBadges()[0].set).toBe(1);
+        expect(fixture.componentInstance.sectionBadges()[0].set).toBe(1);
     });
 
     it('normalizes a legacy comma-joined null_strings string into list chips', () => {
-        // The pre-tab UI wrote null_strings as a comma-joined STRING; the engine's strList reads
+        // The pre-section UI wrote null_strings as a comma-joined STRING; the engine's strList reads
         // both. Seeding the list control with the raw string would render empty chips and a save
         // would silently drop the stored value.
         const fixture = create({ frontend: 'delimited', delimited: { null_strings: 'NULL,N/A' } });
@@ -419,20 +485,123 @@ describe('GrammarEditorComponent', () => {
         expect(delimited['null_strings']).toEqual(['NULL', 'N/A']);
     });
 
-    /** S6: each tab header carries its own accessible NAME — they surfaced unnamed beside their
-     *  badge spans in the accessibility tree (plan §1.5). */
-    it('names every tab header for assistive tech', () => {
+    /** Each panel's title carries its own accessible NAME, asserted via `aria-label` — never
+     *  Material's own panel roles/classes (the standing spec trap this surface has always carried). */
+    it('names every section header for assistive tech', () => {
         const fixture = create({ frontend: 'delimited' });
-        const names = Array.from(fixture.nativeElement.querySelectorAll('[role="tab"]')).map((t) =>
+        const names = Array.from(fixture.nativeElement.querySelectorAll('mat-panel-title[aria-label]')).map((t) =>
             ((t as HTMLElement).getAttribute('aria-label') ?? '').trim(),
         );
-        expect(names).toHaveLength(4);
+        expect(names).toHaveLength(3);
         for (const n of names) expect(n.length).toBeGreaterThan(0);
     });
 
-    it('has no a11y violations on the tabbed surface', async () => {
+    it('has no a11y violations on the sectioned surface', async () => {
         const fixture = create({ frontend: 'delimited' });
 
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    // ── S3 (parse-pane redesign): Sample | Parsed tabs ──────────────────────────────
+
+    it('renders the Sample and Parsed tabs when sampleMode is own', () => {
+        const fixture = create();
+        const labels = Array.from(fixture.nativeElement.querySelectorAll('.mat-mdc-tab .mdc-tab__text-label')).map(
+            (e) => (e as HTMLElement).textContent?.trim(),
+        );
+        expect(labels).toEqual(['Sample', 'Parsed']);
+    });
+
+    it('does not render Sample/Parsed tabs when the host owns the sample', () => {
+        const fixture = create();
+        fixture.componentRef.setInput('sampleMode', 'host');
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.querySelector('mat-tab-group')).toBeNull();
+    });
+
+    /**
+     * The merged textarea reuses {@link GrammarEditorComponent.onSampleText} verbatim — the same
+     * rule that already cleared captured bytes for an xlsx file sample. Typing after a captured
+     * workbook must clear `sampleB64` exactly as before, now proven through the merged Sample tab.
+     */
+    it('typing into the merged Sample textarea clears any previously captured file bytes', () => {
+        const fixture = create({ frontend: 'xlsx' });
+        const c = fixture.componentInstance;
+        c.sampleB64.set('d29ya2Jvb2s=');
+        fixture.detectChanges();
+
+        const textarea = fixture.nativeElement.querySelector('textarea[aria-label="Sample content"]') as HTMLElement;
+        expect(textarea).toBeTruthy();
+        textarea.dispatchEvent(new Event('focus'));
+        (textarea as HTMLTextAreaElement).value = 'a,b\n1,2';
+        textarea.dispatchEvent(new Event('input'));
+
+        expect(c.sampleB64()).toBeNull();
+        expect(c.sampleText()).toBe('a,b\n1,2');
+    });
+
+    it('the Sample tab projects a host [sampleCsvActions] button above the textarea', () => {
+        TestBed.configureTestingModule({
+            imports: [ProjectionHost],
+            providers: [
+                provideNoopAnimations(),
+                { provide: ParsersService, useValue: { list: () => of([]), preview: vi.fn(() => of(TABLE)) } },
+            ],
+        });
+        const fixture = TestBed.createComponent(ProjectionHost);
+        fixture.detectChanges();
+
+        const btn = fixture.nativeElement.querySelector('#export-btn');
+        expect(btn).toBeTruthy();
+        // Projected content lands inside the Sample tab body, above the textarea (DOM order).
+        const textarea = fixture.nativeElement.querySelector('textarea[aria-label="Sample content"]');
+        expect(btn!.compareDocumentPosition(textarea!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    // ── S3: Parsed tab page size ─────────────────────────────────────────────────
+
+    it('defaults the Parsed page size to 10 and offers 10/25/50/100', () => {
+        const fixture = create();
+        const c = fixture.componentInstance;
+
+        expect(c.pageSize()).toBe(10);
+        expect(c.pageSizeOptions).toEqual([10, 25, 50, 100]);
+    });
+
+    it('page size selection persists across a re-parse', () => {
+        const fixture = create();
+        const c = fixture.componentInstance;
+        c.sample = 'id,msisdn\n1,x';
+
+        c.pageSize.set(50);
+        c.test();
+        fixture.detectChanges();
+
+        expect(c.pageSize()).toBe(50);
+        expect(fixture.componentInstance.preview()).not.toBeNull();
+    });
+
+    it('the Parsed tab data table receives the selected page size', () => {
+        const fixture = create();
+        const c = fixture.componentInstance;
+        c.sample = 'id,msisdn\n1,x';
+        c.pageSize.set(25);
+        c.test();
+        fixture.detectChanges();
+
+        // MatTab lazily mounts an inactive tab's body — activate "Parsed" before it renders the
+        // data-table, the same reason S2's expansion panels (not tabs) host the property forms.
+        const tabLabels = Array.from(
+            fixture.nativeElement.querySelectorAll('.mat-mdc-tab .mdc-tab__text-label'),
+        ) as HTMLElement[];
+        tabLabels
+            .find((l) => l.textContent?.trim() === 'Parsed')
+            ?.closest('.mat-mdc-tab')
+            ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        fixture.detectChanges();
+
+        const table = fixture.debugElement.query(By.directive(DataTableComponent))?.componentInstance;
+        expect(table?.pageSize()).toBe(25);
     });
 });

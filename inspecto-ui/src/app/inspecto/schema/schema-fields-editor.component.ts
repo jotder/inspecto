@@ -211,9 +211,25 @@ export class InspectoSchemaFieldsEditorComponent {
 
     /**
      * Data-types Auto mode (§4.4): the type cells render read-only inferred icons — the menu is
-     * disabled with a tooltip pointing at the Declared toggle. The host owns the mode.
+     * disabled with a tooltip pointing at the "Detect column types" property. The host owns the mode.
      */
     readonly autoTypes = input(false);
+
+    /**
+     * The first parsed row's value per column, keyed by SELECTOR (R11 — the mockup's "Sample value"
+     * column). Read-only, purely illustrative: the host takes it from the parse preview it already
+     * holds, so a column the sample lacks (or a pane with no parse yet) simply reads "—".
+     */
+    readonly sampleValues = input<Record<string, string>>({});
+
+    /**
+     * The sink's write-time source-filename column, shown as ONE read-only, visually distinct row at
+     * the end of the table (R11 — the mockup's `filenameOn` row). ⛔ It is NOT a `rows()` entry and
+     * never reaches {@link value}: the column is stamped by the sink at write time and configured on
+     * the sink node, so writing it into `raw.fields[]` would author a column the parse never produces.
+     * `sample` is the sample file's own name when the host knows it, else blank.
+     */
+    readonly filenameColumn = input<{ name: string; sample: string } | null>(null);
 
     /**
      * Name-based frontends (json / text_regex) address parsed columns by key/group NAME, so the
@@ -298,6 +314,24 @@ export class InspectoSchemaFieldsEditorComponent {
         const start = this.pageIndex() * this.pageSize();
         return this.filteredEntries().slice(start, start + this.pageSize());
     });
+
+    /**
+     * Whether the filename row renders on THIS page: only after the last real row (never repeated on
+     * every page of a 500-column feed), and only while the search would match its name — the same
+     * name / also-known-as filter the real rows go through.
+     */
+    readonly showFilenameRow = computed(() => {
+        const f = this.filenameColumn();
+        if (!f) return false;
+        const lastPage = (this.pageIndex() + 1) * this.pageSize() >= this.filteredEntries().length;
+        const q = this.search().trim().toUpperCase();
+        return lastPage && (!q || f.name.toUpperCase().includes(q));
+    });
+
+    /** The first parsed value for this row's column, or `''` when the sample has none. */
+    sampleFor(group: FormGroup): string {
+        return this.sampleValues()[String(group.get('selector')?.value ?? '')] ?? '';
+    }
 
     /** Header master-checkbox state over the FILTERED set (not just the visible page). */
     readonly visibleIncludeState = computed<'all' | 'none' | 'some'>(() => {

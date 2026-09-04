@@ -121,7 +121,7 @@ describe('source time zone spec', () => {
         for (const f of FRONTENDS) {
             const spec = parsingAttributesFor(f).find((a) => a.key === 'source_timezone');
             expect(spec, `missing on ${f}`).toBeTruthy();
-            expect(spec!.tab).toBe('types'); // beside date_formats / timestamp_formats
+            expect(spec!.section).toBe('types'); // beside date_formats / timestamp_formats
         }
     });
 

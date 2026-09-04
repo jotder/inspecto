@@ -1364,6 +1364,74 @@ describe('PipelineEditorComponent', () => {
         });
 
         /**
+         * `collectorInclude` (redesign D2, 2026-09-03) — the Parse pane's read-only "Reads: …" display,
+         * sourced from the upstream Collector (SOURCE-category) node's `include` pattern. The same
+         * single-qualifying-node shape as `filenameColumnTarget`, upstream instead of downstream.
+         */
+        describe('collectorInclude (Parse pane read-only display)', () => {
+            const SOURCE_TYPE = [
+                {
+                    type: 'acquisition',
+                    category: 'SOURCE',
+                    label: 'Collector',
+                    description: '',
+                    accepts: [],
+                    emits: ['data'],
+                    emitsNamedRoutes: false,
+                    lowerable: true,
+                },
+            ];
+
+            it('names the single collector and its include pattern', () => {
+                api.nodeTypes.mockReturnValue(of(SOURCE_TYPE));
+                const c = make();
+                c.model.set({
+                    name: 'demo',
+                    active: false,
+                    nodes: [
+                        {
+                            id: 'in',
+                            name: 'Inbox',
+                            type: 'acquisition',
+                            config: { include: '*.csv' },
+                        },
+                    ],
+                    edges: [],
+                });
+                expect(c.collectorInclude()).toEqual({ value: '*.csv', source: 'Inbox' });
+            });
+
+            it('reports a blank pattern as "" rather than omitting the row', () => {
+                api.nodeTypes.mockReturnValue(of(SOURCE_TYPE));
+                const c = make();
+                c.model.set({
+                    name: 'demo',
+                    active: false,
+                    nodes: [{ id: 'in', type: 'acquisition', config: {} }],
+                    edges: [],
+                });
+                expect(c.collectorInclude()).toEqual({ value: '', source: 'in' });
+            });
+
+            it('is null when there is no single collector (none, or more than one)', () => {
+                api.nodeTypes.mockReturnValue(of(SOURCE_TYPE));
+                const c = make();
+                expect(c.collectorInclude()).toBeNull(); // no model yet
+
+                c.model.set({
+                    name: 'demo',
+                    active: false,
+                    nodes: [
+                        { id: 'a', type: 'acquisition', config: {} },
+                        { id: 'b', type: 'acquisition', config: {} },
+                    ],
+                    edges: [],
+                });
+                expect(c.collectorInclude()).toBeNull();
+            });
+        });
+
+        /**
          * S4 — a parse pane's options render as TABS, and at the dock's 300px default the labels
          * truncated to "Dialect | Typ…" with scroll arrows while the schema toolbar stacked. The host
          * asks the dock for room. ⚠ Transient: nothing is persisted, so the operator's stored width

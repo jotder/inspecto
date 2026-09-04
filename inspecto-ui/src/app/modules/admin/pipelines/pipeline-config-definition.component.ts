@@ -37,6 +37,8 @@ import { pipelineOptionLoader, referenceOptionLoader } from 'app/inspecto/compon
 import { EnrichmentEditorComponent } from 'app/inspecto/enrichment/enrichment-editor.component';
 import { ENRICHMENT_WIRING_ATTRIBUTES } from 'app/inspecto/enrichment/enrichment-attributes';
 import { enrichmentWiringDefaults } from 'app/inspecto/enrichment/enrichment-wiring';
+import { InspectoSchemaPartitionsEditorComponent, SchemaPartitionRow } from 'app/inspecto/schema';
+import { companionSchemaName } from 'app/inspecto/segments';
 import { buildConfiguredNode, splitNodeConfig } from './node-config-build';
 import { PipelineExtraConfigComponent } from './pipeline-extra-config.component';
 import { groupByValidator, measuresValidator } from './measure-grammar';
@@ -97,6 +99,7 @@ const MAX_TEST_ROWS = 50;
         InspectoAlertComponent,
         InspectoSchemaFormComponent,
         EnrichmentEditorComponent,
+        InspectoSchemaPartitionsEditorComponent,
         PipelineExtraConfigComponent,
         StepPreviewResultComponent,
     ],
@@ -127,12 +130,15 @@ const MAX_TEST_ROWS = 50;
                     [specs]="wiringSpecs"
                     [initial]="wiringInitial()"
                     [optionLoaders]="wiringLoaders"
+                    [flat]="true"
                     (submitted)="submit()"
                 ></inspecto-schema-form>
                 <inspecto-enrichment-editor [referenceOptions]="refOptions()" />
             }
         } @else if (specs().length) {
-            <!-- Schema-driven config for known node types (required up front, rest behind disclosure). -->
+            <!-- Schema-driven config for known node types, rendered FLAT (redesign R6): one idiom
+                 across Parser · Map · Sink — uppercase section header → fields, single column, no
+                 tier disclosures. -->
             <div class="mb-1 text-xs font-semibold uppercase opacity-70">Config</div>
             <inspecto-schema-form
                 #config
@@ -140,36 +146,71 @@ const MAX_TEST_ROWS = 50;
                 [initial]="split().schemaInitial"
                 [optionLoaders]="configLoaders"
                 [extraValidators]="configValidators"
+                [flat]="true"
                 (submitted)="submit()"
             ></inspecto-schema-form>
         }
 
         <!-- Additional config: keys OUTSIDE the schema render with their ACTUAL key and a control
              matching the stored value's TYPE (2026-08-21 — the generic Key/Value grid is gone).
-             Adding a key is offered only where this is the node's PRIMARY surface (no schema). -->
-        <div class="mb-1 mt-2 flex items-center justify-between">
-            <button
-                type="button"
-                class="flex items-center gap-1 text-xs font-semibold uppercase opacity-70"
-                [attr.aria-expanded]="freeFormOpen()"
-                (click)="freeFormOpen.set(!freeFormOpen())"
-            >
-                <mat-icon
-                    class="icon-size-4"
-                    [svgIcon]="freeFormOpen() ? 'heroicons_outline:chevron-down' : 'heroicons_outline:chevron-right'"
-                ></mat-icon>
+             Adding a key is offered only where this is the node's PRIMARY surface (no schema). A plain
+             section header, no chevron (R6): shown whenever it has rows or is the primary surface. -->
+        @if (split().extraRows.length || allowAddExtra()) {
+            <div class="mb-1 mt-2 text-xs font-semibold uppercase opacity-70">
                 {{ specs().length || isEnrichment() ? 'Additional config' : 'Config' }}
                 @if (split().extraRows.length) {
                     <span class="opacity-60">({{ split().extraRows.length }})</span>
                 }
-            </button>
-        </div>
-        @if (freeFormOpen()) {
+            </div>
             <app-pipeline-extra-config
                 [entries]="split().extraRows"
-                [allowAdd]="!isEnrichment() && specs().length === 0"
+                [allowAdd]="allowAddExtra()"
                 (changed)="onInteraction()"
             />
+        }
+
+        <!--
+            Partitioning (redesign S5, D4 — moved here from the Parse pane; pure UI relocation, the
+            schema toon's partitions[] storage contract is untouched). Rendered only for the
+            pipeline's single qualifying output sink, over the SAME companion schema toon the Parse
+            pane writes — read/written directly here so an edit does not require reopening Parse.
+        -->
+        @if (isOutputSink()) {
+            <div class="mb-1 mt-4 text-xs font-semibold uppercase opacity-70">Partitioning</div>
+            @if (partitionsState() === 'loading') {
+                <div class="flex items-center gap-2 py-2 text-sm opacity-70">
+                    <mat-spinner diameter="16"></mat-spinner> Loading the output schema…
+                </div>
+            } @else if (partitionsState() === 'none') {
+                <p class="text-secondary m-0 text-sm">
+                    No output schema yet — define this pipeline's parse step first (Partitioning derives from its
+                    columns).
+                </p>
+            } @else {
+                <inspecto-schema-partitions-editor
+                    #partitionsEditor
+                    [initial]="partitionSeed()"
+                    [fieldNames]="schemaFieldNames()"
+                    [dateFieldNames]="schemaDateFieldNames()"
+                />
+                <div class="mt-2 flex items-center gap-2">
+                    <button
+                        mat-stroked-button
+                        type="button"
+                        class="!text-xs"
+                        [disabled]="partitionsSaving()"
+                        (click)="savePartitioning()"
+                    >
+                        @if (partitionsSaving()) {
+                            <mat-progress-spinner diameter="14" mode="indeterminate" class="mr-2" />
+                        }
+                        Save partitioning
+                    </button>
+                    @if (partitionsError(); as e) {
+                        <span class="text-warn text-xs" role="alert">{{ e }}</span>
+                    }
+                </div>
+            }
         }
 
         <!-- The INLINE test: the config on screen, over the tab's own parsed rows. Offered only when
@@ -235,6 +276,13 @@ export class PipelineConfigDefinitionComponent {
     protected satelliteSubdir(): string | undefined {
         return this.configSubdir().trim() || undefined;
     }
+
+    /**
+     * The pipeline this node belongs to (redesign S5, D4) — names the SAME companion schema toon the
+     * Parse pane reads/writes (`companionSchemaName`), so the Partitioning section here edits the
+     * identical `partitions[]` key rather than a second copy.
+     */
+    readonly pipelineName = input('');
     /**
      * The type's config vocabulary as published by the server (`GET /pipelines/node-types`).
      * `undefined` ⇒ the catalog has not resolved — fall back to the local table. A served EMPTY array is
@@ -272,7 +320,27 @@ export class PipelineConfigDefinitionComponent {
         measures: [measuresValidator()],
         group_by: [groupByValidator()],
     };
-    readonly freeFormOpen = signal(false);
+    /** Adding an unmodelled key is offered only where the free-form editor is the node's PRIMARY
+     *  surface — a type with no schema that is not an enrichment (whose surface is the shared editor). */
+    readonly allowAddExtra = computed(() => !this.isEnrichment() && this.specs().length === 0);
+
+    // ── Partitioning (redesign S5, D4): moved here from the Parse pane ──────────────────────────
+    /** Whether this node qualifies as the pipeline's output sink — the same test as the Parse pane's
+     *  cross-node `filenameColumnTarget` gate, applied to THIS node instead of resolved from siblings
+     *  (this pane only ever sees the one node it defines). */
+    readonly isOutputSink = computed(() => typeof this.node().config?.['database'] === 'string');
+    @ViewChild('partitionsEditor') private partitionsEditor?: InspectoSchemaPartitionsEditorComponent;
+    readonly partitionsState = signal<'loading' | 'ok' | 'none'>('loading');
+    readonly partitionSeed = signal<SchemaPartitionRow[]>([]);
+    readonly schemaFieldNames = signal<string[]>([]);
+    readonly schemaDateFieldNames = signal<string[]>([]);
+    readonly partitionsSaving = signal(false);
+    readonly partitionsError = signal<string | null>(null);
+    /** The full schema toon config last read, so a save re-emits every other key verbatim — the
+     *  partitions[]-drop lesson generalised: a save here must not clobber `raw`/`mapping`. */
+    private partitionsSchemaConfig: Record<string, unknown> | null = null;
+    private partitionsSchemaName = '';
+    private partitionsLoadedFor: string | null = null;
 
     // ── enrichment nodes (W4b): the pane authors the REAL companion `*_enrich.toon` ──
     readonly wiringSpecs = ENRICHMENT_WIRING_ATTRIBUTES;
@@ -338,15 +406,15 @@ export class PipelineConfigDefinitionComponent {
         // this runs once per instance — but an input swap without recreation re-seeds correctly too.
         effect(() => {
             const n = this.node();
-            // Show the additional-config editor up front only when it's the primary surface or already
-            // carries keys. For an enrichment node the primary surface is the shared editor (W4b).
-            const extras = this.split().extraRows.length;
-            this.freeFormOpen.set(this.isEnrichment() ? extras > 0 : this.specs().length === 0 || extras > 0);
             this.lastDirty = false;
             this.dirtyChange.emit(false);
             if (this.isEnrichment() && this.enrichInitFor !== n.id) {
                 this.enrichInitFor = n.id;
                 this.initEnrichment(n);
+            }
+            if (this.isOutputSink() && this.partitionsLoadedFor !== n.id) {
+                this.partitionsLoadedFor = n.id;
+                this.loadPartitioning();
             }
         });
         // Hydrate the shared enrichment editor once both it and the config exist (the read is async).
@@ -398,6 +466,76 @@ export class PipelineConfigDefinitionComponent {
                 ),
             error: () => this.refOptions.set([]),
         });
+    }
+
+    /**
+     * Read the pipeline's companion schema toon — the SAME file the Parse pane authors — so the
+     * Partitioning section here offers the current output columns and the stored `partitions[]`
+     * without asking the operator to reopen Parse. `'none'` covers both "no pipeline context" and "no
+     * schema written yet" (a parser defined but never applied) — a state the section explains rather
+     * than errors on.
+     */
+    private loadPartitioning(): void {
+        const pipeline = this.pipelineName().trim();
+        if (!pipeline) {
+            this.partitionsState.set('none');
+            return;
+        }
+        this.partitionsSchemaName = companionSchemaName(pipeline, 'schema');
+        this.partitionsState.set('loading');
+        this.configApi.read('schema', this.partitionsSchemaName, this.satelliteSubdir()).subscribe({
+            next: (r) => {
+                const cfg = r.config ?? {};
+                this.partitionsSchemaConfig = cfg;
+                const raw = (cfg['raw'] ?? {}) as Record<string, unknown>;
+                const fields = Array.isArray(raw['fields']) ? (raw['fields'] as Record<string, unknown>[]) : [];
+                this.schemaFieldNames.set(fields.map((f) => String(f['name'] ?? '')).filter((n) => n !== ''));
+                this.schemaDateFieldNames.set(
+                    fields
+                        .filter((f) => ['DATE', 'TIMESTAMP', 'TIMESTAMPTZ'].includes(String(f['type'] ?? '')))
+                        .map((f) => String(f['name'] ?? ''))
+                        .filter((n) => n !== ''),
+                );
+                this.partitionSeed.set(Array.isArray(cfg['partitions']) ? (cfg['partitions'] as SchemaPartitionRow[]) : []);
+                this.partitionsState.set('ok');
+            },
+            // No schema on disk yet (or unreachable) — offer nothing to edit rather than an error over
+            // a state that is simply "the parser hasn't been applied yet".
+            error: () => this.partitionsState.set('none'),
+        });
+    }
+
+    /**
+     * Write `partitions[]` back onto the SAME schema toon, replacing only that key — every other key
+     * (`raw`, `mapping`, any unmodeled extra) rides verbatim from the last read, the same
+     * carry-everything-forward rule the Parse pane's own schema write follows.
+     */
+    savePartitioning(): void {
+        const editor = this.partitionsEditor;
+        if (!editor || !this.partitionsSchemaConfig) return;
+        if (!editor.validate()) {
+            this.partitionsError.set('Every partition segment needs a name (a valid identifier) and a source field.');
+            return;
+        }
+        const partitions = editor.value();
+        const draft = { ...this.partitionsSchemaConfig, ...(partitions.length ? { partitions } : {}) };
+        if (!partitions.length) delete (draft as Record<string, unknown>)['partitions'];
+        this.partitionsSaving.set(true);
+        this.partitionsError.set(null);
+        this.configApi
+            .write('schema', draft, { overwrite: true, subdir: this.satelliteSubdir() })
+            .subscribe({
+                next: () => {
+                    this.partitionsSaving.set(false);
+                    this.partitionsSchemaConfig = draft;
+                    editor.markPristine();
+                    this.toastr.success('Partitioning saved.');
+                },
+                error: (e) => {
+                    this.partitionsSaving.set(false);
+                    this.partitionsError.set(apiErrorMessage(e, 'Could not save partitioning.'));
+                },
+            });
     }
 
     /** Dirty is derived on interaction, not streamed — the Collection/Parse pane contract. */

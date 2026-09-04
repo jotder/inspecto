@@ -336,20 +336,20 @@ export class DesignSystemComponent {
 <!-- a second VIEW over the SAME rows signal; merge by selector at submit -->
 <inspecto-schema-metadata-grid [rows]="schemaSeed()" />
 // const fields = metaGrid.applyTo(grid.value());`,
-        grammarTabs: `// the 4-tab Grammar surface (delimited-grammar redesign U1) — driven by AttributeSpec.tab
-// ≥2 distinct tabs in a spec set ⇒ <inspecto-grammar-editor> renders a mat-tab-group,
-// one <inspecto-schema-form> per tab; any other spec set renders flat, byte-identical.
+        grammarTabs: `// the collapsible Grammar surface (parse-pane-redesign-plan S2) — driven by AttributeSpec.section
+// ≥2 distinct sections in a spec set ⇒ <inspecto-grammar-editor> renders a mat-accordion,
+// one FLAT <inspecto-schema-form [flat]="true"> per mat-expansion-panel; any other spec set renders flat.
 const SPECS: AttributeSpec[] = [
-  { key: 'delimited__delimiter', label: 'Delimiter', tab: 'Dialect/Parsing', ... },
-  { key: 'delimited__strict_mode', label: 'Strict', tab: 'Robustness/error handling', ... },
+  { key: 'delimited__delimiter', label: 'Delimiter', section: 'dialect', ... },
+  { key: 'delimited__strict_mode', label: 'Strict', section: 'robustness', ... },
 ];
-// ⚠ R9: the tab PANELS live OUTSIDE the mat-tab bodies, [hidden]-toggled — MatTab
-// instantiates body content on FIRST ACTIVATION, so a form inside a body is invisible
-// to value()/validate() until visited (silent loss on save).
+// Panel content is placed DIRECTLY (never <ng-template matExpansionPanelContent>), so Angular
+// Material keeps it mounted whether the panel is open or collapsed — this is what let S2 delete
+// the old R9 [hidden]-tab-panel hack (MatTab instantiated a tab body only on first activation, so
+// an unvisited tab's form was invisible to value()/validate() until visited — silent loss on save).
 // Hosts project write-path content via the named slots:
 <inspecto-grammar-editor [initial]="block" [type]="'delimited'" [lockType]="true">
-  <div tabTypes><!-- tab 2: the columns table --></div>
-  <div tabFiles><!-- tab 4: the column-metadata grid --></div>
+  <div tabTypes><!-- Types section: the columns table + filename column + column metadata --></div>
 </inspecto-grammar-editor>`,
         mapView: `<!-- offline MapLibre host (bundled Natural Earth basemap, no network) -->\n<inspecto-map-view\n  [data]="geoData"          // GeoData { points, routes }; null ⇒ unmounted (show an empty state)\n  [fill]="true"             // grow into a flex column (default: 62vh page band)\n  (pointClick)="open($event)" />\n// colours live in theme/map-tokens.ts (the map's chart-tokens analog)`,
         definitionDrawer: `<!-- the shared definition shell for an editor's right dock (definition-surface D1/D2) -->\n<inspecto-definition-drawer\n  [title]="node.name || node.id"\n  kindLabel="Collector"\n  icon="heroicons_outline:inbox-arrow-down"\n  [dirty]="paneDirty()"          // reported by the projected pane\n  (apply)="pane.submit()"         // Apply = in-memory patch — the toolbar Save persists (D2)\n  (discard)="recreatePane()"      // Discard = recreate the pane from the model\n  (closed)="closeDrawer()">       // dirty close already confirmed by the shell\n  <app-my-definition-pane [node]="node" (applied)="applyPatch($event)" (dirtyChange)="paneDirty.set($event)" />\n</inspecto-definition-drawer>`,

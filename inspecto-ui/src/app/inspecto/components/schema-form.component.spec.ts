@@ -567,4 +567,135 @@ describe('InspectoSchemaFormComponent', () => {
             await expectNoA11yViolations(fixture.nativeElement);
         });
     });
+
+    /**
+     * `flat` renders a compact PROPERTY LIST (operator ask 2026-09-04): one ~32px row per spec — label ·
+     * current value · pencil — with the real control inline only while that row is edited, help as an
+     * info tooltip instead of text under the field, and two columns once the host is wide.
+     */
+    describe('flat: compact property rows', () => {
+        const FLAT: AttributeSpec[] = [
+            { key: 'quote', label: 'Quote', type: 'string', tier: 'required', required: false, default: '"' },
+            { key: 'encoding', label: 'Encoding', type: 'string', tier: 'optional', help: 'Byte encoding of the file' },
+            { key: 'header', label: 'Header row', type: 'boolean', tier: 'optional', default: true },
+            { key: 'skip', label: 'Skip lines', type: 'number', tier: 'advanced', default: 0, group: 'Rows' },
+        ];
+
+        function createFlat(specs: AttributeSpec[] = FLAT) {
+            TestBed.configureTestingModule({
+                imports: [InspectoSchemaFormComponent],
+                providers: [provideNoopAnimations()],
+            });
+            const fixture = TestBed.createComponent(InspectoSchemaFormComponent);
+            fixture.componentInstance.flat = true;
+            fixture.componentInstance.specs = specs;
+            fixture.detectChanges();
+            return fixture;
+        }
+
+        function row(fixture: { nativeElement: HTMLElement }, key: string): HTMLElement {
+            return fixture.nativeElement.querySelector(`.sf-row[data-key="${key}"]`) as HTMLElement;
+        }
+
+        it('renders a string spec as ONE row: label, display value and a pencil — no mat-label, no input', () => {
+            const fixture = createFlat();
+            const r = row(fixture, 'encoding');
+            expect(r).toBeTruthy();
+            expect(r.textContent).toContain('Encoding');
+            expect(r.querySelector('.sf-value')?.textContent?.trim()).toBe('—'); // no value, no default
+            expect(r.querySelector('[aria-label="Edit Encoding"]')).toBeTruthy();
+            expect(r.querySelector('input')).toBeNull();
+            expect(fixture.nativeElement.querySelector('mat-label')).toBeNull();
+        });
+
+        it('renders a boolean as a toggle with no pencil', () => {
+            const fixture = createFlat();
+            const r = row(fixture, 'header');
+            expect(r.querySelector('mat-slide-toggle')).toBeTruthy();
+            expect(r.querySelector('.sf-pencil')).toBeNull();
+            expect(fixture.componentInstance.value()['header']).toBe(true);
+        });
+
+        it('pencil → inline input; typing + Enter updates value(), leaves edit mode and emits submitted', () => {
+            const fixture = createFlat();
+            let submits = 0;
+            fixture.componentInstance.submitted.subscribe(() => submits++);
+
+            (row(fixture, 'encoding').querySelector('[aria-label="Edit Encoding"]') as HTMLButtonElement).click();
+            fixture.detectChanges();
+            const input = row(fixture, 'encoding').querySelector('input') as HTMLInputElement;
+            expect(input).toBeTruthy();
+            expect(fixture.componentInstance.editingKey()).toBe('encoding');
+            // No floating label: the row label is the accessible name.
+            expect(input.getAttribute('aria-labelledby')).toBe(fixture.componentInstance.labelId(FLAT[1]));
+            expect(input.closest('mat-form-field')?.classList.contains('sf-dense')).toBe(true);
+
+            input.value = 'UTF-8';
+            input.dispatchEvent(new Event('input'));
+            input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+            input.form!.dispatchEvent(new Event('submit')); // what the browser does on Enter
+            fixture.detectChanges();
+
+            expect(fixture.componentInstance.value()['encoding']).toBe('UTF-8');
+            expect(fixture.componentInstance.editingKey()).toBeNull();
+            expect(row(fixture, 'encoding').querySelector('input')).toBeNull();
+            expect(row(fixture, 'encoding').querySelector('.sf-value')?.textContent?.trim()).toBe('UTF-8');
+            expect(submits).toBe(1);
+        });
+
+        it('shows a spec default as the display value before any edit', () => {
+            const fixture = createFlat();
+            expect(row(fixture, 'quote').querySelector('.sf-value')?.textContent?.trim()).toBe('"');
+            expect(row(fixture, 'skip').querySelector('.sf-value')?.textContent?.trim()).toBe('0');
+        });
+
+        it('renders help as an info tooltip trigger, not as text under the field', () => {
+            const fixture = createFlat();
+            const r = row(fixture, 'encoding');
+            const info = r.querySelector('mat-icon[aria-label="Byte encoding of the file"]');
+            expect(info).toBeTruthy();
+            expect(r.querySelector('mat-hint')).toBeNull();
+            // The help text appears ONLY as the icon's accessible name — never as visible prose.
+            const prose = Array.from(fixture.nativeElement.querySelectorAll('p, mat-hint')).map(
+                (e: Element) => e.textContent,
+            );
+            expect(prose.join(' ')).not.toContain('Byte encoding');
+        });
+
+        it('lays rows out in a two-column grid when columns() is 2, with group headings spanning both', () => {
+            const fixture = createFlat();
+            const container = () => row(fixture, 'quote').parentElement as HTMLElement;
+            expect(container().classList.contains('grid')).toBe(false);
+
+            fixture.componentInstance.columns.set(2);
+            fixture.detectChanges();
+            expect(container().classList.contains('grid')).toBe(true);
+            expect(container().classList.contains('grid-cols-2')).toBe(true);
+            const heading = fixture.nativeElement.querySelector('[role="heading"]') as HTMLElement;
+            expect(heading.textContent?.trim()).toBe('Rows');
+            expect(heading.classList.contains('col-span-2')).toBe(true);
+        });
+
+        it('renders a select inline as the shared picker (its own click-to-pick row), no pencil', () => {
+            const fixture = createFlat(SPECS);
+            const r = row(fixture, 'type');
+            expect(r.querySelector('inspecto-option-picker')).toBeTruthy();
+            expect(r.querySelector('.sf-pencil')).toBeNull();
+            expect(r.textContent).toContain('Enrich');
+        });
+
+        it('leaves the NON-flat path untouched: Optional settings (N) still renders', () => {
+            const fixture = create();
+            expect(fixture.nativeElement.textContent).toContain('Optional settings (2)');
+            expect(fixture.nativeElement.querySelector('.sf-row')).toBeNull();
+        });
+
+        it('has no axe violations in flat mode, display and edit', async () => {
+            const fixture = createFlat(SPECS);
+            await expectNoA11yViolations(fixture.nativeElement);
+            fixture.componentInstance.startEditing(SPECS[0]);
+            fixture.detectChanges();
+            await expectNoA11yViolations(fixture.nativeElement);
+        });
+    });
 });

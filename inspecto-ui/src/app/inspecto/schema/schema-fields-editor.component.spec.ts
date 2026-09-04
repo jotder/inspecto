@@ -55,7 +55,7 @@ describe('InspectoSchemaFieldsEditorComponent', () => {
         c.setSearch('no_such_column');
         expect(c.filteredEntries().length).toBe(0);
         fixture.detectChanges();
-        expect(fixture.nativeElement.textContent).toContain('No fields match');
+        expect(fixture.nativeElement.textContent).toContain('No columns match');
     });
 
     it('type filter narrows to fields of the chosen type', async () => {
@@ -196,17 +196,53 @@ describe('InspectoSchemaFieldsEditorComponent', () => {
 
     // ── §4.3 redesign (delimited-grammar-properties U2): ①–⑤ order, icon type menu, synonym ──
 
-    it('renders the ①–⑤ column order: include, #, Type, Name, Synonym', async () => {
+    it('renders the mockup\'s column order (R11): Use, #, Name, Type, Sample value, Also known as', async () => {
         const { fixture } = await create(rows(2));
-        const headers = Array.from(fixture.nativeElement.querySelectorAll('thead th')).map((h) =>
-            (h as HTMLElement).textContent?.trim(),
-        );
-        // Header ① is the master checkbox (no text); no Selector column for positional frontends.
-        expect(headers).toHaveLength(5);
+        const el = fixture.nativeElement as HTMLElement;
+        const headers = Array.from(el.querySelectorAll('thead th')).map((h) => (h as HTMLElement).textContent?.trim());
+        // Header ① is the master checkbox (sr-only "Use"); no Selector column for positional frontends.
+        expect(headers).toHaveLength(6);
+        expect(headers[0]).toContain('Use');
         expect(headers[1]).toContain('#');
-        expect(headers[2]).toContain('Type');
-        expect(headers[3]).toContain('Name');
-        expect(headers[4]).toContain('Synonym');
+        expect(headers[2]).toContain('Name');
+        expect(headers[3]).toContain('Type');
+        expect(headers[4]).toContain('Sample value');
+        expect(headers[5]).toContain('Also known as');
+        expect(el.textContent).toContain('Columns that come out');
+        expect(el.textContent).toContain('2 columns');
+    });
+
+    it('shows the first parsed value per column by selector, "—" when the sample has none', async () => {
+        const { fixture } = await create(rows(2));
+        fixture.componentRef.setInput('sampleValues', { col_0: ' Anna Kowalski ' });
+        fixture.detectChanges();
+        const samples = Array.from(fixture.nativeElement.querySelectorAll('tbody tr td:nth-child(5)')).map((td) =>
+            (td as HTMLElement).textContent?.trim(),
+        );
+        expect(samples).toEqual(['Anna Kowalski', '—']);
+        // The full value survives in the title (the cell truncates).
+        expect(fixture.nativeElement.querySelector('tbody tr td:nth-child(5) span')?.getAttribute('title')).toBe(
+            ' Anna Kowalski ',
+        );
+    });
+
+    it('appends the filename column as a read-only last row that never reaches value()', async () => {
+        const { fixture, c } = await create(rows(2));
+        expect(fixture.nativeElement.querySelector('[data-filename-row]')).toBeNull();
+        fixture.componentRef.setInput('filenameColumn', { name: 'file_name', sample: 'orders.csv' });
+        fixture.detectChanges();
+        const row = fixture.nativeElement.querySelector('[data-filename-row]') as HTMLElement;
+        expect(row).toBeTruthy();
+        expect(row.textContent).toContain('file_name');
+        expect(row.textContent).toContain('orders.csv');
+        expect(row.textContent).toContain('2'); // # = next position after the two real rows
+        expect((row.querySelector('mat-checkbox input') as HTMLInputElement).disabled).toBe(true);
+        expect(fixture.nativeElement.querySelectorAll('tbody tr')).toHaveLength(3);
+        expect(c.value().map((r) => r.name)).toEqual(['col_0', 'col_1']);
+        // The search filters it like any other row.
+        c.setSearch('col_');
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('[data-filename-row]')).toBeNull();
     });
 
     it('shows the Selector column only for name-based frontends', async () => {
@@ -216,8 +252,8 @@ describe('InspectoSchemaFieldsEditorComponent', () => {
         const headers = Array.from(fixture.nativeElement.querySelectorAll('thead th')).map((h) =>
             (h as HTMLElement).textContent?.trim(),
         );
-        expect(headers).toHaveLength(6);
-        expect(headers[5]).toContain('Selector');
+        expect(headers).toHaveLength(7);
+        expect(headers[6]).toContain('Selector');
     });
 
     it('replaces the type dropdown with an icon-only menu button, labelled and operable', async () => {
@@ -257,7 +293,7 @@ describe('InspectoSchemaFieldsEditorComponent', () => {
         fixture.detectChanges();
         // The error must reach the screen, not just the problem signal (the invisible-list-error rule).
         const err = fixture.nativeElement.querySelector('mat-error');
-        expect(err?.textContent).toContain('Synonym must be unique');
+        expect(err?.textContent).toContain('Must be unique across aliases and names');
     });
 
     it('refuses a synonym duplicating another synonym', async () => {

@@ -15,8 +15,8 @@ export interface SchemaFieldMetadata {
 
 /**
  * The **column-metadata grid** (D1(b), delimited-grammar-properties plan) — description / unit /
- * classification per column, projected into the grammar editor's `[tabFiles]` slot (tab 4,
- * *Files & metadata*). The model shipped long ago; this is its first UI.
+ * classification per column, projected into the grammar editor's `[tabTypes]` slot under Output
+ * schema (behind the Column metadata… disclosure). The model shipped long ago; this is its first UI.
  *
  * <p><b>A second VIEW over the columns table's rows, not a second owner.</b> It seeds from the same
  * `[rows]` signal as `<inspecto-schema-fields-editor>` and edits ONLY the three metadata keys —

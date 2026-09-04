@@ -147,7 +147,7 @@ export class OptionPickerDialog {
                 LEFT and the value pushed to the right edge.
             -->
             <div class="flex min-h-8 w-full items-center justify-between gap-3">
-                <span class="text-secondary min-w-0 text-sm" [id]="labelId">
+                <span class="text-secondary min-w-0 text-sm" [class.sr-only]="hideLabel()" [id]="labelId">
                     {{ label() }}
                     @if (required()) {
                         <span class="text-warn" aria-hidden="true">*</span>
@@ -185,6 +185,9 @@ export class InspectoOptionPickerComponent implements ControlValueAccessor {
     readonly placeholder = input('Select');
     readonly help = input('');
     readonly required = input(false);
+    /** Visually hide the label (it stays the trigger's accessible name) — for a host that renders the
+     *  label itself, e.g. the schema-form's flat property rows. */
+    readonly hideLabel = input(false);
 
     private dialog = inject(MatDialog);
 

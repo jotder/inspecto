@@ -58,7 +58,38 @@
         (pluginChange)="plugin.set($event)"
         (previewed)="onPreviewed($event)"
         (submitted)="save()"
-    />
+    >
+        <!-- S3: CSV export/import replaced "Save as template…" (U4) — the file IS the portable
+             template. Projected into the Sample tab's action row, above the merged textarea. -->
+        <ng-container sampleCsvActions>
+            <button
+                type="button"
+                mat-icon-button
+                aria-label="Import Grammar from CSV"
+                matTooltip="Import a Grammar CSV — its known options repopulate the form"
+                (click)="csvInput.click()"
+            >
+                <mat-icon class="icon-size-5" svgIcon="heroicons_outline:document-arrow-up"></mat-icon>
+            </button>
+            <input
+                #csvInput
+                type="file"
+                accept=".csv,text/csv"
+                class="hidden"
+                aria-label="Import Grammar from CSV"
+                (change)="importCsv($event)"
+            />
+            <button
+                type="button"
+                mat-icon-button
+                aria-label="Export Grammar as CSV"
+                matTooltip="Export the whole property set as <pipeline>_parser.csv"
+                (click)="exportCsv()"
+            >
+                <mat-icon class="icon-size-5" svgIcon="heroicons_outline:document-arrow-down"></mat-icon>
+            </button>
+        </ng-container>
+    </inspecto-grammar-editor>
 
     <!-- Onward links: the chain continues Grammar → Schema → Mapping; a test parse feeds the
              Schema editor's "Suggest from sample". -->
@@ -85,34 +116,7 @@
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">
-    <!-- CSV export/import replaced "Save as template…" (U4): the file IS the portable template. -->
-    <button
-        type="button"
-        mat-icon-button
-        aria-label="Import Grammar from CSV"
-        matTooltip="Import a Grammar CSV — its known options repopulate the form"
-        (click)="csvInput.click()"
-    >
-        <mat-icon class="icon-size-5" svgIcon="heroicons_outline:arrow-up-tray"></mat-icon>
-    </button>
-    <input
-        #csvInput
-        type="file"
-        accept=".csv,text/csv"
-        class="hidden"
-        aria-label="Import Grammar from CSV"
-        (change)="importCsv($event)"
-    />
-    <button
-        type="button"
-        mat-icon-button
-        aria-label="Export Grammar as CSV"
-        matTooltip="Export the whole property set as <pipeline>_parser.csv"
-        (click)="exportCsv()"
-    >
-        <mat-icon class="icon-size-5" svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
-    </button>
-    <span class="flex-1"></span>
+    <!-- S3: Import/Export moved into the Sample tab's action row (above), beside Upload/Paste. -->
     <button type="button" mat-button (click)="requestClose()">Cancel</button>
     <button type="button" mat-flat-button color="primary" (click)="save()" [disabled]="pluginBlocked()">
         <span>Save</span>

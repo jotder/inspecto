@@ -161,7 +161,8 @@ describe('GrammarEditorDialog', () => {
         });
         fixture.detectChanges();
         expect(editor.frontend()).toBe('delimited');
-        expect(editor.value()['delimited']).toEqual({ delimiter: '|', has_header: false });
+        // R4 (2026-09-04): the engine defaults now materialize as real values beside the stored keys.
+        expect(editor.value()['delimited']).toMatchObject({ delimiter: '|', has_header: false, quote: '"' });
     });
 
     // U4: the extract/name-step path is gone — the Grammar CSV export is the portable template.

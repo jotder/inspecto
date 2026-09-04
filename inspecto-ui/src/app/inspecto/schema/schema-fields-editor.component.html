@@ -1,18 +1,24 @@
-<!-- Field-table toolbar: find / filter / counts. The form stays the source of truth;
-     these only choose which rows render (500+ column feeds stay usable). -->
+<!-- R11 (parse-pane redesign): the mockup's "Columns that come out" table — heading, count, a search box
+     and the type filter on ONE row. The form stays the source of truth; the toolbar only chooses which
+     rows render (500+ column feeds stay usable). -->
 <div class="flex flex-wrap items-center gap-3">
-    <mat-form-field class="w-64" subscriptSizing="dynamic">
+    <span class="text-xs font-semibold uppercase opacity-70">Columns that come out</span>
+    <span class="text-secondary text-xs">
+        {{ includedNames().length }} columns ·
+        {{ autoTypes() ? 'types detected from the sample' : 'types set by you' }}
+    </span>
+    <mat-form-field class="ml-auto w-56" subscriptSizing="dynamic">
         <mat-icon matPrefix class="icon-size-4" svgIcon="heroicons_outline:magnifying-glass"></mat-icon>
         <input
             matInput
             type="text"
-            placeholder="Search name, synonym or source"
-            aria-label="Search fields"
+            placeholder="Find a column…"
+            aria-label="Find a column by name or alias"
             [value]="search()"
             (input)="setSearch($any($event.target).value)"
         />
     </mat-form-field>
-    <mat-form-field class="w-44" subscriptSizing="dynamic">
+    <mat-form-field class="w-40" subscriptSizing="dynamic">
         <mat-select [value]="typeFilter()" (selectionChange)="setTypeFilter($event.value)" aria-label="Filter by type">
             <mat-option value="all">All types</mat-option>
             @for (t of types; track t) {
@@ -25,27 +31,25 @@
             }
         </mat-select>
     </mat-form-field>
-    <span class="text-secondary text-sm">
-        {{ filteredEntries().length }} of {{ totalCount() }} columns · {{ includedNames().length }} included
-    </span>
 </div>
 
 <div>
-    <!-- Column order per the delimited-grammar-properties plan §4.3:
-         ① include ② sequence (# — the selector verbatim for positional frontends) ③ type as an
-         ICON-ONLY button opening a menu ④ name ⑤ synonym (unique, D3) — plus a read-only Selector
-         column only for name-based frontends, where the selector is a key/group name, not ②.
+    <!-- Column order per the approved mockup (R11): Use · # · Name · Type (icon-only menu) · Sample
+         value (read-only, first parsed row) · Also known as (the synonym, unique across synonyms ∪
+         names, D3) — plus Source zone only when a row carries an instant, and a read-only Selector
+         column only for name-based frontends (positional frontends: # IS the selector).
          (Headed "Source" until 2026-08-26: it renders `raw.fields[].selector` verbatim, so the
          canonical key is the honest label, and GLOSSARY reserves "Source".) -->
     <table class="w-full border-collapse">
         <thead>
             <tr class="text-secondary text-left text-xs font-semibold uppercase tracking-wider">
                 <th scope="col" class="w-12 pb-1">
+                    <span class="sr-only">Use</span>
                     <mat-checkbox
                         [checked]="visibleIncludeState() === 'all'"
                         [indeterminate]="visibleIncludeState() === 'some'"
                         (change)="toggleAllVisible($event.checked)"
-                        aria-label="Include all fields matching the current search and filter"
+                        aria-label="Use every column matching the current search and filter"
                     ></mat-checkbox>
                 </th>
                 <th scope="col" class="w-16 pb-1" [attr.aria-sort]="ariaSort('selector')">
@@ -58,19 +62,6 @@
                     >
                         #
                         @if (sortKey() === 'selector') {
-                            <mat-icon
-                                class="icon-size-3"
-                                [svgIcon]="
-                                    sortDir() === 1 ? 'heroicons_outline:chevron-up' : 'heroicons_outline:chevron-down'
-                                "
-                            ></mat-icon>
-                        }
-                    </button>
-                </th>
-                <th scope="col" class="w-14 pb-1" [attr.aria-sort]="ariaSort('type')">
-                    <button type="button" class="inline-flex items-center gap-1 uppercase" (click)="sortBy('type')">
-                        Type
-                        @if (sortKey() === 'type') {
                             <mat-icon
                                 class="icon-size-3"
                                 [svgIcon]="
@@ -93,7 +84,21 @@
                         }
                     </button>
                 </th>
-                <th scope="col" class="pb-1">Synonym</th>
+                <th scope="col" class="w-14 pb-1" [attr.aria-sort]="ariaSort('type')">
+                    <button type="button" class="inline-flex items-center gap-1 uppercase" (click)="sortBy('type')">
+                        Type
+                        @if (sortKey() === 'type') {
+                            <mat-icon
+                                class="icon-size-3"
+                                [svgIcon]="
+                                    sortDir() === 1 ? 'heroicons_outline:chevron-up' : 'heroicons_outline:chevron-down'
+                                "
+                            ></mat-icon>
+                        }
+                    </button>
+                </th>
+                <th scope="col" class="pb-1">Sample value</th>
+                <th scope="col" class="pb-1">Also known as</th>
                 @if (anyTemporal()) {
                     <th scope="col" class="w-44 pb-1">Source zone</th>
                 }
@@ -108,7 +113,7 @@
                     <td class="py-1">
                         <mat-checkbox
                             formControlName="include"
-                            [aria-label]="'Include ' + (e.group.get('name')?.value || 'field ' + (e.index + 1))"
+                            [aria-label]="'Use ' + (e.group.get('name')?.value || 'column ' + (e.index + 1))"
                         ></mat-checkbox>
                     </td>
                     <td class="w-16 py-1 pr-2">
@@ -122,10 +127,21 @@
                             >{{ nameBasedSelectors() ? e.index : e.group.get('selector')?.value }}</span
                         >
                     </td>
+                    <td class="py-1 pr-2">
+                        <mat-form-field class="w-full" subscriptSizing="dynamic">
+                            <input matInput formControlName="name" aria-label="Column name" />
+                            @if (e.group.get('name')?.hasError('pattern') && e.group.get('name')?.touched) {
+                                <mat-error>Letters, digits, _ — start with a letter or _.</mat-error>
+                            }
+                        </mat-form-field>
+                    </td>
                     <td class="w-14 py-1">
                         <span
                             [matTooltip]="
-                                autoTypes() ? 'Inferred — switch Data types to Declared to override' : typeName(e.group)
+                                autoTypes()
+                                    ? typeName(e.group) +
+                                      ' — detected from the sample. Set “Detect column types” to “I will set them myself” to change it'
+                                    : typeName(e.group)
                             "
                         >
                             <button
@@ -167,19 +183,25 @@
                             }
                         </span>
                     </td>
+                    <!-- Sample value (R11): the first parsed row, read-only — what the type above was
+                         detected from. "—" when the sample has no such column or nothing parsed yet. -->
                     <td class="py-1 pr-2">
-                        <mat-form-field class="w-full" subscriptSizing="dynamic">
-                            <input matInput formControlName="name" aria-label="Field name" />
-                            @if (e.group.get('name')?.hasError('pattern') && e.group.get('name')?.touched) {
-                                <mat-error>Letters, digits, _ — start with a letter or _.</mat-error>
-                            }
-                        </mat-form-field>
+                        <span
+                            class="text-secondary block max-w-40 truncate font-mono text-xs"
+                            [attr.title]="sampleFor(e.group) || null"
+                            >{{ sampleFor(e.group) || '—' }}</span
+                        >
                     </td>
                     <td class="py-1 pr-2">
                         <mat-form-field class="w-full" subscriptSizing="dynamic">
-                            <input matInput formControlName="synonym" aria-label="Field synonym" />
+                            <input
+                                matInput
+                                formControlName="synonym"
+                                placeholder="optional"
+                                aria-label="Also known as (alias)"
+                            />
                             @if (e.group.get('synonym')?.hasError('duplicate') && e.group.get('synonym')?.touched) {
-                                <mat-error>Synonym must be unique across synonyms and names.</mat-error>
+                                <mat-error>Must be unique across aliases and names.</mat-error>
                             } @else if (
                                 e.group.get('synonym')?.hasError('pattern') && e.group.get('synonym')?.touched
                             ) {
@@ -233,10 +255,56 @@
                     }
                 </tr>
             }
+            <!-- The sink's source-filename column (R11): one read-only row, visually apart, so a reader
+                 of this table learns the column exists. Not a form row — it is never part of value(). -->
+            @if (showFilenameRow()) {
+                @if (filenameColumn(); as f) {
+                    <tr class="bg-hover border-t align-middle" data-filename-row>
+                        <td class="py-1">
+                            <mat-checkbox
+                                [checked]="true"
+                                [disabled]="true"
+                                [aria-label]="'Use ' + f.name + ' (always on while the file-name column is enabled)'"
+                            ></mat-checkbox>
+                        </td>
+                        <td class="w-16 py-1 pr-2">
+                            <span class="text-secondary block text-xs tabular-nums">{{ totalCount() }}</span>
+                        </td>
+                        <td class="py-1 pr-2">
+                            <span class="font-mono text-sm" matTooltip="Added by the sink at write time — each row's source file">{{
+                                f.name
+                            }}</span>
+                        </td>
+                        <td class="w-14 py-1">
+                            <span [matTooltip]="'VARCHAR — ' + typeMeta['VARCHAR'].hint">
+                                <mat-icon
+                                    class="icon-size-4 mx-3 align-middle"
+                                    [svgIcon]="typeMeta['VARCHAR'].icon"
+                                    aria-label="Column type: VARCHAR (Text)"
+                                ></mat-icon>
+                            </span>
+                        </td>
+                        <td class="py-1 pr-2">
+                            <span
+                                class="text-secondary block max-w-40 truncate font-mono text-xs"
+                                [attr.title]="f.sample || null"
+                                >{{ f.sample || '—' }}</span
+                            >
+                        </td>
+                        <td class="text-secondary py-1 pr-2 text-xs">—</td>
+                        @if (anyTemporal()) {
+                            <td></td>
+                        }
+                        @if (nameBasedSelectors()) {
+                            <td></td>
+                        }
+                    </tr>
+                }
+            }
         </tbody>
     </table>
-    @if (filteredEntries().length === 0) {
-        <p class="text-secondary m-0 py-2 text-sm">No fields match — clear the search or type filter.</p>
+    @if (filteredEntries().length === 0 && !showFilenameRow()) {
+        <p class="text-secondary m-0 py-2 text-sm">No columns match — clear the search or type filter.</p>
     }
     <mat-paginator
         [length]="filteredEntries().length"
@@ -245,7 +313,7 @@
         [pageSizeOptions]="[25, 50, 100]"
         [showFirstLastButtons]="true"
         (page)="onPage($event)"
-        aria-label="Field table pages"
+        aria-label="Column table pages"
     />
 </div>
 

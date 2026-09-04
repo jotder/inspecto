@@ -40,65 +40,67 @@ function sharedRobustnessAttributes(padsShortRowsByDefault: boolean): AttributeS
     return [
         {
             key: 'delimited__ignore_errors',
-            label: 'Skip unparseable rows',
+            label: 'Rows that cannot be read go to the review bin',
             type: 'boolean',
             tier: 'optional',
-            help: 'Engine default is ON — a row the reader cannot parse is dropped and captured as a reject. Turn this on and off to write it explicitly; off fails the batch on the first bad row.',
-            tab: 'robustness',
+            default: true,
+            help: 'A row that cannot be read is set aside in the review bin and the file carries on. Off stops the whole batch at the first bad row.',
+            section: 'robustness',
         },
         {
             key: 'delimited__null_padding',
-            label: 'Pad short rows with NULLs',
+            label: 'Fill missing columns with empty',
             type: 'boolean',
             tier: 'optional',
+            default: padsShortRowsByDefault,
             help: padsShortRowsByDefault
-                ? 'Keep a row that ran out of columns, NULL-filling the rest, instead of rejecting it. ON by default here — a short final line is normal for a line reader.'
-                : 'Keep a row that ran out of columns, NULL-filling the rest, instead of rejecting it. Off for delimited by default.',
-            tab: 'robustness',
+                ? 'Keep a row that has fewer columns than expected, leaving the rest empty, instead of sending it to the review bin. ON by default here — a short final line is normal for a line reader.'
+                : 'Keep a row that has fewer columns than expected, leaving the rest empty, instead of sending it to the review bin. Off for delimited by default.',
+            section: 'robustness',
         },
         {
             key: 'delimited__store_rejects',
-            label: 'Capture rejected rows',
+            label: 'Keep rejected rows for review',
             type: 'boolean',
             tier: 'optional',
-            help: 'Engine default is ON — rejected rows are drained to errors/<base>_errors.csv. Off skips capture entirely, which matters because reject rows carry raw source data.',
-            tab: 'robustness',
+            default: true,
+            help: 'Rejected rows are written to errors/<base>_errors.csv so they can be reviewed. Off keeps nothing — which matters because rejected rows carry raw source data.',
+            section: 'robustness',
         },
         {
             key: 'delimited__rejects_table',
-            label: 'Rejects table',
+            label: 'Review bin table',
             type: 'string',
             tier: 'advanced',
-            placeholder: 'reject_errors',
-            help: 'Per-row reject table name. Blank = reject_errors. Letters, digits and underscore only.',
-            tab: 'robustness',
+            default: 'reject_errors',
+            help: 'Table holding each rejected row. Letters, digits and underscore only.',
+            section: 'robustness',
         },
         {
             key: 'delimited__rejects_scan',
-            label: 'Rejects scan table',
+            label: 'Review bin scan table',
             type: 'string',
             tier: 'advanced',
-            placeholder: 'reject_scans',
-            help: 'Per-file reject scan table name. Blank = reject_scans. Letters, digits and underscore only.',
-            tab: 'robustness',
+            default: 'reject_scans',
+            help: 'Table holding one summary per scanned file. Letters, digits and underscore only.',
+            section: 'robustness',
         },
         {
             key: 'delimited__rejects_limit',
-            label: 'Rejects limit',
+            label: 'Stop keeping bad rows after',
             type: 'number',
             tier: 'advanced',
             min: 0,
-            help: 'Max rejected rows stored per file. Blank or 0 = unlimited.',
-            tab: 'robustness',
+            help: 'Most rejected rows kept per file. Blank or 0 = keep them all.',
+            section: 'robustness',
         },
     ];
 }
 
 export const GRAMMAR_TABS: { id: string; label: string }[] = [
-    { id: 'dialect', label: 'Dialect' },
-    { id: 'types', label: 'Types' },
-    { id: 'robustness', label: 'Robustness' },
-    { id: 'files', label: 'Files & MetaData' },
+    { id: 'dialect', label: 'How the file is written' },
+    { id: 'types', label: 'How values are understood' },
+    { id: 'robustness', label: 'When a row looks wrong' },
 ];
 
 /**
@@ -134,37 +136,37 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
     switch (frontend) {
         case 'delimited':
             // The full LIVE engine key set (delimited-grammar-properties plan §3), split across the
-            // 4 GRAMMAR_TABS. Every key here is read by PipelineConfigParser — no dead knobs.
+            // 3 GRAMMAR_TABS. Every key here is read by PipelineConfigParser — no dead knobs.
             return [
                 // ── tab 1: Dialect / parsing ─────────────────────────────────────
                 {
                     key: 'delimited__delimiter',
-                    label: 'Delimiter',
+                    label: 'Column separator',
                     type: 'string',
                     tier: 'required',
                     required: false,
                     default: ',',
                     placeholder: ',',
-                    tab: 'dialect',
+                    section: 'dialect',
                 },
                 {
                     key: 'delimited__has_header',
-                    label: 'First line is a header',
+                    label: 'First row is the header',
                     type: 'boolean',
                     tier: 'required',
                     required: false,
                     default: true,
-                    tab: 'dialect',
+                    section: 'dialect',
                 },
                 {
                     key: 'delimited__quote',
-                    label: 'Quote character',
+                    label: 'Text quote',
                     type: 'string',
                     tier: 'optional',
                     pattern: SINGLE_CHAR,
-                    placeholder: '"',
-                    help: 'Single character wrapping fields that contain the delimiter (default ").',
-                    tab: 'dialect',
+                    default: '"',
+                    help: 'The single character wrapped around a value that contains the column separator.',
+                    section: 'dialect',
                 },
                 {
                     key: 'delimited__escape',
@@ -172,85 +174,87 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     type: 'string',
                     tier: 'optional',
                     pattern: SINGLE_CHAR,
-                    help: 'Single character escaping a literal quote inside a quoted field (default: the quote, doubled).',
-                    tab: 'dialect',
+                    help: 'The single character that marks a literal quote inside a quoted value (default: the quote itself, doubled).',
+                    section: 'dialect',
                 },
                 {
                     key: 'delimited__comment',
-                    label: 'Comment character',
+                    label: 'Ignore lines starting with',
                     type: 'string',
                     tier: 'optional',
                     pattern: SINGLE_CHAR,
-                    placeholder: '#',
-                    help: 'Lines starting with this single character are skipped (default: none).',
-                    tab: 'dialect',
+                    help: 'Lines starting with this single character are skipped, e.g. #. Empty = no line is ignored.',
+                    section: 'dialect',
                 },
                 {
                     key: 'delimited__skip_header_lines',
-                    label: 'Skip leading lines',
+                    label: 'Skip lines at the top',
                     type: 'number',
                     tier: 'optional',
                     min: 0,
-                    help: 'Banner/preamble lines before the data (and header).',
-                    tab: 'dialect',
+                    default: 0,
+                    help: 'Banner or preamble lines before the data (and the header).',
+                    section: 'dialect',
                 },
                 {
                     key: 'delimited__skip_junk_lines',
-                    label: 'Skip junk lines (adaptive)',
+                    label: 'Skip unreadable lines at the top (up to)',
                     type: 'number',
                     tier: 'optional',
                     min: -1,
-                    help: 'Max preamble lines to probe past until a parseable data row; -1 = unlimited.',
-                    tab: 'dialect',
+                    default: 0,
+                    help: 'How many unreadable lines to look past before the first row that parses; -1 = as many as it takes.',
+                    section: 'dialect',
                 },
                 {
                     key: 'delimited__skip_tail_lines',
-                    label: 'Skip trailing lines',
+                    label: 'Skip lines at the bottom',
                     type: 'number',
                     tier: 'optional',
                     min: 0,
-                    help: 'Footer lines dropped from the end of each file.',
-                    tab: 'dialect',
+                    default: 0,
+                    help: 'Footer lines dropped from the end of every file.',
+                    section: 'dialect',
                 },
                 {
                     key: 'delimited__skip_tail_columns',
-                    label: 'Skip trailing columns',
+                    label: 'Drop extra columns on the right',
                     type: 'number',
                     tier: 'optional',
                     min: 0,
-                    help: 'Phantom columns stripped from the right of each record.',
-                    tab: 'dialect',
+                    default: 0,
+                    help: 'Columns removed from the right-hand end of every row (e.g. a trailing separator).',
+                    section: 'dialect',
                 },
                 {
                     key: 'encoding',
-                    label: 'Encoding',
+                    label: 'Text encoding',
                     type: 'select',
                     tier: 'advanced',
+                    default: 'utf-8',
                     options: [
-                        { value: 'utf-8', label: 'UTF-8 (default)' },
+                        { value: 'utf-8', label: 'UTF-8' },
                         { value: 'utf-16', label: 'UTF-16' },
                         { value: 'latin-1', label: 'Latin-1' },
                     ],
-                    tab: 'dialect',
+                    section: 'dialect',
                 },
                 // ── tab 2: Types & columns ───────────────────────────────────────
                 {
                     key: 'delimited__date_formats',
-                    label: 'Date formats',
+                    label: 'Date formats to try',
                     type: 'list',
                     tier: 'optional',
-                    placeholder: '%Y-%m-%d',
-                    help: 'Accepted DATE parse patterns, tried in order.',
-                    tab: 'types',
+                    help: 'Patterns a date may be written in, tried in order, e.g. %Y-%m-%d. Empty = any standard date form is accepted; listing patterns RESTRICTS parsing to exactly those.',
+                    section: 'types',
                 },
                 {
                     key: 'delimited__timestamp_formats',
-                    label: 'Timestamp formats',
+                    label: 'Timestamp formats to try',
                     type: 'list',
                     tier: 'optional',
-                    placeholder: '%Y-%m-%d %H:%M:%S',
-                    help: 'Accepted TIMESTAMP parse patterns, tried in order.',
-                    tab: 'types',
+                    help: 'Patterns a timestamp may be written in, tried in order, e.g. %Y-%m-%d %H:%M:%S. Empty = any standard timestamp form is accepted; listing patterns RESTRICTS parsing to exactly those.',
+                    section: 'types',
                 },
                 {
                     // ⚠ No `default` — the standing rule: a spec default materializes into every
@@ -267,16 +271,15 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     tier: 'optional',
                     options: SOURCE_TIMEZONE_OPTIONS,
                     help: 'The zone the timestamps in this data are written IN. Set it and values are stored as UTC, instead of being read in the server’s own zone. A column can override it.',
-                    tab: 'types',
+                    section: 'types',
                 },
                 {
                     key: 'delimited__null_strings',
-                    label: 'Null strings',
+                    label: 'Words that mean "no value"',
                     type: 'list',
                     tier: 'optional',
-                    placeholder: 'NULL',
-                    help: 'Literal text values read as NULL.',
-                    tab: 'types',
+                    help: 'Text values read as "no value", e.g. NULL or N/A. Empty = only an empty cell means no value.',
+                    section: 'types',
                 },
                 // ── tab 3: Robustness / error handling ───────────────────────────
                 {
@@ -284,11 +287,11 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     // WRITTEN into blocks the author never touched — mutating faithful copies of
                     // stored grammars (templates are copies, never bindings). Blank = engine default.
                     key: 'delimited__strict_mode',
-                    label: 'Strict mode (RFC-4180)',
+                    label: 'Strict CSV rules (RFC-4180)',
                     type: 'boolean',
                     tier: 'optional',
-                    help: 'Engine default is strict. Off tolerates quote/column drift in messy files.',
-                    tab: 'robustness',
+                    help: 'Strict by default. Off tolerates stray quotes and uneven column counts in messy files.',
+                    section: 'robustness',
                 },
                 {
                     // ⚠ Still NO `default` — the standing rule (a spec default materializes into
@@ -297,16 +300,16 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     // already means auto to the parser, and the editor drops a blank whose default is
                     // blank, so picking it writes nothing. Do not "fix" this into default: 'auto'.
                     key: 'delimited__engine',
-                    label: 'Parse engine',
+                    label: 'Reader',
                     type: 'select',
                     tier: 'optional',
-                    help: 'Auto picks the native reader for clean configs and the Java parser otherwise.',
+                    help: 'Automatic picks the fast reader for clean settings and the tolerant one otherwise.',
                     options: [
-                        { value: '', label: 'Auto — native for clean configs' },
-                        { value: 'duckdb', label: 'DuckDB — native vectorized reader' },
-                        { value: 'java', label: 'Java — fallback for messy files' },
+                        { value: '', label: 'Automatic' },
+                        { value: 'duckdb', label: 'Fast reader (DuckDB)' },
+                        { value: 'java', label: 'Tolerant reader (Java)' },
                     ],
-                    tab: 'robustness',
+                    section: 'robustness',
                 },
                 // Error handling (2026-08-23). Every one is tri-state: blank leaves the engine's own
                 // default, which is what every existing config already gets — so adding these to a
@@ -315,73 +318,69 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                 ...sharedRobustnessAttributes(false),
                 {
                     key: 'delimited__include_prefixes',
-                    label: 'Include rows: prefixes',
+                    label: 'Keep only rows starting with',
                     type: 'list',
                     tier: 'advanced',
-                    help: 'Keep only rows whose filter target column starts with any of these.',
-                    tab: 'robustness',
+                    help: 'Keep only rows whose looked-at column starts with any of these.',
+                    section: 'robustness',
                 },
                 {
                     key: 'delimited__include_regex',
-                    label: 'Include rows: regex',
+                    label: 'Keep only rows matching',
                     type: 'list',
                     tier: 'advanced',
-                    help: 'Keep only rows whose filter target column matches any of these.',
-                    tab: 'robustness',
+                    help: 'Keep only rows whose looked-at column matches any of these patterns.',
+                    section: 'robustness',
                 },
                 {
                     key: 'delimited__exclude_prefixes',
-                    label: 'Exclude rows: prefixes',
+                    label: 'Drop rows starting with',
                     type: 'list',
                     tier: 'advanced',
-                    help: 'Drop rows whose filter target column starts with any of these.',
-                    tab: 'robustness',
+                    help: 'Drop rows whose looked-at column starts with any of these.',
+                    section: 'robustness',
                 },
                 {
                     key: 'delimited__exclude_regex',
-                    label: 'Exclude rows: regex',
+                    label: 'Drop rows matching',
                     type: 'list',
                     tier: 'advanced',
-                    help: 'Drop rows whose filter target column matches any of these.',
-                    tab: 'robustness',
+                    help: 'Drop rows whose looked-at column matches any of these patterns.',
+                    section: 'robustness',
                 },
                 {
                     key: 'delimited__filter_target_column',
-                    label: 'Filter target column',
+                    label: 'Column those row rules look at',
                     type: 'number',
                     tier: 'advanced',
                     min: 0,
-                    help: '0-based physical column the include/exclude filters apply to.',
-                    tab: 'robustness',
+                    default: 0,
+                    help: 'The column (counted from 0) the keep/drop rules above read.',
+                    section: 'robustness',
                 },
-                {
-                    key: 'delimited__where',
-                    label: 'Row filter (SQL)',
-                    type: 'multiline',
-                    tier: 'optional',
-                    placeholder: 'amount > 0',
-                    help: 'Post-parse SQL predicate over the mapped, typed columns.',
-                    tab: 'robustness',
-                },
-                // ── tab 4: Files & metadata ──────────────────────────────────────
+                // Row filter (SQL) is NOT offered here (redesign D3): filtering is the separate
+                // transform.filter Step. The lift/lower's csv.where shorthand still round-trips a
+                // stored `where` untouched.
+                // Input handling (ex "Files & metadata", dissolved by redesign D2/R5 — lives on Dialect).
                 {
                     key: 'compression',
-                    label: 'Input compression',
+                    label: 'Compressed file',
                     type: 'select',
                     tier: 'optional',
+                    default: 'auto',
                     options: [
                         { value: 'auto', label: 'Auto — detect by extension' },
                         { value: 'gzip', label: 'gzip' },
                         { value: 'zstd', label: 'zstd' },
                         { value: 'none', label: 'None' },
                     ],
-                    help: 'Decompressed inline at read. Archives (.zip, .tar, .Z) are not read inline — unpack them into the inbox first (BACKLOG §4 tracks native support).',
-                    tab: 'files',
+                    help: 'Decompressed while reading. Archives (.zip, .tar, .Z) are not — unpack them into the inbox first (BACKLOG §4 tracks native support).',
+                    section: 'dialect',
                 },
             ];
         case 'fixedwidth':
-            // Tabbed since multiformat F1: Record layout (+ the slice table the editor homes there),
-            // Types & columns (transform-time patterns), Robustness, Files & metadata.
+            // Sectioned since multiformat F1: Record layout (+ the slice table the editor homes there),
+            // Types & columns (transform-time patterns), Robustness.
             return [
                 {
                     key: 'delimited__has_header',
@@ -391,25 +390,23 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     required: false,
                     default: true,
                     help: 'Header/banner line to skip before the records.',
-                    tab: 'dialect',
+                    section: 'dialect',
                 },
                 {
                     key: 'delimited__date_formats',
-                    label: 'Date formats',
+                    label: 'Date formats to try',
                     type: 'list',
                     tier: 'optional',
-                    placeholder: '%Y-%m-%d',
-                    help: 'Accepted DATE parse patterns, tried in order.',
-                    tab: 'types',
+                    help: 'Patterns a date may be written in, tried in order, e.g. %Y-%m-%d. Empty = any standard date form is accepted; listing patterns RESTRICTS parsing to exactly those.',
+                    section: 'types',
                 },
                 {
                     key: 'delimited__timestamp_formats',
-                    label: 'Timestamp formats',
+                    label: 'Timestamp formats to try',
                     type: 'list',
                     tier: 'optional',
-                    placeholder: '%Y-%m-%d %H:%M:%S',
-                    help: 'Accepted TIMESTAMP parse patterns, tried in order.',
-                    tab: 'types',
+                    help: 'Patterns a timestamp may be written in, tried in order, e.g. %Y-%m-%d %H:%M:%S. Empty = any standard timestamp form is accepted; listing patterns RESTRICTS parsing to exactly those.',
+                    section: 'types',
                 },
                 {
                     // ⚠ No `default` — the standing rule: a spec default materializes into every
@@ -426,7 +423,7 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     tier: 'optional',
                     options: SOURCE_TIMEZONE_OPTIONS,
                     help: 'The zone the timestamps in this data are written IN. Set it and values are stored as UTC, instead of being read in the server’s own zone. A column can override it.',
-                    tab: 'types',
+                    section: 'types',
                 },
                 {
                     key: 'fixedwidth__min_record_length',
@@ -435,7 +432,7 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     tier: 'optional',
                     min: 0,
                     help: 'Shorter lines (footers, blanks) are dropped. Blank = the widest field end.',
-                    tab: 'robustness',
+                    section: 'robustness',
                 },
                 // The shared read_csv error knobs apply here too: a fixed-width read IS a read_csv
                 // over one VARCHAR 'line' column, so ignore_errors / store_rejects / the reject tables
@@ -454,7 +451,7 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                         { value: 'RIGHT', label: 'Right' },
                         { value: 'NONE', label: 'None' },
                     ],
-                    tab: 'robustness',
+                    section: 'robustness',
                 },
                 {
                     key: 'encoding',
@@ -462,7 +459,7 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     type: 'string',
                     tier: 'advanced',
                     placeholder: 'UTF-8',
-                    tab: 'files',
+                    section: 'dialect',
                 },
                 {
                     key: 'compression',
@@ -470,7 +467,7 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     type: 'string',
                     tier: 'advanced',
                     placeholder: 'gzip',
-                    tab: 'files',
+                    section: 'dialect',
                 },
             ];
         case 'json':
@@ -487,7 +484,7 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                         { value: 'array', label: 'One JSON array of records' },
                         { value: 'auto', label: 'Auto-detect' },
                     ],
-                    tab: 'dialect',
+                    section: 'dialect',
                 },
                 {
                     key: 'json__records_path',
@@ -502,7 +499,7 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     // rejects at load. `$` = the document's top level IS the array.
                     dependsOn: { key: 'json__format', notEquals: 'newline' },
                     help: 'Dotted path to the array holding the records — same notation as a field selector. Blank or "$" = the whole document.',
-                    tab: 'dialect',
+                    section: 'dialect',
                 },
                 {
                     key: 'delimited__skip_header_lines',
@@ -510,25 +507,23 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     type: 'number',
                     tier: 'advanced',
                     min: 0,
-                    tab: 'dialect',
+                    section: 'dialect',
                 },
                 {
                     key: 'delimited__date_formats',
-                    label: 'Date formats',
+                    label: 'Date formats to try',
                     type: 'list',
                     tier: 'optional',
-                    placeholder: '%Y-%m-%d',
-                    help: 'Accepted DATE parse patterns, tried in order.',
-                    tab: 'types',
+                    help: 'Patterns a date may be written in, tried in order, e.g. %Y-%m-%d. Empty = any standard date form is accepted; listing patterns RESTRICTS parsing to exactly those.',
+                    section: 'types',
                 },
                 {
                     key: 'delimited__timestamp_formats',
-                    label: 'Timestamp formats',
+                    label: 'Timestamp formats to try',
                     type: 'list',
                     tier: 'optional',
-                    placeholder: '%Y-%m-%d %H:%M:%S',
-                    help: 'Accepted TIMESTAMP parse patterns, tried in order.',
-                    tab: 'types',
+                    help: 'Patterns a timestamp may be written in, tried in order, e.g. %Y-%m-%d %H:%M:%S. Empty = any standard timestamp form is accepted; listing patterns RESTRICTS parsing to exactly those.',
+                    section: 'types',
                 },
                 {
                     // ⚠ No `default` — the standing rule: a spec default materializes into every
@@ -545,7 +540,7 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     tier: 'optional',
                     options: SOURCE_TIMEZONE_OPTIONS,
                     help: 'The zone the timestamps in this data are written IN. Set it and values are stored as UTC, instead of being read in the server’s own zone. A column can override it.',
-                    tab: 'types',
+                    section: 'types',
                 },
                 // ── J1 reader knobs — read_json (array/auto) only; the load refuses them on NDJSON,
                 // so the form hides them there rather than authoring a config the parser rejects.
@@ -560,7 +555,7 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     // config authored here can never hit that refusal.
                     dependsOn: { key: 'json__format', equals: 'auto' },
                     help: 'auto only: takes effect when the file’s content is itself line-delimited (DuckDB’s own sniff) — a malformed record then lands as an all-NULL row rather than failing the file. Not available under format: array, which DuckDB always rejects this option for.',
-                    tab: 'robustness',
+                    section: 'robustness',
                 },
                 {
                     key: 'json__maximum_object_size',
@@ -570,7 +565,7 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     min: 0,
                     dependsOn: { key: 'json__format', notEquals: 'newline' },
                     help: 'Bound on a single document/record the reader will buffer. Blank = the engine default.',
-                    tab: 'robustness',
+                    section: 'robustness',
                 },
                 {
                     key: 'compression',
@@ -578,7 +573,7 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     type: 'string',
                     tier: 'advanced',
                     placeholder: 'gzip',
-                    tab: 'files',
+                    section: 'dialect',
                 },
             ];
         case 'xlsx':
@@ -595,7 +590,7 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     required: false,
                     placeholder: 'first sheet',
                     help: "Sheet NAME to read. Blank = the workbook's first sheet.",
-                    tab: 'dialect',
+                    section: 'dialect',
                 },
                 {
                     key: 'xlsx__range',
@@ -605,7 +600,7 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     pattern: '[A-Za-z]{1,3}[0-9]{1,7}(:[A-Za-z]{1,3}[0-9]{1,7})?',
                     placeholder: 'A1:F100',
                     help: 'A1-style anchor or span. Blank = the whole sheet.',
-                    tab: 'dialect',
+                    section: 'dialect',
                 },
                 {
                     key: 'xlsx__header',
@@ -615,7 +610,7 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     required: false,
                     default: true,
                     help: 'Header cells name the columns; without one they are A, B, C…',
-                    tab: 'dialect',
+                    section: 'dialect',
                 },
                 {
                     key: 'xlsx__normalize_names',
@@ -623,26 +618,24 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     type: 'boolean',
                     tier: 'optional',
                     help: 'Lower-snake identifiers from the header cells.',
-                    tab: 'dialect',
+                    section: 'dialect',
                 },
                 // ── tab 2: Types & columns (transform-time typing, shared keys) ──
                 {
                     key: 'delimited__date_formats',
-                    label: 'Date formats',
+                    label: 'Date formats to try',
                     type: 'list',
                     tier: 'optional',
-                    placeholder: '%Y-%m-%d',
-                    help: 'Accepted DATE parse patterns, tried in order.',
-                    tab: 'types',
+                    help: 'Patterns a date may be written in, tried in order, e.g. %Y-%m-%d. Empty = any standard date form is accepted; listing patterns RESTRICTS parsing to exactly those.',
+                    section: 'types',
                 },
                 {
                     key: 'delimited__timestamp_formats',
-                    label: 'Timestamp formats',
+                    label: 'Timestamp formats to try',
                     type: 'list',
                     tier: 'optional',
-                    placeholder: '%Y-%m-%d %H:%M:%S',
-                    help: 'Accepted TIMESTAMP parse patterns, tried in order.',
-                    tab: 'types',
+                    help: 'Patterns a timestamp may be written in, tried in order, e.g. %Y-%m-%d %H:%M:%S. Empty = any standard timestamp form is accepted; listing patterns RESTRICTS parsing to exactly those.',
+                    section: 'types',
                 },
                 {
                     // ⚠ No `default` — the standing rule: a spec default materializes into every
@@ -659,7 +652,7 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     tier: 'optional',
                     options: SOURCE_TIMEZONE_OPTIONS,
                     help: 'The zone the timestamps in this data are written IN. Set it and values are stored as UTC, instead of being read in the server’s own zone. A column can override it.',
-                    tab: 'types',
+                    section: 'types',
                 },
                 // ── tab 3: Robustness / error handling ───────────────────────────
                 {
@@ -670,7 +663,7 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     type: 'boolean',
                     tier: 'optional',
                     help: 'Stop reading at the first fully empty row (the extension forces this on when no range is given).',
-                    tab: 'robustness',
+                    section: 'robustness',
                 },
                 {
                     key: 'xlsx__ignore_errors',
@@ -678,10 +671,8 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     type: 'boolean',
                     tier: 'optional',
                     help: 'Unrepresentable cells land as NULL instead of failing the file.',
-                    tab: 'robustness',
+                    section: 'robustness',
                 },
-                // tab 4 (Files & metadata) carries no xlsx option — the tab still renders: the
-                // Collection pointer and the host-projected column-metadata grid live there.
             ];
         case 'text_regex':
             return [

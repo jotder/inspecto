@@ -14,13 +14,15 @@ import {
 } from '@angular/core';
 import { AbstractControl, FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { NgTemplateOutlet } from '@angular/common';
-import { Subscription, merge } from 'rxjs';
+import { Subscription } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatExpansionModule } from '@angular/material/expansion';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSelectModule } from '@angular/material/select';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Observable } from 'rxjs';
@@ -95,6 +97,8 @@ export type SampleMode = 'own' | 'host';
         MatIconModule,
         MatInputModule,
         MatProgressSpinnerModule,
+        MatExpansionModule,
+        MatSelectModule,
         MatTabsModule,
         MatTooltipModule,
         InspectoAlertComponent,
@@ -111,13 +115,14 @@ export class GrammarEditorComponent implements AfterViewInit {
     private readonly destroyRef = inject(DestroyRef);
 
     /**
-     * Every mounted schema-form — ONE for a flat spec set, one PER TAB for a tabbed set (§4.1 of the
-     * delimited-grammar-properties plan). All host-facing reads go through the aggregation helpers
-     * below so neither shape leaks to adopters.
+     * Every mounted `<inspecto-schema-form>` — ONE for a flat spec set, one PER SECTION for a
+     * sectioned set (S2 of the parse-pane redesign; ex "one per tab" under R9), each rendered `flat`
+     * (R1: no per-section Optional/Advanced disclosure — the expansion panel IS the disclosure). All
+     * host-facing reads go through the aggregation helpers below so neither shape leaks to adopters.
      */
     @ViewChildren(InspectoSchemaFormComponent) private schemaForms?: QueryList<InspectoSchemaFormComponent>;
 
-    /** The single form of a flat (untabbed) spec set — legacy accessor for specs/hosts. */
+    /** The single schema-form of a flat (unsectioned) spec set — legacy accessor for specs/hosts. */
     get schemaForm(): InspectoSchemaFormComponent | undefined {
         return this.schemaForms?.first;
     }
@@ -223,33 +228,48 @@ export class GrammarEditorComponent implements AfterViewInit {
     });
 
     /**
-     * The tab split of the active spec set, or null to render flat. A set names tabs by `spec.tab`
-     * (grammarTabsFor order); fewer than 2 distinct tabs ⇒ flat — json/fixedwidth/text_regex and every
-     * served plugin render byte-identical to before. Untabbed specs in a tabbed set fall into tab 1.
+     * The section split of the active spec set, or null to render flat. A set names sections by
+     * `spec.section` (grammarTabsFor's shell order); fewer than 2 distinct sections ⇒ flat —
+     * text_regex and every served plugin render byte-identical to before. Un-sectioned specs in a
+     * sectioned set fall into the shell's first section.
      */
-    readonly tabs = computed<{ id: string; label: string; specs: AttributeSpec[] }[] | null>(() => {
+    readonly sections = computed<{ id: string; label: string; specs: AttributeSpec[] }[] | null>(() => {
         const specs = this.specs();
-        const ids = new Set(specs.map((s) => s.tab).filter((t): t is string => !!t));
+        const ids = new Set(specs.map((s) => s.section).filter((t): t is string => !!t));
         if (ids.size < 2) return null;
         const shell = grammarTabsFor(this.frontend());
         const fallback = shell[0].id;
-        // The 'files' tab is kept even when no spec names it: it anchors the Collection pointer and
-        // the host's [tabFiles] projection (the column-metadata grid) — xlsx has no file-level
-        // option of its own but the tab's content is not the specs'.
         return shell
-            .filter((t) => ids.has(t.id) || t.id === 'files' || (t.id === fallback && specs.some((s) => !s.tab)))
+            .filter((t) => ids.has(t.id) || (t.id === fallback && specs.some((s) => !s.section)))
             .map((t) => ({
                 ...t,
-                specs: specs.filter((s) => (s.tab ?? fallback) === t.id),
+                specs: specs.filter((s) => (s.section ?? fallback) === t.id),
             }));
     });
 
-    /** The selected tab of a tabbed set — `validate()` steers it to the first failing tab. */
-    readonly activeTab = signal(0);
+    /**
+     * Which sections are expanded. Panels stay MOUNTED whether open or closed (S2 — see the html's R9
+     * note), so this only drives the visual open/closed state, never what exists in the DOM. Seeded to
+     * the shell's first section open, the rest collapsed — the target layout's "Dialect (open)".
+     */
+    readonly expandedSections = signal<Set<string>>(new Set());
+
+    isExpanded(id: string): boolean {
+        return this.expandedSections().has(id);
+    }
+
+    setExpanded(id: string, expanded: boolean): void {
+        this.expandedSections.update((s) => {
+            const next = new Set(s);
+            if (expanded) next.add(id);
+            else next.delete(id);
+            return next;
+        });
+    }
 
     /**
      * The seed with legacy scalar spellings normalised for `list` controls: an old block authored as
-     * `null_strings: "NULL,N/A"` (the pre-tab UI wrote comma-joined strings) seeds the chips split,
+     * `null_strings: "NULL,N/A"` (the pre-section UI wrote comma-joined strings) seeds the chips split,
      * exactly as the engine's own `strList` reads it — otherwise the stored value renders as an empty
      * list and a save would silently drop it.
      */
@@ -269,21 +289,21 @@ export class GrammarEditorComponent implements AfterViewInit {
         return out;
     });
 
-    /** Bumped on any form value/status change — drives the tab badges under OnPush. */
+    /** Bumped on any form value/status change — drives the section badges under OnPush. */
     private readonly formTick = signal(0);
     private formSubs = new Subscription();
 
     /**
-     * Per-tab badge state: how many values are set away from their declared default (the count chip),
-     * and whether the tab holds an invalid touched control (the warn dot) — the operator sees where
-     * configuration lives without hunting (§4.1).
+     * Per-section badge state: how many values are set away from their declared default (the count
+     * chip), and whether the section holds an invalid touched control (the warn dot) — the operator
+     * sees where configuration lives without hunting (§4.1), now on the panel header instead of a tab.
      */
-    readonly tabBadges = computed<{ set: number; invalid: boolean }[]>(() => {
+    readonly sectionBadges = computed<{ set: number; invalid: boolean }[]>(() => {
         this.formTick();
-        const tabs = this.tabs();
-        if (!tabs) return [];
+        const sections = this.sections();
+        if (!sections) return [];
         const forms = this.forms();
-        return tabs.map((t, i) => {
+        return sections.map((t, i) => {
             const form = forms[i];
             if (!form) return { set: 0, invalid: false };
             const value = form.value();
@@ -307,19 +327,24 @@ export class GrammarEditorComponent implements AfterViewInit {
         this.destroyRef.onDestroy(() => this.formSubs.unsubscribe());
     }
 
-    /** Re-wire the badge tick to the CURRENT set of mounted forms (a spec/tab swap remounts them). */
+    /** Re-wire the badge tick to the CURRENT set of mounted forms (a spec/section swap remounts them). */
     private resubscribeForms(): void {
         this.formSubs.unsubscribe();
         this.formSubs = new Subscription();
+        // Seed the default-open section the first time a sectioned set mounts (never re-seeds on a
+        // later remount, so an operator's own expand/collapse choices are never clobbered).
+        if (this.sections() && this.expandedSections().size === 0) {
+            const first = this.sections()?.[0]?.id;
+            if (first) this.expandedSections.set(new Set([first]));
+        }
         for (const f of this.forms()) {
-            this.formSubs.add(
-                merge(f.form.valueChanges, f.form.statusChanges).subscribe(() => this.formTick.update((n) => n + 1)),
-            );
+            this.formSubs.add(f.form.valueChanges.subscribe(() => this.formTick.update((n) => n + 1)));
+            this.formSubs.add(f.form.statusChanges.subscribe(() => this.formTick.update((n) => n + 1)));
         }
         this.formTick.update((n) => n + 1);
     }
 
-    // ── schema-form aggregation (one flat form, or one per tab) ────────────────
+    // ── schema-form aggregation (one flat set, or one per section) ─────────────
 
     private forms(): InspectoSchemaFormComponent[] {
         return this.schemaForms?.toArray() ?? [];
@@ -330,8 +355,13 @@ export class GrammarEditorComponent implements AfterViewInit {
         return Object.assign({}, ...this.forms().map((f) => f.value()));
     }
 
+    /** The merged RAW values (including disabled/`dependsOn`-hidden controls) of every mounted form. */
+    rawValue(): Record<string, unknown> {
+        return Object.assign({}, ...this.forms().map((f) => f.form.getRawValue()));
+    }
+
     /** The control for a flat key, wherever it is mounted. */
-    private controlFor(key: string): AbstractControl | null {
+    controlFor(key: string): AbstractControl | null {
         for (const f of this.forms()) {
             const c = f.form.get(key);
             if (c) return c;
@@ -357,6 +387,14 @@ export class GrammarEditorComponent implements AfterViewInit {
         return this.frontend() === 'json' && text ? jsonSampleToTree(text) : null;
     });
     readonly resultView = signal<'table' | 'tree'>('table');
+
+    /**
+     * Parsed-tab page size (S3 of the parse-pane redesign). A grid-toolbar page-size control stays a
+     * plain `mat-select` per the angular-ui skill's own exception list — not `<inspecto-option-picker>`.
+     * Lives on the component instance, so it survives a re-parse (Test parse) without resetting.
+     */
+    readonly pageSizeOptions = [10, 25, 50, 100] as const;
+    readonly pageSize = signal<number>(10);
 
     /** Sniffed suggestion — shown only while it differs from the current pick. Never auto-applied. */
     readonly suggestion = computed<FrontendSuggestion | null>(() => {
@@ -457,7 +495,7 @@ export class GrammarEditorComponent implements AfterViewInit {
         this.seed.update((s) => ({ ...s, ...this.formsValue() }));
         this.pluginDef.set(null);
         this.frontend.set(f);
-        this.activeTab.set(0);
+        this.expandedSections.set(new Set());
         this.typeTouched.set(true);
         this.preview.set(null);
         this.error.set(null);
@@ -542,6 +580,22 @@ export class GrammarEditorComponent implements AfterViewInit {
         this.sampleChange.emit(text);
     }
 
+    /**
+     * The Sample tab's "Paste" affordance (S3): read the clipboard directly rather than requiring a
+     * manual focus + Ctrl/Cmd-V into the textarea. Goes through {@link onSampleText}, so it clears any
+     * captured file bytes exactly like typing does — no separate clearing rule to keep in sync.
+     * Clipboard read can be denied by the browser's permission model; failing silently just leaves the
+     * textarea as it was; there is nothing to error about — the operator can still paste manually.
+     */
+    async pasteSample(): Promise<void> {
+        try {
+            const text = await navigator.clipboard.readText();
+            if (text) this.onSampleText(text);
+        } catch {
+            // Clipboard permission denied/unavailable — the textarea still accepts a manual paste.
+        }
+    }
+
     /** Load sample content from a local file (text, capped; an .xlsx workbook captures as BYTES). */
     onSampleFile(files: FileList | null): void {
         const file = files?.[0];
@@ -582,19 +636,22 @@ export class GrammarEditorComponent implements AfterViewInit {
 
     // ── host API ─────────────────────────────────────────────────────────────
 
-    /** Validate every property sheet (all tabs) and (for fixed width) the slice table. */
+    /** Validate every property sheet (all sections) and (for fixed width) the slice table. */
     validate(): boolean {
-        // Validate ALL forms (marking each invalid one touched), then steer to the first failing tab
-        // rather than short-circuiting — cross-tab errors must all light up their badges at once.
-        let firstFailing = -1;
+        // Validate ALL forms (marking each invalid one touched); a sectioned set EXPANDS every
+        // section holding a failure (S2 — panels stay mounted, so unlike the old tab steer this can
+        // open more than one at once instead of picking just the first).
+        let anyFailing = false;
         const forms = this.forms();
+        const sections = this.sections();
         for (let i = 0; i < forms.length; i++) {
-            if (!forms[i].validate() && firstFailing < 0) firstFailing = i;
+            if (!forms[i].validate()) {
+                anyFailing = true;
+                const id = sections?.[i]?.id;
+                if (id) this.setExpanded(id, true);
+            }
         }
-        if (firstFailing >= 0) {
-            if (this.tabs()) this.activeTab.set(firstFailing);
-            return false;
-        }
+        if (anyFailing) return false;
         if (
             !this.pluginDef() &&
             this.frontend() === 'fixedwidth' &&
@@ -644,21 +701,20 @@ export class GrammarEditorComponent implements AfterViewInit {
     // ── preview ──────────────────────────────────────────────────────────────
 
     /**
-     * Steer a tabbed spec set to a named tab (S4) — the host reveals **Types & columns** the first
-     * time a parse DERIVES a schema, because the derivation used to land there silently while the
-     * viewport showed no schema anywhere. A no-op for an untabbed format or an unknown id, so a host
-     * may ask without first knowing which formats are tabbed.
+     * Expand a sectioned spec set's named section (S4) — the host reveals **Types & columns** the
+     * first time a parse DERIVES a schema, because the derivation used to land there silently while
+     * the viewport showed no schema anywhere. A no-op for an unsectioned format or an unknown id, so a
+     * host may ask without first knowing which formats are sectioned.
      */
     showTab(id: string): void {
-        const tabs = this.tabs();
-        if (!tabs) return;
-        const i = tabs.findIndex((t) => t.id === id);
-        if (i >= 0) this.activeTab.set(i);
+        const sections = this.sections();
+        if (!sections) return;
+        if (sections.some((t) => t.id === id)) this.setExpanded(id, true);
     }
 
-    /** Whether this Grammar's spec set renders as tabs — the host sizes its dock accordingly (S4). */
+    /** Whether this Grammar's spec set renders as sections — the host sizes its dock accordingly (S4). */
     get tabbed(): boolean {
-        return !!this.tabs();
+        return !!this.sections();
     }
 
     /** Parse the sample with the in-progress Grammar (no save) → table or tree. */

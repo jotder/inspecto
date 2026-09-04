@@ -20,26 +20,44 @@ describe('parsingAttributesFor — delimited error handling', () => {
         'delimited__rejects_limit',
     ];
 
-    it('offers every error-handling knob on the robustness tab', () => {
+    it('offers every error-handling knob on the robustness section', () => {
         for (const key of KNOBS) {
             const s = spec(key);
             expect(s, `${key} is offered`).toBeTruthy();
-            expect(s!.tab, `${key} lives on the robustness tab`).toBe('robustness');
+            expect(s!.section, `${key} lives on the robustness section`).toBe('robustness');
         }
     });
 
-    /** 🔴 The rule this whole surface rests on — see the file header. */
-    it('gives none of them a default, so an untouched grammar writes nothing', () => {
-        for (const key of KNOBS) {
-            expect(spec(key)!.default, `${key} must have no default`).toBeUndefined();
+    /**
+     * Review 2026-09-04 (parse-pane-redesign-plan.md R4): a knob whose engine default is known shows
+     * that default as a REAL value — written to the key, a no-op for the engine — instead of an
+     * off-looking tri-state toggle with "default is ON" in its help. Grounded against
+     * PipelineConfigParser/DuckDbCsvIngester: absent ignore_errors/store_rejects are true, null_padding
+     * is false for delimited (true for line readers), the reject tables are reject_errors/reject_scans.
+     */
+    it('shows each engine default as a real default value', () => {
+        expect(spec('delimited__ignore_errors')!.default).toBe(true);
+        expect(spec('delimited__store_rejects')!.default).toBe(true);
+        expect(spec('delimited__null_padding')!.default, 'delimited pads nothing by default').toBe(false);
+        expect(spec('delimited__rejects_table')!.default).toBe('reject_errors');
+        expect(spec('delimited__rejects_scan')!.default).toBe('reject_scans');
+        expect(spec('delimited__rejects_table')!.placeholder).toBeUndefined();
+        expect(spec('delimited__rejects_scan')!.placeholder).toBeUndefined();
+    });
+
+    it('keeps no default where writing one would change or over-specify behaviour', () => {
+        expect(spec('delimited__rejects_limit')!.default, 'no natural value — blank = unlimited').toBeUndefined();
+        expect(spec('delimited__engine')!.default, 'engine keeps no default — blank IS auto').toBeUndefined();
+        for (const key of ['delimited__comment', 'delimited__date_formats', 'delimited__timestamp_formats', 'delimited__null_strings']) {
+            expect(spec(key)!.default, `${key}: writing a value changes parsing`).toBeUndefined();
+            expect(spec(key)!.placeholder, `${key}: suggestion lives in help, not a placeholder`).toBeUndefined();
         }
-        expect(spec('delimited__engine')!.default, 'engine keeps no default either').toBeUndefined();
     });
 
     /**
      * Auto is the SELECTED choice without being a written value: its option value is blank, and the
      * editor drops a blank whose default is blank. Asserted because the obvious "fix" — `default:
-     * 'auto'` — is exactly what the no-default rule forbids.
+     * 'auto'` — is exactly what the engine's own recorded decision forbids.
      */
     it('shows Auto as the engine default by giving it the blank value', () => {
         const engine = spec('delimited__engine')!;
@@ -48,19 +66,7 @@ describe('parsingAttributesFor — delimited error handling', () => {
         expect(engine.options?.map((o) => o.value)).toEqual(['', 'duckdb', 'java']);
     });
 
-    /**
-     * The two knobs whose ENGINE default is on render as an off-looking toggle (a tri-state control
-     * has no third visual state), so their help text must say so — the toggle alone would read as the
-     * opposite of the truth.
-     */
-    it('states the on-by-default behaviour in the help text of the knobs that have it', () => {
-        expect(spec('delimited__ignore_errors')!.help).toContain('default is ON');
-        expect(spec('delimited__store_rejects')!.help).toContain('default is ON');
-    });
-
-    it('caps the rejects limit at zero and names the default table names as placeholders', () => {
+    it('caps the rejects limit at zero', () => {
         expect(spec('delimited__rejects_limit')!.min).toBe(0);
-        expect(spec('delimited__rejects_table')!.placeholder).toBe('reject_errors');
-        expect(spec('delimited__rejects_scan')!.placeholder).toBe('reject_scans');
     });
 });

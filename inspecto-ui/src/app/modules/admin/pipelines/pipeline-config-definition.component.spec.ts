@@ -51,6 +51,7 @@ interface PaneInputs {
     enrichmentHost?: EnrichmentHostPipeline;
     sampleRows?: Record<string, unknown>[];
     configSubdir?: string;
+    pipelineName?: string;
 }
 
 async function create(inputs: PaneInputs, api: Partial<ConfigService> = {}) {
@@ -97,6 +98,7 @@ async function create(inputs: PaneInputs, api: Partial<ConfigService> = {}) {
     if (inputs.enrichmentHost) fixture.componentRef.setInput('enrichmentHost', inputs.enrichmentHost);
     if (inputs.sampleRows) fixture.componentRef.setInput('sampleRows', inputs.sampleRows);
     if (inputs.configSubdir !== undefined) fixture.componentRef.setInput('configSubdir', inputs.configSubdir);
+    if (inputs.pipelineName !== undefined) fixture.componentRef.setInput('pipelineName', inputs.pipelineName);
     fixture.detectChanges();
     return fixture;
 }
@@ -133,9 +135,12 @@ describe('PipelineConfigDefinitionComponent', () => {
     beforeEach(() => vi.clearAllMocks());
 
     it('uses the free-form config editor for a type with no schema', async () => {
-        const c = (await create({ node: { id: 'x', type: 'plugin.unknown' } })).componentInstance;
+        const fixture = await create({ node: { id: 'x', type: 'plugin.unknown' } });
+        const c = fixture.componentInstance;
         expect(c.specs()).toEqual([]);
-        expect(c.freeFormOpen()).toBe(true); // free-form is the primary surface
+        // free-form is the primary surface: rendered flat (R6 — no disclosure), with add-a-key offered
+        expect(c.allowAddExtra()).toBe(true);
+        expect(fixture.nativeElement.querySelector('app-pipeline-extra-config')).toBeTruthy();
     });
 
     it('renders the schema-form for a known type and splits config into schema + free-form', async () => {
@@ -152,7 +157,10 @@ describe('PipelineConfigDefinitionComponent', () => {
         expect(c.split().schemaInitial).toMatchObject({ format: 'CSV', compression: 'gzip' });
         expect(c.split().schemaInitial['custom_flag']).toBeUndefined();
         expect(c.split().extraRows).toEqual([{ key: 'custom_flag', value: 'x' }]);
-        expect(c.freeFormOpen()).toBe(true); // an extra key is present ⇒ shown
+        // an extra key is present ⇒ the flat "Additional config" section renders (no chevron, R6)
+        expect(fixture.nativeElement.querySelector('app-pipeline-extra-config')).toBeTruthy();
+        expect(fixture.nativeElement.textContent).toContain('Additional config');
+        expect(fixture.nativeElement.querySelector('[aria-expanded]')).toBeNull();
     });
 
     it('merges schema-form values with free-form rows on apply', async () => {
@@ -354,9 +362,11 @@ describe('PipelineConfigDefinitionComponent', () => {
      * the client table, or a type the server deliberately unspecced would keep drawing a stale form.
      */
     it('honours a served empty list instead of falling back', async () => {
-        const c = (await create({ node: { id: 'w', type: 'sink.persistent' }, attributes: [] })).componentInstance;
+        const fixture = await create({ node: { id: 'w', type: 'sink.persistent' }, attributes: [] });
+        const c = fixture.componentInstance;
         expect(c.specs()).toEqual([]);
-        expect(c.freeFormOpen()).toBe(true); // free-form becomes the only surface
+        expect(c.allowAddExtra()).toBe(true); // free-form becomes the only surface
+        expect(fixture.nativeElement.querySelector('app-pipeline-extra-config')).toBeTruthy();
     });
 
     // ── enrichment (W4b): the pane authors the REAL companion `*_enrich.toon` ──
@@ -367,7 +377,9 @@ describe('PipelineConfigDefinitionComponent', () => {
         expect(c.isEnrichment()).toBe(true);
         expect(editor(fixture)).toBeTruthy();
         expect(c.enrichName.value).toBe('enrich1');
-        expect(c.freeFormOpen()).toBe(false); // the editor is the primary surface, not the key/value grid
+        // the editor is the primary surface, not the key/value grid (no extras ⇒ no Additional config)
+        expect(c.allowAddExtra()).toBe(false);
+        expect(fixture.nativeElement.querySelector('app-pipeline-extra-config')).toBeNull();
     });
 
     it('seeds a FRESH companion from the host pipeline instead of asking (P6-c)', async () => {
@@ -771,5 +783,132 @@ describe('PipelineConfigDefinitionComponent', () => {
 
     it('has no a11y violations (enrichment node)', async () => {
         await expectNoA11yViolations((await create({ node: { id: 'e', type: 'enrichment' } })).nativeElement);
+    });
+
+    /**
+     * Partitioning (redesign S5, D4) — moved here from the Parse pane; pure UI relocation, the schema
+     * toon's `partitions[]` storage contract is untouched. Renders only for the pipeline's single
+     * qualifying output sink (the SAME `database`-key test the host's `primaryOutputSink` applies),
+     * reading/writing the companion schema toon directly.
+     */
+    describe('partitioning (moved from the Parse pane)', () => {
+        const SINK_NODE: AuthoredNode = { id: 'out', type: 'sink.file', config: { database: 'spaces/demo/data/x' } };
+        const SCHEMA_CONFIG = {
+            raw: {
+                name: 'record',
+                fields: [
+                    { name: 'IMSI', selector: '0', type: 'VARCHAR' },
+                    { name: 'TXN_DATE', selector: '1', type: 'DATE' },
+                ],
+            },
+            mapping: { canonicalName: 'x', rawName: 'record', rules: [] },
+        };
+
+        it('renders nothing for a node that is not the output sink (no database key)', async () => {
+            const fixture = await create({ node: { id: 'x', type: 'transform.filter' }, pipelineName: 'x' });
+            expect(fixture.nativeElement.textContent).not.toContain('Partitioning');
+        });
+
+        it('reads the companion schema toon and offers its field names', async () => {
+            const readSpy = vi.fn(() => of({ config: SCHEMA_CONFIG }));
+            const fixture = await create(
+                { node: SINK_NODE, pipelineName: 'x' },
+                { read: readSpy as unknown as ConfigService['read'] },
+            );
+            expect(readSpy).toHaveBeenCalledWith('schema', 'x_schema', undefined);
+            expect(fixture.nativeElement.querySelector('inspecto-schema-partitions-editor')).toBeTruthy();
+            expect(fixture.nativeElement.textContent).toContain('Partitioning');
+        });
+
+        it('seeds the editor with the stored partitions[]', async () => {
+            const fixture = await create(
+                { node: SINK_NODE, pipelineName: 'x' },
+                {
+                    read: vi.fn(() =>
+                        of({
+                            config: {
+                                ...SCHEMA_CONFIG,
+                                partitions: [{ column: 'year', source: 'TXN_DATE', type: 'DATE_YEAR' }],
+                            },
+                        }),
+                    ) as unknown as ConfigService['read'],
+                },
+            );
+            expect(fixture.componentInstance.partitionSeed()).toEqual([
+                { column: 'year', source: 'TXN_DATE', type: 'DATE_YEAR' },
+            ]);
+        });
+
+        it('explains, rather than errors, when no schema has been written yet', async () => {
+            const fixture = await create(
+                { node: SINK_NODE, pipelineName: 'x' },
+                { read: vi.fn(() => throwError(() => ({ status: 404 }))) as unknown as ConfigService['read'] },
+            );
+            expect(fixture.nativeElement.textContent).toContain('define this pipeline');
+            expect(fixture.nativeElement.querySelector('inspecto-schema-partitions-editor')).toBeNull();
+        });
+
+        it('Save partitioning writes partitions[] back, carrying every other key verbatim', async () => {
+            const writeSpy = vi.fn((type: string, cfg: Record<string, unknown>) =>
+                of({
+                    type,
+                    written: true,
+                    path: 'x_schema.toon',
+                    name: 'x_schema',
+                    bytes: 1,
+                    overwritten: true,
+                    findings: [],
+                }),
+            );
+            const fixture = await create(
+                { node: SINK_NODE, pipelineName: 'x' },
+                {
+                    read: vi.fn(() => of({ config: SCHEMA_CONFIG })) as unknown as ConfigService['read'],
+                    write: writeSpy as unknown as ConfigService['write'],
+                },
+            );
+            const editor = fixture.debugElement.query(
+                By.css('inspecto-schema-partitions-editor'),
+            ).componentInstance as { addRow: () => void; form: { controls: Record<string, unknown> } };
+            // Add one segment through the editor's own API — mirrors how the shared component's own
+            // spec drives it, keeping this test decoupled from its internal form shape.
+            editor.addRow();
+            const group = (editor as unknown as { partitionRows: { controls: { patchValue: (v: unknown) => void }[] } })
+                .partitionRows.controls[0];
+            group.patchValue({ column: 'year', source: 'TXN_DATE', type: 'DATE_YEAR' });
+            fixture.detectChanges();
+
+            fixture.componentInstance.savePartitioning();
+            fixture.detectChanges();
+
+            expect(writeSpy).toHaveBeenCalledTimes(1);
+            const [type, config] = writeSpy.mock.calls[0] as [string, Record<string, unknown>];
+            expect(type).toBe('schema');
+            expect(config['partitions']).toEqual([{ column: 'year', source: 'TXN_DATE', type: 'DATE_YEAR' }]);
+            // Every other key from the read rides verbatim — the partitions[]-drop lesson generalised.
+            expect(config['raw']).toEqual(SCHEMA_CONFIG.raw);
+            expect(config['mapping']).toEqual(SCHEMA_CONFIG.mapping);
+        });
+
+        it('refuses to save an invalid segment, with an inline error', async () => {
+            const writeSpy = vi.fn();
+            const fixture = await create(
+                { node: SINK_NODE, pipelineName: 'x' },
+                {
+                    read: vi.fn(() => of({ config: SCHEMA_CONFIG })) as unknown as ConfigService['read'],
+                    write: writeSpy as unknown as ConfigService['write'],
+                },
+            );
+            const editor = fixture.debugElement.query(By.css('inspecto-schema-partitions-editor'))
+                .componentInstance as { addRow: () => void };
+            editor.addRow(); // a blank row: no column name, no source — invalid
+            fixture.detectChanges();
+
+            fixture.componentInstance.savePartitioning();
+            fixture.detectChanges();
+
+            expect(writeSpy).not.toHaveBeenCalled();
+            expect(fixture.componentInstance.partitionsError()).toContain('Every partition segment needs a name');
+        });
     });
 });

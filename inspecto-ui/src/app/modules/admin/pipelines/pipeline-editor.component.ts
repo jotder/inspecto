@@ -2202,6 +2202,29 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     }
 
     /**
+     * The pipeline's single unambiguous COLLECTOR (SOURCE-category) node, or `null` when there is
+     * none or more than one — the same single-qualifying-node shape as {@link primaryOutputSink}, just
+     * upstream instead of downstream.
+     */
+    private primaryCollector(): AuthoredNode | null {
+        const sources = (this.model()?.nodes ?? []).filter((n) => this.typeCategory(n.type) === 'SOURCE');
+        return sources.length === 1 ? sources[0] : null;
+    }
+
+    /**
+     * The Parse pane's read-only display of "which files this parse reads" (redesign D2): the upstream
+     * Collector's `include` glob/regex pattern. The Parse pane no longer anchors this — it only shows
+     * it, sourced from the Collector step's own `collector:` block. `null` when there is no single
+     * qualifying Collector node, in which case the pane renders nothing rather than guess.
+     */
+    collectorInclude(): { value: string; source: string } | null {
+        const collector = this.primaryCollector();
+        if (!collector) return null;
+        const value = String(collector.config?.['include'] ?? '').trim();
+        return { value, source: collector.name || collector.id };
+    }
+
+    /**
      * Commit from the Parse pane's filename-column field straight onto the sink node — bypassing this
      * drawer's own Apply/Discard, the same immediate-write precedent {@link renameNode} set for
      * cross-node identity edits. Routed through the existing {@link applyNodePatch} so a config change
@@ -2408,6 +2431,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
             this.definitionPane ??
             this.parseDefinitionPane ??
             this.loadDefinitionPane ??
+            this.sqlDefinitionPane ??
             this.configDefinitionPane
         )?.submit();
     }
@@ -2431,7 +2455,6 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     /** U5: the drawer's full-width state, mirrored from `(maximizedChange)` — the dock binds its
      *  width to 100% over the canvas while set; the split handle stays MOUNTED, only hidden. */
     readonly drawerMaximized = signal(false);
-            this.sqlDefinitionPane ??
 
     /** Close the drawer (the shell already dirty-confirmed); the inspector summary returns. */
     closeDefinition(): void {

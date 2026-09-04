@@ -782,6 +782,7 @@
                                             [sample]="sampleThread()"
                                             [filenameColumnTarget]="filenameColumnTarget()"
                                             (filenameColumnChange)="onSinkFilenameColumnChange($event)"
+                                            [collectorInclude]="collectorInclude()"
                                             (applied)="onDefinitionApplied($event)"
                                             (dirtyChange)="definitionDirty.set($event)"
                                         />
@@ -796,6 +797,7 @@
                                         -->
                                         <app-pipeline-config-definition
                                             [node]="dn"
+                                            [pipelineName]="selectedId() ?? ''"
                                             [configSubdir]="configSubdir()"
                                             [attributes]="definitionAttributes()"
                                             [enrichmentHost]="dn.type === 'enrichment' ? enrichmentHost() : undefined"

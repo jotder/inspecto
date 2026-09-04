@@ -14,7 +14,7 @@ import {
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -34,7 +34,6 @@ import {
 } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
-import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { flattenBlock, nestKeys } from 'app/inspecto/component-model';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { downloadCsv } from 'app/inspecto/data-table/core/csv';
@@ -42,8 +41,6 @@ import { DefinitionStateService } from 'app/inspecto/definition/definition-state
 import { InspectoSamplePanelComponent } from 'app/inspecto/definition/sample-panel.component';
 import {
     InspectoSchemaFieldsEditorComponent,
-    InspectoSchemaMetadataGridComponent,
-    InspectoSchemaPartitionsEditorComponent,
     SchemaFieldRow,
     SchemaPartitionRow,
     deriveSelector,
@@ -141,20 +138,17 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
         NgTemplateOutlet,
         FormsModule,
         MatButtonModule,
-        MatButtonToggleModule,
+        MatCheckboxModule,
         MatFormFieldModule,
         MatIconModule,
         MatInputModule,
         MatTooltipModule,
-        ChipComponent,
         GrammarEditorComponent,
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
         InspectoSamplePanelComponent,
         InspectoSegmentsEditorComponent,
         InspectoSchemaFieldsEditorComponent,
-        InspectoSchemaMetadataGridComponent,
-        InspectoSchemaPartitionsEditorComponent,
     ],
     template: `
         <!--
@@ -185,6 +179,16 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
         }
         <!-- Name/Description live on the canvas inspector's rename affordance now, not here: this
              pane defines the Grammar, and the node's display identity is a graph concern. -->
+        <!--
+            D2 (redesign 2026-09-03): "which files this parse reads" is owned by the upstream
+            Collector step now — this is a READ-ONLY display sourced from there, never an edit path.
+        -->
+        @if (collectorInclude(); as ci) {
+            <p class="text-secondary m-0 mb-2 text-xs">
+                Reads: <span class="font-mono">{{ ci.value || '(all files)' }}</span> — from the
+                <span class="font-medium">{{ ci.source }}</span> collector step.
+            </p>
+        }
         <div class="space-y-1">
             <!--
                 CSV export/import replaced "Save as template…" (U4): the file IS the portable
@@ -292,109 +296,90 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                 -->
                 <div tabTypes>
                     @if (authorsSchema()) {
-                        <!-- §4.4 Data types: Auto (inferred snapshot, read-only icons) / Declared. -->
-                        <div class="mb-1 mt-3 flex flex-wrap items-center gap-3">
-                            <span class="text-xs font-semibold uppercase opacity-70">Data types</span>
-                            <mat-button-toggle-group
-                                [value]="typesMode()"
-                                (change)="setTypesMode($event.value)"
-                                aria-label="Data types mode"
-                            >
-                                <mat-button-toggle
-                                    value="auto"
-                                    matTooltip="Types come from the Test parse's inference; saving records the inferred snapshot"
-                                    >Auto</mat-button-toggle
-                                >
-                                <mat-button-toggle value="declared" matTooltip="Pick each column's type yourself"
-                                    >Declared</mat-button-toggle
-                                >
-                            </mat-button-toggle-group>
-                            @if (typesMode() === 'declared' && inferredTypes()) {
-                                <button
-                                    type="button"
-                                    (click)="applySuggestedTypes()"
-                                    matTooltip="One-click starting point: set every column to its inferred type — you can still change any of them"
-                                >
-                                    <inspecto-chip variant="soft" tone="primary">Apply suggested types</inspecto-chip>
-                                </button>
-                            }
-                        </div>
-                        <div class="mb-1 mt-1 flex items-center gap-2">
-                            <span class="text-xs font-semibold uppercase opacity-70">Output schema</span>
-                            @if (schemaLoading()) {
-                                <span class="text-secondary text-xs">Loading the saved schema…</span>
-                            }
-                        </div>
-                        @if (schemaDrift(); as d) {
-                            @if (d.drifted) {
-                                <div
-                                    class="mb-2 flex flex-wrap items-center gap-2 text-sm"
-                                    role="status"
-                                    aria-live="polite"
-                                >
-                                    <span class="text-secondary">
-                                        This sample no longer matches the saved schema:
-                                        {{ d.added.length }} new, {{ d.missing.length }} missing,
-                                        {{ d.typeChanged.length }} changed type.
-                                    </span>
-                                    @if (d.added.length) {
-                                        <button mat-stroked-button type="button" (click)="addDriftedFields()">
-                                            Add {{ d.added.length }} new
-                                        </button>
-                                    }
-                                    <!--
-                                        S4/D7 — the third verb of the generate loop. Add-new can only
-                                        append, and type changes are deliberately never applied, so a
-                                        schema whose sample has genuinely moved on had NO way back to a
-                                        derived one short of a CSV import. Destructive by nature, so the
-                                        confirm names exactly what it replaces.
-                                    -->
-                                    <button mat-stroked-button type="button" (click)="rederiveSchema()">
-                                        Re-derive from this sample
-                                    </button>
-                                </div>
-                                @if (d.typeChanged.length) {
-                                    <p class="text-secondary m-0 mb-2 text-xs">
-                                        Type changes are reported, not applied — a saved type may be a deliberate
-                                        override. Change them yourself if the sample is right:
-                                        @for (t of d.typeChanged; track t.name) {
-                                            <span class="font-mono">{{ t.name }}</span> ({{ t.declared }} →
-                                            {{ t.suggested }})
-                                            @if (!$last) {
-                                                <span>, </span>
-                                            }
-                                        }
-                                    </p>
-                                }
-                            }
+                        <!--
+                            R11 (parse-pane redesign): ONE table over raw.fields[] — the mockup's "Columns
+                            that come out" (Use · # · Name · Type · Sample value · Also known as), rendered
+                            by the shared columns table, which owns the heading, count and search box.
+                            The metadata grid left this pane (D2: description / unit / classification belong
+                            to Transform); a hydrated schema's metadata is carried through by selector from
+                            the loaded rows instead — see withMetadata().
+                        -->
+                        <!--
+                            §4.4 Data types as ONE property row (R11): the persisted concept is unchanged
+                            (raw.types auto | declared); only the Auto/Declared toggle and the "Apply
+                            suggested types" chip are gone — rows now seed from the detected types in BOTH
+                            modes, so "declared" simply unlocks the type menu over that starting point.
+                        -->
+                        <inspecto-option-picker
+                            class="mb-2 mt-3 block w-full"
+                            label="Detect column types"
+                            [options]="typesModeOptions"
+                            [ngModel]="typesMode()"
+                            (ngModelChange)="setTypesMode($event)"
+                        />
+                        @if (schemaLoading()) {
+                            <p class="text-secondary m-0 mb-1 text-xs">Loading the saved schema…</p>
                         }
                         @if (schemaSeed().length) {
-                            @if (schemaStale()) {
-                                <p class="text-warn m-0 mb-2 text-sm" role="status" aria-live="polite">
-                                    These columns came from an earlier test — the settings above no longer parse the
-                                    sample. Fix them and test again, or Apply keeps the columns shown.
-                                </p>
-                            }
                             <inspecto-schema-fields-editor
                                 [rows]="schemaSeed()"
                                 [autoTypes]="typesMode() === 'auto'"
+                                [sampleValues]="sampleValues()"
+                                [filenameColumn]="filenameRow()"
                                 [nameBasedSelectors]="
                                     frontend() === 'json' || frontend() === 'text_regex' || frontend() === 'xlsx'
                                 "
                             />
-                            <!--
-                                Operator ask 2026-08-22: the lineage column is real in the WRITTEN rows but
-                                is not one of the parsed columns above (it never went through this schema —
-                                it is stamped at write time), so a reader of the schema would have no way to
-                                know it exists. Read-only: this is not an editable schemaSeed row, so it can
-                                never be mistaken for an authored column or land in the saved schema.
-                            -->
-                            @if (filenameColumnTarget()?.value; as filenameCol) {
-                                <p class="text-secondary m-0 mt-2 text-xs">
-                                    <span class="font-mono">{{ filenameCol }}</span> is also written to
-                                    {{ filenameColumnTarget()!.target }}'s output — a source-filename lineage column set
-                                    on the Files & metadata tab, not one of the columns above.
+                            <!-- Real states, kept — but BELOW the table so the table is the first thing
+                                 under the heading (R11). -->
+                            @if (schemaStale()) {
+                                <p class="text-warn m-0 mt-2 text-sm" role="status" aria-live="polite">
+                                    These columns came from an earlier test — the settings above no longer parse the
+                                    sample. Fix them and test again, or Apply keeps the columns shown.
                                 </p>
+                            }
+                            @if (schemaDrift(); as d) {
+                                @if (d.drifted) {
+                                    <div
+                                        class="mt-2 flex flex-wrap items-center gap-2 text-sm"
+                                        role="status"
+                                        aria-live="polite"
+                                    >
+                                        <span class="text-secondary">
+                                            This sample no longer matches the saved schema:
+                                            {{ d.added.length }} new, {{ d.missing.length }} missing,
+                                            {{ d.typeChanged.length }} changed type.
+                                        </span>
+                                        @if (d.added.length) {
+                                            <button mat-stroked-button type="button" (click)="addDriftedFields()">
+                                                Add {{ d.added.length }} new
+                                            </button>
+                                        }
+                                        <!--
+                                            S4/D7 — the third verb of the generate loop. Add-new can only
+                                            append, and type changes are deliberately never applied, so a
+                                            schema whose sample has genuinely moved on had NO way back to a
+                                            derived one short of a CSV import. Destructive by nature, so the
+                                            confirm names exactly what it replaces.
+                                        -->
+                                        <button mat-stroked-button type="button" (click)="rederiveSchema()">
+                                            Re-derive from this sample
+                                        </button>
+                                    </div>
+                                    @if (d.typeChanged.length) {
+                                        <p class="text-secondary m-0 mt-1 text-xs">
+                                            Type changes are reported, not applied — a saved type may be a deliberate
+                                            override. Change them yourself if the sample is right:
+                                            @for (t of d.typeChanged; track t.name) {
+                                                <span class="font-mono">{{ t.name }}</span> ({{ t.declared }} →
+                                                {{ t.suggested }})
+                                                @if (!$last) {
+                                                    <span>, </span>
+                                                }
+                                            }
+                                        </p>
+                                    }
+                                }
                             }
                             <!--
                                 BUILDER-1b. One pipeline has ONE output schema (pipeline_schema), and a save
@@ -423,10 +408,10 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                                     </button>
                                 </inspecto-alert>
                             }
-                        } @else {
+                        } @else if (!schemaLoading()) {
                             <p class="text-secondary m-0 text-sm">
-                                Parse the sample above — the output schema is derived from the columns it produces,
-                                never hand-typed.
+                                Parse the sample above — the columns that come out are derived from it, never
+                                hand-typed.
                             </p>
                         }
                     } @else if (foreignSchema()) {
@@ -435,27 +420,21 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                             convention — author it in the pipeline TOON directly. Applying here leaves it untouched.
                         </p>
                     }
-                </div>
-                <!--
-                    D1(b): the column-metadata grid — description/unit/classification per column,
-                    Catalog-facing (raw.fields[]), first UI for a long-shipped model. Projected
-                    into [tabFiles] so the delimited 4-tab surface shows it on tab 4; untabbed
-                    formats render it below the flat options. A second VIEW over the columns
-                    table's rows (same seed signal, merged by selector at submit), never a second
-                    owner.
-                -->
-                <div tabFiles>
                     <!--
-                        Source-filename lineage (operator ask 2026-08-22): output.filename_column
-                        lives on the SINK node, not this one — [filenameColumnTarget] is null whenever
-                        the host cannot name a single sink unambiguously, so the field simply does not
-                        render rather than guess. A blank commit clears the column.
+                        Source-filename lineage (operator ask 2026-08-22; R11 wording from the mockup):
+                        output.filename_column lives on the SINK node, not this one — [filenameColumnTarget]
+                        is null whenever the host cannot name a single sink unambiguously, so the field
+                        simply does not render rather than guess. A blank commit clears the column. When on,
+                        the columns table above shows the column as its read-only last row.
                     -->
                     @if (filenameColumnTarget(); as t) {
-                        <div class="mb-3">
-                            <span class="text-xs font-semibold uppercase opacity-70"
-                                >Source filename column (optional)</span
+                        <div class="mb-3 mt-3">
+                            <mat-checkbox
+                                [checked]="!!t.value"
+                                (change)="onFilenameColumnToggle($event.checked)"
                             >
+                                Add a column with the source file name
+                            </mat-checkbox>
                             <mat-form-field class="mt-1 w-full" subscriptSizing="dynamic">
                                 <input
                                     matInput
@@ -468,45 +447,25 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                             @if (filenameColumnError(); as err) {
                                 <p class="text-warn m-0 mt-1 text-xs" role="alert">{{ err }}</p>
                             }
+                            <!-- ONE short lineage hint (R11): the column is real in the WRITTEN rows but is
+                                 not a parsed column — stamped at write by the sink, never saved into
+                                 raw.fields[]. -->
                             <p class="text-secondary m-0 mt-1 text-xs">
-                                Adds a column of this name to {{ t.target }}'s output, carrying each row's source file.
-                                Blank = no column (lineage stays in the ledger only).
+                                Written by {{ t.target }} as a lineage column, stamped at write with each row's source
+                                file — not one of the parsed columns. Unchecked = no column (lineage stays in the
+                                ledger only).
                             </p>
                         </div>
                     }
                     <!--
-                        Partitioning (operator ask 2026-08-22): the schema toon's partitions[] — how the
-                        written output is cut into Hive directories, derived from the schema's own
-                        fields. Rendered only where this pane owns the schema toon, because the rows
-                        travel through the SAME write as the fields (and reading them back is what
-                        stops that write from dropping a hand-authored block, as it silently did).
+                        Partitioning moved to the Sink pane (redesign S5, D4) — pure UI relocation, the
+                        schema toon's partitions[] storage contract is untouched: this pane still holds
+                        partitionSeed (read by loadSavedSchema) and still carries partitions[] through
+                        the SAME schema write below (submitWithSchema) — only the editing CONTROL
+                        moved. See PipelineConfigDefinitionComponent's own partitioning section, which
+                        reads/writes the same schema toon's partitions[] key directly so an edit there
+                        does not require reopening this pane.
                     -->
-                    @if (authorsSchema() && schemaSeed().length) {
-                        <div class="mb-1 mt-3 flex items-center gap-2">
-                            <span class="text-xs font-semibold uppercase opacity-70">Partitioning</span>
-                        </div>
-                        <inspecto-schema-partitions-editor
-                            [initial]="partitionSeed()"
-                            [fieldNames]="schemaFieldNames()"
-                            [dateFieldNames]="schemaDateFieldNames()"
-                        />
-                        <div class="mb-1 mt-3 flex items-center gap-2">
-                            <span class="text-xs font-semibold uppercase opacity-70">Column metadata</span>
-                        </div>
-                        <inspecto-schema-metadata-grid [rows]="schemaSeed()" />
-                        <!-- The lineage column belongs in this list too (operator ask 2026-08-22):
-                             it IS a column of the written rows. Read-only — stamped at write time,
-                             so description/unit/classification have no schema row to ride. -->
-                        @if (filenameColumnTarget()?.value; as filenameCol) {
-                            <p
-                                class="text-secondary m-0 mt-1 border-t pt-1 text-xs"
-                                style="border-color: var(--gamma-border)"
-                            >
-                                <span class="font-mono">{{ filenameCol }}</span> — each row's source file (lineage,
-                                stamped at write; configured above, not a parsed column).
-                            </p>
-                        }
-                    }
                 </div>
             </inspecto-grammar-editor>
         </div>
@@ -580,6 +539,14 @@ export class PipelineParseDefinitionComponent {
      * fact is ambiguous, per the enrichment-wiring rule — never guess which sink the operator meant).
      */
     readonly filenameColumnTarget = input<{ value: string; target: string } | null>(null);
+
+    /**
+     * D2 (redesign 2026-09-03): the upstream Collector step's `include` pattern, for the read-only
+     * "Reads: …" line above — the Parse pane no longer anchors "which files this parse reads", it only
+     * displays what the Collector step declares. `null` ⇒ no single qualifying Collector node, in
+     * which case the line does not render rather than guess (same rule as `filenameColumnTarget`).
+     */
+    readonly collectorInclude = input<{ value: string; source: string } | null>(null);
     /** Commits straight to the SINK node, bypassing this pane's own Apply/Discard — the same
      *  immediate-write precedent the canvas rename affordance already set for cross-node identity. */
     readonly filenameColumnChange = output<string | null>();
@@ -603,15 +570,29 @@ export class PipelineParseDefinitionComponent {
         this.filenameColumnError.set(null);
         this.filenameColumnChange.emit(value);
     }
+
+    /**
+     * The checkbox half of the control (S4, redesign 2026-09-03): unchecking clears the column
+     * (same as a blank commit); checking writes the DEFAULT name `file_name` unless a name is
+     * already set (e.g. re-checking after only just having unchecked in this same session — the
+     * name field's own value is authoritative, so a real edit is never clobbered by a stray toggle).
+     */
+    onFilenameColumnToggle(checked: boolean): void {
+        if (!checked) {
+            this.filenameColumnError.set(null);
+            this.filenameColumnChange.emit(null);
+            return;
+        }
+        const current = this.filenameColumnTarget()?.value.trim();
+        this.filenameColumnError.set(null);
+        this.filenameColumnChange.emit(current || 'file_name');
+    }
     // U4: the `saveAsTemplate` output is gone — the Grammar CSV is the portable template now
     // (grammar templates are created in the Components registry; "Start from a template" stays).
 
     @ViewChild(GrammarEditorComponent) private editor?: GrammarEditorComponent;
     @ViewChild(InspectoSegmentsEditorComponent) private segmentsEditor?: InspectoSegmentsEditorComponent;
     @ViewChild(InspectoSchemaFieldsEditorComponent) private schemaGrid?: InspectoSchemaFieldsEditorComponent;
-    @ViewChild(InspectoSchemaMetadataGridComponent) private metaGrid?: InspectoSchemaMetadataGridComponent;
-    @ViewChild(InspectoSchemaPartitionsEditorComponent)
-    private partitionsEditor?: InspectoSchemaPartitionsEditorComponent;
 
     /** The stored `partitions[]` of this node's schema toon — seeded by {@link loadSavedSchema}. */
     readonly partitionSeed = signal<SchemaPartitionRow[]>([]);
@@ -636,19 +617,6 @@ export class PipelineParseDefinitionComponent {
      * (`ORDERS`, `CALL`, `SITES`), so the file name was never the convention.
      */
     private schemaIdentity: { rawName?: string; canonicalName?: string; mappingRawName?: string } = {};
-    /** What a partition may derive from: the schema's INCLUDED field names. */
-    readonly schemaFieldNames = computed(() =>
-        this.schemaSeed()
-            .filter((r) => r.include)
-            .map((r) => r.name),
-    );
-    /** The date-typed subset — the partitioning launcher's SUGGESTIONS (a date can also live in a
-     *  VARCHAR column the strptime chain parses, so the full list stays offered). */
-    readonly schemaDateFieldNames = computed(() =>
-        this.schemaSeed()
-            .filter((r) => r.include && ['DATE', 'TIMESTAMP', 'TIMESTAMPTZ'].includes(r.type))
-            .map((r) => r.name),
-    );
 
     // ── segments (asn1 / plugin) ─────────────────────────────────────────────────
 
@@ -712,6 +680,34 @@ export class PipelineParseDefinitionComponent {
     readonly previewTable = signal<ParserTablePreview | null>(null);
     /** Rows for the shared grid; a stable reference, since it rebuilds on identity change. */
     readonly schemaSeed = signal<SchemaFieldRow[]>([]);
+
+    /**
+     * The columns table's "Sample value" column (R11): the FIRST parsed row's value per column, keyed
+     * the way this frontend's selectors address a column (position for delimited/fixedwidth, name
+     * otherwise) so a hydrated schema's rows line up with the sample without a name match.
+     */
+    readonly sampleValues = computed<Record<string, string>>(() => {
+        const p = this.previewTable();
+        const row = p?.rows?.[0];
+        if (!p || !row) return {};
+        const out: Record<string, string> = {};
+        p.columns.forEach((col, i) => {
+            const v = row[col];
+            if (v !== undefined && v !== null) out[deriveSelector(this.frontend(), i, col)] = String(v);
+        });
+        return out;
+    });
+
+    /**
+     * The sink's source-filename column as the columns table's read-only last row (R11) — only while
+     * the checkbox below is on. Its sample value is the captured sample's own file name when the tab
+     * keeps a thread. ⛔ Never a `schemaSeed` row: it is stamped by the sink at write time.
+     */
+    readonly filenameRow = computed<{ name: string; sample: string } | null>(() => {
+        const name = this.filenameColumnTarget()?.value.trim();
+        if (!name) return null;
+        return { name, sample: this.sample()?.sample()?.name ?? '' };
+    });
     readonly schemaLoading = signal(false);
     /** A saved schema was read back, so a fresh parse must NOT re-derive over the operator's edits. */
     private readonly schemaHydrated = signal(false);
@@ -724,19 +720,20 @@ export class PipelineParseDefinitionComponent {
     readonly inferredTypes = signal<string[] | null>(null);
     private typesModeTouched = false;
 
+    /** The "Detect column types" property's two choices (R11) — the mockup's wording over `raw.types`. */
+    readonly typesModeOptions: PickerOption[] = [
+        { value: 'auto', label: 'Automatically from the sample' },
+        { value: 'declared', label: 'I will set them myself' },
+    ];
+
     setTypesMode(mode: 'auto' | 'declared'): void {
         if (mode === this.typesMode()) return;
         this.typesMode.set(mode);
         this.typesModeTouched = true;
         // Entering Auto with a fresh inference re-snapshots the icons; entering Declared keeps
-        // whatever is shown (the inferred set stays offered via the chip, never forced).
+        // whatever is shown — the detected types are already the rows' starting point (R11), so the
+        // operator changes only what they disagree with.
         if (mode === 'auto') this.applyInferredToGrid();
-        this.emitDirty();
-    }
-
-    /** Declared mode's one-click, non-destructive starting point (§4.4). */
-    applySuggestedTypes(): void {
-        this.applyInferredToGrid();
         this.emitDirty();
     }
 
@@ -875,7 +872,9 @@ export class PipelineParseDefinitionComponent {
             this.revealedSchema = true;
             this.editor?.showTab('types');
         }
-        const inferred = this.typesMode() === 'auto' ? this.inferredTypes() : null;
+        // R11: the detected types seed the rows in BOTH modes — Auto keeps them read-only, Declared
+        // unlocks the menu over the same starting point (what "Apply suggested types" used to do).
+        const inferred = this.inferredTypes();
         this.schemaSeed.set(
             p.columns.map((col, i) => ({
                 include: true,
@@ -1010,11 +1009,27 @@ export class PipelineParseDefinitionComponent {
         return grid.fieldRows.controls.map((g) => g.getRawValue() as SchemaFieldRow);
     }
 
-    /** Rows with the metadata grid's description/unit/classification merged on by selector (D1(b)) —
-     *  what persists and exports. The columns table's form does not carry those keys, so skipping the
-     *  merge would silently drop a hydrated schema's metadata on Apply. */
+    /**
+     * Rows with the keys the columns table's form does NOT carry — `description` / `unit` /
+     * `classification` (Catalog-facing, D1(b)) and a hand-authored `timezone_column` — carried through
+     * by SELECTOR from the rows as loaded ({@link schemaSeed}). What persists and exports.
+     *
+     * <p>R11: the metadata grid that used to supply these left the Parse pane (they belong to
+     * Transform), so without this a hydrated schema's metadata would be dropped on Apply and on CSV
+     * export — the same silent-loss shape the grid's merge existed to prevent. A key already present on
+     * the current row wins (the columns table's `value()` merges its seed by index the same way).
+     */
     private withMetadata(rows: SchemaFieldRow[]): SchemaFieldRow[] {
-        return this.metaGrid ? this.metaGrid.applyTo(rows) : rows;
+        const bySelector = new Map(this.schemaSeed().map((r) => [String(r.selector), r]));
+        return rows.map((r) => {
+            const seed = bySelector.get(String(r.selector));
+            if (!seed) return r;
+            const out: SchemaFieldRow = { ...r };
+            for (const k of CARRIED_FIELD_KEYS) {
+                if ((out[k] === undefined || out[k] === '') && seed[k] !== undefined && seed[k] !== '') out[k] = seed[k];
+            }
+            return out;
+        });
     }
 
     /**
@@ -1247,9 +1262,7 @@ export class PipelineParseDefinitionComponent {
             this.parsedSinceApply ||
             (this.editor?.isDirty() ?? false) ||
             (this.segmentsEditor?.isDirty() ?? false) ||
-            (this.schemaGrid?.form.dirty ?? false) ||
-            (this.metaGrid?.form.dirty ?? false) ||
-            (this.partitionsEditor?.form.dirty ?? false);
+            (this.schemaGrid?.form.dirty ?? false);
         if (dirty === this.lastDirty) return;
         this.lastDirty = dirty;
         this.dirtyChange.emit(dirty);
@@ -1469,13 +1482,13 @@ export class PipelineParseDefinitionComponent {
             this.editor?.error.set(grid.problem() ?? 'Fix the output schema before applying.');
             return;
         }
-        if (this.partitionsEditor && !this.partitionsEditor.validate()) {
-            this.editor?.error.set('Every partition segment needs a name (a valid identifier) and a source field.');
-            return;
-        }
-        // The rows travel through this SAME write — before 2026-08-22 the draft carried raw+mapping
-        // only, so overwrite:true silently DROPPED a hand-authored partitions[] on every Apply.
-        const partitions = this.partitionsEditor?.value() ?? this.partitionSeed();
+        // The editing CONTROL moved to the Sink pane (redesign S5, D4) — this pane no longer validates
+        // or reads a live `InspectoSchemaPartitionsEditorComponent`, but the rows still travel through
+        // this SAME write (before 2026-08-22 the draft carried raw+mapping only, so overwrite:true
+        // silently DROPPED a hand-authored partitions[] on every Apply): `partitionSeed` is the last
+        // value read from disk (by `loadSavedSchema`, re-run whenever this pane is (re)opened), which
+        // is exactly what the Sink pane's own write updates.
+        const partitions = this.partitionSeed();
         const fields = this.withMetadata(grid.value());
         const name = this.schemaName();
         // The declared names: what the stored schema says, else the PIPELINE name — never the schema
@@ -1530,8 +1543,6 @@ export class PipelineParseDefinitionComponent {
                     // failure for a schema it had just replaced.
                     this.editor?.error.set('');
                     grid.markPristine();
-                    this.metaGrid?.markPristine();
-                    this.partitionsEditor?.markPristine();
                     this.applyWith(this.parsingValue(), portableConfigRef(name));
                 },
                 error: (e) => {
@@ -1573,6 +1584,9 @@ export class PipelineParseDefinitionComponent {
         this.applied.emit(node);
     }
 }
+
+/** The `raw.fields[]` keys the columns table's form does not model — see `withMetadata`. */
+const CARRIED_FIELD_KEYS = ['description', 'unit', 'classification', 'timezone_column'] as const;
 
 /**
  * The schema BACKWARD save-gate's 422, told apart from every other write failure. Matched on the

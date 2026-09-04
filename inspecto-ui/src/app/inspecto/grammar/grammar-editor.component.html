@@ -36,103 +36,138 @@
     }
 </div>
 
-<!-- ── sample ──────────────────────────────────────────────────────────────── -->
+<!-- ── sample | parsed ─────────────────────────────────────────────────────────
+     S3 (parse-pane redesign): the paste box and the file preview are now ONE textarea (typing clears
+     any captured file bytes — {@link onSampleText}, unchanged), with Upload/Paste/Import/Export above
+     it, and the parsed result moved to an adjacent tab. These are real `mat-tab`s, safe from the R9
+     [hidden]-tab trap because NEITHER tab hosts a form — only the Dialect/Types/Robustness
+     sections below (S2's expansion panels) do. -->
 @if (sampleMode === 'own') {
     <div class="mt-4">
-        <div class="mb-1 flex items-center gap-2">
-            <span class="text-xs font-semibold uppercase opacity-70">Sample</span>
-            <button mat-stroked-button type="button" class="!min-h-0 !py-0 !text-xs" (click)="fileInput.click()">
-                Choose a file
-            </button>
-            <input
-                #fileInput
-                type="file"
-                class="hidden"
-                aria-label="Choose a sample file"
-                (change)="onSampleFile($any($event.target).files)"
-            />
-        </div>
-        <mat-form-field class="w-full" subscriptSizing="dynamic">
-            <textarea
-                matInput
-                rows="6"
-                class="font-mono !text-xs"
-                placeholder="Paste a few lines of your data…"
-                aria-label="Sample content"
-                [value]="sampleText()"
-                (input)="onSampleText($any($event.target).value)"
-            ></textarea>
-        </mat-form-field>
+        <mat-tab-group class="inspecto-sample-tabs" animationDuration="0ms">
+            <mat-tab label="Sample">
+                <div class="mt-3">
+                    <div class="mb-1 flex items-center gap-1">
+                        <button
+                            mat-icon-button
+                            type="button"
+                            aria-label="Upload a sample file"
+                            matTooltip="Upload a sample file"
+                            (click)="fileInput.click()"
+                        >
+                            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:arrow-up-tray"></mat-icon>
+                        </button>
+                        <input
+                            #fileInput
+                            type="file"
+                            class="hidden"
+                            aria-label="Choose a sample file"
+                            (change)="onSampleFile($any($event.target).files)"
+                        />
+                        <button
+                            mat-icon-button
+                            type="button"
+                            aria-label="Paste sample text from the clipboard"
+                            matTooltip="Paste from clipboard"
+                            (click)="pasteSample()"
+                        >
+                            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:clipboard-document"></mat-icon>
+                        </button>
+                        <!-- Import/Export = the existing Grammar CSV round-trip (`grammar-csv.ts`) — the
+                             host projects its own buttons here; the editor has no write path of its own. -->
+                        <ng-content select="[sampleCsvActions]"></ng-content>
+                    </div>
+                    <mat-form-field class="w-full" subscriptSizing="dynamic">
+                        <textarea
+                            matInput
+                            rows="6"
+                            class="font-mono !text-xs"
+                            placeholder="Paste a few lines of your data…"
+                            aria-label="Sample content"
+                            [value]="sampleText()"
+                            (input)="onSampleText($any($event.target).value)"
+                        ></textarea>
+                    </mat-form-field>
+                </div>
+            </mat-tab>
+            <mat-tab label="Parsed">
+                <div class="mt-3">
+                    <ng-container *ngTemplateOutlet="parsedContent" />
+                </div>
+            </mat-tab>
+        </mat-tab-group>
     </div>
 }
 
-<!-- ── properties ──────────────────────────────────────────────────────────── -->
+<!-- ── properties ──────────────────────────────────────────────────────────────
+     No header of its own (R6): the host's section header ("Grammar" on the Parse pane) sits directly
+     above, so the sections follow it without a second stacked heading. -->
 <div class="mt-4">
-    <div class="mb-1 text-xs font-semibold uppercase opacity-70">Options</div>
-    @if (tabs(); as ts) {
-        <!-- Tabbed spec set (delimited, §4.1): the mat-tab-group is the TAB BAR ONLY — the panels
-             live below it, always mounted and [hidden]-toggled. MatTab instantiates a tab's body
-             content on FIRST ACTIVATION, so forms inside the bodies would be invisible to
-             value()/validate() until visited — a save would silently drop unvisited tabs' values
-             (the R9 [hidden]-wrap rule: schema-form ViewChilds must survive, never @if/@case). -->
-        <mat-tab-group [selectedIndex]="activeTab()" (selectedIndexChange)="activeTab.set($event)">
-            @for (t of ts; track t.id; let i = $index) {
-                <!-- S6 a11y: `label` gives the MatTab an accessible name of its own — with only the
-                     ng-template, the tab surfaced in the accessibility tree as an unnamed control
-                     beside its badge spans (found driving the pane; plan §1.5). The template still
-                     renders the visible label + badges. -->
-                <mat-tab [aria-label]="t.label">
-                    <ng-template mat-tab-label>
-                        <span>{{ t.label }}</span>
-                        @if (tabBadges()[i]; as b) {
-                            @if (b.set > 0) {
-                                <span
-                                    class="bg-hover ml-1.5 rounded-full px-1.5 text-xs tabular-nums"
-                                    [attr.aria-label]="b.set + ' options set'"
-                                    >{{ b.set }}</span
-                                >
+    @if (sections(); as secs) {
+        <!-- S2 (parse-pane redesign): sectioned spec set (delimited/json/fixedwidth/xlsx) renders as
+             collapsible mat-expansion-panels instead of mat-tab-group. Each panel's content is placed
+             DIRECTLY (never `<ng-template matExpansionPanelContent>`, Material's own lazy-content
+             mechanism) so Angular Material keeps it MOUNTED whether the panel is open or collapsed —
+             replacing the old R9 [hidden]-tab-panel hack (MatTab instantiated a tab body only on first
+             activation, so an unvisited tab's form was invisible to value()/validate() and a save
+             could silently drop it). grammar-editor.component.spec.ts proves the mounting theory: a
+             value typed into a COLLAPSED, never-opened section survives value() and a save round-trip. -->
+        <mat-accordion multi="true">
+            @for (s of secs; track s.id; let i = $index) {
+                <mat-expansion-panel
+                    [expanded]="isExpanded(s.id)"
+                    (opened)="setExpanded(s.id, true)"
+                    (closed)="setExpanded(s.id, false)"
+                >
+                    <mat-expansion-panel-header>
+                        <mat-panel-title [attr.aria-label]="s.label">
+                            <span>{{ s.label }}</span>
+                            @if (sectionBadges()[i]; as b) {
+                                @if (b.set > 0) {
+                                    <span
+                                        class="bg-hover ml-1.5 rounded-full px-1.5 text-xs tabular-nums"
+                                        [attr.aria-label]="b.set + ' options set'"
+                                        >{{ b.set }} changed</span
+                                    >
+                                }
+                                @if (b.invalid) {
+                                    <span class="text-warn ml-1" aria-label="This section has an invalid value"
+                                        >⚠</span
+                                    >
+                                }
                             }
-                            @if (b.invalid) {
-                                <span class="text-warn ml-1" aria-label="This tab has an invalid value">⚠</span>
-                            }
-                        }
-                    </ng-template>
-                </mat-tab>
+                        </mat-panel-title>
+                    </mat-expansion-panel-header>
+                    <!-- One FLAT schema-form per section (R1–R3): the panel is the only disclosure, every
+                         tier renders in one single column, in tier order. -->
+                    <inspecto-schema-form
+                        [specs]="s.specs"
+                        [initial]="seedValue()"
+                        [flat]="true"
+                        (submitted)="submitted.emit()"
+                    />
+                    @if (s.id === 'dialect' && !pluginDef() && frontend() === 'fixedwidth') {
+                        <ng-container *ngTemplateOutlet="fwSliceTable" />
+                    }
+                    @if (s.id === 'types') {
+                        <!-- Host-owned write-path content (the drawer's columns table). -->
+                        <ng-content select="[tabTypes]"></ng-content>
+                    }
+                    @if (s.id === 'robustness') {
+                        <div class="mt-3">
+                            <inspecto-alert variant="info">
+                                Unparseable rows are never dropped: they land in the rejects ledger. The
+                                <em>rejected</em> chip after Test parse counts them.
+                            </inspecto-alert>
+                        </div>
+                    }
+                </mat-expansion-panel>
             }
-        </mat-tab-group>
-        @for (t of ts; track t.id; let i = $index) {
-            <div class="pt-3" [class.hidden]="activeTab() !== i" role="tabpanel" [attr.aria-label]="t.label">
-                <inspecto-schema-form [specs]="t.specs" [initial]="seedValue()" (submitted)="submitted.emit()" />
-                @if (t.id === 'dialect' && !pluginDef() && frontend() === 'fixedwidth') {
-                    <ng-container *ngTemplateOutlet="fwSliceTable" />
-                }
-                @if (t.id === 'types') {
-                    <!-- Host-owned write-path content (the drawer's columns table). -->
-                    <ng-content select="[tabTypes]"></ng-content>
-                }
-                @if (t.id === 'robustness') {
-                    <div class="mt-3">
-                        <inspecto-alert variant="info">
-                            Unparseable rows are never dropped: they land in the rejects ledger. The
-                            <em>rejected</em> chip after Test parse counts them.
-                        </inspecto-alert>
-                    </div>
-                }
-                @if (t.id === 'files') {
-                    <ng-content select="[tabFiles]"></ng-content>
-                    <div class="mt-3">
-                        <inspecto-alert variant="info">
-                            Which files are read is configured on this pipeline's Collection step.
-                        </inspecto-alert>
-                    </div>
-                }
-            </div>
-        }
+        </mat-accordion>
     } @else {
-        <inspecto-schema-form [specs]="specs()" [initial]="seedValue()" (submitted)="submitted.emit()" />
-        <!-- Untabbed formats still render the hosts' slotted content — below the flat form. -->
+        <inspecto-schema-form [specs]="specs()" [initial]="seedValue()" [flat]="true" (submitted)="submitted.emit()" />
+        <!-- Unsectioned formats still render the host's slotted content — below the flat form. -->
         <ng-content select="[tabTypes]"></ng-content>
-        <ng-content select="[tabFiles]"></ng-content>
     }
 </div>
 
@@ -195,7 +230,7 @@
         <button mat-stroked-button type="button" class="mt-2 !text-xs" (click)="addField()">Add field</button>
     </div>
 </ng-template>
-@if (!pluginDef() && frontend() === 'fixedwidth' && !tabs()) {
+@if (!pluginDef() && frontend() === 'fixedwidth' && !sections()) {
     <ng-container *ngTemplateOutlet="fwSliceTable" />
 }
 
@@ -228,46 +263,75 @@
 }
 
 <!-- ── result ──────────────────────────────────────────────────────────────── -->
-@if (preview(); as p) {
-    <div class="mt-4">
-        <div class="mb-1 flex items-center gap-3">
-            <span class="text-xs font-semibold uppercase opacity-70">Parsed</span>
-            <span class="text-secondary text-xs">{{ activeType() }}</span>
-            @if (p.kind === 'table') {
-                <inspecto-chip variant="soft">{{ p.columns.length }} columns</inspecto-chip>
-                <inspecto-chip variant="soft">{{ p.rowCount }} rows</inspecto-chip>
-                @if (p.rejectedRows > 0) {
-                    <inspecto-chip variant="outline">{{ p.rejectedRows }} rejected</inspecto-chip>
-                }
-            } @else {
-                <inspecto-chip variant="soft">{{ p.recordCount }} records</inspecto-chip>
-            }
+<!-- `own` mode renders this inside the Parsed tab above; `host` mode (no tabs — the host owns the
+     sample UI outside this component entirely) renders it here, unchanged from before S3 except for
+     the page-size selector. -->
+@if (sampleMode !== 'own') {
+    <ng-container *ngTemplateOutlet="parsedContent" />
+}
 
-            @if (sampleTree()) {
-                <mat-button-toggle-group
-                    [value]="resultView()"
-                    (change)="resultView.set($event.value)"
-                    aria-label="Result view"
-                    class="ml-auto"
-                >
-                    <mat-button-toggle value="table">Table</mat-button-toggle>
-                    <mat-button-toggle value="tree">Tree</mat-button-toggle>
-                </mat-button-toggle-group>
+<ng-template #parsedContent>
+    @if (preview(); as p) {
+        <div class="mt-4">
+            <div class="mb-1 flex flex-wrap items-center gap-3">
+                <span class="text-xs font-semibold uppercase opacity-70">Parsed</span>
+                <span class="text-secondary text-xs">{{ activeType() }}</span>
+                @if (p.kind === 'table') {
+                    <inspecto-chip variant="soft">{{ p.columns.length }} columns</inspecto-chip>
+                    <inspecto-chip variant="soft">{{ p.rowCount }} rows</inspecto-chip>
+                    @if (p.rejectedRows > 0) {
+                        <inspecto-chip variant="outline">{{ p.rejectedRows }} rejected</inspecto-chip>
+                    }
+                } @else {
+                    <inspecto-chip variant="soft">{{ p.recordCount }} records</inspecto-chip>
+                }
+
+                @if (sampleTree()) {
+                    <mat-button-toggle-group
+                        [value]="resultView()"
+                        (change)="resultView.set($event.value)"
+                        aria-label="Result view"
+                        class="ml-auto"
+                    >
+                        <mat-button-toggle value="table">Table</mat-button-toggle>
+                        <mat-button-toggle value="tree">Tree</mat-button-toggle>
+                    </mat-button-toggle-group>
+                }
+
+                @if (p.kind === 'table') {
+                    <!-- S3: page size 10/25/50/100, default 10. A grid-toolbar page-size control stays a
+                         plain mat-select per the angular-ui skill's own exception list. -->
+                    <mat-form-field subscriptSizing="dynamic" class="w-24" [class.ml-auto]="!sampleTree()">
+                        <mat-label>Page size</mat-label>
+                        <mat-select
+                            [value]="pageSize()"
+                            (selectionChange)="pageSize.set($event.value)"
+                            aria-label="Rows per page"
+                        >
+                            @for (n of pageSizeOptions; track n) {
+                                <mat-option [value]="n">{{ n }}</mat-option>
+                            }
+                        </mat-select>
+                    </mat-form-field>
+                }
+            </div>
+
+            @if (treeNodes(); as nodes) {
+                <app-parser-tree [nodes]="nodes" />
+            } @else if (sampleTree() && resultView() === 'tree') {
+                <app-parser-tree [nodes]="sampleTree()!" />
+            } @else {
+                <inspecto-data-table
+                    tier="pro"
+                    sourceName="parsed"
+                    exportName="parsed-sample"
+                    [autoHeight]="true"
+                    [rows]="rows()"
+                    [pageSize]="pageSize()"
+                />
             }
         </div>
-
-        @if (treeNodes(); as nodes) {
-            <app-parser-tree [nodes]="nodes" />
-        } @else if (sampleTree() && resultView() === 'tree') {
-            <app-parser-tree [nodes]="sampleTree()!" />
-        } @else {
-            <inspecto-data-table
-                tier="pro"
-                sourceName="parsed"
-                exportName="parsed-sample"
-                [autoHeight]="true"
-                [rows]="rows()"
-            />
-        }
-    </div>
-}
+    } @else {
+        <p class="text-secondary m-0 mt-2 text-sm">Parse a sample to see results here.</p>
+    }
+</ng-template>
