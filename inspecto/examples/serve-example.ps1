@@ -73,6 +73,9 @@ try {
         '--enable-native-access=ALL-UNNAMED',
         "-Dcontrol.port=$Port",
         "-Dservice.poll.seconds=$PollSeconds",
+        # Path-jail roots (PKG-6): single-tenant serve over "." registers no space base, so
+        # -Dassist.safety.roots is the only source of allowed roots; the example dir IS the root.
+        "-Dassist.safety.roots=$((Get-Location).Path)",
         '-Dassist.write.root=out/write',
         '-Djobs.audit.dir=out/jobs_audit',
         '-cp', $jar,

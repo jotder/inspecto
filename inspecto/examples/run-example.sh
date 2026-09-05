@@ -33,7 +33,10 @@ echo "Running '$EX'"
 echo "  jar:    $JAR"
 echo "  config: $DIR/pipeline.toon"
 echo
-java --enable-native-access=ALL-UNNAMED -jar "$JAR" pipeline.toon
+# Path-jail roots (PKG-6): the one-shot CollectorProcessor runs no space discovery, so
+# -Dassist.safety.roots is the ONLY source of allowed roots, and a pipeline carrying a schema_file:
+# ref dies with "no allowed roots configured" without it. The example dir IS the root.
+java --enable-native-access=ALL-UNNAMED "-Dassist.safety.roots=$(pwd)" -jar "$JAR" pipeline.toon
 code=$?
 echo
 echo "Exit code: $code"

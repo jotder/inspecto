@@ -52,7 +52,9 @@ try {
     Write-Host "Running '$Example'" -ForegroundColor Cyan
     Write-Host "  jar:    $jar"
     Write-Host "  config: $pipeline`n"
-    & java --enable-native-access=ALL-UNNAMED -jar $jar 'pipeline.toon'
+    # Path-jail roots (PKG-6): the one-shot CollectorProcessor runs no space discovery, so
+    # -Dassist.safety.roots is the ONLY source of allowed roots; the example dir IS the root.
+    & java --enable-native-access=ALL-UNNAMED "-Dassist.safety.roots=$((Get-Location).Path)" -jar $jar 'pipeline.toon'
     $code = $LASTEXITCODE
     Write-Host "`nExit code: $code"
     if (Test-Path 'out/database') {

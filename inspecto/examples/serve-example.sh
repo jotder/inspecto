@@ -59,7 +59,10 @@ trap cleanup EXIT INT TERM
 echo "Starting Inspecto serve mode on $BASE (poll ${POLL}s)"
 echo "  jar:    $JAR"
 echo "  config: $DIR"
+# Path-jail roots (PKG-6): single-tenant serve over "." registers no space base, so
+# -Dassist.safety.roots is the only source of allowed roots; the example dir IS the root.
 java --enable-native-access=ALL-UNNAMED -Dcontrol.port="$PORT" -Dservice.poll.seconds="$POLL" \
+     "-Dassist.safety.roots=$(pwd)" \
      -Dassist.write.root=out/write -Djobs.audit.dir=out/jobs_audit -cp "$JAR" com.gamma.control.ControlApi . \
      >out/logs/serve.out.log 2>out/logs/serve.err.log &
 SRV_PID=$!
