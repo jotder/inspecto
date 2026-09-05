@@ -224,3 +224,10 @@ body.dark {
     --mdc-checkbox-state-layer-size: 28px;
     --mat-checkbox-state-layer-size: 28px;
 }
+
+/* Native form controls (<select> option lists, scrollbars, date pickers) are painted by the BROWSER from its
+ * own palette, and that palette is light unless the page declares `color-scheme`. Nothing here did, so an open
+ * native <select> in the transform grid rendered a white list with the OS blue highlight against the dark
+ * pane. Follow the scheme class the layout component sets on <body>. */
+body.light { color-scheme: light; }
+body.dark  { color-scheme: dark; }
