@@ -1,0 +1,37 @@
+name: STEP_JOIN
+active: true
+version: 1
+
+dirs:
+  poll:       out/inbox
+  database:   out/orders/database
+  backup:     out/orders/backup
+  temp:       out/orders/temp
+  errors:     out/orders/errors
+  quarantine: out/orders/quarantine
+  markers:    out/orders/markers
+  status_dir: out/orders/status
+  log_dir:    out/orders/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+  schema_file: "schema.toon"
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+output_store: rollup
+
+steps[1]:
+  - join:
+      reference: ref/region_dim.csv
+      on[1]: REGION

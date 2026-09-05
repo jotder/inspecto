@@ -1,0 +1,17 @@
+# Per-example Control API probes for serve-example.{ps1,sh}.
+# One endpoint path per line; blank lines and lines starting with '#' are ignored.
+#
+# STEP: dedup (transform.dedup) — RECORD-grain dedup by business key, keeping one row per key.
+#   steps[1]: - dedup: { keys[1]: ORDER_ID, order_by: "ORDER_DATE DESC" }
+# Not file dedup (that is the Collect step's duplicate_check / duplicate: policy). Implemented as
+# ROW_NUMBER() OVER (PARTITION BY keys ORDER BY order_by): the first row per key is kept, the rest
+# become a counted `duplicate` relation. Day 2 re-sends orders 1002, 1004 and 1001 with newer dates
+# (a status change), so 12 rows land and the rollup holds 9 unique orders — the NEWEST version of each.
+# An optional scope: (a time window) turns this into a cross-Consignment dedup backed by a durable ledger.
+#
+# Expected evidence after the run:
+#   /jobs shows dedup_rollup type PIPELINE with lastStatus SUCCESS; /jobs/dedup_rollup/runs shows the run
+#   record naming the rows the Step produced into store(s) [rollup]. On disk: out/rollup/*.parquet.
+#   The job can also be fired by hand: POST /jobs/dedup_rollup/trigger.
+/jobs
+/jobs/dedup_rollup/runs

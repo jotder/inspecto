@@ -1,0 +1,40 @@
+name: STEP_ROUTE
+active: true
+version: 1
+
+dirs:
+  poll:       out/inbox
+  database:   out/orders/database
+  backup:     out/orders/backup
+  temp:       out/orders/temp
+  errors:     out/orders/errors
+  quarantine: out/orders/quarantine
+  markers:    out/orders/markers
+  status_dir: out/orders/status
+  log_dir:    out/orders/logs
+
+output:
+  format: CSV
+
+sinks[2]{database,format}:
+  out/orders_domestic,CSV
+  out/orders_other,CSV
+
+route:
+  mode: case
+  default: other
+  branches[2]{key,where,database}:
+    domestic,"REGION IN ('NORTH', 'SOUTH')",out/orders_domestic
+    other,"REGION IN ('EAST', 'WEST')",out/orders_other
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+  schema_file: "schema.toon"
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"

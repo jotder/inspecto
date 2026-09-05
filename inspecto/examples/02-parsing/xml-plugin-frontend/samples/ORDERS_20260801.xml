@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed>
+  <order id="A1">
+    <customer><name>Ada</name></customer>
+    <placed>2026-08-01</placed>
+    <total>129.90</total>
+    <lines><line>WIDGET</line><line>GIZMO</line></lines>
+  </order>
+  <order id="A2">
+    <customer><name>Bo</name></customer>
+    <placed>2026-08-01</placed>
+    <total>24.50</total>
+  </order>
+  <refund id="R9"><placed>2026-08-02</placed><total>9.99</total></refund>
+  <order id="A3">
+    <customer><name>Cy</name></customer>
+    <placed>2026-08-02</placed>
+    <total>75.00</total>
+  </order>
+</feed>

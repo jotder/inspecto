@@ -1,0 +1,16 @@
+# Per-example Control API probes for serve-example.{ps1,sh}.
+# One endpoint path per line; blank lines and lines starting with '#' are ignored.
+#
+# STEP: summarize (transform.summarize) — a GROUP BY rollup with algebraically-composable measures.
+#   steps[1]: - summarize: { group_by[1]: REGION, measures[3]: count, "sum(GROSS)", "max(UNIT_PRICE)" }
+# Measures speak the ONE measure grammar the BI query and a materialize job also use:
+# `count` | agg(field) with agg in count, countDistinct, sum, avg, min, max. Result columns are the
+# stable `agg_field` ids (count, sum_gross, max_unit_price). group_by is optional — omit it for one
+# grand-total row. 8 orders roll up to 4 REGION rows.
+#
+# Expected evidence after the run:
+#   /jobs shows summarize_rollup type PIPELINE with lastStatus SUCCESS; /jobs/summarize_rollup/runs shows the run
+#   record naming the rows the Step produced into store(s) [rollup]. On disk: out/rollup/*.parquet.
+#   The job can also be fired by hand: POST /jobs/summarize_rollup/trigger.
+/jobs
+/jobs/summarize_rollup/runs

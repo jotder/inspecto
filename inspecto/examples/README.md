@@ -4,11 +4,11 @@ A growing set of **self-contained, runnable** example pipelines. Each one ships 
 sample data, runs offline with a single command, and writes **only** under its own `out/`
 directory — so you can run, inspect, delete `out/`, and re-run freely without touching anything else.
 
-> **Status:** this catalog is being built out feature-by-feature. The examples below are the
-> Stage-1 ingest / parsing / schema / output core (all verified end-to-end). Acquisition, jobs,
-> authored flows, Stage-2 enrichment, and operational-intelligence examples — plus an
-> `_reference/` set of shape-correct templates for features that need external infra (SFTP/FTP/DB
-> connections) or aren't runnable offline — are landing in subsequent batches.
+> **Status:** the Stage-1 ingest / parsing / schema / output core, the serve-mode acquisition and
+> job examples, and — since 2026-09-06 — **one runnable example per Step kind** (`07-steps/`, plus
+> the three parse frontends that were missing under `02-parsing/`). Every example below is verified
+> end to end. Still to come: authored-flow and Stage-2 enrichment serve examples, and a `_reference/`
+> set of shape-correct templates for features that need external infra (SFTP/FTP/DB connections).
 
 ## How to run
 
@@ -46,6 +46,9 @@ git-ignored.
 | **02-parsing/fixedwidth** | Fixed-width text via an external `grammar.toon` (`frontend: fixedwidth`, column slices by start/length). | `… 02-parsing/fixedwidth` |
 | **02-parsing/json-frontend** | NDJSON input (`frontend: json`, `json.format: newline`) — one JSON object per line, columns bound by JSON key (`raw.fields[].selector`). | `… 02-parsing/json-frontend` |
 | **02-parsing/text-regex-frontend** | Free-text log lines matched against a named-capture-group regex (`frontend: text_regex`) — lines that don't match (a banner + a footer line) are dropped, not fatal. | `… 02-parsing/text-regex-frontend` |
+| **02-parsing/xlsx-frontend** | An Excel workbook sheet (`frontend: xlsx`): `sheet`, a cell `range`, `header: true`, `normalize_names` so the header cells become the `raw.fields[].selector` names. Runs through DuckDB's `excel` extension, loaded from the local extension cache (`~/.duckdb`) or `-Dduckdb.extension.dir`. | `… 02-parsing/xlsx-frontend` |
+| **02-parsing/asn1-frontend** | BER-encoded records decoded against an inline X.680 module (`frontend: asn1`: `grammar`, `root_type`, `segments`). Each record type is a **segment** with its own schema; `raw.fields[].selector` is a dotted path into the decoded record (`party.number`). A record of an undeclared type (the `smsRecord`) is counted as junk, not an error. | `… 02-parsing/asn1-frontend` |
+| **02-parsing/xml-plugin-frontend** | The **custom-plugin** parse family (`frontend: plugin`): a deployed `StreamingFileIngester` named by class — here the shipped `XmlRecordIngester` — with `segments` (one schema per record element) and its own `ingester_config` (`record_element: order`). Selectors address attributes (`@id`) and nested elements (`customer.name`); the `<refund>` element is junk, not a reject. The same block wires any plugin jar on the classpath. | `… 02-parsing/xml-plugin-frontend` |
 | **03-schema-transform/expr-transform** | Per-record `EXPR` transforms: `UPPER(TRIM(...))` and a derived `GROSS = ROUND(net*1.1, 2)` column. | `… 03-schema-transform/expr-transform` |
 | **03-schema-transform/reject-routing** | Structurally-bad rows (wrong column count) are split out to `out/errors/*_errors.csv` while good rows still land in `out/database/`. | `… 03-schema-transform/reject-routing` |
 | **04-output/csv-output** | Switch the sink to `format: CSV` (vs the default Parquet+snappy), same Hive partition layout. | `… 04-output/csv-output` |
@@ -57,6 +60,41 @@ git-ignored.
 | **06-serve/job-on-commit** | A **job triggered by a pipeline commit** (`heartbeat_job.toon` with `on_pipeline: sales_pipeline`). When the pipeline commits, JobService runs the maintenance/heartbeat job; `/jobs` and `/jobs/{name}/runs` show the SUCCESS run. | `serve-example 06-serve/job-on-commit --demo` |
 | **06-serve/maintenance-library** | The **PIP-7 maintenance job library + PIP-6 job templates**: a parameterized `retention-sweep` template (`*_job_template.toon`) instantiated twice (backup 30d, quarantine 14d with a cron override), plus `ledger_prune` (forget old fingerprints — deliberate), `db_maintenance` (CHECKPOINT/VACUUM the ledger DB), and `compact` (merge small per-batch Parquet files per partition, quiet-window + crash-journal safe). `/jobs` lists all six resolved jobs. | `serve-example 06-serve/maintenance-library --demo` |
 | **06-serve/pipeline-job** | An **authored Pipeline run as a `type: pipeline` job** (`PipelineJobRunner`): the ingest pipeline lands SALES Parquet; a pre-authored flow (`write/flows/`, seeded into the engine write root) filters `AMOUNT >= 50` from that store into a new `rollup` store when the commit event fires the job. `/jobs/sales_rollup/runs` shows the SUCCESS run; also manually triggerable via `POST /jobs/sales_rollup/trigger`. | `serve-example 06-serve/pipeline-job --demo` |
+
+## Step catalog — one runnable example per Step kind (`07-steps/`)
+
+A pipeline is a chain of **Steps**: `collect → parse → (map) → transform steps… → sink`. The palette
+offers fifteen Step kinds (`step-types.contract.json`); every one has a worked example below. Two lanes
+matter for how you run them:
+
+- **Ingest lane** — `collect`, every `parse` frontend, `route` and `sink` execute in the poll cycle, so
+  the one-shot batch runner (`run-example`) shows them.
+- **At rest** — `filter`, `dedup`, `join`, `summarize` and `sql` are authored as the pipeline's
+  `steps[n]:` chain with a top-level `output_store:`; the engine runs that chain **over the landed
+  store** through a `type: pipeline` Job (`pipeline_config: <the same file>`, `on_pipeline: <id>`,
+  `data_dir: out`) each time the pipeline commits. That needs the poll loop and the JobService, so
+  those five are serve-mode examples (`serve-example … --demo`): the ingest lands `out/orders/`, the
+  Job fires on commit, and the Step's result lands in `out/rollup/`. Each `probes.txt` states the
+  expected row count. A `route` step is the exception the other way: it lives on the ingest lane
+  (each branch pairs with its own `sinks[]` destination), so the at-rest lift refuses it.
+
+| Step (verb → node type) | What it does · the keys it takes | Example | Run |
+|---|---|---|---|
+| **collect** → `acquisition` | Discovers files for the pipeline: `collector.connector` (`local` here; a saved Connection otherwise), `discovery: poll`, `include[]`/`exclude[]` patterns that override `processing.file_pattern`, `recursive_depth`, `gap_detection` over a numbered series, plus the marker-based `duplicate_check`. The draft file and `notes.txt` are left in the inbox; the file under `archive/` is found by recursion. | `07-steps/collect` | `run-example 07-steps/collect` |
+| **parse** → `parser.delimited` | CSV-like text: `parsing.delimited` (`delimiter`, `quote`, `has_header`, `null_strings`, `date_formats`). | `01-ingest/hello-csv`, `02-parsing/pipe-delimited`, `02-parsing/no-header` | `run-example 01-ingest/hello-csv` |
+| **parse** → `parser.fixedwidth` | Positional slices per record (`fixedwidth.fields[]{name,start,length}`). | `02-parsing/fixedwidth` | `run-example 02-parsing/fixedwidth` |
+| **parse** → `parser.json` | NDJSON or a JSON array (`json.format`, `records_path`); top-level keys are the selectors. | `02-parsing/json-frontend` | `run-example 02-parsing/json-frontend` |
+| **parse** → `parser.text_regex` | Named capture groups over free text; non-matching lines are dropped. | `02-parsing/text-regex-frontend` | `run-example 02-parsing/text-regex-frontend` |
+| **parse** → `parser.xlsx` | A workbook sheet via `read_xlsx` (`sheet`, `range`, `header`). | `02-parsing/xlsx-frontend` | `run-example 02-parsing/xlsx-frontend` |
+| **parse** → `parser.asn1` | BER/DER against an X.680 grammar, one segment schema per record type. | `02-parsing/asn1-frontend` | `run-example 02-parsing/asn1-frontend` |
+| **parse** → `parser.plugin` | Any deployed `StreamingFileIngester` by class, with `segments` + `ingester_config`. | `02-parsing/xml-plugin-frontend` | `run-example 02-parsing/xml-plugin-frontend` |
+| **transform** → `transform.filter` | `where:` — a SQL predicate over the typed, mapped columns; dropped rows are a counted reject relation. 8 in → 4 out. | `07-steps/filter` | `serve-example 07-steps/filter --demo` |
+| **dedup** → `transform.dedup` | `keys[]` + optional `order_by` (+ `scope:` for a cross-Consignment window): one row per business key, newest first. 12 in → 9 out. | `07-steps/dedup` | `serve-example 07-steps/dedup --demo` |
+| **join** → `transform.join` | `reference:` (a path, or `reference/<pipeline>`) + `on[]`: a LEFT JOIN, unmatched keys keep NULL reference columns. 8 in → 8 out, 6 enriched. | `07-steps/join` | `serve-example 07-steps/join --demo` |
+| **sql** → `transform.sql` | `sql:` — one SELECT over `input` (the Record Transformer; the editor's Fields grid compiles to the same key). 8 in → 7 out, two derived columns. | `07-steps/sql` | `serve-example 07-steps/sql --demo` |
+| **summarize** → `transform.summarize` | `group_by[]` + `measures[]` in the one measure grammar (`count`, `sum(GROSS)`, `max(UNIT_PRICE)`). 8 in → 4 groups. | `07-steps/summarize` | `serve-example 07-steps/summarize --demo` |
+| **route** → `transform.route` | `route: {mode: case, default, branches[]{key,where,database}}` paired with `sinks[]{database,format}` by `database`; first match wins, the default catches the rest (the unknown `CENTRAL` region lands in `other`). | `07-steps/route` | `run-example 07-steps/route` |
+| **sink** → `sink.persistent` | `output: {format, compression, filename_column}` (or `sinks[]` for several): the resting store, Hive-partitioned by the schema's `partitionKey`. `filename_column: SOURCE_FILE` stamps each row with the file it came from. | `07-steps/sink` | `run-example 07-steps/sink` |
 
 ## Serve-mode examples — `serve-example.{ps1,sh}`
 
@@ -96,6 +134,14 @@ Stage-2 enrichment serve examples are landing in subsequent batches.
 
 ## Things worth knowing (learned the hard way)
 
+- **A `steps[n]:` chain does not run in the one-shot batch.** Stage-1 (collect → parse → map → sink)
+  lands the store; the chain runs **at rest** over that store through a `type: pipeline` Job with
+  `pipeline_config:` + `output_store:` — see the Step catalog above. A chain with no `output_store:`
+  refuses to lift, and the JobService warns about an active pipeline whose chain no Job runs.
+- **Both runners declare the path-jail root** (`-Dassist.safety.roots=<example dir>`, the PKG-6 rule
+  the bundle's `run.sh` follows). Without it every example carrying a `schema_file:` ref dies with
+  *"no allowed roots configured"* — which is exactly how the whole suite broke between 2026-08-28 and
+  2026-09-06 without a test noticing.
 - **A `DATE`/`TIMESTAMP` column requires `date_formats`/`timestamp_formats`** in `csv_settings` (or
   the grammar). Leaving them empty makes the generated SQL fail. Use ISO dates (`%Y-%m-%d`) for the
   simplest case.

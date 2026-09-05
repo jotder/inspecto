@@ -1,0 +1,15 @@
+# Per-example Control API probes for serve-example.{ps1,sh}.
+# One endpoint path per line; blank lines and lines starting with '#' are ignored.
+#
+# STEP: filter (transform.filter) — keep or drop rows by a SQL predicate over the TYPED, mapped columns.
+#   steps[1]: - filter: { where: "STATUS = 'SHIPPED' AND GROSS >= 30" }
+# The predicate speaks the OUTPUT vocabulary (GROSS is a mapped, derived column), because an explicit
+# steps: filter runs POST-map. Dropped rows are a counted reject relation, never silently lost.
+# 8 rows land in the orders store; the rollup keeps the 4 SHIPPED orders worth >= 30.
+#
+# Expected evidence after the run:
+#   /jobs shows filter_rollup type PIPELINE with lastStatus SUCCESS; /jobs/filter_rollup/runs shows the run
+#   record naming the rows the Step produced into store(s) [rollup]. On disk: out/rollup/*.parquet.
+#   The job can also be fired by hand: POST /jobs/filter_rollup/trigger.
+/jobs
+/jobs/filter_rollup/runs

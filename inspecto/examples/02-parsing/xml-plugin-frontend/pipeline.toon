@@ -1,0 +1,36 @@
+name: PARSE_XML_PLUGIN
+active: true
+version: 1
+
+dirs:
+  poll:       out/inbox
+  database:   out/order/database
+  backup:     out/order/backup
+  temp:       out/order/temp
+  errors:     out/order/errors
+  quarantine: out/order/quarantine
+  markers:    out/order/markers
+  status_dir: out/order/status
+  log_dir:    out/order/logs
+
+output:
+  format: CSV
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.xml"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+  csv_settings:
+    date_formats[1]: "%Y-%m-%d"
+
+parsing:
+  frontend: plugin
+  plugin:
+    ingester: com.gamma.ingester.XmlRecordIngester
+    segments:
+      order: order_schema.toon
+    ingester_config:
+      record_element: order
+      namespace_aware: false

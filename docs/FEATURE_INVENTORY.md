@@ -275,7 +275,8 @@ the rest are planned in subsequent phases. Features that can't run offline (remo
 `[PROPOSED]` frontends, custom-class plugins, RCA) ship as labeled `_reference/` templates.
 
 **A. Ingest** — hello-csv `[done]` · multi-source · active-gate.
-**B. Parsing** — pipe-delimited `[done]`, no-header `[done]`, compressed-gzip `[done]`, fixedwidth `[done]`; csv (duckdb engine), sqlplus-dump (java engine), fixedwidth-binary `[ref/plugin]`, plugin-segments `[ref/plugin]`, multi-schema-dispatch.
+**B. Parsing** — pipe-delimited `[done]`, no-header `[done]`, compressed-gzip `[done]`, fixedwidth `[done]`, json-frontend `[done]`, text-regex-frontend `[done]`, xlsx-frontend `[done 2026-09-06]`, asn1-frontend `[done 2026-09-06]`, xml-plugin-frontend `[done 2026-09-06]` (the `parser.plugin` family, wired to the shipped `XmlRecordIngester`); csv (duckdb engine), sqlplus-dump (java engine), fixedwidth-binary `[ref/plugin]`, multi-schema-dispatch.
+**E. Steps** `[done 2026-09-06]` — `examples/07-steps/`: one example per Step kind of `step-types.contract.json` — collect · route · sink one-shot; filter · dedup · join · summarize · sql at rest through an on-commit `type: pipeline` Job (`serve-example … --demo`). The README's Step catalog maps all 15 kinds to an example.
 **C. Schema & transforms** — expr-transform `[done]`, reject-routing `[done]`; type-casting, concat-dt, filename-date.
 **D. Output** — csv-output `[done]`; parquet-compression (snappy/zstd/gzip), large-file-chunking.
 **E. Acquisition** — stability-gate, dedup-path, dedup-checksum, incremental-watermark, gap-detection; sftp-with-retry `[ref]`, post-action-move `[ref]`.

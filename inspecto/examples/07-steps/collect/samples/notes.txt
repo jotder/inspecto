@@ -1,0 +1,1 @@
+Not a feed file: the include pattern never matches it, so it stays in the inbox untouched.

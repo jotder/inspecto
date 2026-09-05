@@ -1,0 +1,17 @@
+partitionKey: CATEGORY
+raw:
+  name: INVENTORY
+  format: CSV
+  fields[4]{name,selector,type}:
+    ITEM_NAME,"item_name",VARCHAR
+    QTY_ON_HAND,"qty_on_hand",DOUBLE
+    UNIT_PRICE,"unit_price",DOUBLE
+    CATEGORY,"category",VARCHAR
+mapping:
+  canonicalName: inventory
+  rawName: INVENTORY
+  fields[4]{name,from,fn}:
+    ITEM_NAME,ITEM_NAME,keep
+    QTY_ON_HAND,QTY_ON_HAND,keep
+    UNIT_PRICE,UNIT_PRICE,keep
+    CATEGORY,CATEGORY,keep

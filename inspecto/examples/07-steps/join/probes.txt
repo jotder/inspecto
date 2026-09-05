@@ -1,0 +1,18 @@
+# Per-example Control API probes for serve-example.{ps1,sh}.
+# One endpoint path per line; blank lines and lines starting with '#' are ignored.
+#
+# STEP: join (transform.join) — enrich rows from a Reference Dataset by key.
+#   steps[1]: - join: { reference: ref/region_dim.csv, on[1]: REGION }
+# `reference` is either a path (CSV/Parquet, as here) or `reference/<pipeline>` to bind a versioned
+# reference store by name. Always a LEFT JOIN through USING(REGION): an unmatched key keeps its row
+# with NULL reference columns (WEST is deliberately missing from region_dim.csv), so nothing is
+# silently dropped. The rollup gains ZONE and REGION_NAME on 6 of the 8 orders.
+# Mid-branch (inside route:) a join is refused — the ingest walk carries no reference resolver — so
+# a join lives at rest, exactly as here.
+#
+# Expected evidence after the run:
+#   /jobs shows join_rollup type PIPELINE with lastStatus SUCCESS; /jobs/join_rollup/runs shows the run
+#   record naming the rows the Step produced into store(s) [rollup]. On disk: out/rollup/*.parquet.
+#   The job can also be fired by hand: POST /jobs/join_rollup/trigger.
+/jobs
+/jobs/join_rollup/runs

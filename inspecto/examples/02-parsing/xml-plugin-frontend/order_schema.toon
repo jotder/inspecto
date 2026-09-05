@@ -1,0 +1,17 @@
+partitionKey: EVENT_DATE
+raw:
+  name: order
+  format: CSV
+  fields[4]{name,selector,type}:
+    ORDER_ID,"@id",VARCHAR
+    CUSTOMER,"customer.name",VARCHAR
+    EVENT_DATE,"placed",DATE
+    TOTAL,"total",DOUBLE
+mapping:
+  canonicalName: order
+  rawName: order
+  fields[4]{name,from,fn}:
+    ORDER_ID,ORDER_ID,keep
+    CUSTOMER,CUSTOMER,keep
+    EVENT_DATE,EVENT_DATE,keep
+    TOTAL,TOTAL,keep

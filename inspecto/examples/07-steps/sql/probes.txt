@@ -1,0 +1,17 @@
+# Per-example Control API probes for serve-example.{ps1,sh}.
+# One endpoint path per line; blank lines and lines starting with '#' are ignored.
+#
+# STEP: sql (transform.sql, the Record Transformer) — one author SELECT over the typed input.
+#   steps[1]: - sql: { sql: "SELECT ... FROM input WHERE ..." }
+# The relation is ALWAYS `input` (the engine binds it to the landed store); `sql` is the single key
+# the engine reads. In the editor this same Step is authored either as a Fields grid (one row per
+# output column, a catalog function per row) or as this SQL — the two are peer views of one Step.
+# The guard refuses anything but a read-only SELECT. 8 orders in, 7 rows out (1 CANCELLED dropped),
+# with two derived columns NET and SIZE_BAND.
+#
+# Expected evidence after the run:
+#   /jobs shows sql_rollup type PIPELINE with lastStatus SUCCESS; /jobs/sql_rollup/runs shows the run
+#   record naming the rows the Step produced into store(s) [rollup]. On disk: out/rollup/*.parquet.
+#   The job can also be fired by hand: POST /jobs/sql_rollup/trigger.
+/jobs
+/jobs/sql_rollup/runs

@@ -1,0 +1,36 @@
+name: PARSE_XLSX
+active: true
+version: 1
+
+dirs:
+  poll:       out/inbox
+  database:   out/inventory/database
+  backup:     out/inventory/backup
+  temp:       out/inventory/temp
+  errors:     out/inventory/errors
+  quarantine: out/inventory/quarantine
+  markers:    out/inventory/markers
+  status_dir: out/inventory/status
+  log_dir:    out/inventory/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.xlsx"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+  schema_file: "schema.toon"
+
+parsing:
+  frontend: xlsx
+  xlsx:
+    sheet: Inventory
+    range: "A1:D6"
+    header: true
+    normalize_names: true
+    ignore_errors: true
+    stop_at_empty: false

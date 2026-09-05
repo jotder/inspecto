@@ -1539,6 +1539,22 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   ⚠ Two shell gotchas re-confirmed while testing: `package.ps1` needs **pwsh 7**, and `cmd /c` from
   Git Bash silently no-ops here (MSYS mangles `/c`) — use `cmd //c`, and `.\run.bat` never bare
   (`NoDefaultCurrentDirectoryInExePath=1`).
+- ✅ **EXAMPLES-STEPS-1 — CLOSED 2026-09-06: one runnable example per Step kind, and the example
+  runners run again.** `inspecto/examples/07-steps/` (collect · filter · dedup · join · summarize ·
+  sql · route · sink) + `02-parsing/{xlsx,asn1,xml-plugin}-frontend`, every one driven end to end
+  (row counts in each `probes.txt`). Three defects surfaced by building them, all fixed in the same
+  change: 🔴 (1) **`run-example.{sh,ps1}` and `serve-example.{sh,ps1}` never declared
+  `-Dassist.safety.roots`**, so since PKG-6 (2026-08-28) EVERY example carrying a `schema_file:` ref
+  — hello-csv included — died with *"no allowed roots configured"*; the examples are not covered by
+  any test, so the whole suite was dark for nine days. The runners now declare the example dir, the
+  same rule `run.sh` follows. 🔴 (2) **`ConsignmentPlanner.schemaNameOf` NPE'd on a plugin-ingester
+  pipeline** (ASN.1 / XML / segmented fixed-width): the one-shot resolver hands it a selection whose
+  schema is `null` because such a pipeline has segment schemas, not a single one; the plugin tests
+  never saw it because they build the `Consignment` by hand. Null-guarded to the `schema` label,
+  pinned by `ConsignmentPlannerTest.aSelectionWithoutASchemaStillPlans`. (3) A `steps[]` chain is
+  at-rest only — the examples say so in one paragraph, because nothing else in the tree did.
+  **Open:** an `examples` smoke in CI (run `01-ingest/hello-csv` in the release workflow) so (1)
+  cannot recur silently.
 - ✅ **PKG-2 — CLOSED 2026-08-18: `run.bat ADAPTER` resolves a pipeline for the first time.**
   The lookup was a single `for %%F in (spaces\*\config\%1\*_pipeline.toon)`, which NEVER matched —
   cmd's set-based `FOR` globs the **filename only**, so a wildcard in a *directory* component silently
