@@ -16,14 +16,36 @@ raw:
 mapping:
   canonicalName: payments
   rawName: PAYMENTS
-  rules[10]{targetColumn,sourceExpression,transformType}:
-    PAYMENT_ID,PAYMENT_ID,DIRECT
-    PAYER_ACCOUNT,PAYER_ACCOUNT,DIRECT
-    PAYEE_ACCOUNT,PAYEE_ACCOUNT,DIRECT
-    MERCHANT,"UPPER(TRIM(MERCHANT))",EXPR
-    AMOUNT,AMOUNT,DIRECT
-    CURRENCY,CURRENCY,DIRECT
-    MERCHANT_LAT,MERCHANT_LAT,DIRECT
-    MERCHANT_LON,MERCHANT_LON,DIRECT
-    PAID_DATE,PAID_DATE,DIRECT
-    PAID_AT,PAID_AT,DIRECT
+  fields[10]:
+    - name: PAYMENT_ID
+      from: PAYMENT_ID
+      fn: keep
+    - name: PAYER_ACCOUNT
+      from: PAYER_ACCOUNT
+      fn: keep
+    - name: PAYEE_ACCOUNT
+      from: PAYEE_ACCOUNT
+      fn: keep
+    - name: MERCHANT
+      from: ""
+      fn: custom
+      args:
+        expression: "UPPER(TRIM(MERCHANT))"
+    - name: AMOUNT
+      from: AMOUNT
+      fn: keep
+    - name: CURRENCY
+      from: CURRENCY
+      fn: keep
+    - name: MERCHANT_LAT
+      from: MERCHANT_LAT
+      fn: keep
+    - name: MERCHANT_LON
+      from: MERCHANT_LON
+      fn: keep
+    - name: PAID_DATE
+      from: PAID_DATE
+      fn: keep
+    - name: PAID_AT
+      from: PAID_AT
+      fn: keep

@@ -11,10 +11,24 @@ raw:
 mapping:
   canonicalName: sites
   rawName: SITES
-  rules[6]{targetColumn,sourceExpression,transformType}:
-    SITE_ID,SITE_ID,DIRECT
-    SITE_NAME,SITE_NAME,DIRECT
-    SITE_LAT,SITE_LAT,DIRECT
-    SITE_LON,SITE_LON,DIRECT
-    CAPACITY,"TRY_CAST(CAPACITY AS INTEGER)",EXPR
-    STATUS,STATUS,DIRECT
+  fields[6]:
+    - name: SITE_ID
+      from: SITE_ID
+      fn: keep
+    - name: SITE_NAME
+      from: SITE_NAME
+      fn: keep
+    - name: SITE_LAT
+      from: SITE_LAT
+      fn: keep
+    - name: SITE_LON
+      from: SITE_LON
+      fn: keep
+    - name: CAPACITY
+      from: ""
+      fn: custom
+      args:
+        expression: "TRY_CAST(CAPACITY AS INTEGER)"
+    - name: STATUS
+      from: STATUS
+      fn: keep

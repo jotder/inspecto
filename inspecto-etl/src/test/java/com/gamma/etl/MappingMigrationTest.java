@@ -14,13 +14,14 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Phase 4 — converting a stored {@code mapping.rules[]} to {@code fields[]} must not change the SQL
- * that runs. This walks EVERY schema committed under {@code spaces/} and asserts the compiled
- * projection is byte-identical before and after conversion.
+ * The Record Transformer is the ONLY projection spelling: every stored schema under {@code spaces/} must
+ * carry {@code mapping.fields[]} (no {@code rules[]} anywhere), and every one must compile. The converter
+ * {@link RecordTransform#fromMappingRules} stays as the read-time bridge for schemas written by older
+ * builds, and its equivalence rules are asserted per type below.
  *
- * <p>🔴 That equality IS the migration's safety argument. A converter that merely "looks right" would
- * silently re-type a column or drop a coercion across 799 rules in three spaces; comparing the emitted
- * SQL is the only check that cannot be fooled by a plausible-looking field list.
+ * <p>🔴 Until 2026-09-05 this class asserted byte-identical SQL for every rules-bearing stored schema —
+ * that equality was the migration's whole safety argument, and it held for 14 schemas / 799 rules. Now
+ * that the corpus is migrated the invariant is simpler: nothing legacy may come back.
  */
 class MappingMigrationTest {
 
@@ -35,14 +36,14 @@ class MappingMigrationTest {
         throw new AssertionError("cannot locate the repo root from " + Path.of("").toAbsolutePath());
     }
 
-    /** Every committed schema carrying a mapping with rules — the real corpus, not a fixture. */
+    /** Every committed schema carrying a mapping block — the real corpus, not a fixture. */
     private static List<Path> storedSchemas() throws IOException {
         try (Stream<Path> walk = Files.walk(repoRoot().resolve("spaces"))) {
             return walk.filter(p -> p.toString().endsWith(".toon"))
                     .filter(p -> {
                         try {
                             String s = Files.readString(p);
-                            return s.contains("mapping:") && s.contains("rules[");
+                            return s.contains("mapping:");
                         } catch (IOException e) {
                             return false;
                         }
@@ -53,54 +54,96 @@ class MappingMigrationTest {
     }
 
     @Test
-    void everyStoredSchemaConvertsToFieldsWithoutChangingTheSql() throws Exception {
+    void everyStoredSchemaIsOnFieldsAndCompiles() throws Exception {
         List<Path> schemas = storedSchemas();
         assertFalse(schemas.isEmpty(), "the corpus must not be empty — this test would prove nothing");
 
         List<String> checked = new ArrayList<>();
         for (Path p : schemas) {
+            String rel = repoRoot().relativize(p).toString();
             Map<String, Object> schema = com.gamma.config.io.ConfigCodec.toMap(Files.readString(p));
             if (!(schema.get("mapping") instanceof Map<?, ?> mapping)) continue;
+
+            assertNull(mapping.get("rules"), rel + " still carries mapping.rules[] — transform.map is gone; "
+                    + "run com.gamma.etl.MappingMigrator on it");
             @SuppressWarnings("unchecked")
-            List<Map<String, Object>> rules = (List<Map<String, Object>>) mapping.get("rules");
-            if (rules == null || rules.isEmpty()) continue;
+            List<Map<String, Object>> fields = (List<Map<String, Object>>) mapping.get("fields");
+            assertNotNull(fields, rel + " has a mapping block with no fields[]");
+            assertTrue(RecordTransform.isFieldList(fields), rel + ": fields[] is not a Record Transformer field list");
 
-            // What runs today, from the legacy spelling.
-            List<Map<String, Object>> before = DataTransformer.dataColumns(schema, CSV, "raw_input");
-
-            // The same schema with its rules converted to the Record Transformer spelling.
-            Map<String, Object> converted = new LinkedHashMap<>(schema);
-            Map<String, Object> newMapping = new LinkedHashMap<>();
-            mapping.forEach((k, v) -> newMapping.put(String.valueOf(k), v));
-            newMapping.remove("rules");
-            newMapping.put("fields", RecordTransform.fromMappingRules(rules));
-            converted.put("mapping", newMapping);
-
-            List<Map<String, Object>> after = DataTransformer.dataColumns(converted, CSV, "raw_input");
-
-            assertEquals(before, after,
-                    "converting " + repoRoot().relativize(p) + " changed the compiled projection");
-            checked.add(repoRoot().relativize(p).toString() + " (" + rules.size() + " rules)");
+            List<Map<String, Object>> compiled = DataTransformer.dataColumns(schema, CSV, "raw_input");
+            assertEquals(fields.size(), compiled.size(), rel + " compiled to a different column count");
+            checked.add(rel + " (" + fields.size() + " fields)");
         }
 
-        assertFalse(checked.isEmpty(), "no schema was actually compared");
-        System.out.println("[migration] byte-identical projection for " + checked.size()
-                + " stored schemas: " + checked);
+        assertFalse(checked.isEmpty(), "no schema was actually compiled");
+        System.out.println("[record-transformer] " + checked.size() + " stored schemas compile: " + checked);
     }
 
-    /**
-     * ⛔ The two spellings with no faithful equivalent are refused by NAME rather than approximated —
-     * hand-writing them as `custom` would silently move those columns out of the cast-failure audit.
-     */
+    /** The two date rules convert to their catalog functions and stay audited on the date column. */
     @Test
-    void aRuleWithNoFaithfulEquivalentIsRefusedRatherThanApproximated() {
-        for (String type : List.of("CONCAT_DT", "FILENAME_DATE")) {
-            IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                    () -> RecordTransform.fromMappingRules(List.of(Map.of(
-                            "targetColumn", "EVENT_TIME", "sourceExpression", "D|T", "transformType", type))));
-            assertTrue(e.getMessage().contains(type), e.getMessage());
-            assertTrue(e.getMessage().contains("EVENT_TIME"), "the refusal must name the rule: " + e.getMessage());
-        }
+    void theDateRulesConvertToTheirCatalogFunctions() {
+        List<Map<String, Object>> fields = RecordTransform.fromMappingRules(List.of(
+                Map.of("targetColumn", "EVENT_TIME", "sourceExpression", "D|T", "transformType", "CONCAT_DT"),
+                Map.of("targetColumn", "EVENT_DATE", "sourceExpression", "F|data_|%Y%m%d",
+                        "transformType", "FILENAME_DATE")));
+
+        Map<String, Object> concat = fields.get(0);
+        assertEquals("date.concat_parts", concat.get("fn"));
+        assertEquals("D", concat.get("from"));
+        assertEquals("T", ((Map<?, ?>) concat.get("args")).get("time_column"));
+        assertEquals("D", RecordTransform.auditedSourceColumn(concat, Map.of("D", "DATE")),
+                "CONCAT_DT measured its date half; the conversion must keep that coverage");
+
+        Map<String, Object> fromFile = fields.get(1);
+        assertEquals("date.from_filename", fromFile.get("fn"));
+        assertEquals("F", fromFile.get("from"));
+        assertEquals(Map.of("pattern", "data_([0-9]{8})", "format", "%Y%m%d"), fromFile.get("args"));
+
+        List<Map<String, Object>> compiled = RecordTransform.compile(fields, Map.of("D", "DATE"), CSV,
+                SourceZones.of(Map.of(), null), "raw_input", false);
+        assertEquals("TRY_STRPTIME(regexp_extract(F, 'data_([0-9]{8})', 1), '%Y%m%d')::DATE",
+                compiled.get(1).get("expr"));
+    }
+
+    /** A block with an EXPR row is rewritten in the block-list form, and the result parses and compiles the same. */
+    @Test
+    void theMigratorWritesTheBlockListFormWhenARowNeedsArgs() throws IOException {
+        Path dir = Files.createTempDirectory("mig");
+        Path schema = dir.resolve("orders_schema.toon");
+        Files.writeString(schema, """
+                raw:
+                  name: ORDERS
+                  format: CSV
+                  fields[3]{name,selector,type}:
+                    ORDER_ID,0,VARCHAR
+                    REGION,1,VARCHAR
+                    QUANTITY,2,BIGINT
+                mapping:
+                  canonicalName: orders
+                  rawName: ORDERS
+                  rules[3]{targetColumn,sourceExpression,transformType}:
+                    ORDER_ID,ORDER_ID,DIRECT
+                    REGION,"UPPER(TRIM(REGION))",EXPR
+                    QUANTITY,QUANTITY,DIRECT
+                """);
+
+        MappingMigrator.Result r = MappingMigrator.migrate(schema, false);
+        assertNull(r.problem(), r.problem());
+        assertTrue(r.changed());
+
+        String after = Files.readString(schema);
+        assertFalse(after.contains("rules["), after);
+        assertTrue(after.contains("  fields[3]:\n    - name: ORDER_ID\n      from: ORDER_ID\n      fn: keep\n"), after);
+        assertTrue(after.contains("    - name: REGION\n      from: \"\"\n      fn: custom\n      args:\n"
+                + "        expression: \"UPPER(TRIM(REGION))\"\n"), after);
+        assertTrue(after.startsWith("raw:\n  name: ORDERS"), "lines outside the block must survive: " + after);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> parsed = (Map<String, Object>) com.gamma.config.io.ConfigCodec.toMap(after);
+        List<Map<String, Object>> cols = DataTransformer.dataColumns(parsed, CSV, "raw_input");
+        assertEquals(List.of("ORDER_ID", "REGION", "QUANTITY"), cols.stream().map(c -> c.get("name")).toList());
+        assertEquals("UPPER(TRIM(REGION))", cols.get(1).get("expr"));
     }
 
     /** EXPR converts to `custom`, and both are excluded from the audit — coverage is unchanged. */

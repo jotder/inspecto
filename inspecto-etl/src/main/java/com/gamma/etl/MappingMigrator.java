@@ -25,11 +25,18 @@ import java.util.regex.Pattern;
  *     ORDER_ID,ORDER_ID,DIRECT                          →         ORDER_ID,ORDER_ID,keep
  * </pre>
  *
- * <p>⛔ A rule that is not {@code DIRECT} is NOT rewritten this way. {@code EXPR} needs a nested
- * {@code args.expression}, which a flat tabular row cannot hold, and {@code CONCAT_DT} /
- * {@code FILENAME_DATE} have no faithful catalog equivalent at all
- * ({@link RecordTransform#fromMappingRules} refuses them). Such a file is REPORTED and left untouched
- * rather than half-migrated — its {@code rules[]} stay readable permanently.
+ * <p>A block whose rows are not all {@code DIRECT} cannot stay tabular: {@code EXPR} needs a nested
+ * {@code args.expression}, and the two date rules carry parameters. Such a block is rewritten as the TOON
+ * <b>block-list</b> form instead — one {@code - name:/from:/fn:/args:} entry per row, replacing exactly the
+ * header and its N rows; every line outside the block still survives byte-for-byte:
+ * <pre>
+ *   fields[8]:
+ *     - name: REGION
+ *       from: ""
+ *       fn: custom
+ *       args:
+ *         expression: "UPPER(TRIM(REGION))"
+ * </pre>
  *
  * <p>Every rewrite is verified before it is written: the compiled projection
  * ({@link DataTransformer#dataColumns}) must be byte-identical before and after, or the file is left
@@ -105,9 +112,7 @@ public final class MappingMigrator {
         int count = Integer.parseInt(header.group(2));
         String rowIndent = indent + "  ";
 
-        List<String> rewritten = new ArrayList<>(lines);
-        rewritten.set(headerIdx, indent + "fields[" + count + "]{name,from,fn}:");
-
+        List<String> rows = new ArrayList<>();
         for (int i = 1; i <= count; i++) {
             int at = headerIdx + i;
             if (at >= lines.size()) return new Result(file, false, "block claims " + count
@@ -115,12 +120,51 @@ public final class MappingMigrator {
             String row = lines.get(at);
             if (!row.startsWith(rowIndent)) return new Result(file, false,
                     "row " + i + " is not indented like the others — refusing a partial rewrite", count);
-            // ⛔ Only DIRECT maps onto a flat tabular row. Anything else needs a shape this cannot write.
-            if (!row.endsWith(",DIRECT")) return new Result(file, false,
-                    "row " + i + " is not DIRECT (" + row.trim() + ") — needs a nested field shape, "
-                            + "so this file keeps its rules[]", count);
-            rewritten.set(at, row.substring(0, row.length() - ",DIRECT".length()) + ",keep");
+            rows.add(row);
         }
+
+        List<String> rewritten = new ArrayList<>(lines.subList(0, headerIdx));
+        boolean allDirect = rows.stream().allMatch(r -> r.endsWith(",DIRECT"));
+        if (allDirect) {
+            // The tabular forms line up exactly — only the header and each trailing type token change.
+            rewritten.add(indent + "fields[" + count + "]{name,from,fn}:");
+            for (String row : rows)
+                rewritten.add(row.substring(0, row.length() - ",DIRECT".length()) + ",keep");
+        } else {
+            // Something needs args: the whole block becomes the block-list form, via the same converter
+            // the engine's read-time conversion uses, so the two spellings cannot drift.
+            List<Map<String, Object>> rules = new ArrayList<>();
+            for (String row : rows) {
+                List<String> cells = splitRow(row.trim());
+                if (cells.size() != 3) return new Result(file, false,
+                        "row (" + row.trim() + ") does not have 3 cells — refusing a partial rewrite", count);
+                Map<String, Object> rule = new java.util.LinkedHashMap<>();
+                rule.put("targetColumn", cells.get(0));
+                rule.put("sourceExpression", cells.get(1));
+                rule.put("transformType", cells.get(2));
+                rules.add(rule);
+            }
+            List<Map<String, Object>> fields;
+            try {
+                fields = RecordTransform.fromMappingRules(rules);
+            } catch (IllegalArgumentException e) {
+                return new Result(file, false, e.getMessage(), count);
+            }
+            rewritten.add(indent + "fields[" + count + "]:");
+            for (Map<String, Object> f : fields) {
+                rewritten.add(rowIndent + "- name: " + toonScalar(f.get("name")));
+                rewritten.add(rowIndent + "  from: " + toonScalar(f.get("from")));
+                rewritten.add(rowIndent + "  fn: " + toonScalar(f.get("fn")));
+                @SuppressWarnings("unchecked")
+                Map<String, Object> args = (Map<String, Object>) f.get("args");
+                if (args != null && !args.isEmpty()) {
+                    rewritten.add(rowIndent + "  args:");
+                    for (Map.Entry<String, Object> a : args.entrySet())
+                        rewritten.add(rowIndent + "    " + a.getKey() + ": " + toonScalar(a.getValue()));
+                }
+            }
+        }
+        rewritten.addAll(lines.subList(headerIdx + 1 + count, lines.size()));
 
         String updated = String.join("\n", rewritten) + (original.endsWith("\n") ? "\n" : "");
 
@@ -129,6 +173,38 @@ public final class MappingMigrator {
 
         if (!dryRun) Files.writeString(file, updated);
         return new Result(file, true, null, count);
+    }
+
+    /** Split one tabular TOON row into its cells: commas separate, double quotes group (doubled inside). */
+    static List<String> splitRow(String row) {
+        List<String> cells = new ArrayList<>();
+        StringBuilder cur = new StringBuilder();
+        boolean quoted = false;
+        for (int i = 0; i < row.length(); i++) {
+            char c = row.charAt(i);
+            if (quoted) {
+                if (c == '"') {
+                    if (i + 1 < row.length() && row.charAt(i + 1) == '"') { cur.append('"'); i++; }
+                    else quoted = false;
+                } else if (c == '\\' && i + 1 < row.length()) {
+                    cur.append(row.charAt(++i));
+                } else cur.append(c);
+            } else if (c == '"') {
+                quoted = true;
+            } else if (c == ',') {
+                cells.add(cur.toString()); cur.setLength(0);
+            } else cur.append(c);
+        }
+        cells.add(cur.toString());
+        return cells;
+    }
+
+    /** A scalar as a TOON value: bare when it is a plain identifier-like token, double-quoted otherwise. */
+    static String toonScalar(Object v) {
+        String s = v == null ? "" : String.valueOf(v);
+        if (!s.isEmpty() && s.matches("[A-Za-z_][A-Za-z0-9_.]*") && !s.matches("true|false|null"))
+            return s;
+        return '"' + s.replace("\\", "\\\\").replace("\"", "\\\"") + '"';
     }
 
     /**

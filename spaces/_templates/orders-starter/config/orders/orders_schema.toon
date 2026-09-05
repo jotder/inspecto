@@ -13,12 +13,32 @@ raw:
 mapping:
   canonicalName: orders
   rawName: ORDERS
-  rules[8]{targetColumn,sourceExpression,transformType}:
-    ORDER_ID,ORDER_ID,DIRECT
-    ORDER_DATE,ORDER_DATE,DIRECT
-    REGION,"UPPER(TRIM(REGION))",EXPR
-    PRODUCT,PRODUCT,DIRECT
-    QUANTITY,QUANTITY,DIRECT
-    UNIT_PRICE,UNIT_PRICE,DIRECT
-    STATUS,STATUS,DIRECT
-    GROSS,"ROUND(TRY_CAST(QUANTITY AS DOUBLE) * TRY_CAST(UNIT_PRICE AS DOUBLE), 2)",EXPR
+  fields[8]:
+    - name: ORDER_ID
+      from: ORDER_ID
+      fn: keep
+    - name: ORDER_DATE
+      from: ORDER_DATE
+      fn: keep
+    - name: REGION
+      from: ""
+      fn: custom
+      args:
+        expression: "UPPER(TRIM(REGION))"
+    - name: PRODUCT
+      from: PRODUCT
+      fn: keep
+    - name: QUANTITY
+      from: QUANTITY
+      fn: keep
+    - name: UNIT_PRICE
+      from: UNIT_PRICE
+      fn: keep
+    - name: STATUS
+      from: STATUS
+      fn: keep
+    - name: GROSS
+      from: ""
+      fn: custom
+      args:
+        expression: "ROUND(TRY_CAST(QUANTITY AS DOUBLE) * TRY_CAST(UNIT_PRICE AS DOUBLE), 2)"

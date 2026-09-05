@@ -211,6 +211,28 @@ export const SQL_FUNCTIONS: readonly SqlFunction[] = [
         params: [{ name: 'unit', label: 'Period', type: 'text', default: 'month' }],
         help: 'A date in March with period "month" becomes the 1st of March.',
     },
+    {
+        id: 'date.concat_parts',
+        label: 'Build a timestamp from date and time columns',
+        category: 'Dates',
+        template: "TRY_STRPTIME(CONCAT({source}, ' ', {time_column}), {format})",
+        params: [
+            { name: 'time_column', label: 'Time column', type: 'column' },
+            { name: 'format', label: "Format of date + ' ' + time", type: 'text', default: '%Y-%m-%d %H:%M:%S' },
+        ],
+        help: 'The date column is the source; the time column is joined with a space, then read as a timestamp.',
+    },
+    {
+        id: 'date.from_filename',
+        label: 'Take a date out of a file name',
+        category: 'Dates',
+        template: 'TRY_STRPTIME(regexp_extract({source}, {pattern}, 1), {format})::DATE',
+        params: [
+            { name: 'pattern', label: 'Pattern (group 1 is the date)', type: 'text', default: '([0-9]{8})' },
+            { name: 'format', label: 'Format of the captured text', type: 'text', default: '%Y%m%d' },
+        ],
+        help: '"data_20260829.csv" with pattern "data_([0-9]{8})" becomes 2026-08-29.',
+    },
 
     // ── Logic ───────────────────────────────────────────────────────────────────────────────────────
     {

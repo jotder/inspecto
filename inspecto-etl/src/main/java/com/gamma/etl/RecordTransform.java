@@ -152,6 +152,23 @@ public final class RecordTransform {
             new Fn("date.truncate", "Start of the period", "Dates", "DATE_TRUNC({unit}, {source})",
                     List.of(Param.of("unit", "Period", ParamType.TEXT).withDefault("month")),
                     "A date in March with period \"month\" becomes the 1st of March."),
+            // The CONCAT_DT analogue. ⚠ Narrower on purpose: the legacy rule coalesced over every parser
+            // timestamp format and shifted by the date column's source zone; a Record Transformer row cannot
+            // see parser settings, so this takes ONE format and no zone. Nothing stored used CONCAT_DT.
+            new Fn("date.concat_parts", "Build a timestamp from date and time columns", "Dates",
+                    "TRY_STRPTIME(CONCAT({source}, ' ', {time_column}), {format})",
+                    List.of(Param.of("time_column", "Time column", ParamType.COLUMN),
+                            Param.of("format", "Format of date + ' ' + time", ParamType.TEXT)
+                                    .withDefault("%Y-%m-%d %H:%M:%S")),
+                    "The date column is the source; the time column is joined with a space, then read as a timestamp."),
+            // The FILENAME_DATE analogue: lift a date out of a file-name column. Zone-exempt like DATE.
+            new Fn("date.from_filename", "Take a date out of a file name", "Dates",
+                    "TRY_STRPTIME(regexp_extract({source}, {pattern}, 1), {format})::DATE",
+                    List.of(Param.of("pattern", "Pattern (group 1 is the date)", ParamType.TEXT)
+                                    .withDefault("([0-9]{8})"),
+                            Param.of("format", "Format of the captured text", ParamType.TEXT)
+                                    .withDefault("%Y%m%d")),
+                    "\"data_20260829.csv\" with pattern \"data_([0-9]{8})\" becomes 2026-08-29."),
 
             // ── Logic ─────────────────────────────────────────────────────────────────────────────────
             new Fn("logic.default_if_empty", "Use a default when empty", "Logic",
@@ -363,29 +380,23 @@ public final class RecordTransform {
     }
 
     /**
-     * Convert a legacy {@code mapping.rules[]} list into the equivalent {@code fields[]} — the Phase 4
-     * migration off {@code transform.map}.
+     * Convert a legacy {@code mapping.rules[]} list into the equivalent {@code fields[]} — the migration
+     * off {@code transform.map}, which no longer exists as a node type.
      *
-     * <p>The equivalence is exact for the two spellings that exist in practice, and a test asserts the
-     * COMPILED SQL is byte-identical for every stored schema, which is the migration's whole safety
-     * argument:
      * <ul>
      *   <li>{@code DIRECT} (or a blank/absent type) → {@link #KEEP}. On the raw source both compile
-     *       through {@link SchemaFieldTypes#castSql} against the declared type.</li>
+     *       through {@link SchemaFieldTypes#castSql} against the declared type — byte-identical SQL, and
+     *       a test asserts it for every stored schema.</li>
      *   <li>{@code EXPR} → {@link #CUSTOM}. Both emit the author's SQL verbatim, and both are excluded
-     *       from the cast-failure audit for the same reason — so the conversion neither gains nor loses
-     *       coverage.</li>
+     *       from the cast-failure audit for the same reason.</li>
+     *   <li>{@code CONCAT_DT} ({@code DATE|TIME}) → {@code date.concat_parts}. ⚠ The legacy rule coalesced
+     *       over every parser timestamp format and applied the date column's source zone; the catalog
+     *       function takes one format (the parser default) and no zone. Nothing stored used it.</li>
+     *   <li>{@code FILENAME_DATE} ({@code COL|prefix|fmt}) → {@code date.from_filename} with
+     *       {@code pattern = prefix + "([0-9]{8})"} — the same regex the legacy compiler hardcoded.</li>
      * </ul>
      *
-     * <p>⛔ {@code CONCAT_DT} and {@code FILENAME_DATE} are REFUSED rather than approximated: neither has
-     * a faithful catalog equivalent ({@code text.join} concatenates text, it does not build a timestamp
-     * from a {@code |}-delimited pair, and nothing renders {@code FILENAME_DATE}'s
-     * {@code regexp_extract} over the source filename). Converting them by hand-writing {@code custom}
-     * SQL would silently move those columns OUT of the audit. Measured 2026-09-05 across every stored
-     * schema in {@code spaces/}: 799 DIRECT, 6 EXPR, zero of either — so nothing is stranded by this,
-     * and a pipeline that ever needs one keeps its {@code rules[]}, which stay readable permanently.
-     *
-     * @throws IllegalArgumentException naming the rule when it has no faithful equivalent
+     * @throws IllegalArgumentException naming the rule when its type is unknown
      */
     public static List<Map<String, Object>> fromMappingRules(List<Map<String, Object>> rules) {
         List<Map<String, Object>> out = new ArrayList<>();
@@ -394,23 +405,41 @@ public final class RecordTransform {
             String source = str(rule, "sourceExpression");
             String type = str(rule, "transformType");
             String norm = type == null ? "" : type.trim().toUpperCase(java.util.Locale.ROOT);
+            String src = source == null ? "" : source;
 
             Map<String, Object> field = new LinkedHashMap<>();
             field.put("name", target);
             switch (norm) {
                 case "", "DIRECT" -> {
-                    field.put("from", source);
+                    field.put("from", src);
                     field.put("fn", KEEP);
                 }
                 case "EXPR" -> {
                     field.put("from", "");
                     field.put("fn", CUSTOM);
-                    field.put("args", Map.of("expression", source == null ? "" : source));
+                    field.put("args", Map.of("expression", src));
+                }
+                case "CONCAT_DT" -> {
+                    String[] parts = src.split("\\|", 2);
+                    field.put("from", parts[0]);
+                    field.put("fn", "date.concat_parts");
+                    Map<String, Object> args = new LinkedHashMap<>();
+                    args.put("time_column", parts.length > 1 ? parts[1] : "");
+                    args.put("format", "%Y-%m-%d %H:%M:%S");
+                    field.put("args", args);
+                }
+                case "FILENAME_DATE" -> {
+                    String[] parts = src.split("\\|", 3);
+                    field.put("from", parts[0]);
+                    field.put("fn", "date.from_filename");
+                    Map<String, Object> args = new LinkedHashMap<>();
+                    args.put("pattern", (parts.length > 1 ? parts[1] : "") + "([0-9]{8})");
+                    args.put("format", parts.length > 2 ? parts[2] : "%Y%m%d");
+                    field.put("args", args);
                 }
                 default -> throw new IllegalArgumentException(
-                        "rule '" + target + "' uses transformType '" + type + "', which has no faithful "
-                        + "Record Transformer equivalent — approximating it would move the column out of "
-                        + "the cast-failure audit. Keep this schema on mapping.rules[]; they stay readable.");
+                        "rule '" + target + "' uses unknown transformType '" + type
+                        + "'. Valid: DIRECT (or blank), EXPR, CONCAT_DT, FILENAME_DATE.");
             }
             out.add(field);
         }
