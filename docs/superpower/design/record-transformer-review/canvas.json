@@ -1,0 +1,13 @@
+{
+  "artboards": [
+    { "file": "Findings.dc.html", "x": 0, "y": 0, "w": 720, "h": 1340, "title": "Review findings" },
+    { "file": "Main.dc.html", "x": 820, "y": 0, "w": 1180, "h": 900, "title": "Record Transformer · Fields view" },
+    { "file": "SqlMode.dc.html", "x": 820, "y": 1040, "w": 1180, "h": 760, "title": "Record Transformer · SQL view" },
+    { "file": "PopupSheet.dc.html", "x": 0, "y": 1940, "w": 1180, "h": 1180, "title": "Overlay and nested-control sheet" }
+  ],
+  "annotations": [
+    { "id": "how-to-read", "x": 0, "y": -150, "w": 640, "text": "Left: what the review found in the source. Right: the proposed pane, Fields and SQL as two views of one Step. Bottom: the one recipe every popup and nested control follows.\nInteractive prototype was not requested, so these are static mockups." },
+    { "id": "sync-rule", "x": 2040, "y": 0, "w": 260, "text": "Interchangeability rule: switching views never changes the stored SQL. Editing in either view rewrites both. What the field list cannot express stays a Custom SQL row; a WHERE or JOIN keeps the Fields tab disabled with a reason." }
+  ],
+  "launch": { "view": "canvas" }
+}

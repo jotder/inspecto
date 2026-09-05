@@ -112,6 +112,11 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- [`superpower/design/record-transformer-review/`](superpower/design/record-transformer-review/) — design canvas
+  (2026-09-05): review of the pipeline authoring pane, a Record Transformer with Fields and SQL as
+  interchangeable views (bends D4 — decision owed), and the uniform overlay/nested-control sheet. Working
+  files for the published canvas; re-seed from these, never edit the assembled `.html`.
+
 - ~~`superpower/delete-transform-map-plan.md`~~ — **SHIPPED 2026-09-05** (`transform.map` deleted; the
   projection slot is always a Record Transformer). As-built in
   [`okf/backend/engine/catalog-vs-executors.md`](okf/backend/engine/catalog-vs-executors.md) and

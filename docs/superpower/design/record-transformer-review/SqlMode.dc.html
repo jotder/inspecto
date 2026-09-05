@@ -1,0 +1,106 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <style>
+    body { margin: 0; background: #0f172a; color: #ffffff; font-family: "Inter", "Inter var", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 14px; line-height: 1.5; color-scheme: dark; }
+    a { color: #818cf8; } a:hover { color: #a5b4fc; }
+    * { box-sizing: border-box; }
+    .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+  </style>
+</helmet>
+
+<div style="width: 1180px; height: 760px; display: flex; flex-direction: column; background: #1e293b; border-left: 1px solid rgba(241,245,249,0.12); overflow: hidden;">
+
+  <div style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid rgba(241,245,249,0.12); flex-shrink: 0;">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18M3 12h18M3 17h18"></path><path d="M8 4v16"></path></svg>
+    <div style="min-width: 0;">
+      <div style="font-size: 14px; font-weight: 600; line-height: 20px;">Record Transformer</div>
+      <div style="font-size: 12px; line-height: 16px; text-transform: uppercase; letter-spacing: 0.025em; opacity: 0.6; font-weight: 600;">Transform · map</div>
+    </div>
+    <span style="margin-left: 4px; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #dc2626;"><svg width="8" height="8" viewBox="0 0 8 8" aria-hidden="true" style="flex-shrink: 0;"><circle cx="4" cy="4" r="4" fill="#dc2626"></circle></svg> unapplied</span>
+    <div role="tablist" style="margin-left: auto; display: flex; gap: 2px; padding: 2px; border: 1px solid rgba(241,245,249,0.12); border-radius: 6px; background: #0f172a;">
+      <button type="button" role="tab" aria-selected="false" style="height: 24px; padding: 0 10px; border: 0; border-radius: 4px; background: transparent; color: #ffffff; font-size: 12px; font-weight: 500; cursor: pointer;">Fields</button>
+      <button type="button" role="tab" aria-selected="true" style="height: 24px; padding: 0 10px; border: 0; border-radius: 4px; background: #ffffff; color: #0f172a; font-size: 12px; font-weight: 600; cursor: pointer;">SQL</button>
+    </div>
+    <span style="display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: 4px; background: rgba(245,158,11,0.14); color: #fbbf24; font-size: 12px;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"></path><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg>
+      1 field kept as custom SQL
+    </span>
+    <button type="button" aria-label="Maximize" style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; color: #ffffff; border-radius: 6px; cursor: pointer;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14v6h6M20 10V4h-6M14 10l6-6M4 20l6-6"></path></svg></button>
+    <button type="button" aria-label="Close" style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; color: #ffffff; border-radius: 6px; cursor: pointer;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18 18 6M6 6l12 12"></path></svg></button>
+  </div>
+
+  <div style="flex: 1; min-height: 0; overflow-y: auto; padding: 12px; display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 12px;">
+
+    <!-- left: the editor -->
+    <div style="display: flex; flex-direction: column; gap: 8px; min-width: 0;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.025em; opacity: 0.6; font-weight: 600;">SQL over the incoming rows</span>
+        <span style="font-size: 12px; color: #94a3b8;">Relation is always <span class="mono">input</span>. Filtering belongs to a Filter Step.</span>
+      </div>
+      <div style="border-radius: 8px; border: 1px solid rgba(241,245,249,0.12); background: #0f172a; overflow: hidden;">
+        <div style="display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid rgba(241,245,249,0.12); font-size: 12px; color: #94a3b8;">
+          <span class="mono">transform.sql</span>
+          <span style="margin-left: auto;">DuckDB · as-you-type check</span>
+        </div>
+        <div class="mono" style="display: grid; grid-template-columns: 36px minmax(0, 1fr); font-size: 13px; line-height: 22px; padding: 8px 0;">
+          <div style="text-align: right; padding-right: 12px; color: #475569; user-select: none;">1<br>2<br>3<br>4<br>5<br>6<br>7</div>
+          <pre style="margin: 0; white-space: pre-wrap; color: #e2e8f0;"><span style="color: #c4b5fd;">SELECT</span>
+  ORDER_ID,
+  <span style="color: #93c5fd;">strptime</span>(ORDER_DATE, <span style="color: #86efac;">'%d/%m/%Y'</span>)::DATE <span style="color: #c4b5fd;">AS</span> ORDER_DATE,
+  CUSTOMER,
+  AMOUNT,
+  <span style="background: rgba(245,158,11,0.14); border-radius: 3px;"><span style="color: #93c5fd;">round</span>(AMOUNT / 1.19, 2) <span style="color: #c4b5fd;">AS</span> AMOUNT_NET</span>
+<span style="color: #c4b5fd;">FROM</span> input</pre>
+        </div>
+      </div>
+
+      <!-- binder result: the ONLY thing that may block Apply is a 422 -->
+      <div style="display: flex; align-items: center; gap: 8px; border-radius: 8px; border: 1px solid rgba(34,197,94,0.35); background: rgba(34,197,94,0.08); padding: 8px 12px; font-size: 12px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
+        <span>Binds against the declared types. 5 columns come out.</span>
+        <span class="mono" style="margin-left: auto; color: #94a3b8;">VARCHAR · DATE · VARCHAR · DOUBLE · DOUBLE</span>
+      </div>
+    </div>
+
+    <!-- right: the reconciliation — what the Fields view will show for this SQL -->
+    <div style="display: flex; flex-direction: column; gap: 8px; min-width: 0;">
+      <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.025em; opacity: 0.6; font-weight: 600;">As fields</div>
+      <div style="border-radius: 8px; border: 1px solid rgba(241,245,249,0.12); overflow: hidden; font-size: 12px;">
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 120px; gap: 8px; padding: 6px 12px; background: rgba(255,255,255,0.03); color: #94a3b8; text-transform: uppercase; letter-spacing: 0.025em;">
+          <span>Select item</span><span>Shown as</span>
+        </div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 120px; gap: 8px; padding: 6px 12px; border-top: 1px solid rgba(241,245,249,0.12); align-items: center;"><span class="mono">ORDER_ID</span><span>Keep as it is</span></div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 120px; gap: 8px; padding: 6px 12px; border-top: 1px solid rgba(241,245,249,0.12); align-items: center;"><span class="mono">strptime(…)::DATE</span><span>Read a date from text</span></div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 120px; gap: 8px; padding: 6px 12px; border-top: 1px solid rgba(241,245,249,0.12); align-items: center;"><span class="mono">CUSTOMER</span><span>Keep as it is</span></div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 120px; gap: 8px; padding: 6px 12px; border-top: 1px solid rgba(241,245,249,0.12); align-items: center;"><span class="mono">AMOUNT</span><span>Keep as it is</span></div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 120px; gap: 8px; padding: 6px 12px; border-top: 1px solid rgba(241,245,249,0.12); align-items: center; background: rgba(245,158,11,0.08);"><span class="mono">round(AMOUNT / 1.19, 2)</span><span style="color: #fbbf24;">Custom SQL</span></div>
+      </div>
+      <p style="margin: 0; font-size: 12px; color: #94a3b8; line-height: 18px;">Every select item becomes a row. An expression the catalog recognises gets its plain-language operation back; anything else stays a Custom SQL row with the expression verbatim. Nothing is lost in either direction.</p>
+
+      <div style="margin-top: 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.025em; opacity: 0.6; font-weight: 600;">When fields cannot show it</div>
+      <div style="border-radius: 8px; border: 1px solid rgba(241,245,249,0.12); padding: 8px 12px; font-size: 12px; color: #94a3b8; line-height: 18px;">
+        A <span class="mono" style="color: #ffffff;">WHERE</span>, <span class="mono" style="color: #ffffff;">JOIN</span>, CTE, subquery or <span class="mono" style="color: #ffffff;">SELECT *</span> is not a projection. The Fields tab stays visible but disabled, with one line: <span style="color: #ffffff;">"This Step filters or joins. Fields shows projections only; move the filter to a Filter Step to edit it as fields."</span> The SQL is never altered by looking.
+      </div>
+    </div>
+  </div>
+
+  <div style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid rgba(241,245,249,0.12); flex-shrink: 0;">
+    <button type="button" style="height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid rgba(241,245,249,0.12); background: transparent; color: #ffffff; font-size: 14px; font-weight: 500; cursor: pointer;">Test against sample</button>
+    <span style="font-size: 12px; color: #94a3b8;">Types from a dry DESCRIBE · last test 14:02</span>
+    <div style="margin-left: auto; display: flex; gap: 8px;">
+      <button type="button" style="height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid rgba(241,245,249,0.12); background: transparent; color: #ffffff; font-size: 14px; font-weight: 500; cursor: pointer;">Discard</button>
+      <button type="button" style="height: 32px; padding: 0 16px; border-radius: 6px; border: 0; background: #4f46e5; color: #ffffff; font-size: 14px; font-weight: 600; cursor: pointer;">Apply</button>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

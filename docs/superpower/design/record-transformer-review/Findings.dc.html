@@ -1,0 +1,107 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <style>
+    body { margin: 0; background: #0f172a; color: #ffffff; font-family: "Inter", "Inter var", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 14px; line-height: 1.5; color-scheme: dark; }
+    a { color: #818cf8; } a:hover { color: #a5b4fc; }
+    * { box-sizing: border-box; }
+    .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+  </style>
+</helmet>
+
+<div style="width: 720px; height: 1340px; background: #0f172a; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+  <div>
+    <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.025em; opacity: 0.6; font-weight: 600;">Review · pipeline authoring, as built 2026-09-05</div>
+    <h1 style="margin: 4px 0 0; font-size: 20px; font-weight: 600; line-height: 28px;">What breaks the uniform look, and where the SQL ↔ fields story stops</h1>
+    <p style="margin: 6px 0 0; font-size: 13px; color: #94a3b8;">Grounded in the source, not the screenshot. Each row names the file to change.</p>
+  </div>
+
+  <!-- Severity legend -->
+  <div style="display: flex; gap: 8px; font-size: 12px;">
+    <span style="display: inline-block; border-radius: 4px; padding: 2px 8px; font-weight: 700; background: #7f1d1d; color: #fecaca;">Defect</span>
+    <span style="display: inline-block; border-radius: 4px; padding: 2px 8px; font-weight: 700; background: #78350f; color: #fde68a;">Inconsistent</span>
+    <span style="display: inline-block; border-radius: 4px; padding: 2px 8px; font-weight: 700; background: #1e3a8a; color: #bfdbfe;">Decision</span>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px;">
+
+    <div style="display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; border-radius: 8px; border: 1px solid rgba(241,245,249,0.12); background: #1e293b; padding: 12px;">
+      <span style="align-self: start; display: inline-block; border-radius: 4px; padding: 2px 8px; font-size: 12px; font-weight: 700; background: #7f1d1d; color: #fecaca; text-align: center;">Defect</span>
+      <div>
+        <div style="font-weight: 600;">Native select popups render white on a dark app</div>
+        <p style="margin: 4px 0 0; font-size: 13px; color: #94a3b8;">No <span class="mono">color-scheme</span> is declared anywhere. The body gets a <span class="mono">dark</span> class, but the browser paints the option list, scrollbars and date pickers with its light palette. Declare <span class="mono">color-scheme: dark</span> beside the class toggle in the layout component. One line, fixes every native control in the grid.</p>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; border-radius: 8px; border: 1px solid rgba(241,245,249,0.12); background: #1e293b; padding: 12px;">
+      <span style="align-self: start; display: inline-block; border-radius: 4px; padding: 2px 8px; font-size: 12px; font-weight: 700; background: #1e3a8a; color: #bfdbfe; text-align: center;">Decision</span>
+      <div>
+        <div style="font-weight: 600;">SQL and fields are one-directional today, and the way back is destructive</div>
+        <p style="margin: 4px 0 0; font-size: 13px; color: #94a3b8;">Fields compile to SQL live. A hand-written Step opens in a SQL-only mode whose only bridge is "Start a field list from the incoming columns", which throws the SQL away. The recorded decision D4 says never parse SQL back into rows. Interchangeable editing needs a bounded reconciler, not a parser: projections only, catalog templates matched in reverse, everything else kept as a Custom SQL row. Main and SQL view artboards show the shape.</p>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; border-radius: 8px; border: 1px solid rgba(241,245,249,0.12); background: #1e293b; padding: 12px;">
+      <span style="align-self: start; display: inline-block; border-radius: 4px; padding: 2px 8px; font-size: 12px; font-weight: 700; background: #78350f; color: #fde68a; text-align: center;">Inconsistent</span>
+      <div>
+        <div style="font-weight: 600;">Two control heights in one toolbar row</div>
+        <p style="margin: 4px 0 0; font-size: 13px; color: #94a3b8;">The search input is 32px, the filter pills beside it are 28px, the grid inputs are 32px and their parameter inputs 28px. Pick 32px for anything on the toolbar line and in a primary cell, 28px only for nested parameter controls and icon buttons.</p>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; border-radius: 8px; border: 1px solid rgba(241,245,249,0.12); background: #1e293b; padding: 12px;">
+      <span style="align-self: start; display: inline-block; border-radius: 4px; padding: 2px 8px; font-size: 12px; font-weight: 700; background: #78350f; color: #fde68a; text-align: center;">Inconsistent</span>
+      <div>
+        <div style="font-weight: 600;">Borders come from two vocabularies</div>
+        <p style="margin: 4px 0 0; font-size: 13px; color: #94a3b8;">The drawer header uses the border token. The transform grid, its inputs, the SQL-only card and the empty state use literal <span class="mono">gray-300 / gray-600 / gray-700</span> classes. The token guard only catches hex and rgb, so this passes CI. Extend the guard to palette border and text classes and route them through <span class="mono">--gamma-border</span>.</p>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; border-radius: 8px; border: 1px solid rgba(241,245,249,0.12); background: #1e293b; padding: 12px;">
+      <span style="align-self: start; display: inline-block; border-radius: 4px; padding: 2px 8px; font-size: 12px; font-weight: 700; background: #78350f; color: #fde68a; text-align: center;">Inconsistent</span>
+      <div>
+        <div style="font-weight: 600;">Radii drift: 4 · 6 · 8 · 16px with no token</div>
+        <p style="margin: 4px 0 0; font-size: 13px; color: #94a3b8;">Badges 4px, inputs 6px, cards 8px is a fine ramp. The empty state's 16px dashed box is the outlier. Name the ramp once (<span class="mono">--radius-sm/md/lg</span>) and drop the outlier to 8px.</p>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; border-radius: 8px; border: 1px solid rgba(241,245,249,0.12); background: #1e293b; padding: 12px;">
+      <span style="align-self: start; display: inline-block; border-radius: 4px; padding: 2px 8px; font-size: 12px; font-weight: 700; background: #78350f; color: #fde68a; text-align: center;">Inconsistent</span>
+      <div>
+        <div style="font-weight: 600;">Two eyebrow styles on the same pane</div>
+        <p style="margin: 4px 0 0; font-size: 13px; color: #94a3b8;">The drawer eyebrow is uppercase, tracking-wide, 60% opacity. The section label "Fields that come out" is uppercase, semibold, 70%. Make it one style. The eyebrow itself should read "Transform · map", the node kind and id, not the bare word TRANSFORMER.</p>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; border-radius: 8px; border: 1px solid rgba(241,245,249,0.12); background: #1e293b; padding: 12px;">
+      <span style="align-self: start; display: inline-block; border-radius: 4px; padding: 2px 8px; font-size: 12px; font-weight: 700; background: #78350f; color: #fde68a; text-align: center;">Inconsistent</span>
+      <div>
+        <div style="font-weight: 600;">Overlays are patched two different ways</div>
+        <p style="margin: 4px 0 0; font-size: 13px; color: #94a3b8;">Menus, selects and autocompletes get a scheme-agnostic surface override. Dialogs get a dark-only token remap and lean on Material defaults in light mode. The confirm width lives in the service, not in the shared recipe. Both work today, but the popup sheet defines one surface recipe so the next overlay does not pick a third way.</p>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; border-radius: 8px; border: 1px solid rgba(241,245,249,0.12); background: #1e293b; padding: 12px;">
+      <span style="align-self: start; display: inline-block; border-radius: 4px; padding: 2px 8px; font-size: 12px; font-weight: 700; background: #78350f; color: #fde68a; text-align: center;">Inconsistent</span>
+      <div>
+        <div style="font-weight: 600;">The generated SQL is a hidden toggle</div>
+        <p style="margin: 4px 0 0; font-size: 13px; color: #94a3b8;">"Show the SQL this produces" is a disclosure at the bottom. If SQL and fields are peers, the SQL is always visible read-only under the grid, and the view switch in the header is where editing moves.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="margin-top: auto; border-radius: 8px; border: 1px solid rgba(241,245,249,0.12); padding: 12px; font-size: 13px; color: #94a3b8;">
+    <span style="color: #ffffff; font-weight: 600;">What already holds up.</span> One Step type for both views, one compiler, an execution-free DESCRIBE for types, only a real binder 422 blocking Apply, dirty tracking by comparison, unique-name refusal, row order as output order. The redesign keeps all of it.
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
