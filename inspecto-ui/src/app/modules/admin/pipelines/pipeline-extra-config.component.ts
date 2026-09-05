@@ -1,10 +1,21 @@
-import { ChangeDetectionStrategy, Component, effect, inject, input, output, signal } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    ChangeDetectorRef,
+    Component,
+    ElementRef,
+    effect,
+    inject,
+    input,
+    output,
+    signal,
+} from '@angular/core';
 import { AbstractControl, FormBuilder, FormControl, ReactiveFormsModule, ValidationErrors } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 
 /** What an extra entry's stored value IS — decides the control drawn and the validation applied. */
@@ -25,7 +36,7 @@ interface ExtraEntry {
  * Key/Value text grid. Keys outside the node type's schema render as their ACTUAL key with a control
  * matching the stored value's TYPE, each with proper validation:
  *
- * - `boolean` → a true/false select;
+ * - `boolean` → a toggle (its own editor, no pencil);
  * - `number` → a numeric input that refuses a non-number;
  * - object/array (`json`) → a textarea that refuses unparseable JSON — this is how
  *   `transform.route`'s unmodelled `branches` stays EDITABLE without ever silently becoming a string;
@@ -34,6 +45,10 @@ interface ExtraEntry {
  * <p>⚠ The untouched-verbatim rule lives HERE now: a pristine entry's {@link value} is the ORIGINAL
  * value reference, never a re-parse of its display string — so an unmodelled block survives an apply
  * byte-identical (the route-branches data-loss rule, re-homed from `node-config-build`).
+ *
+ * <p><b>Rendered as property rows (2026-09-05)</b> — label · value · pencil, the schema-form's flat
+ * idiom, so an "Additional config" section reads exactly like the schema-driven section above it
+ * instead of a stack of outlined Material fields. Geometry comes from the shared `.sf-*` rules.
  *
  * <p>Keys are NOT editable — the key is the label. New keys can only be added where the free-form
  * editor is the node's PRIMARY surface (`allowAdd`, i.e. a type with no schema at all); a
@@ -51,65 +66,104 @@ interface ExtraEntry {
         MatIconModule,
         MatInputModule,
         MatSelectModule,
+        MatSlideToggleModule,
         MatTooltipModule,
     ],
     template: `
-        <div class="space-y-2">
+        <!-- Property rows, the SAME idiom as the schema-form's flat mode (label · value · pencil): the
+             key is the label, the value reads as text until its pencil (or the value itself) is clicked,
+             and the real control appears inline only while the row is being edited. A boolean is its own
+             editor (a toggle), so it has no pencil — exactly as a schema-form boolean. -->
+        <div class="flex flex-col gap-0.5">
             @for (e of rows(); track e.key) {
-                <div class="flex items-start gap-1">
-                    @switch (e.kind) {
-                        @case ('boolean') {
-                            <mat-form-field subscriptSizing="dynamic" class="flex-1">
-                                <mat-label>{{ e.key }}</mat-label>
-                                <mat-select [formControl]="e.control">
-                                    <mat-option value="true">true</mat-option>
-                                    <mat-option value="false">false</mat-option>
-                                </mat-select>
-                            </mat-form-field>
+                <div
+                    class="sf-row flex min-h-8 min-w-0 items-center gap-2"
+                    [attr.data-key]="e.key"
+                    (focusout)="onRowFocusOut(e, $event)"
+                    (keydown.escape)="stopEditing()"
+                >
+                    <span class="text-secondary flex w-40 shrink-0 items-center gap-1 text-sm">
+                        <span class="sf-label truncate" [id]="labelId(e)" [title]="e.key">{{ e.key }}</span>
+                        @if (e.kind === 'json') {
+                            <span class="shrink-0 text-xs opacity-60" aria-hidden="true">JSON</span>
                         }
-                        @case ('number') {
-                            <mat-form-field subscriptSizing="dynamic" class="flex-1">
-                                <mat-label>{{ e.key }}</mat-label>
-                                <input matInput type="number" [formControl]="e.control" />
-                                @if (e.control.hasError('number')) {
-                                    <mat-error>Must be a number</mat-error>
-                                }
-                            </mat-form-field>
-                        }
-                        @case ('json') {
-                            <mat-form-field subscriptSizing="dynamic" class="flex-1">
-                                <mat-label>{{ e.key }} (JSON)</mat-label>
-                                <textarea
-                                    matInput
-                                    rows="3"
-                                    class="font-mono !text-xs"
-                                    [formControl]="e.control"
-                                ></textarea>
-                                @if (e.control.hasError('json')) {
-                                    <mat-error
-                                        >Not valid JSON — the value is kept as authored until it parses</mat-error
+                    </span>
+                    <div class="flex min-w-0 flex-1 items-center">
+                        @switch (e.kind) {
+                            @case ('boolean') {
+                                <mat-slide-toggle
+                                    class="sf-toggle"
+                                    [checked]="e.control.value === 'true'"
+                                    [aria-labelledby]="labelId(e)"
+                                    (change)="setBoolean(e, $event.checked)"
+                                ></mat-slide-toggle>
+                            }
+                            @default {
+                                @if (isEditing(e)) {
+                                    <mat-form-field
+                                        class="sf-dense w-full"
+                                        appearance="outline"
+                                        subscriptSizing="dynamic"
                                     >
+                                        @if (e.kind === 'json') {
+                                            <textarea
+                                                matInput
+                                                rows="3"
+                                                class="font-mono !text-xs"
+                                                [formControl]="e.control"
+                                                [attr.aria-labelledby]="labelId(e)"
+                                            ></textarea>
+                                        } @else {
+                                            <input
+                                                matInput
+                                                [type]="e.kind === 'number' ? 'number' : 'text'"
+                                                [formControl]="e.control"
+                                                [attr.aria-labelledby]="labelId(e)"
+                                                (keydown.enter)="stopEditing()"
+                                            />
+                                        }
+                                    </mat-form-field>
+                                } @else {
+                                    <button
+                                        type="button"
+                                        class="sf-value hover:bg-hover min-w-0 flex-1 truncate rounded px-1 py-0.5 text-left font-mono text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                                        [class.text-secondary]="displayValue(e) === '—'"
+                                        [attr.aria-label]="e.key + ': ' + displayValue(e)"
+                                        [title]="displayValue(e)"
+                                        (click)="startEditing(e)"
+                                    >
+                                        {{ displayValue(e) }}
+                                    </button>
                                 }
-                            </mat-form-field>
+                            }
                         }
-                        @default {
-                            <mat-form-field subscriptSizing="dynamic" class="flex-1">
-                                <mat-label>{{ e.key }}</mat-label>
-                                <input matInput [formControl]="e.control" />
-                            </mat-form-field>
-                        }
+                    </div>
+                    @if (e.kind !== 'boolean') {
+                        <button
+                            type="button"
+                            class="sf-pencil text-secondary hover:bg-hover flex h-7 w-7 shrink-0 items-center justify-center rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                            [attr.aria-label]="(isEditing(e) ? 'Done editing ' : 'Edit ') + e.key"
+                            (click)="isEditing(e) ? stopEditing() : startEditing(e)"
+                        >
+                            <mat-icon
+                                class="icon-size-4"
+                                [svgIcon]="isEditing(e) ? 'heroicons_outline:check' : 'heroicons_outline:pencil'"
+                            ></mat-icon>
+                        </button>
                     }
                     <button
-                        mat-icon-button
                         type="button"
-                        class="mt-1 shrink-0"
-                        (click)="remove(e.key)"
+                        class="text-secondary hover:bg-hover flex h-7 w-7 shrink-0 items-center justify-center rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                         [attr.aria-label]="'Remove ' + e.key"
                         [matTooltip]="'Remove ' + e.key"
+                        (click)="remove(e.key)"
                     >
-                        <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:x-mark"></mat-icon>
                     </button>
                 </div>
+                @if (rowError(e); as err) {
+                    <p class="text-warn m-0 pl-40 text-xs" role="alert">{{ err }}</p>
+                }
             } @empty {
                 <p class="text-sm opacity-60">
                     {{ allowAdd() ? 'No config yet — add an entry below.' : 'No keys outside the schema.' }}
@@ -119,17 +173,15 @@ interface ExtraEntry {
             @if (allowAdd()) {
                 <!-- Adding is offered ONLY where this editor is the node's primary surface (no schema
                      at all) — a schema-backed type's vocabulary is the schema. -->
-                <div class="flex items-start gap-1">
-                    <mat-form-field subscriptSizing="dynamic" class="flex-1">
-                        <mat-label>Key</mat-label>
-                        <input matInput [formControl]="draftKey" />
+                <div class="mt-1 flex items-start gap-1">
+                    <mat-form-field class="sf-dense flex-1" appearance="outline" subscriptSizing="dynamic">
+                        <input matInput placeholder="New key" aria-label="New key" [formControl]="draftKey" />
                         @if (draftKey.hasError('duplicate')) {
                             <mat-error>That key already exists above</mat-error>
                         }
                     </mat-form-field>
-                    <mat-form-field subscriptSizing="dynamic" class="w-28 shrink-0">
-                        <mat-label>Type</mat-label>
-                        <mat-select [formControl]="draftKind">
+                    <mat-form-field class="sf-dense w-28 shrink-0" appearance="outline" subscriptSizing="dynamic">
+                        <mat-select aria-label="Type of the new key" [formControl]="draftKind">
                             <mat-option value="text">Text</mat-option>
                             <mat-option value="number">Number</mat-option>
                             <mat-option value="boolean">True/false</mat-option>
@@ -139,7 +191,7 @@ interface ExtraEntry {
                     <button
                         mat-icon-button
                         type="button"
-                        class="mt-1 shrink-0"
+                        class="sf-dense-button shrink-0"
                         [disabled]="!draftKey.value.trim() || draftKey.invalid"
                         (click)="add()"
                         aria-label="Add config entry"
@@ -154,6 +206,8 @@ interface ExtraEntry {
 })
 export class PipelineExtraConfigComponent {
     private fb = inject(FormBuilder);
+    private cdr = inject(ChangeDetectorRef);
+    private host = inject<ElementRef<HTMLElement>>(ElementRef);
 
     /** The unmodelled entries, with their ORIGINAL typed values (`splitNodeConfig().extraRows`). */
     readonly entries = input.required<{ key: string; value: unknown }[]>();
@@ -184,6 +238,72 @@ export class PipelineExtraConfigComponent {
         if (kind === 'number') control.addValidators(numberValidator);
         if (kind === 'json') control.addValidators(jsonValidator);
         return { key, kind, control, original: value, added };
+    }
+
+    // ── property-row editing ────────────────────────────────────────────────────────────────────
+
+    /** The ONE row whose real control is rendered inline. */
+    readonly editingKey = signal<string | null>(null);
+
+    isEditing(e: ExtraEntry): boolean {
+        return this.editingKey() === e.key;
+    }
+
+    labelId(e: ExtraEntry): string {
+        return 'xc-' + e.key.replace(/[^A-Za-z0-9_-]/g, '_');
+    }
+
+    /** What the row shows in display mode: the value, or an em dash when there is none. */
+    displayValue(e: ExtraEntry): string {
+        const v = e.control.value;
+        if (e.kind === 'json') {
+            try {
+                return JSON.stringify(JSON.parse(v));
+            } catch {
+                return v;
+            }
+        }
+        return v === '' ? '—' : v;
+    }
+
+    rowError(e: ExtraEntry): string | null {
+        if (!e.control.touched && !e.control.dirty) return null;
+        if (e.control.hasError('number')) return 'Must be a number';
+        if (e.control.hasError('json')) return 'Not valid JSON — the value is kept as authored until it parses';
+        return null;
+    }
+
+    startEditing(e: ExtraEntry): void {
+        this.editingKey.set(e.key);
+        this.cdr.detectChanges();
+        const row = this.host.nativeElement.querySelector<HTMLElement>(
+            `.sf-row[data-key="${e.key.replace(/"/g, '\\"')}"]`,
+        );
+        row?.querySelector<HTMLElement>('input, textarea')?.focus();
+    }
+
+    stopEditing(): void {
+        if (this.editingKey() === null) return;
+        const row = this.rows().find((r) => r.key === this.editingKey());
+        row?.control.markAsTouched();
+        this.editingKey.set(null);
+        this.changed.emit();
+        this.cdr.markForCheck();
+    }
+
+    /** Leaving the row (tab, click elsewhere) commits the edit — the control already holds the value. */
+    onRowFocusOut(e: ExtraEntry, ev: FocusEvent): void {
+        if (!this.isEditing(e)) return;
+        const next = ev.relatedTarget as Node | null;
+        const row = (ev.currentTarget as HTMLElement | null) ?? null;
+        if (next && row?.contains(next)) return;
+        this.stopEditing();
+    }
+
+    setBoolean(e: ExtraEntry, checked: boolean): void {
+        e.control.setValue(checked ? 'true' : 'false');
+        e.control.markAsDirty();
+        this.changed.emit();
     }
 
     add(): void {

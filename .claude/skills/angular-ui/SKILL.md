@@ -208,7 +208,12 @@ src/app/
   `pipelines/pipeline-extra-config.component` — the ACTUAL key as label, a control per stored value
   TYPE (boolean select / validated number / validated-JSON textarea / text), typed round-trip through
   `buildConfiguredNode({extras})`, untouched entries emitted as their ORIGINAL value reference; ⛔ no
-  generic Key/Value grid, and adding keys only where the node type has no schema at all.
+  generic Key/Value grid, and adding keys only where the node type has no schema at all. **Since
+  2026-09-05 it renders PROPERTY ROWS** — label · value · pencil, the schema-form's flat idiom over the
+  shared `.sf-*` geometry; a boolean is a toggle with no pencil — and every definition-pane schema-form,
+  the Collector's three included, is `[flat]="true"`: no Advanced gear, no chevron disclosure. A new
+  pane section that shows stored values follows the same idiom; do not reintroduce a stack of outlined
+  Material fields beside property rows.
   ⚠ The segments editor stays HOST-side (projected via `[grammarExtras]`): segments need one schema
   `.toon` written per segment before the block that references them, which is a write path this
   component deliberately does not have. ⚠ **A host must never read a shared component through

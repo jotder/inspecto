@@ -73,6 +73,7 @@ import { nodeAttributesFor } from './node-attributes';
                 <div class="mb-1 mt-3 text-xs font-semibold uppercase opacity-70">Duplicate handling</div>
                 <inspecto-schema-form
                     #dedup
+                    [flat]="true"
                     [specs]="dedupSpecs()"
                     [initial]="split().schemaInitial"
                     (submitted)="submit()"
@@ -89,6 +90,7 @@ import { nodeAttributesFor } from './node-attributes';
                 <div class="mb-1 mt-3 text-xs font-semibold uppercase opacity-70">Unpack</div>
                 <inspecto-schema-form
                     #unpack
+                    [flat]="true"
                     [specs]="unpackSpecs()"
                     [initial]="split().schemaInitial"
                     (submitted)="submit()"
@@ -97,27 +99,13 @@ import { nodeAttributesFor } from './node-attributes';
 
             <!-- Additional config: keys OUTSIDE the schema, each with its ACTUAL key and a control
                  matching the stored value's TYPE (2026-08-21 — the generic Key/Value grid is gone).
-                 No add here: the collector's vocabulary is its schema. -->
-            <div class="mb-1 mt-2 flex items-center justify-between">
-                <button
-                    type="button"
-                    class="flex items-center gap-1 text-xs font-semibold uppercase opacity-70"
-                    [attr.aria-expanded]="freeFormOpen()"
-                    (click)="freeFormOpen.set(!freeFormOpen())"
-                >
-                    <mat-icon
-                        class="icon-size-4"
-                        [svgIcon]="
-                            freeFormOpen() ? 'heroicons_outline:chevron-down' : 'heroicons_outline:chevron-right'
-                        "
-                    ></mat-icon>
+                 No add here: the collector's vocabulary is its schema. A plain section header, no
+                 chevron, shown only when there ARE rows — the same idiom as the Sink pane (R6). -->
+            @if (split().extraRows.length) {
+                <div class="mb-1 mt-3 text-xs font-semibold uppercase opacity-70">
                     Additional config
-                    @if (split().extraRows.length) {
-                        <span class="opacity-60">({{ split().extraRows.length }})</span>
-                    }
-                </button>
-            </div>
-            @if (freeFormOpen()) {
+                    <span class="opacity-60">({{ split().extraRows.length }})</span>
+                </div>
                 <app-pipeline-extra-config [entries]="split().extraRows" (changed)="onInteraction()" />
             }
         </form>
@@ -172,8 +160,6 @@ export class PipelineCollectionDefinitionComponent {
     /** Schema seed + free-form rows — the same split the dialog runs (`node-config-build.ts`). */
     readonly split = computed(() => splitNodeConfig(this.node(), this.specs(), true));
 
-    readonly freeFormOpen = signal(false);
-
     readonly form = this.fb.group({});
 
     private lastDirty = false;
@@ -183,7 +169,6 @@ export class PipelineCollectionDefinitionComponent {
         // this runs once per instance — but an input swap without recreation re-seeds correctly too.
         effect(() => {
             this.node();
-            this.freeFormOpen.set(this.split().extraRows.length > 0);
             this.emitDirty();
         });
     }

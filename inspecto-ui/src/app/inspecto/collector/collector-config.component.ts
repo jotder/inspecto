@@ -73,11 +73,15 @@ export type CollectorMode = 'local' | 'connection' | 'dataset';
                 </mat-button-toggle-group>
             </div>
 
+            <!-- flat: the same property-row list as every other definition pane (Parse · Transform ·
+                 Sink) — one idiom, no "Advanced settings" gear hiding a tier behind an icon
+                 (operator, 2026-09-05). -->
             <inspecto-schema-form
                 #sf
                 [specs]="visibleSpecs()"
                 [initial]="seed()"
                 [optionLoaders]="optionLoaders"
+                [flat]="true"
                 (submitted)="submitted.emit()"
             />
 

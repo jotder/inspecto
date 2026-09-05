@@ -274,17 +274,23 @@ describe('PipelineConfigDefinitionComponent', () => {
                 },
             });
             const el = fixture.nativeElement as HTMLElement;
-            const labels = Array.from(el.querySelectorAll('app-pipeline-extra-config mat-label')).map((l) =>
+            // Property rows (2026-09-05): the key is the row label, the value reads as text until edited.
+            const labels = Array.from(el.querySelectorAll('app-pipeline-extra-config .sf-label')).map((l) =>
                 l.textContent?.trim(),
             );
-            expect(labels).toContain('note');
-            expect(labels).toContain('retries');
-            expect(labels).toContain('enabled');
-            expect(labels).toContain('block (JSON)');
-            // number gets a numeric input; json a textarea; boolean a select
+            expect(labels).toEqual(['note', 'retries', 'enabled', 'block']);
+            // a boolean is its own editor (a toggle), so it has no pencil
+            expect(el.querySelector('app-pipeline-extra-config mat-slide-toggle')).toBeTruthy();
+            expect(el.querySelector('app-pipeline-extra-config [data-key="enabled"] .sf-pencil')).toBeNull();
+            expect(el.querySelector('app-pipeline-extra-config [data-key="retries"] .sf-pencil')).toBeTruthy();
+            // editing a row reveals the control that matches its TYPE: number → numeric input, json → textarea
+            const extra = extraEditor(fixture);
+            extra.startEditing(extra.rows()[1]);
+            fixture.detectChanges();
             expect(el.querySelector('app-pipeline-extra-config input[type="number"]')).toBeTruthy();
+            extra.startEditing(extra.rows()[3]);
+            fixture.detectChanges();
             expect(el.querySelector('app-pipeline-extra-config textarea')).toBeTruthy();
-            expect(el.querySelector('app-pipeline-extra-config mat-select')).toBeTruthy();
         });
 
         it('an edited number applies as a NUMBER, validated', async () => {
@@ -867,9 +873,8 @@ describe('PipelineConfigDefinitionComponent', () => {
                     write: writeSpy as unknown as ConfigService['write'],
                 },
             );
-            const editor = fixture.debugElement.query(
-                By.css('inspecto-schema-partitions-editor'),
-            ).componentInstance as { addRow: () => void; form: { controls: Record<string, unknown> } };
+            const editor = fixture.debugElement.query(By.css('inspecto-schema-partitions-editor'))
+                .componentInstance as { addRow: () => void; form: { controls: Record<string, unknown> } };
             // Add one segment through the editor's own API — mirrors how the shared component's own
             // spec drives it, keeping this test decoupled from its internal form shape.
             editor.addRow();
