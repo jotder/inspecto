@@ -1,0 +1,42 @@
+name: summarize_step
+active: true
+version: 1
+
+dirs:
+  poll:       spaces/default/data/inbox/summarize_step
+  database:   spaces/default/data/summarize_step/database
+  backup:     spaces/default/data/summarize_step/backup
+  temp:       spaces/default/data/summarize_step/temp
+  errors:     spaces/default/data/summarize_step/errors
+  quarantine: spaces/default/data/summarize_step/quarantine
+  markers:    spaces/default/data/summarize_step/markers
+  status_dir: spaces/default/data/summarize_step/status
+  log_dir:    spaces/default/data/summarize_step/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: spaces/default/config/summarize_step/summarize_step_schema.toon
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+output_store: summarize_step_rollup
+
+steps[1]:
+  - summarize:
+      group_by[1]: REGION
+      measures[3]: count, "sum(GROSS)", "max(UNIT_PRICE)"
+
+collector:
+  discovery: poll
+  connector: local

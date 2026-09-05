@@ -1,0 +1,5 @@
+job:
+  name: dedup_step_rollup
+  type: pipeline
+  pipeline_config: spaces/default/config/dedup_step/dedup_step_pipeline.toon
+  on_pipeline: dedup_step

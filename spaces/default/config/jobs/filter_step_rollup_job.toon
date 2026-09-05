@@ -1,0 +1,5 @@
+job:
+  name: filter_step_rollup
+  type: pipeline
+  pipeline_config: spaces/default/config/filter_step/filter_step_pipeline.toon
+  on_pipeline: filter_step

@@ -1,0 +1,42 @@
+name: xml_example
+active: true
+version: 1
+
+dirs:
+  poll:       spaces/default/data/inbox/xml_example
+  database:   spaces/default/data/xml_example/database
+  backup:     spaces/default/data/xml_example/backup
+  temp:       spaces/default/data/xml_example/temp
+  errors:     spaces/default/data/xml_example/errors
+  quarantine: spaces/default/data/xml_example/quarantine
+  markers:    spaces/default/data/xml_example/markers
+  status_dir: spaces/default/data/xml_example/status
+  log_dir:    spaces/default/data/xml_example/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.xml"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  csv_settings:
+    date_formats[1]: "%Y-%m-%d"
+
+parsing:
+  frontend: plugin
+  plugin:
+    ingester: com.gamma.ingester.XmlRecordIngester
+    segments:
+      order: spaces/default/config/xml_example/xml_example_schema.toon
+    ingester_config:
+      record_element: order
+      namespace_aware: false
+
+collector:
+  discovery: poll
+  connector: local

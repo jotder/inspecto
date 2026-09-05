@@ -35,4 +35,15 @@ for f in csv_example fixedwidth_example excel_example json_example; do
   done
   cp "$f"/* "../inbox/$f/"
 done
-echo "Seeded csv/fixedwidth/excel/json example inboxes (+ the retired subscriber/events/cdr/gwlog corpora) + ref/ - restart the server or wait for the next poll cycle."
+# The Step catalog (one pipeline per Step kind, 2026-09-06) + the asn1 / xml parse frontends. The
+# five at-rest Steps (filter/dedup/join/summarize/sql) also have a config/jobs/<name>_rollup_job.toon
+# that runs their steps[] chain over the landed store on every commit. collect_step's samples keep
+# their sub-directory: recursion is what that example shows.
+for f in filter_step dedup_step join_step summarize_step sql_step route_step collect_step sink_step asn1_example xml_example; do
+  mkdir -p "../inbox/$f"
+  for sub in database backup temp errors quarantine markers status logs; do
+    mkdir -p "../$f/$sub"
+  done
+  cp -r "$f"/. "../inbox/$f/"
+done
+echo "Seeded csv/fixedwidth/excel/json example inboxes, the Step catalog (*_step) + asn1/xml examples (+ the retired subscriber/events/cdr/gwlog corpora) + ref/ - restart the server or wait for the next poll cycle."

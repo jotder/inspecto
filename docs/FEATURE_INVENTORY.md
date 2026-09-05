@@ -189,7 +189,7 @@ runnable and deletable, never newly written (the `Pipeline*Routes` modules). The
 
 ---
 
-## 2. Existing example configs (under `spaces/<id>/config/` — `ucc` hosts voucher; `default` hosts the format-example pack (csv/fixedwidth/excel/json — one worked pipeline per DuckDB-native parser frontend, replacing the retired subscriber/gwlog/cdr/csv_demo pipelines 2026-08-20) plus a Catalog/KPI demo (`events/`); `demo` hosts the full editable sample catalog — one sample of every authorable kind + committed sample data, see [`../spaces/demo/config/README.md`](../spaces/demo/config/README.md))
+## 2. Existing example configs (under `spaces/<id>/config/` — `ucc` hosts voucher; `default` hosts the format-example pack (csv/fixedwidth/excel/json — one worked pipeline per DuckDB-native parser frontend, replacing the retired subscriber/gwlog/cdr/csv_demo pipelines 2026-08-20 — plus `asn1_example`/`xml_example` for the plugin-ingester frontends, 2026-09-06), the **Step catalog** (`<kind>_step/` — one pipeline per Step kind of `step-types.contract.json`; the five at-rest ones run through `jobs/<kind>_step_rollup_job.toon`, mirroring `inspecto/examples/07-steps/`), and a Catalog/KPI demo (`events/`); `demo` hosts the full editable sample catalog — one sample of every authorable kind + committed sample data, see [`../spaces/demo/config/README.md`](../spaces/demo/config/README.md))
 
 | File | Demonstrates |
 |---|---|

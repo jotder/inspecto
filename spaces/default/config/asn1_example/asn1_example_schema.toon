@@ -1,0 +1,15 @@
+partitionKey: IMSI
+raw:
+  name: mo_call
+  format: CSV
+  fields[3]{name,selector,type}:
+    IMSI,imsi,VARCHAR
+    DURATION,duration,INTEGER
+    B_NUMBER,party.number,VARCHAR
+mapping:
+  canonicalName: asn1_example
+  rawName: mo_call
+  fields[3]{name,from,fn}:
+    IMSI,IMSI,keep
+    DURATION,DURATION,keep
+    B_NUMBER,B_NUMBER,keep

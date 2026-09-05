@@ -1,0 +1,5 @@
+job:
+  name: sql_step_rollup
+  type: pipeline
+  pipeline_config: spaces/default/config/sql_step/sql_step_pipeline.toon
+  on_pipeline: sql_step

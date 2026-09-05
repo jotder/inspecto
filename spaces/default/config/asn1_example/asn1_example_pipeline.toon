@@ -1,0 +1,39 @@
+name: asn1_example
+active: true
+version: 1
+
+dirs:
+  poll:       spaces/default/data/inbox/asn1_example
+  database:   spaces/default/data/asn1_example/database
+  backup:     spaces/default/data/asn1_example/backup
+  temp:       spaces/default/data/asn1_example/temp
+  errors:     spaces/default/data/asn1_example/errors
+  quarantine: spaces/default/data/asn1_example/quarantine
+  markers:    spaces/default/data/asn1_example/markers
+  status_dir: spaces/default/data/asn1_example/status
+  log_dir:    spaces/default/data/asn1_example/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.ber"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+
+parsing:
+  frontend: asn1
+  asn1:
+    grammar: "CDR DEFINITIONS IMPLICIT TAGS ::= BEGIN CallEventRecord ::= SEQUENCE { moCallRecord [0] MoCall, smsRecord [1] Sms } MoCall ::= SEQUENCE { imsi [0] IA5String, duration [1] INTEGER, party [2] Party OPTIONAL } Party ::= SEQUENCE { number [0] IA5String } Sms ::= SEQUENCE { imsi [0] IA5String } END"
+    root_type: CallEventRecord
+    strictness: BER
+    segments:
+      moCallRecord: spaces/default/config/asn1_example/asn1_example_schema.toon
+
+collector:
+  discovery: poll
+  connector: local

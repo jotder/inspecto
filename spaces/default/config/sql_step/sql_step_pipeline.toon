@@ -1,0 +1,41 @@
+name: sql_step
+active: true
+version: 1
+
+dirs:
+  poll:       spaces/default/data/inbox/sql_step
+  database:   spaces/default/data/sql_step/database
+  backup:     spaces/default/data/sql_step/backup
+  temp:       spaces/default/data/sql_step/temp
+  errors:     spaces/default/data/sql_step/errors
+  quarantine: spaces/default/data/sql_step/quarantine
+  markers:    spaces/default/data/sql_step/markers
+  status_dir: spaces/default/data/sql_step/status
+  log_dir:    spaces/default/data/sql_step/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: spaces/default/config/sql_step/sql_step_schema.toon
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+output_store: sql_step_rollup
+
+steps[1]:
+  - sql:
+      sql: "SELECT ORDER_ID, ORDER_DATE, REGION, STATUS, GROSS, ROUND(GROSS / 1.19, 2) AS NET, CASE WHEN GROSS >= 50 THEN 'LARGE' ELSE 'SMALL' END AS SIZE_BAND FROM input WHERE STATUS <> 'CANCELLED'"
+
+collector:
+  discovery: poll
+  connector: local

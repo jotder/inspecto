@@ -1,0 +1,5 @@
+job:
+  name: join_step_rollup
+  type: pipeline
+  pipeline_config: spaces/default/config/join_step/join_step_pipeline.toon
+  on_pipeline: join_step

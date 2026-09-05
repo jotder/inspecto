@@ -1,0 +1,41 @@
+name: filter_step
+active: true
+version: 1
+
+dirs:
+  poll:       spaces/default/data/inbox/filter_step
+  database:   spaces/default/data/filter_step/database
+  backup:     spaces/default/data/filter_step/backup
+  temp:       spaces/default/data/filter_step/temp
+  errors:     spaces/default/data/filter_step/errors
+  quarantine: spaces/default/data/filter_step/quarantine
+  markers:    spaces/default/data/filter_step/markers
+  status_dir: spaces/default/data/filter_step/status
+  log_dir:    spaces/default/data/filter_step/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: spaces/default/config/filter_step/filter_step_schema.toon
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+output_store: filter_step_rollup
+
+steps[1]:
+  - filter:
+      where: "STATUS = 'SHIPPED' AND GROSS >= 30"
+
+collector:
+  discovery: poll
+  connector: local

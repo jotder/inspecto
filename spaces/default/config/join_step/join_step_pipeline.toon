@@ -1,0 +1,42 @@
+name: join_step
+active: true
+version: 1
+
+dirs:
+  poll:       spaces/default/data/inbox/join_step
+  database:   spaces/default/data/join_step/database
+  backup:     spaces/default/data/join_step/backup
+  temp:       spaces/default/data/join_step/temp
+  errors:     spaces/default/data/join_step/errors
+  quarantine: spaces/default/data/join_step/quarantine
+  markers:    spaces/default/data/join_step/markers
+  status_dir: spaces/default/data/join_step/status
+  log_dir:    spaces/default/data/join_step/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: spaces/default/config/join_step/join_step_schema.toon
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+output_store: join_step_rollup
+
+steps[1]:
+  - join:
+      reference: spaces/default/data/ref/region_dim.csv
+      on[1]: REGION
+
+collector:
+  discovery: poll
+  connector: local

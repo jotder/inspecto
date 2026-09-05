@@ -1,0 +1,5 @@
+job:
+  name: summarize_step_rollup
+  type: pipeline
+  pipeline_config: spaces/default/config/summarize_step/summarize_step_pipeline.toon
+  on_pipeline: summarize_step

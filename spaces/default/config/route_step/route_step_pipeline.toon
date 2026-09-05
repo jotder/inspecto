@@ -1,0 +1,45 @@
+name: route_step
+active: true
+version: 1
+
+dirs:
+  poll:       spaces/default/data/inbox/route_step
+  database:   spaces/default/data/route_step/database
+  backup:     spaces/default/data/route_step/backup
+  temp:       spaces/default/data/route_step/temp
+  errors:     spaces/default/data/route_step/errors
+  quarantine: spaces/default/data/route_step/quarantine
+  markers:    spaces/default/data/route_step/markers
+  status_dir: spaces/default/data/route_step/status
+  log_dir:    spaces/default/data/route_step/logs
+
+output:
+  format: CSV
+
+sinks[2]{database,format}:
+  spaces/default/data/route_step/domestic,CSV
+  spaces/default/data/route_step/other,CSV
+
+route:
+  mode: case
+  default: other
+  branches[2]{key,where,database}:
+    domestic,"REGION IN ('NORTH', 'SOUTH')",spaces/default/data/route_step/domestic
+    other,"REGION IN ('EAST', 'WEST')",spaces/default/data/route_step/other
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: spaces/default/config/route_step/route_step_schema.toon
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

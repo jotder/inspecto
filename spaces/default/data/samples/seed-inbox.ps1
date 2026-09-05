@@ -33,4 +33,15 @@ foreach ($f in 'csv_example','fixedwidth_example','excel_example','json_example'
   }
   Copy-Item -Path (Join-Path $PSScriptRoot "$f/*") -Destination (Join-Path $data "inbox/$f") -Force
 }
-Write-Host "Seeded csv/fixedwidth/excel/json example inboxes (+ the retired subscriber/events/cdr/gwlog corpora) + ref/ - restart the server or wait for the next poll cycle."
+# The Step catalog (one pipeline per Step kind, 2026-09-06) + the asn1 / xml parse frontends. The
+# five at-rest Steps (filter/dedup/join/summarize/sql) also have a config/jobs/<name>_rollup_job.toon
+# that runs their steps[] chain over the landed store on every commit. collect_step's samples keep
+# their sub-directory: recursion is what that example shows.
+foreach ($f in 'filter_step','dedup_step','join_step','summarize_step','sql_step','route_step','collect_step','sink_step','asn1_example','xml_example') {
+  New-Item -ItemType Directory -Force -Path (Join-Path $data "inbox/$f") | Out-Null
+  foreach ($sub in 'database','backup','temp','errors','quarantine','markers','status','logs') {
+    New-Item -ItemType Directory -Force -Path (Join-Path $data "$f/$sub") | Out-Null
+  }
+  Copy-Item -Path (Join-Path $PSScriptRoot "$f/*") -Destination (Join-Path $data "inbox/$f") -Recurse -Force
+}
+Write-Host "Seeded csv/fixedwidth/excel/json example inboxes, the Step catalog (*_step) + asn1/xml examples (+ the retired subscriber/events/cdr/gwlog corpora) + ref/ - restart the server or wait for the next poll cycle."
