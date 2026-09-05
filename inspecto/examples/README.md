@@ -78,6 +78,9 @@ matter for how you run them:
   expected row count. A `route` step is the exception the other way: it lives on the ingest lane
   (each branch pairs with its own `sinks[]` destination), so the at-rest lift refuses it.
 
+The full reference — every key of every Step kind, the refusals, and the palette's pending processors —
+is [`docs/okf/backend/pipeline-graph/step-catalog.md`](../../docs/okf/backend/pipeline-graph/step-catalog.md).
+
 | Step (verb → node type) | What it does · the keys it takes | Example | Run |
 |---|---|---|---|
 | **collect** → `acquisition` | Discovers files for the pipeline: `collector.connector` (`local` here; a saved Connection otherwise), `discovery: poll`, `include[]`/`exclude[]` patterns that override `processing.file_pattern`, `recursive_depth`, `gap_detection` over a numbered series, plus the marker-based `duplicate_check`. The draft file and `notes.txt` are left in the inbox; the file under `archive/` is found by recursion. | `07-steps/collect` | `run-example 07-steps/collect` |

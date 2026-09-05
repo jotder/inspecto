@@ -104,7 +104,10 @@ former root reference docs** (each index lists them):
 > §16–§20), NEW [`execution-lanes.md`](okf/backend/pipeline-graph/execution-lanes.md) (the one
 > owner of "which lanes run a pipeline") and NEW
 > [`pipeline-config-keys.md`](okf/backend/pipeline-graph/pipeline-config-keys.md) (the key census:
-> 42 read / 25 declared / 17 parser-only). Re-grounded the same day: `job-vs-step.md` (the
+> 42 read / 25 declared / 17 parser-only), and (2026-09-06) NEW
+> [`step-catalog.md`](okf/backend/pipeline-graph/step-catalog.md) — every Step kind, delivered and
+> pending: the 15 executable kinds with keys/behaviour/refusals/examples plus the 119-processor palette
+> taxonomy split delivered / partial / planned. Re-grounded the same day: `job-vs-step.md` (the
 > PipelineNodeExecutor + packs reality), `ADVANCED_GUIDE.md` §5.3/§10 (retired flow-authoring
 > surface removed, current route list), the Batch→Consignment prose sweep (code names; wire/DDL
 > residuals stay BACKLOG §4), and `configuration.md`'s ghost `source:` block → `collector:`
