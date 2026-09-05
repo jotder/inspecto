@@ -29,6 +29,21 @@ class ConsignmentPlannerTest {
         return p.toFile();
     }
 
+    /**
+     * A plugin-ingester pipeline (segments, no single schema) resolves every file to a selection
+     * whose schema is null — the planner must still pack it, labelled "schema", instead of dying
+     * before the first batch (the one-shot ASN.1/XML runs did exactly that, 2026-09-06).
+     */
+    @Test
+    void aSelectionWithoutASchemaStillPlans(@TempDir Path dir) throws Exception {
+        List<File> files = List.of(file(dir, "cdr_1.ber", 20), file(dir, "cdr_2.ber", 20));
+        ConsignmentPlanner.SchemaResolver noSchema = f -> new SchemaSelector.Selection(null, null);
+        List<Consignment> batches = ConsignmentPlanner.plan(files, noSchema, 10, Long.MAX_VALUE, "TS");
+        assertEquals(1, batches.size());
+        assertEquals("schema", batches.get(0).schemaName());
+        assertEquals(2, batches.get(0).members().size());
+    }
+
     @Test
     void packsByFileCount(@TempDir Path dir) throws Exception {
         List<File> files = new ArrayList<>();

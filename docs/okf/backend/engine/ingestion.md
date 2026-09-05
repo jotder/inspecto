@@ -41,7 +41,10 @@ Selectors (parsed in `PipelineConfigParser`): `processing.streaming.large_file_b
 * `CollectorProcessor` (`inspecto-engine/src/main/java/com/gamma/inspector/CollectorProcessor.java`) — the per-source ETL
   entry point, split into two halves (B3b): **`acquire(cfg)`** runs the [acquisition](../acquisition/framework.md)
   phases (remote fetch-and-land; a no-op for a `local` collector), and **`ingest(cfg, onCommit)`** scans the
-  inbox → groups into `Consignment`s via `ConsignmentPlanner` (bounded by
+  inbox → groups into `Consignment`s via `ConsignmentPlanner` — whose audit label is the selected schema's
+  `raw.name`, or the literal `schema` for a plugin-ingester pipeline, whose selection carries NO single
+  schema (segments are chosen per record at ingest; a `null` there threw until 2026-09-06, so no plugin
+  pipeline could plan a batch through `CollectorProcessor`) — (bounded by
   `collector.consignment.max_files`/`max_bytes`, ordered by `collector.consignment.order` — the canonical home
   since 2026-09-02 (CONSIGNMENT-HOME-1; `processing.batch.*` is the dual-read legacy spelling, healed on save);
   `Consignment.batchId` keeps its wire spelling — **default `mtime`

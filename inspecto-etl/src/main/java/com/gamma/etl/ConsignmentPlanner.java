@@ -117,9 +117,18 @@ public final class ConsignmentPlanner {
         return new Consignment(batchId, schemaName, "default".equals(table) ? null : table, reindexed);
     }
 
-    @SuppressWarnings("unchecked")
+    /**
+     * The audit label of the schema a consignment was planned under — {@code raw.name} of the selected
+     * schema, else {@code "schema"}. A plugin-ingester pipeline (ASN.1, XML, fixed-width segments) has
+     * NO single schema: its records flatten onto {@code processing.segments}, chosen per record at
+     * ingest, so the one-shot resolver hands the planner a selection whose schema is {@code null}.
+     * That used to throw here, and every plugin pipeline run through {@code CollectorProcessor} died
+     * before its first batch (found by the 02-parsing/asn1-frontend example, 2026-09-06). The label is
+     * only ever read back by the manifest and audit rows, which already tolerate an unresolvable name.
+     */
     private static String schemaNameOf(SchemaSelector.Selection sel) {
-        Object raw = sel.schema().get("raw");
+        Map<String, Object> schema = sel == null ? null : sel.schema();
+        Object raw = schema == null ? null : schema.get("raw");
         if (raw instanceof Map<?, ?> rawMap && rawMap.get("name") != null)
             return String.valueOf(rawMap.get("name"));
         return "schema";
