@@ -185,26 +185,76 @@ describe('Transform pane: seeding', () => {
         const fixture = await create(sqlNode({ sql: 'anything', fields: stored }), [{ customer: 'A', extra: 'x' }]);
         const c = comp(fixture);
         expect(c.fields().map((f) => f.name)).toEqual(['buyer']);
-        expect(c.sqlOnly()).toBe(false);
+        expect(c.view()).toBe('fields');
     });
 
-    it('opens hand-written SQL read-only rather than inventing a grid that would rewrite it', async () => {
+    it('opens hand-written SQL in the SQL view, as written, with Fields one click away', async () => {
         const fixture = await create(sqlNode({ sql: 'SELECT weird FROM input' }), [{ a: '1' }]);
         const c = comp(fixture);
-        expect(c.sqlOnly()).toBe(true);
-        expect(c.storedSql()).toBe('SELECT weird FROM input');
+        expect(c.view()).toBe('sql');
+        expect(c.sqlText()).toBe('SELECT weird FROM input');
         expect(c.generatedSql()).toBe('SELECT weird FROM input');
-        expect(fixture.nativeElement.textContent).toContain('cannot be shown as a field list');
+        expect(c.fieldsDisabledReason()).toBeNull();
+        expect(fixture.componentInstance.dirty).toBe(false);
+    });
+});
+
+describe('Transform pane: Fields and SQL are two views of one Step', () => {
+    it('SQL → Fields reconciles a projection into rows, keeping unknown expressions as custom SQL', async () => {
+        const sql = 'SELECT a, TRIM(b) AS b, round(c / 1.19, 2) AS net FROM input';
+        const fixture = await create(sqlNode({ sql }), [{ a: '1', b: ' x ', c: '2' }]);
+        const c = comp(fixture);
+        c.showFieldsView();
+        fixture.detectChanges();
+        expect(c.view()).toBe('fields');
+        expect(c.fields().map((f) => [f.name, f.from, f.fn])).toEqual([
+            ['a', 'a', 'keep'],
+            ['b', 'b', 'text.trim'],
+            ['net', '', 'custom'],
+        ]);
+        expect(c.fields()[2].args['expression']).toBe('round(c / 1.19, 2)');
     });
 
-    it('can start a grid from the incoming columns, replacing hand-written SQL only when asked', async () => {
-        const fixture = await create(sqlNode({ sql: 'SELECT weird FROM input' }), [{ a: '1' }]);
+    it('a SQL that is more than a projection disables the Fields tab with a reason', async () => {
+        const fixture = await create(sqlNode({ sql: 'SELECT a FROM input WHERE a > 0' }), [{ a: '1' }]);
         const c = comp(fixture);
-        c.startGridFromColumns();
+        expect(c.fieldsDisabledReason()).toMatch(/cannot be shown as fields/);
+        c.showFieldsView();
+        expect(c.view()).toBe('sql');
+        const tab = fixture.nativeElement.querySelector('[role="tab"]') as HTMLButtonElement;
+        expect(tab.textContent?.trim()).toBe('Fields');
+        expect(tab.disabled).toBe(true);
+    });
+
+    it('Fields → SQL hands the generated SQL to the editor and arms nothing', async () => {
+        const fixture = await create(sqlNode(), [{ a: '1' }]);
+        const c = comp(fixture);
+        c.showSqlView();
         fixture.detectChanges();
-        expect(c.sqlOnly()).toBe(false);
-        expect(c.generatedSql()).toBe('SELECT\n  a AS a\nFROM input');
-        expect(fixture.componentInstance.dirty).toBe(true);
+        expect(c.view()).toBe('sql');
+        expect(c.sqlText()).toBe('SELECT\n  a AS a\nFROM input');
+        expect(fixture.componentInstance.dirty).toBe(false);
+        // …and back, still clean: switching views never changes the SQL.
+        c.showFieldsView();
+        expect(c.view()).toBe('fields');
+        expect(fixture.componentInstance.dirty).toBe(false);
+    });
+
+    it('SELECT * shown as fields seeds one passthrough row per incoming column', async () => {
+        const fixture = await create(sqlNode({ sql: 'SELECT * FROM input' }), [{ a: '1', b: '2' }]);
+        const c = comp(fixture);
+        c.showFieldsView();
+        expect(c.fields().map((f) => f.name)).toEqual(['a', 'b']);
+    });
+
+    it('applying from the SQL view writes fields: [] so the node reopens as SQL', async () => {
+        const fixture = await create(sqlNode(), [{ a: '1' }]);
+        const c = comp(fixture);
+        c.showSqlView();
+        c.onSqlEdited('SELECT a AS a, 1 AS one FROM input');
+        fixture.detectChanges();
+        c.submit();
+        expect(fixture.componentInstance.applied!.config?.['fields']).toEqual([]);
     });
 });
 
@@ -308,13 +358,13 @@ describe('Transform pane: Apply', () => {
 
     /**
      * ⚠ The drawer's Apply is armed by `dirtyChange`, and CodeMirror made the hand-written SQL editable —
-     * so while `canApply()` also refused `sqlOnly`, typing there armed the button and `submit()` returned
+     * so while `canApply()` also refused the SQL view, typing there armed the button and `submit()` returned
      * early: a real edit, a live button, and nothing saved.
      */
     it('arms Apply on a hand-written SQL edit and saves it', async () => {
         const fixture = await create(sqlNode({ sql: 'SELECT weird FROM input' }), [{ a: '1' }]);
         const c = comp(fixture);
-        expect(c.sqlOnly()).toBe(true);
+        expect(c.view()).toBe('sql');
         expect(fixture.componentInstance.dirty).toBe(false);
         c.onSqlEdited('SELECT weird, 1 AS one FROM input');
         fixture.detectChanges();

@@ -11,8 +11,9 @@ import { SqlFunction, quoteIdentifier, renderExpression, sqlFunction, usesSource
  *
  * <p><b>Round-trip.</b> `fields[]` is persisted BESIDE the generated `sql` in the node's config. The
  * engine reads only `sql` (the one declared attribute); `fields` rides the `steps:` chain opaquely, and
- * exists so reopening the Step rebuilds the grid exactly. That is what makes the grid safe without the
- * retired D6 "hand edit locks the grid" rule: nothing has to parse SQL back into rows.
+ * exists so reopening the Step rebuilds the grid exactly. Hand-written SQL comes back into rows only
+ * through the bounded reconciler (`pipeline-transform-sql-reconcile.ts`, 2026-09-05) — projections
+ * only, proven by re-compilation — never by guessing.
  */
 
 /** One output column of the Step. */

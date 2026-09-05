@@ -12,9 +12,11 @@
  * binds the row's source column to `{source}` automatically — the "auto map parameters against sql
  * functions" the operator asked for on 2026-09-03.
  *
- * <p><b>Forward-only.</b> A field compiles to SQL; SQL is never parsed back into a field. That is the
- * standing v1 rule (the retired D4): reading hand-written SQL into an editable row model needs an AST
- * and is gated on a `json_serialize_sql`-under-seal probe (BACKLOG AUTHORING-REDESIGN-1 (c)).
+ * <p><b>Both ways, within bounds.</b> A field compiles to SQL through {@link renderExpression}; the
+ * reverse — a projection's expression back into a field — is `pipeline-transform-sql-reconcile.ts`,
+ * which matches these same templates in reverse and re-compiles the result to prove the round-trip
+ * (2026-09-05, superseding D4). So a template edit here changes BOTH directions: keep every literal
+ * piece of a template distinct enough that no two templates can match the same text.
  *
  * <p><b>Forgiving by construction.</b> Every cast in this catalog is `TRY_CAST`, never bare `CAST`, and
  * every division guards its divisor with `NULLIF`. A bad cell nulls one cell instead of killing the

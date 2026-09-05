@@ -4,26 +4,64 @@
   under a pager (10/20/100). Native <select> rather than mat-select throughout the grid: this table is
   sized for 600+ rows, where a Material overlay per cell is the wrong trade.
 -->
-<div class="mb-2 flex items-center gap-2">
-    <span class="text-xs font-semibold uppercase opacity-70">Fields that come out</span>
+<div class="mb-2 flex flex-wrap items-center gap-2">
+    <span class="text-xs font-semibold uppercase opacity-70">
+        {{ view() === 'fields' ? 'Fields that come out' : 'SQL over the incoming rows' }}
+    </span>
     <span class="text-secondary text-xs">{{ summary() }}</span>
+    <!-- Fields | SQL — two views of ONE Step, same segmented control as the toolbar's Recipe | Canvas.
+         Fields → SQL is the compiler; SQL → Fields is the reconciler, and the tab is disabled (with the
+         reason as its tooltip and the line below) when the SQL is more than a projection. -->
+    <div
+        role="tablist"
+        aria-label="Edit as"
+        class="ml-auto inline-flex shrink-0 overflow-hidden rounded border"
+        style="border-color: var(--gamma-border)"
+    >
+        <button
+            type="button"
+            role="tab"
+            class="px-2 py-1 text-xs font-semibold"
+            [attr.aria-selected]="view() === 'fields'"
+            [disabled]="!!fieldsDisabledReason()"
+            [class.opacity-50]="!!fieldsDisabledReason()"
+            [title]="fieldsDisabledReason() ?? ''"
+            [style.background]="view() === 'fields' ? 'var(--gamma-bg-default)' : 'transparent'"
+            (click)="showFieldsView()"
+        >
+            Fields
+        </button>
+        <button
+            type="button"
+            role="tab"
+            class="px-2 py-1 text-xs font-semibold"
+            [attr.aria-selected]="view() === 'sql'"
+            [style.background]="view() === 'sql' ? 'var(--gamma-bg-default)' : 'transparent'"
+            (click)="showSqlView()"
+        >
+            SQL
+        </button>
+    </div>
 </div>
 
-@if (sqlOnly()) {
-    <!-- Forward-only: rows compile to SQL, SQL is never parsed back into rows. Say so, never fake a grid. -->
-    <div class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
-        <p class="m-0 text-sm">
-            This Step's SQL was written by hand, so it cannot be shown as a field list. Editing it here keeps it as SQL.
-        </p>
-        <div class="mt-2 rounded-lg border border-gray-200 dark:border-gray-700">
-            <inspecto-sql-codemirror [value]="storedSql()" (valueChange)="onSqlEdited($event)" />
-        </div>
-        <button type="button" class="mt-2" mat-stroked-button (click)="startGridFromColumns()">
-            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:table-cells"></mat-icon>
-            <span class="ml-1">Start a field list from the incoming columns</span>
-        </button>
-        <p class="text-secondary m-0 mt-1 text-xs">This replaces the SQL above with one row per incoming column.</p>
+@if (binderError()) {
+    <inspecto-alert class="mb-2 block" variant="warning" title="This does not run yet">
+        <div class="font-mono text-xs whitespace-pre-wrap">{{ binderError() }}</div>
+    </inspecto-alert>
+}
+
+@if (view() === 'sql') {
+    <div class="rounded-lg border border-gray-200 dark:border-gray-700">
+        <inspecto-sql-codemirror [value]="sqlText()" (valueChange)="onSqlEdited($event)" />
     </div>
+    <p class="text-secondary m-0 mt-1 text-xs">
+        The relation is always <code>input</code>. Filtering belongs to a Filter Step.
+        @if (fieldsDisabledReason(); as why) {
+            <span role="status">{{ why }}</span>
+        } @else {
+            Switching to Fields keeps every column; an expression the catalog does not know stays as custom SQL.
+        }
+    </p>
 } @else {
     <!-- toolbar: search + view-only lenses. Neither changes what is written. -->
     <div class="mb-2 flex flex-wrap items-center gap-2">
@@ -65,12 +103,6 @@
             <span>{{ note }}</span>
             <button type="button" class="underline" (click)="setFilter('all')">Show them</button>
         </div>
-    }
-
-    @if (binderError()) {
-        <inspecto-alert class="mb-2 block" variant="warning" title="This does not run yet">
-            <div class="font-mono text-xs whitespace-pre-wrap">{{ binderError() }}</div>
-        </inspecto-alert>
     }
 
     <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
@@ -325,21 +357,23 @@
     </div>
 
     <!-- the generated SQL, on demand: the grid is the surface, this is what it produced -->
-    <div class="mt-3">
+    <div class="mt-3 flex flex-wrap items-center gap-2">
         <button type="button" mat-stroked-button (click)="showSql.set(!showSql())">
             <mat-icon class="icon-size-5" svgIcon="heroicons_outline:code-bracket"></mat-icon>
             <span class="ml-1">{{ showSql() ? 'Hide' : 'Show' }} the SQL this produces</span>
         </button>
-        @if (showSql()) {
-            <pre
-                class="mt-1 overflow-x-auto rounded-lg border border-gray-200 p-2 font-mono text-xs dark:border-gray-700"
-                >{{ generatedSql() }}</pre
-            >
-            <p class="text-secondary m-0 mt-1 text-xs">
-                Read-only. The field list above is what this Step saves; the SQL is generated from it.
-            </p>
-        }
+        <button type="button" mat-stroked-button (click)="showSqlView()">
+            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:pencil-square"></mat-icon>
+            <span class="ml-1">Edit as SQL</span>
+        </button>
     </div>
+    @if (showSql()) {
+        <pre
+            class="mt-1 overflow-x-auto rounded-lg border border-gray-200 p-2 font-mono text-xs dark:border-gray-700"
+            >{{ generatedSql() }}</pre
+        >
+        <p class="text-secondary m-0 mt-1 text-xs">Regenerated from the field list as you edit it.</p>
+    }
 }
 
 <!-- Test this Step — reuses ComponentsService.previewTransform verbatim, the SAME route every

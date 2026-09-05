@@ -382,6 +382,15 @@ The Parse surface itself — tabs, options, columns grid, Grammar CSV round-trip
 
 ## Transform: the `transform.sql` Step pane (SHIPPED `7e13dd82`; SQL-first rebuild 2026-09-04)
 
+> **2026-09-05 — Fields and SQL are two peer views of one Step.** The pane header carries a `Fields | SQL`
+> switch; Fields → SQL is the compiler, SQL → Fields is the bounded reconciler
+> (`pipeline-transform-sql-reconcile.ts`: projections only, catalog templates matched in reverse and
+> re-compiled to prove the round-trip, the rest kept verbatim as custom rows, a `WHERE`/`JOIN` disables the
+> Fields tab with the reason). D4 ("never parse SQL back into rows") is superseded. As-built detail:
+> [schema-mapping-authoring.md §0](schema-mapping-authoring.md). The same change made every
+> definition pane's `Additional config` a property-row list (label · value · pencil) and every Collector
+> sub-form flat — no Advanced gear, no chevron disclosure.
+
 - **Routing arm:** the definition dock has one more type-specific arm — `dn.type === 'transform.sql'` →
   `<app-pipeline-transform-sql-definition>`; the `transform.map` arm and `<app-pipeline-load-definition>`
   were DELETED 2026-09-05 (the projection slot is a `transform.sql`, so it opens this pane); every other

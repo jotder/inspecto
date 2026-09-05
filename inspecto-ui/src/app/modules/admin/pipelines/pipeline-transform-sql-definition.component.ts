@@ -25,6 +25,7 @@ import {
     readFields,
     seedFields,
 } from './pipeline-transform-sql';
+import { ReconcileResult, reconcileSql } from './pipeline-transform-sql-reconcile';
 import { SqlFunction, sqlFunctionsByCategory, usesSource } from './sql-functions';
 
 /** How many rows an inline "Try it on the sample" test posts (mirrors the config pane's cap). */
@@ -32,6 +33,9 @@ const MAX_TEST_ROWS = 50;
 
 /** Page sizes the operator pinned on 2026-09-03 for tables that can run past 600 columns. */
 export const PAGE_SIZES = [10, 20, 100] as const;
+
+/** The two peer views of one Step. Switching never changes the SQL; editing in either rewrites both. */
+export type TransformView = 'fields' | 'sql';
 
 /** The view-only lenses over the grid. They never change what is written — only what is on screen. */
 export type FieldFilter = 'all' | 'changed' | 'calculated' | 'problems';
@@ -65,9 +69,14 @@ export interface FieldRow extends CompiledField {
  * column bound to the function's `{source}` automatically.
  *
  * <p><b>Persisted shape.</b> `{ sql, fields }`. The engine declares and reads only `sql`; `fields` rides
- * the `steps:` chain opaquely and exists so reopening rebuilds the grid exactly. Nothing ever parses SQL
- * back into rows, so a node whose `sql` was hand-written (or authored by the SQL-only pane) opens in
- * {@link sqlOnly} mode and says so rather than inventing a grid that would silently rewrite it.
+ * the `steps:` chain opaquely and exists so reopening rebuilds the grid exactly.
+ *
+ * <p><b>Two views of one Step (2026-09-05).</b> Fields and SQL are peers, switched from the pane's
+ * header. Fields → SQL is the compiler; SQL → Fields is the bounded {@link reconcileSql}: a projection
+ * always becomes rows (catalog functions recognised, the rest kept verbatim as custom rows), and a SQL
+ * that is more than a projection (`WHERE`, `JOIN`, CTE…) leaves the Fields tab disabled with the reason.
+ * Switching views never changes the SQL; only an edit does. A node whose stored `sql` has no `fields`
+ * opens in the SQL view — what the author wrote is what they see — with Fields one click away.
  *
  * <p><b>Wide tables.</b> Search, view-only filters with counts, a `#` that is the position in the full
  * list, and paging at 10 / 20 / 100 — the operator's 2026-09-03 requirement for 600+ column sources.
@@ -106,12 +115,30 @@ export class PipelineTransformSqlDefinitionComponent {
     // ── the authored model ──────────────────────────────────────────────────────────────────────────
     readonly fields = signal<SqlField[]>([]);
     readonly leftOut = signal<string[]>([]);
-    /** Set when the node carries `sql` we did not generate: the grid cannot be rebuilt from it. */
-    readonly sqlOnly = signal(false);
-    /** The hand-written SQL shown in `sqlOnly` mode. */
-    readonly storedSql = signal('');
+    /** Which view is the source of truth right now. */
+    readonly view = signal<TransformView>('fields');
+    /** The SQL under edit in the SQL view. In the Fields view it is regenerated from the rows. */
+    readonly sqlText = signal('');
 
-    readonly generatedSql = computed(() => (this.sqlOnly() ? this.storedSql() : generateSql(this.fields())));
+    readonly generatedSql = computed(() => (this.view() === 'sql' ? this.sqlText() : generateSql(this.fields())));
+
+    /** What the SQL view's text would be as fields — `null` while the Fields view is the truth. */
+    readonly reconciled = computed<ReconcileResult | null>(() =>
+        this.view() === 'sql' ? reconcileSql(this.sqlText()) : null,
+    );
+    /** Why the Fields tab is disabled, or `null` when the SQL can be shown as fields. */
+    readonly fieldsDisabledReason = computed(() => this.reconciled()?.unsupported ?? null);
+    /** In the SQL view: how many select items are recognised vs kept as custom SQL. */
+    readonly reconcileNote = computed<string | null>(() => {
+        const r = this.reconciled();
+        if (!r || r.unsupported) return null;
+        const custom = r.fields.filter((f) => f.fn === 'custom').length;
+        const n = r.fields.length;
+        if (!n) return 'Every incoming column passes through.';
+        const parts = [`${n} field${n === 1 ? '' : 's'} out`];
+        if (custom) parts.push(`${custom} kept as custom SQL`);
+        return parts.join(' · ');
+    });
 
     /** What was loaded, so dirty is a real comparison rather than "something rendered". */
     private loaded = '';
@@ -238,6 +265,7 @@ export class PipelineTransformSqlDefinitionComponent {
     });
 
     readonly summary = computed(() => {
+        if (this.view() === 'sql') return this.reconcileNote() ?? 'Written as SQL';
         const c = this.counts();
         const parts = [`${c.all} fields out`, `${c.changed} changed`, `${c.calculated} calculated`];
         if (this.leftOut().length) parts.push(`${this.leftOut().length} left out`);
@@ -249,7 +277,7 @@ export class PipelineTransformSqlDefinitionComponent {
      * Apply is refused while any row cannot compile or the SQL fails to bind — an incomplete row must
      * never save silently.
      *
-     * <p>⚠ `sqlOnly` is NOT a refusal. It was, while the hand-written SQL was read-only; once CodeMirror
+     * <p>⚠ The SQL view is NOT a refusal. It was, while the hand-written SQL was read-only; once CodeMirror
      * made it editable the drawer's Apply armed on the first keystroke and `submit()` then returned
      * early, so editing hand-written SQL saved NOTHING and said nothing. The binder check above already
      * guards what is typed there.
@@ -283,7 +311,7 @@ export class PipelineTransformSqlDefinitionComponent {
             const cols = this.upstreamColumns();
             // If the node was loaded with no configured fields and cols were empty at the time,
             // seed once cols become available.
-            if (cols.length > 0 && this.fields().length === 0 && !this.sqlOnly() && !this.storedSql()) {
+            if (cols.length > 0 && this.fields().length === 0 && this.view() === 'fields') {
                 this.fields.set(seedFields(cols));
                 this.loaded = this.snapshot();
                 this.lastDirty = false;
@@ -357,17 +385,18 @@ export class PipelineTransformSqlDefinitionComponent {
         this.leftOut.set([]);
 
         if (storedFields) {
-            this.sqlOnly.set(false);
-            this.storedSql.set('');
+            this.view.set('fields');
+            this.sqlText.set('');
             this.fields.set(storedFields);
         } else if (storedSql.trim()) {
-            // Hand-written (or SQL-only-pane) SQL: forward-only means we cannot rebuild rows from it.
-            this.sqlOnly.set(true);
-            this.storedSql.set(storedSql);
+            // Hand-written SQL opens as what the author wrote. Fields is one click away when it is a
+            // projection; the reconciler, not a guess, decides that.
+            this.view.set('sql');
+            this.sqlText.set(storedSql);
             this.fields.set([]);
         } else {
-            this.sqlOnly.set(false);
-            this.storedSql.set('');
+            this.view.set('fields');
+            this.sqlText.set('');
             this.fields.set(seedFields(this.upstreamColumns()));
         }
         // D10: land on Changed when there IS something changed — on a wide feed that is a few rows to
@@ -378,9 +407,14 @@ export class PipelineTransformSqlDefinitionComponent {
         this.loaded = this.snapshot();
     }
 
-    /** The comparison dirty is computed from — the generated SQL plus the authored rows. */
+    /**
+     * The comparison dirty is computed from: the SQL the engine would run. Not the rows — switching
+     * views must not arm Apply, and a row edit that leaves the SQL identical changes nothing the engine
+     * sees. (A hand-written SQL shown as fields regenerates in canonical spelling, so THAT switch can
+     * arm Apply; the pane says so beside the tab.)
+     */
     private snapshot(): string {
-        return JSON.stringify({ sql: this.generatedSql(), fields: this.fields() });
+        return this.generatedSql();
     }
 
     private touched(): void {
@@ -397,7 +431,33 @@ export class PipelineTransformSqlDefinitionComponent {
      * `dirtyChange`, so the drawer's Apply never armed and the edit could not be saved at all.
      */
     onSqlEdited(sql: string): void {
-        this.storedSql.set(sql);
+        this.sqlText.set(sql);
+        this.touched();
+    }
+
+    // ── the view switch ─────────────────────────────────────────────────────────────────────────────
+
+    /** Fields → SQL: the generated SQL becomes editable text. Nothing changes, so nothing arms. */
+    showSqlView(): void {
+        if (this.view() === 'sql') return;
+        this.sqlText.set(generateSql(this.fields()));
+        this.view.set('sql');
+        this.touched();
+    }
+
+    /**
+     * SQL → Fields through the reconciler. Refused (the tab is disabled) when the SQL is not a
+     * projection. An empty projection (`SELECT *`) seeds one passthrough row per incoming column.
+     */
+    showFieldsView(): void {
+        if (this.view() === 'fields') return;
+        const r = this.reconciled();
+        if (!r || r.unsupported) return;
+        this.fields.set(r.fields.length ? r.fields : seedFields(this.upstreamColumns()));
+        this.leftOut.set([]);
+        this.view.set('fields');
+        this.filter.set(this.allRows().some((row) => row.changed) ? 'changed' : 'all');
+        this.page.set(0);
         this.touched();
     }
 
@@ -469,14 +529,6 @@ export class PipelineTransformSqlDefinitionComponent {
         this.touched();
     }
 
-    /** Replace hand-written SQL with a grid seeded from the upstream columns. Explicit, never automatic. */
-    startGridFromColumns(): void {
-        this.sqlOnly.set(false);
-        this.storedSql.set('');
-        this.fields.set(seedFields(this.upstreamColumns()));
-        this.touched();
-    }
-
     // ── view controls ───────────────────────────────────────────────────────────────────────────────
 
     setQuery(q: string): void {
@@ -529,8 +581,14 @@ export class PipelineTransformSqlDefinitionComponent {
     submit(): void {
         if (!this.canApply()) return;
         const n = this.node();
-        // `fields` is the authoring artifact; `sql` is what the engine reads. Both are written together.
-        const config: Record<string, unknown> = { sql: this.generatedSql(), fields: this.fields() };
+        // `fields` is the authoring artifact; `sql` is what the engine reads. Rows are persisted only
+        // when they were authored: a Step applied from the SQL view writes `fields: []` and reopens as
+        // SQL, and the reconciler offers Fields again from there — never a grid invented behind the
+        // author's back.
+        const config: Record<string, unknown> = {
+            sql: this.generatedSql(),
+            fields: this.view() === 'fields' ? this.fields() : [],
+        };
         this.loaded = this.snapshot();
         this.lastDirty = false;
         this.dirtyChange.emit(false);

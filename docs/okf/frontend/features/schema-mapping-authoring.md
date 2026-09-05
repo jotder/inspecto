@@ -38,7 +38,7 @@ rejected it the same day: *"mapping with functions and parameters is not realist
 not an authoring surface for a non-technical user, and the legacy `transform.map` rule grid (four
 `transformType` constants, two of which pack their arguments into a `|`-delimited string) is not a
 mapping model either. The grid is back, and its verb enum is replaced by a **function catalog with typed
-parameters**. D3 (no `where` — filtering stays `transform.filter`), D4 (never parse SQL back into rows)
+parameters**. D3 (no `where` — filtering stays `transform.filter`), D4 (never parse SQL back into rows — **superseded 2026-09-05** by the bounded reconciler, below)
 and D7 (600+ columns stay usable) still hold; D5's five-verb list and D6's lock are superseded by the
 catalog and by persisting `fields[]`.
 
@@ -69,16 +69,28 @@ catalog and by persisting `fields[]`.
   is what lets the grid round-trip exactly without ever parsing SQL. **This is why D6's lock is gone:**
   nothing has to reconstruct rows from text. `readFields` also opens a node written by the retired
   five-verb grid, mapping `verb`/`castType`/`formula` onto catalog ids.
-- **Hand-written SQL is honest, not overwritten.** A node carrying `sql` with no `fields` opens in
-  `sqlOnly` mode: the SQL is shown read-write in CodeMirror and the pane says it cannot be shown as a
-  field list. "Start a field list from the incoming columns" replaces it — explicit, never automatic.
-  ⚠ **Editing it saves — since 2026-09-04.** When the SQL became editable (CodeMirror, item (b)) two
-  seams were left behind: `valueChange` was bound straight to the signal, so no `dirtyChange` was ever
-  emitted and the drawer's Apply never armed; and `canApply()` still refused `sqlOnly` outright, so even
-  an armed Apply would have returned early. Both are closed — the editor goes through `onSqlEdited` →
-  `touched()`, and `sqlOnly` is no longer a refusal (the binder check is what guards what is typed).
-  An Apply from this mode writes `{ sql, fields: [] }`, so the node reopens in `sqlOnly` — no grid is
-  invented behind the author's back.
+- **Fields and SQL are two views of ONE Step (2026-09-05, operator decision; supersedes D4).** The pane's
+  header carries a `Fields | SQL` segmented switch (the toolbar's Recipe | Canvas idiom). Fields → SQL is
+  the compiler: the generated SQL lands in CodeMirror, editable. SQL → Fields is the **bounded reconciler**
+  (`pipeline-transform-sql-reconcile.ts`, pure, 21 specs): it accepts exactly a flat `SELECT <item>, … FROM
+  input` projection and turns every item into a row — a bare column is *Keep as it is*; an expression
+  matching a catalog template in reverse gets its function and parameters back, **but only when re-compiling
+  that row reproduces the expression** (whitespace/keyword case aside — a recognition that would rewrite
+  the SQL is not a recognition; bare `CAST` therefore stays custom, never becomes `TRY_CAST`); anything else
+  is *Write my own expression* with the text verbatim; an unaliased expression keeps an empty name so the
+  grid asks for one. Anything beyond a projection — `WHERE`, `JOIN`, `GROUP BY`, CTE, `DISTINCT`, `*` mixed
+  with items — leaves the **Fields tab disabled with the reason** as its tooltip and a line under the editor
+  (D3 unchanged: filtering belongs to a Filter Step). It is NOT a SQL parser and needs no DuckDB extension;
+  the AST table of BACKLOG AUTHORING-REDESIGN-1 (c) remains the way to make a `WHERE` structurally editable.
+  ⚠ **Switching views never changes the SQL; only an edit does.** Dirty is the generated SQL compared to what
+  was loaded (not the rows), so Fields → SQL → Fields arms nothing — except that a hand-written SQL shown as
+  fields regenerates in canonical spelling, which honestly arms Apply. A node carrying `sql` with no `fields`
+  opens in the **SQL view, as written**, with Fields one click away; an Apply from the SQL view writes
+  `{ sql, fields: [] }` so it reopens as SQL — no grid is invented behind the author's back, the reconciler
+  offers it again from there. The destructive "Start a field list from the incoming columns" button is gone.
+  ⚠ Editing hand-written SQL saves — since 2026-09-04: binding `valueChange` straight to the signal once
+  emitted no `dirtyChange`, and `canApply()` once refused the SQL mode; both closed (`onSqlEdited` →
+  `touched()`; the binder check is what guards what is typed).
 - **Opening a Step never arms Apply.** Seeding emits `dirtyChange(false)`; dirty is a real comparison of
   `{sql, fields}` against what was loaded. ⚠ This was a live defect on the legacy `transform.map` pane
   (a Step showed "unapplied" from a single click with no edit); the grid has a regression test for it.
