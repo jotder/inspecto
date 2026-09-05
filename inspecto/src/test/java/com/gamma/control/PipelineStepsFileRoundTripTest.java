@@ -86,7 +86,9 @@ class PipelineStepsFileRoundTripTest {
 
         // …and the graph comes back with both dedups, in order
         assertEquals(List.of("transform.dedup", "transform.summarize", "transform.dedup"),
-                PipelineLift.lift(cfg).nodes().stream().map(PipelineNode::type)
+                PipelineLift.lift(cfg).nodes().stream()
+                        .filter(n -> !"map".equals(n.id()))   // the projection slot is a transform.sql too (2026-09-05)
+                        .map(PipelineNode::type)
                         .filter(t -> t.startsWith("transform."))
                         .filter(t -> PipelineConfig.Step.KINDS.contains(t.substring("transform.".length())))
                         .toList());

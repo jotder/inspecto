@@ -1,5 +1,6 @@
 import { AuthoredNode, AuthoredPipeline } from 'app/inspecto/api';
 import { NodeStatus, PipelineFinding } from './pipeline-graph';
+import { isProjectionSlot } from './pipeline-editable';
 
 /**
  * The guided **stage model** (definition-surface P6-d) — the wizard's five-step data path expressed
@@ -75,14 +76,14 @@ export function stageChecklist(
     const nodes = model?.nodes ?? [];
     const cat = (n: AuthoredNode): string => typeCat.get(n.type) ?? '';
     const authored = (n: AuthoredNode): boolean => !!n.config && Object.keys(n.config).length > 0;
-    // 🔴 A `transform.map` node is on EVERY lifted graph whether or not anything authored it (the
-    // server emits one per branch — MOCK-1), so the Schema stage keys on AUTHORED evidence: an
-    // artifact named by the parse node, or a map node carrying config. Taking the derived node's
+    // 🔴 The projection slot (a `transform.sql` Record Transformer, id `map`) is on EVERY lifted graph
+    // whether or not anything authored it (the server emits one per branch — MOCK-1), so the Schema
+    // stage keys on AUTHORED evidence: an artifact named by the parse node, or a slot node carrying config. Taking the derived node's
     // status instead would show `blocked` on every pipeline, including ones whose schema is fine.
     const byStage: Record<PipelineStageId, AuthoredNode[]> = {
         collect: nodes.filter((n) => cat(n) === 'SOURCE'),
         parse: nodes.filter((n) => cat(n) === 'PARSE'),
-        schema: nodes.filter((n) => n.type === 'transform.map' && authored(n)),
+        schema: nodes.filter((n) => isProjectionSlot(n) && authored(n)),
         enrich: nodes.filter((n) => n.type === 'enrichment'),
         publish: nodes.filter((n) => cat(n) === 'SINK'),
     };

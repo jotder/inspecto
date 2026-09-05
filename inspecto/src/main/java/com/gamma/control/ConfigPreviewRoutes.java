@@ -277,14 +277,17 @@ final class ConfigPreviewRoutes implements RouteModule {
         }
     }
 
-    /** The mapped relation's column names, in rule order — the draft's own {@code mapping.rules} targets. */
+    /** The mapped relation's column names, in order — the draft's own {@code mapping.fields[].name} (or legacy rule targets). */
     private static List<String> targetColumns(Map<String, Object> content) {
-        if (!(content.get("mapping") instanceof Map<?, ?> mapping)
-                || !(mapping.get("rules") instanceof List<?> rules)) return List.of();
+        if (!(content.get("mapping") instanceof Map<?, ?> mapping)) return List.of();
         List<String> out = new ArrayList<>();
-        for (Object r : rules)
-            if (r instanceof Map<?, ?> rule && rule.get("targetColumn") != null)
-                out.add(rule.get("targetColumn").toString());
+        if (mapping.get("fields") instanceof List<?> fields)
+            for (Object f : fields)
+                if (f instanceof Map<?, ?> field && field.get("name") != null) out.add(field.get("name").toString());
+        if (out.isEmpty() && mapping.get("rules") instanceof List<?> rules)
+            for (Object r : rules)
+                if (r instanceof Map<?, ?> rule && rule.get("targetColumn") != null)
+                    out.add(rule.get("targetColumn").toString());
         return List.copyOf(out);
     }
 

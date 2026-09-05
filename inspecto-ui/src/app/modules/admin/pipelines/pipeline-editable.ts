@@ -35,7 +35,7 @@ export const LOWERABLE = new Set([
     // read-compat only since P5-a: never emitted by the lift, still accepted by lower
     'transform.dedup.marker',
     'transform.filter',
-    'transform.map',
+    'transform.sql', // the projection slot (id map / map_<key>) — a Record Transformer; transform.map is gone
     'sink.persistent',
     'enrichment',
     'transform.route', // route: block — ARMED 2026-08-26 (branch-aware executor live; arming validated at engine load, not save — same as the server)
@@ -237,6 +237,15 @@ function extractRowFilters(parserCfg: Cfg): Cfg {
 }
 
 /** Lift a canonical pipeline config map into the editable graph (topology + verbatim sections). */
+/**
+ * Whether a node occupies the projection SLOT `PipelineLift` fills between parser and sink — a
+ * Record Transformer (`transform.sql`) whose id follows the lift's grammar (`map`, `map_<key>`). A chain
+ * sql step is never named that way (`sql`, `sql__s2`). Mirrors `PipelineEditable.isProjectionSlot`.
+ */
+export function isProjectionSlot(n: { id: string; type: string }): boolean {
+    return n.type === 'transform.sql' && (n.id === 'map' || n.id.startsWith('map_'));
+}
+
 export function liftConfig(config: Cfg): AuthoredPipeline {
     const collector = asMap(config['collector'] ?? config['source']);
     const dirs = asMap(config['dirs']);
@@ -323,9 +332,10 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
         sinkUpstream = 'filter';
     }
 
-    // The map projection sits right after the parse/filter stretch. ⚠ UNCONDITIONAL, mirroring
-    // `PipelineLift.branch`, which pushes a `transform.map` node on every path through `lift()` — the
-    // config is what varies there, never the node's existence (MOCK-1). Emitting it only when
+    // The projection slot — a Record Transformer (`transform.sql`, id `map`) — sits right after the
+    // parse/filter stretch. ⚠ UNCONDITIONAL, mirroring `PipelineLift.branch`, which pushes the slot node
+    // on every path through `lift()` — the config is what varies there, never the node's existence
+    // (MOCK-1). `transform.map` was deleted 2026-09-05; a stored `rules` key is carried as authored. Emitting it only when
     // `processing.map` authored something made the offline editor draw a graph one node SHORTER than the
     // server's for every pipeline without an authored projection, i.e. for most of them.
     //
@@ -343,7 +353,7 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
     const mapCfg = asMap(processing['map']);
     const mc: Cfg = {};
     for (const k of MAP_AUTHORED) if (mapCfg[k] != null) mc[k] = mapCfg[k];
-    nodes.push({ id: 'map', type: 'transform.map', name: 'Map', config: mc });
+    nodes.push({ id: 'map', type: 'transform.sql', name: 'Record Transformer', config: mc });
     edges.push({ from: sinkUpstream, rel: 'data', to: 'map' });
     sinkUpstream = 'map';
 
@@ -550,10 +560,12 @@ export function lowerGraph(
         // the file now holds an ordered steps: chain, so the refusals are gone on both sides. They had
         // to flip together in one commit — a preview that refuses what the backend accepts is the same
         // bug as one that accepts what the backend refuses, just pointing the other way.
+        // ⛔ The projection SLOT is not a chain step (it would change when steps: is emitted at all) —
+        // its authored half lowers to processing.map instead. It is a `transform.sql` like a chain sql
+        // step, so — exactly as `PipelineEditable.isProjectionSlot` — the discriminator is the lift's own
+        // id grammar (`map`, `map_<key>`), never the type.
+        else if (isProjectionSlot(n)) mapNodes.push(n);
         else if (STEP_KIND[n.type]) chain.push(n);
-        // ⛔ transform.map is NOT a chain kind (it would change when steps: is emitted at all) — its
-        // authored half lowers to processing.map instead.
-        else if (n.type === 'transform.map') mapNodes.push(n);
         else if (n.type === 'sink.persistent') {
             if (isQuarantine(n)) quarantine = n;
             else {

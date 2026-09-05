@@ -28,7 +28,7 @@ class PipelineReferencesTest {
                         useNode("p", "parser", "grammar/pipe")), List.of());
         PipelineGraph b = new PipelineGraph("flow_b", true,
                 List.of(useNode("p", "parser", "grammar/pipe"),
-                        PipelineNode.of("m", "transform.map")), List.of());
+                        PipelineNode.of("m", "transform.sql")), List.of());
 
         assertEquals(Map.of("acq", "connection/sftp-prod", "p", "grammar/pipe"), PipelineReferences.uses(a));
         assertEquals(Set.of("connection/sftp-prod", "grammar/pipe"), PipelineReferences.referencedComponents(a));
@@ -51,7 +51,7 @@ class PipelineReferencesTest {
         PipelineGraph g = new PipelineGraph("f", true,
                 List.of(useNode("p", "parser", "grammar/pipe"),
                         useNode("x", "parser", "ingester/com.acme.Plugin"),   // unresolvable class ref → contributes nothing
-                        PipelineNode.of("m", "transform.map")), List.of());
+                        PipelineNode.of("m", "transform.sql")), List.of());
 
         Set<Path> paths = reg.referencedPaths(g);
         assertEquals(1, paths.size());

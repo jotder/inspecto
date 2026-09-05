@@ -87,7 +87,8 @@ export function diffRules(before: Record<string, string>[], after: Record<string
 const MAP_NODE = 'map';
 
 /**
- * A throwaway pipeline that exists only to see what a rule set produces: seed → `transform.map` → sink,
+ * A throwaway pipeline that exists only to see what a rule set produces: seed → `transform.sql` (the
+ * projection slot, id `map`, carrying the rules the engine converts to fields) → sink,
  * with the rules carried INLINE so unsaved drafts preview. It is posted as the dry-run's candidate body,
  * which is parsed and validated exactly like a save but never written, and which skips the stored-flow
  * lookup entirely — so the id need not name a real pipeline. Exported for the spec.
@@ -98,7 +99,7 @@ export function previewGraph(id: string, rules: Record<string, string>[]): Autho
         active: false,
         nodes: [
             { id: 'seed', type: 'acquisition' },
-            { id: MAP_NODE, type: 'transform.map', config: { rules } },
+            { id: MAP_NODE, type: 'transform.sql', config: { rules } },
             { id: 'sink', type: 'sink.persistent', config: { store: 'preview' } },
         ],
         edges: [

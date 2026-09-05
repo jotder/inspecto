@@ -114,7 +114,7 @@ breaks two committed contracts); the full runtime edge model converges at **Phas
 
 | Type | emits | Authorable? |
 |---|---|---|
-| `transform.map` | `DATA` | ✅ (verb `map`) |
+| ~~`transform.map`~~ | DELETED 2026-09-05 — the projection slot is a `transform.sql` (id `map`); a stored `mapping.rules[]` is read as `fields[]` | ❌ (verb `map` removed) |
 | `transform.filter` | `DATA` + **`DROPPED`** | ✅ (verb `transform`) |
 | `transform.select` | `DATA` | ❌ |
 | `transform.derive` | `DATA` | ❌ |

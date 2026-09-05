@@ -93,9 +93,9 @@ public final class PipelineEditable {
      * between parser and sink, whose authored half lives in {@code processing.map} rather than in the
      * {@code steps:} chain.
      *
-     * <p>🔴 <b>Why the id and not the type.</b> Since 2026-09-05 the slot may hold either a
-     * {@code transform.map} or a {@code transform.sql} (a Record Transformer), and {@code transform.sql}
-     * is ALSO a legitimate chain kind with a {@code STEP_KIND} entry — a Simple-authored chain step
+     * <p>🔴 <b>Why the id and not the type.</b> The slot holds a {@code transform.sql} (a Record
+     * Transformer — since 2026-09-05 the only projection spelling; {@code transform.map} is gone), and
+     * {@code transform.sql} is ALSO a legitimate chain kind with a {@code STEP_KIND} entry — a Simple-authored chain step
      * carries {@code fields[]} exactly like a slot node does, so neither the type nor the presence of
      * {@code fields[]} can tell them apart. What distinguishes them is POSITION, and the flat file has
      * no edges to read position from at lower() time. So the discriminator is {@code PipelineLift}'s own
@@ -108,8 +108,7 @@ public final class PipelineEditable {
      */
     static boolean isProjectionSlot(PipelineNode n) {
         String t = n.type();
-        if (!BuiltinNodeType.TRANSFORM_MAP.type().equals(t)
-                && !BuiltinNodeType.TRANSFORM_SQL.type().equals(t)) return false;
+        if (!BuiltinNodeType.TRANSFORM_SQL.type().equals(t)) return false;
         String id = n.id();
         return "map".equals(id) || id.startsWith("map_");
     }
@@ -139,7 +138,7 @@ public final class PipelineEditable {
             BuiltinNodeType.TRANSFORM_ROUTE.type(),   // route: block — authoring-only until the executor lands
             BuiltinNodeType.TRANSFORM_SUMMARIZE.type(), // group-by rollup → processing.summarize (ELT P3), authoring-only
             BuiltinNodeType.TRANSFORM_JOIN.type(),      // reference join → processing.join (ELT P3 S2), authoring-only
-            BuiltinNodeType.TRANSFORM_FILTER.type(), BuiltinNodeType.TRANSFORM_MAP.type(),
+            BuiltinNodeType.TRANSFORM_FILTER.type(),
             BuiltinNodeType.TRANSFORM_SQL.type(),       // one SELECT over the typed input → steps: kind sql
             BuiltinNodeType.SINK_PERSISTENT.type(), BuiltinNodeType.ENRICHMENT.type());
 

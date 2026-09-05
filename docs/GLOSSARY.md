@@ -361,7 +361,9 @@ verbatim DuckDB scalar `EXPR` transforms), and set the **Table** write (Sink pro
 `PARQUET | CSV`). An *authoring-surface* concept — the **Sink** Step and the `sink` verb are unchanged;
 Load is the drawer/checklist chip that groups schema + mapping + table definition. ⛔ never **"Sync"**
 (rejected working name, same decision) — and not "Publish"/"Go-live", which is the separate
-pipeline-level activation action.
+pipeline-level activation action. *(2026-09-05: the Load **drawer's** mapping grid — the `transform.map`
+Load pane — was deleted with `transform.map`; the projection is authored in the **Record Transformer**
+(Transform pane) and the checklist chip keeps the Load name.)*
 
 **Trigger** — The start condition of a run: `cron` \| `event` \| `manual` \| `on-pipeline`. Owned by the
 **Scheduler**.

@@ -23,9 +23,19 @@ schema, or dispatch path per catalog id.
 > Transformer executes on the ingest lane and at rest through one compiler. `processing.map.fields[]`
 > is its flat-file home, and `PipelineLift` puts a `transform.sql` node in the projection slot when it
 > is authored. 🔴 **`fields[]` is now ENGINE-READ**; the four comments saying otherwise moved with it.
-> ⛔ `transform.map` is DEPRECATED, not deleted — it still lifts, executes and round-trips, and
-> `mapping.rules[]` stays readable permanently (~20 readers). Migration is proven by comparing compiled
-> SQL: *byte-identical projection for 14 stored schemas, 795 rules across three spaces*.
+> Migration was proven by comparing compiled SQL: *byte-identical projection for 14 stored schemas,
+> 795 rules across three spaces*.
+
+> **2026-09-05 — `transform.map` is DELETED.** The projection slot `PipelineLift` fills between parser and
+> sink is always a **Record Transformer** (`transform.sql`, id `map` / `map_<key>`); `BuiltinNodeType.TRANSFORM_MAP`,
+> the `map` recipe verb, `TransformCompiler`'s rule path and the UI's Load pane are gone. A stored
+> `mapping.rules[]` still LOADS: `DataTransformer.recordFields` converts it to `fields[]` through
+> `RecordTransform.fromMappingRules` (DIRECT → `keep`, EXPR → `custom`, CONCAT_DT → `date.concat_parts`,
+> FILENAME_DATE → `date.from_filename`), and `PipelineLift` does the same for `processing.map.rules`. Every
+> schema under `spaces/` was migrated by `MappingMigrator` (block-list TOON form when a row needs `args`).
+> ⚠ On the ingest lane `date.concat_parts` compiles exactly as CONCAT_DT did (parser timestamp formats +
+> the date column's source zone) — the same lane-specific special case `keep` has. Plan:
+> `archived-documents/plans-archive/delete-transform-map-plan.md`.
 
 ## The fold — five entries became three (2026-09-04, operator call)
 
@@ -160,19 +170,19 @@ table) works and **survives the seal**, but `DuckDBConnection` exposes **no** Ja
 registry that do not exist. Dynamic/environment values — none in v1; when needed, render at read time
 (the standing rule) or `SET VARIABLE`/`getvariable()`.
 
-## `transform.map` group (2 of the 5 today; 4 before 2026-09-04)
+## The projection slot (was the `transform.map` group — deleted 2026-09-05)
 
-* **No `NodeAttributes`/`AttributeSpec` entry exists for `transform.map`** — deliberately absent
-  (`NodeAttributes.java:28-31`, and `PipelineEditable.java:115`: "the lift emits it as the schema"). Its
-  config surface is informal `columns`/`rules` keys documented at `RowShaper.java:53-55,69-77`, not a
-  declared spec.
+* The slot node is a `transform.sql` whose config may carry `fields` (Record Transformer rows), authored
+  `columns`, a lift-derived `schema`, or a mapping component's `rules`; `RowShaper.isProjection` sends any of
+  those through `project()` (compiled by `RecordTransform`), and only a HAND-WRITTEN `sql` key takes the
+  opaque-SQL path. `RowShaper.MAP_NODE_CONFIG_KEYS` pins the vocabulary.
 * **Engine:** `DataTransformer.materialize()` (`inspecto-etl/.../DataTransformer.java:50`) builds the
   transformed table. Type coercion is `TRY_CAST`; a failed cast is counted + WARN-logged and the row is
   **kept with NULL** (`DataTransformer.java:202-204`) — it is NOT routed to quarantine, despite the catalog
   note for `quality.schema.validator` implying a reject path.
-* **Rule kinds** (`transformType`) are compiled by `TransformCompiler` (`inspecto-etl/.../TransformCompiler.java:14-19`):
-  `DIRECT` (default), `EXPR` (free-form author SQL — this is literally what "whitespace sanitizer" reduces
-  to, e.g. `TRIM(col)`), `CONCAT_DT`, `FILENAME_DATE`.
+* **Legacy rule kinds** (`transformType` — `DIRECT`, `EXPR`, `CONCAT_DT`, `FILENAME_DATE`) no longer
+  compile anywhere: `RecordTransform.fromMappingRules` converts them to catalog functions at read time.
+  `TransformCompiler` now compiles PARTITION and event-time columns only.
 * **"Cast & rename matrix"** is nothing more than a `DIRECT` rule where the row's `targetColumn` differs
   from the source field name — no separate rename mechanism exists.
 * **UI:** bespoke rule-grid component `app-pipeline-load-definition`

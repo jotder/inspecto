@@ -253,7 +253,7 @@ class ControlApiPipelineCrudTest {
                 {"active":true,
                  "nodes":[{"id":"acq","type":"acquisition","config":{"poll":"%1$s/in"}},
                           {"id":"p","type":"parser","config":{"schema_file":"%1$s/s.toon"}},
-                          {"id":"map","type":"transform.map","use":"transform/orders_std"},
+                          {"id":"map","type":"transform.sql","use":"transform/orders_std"},
                           {"id":"out","type":"sink.persistent","config":{"database":"%1$s/db"}}],
                  "edges":[{"from":"acq","rel":"data","to":"p"},{"from":"p","rel":"data","to":"map"},
                           {"from":"map","rel":"data","to":"out"}]}""".formatted(b);
@@ -530,7 +530,7 @@ class ControlApiPipelineCrudTest {
             {"pipeline":
               {"name":"demo_flow","active":false,
                "nodes":[{"id":"acq","type":"acquisition"},
-                        {"id":"map","type":"transform.map","config":{"rules":[
+                        {"id":"map","type":"transform.sql","config":{"rules":[
                            {"targetColumn":"MSISDN","sourceExpression":"a","transformType":"DIRECT"},
                            {"targetColumn":"DOUBLED","sourceExpression":"TRY_CAST(b AS DOUBLE) * 2","transformType":"EXPR"}]}},
                         {"id":"sink","type":"sink.persistent","config":{"store":"out"}}],

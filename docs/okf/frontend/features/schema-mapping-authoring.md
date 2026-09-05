@@ -154,15 +154,29 @@ catalog and by persisting `fields[]`.
   button). This fires on a *parser format* change, never on a manual edit made through `SchemaEditorDialog`,
   and never names which mapping rules would break.
 
-## 2. Mapping authoring (`pipeline-load-definition.component.ts` — `transform.map`, legacy path since 2026-09-04)
+## 2. Mapping authoring — the Load pane (`pipeline-load-definition.component.ts`) was DELETED 2026-09-05
 
-> The catalog now carries ONE entry for this surface — `transform.record`, *Record Transformer*, folded
+> The catalog carries ONE entry for this surface — `transform.record`, *Record Transformer*, folded
 > 2026-09-04 from `transform.expression` + `transform.cast` + `quality.cleanse.trim` — pointing at
 > `transform.sql` (§0). Type *coercion* folded in with it; the schema *contract* stayed on Parse as
 > `quality.schema.validator`, re-scoped, because the declared types are the cast-failure audit's
 > denominator (see [`catalog-vs-executors.md`](../../backend/engine/catalog-vs-executors.md)).
-> `transform.map` and its `EXPR`/`CONCAT_DT`/`FILENAME_DATE` rules remain for stored pipelines and are
-> still authored here, unchanged.
+>
+> **2026-09-05 — `transform.map` is DELETED.** The projection slot `PipelineLift` fills between parser and
+> sink is always a **Record Transformer** (`transform.sql`, id `map` / `map_<key>`); `BuiltinNodeType.TRANSFORM_MAP`,
+> the `map` recipe verb, `TransformCompiler`'s rule path and the UI's Load pane are gone. A stored
+> `mapping.rules[]` still LOADS: `DataTransformer.recordFields` converts it to `fields[]` through
+> `RecordTransform.fromMappingRules` (DIRECT → `keep`, EXPR → `custom`, CONCAT_DT → `date.concat_parts`,
+> FILENAME_DATE → `date.from_filename`), and `PipelineLift` does the same for `processing.map.rules`. Every
+> schema under `spaces/` was migrated by `MappingMigrator` (block-list TOON form when a row needs `args`).
+> ⚠ On the ingest lane `date.concat_parts` compiles exactly as CONCAT_DT did (parser timestamp formats +
+> the date column's source zone) — the same lane-specific special case `keep` has. Plan:
+> `archived-documents/plans-archive/delete-transform-map-plan.md`.
+>
+> Everything below this line describes the deleted pane and is kept as HISTORY of the decisions it
+> encoded (the `|`-packed rule arguments, the audit boundary, the "Applying rules REPLACES columns" rule).
+> The Components feature's mapping editor (`modules/admin/components/mapping-editor.dialog.ts`) still
+> authors `rules[]` for a `mapping` COMPONENT; the engine reads those as fields at run time.
 
 - Rule rows are a `FormArray`, seeded from the node's already-authored `rules` if present, else from a
   legacy `columns: [{name, expr}]` projection read as DIRECT rules (2026-09-04 — before that a

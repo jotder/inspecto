@@ -239,7 +239,7 @@ describe('node-attributes', () => {
     it('returns undefined for a type with no specced shape (free-form fallback)', () => {
         // Deliberately unspecced rather than guessed — the remaining transform shapes are not
         // specced server-side, and a best-guess table that looks authoritative is what U-D removed.
-        expect(nodeAttributesFor('transform.map')).toBeUndefined();
+        expect(nodeAttributesFor('transform.validate')).toBeUndefined();
         expect(nodeAttributesFor('parser')).toBeUndefined();
         expect(nodeAttributesFor('alert')).toBeUndefined();
         expect(nodeAttributesFor('acme.custom')).toBeUndefined();

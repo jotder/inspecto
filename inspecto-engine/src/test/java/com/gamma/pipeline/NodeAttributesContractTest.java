@@ -113,9 +113,9 @@ class NodeAttributesContractTest {
         }
         // An unspecced type must publish an empty list, not be absent — the client tells them apart.
         @SuppressWarnings("unchecked")
-        List<Map<String, Object>> mapAttrs = (List<Map<String, Object>>) byType.get("transform.map");
-        assertNotNull(mapAttrs);
-        assertTrue(mapAttrs.isEmpty(), "transform.map is deliberately unspecced (free-form fallback)");
+        List<Map<String, Object>> validateAttrs = (List<Map<String, Object>>) byType.get("transform.validate");
+        assertNotNull(validateAttrs);
+        assertTrue(validateAttrs.isEmpty(), "transform.validate is deliberately unspecced (free-form fallback)");
     }
 
     /**

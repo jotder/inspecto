@@ -111,7 +111,7 @@ class RowShaperTest {
     @Test
     void projectMapSelectDerive() throws Exception {
         seedSrc();
-        var map = run(PipelineNode.of("m", "transform.map",
+        var map = run(PipelineNode.of("m", "transform.sql",
                 Map.of("columns", List.of(Map.of("name", "id10", "expr", "id*10")))));
         assertEquals(List.of("id10"), columns(map.table(PipelineRel.DATA)));
 
@@ -276,7 +276,7 @@ class RowShaperTest {
         seedSrc();
         RowShaper.Relation r = RowShaper.fuse(conn, List.of(
                 PipelineNode.of("f", "transform.filter", Map.of("where", "amt >= 100")),
-                PipelineNode.of("m", "transform.map", Map.of("columns",
+                PipelineNode.of("m", "transform.sql", Map.of("columns",
                         List.of(Map.of("name", "id", "expr", "id"), Map.of("name", "amt", "expr", "amt"))))
         ), "src", "chain");
         assertEquals(PipelineRel.DATA, r.rel());

@@ -112,7 +112,8 @@ public final class Identifiers {
 
     /**
      * Validate every name a schema config exposes to SQL: {@code raw.fields[].name},
-     * {@code mapping.rules[].targetColumn}, and {@code partitions[].column / source}.
+     * {@code mapping.fields[].name} (or a legacy {@code mapping.rules[].targetColumn}), and
+     * {@code partitions[].column / source}.
      * Called from {@link PipelineConfig#load} for the single-schema, multi-schema,
      * and plugin-segment paths alike.
      *
@@ -138,9 +139,14 @@ public final class Identifiers {
                 }
             }
         }
-        // mapping.rules[].targetColumn
+        // mapping.fields[].name (and the legacy mapping.rules[].targetColumn, still readable)
         Map<String, Object> mapping = (Map<String, Object>) schema.get("mapping");
         if (mapping != null) {
+            if (mapping.get("fields") instanceof List<?> fieldList) {
+                for (Object f : fieldList)
+                    if (f instanceof Map<?, ?> fm && fm.get("name") instanceof String n)
+                        validate(n, origin + ".mapping.fields[].name");
+            }
             Object rules = mapping.get("rules");
             if (rules instanceof List<?> rulesList) {
                 for (Object r : rulesList) {

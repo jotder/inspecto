@@ -131,8 +131,8 @@ class RecordTransformContractTest {
 
     /**
      * 🔴 The migration's whole safety argument in one assertion: on the RAW (all-VARCHAR) source, a
-     * {@code keep} field compiles byte-identically to what a {@code DIRECT} mapping rule emits, so
-     * converting a stored schema cannot change the SQL that runs.
+     * {@code keep} field compiles byte-identically to what a {@code DIRECT} mapping rule emitted, so
+     * a stored schema written as rules[] (converted at read time) runs the same SQL it always did.
      */
     @Test
     void keepOnARawSourceMatchesADirectMappingRuleExactly() {
@@ -143,9 +143,10 @@ class RecordTransformContractTest {
         SourceZones zones = SourceZones.of(schema, null);
         Map<String, String> types = Map.of("AMOUNT", "DOUBLE");
 
-        String viaRule = TransformCompiler.dataColumn(
-                Map.of("targetColumn", "AMOUNT", "sourceExpression", "AMOUNT", "transformType", "DIRECT"),
-                types, "raw_input", csv, zones);
+        // What a DIRECT mapping rule emitted (TransformCompiler.direct, deleted 2026-09-05 with
+        // transform.map): the declared-type cast over the qualified raw column.
+        String viaRule = SchemaFieldTypes.castSql("\"raw_input\".\"AMOUNT\"", "DOUBLE",
+                csv.dateFormats(), csv.tsFormats(), zones.zoneArg("AMOUNT", "raw_input"));
 
         List<Map<String, Object>> viaFields = RecordTransform.compile(
                 List.of(Map.of("name", "AMOUNT", "from", "AMOUNT", "fn", "keep")),

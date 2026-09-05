@@ -155,8 +155,8 @@ public final class PipelineDryRun {
     }
 
     /**
-     * Put the parser node's {@code csv} settings within reach of each {@code transform.map} node that carries
-     * mapping rules instead of authored {@code columns} — either a legacy {@code schema}, the shape
+     * Put the parser node's {@code csv} settings within reach of each projection-slot {@code transform.sql}
+     * node that carries a schema or mapping rules instead of authored {@code columns} — either a legacy {@code schema}, the shape
      * {@link com.gamma.pipeline.PipelineLift} produces for a registered pipeline, or the {@code rules} a
      * resolved {@code mapping} component contributed. {@link RowShaper} compiles them through the legacy
      * authority, which parses DATE/TIMESTAMP sources with the pipeline's configured format lists; a lifted graph
@@ -174,8 +174,8 @@ public final class PipelineDryRun {
         List<PipelineNode> nodes = new ArrayList<>();
         boolean rewrote = false;
         for (PipelineNode n : g.nodes()) {
-            if (BuiltinNodeType.TRANSFORM_MAP.type().equals(n.type())
-                    && (n.cfg("schema") != null || n.cfg("rules") != null)
+            if (BuiltinNodeType.TRANSFORM_SQL.type().equals(n.type())
+                    && (n.cfg("schema") != null || n.cfg("rules") != null || n.cfg("fields") != null)
                     && n.cfg("columns") == null && n.cfg("csv") == null) {
                 Map<String, Object> c = new LinkedHashMap<>(n.config());
                 c.put("csv", csv);

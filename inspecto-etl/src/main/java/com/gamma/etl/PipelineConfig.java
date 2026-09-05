@@ -1003,7 +1003,8 @@ public final class PipelineConfig {
     }
 
     /**
-     * The authored half of a {@code transform.map} node ({@code processing.map}) — the flat file's home
+     * The authored half of the projection slot ({@code processing.map}; a Record Transformer,
+     * {@code transform.sql}) — the flat file's home
      * for a projection an operator typed into the map node's dialog, added so that
      * {@code PipelineEditable.lower} stops dropping it silently (AUTHOR-1 follow-on (a)).
      *
@@ -1020,9 +1021,10 @@ public final class PipelineConfig {
      * {@code steps:} file may carry {@code processing.map}.
      *
      * @param columns explicit projection entries ({@code [{name, expr}]}); empty when unauthored
-     * @param rules   mapping-component rules, field types undeclared; empty when unauthored
-     * @param fields  Record Transformer rows ({@code [{name, from, fn, args}]}) — the spelling that
-     *                supersedes {@code rules} for NEW authoring (2026-09-05); empty when unauthored.
+     * @param rules   legacy mapping rules, still readable — {@code PipelineLift} converts them to
+     *                {@code fields} on the way into the graph; empty when unauthored
+     * @param fields  Record Transformer rows ({@code [{name, from, fn, args}]}) — the only projection
+     *                spelling since 2026-09-05; empty when unauthored.
      *                Compiled by {@code RecordTransform}; see {@code DataTransformer.dataColumns}.
      */
     @PublicApi(since = "4.0.0")

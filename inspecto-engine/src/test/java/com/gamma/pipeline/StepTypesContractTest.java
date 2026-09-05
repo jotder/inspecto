@@ -70,7 +70,7 @@ class StepTypesContractTest {
         // made a deliberate widening look like a regression while saying nothing extra — the invariant
         // that matters is pipeline ORDER, plus each verb's entries staying contiguous.
         List<String> distinct = verbs.stream().distinct().toList();
-        assertEquals(List.of("collect", "parse", "map", "dedup", "transform", "sql", "summarize", "route", "sink"),
+        assertEquals(List.of("collect", "parse", "dedup", "transform", "sql", "summarize", "route", "sink"),
                 distinct, "verbs, in pipeline order: " + verbs);
         java.util.Set<String> closed = new java.util.LinkedHashSet<>();
         String open = null;

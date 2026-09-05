@@ -47,7 +47,7 @@ public final class ConservationCheck {
             PipelineRel.DROPPED, PipelineRel.INVALID, PipelineRel.DUPLICATE, PipelineRel.UNMATCHED);
 
     private static final Set<String> CONSERVING_EXACT = Set.of(
-            "transform.map", "transform.filter", "transform.select", "transform.derive", "transform.validate");
+            "transform.filter", "transform.select", "transform.derive", "transform.validate");
 
     private ConservationCheck() {}
 
@@ -110,6 +110,9 @@ public final class ConservationCheck {
     private static boolean conserves(PipelineNode n) {
         String t = n.type();
         if (CONSERVING_EXACT.contains(t) || t.startsWith("transform.dedup")) return true;
+        // A Record Transformer (fields[] / a lifted schema) is one row in, one row out; only a
+        // HAND-WRITTEN sql step may aggregate, so only that one is left out of the check.
+        if ("transform.sql".equals(t) && n.cfg("sql") == null) return true;
         if ("transform.route".equals(t)) {                  // case routes conserve; clone routes amplify (skip)
             Object mode = n.cfg("mode");
             return mode != null && "case".equalsIgnoreCase(mode.toString());

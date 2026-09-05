@@ -112,6 +112,13 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- ~~`superpower/delete-transform-map-plan.md`~~ — **SHIPPED 2026-09-05** (`transform.map` deleted; the
+  projection slot is always a Record Transformer). As-built in
+  [`okf/backend/engine/catalog-vs-executors.md`](okf/backend/engine/catalog-vs-executors.md) and
+  [`okf/frontend/features/schema-mapping-authoring.md`](okf/frontend/features/schema-mapping-authoring.md);
+  plan archived at
+  [`archived-documents/plans-archive/delete-transform-map-plan.md`](archived-documents/plans-archive/delete-transform-map-plan.md).
+
 - ~~`superpower/parse-pane-redesign-plan.md`~~ + ~~`superpower/sql-transform-v1-plan.md`~~ — **SHIPPED
   and ARCHIVED 2026-09-04** →
   [`archived-documents/plans-archive/parse-pane-redesign-plan.md`](archived-documents/plans-archive/parse-pane-redesign-plan.md)

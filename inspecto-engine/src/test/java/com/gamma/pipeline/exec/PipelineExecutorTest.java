@@ -231,7 +231,7 @@ class PipelineExecutorTest {
                                 Map.of("name", "amt_major", "expr", "amt / 100"))))));
 
         PipelineGraph g = com.gamma.pipeline.PipelineLift.lift(com.gamma.etl.PipelineConfig.fromMap(raw));
-        PipelineNode map = g.nodes().stream().filter(n -> "transform.map".equals(n.type())).findFirst()
+        PipelineNode map = g.nodes().stream().filter(n -> "transform.sql".equals(n.type())).findFirst()
                 .orElseThrow(() -> new AssertionError("the lift emits a map node"));
         assertNotNull(map.cfg("columns"), "processing.map must reach the map node, or nothing below is tested");
 

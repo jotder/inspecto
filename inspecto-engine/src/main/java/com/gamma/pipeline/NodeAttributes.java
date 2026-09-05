@@ -27,8 +27,8 @@ import java.util.stream.Stream;
  *
  * <p>A node type absent from this table has no schema and falls back to the dialog's free-form key/value
  * editor. Types are left absent deliberately rather than guessed — {@code parser} is authored by the
- * Grammar editor and {@code transform.map} by the mapping-CSV surface (ELT UI plan S5), so neither
- * gets a scalar spec here; a best-guess table that looks authoritative is what the plan was cleaning up.
+ * Grammar editor and the projection slot ({@code transform.sql}) by the Record Transformer grid, so
+ * neither gets a scalar spec here; a best-guess table that looks authoritative is what the plan was cleaning up.
  */
 public final class NodeAttributes {
 

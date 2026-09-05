@@ -37,7 +37,7 @@ class PipelineLiftTest {
         // node types
         assertType(g, "acq", "acquisition");
         assertType(g, "parse", "parser");
-        assertType(g, "map", "transform.map");
+        assertType(g, "map", "transform.sql");
         assertType(g, "sink", "sink.persistent");
 
         // NEITHER file-grain dedup is a node: fingerprint folded onto acquisition 2026-08-04, marker
@@ -185,7 +185,7 @@ class PipelineLiftTest {
         assertFalse(g.active());
         assertType(g, "acq", "acquisition");
         assertType(g, "parse", "parser");
-        assertType(g, "map", "transform.map");
+        assertType(g, "map", "transform.sql");
         assertType(g, "sink", "sink.persistent");
         assertNull(g.node("parse").orElseThrow().cfg("schema"));
         // no schema ⇒ the sink falls back to the pipeline's own identity as its store name

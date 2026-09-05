@@ -25,7 +25,7 @@ class DeletionFenceTest {
     /** A flow that consumes {@code store} at rest. */
     private static PipelineGraph consumer(String name, String store) {
         return new PipelineGraph(name, true,
-                List.of(new PipelineNode("src", "transform.map", "read", null,
+                List.of(new PipelineNode("src", "transform.sql", "read", null,
                         Map.of(PipelineStores.CONFIG_SOURCE_STORE, store), null)),
                 List.of());
     }

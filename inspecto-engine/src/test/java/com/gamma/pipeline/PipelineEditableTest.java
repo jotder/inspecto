@@ -207,7 +207,7 @@ class PipelineEditableTest {
     void aTransformComponentRefOnAMapNodeRefusesWithNamedCode() {
         PipelineCompileException ex = assertThrows(PipelineCompileException.class,
                 () -> PipelineEditable.lower(graphBinding(
-                        bound("map", "transform.map", "transform/orders_std")), new LinkedHashMap<>(), true));
+                        bound("map", "transform.sql", "transform/orders_std")), new LinkedHashMap<>(), true));
         assertEquals(1, ex.refusals().size(), ex.getMessage());
         assertEquals(PipelineEditable.UNSUPPORTED_BINDING, ex.refusals().get(0).code());
         assertEquals("map", ex.refusals().get(0).nodeId());
@@ -498,6 +498,7 @@ class PipelineEditableTest {
         PipelineGraph lifted = PipelineLift.lift(cfg);
         PipelineNode sqlNode = lifted.nodes().stream()
                 .filter(n -> BuiltinNodeType.TRANSFORM_SQL.type().equals(n.type()))
+                .filter(n -> !PipelineEditable.isProjectionSlot(n))   // the slot is a transform.sql too
                 .findFirst().orElseThrow(() -> new AssertionError("no transform.sql node lifted: " + lifted.nodes()));
         assertEquals(SIMPLE_AUTHORED_SQL, sqlNode.config(), "the node carries sql + the opaque fields list");
 
@@ -544,6 +545,8 @@ class PipelineEditableTest {
      */
     private static List<String> transformChain(PipelineGraph g) {
         return g.nodes().stream()
+                // the projection slot (a transform.sql since 2026-09-05) is not a chain step
+                .filter(n -> !PipelineEditable.isProjectionSlot(n))
                 .map(PipelineNode::type)
                 .filter(t -> t.startsWith("transform."))
                 .map(t -> t.substring("transform.".length()))
@@ -1138,10 +1141,10 @@ class PipelineEditableTest {
         List<Map<String, Object>> columns = List.of(
                 Map.of("name", "ID_UPPER", "expr", "UPPER(ID)"),
                 Map.of("name", "AMT_MAJOR", "expr", "AMT / 100"));
-        PipelineGraph g = roundTrip(dir, node("map_authored", "transform.map", Map.of("columns", columns)));
+        PipelineGraph g = roundTrip(dir, node("map_authored", "transform.sql", Map.of("columns", columns)));
 
         PipelineNode map = g.nodes().stream()
-                .filter(n -> BuiltinNodeType.TRANSFORM_MAP.type().equals(n.type()))
+                .filter(n -> BuiltinNodeType.TRANSFORM_SQL.type().equals(n.type()))
                 .findFirst().orElseThrow(() -> new AssertionError("the lift always emits a map node"));
         assertEquals(columns, map.cfg("columns"),
                 "the authored projection comes back on the map node; before this slice it was dropped");
@@ -1155,7 +1158,7 @@ class PipelineEditableTest {
     @Test
     void theLiftDerivedSchemaIsStillNotLowered() {
         Map<String, Object> lowered = assertDoesNotThrow(() -> PipelineEditable.lower(
-                graphWith(node("map", "transform.map",
+                graphWith(node("map", "transform.sql",
                         Map.of("schema", Map.of("mapping", Map.of("rules", List.of()))))),
                 new LinkedHashMap<>(), true));
         assertNull(section(lowered, "processing").get("map"),
@@ -1165,7 +1168,7 @@ class PipelineEditableTest {
     @Test
     void anUnknownMapKeyRefusesWithNamedCode() {
         PipelineCompileException ex = assertThrows(PipelineCompileException.class, () -> PipelineEditable.lower(
-                graphWith(node("map", "transform.map", Map.of("flavour", "vanilla"))),
+                graphWith(node("map", "transform.sql", Map.of("flavour", "vanilla"))),
                 new LinkedHashMap<>(), true));
         assertEquals(1, ex.refusals().size(), ex.getMessage());
         assertEquals(PipelineEditable.UNSUPPORTED_MAP_KEY, ex.refusals().get(0).code());
@@ -1184,7 +1187,7 @@ class PipelineEditableTest {
         PipelineGraph g = new PipelineGraph("x", true, List.of(
                 node("acq", "acquisition", Map.of("poll", "in")),
                 node("parse", "parser", Map.of("schema_file", "s.toon", "mapping_file", "m.toon")),
-                node("map", "transform.map", Map.of("columns", List.of(Map.of("name", "A", "expr", "1")))),
+                node("map", "transform.sql", Map.of("columns", List.of(Map.of("name", "A", "expr", "1")))),
                 node("sink", "sink.persistent", Map.of("database", "db"))), List.of());
 
         PipelineCompileException ex = assertThrows(PipelineCompileException.class,
@@ -1198,8 +1201,8 @@ class PipelineEditableTest {
     @Test
     void mapNodesCarryingDifferentAuthoredConfigRefuse() {
         PipelineGraph g = graphWith(
-                node("map_a", "transform.map", Map.of("columns", List.of(Map.of("name", "A", "expr", "1")))),
-                node("map_b", "transform.map", Map.of("columns", List.of(Map.of("name", "B", "expr", "2")))));
+                node("map_a", "transform.sql", Map.of("columns", List.of(Map.of("name", "A", "expr", "1")))),
+                node("map_b", "transform.sql", Map.of("columns", List.of(Map.of("name", "B", "expr", "2")))));
 
         PipelineCompileException ex = assertThrows(PipelineCompileException.class,
                 () -> PipelineEditable.lower(g, new LinkedHashMap<>(), true));
@@ -1216,7 +1219,7 @@ class PipelineEditableTest {
     @Test
     void anAuthoredMapSurvivesAChainThatLowersToSteps() {
         Map<String, Object> lowered = assertDoesNotThrow(() -> PipelineEditable.lower(
-                graphWith(node("map", "transform.map",
+                graphWith(node("map", "transform.sql",
                                 Map.of("columns", List.of(Map.of("name", "A", "expr", "1")))),
                         node("dd1", "transform.dedup", Map.of("keys", List.of("a"))),
                         node("dd2", "transform.dedup", Map.of("keys", List.of("b")))),

@@ -1743,24 +1743,21 @@ describe('PipelineEditorComponent', () => {
         });
 
         /**
-         * The drawer header names the GLOSSARY's definition stage. ⚠ Three kinds reach the drawer, and
-         * the binding used to be a two-way `acquisition ? 'Collector' : 'Parser'` ternary — so the Load
-         * drawer announced itself as "PARSER" with the parse icon. Found by driving the preview.
+         * The drawer header names the GLOSSARY's definition stage. ⚠ The binding used to be a two-way
+         * `acquisition ? 'Collector' : 'Parser'` ternary — so the (since-deleted) Load drawer announced
+         * itself as "PARSER" with the parse icon. Found by driving the preview.
          */
         describe('definition drawer header', () => {
-            it('names each of the three kinds that reach the drawer', () => {
+            it('names each of the definition kinds that reach the drawer', () => {
                 const c = make();
                 expect(c.definitionKind({ id: 'a', type: 'acquisition' }).label).toBe('Collector');
-                expect(c.definitionKind({ id: 'm', type: 'transform.map' }).label).toBe('Load');
                 expect(c.definitionKind({ id: 'p', type: 'parser.delimited' }).label).toBe('Parse');
                 expect(c.definitionKind({ id: 'p2', type: 'parser' }).label).toBe('Parse');
             });
 
-            it('gives the Load drawer its own icon, not the parse one', () => {
+            it('labels the Record Transformer by its category, never as Parse', () => {
                 const c = make();
-                const load = c.definitionKind({ id: 'm', type: 'transform.map' }).icon;
-                expect(load).not.toBe(c.definitionKind({ id: 'p', type: 'parser' }).icon);
-                expect(load).not.toBe(c.definitionKind({ id: 'a', type: 'acquisition' }).icon);
+                expect(c.definitionKind({ id: 'map', type: 'transform.sql' }).label).not.toBe('Parse');
             });
         });
 
@@ -1774,7 +1771,7 @@ describe('PipelineEditorComponent', () => {
                 name: 'p',
                 active: false,
                 nodes: [
-                    { id: 'map', type: 'transform.map' },
+                    { id: 'map', type: 'transform.sql' },
                     { id: 'route', type: 'transform.route', config: { mode: 'case' } },
                     { id: 'emea', type: 'sink.persistent', config: { database: '/db/emea' } },
                     { id: 'apac', type: 'sink.persistent', config: { database: '/db/apac' } },
@@ -1798,7 +1795,7 @@ describe('PipelineEditorComponent', () => {
                 // engine refuses a disable there and the switch must not be offered.
                 expect(c.parkableNode({ id: 'trunk', type: 'sink.persistent' })).toBe(false);
                 expect(c.parkableNode({ id: 'route', type: 'transform.route' })).toBe(false);
-                expect(c.parkableNode({ id: 'map', type: 'transform.map' })).toBe(false);
+                expect(c.parkableNode({ id: 'map', type: 'transform.sql' })).toBe(false);
                 expect(c.parkableNode(null)).toBe(false);
             });
 
@@ -1808,7 +1805,7 @@ describe('PipelineEditorComponent', () => {
                     name: 'p',
                     active: false,
                     nodes: [
-                        { id: 'map', type: 'transform.map' },
+                        { id: 'map', type: 'transform.sql' },
                         { id: 'out', type: 'sink.persistent', config: { database: '/db' } },
                     ],
                     edges: [{ from: 'map', rel: 'data', to: 'out' }],

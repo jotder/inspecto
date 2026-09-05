@@ -62,10 +62,11 @@ class PipelineStepsProjectionTest {
     /** The transform chain the lift actually builds, as step kinds — the {@code transform.} prefix dropped. */
     private static List<String> liftedChain(PipelineConfig cfg) {
         return PipelineLift.lift(cfg).nodes().stream()
+                // the projection slot (a transform.sql since 2026-09-05) is not an authorable step
+                .filter(n -> !PipelineEditable.isProjectionSlot(n))
                 .map(PipelineNode::type)
                 .filter(t -> t.startsWith("transform."))
                 .map(t -> t.substring("transform.".length()))
-                // `map` is not an authorable step: it is the schema projection the lift always emits.
                 .filter(PipelineConfig.Step.KINDS::contains)
                 .toList();
     }

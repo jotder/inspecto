@@ -86,7 +86,7 @@ class PipelineGraphTest {
     void builtinNodeTypesRegistered() {
         assertTrue(PipelineNodeTypes.isKnown("acquisition"));
         assertTrue(PipelineNodeTypes.isKnown("parser"));
-        assertTrue(PipelineNodeTypes.isKnown("transform.map"));
+        assertTrue(PipelineNodeTypes.isKnown("transform.sql"));
         assertTrue(PipelineNodeTypes.isKnown("transform.filter"));        // G1
         assertTrue(PipelineNodeTypes.isKnown("transform.dedup.marker"));  // G2 (the marker subsystem)
         // The fingerprint subtype was removed 2026-08-04 — file dedup executes in the acquisition
@@ -119,14 +119,14 @@ class PipelineGraphTest {
         assertEquals(NodeCategory.SOURCE,    PipelineNodeTypes.categoryOf("acquisition").orElseThrow());
         assertEquals(NodeCategory.SOURCE,    PipelineNodeTypes.categoryOf("adapter").orElseThrow());
         assertEquals(NodeCategory.PARSE,     PipelineNodeTypes.categoryOf("parser").orElseThrow());
-        assertEquals(NodeCategory.TRANSFORM, PipelineNodeTypes.categoryOf("transform.map").orElseThrow());
+        assertEquals(NodeCategory.TRANSFORM, PipelineNodeTypes.categoryOf("transform.sql").orElseThrow());
         assertEquals(NodeCategory.CONTROL,   PipelineNodeTypes.categoryOf("gap").orElseThrow());
 
         // all three sink subtypes share the SINK category, so sink detection is family-based
         assertTrue(PipelineNodeTypes.isCategory("sink.persistent", NodeCategory.SINK));
         assertTrue(PipelineNodeTypes.isCategory("sink.materialized", NodeCategory.SINK));
         assertTrue(PipelineNodeTypes.isCategory("sink.view", NodeCategory.SINK));
-        assertFalse(PipelineNodeTypes.isCategory("transform.map", NodeCategory.SINK));
+        assertFalse(PipelineNodeTypes.isCategory("transform.sql", NodeCategory.SINK));
         assertTrue(PipelineNodeTypes.categoryOf("does.not.exist").isEmpty());
 
         // catalog is UI-ready: every descriptor carries a non-blank label

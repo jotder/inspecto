@@ -52,7 +52,7 @@ function projectDryRun(
     );
     return {
         seedNode: 'seed',
-        nodes: [{ node: 'map', type: 'transform.map', relations: [{ rel: 'data', rowCount: rows.length, rows }] }],
+        nodes: [{ node: 'map', type: 'transform.sql', relations: [{ rel: 'data', rowCount: rows.length, rows }] }],
         sinks: [],
     };
 }
@@ -306,7 +306,7 @@ describe('previewGraph', () => {
     it('is a seed → map → sink chain carrying the rules inline', () => {
         const g = previewGraph('cdr_map', [{ targetColumn: 'A', sourceExpression: 'a', transformType: 'DIRECT' }]);
         expect(g.active).toBe(false);
-        expect(g.nodes.map((n) => n.type)).toEqual(['acquisition', 'transform.map', 'sink.persistent']);
+        expect(g.nodes.map((n) => n.type)).toEqual(['acquisition', 'transform.sql', 'sink.persistent']);
         expect(g.edges).toEqual([
             { from: 'seed', rel: 'data', to: 'map' },
             { from: 'map', rel: 'data', to: 'sink' },

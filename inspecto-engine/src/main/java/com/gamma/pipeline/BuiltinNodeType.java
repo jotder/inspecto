@@ -100,10 +100,9 @@ public enum BuiltinNodeType implements PipelineNodeType {
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true),
 
     // ── transform family (§3.4 + §15) ─────────────────────────────────────────────
-    TRANSFORM_MAP("transform.map", NodeCategory.TRANSFORM, "Map",
-            "Maps raw fields onto the canonical schema. SUPERSEDED by the Record Transformer "
-            + "(transform.sql over processing.map.fields) — authored the legacy way via mapping.rules[].",
-            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),
+    // transform.map was DELETED 2026-09-05: the projection slot is always a Record Transformer
+    // (transform.sql over fields[]). A stored mapping.rules[] is converted at read time by
+    // RecordTransform.fromMappingRules, so old schemas still load — they just never execute as "Map".
     TRANSFORM_FILTER("transform.filter", NodeCategory.TRANSFORM, "Filter",
             "Keeps/drops rows by predicate; index-anchored CSV row-filter (G1).",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.DROPPED), false),

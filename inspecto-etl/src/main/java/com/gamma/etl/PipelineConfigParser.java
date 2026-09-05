@@ -1482,7 +1482,7 @@ final class PipelineConfigParser {
 
     /**
      * Collect the column names a schema map declares — the union of {@code raw.fields[].name} and
-     * {@code mapping.rules[].targetColumn}. Kept here (rather than reusing the engine-side
+     * {@code mapping.fields[].name} (or a legacy {@code mapping.rules[].targetColumn}). Kept here (rather than reusing the engine-side
      * {@code SchemaProjection}) so the etl module stays dependency-free; used to check a
      * {@code reference.key} against the pipeline schema. Empty for a null/malformed schema.
      */
@@ -1493,10 +1493,14 @@ final class PipelineConfigParser {
             for (Object f : fields)
                 if (f instanceof Map<?, ?> fm && fm.get("name") != null) cols.add(fm.get("name").toString());
         }
-        if (schema.get("mapping") instanceof Map<?, ?> mapping && mapping.get("rules") instanceof List<?> rules) {
-            for (Object r : rules)
-                if (r instanceof Map<?, ?> rm && rm.get("targetColumn") != null)
-                    cols.add(rm.get("targetColumn").toString());
+        if (schema.get("mapping") instanceof Map<?, ?> mapping) {
+            if (mapping.get("fields") instanceof List<?> fields)
+                for (Object f : fields)
+                    if (f instanceof Map<?, ?> fm && fm.get("name") != null) cols.add(fm.get("name").toString());
+            if (mapping.get("rules") instanceof List<?> rules)
+                for (Object r : rules)
+                    if (r instanceof Map<?, ?> rm && rm.get("targetColumn") != null)
+                        cols.add(rm.get("targetColumn").toString());
         }
         return cols;
     }

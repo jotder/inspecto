@@ -210,11 +210,9 @@ interface ConsignmentIngestStrategy {
             return "the lifted graph's sink count (" + sinks.size() + ") differs from sinks[] (" + cfg.sinks().size() + ")";
         String seed = seedFeedingTheWrite(lifted);
         String seedType = lifted.byId().get(seed).type();
-        // The projection slot may be authored either way since 2026-09-05: a Record Transformer
-        // (transform.sql over fields[]) compiles through the SAME [{name, expr}] seam transform.map
-        // does, so it is the projection too, not "a node between map and the write". Only a node that
-        // genuinely cannot run on this lane keeps the graph fork closed.
-        if (!"transform.map".equals(seedType) && !"transform.sql".equals(seedType))
+        // The projection slot is a Record Transformer (transform.sql); only a node that genuinely
+        // cannot run on this lane keeps the graph fork closed.
+        if (!"transform.sql".equals(seedType))
             return "a node between the projection and the write (" + seedType
                     + ") would have to EXECUTE at rest — Stage-2 work";
         return "a sink is fed through another node rather than directly off map";
@@ -418,7 +416,7 @@ interface ConsignmentIngestStrategy {
                 .filter(n -> PipelineNodeTypes.isCategory(n.type(), NodeCategory.SINK)).toList();
         if (sinks.size() != cfg.sinks().size() || sinks.isEmpty()) return false;
         String seed = seedFeedingTheWrite(lifted);
-        if (!"transform.map".equals(lifted.byId().get(seed).type())) return false;
+        if (!"transform.sql".equals(lifted.byId().get(seed).type())) return false;
         // EVERY sink must hang directly off the seed — one straggler behind another node would be
         // executed by the walk, which is new behaviour rather than the same write.
         return sinks.stream().allMatch(sink -> lifted.edgesTo(sink.id()).stream()

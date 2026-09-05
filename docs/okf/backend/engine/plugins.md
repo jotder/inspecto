@@ -80,7 +80,7 @@ To make many-small-files efficient, also raise `collector.consignment.max_files`
 
 Each segment key has its own schema toon. Use the `partitions[N]{...}` tabular list syntax (JToon's array form) instead of the legacy `partitionKey:` shorthand. Each row maps an output partition column to a raw table source column and specifies how to derive the value.
 
-> **JToon list syntax matters.** JToon does **not** parse YAML-style `- key: value` list items. Use the `name[N]{col1,col2,col3}:` tabular form everywhere — the same form `raw.fields[N]{...}` and `mapping.rules[N]{...}` already use. A YAML-style list silently parses as `null`, and `PartitionDef.fromSchema` then falls through to the empty-list branch, so every row lands in the `year=1900/month=01/day=01` sentinel partition. Symptoms: single output file regardless of how many distinct dates you have.
+> **JToon list syntax matters.** Prefer the `name[N]{col1,col2,col3}:` tabular form for flat rows — the form `raw.fields[N]{...}` uses. ⚠ The block-list form `name[N]:` + `- key: value` entries DOES parse (verified 2026-09-05: `MappingMigrator` writes it for `mapping.fields[]` rows that carry nested `args`, and `ConfigCodec.toMap`/`JToon.decode` reads it back), but a bare `- item` list under a key with NO `[N]` count is what silently decodes as `null`. A YAML-style list silently parses as `null`, and `PartitionDef.fromSchema` then falls through to the empty-list branch, so every row lands in the `year=1900/month=01/day=01` sentinel partition. Symptoms: single output file regardless of how many distinct dates you have.
 
 ```yaml
 # file: spaces/default/config/events/call_schema.toon

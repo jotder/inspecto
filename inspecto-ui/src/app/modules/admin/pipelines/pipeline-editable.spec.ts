@@ -721,7 +721,7 @@ describe('mock pipeline-editable — UNSUPPORTED_BINDING', () => {
     };
 
     it('refuses a transform component ref on a map node, naming the node and the ref', () => {
-        const refusals = refusalsOf(saveable([{ id: 'map', type: 'transform.map', use: 'transform/orders_std' }]));
+        const refusals = refusalsOf(saveable([{ id: 'map', type: 'transform.sql', use: 'transform/orders_std' }]));
         expect(refusals).toHaveLength(1);
         expect(refusals[0].code).toBe('UNSUPPORTED_BINDING');
         expect(refusals[0].nodeId).toBe('map');
@@ -778,7 +778,7 @@ describe('mock pipeline-editable — UNSUPPORTED_BINDING', () => {
 });
 
 /**
- * AUTHOR-1 (a): the authored half of a `transform.map` node. Until this slice both sides answered
+ * AUTHOR-1 (a): the authored half of the projection slot (a `transform.sql` node with id `map`). Until this slice both sides answered
  * `written: true` and dropped it. The mock flips in the SAME commit as the server — it is contract,
  * not fixture — so these mirror `PipelineEditableTest`'s map cases one for one.
  */
@@ -823,8 +823,9 @@ describe('mock pipeline-editable — the authored map projection (processing.map
         (bare['processing'] as Record<string, unknown>) = { schema_file: 'm_schema.toon' };
 
         const g = liftConfig(bare);
-        const map = g.nodes.find((n) => n.type === 'transform.map');
-        expect(map, 'the server emits a derived map node here; the offline graph must not be shorter').toBeDefined();
+        const map = g.nodes.find((n) => n.id === 'map');
+        expect(map, 'the server emits a derived slot node here; the offline graph must not be shorter').toBeDefined();
+        expect(map!.type, 'the slot is a Record Transformer — transform.map is gone').toBe('transform.sql');
         expect(map!.config ?? {}, 'derived only — nothing was authored to carry').toEqual({});
         expect(
             g.edges.some((e) => e.to === 'map'),
@@ -842,7 +843,7 @@ describe('mock pipeline-editable — the authored map projection (processing.map
         const existing = mapConfig();
         const g = liftConfig(existing);
 
-        const map = g.nodes.find((n) => n.type === 'transform.map');
+        const map = g.nodes.find((n) => n.id === 'map');
         expect(map, 'an authored projection needs a node to carry it').toBeDefined();
         expect(map!.config?.['columns']).toEqual(columns);
 
@@ -853,7 +854,7 @@ describe('mock pipeline-editable — the authored map projection (processing.map
 
     it('does not lower the lift-derived schema as authored config', () => {
         const res = lowerGraph(
-            saveable([{ id: 'map', type: 'transform.map', config: { schema: { mapping: { rules: [] } } } }]) as never,
+            saveable([{ id: 'map', type: 'transform.sql', config: { schema: { mapping: { rules: [] } } } }]) as never,
             {},
             true,
         );
@@ -863,7 +864,7 @@ describe('mock pipeline-editable — the authored map projection (processing.map
     });
 
     it('refuses a map key that is neither authored nor derived', () => {
-        const refusals = refusalsOf(saveable([{ id: 'map', type: 'transform.map', config: { flavour: 'vanilla' } }]));
+        const refusals = refusalsOf(saveable([{ id: 'map', type: 'transform.sql', config: { flavour: 'vanilla' } }]));
         expect(refusals).toHaveLength(1);
         expect(refusals[0].code).toBe('UNSUPPORTED_MAP_KEY');
         expect(refusals[0].nodeId).toBe('map');
@@ -872,7 +873,7 @@ describe('mock pipeline-editable — the authored map projection (processing.map
 
     it('refuses authored columns alongside a declared mapping_file', () => {
         const refusals = refusalsOf(
-            saveable([{ id: 'map', type: 'transform.map', config: { columns } }], { mapping_file: 'm.toon' }),
+            saveable([{ id: 'map', type: 'transform.sql', config: { columns } }], { mapping_file: 'm.toon' }),
         );
         expect(refusals).toHaveLength(1);
         expect(refusals[0].code).toBe('MAPPING_CONFLICT');
@@ -882,8 +883,8 @@ describe('mock pipeline-editable — the authored map projection (processing.map
     it('refuses two map nodes whose authored config has drifted apart', () => {
         const refusals = refusalsOf(
             saveable([
-                { id: 'map_a', type: 'transform.map', config: { columns } },
-                { id: 'map_b', type: 'transform.map', config: { columns: [{ name: 'x', expr: '1' }] } },
+                { id: 'map_a', type: 'transform.sql', config: { columns } },
+                { id: 'map_b', type: 'transform.sql', config: { columns: [{ name: 'x', expr: '1' }] } },
             ]),
         );
         expect(refusals).toHaveLength(1);
@@ -894,7 +895,7 @@ describe('mock pipeline-editable — the authored map projection (processing.map
     it('keeps processing.map when the chain outgrows the singular keys and becomes steps:', () => {
         const res = lowerGraph(
             saveable([
-                { id: 'map', type: 'transform.map', config: { columns } },
+                { id: 'map', type: 'transform.sql', config: { columns } },
                 { id: 'dd1', type: 'transform.dedup', config: { keys: ['a'] } },
                 { id: 'dd2', type: 'transform.dedup', config: { keys: ['b'] } },
             ]) as never,

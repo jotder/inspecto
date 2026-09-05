@@ -123,7 +123,7 @@ class PipelineProjectionTest {
                 List.of(PipelineEdge.data("acq", "sink")));
         // consumer job: reads the "orders" store at rest
         PipelineGraph consumer = new PipelineGraph("ORDERS_ROLLUP", true,
-                List.of(new PipelineNode("src", "transform.map", "Read orders", null,
+                List.of(new PipelineNode("src", "transform.sql", "Read orders", null,
                                 Map.of(PipelineStores.CONFIG_SOURCE_STORE, "orders"), null),
                         new PipelineNode("kpi", "sink.view", "Daily KPI", null,
                                 Map.of(PipelineStores.CONFIG_STORE, "orders_kpi"), null)),

@@ -45,7 +45,7 @@ All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key ref
 | File | Key groups |
 |---|---|
 | `<src>_gen.toon` | `csv_settings` (delimiter, engine, skip_* lines), `type_patterns` (dates/timestamps) |
-| `<src>_schema.toon` | `raw.fields[]` (name/selector/type), `mapping.rules[]` (targetColumn/sourceExpression/transformType), `partitions[]` |
+| `<src>_schema.toon` | `raw.fields[]` (name/selector/type), `mapping.fields[]` (name/from/fn/args — Record Transformer rows; a legacy `mapping.rules[]` is still read and converted), `partitions[]` |
 | `<src>_pipeline.toon` | `name`, `active`, `dirs.*`, `output.format/compression`, `processing.*` (threads, batch, csv_settings, schema_file, streaming, ingester/segments), `source:` acquisition block |
 
 No `#` comments are allowed in files the strict parser handles. Writes go through

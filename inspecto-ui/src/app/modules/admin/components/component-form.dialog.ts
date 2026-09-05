@@ -66,7 +66,6 @@ const jsonValidator: ValidatorFn = (control: AbstractControl): ValidationErrors 
 };
 
 const TRANSFORM_SUBTYPES = [
-    'transform.map',
     'transform.select',
     'transform.derive',
     'transform.filter',

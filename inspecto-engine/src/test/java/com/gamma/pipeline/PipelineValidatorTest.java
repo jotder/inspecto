@@ -48,7 +48,7 @@ class PipelineValidatorTest {
     @Test
     void detectsDataCycle() {
         PipelineGraph g = new PipelineGraph("loop", true,
-                List.of(PipelineNode.of("a", "transform.map"), PipelineNode.of("b", "transform.map")),
+                List.of(PipelineNode.of("a", "transform.sql"), PipelineNode.of("b", "transform.sql")),
                 List.of(PipelineEdge.data("a", "b"), PipelineEdge.data("b", "a")));
         PipelineValidator.Result r = PipelineValidator.validate(g);
         assertFalse(r.ok());
@@ -115,7 +115,7 @@ class PipelineValidatorTest {
     @Test
     void validateOrThrowReportsEveryError() {
         PipelineGraph g = new PipelineGraph("bad", true,
-                List.of(PipelineNode.of("a", "transform.map"), PipelineNode.of("b", "transform.map")),
+                List.of(PipelineNode.of("a", "transform.sql"), PipelineNode.of("b", "transform.sql")),
                 List.of(PipelineEdge.data("a", "b"), PipelineEdge.data("b", "a")));
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> PipelineValidator.validateOrThrow(g));
@@ -128,7 +128,7 @@ class PipelineValidatorTest {
     void rejectsRelationANodeDoesNotEmit() {
         // transform.map emits only data — an 'invalid' branch is illegal (only validate emits invalid)
         PipelineGraph g = new PipelineGraph("emit", true,
-                List.of(PipelineNode.of("acq", "acquisition"), PipelineNode.of("m", "transform.map"),
+                List.of(PipelineNode.of("acq", "acquisition"), PipelineNode.of("m", "transform.sql"),
                         PipelineNode.of("x", "sink.persistent")),
                 List.of(PipelineEdge.data("acq", "m"), new PipelineEdge("m", PipelineRel.INVALID, "x")));
         PipelineValidator.Result r = PipelineValidator.validate(g);
@@ -147,7 +147,7 @@ class PipelineValidatorTest {
 
         // a plain map does NOT emit named routes
         PipelineGraph bad = new PipelineGraph("router", true,
-                List.of(PipelineNode.of("acq", "acquisition"), PipelineNode.of("m", "transform.map"),
+                List.of(PipelineNode.of("acq", "acquisition"), PipelineNode.of("m", "transform.sql"),
                         PipelineNode.of("a", "sink.persistent")),
                 List.of(PipelineEdge.data("acq", "m"), new PipelineEdge("m", PipelineRel.route("emea"), "a")));
         assertTrue(codes(PipelineValidator.validate(bad)).contains(PipelineValidator.ILLEGAL_EMIT));

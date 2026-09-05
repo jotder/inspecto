@@ -50,7 +50,7 @@ import {
 
 const node = (over: Partial<PipelineNode>): PipelineNode => ({
     id: 'n',
-    type: 'transform.map',
+    type: 'transform.sql',
     category: 'TRANSFORM',
     label: 'Map',
     ...over,
@@ -191,7 +191,7 @@ describe('toCombinedG6Data', () => {
             },
             {
                 id: 'orders_rollup/src',
-                type: 'transform.map',
+                type: 'transform.sql',
                 category: 'TRANSFORM',
                 label: 'Read',
                 sourceStore: 'orders',

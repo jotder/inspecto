@@ -249,7 +249,7 @@ config SPI), reached only when config genuinely can't express the need:
 
 | Level | Reach for it when | Where / how |
 |---|---|---|
-| **1 — Mapping rule** *(config, no code)* | rename/select, cast a type, compose a timestamp (`CONCAT_DT`), derive a date from the filename (`FILENAME_DATE`), **or any per-row DuckDB scalar expression (`EXPR`)** | a row in `mapping.rules[]` |
+| **1 — Record Transformer field** *(config, no code)* | rename/select (`keep`), cast a type (`convert.type`), compose a timestamp (`date.concat_parts`), derive a date from the filename (`date.from_filename`), **or any per-row DuckDB scalar expression (`custom`)** — a legacy `mapping.rules[]` row is read as one of these | a row in `mapping.fields[]` |
 | **2 — New named `transformType`** *(engine code)* | you want a **reusable, named** verb across many schemas (e.g. a domain checksum) rather than repeating the same `EXPR` everywhere | add a `ColumnRule` to the `DATA_RULES` registry in `etl/TransformCompiler` — a one-line addition returning a DuckDB **scalar** expression (one row in → one row out) |
 | **3 — Plugin ingester** *(engine code)* | the **input format** isn't delimited text — binary, fixed-width, ASN.1 — or one file splits into several event-type tables | implement [`StreamingFileIngester`](../engine/plugins.md#plugin-ingester): you parse and `emit` records; the framework still applies the same `mapping.rules[]` / `partitions[]` to them |
 

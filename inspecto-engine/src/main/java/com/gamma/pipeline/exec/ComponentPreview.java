@@ -644,8 +644,10 @@ public final class ComponentPreview {
     private static List<Map<String, Object>> mappedProjection(Map<String, Object> content, String sourceTable) {
         if (!(content.get("raw") instanceof Map<?, ?> raw) || !(raw.get("fields") instanceof List<?> fields)
                 || fields.isEmpty()) return null;
-        if (!(content.get("mapping") instanceof Map<?, ?> mapping)
-                || !(mapping.get("rules") instanceof List<?> rules) || rules.isEmpty()) return null;
+        if (!(content.get("mapping") instanceof Map<?, ?> mapping)) return null;
+        boolean hasRules  = mapping.get("rules")  instanceof List<?> ruleRows  && !ruleRows.isEmpty();
+        boolean hasFields = mapping.get("fields") instanceof List<?> fieldRows && !fieldRows.isEmpty();
+        if (!hasRules && !hasFields) return null;
         List<Map<String, Object>> cols =
                 DataTransformer.dataColumns(content, csvSettingsOf(content), sourceTable);
         return cols.isEmpty() ? null : cols;

@@ -173,7 +173,7 @@ public final class ConfigSafetyValidator {
         checkOutput(raw, "output.format", "output.compression", p, out);
         checkDuckLake(raw, out);
 
-        // ── processing.map (the authored half of a transform.map node) ──
+        // ── processing.map (the authored half of the projection slot — a Record Transformer) ──
         // The third hand-rolled list-of-objects walker in this file, for the same reason as the other
         // two: FieldType has scalar LIST and untyped MAP only, no list-of-objects primitive, so a
         // declared FieldSpec cannot express this shape. (Building that primitive and migrating
@@ -183,6 +183,8 @@ public final class ConfigSafetyValidator {
                 "name", "expr", out);
         checkMapEntries(RawConfig.at(raw, "processing.map.rules"), "processing.map.rules",
                 "targetColumn", null, out);
+        checkMapEntries(RawConfig.at(raw, "processing.map.fields"), "processing.map.fields",
+                "name", null, out);
 
         // ── sinks (plural destinations) ──
         // Each entry is a {database, format, compression, ducklake} tuple; validate the same path-jail /

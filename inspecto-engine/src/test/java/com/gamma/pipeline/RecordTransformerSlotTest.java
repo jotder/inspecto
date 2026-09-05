@@ -72,12 +72,12 @@ class RecordTransformerSlotTest {
         assertTrue(PipelineEditable.isProjectionSlot(slot));
     }
 
-    /** ⛔ No fields[] ⇒ the slot stays a Map. Every stored pipeline depends on this being unchanged. */
+    /** No fields[] ⇒ the slot is STILL a Record Transformer: transform.map is gone (2026-09-05). */
     @Test
-    void withoutFieldsTheSlotIsStillAMap() throws Exception {
+    void withoutFieldsTheSlotIsStillARecordTransformer() throws Exception {
         PipelineGraph g = PipelineLift.lift(configWith(""));
         PipelineNode slot = g.byId().get("map");
-        assertEquals(BuiltinNodeType.TRANSFORM_MAP.type(), slot.type());
+        assertEquals(BuiltinNodeType.TRANSFORM_SQL.type(), slot.type());
         assertTrue(PipelineEditable.isProjectionSlot(slot));
     }
 

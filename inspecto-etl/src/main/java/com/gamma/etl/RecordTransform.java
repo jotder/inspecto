@@ -89,6 +89,8 @@ public final class RecordTransform {
     public static final String KEEP = "keep";
     /** The id of the raw-SQL escape hatch — the {@code EXPR} analogue, and unauditable for the same reason. */
     public static final String CUSTOM = "custom";
+    /** The id of the CONCAT_DT analogue — on the ingest lane it compiles through the parser's formats and zones. */
+    public static final String CONCAT_PARTS = "date.concat_parts";
 
     /**
      * The catalog, in the TS file's declaration order (the contract compares order too).
@@ -152,10 +154,10 @@ public final class RecordTransform {
             new Fn("date.truncate", "Start of the period", "Dates", "DATE_TRUNC({unit}, {source})",
                     List.of(Param.of("unit", "Period", ParamType.TEXT).withDefault("month")),
                     "A date in March with period \"month\" becomes the 1st of March."),
-            // The CONCAT_DT analogue. ⚠ Narrower on purpose: the legacy rule coalesced over every parser
-            // timestamp format and shifted by the date column's source zone; a Record Transformer row cannot
-            // see parser settings, so this takes ONE format and no zone. Nothing stored used CONCAT_DT.
-            new Fn("date.concat_parts", "Build a timestamp from date and time columns", "Dates",
+            // The CONCAT_DT analogue. The template is what the grid previews (one format, no zone — a
+            // row cannot see parser settings); on the INGEST lane compile() renders it exactly as the legacy
+            // rule did — COALESCE over the parser's timestamp formats and the date column's source zone.
+            new Fn(CONCAT_PARTS, "Build a timestamp from date and time columns", "Dates",
                     "TRY_STRPTIME(CONCAT({source}, ' ', {time_column}), {format})",
                     List.of(Param.of("time_column", "Time column", ParamType.COLUMN),
                             Param.of("format", "Format of date + ' ' + time", ParamType.TEXT)
@@ -321,6 +323,26 @@ public final class RecordTransform {
                 String type = fieldTypes.getOrDefault(from, SchemaFieldTypes.VARCHAR);
                 expr = SchemaFieldTypes.castSql(col, type, csv.dateFormats(), csv.tsFormats(),
                         zones.zoneArg(from, sourceTable));
+            } else if (CONCAT_PARTS.equals(fn.id()) && !typedSource) {
+                // The CONCAT_DT analogue on the raw table, byte-for-byte what TransformCompiler.concatDt
+                // emitted: COALESCE over the parser's timestamp formats (the row's own `format` first),
+                // then the DATE column's source zone. Like `keep`, this differs from the TS template on
+                // purpose — the template cannot see parser settings; the engine can and must.
+                Map<String, String> a = args(field);
+                if (from == null || from.isBlank())
+                    throw new IllegalArgumentException("field '" + name + "': Pick the column this field reads.");
+                String timeCol = a == null ? null : a.get("time_column");
+                if (timeCol == null || timeCol.isBlank())
+                    throw new IllegalArgumentException("field '" + name + "': “Time column” is required.");
+                String dateRef = "\"" + sourceTable + "\".\"" + from + '"';
+                String timeRef = "\"" + sourceTable + "\".\"" + timeCol + '"';
+                List<String> formats = new ArrayList<>();
+                String fmt = a.get("format");
+                if (fmt != null && !fmt.isBlank()) formats.add(fmt);
+                for (String f : csv.tsFormats()) if (!formats.contains(f)) formats.add(f);
+                StringBuilder sb = new StringBuilder();
+                com.gamma.util.SqlBuilder.appendCoalesce(sb, dateRef + " || ' ' || " + timeRef, formats, "TIMESTAMP");
+                expr = SourceZones.toNaiveUtc(sb.toString(), zones.zoneArg(from, sourceTable));
             } else {
                 Rendered r = renderExpression(fn, from, args(field));
                 if (!r.ok())
@@ -389,9 +411,9 @@ public final class RecordTransform {
      *       a test asserts it for every stored schema.</li>
      *   <li>{@code EXPR} → {@link #CUSTOM}. Both emit the author's SQL verbatim, and both are excluded
      *       from the cast-failure audit for the same reason.</li>
-     *   <li>{@code CONCAT_DT} ({@code DATE|TIME}) → {@code date.concat_parts}. ⚠ The legacy rule coalesced
-     *       over every parser timestamp format and applied the date column's source zone; the catalog
-     *       function takes one format (the parser default) and no zone. Nothing stored used it.</li>
+     *   <li>{@code CONCAT_DT} ({@code DATE|TIME}) → {@code date.concat_parts}. On the ingest lane
+     *       {@link #compile} renders it exactly as the legacy rule did (parser formats + source zone), so
+     *       a rules-written schema keeps its UTC normalisation.</li>
      *   <li>{@code FILENAME_DATE} ({@code COL|prefix|fmt}) → {@code date.from_filename} with
      *       {@code pattern = prefix + "([0-9]{8})"} — the same regex the legacy compiler hardcoded.</li>
      * </ul>
@@ -422,7 +444,7 @@ public final class RecordTransform {
                 case "CONCAT_DT" -> {
                     String[] parts = src.split("\\|", 2);
                     field.put("from", parts[0]);
-                    field.put("fn", "date.concat_parts");
+                    field.put("fn", CONCAT_PARTS);
                     Map<String, Object> args = new LinkedHashMap<>();
                     args.put("time_column", parts.length > 1 ? parts[1] : "");
                     args.put("format", "%Y-%m-%d %H:%M:%S");

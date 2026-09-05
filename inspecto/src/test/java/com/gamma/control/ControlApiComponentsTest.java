@@ -132,7 +132,7 @@ class ControlApiComponentsTest {
     void aTemporalColumnSerialisesAsIsoTextRatherThanFailingTheResponse(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, dir.resolve("wr"))) {
             assertEquals(200, send(c.port, "POST", "/components/transform",
-                    "{\"id\":\"dated\",\"type\":\"transform.map\",\"columns\":["
+                    "{\"id\":\"dated\",\"type\":\"transform.sql\",\"columns\":["
                     + "{\"name\":\"id\",\"expr\":\"id\"},"
                     + "{\"name\":\"d\",\"expr\":\"CAST('2026-01-15' AS DATE)\"}]}").statusCode());
 
@@ -331,7 +331,7 @@ class ControlApiComponentsTest {
     void inlineTransformPreviewPublishesDerivedTypesAndTheCompiledSql(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, null)) {
             HttpResponse<String> t = send(c.port, "POST", "/components/transform/preview",
-                    "{\"config\":{\"type\":\"transform.map\",\"columns\":[{\"name\":\"ident\",\"expr\":\"id\"},{\"name\":\"amt_d\",\"expr\":\"CAST(amt AS DOUBLE)\"}]},\"sampleRows\":[{\"id\":\"1\",\"amt\":\"150\"},{\"id\":\"2\",\"amt\":\"50\"}]}");
+                    "{\"config\":{\"type\":\"transform.sql\",\"columns\":[{\"name\":\"ident\",\"expr\":\"id\"},{\"name\":\"amt_d\",\"expr\":\"CAST(amt AS DOUBLE)\"}]},\"sampleRows\":[{\"id\":\"1\",\"amt\":\"150\"},{\"id\":\"2\",\"amt\":\"50\"}]}");
             assertEquals(200, t.statusCode(), t.body());
 
             JsonNode data = null;

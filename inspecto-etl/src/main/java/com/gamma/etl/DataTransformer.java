@@ -170,10 +170,9 @@ public final class DataTransformer {
             fieldTypes.put((String) f.get("name"), (String) f.get("type"));
         SourceZones zones = SourceZones.of(schemaConfig, cfg.csv().sourceTimezone());
 
-        // 🔴 This method reads the mapping DIRECTLY — it does not go through selectFor — so the Record
-        // Transformer spelling needs its own branch here. Without it a fields[]-authored pipeline would
-        // iterate an empty rule list and report 0 cast failures forever: a silent loss of the audit,
-        // which is precisely the property this whole seam exists to preserve.
+        // 🔴 This method reads the mapping DIRECTLY — it does not go through selectFor — so it must
+        // read the same fields[] the SELECT was compiled from. A mapping with no fields (nor rules to
+        // convert) has nothing to audit.
         List<Map<String, Object>> fieldRows = recordFields(schemaConfig);
 
         List<String> targets = new ArrayList<>();
@@ -190,20 +189,6 @@ public final class DataTransformer {
                         .append(" AND (").append(expr).append(") IS NULL THEN 1 ELSE 0 END)");
                 targets.add(String.valueOf(field.get("name")));
             }
-        } else {
-        List<Map<String, String>> rules = (List<Map<String, String>>)
-                ((Map<String, Object>) schemaConfig.get("mapping")).get("rules");
-
-        for (Map<String, String> rule : rules) {
-            String raw = coercedSourceColumn(rule, fieldTypes);
-            if (raw == null) continue;
-            String col = "\"" + sourceTable + "\".\"" + raw + '"';
-            String expr = TransformCompiler.dataColumn(rule, fieldTypes, sourceTable, cfg.csv(), zones);
-            if (!targets.isEmpty()) select.append(", ");
-            select.append("SUM(CASE WHEN NULLIF(TRIM(CAST(").append(col).append(" AS VARCHAR)), '') IS NOT NULL")
-                    .append(" AND (").append(expr).append(") IS NULL THEN 1 ELSE 0 END)");
-            targets.add(rule.get("targetColumn"));
-        }
         }
         if (targets.isEmpty()) return 0;   // nothing coercing — no failure is possible
         select.append(" FROM \"").append(sourceTable).append('"');
@@ -230,36 +215,14 @@ public final class DataTransformer {
     }
 
     /**
-     * The single raw column a rule's coercion reads, or {@code null} when the rule cannot be measured
-     * (an {@code EXPR}'s author-owned SQL, or a {@code DIRECT} whose declared type is a pass-through).
-     * {@code CONCAT_DT}/{@code FILENAME_DATE} pack extra arguments after a {@code |} — the column is
-     * the first segment.
-     */
-    private static String coercedSourceColumn(Map<String, String> rule, Map<String, String> fieldTypes) {
-        String source = rule.get("sourceExpression");
-        if (source == null || source.isBlank()) return null;
-        String type = rule.get("transformType");
-        String norm = type == null ? "" : type.trim().toUpperCase();
-        if (norm.isEmpty() || norm.equals("DIRECT")) {
-            // Measurable ⇔ the declared type actually coerces. This was a hardcoded
-            // {TIMESTAMP,DATE,DOUBLE} list, so every newly honoured type (BIGINT, DECIMAL, …) would
-            // have cast — and silently nulled bad values — WITHOUT the failure audit counting them.
-            String declared = fieldTypes.getOrDefault(source, SchemaFieldTypes.VARCHAR);
-            return SchemaFieldTypes.coerces(declared) ? source : null;
-        }
-        if (norm.equals("CONCAT_DT") || norm.equals("FILENAME_DATE")) return source.split("\\|", 2)[0];
-        return null;                  // EXPR — see countCastFailures
-    }
-
-    /**
      * The schema's mapping rules as an ordered {@code [{name, expr}]} list — one entry per rule,
      * {@code name} the target column and {@code expr} its DuckDB scalar expression (no {@code AS}).
      *
      * <p>Extracted from {@link #selectFor}, which now assembles its SELECT from this same list, so the
-     * legacy engine and the graph executor's {@code transform.map} projection compile every rule through
-     * one code path instead of two that can drift. Deliberately <b>data columns only</b>: partition
+     * ingest engine and the graph executor's projection slot compile every field through one code path
+     * instead of two that can drift. Deliberately <b>data columns only</b>: partition
      * columns and the {@code __src_id} lineage tag are not per-rule output and stay in {@code selectFor}
-     * (in the graph model they belong to the sink node, not to {@code transform.map}).
+     * (in the graph model they belong to the sink node, not to the Record Transformer).
      *
      * <p>Pure. {@code sourceTable} qualifies every column reference, so it must name the table the
      * caller's {@code FROM} actually reads.
@@ -274,35 +237,34 @@ public final class DataTransformer {
             fieldTypes.put((String) f.get("name"), (String) f.get("type"));
         SourceZones zones = SourceZones.of(schemaConfig, csv.sourceTimezone());
 
-        // The Record Transformer spelling wins when present — the same "authored beats derived" shape
-        // RowShaper.columnsOf already uses. `typedSource=false`: this compiles over the RAW relation,
-        // which is deliberately ALL-VARCHAR, so a `keep` field must cast to its declared type exactly as
-        // a DIRECT rule does (RecordTransform.compile carries that, and a test pins the equality).
+        // `typedSource=false`: this compiles over the RAW relation, which is deliberately ALL-VARCHAR,
+        // so a `keep` field must cast to its declared type (RecordTransform.compile carries that).
         List<Map<String, Object>> fieldRows = recordFields(schemaConfig);
-        if (fieldRows != null)
-            return RecordTransform.compile(fieldRows, fieldTypes, csv, zones, sourceTable, false);
-
-        List<Map<String, String>> rules =
-                (List<Map<String, String>>) ((Map<String, Object>) schemaConfig.get("mapping")).get("rules");
-
-        List<Map<String, Object>> cols = new ArrayList<>();
-        for (Map<String, String> rule : rules)
-            cols.add(Map.of("name", rule.get("targetColumn"),
-                    "expr", TransformCompiler.dataColumn(rule, fieldTypes, sourceTable, csv, zones)));
-        return cols;
+        if (fieldRows == null)
+            throw new IllegalArgumentException("schema '" + schemaConfig.get("name")
+                    + "' has a mapping with neither fields[] nor rules[] — nothing to project");
+        return RecordTransform.compile(fieldRows, fieldTypes, csv, zones, sourceTable, false);
     }
 
     /**
-     * The schema's {@code mapping.fields[]} — the Record Transformer projection — or {@code null} when
-     * the schema is authored the legacy way. Empty is treated as absent: an empty list must not silently
-     * project zero columns where a mapping would have projected the schema.
+     * The schema's {@code mapping.fields[]} — the Record Transformer projection — or, for a schema
+     * written before 2026-09-05, its {@code mapping.rules[]} converted by
+     * {@link RecordTransform#fromMappingRules}; {@code null} when the mapping declares neither. Empty is
+     * treated as absent: an empty list must not silently project zero columns.
+     *
+     * <p>This is THE read-time bridge: {@code transform.map} no longer exists, so a stored
+     * {@code rules[]} is understood here and nowhere else. Gated on the MARKER (every row names a
+     * catalog {@code fn}), never on the key's presence — a stored sql step may carry {name, expr} rows
+     * under the same key. See {@link RecordTransform#isFieldList}.
      */
     @SuppressWarnings("unchecked")
     static List<Map<String, Object>> recordFields(Map<String, Object> schemaConfig) {
         if (!(schemaConfig.get("mapping") instanceof Map<?, ?> mapping)) return null;
-        if (!(mapping.get("fields") instanceof List<?> fields)) return null;
-        // Gated on the MARKER (every row names a catalog `fn`), never on the key's presence — a stored
-        // sql step may carry {name, expr} rows under the same key. See RecordTransform.isFieldList.
-        return RecordTransform.isFieldList(fields) ? (List<Map<String, Object>>) fields : null;
+        if (mapping.get("fields") instanceof List<?> fields && !fields.isEmpty()
+                && RecordTransform.isFieldList(fields))
+            return (List<Map<String, Object>>) fields;
+        if (mapping.get("rules") instanceof List<?> rules && !rules.isEmpty())
+            return RecordTransform.fromMappingRules((List<Map<String, Object>>) rules);
+        return null;
     }
 }

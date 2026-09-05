@@ -6,7 +6,7 @@ import { incompleteStages, pipelineLifecycle, StageChip, stageChecklist } from '
 const TYPE_CAT = new Map<string, string>([
     ['acquisition', 'SOURCE'],
     ['parser.delimited', 'PARSE'],
-    ['transform.map', 'TRANSFORM'],
+    ['transform.sql', 'TRANSFORM'],
     ['enrichment', 'TRANSFORM'],
     ['sink.persistent', 'SINK'],
 ]);
@@ -26,7 +26,7 @@ function chip(chips: StageChip[], id: string): StageChip {
 const FULL: AuthoredNode[] = [
     { id: 'src', type: 'acquisition', config: { poll: 'in/' } },
     { id: 'parse', type: 'parser.delimited', config: { schema_file: 'demo_schema.toon' } },
-    { id: 'map', type: 'transform.map', config: { columns: [] } },
+    { id: 'map', type: 'transform.sql', config: { columns: [] } },
     { id: 'out', type: 'sink.persistent', config: { database: 'd/db' } },
 ];
 
@@ -61,14 +61,14 @@ describe('stageChecklist', () => {
         expect(chip(rejects, 'collect').status).toBe('configured');
     });
 
-    // 🔴 The server puts a `transform.map` node on EVERY lifted graph (one per branch) whether or not
+    // 🔴 The server puts a projection-slot `transform.sql` node on EVERY lifted graph (one per branch) whether or not
     // anything authored it. Keying the Schema stage on that node's presence — or on its status, which
     // is `unconfigured` — would show every pipeline as blocked or configured regardless of the truth.
-    it('ignores a DERIVED, config-less map node', () => {
+    it('ignores a DERIVED, config-less slot node', () => {
         const nodes = [
             FULL[0],
             { id: 'parse', type: 'parser.delimited', config: {} },
-            { id: 'map', type: 'transform.map' },
+            { id: 'map', type: 'transform.sql' },
         ];
         const chips = stageChecklist(
             flow(nodes),

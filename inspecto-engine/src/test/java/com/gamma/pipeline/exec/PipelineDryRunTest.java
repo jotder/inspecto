@@ -115,7 +115,7 @@ class PipelineDryRunTest {
 
         PipelineGraph g = new PipelineGraph("demo", true,
                 List.of(PipelineNode.of("parse", "parser", Map.of("csv", csv)),
-                        new PipelineNode("map", "transform.map", null, null, Map.of(), "mapping/std"),
+                        new PipelineNode("map", "transform.sql", null, null, Map.of(), "mapping/std"),
                         new PipelineNode("sink", "sink.persistent", "S", null, Map.of("store", "out"), null)),
                 List.of(PipelineEdge.data("parse", "map"), PipelineEdge.data("map", "sink")));
 
@@ -165,7 +165,7 @@ class PipelineDryRunTest {
     private static PipelineGraph graphWithMapNode(Map<String, Object> config) {
         return new PipelineGraph("demo", true,
                 List.of(PipelineNode.of("seed", "acquisition"),
-                        new PipelineNode("map", "transform.map", null, null, config, null),
+                        new PipelineNode("map", "transform.sql", null, null, config, null),
                         new PipelineNode("sink", "sink.persistent", "S", null, Map.of("store", "out"), null)),
                 List.of(PipelineEdge.data("seed", "map"), PipelineEdge.data("map", "sink")));
     }

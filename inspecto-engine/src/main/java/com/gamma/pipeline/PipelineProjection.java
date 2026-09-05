@@ -126,7 +126,6 @@ public final class PipelineProjection {
             new String[] {"parse", BuiltinNodeType.PARSER_XLSX.type()},
             new String[] {"parse", BuiltinNodeType.PARSER_ASN1.type()},
             new String[] {"parse", BuiltinNodeType.PARSER_PLUGIN.type()},
-            new String[] {"map", BuiltinNodeType.TRANSFORM_MAP.type()},
             new String[] {"dedup", BuiltinNodeType.TRANSFORM_DEDUP.type()},
             new String[] {"transform", BuiltinNodeType.TRANSFORM_FILTER.type()},
             new String[] {"transform", BuiltinNodeType.TRANSFORM_JOIN.type()},

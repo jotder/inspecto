@@ -45,7 +45,7 @@ class ComponentPreviewTest {
 
     @Test
     void mapPreviewProjectsColumns() throws Exception {
-        PipelineNode node = PipelineNode.of("m", "transform.map",
+        PipelineNode node = PipelineNode.of("m", "transform.sql",
                 Map.of("columns", List.of(Map.of("name", "ident", "expr", "id"),
                         Map.of("name", "double_amt", "expr", "CAST(amt AS INT) * 2"))));
         ComponentPreview.Result r = ComponentPreview.transform(node, SAMPLE);
@@ -66,7 +66,7 @@ class ComponentPreviewTest {
      */
     @Test
     void mapPreviewPublishesTheDerivedOutputSchema() throws Exception {
-        PipelineNode node = PipelineNode.of("m", "transform.map",
+        PipelineNode node = PipelineNode.of("m", "transform.sql",
                 Map.of("columns", List.of(Map.of("name", "ident", "expr", "id"),
                         Map.of("name", "amt_d", "expr", "CAST(amt AS DOUBLE)"),
                         Map.of("name", "amt_i", "expr", "CAST(amt AS INTEGER)"))));
@@ -145,7 +145,7 @@ class ComponentPreviewTest {
     /** ...and the seal must not break ordinary SQL: built-in functions still evaluate. */
     @Test
     void theSealLeavesOrdinarySqlWorking() throws Exception {
-        PipelineNode node = PipelineNode.of("m", "transform.map",
+        PipelineNode node = PipelineNode.of("m", "transform.sql",
                 Map.of("columns", List.of(Map.of("name", "shouted", "expr", "upper(grp)"),
                         Map.of("name", "when_utc", "expr", "timezone('UTC', TIMESTAMP '2026-03-01 10:00:00')"))));
         ComponentPreview.Result r = ComponentPreview.transform(node, SAMPLE);

@@ -367,14 +367,6 @@
   "lowerable" : true,
   "attributes" : [ ]
 }, {
-  "verb" : "map",
-  "type" : "transform.map",
-  "category" : "TRANSFORM",
-  "label" : "Map",
-  "description" : "Maps raw fields onto the canonical schema. SUPERSEDED by the Record Transformer (transform.sql over processing.map.fields) — authored the legacy way via mapping.rules[].",
-  "lowerable" : true,
-  "attributes" : [ ]
-}, {
   "verb" : "dedup",
   "type" : "transform.dedup",
   "category" : "TRANSFORM",

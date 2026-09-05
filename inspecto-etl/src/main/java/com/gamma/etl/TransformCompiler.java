@@ -8,174 +8,27 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * Pure SQL-expression compiler for {@link DataTransformer}. Turns a single mapping
- * rule (or partition definition) into the DuckDB scalar expression that produces one
- * output column — <em>without</em> the {@code AS "alias"} suffix, which the caller adds.
+ * Pure SQL-expression compiler for {@link DataTransformer}'s PARTITION and event-time columns — the
+ * DuckDB scalar expression that produces one output column, <em>without</em> the {@code AS "alias"}
+ * suffix, which the caller adds.
  *
- * <h3>Why a separate seam</h3>
- * The transform vocabulary ({@code DIRECT}, {@code CONCAT_DT}, {@code FILENAME_DATE})
- * was previously an inline {@code if/else} chain inside {@code DataTransformer.materialize}.
- * Modelling each transform type as a {@link ColumnRule} function in a lookup
- * {@link #DATA_RULES registry} keeps {@code materialize} a thin SELECT-assembler and
- * makes a new transform type a one-line registry addition (functional injection) rather
- * than another branch in a growing switch.
- *
- * <h3>Behaviour parity</h3>
- * Every method here emits the byte-identical SQL the inline code produced — it reuses the
- * same {@link SqlBuilder} calls in the same order. Note the deliberate asymmetry preserved
- * from the original: data columns wrap DATE/TIMESTAMP sources in {@code CAST(col AS VARCHAR)}
- * before the {@code TRY_STRPTIME} chain (so an already-typed plugin column is re-stringified),
- * whereas partition columns route through {@link SqlBuilder#buildCastExpr}. The two paths are
- * intentionally distinct.
+ * <p>Until 2026-09-05 this also compiled {@code mapping.rules[]} ({@code DIRECT} / {@code EXPR} /
+ * {@code CONCAT_DT} / {@code FILENAME_DATE}). That path is gone with {@code transform.map}: data columns
+ * are Record Transformer {@code fields[]} compiled by {@link RecordTransform}, and a stored
+ * {@code rules[]} is converted to them at read time ({@link RecordTransform#fromMappingRules}).
  */
 public final class TransformCompiler {
 
     private TransformCompiler() {}
 
     /**
-     * Compiles one mapping rule into a column expression. Implementations receive the
-     * already-extracted {@code sourceExpression} / {@code targetColumn} plus the schema's
-     * field-type map and the source table name.
+     * The legacy {@code mapping.rules[].transformType} vocabulary, upper-case. The rules themselves no
+     * longer compile here — {@link RecordTransform#fromMappingRules} converts each type to its catalog
+     * function at read time — but an authoring-time validator ({@code MappingRules}) still rejects a typo
+     * against this set.
      */
-    @FunctionalInterface
-    public interface ColumnRule {
-        String compile(String source, String target, Map<String, String> fieldTypes,
-                       String sourceTable, PipelineConfig.CsvSettings csv, SourceZones zones);
-    }
-
-    /**
-     * transformType → expression compiler. {@code DIRECT} (and a blank/omitted type) is handled
-     * directly by {@link #dataColumn} via {@link #direct}; any other non-blank value not in this
-     * map is rejected.
-     */
-    private static final Map<String, ColumnRule> DATA_RULES = Map.of(
-            "CONCAT_DT",     TransformCompiler::concatDt,
-            "FILENAME_DATE", TransformCompiler::filenameDate,
-            "EXPR",          TransformCompiler::expr
-    );
-
-    /**
-     * The transform-type vocabulary this compiler accepts, upper-case, including the implicit
-     * {@code DIRECT} (which {@link #dataColumn} handles before the registry lookup). Exposed so an
-     * authoring-time validator can reject a typo against the SAME set the runtime enforces at
-     * {@link #dataColumn} instead of restating it and drifting.
-     */
-    public static final Set<String> TRANSFORM_TYPES = transformTypes();
-
-    private static Set<String> transformTypes() {
-        Set<String> s = new TreeSet<>(DATA_RULES.keySet());
-        s.add("DIRECT");
-        return Collections.unmodifiableSet(s);
-    }
-
-    // ── data columns ────────────────────────────────────────────────────────────
-
-    /**
-     * Build the expression for one mapping rule (no {@code AS} alias). The {@code transformType}
-     * is optional and case-insensitive: <b>blank or omitted means {@code DIRECT}</b>. Recognised
-     * types are {@code DIRECT}, {@code EXPR}, {@code CONCAT_DT}, {@code FILENAME_DATE}; any other
-     * non-blank value is rejected with an {@link IllegalArgumentException} so a typo (e.g.
-     * {@code EXPER}) fails fast instead of silently degrading to a pass-through.
-     */
-    public static String dataColumn(Map<String, String> rule, Map<String, String> fieldTypes,
-                                    String sourceTable, PipelineConfig.CsvSettings csv) {
-        return dataColumn(rule, fieldTypes, sourceTable, csv, SourceZones.NONE);
-    }
-
-    /**
-     * As {@link #dataColumn(Map, Map, String, PipelineConfig.CsvSettings)}, with the schema's source
-     * time-zone policy applied.
-     *
-     * <p>⛔ The four-argument form passes {@link SourceZones#NONE} and so compiles every temporal
-     * column as wall-clock. It exists for callers that genuinely have no schema in hand (and for the
-     * tests that pin today's default shape) — <b>a production path must pass a real resolver</b>, or
-     * a configured zone is silently ignored. The three production call sites are in
-     * {@link DataTransformer}.
-     */
-    public static String dataColumn(Map<String, String> rule, Map<String, String> fieldTypes,
-                                    String sourceTable, PipelineConfig.CsvSettings csv,
-                                    SourceZones zones) {
-        String source = rule.get("sourceExpression");
-        String target = rule.get("targetColumn");
-        String type   = rule.get("transformType");
-        String norm   = type == null ? "" : type.trim().toUpperCase();
-
-        if (norm.isEmpty() || norm.equals("DIRECT"))   // blank / omitted / DIRECT → pass-through cast
-            return direct(source, target, fieldTypes, sourceTable, csv, zones);
-
-        ColumnRule r = DATA_RULES.get(norm);
-        if (r == null)
-            throw new IllegalArgumentException(
-                    "Unknown transformType '" + type + "' for target column '" + target
-                    + "'. Valid: DIRECT (or leave blank), EXPR, CONCAT_DT, FILENAME_DATE.");
-        return r.compile(source, target, fieldTypes, sourceTable, csv, zones);
-    }
-
-    private static String direct(String source, String target, Map<String, String> fieldTypes,
-                                 String sourceTable, PipelineConfig.CsvSettings csv,
-                                 SourceZones zones) {
-        String col  = "\"" + sourceTable + "\".\"" + source + '"';
-        // The honoured vocabulary and the SQL each type compiles to live in ONE place
-        // (SchemaFieldTypes) — this was a four-branch switch whose `default` emitted the column
-        // UNCAST, so a declared BIGINT silently produced text. Unhonoured types are now refused at
-        // config load, so every type reaching here casts.
-        String type = fieldTypes.getOrDefault(source, SchemaFieldTypes.VARCHAR);
-        return SchemaFieldTypes.castSql(col, type, csv.dateFormats(), csv.tsFormats(),
-                zones.zoneArg(source, sourceTable));
-    }
-
-    /**
-     * EXPR: the {@code sourceExpression} <em>is</em> a DuckDB scalar expression, emitted verbatim.
-     * Unqualified column references resolve against the single source table ({@code raw_input}),
-     * giving access to DuckDB's full scalar-function library (e.g. {@code UPPER(TRIM(col))},
-     * {@code TRY_CAST(amt AS DOUBLE) / 100}, {@code CASE WHEN … END}). The author owns validity and
-     * any explicit cast; it must stay a <b>per-row scalar</b> expression — no aggregates or joins,
-     * which belong to Stage-2 enrichment. Schema config is operator-authored and trusted (same model
-     * as the Stage-2 transform SQL), so the expression is not sandbox-validated.
-     */
-    private static String expr(String source, String target, Map<String, String> fieldTypes,
-                               String sourceTable, PipelineConfig.CsvSettings csv,
-                               SourceZones zones) {
-        return source;
-    }
-
-    /**
-     * ⚠ The source zone is taken from the <b>date</b> half ({@code parts[0]}) — that is the raw field
-     * an operator declares a {@code timezone} on, and the time half carries no date to key one from.
-     * Declaring a zone on the time column alone has no effect, by design.
-     */
-    private static String concatDt(String source, String target, Map<String, String> fieldTypes,
-                                   String sourceTable, PipelineConfig.CsvSettings csv,
-                                   SourceZones zones) {
-        String[] parts  = source.split("\\|", 2);
-        String dateCol  = "\"" + sourceTable + "\".\"" + parts[0] + '"';
-        String timeCol  = "\"" + sourceTable + "\".\"" + parts[1] + '"';
-        StringBuilder sb = new StringBuilder();
-        SqlBuilder.appendCoalesce(sb,
-                dateCol + " || ' ' || " + timeCol, csv.tsFormats(), "TIMESTAMP");
-        return SourceZones.toNaiveUtc(sb.toString(), zones.zoneArg(parts[0], sourceTable));
-    }
-
-    /**
-     * ⛔ <b>Deliberately zone-exempt.</b> This lifts a {@code %Y%m%d} <em>date</em> out of a filename.
-     * A date has no instant, so applying a source zone would shift the file dated {@code 20260829}
-     * into the previous day for any negative-offset zone — a silent partition error. Same call as
-     * {@code DATE} in {@link SchemaFieldTypes#castSql}.
-     */
-    private static String filenameDate(String source, String target, Map<String, String> fieldTypes,
-                                       String sourceTable, PipelineConfig.CsvSettings csv,
-                                       SourceZones zones) {
-        if (!"EVENT_DATE".equals(target)) {
-            throw new IllegalArgumentException(
-                    "FILENAME_DATE transform is only supported for the EVENT_DATE column, got: " + target);
-        }
-        String[] parts  = source.split("\\|", 3);
-        String   col    = "\"" + sourceTable + "\".\"" + parts[0] + '"';
-        String   prefix = parts.length > 1 ? parts[1] : "";
-        String   fmt    = parts.length > 2 ? parts[2] : "%Y%m%d";
-        return "TRY_STRPTIME(regexp_extract(" + col + ", '" + prefix
-                + "([0-9]{8})', 1), '" + fmt + "')::DATE";
-    }
+    public static final Set<String> TRANSFORM_TYPES =
+            Collections.unmodifiableSet(new TreeSet<>(Set.of("DIRECT", "EXPR", "CONCAT_DT", "FILENAME_DATE")));
 
     // ── partition columns ─────────────────────────────────────────────────────────
 

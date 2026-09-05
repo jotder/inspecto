@@ -79,7 +79,6 @@ import {
     isParseNodeType,
 } from './pipeline-parse-definition.component';
 import { EnrichmentHostPipeline, PipelineConfigDefinitionComponent } from './pipeline-config-definition.component';
-import { PipelineLoadDefinitionComponent } from './pipeline-load-definition.component';
 import { PipelineTransformSqlDefinitionComponent } from './pipeline-transform-sql-definition.component';
 import { GrammarEditorDialog } from './grammar-editor.dialog';
 import { PipelineDuplicateDialog, PipelineDuplicateResultData } from './pipeline-duplicate.dialog';
@@ -217,7 +216,6 @@ const UNDO_CAP = 50;
         PipelineCollectionDefinitionComponent,
         PipelineParseDefinitionComponent,
         PipelineConfigDefinitionComponent,
-        PipelineLoadDefinitionComponent,
         PipelineTransformSqlDefinitionComponent,
         PipelineDryRunPanelComponent,
         PipelineEditorGraphComponent,
@@ -544,7 +542,6 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     readonly definitionDirty = signal(false);
     @ViewChild(PipelineCollectionDefinitionComponent) private definitionPane?: PipelineCollectionDefinitionComponent;
     @ViewChild(PipelineParseDefinitionComponent) private parseDefinitionPane?: PipelineParseDefinitionComponent;
-    @ViewChild(PipelineLoadDefinitionComponent) private loadDefinitionPane?: PipelineLoadDefinitionComponent;
     @ViewChild(PipelineConfigDefinitionComponent) private configDefinitionPane?: PipelineConfigDefinitionComponent;
     @ViewChild(PipelineTransformSqlDefinitionComponent)
     private sqlDefinitionPane?: PipelineTransformSqlDefinitionComponent;
@@ -2449,14 +2446,13 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
      * The definition drawer's header identity for a node — the GLOSSARY's definition stages
      * (**Collector · Parse · Load**), which is exactly the set `openDefinition` admits.
      *
-     * <p>⚠ It is a THREE-way choice. The template used to inline a two-way
-     * `acquisition ? 'Collector' : 'Parser'` ternary, which labelled the Load drawer **"PARSER"** and
-     * gave it the parse icon — invisible to every unit test, found by driving the preview. Any new node
-     * kind that reaches this drawer must be added here, not re-inlined at the binding.
+     * <p>⚠ It is an explicit table, not a ternary. The template used to inline a two-way
+     * `acquisition ? 'Collector' : 'Parser'` ternary, which labelled the (since-deleted) Load drawer
+     * **"PARSER"** with the parse icon — invisible to every unit test, found by driving the preview. Any
+     * new node kind that reaches this drawer must be added here, not re-inlined at the binding.
      */
     definitionKind(node: AuthoredNode): { label: string; icon: string } {
         if (node.type === 'acquisition') return { label: 'Collector', icon: 'heroicons_outline:inbox-arrow-down' };
-        if (node.type === 'transform.map') return { label: 'Load', icon: 'heroicons_outline:arrows-right-left' };
         if (isParseNodeType(node.type)) return { label: 'Parse', icon: 'heroicons_outline:document-text' };
         // S2 generalised the table: every other kind now reaches the drawer too, and there is no
         // definition-stage name for them — so the header states the node's own CATEGORY, which is what
@@ -2486,7 +2482,6 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         (
             this.definitionPane ??
             this.parseDefinitionPane ??
-            this.loadDefinitionPane ??
             this.sqlDefinitionPane ??
             this.configDefinitionPane
         )?.submit();

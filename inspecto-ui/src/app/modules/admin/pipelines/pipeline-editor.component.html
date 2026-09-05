@@ -733,31 +733,12 @@
                                             (applied)="onDefinitionApplied($event)"
                                             (dirtyChange)="definitionDirty.set($event)"
                                         />
-                                    } @else if (dn.type === 'transform.map') {
-                                        <!--
-                                            Load (P4-2b). A distinct node KIND, not a parse subtype, so
-                                            this arm is not the enumeration the note below forbids. The
-                                            parser's schema_file comes in as read-only context: the
-                                            rules map FROM that schema's fields, and the key lives on
-                                            the parser node, which only the host can reach. The tab's
-                                            sample thread comes in the same way (B1) — it is what
-                                            "Test mapping" runs the rules over.
-                                        -->
-                                        <app-pipeline-load-definition
-                                            [node]="dn"
-                                            [schemaFile]="parserSchemaFile()"
-                                            [configSubdir]="configSubdir()"
-                                            [pipeline]="selectedId() || ''"
-                                            [sample]="sampleThread()"
-                                            (applied)="onDefinitionApplied($event)"
-                                            (dirtyChange)="definitionDirty.set($event)"
-                                        />
                                     } @else if (dn.type === 'transform.sql') {
                                         <!--
-                                            SQL transformer (SQL-first since 2026-09-04, operator
-                                            instruction). A distinct node KIND (like transform.map
-                                            above) with its own pane: the SQL textarea + Test this
-                                            Step + the derived columns table.
+                                            The Record Transformer — the projection slot and any chain
+                                            sql step alike (transform.map was deleted 2026-09-05). A
+                                            distinct node KIND with its own pane: the fields grid over
+                                            the function catalog + Test this Step + the derived columns.
                                         -->
                                         <app-pipeline-transform-sql-definition
                                             [node]="dn"

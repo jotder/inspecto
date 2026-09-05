@@ -383,8 +383,8 @@ The Parse surface itself — tabs, options, columns grid, Grammar CSV round-trip
 ## Transform: the `transform.sql` Step pane (SHIPPED `7e13dd82`; SQL-first rebuild 2026-09-04)
 
 - **Routing arm:** the definition dock has one more type-specific arm — `dn.type === 'transform.sql'` →
-  `<app-pipeline-transform-sql-definition>` (`pipeline-editor.component.html:755-767`), beside the
-  `transform.map` arm (`:736-754`) that projects `<app-pipeline-load-definition>`; every other
+  `<app-pipeline-transform-sql-definition>`; the `transform.map` arm and `<app-pipeline-load-definition>`
+  were DELETED 2026-09-05 (the projection slot is a `transform.sql`, so it opens this pane); every other
   `transform.*` kind stays on the generic `pipeline-config-definition` schema-form. A node TYPE routes to
   its own pane — the rule that already held for map/parse/sink.
 - **The pane (SQL-first, operator instruction 2026-09-04 — supersedes D5/D6):** one SQL `<textarea>`
@@ -404,12 +404,22 @@ The Parse surface itself — tabs, options, columns grid, Grammar CSV round-trip
   *Cross-Step fields* facts above still hold (`output.filename_column` lives on the SINK; the Parse
   checkbox that appends a read-only `file_name` row is default OFF for exactly that reason).
 
-## Load: mapping on the map Step, schema on the parser
+## Load: the projection slot is a Record Transformer; schema on the parser
 
-> 2026-09-04: `transform.map` is the **legacy** mapping path. New computed columns / renames go through
-> `transform.sql` (the catalog's single `transform.record` — *Record Transformer* — points there, folded
-> 2026-09-04 from `transform.expression` + `transform.cast` + `quality.cleanse.trim`); the facts below are
-> unchanged for stored pipelines.
+> **2026-09-05 — `transform.map` is DELETED.** The projection slot `PipelineLift` fills between parser and
+> sink is always a **Record Transformer** (`transform.sql`, id `map` / `map_<key>`); `BuiltinNodeType.TRANSFORM_MAP`,
+> the `map` recipe verb, `TransformCompiler`'s rule path and the UI's Load pane are gone. A stored
+> `mapping.rules[]` still LOADS: `DataTransformer.recordFields` converts it to `fields[]` through
+> `RecordTransform.fromMappingRules` (DIRECT → `keep`, EXPR → `custom`, CONCAT_DT → `date.concat_parts`,
+> FILENAME_DATE → `date.from_filename`), and `PipelineLift` does the same for `processing.map.rules`. Every
+> schema under `spaces/` was migrated by `MappingMigrator` (block-list TOON form when a row needs `args`).
+> ⚠ On the ingest lane `date.concat_parts` compiles exactly as CONCAT_DT did (parser timestamp formats +
+> the date column's source zone) — the same lane-specific special case `keep` has. Plan:
+> `archived-documents/plans-archive/delete-transform-map-plan.md`.
+> The facts below that name `transform.map` now read as "the projection slot (`transform.sql`, id
+> `map`)": `MAP_AUTHORED` (`columns`/`rules`/`fields`) lowers to `processing.map`, `schema`/`csv` are
+> `MAP_DERIVED`, the slot is on EVERY lifted graph, and readiness keys on authored evidence
+> (`isProjectionSlot` in `pipeline-editable.ts` is the discriminator — the id grammar, never the type).
 
 - **`processing.schema_file` is the PARSER Step's key** (where `PipelineLift` puts it and
   `PARSER_NO_SCHEMA` checks it) — the Parse drawer authors the output schema.

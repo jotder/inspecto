@@ -264,7 +264,11 @@ public final class PipelineValidator {
             // RecordTransform, so its coercing columns ARE counted by the cast-failure audit. Only
             // hand-written `sql` is unaudited, and warning on both would tell an author the opposite
             // of what now happens.
+            // …and since transform.map was deleted (2026-09-05) the projection SLOT is a transform.sql
+            // too. It compiles through RecordTransform (fields / columns / the lifted schema), never as
+            // hand-written SQL, so it is recognised by the lift's id grammar and left out.
             if (BuiltinNodeType.TRANSFORM_SQL.type().equals(n.type())
+                    && !PipelineEditable.isProjectionSlot(n)
                     && !(n.cfg("fields") instanceof List<?> rtFields && !rtFields.isEmpty())) {
                 issues.add(new Issue(Severity.WARNING, SQL_STEP_UNAUDITED,
                         "Node '" + n.id() + "' (transform.sql): its 'sql' attribute runs author-owned SQL "

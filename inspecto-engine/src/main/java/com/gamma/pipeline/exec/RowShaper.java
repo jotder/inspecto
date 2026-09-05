@@ -51,7 +51,7 @@ import java.util.Set;
  *   <li>{@code transform.summarize} — {@code group_by}: [col] (optional); {@code measures}: shorthand
  *       ({@code count} | {@code agg(field)}, compiled by {@link MeasureCompiler}) → {@code data}
  *       (the rollup).</li>
- *   <li>{@code transform.map}/{@code select}/{@code derive} — {@code columns}: map/select take
+ *   <li>{@code transform.sql} (projection slot)/{@code select}/{@code derive} — {@code columns}: sql/select take
  *       [{@code {name, expr}}] / [name]; derive adds [{@code {name, expr}}] to the input columns →
  *       {@code data}.</li>
  *   <li>{@code transform.merge} — {@code type}: {@code union}|{@code inner}|{@code left} (default
@@ -67,7 +67,7 @@ public final class RowShaper {
     private RowShaper() {}
 
     /**
-     * <b>Every node-config key this class reads on a {@code transform.map} node</b> — the executable
+     * <b>Every node-config key this class reads on a projection-slot {@code transform.sql} node</b> — the executable
      * vocabulary, as opposed to what the map dialog can type. {@code PipelineEditable} splits it into
      * authored ({@code columns}, {@code rules} — lowered to {@code processing.map}) and derived
      * ({@code schema}, {@code csv} — never lowered), and {@code MapNodeKeyContractTest} pins this
@@ -170,16 +170,16 @@ public final class RowShaper {
         if (type.startsWith("transform.dedup"))                      return dedup(conn, node, input, outPrefix, ctx);
         if (BuiltinNodeType.TRANSFORM_SPLIT.type().equals(type))    return split(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_SUMMARIZE.type().equals(type)) return summarize(conn, node, input, outPrefix);
-        if (BuiltinNodeType.TRANSFORM_MAP.type().equals(type)
-                || BuiltinNodeType.TRANSFORM_SELECT.type().equals(type)
+        if (BuiltinNodeType.TRANSFORM_SELECT.type().equals(type)
                 || BuiltinNodeType.TRANSFORM_DERIVE.type().equals(type)) return project(conn, node, input, outPrefix);
-        // A Record Transformer authored as FIELDS compiles through the same [{name, expr}] seam the map
-        // projection uses, so both lanes run one compiler (RecordTransform) rather than the browser's
-        // rendering and the engine's diverging. Only a HAND-WRITTEN sql node takes the opaque-string
-        // path — which is also the only one the SQL_STEP_UNAUDITED warning still applies to.
+        // A Record Transformer — authored FIELDS, or the projection slot carrying a lifted schema /
+        // authored columns / component rules — compiles through the one [{name, expr}] seam, so both
+        // lanes run one compiler (RecordTransform) rather than the browser's rendering and the engine's
+        // diverging. Only a HAND-WRITTEN sql node takes the opaque-string path — which is also the only
+        // one the SQL_STEP_UNAUDITED warning still applies to.
         if (BuiltinNodeType.TRANSFORM_SQL.type().equals(type))
-            return hasRecordFields(node) ? project(conn, node, input, outPrefix)
-                                         : sql(conn, node, input, outPrefix);
+            return isProjection(node) ? project(conn, node, input, outPrefix)
+                                      : sql(conn, node, input, outPrefix);
         // ⚠ Name the seam in the message: a CONTRIBUTED node type reaches here having rendered in the
         // palette, validated and lifted, so "cannot shape" alone reads as a core bug rather than a
         // missing provider — which was the whole shape of the descriptor-only gap.
@@ -564,7 +564,7 @@ public final class RowShaper {
     }
 
     /**
-     * A projection node's {@code columns}, or — for a {@code transform.map} lifted from a legacy config,
+     * A projection node's {@code columns}, or — for a projection slot lifted from a stored config,
      * which carries the schema itself rather than authored columns ({@code PipelineLift} keeps legacy
      * sub-records verbatim) — the schema's mapping rules compiled to {@code [{name, expr}]} by
      * {@link DataTransformer#dataColumns}, the same authority the legacy engine's own SELECT uses.
@@ -579,11 +579,18 @@ public final class RowShaper {
         return node.cfg("fields") instanceof List<?> f && RecordTransform.isFieldList(f);
     }
 
+    /**
+     * Whether a {@code transform.sql} node is a PROJECTION (compiled by {@code RecordTransform}) rather
+     * than hand-written SQL: it carries fields, authored columns, a lifted schema or component rules.
+     */
+    static boolean isProjection(PipelineNode node) {
+        return hasRecordFields(node) || node.cfg("columns") != null || node.cfg("schema") != null
+                || node.cfg("rules") != null;
+    }
+
     private static List<?> columnsOf(PipelineNode node, String sourceTable) {
         if (node.cfg("columns") instanceof List<?> authored && !authored.isEmpty()) return authored;
-        if (!BuiltinNodeType.TRANSFORM_MAP.type().equals(node.type())
-                && !(BuiltinNodeType.TRANSFORM_SQL.type().equals(node.type()) && hasRecordFields(node)))
-            return null;
+        if (!BuiltinNodeType.TRANSFORM_SQL.type().equals(node.type())) return null;
         Map<String, Object> schema = mappingSchemaOf(node);
         if (schema == null) return null;
         return DataTransformer.dataColumns(schema, csvSettingsOf(node), sourceTable);
@@ -656,7 +663,7 @@ public final class RowShaper {
             if (w == null || w.toString().isBlank()) return Optional.empty();
             return Optional.of("SELECT * FROM " + from + " WHERE COALESCE((" + w + "), FALSE)");
         }
-        if (BuiltinNodeType.TRANSFORM_MAP.type().equals(type)
+        if ((BuiltinNodeType.TRANSFORM_SQL.type().equals(type) && isProjection(node))
                 || BuiltinNodeType.TRANSFORM_SELECT.type().equals(type)
                 || BuiltinNodeType.TRANSFORM_DERIVE.type().equals(type)) {
             try {

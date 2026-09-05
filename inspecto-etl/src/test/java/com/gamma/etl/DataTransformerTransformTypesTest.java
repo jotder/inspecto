@@ -155,9 +155,13 @@ class DataTransformerTransformTypesTest {
         }
     }
 
-    /** FILENAME_DATE is only valid for the EVENT_DATE target column. */
+    /**
+     * FILENAME_DATE used to be legal for the EVENT_DATE target only — a guard on the rule TYPE, not on the
+     * SQL. Since 2026-09-05 the rule is read as a {@code date.from_filename} field, and any target may
+     * carry it.
+     */
     @Test
-    void filenameDateRejectsNonEventDateTarget(@TempDir Path dir) throws Exception {
+    void filenameDateIsAcceptedForAnyTarget(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = cfg(dir, "\"%Y-%m-%d\"");
         Map<String, Object> schema = Map.of(
                 "raw", Map.of("fields", List.of(
@@ -169,9 +173,12 @@ class DataTransformerTransformTypesTest {
 
         File db = DuckDbUtil.tempDbFile("dt3_");
         try (Connection conn = DuckDbUtil.openConnection(db); Statement st = conn.createStatement()) {
-            st.execute("CREATE TABLE src AS SELECT * FROM (VALUES ('x',0)) t(FILE_NAME,__src_id)");
-            assertThrows(IllegalArgumentException.class,
-                    () -> DataTransformer.materialize(conn, schema, cfg, "src", "dst"));
+            st.execute("CREATE TABLE src AS SELECT * FROM (VALUES ('data_20200403.csv',0)) t(FILE_NAME,__src_id)");
+            DataTransformer.materialize(conn, schema, cfg, "src", "dst");
+            try (ResultSet rs = st.executeQuery("SELECT SOME_OTHER_COL::VARCHAR FROM dst")) {
+                assertTrue(rs.next());
+                assertEquals("2020-04-03", rs.getString(1));
+            }
         } finally {
             DuckDbUtil.deleteTempDb(db);
         }

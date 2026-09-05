@@ -1,7 +1,8 @@
 # Delete `transform.map` — the Record Transformer becomes the only projection slot
 
-**Status:** in flight (2026-09-05). Operator decision: full deletion, overriding the 2026-09-05 handoff's
-"deprecated, not deleted" guardrail. Drains `docs/BACKLOG.md` RECORD-TRANSFORMER-1 (a)+(b)+(f).
+**Status:** SHIPPED 2026-09-05 (archived). Operator decision: full deletion, overriding the 2026-09-05
+handoff's "deprecated, not deleted" guardrail. Drained `docs/BACKLOG.md` RECORD-TRANSFORMER-1 (a)+(b)+(f).
+As-built facts live in the OKF concepts named under Phase D; this file is history.
 
 ## Why this is safe to attempt now
 
@@ -23,9 +24,9 @@ refusals (`demo/orders`, `demo/payments`, `ucc/sites`, `_templates/orders-starte
    same position, contract JSON regenerated with `-Drecord.transform.write=true`):
    - `date.concat_parts` — `TRY_STRPTIME(CONCAT({source}, ' ', {time_column}), {format})`;
      params `time_column` (column), `format` (text, default `%Y-%m-%d %H:%M:%S`). The `CONCAT_DT`
-     analogue. ⚠ Deliberate narrowing: legacy coalesced over every `csv.tsFormats()` entry and applied
-     the date column's source zone; the catalog function takes ONE format and no zone (a Record
-     Transformer row cannot see parser settings). Zero stored users, so nothing changes at rest.
+     analogue. The template is the grid's preview; on the INGEST lane `RecordTransform.compile`
+     renders it exactly as the legacy rule did (COALESCE over `csv.tsFormats()` + the date column's
+     source zone) — the same lane-specific special case `keep` already has. `SourceZonesTest` pins it.
    - `date.from_filename` — `TRY_STRPTIME(regexp_extract({source}, {pattern}, 1), {format})::DATE`;
      params `pattern` (text, default `([0-9]{8})`), `format` (text, default `%Y%m%d`). The
      `FILENAME_DATE` analogue; converter builds `pattern = prefix + "([0-9]{8})"`. The legacy
