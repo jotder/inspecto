@@ -107,7 +107,11 @@ export function pipelineScaffold(
     } = {},
 ): Record<string, unknown> {
     const base = spaceBase(opts.space);
-    const home = pipelineHome(name, opts.database || `${base}/data/${name}/database`);
+    // Decision 2026-09-06 (NAME-DIRS-1): every dir hangs off the SLUG id, not the display name — one
+    // identity for id, file and paths, so a name with spaces never puts spaces on disk. Existing
+    // pipelines are untouched: dirs are stored, never re-derived.
+    const id = pipelineId(name);
+    const home = pipelineHome(id, opts.database || `${base}/data/${id}/database`);
     const config: Record<string, unknown> = {
         name,
         // Stamp identity at CREATION so `name` is a display label from day one: a later relabel is then
@@ -118,11 +122,11 @@ export function pipelineScaffold(
         // to be omitted whenever the raw slug failed that pattern (e.g. "my-pipe"), which left the
         // pipeline deriving its id — and `PipelineRoutes.rename` enforces the same pattern, so such a
         // pipeline could never be renamed for the rest of its life.
-        id: pipelineId(name),
+        id,
         active: false,
         dirs: {
-            poll: opts.poll || `${base}/data/inbox/${name}`,
-            database: opts.database || `${base}/data/${name}/database`,
+            poll: opts.poll || `${base}/data/inbox/${id}`,
+            database: opts.database || `${base}/data/${id}/database`,
             backup: `${home}/backup`,
             temp: `${home}/temp`,
             errors: `${home}/errors`,

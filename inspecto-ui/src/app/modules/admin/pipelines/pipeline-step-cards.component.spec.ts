@@ -239,9 +239,11 @@ describe('PipelineStepCardsComponent', () => {
         expect(c.insertBranch).toEqual({ routeId: 'route-1', key: 'emea' });
 
         // the branch palette is the served/fallback palette narrowed to what arms mid-branch
+        // SQL-BRANCH-1 (2026-09-06): sql joined the mid-branch set — RowShaper.sql needs no resolver/context
         expect(c.branchVerbs().map((v) => v.type)).toEqual([
             'transform.dedup',
             'transform.filter',
+            'transform.sql',
             'transform.summarize',
         ]);
 

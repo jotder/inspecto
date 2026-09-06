@@ -155,7 +155,7 @@ Supersedes the PDF's §1–§5 tables. Verified against DuckDB 1.x (the engine b
 | Param | Notes |
 |---|---|
 | `ignore_errors` | Drop unparseable rows instead of failing the query. Engine sets `true`. |
-| `null_padding` | Pad short rows with NULL on the right. Engine sets `false` (short rows → reject). |
+| `null_padding` | Pad short rows with NULL on the right. Engine sets `false` for delimited; the line readers (fixed-width, regex) default to `true` (short rows → reject). |
 | `strict_mode` | BOOL, default `true`; `false` tolerates quote/column drift. |
 | `nullstr` / `null` | LIST → SQL NULL, e.g. `['','NULL','NaN','N/A','-']`. |
 | `store_rejects` | BOOL — **the engine's real error channel.** Rejected rows land in `reject_errors`/`reject_scans`, drained to `errors/<base>_errors.csv`. **Missing from the PDF; document it.** |

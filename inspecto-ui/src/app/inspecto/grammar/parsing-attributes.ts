@@ -286,11 +286,20 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     // ⚠ No `default`: a spec default materializes into every value() and would be
                     // WRITTEN into blocks the author never touched — mutating faithful copies of
                     // stored grammars (templates are copies, never bindings). Blank = engine default.
+                    // Decision 2026-09-06 (STRICT-MODE-1): a THREE-way select, not a toggle — a boolean
+                    // with no default rendered OFF while the engine default is ON. The blank option IS
+                    // the engine default (the same idiom as `delimited__engine` below); the parser reads
+                    // 'true'/'false' as booleans (`parseBoolOrNull`).
                     key: 'delimited__strict_mode',
                     label: 'Strict CSV rules (RFC-4180)',
-                    type: 'boolean',
+                    type: 'select',
                     tier: 'optional',
-                    help: 'Strict by default. Off tolerates stray quotes and uneven column counts in messy files.',
+                    help: 'The engine is strict unless told otherwise. Tolerant accepts stray quotes and uneven column counts in messy files.',
+                    options: [
+                        { value: '', label: 'Engine default (strict)' },
+                        { value: 'true', label: 'Strict' },
+                        { value: 'false', label: 'Tolerant' },
+                    ],
                     section: 'robustness',
                 },
                 {

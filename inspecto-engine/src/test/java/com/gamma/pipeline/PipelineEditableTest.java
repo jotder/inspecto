@@ -509,6 +509,25 @@ class PipelineEditableTest {
                 "lift -> lower reproduces the stored file byte for byte");
     }
 
+    /** ENGINE-AUTO-1 (2026-09-06): a literal `engine: auto` lifts as ABSENT; any other spelling survives. */
+    @Test
+    void aLiteralAutoEngineIsNormalisedAwayOnLiftButJavaIsKept() {
+        Map<String, Object> auto = new LinkedHashMap<>(Map.of("delimiter", ",", "engine", "Auto"));
+        Map<String, Object> java = new LinkedHashMap<>(Map.of("delimiter", ",", "engine", "java"));
+        Map<String, Object> c1 = new LinkedHashMap<>(Map.of("csv_settings", auto));
+        PipelineEditable.stripAutoEngine(c1, "csv_settings");
+        assertEquals(Map.of("delimiter", ","), c1.get("csv_settings"), "auto is the engine's own default — absent");
+        assertEquals("Auto", auto.get("engine"), "the caller's map is not mutated");
+        Map<String, Object> c2 = new LinkedHashMap<>(Map.of("csv_settings", java));
+        PipelineEditable.stripAutoEngine(c2, "csv_settings");
+        assertEquals("java", ((Map<?, ?>) c2.get("csv_settings")).get("engine"));
+        // the unified parsing: block nests the choice under its frontend
+        Map<String, Object> c3 = new LinkedHashMap<>(Map.of("parsing",
+                Map.of("frontend", "delimited", "delimited", Map.of("engine", "auto", "delimiter", "|"))));
+        PipelineEditable.stripAutoEngine(c3, "parsing");
+        assertEquals(Map.of("delimiter", "|"), ((Map<?, ?>) c3.get("parsing")).get("delimited"));
+    }
+
     /** A lookup is a chain step with no singular block: it lowers to {@code steps:} verbatim, like sql. */
     @Test
     void aLookupStepLowersToStepsVerbatimAndForcesTheStepsForm() {

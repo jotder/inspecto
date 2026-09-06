@@ -795,6 +795,7 @@ export const BRANCH_STEP_TYPES: ReadonlySet<string> = new Set([
     'transform.filter',
     'transform.dedup',
     'transform.summarize',
+    'transform.sql', // SQL-BRANCH-1 (2026-09-06): RowShaper.sql needs neither a resolver nor a context
 ]);
 
 /**

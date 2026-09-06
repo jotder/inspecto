@@ -145,9 +145,13 @@ public final class RouteArming {
     }
 
     /** The steps[] kinds a route branch may arm with — what the ingest walk can actually run with
-     *  its NONE reference/execution context (see {@code branchStepRefusals}). */
+     *  its NONE reference/execution context (see {@code branchStepRefusals}). {@code sql} joined
+     *  2026-09-06 (SQL-BRANCH-1): {@code RowShaper.sql} reads only its input relation — no reference
+     *  resolver, no execution context — so the walk runs it unchanged; the author SQL still passes
+     *  {@code SqlGuard} at execution exactly as on the trunk. */
     public static final Set<String> BRANCH_STEP_KINDS = Set.of(
-            PipelineConfig.Step.FILTER, PipelineConfig.Step.DEDUP, PipelineConfig.Step.SUMMARIZE);
+            PipelineConfig.Step.FILTER, PipelineConfig.Step.DEDUP, PipelineConfig.Step.SUMMARIZE,
+            PipelineConfig.Step.SQL);
 
     /**
      * Every reason one branch's {@code steps[]} sub-chain would refuse to arm (MIDBRANCH-1). Empty

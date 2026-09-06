@@ -40,6 +40,19 @@ describe('pipelineScaffold', () => {
         expect(dirs['status_dir']).toBe('spaces/default/data/orders/status');
     });
 
+    // Decision 2026-09-06 (NAME-DIRS-1): dirs follow the slug id, so a display name with spaces or
+    // punctuation never reaches the filesystem — one identity for id, file and every path.
+    it('derives every dir from the slug id, never the raw display name', () => {
+        const cfg = pipelineScaffold('My Order Feed', { space: 'default' });
+        expect(cfg['name']).toBe('My Order Feed');
+        expect(cfg['id']).toBe('my_order_feed');
+        const dirs = cfg['dirs'] as Record<string, string>;
+        expect(dirs['poll']).toBe('spaces/default/data/inbox/my_order_feed');
+        expect(dirs['database']).toBe('spaces/default/data/my_order_feed/database');
+        expect(dirs['quarantine']).toBe('spaces/default/data/my_order_feed/quarantine');
+        for (const v of Object.values(dirs)) expect(v).not.toMatch(/[ .-]/);
+    });
+
     // An explicit database (Onboarding lets the operator type one) still governs the siblings.
     it('derives the siblings off an explicit space-qualified database', () => {
         const dirs = pipelineScaffold('orders', {

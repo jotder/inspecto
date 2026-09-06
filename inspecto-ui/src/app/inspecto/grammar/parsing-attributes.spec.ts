@@ -7,6 +7,17 @@ import { parsingAttributesFor } from './parsing-attributes';
  * initialises to null, nothing is written until the author touches it, and a stored grammar round-trips
  * unchanged. A `default` here would materialise into every `value()` and mutate faithful copies.
  */
+import { parsingAttributesFor as _paf } from './parsing-attributes';
+
+describe('strict_mode is a three-way choice (STRICT-MODE-1, 2026-09-06)', () => {
+    it('offers Engine default / Strict / Tolerant with the blank option as the default and no spec default', () => {
+        const spec = _paf('delimited').find((s) => s.key === 'delimited__strict_mode')!;
+        expect(spec.type).toBe('select');
+        expect(spec.default).toBeUndefined();
+        expect(spec.options?.map((o) => o.value)).toEqual(['', 'true', 'false']);
+    });
+});
+
 describe('parsingAttributesFor — delimited error handling', () => {
     const SPECS = parsingAttributesFor('delimited');
     const spec = (key: string) => SPECS.find((s) => s.key === key);

@@ -7,6 +7,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -119,6 +120,58 @@ class RouteIngestEndToEndTest {
             assertTrue(w.noneMatch(p -> p.getFileName().toString().startsWith("branch_commit_")),
                     "no branch_commit_*.log left in temp after a successful commit");
         }
+    }
+
+    /**
+     * SQL-BRANCH-1 (2026-09-06): a {@code sql} step INSIDE a route branch arms and executes on the ingest
+     * lane — {@code RowShaper.sql} reads only its input relation, so the walk's NONE reference/execution
+     * context is enough. The emea branch multiplies AMT by ten; apac is untouched.
+     */
+    @Test
+    void aSqlStepInsideARouteBranchExecutesOnTheIngestLane(@TempDir Path dir) throws Exception {
+        String d = dir.toString().replace("\\", "/");
+        Path schema = dir.resolve("mini_schema.toon");
+        Files.writeString(schema, com.gamma.etl.PipelineConfigBatchTest.miniSchema());
+        Map<String, Object> cfgMap = new java.util.LinkedHashMap<>();
+        cfgMap.put("name", "ROUTE_SQL_E2E");
+        cfgMap.put("active", true);
+        cfgMap.put("dirs", new java.util.LinkedHashMap<>(Map.of(
+                "poll", d + "/inbox", "database", d + "/db", "backup", d + "/backup", "temp", d + "/temp",
+                "quarantine", d + "/quarantine", "markers", d + "/markers", "status_dir", d + "/status")));
+        cfgMap.put("output", Map.of("format", "CSV"));
+        cfgMap.put("sinks", List.of(Map.of("database", d + "/db_emea", "format", "CSV"),
+                Map.of("database", d + "/db_apac", "format", "CSV")));
+        Map<String, Object> emea = new java.util.LinkedHashMap<>(Map.of("key", "emea", "where", "ID LIKE 'E%'",
+                "database", d + "/db_emea"));
+        // ⚠ `SELECT *, … AS new_col`, never an explicit column list and never `SELECT * REPLACE`: the branch
+        // sink partitions by the derived year/month/day columns the projection slot added, so a projection
+        // that names columns drops them and the sink refuses the batch ("partition_by expected to find
+        // year"); and SqlGuard's lexical allow-list bans the word `replace` (it guards DDL), so the DuckDB
+        // REPLACE clause is refused too. Both hold on the trunk as well — schema-mapping-authoring.md §6b.
+        emea.put("steps", List.of(Map.of("sql", Map.of("sql", "SELECT *, AMT * 10 AS AMT10 FROM input"))));
+        cfgMap.put("route", new java.util.LinkedHashMap<>(Map.of("mode", "case", "default", "apac",
+                "branches", List.of(emea, Map.of("key", "apac", "where", "ID LIKE 'A%'", "database", d + "/db_apac")))));
+        cfgMap.put("processing", new java.util.LinkedHashMap<>(Map.of("threads", 1,
+                "schema_file", schema.toString().replace("\\", "/"),
+                "csv_settings", new java.util.LinkedHashMap<>(Map.of("delimiter", ",", "skip_header_lines", 0,
+                        "date_formats", List.of("%Y-%m-%d"), "timestamp_formats", List.of("%Y-%m-%d"))))));
+        Path toon = dir.resolve("route_sql_pipeline.toon");
+        Files.writeString(toon, com.gamma.config.io.ConfigCodec.toToon(cfgMap));
+
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+        Path inbox = Files.createDirectories(Path.of(cfg.dirs().poll()));
+        Files.writeString(inbox.resolve("feed.csv"),
+                "ID,AMT,EVENT_DATE\nE1,1.0,2020-04-03\nA2,2.0,2020-04-03\n");
+
+        CollectorProcessor.run(cfg);
+
+        List<String> emeaRows = dataLines(dir.resolve("db_emea"));
+        List<String> apacRows = dataLines(dir.resolve("db_apac"));
+        assertEquals(1, emeaRows.size(), emeaRows.toString());
+        assertTrue(emeaRows.get(0).startsWith("E1,") && emeaRows.get(0).contains("10"),
+                "the branch's sql step ran over the branch's rows and added AMT10: " + emeaRows);
+        assertEquals(1, apacRows.size(), apacRows.toString());
+        assertTrue(apacRows.get(0).startsWith("A2,2"), "the other branch is untouched: " + apacRows);
     }
 
     /**

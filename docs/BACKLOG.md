@@ -37,10 +37,9 @@ a new dependency — not a build. The rule that fell out: **a P1 must name the f
 cannot is a decision (§1) or a design (P2).
 
 Do next, in order (all decided 2026-09-06, all P1):
-1. **NAME-DIRS-1** dirs from the slug id · **STRICT-MODE-1** · **PARK-MSG-1** · **SQL-BRANCH-1** · **ENGINE-AUTO-1** — the S rows.
-2. **CATALOG-LINK-1** · **PARSE-HOME-1** · **CLONE-ARM-1** · **JOB-SPEC-1** · **D4-ENRICH-1** — the M rows.
-3. **SAMPLE-1-REMOVE** · **STRUCTURE-CSV-1** · **SEC-07-GATE** · **DATA-GOV-SYNTH** · **OPEN-DAG-S1** — the larger builds.
-4. **Release notes for the next MAJOR** — keep appending (§2). **Step Processor catalog** — pick a partial by name (§3).
+1. **CATALOG-LINK-1** · **PARSE-HOME-1** · **CLONE-ARM-1** · **JOB-SPEC-1** · **D4-ENRICH-1** — the M rows.
+2. **SAMPLE-1-REMOVE** · **STRUCTURE-CSV-1** · **SEC-07-GATE** · **DATA-GOV-SYNTH** · **OPEN-DAG-S1** — the larger builds.
+3. **Release notes for the next MAJOR** — keep appending (§2). **Step Processor catalog** — pick a partial by name (§3).
 
 ## 1. Operator decisions pending
 
@@ -79,11 +78,7 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 
 ### Authoring (Parse / Transform / pipeline editor)
 
-- **P1** · **NAME-DIRS-1** — `pipelineScaffold` derives every `dirs.*` from the slug id, not the raw display name (decided 2026-09-06; existing pipelines untouched). → `okf/backend/control-plane/pipeline-identity.md` §Decision
 - **P1** · **PARSE-HOME-1** — a dangling grammar binding opens the Parse drawer with the Grammar section flagged "template missing" instead of the custody dialog; the pane is organised as Grammar · Schemas emitted · other properties; fix the stale bound→dialog comment; dialog stays for binary fixed-width + unmappable generic parser. Unblocks P4 Test-mapping there. → `okf/frontend/features/pipeline-editor.md` §Decision
-- **P1** · **STRICT-MODE-1** — `strict_mode` renders as *Engine default (on) / On / Off* (blank-option select), never `default: true`; fix the `null_padding` doc line. → `okf/backend/config/parsing-options-reference.md` §Decision
-- **P1** · **SQL-BRANCH-1** — admit `sql` to `RouteArming.BRANCH_STEP_KINDS` + the UI `BRANCH_STEP_TYPES`; positive arming test + an executed mid-branch run. → `okf/frontend/features/schema-mapping-authoring.md` §0
-- **P1** · **ENGINE-AUTO-1** — a stored literal `engine: auto` is normalised to absent at lift (the compiler path already does); round-trip test. → `okf/backend/pipeline-graph/pipeline-config-keys.md`
 - **P2** · **WORKBENCH-S4** — the one-surface Step workbench (input-relation picker, column filter, grouping beside the field list); `RowShaper.fuse` is delete-or-wire (tested, caller-less, "last projection wins"). → `okf/backend/engine/catalog-vs-executors.md` §distilled
 - **P1** · **STRUCTURE-CSV-1** — a `<name>_structure.csv` sibling (`field,type,selector,unit,description,classification`) with the `_mapping.csv` split-read/split-write idiom (decided BUILD 2026-09-06). → `superpower/elt-final-amendment-plan.md` §3.2
 
@@ -109,7 +104,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 ### Execution, Consignments, Pipeline graph
 
 - **P1** · **CLONE-ARM-1** — arm `mode: clone`; merge `committedBranches[]` / `sourceFinalized` from `BranchCommitLog` into `GET /runs/{name}/batches` beside the park detail; Batches-tab line; tests. → `okf/backend/engine/branch-aware-ingest.md` §Decision
-- **P1** · **PARK-MSG-1** — `DrainCommand.refuseExpansionMembers` names the archive and the sibling batch ids. → `okf/backend/pipeline-graph/step-park-drain.md` §Decision
 - **P2** · **OPEN-DAG-S1** — authored post-sync step chains: a step's table registers as a Consignment output, re-runs supersede via the revision model, Step per Consignment / Job across (Q1/Q3/Q4 decided 2026-09-06). → `superpower/open-dag-pipeline-design.md` §5
 
 - **P2** · **Branch-aware executor residuals** — ((b) and (c) are design passes before code; (d)–(g) wait for a real need) — (b) multi-schema + route needs a **segment-scoped lift** (`writeAndTrace` runs once per segment while the divert lifts the whole graph) — ⛔ do NOT just lift the refusal; (c) mid-branch transforms in the recipe route verb — no per-branch scaffolding in `RecipeCompiler.route()` / `PipelineLift.branch()`, design pass written; (d) still unimplemented anywhere: `adapter`, `alert`, `event`; still refused at lowering as flat homes: `transform.select/derive/validate/split/merge`, `sink.materialized/view` on ingest; (e) acquisition-side "listed remotely, not yet fetched" gauge — name it first; (f) `acquire.maxFilesPerCycle` — only if overshoot is real; (g) `sinks:` follow-ups: per-sink `ducklake` block in flat `.toon`, decision-rule routing with `sinks>1`, versioned reference store with `sinks>1`, and a `ConfigSpecs`/`ConfigJsonSchema` structural spec for `sinks:`. ((a) `mode: clone` is a §1 decision.) → `okf/backend/engine/branch-aware-ingest.md` · `okf/backend/engine/output-sinks.md` · `archived-documents/plans-archive/mid-branch-transforms-design.md`

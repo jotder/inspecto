@@ -294,6 +294,36 @@ public final class PipelineEditable {
     private static final Set<String> PARSER_OWNED = Set.of(
             "csv_settings", "schema_file", "mapping_file", "schemas", "segments", "ingester", "ingester_config");
 
+    /**
+     * Decision 2026-09-06 (ENGINE-AUTO-1): a stored literal {@code engine: auto} is normalised to ABSENT on
+     * lift — the parser already treats the two identically ({@code PipelineConfigParser} defaults absent to
+     * {@code auto}) and the recipe/compiler path already drops it ({@code PipelineCompiler.csvSettingsToMap}),
+     * so the two paths now agree and the editor's Reader picker (whose blank option IS auto) shows the
+     * choice selected instead of an unmatched literal. Looks under {@code csv_settings} directly and under
+     * each per-frontend block of {@code parsing} ({@code parsing.delimited.engine}). Copies before removing —
+     * the raw map is the caller's.
+     */
+    static void stripAutoEngine(Map<String, Object> nodeCfg, String key) {
+        if (!(nodeCfg.get(key) instanceof Map<?, ?> block)) return;
+        Map<String, Object> copy = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> e : block.entrySet()) copy.put(String.valueOf(e.getKey()), e.getValue());
+        boolean changed = removeAutoEngine(copy);
+        for (Map.Entry<String, Object> e : new ArrayList<>(copy.entrySet())) {
+            if (e.getValue() instanceof Map<?, ?> inner) {
+                Map<String, Object> innerCopy = new LinkedHashMap<>();
+                for (Map.Entry<?, ?> ie : inner.entrySet()) innerCopy.put(String.valueOf(ie.getKey()), ie.getValue());
+                if (removeAutoEngine(innerCopy)) { copy.put(e.getKey(), innerCopy); changed = true; }
+            }
+        }
+        if (changed) nodeCfg.put(key, copy);
+    }
+
+    private static boolean removeAutoEngine(Map<String, Object> m) {
+        Object v = m.get("engine");
+        if (v != null && "auto".equalsIgnoreCase(String.valueOf(v).trim())) { m.remove("engine"); return true; }
+        return false;
+    }
+
     /** The registry-reference prefix a Grammar-bound parser node carries on {@code use:}. */
     static final String GRAMMAR_REF_PREFIX = "grammar/";
 
@@ -549,6 +579,7 @@ public final class PipelineEditable {
             }
         } else if (isParserType(t)) {
             for (String k : PARSER_OWNED) putIfPresent(c, k, processing.get(k));
+            stripAutoEngine(c, "csv_settings");
             // The unified top-level parsing: block is parser-owned too, carried VERBATIM under its own
             // key rather than flattened into the legacy ones. It is not a second spelling the editor may
             // ignore: PipelineConfigParser overlays parsing: OVER processing.csv_settings, so a parser
@@ -564,6 +595,7 @@ public final class PipelineEditable {
                 if (stripped.isEmpty()) c.remove("parsing");
                 else c.put("parsing", stripped);
             }
+            stripAutoEngine(c, "parsing");
         } else if (BuiltinNodeType.GAP.type().equals(t)) {
             if (collector.get("gap_detection") instanceof Map<?, ?> gd)
                 for (Map.Entry<?, ?> e : gd.entrySet())

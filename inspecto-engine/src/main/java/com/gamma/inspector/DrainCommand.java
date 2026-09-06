@@ -123,7 +123,7 @@ public final class DrainCommand {
                     + ParkedCommit.pathFor(parkHome, batchId) + ") is missing, so the branches that"
                     + " committed before the park cannot be registered. " + missing.getMessage());
         }
-        refuseExpansionMembers(batchId, m);
+        refuseExpansionMembers(batchId, m, cfg.dirs().manifestsDir());
 
         log.info("[DRAIN] {} — {} parked branch(es) {}, {} member(s), {} already-committed output(s)",
                 batchId, parkTables.size(), parkTables.keySet(), m.members.size(), pending.outputs().size());
@@ -237,16 +237,55 @@ public final class DrainCommand {
      * because {@code StepDisableArming} now refuses to arm a park with no park home. Keeping it would
      * have reported that config error as an unpack problem the operator does not have.
      */
-    private static void refuseExpansionMembers(String batchId, ConsignmentManifest m) {
-        List<String> expansion = m.members.stream()
-                .filter(me -> me.originalRelPath().contains("!"))
-                .map(ConsignmentManifest.MemberEntry::filename)
-                .toList();
-        if (!expansion.isEmpty())
-            throw new IllegalStateException("Refusing to drain " + batchId + ": member(s) " + expansion
-                    + " came out of an unpack expansion, whose original stayed in the inbox and re-expands"
-                    + " each cycle. Re-enable the step and let the next poll park (and drain) the fresh"
-                    + " batch instead.");
+    private static void refuseExpansionMembers(String batchId, ConsignmentManifest m, String manifestsDir) {
+        String refusal = expansionRefusal(batchId, m, manifestsDir);
+        if (refusal != null) throw new IllegalStateException(refusal);
+    }
+
+    /**
+     * PARK-1 (b), decided 2026-09-06: the refusal stays (the shared archive original cannot move while
+     * sibling batches split off the same archive still need it, and no cross-batch member registry says
+     * when the LAST sibling has drained) — but it now NAMES the archive(s) and the sibling Consignment ids
+     * whose manifests hold entries of the same archive, so the operator drains them together. Returns the
+     * message, or {@code null} when nothing came out of an expansion. Sibling discovery is best-effort: an
+     * unreadable manifest is skipped, never a reason to change the verdict.
+     */
+    static String expansionRefusal(String batchId, ConsignmentManifest m, String manifestsDir) {
+        java.util.Set<String> archives = new java.util.TreeSet<>();
+        List<String> expansion = new ArrayList<>();
+        for (ConsignmentManifest.MemberEntry me : m.members) {
+            String orig = me.originalRelPath() == null ? "" : me.originalRelPath();
+            int bang = orig.indexOf('!');
+            if (bang < 0) continue;
+            archives.add(orig.substring(0, bang));
+            expansion.add(me.filename());
+        }
+        if (expansion.isEmpty()) return null;
+        java.util.Set<String> siblings = new java.util.TreeSet<>();
+        if (manifestsDir != null) {
+            try (java.util.stream.Stream<Path> files = Files.list(Paths.get(manifestsDir))) {
+                for (Path f : files.filter(p -> p.getFileName().toString().endsWith(".json")).toList()) {
+                    String id = f.getFileName().toString();
+                    id = id.substring(0, id.length() - ".json".length());
+                    if (id.equals(batchId)) continue;
+                    try {
+                        ConsignmentManifest other = ManifestStore.read(manifestsDir, id);
+                        if (other.members == null) continue;
+                        for (ConsignmentManifest.MemberEntry me : other.members) {
+                            String orig = me.originalRelPath() == null ? "" : me.originalRelPath();
+                            int bang = orig.indexOf('!');
+                            if (bang >= 0 && archives.contains(orig.substring(0, bang))) { siblings.add(id); break; }
+                        }
+                    } catch (Exception unreadable) { /* best effort — see javadoc */ }
+                }
+            } catch (java.io.IOException unreadable) { /* best effort */ }
+        }
+        return "Refusing to drain " + batchId + ": member(s) " + expansion + " came out of the unpack expansion of "
+                + archives + ", whose original stayed in the inbox and re-expands each cycle."
+                + (siblings.isEmpty()
+                        ? " No other parked Consignment holds entries of the same archive."
+                        : " Sibling Consignment(s) " + siblings + " hold entries of the same archive — drain them together.")
+                + " Re-enable the step and let the next poll park (and drain) the fresh batch instead.";
     }
 
     /** Move each member's original back from the park home to its inbox path — see the class note. */

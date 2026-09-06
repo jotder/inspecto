@@ -141,7 +141,7 @@ class RouteArmingTest {
     }
 
     @Test
-    @DisplayName("a branch chaining the executable kinds (filter/dedup/summarize) arms")
+    @DisplayName("a branch chaining the executable kinds (filter/dedup/summarize/sql) arms")
     void executableBranchChainArms() {
         Map<String, Object> route = Map.of(
                 "mode", "case",
@@ -150,6 +150,8 @@ class RouteArmingTest {
                         branchWithSteps("emea", "emea_db", List.of(
                                 Map.of("filter", Map.of("where", "AMT > 0")),
                                 Map.of("dedup", Map.of("keys", List.of("ID"))),
+                                // SQL-BRANCH-1 (2026-09-06): a sql step compiles AND arms mid-branch
+                                Map.of("sql", Map.of("sql", "SELECT ID, AMT * 10 AS AMT, DAY FROM input")),
                                 Map.of("summarize", Map.of("group_by", List.of("DAY"),
                                         "measures", List.of("count"))))),
                         branch("apac", "apac_db")));

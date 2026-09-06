@@ -235,6 +235,17 @@ class ControlApiRouteArmingTest {
     }
 
     @Test
+    @DisplayName("SQL-BRANCH-1: an active branch chaining a sql step ARMS — it used to compile and then refuse")
+    void activeMidBranchSqlArmsAtSave(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> r = post(c.port, "/config/write", branchSteps(true,
+                    "[{\"sql\":{\"sql\":\"SELECT ID, AMT * 10 AS AMT, EVENT_DATE FROM input\"}}]"));
+            assertEquals(200, r.statusCode(), r.body());
+            assertFalse(r.body().contains("ERR_ROUTE_UNARMABLE"), r.body());
+        }
+    }
+
+    @Test
     @DisplayName("MIDBRANCH-1: an active branch chaining a disallowed kind (join) is refused — 422, coded")
     void activeMidBranchJoinIsRefusedAtSave(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {

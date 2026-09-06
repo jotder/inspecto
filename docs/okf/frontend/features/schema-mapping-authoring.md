@@ -330,6 +330,21 @@ path.
    canvas-level `RunToHereDialog`) with no cross-linking, so an author working inside a drawer has no path
    to the more powerful real-run capability without leaving the drawer and finding it manually.
 
+## 6b. `sql` mid-branch (SQL-BRANCH-1, 2026-09-06)
+
+A `transform.sql` step inside a `route:` branch used to compile and then refuse at arming, because
+`RouteArming.BRANCH_STEP_KINDS` held filter/dedup/summarize only. `RowShaper.sql` reads nothing but its input
+relation — no reference resolver, no execution context — so the ingest walk runs it unchanged; `sql` is now in
+the set (and the UI's `BRANCH_STEP_TYPES`), pinned by `RouteArmingTest`, `ControlApiRouteArmingTest` and an
+executed branch in `RouteIngestEndToEndTest`. The author SQL still passes `SqlGuard` at execution.
+
+🔴 **Trap, found by that test:** the sink partitions by the derived `year`/`month`/`day` columns the projection slot
+added, so a `sql` step that NAMES its output columns drops them and the sink refuses the batch (`partition_by
+expected to find year`). And `SELECT * REPLACE (…)` is refused too: `SqlGuard`'s lexical allow-list bans the
+word `replace` because it guards `CREATE OR REPLACE`. The idiom that works is `SELECT *, <expr> AS <new_col> FROM
+input` — add, don't rename; reshaping a column in place is the Record Transformer's job on the trunk. Both hold
+mid-branch and on the trunk alike.
+
 ## 7. Wide-feed decisions (D8–D10, decided 2026-09-04 — BUILT the same day, verified 2026-09-06)
 
 Three decisions taken after the redesign shipped, from driving the clickable mockup
