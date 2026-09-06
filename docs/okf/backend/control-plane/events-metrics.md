@@ -205,3 +205,11 @@ faster than notifications. Test: `MaintenanceLibraryTest` (`receiptPrune…`).
 The matching UI surfaces are the [events](../../frontend/features/events.md) and
 [dashboard](../../frontend/features/dashboard.md) screens in the frontend bundle.
 Production-investigation detail: [`docs/ADVANCED_GUIDE.md`](../../../ADVANCED_GUIDE.md).
+
+## Decision 2026-09-06 — bounce/complaint handling stays manual until receipts persist
+
+`DeliveryReceipt`s live in an in-memory store, so any suppression policy built today forgets on restart.
+**Decided:** no auto-disable of a channel (one bad address must not silence a channel); when a DB-backed
+receipt store exists, build a **per-recipient suppression list** — TTL for hard bounces, permanent for
+complaints — consulted before delivery, with `GET/DELETE /notifications/suppressions`. Until then the
+`enabled` flag is the operator's tool. (BACKLOG §3 P3 `D8-SUPPRESS-1`, gated on receipt persistence.)

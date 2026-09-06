@@ -67,6 +67,11 @@ above the generated commit list.
 - The pipeline TOON `source:` block is unchanged, but every Java/TS/API name says **Collector** <!-- vocab-allow: names the rename itself -->
   (GLOSSARY §13); `?flow=` query params are dual-read, `?pipeline=` is canonical.
 
+- **Consignment rename, persisted surfaces (D-12, confirmed 2026-09-06):** `batch_id` DDL columns in `DbProvenanceStore` /
+  `DbStatusStore` → `consignment_id` (versioned migration, `payload` literal rewritten); the `__batch_id` system column in
+  output Parquet/CSV → `__consignment_id` (output-schema break, documented); the `.toon` key `batch_id` → `consignment_id`
+  with the old key accepted on read for the major. All three ride this MAJOR, none earlier.
+
 **Breaking — Java `@PublicApi` (binds only within a released major; none of this was published in 3.x)**
 - Three store interfaces gained abstract methods for `incident_purge` (MNT-14, 2026-07-27).
 - `com.gamma.ops.NoteTargets` → `com.gamma.ops.AnnotationKinds` (no alias).

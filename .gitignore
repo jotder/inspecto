@@ -116,3 +116,6 @@ graphify-out/
 # `mvn dependency:build-classpath` writes cp.txt into every module dir it touches
 cp.txt
 inspecto-dedup-ledger.db*
+
+# Office lock files (a sheet open in Excel while a shift commits)
+~$*

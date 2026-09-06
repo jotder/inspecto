@@ -238,7 +238,7 @@ than being parsed and rolled up. A Reference materializes as a **Reference Datas
 **Expectation** — A **data-quality** rule that validates records against a Schema (non-null, range, regex,
 referential). Borrowed from the Great Expectations model.
 
-**Alert Rule** — Watches an observability **Metric** against a threshold and fires an **Alert** when crossed.
+**Alert Rule** — Watches an observability **Metric** — or, since BI-5, a BI **Measure** over a Dataset — against a threshold and fires an **Alert** when crossed. *(Widened 2026-09-06: one `AlertRule` record carries both shapes; a thresholded Measure is a KPI, so a Measure-watching Alert Rule is a KPI alert.)*
 
 **Decision Rule** — A **business-logic / routing** rule that transforms or routes records (e.g. send event-type
 X to sink Y). Drools-style. Unified in R5 on `Condition → Evaluation → Consequence[]`; a first-class Component
@@ -572,7 +572,7 @@ error). The Signal Ledger page (`/events`) renders the ledger newest-first with 
 **Metric** — An **observability** time-series signal (throughput, error rate, lag) derived from Signals.
 *(Ops sense only; the BI aggregation is a **Measure**.)*
 
-**Alert Rule** — *(see §4)* watches a Metric vs a threshold.
+**Alert Rule** — *(see §4)* watches a Metric — or a BI Measure (BI-5) — vs a threshold.
 
 **Alert** — A fired instance of an Alert Rule (severity: info / warning / critical) — the `ALERT_FIRED` **view**
 of the signal ledger.

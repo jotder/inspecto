@@ -81,6 +81,9 @@ absent — it manufactures false confidence in exactly the number it exists to c
 
 ## 2b. K2, as built — and the two things still open
 
+> **2026-09-06:** the hold **stands**. Q2 (does `{seq}` restart per hour) is a fact about the carrier's feed the
+> operator could not confirm; Q1 leans `file_stages` default-on but is not decided until Q2 is. Nothing builds.
+
 **The filename shape is `CDR_{yyyyMMddHH}_{seq}_*`** (operator, 2026-08-30): a date/time token, a
 **separate numeric sequence** token, and an arbitrary suffix.
 

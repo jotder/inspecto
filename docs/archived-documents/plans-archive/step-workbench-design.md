@@ -1,6 +1,6 @@
 # The Step workbench — publish the derived schema instead of asking for it
 
-**Status:** DESIGN, not scheduled (operator asked to "fill up the gap", 2026-08-29). **PARTLY
+**Status:** **ARCHIVED 2026-09-06** (operator decision — S4 lives on as BACKLOG §3 `WORKBENCH-S4`; `RowShaper.fuse` decided separately as delete-or-wire). Originally: DESIGN, not scheduled (operator asked to "fill up the gap", 2026-08-29). **PARTLY
 SUPERSEDED 2026-09-04 — read §0's table as history, not as current state.** The authoring redesign
 shipped the Transform Step (`transform.sql`) with a fields grid over a function catalog, a sample test
 run, and — since 2026-09-04 — the derived-schema half of this design: `POST

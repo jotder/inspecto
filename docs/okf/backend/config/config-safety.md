@@ -230,3 +230,12 @@ precedent `checkReference` follows. A future map-of-objects notion in the spec l
 Only `pipeline` and `enrichment` config types have a write surface to gate. This is tied to the write-gate:
 when `-Dassist.write.root` is set, writes are jailed to that root and validated here (see
 [auth & security](../editions/auth-security.md)).
+
+## Decision 2026-09-06 — job configs get a save-time spec; the depth rule stays
+
+(a) Job `.toon` files bypass `ConfigSafetyValidator` at save because no `ConfigSpecs.job()` exists, so
+containment is enforced only at run (`PipelineJobRunner`). **Decided:** close it — add a job spec and route job
+writes through the same 422 gate, keeping the run-time check as belt (BACKLOG §4 `JOB-SPEC-1`).
+(b) `requireTopLevelSinks` is a rule about literal directory nesting ("no store inside another store's tree"),
+not a jail; resolving real paths would change its answer for the wrong reason. **Decided:** keep as designed —
+a standing refusal (BACKLOG §6).

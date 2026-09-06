@@ -218,3 +218,11 @@ As-built notes worth keeping:
 ## Backlog (not built)
 
 - Nothing open. ~~Automated resumability from `rename.journal`~~ shipped 2026-08-13 (§ above).
+
+## Decision 2026-09-06 — the data directories follow the slug id
+
+The display name may carry spaces; the id is slugged (`my order feed` → `my_order_feed`) and the file is
+named by the id. Until now the UI scaffold derived every `dirs.*` from the raw display name, so paths carried
+spaces. **Decided:** `dirs.*` derive from the slug id too — one identity for id, file and paths. Existing
+pipelines are untouched (dirs are stored, not re-derived). Build: `pipelineScaffold` in
+`inspecto-ui/src/app/inspecto/component-model/pipeline-scaffold.ts` + its spec (BACKLOG §3 `NAME-DIRS-1`).

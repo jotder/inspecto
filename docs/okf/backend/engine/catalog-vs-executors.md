@@ -254,3 +254,15 @@ naturally expressible as a join against a stored relation.
 * Searched broadly for a class named for any of these processors ("schema validator", "whitespace
   sanitizer", "expression builder", "cast matrix", "lookup transcoder") — none exist. This is a confirmed
   gap, not an unexplored one.
+
+## The step workbench design, distilled (2026-09-06)
+
+`step-workbench-design.md` (archived) asked for one surface where a Step is authored against its real input
+relation. What shipped of it: S1 `RelationPreview.columnTypes` + `Result.sql` on the sealed sandbox; S2
+`<inspecto-step-preview-result>`; S5 `GET /config/schema/derived` + `<inspecto-derived-schema-panel>`; and the
+derived-schema half as `POST /components/transform/describe` (`TypeFlow.describe`). S3 was refuted. Two durable
+facts: a chain preview must run each Step's `shape` in order over the previous relation (never fuse — `RowShaper.fuse`
+is "last projection wins" and has no production caller; it is tested and must be either wired with that fixed or
+deleted); and a preview publishes at two points — the relation and the derived schema — which must agree. S4, the
+one-surface workbench (input-relation picker, column filter, grouping beside the field list), is BACKLOG §3
+`WORKBENCH-S4`, unscheduled.

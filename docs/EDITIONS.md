@@ -325,7 +325,7 @@ E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for P
 | SEC-04 | Authorization — ABAC policy engine (`inspecto-policy`, `access-policies.toon`, route + row scope) | — | — | ✅ | |
 | SEC-05 | Policy authoring UX (matrix/create editor beyond hand-authored TOON) | — | — | 🔲 | seed visibility, "why denied?" explain, read-only Policies tab shipped; editor is BACKLOG |
 | SEC-06 | Per-tenant space isolation enforced by seeded policies | — | — | ✅ | engages once a `space` claim is mapped |
-| SEC-07 | Secrets: `${ENV}` / `${SYS}` references, `SecretsProvider` SPI (file, OS keystore, Vault) | ✅ | ✅ | ✅ | Vault / cloud provider impls: ❓ which ship where |
+| SEC-07 | Secrets: `${ENV}` / `${SYS}` references in every edition; `${FILE}` / `${KEYSTORE}` Standard + Enterprise; Vault / cloud KMS Enterprise-only, gated on a client policy (D4) | ✅ ENV/SYS | ✅ +FILE/KEYSTORE | ✅ +Vault/KMS when a client requires it | **DECIDED 2026-09-06** — the FILE/KEYSTORE gating is a build (today one core `SecretResolver` serves all four schemes everywhere): BACKLOG §3 `SEC-07-GATE` |
 | SEC-08 | Data masking / row scoping driven by field classification | — | — | 🔲 | **decided 2026-09-02 (operator): Enterprise only.** Classification exists (SCH-03), row scope exists (SEC-04); the join is E-only build work |
 | SEC-09 | Actor-attributed, tamper-evident audit log | 🟡 | ✅ | ✅ | P has no actor (auth-free) — events carry `actor=anonymous` |
 | SEC-10 | Exchange / sharing grants between spaces | — | ✅ | ✅ | attributes private by default, not by guarantee (SEC-EXCHANGE-ATTRS); **decided 2026-09-02 (operator): not for Personal** — core code ships it in every bundle today, so the cell is a product decision awaiting gating (EDG-01) |
@@ -358,7 +358,7 @@ E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for P
 | CMP-07 | RBAC R5 residual (G8) | — | 🔲 | 🔲 | matrix gap G8, open |
 | CMP-08 | Certifications (SOC 2 Type II, ISO 27001, FedRAMP…) | — | — | 🔲 | **decided 2026-09-02 (operator): Enterprise only.** Org-paced (NFR-7); C1 scope statement is org-gated |
 
-**Open ❓ cell to decide:** SEC-07 (which secrets providers ship in which edition). SEC-08 and CMP-08 were
+**No open ❓ cell** — SEC-07 decided 2026-09-06 (see its row). SEC-08 and CMP-08 were
 decided Enterprise-only on 2026-09-02. Everything 🔲 already has a BACKLOG home; a 🔲 cell that gets
 scheduled should cite its row here.
 

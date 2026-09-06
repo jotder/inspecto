@@ -203,3 +203,10 @@ unbounded — a fake `0` reads as "wedged"**), per-pipeline in-flight/waiting/pr
 — the pipelines the governor has admitted **below** their base cap, joined in the route because the
 broker cannot see the governor. Only actually-throttled rows appear, hard-capped at 50 with the true
 total beside it. Rendered on **Settings ▸ Scheduler** (`canOperateRuns`).
+
+## Decision 2026-09-06 — the fetch lane stays FIFO
+
+`processing.priority` weights run admission through `ConcurrencyBroker`; `acquirePermits` stays a plain
+semaphore. No fetch-lane contention has been observed. **Decided:** keep FIFO; the trigger to revisit is the
+first observed fetch-lane wait, at which point a second `ConcurrencyBroker` instance on the fetch lane is a
+small change. ⛔ `PipelineScheduler.runPermits` is not retired. Recorded as a standing decision (BACKLOG §6).

@@ -158,8 +158,6 @@ const DOC_ALLOW = {
         'Subject matter: the one hit names the Flow→Pipeline rename as the largest remaining blast radius (517 files / 39 @PublicApi).',
     'docs/PROJECT_NOTES.md::bare-flow':
         'Subject matter: the one hit records that CONFIG_ALLOW doubles as the Flow→Pipeline Tier-3 ledger. The other four hits in this file were stale and were fixed 2026-08-29.',
-    'docs/REQUIREMENTS.md::measure-threshold':
-        'Sanctioned: BI-5 is a SHIPPED capability — `*_alert.toon` measure rules alert on a BI Measure — so the line describes the product, not the A2 confusion. ⚠ Whether that capability is correctly NAMED is an open vocabulary question (BACKLOG §6), not something to settle by editing a requirement to make a guard green.',
 };
 
 // Each rule: a per-line matcher returning the matched text (or null), plus a message. Rules run against
@@ -167,16 +165,10 @@ const DOC_ALLOW = {
 // show a banned term being retired) are stripped/skipped first, so citing a ban is never itself a
 // violation. Extend cautiously: only add a term that is unambiguous in this scanned set.
 const RULES = [
-    {
-        id: 'measure-threshold',
-        // A2 is specifically *alerting* on a Measure. A **KPI** legitimately is "a single-number Measure
-        // with a target/threshold" (GLOSSARY §8) — so only fire when the line is also about alerting.
-        test: (line) =>
-            /measure/i.test(line) && /threshold/i.test(line) && /\balert(s|ing)?\b/i.test(line)
-                ? 'measure … threshold … alert'
-                : null,
-        msg: 'An Alert Rule watches an observability **Metric** against a threshold, never a BI **Measure** (GLOSSARY §4/§8). This is the A2 confusion.',
-    },
+    // `measure-threshold` (the A2 confusion: alerting on a BI Measure) was RETIRED 2026-09-06 — the operator
+    // widened GLOSSARY §4/§8 so an Alert Rule watches a Metric OR a BI Measure (BI-5 shipped exactly that in
+    // one `AlertRule` record), so the premise the rule enforced is no longer the glossary's. Its one waiver
+    // (`docs/REQUIREMENTS.md`) went with it.
     {
         id: 'data-store',
         test: (line) => { const m = line.match(/\bdata stores?\b/i); return m ? m[0] : null; },

@@ -227,6 +227,11 @@ a much smaller thing. Building the chain first bakes that answer in by accident.
 
 ## 5. Open questions
 
+> **Decided 2026-09-06:** Q1 — a post-sync step's table **registers as a Consignment output** (retire/compact/registry
+> lifecycle reused; "connect, don't invent"); Q3 — when step A re-runs, B's output is **superseded through the
+> existing revision model**; Q4 — a per-Consignment matrix is a **Step**, a cross-Consignment report is a **Job**
+> (`job-vs-step.md`). Stage 1 (authored step chains) is unblocked → BACKLOG §3 `OPEN-DAG-S1`.
+
 1. 🔴 **May a post-sync step create an arbitrary table, or must its output go through the summary
    guardrail?** The guardrail exists so incremental measures compose correctly; arbitrary tables give
    the freedom point 3 describes and hand that correctness back to each author. ⚠ Note the **schema

@@ -71,3 +71,12 @@ list (left, resizable via `InspectoSplitDirective`) + column schema, paginated/s
 (when DB-backed) the operational tables via the backend's `/db/catalog|table|query` routes. Ops-table
 reads go through each store's own live connection (`BrowsableStore` — DuckDB files are single-writer);
 SQL is `SqlGuard`-checked server-side. Offline via the `db-browser` mock handler.
+
+## Decision 2026-09-06 — a blank `output_table` batch still gets a Catalog link, resolved by pipeline
+
+The 2026-08-14 refusal stands for what it refused: never synthesise a store/`table` attribute. What it did
+not cover is resolving by **identity**: every event node carries a named schema (`event:<pipeline>/<canonicalName>`),
+so a batch that wrote straight to `dirs.database` can be linked by its pipeline. **Decided:** when
+`output_table` is blank the dialog resolves by pipeline — exactly one event node ⇒ link that node; several
+(segments) ⇒ link the pipeline's Stream node. No store edge is ever invented. Build: a `GET /catalog/resolve?pipeline=`
+arm + `batch-detail.dialog.ts` (BACKLOG §3 `CATALOG-LINK-1`).

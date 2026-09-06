@@ -539,3 +539,12 @@ the frontend/backend split.
    note they are not implemented here; the equivalent today is `skip_junk_lines` + a `WHERE`/`EXPR`).
 6. State the engine's **read-as-VARCHAR-then-`TRY_STRPTIME`** typing model, so readers know
    `dateformat`/`decimal_separator`/sniffer settings are largely redundant on the ingest path.
+
+## Decision 2026-09-06 — `strict_mode` is a three-way choice
+
+`ignore_errors` and `store_rejects` carry real defaults since 2026-09-04; `strict_mode` stayed a
+blank-means-engine-default boolean and rendered as an OFF-looking toggle while the engine default is ON.
+**Decided:** render it as a select — *Engine default (on)* / *On* / *Off* — the blank-option idiom the engine
+picker already uses, so the default writes nothing. ⛔ Not `default: true` (that would stamp every saved
+grammar). Build: `parsing-attributes.ts` + spec (BACKLOG §3 `STRICT-MODE-1`). Also: the `null_padding` row above
+says "Engine sets false" — true for delimited only; line readers default to `true`.

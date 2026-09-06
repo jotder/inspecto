@@ -181,3 +181,11 @@ concurrent poll or a crash inside that window re-ingests the file — the same i
 
 - [Design](pipeline-graph-design.md) — the graph IR, lift and executor this rides on.
 - [Consignment status flow](../engine/consignment-status-flow.md) — where `FileStage` and the batch ledger fit.
+
+## Decision 2026-09-06 — expansion members stay refused at drain, but the refusal names its siblings
+
+The shared archive original cannot move while sibling batches split off the same archive still need it, and
+no cross-batch member registry exists to know when the LAST sibling has drained. **Decided:** keep the refusal
+and sharpen it — name the archive and the sibling batch ids so the operator drains them together. The full
+lifecycle rule ("the original moves when its last sibling drains") is recorded here as the shape of the
+eventual fix, not scheduled. Build: `DrainCommand.refuseExpansionMembers` + test (BACKLOG §3 `PARK-MSG-1`).

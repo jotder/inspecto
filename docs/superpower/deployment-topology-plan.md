@@ -430,6 +430,10 @@ the `maintenance_backups` catalog give the durable trail).
 
 ## 10. Gaps, risks & decision asks
 
+> **D1–D8 SIGNED 2026-09-06** as recommended below, with one clarification: D3's cap default is the shipped D11
+> `memory_limit=2GB` (no new number). The plan leaves DRAFT; Phases 0–5 are schedulable, Phases 2–4 still
+> need a live deployment (BACKLOG §2). D4 = Vault/KMS Enterprise-only when a client policy requires it (= SEC-07).
+
 Design/reality gaps (tracked honestly — none block T1/T2 sales today):
 
 - ~~**GAP-1 bind-all**~~ **CLOSED 2026-08-29**: `-Dcontrol.bind` ships on both the HTTP and HTTPS paths

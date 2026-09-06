@@ -143,3 +143,11 @@ would be the hand-mirrored-map drift this repo has already paid for three times.
   §11.3) — never reuse it for ingest destinations.
 - A TOON tuple row with an **unquoted Windows path** fails as "Array length mismatch … found 0"
   (the drive colon); quote every path cell.
+
+## Decision 2026-09-06 — `mode: clone` arms, and committed branches become visible
+
+B9's constraint was that nothing surfaces partial-commit state. The `BranchCommitLog` is already durable per
+`(batch, branch, phase)`; only the read surface was missing. **Decided:** arm `clone` and merge
+`committedBranches[]` / `sourceFinalized` into `GET /runs/{name}/batches` beside the park detail, rendered on the
+Batches tab. Build: `RouteArming` (drop the clone refusal), `RunRoutes` merge, `BranchCommitLog` reader,
+Batches-tab line + tests (BACKLOG §3 `CLONE-ARM-1`).

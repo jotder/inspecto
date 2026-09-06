@@ -1,6 +1,8 @@
 # Postgres multi-user backend — plan
 
-> **Status:** PLAN ONLY, build not started (written 2026-07-27). BACKLOG §6 requires this document to
+> **Status:** **PARKED 2026-09-06** — no Standard/Enterprise deployment is multi-operator yet; direction stands
+> (HikariCP in-process pool if anything, never a customer-run PgBouncer). Reopen on the first multi-operator
+> install. Archived under plans-archive/. Originally: PLAN ONLY, build not started (written 2026-07-27). BACKLOG §6 requires this document to
 > exist before any code lands, because "add a pool" understates the work by a factor the investigation
 > below makes concrete. **Direction was captured and deferred by the operator** — this plan does not
 > re-open that call, it makes the build schedulable when it is taken.

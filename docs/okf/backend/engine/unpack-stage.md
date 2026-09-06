@@ -212,3 +212,10 @@ compressed spelling of that logical name has been processed.
   `Decompressors.forFile` resolves by **longest matching suffix** and its own javadoc says ordering
   the services file is explicitly *not* relied on (ServiceLoader order across jars is unspecified).
   The listed order is harmless; the reason given for it is wrong.
+
+## Ratified 2026-09-06 — the archive-level verdict and the entry grain
+
+Both were "pending ratification" while the code already did them: `UnpackStatus` (UNPACKED / UNPACKED_PARTIAL /
+UNREADABLE / EMPTY — reporting, never a gate) is the archive-level roll-up, and lineage records the ENTRY
+(`good.csv`), never `bundle.zip!good.csv`. **Ratified as in force**; a composite grain would break
+`filename_column` consumers and the origin resolver for no reported need.

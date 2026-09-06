@@ -587,8 +587,8 @@ resolved** — `processing.schema_file: schema/<id>` now executes the registry c
 **Phase 1 remaining:** the schema *structure* CSV shape (§3.2 first table) — schemas persist as
 TOON for now. ⚠ **Its gate is SPENT (noted 2026-08-29): "revisit with Phase 2's type flow" — and Phase 2
 is fully closed** (see P2 S5, 2026-08-06). So this is not deferred work waiting on a prerequisite; it is
-unblocked work nobody went back to. Re-scope or drop it deliberately rather than leaving it wearing a
-prerequisite that no longer exists.
+unblocked work nobody went back to. **Decided 2026-09-06: BUILD** — a `<name>_structure.csv` sibling with the same
+split-read/split-write idiom as `_mapping.csv` (BACKLOG §3 `STRUCTURE-CSV-1`).
 
 #### Phase 2 GROUNDED 2026-08-05 — findings that shape the slices
 
@@ -982,7 +982,7 @@ is withdrawn: **Job is again a first-class user-facing concept** (GLOSSARY §6-A
 updated; authoring contract in `superpower/job-parameter-contract-plan.md` §0-A). The S3a–d design
 of record above is unaffected and proceeds as an *additive* thread — table-entry Pipelines
 complement Jobs, they no longer replace them. Consequences: Phase 6's Jobs-UI retirement is
-cancelled; the per-kind authoring migrations (D-4 enrichment, D-7 materialize) become S3-gated
+cancelled; the per-kind authoring migrations (D-4 enrichment, D-7 materialize) became S3-gated — **re-decided 2026-09-06: D-4 GO** (migrate the one `*_enrich.toon` fixture to `transform: {join}`, mark `enrichment` deprecated read-only — BACKLOG §3 `D4-ENRICH-1`); **D-7 DROPPED as done-by-absence** (no authored config spells `materialized`; `MaterializeTask` is a Job, not authoring) — originally
 options to re-decide when S3 lands, not commitments.
 
 #### Phase 4 GROUNDED 2026-08-06 — findings that shape the slices

@@ -726,3 +726,12 @@ touching `inspecto-ui/`.** Highlights (full detail there):
 - **CVVE** (`C:/sandbox/agentic-doc-validation`) — kernel's 3rd consumer; first real `HumanHandoff` driver.
 
 (Detailed progress for these lives in the per-user agent memory, not in this repo — they are different projects.)
+
+## DATA-GOV-1 decision (2026-09-06)
+
+The real carrier corpus (~57 MB, two carriers, only in working trees) moves to an **encrypted out-of-band
+archive on company storage, fetched by script**, access held by the data-agreement owner; the parity harness runs
+wherever the archive is provisioned. A **small synthetic subset is committed for CI smoke** — a complement, not a
+replacement: every parity defect so far came from real files. Git LFS is refused unless the data agreement permits
+third-party hosting. ⚠ Never force-push or reset master to fix this. The archive itself is an org action
+(BACKLOG §2); the synthetic subset is BACKLOG §3 `DATA-GOV-SYNTH`.

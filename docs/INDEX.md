@@ -234,7 +234,7 @@ former root reference docs** (each index lists them):
   `RecipeCompiler` verb switch and hardcoded `LOWERABLE` for plugin steps. Five stages; the open decision
   is whether a post-sync step may create an arbitrary table or must stay in the summary guardrail.
 
-- [`superpower/step-workbench-design.md`](superpower/step-workbench-design.md) — **DESIGN, not
+- ~~`superpower/step-workbench-design.md`~~ — **ARCHIVED 2026-09-06 (distilled into `okf/backend/engine/catalog-vs-executors.md`; S4 → BACKLOG)** → `archived-documents/plans-archive/step-workbench-design.md`. Was: [`step-workbench-design.md`](archived-documents/plans-archive/step-workbench-design.md) — **DESIGN, not
   scheduled** (2026-08-29; ⚠ 2026-09-04: most of its ask — free SQL, derived output schema, test on
   sample — shipped as the `transform.sql` pane; re-read against `schema-mapping-authoring.md` §0 before
   reviving it): one Step editor where the author builds a query (named fields, functions,
@@ -741,7 +741,7 @@ former root reference docs** (each index lists them):
   2026-07-25 (parallel; SOC 2 is not a gate). **C2 shipped 2026-08-28** →
   [`../compliance/controls-matrix.md`](../compliance/controls-matrix.md); C1 stays org-gated (it
   needs facts the repo does not hold).
-- [`superpower/postgres-multi-user-plan.md`](superpower/postgres-multi-user-plan.md) — **Postgres
+- ~~`superpower/postgres-multi-user-plan.md`~~ — **PARKED 2026-09-06 (no multi-operator deployment yet)** → `archived-documents/plans-archive/postgres-multi-user-plan.md`. Was: [`postgres-multi-user-plan.md`](archived-documents/plans-archive/postgres-multi-user-plan.md) — **Postgres
   multi-user backend, PLAN ONLY 2026-07-27, build not started** (BACKLOG §6 required a plan first).
   Pool behind `JdbcDrivers`, scheme-derived sizing, schema-per-space; phases P0–P4. ⚠ Names four
   things that break under a pool, chiefly `DbAcquisitionLedger.record()`'s DELETE+INSERT being atomic

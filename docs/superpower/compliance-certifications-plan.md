@@ -206,6 +206,10 @@ the evidence" for every technical control an auditor asks about.
 
 ## 6. Open questions
 
+> **2026-09-06:** the HIPAA-vs-PCI framework choice is **deferred** until a prospect is named (C1 stays org-gated);
+> the **SOC 2 Type II observation window opens now at 6 months** (Q6 — its RBAC/ABAC precondition is met).
+> Opening the window is an org action outside this repo (BACKLOG §2).
+
 1. ~~**Sequence sign-off (product):**~~ **ANSWERED 2026-07-25 (BACKLOG D1): no strict sequence — NFR-7 work
    proceeds in parallel; SOC 2 is not a gate on the rest.** The plan is *not* re-ordered (SOC 2 Type I → II →
    ISO 27001 remains the expected certification order where certifications interact), but engineering

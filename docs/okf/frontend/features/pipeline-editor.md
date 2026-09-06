@@ -665,3 +665,14 @@ Three lessons this feature keeps re-proving, kept here because they shape every 
   branch round-trip; the dirty-arming `setValue` trap).
 - **Falsify guards before trusting them** — the write-ordering guards were verified by deleting
   them and watching exactly their own tests fail.
+
+## Decision 2026-09-06 — a Parse Step is three things, and the drawer is its one home
+
+Operator's model: a parse Step is **a Grammar** (how the source format is read — optional when the format is
+hardcoded), **the Schemas it emits** (its events), and **its other properties**. The drawer's Parse pane is
+organised on those three sections, and it is the home for every parse node the drawer can represent — including
+a **dangling grammar binding**, which now opens the drawer with the Grammar section flagged "template missing"
+instead of falling back to the custody dialog (this also unblocks Test-mapping on those nodes, P4).
+`GrammarEditorDialog` survives only for binary fixed-width and an unmappable generic `parser`. Build:
+`pipeline-editor.component.ts` `isDrawerParse` / `definitionDraft`, the Parse pane's Grammar section banner,
+specs (BACKLOG §3 `PARSE-HOME-1`). The stale comment claiming bound nodes keep the dialog goes with it.
