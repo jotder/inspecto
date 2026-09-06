@@ -309,6 +309,27 @@ public final class NodeAttributes {
                     .help("Which raw column (0-based) the four before-parsing lists above match against. Ignored by the row predicate."));
 
     /**
+     * {@code transform.lookup} (2026-09-06, the first PARTIAL Step Processor delivered): one column,
+     * transcoded through an inline static map. The map is a {@code list} of {@code key=value} strings — the
+     * one spelling — because a map-valued attribute type is refused on purpose (see the route comment below)
+     * and the shared list widget already authors removable rows. A value with no mapping passes through
+     * unchanged unless {@code default} names the literal it should become; {@code target} writes a new
+     * column instead of replacing the source in place.
+     */
+    public static final List<NodeAttribute> TRANSFORM_LOOKUP = List.of(
+            NodeAttribute.of("column", "Column to transcode", "string", "required")
+                    .placeholder("STATUS")
+                    .help("The typed, mapped column whose values are looked up."),
+            NodeAttribute.of("mappings", "Mappings (key=value)", "list", "required")
+                    .placeholder("NEW=Open")
+                    .help("One entry per code: the value found in the column, an equals sign, the value to write. Compared as text."),
+            NodeAttribute.of("target", "Write to column", "string", "optional")
+                    .placeholder("STATUS_LABEL")
+                    .help("A new column for the result. Leave blank to replace the source column in place."),
+            NodeAttribute.of("default", "Unmatched values become", "string", "optional")
+                    .help("The literal written when no mapping matches. Leave blank to pass unmatched values through unchanged."));
+
+    /**
      * {@code transform.route}: {@code mode} is the only scalar. {@code branches} — the list of
      * {@code {key, where, database}} that actually does the routing — has no spec because the
      * {@code list} type is {@code string[]} and these are MAPS.
@@ -382,8 +403,8 @@ public final class NodeAttributes {
 
     private static Map<String, List<NodeAttribute>> byType() {
         for (List<NodeAttribute> table : List.of(COLLECTOR, TRIGGER, MARKER_DEDUP, OUTPUT, SINK_PERSISTENT,
-                TRANSFORM_FILTER, TRANSFORM_ROUTE, TRANSFORM_DEDUP, TRANSFORM_SUMMARIZE, TRANSFORM_JOIN,
-                TRANSFORM_SQL))
+                TRANSFORM_FILTER, TRANSFORM_LOOKUP, TRANSFORM_ROUTE, TRANSFORM_DEDUP, TRANSFORM_SUMMARIZE,
+                TRANSFORM_JOIN, TRANSFORM_SQL))
             for (NodeAttribute a : table) a.validate();   // whole-spec checks, once the builders are done
         Map<String, List<NodeAttribute>> m = new LinkedHashMap<>();
         // The acquisition node authors the WHOLE collector block, duplicate__* included — fingerprint
@@ -392,6 +413,7 @@ public final class NodeAttributes {
         // read-compat only, never authored, and a spec would invite editing a node nothing emits.
         m.put(BuiltinNodeType.ACQUISITION.type(), ACQUISITION);
         m.put(BuiltinNodeType.TRANSFORM_FILTER.type(), TRANSFORM_FILTER);
+        m.put(BuiltinNodeType.TRANSFORM_LOOKUP.type(), TRANSFORM_LOOKUP);
         m.put(BuiltinNodeType.TRANSFORM_ROUTE.type(), TRANSFORM_ROUTE);
         m.put(BuiltinNodeType.TRANSFORM_DEDUP.type(), TRANSFORM_DEDUP);
         m.put(BuiltinNodeType.TRANSFORM_SUMMARIZE.type(), TRANSFORM_SUMMARIZE);

@@ -472,8 +472,8 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     private readonly refsLoaded = signal(false);
     /** Per-node test outcome from the last run-to-here (`tested` / `rejects`). */
     private readonly testedStatus = signal<Map<string, TestOutcome>>(new Map());
-    // ── T17 live last-run overlay: the flow's most recent real run, from the durable provenance store ──
-    /** The most recent recorded run of the selected flow (`null` = none yet, or provenance backend unset). */
+    // ── T17 live last-run overlay: the pipeline's most recent real run, from the durable provenance store ──
+    /** The most recent recorded run of the selected pipeline (`null` = none yet, or provenance backend unset). */
     readonly lastRunBatch = signal<ProvenanceBatch | null>(null);
     /** `nodeId|rel` → row count for {@link lastRunBatch} — paints edge weights and the inspector's node total. */
     private readonly lastRunCounts = signal<Map<string, number>>(new Map());
@@ -592,7 +592,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         this.inspectorOpen.set(true);
     }
 
-    /** The selected flow's editable model mapped to G6 data — fed to the host only on a flow switch. */
+    /** The selected pipeline's editable model mapped to G6 data — fed to the host only on a pipeline switch. */
     readonly g6Data = computed<G6GraphData | null>(() => {
         const m = this.model();
         return m
@@ -1335,18 +1335,18 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         // The tab this load is FOR. ⚠ `activateTab` returns immediately when `selectedId()` already
         // matches, and `select()` only moves `selectedId` when its response lands — so clicking an
         // uncached tab C and then going back to A left A legitimately editable while C's fetch was still
-        // in flight. C then landed and did `model.set(flow)` unconditionally: A's edits since the switch
+        // in flight. C then landed and did `model.set(pipeline)` unconditionally: A's edits since the switch
         // were destroyed, `selectedId` jumped to C, and `dirty.set(false)` erased the unsaved marker.
         // They were not recoverable from `cachedModels` either — `parkCurrent()` had cached the OLDER A.
         this.pendingSelect = id;
         // W5: the editor edits the CANONICAL *_pipeline.toon — lift it to the editable graph.
         this.api.pipelineGraphRaw(id).subscribe({
-            next: (flow) => {
+            next: (pipeline) => {
                 if (this.pendingSelect !== id) return; // superseded — the operator moved on
-                this.model.set(flow);
+                this.model.set(pipeline);
                 this.selectedId.set(id); // drives the host rebuild (graphKey)
                 this.dirty.set(false);
-                this.stampBaseline(id, flow); // what undo-to-the-bottom compares against
+                this.stampBaseline(id, pipeline); // what undo-to-the-bottom compares against
             },
             error: (err) => {
                 if (this.pendingSelect === id) this.toast.error(apiErrorMessage(err, 'Could not load the pipeline'));
@@ -1391,9 +1391,9 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     }
 
     /**
-     * T17 live last-run overlay: fetch the flow's most recent real run from the durable provenance store
+     * T17 live last-run overlay: fetch the pipeline's most recent real run from the durable provenance store
      * (`/provenance/batches` + `/provenance`) and paint it onto the canvas edges + inspector. Degrades
-     * silently to "no overlay" both when the flow has no recorded run yet (empty batch list) and when no
+     * silently to "no overlay" both when the pipeline has no recorded run yet (empty batch list) and when no
      * provenance backend is configured (404, `-Dprovenance.backend` unset) — this is a read-only enhancement,
      * never worth blocking or erroring the editor over.
      */
@@ -1517,13 +1517,13 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
      */
     applyPipelineDraft(draft: AiDraft): void {
         if (!this.canAuthor()) return; // defense in depth, not just the button
-        const flow = draft.config as unknown as AuthoredPipeline;
-        if (!flow?.nodes || !flow?.edges) return;
+        const pipeline = draft.config as unknown as AuthoredPipeline;
+        if (!pipeline?.nodes || !pipeline?.edges) return;
         const current = this.model();
         this.captureUndo(); // R4: adopting a draft replaces the whole graph — very much worth an undo
         // Keep the open pipeline's identity and active state — the tool echoes the graph, not the
         // lifecycle, and adopting a draft must never silently activate or rename a live pipeline.
-        this.model.set({ ...flow, name: current?.name ?? flow.name, active: current?.active ?? false });
+        this.model.set({ ...pipeline, name: current?.name ?? pipeline.name, active: current?.active ?? false });
         this.dirty.set(true);
         this.selectedNode.set(null);
         this.selectedEdgeId.set(null);
@@ -1865,7 +1865,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     /**
      * The full identity migration (T3) — distinct from {@link renamePipeline}'s display-only relabel.
      * Moves the id itself, so every route addressing the pipeline by name must switch to `newId`
-     * afterwards: update `selectedId`/the flow list entry, and reselect so the editor keeps pointing at
+     * afterwards: update `selectedId`/the pipeline list entry, and reselect so the editor keeps pointing at
      * the (now-renamed) pipeline instead of 404ing on its old id.
      */
     changePipelineId(): void {
@@ -2850,7 +2850,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
 
     // ── validate & activate (Stage 4) ──
 
-    /** Whether the selected flow is currently active. */
+    /** Whether the selected pipeline is currently active. */
     isActive(): boolean {
         return this.model()?.active ?? false;
     }
@@ -2860,7 +2860,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         else this.validate();
     }
 
-    /** Walk the flow for activation-blocking issues; opens the findings panel. */
+    /** Walk the pipeline for activation-blocking issues; opens the findings panel. */
     validate(): PipelineFinding[] {
         const f = this.refreshFindings();
         this.bottomTab.set('validation');

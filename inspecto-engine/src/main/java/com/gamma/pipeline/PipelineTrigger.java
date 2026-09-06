@@ -6,10 +6,10 @@ import com.gamma.util.Values;
 import java.util.Map;
 
 /**
- * <b>T13 — the entry-node trigger.</b> A flow's entry node (no inbound {@code data} edge — typically
+ * <b>T13 — the entry-node trigger.</b> A pipeline's entry node (no inbound {@code data} edge — typically
  * {@code acquisition}/{@code adapter}) carries a {@code trigger:}; everything downstream is data-driven
  * (§3.6). This parses that config into a typed trigger and classifies which of the two schedulers (§3.8)
- * drives the flow — so the engine can route a flow to the loop scheduler vs the custom-function/event
+ * drives the pipeline — so the engine can route a pipeline to the loop scheduler vs the custom-function/event
  * scheduler from the graph alone, with no separate mechanism.
  *
  * <p>Trigger forms (§3.6):
@@ -34,7 +34,7 @@ public record PipelineTrigger(Kind kind, long everyMs, String cron, String on, S
     /** The literal trigger shape declared on the entry node. */
     public enum Kind { SCHEDULE_INTERVAL, SCHEDULE_CRON, EVENT, MANUAL, DEFAULT_POLL }
 
-    /** Which scheduler (§3.8 two-scheduler split) drives a flow carrying this trigger. */
+    /** Which scheduler (§3.8 two-scheduler split) drives a pipeline carrying this trigger. */
     public enum Scheduler { LOOP, EVENT, MANUAL }
 
     /** The driving scheduler for this trigger. */

@@ -17,13 +17,13 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * <b>T18 — flow dry-run (§7.2): "test the pipeline incrementally".</b> Runs a bounded sample through a flow's
+ * <b>T18 — pipeline dry-run (§7.2): "test the pipeline incrementally".</b> Runs a bounded sample through a pipeline's
  * {@code transform → sink} subgraph on a throwaway DuckDB and reports per-node produced relations and the rows
  * each sink would receive — the per-edge record counts an operator watches as records flow. It reuses the
  * <em>production</em> walk ({@link PipelineExecutor#dryRun}, the same {@link RowShaper} as a real run) and commits
  * nothing; the scratch database is deleted afterwards.
  *
- * <p>The sample is the <b>post-parse</b> record set, so it is seeded at the flow's parser node (or, if the flow
+ * <p>The sample is the <b>post-parse</b> record set, so it is seeded at the pipeline's parser node (or, if the pipeline
  * has none, its entry node); the acquisition/parse stage upstream of the seed is not exercised here.
  */
 @PublicApi(since = "4.0.0")
@@ -71,7 +71,7 @@ public final class PipelineDryRun {
 
     /**
      * Dry-run {@code g} over {@code sampleRows}, resolving any {@code transform.join} reference through
-     * {@code references}. Throws {@link IllegalArgumentException} for an empty sample or a flow with no
+     * {@code references}. Throws {@link IllegalArgumentException} for an empty sample or a pipeline with no
      * parser/entry node to seed at; validation errors surface from {@link PipelineExecutor#dryRun}.
      */
     public static Result run(PipelineGraph g, List<Map<String, Object>> sampleRows,

@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
 /**
  * Persistence for authored flows (doc §7.1 / §14 T19): create / replace / delete / list {@code *_flow.toon}
  * files under a root, each round-tripped through {@link PipelineCodec}. Mirrors {@link ComponentStore} — id
- * sanitised, path-jailed, written atomically (temp + atomic move). A flow is addressed by its {@code id},
+ * sanitised, path-jailed, written atomically (temp + atomic move). A pipeline is addressed by its {@code id},
  * which is also its graph {@link PipelineGraph#name() name} and filename stem.
  *
  * <p>These are the <b>build side</b> of the NiFi UX: authored flows are validated ({@link PipelineValidator}) and
@@ -44,7 +44,7 @@ public final class PipelineStore {
         return pipelinesRoot;
     }
 
-    /** Every authored flow on disk (re-scans), in filename order; an unparseable file is warned and skipped. */
+    /** Every authored pipeline on disk (re-scans), in filename order; an unparseable file is warned and skipped. */
     public List<PipelineGraph> list() {
         List<PipelineGraph> out = new ArrayList<>();
         if (!Files.isDirectory(pipelinesRoot)) return out;
@@ -58,7 +58,7 @@ public final class PipelineStore {
         return out;
     }
 
-    /** One authored flow by id, if present. An unsafe/unresolvable id is treated as "not present" (empty). */
+    /** One authored pipeline by id, if present. An unsafe/unresolvable id is treated as "not present" (empty). */
     public Optional<PipelineGraph> get(String id) {
         Path file = fileForOrNull(id);
         if (file == null || !Files.isRegularFile(file)) return Optional.empty();
@@ -70,13 +70,13 @@ public final class PipelineStore {
         }
     }
 
-    /** Whether a flow is stored under {@code id}; an unsafe/unresolvable id is "not present" (false). */
+    /** Whether a pipeline is stored under {@code id}; an unsafe/unresolvable id is "not present" (false). */
     public boolean exists(String id) {
         Path file = fileForOrNull(id);
         return file != null && Files.isRegularFile(file);
     }
 
-    /** Write (create or replace) the flow at {@code <root>/<id>.toon}, atomically. Returns the written graph. */
+    /** Write (create or replace) the pipeline at {@code <root>/<id>.toon}, atomically. Returns the written graph. */
     public PipelineGraph write(String id, PipelineGraph g) throws IOException {
         Path file = fileFor(id);
         byte[] bytes = ConfigCodec.toToon(PipelineCodec.toMap(g)).getBytes(StandardCharsets.UTF_8);
@@ -84,7 +84,7 @@ public final class PipelineStore {
         return g;
     }
 
-    /** Delete the flow's backing file; returns whether a file was removed. */
+    /** Delete the pipeline's backing file; returns whether a file was removed. */
     public boolean delete(String id) throws IOException {
         return Files.deleteIfExists(fileFor(id));
     }

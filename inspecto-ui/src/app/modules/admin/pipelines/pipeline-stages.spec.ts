@@ -11,7 +11,7 @@ const TYPE_CAT = new Map<string, string>([
     ['sink.persistent', 'SINK'],
 ]);
 
-function flow(nodes: AuthoredNode[]): AuthoredPipeline {
+function pipeline(nodes: AuthoredNode[]): AuthoredPipeline {
     return { name: 'demo', active: false, nodes, edges: [] };
 }
 
@@ -32,13 +32,13 @@ const FULL: AuthoredNode[] = [
 
 describe('stageChecklist', () => {
     it('reads the wizard stages off the graph, in data-path order', () => {
-        const chips = stageChecklist(flow(FULL), TYPE_CAT, CONFIGURED, []);
+        const chips = stageChecklist(pipeline(FULL), TYPE_CAT, CONFIGURED, []);
         expect(chips.map((c) => c.id)).toEqual(['collect', 'parse', 'schema', 'enrich', 'publish']);
         expect(chips.map((c) => c.status)).toEqual(['configured', 'configured', 'configured', 'empty', 'configured']);
     });
 
     it('an empty graph is five empty chips and no node to open', () => {
-        const chips = stageChecklist(flow([]), TYPE_CAT, CONFIGURED, []);
+        const chips = stageChecklist(pipeline([]), TYPE_CAT, CONFIGURED, []);
         expect(chips.every((c) => c.status === 'empty')).toBe(true);
         expect(chips.every((c) => c.nodeId === null)).toBe(true);
     });
@@ -48,16 +48,16 @@ describe('stageChecklist', () => {
     });
 
     it('an unconfigured or dangling node BLOCKS its stage — the same thing the canvas warns about', () => {
-        const chips = stageChecklist(flow(FULL), TYPE_CAT, (n) => (n.id === 'parse' ? 'dangling' : 'configured'), []);
+        const chips = stageChecklist(pipeline(FULL), TYPE_CAT, (n) => (n.id === 'parse' ? 'dangling' : 'configured'), []);
         expect(chip(chips, 'parse').status).toBe('blocked');
         expect(chip(chips, 'collect').status).toBe('configured');
     });
 
     it('a tested node validates its stage, and `rejects` deliberately does NOT', () => {
-        const tested = stageChecklist(flow(FULL), TYPE_CAT, (n) => (n.id === 'src' ? 'tested' : 'configured'), []);
+        const tested = stageChecklist(pipeline(FULL), TYPE_CAT, (n) => (n.id === 'src' ? 'tested' : 'configured'), []);
         expect(chip(tested, 'collect').status).toBe('validated');
         // Rows were dropped — a ✓ would be a lie; the warning shows up as the chip's finding count.
-        const rejects = stageChecklist(flow(FULL), TYPE_CAT, (n) => (n.id === 'src' ? 'rejects' : 'configured'), []);
+        const rejects = stageChecklist(pipeline(FULL), TYPE_CAT, (n) => (n.id === 'src' ? 'rejects' : 'configured'), []);
         expect(chip(rejects, 'collect').status).toBe('configured');
     });
 
@@ -71,7 +71,7 @@ describe('stageChecklist', () => {
             { id: 'map', type: 'transform.sql' },
         ];
         const chips = stageChecklist(
-            flow(nodes),
+            pipeline(nodes),
             TYPE_CAT,
             (n) => (n.id === 'map' ? 'unconfigured' : 'configured'),
             [],
@@ -82,7 +82,7 @@ describe('stageChecklist', () => {
 
     it('counts the schema artifact on the PARSE node as the Schema stage, and opens that node', () => {
         const nodes = [FULL[0], FULL[1]]; // parse carries schema_file; no map node at all
-        const chips = stageChecklist(flow(nodes), TYPE_CAT, CONFIGURED, []);
+        const chips = stageChecklist(pipeline(nodes), TYPE_CAT, CONFIGURED, []);
         expect(chip(chips, 'schema').status).toBe('configured');
         expect(chip(chips, 'schema').nodeId).toBe('parse');
     });
@@ -92,12 +92,12 @@ describe('stageChecklist', () => {
             FULL[0],
             { id: 'parse', type: 'parser.delimited', config: { parsing: { asn1: { segments: { call: 's.toon' } } } } },
         ];
-        expect(chip(stageChecklist(flow(nodes), TYPE_CAT, CONFIGURED, []), 'schema').status).toBe('configured');
+        expect(chip(stageChecklist(pipeline(nodes), TYPE_CAT, CONFIGURED, []), 'schema').status).toBe('configured');
     });
 
     it('an AUTHORED map node is the Schema stage even with no artifact, and is what a click opens', () => {
         const nodes = [FULL[0], { id: 'parse', type: 'parser.delimited', config: {} }, FULL[2]];
-        const chips = stageChecklist(flow(nodes), TYPE_CAT, CONFIGURED, []);
+        const chips = stageChecklist(pipeline(nodes), TYPE_CAT, CONFIGURED, []);
         expect(chip(chips, 'schema').status).toBe('configured');
         expect(chip(chips, 'schema').nodeId).toBe('map');
     });
@@ -109,20 +109,20 @@ describe('stageChecklist', () => {
             { severity: 'warning', nodeId: 'out', message: 'c' },
             { severity: 'warning', message: 'No writer/sink.' }, // global: belongs to no chip
         ];
-        const chips = stageChecklist(flow(FULL), TYPE_CAT, CONFIGURED, findings);
+        const chips = stageChecklist(pipeline(FULL), TYPE_CAT, CONFIGURED, findings);
         expect(chip(chips, 'collect').findings).toBe(2);
         expect(chip(chips, 'publish').findings).toBe(1);
         expect(chip(chips, 'parse').findings).toBe(0);
     });
 
     it('marks enrichment optional and nothing else', () => {
-        const chips = stageChecklist(flow(FULL), TYPE_CAT, CONFIGURED, []);
+        const chips = stageChecklist(pipeline(FULL), TYPE_CAT, CONFIGURED, []);
         expect(chips.filter((c) => c.optional).map((c) => c.id)).toEqual(['enrich']);
     });
 
     it('an enrichment node fills its stage', () => {
         const chips = stageChecklist(
-            flow([...FULL, { id: 'enr', type: 'enrichment', config: {}, use: 'enrichment/demo_enrich' }]),
+            pipeline([...FULL, { id: 'enr', type: 'enrichment', config: {}, use: 'enrichment/demo_enrich' }]),
             TYPE_CAT,
             CONFIGURED,
             [],
@@ -133,7 +133,7 @@ describe('stageChecklist', () => {
 });
 
 describe('pipelineLifecycle / incompleteStages', () => {
-    const full = (): StageChip[] => stageChecklist(flow(FULL), TYPE_CAT, CONFIGURED, []);
+    const full = (): StageChip[] => stageChecklist(pipeline(FULL), TYPE_CAT, CONFIGURED, []);
 
     it('a complete inactive pipeline is Ready; active is Live', () => {
         expect(pipelineLifecycle(full(), false)).toBe('Ready');
@@ -146,7 +146,7 @@ describe('pipelineLifecycle / incompleteStages', () => {
 
     it('names every required stage that is empty OR blocked', () => {
         const chips = stageChecklist(
-            flow([FULL[1], FULL[2]]), // no source, no sink
+            pipeline([FULL[1], FULL[2]]), // no source, no sink
             TYPE_CAT,
             (n) => (n.id === 'parse' ? 'unconfigured' : 'configured'),
             [],
@@ -156,6 +156,6 @@ describe('pipelineLifecycle / incompleteStages', () => {
     });
 
     it('an ACTIVE pipeline reads Live even when a stage regressed — the deployment is the fact', () => {
-        expect(pipelineLifecycle(stageChecklist(flow([]), TYPE_CAT, CONFIGURED, []), true)).toBe('Live');
+        expect(pipelineLifecycle(stageChecklist(pipeline([]), TYPE_CAT, CONFIGURED, []), true)).toBe('Live');
     });
 });

@@ -71,7 +71,7 @@ export const SVG_EXPORT_COLORS = {
 } as const;
 
 /**
- * Outline stroke for a flow-editor node's status cue, or {@code null} to keep the category colour
+ * Outline stroke for a pipeline-editor node's status cue, or {@code null} to keep the category colour
  * ({@code configured}). Status is also conveyed by a label glyph + the inspector chip (never colour alone).
  */
 export function nodeStatusStroke(status: string): string | null {

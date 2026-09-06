@@ -20,7 +20,7 @@ export interface Component<C = Record<string, unknown>> {
 
 /** A reference to another component, with a local config override merged over the referent's own config. */
 export interface Part {
-    partId: string; // stable id within the parent (a flow nodeId, a dashboard tile id)
+    partId: string; // stable id within the parent (a pipeline nodeId, a dashboard tile id)
     ref: ComponentRef;
     configOverride?: Record<string, unknown>;
 }
@@ -56,7 +56,7 @@ export type RefRel =
 
 /**
  * One outgoing lineage edge derivable from a component's config — THE unit of the metadata
- * network. `via` anchors the edge locally (a flow node id, `tile3`, `dataset`) so consumers that
+ * network. `via` anchors the edge locally (a pipeline node id, `tile3`, `dataset`) so consumers that
  * need part identity (reuse-graph, wiring) keep stable ids; graph-only consumers ignore it.
  */
 export interface Ref {
@@ -76,7 +76,7 @@ export type WiringStrategy = 'none' | 'graph' | 'mapping' | 'layout' | 'schedule
 /** Kind-specific topology over a composite's parts. */
 export type Wiring =
     | { strategy: 'none' }
-    | { strategy: 'graph'; nodes: WiringNode[]; edges: WiringEdge[] } // pipeline / flow DAG
+    | { strategy: 'graph'; nodes: WiringNode[]; edges: WiringEdge[] } // pipeline DAG
     | { strategy: 'mapping'; channels: Record<string, string> } // chart field → channel
     | { strategy: 'layout'; tiles: LayoutTile[] } // dashboard grid
     | { strategy: 'schedule'; cron?: string; on?: string }; // job trigger: a cron, an upstream pipeline event, or neither (manual)

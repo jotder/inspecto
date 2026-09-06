@@ -344,7 +344,7 @@ final class PipelineGraphRoutes implements RouteModule {
         }
     }
 
-    /** Parse a flow definition (400 on a malformed shape) and validate it (422 on validation errors). */
+    /** Parse a pipeline definition (400 on a malformed shape) and validate it (422 on validation errors). */
     private PipelineGraph parseAndValidateFlow(ApiContext api, Map<String, Object> body) {
         PipelineGraph g;
         try {
@@ -414,14 +414,14 @@ final class PipelineGraphRoutes implements RouteModule {
     }
 
     /**
-     * {@code POST /pipelines/authored/{id}/dry-run} — run a bounded sample through an authored flow's
+     * {@code POST /pipelines/authored/{id}/dry-run} — run a bounded sample through an authored pipeline's
      * transform→sink subgraph on a throwaway DuckDB (T18, §7.2); per-node + per-sink row counts. 404 if the
-     * flow is absent, 400 on a bad sample, 422 on a validation/SQL error. Never touches production output.
+     * pipeline is absent, 400 on a bad sample, 422 on a validation/SQL error. Never touches production output.
      *
      * <p>A {@code pipeline} body key dry-runs that <b>candidate</b> graph instead of the stored one, so the
      * editor can preview an edit before saving it — and diff the two by running once with the key and once
      * without. The candidate is never written anywhere: it is parsed, validated and executed on the scratch
-     * database like any other graph. With the key present the stored flow is not consulted at all, so a
+     * database like any other graph. With the key present the stored pipeline is not consulted at all, so a
      * draft of a pipeline that does not exist yet previews too (no 404).
      */
     private Object dryRunFlow(ApiContext api, String id, Map<String, Object> body) {
@@ -650,7 +650,7 @@ final class PipelineGraphRoutes implements RouteModule {
 
     /**
      * The candidate graph in a dry-run body's {@code pipeline} key, or {@code null} when the caller wants the
-     * stored flow. Goes through the same {@link #parseAndValidateFlow} the save route uses — a draft that
+     * stored pipeline. Goes through the same {@link #parseAndValidateFlow} the save route uses — a draft that
      * could not be saved must not preview as if it could (400 malformed / 422 invalid, identically).
      */
     private PipelineGraph candidateGraph(ApiContext api, Map<String, Object> body) {
@@ -669,12 +669,12 @@ final class PipelineGraphRoutes implements RouteModule {
     }
 
     /**
-     * {@code POST /pipelines/authored/{id}/trigger} — run an authored flow for real, once, config-less (T32
+     * {@code POST /pipelines/authored/{id}/trigger} — run an authored pipeline for real, once, config-less (T32
      * follow-up): no {@code type: pipeline} {@code *_job.toon} needed. The fire goes through
      * {@link com.gamma.job.JobService#triggerPipelineRun} so it gets the full registered-run lifecycle
      * (deletion-fence tracking, non-overlap, durable run ledger) without registering a job. Async:
      * {@code 202} + {@code {runId,...}} + a {@code Location} to poll ({@code GET /jobs/runs/{runId}});
-     * optional {@code ?actor=} attributes the fire. 503 without a write root, 404 if the flow is absent.
+     * optional {@code ?actor=} attributes the fire. 503 without a write root, 404 if the pipeline is absent.
      */
     private Object runPipeline(ApiContext api, HttpExchange e, String id) throws IOException {
         Path root = SpaceRoot.pipelinesSubdir(WriteGates.requireWriteRoot(api, "pipeline run"));
@@ -683,7 +683,7 @@ final class PipelineGraphRoutes implements RouteModule {
         try {
             runId = api.service().jobServiceOrCreate().triggerPipelineRun(id, ApiContext.query(e, "actor"));
         } catch (IllegalStateException ex) {
-            // the service booted without a write root, so its flow store never opened — same gate as above
+            // the service booted without a write root, so its pipeline store never opened — same gate as above
             throw new ApiException(503, ex.getMessage());
         }
         log.info("[PIPELINE-RUN] ad-hoc run {} of authored pipeline {}", runId, id);

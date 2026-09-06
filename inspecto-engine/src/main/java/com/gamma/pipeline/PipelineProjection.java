@@ -130,6 +130,7 @@ public final class PipelineProjection {
             new String[] {"transform", BuiltinNodeType.TRANSFORM_FILTER.type()},
             new String[] {"transform", BuiltinNodeType.TRANSFORM_JOIN.type()},
             new String[] {"sql", BuiltinNodeType.TRANSFORM_SQL.type()},
+            new String[] {"lookup", BuiltinNodeType.TRANSFORM_LOOKUP.type()},
             new String[] {"summarize", BuiltinNodeType.TRANSFORM_SUMMARIZE.type()},
             new String[] {"route", BuiltinNodeType.TRANSFORM_ROUTE.type()},
             new String[] {"sink", BuiltinNodeType.SINK_PERSISTENT.type()});
@@ -148,7 +149,7 @@ public final class PipelineProjection {
         return m;
     }
 
-    /** A flow's full topology for the G6 renderer: nodes + relationship-typed edges + store endpoints. */
+    /** A pipeline's full topology for the G6 renderer: nodes + relationship-typed edges + store endpoints. */
     public static Map<String, Object> graph(PipelineGraph g) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("name", g.name());
@@ -167,10 +168,10 @@ public final class PipelineProjection {
     /**
      * <b>T24 — the combined pipeline+job topology.</b> Projects several flows into <em>one</em> graph where
      * a pipeline and the job(s)/enrichment(s) over its output meet at the <b>shared store</b> (§3.8): each
-     * flow's nodes are emitted with their ids namespaced by flow ({@code <flow>/<node>}, so two flows that
+     * pipeline's nodes are emitted with their ids namespaced by pipeline ({@code <pipeline>/<node>}, so two pipelines that
      * both have an {@code acq} node don't collide), plus a synthetic <b>store node</b>
-     * ({@code store:<name>}, category {@code STORE}) for every store any flow produces or consumes, wired
-     * {@code producer-sink → store → consumer} — drawing the cross-flow {@code on_commit} producer→consumer
+     * ({@code store:<name>}, category {@code STORE}) for every store any pipeline produces or consumes, wired
+     * {@code producer-sink → store → consumer} — drawing the cross-pipeline {@code on_commit} producer→consumer
      * relationship through the table itself. The {@code links} list is the derived
      * {@link PipelineStores#superimpose(Collection) superimposition} (producer, store, consumer) for reference.
      *
@@ -193,7 +194,7 @@ public final class PipelineProjection {
 
             for (PipelineNode n : g.nodes()) {
                 Map<String, Object> nm = node(n);
-                nm.put("id", qualify(g.name(), n.id()));   // namespace to avoid cross-flow id collisions
+                nm.put("id", qualify(g.name(), n.id()));   // namespace to avoid cross-pipeline id collisions
                 nm.put("pipeline", g.name());
                 nm.put("flow", g.name());   // Tier 3 dual-emit: kept for callers still reading the pre-rename key
                 nodes.add(nm);
@@ -201,7 +202,7 @@ public final class PipelineProjection {
             for (PipelineEdge e : g.edges()) {
                 Map<String, Object> em = edge(e);
                 em.put("from", qualify(g.name(), e.from()));
-                // on_commit's `to` names another flow, not a local node — keep it bare so it can resolve cross-flow
+                // on_commit's `to` names another pipeline, not a local node — keep it bare so it can resolve cross-pipeline
                 em.put("to", g.byId().containsKey(e.to()) ? qualify(g.name(), e.to()) : e.to());
                 em.put("pipeline", g.name());
                 em.put("flow", g.name());   // Tier 3 dual-emit: kept for callers still reading the pre-rename key
@@ -246,8 +247,8 @@ public final class PipelineProjection {
         return out;
     }
 
-    private static String qualify(String flow, String nodeId) {
-        return flow + "/" + nodeId;
+    private static String qualify(String pipeline, String nodeId) {
+        return pipeline + "/" + nodeId;
     }
 
     private static String storeId(String store) {

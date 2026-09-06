@@ -26,9 +26,9 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * The config-less ad-hoc flow run (T32 follow-up) over real HTTP: {@code POST /pipelines/authored/{id}/trigger}
+ * The config-less ad-hoc pipeline run (T32 follow-up) over real HTTP: {@code POST /pipelines/authored/{id}/trigger}
  * (mirrors {@code POST /jobs/{name}/trigger}; {@code …/run} is reserved for the editor's scratch-only
- * run-to-here contract) — 503 without a write root, 404 for a missing/unsafe flow id, and the happy path:
+ * run-to-here contract) — 503 without a write root, 404 for a missing/unsafe pipeline id, and the happy path:
  * 202 + runId polled to SUCCESS via {@code GET /jobs/runs/{runId}}, the sink store written, and no job
  * registered ({@code GET /jobs} stays empty — the run is ad-hoc, not a {@code *_job.toon}).
  */
@@ -37,7 +37,7 @@ class ControlApiPipelineRunTest {
     private static final ObjectMapper JSON = new ObjectMapper();
     private final HttpClient client = HttpClient.newHttpClient();
 
-    /** An authored job-style flow: at-rest source store {@code events} → filter → sink store {@code rollup}. */
+    /** An authored job-style pipeline: at-rest source store {@code events} → filter → sink store {@code rollup}. */
     private static final String FLOW = """
         {"name":"evt_rollup","active":false,
          "nodes":[{"id":"src","type":"acquisition","config":{"source_store":"events"}},
@@ -45,7 +45,7 @@ class ControlApiPipelineRunTest {
                   {"id":"out","type":"sink.persistent","config":{"store":"rollup"}}],
          "edges":[{"from":"src","rel":"data","to":"flt"},{"from":"flt","rel":"data","to":"out"}]}""";
 
-    /** The same flow, except the filter carries no {@code where} of its own — it lives in the {@code transform}
+    /** The same pipeline, except the filter carries no {@code where} of its own — it lives in the {@code transform}
      *  component the node binds with {@code use:}. Runnable only if the run path resolves that binding. */
     private static final String FLOW_VIA_COMPONENT = """
         {"name":"evt_rollup","active":false,
@@ -56,7 +56,7 @@ class ControlApiPipelineRunTest {
 
     /** Unlike the CRUD harness, the properties are set BEFORE the service is constructed (the boot order
      *  of a real deployment) and held until {@link Ctx#close()}: the run path resolves the service's own
-     *  flow store / data root ({@code jobServiceOrCreate}), which are wired at construction/request time —
+     *  pipeline store / data root ({@code jobServiceOrCreate}), which are wired at construction/request time —
      *  not just the ControlApi write gate captured at API construction. */
     private record Ctx(CollectorService svc, ControlApi api, int port,
                        String priorRoot, String priorData, String priorAudit) implements AutoCloseable {
@@ -113,7 +113,7 @@ class ControlApiPipelineRunTest {
             JsonNode run = awaitTerminal(c.port, runId);
             assertEquals("SUCCESS", run.get("status").asText(), run.toString());
             assertEquals("manual:rahul", run.get("trigger").asText(), "the fire is actor-attributed");
-            assertEquals("evt_rollup", run.get("job").asText(), "the run is recorded under the flow id");
+            assertEquals("evt_rollup", run.get("job").asText(), "the run is recorded under the pipeline id");
             try (Stream<Path> out = Files.walk(dataDir.resolve("rollup"))) {
                 assertTrue(out.anyMatch(p -> p.toString().endsWith(".parquet")), "the sink store was written");
             }
@@ -126,7 +126,7 @@ class ControlApiPipelineRunTest {
     /**
      * A {@code use:} binding is resolved on the real run path, not only in preview. Until 2026-08-11 the
      * runner executed the graph exactly as {@link com.gamma.pipeline.PipelineStore} returned it — local
-     * config only — so the {@code where} living in the referenced component was invisible: this flow ran
+     * config only — so the {@code where} living in the referenced component was invisible: this pipeline ran
      * a filter with no predicate and the whole run died {@code FAILED "missing predicate"}. How an
      * unresolved binding shows up is node-dependent (a {@code transform.map} whose rules live in a
      * mapping component projects nothing instead of failing), so the row count is asserted too — a

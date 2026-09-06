@@ -11,7 +11,7 @@ import { InspectoRowAction } from 'app/inspecto/grid';
 /**
  * Store lineage panel (catalog node inspector, table-kind nodes): the files that fed this store (ingest
  * upstream, from `GET /lineage?store=`) and the authored flows that consume it (downstream). The store is the
- * bridge between ingest file-lineage and flow step-provenance — see `docs/GLOSSARY.md` §11.
+ * bridge between ingest file-lineage and pipeline step-provenance — see `docs/GLOSSARY.md` §11.
  * Thin container: fetches via {@link LineageService}; rendering reuses the shared `<inspecto-data-table>`.
  */
 @Component({

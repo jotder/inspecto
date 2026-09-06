@@ -25,7 +25,7 @@ import { NodeStatus, statusGlyph } from './pipeline-graph';
  * Interactive AntV G6 host for the pipeline editor. Unlike the read-only {@link GraphViewComponent} (which
  * `destroy()`s + rebuilds on every data change), this host keeps a **persistent** graph and mutates it in
  * place ({@link addNode}/{@link addEdge}/{@link removeElement}/{@link updateNodeLabel}) so user-arranged
- * positions survive edits. It only rebuilds when {@link graphKey} (the selected flow id) changes or the
+ * positions survive edits. It only rebuilds when {@link graphKey} (the selected pipeline id) changes or the
  * colour scheme flips. Authored flows store no coordinates, so node moves are purely visual (not emitted).
  *
  * <p>Gestures: plain **drag moves** a node (`drag-element`); **Shift+drag** from one node to another draws
@@ -53,7 +53,7 @@ import { NodeStatus, statusGlyph } from './pipeline-graph';
 export class PipelineEditorGraphComponent implements AfterViewInit, OnChanges, OnDestroy {
     /** Initial graph data; consumed on (re)build only — in-place edits go through the mutation methods. */
     @Input() data: G6GraphData | null = null;
-    /** Rebuild the canvas only when this changes (the selected flow id). Never rebuild on in-place edits. */
+    /** Rebuild the canvas only when this changes (the selected pipeline id). Never rebuild on in-place edits. */
     @Input() graphKey: string | null = null;
     /**
      * Bump to force a rebuild from [data] WITHOUT a graphKey change — the undo/redo restore (R4),
@@ -116,7 +116,7 @@ export class PipelineEditorGraphComponent implements AfterViewInit, OnChanges, O
     }
 
     ngOnChanges(changes: SimpleChanges): void {
-        // Rebuild only on a flow switch (or an explicit undo/redo restore) — in-place edits must
+        // Rebuild only on a pipeline switch (or an explicit undo/redo restore) — in-place edits must
         // not re-run layout (it discards positions).
         if (this.ready && (changes['graphKey'] || changes['rebuildEpoch'])) this.rebuild();
     }

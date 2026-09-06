@@ -25,7 +25,7 @@ class PipelineValidatorTest {
         return r.issues().stream().map(PipelineValidator.Issue::code).collect(Collectors.toSet());
     }
 
-    /** acquisition -> parser -> sink, with the parser's unmatched branch to a quarantine sink: a valid flow. */
+    /** acquisition -> parser -> sink, with the parser's unmatched branch to a quarantine sink: a valid pipeline. */
     private static PipelineGraph linearValid() {
         return new PipelineGraph("good", true,
                 List.of(PipelineNode.of("acq", "acquisition"),
@@ -72,18 +72,18 @@ class PipelineValidatorTest {
 
     @Test
     void rejectsSameGraphOnCommitButAllowsCrossFlowTarget() {
-        // on_commit to a LOCAL node -> rejected (cross-flow only)
+        // on_commit to a LOCAL node -> rejected (cross-pipeline only)
         PipelineGraph local = new PipelineGraph("f", true,
                 List.of(PipelineNode.of("acq", "acquisition"), PipelineNode.of("sink", "sink.persistent")),
                 List.of(PipelineEdge.data("acq", "sink"), new PipelineEdge("sink", PipelineRel.ON_COMMIT, "acq")));
         assertTrue(codes(PipelineValidator.validate(local)).contains(PipelineValidator.ON_COMMIT_SAME_GRAPH));
 
-        // on_commit to ANOTHER flow (not a local node) -> fine, and not a dangling-to error
+        // on_commit to ANOTHER pipeline (not a local node) -> fine, and not a dangling-to error
         PipelineGraph cross = new PipelineGraph("f", true,
                 List.of(PipelineNode.of("acq", "acquisition"), PipelineNode.of("sink", "sink.persistent")),
                 List.of(PipelineEdge.data("acq", "sink"), new PipelineEdge("sink", PipelineRel.ON_COMMIT, "downstream_flow")));
         PipelineValidator.Result r = PipelineValidator.validate(cross);
-        assertTrue(r.ok(), () -> "cross-flow on_commit should be valid, got " + r.issues());
+        assertTrue(r.ok(), () -> "cross-pipeline on_commit should be valid, got " + r.issues());
     }
 
     @Test

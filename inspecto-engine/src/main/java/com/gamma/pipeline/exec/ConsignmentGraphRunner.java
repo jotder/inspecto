@@ -37,7 +37,7 @@ public final class ConsignmentGraphRunner {
      * Everything the runner needs to drive one batch through {@link PipelineExecutor#execute}.
      *
      * @param conn            DuckDB connection already holding {@code seedTable}
-     * @param graph           the lifted flow graph (validated inside the executor)
+     * @param graph           the lifted pipeline graph (validated inside the executor)
      * @param seedNodeId      the node whose {@code data} relation is {@code seedTable} (typically the parser)
      * @param seedTable       the DuckDB table the parse stage already produced
      * @param batchId         the batch being committed
@@ -66,7 +66,7 @@ public final class ConsignmentGraphRunner {
      * The once-per-batch source finalisation, given the files written across <em>all</em> sink branches.
      * Runs after every branch is durable (the T11 commit-split), so {@code sinkOutputs} is complete — the
      * ingest path uses it for DuckLake register / manifest before the input-file steps (backup → markers
-     * LAST → ledger / watermark). A no-arg finaliser can ignore the argument (e.g. a flow job or a test).
+     * LAST → ledger / watermark). A no-arg finaliser can ignore the argument (e.g. a pipeline job or a test).
      */
     @FunctionalInterface
     public interface SourceFinalizer {
@@ -89,7 +89,7 @@ public final class ConsignmentGraphRunner {
      * As {@link #run(Input, SourceFinalizer)}, but with a caller-supplied {@link PipelineExecutor.SinkWriter}
      * (arming plan S2): the ingest path writes each route branch to its paired {@code sinks[]} destination —
      * with the destination's own format/compression/{@code filename_column} and per-branch lineage — which
-     * the flow-job-shaped {@link PartitionSinkWriter} (one {@code dataDir/store} root, no lineage) cannot
+     * the pipeline-job-shaped {@link PartitionSinkWriter} (one {@code dataDir/store} root, no lineage) cannot
      * express. The runnable/finalize contract is identical: every sink branch commits through the durable
      * {@link BranchCommitLog}, and {@code onAllBranchesDurable} runs exactly once after the last of them.
      */

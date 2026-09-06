@@ -16,11 +16,11 @@ import { GLYPH_LIBRARY, G6GraphData, iconDataUri, nodeColor, nodeIcon } from 'ap
 import { FAMILY_CODE_COLORS } from 'app/inspecto/theme/chart-tokens';
 
 /**
- * Pure mappers that turn the flow-graph projection (GET /pipelines/{id}/graph) into AntV G6 data for the
+ * Pure mappers that turn the pipeline-graph projection (GET /pipelines/{id}/graph) into AntV G6 data for the
  * shared {@link GraphViewComponent}, plus palette grouping. Kept free of Angular/G6 imports so they
  * unit-test without TestBed.
  *
- * <p>The G6 host keys shape + outline colour off a catalog {@link NodeKind}; a flow node's
+ * <p>The G6 host keys shape + outline colour off a catalog {@link NodeKind}; a pipeline node's
  * {@link PipelineNode.category} is mapped onto a NodeKind purely for that visual reuse (so colours come
  * from the existing token palette, never a hardcoded value here).
  */
@@ -50,7 +50,7 @@ export function bindKindFor(category: string): ComponentType | null {
  */
 const NEEDS_CONFIG = new Set(['SOURCE', 'PARSE', 'TRANSFORM', 'SINK']);
 
-// ── Node status (canvas state) + flow validation (Stages 2 & 4) ──
+// ── Node status (canvas state) + pipeline validation (Stages 2 & 4) ──
 
 /** A node's authoring status, shown on the canvas + inspector. */
 export type NodeStatus = 'unconfigured' | 'dangling' | 'disabled' | 'configured' | 'tested' | 'rejects';
@@ -131,23 +131,23 @@ export interface PipelineFinding {
 }
 
 /**
- * Validate an authored flow for activation: every node configured + its refs resolvable, a source feeding it,
+ * Validate an authored pipeline for activation: every node configured + its refs resolvable, a source feeding it,
  * a sink draining it, and no orphan (non-source node with no input). `error`-severity findings block Activate.
  */
 export function validatePipeline(
-    flow: AuthoredPipeline,
+    pipeline: AuthoredPipeline,
     typeCat: ReadonlyMap<string, string>,
     validRefs: ReadonlySet<string>,
     tested: ReadonlyMap<string, TestOutcome>,
 ): PipelineFinding[] {
     const findings: PipelineFinding[] = [];
-    if (!flow.nodes.length) {
+    if (!pipeline.nodes.length) {
         return [{ severity: 'error', message: 'The pipeline has no Steps.' }];
     }
-    const incoming = new Set(flow.edges.map((e) => e.to));
+    const incoming = new Set(pipeline.edges.map((e) => e.to));
     let hasSource = false;
     let hasSink = false;
-    for (const n of flow.nodes) {
+    for (const n of pipeline.nodes) {
         const cat = typeCat.get(n.type) ?? 'TRANSFORM';
         if (cat === 'SOURCE') hasSource = true;
         if (cat === 'SINK') hasSink = true;
@@ -203,7 +203,7 @@ export function resolveNodeIcon(
     return { iconSrc: nodeIcon(kind), color: nodeColor(kind) };
 }
 
-/** Map a flow node category onto a catalog NodeKind for shape/colour reuse (cosmetic only). */
+/** Map a pipeline node category onto a catalog NodeKind for shape/colour reuse (cosmetic only). */
 export function categoryVisualKind(category: string): NodeKind {
     switch (category) {
         case 'SOURCE':
@@ -258,13 +258,13 @@ export function categoryLabel(category: string): string {
     }
 }
 
-/** A flow node's display label: the user-given name if set, else the type label. */
+/** A pipeline node's display label: the user-given name if set, else the type label. */
 export function nodeDisplayLabel(n: PipelineNode): string {
     return n.name && n.name.trim() ? n.name : n.label;
 }
 
 /**
- * Map the flow-graph projection to G6 data (reusing the catalog G6 host). When {@code counts} is supplied
+ * Map the pipeline-graph projection to G6 data (reusing the catalog G6 host). When {@code counts} is supplied
  * (the data-plane provenance overlay, T22), each edge's label gains the record count its source emitted on
  * that relationship and a {@code weight} drives the line width — the structure plane painted with quantities
  * (§11). Edges with no recorded count are left at their default style.
@@ -279,7 +279,7 @@ export function toPipelineG6Data(g: PipelineGraph, counts?: Map<string, number>,
                 ...(iconMap ? resolveNodeIcon(n.type, n.category, iconMap) : {}),
             },
         })),
-        // a flow can carry several edges between the same pair (e.g. data + a route branch), so the id
+        // a pipeline can carry several edges between the same pair (e.g. data + a route branch), so the id
         // folds in the relationship + row index to stay unique.
         edges: g.edges.map((e, i) => {
             const rel = e.kind === 'route' && e.routeKey ? `route:${e.routeKey}` : e.rel;
@@ -300,9 +300,9 @@ export function provenanceCounts(rows: ProvenanceCount[]): Map<string, number> {
 }
 
 /**
- * Map the combined pipeline+job topology (GET /pipelines/combined) to G6 data: flow nodes (namespaced ids)
+ * Map the combined pipeline+job topology (GET /pipelines/combined) to G6 data: pipeline nodes (namespaced ids)
  * plus the synthetic `STORE` join nodes, with the store-join edges ({@code produces}/{@code consumes})
- * drawn alongside the intra-flow edges. Node ids are already unique (flow nodes `<flow>/<node>`, store
+ * drawn alongside the intra-pipeline edges. Node ids are already unique (pipeline nodes `<pipeline>/<node>`, store
  * nodes `store:<name>`), so they're used verbatim.
  */
 export function toCombinedG6Data(c: PipelineCombined, iconMap?: IconMap): G6GraphData {
@@ -340,22 +340,22 @@ export function typeLabelMap(types: PipelineNodeType[]): Map<string, string> {
 }
 
 /**
- * Map an authored flow (config-bearing, from GET …/raw) to G6 data for the editor host. A node's category —
+ * Map an authored pipeline (config-bearing, from GET …/raw) to G6 data for the editor host. A node's category —
  * which drives shape + outline colour — is resolved from the palette ({@link typeCategoryMap}); an unknown
  * type falls back to TRANSFORM so a plugin/unknown node still renders. When {@code lastRunCounts} is supplied
- * (T17's live last-run overlay — the flow's most recent {@code /provenance} read), each edge's label gains the
+ * (T17's live last-run overlay — the pipeline's most recent {@code /provenance} read), each edge's label gains the
  * record count its source emitted on that relationship during the real last run, same painting rule as
  * {@link toPipelineG6Data}'s {@code counts} (edges with no recorded count are left at their default style).
  */
 export function authoredToG6(
-    flow: AuthoredPipeline,
+    pipeline: AuthoredPipeline,
     typeCat: Map<string, string>,
     statusOf?: (node: AuthoredNode) => NodeStatus,
     iconMap?: IconMap,
     lastRunCounts?: Map<string, number>,
 ): G6GraphData {
     return {
-        nodes: flow.nodes.map((n) => {
+        nodes: pipeline.nodes.map((n) => {
             const category = typeCat.get(n.type) ?? 'TRANSFORM';
             return {
                 id: n.id,
@@ -367,7 +367,7 @@ export function authoredToG6(
                 },
             };
         }),
-        edges: flow.edges.map((e, i) => {
+        edges: pipeline.edges.map((e, i) => {
             const count = lastRunCounts?.get(`${e.from}|${e.rel}`);
             return {
                 id: `${e.from}->${e.to}:${e.rel}:${i}`,
@@ -395,7 +395,7 @@ export function nodeLastRunTotal(nodeId: string, counts: ReadonlyMap<string, num
 /** The stable category order for the palette (unknown/plugin categories fall after, in first-seen order). */
 export const CATEGORY_ORDER: readonly string[] = ['SOURCE', 'PARSE', 'TRANSFORM', 'SINK', 'CONTROL'];
 
-/** The legend categories for the combined view — the flow categories plus the synthetic shared store. */
+/** The legend categories for the combined view — the pipeline categories plus the synthetic shared store. */
 export const COMBINED_CATEGORY_ORDER: readonly string[] = [...CATEGORY_ORDER, 'STORE'];
 
 export interface NodeTypeGroup {
@@ -777,6 +777,7 @@ export const RECIPE_VERBS: readonly { type: string; label: string }[] = [
     { type: 'transform.filter', label: 'Transform (filter)' },
     { type: 'transform.join', label: 'Transform (join)' },
     { type: 'transform.sql', label: 'Transform (SQL)' },
+    { type: 'transform.lookup', label: 'Lookup' },
     { type: 'transform.summarize', label: 'Summarize' },
     { type: 'transform.route', label: 'Route' },
     { type: 'sink.persistent', label: 'Sink' },

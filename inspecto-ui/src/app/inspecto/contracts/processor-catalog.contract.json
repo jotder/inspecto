@@ -536,9 +536,9 @@
     "label" : "Lookup & static map transcoder",
     "emoji" : "🗺️",
     "icon" : "heroicons_outline:map",
-    "status" : "partial",
-    "nodeType" : "transform.join",
-    "note" : "a reference join covers it; no inline static map",
+    "status" : "delivered",
+    "nodeType" : "transform.lookup",
+    "note" : "inline key=value map over one column (2026-09-06); a versioned reference is transform.join",
     "addable" : true
   }, {
     "id" : "transform.matrix.pivot",

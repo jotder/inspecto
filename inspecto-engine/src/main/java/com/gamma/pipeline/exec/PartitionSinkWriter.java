@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * <b>T32 Phase A — the real sink write for a flow job.</b> A {@link PipelineExecutor.SinkWriter} that
+ * <b>T32 Phase A — the real sink write for a pipeline job.</b> A {@link PipelineExecutor.SinkWriter} that
  * persists each committed sink branch's relation to its declared {@code store} under
  * {@code <dataDir>/<store>}, reusing the production {@link PartitionWriter} (the same idempotent,
  * {@code OVERWRITE_OR_IGNORE} Hive-partitioned write the legacy engine and the enrichment engine use).
@@ -31,7 +31,7 @@ import java.util.Map;
  * unpartitioned file — one writer owns staging + atomic reveal for both, on every lane.
  *
  * <p>{@code sink.view} subtypes ({@link PipelineStores.Produced#restsOnDisk() non-resting}) write no bytes —
- * this writer skips the byte write; the flow job registers the view's durable definition instead
+ * this writer skips the byte write; the pipeline job registers the view's durable definition instead
  * ({@code com.gamma.job.PipelineJobRunner.registerViews} → {@link com.gamma.pipeline.ViewStore}, T32 Phase C).
  */
 @PublicApi(since = "4.0.0")

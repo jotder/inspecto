@@ -19,7 +19,7 @@ import { SchemaEditorDialog } from './schema-editor.dialog';
 /**
  * Component registry editor (T19) — create / edit / delete the reusable grammar / schema / transform / sink
  * components that flows compose via `use:`, and dry-run each over a sample (T18) from its edit dialog. Writes
- * are write-root gated; listing works regardless. The flow-topology editor is a separate (later) feature.
+ * are write-root gated; listing works regardless. The pipeline-topology editor is a separate (later) feature.
  */
 @Component({
     selector: 'app-components',

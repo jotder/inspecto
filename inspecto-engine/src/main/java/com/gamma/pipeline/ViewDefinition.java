@@ -10,14 +10,14 @@ import static com.gamma.util.Values.str;
 /**
  * <b>T32 Phase C — the durable definition of a logical {@code sink.view} store.</b> A {@code sink.view}
  * (§3.1) persists no bytes; it is a logical store a job / KPI / report / alert API binds to and the engine
- * <em>concretises on demand</em> (re-deriving it by running its producing flow). A flow job therefore does
+ * <em>concretises on demand</em> (re-deriving it by running its producing pipeline). A pipeline job therefore does
  * not write Parquet for such a sink — instead it records this definition under {@code <write-root>/views/}
  * so the binding side can discover the view, its lineage (which {@code source_store}s feed it, via which
- * flow), and — when expressible — the SQL that derives it.
+ * pipeline), and — when expressible — the SQL that derives it.
  *
  * @param store        the produced logical store name (the view's identity)
- * @param flow         the authored flow id that produces it (run to concretise the view)
- * @param sourceStores the {@code source_store}s the producing flow consumes (lineage)
+ * @param flow         the authored pipeline id that produces it (run to concretise the view)
+ * @param sourceStores the {@code source_store}s the producing pipeline consumes (lineage)
  * @param derivedSql   the SELECT that derives the view, when expressible as a single statement; else {@code null}
  *                     (the multi-statement transform chain is re-run via {@code flow} instead). A runner-written
  *                     definition carries its source read as the {@code ViewReaderSql.READER_TOKEN} placeholder —

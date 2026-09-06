@@ -1,0 +1,6 @@
+job:
+  name: lookup_rollup
+  type: pipeline
+  pipeline_config: orders_pipeline.toon
+  data_dir: out
+  on_pipeline: step_lookup

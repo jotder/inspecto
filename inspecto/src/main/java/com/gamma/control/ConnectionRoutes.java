@@ -24,7 +24,7 @@ import static com.gamma.util.Values.mapAt;
 /**
  * Connection-profile CRUD + reachability test ({@code /connections*}). Extracted verbatim from
  * {@link ControlApi}: identical routes, HTTP statuses and secret-masking behaviour — only the home
- * changed. Persistence mirrors the flow/component/view stores (atomic write under the write root).
+ * changed. Persistence mirrors the pipeline/component/view stores (atomic write under the write root).
  */
 final class ConnectionRoutes implements RouteModule {
 

@@ -22,10 +22,10 @@ describe('platform kinds (P2 adapters)', () => {
         expect(grammar.config.validate({})).toEqual([]);
     });
 
-    it('pipeline is a composite graph kind whose wiring derives from the authored flow DAG', () => {
+    it('pipeline is a composite graph kind whose wiring derives from the authored pipeline DAG', () => {
         expect(PIPELINE_KIND.wiring).toBe('graph');
         expect(PIPELINE_KIND.allowedPartKinds).toContain('grammar');
-        const flow: AuthoredPipeline = {
+        const pipeline: AuthoredPipeline = {
             name: 'p1',
             active: false,
             nodes: [
@@ -38,7 +38,7 @@ describe('platform kinds (P2 adapters)', () => {
             { partId: 'src', ref: { kind: 'grammar' } },
             { partId: 'parse', ref: { kind: 'grammar', id: 'cdr' } },
         ];
-        expect(PIPELINE_KIND.deriveWiring!(parts, flow)).toEqual({
+        expect(PIPELINE_KIND.deriveWiring!(parts, pipeline)).toEqual({
             strategy: 'graph',
             nodes: [{ partId: 'src' }, { partId: 'parse' }],
             edges: [{ from: 'src', to: 'parse', rel: 'data' }],

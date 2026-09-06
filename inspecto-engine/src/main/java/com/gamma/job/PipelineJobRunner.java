@@ -51,9 +51,9 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 /**
- * <b>T32 Phase A — run an authored {@code *_flow.toon} flow for real, as a {@link JobType#PIPELINE} job.</b>
+ * <b>T32 Phase A — run an authored {@code *_flow.toon} pipeline for real, as a {@link JobType#PIPELINE} job.</b>
  *
- * <p>An authored flow is <em>job-style</em> (§3.8, T23): it reads a {@code source_store} (data already
+ * <p>An authored pipeline is <em>job-style</em> (§3.8, T23): it reads a {@code source_store} (data already
  * at rest), runs its {@code transform.*} nodes, and writes its sink {@code store}(s) — it is not a
  * re-acquisition (ingest is pipeline-exclusive). So rather than compile it back to a {@code PipelineConfig}
  * (which only round-trips lifted graphs, not UI-authored ones), this runner drives the production
@@ -66,7 +66,7 @@ import java.util.function.Supplier;
  *   <li>seed each {@code source_store} as a view ({@link SourceStoreReader});</li>
  *   <li>execute the {@code transform → sink} subgraph ({@link PipelineExecutor#execute}) with a
  *       {@link PartitionSinkWriter} and a {@link BranchCommitCoordinator} (idempotent multi-branch commit,
- *       T11) — a flow job has no acquisition to finalise, so the source-finalisation step is a no-op;</li>
+ *       T11) — a pipeline job has no acquisition to finalise, so the source-finalisation step is a no-op;</li>
  *   <li>publish a chain {@link ConsignmentEvent} so downstream {@code on_pipeline} jobs fire.</li>
  * </ol>
  *
@@ -75,7 +75,7 @@ import java.util.function.Supplier;
  * job:
  *   name: nightly_rollup
  *   type: pipeline             # this runner
- *   flow: events_rollup        # authored flow id (PipelineStore.get); `pipeline:` is the canonical key
+ *   flow: events_rollup        # authored pipeline id (PipelineStore.get); `pipeline:` is the canonical key
  *   pipeline_config: config/x_pipeline.toon   # OR (A5-at-rest): the flat file whose Stage-2 chain this
  *                              #   run executes over its landed store (PipelineLift.stageTwo, lifted at
  *                              #   run time); mutually exclusive with pipeline:/flow:
@@ -117,9 +117,9 @@ public final class PipelineJobRunner implements Job {
     }
 
     /**
-     * @param cfg        the job config ({@code flow} param = authored flow id)
+     * @param cfg        the job config ({@code flow} param = authored pipeline id)
      * @param bus        the batch-event bus for chain events
-     * @param pipelineStore  the authored-flow store ({@code <write-root>/flows}) to load the flow from
+     * @param pipelineStore  the authored-pipeline store ({@code <write-root>/flows}) to load the pipeline from
      * @param dataDir    the data root under which each store is a sub-directory (per-job {@code data_dir} overrides)
      * @param auditDir   the directory for the branch-commit log
      * @param provenance the data-plane provenance store (T21), or {@code null} to not record per-edge counts
@@ -224,7 +224,7 @@ public final class PipelineJobRunner implements Job {
         ArtifactRecorder artifacts = ctx == null ? null : ctx.artifacts();
         // A5-at-rest slice 2: `pipeline_config:` names the flat *_pipeline.toon file (a path, like the
         // enrich job's `config:`); the Stage-2 remainder is lifted at RUN time (PipelineLift.stageTwo),
-        // so the flat file stays the single truth — no derived graph is persisted to the flow store.
+        // so the flat file stays the single truth — no derived graph is persisted to the pipeline store.
         // Mutually exclusive with `pipeline:`/`flow:` — carrying both leaves the graph source undefined.
         String flatPath = cfg.opt("pipeline_config", null);
         // Tier 3 dual-read (vocabulary plan §4): `pipeline:` is canonical; `flow:` is the pre-rename key,
@@ -490,7 +490,7 @@ public final class PipelineJobRunner implements Job {
     /** A seed: one {@code source_store} node, its store, and its at-rest format. */
     private record Seed(String node, String store, String format) {}
 
-    /** Every {@code source_store} node in the flow (≥1); a {@code transform.merge} downstream joins/unions them. */
+    /** Every {@code source_store} node in the pipeline (≥1); a {@code transform.merge} downstream joins/unions them. */
     private static List<Seed> seedsOf(PipelineGraph g) {
         List<Seed> seeds = g.nodes().stream()
                 .filter(n -> {
@@ -510,13 +510,13 @@ public final class PipelineJobRunner implements Job {
     }
 
     /**
-     * T32 Phase C — register a durable {@link ViewDefinition} for each logical {@code sink.view} the flow
+     * T32 Phase C — register a durable {@link ViewDefinition} for each logical {@code sink.view} the pipeline
      * produces (those that {@link PipelineStores.Produced#restsOnDisk() rest nothing}). Non-fatal: the data sinks
      * have already committed, so a registration failure is logged, not raised. Views land under
-     * {@code <write-root>/views/} (sibling of the authored-flow store) for a KPI/report/alert API to bind to.
+     * {@code <write-root>/views/} (sibling of the authored-pipeline store) for a KPI/report/alert API to bind to.
      */
     private void registerViews(PipelineGraph g, String pipelineId, List<String> srcStores, String dir) {
-        // an A5-at-rest run (pipeline_config:) has no authored-flow store to anchor the views sibling on —
+        // an A5-at-rest run (pipeline_config:) has no authored-pipeline store to anchor the views sibling on —
         // and its lifted graph only ever carries sink.persistent, so there is nothing to register anyway
         if (pipelineStore == null) return;
         ViewStore views = new ViewStore(pipelineStore.root().resolveSibling("views"));
@@ -545,7 +545,7 @@ public final class PipelineJobRunner implements Job {
      * <b>single</b> source_store through a <b>linear</b> path of simple nodes
      * ({@code filter}/{@code map}/{@code select}/{@code derive}), fold that path into one SELECT over the source
      * read so a consumer can query the view directly. Returns empty for a branched / merged / multi-source /
-     * complex path — the view then stays a re-run-the-flow definition ({@code derived_sql} null).
+     * complex path — the view then stays a re-run-the-pipeline definition ({@code derived_sql} null).
      *
      * <p><b>The source read is a template, not a glob</b> (addressing §7-A). This SQL is persisted and executed
      * later, so a baked-in glob would keep reading a revision the catalog has since marked superseded — the

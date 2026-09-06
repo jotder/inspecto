@@ -968,11 +968,11 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         if (jobs != null) jobs.start();
         assistSlot.start(AssistAgent::start);   // intelligence agent is intentionally not start()ed here
         // T13 / §3.8 — drive event-triggered flows: an upstream batch-commit signals the downstream
-        // flow's coalescer (off the publishing thread, see triggerWorkers). Subscribed before the first
+        // pipeline's coalescer (off the publishing thread, see triggerWorkers). Subscribed before the first
         // poll cycle so no commit is missed; flows with no event trigger ignore every event.
         bus.subscribe(pipelineScheduler::onUpstreamCommit);
         // S3b — drive dataset-triggered flows: a dataset.write Signal on this space's ledger signals
-        // every {type: event, on: dataset, from: datasets/<id>} flow's coalescer. The subscriber runs
+        // every {type: event, on: dataset, from: datasets/<id>} pipeline's coalescer. The subscriber runs
         // on the emitting thread; onDatasetWrite hands the run to triggerWorkers, same as the bus path.
         eventLog.addSubscriber(e -> {
             java.util.Map<String, String> attrs = e.attributes();
@@ -1030,7 +1030,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
 
     /**
      * Deletion fence (T25, §3.8 rule 4): given the data stores a delete/maintenance job is about to remove,
-     * report which are <em>currently</em> produced or consumed by a running flow — the one cross-driver
+     * report which are <em>currently</em> produced or consumed by a running pipeline — the one cross-driver
      * hazard — and surface each as a {@code STORE_DELETE_CONFLICT} event/alert. Lifts the configured
      * pipelines and intersects {@link DeletionFence#check} with the live {@link #running} set. Non-blocking:
      * it warns/alerts; the operator fences via a quiet window or slice-disjoint deletes. Returns the
@@ -1040,7 +1040,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         if (targetStores == null || targetStores.isEmpty()) return List.of();
         List<PipelineGraph> flows = new ArrayList<>();
         for (Path p : registry) configRegistry.configForPath(p).ifPresent(c -> flows.add(PipelineLift.lift(c)));
-        // T32: authored flow jobs also produce/consume stores. Include them in the topology and union their
+        // T32: authored pipeline jobs also produce/consume stores. Include them in the topology and union their
         // in-flight runs into the active set, so a delete that races an active pipeline-job reader/writer is
         // flagged as a conflict — not just one racing a running pipeline.
         Set<String> active = running;

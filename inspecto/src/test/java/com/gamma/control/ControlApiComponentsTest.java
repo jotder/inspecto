@@ -80,7 +80,7 @@ class ControlApiComponentsTest {
             // update a missing one → 404
             assertEquals(404, send(c.port, "PUT", "/components/grammar/ghost", "{\"delimiter\":\",\"}").statusCode());
 
-            // delete (no flow references it → allowed)
+            // delete (no pipeline references it → allowed)
             assertEquals(200, send(c.port, "DELETE", "/components/grammar/pipe", null).statusCode());
             assertEquals(0, json(send(c.port, "GET", "/components/grammar", null)).size());
             assertEquals(404, send(c.port, "GET", "/components/grammar/pipe", null).statusCode());

@@ -262,7 +262,7 @@ final class PipelineConfigParser {
             b.chunkTargetBytes  = toLong(chunk.get("target_chunk_bytes"));
         }
 
-        // ── per-flow intake admission-control override (T15 follow-up, additive, optional) ──
+        // ── per-pipeline intake admission-control override (T15 follow-up, additive, optional) ──
         // Each key is independently optional: an absent key inherits its -Dingest.* global at the
         // IntakeGovernor call site, which is why these stay nullable rather than defaulted here.
         Map<String, Object> intake = castMapAt(proc, "intake");

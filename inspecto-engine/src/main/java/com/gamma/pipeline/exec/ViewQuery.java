@@ -18,11 +18,11 @@ import java.util.Map;
  * SQL that derives a logical {@code sink.view} store (when expressible as a single statement). This helper is
  * the <em>consumer</em>: it runs that {@link ViewDefinition#derivedSql() derived SQL} and returns a bounded
  * result, so a job / KPI / report / alert API (or the UI) can bind to the view without re-running the whole
- * producing flow.
+ * producing pipeline.
  *
  * <h3>Why the sandbox is opened but not sealed</h3>
  * The derived SQL is <em>engine-generated</em> (built by {@link com.gamma.job.PipelineJobRunner#deriveViewSql} from an authored,
- * validated flow) and embeds an absolute {@code read_parquet('<dataDir>/<store>/**')} glob over the
+ * validated pipeline) and embeds an absolute {@code read_parquet('<dataDir>/<store>/**')} glob over the
  * source store's at-rest data. It therefore needs file access, so {@link SqlSandbox#seal()} (which blocks all
  * file reads) is deliberately <em>not</em> applied. {@link SqlSandbox#open} still gives the protections that
  * matter here — extension auto-install/-load are off and the memory / thread / query-timeout caps apply — and
@@ -43,7 +43,7 @@ public final class ViewQuery {
      * Run {@code def}'s {@link ViewDefinition#derivedSql() derived SQL} and return up to {@code cap} rows.
      *
      * @throws IllegalStateException if the definition has no derived SQL (a multi-statement view — re-run its
-     *                               {@link ViewDefinition#flow() flow} to concretise it instead)
+     *                               {@link ViewDefinition#flow() pipeline} to concretise it instead)
      * @throws SQLException          if the query fails (e.g. the source store's data is missing/unreadable)
      * @throws IOException           if the sandbox temp DB cannot be created
      */

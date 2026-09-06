@@ -131,7 +131,7 @@ public final class DataSourceBundleResolver {
      * a {@code view}-backed Dataset (its {@code view} resolves through a {@code ViewStore} living outside
      * {@code config/}, so the thing it depends on cannot ride in a config bundle at all); a Dataset over a
      * bundled <em>job's</em> output store ({@code orders_rollup_dataset}'s {@code physicalRef: rollup} —
-     * resolving a job's output store means following job → flow → sink, which nothing here reads today);
+     * resolving a job's output store means following job → pipeline → sink, which nothing here reads today);
      * and Alert Rules / Expectations, which are the same shape and the same one-line addition, but were
      * not in this change's scope.
      *

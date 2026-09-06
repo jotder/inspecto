@@ -35,7 +35,7 @@ import java.util.Set;
  * (T11) — each sink is a branch, and the source is finalised only once every branch has committed.
  *
  * <p>Scheduling is the new piece (R3): the legacy {@code MultiCollectorProcessor} fan-out is per-config with
- * no intra-pipeline branch concept; here a single batch fans across the flow's branches. This first cut is
+ * no intra-pipeline branch concept; here a single batch fans across the pipeline's branches. This first cut is
  * a deterministic sequential topological walk (correct + ordered); running independent branches on the
  * existing vthread pool/permit pattern is a follow-up optimisation.
  *
@@ -46,7 +46,7 @@ import java.util.Set;
  *
  * <p>Relations flow by a <b>pull</b> model over the topological order: when a node is visited, each of its
  * inbound edges {@code (from, rel, to)} contributes the relation {@code rel} that {@code from} produced as
- * one of this node's inputs. {@code on_commit} edges are cross-flow and excluded from the walk.
+ * one of this node's inputs. {@code on_commit} edges are cross-pipeline and excluded from the walk.
  */
 @PublicApi(since = "4.0.0")
 public final class PipelineExecutor {
@@ -64,7 +64,7 @@ public final class PipelineExecutor {
      * executor walks the graph, with the number of records the node emitted on that relationship (§11.1/§11.3).
      * The structure plane (the {@link PipelineGraph} edges) carries the topology; these counts are the quantities
      * painted onto it. The default {@link #NONE} ignores them, so the live path is unchanged unless a collector
-     * is supplied (a flow job passes one to persist a {@code ProvenanceRow} per call — T21).
+     * is supplied (a pipeline job passes one to persist a {@code ProvenanceRow} per call — T21).
      */
     @FunctionalInterface
     public interface ProvenanceCollector {
@@ -83,7 +83,7 @@ public final class PipelineExecutor {
      * Execute the {@code transform → sink} subgraph downstream of {@code seedNodeId}.
      *
      * @param conn           DuckDB connection holding {@code seedTable}
-     * @param g              the flow graph (validated up-front via {@link PipelineValidator#validateOrThrow})
+     * @param g              the pipeline graph (validated up-front via {@link PipelineValidator#validateOrThrow})
      * @param seedNodeId     the node whose {@code data} relation is {@code seedTable} (typically the parser)
      * @param seedTable      the DuckDB table the parse stage already produced
      * @param batchId        the batch being committed
@@ -101,7 +101,7 @@ public final class PipelineExecutor {
     /**
      * Execute the {@code transform → sink} subgraph downstream of one or more <b>seed</b> nodes. Each entry of
      * {@code seeds} maps a node id to the DuckDB table/view already holding that node's {@code data} relation.
-     * The common case is a single parser-seeded relation (the {@code (seedNodeId, seedTable)} overload); a flow
+     * The common case is a single parser-seeded relation (the {@code (seedNodeId, seedTable)} overload); a pipeline
      * job seeds <em>one view per {@code source_store}</em> (T32 Phase C, multi-source), so a {@code transform.merge}
      * can join/union several at-rest stores into one branch.
      */
@@ -195,7 +195,7 @@ public final class PipelineExecutor {
         Map<String, Map<String, String>> produced = new LinkedHashMap<>();
         seeds.forEach((nodeId, table) -> produced.put(nodeId, new LinkedHashMap<>(Map.of(PipelineRel.DATA, table))));
         Map<String, String> sinkInputs = new LinkedHashMap<>();
-        // Each seed's data relation is the flow's recordsIn at that source/parse node.
+        // Each seed's data relation is the pipeline's recordsIn at that source/parse node.
         for (Map.Entry<String, String> seed : seeds.entrySet())
             prov.record(seed.getKey(), PipelineRel.DATA, count(conn, seed.getValue()));
 
@@ -389,7 +389,7 @@ public final class PipelineExecutor {
      * execute. {@code null} in, {@code null} out, meaning "no cutoff"; that is the production shape.
      *
      * <p>{@code on_commit} edges are skipped for the same reason {@link #topoOrder} skips them: they are
-     * cross-flow triggers, not within-graph data dependencies, so an upstream flow is not an ancestor here.
+     * cross-pipeline triggers, not within-graph data dependencies, so an upstream pipeline is not an ancestor here.
      */
     private static Set<String> ancestorsOf(PipelineGraph g, String stopAt, Map<String, PipelineNode> byId) {
         if (stopAt == null || stopAt.isBlank()) return null;
@@ -411,7 +411,7 @@ public final class PipelineExecutor {
     }
 
     /**
-     * Kahn topological order over all edges except cross-flow {@code on_commit}. The graph is a DAG over
+     * Kahn topological order over all edges except cross-pipeline {@code on_commit}. The graph is a DAG over
      * data edges (the validator guarantees it); forward control/route edges keep the full order acyclic.
      */
     private static List<String> topoOrder(PipelineGraph g) {
@@ -422,7 +422,7 @@ public final class PipelineExecutor {
             adj.put(n.id(), new ArrayList<>());
         }
         for (PipelineEdge e : g.edges()) {
-            if (PipelineRel.ON_COMMIT.equals(e.rel())) continue;     // cross-flow trigger, not a within-graph edge
+            if (PipelineRel.ON_COMMIT.equals(e.rel())) continue;     // cross-pipeline trigger, not a within-graph edge
             adj.get(e.from()).add(e.to());
             indegree.merge(e.to(), 1, Integer::sum);
         }

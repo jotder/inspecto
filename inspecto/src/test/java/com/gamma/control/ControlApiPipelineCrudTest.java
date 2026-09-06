@@ -37,7 +37,7 @@ class ControlApiPipelineCrudTest {
     private static final ObjectMapper JSON = new ObjectMapper();
     private final HttpClient client = HttpClient.newHttpClient();
 
-    /** A valid 2-node flow: acquisition --data--> persistent sink (grandfathered *_flow.toon fixture). */
+    /** A valid 2-node pipeline: acquisition --data--> persistent sink (grandfathered *_flow.toon fixture). */
     private static final String VALID = """
         {"name":"demo_flow","active":false,
          "nodes":[{"id":"acq","type":"acquisition"},
@@ -209,7 +209,7 @@ class ControlApiPipelineCrudTest {
             // graph route gained the arming pre-checks (armedWithoutSchemaFindings; it would also
             // hard-fail at PipelineConfig.load). The old active:true only saved because the gate was
             // missing — exactly the silent-arm-failure the pre-check closes.
-            String flow = """
+            String pipeline = """
                 {"active":false,
                  "nodes":[{"id":"acq","type":"acquisition","config":{"poll":"%1$s/in"}},
                           {"id":"p","type":"parser","use":"grammar/%2$s"},
@@ -218,7 +218,7 @@ class ControlApiPipelineCrudTest {
 
             // the author mistyped the grammar name — nothing named 'pipe-delimted' is registered
             HttpResponse<String> bad = send(c.port, "PUT", "/pipelines/use_typo/graph",
-                    flow.formatted(b, "pipe-delimted"));
+                    pipeline.formatted(b, "pipe-delimted"));
             assertEquals(422, bad.statusCode(), bad.body());
             assertTrue(bad.body().contains("UNKNOWN_USE_REF"), bad.body());
             assertTrue(bad.body().contains("pipe-delimted"),
@@ -226,7 +226,7 @@ class ControlApiPipelineCrudTest {
 
             // the correctly-spelled binding against the same registry saves
             HttpResponse<String> ok = send(c.port, "PUT", "/pipelines/use_ok/graph",
-                    flow.formatted(b, "pipe-delimited"));
+                    pipeline.formatted(b, "pipe-delimited"));
             assertEquals(200, ok.statusCode(), ok.body());
         }
     }
@@ -244,7 +244,7 @@ class ControlApiPipelineCrudTest {
         Files.createDirectories(wr);
         try (Ctx c = open(dir, wr)) {
             String b = dir.toString().replace('\\', '/');
-            String flow = """
+            String pipeline = """
                 {"active":false,
                  "nodes":[{"id":"acq","type":"acquisition","config":{"poll":"%1$s/in"}},
                           {"id":"p","type":"parser","config":{"schema_file":"%1$s/s.toon"}},
@@ -254,13 +254,13 @@ class ControlApiPipelineCrudTest {
                           {"from":"j","rel":"data","to":"out"}]}""";
 
             HttpResponse<String> bad = send(c.port, "PUT", "/pipelines/join_typo/graph",
-                    flow.formatted(b, "reference/sitez"));
+                    pipeline.formatted(b, "reference/sitez"));
             assertEquals(422, bad.statusCode(), bad.body());
             assertTrue(bad.body().contains("UNKNOWN_JOIN_REFERENCE"), bad.body());
             assertTrue(bad.body().contains("sitez"), "the refusal names the reference the author typed");
 
             HttpResponse<String> ok = send(c.port, "PUT", "/pipelines/join_path/graph",
-                    flow.formatted(b, b + "/ref/sites.csv"));
+                    pipeline.formatted(b, b + "/ref/sites.csv"));
             assertEquals(200, ok.statusCode(), ok.body());
         }
     }
@@ -316,7 +316,7 @@ class ControlApiPipelineCrudTest {
     void anEnrichmentNodesCompanionBindingSavesOverHttp(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, dir.resolve("wr"))) {
             String b = dir.toString().replace('\\', '/');
-            String flow = """
+            String pipeline = """
                 {"active":true,
                  "nodes":[{"id":"acq","type":"acquisition","config":{"poll":"%1$s/in"}},
                           {"id":"p","type":"parser","config":{"schema_file":"%1$s/s.toon"}},
@@ -325,7 +325,7 @@ class ControlApiPipelineCrudTest {
                  "edges":[{"from":"acq","rel":"data","to":"p"},{"from":"p","rel":"data","to":"enrich"},
                           {"from":"enrich","rel":"data","to":"out"}]}""".formatted(b);
 
-            HttpResponse<String> r = send(c.port, "PUT", "/pipelines/enrich_rt/graph", flow);
+            HttpResponse<String> r = send(c.port, "PUT", "/pipelines/enrich_rt/graph", pipeline);
             assertEquals(200, r.statusCode(), r.body());
         }
     }
@@ -421,7 +421,7 @@ class ControlApiPipelineCrudTest {
             assertEquals(404, send(c.port, "POST", "/pipelines/authored/demo_flow/edges",
                     "{\"from\":\"acq\",\"rel\":\"data\",\"to\":\"sink\"}").statusCode());
 
-            // delete (retiring an old flow) still works
+            // delete (retiring an old pipeline) still works
             assertEquals(200, send(c.port, "DELETE", "/pipelines/authored/demo_flow", null).statusCode());
             assertEquals(404, send(c.port, "GET", "/pipelines/authored/demo_flow", null).statusCode());
 
@@ -454,7 +454,7 @@ class ControlApiPipelineCrudTest {
 
     /**
      * DRYRUN-1: a {@code transform.join} pipeline dry-runs. Before the route supplied a
-     * {@link com.gamma.pipeline.exec.RowShaper.ReferenceResolver}, every join flow 422'd with
+     * {@link com.gamma.pipeline.exec.RowShaper.ReferenceResolver}, every join pipeline 422'd with
      * "no ReferenceResolver supplied", leaving the preview blind to the most realistic pipelines.
      * The reference here is a {@code path:} CSV, resolved through the shared {@code ReferenceReader} —
      * the same resolution a production run does.
@@ -507,9 +507,9 @@ class ControlApiPipelineCrudTest {
     /**
      * A {@code pipeline} body key dry-runs a candidate graph instead of the stored one — the editor's "preview
      * before you save" seam. Pinning three things: the candidate's own topology drives the result (not the
-     * stored flow's, which differs); a candidate that would fail {@code /graph}'s own validation 422s the
-     * SAME way (no separate, laxer path); and the candidate never touches disk (the stored flow is untouched,
-     * and a candidate for an id that has no stored flow at all previews with no 404).
+     * stored pipeline's, which differs); a candidate that would fail {@code /graph}'s own validation 422s the
+     * SAME way (no separate, laxer path); and the candidate never touches disk (the stored pipeline is untouched,
+     * and a candidate for an id that has no stored pipeline at all previews with no 404).
      */
     @Test
     void dryRunOverACandidateBodyPreviewsWithoutTouchingTheStoredFlow(@TempDir Path dir) throws Exception {
@@ -538,11 +538,11 @@ class ControlApiPipelineCrudTest {
                  "sampleRows":[{"id":"1"}]}""";
             assertEquals(422, send(c.port, "POST", "/pipelines/authored/demo_flow/dry-run", invalid).statusCode());
 
-            // a candidate for an id with no stored flow previews too — the candidate alone is enough
+            // a candidate for an id with no stored pipeline previews too — the candidate alone is enough
             String freshId = candidate.replace("demo_flow", "brand_new");
             assertEquals(200, send(c.port, "POST", "/pipelines/authored/brand_new/dry-run", freshId).statusCode());
 
-            // the stored flow is unchanged by any of this
+            // the stored pipeline is unchanged by any of this
             JsonNode stored = json(send(c.port, "GET", "/pipelines/authored/demo_flow", null));
             assertEquals(2, stored.get("nodes").size(), "still acq+sink — the candidate was never persisted");
         }

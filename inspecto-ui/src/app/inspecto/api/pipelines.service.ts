@@ -294,9 +294,9 @@ export interface PipelineRunResult {
     warnings: string[];
 }
 
-// ── Data-plane provenance (T22) — per-edge record counts of a past flow run ──
+// ── Data-plane provenance (T22) — per-edge record counts of a past pipeline run ──
 
-/** One run of a flow that recorded provenance (GET /provenance/batches), newest first. */
+/** One run of a pipeline that recorded provenance (GET /provenance/batches), newest first. */
 export interface ProvenanceBatch {
     batchId: string;
     runTs: string;
@@ -593,7 +593,7 @@ export class PipelinesService {
      *
      * <p>Pass `candidate` to preview a DRAFT graph instead of the stored one: it is parsed and validated
      * through the same gate the save route uses (an invalid draft 422s identically) and never written
-     * anywhere. When present the stored flow is not consulted at all, so a draft for an id with no stored
+     * anywhere. When present the stored pipeline is not consulted at all, so a draft for an id with no stored
      * pipeline previews too — which is what lets a caller with no pipeline of its own synthesize a
      * throwaway graph purely to see what some rules would produce.
      */

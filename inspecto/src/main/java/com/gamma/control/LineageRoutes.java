@@ -20,21 +20,21 @@ import java.util.Map;
  *   <li>the <b>ingest pipeline</b> records which input <i>file</i>'s rows landed in which output store+partition
  *       — the per-{@code (inputFile, partition)} count matrix ({@link com.gamma.etl.LineageRow}, written to the
  *       {@code lineage}/{@code batches} audit CSVs, joined by {@code consignment_id});</li>
- *   <li>an <b>authored flow</b> declares the {@code source_store}(s) it reads (and emits per-{@code (node, rel)}
+ *   <li>an <b>authored pipeline</b> declares the {@code source_store}(s) it reads (and emits per-{@code (node, rel)}
  *       counts to {@link com.gamma.pipeline.exec.DbProvenanceStore}, painted as the {@code /provenance} Sankey).</li>
  * </ul>
- * Neither half carries the other's dimension (the flow has no file; the ingest matrix has no node), and they do
+ * Neither half carries the other's dimension (the pipeline has no file; the ingest matrix has no node), and they do
  * <b>not</b> share a {@code consignment_id} — they are distinct execution engines. The bridge between them is the
- * <b>store name</b>: ingest <i>writes</i> a store (the {@code batches.output_table}); a flow <i>reads</i> it as a
+ * <b>store name</b>: ingest <i>writes</i> a store (the {@code batches.output_table}); a pipeline <i>reads</i> it as a
  * {@code source_store}. {@code GET /lineage?store=<store>} returns both ends so a consumer can trace
- * <i>file → store → flow → sink</i>:
+ * <i>file → store → pipeline → sink</i>:
  * <pre>
  *   { "store": "...",
  *     "upstream":   [ { pipeline, batchId, inputFile, partition, rowCount } … ],   // ingest: files → this store
  *     "downstream": [ { flow, sinks:[…] } … ] }                                    // flows reading this store
  * </pre>
  * Independent of {@code -Dprovenance.backend}: the upstream half reads the ingest audit CSVs and the downstream
- * half reads the authored-flow store. Both degrade to {@code []} (never a 500) when their inputs are absent.
+ * half reads the authored-pipeline store. Both degrade to {@code []} (never a 500) when their inputs are absent.
  */
 final class LineageRoutes implements RouteModule {
 
@@ -43,7 +43,7 @@ final class LineageRoutes implements RouteModule {
         api.get("/lineage", (e, m) -> storeLineage(api, ApiContext.query(e, "store")));
     }
 
-    /** {@code GET /lineage?store=} — the file→store (ingest) and store→flow (authored) lineage around one store. */
+    /** {@code GET /lineage?store=} — the file→store (ingest) and store→pipeline (authored) lineage around one store. */
     private Object storeLineage(ApiContext api, String store) {
         if (store == null || store.isBlank())
             throw new ApiException(400, "the 'store' query param is required");

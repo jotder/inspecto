@@ -1,0 +1,15 @@
+# Per-example Control API probes for serve-example.{ps1,sh}.
+# One endpoint path per line; blank lines and lines starting with '#' are ignored.
+#
+# STEP: lookup (transform.lookup) — transcode one column's values through an inline static map.
+#   steps[1]: - lookup: { column: STATUS, target: STATUS_LABEL, mappings: [NEW=Open, SHIPPED=Done, CANCELLED=Void] }
+# Keys and values are author LITERALS (never SQL): the Step compiles them to a CASE and writes the result to
+# STATUS_LABEL, leaving STATUS untouched. A value with no mapping passes through unchanged (set default: to
+# replace it instead). All 8 rows keep flowing — a lookup changes values, never row counts.
+#
+# Expected evidence after the run:
+#   /jobs shows lookup_rollup type PIPELINE with lastStatus SUCCESS; /jobs/lookup_rollup/runs names the rows the
+#   Step produced into store(s) [rollup]. On disk: out/rollup/*.parquet carries STATUS_LABEL = Open|Done|Void.
+#   The job can also be fired by hand: POST /jobs/lookup_rollup/trigger.
+/jobs
+/jobs/lookup_rollup/runs

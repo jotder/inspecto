@@ -122,6 +122,7 @@ public final class RecipeCompiler {
                 case "sql" -> nodes.add(sql(id, cfg, refusals));
                 case "sink" -> nodes.add(sink(id, cfg));
                 case "dedup" -> nodes.add(dedup(id, cfg, refusals));
+                case "lookup" -> nodes.add(lookup(id, cfg, refusals));
                 case "route" -> {
                     route(id, cfg, nodes, branchSinks, routeEdges, refusals);
                     routeSeen = true;
@@ -335,6 +336,24 @@ public final class RecipeCompiler {
     /** {@code dedup: {key: […], order_by: …, scope: …}} → the record-grain dedup node ({@code processing.dedup}).
      *  {@code keep:} other than {@code first} is refused — the winner is {@code order_by}'s job. {@code scope}
      *  is D-9's window vocabulary and compiles verbatim; whether it may ARM is the save gates' call. */
+    /** {@code lookup: {column, mappings[], target?, default?}} → a transform.lookup node, config verbatim. */
+    private static PipelineNode lookup(String id, Map<String, Object> cfg,
+                                       List<PipelineCompileException.Refusal> refusals) {
+        Object column = cfg.get("column");
+        if (column == null || String.valueOf(column).isBlank())
+            refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id,
+                    "lookup needs a column: — the column whose values are transcoded"));
+        Object mappings = cfg.get("mappings");
+        if (!(mappings instanceof List<?> l) || l.isEmpty())
+            refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id,
+                    "lookup needs mappings: — a list of key=value entries"));
+        else for (Object o : l)
+            if (o == null || String.valueOf(o).indexOf('=') <= 0)
+                refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id,
+                        "lookup mapping '" + o + "' is not key=value"));
+        return PipelineNode.of(id, BuiltinNodeType.TRANSFORM_LOOKUP.type(), new LinkedHashMap<>(cfg));
+    }
+
     private static PipelineNode dedup(String id, Map<String, Object> cfg,
                                       List<PipelineCompileException.Refusal> refusals) {
         Map<String, Object> c = new LinkedHashMap<>(cfg);
@@ -461,6 +480,7 @@ public final class RecipeCompiler {
                         sinkSeen = true;
                     }
                     case "dedup" -> stepNode = dedup(stepId, stepCfg, refusals);
+                    case "lookup" -> stepNode = lookup(stepId, stepCfg, refusals);
                     case "summarize" -> stepNode = summarize(stepId, stepCfg, refusals);
                     case "sql" -> stepNode = sql(stepId, stepCfg, refusals);
                     case "transform" -> {

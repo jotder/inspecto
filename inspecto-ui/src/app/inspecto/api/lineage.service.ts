@@ -12,7 +12,7 @@ export interface UpstreamRow {
     rowCount: number;
 }
 
-/** An authored flow that reads a store as a source, with the sink stores it produces. */
+/** An authored pipeline that reads a store as a source, with the sink stores it produces. */
 export interface DownstreamFlow {
     flow: string;
     sinks: string[];
@@ -27,7 +27,7 @@ export interface StoreLineage {
 
 /**
  * Store-keyed cross-engine lineage (`GET /lineage?store=`). The store bridges the two provenance halves:
- * ingest records file→store/partition counts; an authored flow reads the store and emits step counts. See
+ * ingest records file→store/partition counts; an authored pipeline reads the store and emits step counts. See
  * `docs/GLOSSARY.md` §11 — the bridge is the store, never a shared batch id.
  */
 @Injectable({ providedIn: 'root' })

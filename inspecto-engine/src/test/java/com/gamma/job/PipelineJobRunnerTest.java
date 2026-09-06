@@ -36,7 +36,7 @@ import java.util.function.Consumer;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * T32 Phase A — {@link PipelineJobRunner} runs an authored flow for real over embedded DuckDB: it seeds a
+ * T32 Phase A — {@link PipelineJobRunner} runs an authored pipeline for real over embedded DuckDB: it seeds a
  * {@code source_store} from a small on-disk Parquet dataset, executes the {@code transform → sink}
  * subgraph via the production {@link PipelineExecutor}, and writes each sink {@code store}. Covers the single
  * filter→sink path, idempotent re-run (same batch id skips the committed branch), a multi-branch route to
@@ -355,7 +355,7 @@ class PipelineJobRunnerTest {
 
     @Test
     void unionsTwoSourceStores() throws Exception {
-        // T32 Phase C — a flow job seeds each source_store as its own view; a transform.merge unions them.
+        // T32 Phase C — a pipeline job seeds each source_store as its own view; a transform.merge unions them.
         String dataDir = tmp.resolve("data").toString();
         String auditDir = tmp.resolve("audit").toString();
         seedParquet(dataDir, "events_a", "(1,150),(3,200)");
@@ -379,7 +379,7 @@ class PipelineJobRunnerTest {
 
     @Test
     void registersASinkViewDefinitionWithoutWritingBytes() throws Exception {
-        // T32 Phase C — a sink.view persists no bytes; the flow job records a durable view definition instead.
+        // T32 Phase C — a sink.view persists no bytes; the pipeline job records a durable view definition instead.
         Path wr = tmp.resolve("wr");
         String dataDir = tmp.resolve("data").toString();
         String auditDir = tmp.resolve("audit").toString();
@@ -398,7 +398,7 @@ class PipelineJobRunnerTest {
         assertTrue(res.success(), res.message());
         assertFalse(Files.exists(Path.of(dataDir, "active_subs")), "a sink.view writes no data bytes");
         ViewDefinition def = new ViewStore(wr.resolve("views")).get("active_subs").orElseThrow();
-        assertEquals("subs_kpi", def.flow(), "view definition records the producing flow");
+        assertEquals("subs_kpi", def.flow(), "view definition records the producing pipeline");
         assertEquals(List.of("subs"), def.sourceStores(), "view definition records source-store lineage");
     }
 
@@ -430,7 +430,7 @@ class PipelineJobRunnerTest {
 
     @Test
     void incrementalMultiSourceAdvancesPerSourceWatermarks() throws Exception {
-        // T32 follow-up — each source_store keeps its OWN watermark, so a multi-source incremental flow
+        // T32 follow-up — each source_store keeps its OWN watermark, so a multi-source incremental pipeline
         // re-reads only the rows newer than each source's last run.
         String dataDir = tmp.resolve("data").toString();
         String auditDir = tmp.resolve("audit").toString();
@@ -542,7 +542,7 @@ class PipelineJobRunnerTest {
 
     @Test
     void persistsPerEdgeProvenanceWhenAStoreIsConfigured() throws Exception {
-        // T21 — a flow run records its per-(node, relationship) record counts to the provenance store.
+        // T21 — a pipeline run records its per-(node, relationship) record counts to the provenance store.
         String dataDir = tmp.resolve("data").toString();
         String auditDir = tmp.resolve("audit").toString();
         seedParquet(dataDir, "events", "(1,150),(2,50),(3,200)");
@@ -577,7 +577,7 @@ class PipelineJobRunnerTest {
     void reportConservationEmitsAnImbalanceEventForALostRecordCount() {
         // T22 — the run→check→event bridge. A healthy real run conserves by construction (every conserving
         // node records both its kept and its diverted relations — see PipelineExecutor.recordCounts), so a
-        // positive imbalance is only reachable from an injected count mismatch, not a clean flow. Drive the
+        // positive imbalance is only reachable from an injected count mismatch, not a clean pipeline. Drive the
         // bridge directly with crafted counts: a filter that consumed 3 but accounted for only 2 (data 2,
         // dropped 0) is a silent LOSS the runner must promote to a FLOW_CONSERVATION_IMBALANCE event.
         PipelineGraph g = new PipelineGraph("loss_flow", true,

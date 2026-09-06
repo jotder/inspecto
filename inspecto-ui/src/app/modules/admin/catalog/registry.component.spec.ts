@@ -51,7 +51,7 @@ describe('RegistryComponent', () => {
     });
 
     it('loads pipelines and derives node→component reference edges from use=<kind>/<id>', async () => {
-        const flow: AuthoredPipeline = {
+        const pipeline: AuthoredPipeline = {
             name: 'cdr_pipeline',
             active: true,
             nodes: [
@@ -73,7 +73,7 @@ describe('RegistryComponent', () => {
                 summaries: [
                     { name: 'cdr_pipeline', active: true, nodeCount: 3, edgeCount: 2, produces: [], consumes: [] },
                 ],
-                raw: { cdr_pipeline: flow },
+                raw: { cdr_pipeline: pipeline },
             },
         );
         const c = TestBed.createComponent(RegistryComponent).componentInstance;

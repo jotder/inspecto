@@ -172,7 +172,7 @@ public final class ArgumentDeriver {
     /**
      * {@code pipeline_author}'s spec with {@code flow} constrained by the hand-written graph schema (A5.3).
      *
-     * <p>Unlike {@link #constrainedFor} there is no {@code kind} to key on — a flow has exactly one shape —
+     * <p>Unlike {@link #constrainedFor} there is no {@code kind} to key on — a pipeline has exactly one shape —
      * and no {@link com.gamma.config.spec.ConfigSpec} to project from, because an authored graph is an IR
      * rather than a config type. Plan D9 therefore does not reach it; see {@code InspectoTools.flowSchemaJson}.
      */

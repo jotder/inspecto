@@ -532,7 +532,7 @@ class InspectoToolsTest {
         return tool(InspectoTools.tools(seeded()), "pipeline_author");
     }
 
-    /** A filter flow mirroring PipelineDryRunTest: acq → transform.filter(amt>=100) → sink. */
+    /** A filter pipeline mirroring PipelineDryRunTest: acq → transform.filter(amt>=100) → sink. */
     private static Map<String, Object> filterFlowMap() {
         return Map.of(
                 "name", "orders_flow",
@@ -575,11 +575,11 @@ class InspectoToolsTest {
     void pipelineAuthorReportsAStructurallyBrokenGraphAsFindingsNotAnError() {
         // A5.3: an unexecutable topology must stay ok=true and carry coded findings, so the repair loop
         // (and the human) get something anchored to act on rather than a bare refusal.
-        Map<String, Object> flow = new java.util.LinkedHashMap<>(filterFlowMap());
-        flow.put("edges", List.of(
+        Map<String, Object> pipeline = new java.util.LinkedHashMap<>(filterFlowMap());
+        pipeline.put("edges", List.of(
                 Map.of("from", "acq", "to", "flt"),
                 Map.of("from", "flt", "to", "warehouse")));   // no such node
-        Map<String, Object> out = invoke(authorTool(), flow(flow));
+        Map<String, Object> out = invoke(authorTool(), pipelineArg(pipeline));
 
         assertEquals(false, out.get("clean"));
         assertEquals(false, out.get("simulated"), "an unexecutable graph is never simulated");
@@ -588,7 +588,7 @@ class InspectoToolsTest {
                 && "edges".equals(f.get("fieldPath"))), findings.toString());
     }
 
-    private static Map<String, Object> flow(Map<String, Object> f) {
+    private static Map<String, Object> pipelineArg(Map<String, Object> f) {
         return Map.of("flow", f);
     }
 

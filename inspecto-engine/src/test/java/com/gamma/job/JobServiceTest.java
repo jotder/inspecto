@@ -599,7 +599,7 @@ class JobServiceTest {
         }
     }
 
-    // ── T32: flow jobs (JobType.PIPELINE) ──────────────────────────────────────────
+    // ── T32: pipeline jobs (JobType.PIPELINE) ──────────────────────────────────────────
 
     @Test
     void flowJobIsBuiltWhenAFlowStoreIsConfigured(@TempDir Path dir) throws Exception {
@@ -609,7 +609,7 @@ class JobServiceTest {
              JobService js = new JobService(List.of(fj), new ConsignmentEventBus(), s, null,
                      dir.resolve("audit").toString(), null, store, dir.resolve("data").toString())) {
             js.start();
-            assertTrue(js.has("fj"), "a flow job is built when a flow store is configured");
+            assertTrue(js.has("fj"), "a pipeline job is built when a pipeline store is configured");
             assertEquals("pipeline", js.jobs().get(0).type(), "the listing reports the PIPELINE type");
         }
     }
@@ -617,7 +617,7 @@ class JobServiceTest {
     @Test
     void flowJobWithoutAFlowStoreFailsClosed(@TempDir Path dir) throws Exception {
         JobConfig fj = new JobConfig("fj", JobType.PIPELINE, null, null, true, false, Map.of("flow", "some_flow"));
-        // the 5-arg constructor leaves the flow store null → building a flow job must fail closed
+        // the 5-arg constructor leaves the pipeline store null → building a pipeline job must fail closed
         try (Scheduler s = new Scheduler()) {
             assertThrows(IllegalStateException.class, () ->
                     new JobService(List.of(fj), new ConsignmentEventBus(), s, null, dir.resolve("audit").toString()));
@@ -626,7 +626,7 @@ class JobServiceTest {
 
     @Test
     void flowJobRunsEndToEndAndIsTrackedWhileRunning(@TempDir Path dir) throws Exception {
-        // a tiny at-rest source store + an authored flow that filters it into a sink store
+        // a tiny at-rest source store + an authored pipeline that filters it into a sink store
         String dataDir = dir.resolve("data").toString();
         seedParquet(dataDir, "events", "(1,150),(2,50),(3,200)");
         PipelineStore store = new PipelineStore(dir.resolve("flows"));
@@ -640,17 +640,17 @@ class JobServiceTest {
              JobService js = new JobService(List.of(fj), bus, s, null,
                      dir.resolve("audit").toString(), null, store, dataDir)) {
             // the bus is synchronous on the publishing (job) thread, so this fires while run() is still in
-            // flight → the flow id must already be in runningPipelines() at that instant (before the finally removes it)
+            // flight → the pipeline id must already be in runningPipelines() at that instant (before the finally removes it)
             bus.subscribe(ev -> { if ("nightly".equals(ev.pipeline())) midRun.set(js.runningPipelines()); });
             js.start();
-            assertTrue(js.trigger("nightly"), "the flow job is built and triggerable");
+            assertTrue(js.trigger("nightly"), "the pipeline job is built and triggerable");
             JobRun run = await(() -> js.lastRunOf("nightly").orElse(null));
 
             assertEquals("SUCCESS", run.status(), run.message());
             assertEquals("pipeline", run.type());
-            assertNotNull(midRun.get(), "the flow's chain event fired");
-            assertTrue(midRun.get().contains("evt_rollup"), "flow tracked as running mid-run: " + midRun.get());
-            assertTrue(js.runningPipelines().isEmpty(), "the running-flow set is cleaned up after the run");
+            assertNotNull(midRun.get(), "the pipeline's chain event fired");
+            assertTrue(midRun.get().contains("evt_rollup"), "pipeline tracked as running mid-run: " + midRun.get());
+            assertTrue(js.runningPipelines().isEmpty(), "the running-pipeline set is cleaned up after the run");
         }
     }
 
@@ -717,7 +717,7 @@ class JobServiceTest {
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(List.of(), bus, s, null,
                      dir.resolve("audit").toString(), null, store, dataDir)) {
-            // the ad-hoc run publishes its chain event under the flow id (there is no job name)
+            // the ad-hoc run publishes its chain event under the pipeline id (there is no job name)
             bus.subscribe(ev -> { if ("evt_rollup".equals(ev.pipeline())) midRun.set(js.runningPipelines()); });
             js.start();
             String runId = js.triggerPipelineRun("evt_rollup", "rahul");
@@ -726,18 +726,18 @@ class JobServiceTest {
             assertEquals("SUCCESS", run.status(), run.message());
             assertEquals("pipeline", run.type());
             assertEquals("manual:rahul", run.trigger(), "the ad-hoc fire is actor-attributed");
-            assertEquals("evt_rollup", run.job(), "the run is recorded under the flow id");
-            assertNotNull(midRun.get(), "the flow's chain event fired");
+            assertEquals("evt_rollup", run.job(), "the run is recorded under the pipeline id");
+            assertNotNull(midRun.get(), "the pipeline's chain event fired");
             assertTrue(midRun.get().contains("evt_rollup"), "ad-hoc run tracked for the deletion fence mid-run");
-            assertTrue(js.runningPipelines().isEmpty(), "the running-flow set is cleaned up after the run");
+            assertTrue(js.runningPipelines().isEmpty(), "the running-pipeline set is cleaned up after the run");
             assertTrue(js.jobs().isEmpty(), "an ad-hoc run never registers a job");
-            assertEquals(1, js.runsFor("evt_rollup").size(), "history is browsable under the flow id");
+            assertEquals(1, js.runsFor("evt_rollup").size(), "history is browsable under the pipeline id");
         }
     }
 
     @Test
     void adhocFlowRunWithoutAFlowStoreFailsClosed(@TempDir Path dir) throws Exception {
-        // the 5-arg constructor leaves the flow store null → the ad-hoc path must fail closed too
+        // the 5-arg constructor leaves the pipeline store null → the ad-hoc path must fail closed too
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(List.of(), new ConsignmentEventBus(), s, null, dir.resolve("audit").toString())) {
             js.start();
@@ -770,8 +770,8 @@ class JobServiceTest {
 
     @Test
     void onPipelineEventFiresAFlowJob(@TempDir Path dir) throws Exception {
-        // chaining INTO a flow: an upstream pipeline commit triggers the flow job (the recommended
-        // pattern over cron when the flow reads a store the pipeline writes — avoids a half-written read).
+        // chaining INTO a pipeline: an upstream pipeline commit triggers the pipeline job (the recommended
+        // pattern over cron when the pipeline reads a store the pipeline writes — avoids a half-written read).
         String dataDir = dir.resolve("data").toString();
         seedParquet(dataDir, "events", "(1,150),(2,50),(3,200)");
         PipelineStore store = new PipelineStore(dir.resolve("flows"));
@@ -788,7 +788,7 @@ class JobServiceTest {
             assertEquals("SUCCESS", run.status(), run.message());
             assertEquals("pipeline", run.type());
             assertTrue(run.trigger().startsWith("event:events_etl"), "fired by the upstream commit: " + run.trigger());
-            assertTrue(Files.exists(Path.of(dataDir, "rollup")), "the flow job wrote its sink store");
+            assertTrue(Files.exists(Path.of(dataDir, "rollup")), "the pipeline job wrote its sink store");
         }
     }
 
@@ -864,8 +864,8 @@ class JobServiceTest {
 
     @Test
     void aFlowJobSuccessChainsADownstreamJob(@TempDir Path dir) throws Exception {
-        // chaining OUT of a flow: PipelineJobRunner publishes a ConsignmentEvent(jobName) on success, so a
-        // downstream on_pipeline job fires — the flow job is a first-class upstream in the event graph.
+        // chaining OUT of a pipeline: PipelineJobRunner publishes a ConsignmentEvent(jobName) on success, so a
+        // downstream on_pipeline job fires — the pipeline job is a first-class upstream in the event graph.
         String dataDir = dir.resolve("data").toString();
         seedParquet(dataDir, "events", "(1,150),(2,50),(3,200)");
         PipelineStore store = new PipelineStore(dir.resolve("flows"));
@@ -881,7 +881,7 @@ class JobServiceTest {
             js.trigger("rollup_job");
             JobRun run = await(() -> js.lastRunOf("after_rollup").orElse(null));
             assertEquals("SUCCESS", run.status());
-            assertTrue(run.trigger().startsWith("event:rollup_job"), "chained off the flow job: " + run.trigger());
+            assertTrue(run.trigger().startsWith("event:rollup_job"), "chained off the pipeline job: " + run.trigger());
         }
     }
 
@@ -902,14 +902,14 @@ class JobServiceTest {
             js.trigger("nightly_rollup");
             await(() -> js.lastRunOf("nightly_rollup").orElse(null));
             assertTrue(((Number) runStore.metrics("nightly_rollup").get("total")).longValue() >= 1,
-                    "the flow run was projected into the reporting store");
+                    "the pipeline run was projected into the reporting store");
             List<Map<String, Object>> recent = runStore.recentRuns(10, "nightly_rollup");
-            assertFalse(recent.isEmpty(), "the flow run is queryable in the reporting store");
+            assertFalse(recent.isEmpty(), "the pipeline run is queryable in the reporting store");
             assertEquals("pipeline", recent.get(0).get("type"), "reported as a PIPELINE run");
         }
     }
 
-    /** Author the canonical {@code events → filter(amt>=100) → sink rollup} flow used by the T32 tests. */
+    /** Author the canonical {@code events → filter(amt>=100) → sink rollup} pipeline used by the T32 tests. */
     private static void writeRollupFlow(PipelineStore store, String id) throws Exception {
         store.write(id, new PipelineGraph(id, true,
                 List.of(PipelineNode.of("src", "acquisition", Map.of("source_store", "events")),

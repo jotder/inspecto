@@ -110,11 +110,11 @@ final class PipelineScheduler {
 
     // ── Owned by the scheduler ───────────────────────────────────────────────────
     /** T13 / §3.8 — per-pipeline last-run epoch (ms); gates a {@code schedule:{every}}/{@code cron} pipeline
-     *  by its own cadence instead of running every active flow each tick. A pipeline with no {@code trigger:}
+     *  by its own cadence instead of running every active pipeline each tick. A pipeline with no {@code trigger:}
      *  is {@code DEFAULT_POLL} and still runs every cycle. */
     private final Map<String, Long> lastRunAtMs = new ConcurrentHashMap<>();
     /** Per-pipeline coalescer for {@code event}-triggered flows: an upstream-commit storm collapses to one
-     *  non-overlapping run (the in-process run-guard debounce, lifted to the flow grain). */
+     *  non-overlapping run (the in-process run-guard debounce, lifted to the pipeline grain). */
     private final Map<String, TriggerCoalescer> eventCoalescers = new ConcurrentHashMap<>();
     /** Zone for evaluating {@code cron} triggers — the operations zone (mirrors {@link com.gamma.job.JobService}). */
     private final ZoneId triggerZone = OperationsZone.resolve();
@@ -399,10 +399,10 @@ final class PipelineScheduler {
     }
 
     /**
-     * Bus listener (T13 / §3.8): an upstream SUCCESS commit triggers every {@code event}-triggered flow whose
+     * Bus listener (T13 / §3.8): an upstream SUCCESS commit triggers every {@code event}-triggered pipeline whose
      * {@code from} names that upstream. The run is handed to {@link #triggerWorkers} (the bus delivers on the
      * publishing thread, which holds that pipeline's claim; running inline would deadlock) and coalesced per
-     * flow so an upstream storm collapses to one non-overlapping run.
+     * pipeline so an upstream storm collapses to one non-overlapping run.
      */
     void onUpstreamCommit(ConsignmentEvent event) {
         if (!"SUCCESS".equals(event.status())) return;
@@ -426,9 +426,9 @@ final class PipelineScheduler {
 
     /**
      * Signal listener (ELT Phase 3 S3b): a {@code dataset.write} Signal triggers every event-triggered
-     * flow declaring {@code {type: event, on: dataset, from: datasets/<id>}} for that Dataset. The exact
+     * pipeline declaring {@code {type: event, on: dataset, from: datasets/<id>}} for that Dataset. The exact
      * sibling of {@link #onUpstreamCommit} — same off-thread hand-off (the EventLog subscriber delivers
-     * on the emitting thread, which may hold a pipeline claim), same per-flow coalescing — over the
+     * on the emitting thread, which may hold a pipeline claim), same per-pipeline coalescing — over the
      * Dataset namespace instead of the pipeline one. No self-loop guard is needed: the producer is a
      * Dataset write (a job/materialize), never the triggered pipeline's own commit.
      */

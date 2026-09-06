@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * <b>T22 — the conservation invariant over data-plane provenance (§11.4).</b> Given a flow's per-(node,
+ * <b>T22 — the conservation invariant over data-plane provenance (§11.4).</b> Given a pipeline's per-(node,
  * relationship) record counts (collected by a {@link PipelineExecutor.ProvenanceCollector}), find the
  * <em>non-amplifying</em> nodes where {@code recordsIn != recordsOut} — i.e. records entered that did not
  * leave (silent <b>data loss</b>) or were unexpectedly multiplied (<b>amplification</b>).

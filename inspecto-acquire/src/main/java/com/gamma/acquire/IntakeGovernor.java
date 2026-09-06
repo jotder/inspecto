@@ -20,10 +20,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * returns {@link #UNBOUNDED} and nothing in the ingest path changes. Setting a base cap enables both the hard
  * cap and (unless {@code -Dingest.backpressure.adaptive=false}) the controller.
  *
- * <h3>Per-flow override (T15 follow-up)</h3>
+ * <h3>Per-pipeline override (T15 follow-up)</h3>
  * A pipeline's {@code processing.intake} TOON block installs its own {@link Policy} via {@link #configure}
- * (resolved against the globals by the caller), so one noisy flow can be capped while the fleet stays
- * unbounded — or one flow exempted (base cap 0) from a fleet-wide cap. {@link #capFor} and
+ * (resolved against the globals by the caller), so one noisy pipeline can be capped while the fleet stays
+ * unbounded — or one pipeline exempted (base cap 0) from a fleet-wide cap. {@link #capFor} and
  * {@link #observeCycle} resolve thresholds per pipeline via {@link #policyFor}.
  *
  * <h3>Why cycle overrun, not inbox lag</h3>
@@ -129,7 +129,7 @@ public final class IntakeGovernor {
     }
 
     /**
-     * Install (or clear, with {@code null}) {@code pipelineId}'s own thresholds — the per-flow
+     * Install (or clear, with {@code null}) {@code pipelineId}'s own thresholds — the per-pipeline
      * {@code processing.intake} TOON override. Called idempotently by the ingest path every cycle with
      * the policy resolved from the pipeline's config, so a hot-reloaded edit takes effect on the next
      * cycle and removing the block restores the globals — no registration-lifecycle wiring needed.

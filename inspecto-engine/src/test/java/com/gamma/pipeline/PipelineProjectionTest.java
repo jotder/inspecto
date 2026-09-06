@@ -131,7 +131,7 @@ class PipelineProjectionTest {
 
         Map<String, Object> c = PipelineProjection.combined(List.of(producer, consumer));
 
-        // node ids are namespaced by flow, so the two flows never collide
+        // node ids are namespaced by pipeline, so the two pipelines never collide
         assertNotNull(nodeById(c, "ORDERS_ETL/acq"));
         assertNotNull(nodeById(c, "ORDERS_ROLLUP/src"));
         // a synthetic store node joins them

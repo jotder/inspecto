@@ -13,7 +13,7 @@ import java.util.Set;
 /**
  * Answers "what references this component?" over a set of {@link PipelineGraph}s by scanning {@code use:}
  * references (doc §4.1 / §14 T8). This drives <b>safe-delete</b>: deleting a registry component that some
- * flow still references is refused — generalising the existing {@code connectionInUse} 409 guard from
+ * pipeline still references is refused — generalising the existing {@code connectionInUse} 409 guard from
  * connections to every component type ({@code grammar}/{@code schema}/{@code transform}/{@code sink}/…).
  */
 @PublicApi(since = "4.0.0")

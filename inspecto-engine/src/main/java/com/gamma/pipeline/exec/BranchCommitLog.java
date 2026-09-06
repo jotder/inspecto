@@ -19,7 +19,7 @@ import java.util.Set;
 /**
  * <b>T11 — partial-commit state with a branch dimension.</b> A durable, append-only,
  * {@code fsync}-per-record ledger (the same crash-safety contract as {@link com.gamma.etl.CommitLog})
- * extended with the {@code (batch_id, branch)} key a branch-aware flow needs. Two phases are recorded:
+ * extended with the {@code (batch_id, branch)} key a branch-aware pipeline needs. Two phases are recorded:
  * <ul>
  *   <li>{@code BRANCH} — one branch's outputs + manifest are durable on disk;</li>
  *   <li>{@code SOURCE} — every branch committed and the source files were finalised (backup / markers
@@ -28,7 +28,7 @@ import java.util.Set;
  *
  * <p>This is what lets {@link BranchCommitCoordinator} resume a half-committed batch idempotently: on
  * replay an already-{@code BRANCH}-recorded branch is skipped, and source-finalisation runs only when
- * every expected branch is present and no {@code SOURCE} row exists yet. A single-branch flow degrades
+ * every expected branch is present and no {@code SOURCE} row exists yet. A single-branch pipeline degrades
  * to one {@code BRANCH} row + one {@code SOURCE} row — the legacy single-output sequence.
  *
  * <p>Format (CSV, header on first creation): {@code recorded_at,batch_id,branch,phase} (a {@code SOURCE}

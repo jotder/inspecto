@@ -9,16 +9,16 @@ import java.sql.Statement;
 import java.util.List;
 
 /**
- * <b>T32 Phase A — seed a flow job's {@code source_store} as a DuckDB view.</b> A flow run as a
+ * <b>T32 Phase A — seed a pipeline job's {@code source_store} as a DuckDB view.</b> A pipeline run as a
  * {@link com.gamma.job.JobType#PIPELINE} job reads data already at rest (the {@code source_store} a node
  * declares, §3.8) rather than re-acquiring it; this helper registers that store's Hive-partitioned
  * dataset as a view the {@link PipelineExecutor} can seed from, exactly as the Stage-2
  * {@link com.gamma.enrich.EnrichmentEngine} registers its {@code input} view.
  *
  * <p>The store lives under {@code <dataDir>/<store>}; it is read with the shared {@link SqlViews}
- * idiom so a flow job validates against the same dataset shape a real run produces. A
+ * idiom so a pipeline job validates against the same dataset shape a real run produces. A
  * pipeline-shaped store (one with a {@code database/} subtree) reads its mapped output only
- * ({@link SqlViews#storeReadRoot} — the store-layout contract), so a flow can seed directly from an
+ * ({@link SqlViews#storeReadRoot} — the store-layout contract), so a pipeline can seed directly from an
  * ingest pipeline's store by name without a {@code data_dir} override.
  */
 @PublicApi(since = "4.0.0")
@@ -44,7 +44,7 @@ public final class SourceStoreReader {
 
     /**
      * As {@link #registerView(Connection, String, String, String, String)}, but applies an optional
-     * {@code WHERE} predicate to the view — used by incremental flow jobs (T32 Phase C) to read only rows
+     * {@code WHERE} predicate to the view — used by incremental pipeline jobs (T32 Phase C) to read only rows
      * past the stored watermark (e.g. {@code "ts" > '2026-06-01'}). {@code null}/blank ⇒ the full store.
      */
     public static List<String> registerView(Connection conn, String viewName, String dataDir,

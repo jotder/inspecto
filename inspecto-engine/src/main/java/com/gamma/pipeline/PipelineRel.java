@@ -54,7 +54,7 @@ public final class PipelineRel {
     public static final String UNMATCHED = "unmatched";
     /** A sequence gap was detected (→ {@code gap}/{@code alert} node). */
     public static final String GAP = "gap";
-    /** A batch committed (→ {@code enrichment} / a downstream flow trigger). Cross-flow only. */
+    /** A batch committed (→ {@code enrichment} / a downstream pipeline trigger). Cross-pipeline only. */
     public static final String ON_COMMIT = "on_commit";
 
     // ── split relationships (the diverted side of a record operator) ─────────────

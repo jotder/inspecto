@@ -29,7 +29,7 @@ export interface PipelineViewData {
 /**
  * Read-only consumer for `sink.view` pipeline nodes (T32 follow-up): the backend runs a view's captured
  * `derived_sql` over a resource-capped sandbox and returns bounded rows — there is no file/table to
- * browse via {@link DbBrowserService}. 409 (no `derived_sql` yet — the flow hasn't run) and 422 (query
+ * browse via {@link DbBrowserService}. 409 (no `derived_sql` yet — the pipeline hasn't run) and 422 (query
  * failed) surface through {@code apiErrorMessage} at the call site.
  */
 @Injectable({ providedIn: 'root' })

@@ -1,0 +1,43 @@
+name: lookup_step
+active: true
+version: 1
+
+dirs:
+  poll:       spaces/default/data/inbox/lookup_step
+  database:   spaces/default/data/lookup_step/database
+  backup:     spaces/default/data/lookup_step/backup
+  temp:       spaces/default/data/lookup_step/temp
+  errors:     spaces/default/data/lookup_step/errors
+  quarantine: spaces/default/data/lookup_step/quarantine
+  markers:    spaces/default/data/lookup_step/markers
+  status_dir: spaces/default/data/lookup_step/status
+  log_dir:    spaces/default/data/lookup_step/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: spaces/default/config/lookup_step/lookup_step_schema.toon
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+output_store: lookup_step_rollup
+
+steps[1]:
+  - lookup:
+      column: STATUS
+      target: STATUS_LABEL
+      mappings[3]: "NEW=Open", "SHIPPED=Done", "CANCELLED=Void"
+
+collector:
+  discovery: poll
+  connector: local

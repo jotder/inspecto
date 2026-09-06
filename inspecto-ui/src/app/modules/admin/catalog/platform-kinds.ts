@@ -28,7 +28,7 @@ function atomicKind(id: string, label: string): ComponentKind {
     return { id, label, allowedPartKinds: [], wiring: 'none', config: { validate: () => [] } };
 }
 
-// User-facing labels mirror the flow palette taxonomy (PARSE → Parser, TRANSFORM → Transformer, SINK → Writer).
+// User-facing labels mirror the pipeline palette taxonomy (PARSE → Parser, TRANSFORM → Transformer, SINK → Writer).
 export const GRAMMAR_KIND = atomicKind('grammar', 'Parser');
 export const TRANSFORM_KIND = atomicKind('transform', 'Transformer');
 export const SINK_KIND = atomicKind('sink', 'Writer');
@@ -44,9 +44,9 @@ const ATOMIC_KINDS: ComponentKind[] = [GRAMMAR_KIND, TRANSFORM_KIND, SINK_KIND, 
 
 /**
  * The `pipeline` composite kind. Its parts are the registry components its nodes bind (parser / transform /
- * sink …); its `graph` wiring is the authored flow's DAG — `deriveWiring` maps the {@link AuthoredPipeline} edges
- * onto {@link Wiring} edges (the parts supply the nodes). Authoring stays the existing flow editor; exec is the
- * backend pipeline runner. (Deriving the *parts* from a flow needs the palette's type→kind map and lands with
+ * sink …); its `graph` wiring is the authored pipeline's DAG — `deriveWiring` maps the {@link AuthoredPipeline} edges
+ * onto {@link Wiring} edges (the parts supply the nodes). Authoring stays the existing pipeline editor; exec is the
+ * backend pipeline runner. (Deriving the *parts* from a pipeline needs the palette's type→kind map and lands with
  * the P3 reuse-graph, where that catalog is in hand.)
  */
 export const PIPELINE_KIND: ComponentKind<AuthoredPipeline> = {
@@ -57,12 +57,12 @@ export const PIPELINE_KIND: ComponentKind<AuthoredPipeline> = {
     allowedPartKinds: ['grammar', 'transform', 'sink'],
     wiring: 'graph',
     config: { validate: () => [] },
-    deriveWiring: (parts: Part[], flow: AuthoredPipeline): Wiring => ({
+    deriveWiring: (parts: Part[], pipeline: AuthoredPipeline): Wiring => ({
         strategy: 'graph',
         nodes: parts.map((p) => ({ partId: p.partId })),
-        edges: (flow?.edges ?? []).map((e) => ({ from: e.from, to: e.to, rel: e.rel })),
+        edges: (pipeline?.edges ?? []).map((e) => ({ from: e.from, to: e.to, rel: e.rel })),
     }),
-    deriveRefs: (flow: AuthoredPipeline): Ref[] => pipelineRefs(flow as unknown as Record<string, unknown>),
+    deriveRefs: (pipeline: AuthoredPipeline): Ref[] => pipelineRefs(pipeline as unknown as Record<string, unknown>),
     authoring: { editorKey: 'pipeline' },
     exec: { runnerKey: 'pipeline' },
 };

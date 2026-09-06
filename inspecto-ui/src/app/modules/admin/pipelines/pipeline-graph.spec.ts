@@ -57,7 +57,7 @@ const node = (over: Partial<PipelineNode>): PipelineNode => ({
 });
 
 describe('categoryVisualKind', () => {
-    it('maps flow categories onto catalog node kinds for shape/colour reuse', () => {
+    it('maps pipeline categories onto catalog node kinds for shape/colour reuse', () => {
         expect(categoryVisualKind('SOURCE')).toBe('STREAM');
         expect(categoryVisualKind('PARSE')).toBe('SCHEMA');
         expect(categoryVisualKind('TRANSFORM')).toBe('ENRICHMENT');
@@ -124,7 +124,7 @@ describe('toPipelineG6Data', () => {
 });
 
 describe('authoredToG6 last-run overlay (T17)', () => {
-    const flow: AuthoredPipeline = {
+    const pipeline: AuthoredPipeline = {
         name: 'F',
         active: true,
         nodes: [
@@ -143,13 +143,13 @@ describe('authoredToG6 last-run overlay (T17)', () => {
 
     it('paints matching edges with the last-run count and leaves others plain', () => {
         const counts = provenanceCounts([{ nodeId: 'acq', rel: 'data', rowCount: 42 }]);
-        const { edges } = authoredToG6(flow, typeCat, undefined, undefined, counts);
+        const { edges } = authoredToG6(pipeline, typeCat, undefined, undefined, counts);
         expect(edges[0].data).toEqual({ kind: 'data · 42', weight: 42 });
         expect(edges[1].data).toEqual({ kind: 'dropped' });
     });
 
     it('leaves edges plain when no counts are supplied (no run yet / provenance backend unset)', () => {
-        const { edges } = authoredToG6(flow, typeCat);
+        const { edges } = authoredToG6(pipeline, typeCat);
         expect(edges.map((e) => e.data.kind)).toEqual(['data', 'dropped']);
         expect(edges.every((e) => !('weight' in e.data))).toBe(true);
     });
@@ -207,7 +207,7 @@ describe('toCombinedG6Data', () => {
         links: [{ producer: 'orders_etl', store: 'orders', consumer: 'orders_rollup' }],
     };
 
-    it('maps namespaced flow nodes plus the synthetic store node (as a TABLE)', () => {
+    it('maps namespaced pipeline nodes plus the synthetic store node (as a TABLE)', () => {
         const { nodes } = toCombinedG6Data(combined);
         expect(nodes.find((n) => n.id === 'orders_etl/acq')?.data.kind).toBe('STREAM');
         const store = nodes.find((n) => n.id === 'store:orders');
@@ -348,7 +348,7 @@ describe('validatePipeline', () => {
     const refs = new Set(['grammar/cdr_csv']);
 
     it('reports an error for an unconfigured node and blocks activation', () => {
-        const flow: AuthoredPipeline = {
+        const pipeline: AuthoredPipeline = {
             name: 'f',
             active: false,
             nodes: [
@@ -361,18 +361,18 @@ describe('validatePipeline', () => {
                 { from: 'parse', rel: 'data', to: 'write' },
             ],
         };
-        const findings = validatePipeline(flow, typeCat, refs, new Map());
+        const findings = validatePipeline(pipeline, typeCat, refs, new Map());
         expect(findings.some((f) => f.severity === 'error' && f.nodeId === 'parse')).toBe(true);
     });
 
     it('warns when there is no source or no sink', () => {
-        const flow: AuthoredPipeline = {
+        const pipeline: AuthoredPipeline = {
             name: 'f',
             active: false,
             nodes: [{ id: 'parse', type: 'parser', use: 'grammar/cdr_csv' }],
             edges: [],
         };
-        const findings = validatePipeline(flow, typeCat, refs, new Map());
+        const findings = validatePipeline(pipeline, typeCat, refs, new Map());
         expect(findings.some((f) => /no source/i.test(f.message))).toBe(true);
         expect(findings.some((f) => /no writer/i.test(f.message))).toBe(true);
     });

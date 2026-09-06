@@ -114,7 +114,7 @@ public final class ProcessorCatalog {
             p("XFM", "transform.route", "🔀", "heroicons_outline:arrows-pointing-out", "Router — case / clone branches with mid-branch steps", Status.DELIVERED, "transform.route", null, null),
             p("XFM", "transform.summarize", "∑", "heroicons_outline:calculator", "Group-by summarizer (measures grammar)", Status.DELIVERED, "transform.summarize", null, null),
             p("XFM", "transform.join", "🤝", "heroicons_outline:link", "Reference-store join (versioned references)", Status.DELIVERED, "transform.join", null, "at rest only — refused mid-branch (no reference resolver on the ingest lane)"),
-            p("XFM", "transform.lookup", "🗺️", "heroicons_outline:map", "Lookup & static map transcoder", Status.PARTIAL, "transform.join", null, "a reference join covers it; no inline static map"),
+            p("XFM", "transform.lookup", "🗺️", "heroicons_outline:map", "Lookup & static map transcoder", Status.DELIVERED, "transform.lookup", null, "inline key=value map over one column (2026-09-06); a versioned reference is transform.join"),
             p("XFM", "transform.matrix.pivot", "🔀", "heroicons_outline:arrows-up-down", "Dynamic pivot / transpose", Status.PLANNED, null, null, null),
             p("XFM", "transform.matrix.unpivot", "🔄", "heroicons_outline:bars-4", "Unpivot / column flattener", Status.PLANNED, null, null, null),
             p("XFM", "transform.analytics.rank", "🏆", "heroicons_outline:trophy", "Rank & Top-N pruner", Status.PLANNED, null, null, null),

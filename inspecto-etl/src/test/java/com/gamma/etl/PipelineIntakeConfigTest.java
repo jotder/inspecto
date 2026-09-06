@@ -8,14 +8,14 @@ import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * The per-flow {@code processing.intake} admission-control override (T15 follow-up). Every case goes
+ * The per-pipeline {@code processing.intake} admission-control override (T15 follow-up). Every case goes
  * through a real TOON file via {@link PipelineConfigBatchTest#writePipeline} — never a hand-built map —
  * per the {@code steps:}/{@code sinks:} lesson that a config-format claim is only proven through the
  * codec the routes actually write with.
  *
  * <p>The load-bearing property is <b>absent ≠ stated</b>: an absent block (or key) must stay {@code null}
  * so the {@code IntakeGovernor} call site can inherit the live {@code -Dingest.*} global, while a stated
- * {@code max_files_per_cycle: 0} means "explicitly unbounded" (exempts the flow from a fleet-wide cap).
+ * {@code max_files_per_cycle: 0} means "explicitly unbounded" (exempts the pipeline from a fleet-wide cap).
  */
 class PipelineIntakeConfigTest {
 
@@ -59,7 +59,7 @@ class PipelineIntakeConfigTest {
             """;
         PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, intake).toString());
         assertEquals(0, cfg.intake().maxFilesPerCycle(),
-                "a stated 0 must survive as 0 — it exempts this flow from a fleet-wide cap");
+                "a stated 0 must survive as 0 — it exempts this pipeline from a fleet-wide cap");
     }
 
     @Test

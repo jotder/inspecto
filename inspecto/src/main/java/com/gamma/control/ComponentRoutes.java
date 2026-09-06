@@ -31,7 +31,7 @@ import static com.gamma.util.Values.mapAt;
  * Component registry CRUD + scratch preview/test ({@code /components*}, T19/T18, §7.1):
  * grammar/schema/transform/sink components under {@code <write-root>/registry}. Extracted verbatim
  * from {@link ControlApi}: identical routes, HTTP statuses and safe-delete semantics. Safe-delete
- * checks flow references via the shared {@link PipelineSupport#liftedPipelines} projection; previews run on a
+ * checks pipeline references via the shared {@link PipelineSupport#liftedPipelines} projection; previews run on a
  * throwaway DuckDB and never touch production output.
  */
 final class ComponentRoutes implements RouteModule {
@@ -318,7 +318,7 @@ final class ComponentRoutes implements RouteModule {
         }
     }
 
-    /** {@code DELETE /components/{type}/{id}} — safe-delete; 404 if absent, 409 if a flow references it. */
+    /** {@code DELETE /components/{type}/{id}} — safe-delete; 404 if absent, 409 if a pipeline references it. */
     private Object deleteComponent(ApiContext api, com.sun.net.httpserver.HttpExchange ex, String type, String id) throws IOException {
         ComponentStore store = componentStore(api);
         ComponentRegistry.Component current = existing(store, type, id);

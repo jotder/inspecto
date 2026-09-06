@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Pipeline listing and authored-flow read/delete routes ({@code /pipelines}, {@code /pipelines/node-types},
+ * Pipeline listing and authored-pipeline read/delete routes ({@code /pipelines}, {@code /pipelines/node-types},
  * {@code /pipelines/step-types}, {@code /pipelines/combined}, {@code /pipelines/authored*}): the read-only
  * lifted-pipeline projections (T31) and the grandfathered {@code *_flow.toon} reads (W5, plan U-A).
  * Extracted verbatim from {@code PipelineRoutes}: identical routes, order, HTTP statuses and validation.
@@ -74,14 +74,14 @@ final class PipelineListRoutes implements RouteModule {
         return new PipelineStore(SpaceRoot.pipelinesSubdir(WriteGates.requireWriteRoot(api, "pipeline write")));
     }
 
-    /** {@code GET /pipelines/authored} — summaries of every authored flow (empty when no write root). */
+    /** {@code GET /pipelines/authored} — summaries of every authored pipeline (empty when no write root). */
     private Object authoredPipelineList(ApiContext api) {
         Path root = PipelineSupport.pipelinesRootOrNull(api);
         if (root == null) return List.of();
         return new PipelineStore(root).list().stream().map(PipelineProjection::summary).toList();
     }
 
-    /** {@code GET /pipelines/authored/{id}} — one authored flow's graph projection; 404 if absent. */
+    /** {@code GET /pipelines/authored/{id}} — one authored pipeline's graph projection; 404 if absent. */
     private Object authoredPipeline(ApiContext api, String id) {
         Path root = PipelineSupport.pipelinesRootOrNull(api);
         PipelineGraph g = root == null ? null : new PipelineStore(root).get(id).orElse(null);
@@ -91,7 +91,7 @@ final class PipelineListRoutes implements RouteModule {
 
     /**
      * {@code GET /pipelines/authored/{id}/raw} — the <b>lossless</b> authored definition ({@link PipelineCodec#toMap},
-     * nodes with their config) so the editor can round-trip a flow without dropping node config; the
+     * nodes with their config) so the editor can round-trip a pipeline without dropping node config; the
      * {@link #authoredPipeline} projection is structural-only. 404 if absent.
      */
     private Object authoredPipelineRaw(ApiContext api, String id) {
@@ -101,7 +101,7 @@ final class PipelineListRoutes implements RouteModule {
         return PipelineCodec.toMap(g);
     }
 
-    /** {@code DELETE /pipelines/authored/{id}} — remove an authored flow; 404 if absent. */
+    /** {@code DELETE /pipelines/authored/{id}} — remove an authored pipeline; 404 if absent. */
     private Object deletePipeline(ApiContext api, String id) throws IOException {
         PipelineStore store = pipelineStore(api);
         if (!pipelineExists(store, id)) throw new ApiException(404, "no authored pipeline '" + id + "'");

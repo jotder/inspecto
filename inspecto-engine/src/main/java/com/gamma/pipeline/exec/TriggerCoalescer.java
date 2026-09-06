@@ -6,11 +6,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * <b>T13 — event coalescing under the non-overlapping lock.</b> An event-triggered flow (§3.6) does
- * <em>not</em> spawn a run per event; an event marks the entry "work available" and the flow is admitted
+ * <b>T13 — event coalescing under the non-overlapping lock.</b> An event-triggered pipeline (§3.6) does
+ * <em>not</em> spawn a run per event; an event marks the entry "work available" and the pipeline is admitted
  * <b>once</b> under the same non-overlapping guard as a timer tick (§3.5) — so a storm of 1,000
  * file-arrival events collapses to one admitted run that drains the pending set, not 1,000 overlapping
- * runs. <b>A flow never overlaps itself.</b>
+ * runs. <b>A pipeline never overlaps itself.</b>
  *
  * <p>{@link #signal} sets a pending flag and tries to become the single draining thread; whoever is
  * draining loops while pending is set, so events arriving <em>during</em> a run are folded into exactly

@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * {@link PipelineReferences} (T8 — reference scan / safe-delete) and the {@link ComponentRegistry#referencedPaths}
- * primitive (T7 — the component files a flow's mtime fingerprint must include).
+ * primitive (T7 — the component files a pipeline's mtime fingerprint must include).
  */
 class PipelineReferencesTest {
 

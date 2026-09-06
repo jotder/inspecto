@@ -2581,7 +2581,7 @@ describe('PipelineEditorComponent', () => {
         expect(c.unavailable()).toBe(true);
     });
 
-    it('selecting a flow loads its last-run overlay and paints edge counts (T17)', () => {
+    it('selecting a pipeline loads its last-run overlay and paints edge counts (T17)', () => {
         api.provenanceBatches.mockReturnValue(of([{ batchId: 'b2', runTs: '2026-07-18T10:00:00Z', totalRows: 50 }]));
         api.provenance.mockReturnValue(of([{ nodeId: 'src', rel: 'data', rowCount: 50 }]));
         const c = make();

@@ -646,7 +646,7 @@ interface ConsignmentIngestStrategy {
         DuckDbUtil.applyWorkerThreads(conn, effectiveThreads);
         // Per-config value wins; else the server configuration's installed memory_limit, else the
         // -Dprocessing.duckdb.* bootstrap default, so one operator knob caps this path uniformly with
-        // the (config-less) flow-job and enrichment scratch connections.
+        // the (config-less) pipeline-job and enrichment scratch connections.
         DuckDbUtil.applyDuckDbSettings(conn,
                 DuckDbUtil.memoryLimit(cfg.duckdb().memoryLimit()),
                 scratchDir(cfg),

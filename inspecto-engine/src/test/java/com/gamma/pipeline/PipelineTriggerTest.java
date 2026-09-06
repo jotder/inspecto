@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * T13 — {@link PipelineTrigger}: parsing the entry-node {@code trigger:} config into a typed trigger and
- * classifying which of the two schedulers (§3.8) drives the flow; plus the duration convention.
+ * classifying which of the two schedulers (§3.8) drives the pipeline; plus the duration convention.
  */
 class PipelineTriggerTest {
 

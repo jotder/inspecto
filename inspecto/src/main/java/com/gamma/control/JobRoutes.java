@@ -78,7 +78,7 @@ final class JobRoutes implements RouteModule {
         // /jobs/runs/, so it never collides with the exact /jobs/runs or the /jobs/{name}/runs history route.
         api.get("/jobs/runs/([^/]+)", (e, m) -> runById(api, ApiContext.name(m)));
         // Replay a finished at-rest run (the /runs/{name}/reprocess analog for job runs): re-fires the
-        // same job/flow, linked to the original via trigger "replay:<runId>". Fixed /replay tail, so it
+        // same job/pipeline, linked to the original via trigger "replay:<runId>". Fixed /replay tail, so it
         // never collides with the single-segment poll route above. Operating verb → canOperateRuns.
         api.post("/jobs/runs/([^/]+)/replay", ApiContext.withCapability("canOperateRuns",
                 (e, m) -> replayRun(api, e, ApiContext.name(m))));
@@ -112,7 +112,7 @@ final class JobRoutes implements RouteModule {
         // Requires canOperateRuns (W6; a no-op on Personal — no Subject is ever attached there).
         api.post("/jobs/([^/]+)/trigger", ApiContext.withCapability("canOperateRuns", (e, m) -> triggerJob(api, e, ApiContext.name(m))));
 
-        // ── data-plane provenance (T22, §11): per-(node, relationship) record counts of a past flow run,
+        // ── data-plane provenance (T22, §11): per-(node, relationship) record counts of a past pipeline run,
         // for painting quantities onto the PipelineGraph edges (Sankey). 404 unless -Dprovenance.backend is set. ──
         api.get("/provenance", (e, m) -> provenanceData(api, pipelineParam(e), ApiContext.query(e, "batch")));
         api.get("/provenance/batches", (e, m) -> provenanceBatches(api, pipelineParam(e), ApiContext.query(e, "limit")));
@@ -146,7 +146,7 @@ final class JobRoutes implements RouteModule {
     }
 
     /**
-     * {@code POST /jobs/runs/{runId}/replay} — re-fire the job (or ad-hoc flow) behind a finished run.
+     * {@code POST /jobs/runs/{runId}/replay} — re-fire the job (or ad-hoc pipeline) behind a finished run.
      * 404 for an unknown/evicted runId; 409 while that job is currently running (the non-overlap guard,
      * checked here so the caller gets a refusal instead of a silently-SKIPPED run) and when the job is
      * no longer registered. ⚠ The ledger persists no firing parameters, so the replay re-triggers with

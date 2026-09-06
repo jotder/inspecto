@@ -241,7 +241,7 @@ public final class ConfigSpecs {
                         "Files larger than this are streamed in bounded chunks to cap scratch; 0 = disabled. Defaults to 8 GiB — high enough that only pathological single files chunk."),
                 FieldSpec.of("processing.chunking.target_chunk_bytes", "Target chunk size (bytes)", FieldType.LONG,
                         "Approximate size of each chunk when chunking is active; defaults to the threshold."),
-                // Per-flow intake admission-control override (T15 follow-up). Every key is optional and
+                // Per-pipeline intake admission-control override (T15 follow-up). Every key is optional and
                 // inherits its -Dingest.* global when unset — the spec deliberately declares no defaults,
                 // because "absent" must stay distinguishable from "stated" (an absent key inherits live).
                 FieldSpec.of("processing.intake.max_files_per_cycle", "Intake cap (files/cycle)", FieldType.INT,

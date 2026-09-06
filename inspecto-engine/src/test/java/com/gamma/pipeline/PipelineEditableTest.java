@@ -509,6 +509,23 @@ class PipelineEditableTest {
                 "lift -> lower reproduces the stored file byte for byte");
     }
 
+    /** A lookup is a chain step with no singular block: it lowers to {@code steps:} verbatim, like sql. */
+    @Test
+    void aLookupStepLowersToStepsVerbatimAndForcesTheStepsForm() {
+        Map<String, Object> cfg = new LinkedHashMap<>();
+        cfg.put("column", "STATUS");
+        cfg.put("mappings", List.of("NEW=Open", "SHIPPED=Done"));
+        cfg.put("target", "STATUS_LABEL");
+        assertChain(List.of("lookup"), node("l", "transform.lookup", cfg));
+        Map<String, Object> out = PipelineEditable.lower(graphWith(node("l", "transform.lookup", cfg)),
+                new LinkedHashMap<>(), true);
+        Map<?, ?> step = (Map<?, ?>) ((List<?>) out.get("steps")).get(0);
+        assertEquals(cfg, step.get("lookup"), "the config travels verbatim — no legacy spelling exists for it");
+        // beside a filter, which HAS a singular block, the chain still takes steps: because lookup has none
+        assertChain(List.of("filter", "lookup"),
+                node("f", "transform.filter", Map.of("where", "GROSS > 0")), node("l", "transform.lookup", cfg));
+    }
+
     /** Lower {@code extra} and assert the {@code steps:} kinds it produced, in order. */
     private static void assertChain(List<String> expected, PipelineNode... extra) {
         Map<String, Object> out = PipelineEditable.lower(graphWith(extra), new LinkedHashMap<>(), true);

@@ -16,7 +16,7 @@ import java.util.Set;
  * Structural validation of a {@link PipelineGraph} before it is executed or accepted from the UI
  * (doc §14 T14, §13 R5, §12 B7). Unlike {@link com.gamma.etl.ConfigValidator} — which only emits
  * non-fatal warnings about suspicious-but-legal {@code *_pipeline.toon} settings — this validator
- * distinguishes hard {@link Severity#ERROR}s that make a flow <b>unexecutable</b> (a cycle, a
+ * distinguishes hard {@link Severity#ERROR}s that make a pipeline <b>unexecutable</b> (a cycle, a
  * dangling edge) from {@link Severity#WARNING}s, so the executor and the future authoring API can
  * <em>reject</em> a broken graph rather than fail mid-run.
  *
@@ -25,14 +25,14 @@ import java.util.Set;
  *   <li><b>DAG over {@code data} edges</b> — a cycle in the record-set subgraph is rejected; flows
  *       are DAGs so the topological walk terminates (B7 / D10). Control + split + {@code route:*}
  *       edges are excluded from the cycle check, matching the executor's walk.</li>
- *   <li><b>No same-graph {@code on_commit}</b> (R5) — {@code on_commit} is <em>cross-flow only</em>
- *       (it triggers a downstream flow); an {@code on_commit} edge whose target is a node in this
+ *   <li><b>No same-graph {@code on_commit}</b> (R5) — {@code on_commit} is <em>cross-pipeline only</em>
+ *       (it triggers a downstream pipeline); an {@code on_commit} edge whose target is a node in this
  *       same graph would be a cycle the data-edge check can't see, so it is rejected here.</li>
  *   <li><b>No dangling endpoints</b> — every edge's {@code from} must be a node in the graph, and so
  *       must its {@code to} <em>unless</em> the edge is {@code on_commit} (whose {@code to} names
- *       another flow, not a local node).</li>
+ *       another pipeline, not a local node).</li>
  *   <li><b>No duplicate node ids</b> and <b>at least one entry (trigger) node</b> for a non-empty
- *       graph (nothing can start a flow in which every node has an inbound edge).</li>
+ *       graph (nothing can start a pipeline in which every node has an inbound edge).</li>
  *   <li><b>Relationship wiring against the node-output contract</b> (T9): an edge's relationship must
  *       be one its source node type {@link PipelineNodeType#emits() emits} (or a {@code route:*} branch
  *       when it {@link PipelineNodeType#emitsNamedRoutes() emits named routes}); a {@code data} edge's
@@ -200,7 +200,7 @@ public final class PipelineValidator {
         return ids;
     }
 
-    /** Every edge endpoint must resolve to a local node — except an {@code on_commit} target (cross-flow). */
+    /** Every edge endpoint must resolve to a local node — except an {@code on_commit} target (cross-pipeline). */
     private static void checkEdgeEndpoints(PipelineGraph g, Set<String> ids, List<Issue> issues) {
         for (PipelineEdge e : g.edges()) {
             if (!ids.contains(e.from())) {
@@ -209,7 +209,7 @@ public final class PipelineValidator {
             }
             boolean onCommit = PipelineRel.ON_COMMIT.equals(e.rel());
             if (onCommit) {
-                // on_commit is cross-flow only: a local target is a hidden cycle (R5).
+                // on_commit is cross-pipeline only: a local target is a hidden cycle (R5).
                 if (ids.contains(e.to())) {
                     issues.add(new Issue(Severity.ERROR, ON_COMMIT_SAME_GRAPH,
                             "on_commit edge from '" + e.from() + "' targets node '" + e.to()
@@ -357,7 +357,7 @@ public final class PipelineValidator {
             } else if (!PipelineRel.ON_COMMIT.equals(e.rel())) {
                 // Neighbour pairing for an outcome/route edge (A6): the target must accept the
                 // relationship, or accept data (the handler exemption — a reject/route stream is
-                // rows to a row-consumer). on_commit is cross-flow, its target is not a local node.
+                // rows to a row-consumer). on_commit is cross-pipeline, its target is not a local node.
                 PipelineNode to = byId.get(e.to());
                 if (to != null) {
                     PipelineNodeTypes.get(to.type()).ifPresent(dst -> {

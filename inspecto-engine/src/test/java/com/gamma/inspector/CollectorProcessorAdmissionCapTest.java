@@ -64,7 +64,7 @@ class CollectorProcessorAdmissionCapTest {
         assertEquals(0, CollectorProcessor.countPending(cfg), "no cap ⇒ pre-T15 behaviour, all 6 in one cycle");
     }
 
-    /** The per-flow {@code processing.intake} override (T15 follow-up), end-to-end through the real
+    /** The per-pipeline {@code processing.intake} override (T15 follow-up), end-to-end through the real
      *  ingest path: the fleet is UNCAPPED (the global default) and this one pipeline's own TOON block
      *  is what bounds its cycle — proving {@code admit()} installs the override before reading the cap. */
     @Test
@@ -86,11 +86,11 @@ class CollectorProcessorAdmissionCapTest {
 
         CollectorProcessor.run(cfg);
         assertEquals(4, CollectorProcessor.countPending(cfg),
-                "the flow's own cap 2 of 6 admitted while the fleet default stays unbounded");
+                "the pipeline's own cap 2 of 6 admitted while the fleet default stays unbounded");
 
         CollectorProcessor.run(cfg);
         CollectorProcessor.run(cfg);
-        assertEquals(0, CollectorProcessor.countPending(cfg), "a per-flow-capped inbox still drains fully");
+        assertEquals(0, CollectorProcessor.countPending(cfg), "a per-pipeline-capped inbox still drains fully");
     }
 
     @Test

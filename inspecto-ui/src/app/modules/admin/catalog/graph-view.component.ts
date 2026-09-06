@@ -326,7 +326,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
             // several-hundred-node `autoFit: 'view'` legitimately needs to zoom well out.
             zoomRange: [0.05, 4],
             node: {
-                // Icon tile (rounded rect + glyph) when the data carries a resolved icon (flow/pipeline views);
+                // Icon tile (rounded rect + glyph) when the data carries a resolved icon (pipeline views);
                 // otherwise the per-kind shape (the catalog metadata graph).
                 type: (d) => (iconOf(d) ? 'rect' : (display?.nodeShapes[kindOf(d)] ?? nodeShape(kindOf(d)))),
                 style: {

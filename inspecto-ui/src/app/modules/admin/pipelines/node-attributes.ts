@@ -341,6 +341,41 @@ const NODE_ATTRIBUTES: Record<string, AttributeSpec[]> = {
             placeholder: 'currency',
         },
     ],
+    // Inline static-map transcoder (2026-09-06, the first PARTIAL Step Processor delivered). The map is a
+    // `list` of key=value strings — the one spelling; a map-valued attribute type is refused on purpose.
+    'transform.lookup': [
+        {
+            key: 'column',
+            label: 'Column to transcode',
+            type: 'string',
+            tier: 'required',
+            help: 'The typed, mapped column whose values are looked up.',
+            placeholder: 'STATUS',
+        },
+        {
+            key: 'mappings',
+            label: 'Mappings (key=value)',
+            type: 'list',
+            tier: 'required',
+            help: 'One entry per code: the value found in the column, an equals sign, the value to write. Compared as text.',
+            placeholder: 'NEW=Open',
+        },
+        {
+            key: 'target',
+            label: 'Write to column',
+            type: 'string',
+            tier: 'optional',
+            help: 'A new column for the result. Leave blank to replace the source column in place.',
+            placeholder: 'STATUS_LABEL',
+        },
+        {
+            key: 'default',
+            label: 'Unmatched values become',
+            type: 'string',
+            tier: 'optional',
+            help: 'The literal written when no mapping matches. Leave blank to pass unmatched values through unchanged.',
+        },
+    ],
     // SQL transformer v1 (sql-transform-v1-plan.md, B1) — one author SELECT over the typed input.
     // No `where` here on purpose (D3): filtering stays a separate transform.filter Step.
     'transform.sql': [

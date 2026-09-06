@@ -9,7 +9,7 @@ import { Finding } from './models';
  *  `requirement` backs the Business Requirements-intake queue (C1). Every kind here is backend-persisted —
  *  keep this union in lockstep with `WRITABLE_TYPES`, since a kind the server does not know 400s on every
  *  list/create/remove (that is exactly how `rule-template` stayed broken; the mock served it regardless).
- *  None of the extras are in {@link COMPONENT_TYPES} (not flow-node palette components). */
+ *  None of the extras are in {@link COMPONENT_TYPES} (not pipeline-node palette components). */
 export type ComponentType =
     | 'grammar'
     | 'schema'

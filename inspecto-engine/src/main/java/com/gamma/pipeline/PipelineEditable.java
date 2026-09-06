@@ -139,6 +139,7 @@ public final class PipelineEditable {
             BuiltinNodeType.TRANSFORM_SUMMARIZE.type(), // group-by rollup → processing.summarize (ELT P3), authoring-only
             BuiltinNodeType.TRANSFORM_JOIN.type(),      // reference join → processing.join (ELT P3 S2), authoring-only
             BuiltinNodeType.TRANSFORM_FILTER.type(),
+            BuiltinNodeType.TRANSFORM_LOOKUP.type(),    // inline static map → steps: kind lookup (2026-09-06)
             BuiltinNodeType.TRANSFORM_SQL.type(),       // one SELECT over the typed input → steps: kind sql
             BuiltinNodeType.SINK_PERSISTENT.type(), BuiltinNodeType.ENRICHMENT.type());
 
@@ -161,6 +162,7 @@ public final class PipelineEditable {
             BuiltinNodeType.TRANSFORM_DEDUP.type(),     PipelineConfig.Step.DEDUP,
             BuiltinNodeType.TRANSFORM_SUMMARIZE.type(), PipelineConfig.Step.SUMMARIZE,
             BuiltinNodeType.TRANSFORM_ROUTE.type(),     PipelineConfig.Step.ROUTE,
+            BuiltinNodeType.TRANSFORM_LOOKUP.type(),    PipelineConfig.Step.LOOKUP,
             BuiltinNodeType.TRANSFORM_SQL.type(),       PipelineConfig.Step.SQL);
 
     /**
@@ -1035,7 +1037,7 @@ public final class PipelineEditable {
             // cannot hold a step type they have never heard of. Such a chain must take `steps:`.
             // `sql` IS in KINDS (the parser accepts it standalone) but has no singular block either.
             String kind = STEP_KIND.get(n.type());
-            if (PipelineConfig.Step.SQL.equals(kind)) return false;
+            if (PipelineConfig.Step.SQL.equals(kind) || PipelineConfig.Step.LOOKUP.equals(kind)) return false;
             int position = PipelineConfig.Step.KINDS.indexOf(kind);
             if (position <= previous) return false;
             previous = position;

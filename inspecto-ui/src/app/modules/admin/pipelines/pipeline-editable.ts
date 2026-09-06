@@ -35,6 +35,7 @@ export const LOWERABLE = new Set([
     // read-compat only since P5-a: never emitted by the lift, still accepted by lower
     'transform.dedup.marker',
     'transform.filter',
+    'transform.lookup', // inline key=value transcoder over one column (2026-09-06) — steps: kind lookup
     'transform.sql', // the projection slot (id map / map_<key>) — a Record Transformer; transform.map is gone
     'sink.persistent',
     'enrichment',

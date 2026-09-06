@@ -12,7 +12,7 @@ import java.nio.file.StandardCopyOption;
  *
  * <p>The rename uses {@link StandardCopyOption#ATOMIC_MOVE} where the filesystem supports it,
  * falling back to a plain replacing move otherwise. Consolidated from five byte-identical inline
- * copies (the {@code config} and {@code connection} writes in the control API, plus the flow,
+ * copies (the {@code config} and {@code connection} writes in the control API, plus the pipeline,
  * component and view stores).
  */
 public final class AtomicFiles {

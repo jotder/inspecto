@@ -159,6 +159,7 @@ public final class RecipeConverter {
                     case PipelineConfig.Step.DEDUP -> steps.add(step("dedup", dedupStep(cfg)));
                     case PipelineConfig.Step.SUMMARIZE -> steps.add(step("summarize", summarizeStep(cfg)));
                     case PipelineConfig.Step.SQL -> steps.add(step("sql", sqlStep(cfg)));
+                    case PipelineConfig.Step.LOOKUP -> steps.add(step("lookup", new LinkedHashMap<>(cfg)));
                     case PipelineConfig.Step.ROUTE -> {
                         steps.add(step("route", routeStep(cfg, sink, extraSinks, dirs)));
                         routed = true;
@@ -268,6 +269,7 @@ public final class RecipeConverter {
                             case PipelineConfig.Step.DEDUP -> branchSteps.add(step("dedup", dedupStep(cfg)));
                             case PipelineConfig.Step.SUMMARIZE -> branchSteps.add(step("summarize", summarizeStep(cfg)));
                             case PipelineConfig.Step.SQL -> branchSteps.add(step("sql", sqlStep(cfg)));
+                            case PipelineConfig.Step.LOOKUP -> branchSteps.add(step("lookup", new LinkedHashMap<>(cfg)));
                             default -> branchSteps.add(step(kind, cfg));
                         }
                     }

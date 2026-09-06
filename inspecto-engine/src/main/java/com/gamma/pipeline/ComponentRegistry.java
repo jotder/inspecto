@@ -26,7 +26,7 @@ import java.util.Set;
  * identity-vs-filename reconciliation — so a component can be renamed/relocated on disk without breaking
  * {@code use:} references.
  *
- * <p>Phase-2 scope (decided): this is <b>additive flow-layer infrastructure</b> consumed by the flow world
+ * <p>Phase-2 scope (decided): this is <b>additive pipeline-layer infrastructure</b> consumed by the pipeline world
  * ({@link PipelineNode#use()} + future {@code *_flow.toon} authoring). It does <em>not</em> touch the legacy
  * {@code *_pipeline.toon} loader. Resolution overlays a node's local config over the referenced component's
  * content ("reference, override only what's local"). v1 has no version pinning — a component resolves to its
@@ -236,8 +236,8 @@ public final class ComponentRegistry {
     }
 
     /**
-     * The on-disk files backing a graph's resolvable {@code use:} references — so a flow cache can fold them
-     * into its mtime fingerprint (T7), reloading a flow exactly when a shared component it references changes
+     * The on-disk files backing a graph's resolvable {@code use:} references — so a pipeline cache can fold them
+     * into its mtime fingerprint (T7), reloading a pipeline exactly when a shared component it references changes
      * (the same pattern {@link com.gamma.service.ConfigRegistry} uses for {@code referencedFiles()}).
      * Unresolvable references (a plugin {@code ingester/<fqcn>} class ref, or a dangling name) contribute nothing.
      */

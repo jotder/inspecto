@@ -1438,10 +1438,10 @@ final class InspectoTools {
     }
 
     /**
-     * AGT-5 P2 {@code pipeline_author} (plan §8): parse a proposed authored-flow graph (nodes + edges)
+     * AGT-5 P2 {@code pipeline_author} (plan §8): parse a proposed authored-pipeline graph (nodes + edges)
      * and — when the caller supplies sample rows — simulate its {@code transform → sink} subgraph on a
      * throwaway DuckDB, reporting the per-node produced-relation counts and each sink's row count. This
-     * is the flow-world "parser test + simulate": the model tests a pipeline draft (the same
+     * is the pipeline-world "parser test + simulate": the model tests a pipeline draft (the same
      * {@link PipelineDryRun} the editor's dry-run uses) before a human applies it. Persists nothing;
      * a malformed graph or a failing simulate is an {@code ok=false} result, never a throw.
      */
@@ -1456,11 +1456,11 @@ final class InspectoTools {
                         + "\"required\":[\"flow\"]}",
                 false, Role.USER, Capability.AUTHOR_PIPELINE);
         return new FunctionTool(spec, call -> {
-            Map<String, Object> flow = mapArg(call, "flow");
-            if (flow == null) return error("flow is required and must be an object");
+            Map<String, Object> pipeline = mapArg(call, "flow");
+            if (pipeline == null) return error("flow is required and must be an object");
             PipelineGraph g;
             try {
-                g = PipelineCodec.fromMap(flow);
+                g = PipelineCodec.fromMap(pipeline);
             } catch (IllegalArgumentException e) {
                 return error("invalid flow: " + e.getMessage());
             }

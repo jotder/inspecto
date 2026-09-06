@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class DeletionFenceTest {
 
-    /** A flow that produces {@code store} via a sink of the given subtype. */
+    /** A pipeline that produces {@code store} via a sink of the given subtype. */
     private static PipelineGraph producer(String name, String store, String sinkType) {
         return new PipelineGraph(name, true,
                 List.of(PipelineNode.of("acq", "acquisition"),
@@ -22,7 +22,7 @@ class DeletionFenceTest {
                 List.of(PipelineEdge.data("acq", "sink")));
     }
 
-    /** A flow that consumes {@code store} at rest. */
+    /** A pipeline that consumes {@code store} at rest. */
     private static PipelineGraph consumer(String name, String store) {
         return new PipelineGraph(name, true,
                 List.of(new PipelineNode("src", "transform.sql", "read", null,

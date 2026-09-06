@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
  * <em>read</em> path — it does not materialize anything (Matrices materialization stays a separate
  * backend-backlog concern). Two forms:
  * <ul>
- *   <li>{@code {view: "<store>"}} — the flow-produced {@link ViewDefinition}'s
+ *   <li>{@code {view: "<store>"}} — the pipeline-produced {@link ViewDefinition}'s
  *       {@link ViewDefinition#derivedSql() derived SQL} (which already embeds its physical paths).</li>
  *   <li>{@code {physicalRef: "<store>"}} — a {@code read_parquet('<dataDir>/<store>/**')} glob
  *       over the space's at-rest data (the same physical layout {@code ViewQuery} reads). Always

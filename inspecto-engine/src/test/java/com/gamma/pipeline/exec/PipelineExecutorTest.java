@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * T12 — {@link PipelineExecutor} end-to-end over embedded DuckDB: a {@code parse → filter → route → 2 sinks}
- * flow is walked topologically, each transform runs through {@link RowShaper} (T10), relations are routed
+ * pipeline is walked topologically, each transform runs through {@link RowShaper} (T10), relations are routed
  * along the edges to the right sink, and the {@link BranchCommitCoordinator} (T11) commits both sink
  * branches then finalises the source exactly once.
  */

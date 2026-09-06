@@ -11,12 +11,12 @@ import java.util.Map;
 
 /**
  * Serialises a {@link PipelineGraph} to / from a plain {@code Map} for authored {@code *_flow.toon} persistence
- * (doc §7.1 / §14 T19) — the inverse pair used by the flow CRUD endpoints + {@link PipelineStore}. Unlike the
+ * (doc §7.1 / §14 T19) — the inverse pair used by the pipeline CRUD endpoints + {@link PipelineStore}. Unlike the
  * read-only {@link PipelineProjection} (a UI-shaped, structural-only view), this is a <b>lossless</b> round-trip
  * of the authoring IR: every node's {@code id}/{@code type}/{@code name}/{@code description}/{@code use} and
  * its full local {@code config}, plus every relationship-typed edge.
  *
- * <p>Authored-flow config is plain nested maps (not the live typed {@code PipelineConfig} records the legacy
+ * <p>Authored-pipeline config is plain nested maps (not the live typed {@code PipelineConfig} records the legacy
  * lift carries), so the round-trip is a straightforward map copy. Pure functions — no engine, no I/O.
  */
 @PublicApi(since = "4.0.0")

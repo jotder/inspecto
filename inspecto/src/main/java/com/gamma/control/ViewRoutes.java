@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Read-only access to the durable {@code sink.view} definitions a flow job records ({@code /views*}):
+ * Read-only access to the durable {@code sink.view} definitions a pipeline job records ({@code /views*}):
  * list, one definition, and a bounded data preview. Extracted verbatim from {@link ControlApi}:
  * identical routes, HTTP statuses (400/404/409/422) and row-cap behaviour.
  */
@@ -49,7 +49,7 @@ final class ViewRoutes implements RouteModule {
     /**
      * {@code GET /views/{name}/data?limit=N} — run the view's {@code derived_sql} and return up to {@code N}
      * rows (default {@value #DEFAULT_VIEW_ROW_CAP}, capped at {@value #MAX_VIEW_ROW_CAP}). 404 if the view is
-     * absent; 409 if it has no {@code derived_sql} (a multi-statement view — re-run its flow); 422 on a query
+     * absent; 409 if it has no {@code derived_sql} (a multi-statement view — re-run its pipeline); 422 on a query
      * error (e.g. the source store has no data yet).
      */
     private Object viewData(ApiContext api, String name, String limitParam) {

@@ -57,6 +57,68 @@ class RowShaperTest {
         assertEquals(List.of(2), ids(out.table(PipelineRel.DROPPED), "id"));
     }
 
+    // ── lookup (inline static map, 2026-09-06) ──────────────────────────────────
+
+    @Test
+    void lookupTranscodesInPlaceAndPassesUnmatchedThrough() throws Exception {
+        seedSrc();
+        var out = run(PipelineNode.of("l", "transform.lookup",
+                Map.of("column", "grp", "mappings", List.of("a=Alpha"))));
+        assertEquals(List.of("Alpha", "b", "Alpha"), strings(out.table(PipelineRel.DATA), "grp"),
+                "ids 1 and 3 (grp a) are transcoded in place; id 2 (grp b) has no mapping and passes through");
+        assertEquals(3, ids(out.table(PipelineRel.DATA), "id").size(), "a lookup never changes row counts");
+    }
+
+    @Test
+    void lookupWritesATargetColumnAndAppliesTheDefault() throws Exception {
+        seedSrc();
+        var out = run(PipelineNode.of("l", "transform.lookup", Map.of(
+                "column", "amt", "mappings", List.of("150=low", "200=high"), "default", "other", "target", "band")));
+        assertEquals(List.of("low", "other", "high"), strings(out.table(PipelineRel.DATA), "band"),
+                "a numeric column maps by its text; the unmatched row takes the default");
+        assertEquals(List.of(150, 50, 200), ints(out.table(PipelineRel.DATA), "amt"), "the source column is untouched");
+    }
+
+    @Test
+    void lookupLiteralsAreQuotedNotInterpolated() throws Exception {
+        seedSrc();
+        // a value carrying a quote and SQL: it must land as text, never run
+        var out = run(PipelineNode.of("l", "transform.lookup", Map.of(
+                "column", "grp", "mappings", List.of("a=O'Brien'); DROP TABLE src; --"), "target", "t")));
+        assertEquals(List.of("O'Brien'); DROP TABLE src; --", "b", "O'Brien'); DROP TABLE src; --"),
+                strings(out.table(PipelineRel.DATA), "t"));
+        assertEquals(3, ids("src", "id").size(), "the source table is still there");
+    }
+
+    @Test
+    void lookupRefusesAMissingColumnOrMappingAndAMalformedEntry() throws Exception {
+        seedSrc();
+        assertThrows(IllegalArgumentException.class,
+                () -> run(PipelineNode.of("l", "transform.lookup", Map.of("mappings", List.of("a=b")))));
+        assertThrows(IllegalArgumentException.class,
+                () -> run(PipelineNode.of("l", "transform.lookup", Map.of("column", "grp"))));
+        assertThrows(IllegalArgumentException.class,
+                () -> run(PipelineNode.of("l", "transform.lookup", Map.of("column", "grp", "mappings", List.of("no-equals")))));
+    }
+
+    private List<String> strings(String table, String col) throws SQLException {
+        List<String> out = new ArrayList<>();
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT \"" + col + "\" FROM \"" + table + "\" ORDER BY id")) {
+            while (rs.next()) out.add(rs.getString(1));
+        }
+        return out;
+    }
+
+    private List<Integer> ints(String table, String col) throws SQLException {
+        List<Integer> out = new ArrayList<>();
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT \"" + col + "\" FROM \"" + table + "\" ORDER BY id")) {
+            while (rs.next()) out.add(rs.getInt(1));
+        }
+        return out;
+    }
+
     @Test
     void validateSplitsValidAndInvalid_nullPredicateGoesInvalid() throws Exception {
         // grp='a' for ids 1,3; NULLIF makes id 2's predicate NULL -> must land in invalid, not data

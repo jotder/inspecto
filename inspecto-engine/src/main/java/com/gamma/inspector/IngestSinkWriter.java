@@ -25,7 +25,7 @@ import java.util.Map;
  * {@link ConsignmentIngestStrategy#writeAndTrace} does for the flat path, minus the fan-out (a route branch
  * is one destination by construction).
  *
- * <p><b>Why not {@code PartitionSinkWriter}:</b> that writer is flow-job-shaped — it writes every
+ * <p><b>Why not {@code PartitionSinkWriter}:</b> that writer is pipeline-job-shaped — it writes every
  * store under one {@code dataDir} root, ignores the sink node's {@code database}, passes no
  * {@code srcIdToFile} (so {@code filename_column} translation is lost), collects no lineage, and
  * registers §11.3 rows itself. The ingest path needs the opposite on every count: destination-rooted

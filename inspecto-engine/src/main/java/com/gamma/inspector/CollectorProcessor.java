@@ -353,7 +353,7 @@ public class CollectorProcessor {
         if (emitSignals) candidates = CommitRetry.due(cfg, candidates);
         // T15 admission control: bound what ONE cycle admits (§3.5). Applied only on the run path — a
         // read-only pending scan must keep reporting the true backlog — and only when an operator set
-        // -Dingest.maxFilesPerCycle or the pipeline's own processing.intake block (per-flow override),
+        // -Dingest.maxFilesPerCycle or the pipeline's own processing.intake block (per-pipeline override),
         // so the default path is byte-for-byte the pre-T15 behaviour. Files
         // beyond the cap are simply not admitted this cycle: they stay in the durable inbox (uncommitted,
         // so no marker/ledger entry hides them) and the next cycle sees them again.
@@ -402,7 +402,7 @@ public class CollectorProcessor {
      */
     private static List<File> admit(PipelineConfig cfg, List<File> candidates) {
         IntakeGovernor gov = IntakeGovernor.shared();
-        // Per-flow processing.intake override, installed idempotently every cycle so a hot-reloaded
+        // Per-pipeline processing.intake override, installed idempotently every cycle so a hot-reloaded
         // edit applies next cycle and removing the block restores the -D globals (T15 follow-up).
         gov.configure(cfg.identity().pipelineName(), intakePolicy(cfg, gov.policy()));
         int cap = gov.capFor(cfg.identity().pipelineName());
@@ -415,7 +415,7 @@ public class CollectorProcessor {
     }
 
     /**
-     * The pipeline's {@code processing.intake} block resolved against the {@code -D} globals — the per-flow
+     * The pipeline's {@code processing.intake} block resolved against the {@code -D} globals — the per-pipeline
      * {@link IntakeGovernor.Policy}, or {@code null} when the block is absent (inherit the globals whole).
      * Resolution lives here rather than in the config module because only this side knows the runtime
      * defaults; each stated field wins, each unset field inherits its global counterpart.

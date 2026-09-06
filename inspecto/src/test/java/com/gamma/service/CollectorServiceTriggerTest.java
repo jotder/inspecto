@@ -114,7 +114,7 @@ class CollectorServiceTriggerTest {
         Path plain = pipeline(dir.resolve("p"), "PLAIN", null);
         try (CollectorService svc = new CollectorService(List.of(cron, plain), 3600, 2)) {
             assertEquals(1, svc.runAllOnce().total(),
-                    "only the untriggered pipeline runs; the cron flow is not yet due");
+                    "only the untriggered pipeline runs; the cron pipeline is not yet due");
             assertEquals(0, outputCount(dir.resolve("c")), "the cron pipeline did not run");
             assertTrue(outputCount(dir.resolve("p")) >= 1, "the plain pipeline did run");
         }
@@ -139,7 +139,7 @@ class CollectorServiceTriggerTest {
             });
             svc.start();   // wires the upstream-commit bus subscriber (poll interval 3600s won't interfere)
 
-            assertEquals(0, svc.runAllOnce().total(), "neither flow is loop-driven (manual + event)");
+            assertEquals(0, svc.runAllOnce().total(), "neither pipeline is loop-driven (manual + event)");
 
             // drive the upstream: its commit event signals the downstream's coalescer (off the bus thread)
             svc.runPipeline("up_stream").orElseThrow();
@@ -151,7 +151,7 @@ class CollectorServiceTriggerTest {
 
     /**
      * ELT Phase 3 S3b: a {@code dataset.write} Signal drives a {@code {type: event, on: dataset,
-     * from: datasets/<id>}} flow — and ONLY that Signal does. The fence half matters as much as the
+     * from: datasets/<id>}} pipeline — and ONLY that Signal does. The fence half matters as much as the
      * firing half: {@code triggerMatches}' suffix rule cannot tell {@code datasets/orders_rollup} from
      * a PIPELINE named {@code orders_rollup} committing, so without the {@code on: dataset} fence in
      * {@code onUpstreamCommit} the trigger would fire on both namespaces.
@@ -171,7 +171,7 @@ class CollectorServiceTriggerTest {
             });
             svc.start();   // wires both the bus subscriber and the S3b dataset.write ledger subscriber
 
-            assertEquals(0, svc.runAllOnce().total(), "neither flow is loop-driven (manual + event)");
+            assertEquals(0, svc.runAllOnce().total(), "neither pipeline is loop-driven (manual + event)");
 
             // the decoy pipeline commits — same suffix as the dataset ref, wrong namespace: no fire
             svc.runPipeline("orders_rollup").orElseThrow();
@@ -181,7 +181,7 @@ class CollectorServiceTriggerTest {
             // the real thing: a dataset.write Signal on this space's ledger
             com.gamma.signal.DatasetWriteSignal.emit("orders_rollup", 7, "materialize:test");
             assertTrue(downCommitted.await(10, TimeUnit.SECONDS),
-                    "the dataset-triggered flow ran when its Dataset was written");
+                    "the dataset-triggered pipeline ran when its Dataset was written");
             assertTrue(outputCount(dir.resolve("down")) >= 1, "the triggered run produced output");
         }
     }

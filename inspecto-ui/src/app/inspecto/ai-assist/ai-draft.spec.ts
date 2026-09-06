@@ -103,7 +103,7 @@ describe('adaptToolResult', () => {
 
     it('surfaces a pipeline_author topology finding instead of claiming every graph is clean', () => {
         // A5.3: the tool validates structurally now. Hardcoding clean:true here would render a dangling
-        // edge as a green draft and invite the operator to apply an unexecutable flow.
+        // edge as a green draft and invite the operator to apply an unexecutable pipeline.
         const drafts = adaptToolResult('pipeline_author', {
             name: 'orders_flow',
             flow: { name: 'orders_flow', nodes: [{ id: 'acq' }] },

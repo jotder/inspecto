@@ -12,10 +12,10 @@ import java.nio.file.Path;
 import java.util.Optional;
 
 /**
- * <b>T32 Phase C — durable high-watermark for an incremental flow job.</b> Keyed by {@code (flow, store)},
+ * <b>T32 Phase C — durable high-watermark for an incremental pipeline job.</b> Keyed by {@code (pipeline, store)},
  * it remembers the largest value of the job's {@code incremental_column} processed so far, so the next run
  * reads only rows past it (append) rather than recomputing the whole {@code source_store}. One small file per
- * key under the jobs audit dir ({@code <flow>__<store>.watermark}); the value is the column's {@code max()}
+ * key under the jobs audit dir ({@code <pipeline>__<store>.watermark}); the value is the column's {@code max()}
  * rendered as text and re-applied as a SQL literal. Absent file ⇒ first run ⇒ read everything.
  *
  * <p>Persisted <em>after</em> the branch commit (same stranding-safety rationale as the acquisition ledger):
@@ -33,9 +33,9 @@ public final class PipelineWatermarkStore {
         this.dir = dir.normalize();
     }
 
-    /** The last watermark for {@code (flow, store)}, if a prior run recorded one. */
-    public Optional<String> get(String flow, String store) {
-        Path f = fileFor(flow, store);
+    /** The last watermark for {@code (pipeline, store)}, if a prior run recorded one. */
+    public Optional<String> get(String pipeline, String store) {
+        Path f = fileFor(pipeline, store);
         if (!Files.isRegularFile(f)) return Optional.empty();
         try {
             String v = Files.readString(f, StandardCharsets.UTF_8).strip();
@@ -46,14 +46,14 @@ public final class PipelineWatermarkStore {
         }
     }
 
-    /** Record the new watermark for {@code (flow, store)} (last write wins). */
-    public void put(String flow, String store, String watermark) throws IOException {
-        Path f = fileFor(flow, store);
+    /** Record the new watermark for {@code (pipeline, store)} (last write wins). */
+    public void put(String pipeline, String store, String watermark) throws IOException {
+        Path f = fileFor(pipeline, store);
         Files.createDirectories(f.getParent());
         Files.writeString(f, watermark, StandardCharsets.UTF_8);
     }
 
-    private Path fileFor(String flow, String store) {
-        return dir.resolve(Values.fileSafe(flow) + "__" + Values.fileSafe(store) + ".watermark");
+    private Path fileFor(String pipeline, String store) {
+        return dir.resolve(Values.fileSafe(pipeline) + "__" + Values.fileSafe(store) + ".watermark");
     }
 }

@@ -75,12 +75,12 @@ public final class PipelineStores {
         return out;
     }
 
-    /** A derived producer→consumer relationship over a shared store (a cross-flow {@code on_commit} link). */
+    /** A derived producer→consumer relationship over a shared store (a cross-pipeline {@code on_commit} link). */
     public record Link(String producer, String store, String consumer) {}
 
     /**
-     * Superimpose the given flows: for every store a flow {@link #consumed(PipelineGraph) consumes}, link it
-     * to each flow that {@link #produced(PipelineGraph) produces} that store. A flow is never linked to itself.
+     * Superimpose the given pipelines: for every store a pipeline {@link #consumed(PipelineGraph) consumes}, link it
+     * to each pipeline that {@link #produced(PipelineGraph) produces} that store. A pipeline is never linked to itself.
      * Returns links in (consumer, store, producer) discovery order.
      */
     public static List<Link> superimpose(Collection<PipelineGraph> graphs) {

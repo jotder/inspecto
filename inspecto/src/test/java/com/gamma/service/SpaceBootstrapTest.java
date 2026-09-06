@@ -59,7 +59,7 @@ class SpaceBootstrapTest {
 
     @Test
     void flowJobResolvesAFlowAuthoredUnderConfigFlows(@TempDir Path tmp) throws Exception {
-        // The flow is written exactly where the HTTP flow CRUD writes it (writeRoot == the space's
+        // The pipeline is written exactly where the HTTP pipeline CRUD writes it (writeRoot == the space's
         // config/ → config/flows/); a pipeline-type job booted from the same space must resolve it —
         // the two stores diverged once (config/flows vs a sibling flows/) and jobs failed with
         // "references unknown flow".
@@ -81,11 +81,11 @@ class SpaceBootstrapTest {
 
         try (SpaceContext ctx = SpaceBootstrap.load(SpaceRoot.under(base))) {
             JobService js = ctx.service().jobService().orElseThrow();
-            assertTrue(js.trigger("space_rollup"), "the flow job is registered and triggerable");
+            assertTrue(js.trigger("space_rollup"), "the pipeline job is registered and triggerable");
             JobRun run = await(() -> js.lastRunOf("space_rollup").orElse(null));
             assertEquals("SUCCESS", run.status(),
-                    "the job resolves the flow from config/flows/: " + run.message());
-            assertTrue(Files.exists(base.resolve("data").resolve("rollup")), "the flow wrote its sink store");
+                    "the job resolves the pipeline from config/flows/: " + run.message());
+            assertTrue(Files.exists(base.resolve("data").resolve("rollup")), "the pipeline wrote its sink store");
         } finally {
             MDC.put(EventLog.SPACE_MDC_KEY, "space-fl");
             try { AcquisitionLedgers.use(null); }

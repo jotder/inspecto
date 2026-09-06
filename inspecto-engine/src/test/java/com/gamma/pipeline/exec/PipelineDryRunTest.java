@@ -20,7 +20,7 @@ import java.util.Map;
 import static com.gamma.etl.TestConfigs.csv;
 import static org.junit.jupiter.api.Assertions.*;
 
-/** {@link PipelineDryRun} (T18): a bounded sample through a flow's transform→sink subgraph, scratch-only. */
+/** {@link PipelineDryRun} (T18): a bounded sample through a pipeline's transform→sink subgraph, scratch-only. */
 class PipelineDryRunTest {
 
     private static Map<String, Object> row(String id, String amt) {
@@ -346,7 +346,7 @@ class PipelineDryRunTest {
 
     /**
      * A cutoff above every sink is a legitimate run, not a silent nothing — and it must NOT trip the DRYRUN-2
-     * "no sink received any rows" warning, which is about a flow that would write nothing. Here no sink ran at
+     * "no sink received any rows" warning, which is about a pipeline that would write nothing. Here no sink ran at
      * all because the operator bounded the run, which is a different statement.
      */
     @Test

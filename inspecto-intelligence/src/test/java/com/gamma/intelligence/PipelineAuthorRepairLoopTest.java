@@ -33,7 +33,7 @@ class PipelineAuthorRepairLoopTest {
 
     private static final ModelInfo MODEL = new ModelInfo("stub", "scripted", true);
 
-    /** A gateway that answers each successive {@code chat} with the next scripted flow. */
+    /** A gateway that answers each successive {@code chat} with the next scripted pipeline. */
     private static final class ScriptedModel implements LlmGateway {
         private final List<Map<String, Object>> flows;
         private final List<ChatRequest> seen = new ArrayList<>();
@@ -45,9 +45,9 @@ class PipelineAuthorRepairLoopTest {
         @Override
         public ChatResult chat(ChatRequest request) {
             seen.add(request);
-            Map<String, Object> flow = flows.get(Math.min(turn++, flows.size() - 1));
+            Map<String, Object> pipeline = flows.get(Math.min(turn++, flows.size() - 1));
             return new ChatResult(null,
-                    List.of(new ToolCall("pipeline_author", Map.of("flow", flow), new RunId("t"))),
+                    List.of(new ToolCall("pipeline_author", Map.of("flow", pipeline), new RunId("t"))),
                     MODEL, null);
         }
 
@@ -57,7 +57,7 @@ class PipelineAuthorRepairLoopTest {
         @Override public boolean isAvailable(ModelRole role) { return true; }
     }
 
-    private static Map<String, Object> flow(List<Map<String, Object>> edges) {
+    private static Map<String, Object> pipelineArg(List<Map<String, Object>> edges) {
         return Map.of(
                 "name", "orders_flow",
                 "nodes", List.of(
@@ -68,12 +68,12 @@ class PipelineAuthorRepairLoopTest {
                 "edges", edges);
     }
 
-    private static final Map<String, Object> WIRED = flow(List.of(
+    private static final Map<String, Object> WIRED = pipelineArg(List.of(
             Map.of("from", "acq", "to", "flt"),
             Map.of("from", "flt", "to", "sink")));
 
     /** `flt → warehouse` names a node that does not exist ⇒ a DANGLING_TO error. */
-    private static final Map<String, Object> DANGLING = flow(List.of(
+    private static final Map<String, Object> DANGLING = pipelineArg(List.of(
             Map.of("from", "acq", "to", "flt"),
             Map.of("from", "flt", "to", "warehouse")));
 

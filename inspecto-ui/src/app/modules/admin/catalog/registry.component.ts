@@ -196,12 +196,12 @@ export class RegistryComponent implements OnInit {
             const loaded = await Promise.all(
                 flows.map(async (f): Promise<ModelComponent | null> => {
                     try {
-                        const flow = await firstValueFrom(this.flows.pipelineGraphRaw(f.name));
-                        const config = flow as unknown as Record<string, unknown>; // carried opaquely; parts already derived
+                        const pipeline = await firstValueFrom(this.flows.pipelineGraphRaw(f.name));
+                        const config = pipeline as unknown as Record<string, unknown>; // carried opaquely; parts already derived
                         return {
                             kind: 'pipeline',
                             id: f.name,
-                            name: flow.name || f.name,
+                            name: pipeline.name || f.name,
                             config,
                             parts: refParts('pipeline', config, PIPELINE_REF_KINDS),
                         };

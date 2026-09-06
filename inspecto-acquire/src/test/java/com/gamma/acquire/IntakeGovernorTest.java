@@ -117,14 +117,14 @@ class IntakeGovernorTest {
         assertEquals(100, gov.capFor("p"), "forgotten ⇒ back to the base cap, no leaked entry");
     }
 
-    // ── per-flow processing.intake overrides (T15 follow-up) ───────────────────────
+    // ── per-pipeline processing.intake overrides (T15 follow-up) ───────────────────────
 
     @Test
     void anOverrideCapsOneFlowWhileTheFleetStaysUnbounded() {
         IntakeGovernor gov = new IntakeGovernor(new IntakeGovernor.Policy(0, 1, true)); // globals: off
         gov.configure("noisy", new IntakeGovernor.Policy(10, 1, true));
         assertEquals(10, gov.capFor("noisy"));
-        assertEquals(IntakeGovernor.UNBOUNDED, gov.capFor("other"), "the override is that flow's alone");
+        assertEquals(IntakeGovernor.UNBOUNDED, gov.capFor("other"), "the override is that pipeline's alone");
         gov.observeCycle(List.of("noisy"), POLL_MS + 1, POLL_MS);
         assertEquals(5, gov.capFor("noisy"), "the controller adapts against the OVERRIDE thresholds");
     }
@@ -179,7 +179,7 @@ class IntakeGovernorTest {
         IntakeGovernor gov = capped(100, 1);
         gov.configure("pinned", new IntakeGovernor.Policy(30, 1, false));
         gov.observeCycle(List.of("pinned", "global"), POLL_MS + 1, POLL_MS);
-        assertEquals(30, gov.capFor("pinned"), "adaptive=false in the override is a hard cap for that flow");
-        assertEquals(50, gov.capFor("global"), "the globally-governed flow in the same cycle still adapts");
+        assertEquals(30, gov.capFor("pinned"), "adaptive=false in the override is a hard cap for that pipeline");
+        assertEquals(50, gov.capFor("global"), "the globally-governed pipeline in the same cycle still adapts");
     }
 }

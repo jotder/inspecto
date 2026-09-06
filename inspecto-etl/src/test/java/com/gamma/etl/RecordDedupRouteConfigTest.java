@@ -365,7 +365,7 @@ class RecordDedupRouteConfigTest {
 
     // ── A5-at-rest (2026-08-11): output_store: is the arming condition for the Stage-2 blocks ──
 
-    /** With an authored output_store: the chain has a real route (the at-rest flow job), so arming is
+    /** With an authored output_store: the chain has a real route (the at-rest pipeline job), so arming is
      *  the intended EL/T split — not the silent skip the gates exist to refuse. */
     @Test
     void anAuthoredOutputStoreArmsAStageTwoPipeline(@TempDir Path dir) throws Exception {

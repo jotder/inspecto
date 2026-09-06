@@ -310,10 +310,16 @@ public final class PipelineConfig {
          * ⚠ No legacy singular spelling — a chain holding one always takes the {@code steps:} form.
          */
         public static final String SQL = "sql";
+        /**
+         * Inline static-map transcoder ({@code transform.lookup}, 2026-09-06). Keys: {@code column},
+         * {@code mappings} (a list of {@code key=value}), optional {@code target} and {@code default}.
+         * ⚠ No legacy singular spelling, like {@link #SQL} — a chain holding one always takes {@code steps:}.
+         */
+        public static final String LOOKUP = "lookup";
 
         /** Every kind a {@code steps:} entry may name, in the order the legacy projection emits them
-         *  ({@link #SQL} last: it has no legacy projection at all). */
-        public static final List<String> KINDS = List.of(FILTER, JOIN, DEDUP, SUMMARIZE, ROUTE, SQL);
+         *  ({@link #LOOKUP} and {@link #SQL} last: neither has a legacy projection at all). */
+        public static final List<String> KINDS = List.of(FILTER, JOIN, DEDUP, SUMMARIZE, ROUTE, LOOKUP, SQL);
 
         public Step {
             config = (config == null) ? Map.of() : Map.copyOf(config);
@@ -404,8 +410,8 @@ public final class PipelineConfig {
      * thresholds apply whole, so every existing config is byte-identical in behaviour.
      *
      * <p>Each field is independently optional — an unset field inherits its global counterpart — so an
-     * operator can cap one noisy flow while the fleet stays unbounded ({@code max_files_per_cycle: N}),
-     * exempt one flow from a fleet-wide cap ({@code max_files_per_cycle: 0}), or pin one flow's cap hard
+     * operator can cap one noisy pipeline while the fleet stays unbounded ({@code max_files_per_cycle: N}),
+     * exempt one pipeline from a fleet-wide cap ({@code max_files_per_cycle: 0}), or pin one pipeline's cap hard
      * ({@code adaptive: false}) without touching any {@code -D}. This record carries only what the author
      * <b>stated</b>; merging with the globals happens at the {@code IntakeGovernor} call site
      * ({@code CollectorProcessor}), never here — the config module does not know the runtime defaults.
@@ -1161,7 +1167,7 @@ public final class PipelineConfig {
      * Absent ⇒ the pipeline rides the default poll cycle exactly as before; present ⇒ the live loop
      * ({@link com.gamma.service.CollectorService}) classifies it via {@code com.gamma.pipeline.PipelineTrigger}
      * into {@code schedule}(every/cron) / {@code event} / {@code manual}. Carried onto the lifted
-     * acquisition node so the flow projection and the live driver agree on the schedule.
+     * acquisition node so the pipeline projection and the live driver agree on the schedule.
      */
     private final Map<String, Object> trigger;
 
@@ -1674,7 +1680,7 @@ public final class PipelineConfig {
         }
         // The three Stage-2 blocks below (summarize / dedup / join) arm ONLY when output_store: is
         // authored (A5-at-rest, 2026-08-11): the file itself then declares that its chain executes as
-        // a flow job over the landed store (PipelineLift.stageTwo via a pipeline_config: job), so the
+        // a pipeline job over the landed store (PipelineLift.stageTwo via a pipeline_config: job), so the
         // linear path running the pure EL is the intended split, not a silent skip. Without
         // output_store: the keys have no execution route and arming stays refused, exactly as before.
         if (active && summarize != null && outputStore == null) {

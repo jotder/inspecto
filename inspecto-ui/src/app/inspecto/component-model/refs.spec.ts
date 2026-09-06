@@ -86,14 +86,14 @@ describe('structural derivations', () => {
     });
 
     it('pipeline: binds every node use ref, anchored on the node id', () => {
-        const flow = {
+        const pipeline = {
             nodes: [
                 { id: 'c', type: 'acquisition', use: 'connection/cdr_sftp_prod' },
                 { id: 'p', type: 'parser', use: 'grammar/cdr_asn1_ber' },
                 { id: 's', type: 'sink.persistent' },
             ],
         };
-        expect(pipelineRefs(flow)).toEqual([
+        expect(pipelineRefs(pipeline)).toEqual([
             { kind: 'connection', id: 'cdr_sftp_prod', rel: 'binds', via: 'c' },
             { kind: 'grammar', id: 'cdr_asn1_ber', rel: 'binds', via: 'p' },
         ]);
@@ -126,9 +126,9 @@ describe('structural derivations', () => {
 
 describe('refsForComponent', () => {
     it('serves the structural derivation for unregistered kinds, and aliases authored-pipeline → pipeline', () => {
-        const flow = { nodes: [{ id: 'n', use: 'transform/drop_test_rows' }] };
-        expect(refsForComponent('authored-pipeline', flow)).toEqual(refsForComponent('pipeline', flow));
-        expect(refsForComponent('pipeline', flow)).toEqual([
+        const pipeline = { nodes: [{ id: 'n', use: 'transform/drop_test_rows' }] };
+        expect(refsForComponent('authored-pipeline', pipeline)).toEqual(refsForComponent('pipeline', pipeline));
+        expect(refsForComponent('pipeline', pipeline)).toEqual([
             { kind: 'transform', id: 'drop_test_rows', rel: 'binds', via: 'n' },
         ]);
     });

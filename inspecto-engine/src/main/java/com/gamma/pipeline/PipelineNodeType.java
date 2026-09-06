@@ -5,7 +5,7 @@ import com.gamma.api.PublicApi;
 import java.util.Set;
 
 /**
- * The plugin seam for flow node types. Mirrors
+ * The plugin seam for pipeline node types. Mirrors
  * {@link com.gamma.acquire.CollectorConnectorFactory}: the engine {@link java.util.ServiceLoader}s the
  * available node types and matches one by its {@link #type()} discriminator. The lean core ships the
  * {@link BuiltinNodeType built-ins}; editions/plugins contribute extra types by listing a provider in

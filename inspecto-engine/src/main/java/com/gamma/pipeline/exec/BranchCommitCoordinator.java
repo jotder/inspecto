@@ -8,7 +8,7 @@ import java.util.Set;
  * <b>T11 — the commit-split.</b> Splits a batch commit into <b>per-branch</b> commit
  * (register + manifest, one branch at a time) and a single <b>source-finalisation</b>
  * (backup → markers LAST → ledger / watermark LAST) that runs <em>only after every branch is durable</em>
- * — generalising the legacy single-output {@code ConsignmentIngestor.commit} to a branch-aware flow without
+ * — generalising the legacy single-output {@code ConsignmentIngestor.commit} to a branch-aware pipeline without
  * losing its crash-ordering invariant.
  *
  * <p>Driven by {@link BranchCommitLog} (partial-commit state), the coordinator is <b>idempotent and
@@ -21,7 +21,7 @@ import java.util.Set;
  *       finalises without re-committing any branch.</li>
  * </ul>
  *
- * <p>A single-branch flow (one expected branch) reduces to "commit the one branch, then finalise the
+ * <p>A single-branch pipeline (one expected branch) reduces to "commit the one branch, then finalise the
  * source" — the same observable sequence as today, so the legacy path's behaviour is preserved.
  */
 @PublicApi(since = "4.0.0")

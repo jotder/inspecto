@@ -92,7 +92,7 @@ public final class JobService implements AutoCloseable {
     /** Run journal (T26/T27): the durable {@code jobs_runs.csv} audit, the in-memory history the Control
      *  API serves, and the optional DuckDB run projection. */
     private final JobRunLedger ledger;
-    /** The audit dir — also where a {@code flow} job's branch-commit log lives (T32). */
+    /** The audit dir — also where a pipeline job's branch-commit log lives (T32). */
     private final String auditDir;
     /** Optional DuckDB data-plane provenance store for PIPELINE jobs (T21); {@code null} when no backend is configured. */
     private final com.gamma.pipeline.exec.DbProvenanceStore provenanceStore;
@@ -104,7 +104,7 @@ public final class JobService implements AutoCloseable {
     /** This space's delivery receipts (D8), attached post-construction like the feed above; read at run
      *  time by the {@code receipt_prune} maintenance task. */
     private volatile com.gamma.notify.DeliveryReceiptStore deliveryReceiptStore;
-    /** Authored-flow store for {@link JobType#PIPELINE} jobs (T32); {@code null} when no write root is configured. */
+    /** Authored-pipeline store for {@link JobType#PIPELINE} jobs (T32); {@code null} when no write root is configured. */
     private final PipelineStore pipelineStore;
     /** This space's component registry, for resolving a pipeline's {@code use:} bindings before it runs.
      *  Supplied (not held) so each run scans live, exactly as the dry-run route does — a component edited
@@ -112,9 +112,9 @@ public final class JobService implements AutoCloseable {
      *  is the behaviour every run had before this was added. */
     private volatile java.util.function.Supplier<com.gamma.pipeline.ComponentRegistry> componentRegistry;
 
-    /** Loaded pipelines a flow job's {@code transform.join} resolves a by-name reference against; nullable. */
+    /** Loaded pipelines a pipeline job's {@code transform.join} resolves a by-name reference against; nullable. */
     private volatile java.util.function.Supplier<List<com.gamma.etl.PipelineConfig>> pipelineConfigs;
-    /** Data root under which each store is a sub-directory — a flow job reads/writes {@code <dataDir>/<store>} (T32). */
+    /** Data root under which each store is a sub-directory — a pipeline job reads/writes {@code <dataDir>/<store>} (T32). */
     private final String dataDir;
     /** Optional deletion fence (T25): consulted before a {@code maintenance} job that declares a {@code store:}
      *  deletes, to surface a conflict when the delete races an active reader/writer. {@code null} = no fence. */
@@ -256,8 +256,8 @@ public final class JobService implements AutoCloseable {
     /** The ledger subscriber this service installed, kept so {@link #close()} can remove it — the default
      *  space's {@link EventLog#global()} is process-wide, so an un-removed subscriber would leak and misfire. */
     private volatile java.util.function.Consumer<Event> signalSubscriber;
-    /** Flow ids (authored-flow graph names) of {@link JobType#PIPELINE} jobs currently in flight — fed to the
-     *  deletion fence (T32) so a delete that races an active flow-job reader/writer surfaces a conflict. */
+    /** Pipeline ids (authored-pipeline graph names) of {@link JobType#PIPELINE} jobs currently in flight — fed to the
+     *  deletion fence (T32) so a delete that races an active pipeline-job reader/writer surfaces a conflict. */
     private final Set<String> runningPipelines = ConcurrentHashMap.newKeySet();
 
     /** Live + recently-finished runs by {@code runId}, so {@code GET /jobs/runs/{runId}} can poll a manual
@@ -296,10 +296,10 @@ public final class JobService implements AutoCloseable {
     }
 
     /**
-     * Full constructor. Adds the authored-flow store and data root that {@link JobType#PIPELINE} jobs need (T32):
-     * a flow job loads its flow from {@code pipelineStore} and reads/writes stores under {@code dataDir}; plus an
+     * Full constructor. Adds the authored-pipeline store and data root that {@link JobType#PIPELINE} jobs need (T32):
+     * a pipeline job loads its pipeline from {@code pipelineStore} and reads/writes stores under {@code dataDir}; plus an
      * optional {@code provenanceStore} (T21) it records per-edge record counts to. All may be left at
-     * {@code null}/default when no flow jobs / no provenance backend are configured.
+     * {@code null}/default when no pipeline jobs / no provenance backend are configured.
      */
     public JobService(List<JobConfig> configs, ConsignmentEventBus bus, Scheduler scheduler,
                       ReportRunner reports, String auditDir, DbJobRunStore jobRunStore,
@@ -676,10 +676,10 @@ public final class JobService implements AutoCloseable {
             if (owner.equals(e.getValue())) unavailableJobs.add(e.getKey());
     }
 
-    /** A {@link JobType#PIPELINE} job (T32) — requires an authored-flow store (set {@code -Dassist.write.root}). */
+    /** A {@link JobType#PIPELINE} job (T32) — requires an authored-pipeline store (set {@code -Dassist.write.root}). */
     private Job buildPipelineJob(JobConfig c) {
         // an A5-at-rest job (pipeline_config:) lifts its graph from the flat file at run time and
-        // never touches the authored-flow store, so the store requirement doesn't apply to it
+        // never touches the authored-pipeline store, so the store requirement doesn't apply to it
         if (pipelineStore == null && c.opt("pipeline_config", null) == null)
             throw new IllegalStateException("pipeline job '" + c.name()
                     + "' needs an authored-pipeline store; set -Dassist.write.root so authored pipelines can be loaded");
@@ -701,7 +701,7 @@ public final class JobService implements AutoCloseable {
     }
 
     /**
-     * Wire this space's loaded pipelines so a flow job's {@code transform.join} can resolve a <b>by-name</b>
+     * Wire this space's loaded pipelines so a pipeline job's {@code transform.join} can resolve a <b>by-name</b>
      * reference ({@code reference/<pipeline>}) — the same context {@code EnrichmentService} already supplies
      * its engine. Without it a by-name join refuses naming the missing wiring; a {@code path:} reference
      * never needs it. Set by the hosting service, like {@link #componentRegistry} and {@link #knownPipelines}.
@@ -882,22 +882,22 @@ public final class JobService implements AutoCloseable {
     }
 
     /**
-     * Run an authored flow once, ad-hoc, without a registered job (T32 — the config-less
+     * Run an authored pipeline once, ad-hoc, without a registered job (T32 — the config-less
      * {@code POST /pipelines/authored/{id}/trigger} route). A synthetic {@code type: pipeline} config is
      * built on the fly and executed through the exact registered-job run lifecycle — deletion-fence
-     * tracking ({@link #runningPipelines()}), per-name non-overlap (keyed by the flow id, so a re-fire while
-     * the flow is still running records {@code SKIPPED}), the durable run ledger and {@link #runById}
+     * tracking ({@link #runningPipelines()}), per-name non-overlap (keyed by the pipeline id, so a re-fire while
+     * the pipeline is still running records {@code SKIPPED}), the durable run ledger and {@link #runById}
      * polling — but it is never added to the registry, so {@link #jobs()} stays config-only. The run
-     * (and its {@code GET /jobs/{name}/runs} history) is recorded under the flow id. Attribution matches
+     * (and its {@code GET /jobs/{name}/runs} history) is recorded under the pipeline id. Attribution matches
      * {@link #trigger(String, String)}.
      *
      * @return the {@code runId} to poll
-     * @throws IllegalStateException when no authored-flow store is configured (no write root)
+     * @throws IllegalStateException when no authored-pipeline store is configured (no write root)
      */
     public String triggerPipelineRun(String pipelineId, String actor) {
         JobConfig cfg = new JobConfig(pipelineId, "pipeline", null, null, true, false,
                 Map.of("pipeline", pipelineId), null, null);
-        Job job = buildPipelineJob(cfg);   // fails closed without an authored-flow store
+        Job job = buildPipelineJob(cfg);   // fails closed without an authored-pipeline store
         String runId = newRunId(pipelineId);
         String trigger = actor == null || actor.isBlank() ? "manual" : "manual:" + actor.trim();
         submitAdhocRun(job, cfg, runId, trigger);
@@ -920,7 +920,7 @@ public final class JobService implements AutoCloseable {
     }
 
     /**
-     * Replay a finished run: re-fire the same job (or ad-hoc authored flow) that produced
+     * Replay a finished run: re-fire the same job (or ad-hoc authored pipeline) that produced
      * {@code originalRunId}. ⚠ The run ledger persists no firing parameters ({@link JobRun} carries
      * none), so a replay re-triggers with the job's CONFIGURED defaults — it is a re-trigger of the
      * same unit of work as configured, not a byte-identical re-fire of ad-hoc trigger args. The new
@@ -941,8 +941,8 @@ public final class JobService implements AutoCloseable {
             return Optional.of(runId);
         }
         if ("pipeline".equals(orig.type())) {
-            // The original was an ad-hoc authored-flow run (triggerPipelineRun) — rebuild the same
-            // synthetic config; buildPipelineJob fails closed without an authored-flow store.
+            // The original was an ad-hoc authored-pipeline run (triggerPipelineRun) — rebuild the same
+            // synthetic config; buildPipelineJob fails closed without an authored-pipeline store.
             JobConfig cfg = new JobConfig(orig.job(), "pipeline", null, null, true, false,
                     Map.of("pipeline", orig.job()), null, null);
             Job job = buildPipelineJob(cfg);
@@ -1068,13 +1068,13 @@ public final class JobService implements AutoCloseable {
 
     /** The run lifecycle with the {@link Job} + config carried explicitly — shared by the registered path
      *  above (which re-resolves both from the registry on the worker thread, so a removed job stays an
-     *  inert no-op) and the ad-hoc flow path ({@link #triggerPipelineRun}), whose synthetic config is never
+     *  inert no-op) and the ad-hoc pipeline path ({@link #triggerPipelineRun}), whose synthetic config is never
      *  registered and so cannot be resolved by name. */
     private void runJob(Job job, JobConfig cfg, String runId, String name, String trigger, String start,
                         String correlationId, String causationId, int chainDepth, Firing firing) {
         runner.runExclusiveOrSkip(name, () -> {
             fenceDelete(cfg);   // T25: surface a conflict if a declared delete races an active reader/writer
-            String pipelineId = trackPipelineStart(job, cfg, name);   // T32: mark a flow job's stores active for the fence
+            String pipelineId = trackPipelineStart(job, cfg, name);   // T32: mark a pipeline job's stores active for the fence
             Map<String, String> params = cfg != null ? cfg.params() : Map.of();
             RunContext ctx = new RunContext(runId, spaceId, name, trigger, correlationId, causationId,
                     chainDepth, params, runLogStore, runLogMax, runArtifactStore);
@@ -1250,10 +1250,10 @@ public final class JobService implements AutoCloseable {
     }
 
     /**
-     * Mark a {@link JobType#PIPELINE} job's flow as running for the deletion fence (T32) and return its flow id;
-     * {@code null} for a non-flow job. The id is the authored-flow graph name (the job's {@code flow} param),
-     * so it matches the flow names {@link DeletionFence#check} derives from the authored flows the live
-     * {@code CollectorService} feeds it — a delete racing this flow's store then surfaces as a conflict.
+     * Mark a {@link JobType#PIPELINE} job's pipeline as running for the deletion fence (T32) and return its pipeline id;
+     * {@code null} for a non-pipeline job. The id is the authored-pipeline graph name (the job's {@code flow} param),
+     * so it matches the pipeline names {@link DeletionFence#check} derives from the authored pipelines the live
+     * {@code CollectorService} feeds it — a delete racing this pipeline's store then surfaces as a conflict.
      */
     private String trackPipelineStart(Job job, JobConfig cfg, String name) {
         if (!"pipeline".equals(job.type())) return null;
@@ -1275,7 +1275,7 @@ public final class JobService implements AutoCloseable {
 
     /**
      * Flow ids of {@link JobType#PIPELINE} jobs currently in flight. The live {@code CollectorService} unions this
-     * into the deletion fence's running-set (T32) so deleting a store an active flow job reads/writes is
+     * into the deletion fence's running-set (T32) so deleting a store an active pipeline job reads/writes is
      * flagged as a {@code STORE_DELETE_CONFLICT}, just as for a running pipeline.
      */
     public Set<String> runningPipelines() {

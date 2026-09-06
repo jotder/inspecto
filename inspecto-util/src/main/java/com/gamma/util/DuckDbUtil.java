@@ -223,7 +223,7 @@ public final class DuckDbUtil {
     /**
      * Apply the global {@code -Dprocessing.duckdb.*} caps (memory_limit, spill {@code temp_directory},
      * spill-size cap, and worker {@code threads}) to a scratch connection that has no per-pipeline
-     * {@code processing.duckdb} config to read from — the flow-job ({@code PipelineJobRunner}) and
+     * {@code processing.duckdb} config to read from — the pipeline job ({@code PipelineJobRunner}) and
      * enrichment ({@code EnrichmentEngine}) scratch DBs, which would otherwise open fully uncapped while
      * the batch-ingest path caps its own connections. Every property is opt-in: unset ⇒ no {@code SET}/
      * {@code PRAGMA} is issued ⇒ DuckDB keeps its own defaults, so behaviour is unchanged unless an

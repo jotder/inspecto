@@ -5,7 +5,7 @@ import { NodeKind } from 'app/inspecto/api';
  * (the component-model reuse-graph) can target the existing `GraphViewComponent` host **without importing a
  * feature**. `kind` is a {@link NodeKind} — a known metadata kind or any free string (a `ComponentKind` id) —
  * which the host keys node shape / outline colour off. `iconSrc`/`color` are set when a configurable icon is
- * resolved (flow / pipeline views); `missing` marks a dangling-reference ghost node (the reuse-graph). Colours
+ * resolved (pipeline views); `missing` marks a dangling-reference ghost node (the reuse-graph). Colours
  * come from tokens, never hardcoded here.
  */
 export interface G6Node {

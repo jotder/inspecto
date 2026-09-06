@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * The {@code sink.view} consumer (T32 Phase C follow-up) over real HTTP: discover view definitions
  * (<code>GET /views</code>, <code>/views/{name}</code>) and query a view's {@code derived_sql} for bounded
  * rows (<code>/views/{name}/data</code>). Seeds a real Parquet store + a {@link ViewDefinition} under
- * {@code <write-root>/views} the way a flow job would.
+ * {@code <write-root>/views} the way a pipeline job would.
  */
 class ControlApiViewsTest {
 
@@ -133,7 +133,7 @@ class ControlApiViewsTest {
             seedViews(wr, dir.resolve("data"));
             assertEquals(404, send(c.port, "GET", "/views/ghost", null).statusCode());
             assertEquals(404, send(c.port, "GET", "/views/ghost/data", null).statusCode());
-            // a view with no derived_sql cannot be queried directly → 409 (re-run its flow)
+            // a view with no derived_sql cannot be queried directly → 409 (re-run its pipeline)
             assertEquals(409, send(c.port, "GET", "/views/complex_view/data", null).statusCode());
         }
     }

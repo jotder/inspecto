@@ -75,7 +75,7 @@ final class ServiceStores {
      * Data-plane provenance store for PIPELINE jobs (T21), gated by {@code -Dprovenance.backend}: {@code duckdb}
      * (the bundled default engine), {@code postgres}/{@code postgresql} (resolves {@code -Dprovenance.db.url},
      * which must be a {@code jdbc:postgresql://…} URL with the PG driver on the classpath), or a raw {@code jdbc:}
-     * URL. Any other value ⇒ {@code null} ⇒ flow runs record no per-edge counts and {@code /provenance} 404s.
+     * URL. Any other value ⇒ {@code null} ⇒ pipeline runs record no per-edge counts and {@code /provenance} 404s.
      * Mirrors {@link #openJobRunStore(SpaceRoot)}.
      */
     static com.gamma.pipeline.exec.DbProvenanceStore openProvenanceStore(SpaceRoot root) {

@@ -6,7 +6,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 /**
- * Live per-step progress, per pipeline/flow — "Consignment X is at step 3/5" (G6,
+ * Live per-step progress, per pipeline — "Consignment X is at step 3/5" (G6,
  * {@code consignment-chain-plan.md} S7).
  *
  * <p>The {@link IngestProgress} idiom one level up: {@code IngestProgress} answers <em>which
@@ -24,7 +24,7 @@ import java.util.concurrent.ConcurrentMap;
  */
 public final class StepProgress {
 
-    /** Where a pipeline/flow is right now: step {@code index} of {@code total} for a Consignment. */
+    /** Where a pipeline is right now: step {@code index} of {@code total} for a Consignment. */
     public record Snapshot(String consignmentId, String step, int index, int total, String startedAt) {}
 
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");

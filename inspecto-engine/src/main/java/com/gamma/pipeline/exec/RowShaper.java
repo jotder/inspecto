@@ -21,7 +21,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * <b>T10 — row-shaping SQL assembly.</b> Executes one flow {@code transform.*} node as SQL over a DuckDB
+ * <b>T10 — row-shaping SQL assembly.</b> Executes one pipeline {@code transform.*} node as SQL over a DuckDB
  * input relation, producing one or more <b>named output relations</b> (the multi-named-relation node-output
  * contract T9 made enforceable). Each output relation is materialised as a DuckDB table named
  * {@code <outPrefix>__<relkey>} and returned as a {@link Relation} ({@code rel} = the {@link PipelineRel}
@@ -165,6 +165,7 @@ public final class RowShaper {
         if (contributed.isPresent()) return contributed.get().shape(conn, node, input, outPrefix, references);
         if (BuiltinNodeType.TRANSFORM_JOIN.type().equals(type))     return join(conn, node, input, outPrefix, references);
         if (BuiltinNodeType.TRANSFORM_FILTER.type().equals(type))   return filter(conn, node, input, outPrefix);
+        if (BuiltinNodeType.TRANSFORM_LOOKUP.type().equals(type))   return lookup(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_VALIDATE.type().equals(type)) return validate(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_ROUTE.type().equals(type))    return route(conn, node, input, outPrefix);
         if (type.startsWith("transform.dedup"))                      return dedup(conn, node, input, outPrefix, ctx);
@@ -189,6 +190,57 @@ public final class RowShaper {
                 + (PipelineNodeTypes.isKnown(type)
                         ? " — the type IS registered as a descriptor, so only its executor is missing."
                         : " — and this type is not a registered node type at all."));
+    }
+
+    // ── lookup (inline static map) ──────────────────────────────────────────────
+
+    /**
+     * {@code transform.lookup}: one column transcoded through an inline {@code key=value} list, compiled to a
+     * {@code CASE}. Keys and values are AUTHOR LITERALS, never SQL — they go through {@link #sqlStr}, and the
+     * column names through {@link #q}; nothing here passes {@code SqlGuard}, because there is no author SQL to
+     * guard. In place ({@code SELECT * REPLACE}) unless {@code target} names a new column; an unmatched value
+     * passes through, or becomes {@code default} when that is set. Comparison is textual ({@code CAST … AS
+     * VARCHAR}) so a numeric code column maps without the author casting. Emits {@code data} only — a lookup
+     * changes values, never row counts.
+     */
+    private static List<Relation> lookup(Connection conn, PipelineNode node, String input, String p) throws SQLException {
+        String column = strOrNull(node, "column");
+        if (column == null)
+            throw new IllegalArgumentException("transform.lookup node '" + node.id() + "' needs a 'column'");
+        List<String[]> pairs = mappingPairs(node);
+        if (pairs.isEmpty())
+            throw new IllegalArgumentException("transform.lookup node '" + node.id()
+                    + "' needs at least one 'mappings' entry of the form key=value");
+        String target = strOrNull(node, "target");
+        String dflt = strOrNull(node, "default");
+        String src = q(column);
+        StringBuilder caseExpr = new StringBuilder("CASE CAST(").append(src).append(" AS VARCHAR)");
+        for (String[] kv : pairs)
+            caseExpr.append(" WHEN ").append(sqlStr(kv[0])).append(" THEN ").append(sqlStr(kv[1]));
+        caseExpr.append(" ELSE ").append(dflt != null ? sqlStr(dflt) : "CAST(" + src + " AS VARCHAR)").append(" END");
+        String data = table(p, PipelineRel.DATA);
+        String select = target == null
+                ? "SELECT * REPLACE (" + caseExpr + " AS " + src + ") FROM " + q(input)
+                : "SELECT *, " + caseExpr + " AS " + q(target) + " FROM " + q(input);
+        exec(conn, "CREATE TABLE " + q(data) + " AS " + select);
+        return List.of(new Relation(PipelineRel.DATA, data));
+    }
+
+    /** The {@code mappings} list as {@code [key, value]} pairs; a malformed entry names itself. */
+    static List<String[]> mappingPairs(PipelineNode node) {
+        List<String[]> out = new ArrayList<>();
+        Object raw = node.cfg("mappings");
+        if (!(raw instanceof List<?> list)) return out;
+        for (Object o : list) {
+            if (o == null) continue;
+            String s = o.toString();
+            int eq = s.indexOf('=');
+            if (eq <= 0)
+                throw new IllegalArgumentException("transform.lookup node '" + node.id() + "': mapping '" + s
+                        + "' is not key=value");
+            out.add(new String[]{s.substring(0, eq).trim(), s.substring(eq + 1).trim()});
+        }
+        return out;
     }
 
     // ── filter / validate (predicate split) ────────────────────────────────────
