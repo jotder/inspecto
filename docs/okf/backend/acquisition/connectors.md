@@ -152,7 +152,10 @@ a listed object is atomic ⇒ `readiness` is always `READY`.
   expected shape, the CONNECT having happened is the claim.
 * **Secrets are never literals** — `SecretResolver` (`com/gamma/acquire/SecretResolver.java`) resolves
   `${ENV:VAR}` / `${SYS:prop}` / `${FILE:/path}` / `${KEYSTORE:alias}` / `${NAME}` at connect time, never at
-  load; `isResolvable()` powers the test endpoint without exposing values. `${FILE:…}` reads a mounted secret
+  load; `isResolvable()` powers the test endpoint without exposing values. **SEC-07 (2026-09-06): `${FILE}` and
+  `${KEYSTORE}` are Standard + Enterprise** — the `SecretsProvider` SPI in the core is served by
+  `inspecto-security`'s `FileKeystoreSecretsProvider` (ServiceLoader); a Personal bundle throws a refusal naming
+  the edition, which a connection test surfaces as its failure. `${FILE:…}` reads a mounted secret
   file (Docker/K8s idiom; one trailing newline stripped). `${KEYSTORE:alias}` reads a `SecretKeyEntry` from a
   Java KeyStore located by `-Dsecrets.keystore.path` / `-Dsecrets.keystore.type` (default `JCEKS`) /
   `-Dsecrets.keystore.password` (itself a reference, so the store password need not be in the clear) — the

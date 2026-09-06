@@ -37,7 +37,7 @@ a new dependency — not a build. The rule that fell out: **a P1 must name the f
 cannot is a decision (§1) or a design (P2).
 
 Do next, in order (all decided 2026-09-06, all P1):
-1. **SEC-07-GATE** · **DATA-GOV-SYNTH** · **OPEN-DAG-S1** — the larger builds.
+1. **DATA-GOV-SYNTH** · **OPEN-DAG-S1** — the larger builds.
 2. **Release notes for the next MAJOR** — keep appending (§2). **Step Processor catalog** — pick a partial by name (§3).
 
 ## 1. Operator decisions pending
@@ -125,7 +125,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - **P3** · **Security: policy-authoring UX** — a matrix/create editor beyond hand-authored TOON (seed visibility, "why denied?" endpoint and read-only Policies tab already shipped). Non-blocking. → `okf/backend/editions/auth-security.md`
 ### Deployment & packaging
 
-- **P1** · **SEC-07-GATE** — `${FILE}` / `${KEYSTORE}` secret schemes become Standard + Enterprise only (ENV/SYS stay everywhere; Vault/KMS Enterprise when a client policy requires it). Today one core `SecretResolver` serves all four everywhere, so this needs a `SecretsProvider` seam + edition wiring + a Personal refusal message. → `EDITIONS.md` §SEC-07
 - **P2** · **DATA-GOV-SYNTH** — a small synthetic ASN.1 subset committed for CI smoke, complementing the out-of-band real corpus. → `PROJECT_NOTES.md` §DATA-GOV-1
 - **P3** · **D8-SUPPRESS-1** — per-recipient suppression list (TTL for hard bounces, permanent for complaints) — gated on a DB-backed `DeliveryReceiptStore`. → `okf/backend/control-plane/events-metrics.md` §Decision
 

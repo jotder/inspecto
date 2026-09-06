@@ -3,13 +3,9 @@ package com.gamma.acquire;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
-import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.KeyStore;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -52,50 +48,40 @@ class SecretResolverTest {
         assertNull(SecretResolver.resolve(null));
     }
 
+    // ── SEC-07 (2026-09-06): FILE / KEYSTORE are edition-provided, not core ─────────────────────
+
     @Test
-    void resolvesFileScopeStrippingOneTrailingNewline(@TempDir Path dir) throws Exception {
+    void fileAndKeystoreSchemesAreRefusedNamingTheEditionWhenNoProviderIsBundled(@TempDir Path dir) throws Exception {
         Path secret = dir.resolve("db.pass");
-        Files.writeString(secret, "swordfish\n");                 // the `echo > file` idiom
-        assertEquals("swordfish", SecretResolver.resolve("${FILE:" + secret + "}"));
-        assertTrue(SecretResolver.isResolvable("${FILE:" + secret + "}"));
-
-        Files.writeString(secret, "no-newline");
-        assertEquals("no-newline", SecretResolver.resolve("${FILE:" + secret + "}"));
-    }
-
-    @Test
-    void missingFileReferenceResolvesToNull(@TempDir Path dir) {
-        assertNull(SecretResolver.resolve("${FILE:" + dir.resolve("absent") + "}"));
-        assertFalse(SecretResolver.isResolvable("${FILE:" + dir.resolve("absent") + "}"));
-    }
-
-    @Test
-    void resolvesKeystoreScopeWithReferencedStorePassword(@TempDir Path dir) throws Exception {
-        Path ksFile = dir.resolve("secrets.jceks");
-        char[] storePw = "store-pw".toCharArray();
-        KeyStore ks = KeyStore.getInstance("JCEKS");
-        ks.load(null, null);
-        SecretKey secret = new SecretKeySpec("hunter2".getBytes(StandardCharsets.UTF_8), "RAW");
-        ks.setKeyEntry("db-pass", secret, storePw, null);
-        try (OutputStream out = Files.newOutputStream(ksFile)) {
-            ks.store(out, storePw);
-        }
-
-        String pwProp = "test.ks.pw." + System.nanoTime();
-        System.setProperty("secrets.keystore.path", ksFile.toString());
-        System.setProperty("secrets.keystore.type", "JCEKS");
-        System.setProperty("secrets.keystore.password", "${SYS:" + pwProp + "}");   // store pw via a reference
-        System.setProperty(pwProp, "store-pw");
+        Files.writeString(secret, "swordfish\n");
+        SecretResolver.useProviders(List.of());                  // a Personal bundle: no inspecto-security on the classpath
         try {
-            assertEquals("hunter2", SecretResolver.resolve("${KEYSTORE:db-pass}"));
-            assertTrue(SecretResolver.isResolvable("${KEYSTORE:db-pass}"));
-            assertNull(SecretResolver.resolve("${KEYSTORE:no-such-alias}"), "absent alias ⇒ unresolved");
+            IllegalStateException e = assertThrows(IllegalStateException.class,
+                    () -> SecretResolver.resolve("${FILE:" + secret + "}"),
+                    "a readable file must NOT resolve without the provider — that is the whole gate");
+            assertTrue(e.getMessage().contains("FILE") && e.getMessage().contains("Standard and Enterprise")
+                    && e.getMessage().contains("${ENV:NAME}"), e.getMessage());
+            assertThrows(IllegalStateException.class, () -> SecretResolver.isResolvable("${KEYSTORE:db-pass}"),
+                    "a connection test surfaces the refusal rather than a bland 'unresolved'");
+            assertEquals("literal", SecretResolver.resolve("literal"), "ENV/SYS/literal are untouched by the gate");
         } finally {
-            System.clearProperty("secrets.keystore.path");
-            System.clearProperty("secrets.keystore.type");
-            System.clearProperty("secrets.keystore.password");
-            System.clearProperty(pwProp);
+            SecretResolver.useProviders(null);
         }
-        assertNull(SecretResolver.resolve("${KEYSTORE:db-pass}"), "no keystore configured ⇒ unresolved");
+    }
+
+    @Test
+    void aBundledProviderServesTheSchemesItSupports(@TempDir Path dir) throws Exception {
+        SecretsProvider stub = new SecretsProvider() {
+            @Override public boolean supports(String scope) { return "FILE".equals(scope); }
+            @Override public String resolve(String scope, String key) { return "from-provider:" + key; }
+        };
+        SecretResolver.useProviders(List.of(stub));
+        try {
+            assertEquals("from-provider:/x", SecretResolver.resolve("${FILE:/x}"));
+            assertThrows(IllegalStateException.class, () -> SecretResolver.resolve("${KEYSTORE:a}"),
+                    "a provider gates only the schemes it declares");
+        } finally {
+            SecretResolver.useProviders(null);
+        }
     }
 }
