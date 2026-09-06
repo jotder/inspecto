@@ -1,0 +1,11 @@
+SYNTH-CDR DEFINITIONS IMPLICIT TAGS ::= BEGIN
+CallEventRecord ::= [APPLICATION 5] SEQUENCE
+{
+  imsi [0] IA5String,
+  duration [1] INTEGER,
+  roaming [2] BOOLEAN,
+  cellId [3] OCTET STRING,
+  party [4] Party OPTIONAL
+}
+Party ::= SEQUENCE { number [0] IA5String }
+END

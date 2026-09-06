@@ -1,0 +1,6 @@
+{
+  "root": "CallEventRecord",
+  "fileHeaderLength": 50,
+  "recordHeaderLength": 4,
+  "padding": [0, 255]
+}

@@ -1,0 +1,2 @@
+{"imsi":"12345","duration":60,"roaming":true,"cellId":"AB","party":{"number":"9999"}}
+{"imsi":"67890","duration":0,"roaming":false,"cellId":"CD"}

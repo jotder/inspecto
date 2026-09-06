@@ -37,7 +37,7 @@ a new dependency — not a build. The rule that fell out: **a P1 must name the f
 cannot is a decision (§1) or a design (P2).
 
 Do next, in order (all decided 2026-09-06, all P1):
-1. **DATA-GOV-SYNTH** · **OPEN-DAG-S1** — the larger builds.
+1. **OPEN-DAG-S1** — the last larger build.
 2. **Release notes for the next MAJOR** — keep appending (§2). **Step Processor catalog** — pick a partial by name (§3).
 
 ## 1. Operator decisions pending
@@ -125,7 +125,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - **P3** · **Security: policy-authoring UX** — a matrix/create editor beyond hand-authored TOON (seed visibility, "why denied?" endpoint and read-only Policies tab already shipped). Non-blocking. → `okf/backend/editions/auth-security.md`
 ### Deployment & packaging
 
-- **P2** · **DATA-GOV-SYNTH** — a small synthetic ASN.1 subset committed for CI smoke, complementing the out-of-band real corpus. → `PROJECT_NOTES.md` §DATA-GOV-1
 - **P3** · **D8-SUPPRESS-1** — per-recipient suppression list (TTL for hard bounces, permanent for complaints) — gated on a DB-backed `DeliveryReceiptStore`. → `okf/backend/control-plane/events-metrics.md` §Decision
 
 - **P2** · **Deployment topology gaps** (after §1 D1–D8 are signed) — GAP-2 Enterprise packaging (SCR-8) · GAP-3 service wrappers (SCR-3) · GAP-4 DuckDB cap default · GAP-5 T15 surge admission · GAP-6 Vault/KMS (SEC-8) · GAP-8 Postgres driver · GAP-9 launcher token-line debris (SCR-9) · GAP-10 bundle missing 13 archived docs (SCR-10). Phases 0–5 all unbuilt. → `superpower/deployment-topology-plan.md` §11

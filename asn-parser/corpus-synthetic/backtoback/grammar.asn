@@ -1,0 +1,9 @@
+SYNTH-BACKTOBACK DEFINITIONS IMPLICIT TAGS ::= BEGIN
+Record ::= [APPLICATION 1] SEQUENCE
+{
+  id [0] INTEGER,
+  name [1] IA5String OPTIONAL,
+  events [2] SEQUENCE OF Event
+}
+Event ::= CHOICE { start [3] INTEGER, stop [4] INTEGER }
+END

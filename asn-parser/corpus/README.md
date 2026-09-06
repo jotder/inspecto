@@ -6,6 +6,11 @@ over every `config/` + `data/` pairing that works. This is the only objective de
 is validated against these files; every intentional difference must appear in a written
 deviation report, never silently.
 
+## The committed complement
+
+This corpus never enters git. The synthetic subset that DOES — hand-written grammars + hex-text BER + expected
+records, run by `SyntheticCorpusTest` on every build — lives in `../corpus-synthetic/` (DATA-GOV-1, 2026-09-06).
+
 ## Regenerate
 
 ```powershell

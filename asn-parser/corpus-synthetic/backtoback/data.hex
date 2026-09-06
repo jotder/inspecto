@@ -1,0 +1,7 @@
+# Three back-to-back Record values, no file header, no record headers.
+# record 1: id=42, name="hi", events=[start=5]
+61 0C  80 01 2A  81 02 68 69  A2 03  83 01 05
+# record 2: id=7, name absent, events=[stop=9]
+61 08  80 01 07  A2 03  84 01 09
+# record 3: id=1000 (two-byte INTEGER), name="alpha", events=[start=1, stop=2]
+61 13  80 02 03 E8  81 05 61 6C 70 68 61  A2 06  83 01 01  84 01 02

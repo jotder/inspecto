@@ -732,6 +732,11 @@ touching `inspecto-ui/`.** Highlights (full detail there):
 The real carrier corpus (~57 MB, two carriers, only in working trees) moves to an **encrypted out-of-band
 archive on company storage, fetched by script**, access held by the data-agreement owner; the parity harness runs
 wherever the archive is provisioned. A **small synthetic subset is committed for CI smoke** — a complement, not a
-replacement: every parity defect so far came from real files. Git LFS is refused unless the data agreement permits
+replacement: every parity defect so far came from real files. **The synthetic subset SHIPPED 2026-09-06**
+(`asn-parser/corpus-synthetic/` + `SyntheticCorpusTest` in asn-golden, always-on: two cases — back-to-back records
+with OPTIONAL/SEQUENCE OF/CHOICE, and the Huawei file shape with a 50-byte header, 4-byte record headers and 0x00
+fill; BER as hex text so the `*.ber` ban stands; regenerate with `-Dasn.synthetic.write=true`). It pinned one
+reader rule on the way: fill bytes are skipped BEFORE a record header, so a header must not start with 0x00/0xFF.
+Git LFS is refused unless the data agreement permits
 third-party hosting. ⚠ Never force-push or reset master to fix this. The archive itself is an org action
 (BACKLOG §2); the synthetic subset is BACKLOG §3 `DATA-GOV-SYNTH`.

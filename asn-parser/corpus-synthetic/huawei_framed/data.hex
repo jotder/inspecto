@@ -1,0 +1,18 @@
+# The vendor file SHAPE without the vendor: a 50-byte file header, a 4-byte header before every record
+# (skipped, not parsed), and 0x00 fill after the last record. All values invented.
+#
+# Reader rule this case pins: padding bytes (0x00/0xFF) are skipped BEFORE a record header is consumed, so a
+# record header must not START with a fill byte — here it is "HW" + a 2-byte sequence number. (A header that
+# began with 0x00 would be eaten as fill and the decode would slide off by one byte.)
+#
+# 50-byte file header: "SYNTH-CDR FILE HEADER v1" (24 bytes) + 26 spaces
+53 59 4E 54 48 2D 43 44 52 20 46 49 4C 45 20 48 45 41 44 45 52 20 76 31
+20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
+# record header (4 bytes: 'H' 'W' seq=1) + record 1: imsi="12345", duration=60, roaming=TRUE, cellId="AB", party.number="9999"
+48 57 00 01
+65 19  80 05 31 32 33 34 35  81 01 3C  82 01 FF  83 02 41 42  A4 06  80 04 39 39 39 39
+# record header ('H' 'W' seq=2) + record 2: imsi="67890", duration=0, roaming=FALSE, cellId="CD", party absent
+48 57 00 02
+65 11  80 05 36 37 38 39 30  81 01 00  82 01 00  83 02 43 44
+# trailing zero fill
+00 00 00 00 00 00

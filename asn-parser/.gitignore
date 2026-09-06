@@ -30,6 +30,10 @@ data/
 corpus/*
 !corpus/README.md
 
+# corpus-synthetic/ is the DELIBERATE exception to all of the above (DATA-GOV-1, 2026-09-06): invented grammars,
+# invented values, BER as hex TEXT (so the *.ber ban below still holds), and small expected.jsonl files. It is
+# tracked on purpose so CI decodes SOMETHING on every build. Nothing captured from an operator goes in there.
+
 # Archives of the above — a single `git add -A` would otherwise commit the whole
 # corpus as one blob. This is how 132 MB nearly shipped on 2026-07-30.
 *.7z
