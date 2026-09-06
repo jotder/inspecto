@@ -138,6 +138,18 @@ a listed object is atomic ⇒ `readiness` is always `READY`.
   An unrecognised proxy `type` is still rejected fail-closed, now naming both supported types. **Still not
   dialing through any proxy:** the JDBC-based connectors (proxying is driver-URL-param territory, not a
   uniform hook).
+* **2026-09-06 SHIPPED the JDBC half of the dial-through — PostgreSQL only.** `DbConnections.open` now honours
+  `ConnectionProfile.proxy` through the driver's own seam, `socketFactory=` + a single-string `socketFactoryArg=`
+  (`host:port[:user:password]`, parsed once in `ProxyArg`): the driver instantiates `SocksProxySocketFactory` /
+  `HttpProxySocketFactory` reflectively (both now public with a `(String)` constructor), takes the
+  unconnected socket from `createSocket()` and calls `connect` itself — the same shape sshj uses, so the
+  `TunnellingSocket` redirect above covers it unchanged. Fail-closed on what cannot be routed: a driver other
+  than PostgreSQL (DuckDB is embedded; an explicit `jdbc_url` for anything else has no hook), an unknown proxy
+  type, and a proxy COMBINED with an SSH tunnel — the JDBC socket then dials the tunnel's local endpoint, which
+  a proxy must not carry, and the SSH hop itself is not proxied. `DbConnectionsProxyTest` keeps the rule the
+  SFTP/FTP tests set: each case dials the real driver through `MiniHttpConnectRelay` / `MiniSocks5Relay` at a
+  bare listener and asserts the relay was asked for the database — the handshake failing afterwards is the
+  expected shape, the CONNECT having happened is the claim.
 * **Secrets are never literals** — `SecretResolver` (`com/gamma/acquire/SecretResolver.java`) resolves
   `${ENV:VAR}` / `${SYS:prop}` / `${FILE:/path}` / `${KEYSTORE:alias}` / `${NAME}` at connect time, never at
   load; `isResolvable()` powers the test endpoint without exposing values. `${FILE:…}` reads a mounted secret

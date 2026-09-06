@@ -17,6 +17,8 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 
@@ -174,6 +176,55 @@ class MaintenanceLibraryTest {
             assertEquals(1, left.size());
             assertEquals("fresh", left.get(0).message(), "inside the window nothing is touched");
         }
+    }
+
+    // ── partition_prune (per-date retention for a sink store, 2026-09-06) ────────
+
+    private static Path seedDay(Path store, int y, int m, int d, String file) throws Exception {
+        Path day = store.resolve("year=%04d/month=%02d/day=%02d".formatted(y, m, d));
+        Files.createDirectories(day);
+        Files.writeString(day.resolve(file), "parquet-bytes");
+        return day;
+    }
+
+    @Test
+    void partitionPruneDropsWholeDayPartitionsOlderThanTheWindowAndLeavesTheRest(@TempDir Path store, @TempDir Path audit)
+            throws Exception {
+        assertThrows(Exception.class,
+                () -> new MaintenanceJob(job(Map.of("task", "partition_prune", "dir", store.toString()))).run(),
+                "forgetting is deliberate — retention_days is required");
+
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        Path aged = seedDay(store, 2020, 1, 5, "a.parquet");
+        LocalDate fresh = today.minusDays(3);
+        Path recent = seedDay(store, fresh.getYear(), fresh.getMonthValue(), fresh.getDayOfMonth(), "b.parquet");
+        // the store's own non-partition file and a partition-looking directory with a nonsense date
+        Files.writeString(store.resolve("_catalog.json"), "{}");
+        Files.createDirectories(store.resolve("year=abcd/month=01/day=01"));
+        // mtime lies: touch the aged partition's file to NOW — file age is not data age
+        Files.setLastModifiedTime(aged.resolve("a.parquet"), FileTime.from(Instant.now()));
+
+        JobConfig cfg = job(Map.of("task", "partition_prune", "dir", store.toString(), "retention_days", "30"));
+        JobResult dry = new MaintenanceJob(cfg).run(dryCtx(audit));
+        assertTrue(dry.message().contains("would remove 1 of 2 day-partition(s)"), dry.message());
+        assertTrue(Files.exists(aged.resolve("a.parquet")), "dry run deletes nothing");
+
+        JobResult real = new MaintenanceJob(cfg).run();
+        assertEquals("SUCCESS", real.status(), real.message());
+        assertTrue(real.message().contains("removed 1 of 2 day-partition(s)"), real.message());
+        assertFalse(Files.exists(aged), "the aged day is gone whole");
+        assertFalse(Files.exists(store.resolve("year=2020")), "empty month=/year= parents go with it");
+        assertTrue(Files.exists(recent.resolve("b.parquet")), "inside the window nothing is touched");
+        assertTrue(Files.exists(store.resolve("_catalog.json")), "only partitions are candidates");
+        assertTrue(Files.exists(store.resolve("year=abcd/month=01/day=01")),
+                "a directory that only LOOKS like a partition is not judged, let alone deleted");
+
+        // a store partitioned by something other than a date says so rather than guessing
+        Path regional = store.resolveSibling("regional");
+        Files.createDirectories(regional.resolve("region=EU"));
+        JobResult none = new MaintenanceJob(job(Map.of("task", "partition_prune", "dir", regional.toString(),
+                "retention_days", "30"))).run();
+        assertTrue(none.message().contains("prunes by date"), none.message());
     }
 
     @Test

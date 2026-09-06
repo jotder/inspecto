@@ -22,7 +22,7 @@ import java.util.Base64;
  * {@link #createSocket()} and calls {@code connect(target)} on it itself, so a factory that only tunnelled in
  * its connecting overloads would be silently bypassed and dial the target directly.
  */
-final class HttpProxySocketFactory extends SocketFactory {
+public final class HttpProxySocketFactory extends SocketFactory {
 
     private final String proxyHost;
     private final int proxyPort;
@@ -34,6 +34,22 @@ final class HttpProxySocketFactory extends SocketFactory {
         this.proxyPort = proxyPort;
         this.username = username;
         this.password = password;
+    }
+
+    /**
+     * The single-string form a JDBC driver's {@code socketFactory=} / {@code socketFactoryArg=} hook can
+     * instantiate reflectively (2026-09-06, the JDBC half of the proxy dial-through): {@code host:port}
+     * or {@code host:port:user:password}. PostgreSQL's driver takes the socket from {@link #createSocket()}
+     * and calls {@code connect} itself, exactly like sshj, so {@link TunnellingSocket} covers it unchanged.
+     * Public, and the class with it, because the driver reaches it through {@code Class.forName} from
+     * another package.
+     */
+    public HttpProxySocketFactory(String arg) {
+        String[] p = ProxyArg.split(arg, 4, "HttpProxySocketFactory");
+        this.proxyHost = p[0];
+        this.proxyPort = ProxyArg.port(p[1], arg);
+        this.username = p.length > 2 && !p[2].isEmpty() ? p[2] : null;
+        this.password = p.length > 3 && !p[3].isEmpty() ? p[3] : null;
     }
 
     @Override

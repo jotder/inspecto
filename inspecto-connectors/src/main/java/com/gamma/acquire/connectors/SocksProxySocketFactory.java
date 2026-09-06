@@ -17,12 +17,18 @@ import java.net.Socket;
  * explicit {@code CONNECT} to a target that isn't known until that later {@code connect} call — not
  * supported by this factory).
  */
-final class SocksProxySocketFactory extends SocketFactory {
+public final class SocksProxySocketFactory extends SocketFactory {
 
     private final Proxy proxy;
 
     SocksProxySocketFactory(String proxyHost, int proxyPort) {
         this.proxy = new Proxy(Proxy.Type.SOCKS, new InetSocketAddress(proxyHost, proxyPort));
+    }
+
+    /** {@code host:port} — the reflective single-string form a JDBC {@code socketFactoryArg=} passes (see {@link HttpProxySocketFactory#HttpProxySocketFactory(String)}). */
+    public SocksProxySocketFactory(String arg) {
+        String[] p = ProxyArg.split(arg, 2, "SocksProxySocketFactory");
+        this.proxy = new Proxy(Proxy.Type.SOCKS, new InetSocketAddress(p[0], ProxyArg.port(p[1], arg)));
     }
 
     @Override

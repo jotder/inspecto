@@ -27,6 +27,9 @@ import java.time.Instant;
  *       (the window each claim was filed under), never mtime. <b>Deliberate forgetting</b>: retention
  *       must cover the longest {@code scope: window(...)} any pipeline declares. See
  *       {@link DedupPruneTask}.</li>
+ *   <li>{@code partition_prune} — per-date retention for a pipeline sink store: drop the
+ *       {@code year=/month=/day=} partitions under {@code dir} older than {@code retention_days} (UTC), whole
+ *       directories only, empty parents removed; files go, catalog rows stay (2026-09-06).</li>
  *   <li>{@code event_prune} — apply the audit-retention window (COMPLY-3, one year by operator decision) to
  *       the durable event store: delete the {@code level/year/month/day} Parquet partitions whose UTC day is
  *       older than {@code retention_days} (required). A file delete by partition, never a SQL DELETE; the
@@ -149,6 +152,7 @@ final class MaintenanceJob implements Job {
             case "runlog_prune"       -> RunlogPruneTask.run(cfg, auditDir, runStore, dryRun);
             case "notification_prune" -> NotificationPruneTask.run(cfg, host, dryRun);
             case "event_prune"        -> EventPruneTask.run(cfg, host, dryRun);
+            case "partition_prune"    -> PartitionPruneTask.run(cfg, dryRun);
             case "receipt_prune"      -> ReceiptPruneTask.run(cfg, host, dryRun);
             case "incident_purge"     -> IncidentPurgeTask.run(cfg, host, dryRun);
             // Read-only observers: a dry run and a real run observe the same thing. (storage_report

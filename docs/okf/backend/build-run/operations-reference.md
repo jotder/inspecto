@@ -549,6 +549,7 @@ forgetting is a policy decision and a wrong default is silent data loss.
 | `ledger_prune` | acquisition-ledger fingerprints | ⚠ a pruned file still at the source **re-ingests as new** — retention must exceed the source's own file lifetime |
 | `runlog_prune` | Run history JSONL + artifacts (+ the `inspecto_job_runs` projection) | |
 | `notification_prune` | in-app notifications, whatever their read/archived state | |
+| `partition_prune` | a pipeline sink store's `year=/month=/day=` partitions older than the window — `dir` is the store's `database/` directory (path-jailed), whole day directories only, empty parents removed | per-date retention for stream data (2026-09-06). Files go, catalog rows stay — the same rule as `retire_superseded`; `ConsignmentSelector` re-enumerates the live tree. A store partitioned by other columns (`partitions[]`) has no date tree and prunes nothing, by design |
 | `event_prune` | the durable event store's `level=/year=/month=/day=` Parquet partitions older than the window | COMPLY-3 — the audit-retention window is **one year** (operator, 2026-08-30): schedule it with `retention_days: 365`, or the window stays stated policy the code does not apply. In-memory backend ⇒ nothing to prune |
 | `receipt_prune` | delivery receipts (D8) | the in-memory store's oldest-first cap at 5000 is a **backstop, not retention** |
 | `incident_purge` | **Archived Incidents and their notes, attachments, links and tag edges** | the only task that deletes operator business records — see below |

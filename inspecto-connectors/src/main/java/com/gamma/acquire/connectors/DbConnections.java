@@ -63,11 +63,52 @@ final class DbConnections {
             }
             String user = profile.username();
             String pass = SecretResolver.resolve(profile.password());
-            Connection conn = (user == null) ? DriverManager.getConnection(url) : DriverManager.getConnection(url, user, pass);
+            java.util.Properties props = new java.util.Properties();
+            if (user != null) props.setProperty("user", user);
+            if (user != null && pass != null) props.setProperty("password", pass);
+            applyProxy(profile, url, tunnel != null, props);
+            Connection conn = DriverManager.getConnection(url, props);
             return new Handle(conn, tunnel);
         } catch (SQLException e) {
             if (tunnel != null) try { tunnel.close(); } catch (IOException ignore) { /* best effort */ }
             throw e;
+        }
+    }
+
+    /**
+     * The JDBC half of the connector proxy dial-through (2026-09-06). {@code ConnectionProfile.proxy} was
+     * honoured by SFTP/FTP since 2026-07-20/08-13 and ignored here — a DB Connection with a proxy dialled
+     * the database directly, silently. PostgreSQL's driver exposes the same seam sshj does: a
+     * {@code socketFactory=} class (+ a single-string {@code socketFactoryArg=}) it instantiates
+     * reflectively and takes an unconnected socket from, so the two existing factories carry it with no new
+     * tunnelling code. Fail-closed on what cannot be routed: a driver other than PostgreSQL (no such hook
+     * on DuckDB or an unknown {@code jdbc_url}), an unknown proxy type, and a proxy COMBINED with an SSH
+     * tunnel — the JDBC socket then dials the tunnel's local endpoint, which a proxy must not carry, and the
+     * SSH hop itself is not proxied today; refusing beats routing half the path.
+     */
+    static void applyProxy(ConnectionProfile profile, String url, boolean tunnelled, java.util.Properties props)
+            throws SQLException {
+        ConnectionProfile.Proxy proxy = profile.proxy();
+        if (proxy == null || proxy.host() == null || proxy.host().isBlank()) return;
+        if (tunnelled)
+            throw new SQLException("DB connection '" + profile.id() + "' declares both an SSH tunnel and a proxy; "
+                    + "the JDBC socket dials the tunnel's local endpoint, which a proxy cannot carry — drop one");
+        if (!url.startsWith("jdbc:postgresql:"))
+            throw new SQLException("DB connection '" + profile.id() + "' declares a proxy but its driver has no "
+                    + "per-connection proxy hook (only PostgreSQL's socketFactory= is wired); remove the proxy or "
+                    + "route at the network layer");
+        String type = proxy.type() == null ? "" : proxy.type().trim().toUpperCase(java.util.Locale.ROOT);
+        switch (type) {
+            case "SOCKS5" -> {
+                props.setProperty("socketFactory", SocksProxySocketFactory.class.getName());
+                props.setProperty("socketFactoryArg", ProxyArg.of(proxy, false));
+            }
+            case "HTTP" -> {
+                props.setProperty("socketFactory", HttpProxySocketFactory.class.getName());
+                props.setProperty("socketFactoryArg", ProxyArg.of(proxy, true));
+            }
+            default -> throw new SQLException("DB connection '" + profile.id() + "' supports proxy type SOCKS5 or HTTP only (got '"
+                    + proxy.type() + "')");
         }
     }
 
