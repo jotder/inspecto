@@ -189,7 +189,7 @@ runnable and deletable, never newly written (the `Pipeline*Routes` modules). The
 
 ---
 
-## 2. Existing example configs (under `spaces/<id>/config/` — `ucc` hosts voucher; `default` hosts the format-example pack (csv/fixedwidth/excel/json — one worked pipeline per DuckDB-native parser frontend, replacing the retired subscriber/gwlog/cdr/csv_demo pipelines 2026-08-20 — plus `asn1_example`/`xml_example` for the plugin-ingester frontends, 2026-09-06), the **Step catalog** (`<kind>_step/` — one pipeline per Step kind of `step-types.contract.json`; the five at-rest ones run through `jobs/<kind>_step_rollup_job.toon`, mirroring `inspecto/examples/07-steps/`), and a Catalog/KPI demo (`events/`); `demo` hosts the full editable sample catalog — one sample of every authorable kind + committed sample data, see [`../spaces/demo/config/README.md`](../spaces/demo/config/README.md))
+## 2. Existing example configs (under `spaces/<id>/config/` — `ucc` hosts voucher; `default` hosts the format-example pack (csv/fixedwidth/excel/json — one worked pipeline per DuckDB-native parser frontend, replacing the retired subscriber/gwlog/cdr/csv_demo pipelines 2026-08-20 — plus `asn1_example`/`xml_example` for the plugin-ingester frontends, 2026-09-06), the **Step catalog** (`<kind>_step/` — one pipeline per Step kind of `step-types.contract.json`; the five at-rest ones run through `jobs/<kind>_step_rollup_job.toon`, mirroring `inspecto/examples/07-steps/`), and a Catalog/KPI demo (`events/` — a semantic model only; its sample corpus was removed 2026-09-06); `demo` hosts the full editable sample catalog — one sample of every authorable kind + committed sample data, see [`../spaces/demo/config/README.md`](../spaces/demo/config/README.md))
 
 | File | Demonstrates |
 |---|---|
@@ -329,9 +329,9 @@ not committable), and `hive_partitioning` is **off**, matching `DatasetRelation`
   (line-per-record) behavior is unchanged. See `inspecto-etl/src/test/java/com/gamma/etl/TextRegexTest.java`
   (`blankLineRecordSplitSpansMultipleLines`, `literalDelimiterRecordSplitIsAccepted`).
 - ~~No subscriber `.dat` / plugin-binary sample data in the repo — synthesize for those examples.~~
-  **Partly stale, corrected 2026-07-22**: subscriber `.dat` samples now ship
-  (`spaces/default/data/samples/subscriber/SUBSCRIBER_*.dat`, per §2). Only the plugin/CALL **binary**
-  samples remain unsynthesized.
+  **Partly stale, corrected 2026-07-22**: subscriber `.dat` samples shipped from then until 2026-09-06, when the
+  four retired corpora (subscriber/events/cdr/gwlog — their pipelines went 2026-08-20) were removed with their
+  seed arms (SAMPLE-1-REMOVE). Only the plugin/CALL **binary** samples remain unsynthesized.
 - ~~`package.ps1` pre-creates inbox/database dirs only for `adjustment` + `voucher`~~ **stale, corrected
   2026-07-20**: `package.ps1` does not pre-create any adapter inbox/database dirs — the bundle's own
   comment (line 21) tells the operator to create `inspecto-deploy/inbox/<adapter>/` manually;

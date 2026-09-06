@@ -4,25 +4,11 @@
 #
 # The format-example pack (csv/fixedwidth/excel/json) is the set of pipelines this space actually
 # ships; each has one sample beside this script.
-# NOTE: the subscriber / events / cdr / gwlog arms below seed pipelines RETIRED 2026-08-20
-# (FEATURE_INVENTORY.md 2). They are left in place because their sample corpora are still
-# committed; retiring the arms and the corpora together is an operator call.
+# The subscriber / events / cdr / gwlog corpora (pipelines RETIRED 2026-08-20) were removed 2026-09-06
+# (SAMPLE-1-REMOVE); only ref/ is seeded outside the example packs below.
 $ErrorActionPreference = 'Stop'
 $data = Split-Path -Parent $PSScriptRoot
-foreach ($d in 'inbox/subscriber','subscriber/database','subscriber/backup','subscriber/temp','subscriber/errors',
-               'subscriber/quarantine','subscriber/markers','subscriber/status','subscriber/logs',
-               'inbox/events','events_etl/database','events_etl/backup','events_etl/temp','events_etl/errors',
-               'events_etl/quarantine','events_etl/markers','events_etl/status','events_etl/logs',
-               'inbox/cdr','cdr/database','cdr/backup','cdr/temp','cdr/errors',
-               'cdr/quarantine','cdr/markers','cdr/status','cdr/logs',
-               'inbox/gwlog','gwlog/database','gwlog/backup','gwlog/temp','gwlog/errors',
-               'gwlog/quarantine','gwlog/markers','gwlog/status','gwlog/logs',
-               'reports/events_daily','ref') {
-  New-Item -ItemType Directory -Force -Path (Join-Path $data $d) | Out-Null
-}
-foreach ($f in 'subscriber','events','cdr','gwlog') {
-  Copy-Item -Path (Join-Path $PSScriptRoot "$f/*") -Destination (Join-Path $data "inbox/$f") -Force
-}
+New-Item -ItemType Directory -Force -Path (Join-Path $data 'ref') | Out-Null
 Copy-Item -Path (Join-Path $PSScriptRoot 'ref/*') -Destination (Join-Path $data 'ref') -Force
 
 # The format-example pack: one pipeline per DuckDB-native parser frontend.
@@ -44,4 +30,4 @@ foreach ($f in 'filter_step','dedup_step','join_step','summarize_step','sql_step
   }
   Copy-Item -Path (Join-Path $PSScriptRoot "$f/*") -Destination (Join-Path $data "inbox/$f") -Recurse -Force
 }
-Write-Host "Seeded csv/fixedwidth/excel/json example inboxes, the Step catalog (*_step) + asn1/xml examples (+ the retired subscriber/events/cdr/gwlog corpora) + ref/ - restart the server or wait for the next poll cycle."
+Write-Host "Seeded csv/fixedwidth/excel/json example inboxes, the Step catalog (*_step) + asn1/xml examples + ref/ - restart the server or wait for the next poll cycle."

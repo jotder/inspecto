@@ -37,7 +37,7 @@ a new dependency — not a build. The rule that fell out: **a P1 must name the f
 cannot is a decision (§1) or a design (P2).
 
 Do next, in order (all decided 2026-09-06, all P1):
-1. **SAMPLE-1-REMOVE** · **STRUCTURE-CSV-1** · **SEC-07-GATE** · **DATA-GOV-SYNTH** · **OPEN-DAG-S1** — the larger builds.
+1. **STRUCTURE-CSV-1** · **SEC-07-GATE** · **DATA-GOV-SYNTH** · **OPEN-DAG-S1** — the larger builds.
 2. **Release notes for the next MAJOR** — keep appending (§2). **Step Processor catalog** — pick a partial by name (§3).
 
 ## 1. Operator decisions pending
@@ -89,7 +89,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - **P3** · **AI drafting has no applicable component kind** — restore `<inspecto-ai-assist>`/`component_draft` for a kind: either give `grammar`/`transform`/`sink` a backend `ConfigSpec` (none has one; `ConfigSpecs.TYPES` excludes them) or rework `SchemaEditorDialog`. No low-risk slice survives — design first. → `okf/frontend/features/inline-ai-authoring.md`
 ### Onboarding, Catalog, Parsing
 
-- **P1** · **SAMPLE-1-REMOVE** — `git rm` the four retired corpora under `spaces/default/data/samples/` (keep `events/` only if the live KPI demo reads it), drop the seed arms in `seed-inbox.{ps1,sh}`, fix two `FEATURE_INVENTORY.md` mentions. → `FEATURE_INVENTORY.md` §2
 - **P2** · **D4-ENRICH-1** — the D-4 migration is BLOCKED by a design gap found on grounding (2026-09-06): `orders_daily_enrich.toon` is a join **plus an aggregate** over the LANDED `orders` store, so it needs `join → sql` as an at-rest chain — but the orders pipeline already carries its one at-rest chain (`filter` → `rollup`), and no pipeline can read ANOTHER pipeline's landed store as its source (the at-rest lift's `STAGE2_SRC` is the pipeline's own canonical store). Until either a second chain per pipeline or a store-sourced pipeline exists, `enrichment` stays the only spelling and cannot go read-only. Design first. → `superpower/elt-final-amendment-plan.md` §9 D-4
 
 - **P3** · **Unpack (11) absent codecs** — (xz/zstd need a new decompression library: a dependency sign-off, not a build) — xz and zstd have no plugin; `.Z` has no round-trip test; multi-part/split archives (`.z01`, `.part1.rar`) unhandled — arrival-completeness is a Collector question. ⚠ The UI cannot author the explicit empty-list `data_extensions[0]:` opt-out (schema-form `list` writes empty as `null`). 🔴 Stale `META-INF/services` "ORDER MATTERS" header. → `okf/backend/engine/unpack-stage.md`
