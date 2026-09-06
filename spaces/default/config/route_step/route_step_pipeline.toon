@@ -4,7 +4,7 @@ version: 1
 
 dirs:
   poll:       spaces/default/data/inbox/route_step
-  database:   spaces/default/data/route_step/database
+  database:   spaces/default/data/route_step/domestic
   backup:     spaces/default/data/route_step/backup
   temp:       spaces/default/data/route_step/temp
   errors:     spaces/default/data/route_step/errors
