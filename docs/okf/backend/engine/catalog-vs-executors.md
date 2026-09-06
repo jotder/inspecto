@@ -261,8 +261,10 @@ naturally expressible as a join against a stored relation.
 relation. What shipped of it: S1 `RelationPreview.columnTypes` + `Result.sql` on the sealed sandbox; S2
 `<inspecto-step-preview-result>`; S5 `GET /config/schema/derived` + `<inspecto-derived-schema-panel>`; and the
 derived-schema half as `POST /components/transform/describe` (`TypeFlow.describe`). S3 was refuted. Two durable
-facts: a chain preview must run each Step's `shape` in order over the previous relation (never fuse — `RowShaper.fuse`
-is "last projection wins" and has no production caller; it is tested and must be either wired with that fixed or
-deleted); and a preview publishes at two points — the relation and the derived schema — which must agree. S4, the
-one-surface workbench (input-relation picker, column filter, grouping beside the field list), is BACKLOG §3
-`WORKBENCH-S4`, unscheduled.
+facts: a chain preview must run each Step's `shape` in order over the previous relation (never fuse — `RowShaper.fuse`,
+"last projection wins" and caller-less, was **deleted 2026-09-06** rather than wired); and a preview publishes at two
+points — the relation and the derived schema — which must agree. S4, the one-surface workbench (input-relation
+picker, column filter, grouping beside the field list), is BACKLOG §3 `WORKBENCH-S4`, unscheduled: grounding
+2026-09-06 found no picker/filter/grouping control exists, only the S1/S2/S5 plumbing it would host
+(`upstreamColumns` into the SQL pane, `POST /components/transform/describe`, the two preview components) and no
+endpoint that lists a node's input relations — the relation is implicit (the upstream node's output).

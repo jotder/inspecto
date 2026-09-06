@@ -221,18 +221,14 @@ former root reference docs** (each index lists them):
   not deferred. 🔴 The operator's chosen count source (`CommitLog`) was REFUTED — it is per-batch with
   no day column; the KPI reads `consignment_outputs` instead. Slices K1–K5.
 
-- [`superpower/open-dag-pipeline-design.md`](superpower/open-dag-pipeline-design.md) — **DESIGN, not
-  scheduled** (operator direction, 2026-08-29): open the pipeline into a NiFi-style DAG — steps after the
-  sink, and pluggable **authorable** steps. Grounded: most machinery exists (the graph executor already
-  runs arbitrary topologies; `ParserPlugin` already serves its grammar; `PipelineNodeExecutor` shipped
-  the execution half). 🔴 **Corrected the same day** once the operator described the dataflow model: the
-  post-sync carrier is the **Consignment output registry**, not a piped relation — a step reads via
-  `ProcessorContext.outputs()`/`read()` and what it emits is written AND REGISTERED back onto the same
-  Consignment, so the next step sees it. Schema **propagates** through `TypeFlow`, never re-declared.
-  ⛔ So the sink does NOT need to emit `DATA` — that framing solved the wrong problem. What is missing is
-  **composition and authoring** (one processor per Job run, no DAG, not on the canvas) plus the closed
-  `RecipeCompiler` verb switch and hardcoded `LOWERABLE` for plugin steps. Five stages; the open decision
-  is whether a post-sync step may create an arbitrary table or must stay in the summary guardrail.
+- ~~`superpower/open-dag-pipeline-design.md`~~ — **ARCHIVED 2026-09-06 (every stage shipped, decided or refuted;
+  distilled into [`okf/backend/engine/post-sync-step-chains.md`](okf/backend/engine/post-sync-step-chains.md))** →
+  [`archived-documents/plans-archive/open-dag-pipeline-design.md`](archived-documents/plans-archive/open-dag-pipeline-design.md).
+  Was the open-the-pipeline-into-a-DAG design (operator direction 2026-08-29): the post-sync carrier is the
+  **Consignment output registry**, a step's table is written AND registered onto the same Consignment, schema
+  propagates through `TypeFlow`. Stages 2/3/5 shipped 2026-08-29, stage 4 (outputs list + the `job-chain-editor`)
+  2026-08-29/31, stage 6 refuted; the 2026-09-06 Q1/Q3/Q4 decisions ratified the as-built. BACKLOG `OPEN-DAG-S1`
+  closed as already-shipped.
 
 - ~~`superpower/step-workbench-design.md`~~ — **ARCHIVED 2026-09-06 (distilled into `okf/backend/engine/catalog-vs-executors.md`; S4 → BACKLOG)** → `archived-documents/plans-archive/step-workbench-design.md`. Was: [`step-workbench-design.md`](archived-documents/plans-archive/step-workbench-design.md) — **DESIGN, not
   scheduled** (2026-08-29; ⚠ 2026-09-04: most of its ask — free SQL, derived output schema, test on

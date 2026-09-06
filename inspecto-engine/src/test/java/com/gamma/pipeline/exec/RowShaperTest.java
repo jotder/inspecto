@@ -334,19 +334,6 @@ class RowShaperTest {
     }
 
     @Test
-    void fuseFiltersAndProjectionIntoOnePass() throws Exception {
-        seedSrc();
-        RowShaper.Relation r = RowShaper.fuse(conn, List.of(
-                PipelineNode.of("f", "transform.filter", Map.of("where", "amt >= 100")),
-                PipelineNode.of("m", "transform.sql", Map.of("columns",
-                        List.of(Map.of("name", "id", "expr", "id"), Map.of("name", "amt", "expr", "amt"))))
-        ), "src", "chain");
-        assertEquals(PipelineRel.DATA, r.rel());
-        assertEquals(List.of(1, 3), ids(r.table(), "id"));                 // filtered
-        assertEquals(List.of("amt", "id"), columns(r.table()).stream().sorted().toList());   // projected
-    }
-
-    @Test
     void mergeUnionAndJoin() throws Exception {
         sql("CREATE TABLE a AS SELECT * FROM (VALUES (1,'x'),(2,'y')) t(id,v)");
         sql("CREATE TABLE b AS SELECT * FROM (VALUES (3,'z')) t(id,v)");

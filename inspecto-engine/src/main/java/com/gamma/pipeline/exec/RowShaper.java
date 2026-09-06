@@ -727,34 +727,9 @@ public final class RowShaper {
         return Optional.empty();
     }
 
-    /**
-     * <b>Chain-fusion (T10).</b> Fuse a linear run of projection ({@code map}/{@code select}/{@code derive})
-     * and {@code filter} nodes into a <b>single</b> {@code SELECT … WHERE …} pass over {@code input},
-     * avoiding an intermediate table per node. Safe for the common shape (a projection plus filters whose
-     * predicates and expressions reference the chain's <em>input</em> columns); the executor falls back to
-     * per-node {@link #shape} for anything that interdepends. Emits one {@code data} relation.
-     */
-    public static Relation fuse(Connection conn, List<PipelineNode> chain, String input, String outPrefix)
-            throws SQLException {
-        if (chain.isEmpty()) throw new IllegalArgumentException("fuse needs at least one node");
-        String projection = "SELECT * FROM " + q(input);
-        List<String> wheres = new ArrayList<>();
-        for (PipelineNode n : chain) {
-            if (BuiltinNodeType.TRANSFORM_FILTER.type().equals(n.type())) {
-                String w = str(n, "where");
-                requireExpr(w, "predicate");
-                wheres.add("COALESCE((" + w + "), FALSE)");
-            } else {
-                projection = projectionSelect(n, input);   // last projection wins (input-referencing)
-            }
-        }
-        String data = table(outPrefix, PipelineRel.DATA);
-        String sql = "CREATE TABLE " + q(data) + " AS " + projection;
-        if (!wheres.isEmpty()) sql += (projection.toUpperCase().contains(" WHERE ") ? " AND " : " WHERE ")
-                + String.join(" AND ", wheres);
-        exec(conn, sql);
-        return new Relation(PipelineRel.DATA, data);
-    }
+    // Chain-fusion (`fuse`) was DELETED 2026-09-06 (WORKBENCH-S4 grounding): it had no production caller and its
+    // "last projection wins" rule silently dropped every projection but the final one in a chain. A chain — in the
+    // executor or a preview — runs each Step's shape() in order over the previous relation; never fuse.
 
     // ── merge (multi-input join / union) ───────────────────────────────────────────
 

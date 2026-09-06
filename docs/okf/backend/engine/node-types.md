@@ -142,8 +142,9 @@ over a DuckDB relation, so they operate on the previous node's output metadata, 
   relation is all-VARCHAR — the split and its reasons live in
   [catalog-vs-executors.md](catalog-vs-executors.md).
 * ✅ **`map` / `select` / `derive` already ARE one construct in the executor** — one method,
-  `RowShaper.projectionSelectFrom`, serves all three (`derive` just prepends `*`). And
-  `RowShaper.fuse` already fuses a projection plus filters into a **single** `SELECT … WHERE`.
+  `RowShaper.projectionSelectFrom`, serves all three (`derive` just prepends `*`). (`RowShaper.fuse`, which
+  fused a projection plus filters into one `SELECT … WHERE`, was deleted 2026-09-06 — caller-less, and its
+  "last projection wins" rule dropped every projection but the final one; a chain runs each `shape` in order.)
 * 🔴 **`filter` is not equivalent to them.** It emits `DROPPED` — the rejected rows are a first-class
   relation an author can wire to a quarantine sink. Fold it into a node that emits only `DATA` and that
   side disappears silently. (Likewise `validate`→`INVALID`, `dedup`→`DUPLICATE`, `route`→named

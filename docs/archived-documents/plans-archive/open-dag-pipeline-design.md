@@ -23,6 +23,11 @@ once the operator described the dataflow model — see §2). No code beyond what
 
 ---
 
+> **ARCHIVED 2026-09-06 — every stage shipped, decided or refuted; nothing left to build.** The 2026-09-06 Q1/Q3/Q4
+> decisions ratified the as-built (the derived table registers as a Consignment output; re-runs supersede through
+> `DbConsignmentOutputStore.supersede`; Step per Consignment / Job across). BACKLOG `OPEN-DAG-S1` closed as
+> already-shipped. Durable truth: `okf/backend/engine/post-sync-step-chains.md`.
+
 ## 0. DECIDED 2026-08-29 (operator)
 
 > **Arbitrary tables, registered as Consignment outputs.** *"Steps may write arbitrary tables; the chain
@@ -367,7 +372,7 @@ thing"* is a one-concept-two-words violation.
 | **1** | ~~decide the output contract~~ | ✅ **DECIDED**: arbitrary tables, registered as outputs |
 | **2** | ✅ **SHIPPED 2026-08-29** — `DerivedTableEmitter` / `DerivedTableWriter`, registered onto the same Consignment | no new state; the reprocess cascade is proven free by test. §7 |
 | **3** | ✅ **SHIPPED 2026-08-29** — an ordered chain, the registry re-read per step | §8 |
-| **4** | ⚠ **HALF: the read-only registered-outputs list SHIPPED 2026-08-29** (`GET /runs/{name}/outputs` + the Batch-detail section, `aa777782`); the **authoring** half — an ordered chain-authoring UX over the `processor`+`chain_config` param pair — is still hand-edited TOON (gate-register §4; corrected 2026-09-01 — this row's bare "SHIPPED" contradicted the prose and was called out by spec §10 item 12) | authoring |
+| **4** | ✅ **SHIPPED** — the read-only registered-outputs list 2026-08-29 (`GET /runs/{name}/outputs` + the Batch-detail section, `aa777782`) AND the authoring half 2026-08-31: `job-chain-editor.component.ts` / `job-chain.ts`, the structural `processor`+`chain_config` editor the Job form renders whenever a job type declares both params (new job or existing — an empty chain parses to `[]`, so it engages on create too). ⚠ The 2026-09-01 "still hand-edited TOON" correction was itself stale by a day. | authoring |
 | **5** | ✅ **SHIPPED 2026-08-29** — a CONTRIBUTED step is authorable via `steps:` | §11 |
 | **6** | 🔴 **REFUTED 2026-08-29 — already shipped, nothing to build.** See §12 | n/a |
 

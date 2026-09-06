@@ -125,8 +125,8 @@ by [execution-lanes.md](execution-lanes.md); the branch-aware ingest fork by
   deliberately out of scope.
 - **`PipelineExecutor`** (the at-rest/authored lane) validates, walks `data` edges topologically
   (Kahn; cross-flow `on_commit` excluded), compiles transforms via `RowShaper` (multi-named-relation
-  SQL: filter/validate/route case+clone/dedup/split/map/select/derive/merge, with `fuse()`
-  chain-fusion of linear runs), routes each produced relation along its edge, and drives the
+  SQL: filter/validate/route case+clone/dedup/split/map/select/derive/merge — one `shape` per node in
+  order; the `fuse()` chain-fusion was deleted 2026-09-06), routes each produced relation along its edge, and drives the
   coordinator at sinks. ⚠ Under the token rule (§1) this SQL-relation walk is the **at-rest lane's
   mechanism**, not the general edge semantics — the ingest lane diverts at `writeAndTrace`, and the
   runtime's remaining convergence on the token model lands with Phase 7.
