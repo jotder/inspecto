@@ -156,8 +156,6 @@ const DOC_ALLOW = {
         'Subject matter: the §13 rename-map rows for Cube → Matrix.',
     'docs/INDEX.md::bare-flow':
         'Subject matter: the one hit names the Flow→Pipeline rename as the largest remaining blast radius (517 files / 39 @PublicApi).',
-    'docs/BACKLOG.md::source-acquisition-entity':
-        'Subject matter: the one hit cites the Source→Collector rename (GLOSSARY §13) as a worked example of a concept renamed three times.',
     'docs/PROJECT_NOTES.md::bare-flow':
         'Subject matter: the one hit records that CONFIG_ALLOW doubles as the Flow→Pipeline Tier-3 ledger. The other four hits in this file were stale and were fixed 2026-08-29.',
     'docs/REQUIREMENTS.md::measure-threshold':

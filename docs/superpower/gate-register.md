@@ -1,5 +1,9 @@
 # Gate register — everything currently gated, blocked or restricted (2026-08-29)
 
+> **2026-09-06 — folded into the backlog.** Every pending decision (§3), every "simply unbuilt" item (§4)
+> and the five clusters (§2) now have rows in [`../BACKLOG.md`](../BACKLOG.md) §1–§3, and §5 is its §6.
+> `BACKLOG.md` is the board of record; this file stays as the dated method and evidence. Close rows there.
+
 **Status:** discussion input, not an approved plan. Built by a four-way sweep of `docs/BACKLOG.md`,
 `docs/superpower/`, the root canon + `compliance/`, and `docs/okf/`. Nothing here is new work — it is
 the existing record, deduplicated and sorted by **who can actually lift the gate**.

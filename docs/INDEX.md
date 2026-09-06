@@ -28,8 +28,12 @@
   code or git: key decisions, gotchas, engine seams & perf, pointer map.
 - [`REQUIREMENTS.md`](REQUIREMENTS.md) — **requirements-of-record**: full platform requirement set with
   reconciled MoSCoW, edition mapping, NFRs, sequencing.
-- [`BACKLOG.md`](BACKLOG.md) — **the consolidated open-items index** (one line + pointer each). Refreshed
-  2026-07-16 from all archived plans' deferrals.
+- [`BACKLOG.md`](BACKLOG.md) — **the consolidated open-items index** (one line + pointer each), grouped by
+  what has to happen next: §0 priority order (P1–P3 on every row) · §1 operator decisions · §2 externally gated · §3 unbuilt features · §4 tech-debt
+  · §5 docs · §6 standing refusals. **Consolidated 2026-09-06** — the closed-row narratives that had grown
+  it to 505 KB are frozen in
+  [`archived-documents/backlog-snapshot-2026-09-06.md`](archived-documents/backlog-snapshot-2026-09-06.md);
+  the gate register's §3/§4 rows and every active plan's remainder were folded in the same pass.
 - [`FEATURE_INVENTORY.md`](FEATURE_INVENTORY.md) — every feature's TOON shape + where defined, examples,
   packaging, runnability. Pairs with the runnable suite in [`../inspecto/examples/`](../inspecto/examples).
 - [`ADVANCED_GUIDE.md`](ADVANCED_GUIDE.md) — **Advanced Operations & Internals Guide** (the production
@@ -179,8 +183,9 @@ former root reference docs** (each index lists them):
   X4 record-replay shape · X5 StepInfo envelope feeding Phase 7 · X6 consignment-identity already
   held), plus the R3 unblock verdict. The same-shift build package (default-on orphan gate · D-9
   finish via the ExecutionContext seam · `POST /jobs/runs/{runId}/replay`) is recorded there.
-- [`superpower/gate-register.md`](superpower/gate-register.md) — the register of decision-gated
-  rows: what each is waiting on and who owns the call.
+- [`superpower/gate-register.md`](superpower/gate-register.md) — the 2026-08-29 register of decision-gated
+  rows: what each is waiting on and who owns the call. Its pending decisions and unbuilt list were folded
+  into `BACKLOG.md` §1–§3 on 2026-09-06; BACKLOG is the board of record, the register is the method.
 - [`superpower/pipeline-waves-drain-plan.md`](superpower/pipeline-waves-drain-plan.md) — **IN FLIGHT
   2026-08-31**, the drain of `pipeline-spec.md`'s remaining waves. §1 records what grounding found the
   spec's own wave tables got wrong (three of six rows), §2 the work left and its single gate, **§3 the
