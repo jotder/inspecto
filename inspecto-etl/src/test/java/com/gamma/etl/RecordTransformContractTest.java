@@ -109,6 +109,30 @@ class RecordTransformContractTest {
     }
 
     /**
+     * RECORD-TRANSFORMER-1 (c): a two-source function has EVERY column input audited for non-blankness, not
+     * only {@code from} — and measurability is still decided on the primary input alone, so a text join over
+     * a VARCHAR primary stays uncounted exactly as before.
+     */
+    @Test
+    void theAuditTestsEveryColumnInputOfATwoSourceFunction() {
+        Map<String, String> types = Map.of("D", "DATE", "T", "VARCHAR", "NOTE", "VARCHAR");
+        Map<String, Object> join = Map.of("name", "dt", "from", "D", "fn", "text.join",
+                "args", Map.of("separator", " ", "other", "T"));
+        assertEquals(List.of("D", "T"), RecordTransform.auditedSourceColumns(join, types),
+                "the primary input first, then the COLUMN argument");
+        assertEquals("D", RecordTransform.auditedSourceColumn(join, types), "the single-column form is unchanged");
+
+        Map<String, Object> varcharJoin = Map.of("name", "x", "from", "NOTE", "fn", "text.join",
+                "args", Map.of("separator", " ", "other", "T"));
+        assertTrue(RecordTransform.auditedSourceColumns(varcharJoin, types).isEmpty(),
+                "measurability is the primary input's call: a VARCHAR pass-through cannot null out");
+
+        assertEquals(List.of("AMOUNT"), RecordTransform.auditedSourceColumns(
+                Map.of("name", "amt", "from", "AMOUNT", "fn", "keep"), Map.of("AMOUNT", "DOUBLE")),
+                "a one-source function audits exactly its one input");
+    }
+
+    /**
      * The audit's measurability rule, both arms: a {@code custom} row is excluded exactly as {@code EXPR}
      * is (author-owned SQL has no defined "source was non-blank"), and a VARCHAR pass-through is excluded
      * because it cannot null out.

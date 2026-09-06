@@ -297,9 +297,13 @@ AUTHORING-REDESIGN-1): **1 — partially absorbed** by `transform.sql` (Test thi
 after the fact; there is still no as-you-type validation — a DESCRIBE-backed `/describe` route is the
 follow-on). **2 — re-opened 2026-09-04**: the five-verb Fields grid that briefly served as the expression
 builder was retired with the SQL-first rebuild (§0); the SQL textarea is the builder, so CodeMirror (BACKLOG
-(b)) is now the nearest improvement and the v2 AST table (c) the structured surface. **3 — still
-valid** small follow-on (join reference-existence). **4 — partially absorbed**: the drift-into-mapping
-check stays valid *because* Layer 1 remains a rule table; still open. **5, 6, 8 — dropped as premature**
+(b)) is now the nearest improvement and the v2 AST table (c) the structured surface. **3 — CLOSED 2026-09-06**: `PipelineValidator` refuses `JOIN_REFERENCE_MISSING` / `JOIN_ON_MISSING`
+and `PipelineGraphRoutes` refuses `UNKNOWN_JOIN_REFERENCE` (a `reference/<pipeline>` naming no loaded
+pipeline, or one without `produces: reference`) at save; which columns the reference carries stays the
+dry-run's question. **4 — CLOSED 2026-09-06**: `SchemaMappingDrift` (inspecto-etl) runs on all three schema
+save paths (`/config/write`, `/config/patch`, `/components/schema/{id}`) and 422s a mapping `from` or COLUMN
+argument naming a column `raw.fields` no longer declares — cell-addressed (`mapping.fields[<name>].from`),
+no `compatibility: none` escape because both halves are one document; `custom` rows are author SQL and exempt. **5, 6, 8 — dropped as premature**
 for a surface that was redesigned (async validators, auto-recompute, drag-and-drop, RunToHere
 cross-link). **7 — absorbed**: a `transform.sql` binder error names the stale column (DuckDB's message
 verbatim) instead of defaulting to VARCHAR; the `DIRECT`-rule fallback itself is unchanged on the legacy
@@ -326,12 +330,18 @@ path.
    canvas-level `RunToHereDialog`) with no cross-linking, so an author working inside a drawer has no path
    to the more powerful real-run capability without leaving the drawer and finding it manually.
 
-## 7. Wide-feed decisions (D8–D10, decided 2026-09-04 — NOT yet built)
+## 7. Wide-feed decisions (D8–D10, decided 2026-09-04 — BUILT the same day, verified 2026-09-06)
 
 Three decisions taken after the redesign shipped, from driving the clickable mockup
 (Artifact *Pipeline Authoring Redesign*, `b5e7ec6c-5bb2-467a-a513-93bfda987f3d`; working artboards in the
-session scratchpad `design/`). They are **design decisions with no code behind them yet** — tracked in
-BACKLOG as `AUTHORING-WIDE-1`.
+session scratchpad `design/`). They were built the same day they were decided (`4e64fe4a`, `c769719d`): Parse's columns table carries no
+include control (`SchemaFieldRow.include` survives only for Grammar-CSV round-trips), both grids search over
+name + synonym with counted filter chips and paging (Transform `[10, 20, 100]` defaulting to 10, Parse
+`[10, 25, 50, 100]` defaulting to 50, `#` = `seq` in the FULL list), and Transform opens on *Changed* with the
+pass-through banner + **Show them**. ⚠ The BACKLOG row `AUTHORING-WIDE-1` said "none built" for two days
+after — a fresh grep, not the row, is the source of truth ([[stale-residuals-in-shipped-rows]]). The Parse
+sample values render inline per row, so they cover only the current page by construction; there is no
+separate caption saying so.
 
 🔴 **What prompted them: the mockup's sample was chosen to flatter the design.** Both boards were drawn
 over a 7-column orders CSV, where "one row per field" reads as clarity. This product's real feeds are not

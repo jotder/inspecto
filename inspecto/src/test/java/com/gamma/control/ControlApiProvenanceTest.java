@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The data-plane provenance query routes (T22) over real HTTP: param validation and the default-off gate.
@@ -42,7 +43,10 @@ class ControlApiProvenanceTest {
     void validatesParamsAndGatesOnTheBackend(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
             // missing required params → 400 (checked before the store is consulted)
-            assertEquals(400, get(c.port, "/provenance").statusCode());
+            HttpResponse<String> missing = get(c.port, "/provenance");
+            assertEquals(400, missing.statusCode());
+            assertTrue(missing.body().contains("'pipeline'") && !missing.body().contains("'flow'"),
+                    "the 400 names the canonical param, not the pre-rename one: " + missing.body());
             assertEquals(400, get(c.port, "/provenance?flow=f").statusCode());
             assertEquals(400, get(c.port, "/provenance/batches").statusCode());
 

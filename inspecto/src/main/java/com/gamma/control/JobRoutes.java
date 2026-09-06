@@ -286,21 +286,22 @@ final class JobRoutes implements RouteModule {
     }
 
     /**
-     * {@code GET /provenance?flow=&batch=} — the per-(node, relationship) record counts of one flow run (T22).
-     * A consumer paints each {@code (nodeId, rel)} onto its outgoing {@code PipelineGraph} edge as the Sankey weight.
-     * 400 if either param is missing, 404 when no provenance backend is configured.
+     * {@code GET /provenance?pipeline=&batch=} — the per-(node, relationship) record counts of one pipeline
+     * run (T22). A consumer paints each {@code (nodeId, rel)} onto its outgoing {@code PipelineGraph} edge as
+     * the Sankey weight. 400 if either param is missing, 404 when no provenance backend is configured.
+     * {@link #pipelineParam} still dual-reads the pre-rename {@code flow=}; the message names the canonical one.
      */
-    private Object provenanceData(ApiContext api, String flow, String batch) {
-        if (flow == null || flow.isBlank() || batch == null || batch.isBlank())
-            throw new ApiException(400, "both 'flow' and 'batch' query params are required");   // vocab-allow: names the `flow` QUERY PARAM this route reads
-        return provenanceStore(api).query(flow, batch);
+    private Object provenanceData(ApiContext api, String pipeline, String batch) {
+        if (pipeline == null || pipeline.isBlank() || batch == null || batch.isBlank())
+            throw new ApiException(400, "both 'pipeline' and 'batch' query params are required");
+        return provenanceStore(api).query(pipeline, batch);
     }
 
-    /** {@code GET /provenance/batches?flow=&limit=} — recent runs of a flow (newest first) to pick one to inspect. */
-    private Object provenanceBatches(ApiContext api, String flow, String limit) {
-        if (flow == null || flow.isBlank())
-            throw new ApiException(400, "the 'flow' query param is required");   // vocab-allow: names the `flow` QUERY PARAM this route reads
-        return provenanceStore(api).batches(flow, ApiContext.parseIntOr(limit, 20));
+    /** {@code GET /provenance/batches?pipeline=&limit=} — recent runs of a pipeline (newest first) to pick one to inspect. */
+    private Object provenanceBatches(ApiContext api, String pipeline, String limit) {
+        if (pipeline == null || pipeline.isBlank())
+            throw new ApiException(400, "the 'pipeline' query param is required");
+        return provenanceStore(api).batches(pipeline, ApiContext.parseIntOr(limit, 20));
     }
 
     /** The DuckDB data-plane provenance store (T21/T22), or a 404 when no backend is configured (-Dprovenance.backend). */

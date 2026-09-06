@@ -367,8 +367,9 @@ public final class RecordTransform {
      * type is VARCHAR, because a pass-through cannot null out. The lookup is keyed by the SOURCE column,
      * not the target.
      *
-     * <p>⚠ Known narrowing: {@code from} is a single column, so a two-source function
-     * (e.g. {@code text.join}) tests only its primary input for non-blankness.
+     * <p>This names the PRIMARY input only. A two-source function ({@code text.join}'s {@code other}) has
+     * every column input tested by {@link #auditedSourceColumns}, which is what the audit reads; this
+     * single-column form stays for the measurability question ("is this field counted at all?").
      */
     public static String auditedSourceColumn(Map<String, Object> field, Map<String, String> fieldTypes) {
         String fnId = str(field, "fn");
@@ -378,6 +379,33 @@ public final class RecordTransform {
         if (from == null || from.isBlank()) return null;
         String declared = fieldTypes.getOrDefault(from, SchemaFieldTypes.VARCHAR);
         return SchemaFieldTypes.coerces(declared) ? from : null;
+    }
+
+    /**
+     * Every source column whose non-blankness the cast-failure audit tests for this field: the primary
+     * {@code from} first, then each {@link ParamType#COLUMN} argument the function reads (e.g.
+     * {@code text.join}'s {@code other}). Empty when the field is not measurable — the same rule as
+     * {@link #auditedSourceColumn}, which decides measurability on the primary input alone.
+     *
+     * <p>Closed 2026-09-06 (RECORD-TRANSFORMER-1 (c)): the audit's predicate is "the inputs were non-blank
+     * AND the expression came out NULL"; testing only the primary input counted a blank {@code other} as a
+     * coercion failure of a value that was never there, exactly what the legacy {@code CONCAT_DT} audit
+     * avoided by construction.
+     */
+    public static List<String> auditedSourceColumns(Map<String, Object> field, Map<String, String> fieldTypes) {
+        String primary = auditedSourceColumn(field, fieldTypes);
+        if (primary == null) return List.of();
+        List<String> cols = new ArrayList<>();
+        cols.add(primary);
+        String fnId = str(field, "fn");
+        Fn fn = function(fnId == null || fnId.isBlank() ? KEEP : fnId);
+        Map<String, String> a = args(field);
+        for (Param p : fn.params()) {
+            if (p.type() != ParamType.COLUMN) continue;
+            String v = a.get(p.name());
+            if (v != null && !v.isBlank() && !cols.contains(v)) cols.add(v);
+        }
+        return cols;
     }
 
     /**

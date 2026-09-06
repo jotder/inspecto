@@ -9,6 +9,7 @@ import com.gamma.config.spec.ConfigSpec;
 import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.config.spec.Finding;
 import com.gamma.config.spec.Severity;
+import com.gamma.etl.SchemaMappingDrift;
 import com.gamma.util.AtomicFiles;
 import com.gamma.util.MappingCsv;
 import com.sun.net.httpserver.HttpExchange;
@@ -152,6 +153,18 @@ final class ConfigWriteRoutes implements RouteModule {
         WriteGates.conflictIf(exists && !overwrite,
                 "file exists: " + writeRoot.relativize(target).toString().replace('\\', '/')
                         + " (pass overwrite:true to replace)");
+
+        // Schema drift into the mapping (AUTHORING-REDESIGN-1 (g)): a mapping field reading a column the
+        // draft's raw.fields no longer declares fails at the first row, so it is refused here. No override —
+        // both halves are in this one document.
+        if ("schema".equals(type)) {
+            List<Finding> drift = SchemaMappingDrift.check(draft);
+            if (!drift.isEmpty()) {
+                findings.addAll(drift);
+                return ApiContext.respondJson(ex, 422, Map.of("type", type, "written", false,
+                        "error", "mapping reads columns the schema no longer declares; not written", "findings", findings));
+            }
+        }
 
         // Schema compatibility save-gate (ELT amendment §3.4.2, D-10): a schema OVERWRITE is diffed
         // old→new under the BACKWARD class; breaking edits (remove/narrow/selector-move) 422 with
@@ -301,6 +314,16 @@ final class ConfigWriteRoutes implements RouteModule {
         if (findings.stream().anyMatch(f -> f.severity() == Severity.ERROR)) {
             return ApiContext.respondJson(ex, 422, Map.of("type", type, "written", false,
                     "error", "merged config has ERROR-level findings; not written", "findings", findings));
+        }
+
+        // Same drift gate as /config/write — a patch can rename a raw field out from under the mapping.
+        if ("schema".equals(type)) {
+            List<Finding> drift = SchemaMappingDrift.check(merged);
+            if (!drift.isEmpty()) {
+                findings.addAll(drift);
+                return ApiContext.respondJson(ex, 422, Map.of("type", type, "written", false,
+                        "error", "mapping reads columns the schema no longer declares; not written", "findings", findings));
+            }
         }
 
         // Same BACKWARD save-gate as /config/write — a patch is an edit of an existing schema.

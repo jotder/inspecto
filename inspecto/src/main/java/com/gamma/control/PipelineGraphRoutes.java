@@ -371,6 +371,46 @@ final class PipelineGraphRoutes implements RouteModule {
         if (!r.ok())
             throw new ApiException(422, "pipeline validation failed: " + r.errors().stream()
                     .map(i -> i.code() + " — " + i.message()).toList());
+        if (registry != null) checkJoinReferences(api, g);
+    }
+
+    /** The refusal code for a {@code transform.join} whose {@code reference} names nothing that exists. */
+    static final String UNKNOWN_JOIN_REFERENCE = "UNKNOWN_JOIN_REFERENCE";
+
+    /**
+     * AUTHORING-REDESIGN-1 (f): a {@code transform.join}'s {@code reference/<pipeline>} binding is not a
+     * {@code use:} ref (no component dir to scan), so {@link PipelineValidator}'s {@code UNKNOWN_USE_REF}
+     * never saw it and a typo surfaced at the first row of the first run. Resolve it here exactly as the
+     * run does — {@link ReferenceReader#parse} then the loaded-pipeline context — and 422 at save instead.
+     * A {@code path:} reference names a data file that may legitimately not exist yet; only its SYNTAX is
+     * checked. Which columns the reference carries is still the dry-run's question (it reads the store).
+     */
+    private static void checkJoinReferences(ApiContext api, PipelineGraph g) {
+        for (com.gamma.pipeline.PipelineNode n : g.nodes()) {
+            if (!com.gamma.pipeline.BuiltinNodeType.TRANSFORM_JOIN.type().equals(n.type())) continue;
+            Object raw = n.cfg("reference");
+            if (raw == null || raw.toString().isBlank()) continue;   // JOIN_REFERENCE_MISSING already refused it
+            com.gamma.enrich.EnrichmentConfig.Reference ref;
+            try {
+                ref = ReferenceReader.parse(raw.toString());
+            } catch (IllegalArgumentException e) {
+                throw new ApiException(422, "pipeline validation failed: [" + UNKNOWN_JOIN_REFERENCE
+                        + " — Node '" + n.id() + "' (transform.join): " + e.getMessage() + "]");
+            }
+            if (!ref.byName()) continue;
+            PipelineConfig target = api.service().loadedPipelines().stream()
+                    .filter(p -> p.identity().pipelineName().equals(ref.ref()))
+                    .findFirst().orElse(null);
+            if (target == null)
+                throw new ApiException(422, "pipeline validation failed: [" + UNKNOWN_JOIN_REFERENCE
+                        + " — Node '" + n.id() + "' (transform.join) joins '" + raw + "' but no pipeline named '"
+                        + ref.ref() + "' is loaded; a by-name reference must be a loaded pipeline that declares "
+                        + "produces: reference (use a path: for a plain file).]");
+            if (!target.producesReference())
+                throw new ApiException(422, "pipeline validation failed: [" + UNKNOWN_JOIN_REFERENCE
+                        + " — Node '" + n.id() + "' (transform.join) joins '" + raw + "' but pipeline '"
+                        + ref.ref() + "' does not declare produces: reference.]");
+        }
     }
 
     /**

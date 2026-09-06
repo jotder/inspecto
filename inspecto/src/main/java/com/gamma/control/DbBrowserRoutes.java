@@ -185,10 +185,14 @@ final class DbBrowserRoutes implements RouteModule {
         String format = detectFormat(browseDir);
         if (format == null) throw new ApiException(404, "store '" + storeName + "' has no parquet/csv data");
 
-        String glob = browseDir.toString().replace('\\', '/') + "/**/*." + SqlViews.ext(format);
         // QueryExecutor registers this as `CREATE VIEW <store> AS <relationSql>`, so it must be a full
-        // SELECT — the same wrap DatasetRelation / SourceStoreReader apply around SqlViews.reader(...).
-        String relationSql = "SELECT * FROM " + SqlViews.reader(format, glob, true);
+        // SELECT — the same wrap DatasetRelation / SourceStoreReader apply around the reader. The source
+        // is the Consignment catalog's PINNED file list (addressing §7-A), not a live glob: a browse over a
+        // pipeline sink during a full recompute otherwise re-expands the glob at scan time and shows a
+        // revision the catalog has already superseded (2026-09-06; the same fix DatasetRelation carries).
+        String source = com.gamma.consignment.ConsignmentSelector.sourceLiteral(
+                browseDir.toString().replace('\\', '/'), SqlViews.ext(format));
+        String relationSql = "SELECT * FROM " + SqlViews.readerOverLiteral(format, source, true);
         String sql = userSql != null ? userSql : "SELECT * FROM " + q(storeName);
 
         QueryExecutor.Request req = new QueryExecutor.Request(storeName, relationSql, sql,

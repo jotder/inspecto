@@ -290,6 +290,15 @@ final class ComponentRoutes implements RouteModule {
                                                   Map<String, Object> current, Map<String, Object> draft)
             throws IOException {
         if (!"schema".equals(type)) return null;
+        // Drift into the mapping is refused BEFORE — and regardless of — the compatibility override: the
+        // document itself is inconsistent, so no later step can make the reference resolve.
+        List<Finding> drift = com.gamma.etl.SchemaMappingDrift.check(draft);
+        if (!drift.isEmpty()) {
+            return ApiContext.respondJson(ex, 422, Map.of(
+                    "type", type, "written", false,
+                    "error", "mapping reads columns the schema no longer declares; not written",
+                    "findings", drift));
+        }
         if ("none".equalsIgnoreCase(ApiContext.query(ex, "compatibility"))) return null;
         List<Finding> breaking = SchemaCompatibility.check(current, draft);
         if (breaking.isEmpty()) return null;

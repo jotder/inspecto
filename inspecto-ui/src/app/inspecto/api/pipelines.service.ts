@@ -622,13 +622,17 @@ export class PipelinesService {
 
     // ── data-plane provenance (T22; 404 unless -Dprovenance.backend=duckdb) ──
 
-    /** Recent runs of a flow that recorded provenance (newest first). */
-    provenanceBatches(flow: string): Observable<ProvenanceBatch[]> {
-        return this.http.get<ProvenanceBatch[]>(apiUrl('/provenance/batches'), { params: { flow } });
+    /** Recent runs of a pipeline that recorded provenance (newest first). */
+    provenanceBatches(pipeline: string): Observable<ProvenanceBatch[]> {
+        return this.http.get<ProvenanceBatch[]>(apiUrl('/provenance/batches'), { params: { pipeline } });
     }
 
-    /** The per-(node, relationship) record counts of one run — painted onto the flow's edges as weights. */
-    provenance(flow: string, batch: string): Observable<ProvenanceCount[]> {
-        return this.http.get<ProvenanceCount[]>(apiUrl('/provenance'), { params: { flow, batch } });
+    /**
+     * The per-(node, relationship) record counts of one run — painted onto the pipeline's edges as weights.
+     * `pipeline=` is the canonical query param (GLOSSARY §13); the server still dual-reads the pre-rename
+     * `flow=` for callers not yet updated, but nothing here sends it any more.
+     */
+    provenance(pipeline: string, batch: string): Observable<ProvenanceCount[]> {
+        return this.http.get<ProvenanceCount[]>(apiUrl('/provenance'), { params: { pipeline, batch } });
     }
 }

@@ -103,7 +103,10 @@ the UI contract tests now pin the served vocabulary).
 With a registry, `validate(g, ComponentRegistry)` adds `UNKNOWN_USE_REF` (ERROR) for a dangling
 `use:` of a real component kind and `UNKNOWN_USE_KIND` for a bad kind (one typo must not read as two
 faults). ⚠ Skipped when the space has no write root (the registry reads empty there and every
-binding would look dangling). ⚠ **Save-time resolution is not run-time resolution**:
+binding would look dangling). A `transform.join` is checked the same two-layered way since 2026-09-06:
+`JOIN_REFERENCE_MISSING` / `JOIN_ON_MISSING` are config shape (engine, always), `UNKNOWN_JOIN_REFERENCE`
+is existence (control plane, registry-gated — resolved through `ReferenceReader.parse` + the loaded
+pipelines exactly as the run resolves it; a `path:` reference is syntax-checked only). ⚠ **Save-time resolution is not run-time resolution**:
 `PipelineJobRunner` never calls `effectiveConfig` — a `use:` binding is resolved for preview/save
 validation, not honoured by a run. That gap is recorded, not closed.
 

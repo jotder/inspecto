@@ -43,6 +43,52 @@ Two consequences, and they govern every relocation and rename question on this c
    `ConsignmentProcessor` SPI widening ([BACKLOG](../../../BACKLOG.md) §4), and the architecture
    plan's Phase C cycle cuts. It is *inherited*, not measured. Measure it.
 
+## Release notes — the pending MAJOR (draft, kept current until the tag is cut)
+
+Everything below is already on `master` and is either a `feat!:` or an operator-visible behaviour change
+relative to `v3.11.0`, the newest ancestor release. The list is the BACKLOG §2 "Release notes for the next
+MAJOR" row, moved here so it accrues in one place; add a line in the same commit as any further `feat!:`.
+The GitHub release is cut by `.github/workflows/release.yml` with `--generate-notes`; paste this section
+above the generated commit list.
+
+**Breaking — configuration and CLI**
+- `-Dauth.oidc.tokenEndpoint` is **required** under `authMode: oidc` (D15, 2026-07-25); there is no IdP
+  vendor of record and `OidcTokenRelay` will not guess the endpoint.
+- `transform.map` is **deleted** (`42fa41fe`, 2026-09-05): the projection slot is always a Record
+  Transformer (`transform.sql` with `fields[]`). Stored `mapping.rules[]` stay readable; `MappingMigrator`
+  rewrites them to `fields[]` (`--dry-run` first).
+- Dedup is folded into acquisition (`61dc8280`): `transform.dedup.fingerprint` is gone; the marker-based
+  `duplicate_check` and the windowed `dedup` ledger are the two surviving mechanisms.
+- `$`-token evaluation in job parameters: an unknown or malformed token is **REJECTED** at save
+  (`e8a8a755`); a literal dollar is written `$$` (`8504b782`).
+- `consignment.outputs.backend` defaults to `duckdb`; `ReprocessCommand` refuses a batch younger than
+  `min_age_days` (§6.2).
+- A sink whose `partitions[].column` is blank **fails the sink branch** instead of writing unpartitioned.
+- The pipeline TOON `source:` block is unchanged, but every Java/TS/API name says **Collector** <!-- vocab-allow: names the rename itself -->
+  (GLOSSARY §13); `?flow=` query params are dual-read, `?pipeline=` is canonical.
+
+**Breaking — Java `@PublicApi` (binds only within a released major; none of this was published in 3.x)**
+- Three store interfaces gained abstract methods for `incident_purge` (MNT-14, 2026-07-27).
+- `com.gamma.ops.NoteTargets` → `com.gamma.ops.AnnotationKinds` (no alias).
+- Maven artifactIds `file-processor-*` → `inspecto-*` (2026-08-10); the deployment bundle name is
+  unchanged — renaming it is a separate, unmade decision.
+
+**Operator-visible behaviour**
+- `DELETE /spaces/{id}` answers **409** unless `?purge=true` (D4).
+- Full recomputes write a sibling `<pipeline>_<batchId>` table and supersede the old revision in the
+  catalog; **nothing deletes the bytes** until a `retire_superseded` maintenance job is configured.
+- Run artifacts carry `event_time_min` / `event_time_max` instead of `timeRange`.
+- `mail.send` with no recipients logs "SUCCESS, nothing sent" rather than failing the job.
+- The token picker's preview is the server's evaluation, not a client-side guess.
+- New default-on caps: DuckDB `memory_limit=2GB` and `-Djobs.maxConcurrentRuns=4` (D11), both editable
+  under Settings ▸ Scheduler ▸ Resource caps.
+- The event store prunes by whole day partitions once an `event_prune` maintenance job exists (COMPLY-3);
+  releases are SBOM'd and signed in CI only (COMPLY-1/2).
+
+**Deferred to this same release by decision:** the §11 token *runtime* model (pipeline-spec D2), the ELT
+Phase 6 deletion of the flat read path (Row 15; the `-Dingest.lane` flag ships, the deletion waits for the
+verification minor), and X5's cross-lane StepInfo envelope.
+
 ## The public surface (2.0.0)
 
 Two audiences depend on the framework from outside:

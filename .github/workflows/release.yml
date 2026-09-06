@@ -80,6 +80,16 @@ jobs:
         env:
           INSPECTO_SIGNING_KEY: ${{ secrets.INSPECTO_SIGNING_KEY_ID }}
         run: pwsh -NoProfile -File inspecto/package.ps1 -Edition Personal -NoRuntime -Sign
+      # Examples smoke (EXAMPLES-STEPS-1): run one bundled example through the bundle's OWN runner against the
+      # packaged jar, so a runner that stops declaring -Dassist.safety.roots ("no allowed roots configured")
+      # fails the release instead of shipping. hello-csv is the minimum pipeline: CSV -> Parquet, 4 typed columns.
+      - name: Smoke - the bundled examples run against the packaged jar
+        run: |
+          set -euo pipefail
+          bash inspecto-deploy/examples/run-example.sh 01-ingest/hello-csv --clean
+          n=$(find inspecto-deploy/examples/01-ingest/hello-csv/out/database -type f -name '*.parquet' | wc -l)
+          [ "$n" -gt 0 ] || { echo "::error::hello-csv ran but produced no parquet under out/database"; exit 1; }
+          rm -rf inspecto-deploy/examples/01-ingest/hello-csv/out
       - name: Collect Personal artifacts
         run: |
           set -euo pipefail

@@ -284,6 +284,45 @@ class PipelineValidatorTest {
                 "the message names the component the author actually typed");
     }
 
+    // ── transform.join wiring (AUTHORING-REDESIGN-1 (f), 2026-09-06) ─────────────────
+    // Until now a join with no reference or no key columns saved 200 and died in RowShaper.join at the
+    // first row of the first run. Both are config shape, so the engine validator owns them; whether the
+    // NAMED reference exists is the control plane's check (PipelineGraphRoutes.UNKNOWN_JOIN_REFERENCE).
+
+    @Test
+    void aJoinWithoutAReferenceOrKeyColumnsIsRefusedAtValidation() {
+        PipelineGraph g = new PipelineGraph("join-bare", true,
+                List.of(new PipelineNode("j", "transform.join", Map.of(), null)),
+                List.of());
+        PipelineValidator.Result r = PipelineValidator.validate(g);
+        assertTrue(codes(r).contains(PipelineValidator.JOIN_REFERENCE_MISSING), () -> r.issues().toString());
+        assertTrue(codes(r).contains(PipelineValidator.JOIN_ON_MISSING), () -> r.issues().toString());
+        assertFalse(r.ok());
+    }
+
+    @Test
+    void aJoinNamingItsReferenceAndKeysIsClean_listOrScalarOn() {
+        PipelineGraph list = new PipelineGraph("join-list", true,
+                List.of(new PipelineNode("j", "transform.join",
+                        Map.of("reference", "reference/sites", "on", List.of("site_id")), null)),
+                List.of());
+        PipelineGraph scalar = new PipelineGraph("join-scalar", true,
+                List.of(new PipelineNode("j", "transform.join",
+                        Map.of("reference", "/data/ref.csv", "on", "site_id"), null)),
+                List.of());
+        for (PipelineGraph g : List.of(list, scalar)) {
+            Set<String> c = codes(PipelineValidator.validate(g));
+            assertFalse(c.contains(PipelineValidator.JOIN_REFERENCE_MISSING), c::toString);
+            assertFalse(c.contains(PipelineValidator.JOIN_ON_MISSING), c::toString);
+        }
+        // a list of blanks is no key at all — RowShaper.join would refuse it the same way
+        PipelineGraph blanks = new PipelineGraph("join-blanks", true,
+                List.of(new PipelineNode("j", "transform.join",
+                        Map.of("reference", "reference/sites", "on", List.of("", " ")), null)),
+                List.of());
+        assertTrue(codes(PipelineValidator.validate(blanks)).contains(PipelineValidator.JOIN_ON_MISSING));
+    }
+
     /** …and the correctly-spelled one against the same registry is clean. */
     @Test
     void resolvableUseRefIsClean(@TempDir Path root) throws Exception {

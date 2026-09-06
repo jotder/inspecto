@@ -92,6 +92,26 @@ public final class PipelineValidator {
      * tell a typo from a component it simply cannot see, so it stays silent rather than guessing.
      */
     public static final String UNKNOWN_USE_REF = "UNKNOWN_USE_REF";
+    /**
+     * A {@code transform.join} node with no {@code reference}, or with no {@code on} key column(s). Until
+     * 2026-09-06 both were found only by {@code RowShaper.join} — at the first row of the first run — while the
+     * save answered 200 (AUTHORING-REDESIGN-1 (f)). The reference's EXISTENCE is the control plane's check
+     * (it needs the loaded-pipeline context): {@code PipelineGraphRoutes} refuses {@code UNKNOWN_JOIN_REFERENCE}.
+     */
+    public static final String JOIN_REFERENCE_MISSING = "JOIN_REFERENCE_MISSING";
+    public static final String JOIN_ON_MISSING = "JOIN_ON_MISSING";
+
+    /** The non-blank {@code on} key column(s) of a join node — a list or a single scalar, as {@code RowShaper.join} reads it. */
+    public static List<String> joinKeys(PipelineNode n) {
+        List<String> on = new ArrayList<>();
+        Object v = n.cfg("on");
+        if (v instanceof List<?> list) {
+            for (Object o : list) if (o != null && !o.toString().isBlank()) on.add(o.toString());
+        } else if (v != null && !v.toString().isBlank()) {
+            on.add(v.toString());
+        }
+        return on;
+    }
 
     /** One validation finding: a {@code severity}, a stable {@code code}, and a human message. */
     public record Issue(Severity severity, String code, String message) {
@@ -275,6 +295,18 @@ public final class PipelineValidator {
                         + "verbatim over the typed source and is not covered by the batch's cast-failure "
                         + "audit — a row this produces NULL for will not be counted. A field list "
                         + "authored in the Record Transformer grid IS audited."));
+            }
+            if (BuiltinNodeType.TRANSFORM_JOIN.type().equals(n.type())) {
+                Object ref = n.cfg("reference");
+                if (ref == null || ref.toString().isBlank()) {
+                    issues.add(new Issue(Severity.ERROR, JOIN_REFERENCE_MISSING,
+                            "Node '" + n.id() + "' (transform.join) names no 'reference' — "
+                                    + "reference/<pipeline> or a data-file path."));
+                }
+                if (joinKeys(n).isEmpty()) {
+                    issues.add(new Issue(Severity.ERROR, JOIN_ON_MISSING,
+                            "Node '" + n.id() + "' (transform.join) names no 'on' key column(s)."));
+                }
             }
             if (n.hasUse()) {
                 String use = n.use();

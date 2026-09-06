@@ -92,6 +92,49 @@ class ControlApiSchemaSplitTest {
         }
     }
 
+    /**
+     * AUTHORING-REDESIGN-1 (g): the Parse side renames {@code QTY} while the mapping still reads it. Both
+     * halves travel in ONE document, so the save is refused with a cell-level finding on the mapping row —
+     * on a CREATE as much as an overwrite, and with no {@code compatibility: none} escape (the document is
+     * inconsistent with itself). The legacy {@code rules[]} spelling is checked through the same converter
+     * the engine reads it with; an {@code EXPR} rule is author SQL and is not a column reference.
+     */
+    @Test
+    void aMappingReadingARenamedColumnIsRefusedOnEveryWrite(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String drifted = """
+                {"type":"schema","compatibility":"none","config":{
+                   "raw":{"name":"ev","format":"CSV","fields":[
+                      {"name":"ID","selector":"0","type":"VARCHAR"},
+                      {"name":"QUANTITY","selector":"1","type":"INTEGER"}]},
+                   "mapping":{"canonicalName":"ev","fields":[
+                      {"name":"ID","from":"ID","fn":"keep"},
+                      {"name":"QTY","from":"QTY","fn":"keep"},
+                      {"name":"NOTE","from":"ID","fn":"text.join","args":{"separator":" ","other":"REMARK"}},
+                      {"name":"X","fn":"custom","args":{"expression":"QTY * 2"}}]}}}
+                """;
+            HttpResponse<String> w = send(c.port, "POST", "/config/write", drifted);
+            assertEquals(422, w.statusCode(), w.body());
+            JsonNode err = V1Body.envelope(w.body()).get("error");
+            String body = w.body();
+            assertTrue(body.contains("mapping.fields[QTY].from"), body);
+            assertTrue(body.contains("mapping.fields[NOTE].args.other"), "a COLUMN argument drifts too: " + body);
+            assertFalse(body.contains("mapping.fields[X]"), "a custom row is author SQL, not a column reference");
+            assertFalse(Files.exists(root.resolve("ev.toon")), "nothing is written");
+            assertNotNull(err);
+
+            // the legacy rules[] spelling: DIRECT reads a column that is not declared
+            HttpResponse<String> legacy = send(c.port, "POST", "/config/write",
+                    schemaDraft("INTEGER", false, "").replace("\"sourceExpression\":\"ID\"", "\"sourceExpression\":\"IDX\""));
+            assertEquals(422, legacy.statusCode(), legacy.body());
+            assertTrue(legacy.body().contains("mapping.fields[ID].from"), legacy.body());
+
+            // consistent document saves; the EXPR rule beside it is untouched by the check
+            HttpResponse<String> ok = send(c.port, "POST", "/config/write", schemaDraft("INTEGER", false, ""));
+            assertEquals(200, ok.statusCode(), ok.body());
+        }
+    }
+
     @Test
     void breakingOverwriteIsRefusedWithCellLevelFindings(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {

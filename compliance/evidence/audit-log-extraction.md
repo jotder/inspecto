@@ -121,6 +121,11 @@ tracing a single request end to end across subsystems.
    (AUDIT-CSV-1 / matrix G10) and is not true now — a filtered CSV is audit-complete. The stale
    wording survived the fix by three weeks; it is recorded here rather than deleted because an
    auditor may hold an earlier copy of this document.
-3. **Retention is not yet configurable** for the event/audit store (matrix gap **G5**, NIST
-   AU-4/AU-11). Extract before any retention pressure applies, and do not claim a retention period
-   the deployment does not enforce.
+3. **Retention is operator-authored, not automatic** for the event/audit store (matrix **G5**, NIST
+   AU-4/AU-11 — ✅ CLOSED 2026-09-02, COMPLY-3). The `event_prune` maintenance task deletes whole
+   `day=` partitions older than `retention_days`, never a row inside the window; the org's stated
+   window is one year. A deployment enforces it only once a `maintenance` job with `task: event_prune`
+   and `retention_days: 365` exists in the space's `config/jobs/` — check that job before telling an
+   auditor "enforced", and extract before any retention pressure applies
+   (`retention-configuration.md` §3). ⚠ *Corrected 2026-09-06:* this entry said "not yet
+   configurable" for four days after the task shipped.

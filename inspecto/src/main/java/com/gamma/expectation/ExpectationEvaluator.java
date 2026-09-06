@@ -101,9 +101,12 @@ public final class ExpectationEvaluator {
      */
     private static String parquetGlob(Path dataRoot, String ref) {
         Path resolved = DataRef.requireUnder(dataRoot, ref, REF_LABEL);
-        String glob = com.gamma.sql.SqlViews.storeReadRoot(
-                resolved.toString().replace('\\', '/')) + "/**/*.parquet";
-        return "read_parquet(" + literal(glob) + ")";
+        String root = com.gamma.sql.SqlViews.storeReadRoot(resolved.toString().replace('\\', '/'));
+        // The Consignment catalog's PINNED file list, not a live glob (addressing §7-A, 2026-09-06): an
+        // expectation evaluated during a full recompute otherwise counts a superseded revision beside the
+        // new one and fails — or passes — on rows the catalog no longer serves.
+        String source = com.gamma.consignment.ConsignmentSelector.sourceLiteral(root, "parquet");
+        return com.gamma.sql.SqlViews.readerOverLiteral("PARQUET", source, false);
     }
 
     private static String ident(String col) {

@@ -179,14 +179,19 @@ public final class DataTransformer {
         StringBuilder select = new StringBuilder("SELECT ");
         if (fieldRows != null) {
             for (Map<String, Object> field : fieldRows) {
-                String raw = RecordTransform.auditedSourceColumn(field, fieldTypes);
-                if (raw == null) continue;   // custom / no source / VARCHAR pass-through — see that method
-                String col = "\"" + sourceTable + "\".\"" + raw + '"';
+                List<String> inputs = RecordTransform.auditedSourceColumns(field, fieldTypes);
+                if (inputs.isEmpty()) continue;   // custom / no source / VARCHAR pass-through — see that method
                 String expr = RecordTransform.compile(List.of(field), fieldTypes, cfg.csv(), zones,
                         sourceTable, false).get(0).get("expr").toString();
                 if (!targets.isEmpty()) select.append(", ");
-                select.append("SUM(CASE WHEN NULLIF(TRIM(CAST(").append(col).append(" AS VARCHAR)), '') IS NOT NULL")
-                        .append(" AND (").append(expr).append(") IS NULL THEN 1 ELSE 0 END)");
+                // every column input non-blank AND the expression NULL — a blank second input is not a
+                // coercion failure of the first (RECORD-TRANSFORMER-1 (c))
+                select.append("SUM(CASE WHEN ");
+                for (String raw : inputs) {
+                    String col = "\"" + sourceTable + "\".\"" + raw + '"';
+                    select.append("NULLIF(TRIM(CAST(").append(col).append(" AS VARCHAR)), '') IS NOT NULL AND ");
+                }
+                select.append("(").append(expr).append(") IS NULL THEN 1 ELSE 0 END)");
                 targets.add(String.valueOf(field.get("name")));
             }
         }

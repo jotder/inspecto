@@ -162,6 +162,7 @@ old revision in. Traced per reader:
 | `SourceStoreReader` | yes — `ConsignmentSelector.resolve` | reads a sink store on a connection |
 | `DatasetRelation` (`physicalRef`) | yes — `sourceLiteral` (walks; no connection in scope) | the dataset read of a sink store |
 | `DatasetRelation` (`view`) + `ViewQuery` | yes — **rendered at read time**, see below | executes a *persisted* definition |
+| `DbBrowserRoutes.browseStore`, `ExpectationEvaluator` | yes — `sourceLiteral` (since 2026-09-06) | both read a pipeline sink store and were missing from this table: the Data Browser re-globbed at scan time and showed a superseded revision during a recompute; an Expectation counted it |
 | `EnrichmentEngine` ×2, `BatchIngestStrategy` | ⛔ no, correctly | read Stage-1 ingest output / the ingest-written reference store — append-only, never `supersedeOtherRevisions` targets, so no catalog-marked file can appear |
 | `ReferenceCompactor` | ⛔ no, correctly | owns an equivalent safety model (`*.refcompact.tmp` / `*.parquet.refcompacting` + journal) — a second authority, not a missing one |
 

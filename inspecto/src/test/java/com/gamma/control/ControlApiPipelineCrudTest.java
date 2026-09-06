@@ -232,6 +232,40 @@ class ControlApiPipelineCrudTest {
     }
 
     /**
+     * <b>AUTHORING-REDESIGN-1 (f) over real HTTP.</b> A {@code transform.join} whose {@code reference/<name>}
+     * names no loaded pipeline used to save 200 and fail at the first row of the first run. The write root
+     * is present so the registry-gated check runs; the pipeline is {@code active:false} so no arming
+     * pre-check competes for the 422. A {@code path:} reference names a data file that may not exist yet,
+     * so only its syntax is checked and the save succeeds.
+     */
+    @Test
+    void aJoinOnAnUnknownReferenceIsRefusedAtSaveButAPathReferenceSaves(@TempDir Path dir) throws Exception {
+        Path wr = dir.resolve("wr");
+        Files.createDirectories(wr);
+        try (Ctx c = open(dir, wr)) {
+            String b = dir.toString().replace('\\', '/');
+            String flow = """
+                {"active":false,
+                 "nodes":[{"id":"acq","type":"acquisition","config":{"poll":"%1$s/in"}},
+                          {"id":"p","type":"parser","config":{"schema_file":"%1$s/s.toon"}},
+                          {"id":"j","type":"transform.join","config":{"reference":"%2$s","on":["site_id"]}},
+                          {"id":"out","type":"sink.persistent","config":{"database":"%1$s/db"}}],
+                 "edges":[{"from":"acq","rel":"data","to":"p"},{"from":"p","rel":"data","to":"j"},
+                          {"from":"j","rel":"data","to":"out"}]}""";
+
+            HttpResponse<String> bad = send(c.port, "PUT", "/pipelines/join_typo/graph",
+                    flow.formatted(b, "reference/sitez"));
+            assertEquals(422, bad.statusCode(), bad.body());
+            assertTrue(bad.body().contains("UNKNOWN_JOIN_REFERENCE"), bad.body());
+            assertTrue(bad.body().contains("sitez"), "the refusal names the reference the author typed");
+
+            HttpResponse<String> ok = send(c.port, "PUT", "/pipelines/join_path/graph",
+                    flow.formatted(b, b + "/ref/sites.csv"));
+            assertEquals(200, ok.statusCode(), ok.body());
+        }
+    }
+
+    /**
      * <b>AUTHOR-1 over real HTTP.</b> The builder's Configure dialog binds a transform component to a map
      * node ({@code use: transform/<id>}), and this used to answer <b>200 {@code written:true}</b> while the
      * binding never reached the file — {@code graph/raw} still showed the node with {@code {}}.
