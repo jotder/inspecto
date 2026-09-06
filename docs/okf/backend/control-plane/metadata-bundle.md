@@ -97,6 +97,10 @@ read/written through the uniform `BundleSource` seam regardless of its backing s
     **the server WRITES a schema item the UI and its offline mock expect skipped**: the same old bundle
     imports differently offline and against a backend. Filed as **BUNDLE-SCHEMA-1** (`BACKLOG.md` §6) —
     a product call, since whichever way it resolves, one of the three surfaces changes.
+  * **Decision 2026-09-06 (operator) — the word `schema` in a bundle manifest means the REGISTRY id**
+    (`registry/schemas/<id>`). A pipeline-owned `<name>_schema.toon` and its `_mapping.csv` / `_structure.csv`
+    siblings travel under their own kind (with the pipeline's dependency closure), never as `schema`. This is the
+    pre-condition the BACKLOG row "Canonical-pipeline selective bundle export/import" was waiting on.
 * `requires` classify `satisfied | different | missing` — *present-but-different* (2026-07-18) compares the
   ref's export-stamped `originHash` to the target's stored hash; a ref that travels hash-less (older bundle, or
   unresolvable at export) can only be `satisfied`/`missing`, so the classification degrades gracefully.

@@ -240,6 +240,12 @@ former root reference docs** (each index lists them):
   shipped preview already computes rows the UI discards. ⛔ `fuse` is deliberately NOT used (dead,
   untested, and only a perf win on a bounded sample). Five slices, S1+S2 deliver most of it.
 
+- [`superpower/step-workbench-s4-design.md`](superpower/step-workbench-s4-design.md) — **DESIGN, awaiting
+  operator review (2026-09-06)**: the one-surface Step workbench — input strip (graph edges, no new endpoint),
+  field list with filter + referenced/unreferenced grouping, summarize group-by chips over catalog functions,
+  hosted in the existing definition drawer above the two shipped previews. Three UI-only slices; two open
+  questions in its §5. Decided "design now, build later" for BACKLOG `WORKBENCH-S4`.
+
 - ~~`superpower/sql-only-transform-feasibility.md`~~ — **ARCHIVED 2026-09-04** →
   [`archived-documents/plans-archive/sql-only-transform-feasibility.md`](archived-documents/plans-archive/sql-only-transform-feasibility.md).
   The 2026-08-29 analysis ("drop the mapping, keep only SQL") whose de-risking order is done: step 1 (the
