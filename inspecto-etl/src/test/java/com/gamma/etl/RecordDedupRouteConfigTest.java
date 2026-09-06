@@ -127,7 +127,9 @@ class RecordDedupRouteConfigTest {
     }
 
     @Test
-    void anArmedCloneRouteIsRefused(@TempDir Path dir) throws Exception {
+    void anArmedCloneRouteArms(@TempDir Path dir) throws Exception {
+        // CLONE-ARM-1 (2026-09-06): clone mode ARMS like every other route mode — a row lands in every matching
+        // branch, and the Batches tab surfaces committedBranches/sourceFinalized while a batch is unfinished.
         String d = dir.toString().replace('\\', '/');
         Path p = write(dir, true, "", """
                 sinks[2]{database,format}:
@@ -140,9 +142,8 @@ class RecordDedupRouteConfigTest {
                     emea,"ID LIKE 'E%%'","%1$s/db_e"
                     apac,"ID LIKE 'A%%'","%1$s/db_a"
                 """.formatted(d));
-        IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> PipelineConfig.load(p.toString()));
-        assertTrue(e.getMessage().contains("clone"), e.getMessage());
+        assertDoesNotThrow(() -> PipelineConfig.load(p.toString()),
+                "clone mode is no longer refused at load (CLONE-ARM-1)");
     }
 
     @Test

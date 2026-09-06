@@ -229,6 +229,12 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                     </button>
                 }
             </ng-template>
+            @if (grammarMissing(); as missing) {
+                <inspecto-alert class="mb-2 mt-2 block" variant="warning" title="Grammar template missing" data-testid="grammar-missing">
+                    This Step binds the Grammar template '{{ missing }}', which no longer exists. The settings below
+                    start from a blank {{ frontend() }} Grammar; Apply writes them inline in place of the binding.
+                </inspecto-alert>
+            }
             <div class="mb-1 mt-2 flex items-center gap-2">
                 <span class="text-xs font-semibold uppercase opacity-70">Grammar</span>
                 @if (!sample()) {
@@ -490,6 +496,13 @@ export class PipelineParseDefinitionComponent {
      * there and then edited here rewrites its own schemas instead of growing a second set.
      */
     readonly pipelineName = input('');
+
+    /**
+     * PARSE-HOME-1 (2026-09-06): the `grammar/<id>` this node binds when that template no longer exists —
+     * the host resolves it, the Grammar section names it. The editor below is then seeded with a blank
+     * Grammar of this node's frontend; Apply replaces the dangling binding with what the operator set.
+     */
+    readonly grammarMissing = input<string | null>(null);
 
     /**
      * The directory the open pipeline's own config file lives in, relative to the write root (`''` at the

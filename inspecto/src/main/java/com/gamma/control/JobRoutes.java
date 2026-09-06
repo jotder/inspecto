@@ -1,6 +1,12 @@
 package com.gamma.control;
 
 import com.gamma.config.io.ConfigCodec;
+import com.gamma.config.io.ConfigLoader;
+import com.gamma.config.safety.ConfigSafetyValidator;
+import com.gamma.config.safety.SafetyPolicy;
+import com.gamma.config.spec.ConfigSpecs;
+import com.gamma.config.spec.Finding;
+import com.gamma.config.spec.Severity;
 import com.gamma.pipeline.exec.DbProvenanceStore;
 import com.gamma.job.DbJobRunStore;
 import com.gamma.job.JobConfig;
@@ -347,11 +353,23 @@ final class JobRoutes implements RouteModule {
     /** Parse+validate a job body into a {@link JobConfig} via the same {@code job:}-section shape the
      *  TOON loader accepts (name/type/cron/... at top level of the body, mirroring {@code fromMap}). */
     private static JobConfig parseJob(Map<String, Object> body) {
+        JobConfig cfg;
         try {
-            return JobConfig.fromMap(Map.of("job", body));
+            cfg = JobConfig.fromMap(Map.of("job", body));
         } catch (RuntimeException e) {
             throw new ApiException(422, e.getMessage());
         }
+        // JOB-SPEC-1 (decided 2026-09-06): the SAME spec + safety gate /config/write applies, at the one
+        // moment the author is present. Until now this route parsed the shape and skipped containment,
+        // so a job naming a directory outside the space saved fine and failed at run — the maintenance
+        // tasks' own run-time jail stays as belt. ERRORs refuse; warnings pass.
+        Map<String, Object> raw = Map.of("job", body);
+        List<Finding> findings = new java.util.ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.job(), raw));
+        findings.addAll(ConfigSafetyValidator.check("job", raw, SafetyPolicy.defaultPolicy()));
+        List<String> errors = findings.stream().filter(f -> f.severity() == Severity.ERROR)
+                .map(f -> f.fieldPath() + ": " + f.message()).toList();
+        if (!errors.isEmpty()) throw new ApiException(422, "job refused at save: " + errors);
+        return cfg;
     }
 
     /** Encode the config as a {@code job { … }} TOON doc, write it atomically, and hot-register it. */

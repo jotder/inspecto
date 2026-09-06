@@ -982,7 +982,7 @@ is withdrawn: **Job is again a first-class user-facing concept** (GLOSSARY §6-A
 updated; authoring contract in `superpower/job-parameter-contract-plan.md` §0-A). The S3a–d design
 of record above is unaffected and proceeds as an *additive* thread — table-entry Pipelines
 complement Jobs, they no longer replace them. Consequences: Phase 6's Jobs-UI retirement is
-cancelled; the per-kind authoring migrations (D-4 enrichment, D-7 materialize) became S3-gated — **re-decided 2026-09-06: D-4 GO** (migrate the one `*_enrich.toon` fixture to `transform: {join}`, mark `enrichment` deprecated read-only — BACKLOG §3 `D4-ENRICH-1`); **D-7 DROPPED as done-by-absence** (no authored config spells `materialized`; `MaterializeTask` is a Job, not authoring) — originally
+cancelled; the per-kind authoring migrations (D-4 enrichment, D-7 materialize) became S3-gated — **re-decided 2026-09-06: D-4 GO — then BLOCKED the same day on grounding**: the fixture is a join PLUS an aggregate over the landed `orders` store, the orders pipeline already holds its one at-rest chain, and no pipeline can source another pipeline's landed store; so the migration needs a design (a second at-rest chain per pipeline, or a store-sourced pipeline) before `enrichment` can go read-only — BACKLOG §3 `D4-ENRICH-1` (P2, design first); **D-7 DROPPED as done-by-absence** (no authored config spells `materialized`; `MaterializeTask` is a Job, not authoring) — originally
 options to re-decide when S3 lands, not commitments.
 
 #### Phase 4 GROUNDED 2026-08-06 — findings that shape the slices

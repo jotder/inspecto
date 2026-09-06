@@ -26,6 +26,7 @@ import { PipelineParseDefinitionComponent } from './pipeline-parse-definition.co
     template: `
         <app-pipeline-parse-definition
             [node]="node()"
+            [grammarMissing]="grammarMissing()"
             [pipelineName]="pipelineName()"
             [sample]="sample"
             [filenameColumnTarget]="filenameColumnTarget()"
@@ -40,6 +41,8 @@ class HostComponent {
     // Zoneless CD: inputs mutated after the first detectChanges are signals, so the host is
     // marked dirty and the harness verify sweep never compares against stale bindings (NG0100).
     node = signal<AuthoredNode>(delimitedNode());
+    /** PARSE-HOME-1: the dangling template the host resolved, or null. */
+    grammarMissing = signal<string | null>(null);
     pipelineName = signal('');
     /** The tab's sample thread — null in most specs, exactly as a host that keeps none. */
     sample: DefinitionStateService | null = null;
@@ -424,6 +427,16 @@ describe('PipelineParseDefinitionComponent', () => {
             expect(thread.parsePreview()).toBeNull();
             expect(thread.parseError()).toBeNull();
         });
+    });
+
+    it('names a missing Grammar template in the Grammar section (PARSE-HOME-1)', async () => {
+        const fixture = await create();
+        expect(fixture.nativeElement.querySelector('[data-testid="grammar-missing"]')).toBeNull();
+        fixture.componentInstance.grammarMissing.set('gone_template');
+        fixture.detectChanges();
+        const alert = fixture.nativeElement.querySelector('[data-testid="grammar-missing"]');
+        expect(alert?.textContent).toContain('gone_template');
+        expect(alert?.textContent).toContain('blank delimited Grammar');
     });
 
     it('renders the shared Grammar editor with the format picker locked', async () => {

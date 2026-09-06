@@ -102,9 +102,27 @@ public final class ConfigSafetyValidator {
         switch (type) {
             case "pipeline" -> checkPipeline(raw, p, configDir, out);
             case "enrichment" -> checkEnrichment(raw, p, out);
-            default -> { /* job / schema / meta: no path/numeric/output surface to gate */ }
+            case "job" -> checkJob(raw, p, out);
+            default -> { /* schema / meta: no path/numeric/output surface to gate */ }
         }
         return out;
+    }
+
+    // ── job ──────────────────────────────────────────────────────────────────────────
+
+    /**
+     * The path-shaped keys a {@code job:} carries at its top level, across the built-in Job Types
+     * (JOB-SPEC-1, decided 2026-09-06): the pipeline job's {@code data_dir} / {@code pipeline_config},
+     * the maintenance tasks' {@code dir} / {@code backup_dir} / {@code archive} / {@code target_dir}.
+     * Before this the job save skipped containment entirely and the tasks re-checked at RUN time —
+     * which stays as belt; this is the braces, at the one moment the author is present. Task-specific
+     * keys this list does not name still get their run-time check.
+     */
+    private static final List<String> JOB_PATH_KEYS =
+            List.of("data_dir", "pipeline_config", "dir", "backup_dir", "archive", "target_dir");
+
+    private static void checkJob(Map<String, Object> raw, SafetyPolicy p, List<Finding> out) {
+        for (String k : JOB_PATH_KEYS) checkPath(raw, "job." + k, p, out);
     }
 
     // ── pipeline ─────────────────────────────────────────────────────────────────────

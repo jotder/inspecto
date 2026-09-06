@@ -78,5 +78,7 @@ The 2026-08-14 refusal stands for what it refused: never synthesise a store/`tab
 not cover is resolving by **identity**: every event node carries a named schema (`event:<pipeline>/<canonicalName>`),
 so a batch that wrote straight to `dirs.database` can be linked by its pipeline. **Decided:** when
 `output_table` is blank the dialog resolves by pipeline — exactly one event node ⇒ link that node; several
-(segments) ⇒ link the pipeline's Stream node. No store edge is ever invented. Build: a `GET /catalog/resolve?pipeline=`
-arm + `batch-detail.dialog.ts` (BACKLOG §3 `CATALOG-LINK-1`).
+(segments) ⇒ link the pipeline's Stream node. No store edge is ever invented. **Shipped 2026-09-06:**
+`GET /catalog/resolve?pipeline=` (`MetadataGraphService.nodeByPipeline`, case-insensitive on the pipeline id;
+`table` wins when both are passed; nothing named is still the old 404) and `batch-detail.dialog.ts` resolving by
+pipeline when `output_table` is blank — the link then reads "View this pipeline in the Catalog".

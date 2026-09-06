@@ -2136,9 +2136,11 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         // owns — the drawer's Apply is an in-memory patch only (D2).
         // S2: EVERY kind now defines in the right-dock drawer — the canvas stays visible while it is
         // configured, and Apply/Discard means one thing everywhere. The ONE surface still on a popup is
-        // the Grammar editor, for the parse nodes the drawer deliberately refuses (a grammar-BOUND node
-        // — updating a reusable Grammar component is its own write route — a DANGLING binding, and
-        // binary fixed-width; see isDrawerParse).
+        // the Grammar editor, for the two parse shapes the drawer cannot represent: binary fixed-width
+        // and a generic `parser` that maps to no frontend (see isDrawerParse). A grammar-BOUND per-format
+        // node opens the drawer as an inline COPY (D4, migrates on edit), and since 2026-09-06
+        // (PARSE-HOME-1) so does a DANGLING binding — the drawer's Grammar section flags the missing
+        // template instead of the dialog showing a binding nothing can resolve.
         // ⚠ The predicate is the node TYPE (`isParseNodeType`), never the served category: the catalog
         // may not have resolved, and a category of '' would route a generic `parser` — the one node
         // kind that MUST keep the dialog — into the drawer.
@@ -2265,9 +2267,23 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         const effectiveType = node.type === 'parser' ? this.retypedParserType(node) : node.type;
         if (!effectiveType || !(effectiveType in PARSE_NODE_FRONTENDS)) return false;
         if (this.isBinaryFixedWidth(node)) return false;
-        const id = this.boundGrammarId(node);
-        return id === null || this.grammarTemplates().some((t) => t.name === id);
+        // PARSE-HOME-1 (2026-09-06): a per-format node whose grammar binding DANGLES opens the drawer too —
+        // the Parse pane is the one home (Grammar · Schemas emitted · other properties) and its Grammar
+        // section names the missing template (see danglingGrammarId). The seed is a blank Grammar of the
+        // node's own frontend; `use:` is kept on the draft and dropped only on Apply, as for any binding.
+        return true;
     }
+
+    /**
+     * The `grammar/<id>` the open definition binds when that template no longer exists — what the Parse
+     * pane's Grammar section names as missing. `null` for an inline or resolvable Grammar.
+     */
+    readonly danglingGrammarId = computed<string | null>(() => {
+        const n = this.definitionNode();
+        if (!n) return null;
+        const id = this.boundGrammarId(n);
+        return id !== null && !this.grammarTemplates().some((t) => t.name === id) ? id : null;
+    });
 
     /**
      * S5/D8 — the per-format type a legacy generic `parser` node's own config maps to, or `null` for
@@ -2353,7 +2369,13 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         const id = this.boundGrammarId(node);
         if (id === null) return node;
         const component = this.grammarTemplates().find((t) => t.name === id);
-        if (!component) return node; // dangling — isDrawerParse already kept it off the drawer
+        if (!component) {
+            // dangling (PARSE-HOME-1): a blank Grammar of the node's own frontend, `use:` kept so the pane
+            // can name what is missing and Apply — not opening — is what replaces the binding
+            const frontend = node.type.startsWith('parser.') ? node.type.slice('parser.'.length) : undefined;
+            const { parsing: _ignored, ...cfg } = node.config ?? {};
+            return { ...node, config: { ...cfg, ...(frontend ? { parsing: { frontend } } : {}) } };
+        }
         return {
             ...node,
             config: { ...(node.config ?? {}), parsing: grammarContentAsParsingBlock(component.content ?? {}) },

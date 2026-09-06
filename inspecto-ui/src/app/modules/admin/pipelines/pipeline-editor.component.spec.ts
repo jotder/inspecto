@@ -1078,20 +1078,6 @@ describe('PipelineEditorComponent', () => {
 
         /** A binding with nothing behind it has no faithful copy to migrate to — seeding the drawer
          *  with defaults would invent a Grammar, so it stays on the dialog. */
-        it('keeps a DANGLING grammar binding on the dialog', () => {
-            const c = make();
-            c.select('demo');
-            c.grammarTemplates.set([]);
-            dialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
-            const node = { id: 'parse', type: 'parser.delimited', use: 'grammar/missing', config: {} };
-            c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, node] }));
-
-            c.openNodeConfig(node);
-
-            expect(dialog.open).toHaveBeenCalledTimes(1);
-            expect(c.definitionNode()).toBeNull();
-        });
-
         /** ⚠ Since S3 the ONLY parse node left on the dialog is the plain `parser` type — it has no
          *  drawer pane yet (that is P3d's slice, which then retires the dialog entirely). A bound
          *  `parser.delimited` no longer belongs here; it has its own migration case above. */
@@ -1171,6 +1157,19 @@ describe('PipelineEditorComponent', () => {
                 c.openNodeConfig(node);
                 expect(dialog.open).not.toHaveBeenCalled();
                 expect(c.definitionNode()!.type).toBe('parser.json');
+            });
+
+            it('a DANGLING per-format grammar binding opens the drawer with the template flagged missing (PARSE-HOME-1)', () => {
+                const c = make();
+                c.select('demo');
+                const node = { id: 'parse', type: 'parser.delimited', use: 'grammar/gone_template', config: {} };
+                c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, node] }));
+                c.openNodeConfig(node);
+                expect(dialog.open).not.toHaveBeenCalled();
+                expect(c.definitionNode()!.type).toBe('parser.delimited');
+                expect(c.definitionNode()!.use).toBe('grammar/gone_template'); // kept until Apply
+                expect(c.definitionNode()!.config?.['parsing']).toEqual({ frontend: 'delimited' }); // a blank Grammar of its frontend
+                expect(c.danglingGrammarId()).toBe('gone_template');
             });
 
             it('a BOUND generic parser keeps the dialog — component custody', () => {

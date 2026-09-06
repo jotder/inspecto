@@ -27,9 +27,18 @@ export class CatalogService {
      * The catalog node a batch row's `output_table` names. 404s when the store name resolves to no node
      * or to several — callers must treat that as "no link", never as a reason to guess.
      */
-    resolveTable(table: string): Observable<{ id: string; label: string }> {
-        return this.http.get<{ id: string; label: string }>(apiUrl('/catalog/resolve'), {
+    resolveTable(table: string): Observable<{ id: string; label: string; kind?: string }> {
+        return this.http.get<{ id: string; label: string; kind?: string }>(apiUrl('/catalog/resolve'), {
             params: toParams({ table }),
+        });
+    }
+    /**
+     * CATALOG-LINK-1 (2026-09-06): the node a batch links to when its row has NO `output_table` — resolved
+     * by identity: the pipeline's single event node, else its Stream node. 404 when the pipeline is unknown.
+     */
+    resolveByPipeline(pipeline: string): Observable<{ id: string; label: string; kind?: string }> {
+        return this.http.get<{ id: string; label: string; kind?: string }>(apiUrl('/catalog/resolve'), {
+            params: toParams({ pipeline }),
         });
     }
     node(id: string): Observable<NodeDetail> {

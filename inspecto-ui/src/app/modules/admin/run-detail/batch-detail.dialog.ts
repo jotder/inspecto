@@ -53,7 +53,7 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
                             [queryParams]="{ tab: 'graph', from: catalogNodeId() }"
                             mat-dialog-close
                         >
-                            View {{ outputTable() }} in the Catalog
+                            View {{ outputTable() || 'this pipeline' }} in the Catalog
                         </a>
                     }
                 }
@@ -61,6 +61,19 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
                 <!-- PARK-1(a): a PARKED Consignment says WHICH Step it parked at and WHERE its rows sit,
                      straight from the manifest the drain will read — before this the dialog could only
                      show the word PARKED. Absent on every non-parked row, so nothing else changes. -->
+                <!-- CLONE-ARM-1: a batch that did not finish committing says which branches landed. -->
+                @if (committedBranches().length) {
+                    <div class="mt-4 font-semibold">Branches committed ({{ committedBranches().length }})</div>
+                    <inspecto-alert variant="info">
+                        This Consignment did not finish: the branches below already landed and the source was
+                        {{ sourceFinalized() ? 'finalised' : 'not finalised' }}. A retry re-runs only what is missing.
+                    </inspecto-alert>
+                    <ul class="mt-1 text-sm font-mono" data-testid="committed-branches">
+                        @for (b of committedBranches(); track b) {
+                            <li>{{ b }}</li>
+                        }
+                    </ul>
+                }
                 @if (parked().length) {
                     <div class="mt-4 font-semibold">Parked at ({{ parked().length }})</div>
                     <inspecto-alert variant="warning">
@@ -175,7 +188,7 @@ export class BatchDetailDialog implements OnInit {
 
     /** The two keys `/runs/{name}/batches` adds to a PARKED row. They are STRUCTURED (a list and a map),
      *  not ledger strings, so they render in their own table below rather than as `[object Object]`. */
-    private static readonly PARK_KEYS = new Set(['parkedAt', 'parkedTables']);
+    private static readonly PARK_KEYS = new Set(['parkedAt', 'parkedTables', 'committedBranches', 'sourceFinalized']);
 
     get batchSummary(): { key: string; value: string }[] {
         const row = this.batchRow();
@@ -191,6 +204,21 @@ export class BatchDetailDialog implements OnInit {
      * ⚠ `AuditRow` is typed `Record<string, string>` because a ledger row IS all strings; these two
      * keys are the deliberate exception (route-merged from the manifest), hence the local narrowing.
      */
+    /**
+     * CLONE-ARM-1 (2026-09-06): the branches a batch that did NOT finish committing has already landed —
+     * merged by the route from the durable branch commit log (a fully committed batch deletes it). This is
+     * what made arming `mode: clone` honest: a clone that reached 2 of 3 destinations reads as such here.
+     */
+    readonly committedBranches = computed<string[]>(() => {
+        const row = this.batchRow() as Record<string, unknown> | null;
+        const b = row?.['committedBranches'];
+        return Array.isArray(b) ? (b as string[]) : [];
+    });
+    readonly sourceFinalized = computed<boolean>(() => {
+        const row = this.batchRow() as Record<string, unknown> | null;
+        return row?.['sourceFinalized'] === true;
+    });
+
     readonly parked = computed<{ step: string; table: string }[]>(() => {
         const row = this.batchRow() as Record<string, unknown> | null;
         if (!row || row['status'] !== 'PARKED') return [];
@@ -247,10 +275,12 @@ export class BatchDetailDialog implements OnInit {
      */
     private resolveCatalogNode(): void {
         this.outputTable.set(this.batchRow()?.['output_table'] || '');
-        if (!this.outputTable()) return;
-        this.catalog
-            .resolveTable(this.outputTable())
-            .pipe(catchError(() => of(null)))
-            .subscribe((hit) => this.catalogNodeId.set(hit?.id ?? null));
+        // CATALOG-LINK-1 (2026-09-06): a blank output_table (single-schema / segments shapes write
+        // straight to dirs.database) resolves by IDENTITY — the pipeline's single event node, else its
+        // Stream node — never a fabricated store. A 404 on either path leaves the link off.
+        const resolved = this.outputTable()
+            ? this.catalog.resolveTable(this.outputTable())
+            : this.catalog.resolveByPipeline(this.data.pipeline);
+        resolved.pipe(catchError(() => of(null))).subscribe((hit) => this.catalogNodeId.set(hit?.id ?? null));
     }
 }

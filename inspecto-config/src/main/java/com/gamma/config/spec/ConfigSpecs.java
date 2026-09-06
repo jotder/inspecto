@@ -504,17 +504,11 @@ public final class ConfigSpecs {
                 FieldSpec.withDefault("job.enabled", "Enabled", FieldType.BOOL, true,
                         "Whether the scheduler arms this job.")
         );
+        // ⚠ No "job.type must be one of enrich|report|maintenance" rule: the type is an OPEN registry
+        // key (pipeline, plus module/pack-provided ids) and JobConfig.fromMap already refuses an unknown
+        // one against the live registry. The stale closed list here would have 422'd every pipeline job
+        // the moment POST /jobs started running the spec (JOB-SPEC-1, 2026-09-06).
         List<CrossFieldRule> rules = List.of(
-                new CrossFieldRule(
-                        "job-type-required",
-                        "job.type must be one of enrich|report|maintenance.",
-                        Severity.ERROR,
-                        List.of("job.type"),
-                        raw -> {
-                            String t = str(raw, "job.type");
-                            return t != null && List.of("enrich", "report", "maintenance")
-                                    .contains(t.toLowerCase());
-                        }),
                 new CrossFieldRule(
                         "cron-field-count",
                         "job.cron, when present, must have 5 or 6 whitespace-separated fields.",

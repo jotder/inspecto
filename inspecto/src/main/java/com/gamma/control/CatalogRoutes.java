@@ -41,7 +41,7 @@ final class CatalogRoutes implements RouteModule {
         // Resolve a batch ledger row's output_table to its catalog node, so a run/batch surface can link
         // into the Catalog. Query param, not a /catalog/tables/... path: that route's (.+) is greedy and
         // would swallow any sub-path added under it.
-        api.get("/catalog/resolve", (e, m) -> resolveTable(api, ApiContext.query(e, "table")));
+        api.get("/catalog/resolve", (e, m) -> resolve(api, ApiContext.query(e, "table"), ApiContext.query(e, "pipeline")));
         api.get("/catalog/tables/(.+)", (e, m) -> catalogNodeDetail(api, ApiContext.name(m)));
     }
 
@@ -53,7 +53,22 @@ final class CatalogRoutes implements RouteModule {
     private Map<String, Object> resolveTable(ApiContext api, String table) {
         MetadataNode node = api.service().catalog().nodeByTable(table);
         if (node == null) throw new ApiException(404, "no unique catalog node for table '" + table + "'");
-        return Map.of("id", node.id(), "label", node.label());
+        return Map.of("id", node.id(), "label", node.label(), "kind", node.kind().name());
+    }
+
+    /**
+     * {@code GET /catalog/resolve?table=…} resolves by STORE (above); {@code ?pipeline=…} resolves by
+     * IDENTITY (CATALOG-LINK-1, 2026-09-06) for a batch whose ledger row has no {@code output_table}: the
+     * pipeline's single event node, else its Stream node. {@code table} wins when both are given, because
+     * a store is the more specific answer. 404 when neither resolves — the caller renders no link.
+     */
+    private Map<String, Object> resolve(ApiContext api, String table, String pipeline) {
+        if (table != null && !table.isBlank()) return resolveTable(api, table);
+        if (pipeline == null || pipeline.isBlank())
+            throw new ApiException(404, "no unique catalog node for table '" + table + "'");   // the pre-existing contract: nothing named ⇒ 404, never a guess
+        MetadataNode node = api.service().catalog().nodeByPipeline(pipeline);
+        if (node == null) throw new ApiException(404, "no catalog node for pipeline '" + pipeline + "'");
+        return Map.of("id", node.id(), "label", node.label(), "kind", node.kind().name());
     }
 
     /** {@code GET /catalog/streams} — every Collector's data-origin stream as a browsable node (MET-4). */

@@ -40,7 +40,6 @@ parsing:
     date_formats[1]: "%Y-%m-%d"
     timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
     strict_mode: true
-    engine: auto
 
 collector:
   discovery: poll

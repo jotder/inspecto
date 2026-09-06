@@ -125,6 +125,29 @@ class ControlApiCatalogTest {
         return new Ctx(svc, api, api.port());
     }
 
+    /**
+     * CATALOG-LINK-1 (2026-09-06): a batch with no {@code output_table} resolves by pipeline — the single
+     * event node when there is one (this fixture), the Stream node otherwise — and never a fabricated store.
+     * {@code table} still wins when both params are present; an unknown pipeline is a 404.
+     */
+    @Test
+    void resolveByPipelineLinksTheSingleEventNodeAndNeverInventsAStore(@TempDir Path dir) throws Exception {
+        try (Ctx c = openWithTable(dir, "voucher_main")) {
+            HttpResponse<String> r = get(c.port, "/catalog/resolve?pipeline=VOUCHER");
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode body = V1Body.of(r.body());
+            assertEquals("TABLE", body.get("kind").asText());
+            assertTrue(body.get("id").asText().toLowerCase().startsWith("event:voucher/"), "the graph keys the pipeline by its lower-cased id: " + body);
+            assertEquals(200, get(c.port, "/catalog/tables/" + body.get("id").asText()).statusCode());
+
+            JsonNode byTable = V1Body.of(get(c.port, "/catalog/resolve?pipeline=VOUCHER&table=voucher_main").body());
+            assertEquals(body.get("id").asText(), byTable.get("id").asText(), "table wins, and here they agree");
+
+            assertEquals(404, get(c.port, "/catalog/resolve?pipeline=nope").statusCode());
+            assertEquals(404, get(c.port, "/catalog/resolve").statusCode(), "nothing named is still the old 404, never a guess");
+        }
+    }
+
     @Test
     void resolveMapsABatchOutputTableToItsCatalogNodeId(@TempDir Path dir) throws Exception {
         try (Ctx c = openWithTable(dir, "voucher_main")) {

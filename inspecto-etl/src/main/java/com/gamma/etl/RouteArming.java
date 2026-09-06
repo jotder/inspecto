@@ -65,18 +65,13 @@ public final class RouteArming {
             out.add("route: needs a non-empty branches list to arm");
             return out;
         }
-        // (1) clone mode stays authoring-only. ⚠ NOT for lack of engine substrate — that reason was
-        //     stale and was corrected 2026-08-26: D8 (the `(batch, branch)` commit, source finalised
-        //     only when every branch commits, idempotent sinks) SHIPPED, `BranchCommitCoordinator`
-        //     keys expectedBranches by sink NODE ID so it is already generic over case vs clone, and
-        //     `RowShaper.route` already implements clone fan-out. B9 ("no cross-branch transactional
-        //     commit") is a DELIBERATE ACCEPTED constraint, not missing work.
-        //     The real reason it stays refused: nothing SURFACES partial-commit state to an operator,
-        //     so a clone that lands 2 of 3 destinations and retries the third is invisible. Arming
-        //     this is an operator/product call about that visibility, not an engine gap.
-        if ("clone".equalsIgnoreCase(String.valueOf(route.get("mode"))))
-            out.add("route: mode 'clone' is authoring-only — arming runs 'case' (exclusive) branches; "
-                    + "keep the pipeline inactive or switch to mode: case");
+        // (1) clone mode ARMS (decided 2026-09-06, CLONE-ARM-1). The substrate was never the gate —
+        //     `BranchCommitCoordinator` keys expectedBranches by sink node id (generic over case vs
+        //     clone) and `RowShaper.route` fans out; B9 ("no cross-branch transactional commit") is a
+        //     deliberate accepted constraint. What kept it refused was VISIBILITY: a clone that lands 2
+        //     of 3 destinations was invisible to an operator. `RunRoutes.withParkDetail` now merges the
+        //     durable `BranchCommitLog` (`committedBranches[]`, `sourceFinalized`) onto every batch row
+        //     that still has one, so a partial commit is a line on the Batches tab, not a mystery.
         // (2) every branch names a database matching a sinks[] destination, and no two branches share
         //     one — the lift pairs route:<key> edges to sinks BY DATABASE, so an unmatched or
         //     duplicated database is a branch whose rows land NOWHERE.

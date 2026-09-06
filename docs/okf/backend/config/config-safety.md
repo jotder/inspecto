@@ -235,7 +235,11 @@ when `-Dassist.write.root` is set, writes are jailed to that root and validated 
 
 (a) Job `.toon` files bypass `ConfigSafetyValidator` at save because no `ConfigSpecs.job()` exists, so
 containment is enforced only at run (`PipelineJobRunner`). **Decided:** close it — add a job spec and route job
-writes through the same 422 gate, keeping the run-time check as belt (BACKLOG §4 `JOB-SPEC-1`).
+writes through the same 422 gate, keeping the run-time check as belt. **Shipped 2026-09-06:** grounding found
+`ConfigSpecs.job()` already existed but `POST/PUT /jobs` skipped both it and the validator; `JobRoutes.parseJob`
+now runs both (ERRORs 422 with `field: message`), `ConfigSafetyValidator` gained a `job` case jailing
+`data_dir` / `pipeline_config` / `dir` / `backup_dir` / `archive` / `target_dir`, and the spec's stale
+"type must be enrich|report|maintenance" rule — which would have refused every pipeline job — was removed.
 (b) `requireTopLevelSinks` is a rule about literal directory nesting ("no store inside another store's tree"),
 not a jail; resolving real paths would change its answer for the wrong reason. **Decided:** keep as designed —
 a standing refusal (BACKLOG §6).

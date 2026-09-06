@@ -136,6 +136,42 @@ public final class MetadataGraphService {
         return found;
     }
 
+    /**
+     * CATALOG-LINK-1 (decided 2026-09-06): the node a batch links to when its ledger row has no
+     * {@code output_table} — the single-schema and segments shapes, which write straight to
+     * {@code dirs.database}. Every event node carries a named schema, so the pipeline is enough to resolve
+     * by IDENTITY: exactly one {@code event:<pipeline>/…} node ⇒ that node; several (segments) ⇒ the
+     * pipeline's Stream node; no event node at all ⇒ the Stream node too, or {@code null} when the
+     * pipeline is not in the graph. ⛔ This never invents a {@code table} attribute — the 2026-08-14
+     * refusal of a synthesised store edge stands; identity is not a store.
+     */
+    public MetadataNode nodeByPipeline(String pipeline) {
+        if (pipeline == null || pipeline.isBlank()) return null;
+        // The graph keys pipelines by their lower-cased id (the ledger's `pipeline` column is lower-cased
+        // too), while a caller may pass the display name — compare case-insensitively, never by case.
+        String key = pipeline.trim().toLowerCase(java.util.Locale.ROOT);
+        String eventPrefix = IdScheme.event(key, "").toLowerCase(java.util.Locale.ROOT);
+        String streamId = IdScheme.stream(key).toLowerCase(java.util.Locale.ROOT);
+        MetadataNode onlyEvent = null;
+        int events = 0;
+        MetadataNode stream = null;
+        for (MetadataNode n : structural().nodes()) {
+            String id = n.id().toLowerCase(java.util.Locale.ROOT);
+            if (n.kind() == NodeKind.TABLE && id.startsWith(eventPrefix)) {
+                events++;
+                onlyEvent = n;
+            } else if (n.kind() == NodeKind.STREAM && stream == null) {
+                Object owner = n.attrs().get("pipeline");
+                Object members = n.attrs().get("members");
+                boolean owns = owner != null && key.equalsIgnoreCase(String.valueOf(owner));
+                boolean member = members instanceof List<?> l
+                        && l.stream().anyMatch(m -> key.equalsIgnoreCase(String.valueOf(m)));
+                if (id.equals(streamId) || owns || member) stream = n;
+            }
+        }
+        return events == 1 ? onlyEvent : stream;
+    }
+
     /** All nodes of a given kind (no overlay). */
     public List<MetadataNode> nodesOfKind(NodeKind kind) {
         List<MetadataNode> out = new ArrayList<>();

@@ -12,6 +12,7 @@ import com.gamma.consignment.DbConsignmentOutputStore;
 import com.gamma.etl.ConsignmentManifest;
 import com.gamma.etl.ManifestStore;
 import com.gamma.etl.PipelineConfig;
+import com.gamma.pipeline.exec.BranchCommitLog;
 import com.gamma.inspector.DrainCommand;
 import com.gamma.inspector.ReprocessCommand;
 import com.gamma.report.ReportService;
@@ -413,6 +414,7 @@ final class RunRoutes implements RouteModule {
      */
     static List<Map<String, Object>> withParkDetail(PipelineConfig cfg, List<Map<String, String>> rows) {
         String manifests = cfg.dirs().manifestsDir();
+        String temp = cfg.dirs().temp();
         List<Map<String, Object>> out = new ArrayList<>(rows.size());
         for (Map<String, String> r : rows) {
             Map<String, Object> row = new LinkedHashMap<>(r);
@@ -424,6 +426,22 @@ final class RunRoutes implements RouteModule {
                     if (mf.parkedTables != null) row.put("parkedTables", mf.parkedTables);
                 } catch (IOException | RuntimeException missingOrCorrupt) {
                     // see the Javadoc — the row stays as the ledger wrote it
+                }
+            }
+            // CLONE-ARM-1 (2026-09-06): a batch whose branch commit log still EXISTS is one that did not
+            // finish committing (a fully committed batch deletes its log) — the row says which branches
+            // landed and whether the source was finalised, so a clone that reached 2 of 3 destinations
+            // is a line here instead of an invisible retry. Best-effort like the park detail.
+            if (temp != null && id != null) {
+                try {
+                    Path log = BranchCommitLog.pathFor(temp, id);
+                    if (Files.exists(log)) {
+                        BranchCommitLog bcl = new BranchCommitLog(log.toString());
+                        row.put("committedBranches", new ArrayList<>(new java.util.TreeSet<>(bcl.committedBranches(id))));
+                        row.put("sourceFinalized", bcl.isSourceFinalized(id));
+                    }
+                } catch (RuntimeException unreadable) {
+                    // the row stays as the ledger wrote it
                 }
             }
             out.add(row);

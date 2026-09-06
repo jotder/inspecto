@@ -116,6 +116,22 @@ class ConfigSafetyValidatorTest {
                 && f.fieldPath().contains(fieldContains));
     }
 
+    /** JOB-SPEC-1 (2026-09-06): a job's path-shaped keys are jailed at save like a pipeline's dirs. */
+    @Test
+    void aJobsPathKeysAreContained(@TempDir Path root) {
+        Map<String, Object> ok = Map.of("job", Map.of("name", "sweep", "type", "maintenance",
+                "task", "cleanup", "dir", root.resolve("data/quarantine").toString()));
+        assertTrue(ConfigSafetyValidator.check("job", ok, SafetyPolicy.withRoots(root)).isEmpty());
+        Map<String, Object> bad = Map.of("job", Map.of("name", "sweep", "type", "maintenance",
+                "task", "cleanup", "dir", "../../outside", "backup_dir", "//nas/share"));
+        List<Finding> f = ConfigSafetyValidator.check("job", bad, SafetyPolicy.withRoots(root));
+        assertTrue(f.stream().anyMatch(x -> x.fieldPath().equals("job.dir")), f.toString());
+        assertTrue(f.stream().anyMatch(x -> x.fieldPath().equals("job.backup_dir")), f.toString());
+        // a key the list does not name is the task's run-time business, not a false refusal
+        assertTrue(ConfigSafetyValidator.check("job", Map.of("job", Map.of("name", "x", "type", "maintenance",
+                "task", "noop", "store", "../whatever")), SafetyPolicy.withRoots(root)).isEmpty());
+    }
+
     @Test
     void cleanDraftUnderRootPasses(@TempDir Path root) {
         List<Finding> f = ConfigSafetyValidator.check("pipeline", pipeline(safeDirs(root)),

@@ -12,7 +12,15 @@ import { BatchDetailDialog } from './batch-detail.dialog';
 
 const BATCHES: AuditRow[] = [
     { consignment_id: 'b-1', status: 'SUCCESS', member_count: '2', output_table: 'cdr_output' },
-    { consignment_id: 'b-2', status: 'FAILED', member_count: '1', output_table: '' },
+    // CLONE-ARM-1: a FAILED row whose branch commit log survived carries the branches that landed
+    {
+        consignment_id: 'b-2',
+        status: 'FAILED',
+        member_count: '1',
+        output_table: '',
+        committedBranches: ['sink__d1'],
+        sourceFinalized: false,
+    } as unknown as AuditRow,
     // PARK-1(a): the route merges the manifest's STRUCTURED park detail onto a PARKED ledger row —
     // the one place an AuditRow carries a list and a map, hence the cast.
     {
@@ -58,6 +66,7 @@ function create(
     };
     const catalog = {
         resolveTable: vi.fn(() => (resolved ? of(resolved) : throwError(() => ({ status: 404 })))),
+        resolveByPipeline: vi.fn(() => of({ id: 'stream:cdr', label: 'cdr', kind: 'STREAM' })),
     };
     TestBed.configureTestingModule({
         imports: [BatchDetailDialog],
@@ -137,11 +146,15 @@ describe('BatchDetailDialog', () => {
         expect(fixture.nativeElement.textContent).not.toContain('in the Catalog');
     });
 
-    it('does not ask the catalog about a batch that wrote no store', () => {
+    it('resolves a batch that wrote no store by its pipeline instead of asking for a table', () => {
         const { fixture, catalog } = create({ id: 'x', label: 'x' }, 'b-2');
         fixture.detectChanges();
         expect(catalog.resolveTable).not.toHaveBeenCalled();
-        expect(fixture.componentInstance.catalogNodeId()).toBeNull();
+        // CATALOG-LINK-1: a blank output_table resolves by pipeline instead — the single event node,
+        // else the Stream node; the link reads 'this pipeline'.
+        expect(catalog.resolveByPipeline).toHaveBeenCalledWith('cdr');
+        expect(fixture.componentInstance.catalogNodeId()).toBe('stream:cdr');
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain('View this pipeline in the Catalog');
     });
 
     it('lists which Step a PARKED Consignment parked at and where its rows sit', () => {
@@ -156,6 +169,17 @@ describe('BatchDetailDialog', () => {
         expect(table?.textContent).toContain('sink__d1');
         expect(table?.textContent).toContain('status/park/b-3__sink__d1.parquet');
         expect(el.textContent).not.toContain('[object Object]');
+    });
+
+    it('lists the branches a Consignment that did not finish committing already landed', () => {
+        const { fixture } = create(null, 'b-2', { enabled: true, consignmentId: 'b-2', outputs: [] });
+        const c = fixture.componentInstance;
+        expect(c.committedBranches()).toEqual(['sink__d1']);
+        expect(c.sourceFinalized()).toBe(false);
+        expect(c.batchSummary.map((kv) => kv.key)).not.toContain('committedBranches');
+        const el: HTMLElement = fixture.nativeElement;
+        expect(el.querySelector('[data-testid="committed-branches"]')?.textContent).toContain('sink__d1');
+        expect(el.textContent).toContain('not finalised');
     });
 
     it('shows no park section on a Consignment that did not park', () => {

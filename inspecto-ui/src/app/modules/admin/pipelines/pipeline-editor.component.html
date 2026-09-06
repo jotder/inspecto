@@ -759,6 +759,7 @@
                                         -->
                                         <app-pipeline-parse-definition
                                             [node]="dn"
+                                            [grammarMissing]="danglingGrammarId()"
                                             [pipelineName]="selectedId() ?? ''"
                                             [configSubdir]="configSubdir()"
                                             [sample]="sampleThread()"

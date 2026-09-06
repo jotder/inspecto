@@ -525,6 +525,11 @@ class ControlApiTest {
             Files.writeString(status.resolve("test_etl_batches_20260902000000.csv"),
                     header + row.formatted("parked_01", "PARKED") + row.formatted("orphan_02", "PARKED")
                             + row.formatted("done_03", "SUCCESS"));
+            // CLONE-ARM-1: orphan_02 also has a branch commit log left behind (a batch that did not finish
+            // committing keeps it) — the row must say which branches landed.
+            Files.createDirectories(dir.resolve("temp"));
+            Files.writeString(dir.resolve("temp").resolve("branch_commit_orphan_02.log"),
+                    "2026-09-02T00:00:00Z,orphan_02,sink__d1,BRANCH\n2026-09-02T00:00:00Z,orphan_02,sink__d2,BRANCH\n");
             // parked_01 has a manifest; orphan_02 (PARKED, no manifest) must not break the list.
             Files.writeString(status.resolve("manifests").resolve("parked_01.json"), """
                     {"consignmentId":"parked_01","pipeline":"test_etl","members":[],"outputs":[],
@@ -545,6 +550,14 @@ class ControlApiTest {
             assertNotNull(parked); assertNotNull(orphan); assertNotNull(done);
 
             assertEquals("sink__d1", parked.get("parkedAt").get(0).asText(), parked.toString());
+
+            assertEquals(2, orphan.get("committedBranches").size(), orphan.toString());
+
+            assertEquals("sink__d1", orphan.get("committedBranches").get(0).asText());
+
+            assertFalse(orphan.get("sourceFinalized").asBoolean(), "two branches landed, the source never finalised");
+
+            assertNull(done.get("committedBranches"), "a fully committed batch has no log left, so no key");
             assertEquals("status/park/parked_01__sink__d1.parquet",
                     parked.get("parkedTables").get("sink__d1").asText(), parked.toString());
             assertEquals("PARKED", parked.get("status").asText(), "the ledger fields are still there");

@@ -149,5 +149,6 @@ would be the hand-mirrored-map drift this repo has already paid for three times.
 B9's constraint was that nothing surfaces partial-commit state. The `BranchCommitLog` is already durable per
 `(batch, branch, phase)`; only the read surface was missing. **Decided:** arm `clone` and merge
 `committedBranches[]` / `sourceFinalized` into `GET /runs/{name}/batches` beside the park detail, rendered on the
-Batches tab. Build: `RouteArming` (drop the clone refusal), `RunRoutes` merge, `BranchCommitLog` reader,
-Batches-tab line + tests (BACKLOG §3 `CLONE-ARM-1`).
+Batches tab. **Shipped 2026-09-06:** `RouteArming` no longer refuses `clone`; `RunRoutes.withParkDetail` merges
+`committedBranches[]` + `sourceFinalized` onto any batch row whose branch commit log still exists (a fully
+committed batch deletes its log, so only unfinished ones carry the keys); the batch dialog lists them.

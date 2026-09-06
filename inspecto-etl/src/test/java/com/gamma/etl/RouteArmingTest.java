@@ -48,18 +48,27 @@ class RouteArmingTest {
     @Test
     @DisplayName("EVERY refusal is reported, not just the first — the reason this is not prepare()")
     void reportsEveryRefusal() {
-        // Four independent problems at once: clone mode, an unmatched database, no usable default,
-        // and multi-schema. prepare() would surface only the clone one.
+        // Three independent problems at once: an unmatched database, no usable default, and
+        // multi-schema (clone mode ARMS since 2026-09-06). prepare() would surface only the first.
         Map<String, Object> route = Map.of(
                 "mode", "clone",
                 "branches", List.of(branch("emea", "nowhere_db")));
         List<String> refusals = RouteArming.refusals(route, List.of("emea_db"), true);
 
-        assertEquals(4, refusals.size(), refusals.toString());
-        assertTrue(refusals.get(0).contains("'clone' is authoring-only"), refusals.get(0));
-        assertTrue(refusals.get(1).contains("matches no sinks[] destination"), refusals.get(1));
-        assertTrue(refusals.get(2).contains("needs default:"), refusals.get(2));
-        assertTrue(refusals.get(3).contains("multi-schema"), refusals.get(3));
+        assertEquals(3, refusals.size(), refusals.toString());
+        assertTrue(refusals.get(0).contains("matches no sinks[] destination"), refusals.get(0));
+        assertTrue(refusals.get(1).contains("needs default:"), refusals.get(1));
+        assertTrue(refusals.get(2).contains("multi-schema"), refusals.get(2));
+    }
+
+    @Test
+    @DisplayName("CLONE-ARM-1 (2026-09-06): mode: clone arms when its branches are otherwise sound")
+    void cloneModeArms() {
+        Map<String, Object> route = Map.of(
+                "mode", "clone",
+                "default", "apac",
+                "branches", List.of(branch("emea", "emea_db"), branch("apac", "apac_db")));
+        assertEquals(List.of(), RouteArming.refusals(route, List.of("emea_db", "apac_db"), false));
     }
 
     @Test

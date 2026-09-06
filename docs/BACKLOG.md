@@ -37,9 +37,8 @@ a new dependency — not a build. The rule that fell out: **a P1 must name the f
 cannot is a decision (§1) or a design (P2).
 
 Do next, in order (all decided 2026-09-06, all P1):
-1. **CATALOG-LINK-1** · **PARSE-HOME-1** · **CLONE-ARM-1** · **JOB-SPEC-1** · **D4-ENRICH-1** — the M rows.
-2. **SAMPLE-1-REMOVE** · **STRUCTURE-CSV-1** · **SEC-07-GATE** · **DATA-GOV-SYNTH** · **OPEN-DAG-S1** — the larger builds.
-3. **Release notes for the next MAJOR** — keep appending (§2). **Step Processor catalog** — pick a partial by name (§3).
+1. **SAMPLE-1-REMOVE** · **STRUCTURE-CSV-1** · **SEC-07-GATE** · **DATA-GOV-SYNTH** · **OPEN-DAG-S1** — the larger builds.
+2. **Release notes for the next MAJOR** — keep appending (§2). **Step Processor catalog** — pick a partial by name (§3).
 
 ## 1. Operator decisions pending
 
@@ -78,7 +77,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 
 ### Authoring (Parse / Transform / pipeline editor)
 
-- **P1** · **PARSE-HOME-1** — a dangling grammar binding opens the Parse drawer with the Grammar section flagged "template missing" instead of the custody dialog; the pane is organised as Grammar · Schemas emitted · other properties; fix the stale bound→dialog comment; dialog stays for binary fixed-width + unmappable generic parser. Unblocks P4 Test-mapping there. → `okf/frontend/features/pipeline-editor.md` §Decision
 - **P2** · **WORKBENCH-S4** — the one-surface Step workbench (input-relation picker, column filter, grouping beside the field list); `RowShaper.fuse` is delete-or-wire (tested, caller-less, "last projection wins"). → `okf/backend/engine/catalog-vs-executors.md` §distilled
 - **P1** · **STRUCTURE-CSV-1** — a `<name>_structure.csv` sibling (`field,type,selector,unit,description,classification`) with the `_mapping.csv` split-read/split-write idiom (decided BUILD 2026-09-06). → `superpower/elt-final-amendment-plan.md` §3.2
 
@@ -91,9 +89,8 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - **P3** · **AI drafting has no applicable component kind** — restore `<inspecto-ai-assist>`/`component_draft` for a kind: either give `grammar`/`transform`/`sink` a backend `ConfigSpec` (none has one; `ConfigSpecs.TYPES` excludes them) or rework `SchemaEditorDialog`. No low-risk slice survives — design first. → `okf/frontend/features/inline-ai-authoring.md`
 ### Onboarding, Catalog, Parsing
 
-- **P1** · **CATALOG-LINK-1** — blank `output_table` resolves by pipeline: one event node ⇒ link it, several ⇒ link the pipeline's Stream node; `GET /catalog/resolve?pipeline=` arm + `batch-detail.dialog.ts`; no store edge invented. → `okf/frontend/features/catalog.md` §Decision
 - **P1** · **SAMPLE-1-REMOVE** — `git rm` the four retired corpora under `spaces/default/data/samples/` (keep `events/` only if the live KPI demo reads it), drop the seed arms in `seed-inbox.{ps1,sh}`, fix two `FEATURE_INVENTORY.md` mentions. → `FEATURE_INVENTORY.md` §2
-- **P1** · **D4-ENRICH-1** — migrate `spaces/demo/config/orders/orders_daily_enrich.toon` to a `transform: {join}` step and mark the `enrichment` kind deprecated read-only in `ConfigSpecs`; `_enrich` tests follow. → `superpower/elt-final-amendment-plan.md` §9 D-4
+- **P2** · **D4-ENRICH-1** — the D-4 migration is BLOCKED by a design gap found on grounding (2026-09-06): `orders_daily_enrich.toon` is a join **plus an aggregate** over the LANDED `orders` store, so it needs `join → sql` as an at-rest chain — but the orders pipeline already carries its one at-rest chain (`filter` → `rollup`), and no pipeline can read ANOTHER pipeline's landed store as its source (the at-rest lift's `STAGE2_SRC` is the pipeline's own canonical store). Until either a second chain per pipeline or a store-sourced pipeline exists, `enrichment` stays the only spelling and cannot go read-only. Design first. → `superpower/elt-final-amendment-plan.md` §9 D-4
 
 - **P3** · **Unpack (11) absent codecs** — (xz/zstd need a new decompression library: a dependency sign-off, not a build) — xz and zstd have no plugin; `.Z` has no round-trip test; multi-part/split archives (`.z01`, `.part1.rar`) unhandled — arrival-completeness is a Collector question. ⚠ The UI cannot author the explicit empty-list `data_extensions[0]:` opt-out (schema-form `list` writes empty as `null`). 🔴 Stale `META-INF/services` "ORDER MATTERS" header. → `okf/backend/engine/unpack-stage.md`
 - **P2** · **Onboarding (Stream/Reference)** — D5-ref: how a `delete` tombstone *enters* the reference store (reserved column? Decision Rule consequence?) — wait for a real delete-feed; D6-ref: within-batch same-key tie-break is arbitrary — add an optional latest-by-`order_by` column only when needed; optional templates entry (space-template-gallery precedent). ⚠ Enrichment/job configs still derive identity from name. ⚠ Do not implement name-deferral by holding the draft client-side. → `okf/backend/control-plane/onboarding-authoring.md` · `okf/frontend/features/onboarding.md`
@@ -103,7 +100,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 
 ### Execution, Consignments, Pipeline graph
 
-- **P1** · **CLONE-ARM-1** — arm `mode: clone`; merge `committedBranches[]` / `sourceFinalized` from `BranchCommitLog` into `GET /runs/{name}/batches` beside the park detail; Batches-tab line; tests. → `okf/backend/engine/branch-aware-ingest.md` §Decision
 - **P2** · **OPEN-DAG-S1** — authored post-sync step chains: a step's table registers as a Consignment output, re-runs supersede via the revision model, Step per Consignment / Job across (Q1/Q3/Q4 decided 2026-09-06). → `superpower/open-dag-pipeline-design.md` §5
 
 - **P2** · **Branch-aware executor residuals** — ((b) and (c) are design passes before code; (d)–(g) wait for a real need) — (b) multi-schema + route needs a **segment-scoped lift** (`writeAndTrace` runs once per segment while the divert lifts the whole graph) — ⛔ do NOT just lift the refusal; (c) mid-branch transforms in the recipe route verb — no per-branch scaffolding in `RecipeCompiler.route()` / `PipelineLift.branch()`, design pass written; (d) still unimplemented anywhere: `adapter`, `alert`, `event`; still refused at lowering as flat homes: `transform.select/derive/validate/split/merge`, `sink.materialized/view` on ingest; (e) acquisition-side "listed remotely, not yet fetched" gauge — name it first; (f) `acquire.maxFilesPerCycle` — only if overshoot is real; (g) `sinks:` follow-ups: per-sink `ducklake` block in flat `.toon`, decision-rule routing with `sinks>1`, versioned reference store with `sinks>1`, and a `ConfigSpecs`/`ConfigJsonSchema` structural spec for `sinks:`. ((a) `mode: clone` is a §1 decision.) → `okf/backend/engine/branch-aware-ingest.md` · `okf/backend/engine/output-sinks.md` · `archived-documents/plans-archive/mid-branch-transforms-design.md`
@@ -140,7 +136,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 
 ## 4. Engineering / tech-debt
 
-- **P1** · **JOB-SPEC-1** — `ConfigSpecs.job()` + route job writes through the save-time 422 gate; run-time containment check stays as belt. → `okf/backend/config/config-safety.md` §Decision
 
 - **P3** · **PATH-2 (residual, untidy only)** — (the `BackupTask.restore` zip-slip jail is PINNED 2026-09-06 by `MaintenanceLibraryTest.restoreRefusesASidecarEntryThatEscapesTheTargetBeforeWritingAnything`.) Family (a) three store `fileFor` helpers: LEAVE unless someone is in those files anyway. ⚠ Routing `ControlApi.serveStatic` through `PathJail.contains` is a posture change needing an operator call — ⛔ grounded 2026-08-26 "do not build it". → `okf/backend/config/config-safety.md`
 - **P3** · **Vocabulary rollout, Tier 3** — the bare-identifier sweep ran 2026-09-06 (Java 454 → 166 bare `flow` words, TS 201 → 96; every survivor is a wire key, a `*_flow.toon`/`flow-graph` format citation, the agent-tool `flow` argument, or another sense of the word — max-flow, OAuth flow, control flow). Left by decision, each a wire change: the `ViewDefinition.flow` record component (dual-emitted with `pipeline`; `ViewRoutes` reads it), the UI DTO fields `DownstreamFlow.flow` / `ViewSummary.flow` / combined-topology `flow?` (switch to reading `pipeline` once every emitter provably dual-emits), the `flow` job type id + its `'Flow'` label in `job-display.ts`, `"flow"` test-data literals. → `GLOSSARY.md` §13 · `PROJECT_NOTES.md`

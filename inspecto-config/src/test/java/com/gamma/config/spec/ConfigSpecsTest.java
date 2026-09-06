@@ -311,11 +311,11 @@ class ConfigSpecsTest {
     @Test
     void jobTypeAndCronRules() {
         ConfigSpec j = ConfigSpecs.job();
-        assertTrue(fire(j, "job-type-required", Map.of("job", Map.of("type", "enrich"))).isEmpty());
-        // ingest is no longer a job type (T23 / §3.8 — ingest is pipeline-exclusive)
-        assertTrue(fire(j, "job-type-required", Map.of("job", Map.of("type", "ingest"))).isPresent());
-        assertTrue(fire(j, "job-type-required", Map.of("job", Map.of("type", "bogus"))).isPresent());
-        assertTrue(fire(j, "job-type-required", Map.of("job", Map.of())).isPresent());
+        // JOB-SPEC-1 (2026-09-06): the stale `job-type-required` rule (enrich|report|maintenance) is GONE —
+        // now that POST/PUT /jobs runs this spec at save it would have refused every `type: pipeline` job.
+        // The job type is owned by JobRoutes/JobTypeRegistry, not by the spec.
+        assertTrue(j.rules().stream().noneMatch(r -> r.id().equals("job-type-required")),
+                "the spec must not re-grow a type whitelist that the job registry already owns");
 
         // absent cron → ok; 5 fields → ok; 6 fields → ok; 3 fields → error
         assertTrue(fire(j, "cron-field-count", Map.of("job", Map.of())).isEmpty());

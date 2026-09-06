@@ -54,6 +54,15 @@ class ControlApiJobCrudTest {
             assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
             String base = "/spaces/acme";
 
+            // JOB-SPEC-1 (2026-09-06): the save runs containment — a job naming a directory outside the
+            // space is refused HERE, not at the task's run-time jail (which stays as belt).
+            HttpResponse<String> escaping = send(c.port, "POST", base + "/jobs", """
+                    {"name":"evil_sweep","type":"maintenance","task":"cleanup",
+                     "dir":"../../outside","retention_days":"30"}""");
+            assertEquals(422, escaping.statusCode(), escaping.body());
+            assertTrue(escaping.body().contains("job.dir"), escaping.body());
+            assertEquals(404, send(c.port, "GET", base + "/jobs/evil_sweep", null).statusCode(), "nothing was written");
+
             // an event trigger + a flat type-specific param
             assertEquals(200, send(c.port, "POST", base + "/jobs", """
                     {"name":"after_ingest","type":"maintenance","task":"cleanup",

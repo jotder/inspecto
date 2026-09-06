@@ -673,6 +673,8 @@ hardcoded), **the Schemas it emits** (its events), and **its other properties**.
 organised on those three sections, and it is the home for every parse node the drawer can represent — including
 a **dangling grammar binding**, which now opens the drawer with the Grammar section flagged "template missing"
 instead of falling back to the custody dialog (this also unblocks Test-mapping on those nodes, P4).
-`GrammarEditorDialog` survives only for binary fixed-width and an unmappable generic `parser`. Build:
-`pipeline-editor.component.ts` `isDrawerParse` / `definitionDraft`, the Parse pane's Grammar section banner,
-specs (BACKLOG §3 `PARSE-HOME-1`). The stale comment claiming bound nodes keep the dialog goes with it.
+`GrammarEditorDialog` survives only for binary fixed-width and an unmappable generic `parser`. **Shipped
+2026-09-06:** `isDrawerParse` admits a dangling per-format binding; `definitionDraft` seeds a blank Grammar of the
+node's frontend and KEEPS `use:` (Apply, not opening, replaces the binding); the host's `danglingGrammarId`
+feeds the pane's `[grammarMissing]`, whose Grammar section renders the warning naming the template. Pinned by
+the editor and pane specs. The stale comment claiming bound nodes keep the dialog went with it.
