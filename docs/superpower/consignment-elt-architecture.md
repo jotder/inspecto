@@ -16,7 +16,7 @@ end-of-period pass (which §7.5 defers non-additive measures to) is the only rem
 built. Open items deliberately carried to `docs/BACKLOG.md` §4 rather than tracked here: §7.4's rollup cache, the
 three deferred `batch_id` renames (the `DbProvenanceStore`/`DbStatusStore` **DDL columns**, `__batch_id` where
 accept-both-on-read is impossible, and the **`.toon` config key**), and §7.5's histogram-vs-sketch question —
-whose "DuckDB `approx_quantile` exposes no mergeable state" premise is still **unverified**.
+whose "DuckDB `approx_quantile` exposes no mergeable state" premise was **VERIFIED 2026-08-28** (live probe, §7.5 — histogram wins).
 
 **Trigger:** operator question — *"why do we need two execution systems? what processor blocks on our
 pipeline make sense?"* — asked while scoping a replacement for an existing Kafka-based record-at-a-time

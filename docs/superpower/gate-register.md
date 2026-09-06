@@ -149,7 +149,7 @@ Ordered by what they unblock.
    ✅ **DECIDED and SHIPPED 2026-08-29** (`chain_config` JSON param — this register's own §4
    records it; corrected 2026-09-01, the two sections had drifted). What survives as open is the
    **ordered chain-authoring UX** (a designed editor surface over the param pair), listed in §4.
-2. **`open-dag` §9 Q2 — should a mid-chain failure retire what earlier steps wrote?** Today: no
+2. **`open-dag` §9 Q2 — should a mid-chain failure retire what earlier steps wrote?** (⚠ a different question from §3's *§5 Q2*, which is answered; the two share a number, not a verdict.) Today: no
    (append-only, "a registered table is a fact"). The alternative is expressible with existing state
    but changes that contract to "a fact only if its chain finished".
 3. **Consignment rename trio** (ELT Phase 7 / D-12) — three *different* classes of decision, gated
@@ -213,9 +213,11 @@ Ordered by what they unblock.
   §9 questions (per-step chain config; mid-chain-failure semantics) are also now decided and shipped
   (`6bf92b1b`, 2026-08-29): `chain_config` JSON parameter + `ProcessorContext.config()`; failure stays
   append-only, no code needed.
-- `open-dag` **stage 4** — the editor surface. ⚠ **This row was half-stale (checked 2026-08-30):**
-  the design's §6.4 already marks stage 4 SHIPPED (`aa777782`), but what shipped is the **read-only**
-  registered-outputs list in Batch detail — *authoring* the post-sync chain is still hand-edited TOON.
+- `open-dag` **stage 4** — the editor surface. ✅ **CLOSED 2026-08-31**: `<app-job-chain-editor>` in
+  `JobFormDialog` edits the post-sync chain as ordered steps with per-step config (pipeline-spec §12
+  row 12); the surviving defect is the engine half, **CHAIN-CONFIG-1** (closed 2026-09-02). History:
+  the design's §6.4 marked stage 4 SHIPPED (`aa777782`) for the **read-only** registered-outputs list
+  while authoring was still hand-edited TOON — that was the half-stale state checked 2026-08-30.
   There is also no "decision 3.1" anywhere in `open-dag-pipeline-design.md`; §5 Q1 is closed and §9's
   two decisions shipped, so nothing is decision-gated here. 🔴 Grounded gap: `chain_config` ships as
   `ParamType.JSON` (published, tier ADVANCED) and the UI had **no `json` widget**.

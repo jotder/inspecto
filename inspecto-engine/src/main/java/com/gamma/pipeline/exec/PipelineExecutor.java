@@ -2,6 +2,9 @@ package com.gamma.pipeline.exec;
 
 import com.gamma.api.PublicApi;
 import com.gamma.etl.StepProgress;
+import com.gamma.event.Event;
+import com.gamma.event.EventLog;
+import com.gamma.event.EventType;
 import com.gamma.pipeline.BuiltinNodeType;
 import com.gamma.pipeline.PipelineEdge;
 import com.gamma.pipeline.PipelineGraph;
@@ -233,6 +236,7 @@ public final class PipelineExecutor {
                         nodeId, references, ctx));
                 produced.put(nodeId, rels);
                 recordCounts(conn, prov, nodeId, rels);
+                emitDedupDropped(conn, g, node, batchId, rels);
             }
             // control terminals (gap/alert/event) consume but produce no data relation — nothing to route on
         }
@@ -335,6 +339,33 @@ public final class PipelineExecutor {
     }
 
     /** Report a record count to {@code prov} for every produced relation of {@code nodeId}. */
+    /**
+     * {@link EventType#DEDUP_RECORDS_DROPPED}'s emitter (2026-09-06). The flat lane's counter went with
+     * {@code applyRecordDedup} on 2026-08-11 and the constant sat emitter-less on purpose — this executor
+     * is the place its javadoc named, because only here are the losers a real relation whose count is
+     * known. Emitted once per dedup node per Consignment, only when at least one row was dropped; the
+     * rows themselves stay inspectable on the {@code duplicate} relation, so the event is the headline,
+     * not the ledger. {@code correlationId} is the batch id, as the taxonomy promises.
+     */
+    private static void emitDedupDropped(Connection conn, PipelineGraph g, PipelineNode node, String batchId,
+                                         Map<String, String> rels) throws SQLException {
+        if (!BuiltinNodeType.TRANSFORM_DEDUP.type().equals(node.type())) return;
+        String dup = rels.get(PipelineRel.DUPLICATE);
+        if (dup == null) return;
+        long dropped = count(conn, dup);
+        if (dropped <= 0) return;
+        Object keys = node.cfg("keys");
+        EventLog.current().emit(Event.builder(EventType.DEDUP_RECORDS_DROPPED)
+                .source("pipeline-executor")
+                .pipeline(g.name())
+                .correlationId(batchId)
+                .message("dedup '" + node.id() + "' dropped " + dropped + " duplicate row(s) by "
+                        + (keys == null ? "its business key" : keys))
+                .attr("node", node.id())
+                .attr("keys", keys == null ? "" : String.valueOf(keys))
+                .attr("dropped", dropped));
+    }
+
     private static void recordCounts(Connection conn, ProvenanceCollector prov, String nodeId,
                                      Map<String, String> rels) throws SQLException {
         for (Map.Entry<String, String> e : rels.entrySet())

@@ -720,7 +720,7 @@ former root reference docs** (each index lists them):
   `compliance/controls-matrix.md` CC6.1. The two incident-only runbooks moved with it:
   `archived-documents/secret-rotation-runbook.md`, `archived-documents/github-support-purge-request.md`.
 - [`superpower/agt-6-plan.md`](superpower/agt-6-plan.md) — **AGT-6 plan — AGT-6a A1–A4 (incl. A4-status)
-  SHIPPED 2026-07-26, plan STILL ACTIVE** (**A5** + the `kpi_report_builder` host + all of AGT-6b remain).
+  SHIPPED 2026-07-26, A5 2026-07-27, plan STILL ACTIVE** (the `kpi_report_builder` host + all of AGT-6b remain).
   Splits the requirement: **AGT-6a** inline AI authoring (one shared `<inspecto-ai-assist>` surface + a pane
   adoption wave, phases A1–A5) vs **AGT-6b** model-composed agent graphs (`Could`, demand-gated behind the
   eoiagent `DryRunProvider` seam). **§3.4 is the A5 scope** — the NL→structure model hop: build it on the
@@ -802,8 +802,9 @@ former root reference docs** (each index lists them):
   never needed.
 - [`superpower/living-operational-system.md`](superpower/living-operational-system.md) — standing
   **architecture north-star** (seven networks over one Component metamodel); R1–R6 all shipped.
-- [`superpower/geo-map-case-studies.md`](superpower/geo-map-case-studies.md) — Geo Map CS1–CS5
-  case-study pack (spec-pinned demo seeds) — reference.
+- ~~`superpower/geo-map-case-studies.md`~~ — **ARCHIVED 2026-09-06** (CS1–CS5 shipped and spec-pinned;
+  distilled into [`okf/frontend/features/geo-map.md`](okf/frontend/features/geo-map.md) §Case studies) →
+  `archived-documents/plans-archive/geo-map-case-studies.md`.
 - ~~`superpower/pipeline-case-studies.md`~~ — **RETIRED 2026-08-20**
   ([archive copy](archived-documents/plans-archive/pipeline-case-studies.md)). Replaced by the
   `format-examples.seed.ts` pack (one pipeline per DuckDB-native parser frontend) — operator

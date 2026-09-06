@@ -846,6 +846,69 @@ class MaintenanceLibraryTest {
         assertTrue(forced.message().contains("(2 overwritten)"), forced.message());
     }
 
+    /**
+     * PATH-2 residual (pinned 2026-09-06): the zip-slip jail in {@code BackupTask.restore} sits BEHIND the
+     * sidecar + archive-hash verification — and that verification also checks that every sidecar entry
+     * EXISTS in the archive, so a tampered sidecar alone is refused one layer earlier ("manifest entry
+     * missing from archive") and never reaches the jail. Reaching it takes what an attacker with write
+     * access to the backup dir has: an archive RE-PACKED with the escaping entry name and a sidecar
+     * re-signed to match (same hashing as the writer, {@code Checksums.of}). Both a relative escape and an
+     * absolute path must refuse BEFORE a byte is written — the jail is a pre-pass over every entry.
+     */
+    @Test
+    void restoreRefusesAnArchiveEntryThatEscapesTheTargetBeforeWritingAnything(
+            @TempDir Path source, @TempDir Path backupDir, @TempDir Path target) throws Exception {
+        new MaintenanceJob(backupCfg(source, backupDir)).run();
+        Path zip = onlyZip(backupDir);
+        Path sidecar = zip.resolveSibling(zip.getFileName() + ".manifest.json");
+        byte[] signedZip = Files.readAllBytes(zip);
+        String signedSidecar = Files.readString(sidecar);
+        Path outside = target.getParent().resolve("evil.txt");
+        var json = new com.fasterxml.jackson.databind.ObjectMapper();
+
+        for (String escape : new String[]{"../evil.txt", outside.toString().replace('\\', '/')}) {
+            // 1. re-pack: the entry `space.toon` travels under the escaping name, bytes unchanged
+            var out = new java.io.ByteArrayOutputStream();
+            try (var zin = new java.util.zip.ZipInputStream(new java.io.ByteArrayInputStream(signedZip));
+                 var zout = new java.util.zip.ZipOutputStream(out)) {
+                java.util.zip.ZipEntry e;
+                while ((e = zin.getNextEntry()) != null) {
+                    zout.putNextEntry(new java.util.zip.ZipEntry("space.toon".equals(e.getName()) ? escape : e.getName()));
+                    zin.transferTo(zout);
+                    zout.closeEntry();
+                }
+            }
+            Files.write(zip, out.toByteArray());
+            // 2. re-sign: the sidecar names the new entry and the archive's new hash, exactly as the writer would
+            @SuppressWarnings("unchecked")
+            Map<String, Object> manifest = json.readValue(signedSidecar, Map.class);
+            manifest.put("archiveSha256", com.gamma.acquire.Checksums.of(zip, "SHA-256"));
+            boolean renamed = false;
+            for (Object o : (List<?>) manifest.get("files")) {
+                @SuppressWarnings("unchecked") Map<String, Object> entry = (Map<String, Object>) o;
+                if ("space.toon".equals(entry.get("path"))) { entry.put("path", escape); renamed = true; }
+            }
+            assertTrue(renamed, "the fixture's second entry is space.toon");
+            Files.writeString(sidecar, json.writeValueAsString(manifest));
+
+            // the archive verifies (hash + every entry present) — and THEN the jail refuses
+            JobResult r = new MaintenanceJob(job(Map.of("task", "restore",
+                    "archive", zip.toString(), "target_dir", target.toString()))).run();
+            assertEquals("FAILED", r.status(), r.message());
+            assertTrue(r.message().contains("restore blocked: entry escapes target_dir: " + escape), r.message());
+            assertFalse(Files.exists(outside), "nothing lands outside the target");
+            assertFalse(Files.exists(target.resolve("orders").resolve("a.toon")),
+                    "the pre-pass refuses before the FIRST entry is written, not after the good ones");
+        }
+
+        // and the untampered pair restores — the refusal was the escape, not the fixture
+        Files.write(zip, signedZip);
+        Files.writeString(sidecar, signedSidecar);
+        JobResult ok = new MaintenanceJob(job(Map.of("task", "restore",
+                "archive", zip.toString(), "target_dir", target.toString()))).run();
+        assertEquals("SUCCESS", ok.status(), ok.message());
+    }
+
     @Test
     void backupAppendsCatalogRowAndRegistersTheDataset(@TempDir Path source, @TempDir Path backupDir,
                                                        @TempDir Path dataDir, @TempDir Path writeRoot) throws Exception {

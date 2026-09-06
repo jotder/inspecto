@@ -82,10 +82,12 @@ public final class EventType {
      *  {@code expected} attribute carries the missing key; {@code sequence}/{@code unit} describe the series. */
     public static final String SEQUENCE_GAP     = "SEQUENCE_GAP";
     /** The record-grain {@code dedup} Step (§2.4) dropped one or more duplicate rows by business key —
-     *  a reject stream the user tunes where it rests, never wires (§2.6). Phase 4 §2.4/§11.3's
-     *  legacy-lane counter, since {@code ConsignmentIngestStrategy} has no per-node provenance graph to
-     *  record against. The {@code keys} and {@code dropped} attributes carry the dedup key list and
-     *  the count; {@code correlationId} is the batch id. */
+     *  a reject stream the user tunes where it rests, never wires (§2.6). Emitted by the Stage-2
+     *  executor ({@code PipelineExecutor}, since 2026-09-06) once per dedup node per Consignment when
+     *  the {@code duplicate} relation is non-empty — the flat lane's counter went with
+     *  {@code applyRecordDedup} on 2026-08-11 and the constant was emitter-less in between. The
+     *  {@code keys} and {@code dropped} attributes carry the dedup key list and the count, {@code node}
+     *  the Step id; {@code correlationId} is the batch id. */
     public static final String DEDUP_RECORDS_DROPPED = "DEDUP_RECORDS_DROPPED";
 
     // ── job / enrichment ────────────────────────────────────────────────────────────

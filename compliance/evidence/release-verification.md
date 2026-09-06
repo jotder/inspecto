@@ -92,7 +92,7 @@ now **ANSWERED — 2026-08-30, operator: the release key lives in the CI secret 
 individual locally. Signing therefore becomes a **mandatory step of the release pipeline**, and what
 remains is engineering, not a decision.
 
-⚠ Until that wiring ships, this section still describes the live state: treat a missing `.asc` as
+⚠ Standing rule for a verifier (the wiring shipped 2026-09-02): treat a missing `.asc` as
 "this release was not signed", never as "signatures are not offered". 🔴 One accepted consequence of
 the custody choice, worth stating to a verifier: a release cut **outside CI cannot be signed at
 all**.

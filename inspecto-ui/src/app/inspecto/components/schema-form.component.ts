@@ -315,22 +315,56 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
                             </div>
                         }
                         @case ('number') {
-                            <!-- Static type="number" so Angular's NumberValueAccessor attaches (a [type]
-                                 binding would leave the default accessor → string values). -->
-                            <mat-form-field class="w-full" subscriptSizing="dynamic">
-                                <mat-label>{{ spec.label }}</mat-label>
-                                <input
-                                    matInput
-                                    type="number"
-                                    [formControlName]="spec.key"
-                                    [placeholder]="spec.placeholder ?? ''"
-                                    [attr.cdkFocusInitial]="first ? '' : null"
-                                />
-                                @if (spec.help) {
-                                    <mat-hint>{{ spec.help }}</mat-hint>
-                                }
-                                <mat-error>{{ errorFor(spec) }}</mat-error>
-                            </mat-form-field>
+                            @if (tokensFor(spec).length > 0) {
+                                <!-- A numeric field the host offers tokens for (a job's INTEGER/DECIMAL
+                                     parameter and the epoch-seconds token): a TEXT input, because a native
+                                     type="number" cannot display a dollar-token at all — it reads back blank.
+                                     The numeric contract moves into a validator that exempts a whole-value
+                                     token (see tokenSyntax); value() turns a numeric literal back into a
+                                     number so hosts see the same shape the type="number" widget emits.
+                                     Deliberately no spinner: the affordance a token-capable field trades
+                                     away is stepping, which never made sense for an epoch anyway.
+                                     ⛔ Not folded into the branch below — its static type="number" is
+                                     load-bearing for NumberValueAccessor. -->
+                                <mat-form-field class="w-full" subscriptSizing="dynamic">
+                                    <mat-label>{{ spec.label }}</mat-label>
+                                    <input
+                                        matInput
+                                        type="text"
+                                        inputmode="decimal"
+                                        [formControlName]="spec.key"
+                                        [placeholder]="spec.placeholder ?? ''"
+                                        [attr.cdkFocusInitial]="first ? '' : null"
+                                    />
+                                    <inspecto-token-picker
+                                        matSuffix
+                                        [fieldLabel]="spec.label"
+                                        [tokens]="tokensFor(spec)"
+                                        (picked)="applyToken(spec, $event)"
+                                    />
+                                    @if (spec.help) {
+                                        <mat-hint>{{ spec.help }}</mat-hint>
+                                    }
+                                    <mat-error>{{ errorFor(spec) }}</mat-error>
+                                </mat-form-field>
+                            } @else {
+                                <!-- Static type="number" so Angular's NumberValueAccessor attaches (a [type]
+                                     binding would leave the default accessor → string values). -->
+                                <mat-form-field class="w-full" subscriptSizing="dynamic">
+                                    <mat-label>{{ spec.label }}</mat-label>
+                                    <input
+                                        matInput
+                                        type="number"
+                                        [formControlName]="spec.key"
+                                        [placeholder]="spec.placeholder ?? ''"
+                                        [attr.cdkFocusInitial]="first ? '' : null"
+                                    />
+                                    @if (spec.help) {
+                                        <mat-hint>{{ spec.help }}</mat-hint>
+                                    }
+                                    <mat-error>{{ errorFor(spec) }}</mat-error>
+                                </mat-form-field>
+                            }
                         }
                         @default {
                             <!-- string / identifier. A secret spec masks the input; unlike the number
@@ -988,9 +1022,26 @@ export class InspectoSchemaFormComponent implements AfterViewInit, OnDestroy {
         return this.tiers()[tier].some((s) => this.isVisible(s) && !!this.form.get(s.key)?.invalid);
     }
 
-    /** The visible values only — hidden (`dependsOn`-suppressed) controls are disabled and excluded. */
+    /**
+     * The visible values only — hidden (`dependsOn`-suppressed) controls are disabled and excluded.
+     *
+     * <p>A token-capable numeric field (a `number` spec the host offers tokens for) is a TEXT control, so a
+     * numeric literal typed into it is a string here; it is turned back into a number so the host sees the
+     * same shape the native `type="number"` widget emits. A token stays the string it is — that is the point.
+     */
     value(): Record<string, unknown> {
-        return this.form.value as Record<string, unknown>;
+        const raw = this.form.value as Record<string, unknown>;
+        const out: Record<string, unknown> = { ...raw };
+        for (const s of this.allSpecs) {
+            if (s.type !== 'number' || this.tokensFor(s).length === 0) continue;
+            const v = out[s.key];
+            if (typeof v === 'string' && v.trim() !== '' && !this.isTokenValue(v) && isFinite(Number(v))) {
+                out[s.key] = Number(v);
+            } else if (typeof v === 'string' && v.trim() === '') {
+                out[s.key] = null;
+            }
+        }
+        return out;
     }
 
     /**
@@ -1021,6 +1072,7 @@ export class InspectoSchemaFormComponent implements AfterViewInit, OnDestroy {
         if (typeof c.errors['message'] === 'string') return c.errors['message'] as string;
         if (c.errors['duplicate']) return `${spec.label} already exists`;
         if (c.errors['pattern']) return `${spec.label} has an invalid format`;
+        if (c.errors['numeric']) return `${spec.label} must be a number or a token`;
         if (c.errors['min']) return `${spec.label} must be ≥ ${spec.min}`;
         if (c.errors['max']) return `${spec.label} must be ≤ ${spec.max}`;
         return `${spec.label} is invalid`;
@@ -1051,6 +1103,18 @@ export class InspectoSchemaFormComponent implements AfterViewInit, OnDestroy {
             v.push((control: AbstractControl) => (this.isTokenValue(control.value) ? null : literal(control)));
         }
         if (s.type === 'number') {
+            // The token-capable numeric widget is a text control: hold it to "a number, or a whole-value
+            // token". Validators.min/max coerce a numeric string themselves and skip a non-numeric one, so
+            // they keep working on it; the token is exempt from them because it is not numeric.
+            if (this.tokensFor(s).length > 0) {
+                v.push((control: AbstractControl) => {
+                    const val = control.value;
+                    if (val === null || val === undefined || val === '' || typeof val === 'number') return null;
+                    if (typeof val !== 'string') return { numeric: true };
+                    if (this.isTokenValue(val)) return null;
+                    return val.trim() !== '' && isFinite(Number(val)) ? null : { numeric: true };
+                });
+            }
             if (s.min !== undefined) v.push(Validators.min(s.min));
             if (s.max !== undefined) v.push(Validators.max(s.max));
         }

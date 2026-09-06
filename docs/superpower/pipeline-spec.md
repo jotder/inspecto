@@ -742,7 +742,7 @@ deletes.
 
 | Gap | Why |
 |---|---|
-| **14** D-9 cross-Consignment dedup | ~~named, not designed~~ ✅ **stale — DESIGNED 2026-08-31 (`pipeline-waves-drain-plan.md` §3), 🚧 HALF BUILT 2026-09-01 (ledger `8a3d2aae` + vocabulary `5e43bcbf`), remainder BUILDING 2026-09-01 via the ExecutionContext seam; board of record = BACKLOG §6** |
+| **14** D-9 cross-Consignment dedup | ~~named, not designed~~ ✅ **COMPLETE 2026-09-01** — designed 2026-08-31 (`pipeline-waves-drain-plan.md` §3), ledger `8a3d2aae` + vocabulary `5e43bcbf`, wiring through the `RowShaper.ExecutionContext` seam the same day; `DEDUP_RECORDS_DROPPED` gained its emitter in `PipelineExecutor` 2026-09-06 |
 
 ### The honest shape of it
 

@@ -105,13 +105,48 @@ class PipelineExecutorDedupWindowTest {
         // A arrives again with the SAME event date — same epoch-anchored window by construction.
         // (An event date near a window boundary may legitimately open a new window; that is the
         // window advancing, not a duplicate.)
-        Batch second = runBatch(g, "('A', DATE '2026-08-02'), ('C', DATE '2026-08-02')", "c2",
-                new RowShaper.ExecutionContext("pipe1", "c2", ledger));
+        // The taxonomy's DEDUP_RECORDS_DROPPED had no emitter from 2026-08-11 to 2026-09-06; the executor
+        // is it. Once per dedup node per Consignment, only when something was dropped — c1 dropped nothing.
+        List<com.gamma.event.Event> dropped = new java.util.concurrent.CopyOnWriteArrayList<>();
+        java.util.function.Consumer<com.gamma.event.Event> sub = e -> {
+            if (com.gamma.event.EventType.DEDUP_RECORDS_DROPPED.equals(e.type())) dropped.add(e);
+        };
+        com.gamma.event.EventLog.current().addSubscriber(sub);
+        Batch second;
+        try {
+            second = runBatch(g, "('A', DATE '2026-08-02'), ('C', DATE '2026-08-02')", "c2",
+                    new RowShaper.ExecutionContext("pipe1", "c2", ledger));
+        } finally {
+            com.gamma.event.EventLog.current().removeSubscriber(sub);
+        }
         assertEquals(List.of("C"), second.sinkKeys(),
                 "A was admitted by c1 inside the window and must not reach the sink again");
         assertEquals(List.of("A"), second.duplicateKeys(),
                 "the cross-Consignment loser leaves on the duplicate relation, exactly like an in-batch loser");
         assertEquals(3, ledger.size(), "c2 claimed only the key it won");
+        assertEquals(1, dropped.size(), "one event for the one dedup node that dropped a row: " + dropped);
+        com.gamma.event.Event ev = dropped.get(0);
+        assertEquals("DEDUP_WIN", ev.pipeline());
+        assertEquals("c2", ev.correlationId(), "the batch id is the correlation id, as the taxonomy promises");
+        assertEquals("1", String.valueOf(ev.attributes().get("dropped")));
+        assertEquals("d", String.valueOf(ev.attributes().get("node")));
+    }
+
+    @Test
+    void aDedupThatDropsNothingEmitsNoEvent() throws Exception {
+        PipelineGraph g = windowedGraph("window(P4D)", "event_time DESC");
+        List<com.gamma.event.Event> dropped = new java.util.concurrent.CopyOnWriteArrayList<>();
+        java.util.function.Consumer<com.gamma.event.Event> sub = e -> {
+            if (com.gamma.event.EventType.DEDUP_RECORDS_DROPPED.equals(e.type())) dropped.add(e);
+        };
+        com.gamma.event.EventLog.current().addSubscriber(sub);
+        try {
+            runBatch(g, "('A', DATE '2026-08-02'), ('B', DATE '2026-08-02')", "c1",
+                    new RowShaper.ExecutionContext("pipe1", "c1", ledger));
+        } finally {
+            com.gamma.event.EventLog.current().removeSubscriber(sub);
+        }
+        assertTrue(dropped.isEmpty(), "a clean Consignment is not news: " + dropped);
     }
 
     @Test

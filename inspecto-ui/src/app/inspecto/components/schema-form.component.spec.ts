@@ -520,6 +520,40 @@ describe('InspectoSchemaFormComponent', () => {
             expect(control.dirty).toBe(true);
         });
 
+        it('gives a numeric field the host offers tokens for a TEXT input that holds the token un-coerced', () => {
+            // A native type="number" cannot display a `$`-token (it reads back blank), which is why INTEGER
+            // and DECIMAL job parameters had no reachable `$now.epoch_seconds`. With tokens offered the
+            // field is text + picker; without them it stays the native number widget, untouched.
+            const EPOCH: AttributeToken = { token: '$now.epoch_seconds', description: 'Fire time', preview: '1' };
+            const NUMS: AttributeSpec[] = [
+                { key: 'since', label: 'Since', type: 'number', tier: 'required', required: false, min: 0 },
+                { key: 'threads', label: 'Threads', type: 'number', tier: 'required', required: false },
+            ];
+            const fixture = create(NUMS, undefined, undefined, { tokens: { since: [EPOCH] }, tokenSyntax: SYNTAX });
+            // specs render in declaration order; formControlName is a property binding, not an attribute
+            const [since, threads] = Array.from(fixture.nativeElement.querySelectorAll('input')) as HTMLInputElement[];
+            expect(since.type).toBe('text');
+            expect(threads.type).toBe('number');
+            expect(pickers(fixture).map((b) => b.getAttribute('aria-label'))).toEqual(['Insert a runtime token into Since']);
+            expect(pickers(fixture)[0].closest('.mat-mdc-form-field-icon-suffix')).not.toBeNull();
+
+            const control = fixture.componentInstance.form.get('since')!;
+            control.setValue('abc');
+            expect(control.valid).toBe(false); // the numeric contract still bites on a text control
+            expect(fixture.componentInstance.errorFor(NUMS[0])).toBe('Since must be a number or a token');
+
+            control.setValue('-1');
+            expect(control.valid).toBe(false); // min still applies to a numeric literal
+
+            control.setValue('42');
+            expect(control.valid).toBe(true);
+            expect(fixture.componentInstance.value()['since']).toBe(42); // a literal comes back as a number
+
+            fixture.componentInstance.applyToken(NUMS[0], EPOCH);
+            expect(control.valid).toBe(true);
+            expect(fixture.componentInstance.value()['since']).toBe('$now.epoch_seconds'); // the token, verbatim
+        });
+
         it('exempts a token from the field format, so the picker cannot author a value Save refuses', () => {
             // Without the exemption every date/instant/email field marks the token invalid the moment it
             // lands — the picker offers it, the form rejects it, and the feature is decorative.

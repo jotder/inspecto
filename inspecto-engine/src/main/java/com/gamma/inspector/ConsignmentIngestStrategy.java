@@ -454,8 +454,8 @@ interface ConsignmentIngestStrategy {
     // Its replacement already exists and is better: RowShaper.dedup (pipeline/exec) computes the same
     // ROW_NUMBER window but emits the losers as a first-class `duplicate` relation instead of counting
     // and discarding them — so the rows this lane could only report as a number are inspectable there.
-    // A consequence worth knowing: EventType.DEDUP_RECORDS_DROPPED now has NO emitter. The constant is
-    // deliberately kept — the taxonomy is public and the Stage-2 executor is the right place to emit it.
+    // EventType.DEDUP_RECORDS_DROPPED was emitter-less from that day until 2026-09-06, when
+    // PipelineExecutor.emitDedupDropped took it over — the Stage-2 executor was always the right place.
 
     /** The reference system columns a versioned store carries (§2.1) — never part of the payload hash. */
     List<String> REF_SYSTEM_COLUMNS =

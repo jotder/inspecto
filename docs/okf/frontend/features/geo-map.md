@@ -55,3 +55,13 @@ Geocoder — never "marker/pin" in model names).
 Plan + gotchas (rAF hidden-page stall, absolute style URLs, seed-once localStorage) — archived:
 [`geo-map-analysis-plan.md`](../../../archived-documents/plans-archive/geo-map-analysis-plan.md) ·
 case-study pack: [`geo-map-case-studies.md`](../../../superpower/geo-map-case-studies.md).
+
+## Case studies (CS1–CS5)
+
+Five deterministic, seeded case studies ship with the Geo Map studio — each an LCG-seeded generated
+dataset paired with a saved Dataset + Geo View, and each built to push one boundary (CS1: the
+`GEO_POINT_CAP = 5000` cap plus the 25-broken-row skip banner at 5,665 rows). Their invariants are pinned by
+`studio/geo-map/geo-case-studies.spec.ts`, so an edit cannot silently change what a case study demonstrates.
+The pack's original write-up (2026-08) is archived at
+[`archived-documents/plans-archive/geo-map-case-studies.md`](../../../archived-documents/plans-archive/geo-map-case-studies.md);
+the spec, not the write-up, is the source of truth for what each case shows.

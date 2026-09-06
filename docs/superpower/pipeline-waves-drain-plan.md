@@ -323,7 +323,7 @@ sequence out in four steps, and **two of them are unmet**:
 |---|---|
 | 1. one-shot converter (`inspecto migrate-configs`) | ✅ exists (amended **2026-08-18**, `f72f7fc8`) |
 | 2. parity gate — the full suite green **through the compiled-recipe path** before any legacy path goes | ⚠ unverified here |
-| 3. legacy read path **kept behind a flag** for one verification minor | 🔴 **THE FLAG DOES NOT EXIST.** `legacy` appears 242× in main source as identifiers and prose; there is no system property or gate anywhere that disables the legacy read path |
+| 3. legacy read path **kept behind a flag** for one verification minor | ✅ **BUILT 2026-09-02** — `-Dingest.lane=auto\|graph\|flat` (`ConsignmentIngestStrategy.LANE_PROPERTY`, default `auto`; `graph` disables the flat lane), pinned by `IngestLaneFlagTest`. (Until then this cell read "THE FLAG DOES NOT EXIST" — true when written 2026-08-31.) |
 | 4. the release | 🔴 newest tag **`v3.12.0` shipped 2026-06-05** — ten weeks BEFORE the converter — and is **not an ancestor of `master`** |
 
 ⇒ **Two independent reasons row 15 cannot close by writing code**: no release has ever carried a flagged

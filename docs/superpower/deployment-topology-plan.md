@@ -237,7 +237,7 @@ Overlays are **optional and composable per client policy**. Status: ✅ shipped 
 | 3.10 | **Air gap** | No required external services; embedded runtime; hosted-AI SDKs isolated out of core (NFR-4); IAM must be on-prem (Keycloak) | ✅ |
 | 3.11 | **Write gate (all editions)** | `-Dassist.write.root` absent → all mutation routes 503 `CONTROL_PLANE_READ_ONLY` (SEC-9) — a legitimate read-only boot mode for the legacy/default space; **boot-time only**, and discovered multi-space roots are always writable | ⚠️ nuance |
 | 3.12 | **FIPS (Gov)** | Pattern: JVM FIPS provider under the same `HttpsServer` seam | 🔭 not validated → D7 |
-| 3.13 | **Network posture** | ⚠️ GAP-1: server binds all interfaces, no bind flag — mitigate with OS firewall / private subnet until shipped; single-origin CORS `-Dcontrol.cors` | ⚠️ |
+| 3.13 | **Network posture** | ✅ GAP-1 CLOSED 2026-08-29: `-Dcontrol.bind=<host-or-IP>` restricts the bind address on both the HTTP and HTTPS paths (`ControlApi`); single-origin CORS `-Dcontrol.cors` | ✅ |
 
 Compliance policy mapping (SOC 2 / ISO 27001 / FedRAMP / HIPAA / PCI scoping) is owned by
 [`compliance-certifications-plan.md`](compliance-certifications-plan.md); this matrix is its technical inventory.

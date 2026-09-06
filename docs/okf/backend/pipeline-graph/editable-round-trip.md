@@ -485,3 +485,14 @@ UI side: [Grammar configuration](../../frontend/features/grammar-config.md).
 - The UI's Duplicate + row export still ride the client stream-bundle — migration onto these
   routes is the BACKLOG follow-up; the metadata bundle's `authored-pipeline` kind stays serving
   grandfathered flows only.
+
+## Every fixture survives the round trip — the standing gate (W0, proven 2026-09-06)
+
+`LiftLowerFixtureSweepTest` (inspecto-engine) runs every `spaces/**/*_pipeline.toon` in the repo through the
+editor's own seam — `PipelineEditable.toMap(cfg, raw)` → `PipelineCodec.fromMap` → a **strict** `lower` over the
+original — and asserts the decoded original comes back verbatim (modulo the always-written `active`). All 22
+fixtures pass, which is the proof the unification plan's W0 asked for before W4/W5. ⚠ The proof is about
+THIS seam: a first cut used `PipelineLift.lift(cfg)` alone and every fixture "failed", because the bare lift
+materialises engine defaults (`duckdb_threads=0`) and typed records (`PostActionConfig[…]`) that the editable
+projection strips — that is the projection's business, not a loss. `RecipeConverterTest` gates the recipe
+projection over the same fixtures; a hand-authored fixture must pass both before it is committed.

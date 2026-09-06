@@ -1199,10 +1199,12 @@ reframes each 2026-08-10 finding. Read this section INSTEAD of re-deriving from 
    `PipelineLift` itself, not a second copy.
 2. **`branchCommitLog` HAS a durable home**: `dirs.temp()/branch_commit_<batchId>.log`
    (`graphWriteAndTrace:250-252`), fsync-per-record (`BranchCommitLog`). The one remainder is
-   **growth**: nothing deletes the per-batch files (verified — no delete anywhere in the class or
-   its callers). Zero-code housekeeping exists today: a `cleanup` maintenance job on `dirs.temp`
-   with `glob: branch_commit_*.log` + `retention_days`. A delete-on-successful-commit in
-   `BatchProcessor.commit`'s tail is the code option (small) if temp growth ever matters.
+   **growth** — ✅ re-grounded 2026-09-06: a successful commit DOES delete its log
+   (`ConsignmentIngestor.commit` after `finalizeSource`, and `DrainCommand.drain` at its own success
+   tail); a FAILED batch keeps it for the coordinator to resume from. Only the failed-and-abandoned
+   case grows, and a `cleanup` maintenance job on `dirs.temp` with `glob: branch_commit_*.log` +
+   `retention_days` covers it. (The earlier "nothing deletes" reading named `BatchProcessor`, a class
+   this codebase does not have.)
 3. **Dedup parity is SHIPPED and BETTER than legacy** (2026-08-11 operator decision): legacy
    in-line dedup was deleted; `processing.dedup` lifts to a `transform.dedup` node and
    `RowShaper.dedup` emits losers as an inspectable `duplicate` relation (legacy only logged a
@@ -1222,9 +1224,9 @@ routing and versioned reference stores are refused by name when combined with ro
 that is the contract, not a gap; do not re-file either as work without a demand case that names a
 real pipeline. **⇒ Phase 4 S4 and Phase 6 are UNBLOCKED**, with two preconditions carried into
 their slices:
-- **S4 precondition (small):** commit-log housekeeping — today a `cleanup` maintenance job on
-  `dirs.temp` with `glob: branch_commit_*.log`; a delete-on-successful-commit in
-  `BatchProcessor.commit`'s tail is the code option if temp growth matters.
+- **S4 precondition (small):** commit-log housekeeping — ✅ already coded: a successful commit deletes
+  its `branch_commit_<batchId>.log` (`ConsignmentIngestor.commit`); abandoned failures are a `cleanup`
+  job on `dirs.temp` with `glob: branch_commit_*.log`.
 - **Phase 6 precondition (real work, scoped in its slice):** deleting the legacy lane needs the
   graph lane to carry NON-route pipelines with proven output parity (an output-comparison test of
   the two lanes on the same non-route pipeline) — and that extension re-opens item (1): move
