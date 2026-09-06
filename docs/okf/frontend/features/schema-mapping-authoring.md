@@ -147,8 +147,10 @@ catalog and by persisting `fields[]`.
   runs a DuckDB `auto_detect` sniff and returns per-column types (`ParserRoutes.java:111-113`). Stateless —
   writes nothing.
 - **Save:** `ConfigService.write('schema', config, {overwrite:true, ...compatibility})` (`:249-253`) →
-  `POST /config/write type=schema`, persisted as `<name>_schema.toon` beside `<name>_mapping.csv`
-  (`ConfigFileSupport.java:74-115`).
+  `POST /config/write type=schema`, persisted as `<name>_schema.toon` beside `<name>_mapping.csv` and — since
+  STRUCTURE-CSV-1 (2026-09-06) — `<name>_structure.csv` for `raw.fields` (`StructureCsv`, `ConfigFileSupport`),
+  both merged back on read so the UI always sees the conflated document. A field with a key the CSV cannot hold
+  (`timezone`, `partitions`, …) keeps the whole list inline; the sibling is then removed.
 - **Editing an existing schema is real and gated:** a backward-compatibility diff,
   `SchemaCompatibility.check(existing, draft)` (`inspecto-config/.../safety/SchemaCompatibility.java:48-82`),
   flags removed fields, non-widening type changes, and moved selectors as ERROR findings, mapped back onto

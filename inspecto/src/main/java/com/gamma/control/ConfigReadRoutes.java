@@ -5,6 +5,7 @@ import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.service.PipelineDataDirs;
 import com.gamma.service.PipelineDependents;
 import com.gamma.util.MappingCsv;
+import com.gamma.util.StructureCsv;
 import com.sun.net.httpserver.HttpExchange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -128,8 +129,11 @@ final class ConfigReadRoutes implements RouteModule {
         }
 
         Files.delete(target);
-        // Split storage (schema): the sibling _mapping.csv is part of the component — discard it too.
-        if ("schema".equals(type)) Files.deleteIfExists(MappingCsv.siblingFor(target));
+        // Split storage (schema): the sibling _structure.csv / _mapping.csv are part of the component — discard them too.
+        if ("schema".equals(type)) {
+            Files.deleteIfExists(StructureCsv.siblingFor(target));
+            Files.deleteIfExists(MappingCsv.siblingFor(target));
+        }
         if ("pipeline".equals(type)) {
             api.service().unregisterPipeline(target);   // drop the ghost row instead of waiting for the next poll cycle
         } else if ("enrichment".equals(type)) {
@@ -230,8 +234,8 @@ final class ConfigReadRoutes implements RouteModule {
         if (!Files.isRegularFile(target)) throw new ApiException(404, "no such config: " + rel);
 
         Map<String, Object> config = ConfigLoader.filesystem().decode(target.toString());
-        // Split storage (schema): serve the conflated view — sibling _mapping.csv rules merged in.
-        if ("schema".equals(type)) ConfigFileSupport.mergeSiblingMapping(target, config);
+        // Split storage (schema): serve the conflated view — sibling _structure.csv fields + _mapping.csv rules merged in.
+        if ("schema".equals(type)) ConfigFileSupport.mergeSiblings(target, config);
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("type", type);
         r.put("name", fileName);

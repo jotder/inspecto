@@ -12,6 +12,7 @@ import com.gamma.config.spec.Severity;
 import com.gamma.etl.SchemaMappingDrift;
 import com.gamma.util.AtomicFiles;
 import com.gamma.util.MappingCsv;
+import com.gamma.util.StructureCsv;
 import com.sun.net.httpserver.HttpExchange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -171,6 +172,9 @@ final class ConfigWriteRoutes implements RouteModule {
         // cell-level findings. Escape hatches: copy to a new name, or the explicit override below.
         if ("schema".equals(type) && exists && !compatibilityOverridden(body)) {
             Map<String, Object> current = ConfigLoader.filesystem().decode(target.toString());
+            // STRUCTURE-CSV-1: a split schema keeps its fields in the sibling CSV — without merging it the
+            // gate would see NO fields on disk and wave every edit through.
+            ConfigFileSupport.mergeSiblingStructure(target, current);
             List<Finding> breaking = SchemaCompatibility.check(current, draft);
             if (!breaking.isEmpty()) {
                 findings.addAll(breaking);
@@ -181,11 +185,12 @@ final class ConfigWriteRoutes implements RouteModule {
 
         // Encode and write atomically: a partial/concurrent reader never sees a half-written file.
         Map<String, Object> toWrite = draft;
-        String mappingRel = null;
+        String mappingRel = null, structureRel = null;
         if ("schema".equals(type)) {
             SchemaSplit split = splitMapping(writeRoot, target, draft);
             toWrite = split.structure();
             mappingRel = split.mappingRel();
+            structureRel = split.structureRel();
         }
         byte[] bytes = ConfigCodec.toToon(toWrite).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(target, bytes, ".cfg-");
@@ -197,6 +202,7 @@ final class ConfigWriteRoutes implements RouteModule {
         r.put("written", true);
         r.put("path", rel);
         if (mappingRel != null) r.put("mappingPath", mappingRel);
+        if (structureRel != null) r.put("structurePath", structureRel);
         r.put("name", safeIdentity);
         r.put("bytes", bytes.length);
         r.put("overwritten", exists);
@@ -209,33 +215,49 @@ final class ConfigWriteRoutes implements RouteModule {
         return "none".equalsIgnoreCase(String.valueOf(body.get("compatibility")));
     }
 
-    /** A schema draft split for persistence: the structure map (no {@code mapping.rules}) + the CSV's rel path. */
-    private record SchemaSplit(Map<String, Object> structure, String mappingRel) {}
+    /** A schema draft split for persistence: the TOON remainder + the rel paths of the sibling CSVs written. */
+    private record SchemaSplit(Map<String, Object> structure, String mappingRel, String structureRel) {}
 
     /**
-     * Split-write for the Schema/Mapping separation (ELT amendment Phase 1 slice 2): a schema draft's
-     * {@code mapping.rules} are persisted as the sibling {@code <name>_mapping.csv} (the shape the
-     * engine's slice-1 dual-read consumes) and stripped from the TOON. A draft without rules writes
-     * the TOON unchanged — an existing sibling CSV then remains the mapping source of truth.
+     * Split-write for the Schema/Mapping separation (ELT amendment Phase 1 slice 2 + STRUCTURE-CSV-1): a
+     * schema draft's {@code mapping.rules} are persisted as the sibling {@code <name>_mapping.csv} and its
+     * {@code raw.fields} as {@code <name>_structure.csv} (the shapes the engine's dual-read consumes), both
+     * stripped from the TOON. A draft without rules writes the TOON unchanged — an existing sibling mapping CSV
+     * then remains the mapping source of truth. Fields are split only when {@link StructureCsv#splittable}
+     * (every field key has a column); a list carrying {@code timezone}/{@code partitions}/… stays inline
+     * and a stale structure sibling is REMOVED, so the sibling can never shadow the fields just written.
      */
     @SuppressWarnings("unchecked")
     private static SchemaSplit splitMapping(Path writeRoot, Path target, Map<String, Object> draft)
             throws IOException {
-        Object mappingObj = draft.get("mapping");
-        if (!(mappingObj instanceof Map<?, ?> mapping)) return new SchemaSplit(draft, null);
-        Object rulesObj = mapping.get("rules");
-        if (!(rulesObj instanceof List<?> rules) || rules.isEmpty()) return new SchemaSplit(draft, null);
-
-        Path csv = MappingCsv.siblingFor(target);
-        String text = MappingCsv.encode((List<? extends Map<String, ?>>) rules);
-        AtomicFiles.write(csv, text.getBytes(StandardCharsets.UTF_8), ".map-");
-
         Map<String, Object> structure = new LinkedHashMap<>(draft);
-        Map<String, Object> mappingRest = new LinkedHashMap<>(mapAt(draft, "mapping"));
-        mappingRest.remove("rules");
-        if (mappingRest.isEmpty()) structure.remove("mapping");
-        else structure.put("mapping", mappingRest);
-        return new SchemaSplit(structure, writeRoot.relativize(csv).toString().replace('\\', '/'));
+        String mappingRel = null, structureRel = null;
+
+        if (draft.get("mapping") instanceof Map<?, ?> mapping
+                && mapping.get("rules") instanceof List<?> rules && !rules.isEmpty()) {
+            Path csv = MappingCsv.siblingFor(target);
+            String text = MappingCsv.encode((List<? extends Map<String, ?>>) rules);
+            AtomicFiles.write(csv, text.getBytes(StandardCharsets.UTF_8), ".map-");
+            Map<String, Object> mappingRest = new LinkedHashMap<>(mapAt(draft, "mapping"));
+            mappingRest.remove("rules");
+            if (mappingRest.isEmpty()) structure.remove("mapping");
+            else structure.put("mapping", mappingRest);
+            mappingRel = writeRoot.relativize(csv).toString().replace('\\', '/');
+        }
+
+        Path structureCsv = StructureCsv.siblingFor(target);
+        if (draft.get("raw") instanceof Map<?, ?> raw && raw.get("fields") instanceof List<?> fields
+                && StructureCsv.splittable(fields)) {
+            String text = StructureCsv.encode((List<? extends Map<String, ?>>) fields);
+            AtomicFiles.write(structureCsv, text.getBytes(StandardCharsets.UTF_8), ".str-");
+            Map<String, Object> rawRest = new LinkedHashMap<>(mapAt(draft, "raw"));
+            rawRest.remove("fields");
+            structure.put("raw", rawRest);
+            structureRel = writeRoot.relativize(structureCsv).toString().replace('\\', '/');
+        } else {
+            Files.deleteIfExists(structureCsv);
+        }
+        return new SchemaSplit(structure, mappingRel, structureRel);
     }
 
     /**
@@ -287,7 +309,7 @@ final class ConfigWriteRoutes implements RouteModule {
         Map<String, Object> existing = ConfigLoader.filesystem().decode(target.toString());
         // Split storage (schema): patch over the CONFLATED view, so a partial draft can address
         // mapping.rules whether they live inline or in the sibling CSV.
-        if ("schema".equals(type)) ConfigFileSupport.mergeSiblingMapping(target, existing);
+        if ("schema".equals(type)) ConfigFileSupport.mergeSiblings(target, existing);
         Map<String, Object> merged = deepMerge(existing, patch);
 
         // The filename derives from the identity field, so a patch may not move it — a renamed
@@ -337,11 +359,12 @@ final class ConfigWriteRoutes implements RouteModule {
         }
 
         Map<String, Object> toWrite = merged;
-        String mappingRel = null;
+        String mappingRel = null, structureRel = null;
         if ("schema".equals(type)) {
             SchemaSplit split = splitMapping(writeRoot, target, merged);
             toWrite = split.structure();
             mappingRel = split.mappingRel();
+            structureRel = split.structureRel();
         }
         byte[] bytes = ConfigCodec.toToon(toWrite).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(target, bytes, ".cfg-");
@@ -352,6 +375,7 @@ final class ConfigWriteRoutes implements RouteModule {
         r.put("written", true);
         r.put("path", rel);
         if (mappingRel != null) r.put("mappingPath", mappingRel);
+        if (structureRel != null) r.put("structurePath", structureRel);
         r.put("name", fileName);
         r.put("bytes", bytes.length);
         r.put("overwritten", true);

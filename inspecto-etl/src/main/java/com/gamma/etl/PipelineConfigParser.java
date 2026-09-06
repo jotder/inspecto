@@ -16,6 +16,7 @@ import com.gamma.etl.PipelineConfig.Reference;
 import com.gamma.etl.PipelineConfig.Retry;
 import com.gamma.etl.PipelineConfig.Stability;
 import com.gamma.util.MappingCsv;
+import com.gamma.util.StructureCsv;
 import com.gamma.util.ToonHelper;
 import dev.toonformat.jtoon.JToon;
 import org.slf4j.Logger;
@@ -664,6 +665,7 @@ final class PipelineConfigParser {
                     throw new FileNotFoundException("Schema file not found: " + schemaPath);
                 Map<String, Object> schemaCfg = (Map<String, Object>)
                         JToon.decode(Files.readString(schemaFile, StandardCharsets.UTF_8));
+                mergeSiblingStructure(schemaCfg, schemaFile, b);
                 mergeSiblingMapping(schemaCfg, schemaFile, b);
                 Identifiers.validateSchema(schemaCfg, "schemas[col=" + colCount + "]");
                 requireZoneForTimestampTz(schemaCfg, b.sourceTimezone, "schemas[col=" + colCount + "]");
@@ -703,6 +705,7 @@ final class PipelineConfigParser {
                     throw new FileNotFoundException("Schema file not found: " + schemaPath);
                 b.singleSchema = (Map<String, Object>)
                         JToon.decode(Files.readString(schemaFile, StandardCharsets.UTF_8));
+                mergeSiblingStructure(b.singleSchema, schemaFile, b);
                 mergeSiblingMapping(b.singleSchema, schemaFile, b);
                 applyMappingFile(proc, b.singleSchema, configDir, b);
                 Identifiers.validateSchema(b.singleSchema, "schema_file");
@@ -1113,6 +1116,7 @@ final class PipelineConfigParser {
                     throw new FileNotFoundException("Segment schema not found for '" + key + "': " + schemaPath);
                 Map<String, Object> schema = (Map<String, Object>)
                         JToon.decode(Files.readString(schemaFile, StandardCharsets.UTF_8));
+                mergeSiblingStructure(schema, schemaFile, b);
                 mergeSiblingMapping(schema, schemaFile, b);
                 Identifiers.validateSchema(schema, "segment[" + key + "]");
                 requireZoneForTimestampTz(schema, b.sourceTimezone, "segment[" + key + "]");
@@ -1223,6 +1227,31 @@ final class PipelineConfigParser {
             resolved = candidate.startsWith(base) && Files.exists(candidate) ? candidate : asAuthored;
         }
         return PathJail.requireUnderAny(PathJail.allowedRoots(), resolved.toString(), field);
+    }
+
+    // ── sibling Structure CSV (STRUCTURE-CSV-1, 2026-09-06) ───────────────────
+
+    /**
+     * Dual-read for the schema's <em>structure</em> half (ELT final amendment §3.2 first table): if a sibling
+     * {@code <name>_structure.csv} exists next to the resolved schema file, its rows <b>replace</b> the
+     * schema's inline {@code raw.fields}. Same idiom, same merge point and same sibling naming as
+     * {@link #mergeSiblingMapping}; additive when absent.
+     */
+    private static void mergeSiblingStructure(Map<String, Object> schema, Path schemaFile, Builder b)
+            throws IOException {
+        Path csv = StructureCsv.siblingFor(schemaFile);
+        if (!Files.exists(csv)) return;
+        List<Map<String, String>> fields =
+                StructureCsv.parse(Files.readString(csv, StandardCharsets.UTF_8), csv.toString());
+        Map<String, Object> raw = castMapAt(schema, "raw");
+        if (raw == null) {
+            raw = new LinkedHashMap<>();
+            schema.put("raw", raw);
+        }
+        raw.put("fields", fields);
+        b.referencedFiles.add(csv);
+        log.info("[CONFIG] Structure CSV {} overrides raw.fields of {} ({} field(s))",
+                csv.getFileName(), schemaFile.getFileName(), fields.size());
     }
 
     // ── sibling Mapping CSV (ELT amendment Phase 1 slice 1) ───────────────────

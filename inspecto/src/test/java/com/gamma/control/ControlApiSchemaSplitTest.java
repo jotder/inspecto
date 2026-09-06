@@ -75,13 +75,19 @@ class ControlApiSchemaSplitTest {
             assertEquals(200, w.statusCode(), w.body());
             JsonNode out = V1Body.of(w.body());
             assertEquals("ev_mapping.csv", out.get("mappingPath").asText());
+            assertEquals("ev_structure.csv", out.get("structurePath").asText(), "STRUCTURE-CSV-1");
 
-            // On disk: TOON without rules + sibling CSV with them.
+            // On disk: TOON without rules or fields + two sibling CSVs with them.
             String toon = Files.readString(root.resolve("ev.toon"), StandardCharsets.UTF_8);
             assertFalse(toon.contains("GROSS"), "rules are NOT in the TOON:\n" + toon);
+            assertFalse(toon.contains("QTY"), "fields are NOT in the TOON either:\n" + toon);
             assertTrue(toon.contains("canonicalName"), "the rest of the mapping block survives");
+            assertTrue(toon.contains("format"), "the rest of the raw block survives");
             String csv = Files.readString(root.resolve("ev_mapping.csv"), StandardCharsets.UTF_8);
             assertTrue(csv.contains("GROSS"), "rules live in the sibling CSV");
+            String structure = Files.readString(root.resolve("ev_structure.csv"), StandardCharsets.UTF_8);
+            assertTrue(structure.startsWith("field,type,selector,unit,description,classification\n"), structure);
+            assertTrue(structure.contains("QTY,INTEGER,1"), "fields live in the structure CSV:\n" + structure);
 
             // Read-back is the conflated view the author sent (round-trip).
             JsonNode read = V1Body.of(send(c.port, "GET", "/config/schema/ev", null).body());
@@ -89,6 +95,46 @@ class ControlApiSchemaSplitTest {
             assertEquals(2, rules.size(), "sibling CSV merged back on read");
             assertEquals("TRY_CAST(QTY AS DOUBLE) * 2, 0 + 1",
                     rules.get(1).get("sourceExpression").asText(), "commas survive the CSV hop");
+            JsonNode fields = read.get("config").get("raw").get("fields");
+            assertEquals(2, fields.size(), "structure sibling merged back on read");
+            assertEquals("QTY", fields.get(1).get("name").asText());
+            assertEquals("INTEGER", fields.get(1).get("type").asText());
+
+            // A re-save of the split schema still meets the BACKWARD gate against the ON-DISK fields: dropping
+            // ID is refused, which proves the gate read the structure sibling (the TOON alone has no fields).
+            String dropsId = """
+                    {"type":"schema","overwrite":true,"config":{
+                       "raw":{"name":"ev","format":"CSV","fields":[
+                          {"name":"QTY","selector":"1","type":"INTEGER"}]}}}""";
+            HttpResponse<String> narrow = send(c.port, "POST", "/config/write", dropsId);
+            assertEquals(422, narrow.statusCode(), "the compatibility gate must see the split fields: " + narrow.body());
+        }
+    }
+
+    /** STRUCTURE-CSV-1: a field carrying a key the CSV has no column for keeps the list inline and drops a stale sibling. */
+    @Test
+    void fieldsTheCsvCannotHoldStayInlineAndRemoveAStaleStructureSibling(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            assertEquals(200, send(c.port, "POST", "/config/write", schemaDraft("INTEGER", false, "")).statusCode());
+            assertTrue(Files.exists(root.resolve("ev_structure.csv")));
+            String widened = """
+                {"type":"schema","overwrite":true,"compatibility":"none","config":{
+                   "raw":{"name":"ev","format":"CSV","fields":[
+                      {"name":"ID","selector":"0","type":"VARCHAR"},
+                      {"name":"QTY","selector":"1","type":"INTEGER"},
+                      {"name":"TS","selector":"2","type":"TIMESTAMPTZ","timezone":"Europe/Paris"}]},
+                   "mapping":{"canonicalName":"ev","rules":[
+                      {"targetColumn":"ID","sourceExpression":"ID","transformType":"DIRECT"}]}}}
+                """;
+            HttpResponse<String> w = send(c.port, "POST", "/config/write", widened);
+            assertEquals(200, w.statusCode(), w.body());
+            assertNull(V1Body.of(w.body()).get("structurePath"), "no structure sibling for an unsplittable list");
+            assertFalse(Files.exists(root.resolve("ev_structure.csv")), "the stale sibling must not shadow the inline fields");
+            String toon = Files.readString(root.resolve("ev.toon"), StandardCharsets.UTF_8);
+            assertTrue(toon.contains("Europe/Paris"), "fields stay inline, timezone included:\n" + toon);
+            JsonNode fields = V1Body.of(send(c.port, "GET", "/config/schema/ev", null).body())
+                    .get("config").get("raw").get("fields");
+            assertEquals(3, fields.size());
         }
     }
 
@@ -176,6 +222,7 @@ class ControlApiSchemaSplitTest {
             assertEquals(200, send(c.port, "DELETE", "/config/schema/ev", null).statusCode());
             assertFalse(Files.exists(root.resolve("ev.toon")));
             assertFalse(Files.exists(root.resolve("ev_mapping.csv")), "sibling is part of the component");
+            assertFalse(Files.exists(root.resolve("ev_structure.csv")), "so is the structure sibling");
         }
     }
 }

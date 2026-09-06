@@ -37,7 +37,7 @@ a new dependency — not a build. The rule that fell out: **a P1 must name the f
 cannot is a decision (§1) or a design (P2).
 
 Do next, in order (all decided 2026-09-06, all P1):
-1. **STRUCTURE-CSV-1** · **SEC-07-GATE** · **DATA-GOV-SYNTH** · **OPEN-DAG-S1** — the larger builds.
+1. **SEC-07-GATE** · **DATA-GOV-SYNTH** · **OPEN-DAG-S1** — the larger builds.
 2. **Release notes for the next MAJOR** — keep appending (§2). **Step Processor catalog** — pick a partial by name (§3).
 
 ## 1. Operator decisions pending
@@ -78,7 +78,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 ### Authoring (Parse / Transform / pipeline editor)
 
 - **P2** · **WORKBENCH-S4** — the one-surface Step workbench (input-relation picker, column filter, grouping beside the field list); `RowShaper.fuse` is delete-or-wire (tested, caller-less, "last projection wins"). → `okf/backend/engine/catalog-vs-executors.md` §distilled
-- **P1** · **STRUCTURE-CSV-1** — a `<name>_structure.csv` sibling (`field,type,selector,unit,description,classification`) with the `_mapping.csv` split-read/split-write idiom (decided BUILD 2026-09-06). → `superpower/elt-final-amendment-plan.md` §3.2
 
 - **P2** · **AUTHORING-REDESIGN-1** — open letters (decisions (j)(l)(n2)(o) are in §1; (f)(g)(m) SHIPPED 2026-09-06 — `JOIN_REFERENCE_MISSING`/`JOIN_ON_MISSING`/`UNKNOWN_JOIN_REFERENCE` at save, `SchemaMappingDrift` on all three schema save paths, `?pipeline=` sent by the UI): (c) v2 structured AST table over the SQL for WHERE/JOIN editing — 🔴 precondition: probe that the `json` extension loads on the SEALED `SqlSandbox` connection; (d) v3 macros as the UDF registry (per-connection re-creation in `EnrichmentEngine`, `PipelineJobRunner`, `BatchIngestStrategy`, preview) — demand-gated; (e) column metadata editing on the Transform pane (Parse D2) — needs a backend home for metadata on a `transform.sql` node first; (i) per-row "sample resolves to" line — no host resolves a sample against an `AttributeSpec`. Still open on (f): which COLUMNS the reference carries is the dry-run's question (it reads the store); the save checks existence and `on` presence only. → `okf/frontend/features/schema-mapping-authoring.md` §0
 - **P2** · **Step Processor catalog** — 121 processors: 34 delivered / **16 partial / 69 planned** (`transform.lookup` DELIVERED 2026-09-06). Each partial is a product decision (Kafka consumer, XPath grammar, drift report, profiler, resampler, KPI layer, Jinja, graph tagging, commit controller, SLA object, view/email/webhook sinks…) — pick one by name. → `EDITIONS.md` §Step Processors · `okf/backend/pipeline-graph/step-catalog.md`

@@ -1,6 +1,7 @@
 package com.gamma.control;
 
 import com.gamma.util.MappingCsv;
+import com.gamma.util.StructureCsv;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -119,10 +120,29 @@ final class ConfigFileSupport {
     private static final int SATELLITE_SCAN_DEPTH = 3;
 
     /**
-     * The read-side of the split: merge a schema file's sibling {@code _mapping.csv} (if any) into
-     * its decoded map, so clients always see the conflated shape they authored — the same dual-read
-     * the engine's {@code PipelineConfigParser} performs.
+     * The read-side of the split: merge a schema file's sibling {@code _structure.csv} (STRUCTURE-CSV-1) /
+     * {@code _mapping.csv} (if any) into its decoded map, so clients always see the conflated shape they
+     * authored — the same dual-read the engine's {@code PipelineConfigParser} performs.
      */
+    static void mergeSiblingStructure(Path schemaFile, Map<String, Object> config) throws IOException {
+        Path csv = StructureCsv.siblingFor(schemaFile);
+        if (!Files.exists(csv)) return;
+        List<Map<String, String>> fields =
+                StructureCsv.parse(Files.readString(csv, StandardCharsets.UTF_8), csv.toString());
+        Map<String, Object> raw = mapAt(config, "raw");
+        if (raw == null) {
+            raw = new LinkedHashMap<>();
+            config.put("raw", raw);
+        }
+        raw.put("fields", fields);
+    }
+
+    /** Both halves of the split, read back over the TOON: structure first, then mapping (STRUCTURE-CSV-1). */
+    static void mergeSiblings(Path schemaFile, Map<String, Object> config) throws IOException {
+        mergeSiblingStructure(schemaFile, config);
+        mergeSiblingMapping(schemaFile, config);
+    }
+
     static void mergeSiblingMapping(Path schemaFile, Map<String, Object> config) throws IOException {
         Path csv = MappingCsv.siblingFor(schemaFile);
         if (!Files.exists(csv)) return;

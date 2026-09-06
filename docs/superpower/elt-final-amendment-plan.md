@@ -587,8 +587,17 @@ resolved** — `processing.schema_file: schema/<id>` now executes the registry c
 **Phase 1 remaining:** the schema *structure* CSV shape (§3.2 first table) — schemas persist as
 TOON for now. ⚠ **Its gate is SPENT (noted 2026-08-29): "revisit with Phase 2's type flow" — and Phase 2
 is fully closed** (see P2 S5, 2026-08-06). So this is not deferred work waiting on a prerequisite; it is
-unblocked work nobody went back to. **Decided 2026-09-06: BUILD** — a `<name>_structure.csv` sibling with the same
-split-read/split-write idiom as `_mapping.csv` (BACKLOG §3 `STRUCTURE-CSV-1`).
+unblocked work nobody went back to. **Decided 2026-09-06: BUILD — and SHIPPED the same day** (`STRUCTURE-CSV-1`):
+`StructureCsv` (inspecto-util) is the twin of `MappingCsv` — header `field,type,selector,unit,description,classification`
+(`name` accepted for `field`), blank optional cells omitted on read; the engine's `PipelineConfigParser` dual-reads
+a sibling `<name>_structure.csv` over `raw.fields` at the same three merge points as `_mapping.csv`; the control
+plane's `GET /config/schema/<name>` merges it back, `DELETE` removes it, `/config/write` + `/config/patch` split it
+out (response `structurePath`) and merge it into the on-disk view BEFORE the BACKWARD gate — without that the gate
+would see no fields on disk and wave every edit through. ⚠ A field carrying a key the CSV has no column for
+(`timezone`, `timezone_column`, `partitions`, …) is NOT split: the list stays inline and a stale sibling is deleted so
+it can never shadow the fields just written. Registry schemas (`registry/schemas/<id>.toon`) and the
+`PipelineSettingsRoutes` byte-copy of a schema file are untouched — the same coverage the mapping sibling has.
+Phase 1 is now COMPLETE.
 
 #### Phase 2 GROUNDED 2026-08-05 — findings that shape the slices
 
