@@ -49,8 +49,12 @@ if (!['Personal', 'Standard', 'Enterprise'].includes(edition)) {
 
 // ── the shipped module set per edition — the SAME table package.ps1 stages from ──────────────
 // artifactId → bundle file. `inspecto/` is artifactId inspecto-processor (the one dir≠artifactId).
-const SHIPPED = { 'inspecto-processor': 'inspecto.jar' };
-const plModules = ['inspecto'];
+// CONNECTORS-BUNDLE-1 (2026-09-07): the connector sidecar ships in EVERY edition, so it belongs in
+// every SBOM. It is what brings sshj/BouncyCastle, commons-net, kafka-clients and javax.mail into a
+// deployment -- deliberately absent from the lean core, and previously absent from the bundle too,
+// which is why they never appeared in a shipped SBOM despite being reactor-governed.
+const SHIPPED = { 'inspecto-processor': 'inspecto.jar', 'inspecto-connectors': 'inspecto-connectors.jar' };
+const plModules = ['inspecto', 'inspecto-connectors'];
 let profile = null;
 if (edition !== 'Personal') {
     SHIPPED['inspecto-security'] = 'inspecto-security.jar';

@@ -358,8 +358,11 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   derives the classpath at launch and gets the rule below right *by construction*. Read on before editing it.
   `inspecto-connectors` is an *optional* ServiceLoader module carrying `SmtpEmailChannel`, and it
   is deliberately **not** in `inspecto`'s dependency tree — putting its `target/classes` on the classpath makes
-  `NotificationService.discoverChannels` find a channel whose `javax.mail` dep was never shipped, and boot dies
-  with `NoClassDefFoundError: javax/mail/Message`. Derive the list from
+  `NotificationService.discoverChannels` find a channel whose `javax.mail` dep is not there, and boot dies
+  with `NoClassDefFoundError: javax/mail/Message`. ⚠ **Still true for a hand-built DEV classpath, but no longer
+  true of a bundle**: since 2026-09-07 (CONNECTORS-BUNDLE-1) the module ships as the SHADED
+  `inspecto-connectors.jar` sidecar, which carries javax.mail and the rest, so a packaged deployment boots and
+  the connectors actually work. This note is now about the dev launch path only. Derive the list from
   `mvn -o dependency:build-classpath -pl inspecto -am` (9 modules today) rather than globbing `*/target/classes`,
   and put the module `target/classes` **ahead** of the `.m2` jars so fresh code shadows the stale installed
   `inspecto-*` artifacts (that ordering also silences the duplicate-`logback.xml` warning).

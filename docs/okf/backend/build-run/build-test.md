@@ -61,10 +61,31 @@ example). A bundle without the agent is a **valid deployment, not a broken one**
 "stays dependency-lean" (`inspecto/pom.xml`, `AssistAgent`'s class javadoc) and the agent modules pull
 the vendored kernel + eoiagent model transport.
 
-⚠ **They are NOT edition-gated modules.** `inspecto-agent`, `inspecto-agent-hosted`,
-`inspecto-intelligence` and `inspecto-connectors` are plain default `<modules>` in the root POM — the
-only profile-gated modules are `inspecto-security` and `inspecto-policy`. They build in an ordinary
-`mvn test` run; they are simply never *bundled*.
+⚠ **They are NOT edition-gated modules.** `inspecto-agent`, `inspecto-agent-hosted` and
+`inspecto-intelligence` are plain default `<modules>` in the root POM — the only profile-gated modules are
+`inspecto-security` and `inspecto-policy`. They build in an ordinary `mvn test` run; they are simply never
+*bundled*.
+
+🔴 **`inspecto-connectors` was in that list until 2026-09-07, and that was a defect, not a design.** It is
+still a plain default module, but it is now **bundled in every edition** as `inspecto-connectors.jar`
+(CONNECTORS-BUNDLE-1). Before that it was built and unit-tested by CI and shipped by nothing, so SFTP,
+FTP/FTPS, S3, GCS, Azure Blob, Kafka and `SmtpEmailChannel` were unreachable in every deployment — for 85
+days, while `EDITIONS.md` marked SFTP shipped in all three editions. Two details make it work:
+
+* **It ships SHADED** (Maven classifier `sidecar`), because a thin jar is worse than useless — sshj,
+  commons-net, kafka-clients and javax.mail would be missing, and `NotificationService.discoverChannels`
+  finding `SmtpEmailChannel` without javax.mail kills boot with `NoClassDefFoundError: javax/mail/Message`.
+* **Its dependency on the core is `provided`**, the same idiom `tools/templates/processor/pom.xml` uses for
+  third-party plugin modules. Compile scope would drag the whole ~97 MB core into the sidecar. The shaded
+  jar is ~32 MB, dominated by BouncyCastle (via sshj) and kafka-clients, and contains **zero** core classes.
+
+⚠ `-am` walks **upstream only**, and `inspecto-connectors` depends *on* the core — so it is unreachable
+from `-pl inspecto -am` and has to be named: the packaging build is now
+`mvn clean package -pl inspecto,inspecto-connectors -am`. Miss that and the sidecar is silently absent.
+`package.ps1` therefore **verifies the staged jar** (8 factories registered, sshj present, javax.mail
+present) rather than trusting the copy — the connector tests all live *inside* the module, where the
+classpath is trivially correct, so they can never go red for a packaging gap. That is exactly how this
+survived undetected.
 
 **To run with the assist agent**, build the module and put its jar (plus its dependencies) on the
 launch classpath yourself — there is no `package.ps1` switch for it:

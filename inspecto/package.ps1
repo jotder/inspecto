@@ -163,7 +163,9 @@ $bundleDir    = Join-Path $sandboxRoot  'inspecto-deploy'
 if (-not $NoBuild) {
     Write-Host "Building fat JAR (skipping tests)..." -ForegroundColor Cyan
     Push-Location $sandboxRoot
-    & mvn clean package -pl inspecto -am -DskipTests -q
+    # CONNECTORS-BUNDLE-1: `inspecto-connectors` is NOT upstream of `inspecto`, so `-am` (which walks
+    # upstream only) never reaches it - it has to be named explicitly or the sidecar is silently absent.
+    & mvn clean package -pl inspecto,inspecto-connectors -am -DskipTests -q
     if ($LASTEXITCODE -ne 0) { throw "mvn build failed" }
     Pop-Location
     Write-Host "Build complete." -ForegroundColor Green
@@ -199,6 +201,20 @@ $jarSrc = Get-ChildItem -Path $targetDir -Filter 'inspecto-processor-*.jar' -Err
           Select-Object -First 1 -ExpandProperty FullName
 if (-not $jarSrc -or -not (Test-Path $jarSrc)) {
     throw "JAR not found matching $targetDir\inspecto-processor-*.jar.  Run without -NoBuild or build manually first."
+}
+
+# -- step 1b-bis: the remote-connector sidecar (CONNECTORS-BUNDLE-1, 2026-09-07) ---------------
+# Until now this module was built by CI, unit-tested, and shipped by nothing: no pom depended on it and
+# no copy step existed, so SFTP/FTP/FTPS/S3/GCS/Azure/Kafka and SmtpEmailChannel were unreachable in every
+# bundle. Its founding commit described the drop-in ("dropping THIS jar on the classpath is what lights up
+# the sftp:/ftp: schemes") but the delivery half was never built. It ships SHADED (classifier `sidecar`)
+# because a thin jar is useless: sshj/commons-net/kafka-clients/javax.mail would be missing, and
+# NotificationService discovering SmtpEmailChannel without javax.mail kills boot (PROJECT_NOTES section 6).
+$connectorsTargetDir = Join-Path $sandboxRoot 'inspecto-connectors\target'
+$connectorsJarSrc = Get-ChildItem -Path $connectorsTargetDir -Filter 'inspecto-connectors-*-sidecar.jar' -ErrorAction SilentlyContinue |
+          Select-Object -First 1 -ExpandProperty FullName
+if (-not $connectorsJarSrc -or -not (Test-Path $connectorsJarSrc)) {
+    throw "Connector sidecar not found matching $connectorsTargetDir\inspecto-connectors-*-sidecar.jar. Run without -NoBuild, or build with: mvn package -pl inspecto-connectors -am -DskipTests"
 }
 
 # ── step 1c: Standard/Enterprise editions — build the optional edition modules ─────────────────
@@ -256,6 +272,36 @@ if ($policyJarSrc) {
     Copy-Item $policyJarSrc "$bundleDir\inspecto-policy.jar"
     Write-Host "Bundled Enterprise-edition policy module → inspecto-policy.jar" -ForegroundColor Green
 }
+# Every edition: remote acquisition is a core product capability (EDITIONS SP-ACQ-02 marks SFTP shipped in
+# all three), so the sidecar is NOT edition-gated. It is inert until a pipeline names a non-local
+# `collector.connector`. NOTE it adds ~32 MB, dominated by BouncyCastle (sshj) and kafka-clients - if
+# Personal must stay leaner, gate this copy on $Edition and correct the SP-ACQ rows to match.
+Copy-Item $connectorsJarSrc "$bundleDir\inspecto-connectors.jar"
+Write-Host "Bundled remote connector sidecar -> inspecto-connectors.jar" -ForegroundColor Green
+
+# Verify the sidecar is actually USABLE, not merely present. CONNECTORS-BUNDLE-1 went unnoticed for 85 days
+# because nothing could go red: the connector tests live INSIDE inspecto-connectors, where the classes and
+# their META-INF/services file are trivially on the same test classpath, so they can never fail for a
+# packaging gap. This check runs on the STAGED ARTIFACT and is the one thing that could have caught it --
+# a thin jar, a shade config that dropped the ServicesResourceTransformer, or a lost dependency all fail here.
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$connZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-connectors.jar")
+try {
+    $spi = $connZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.acquire.CollectorConnectorFactory' }
+    if (-not $spi) { throw "inspecto-connectors.jar has no CollectorConnectorFactory service file - the shade lost the ServicesResourceTransformer, so no connector would be discovered at run time." }
+    $reader = New-Object System.IO.StreamReader($spi.Open())
+    $factories = ($reader.ReadToEnd() -split "`n" | Where-Object { $_.Trim() -and -not $_.Trim().StartsWith('#') }).Count
+    $reader.Close()
+    if ($factories -lt 8) { throw "inspecto-connectors.jar registers only $factories CollectorConnectorFactory entries (expected 8: sftp/ftp/ftps/db/s3/kafka/azure/gcs)." }
+    # sshj is the marker for "dependencies really came along" - a thin jar has the classes but not these.
+    if (-not ($connZip.Entries | Where-Object { $_.FullName -like 'net/schmizz/sshj/*' })) {
+        throw "inspecto-connectors.jar carries no sshj classes - it is a THIN jar; SFTP would fail with NoClassDefFoundError at run time."
+    }
+    if (-not ($connZip.Entries | Where-Object { $_.FullName -like 'javax/mail/*' })) {
+        throw "inspecto-connectors.jar carries no javax.mail classes - NotificationService.discoverChannels would kill boot with NoClassDefFoundError: javax/mail/Message."
+    }
+    Write-Host "  verified: $factories connector factories + sshj + javax.mail present in the sidecar" -ForegroundColor DarkGray
+} finally { $connZip.Dispose() }
 
 # ── step 3a: Standard/Enterprise — bundle the PostgreSQL JDBC driver as a sidecar (PG-1) ─────────
 # The fat JAR and its SBOM stay JDBC-driver-free by design (inspecto/pom.xml, inspecto-engine/pom.xml);
@@ -594,6 +640,10 @@ if [ -f inspecto-security.jar ]; then
 fi
 # PostgreSQL JDBC driver sidecar (PG-1): present in Standard/Enterprise bundles, and honored on ANY
 # bundle so a drop-in works — the classpath entry is inert until -Dinspecto.db=postgres selects it.
+# Remote connector sidecar (CONNECTORS-BUNDLE-1): present in every edition, and honoured on ANY
+# bundle so a drop-in works. Inert until a pipeline names a non-local `collector.connector` --
+# without it CollectorConnectors.forConfig throws, naming this jar as the thing that is missing.
+[ -f inspecto-connectors.jar ] && CP="${CP}:inspecto-connectors.jar"
 [ -f postgresql.jar ] && CP="${CP}:postgresql.jar"
 # Operational stores on PostgreSQL (2026-08-31). The three ledgers (status/batches/lineage) are now
 # SERVED from a database by default; Personal stays on the bundled DuckDB with zero configuration,
@@ -669,6 +719,8 @@ if exist inspecto-security.jar (
 )
 rem PostgreSQL JDBC driver sidecar (PG-1): present in Standard/Enterprise bundles, and honored on ANY
 rem bundle so a drop-in works - the classpath entry is inert until -Dinspecto.db=postgres selects it.
+rem Remote connector sidecar (CONNECTORS-BUNDLE-1) - see serve.sh for why it is unconditional.
+if exist inspecto-connectors.jar set "CP=%CP%;inspecto-connectors.jar"
 if exist postgresql.jar set "CP=%CP%;postgresql.jar"
 rem Operational stores on PostgreSQL (2026-08-31) - the edition seam; see serve.sh for the reasoning.
 rem The URL is the signal, never the driver's presence: postgres without a URL fails the boot.

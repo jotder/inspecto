@@ -39,11 +39,27 @@
     </properties>
 
     <dependencies>
-        <!-- The core: the SourceConnector SPI, ConnectionProfile, SecretResolver, RetrievalPlan. -->
+        <!-- The core: the SourceConnector SPI, ConnectionProfile, SecretResolver, RetrievalPlan.
+             PROVIDED on purpose (CONNECTORS-BUNDLE-1, 2026-09-07): this jar is dropped onto a running
+             engine's classpath, where `inspecto.jar` already supplies all of it. Compile scope would drag
+             the whole ~97 MB core and its deps into the shaded sidecar below. Same idiom as
+             `tools/templates/processor/pom.xml`, the scaffold for third-party plugin modules. -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-processor</artifactId>
             <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- slf4j facade. Seven classes here call LoggerFactory directly, and it used to arrive as a
+             transitive of the core — which `provided` above no longer propagates, so the module has to
+             declare it (the same "declare it directly" rule the parent pom records for inspecto-util).
+             PROVIDED, not compile: the running engine already supplies slf4j-api + its logback binding, so
+             shading a second copy of the logging facade into the sidecar would be asking for trouble. -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <scope>provided</scope>
         </dependency>
 
         <!-- SFTP client (Apache 2.0). Pulls BouncyCastle transitively — confined to this module. -->
@@ -120,4 +136,56 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <!-- CONNECTORS-BUNDLE-1 (2026-09-07): the DELIVERY half this module's description promised in
+                 its founding commit and nobody ever built. A thin jar is useless as a drop-in — sshj,
+                 commons-net, kafka-clients and javax.mail would be missing, and `NotificationService`
+                 discovering `SmtpEmailChannel` without javax.mail kills boot with
+                 `NoClassDefFoundError: javax/mail/Message` (PROJECT_NOTES §6). So the sidecar is SHADED.
+                 The core is `provided` above, so it and its deps are excluded by construction; what lands
+                 here is exactly the network-client set this module exists to confine. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <!-- Pinned: the offline reactor resolves no plugin version from a repository, and this is
+                     the version the core fat jar already uses. -->
+                <version>3.5.2</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals><goal>shade</goal></goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <!-- `sidecar` so the reactor's own thin artifact stays the installed one and
+                                 only the bundle carries the fat copy. -->
+                            <shadedArtifactAttached>true</shadedArtifactAttached>
+                            <shadedClassifierName>sidecar</shadedClassifierName>
+                            <transformers>
+                                <!-- The whole point: MERGE the ServiceLoader registrations, or the eight
+                                     CollectorConnectorFactory entries and SmtpEmailChannel are lost. -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <!-- Signed jars (BouncyCastle is one): a retained signature throws
+                                             SecurityException at run time. Same filter as the core fat jar. -->
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                        <!-- Never ship a second logging config; the core owns it. -->
+                                        <exclude>logback.xml</exclude>
+                                        <exclude>module-info.class</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>

@@ -83,17 +83,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - **P2** · **WORKBENCH-S4** — the one-surface Step workbench. **Operator 2026-09-06: design now, build later** — the design is written and awaiting review: `superpower/step-workbench-s4-design.md` (three UI-only slices S4a field list+filter · S4b input strip · S4c summarize grouping; NO new endpoint — the canvas edges are the input-relation truth). Build only after the two open questions in its §5 are answered.
 
 - **P2** · **AUTHORING-REDESIGN-1** — open letters (⚠ the old "(j)(l)(n2)(o) are in §1" clause was stale in all four: (o) is now the WORKBENCH-S4 row above, (l) and (n2) SHIPPED, (j) `engine: auto` was already answered by shipped code; (f)(g)(m) SHIPPED 2026-09-06 — `JOIN_REFERENCE_MISSING`/`JOIN_ON_MISSING`/`UNKNOWN_JOIN_REFERENCE` at save, `SchemaMappingDrift` on all three schema save paths, `?pipeline=` sent by the UI): (c) v2 structured AST table over the SQL for WHERE/JOIN editing — 🔴 precondition: probe that the `json` extension loads on the SEALED `SqlSandbox` connection; (d) v3 macros as the UDF registry (per-connection re-creation in `EnrichmentEngine`, `PipelineJobRunner`, `BatchIngestStrategy`, preview) — demand-gated; (e) column metadata editing on the Transform pane (Parse D2) — needs a backend home for metadata on a `transform.sql` node first; (i) per-row "sample resolves to" line — no host resolves a sample against an `AttributeSpec`. Still open on (f): which COLUMNS the reference carries is the dry-run's question (it reads the store); the save checks existence and `on` presence only. → `okf/frontend/features/schema-mapping-authoring.md` §0
-- **P1** · **CONNECTORS-BUNDLE-1** — 🔴 **`inspecto-connectors` is built and tested but reaches no deployment.**
-  Nothing declares a dependency on it (`grep artifactId>inspecto- inspecto/pom.xml` lists nine modules, not this
-  one), `package.ps1` copies only `inspecto.jar` + the `inspecto-security` / `inspecto-policy` / `postgresql`
-  sidecars, `serve.sh` runs `-cp "$CP"` built from exactly those, and the shipped fat jar contains **zero**
-  `com/gamma/connect` classes. So `SftpConnector`, `S3Connector`, `GcsConnector`, `AzureBlobConnector`, the Kafka
-  connector and `SmtpEmailChannel` are all unreachable at run time in every edition — they are ServiceLoader
-  discoveries, so their absence is silent and the collector falls back to `local`. Decide the intended shape
-  first (shade the module into the fat jar · ship it as a sidecar like `inspecto-security` · or a `plugins/`
-  drop-in dir), then make the catalog and REQUIREMENTS say it. ⚠ This makes several "SHIPPED" claims optimistic:
-  ACQ-4, INC-3's email half, and `acquisition.file.sftp`'s DELIVERED row in `ProcessorCatalog`.
-  → `okf/backend/build-run/build-test.md` · `inspecto/package.ps1` · `inspecto-deploy/serve.sh`
 - **P1** · **NAME-DIRS-1** — the UI scaffold still derives every `dirs.*` from the **raw display name**, so a
   pipeline named `my order feed` gets paths with spaces in them. Decided 2026-09-06: `dirs.*` derive from the
   **slug id**, one identity for id, file and paths; existing pipelines are untouched (dirs are stored, not
@@ -281,6 +270,15 @@ One line each; the reasoning is in the pointer. Reopen only on the stated trigge
 - **Geo map** — DuckDB `spatial` extension deferred (zero `ST_*` demand); progressive loading obsoleted by `GEO_POINT_CAP = 5000` → `okf/frontend/features/geo-map.md`
 - **Catalog** — offline `/db/query` returns 501 (honest degrade); `EntityProjectionGraphSource`, Geo point/route sources, `ReconExecService` stay offline arms; ⛔ "backfill the `table` attr" REFUTED — do not re-file → `okf/frontend/features/catalog.md`
 - **`endSessionUrl` / server-published OIDC config** — not buildable as scoped; 🔴 if ever built, `session.service.ts` uses `??` so a server-sent empty string beats `environment.oidc` → `okf/backend/editions/auth-security.md`
+- **The connector sidecar is NOT edition-gated** (CONNECTORS-BUNDLE-1, shipped 2026-09-07) — remote
+  acquisition is a core capability and `EDITIONS.md` marks SFTP shipped in all three editions, so
+  `inspecto-connectors.jar` rides every bundle. ⚠ It costs ~32 MB (BouncyCastle via sshj, plus
+  kafka-clients). Reopen ONLY if Personal must be leaner than that — the copy is one `if` in
+  `package.ps1`, but gating it means correcting the SP-ACQ rows to match.
+- **`mail.send` returns SUCCESS when no channel is configured** — `JobResult.ok("no email channel
+  configured — nothing sent")`. Deliberate and already in the pending-MAJOR release notes; ⛔ do not
+  "fix" it to a failure without an operator call, but know that a scheduled mail job reads green
+  while delivering nothing.
 - **Kafka is not the data path** — decided in the consignment-ELT design and never re-opened: urgency is a *parameter on one node*, not a second execution model. ⛔ Do not re-file "add a Kafka lane"; a Kafka **Collector** (SP-ACQ-09) is a different, open question.
 - **EXPR-1** — expression interpolation inside a longer string only ever per-declaration opt-in, never global
 - **BUNDLE-1 perf question** — `no-cache` on content-hashed chunks vs `immutable`; unmeasured; only if a revalidation storm is observed
