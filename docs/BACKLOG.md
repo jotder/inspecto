@@ -83,6 +83,47 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - **P2** · **WORKBENCH-S4** — the one-surface Step workbench. **Operator 2026-09-06: design now, build later** — the design is written and awaiting review: `superpower/step-workbench-s4-design.md` (three UI-only slices S4a field list+filter · S4b input strip · S4c summarize grouping; NO new endpoint — the canvas edges are the input-relation truth). Build only after the two open questions in its §5 are answered.
 
 - **P2** · **AUTHORING-REDESIGN-1** — open letters (⚠ the old "(j)(l)(n2)(o) are in §1" clause was stale in all four: (o) is now the WORKBENCH-S4 row above, (l) and (n2) SHIPPED, (j) `engine: auto` was already answered by shipped code; (f)(g)(m) SHIPPED 2026-09-06 — `JOIN_REFERENCE_MISSING`/`JOIN_ON_MISSING`/`UNKNOWN_JOIN_REFERENCE` at save, `SchemaMappingDrift` on all three schema save paths, `?pipeline=` sent by the UI): (c) v2 structured AST table over the SQL for WHERE/JOIN editing — 🔴 precondition: probe that the `json` extension loads on the SEALED `SqlSandbox` connection; (d) v3 macros as the UDF registry (per-connection re-creation in `EnrichmentEngine`, `PipelineJobRunner`, `BatchIngestStrategy`, preview) — demand-gated; (e) column metadata editing on the Transform pane (Parse D2) — needs a backend home for metadata on a `transform.sql` node first; (i) per-row "sample resolves to" line — no host resolves a sample against an `AttributeSpec`. Still open on (f): which COLUMNS the reference carries is the dry-run's question (it reads the store); the save checks existence and `on` presence only. → `okf/frontend/features/schema-mapping-authoring.md` §0
+- **P1** · **SEC-SIDECAR-BOOT-1** — 🔴 **every Standard and Enterprise bundle cannot boot.**
+  `inspecto-security/pom.xml` declares `nimbus-jose-jwt` at compile scope and has **no `<build>` section
+  and no shade plugin**, so the jar `package.ps1` copies is 16 KB / 18 files with **zero `com/nimbusds`
+  classes** — verified on disk. `OidcAuthenticator` has 9 direct `com.nimbusds` imports;
+  `ControlApi:263` calls `Authenticators.active()` **during startup**, and `SpiSlot.active()` iterates
+  `ServiceLoader` with no try/catch. The only `nimbus` mention in `package.ps1` is a jlink comment that
+  *assumes* the jar carries it. Exactly the CONNECTORS-BUNDLE-1 trap, one module over and worse — a boot
+  failure, not a degraded feature. Fix: shade `inspecto-security` (classifier `sidecar`, core `provided`)
+  and extend `package.ps1`'s staged-artifact check to assert `com/nimbusds` is present. ⚠ Nothing goes
+  red today because the module's own tests have Nimbus on the compile classpath and the core-side tests
+  inject a lambda via `Authenticators.forTest`. → `okf/backend/build-run/guard-coverage.md`
+- **P1** · **CI-RED-1** — 🔴 **CI has failed on `master` for 100 of the last 100 runs** and nobody noticed;
+  a permanently-red build trains everyone to ignore it. Two Linux-only test failures, both test defects
+  rather than product bugs: `DbConsignmentOutputStoreTest.mapsReadPathsBackToTheirLiveConsignments` feeds
+  a Windows-spelled path and expects `norm()` (`Path.of(...).toAbsolutePath()`, platform-native) to match
+  it — true on Windows, false on Linux where `\` is a legal filename char; and
+  `RunContextCausationTest.aSignalTriggeredRunStampsItsTriggerAsTheCauseOfEverythingItEmits` counts ALL
+  `job.run.started` signals in a globally-installed store (expected 1, got 11). ⛔ Fix the tests, not
+  `norm()` — making it separator-normalising would break legitimate Linux filenames, and that is a
+  product call. **Consequence while red:** `ci.yml`'s lean-core and dependency-lock guards sit AFTER the
+  test step and have therefore never executed on master.
+- **P1** · **RUNSH-CP-1** — 🔴 the connector sidecar does not reach the one-shot ETL path.
+  `run.sh`/`run.bat` launch `java -jar inspecto.jar`, and `-jar` ignores `-cp`; the manifest carries no
+  `Class-Path`. So all 12 sidecar providers stay unreachable there, while `serve.sh`/`serve.bat` (which
+  use `-cp`) get them. `CollectorProcessor` — the `-jar` main class — is the very caller that reaches
+  `CollectorConnectors.forConfig`. Fix: put `run.sh`/`run.bat` on a `-cp` like `serve.sh`. *(Filed
+  2026-09-07 — an incompleteness in the same day's CONNECTORS-BUNDLE-1 fix.)*
+- **P2** · **GUARD-SWEEP-1** — the rest of the 2026-09-07 sweep, ranked. (a) `mvn test` runs **no
+  edition profile**, so **54 test methods never run anywhere automated** — all OIDC auth, token relay,
+  ABAC policy and keystore-secret coverage; `release.yml` builds Enterprise with `-DskipTests`. One CI
+  step fixes it: `mvn test -Pedition-enterprise` (the superset). (b) `check-dependencies.mjs` and
+  `sbom.mjs` resolve without a profile, so `inspecto-security`'s Nimbus tree is never locked — while
+  `compliance/controls-matrix.md` marks **G7 CLOSED**. (c) `check-secrets.mjs` has **no emptiness floor**
+  and falls back to walking the tree when `git ls-files` throws — it can read zero files and exit green;
+  its siblings both fail closed. Also `MIN_SECRET_LEN = 16`, so a 15-char key passes. (d) Conventional-
+  commit lint is gated on `pull_request` and this team opens none. (e) No `typecheck` script exists and
+  CI checks only `tsconfig.app.json` — the gap that let a renamed DTO field reach an AOT failure on
+  2026-09-07. (f) `sbom.mjs` is tag-only and its `unhashed`/`unlicensed` counters are warn-only, so a
+  fully unhashed SBOM ships green. (g) No coverage gate and no compiler-lint (`-Xlint`/`-Werror`)
+  anywhere. (h) `addable >= 10` against 35 actual, asserted in both Java and TS. (i) five corpus sweeps
+  disarm themselves with `assumeTrue` if a fixture path moves. → `okf/backend/build-run/guard-coverage.md`
 - **P1** · **NAME-DIRS-1** — the UI scaffold still derives every `dirs.*` from the **raw display name**, so a
   pipeline named `my order feed` gets paths with spaces in them. Decided 2026-09-06: `dirs.*` derive from the
   **slug id**, one identity for id, file and paths; existing pipelines are untouched (dirs are stored, not
@@ -229,8 +270,8 @@ One line each; the reasoning is in the pointer. Reopen only on the stated trigge
 - **PATH-2 residual** (moved from §4 2026-09-07 — it is a LEAVE, not work) — the `BackupTask.restore` zip-slip
   jail is PINNED by `MaintenanceLibraryTest.restoreRefusesAnArchiveEntryThatEscapesTheTargetBeforeWritingAnything`
   (the page cited a `…ASidecarEntry…` variant that does not exist — a tampered sidecar is refused a layer
-  earlier). Family (a), the three store `fileFor` helpers — `ViewStore:100`, `PipelineStore:101`,
-  `ComponentStore:351`, none importing `PathJail` — LEAVE unless someone is in those files anyway; their line
+  earlier). Family (a), the three store `fileFor` helpers — `ViewStore:100`, `PipelineStore:101`, `ComponentStore:351`
+  and `PipelineWatermarkStore:56` — **four sites, not three** (recounted 2026-09-07), none importing `PathJail` — LEAVE unless someone is in those files anyway; their line
   numbers have now drifted three times, which is itself the argument. ⛔ Routing `ControlApi.serveStatic:866`
   through `PathJail.contains` is a posture change needing an operator call — grounded 2026-08-26 "do not build it".
   → `okf/backend/config/config-safety.md`
@@ -261,7 +302,8 @@ One line each; the reasoning is in the pointer. Reopen only on the stated trigge
 - **`AiDraft.prerequisites` shared applier** — single producer; extract only when a second tool gains prerequisites
 - **AGT-6a tool `args` runtime validation** declined (contract test instead) — revisit after all **23** tool
   schemas are audited; still 23 (`InspectoPackTest:61` pins the count) and the audit has **not** run: the
-  2026-07-27 cross-adopter pass covers **6 of 23** (`ToolSchemaAdopterContractTest`). Precondition unmet.
+  2026-07-27 cross-adopter pass covers **5 of 23** — its 6 payloads span 5 distinct tools (`query_author`
+  twice), and the test asserts nothing about its own list's size. Precondition unmet.
 - **AGT-5 embedding recall** parked (`CaseStore` is a 256-cap ring)
 - **D8** digest deliveries correlate to the digest, not per notification; `deliverWithReceipt` escape hatch only if a provider won't echo `Message-ID`
 - **Time zone of incoming data (a)** — no editor for `raw.fields[].timezone_column` by decision; a fifth "data offset wins" tier is a separate build; ⛔ never reached by relaxing the `%z`/`%Z` gate → `okf/backend/engine/duckdb.md`
