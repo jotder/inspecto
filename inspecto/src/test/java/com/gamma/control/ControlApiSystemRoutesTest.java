@@ -84,7 +84,11 @@ class ControlApiSystemRoutesTest {
             JsonNode body = json(get(c.port, "/system/operational-db"));
             assertEquals("duckdb", body.get("engine").asText());
             JsonNode families = body.get("families");
-            assertEquals(11, families.size(), "the roster is eleven families — " + families);
+            // 11 → 12 on 2026-09-07: DELIVERY_RECEIPTS joined the roster (D8-SUPPRESS-1's precondition).
+            // ⚠ The count is a RATCHET, not decoration — it is what makes adding an operational-store
+            // family a conscious act rather than a silent one, so move it deliberately and never to make
+            // a red build green.
+            assertEquals(12, families.size(), "the roster is twelve families — " + families);
             for (JsonNode f : families) {
                 assertNotNull(f.get("source"), "every family reports where its value came from");
                 assertTrue(f.has("backendProperty") && f.has("urlProperty"),

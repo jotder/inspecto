@@ -161,6 +161,35 @@ final class ServiceStores {
      * {@code null} ⇒ no per-file stage index is kept; the crash-safe commit ordering
      * {@code ConsignmentIngestor.finalizeSource} enforces is unchanged either way.
      */
+    /**
+     * Durable delivery-receipt store (D8-SUPPRESS-1's precondition), gated by
+     * {@code -Ddelivery.receipts.backend}: {@code duckdb}, {@code postgres}/{@code postgresql}
+     * ({@code -Ddelivery.receipts.db.url}), or a raw {@code jdbc:} URL. Any other value — including the
+     * default — ⇒ {@code null} ⇒ {@link CollectorService} keeps the bounded
+     * {@link com.gamma.notify.InMemoryDeliveryReceiptStore}, which is the shipped behaviour and stays it.
+     *
+     * <p>⚠ Absence here is NOT degraded correctness (unlike {@link #openDedupLedger(SpaceRoot)}): nothing
+     * silently produces a wrong result without it. What it costs is per-recipient suppression, which needs
+     * a bounce record to survive long enough to be consulted on the next send — and the in-memory map
+     * evicts oldest-first, so the bounce that should suppress an address is the record most likely to be
+     * gone. That is why suppression is gated on this store rather than built over the map.
+     */
+    static com.gamma.notify.DbDeliveryReceiptStore openDeliveryReceiptStore(SpaceRoot root) {
+        String backend = System.getProperty("delivery.receipts.backend", "none").trim().toLowerCase();
+        boolean pg = "postgres".equals(backend) || "postgresql".equals(backend);
+        if (!"duckdb".equals(backend) && !pg && !backend.startsWith("jdbc:")) return null;
+        String url = backend.startsWith("jdbc:")
+                ? backend
+                : OperationalDb.urlFor(OperationalDb.Family.DELIVERY_RECEIPTS, root.deliveryReceiptsDbUrl());
+        try {
+            return com.gamma.notify.DbDeliveryReceiptStore.open(url, null, null);
+        } catch (Exception e) {
+            log.warn("Could not open delivery-receipts DB ({}) — receipts stay in memory: {}",
+                    url, e.getMessage());
+            return null;
+        }
+    }
+
     static com.gamma.consignment.DbFileStageStore openFileStageStore(SpaceRoot root) {
         String backend = System.getProperty("file.stages.backend", "none").trim().toLowerCase();
         boolean pg = "postgres".equals(backend) || "postgresql".equals(backend);

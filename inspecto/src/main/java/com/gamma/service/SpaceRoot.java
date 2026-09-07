@@ -84,6 +84,11 @@ public interface SpaceRoot {
      *  {@code -Dfile.stages.backend} is set. */
     String fileStagesDbUrl();
 
+    /** Default JDBC URL for the durable delivery-receipt store, when {@code -Ddelivery.receipts.backend}
+     *  is set. ⛔ Default-off (see {@code OperationalDb.Family.DELIVERY_RECEIPTS}): unset, receipts stay
+     *  in the lean in-memory store and this file is never created. */
+    String deliveryReceiptsDbUrl();
+
     /** The pre-spaces flat layout: historical file names in the working directory. */
     static SpaceRoot legacy() {
         return new LegacySpaceRoot();
@@ -151,6 +156,9 @@ final class LegacySpaceRoot implements SpaceRoot {
     public String dedupLedgerDbUrl() { return "jdbc:duckdb:inspecto-dedup-ledger.db"; }
 
     public String fileStagesDbUrl() { return "jdbc:duckdb:inspecto-file-stages.db"; }
+
+    @Override
+    public String deliveryReceiptsDbUrl() { return "jdbc:duckdb:inspecto-delivery-receipts.db"; }
 }
 
 /** A self-contained per-space directory: {@code base/{config,data,audit,duckdb}}. */
@@ -212,4 +220,7 @@ final class DirSpaceRoot implements SpaceRoot {
         public String dedupLedgerDbUrl() { return duckdb("inspecto-dedup-ledger.db"); }
 
     public String fileStagesDbUrl() { return duckdb("inspecto-file-stages.db"); }
+
+    @Override
+    public String deliveryReceiptsDbUrl() { return duckdb("inspecto-delivery-receipts.db"); }
 }

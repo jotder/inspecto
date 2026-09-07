@@ -79,6 +79,14 @@ final class OperationalDb {
                 "consignment.outputs.db.url", null, null, SpaceRoot::consignmentOutputsDbUrl),
         FILE_STAGES("File stages", "file.stages.backend", "none", Mode.URL_OR_ENGINE,
                 "file.stages.db.url", null, null, SpaceRoot::fileStagesDbUrl),
+        // D8-SUPPRESS-1's precondition. ⛔ Default "none" — the OPPOSITE call from DEDUP_LEDGER above, and
+        // deliberately: an absent receipt store is not degraded correctness, it is the shipped behaviour
+        // (receipts stay in InMemoryDeliveryReceiptStore, bounded and prunable, exactly as before). Making
+        // it default-ON would create a DB file in the working directory under SpaceRoot.legacy() for every
+        // Personal install — and CP-15 is a "not for Personal" cell, so Personal must not gain a database
+        // it was never meant to have.
+        DELIVERY_RECEIPTS("Delivery receipts", "delivery.receipts.backend", "none", Mode.URL_OR_ENGINE,
+                "delivery.receipts.db.url", null, null, SpaceRoot::deliveryReceiptsDbUrl),
         // D-9. ⛔ Default "duckdb", never "none": a dedup ledger that silently does nothing is WORSE than
         // an absent one — the pipeline reports success while emitting the duplicates the author asked it
         // to drop. Default-off is this codebase's most repeated trap (provenance, file_stages, the

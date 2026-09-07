@@ -494,6 +494,48 @@ too and `inspecto/inspecto-status.db` is no longer minted (TEST-CWD-DB-1). The `
 
 ---
 
+
+### 3.12 `inspecto_delivery_receipts` — per-delivery status receipts (D8)  · **M**
+File: `inspecto-delivery-receipts.db`
+
+```sql
+CREATE TABLE IF NOT EXISTS inspecto_delivery_receipts (
+  delivery_id        VARCHAR PRIMARY KEY,
+  notification_id    VARCHAR,
+  channel_config_id  VARCHAR,
+  target             VARCHAR,
+  sent_at            BIGINT,
+  status_at          VARCHAR,  -- JSON {"DELIVERED":"2000","COMPLAINED":"3000"} — see below
+  provider_raw       VARCHAR,
+  digest             BOOLEAN
+);
+CREATE INDEX IF NOT EXISTS inspecto_delivery_receipts_notification ON inspecto_delivery_receipts (notification_id);
+CREATE INDEX IF NOT EXISTS inspecto_delivery_receipts_sent_at ON inspecto_delivery_receipts (sent_at);
+```
+
+One row per attempted delivery to one external destination (`DeliveryReceipt`), stamped by provider
+callbacks on `/public/delivery-status/{adapterId}`. Added 2026-09-07 as **D8-SUPPRESS-1's stated
+precondition** — per-recipient suppression cannot be built on `InMemoryDeliveryReceiptStore`, whose
+bounded map evicts oldest-first, so the bounce that should suppress an address is the record most likely
+to be gone by the next send.
+
+⛔ **Default `none`, and that is the opposite call from `inspecto_dedup_keys` on purpose.** An absent
+receipt DB is not degraded correctness — it is the shipped behaviour (receipts stay in the bounded
+in-memory store). Default-ON would create a DB file in the working directory under `SpaceRoot.legacy()`
+for every Personal install, and EDITIONS `CP-15` is a "not for Personal" cell.
+
+⚠ **`status_at` is a JSON column, not a child table.** `DeliveryReceipt.statusAt` is a
+`Map<DeliveryStatus,Long>` because a spam-button click produces `delivered` *then* `complaint` for one
+message and a single enum would erase the earlier one. Every read wants the whole map and none wants a
+single status, so a child table would buy a join per query and no expressiveness. An entry naming a
+`DeliveryStatus` this build does not know is **dropped on read, never thrown on** — a receipt written by
+a newer build must stay readable.
+
+⚠ **`add` is delete-then-insert, not an UPSERT** — DuckDB and Postgres spell upsert differently and this
+store runs unchanged on both. It keeps `add` idempotent, matching the in-memory `put` a resend relies on.
+`stamp` is read-merge-write on the store monitor, so the "first observation of a status wins" rule stays
+in `DeliveryReceipt.withStatus` rather than being re-implemented in SQL.
+
 ## 4. File topology (per space)
 
 **One DuckDB file per capability** — not one shared DB, and not one file per space. Each file is
@@ -503,7 +545,7 @@ single-writer-locked (documented in `ServiceStores`). Locations come from
 | Layout | Capability file locations |
 |---|---|
 | **`DirSpaceRoot`** (per-space dir) | `<spaceBase>/duckdb/<file>` — e.g. `spaces/demo/duckdb/inspecto-ops.db` |
-| **`LegacySpaceRoot`** (flat working dir) | `./inspecto-ops.db`, `./inspecto-ops-links.db`, `./inspecto-ops-notes.db`, `./inspecto-status.db`, `./jobs_report.duckdb`, `./provenance.duckdb`, `./inspecto-acquisition.db`, `./inspecto-consignment-outputs.db`, `./inspecto-file-stages.db` |
+| **`LegacySpaceRoot`** (flat working dir) | `./inspecto-ops.db`, `./inspecto-ops-links.db`, `./inspecto-ops-notes.db`, `./inspecto-status.db`, `./jobs_report.duckdb`, `./provenance.duckdb`, `./inspecto-acquisition.db`, `./inspecto-consignment-outputs.db`, `./inspecto-file-stages.db`, `./inspecto-delivery-receipts.db` |
 
 So across N spaces you get N separate sets of these files. Events live under `<dataDir>/events/`
 (`DirSpaceRoot`) or `./inspecto-events/` (legacy). Every `-D<capability>.db.url` flag overrides the
@@ -615,6 +657,8 @@ operator applies flags through their own deployment tooling; this screen tells t
 | Acquisition ledger | `-Dacquire.ledger.backend=db` | (property in [`AcquisitionLedgers`](../../../../inspecto-acquire/src/main/java/com/gamma/acquire/AcquisitionLedgers.java)) | — |
 | Consignment outputs | `-Dconsignment.outputs.backend=postgres` | `-Dconsignment.outputs.db.url` | (in URL) |
 | File stages | `-Dfile.stages.backend=postgres` | `-Dfile.stages.db.url` | (in URL) |
+| Delivery receipts | `-Ddelivery.receipts.backend=postgres` | `-Ddelivery.receipts.db.url` | (in URL) |
+| Delivery receipts | `notify/DeliveryReceiptStore` | [`DbDeliveryReceiptStore`](../../../../inspecto-engine/src/main/java/com/gamma/notify/DbDeliveryReceiptStore.java) | `delivery.receipts.backend=duckdb\|postgres\|jdbc:…` | `none` (in-memory) |
 | Events | `-Devents.backend=parquet` | — | **No Postgres path** |
 
 Point each URL at `jdbc:postgresql://…`; the three ops URLs may share one database/schema (table names

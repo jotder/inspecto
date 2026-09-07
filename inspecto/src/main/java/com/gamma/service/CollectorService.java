@@ -527,9 +527,15 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                 notificationPreferences,
                 this::persistedChannels);
         // Delivery-status receipts (BACKLOG D8): one per external delivery, stamped by provider callbacks
-        // on /public/delivery-status/{adapterId}. In-memory like the feed itself — receipts are
-        // operational breadcrumbs, not a durable record, and are prunable.
-        this.deliveryReceipts = new com.gamma.notify.InMemoryDeliveryReceiptStore();
+        // on /public/delivery-status/{adapterId}. In-memory by default — receipts are operational
+        // breadcrumbs, bounded and prunable — but a deployment that wants per-recipient suppression
+        // (D8-SUPPRESS-1) sets -Ddelivery.receipts.backend and gets the durable store instead. ⚠ Degrades
+        // to memory rather than failing boot, like every other family: notifications must keep flowing
+        // even when the receipt DB will not open.
+        com.gamma.notify.DbDeliveryReceiptStore durableReceipts = ServiceStores.openDeliveryReceiptStore(root);
+        this.deliveryReceipts = durableReceipts != null
+                ? durableReceipts
+                : new com.gamma.notify.InMemoryDeliveryReceiptStore();
         this.notificationService.deliveryReceipts(deliveryReceipts);
         if (this.jobs != null) this.jobs.deliveryReceiptStore(deliveryReceipts);   // receipt_prune maintenance task
         this.notificationSubscriber = notificationService::onEvent;
