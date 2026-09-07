@@ -1,6 +1,6 @@
 # EDG-01 — gating the six "not for Personal" features (BUILD PLAN, in flight)
 
-> **Status 2026-09-07: mechanism DECIDED; ✅ cells 1 (`CP-15`), 2 (`OPS-06`), 3a (public route SPI) and 3b (`CP-09`) SHIPPED; cell 4 (`SEC-10`) BUILT, verification pending; two cells remain (CP-13 · CP-11).** BACKLOG `EDG-01`, ranked **P1** — the
+> **Status 2026-09-07: ✅ cells 1 (`CP-15`), 2 (`OPS-06`), 3a (route SPI), 3b (`CP-09`) and 4 (`SEC-10`) SHIPPED; cell 5 (`CP-13` metrics half) BUILT, verification pending. Remaining: CP-13's events-feed half and `CP-11` — both need an operator call, see §19.** BACKLOG `EDG-01`, ranked **P1** — the
 > only substantive Personal-scoped work on the board. Parent truth:
 > [`../EDITIONS.md`](../EDITIONS.md) §Feature × edition matrix + §Edition-gating debt.
 
@@ -557,3 +557,66 @@ SPI would have to replace the *type* at every field and signature, not just the 
 
 ⚠ **(b) is the honest reading of the cell and a fraction of the cost**; (a) is the letter of the mechanism
 decision. Worth putting to the operator before either is started, with this measurement in hand.
+
+## 19. Cell 5 as built — `CP-13`'s metrics half; and the two calls that are the operator's
+
+### Built: `GET /metrics` → `inspecto-metrics`
+
+`MetricsRoutes` is a `RouteModule` in a new thin module; core drops the inline registration at
+`ControlApi:418` and gains `AbsentMetricsRoutes` (one stub, via `ApiContext.stub`). `/metrics` stays in
+`PUBLIC_PATHS` and `isInfraRoute` so the module's route is reachable unauthenticated at the bare path a
+scraper expects, and so the 503 is too — a scraper carries no token, and "this bundle does not expose
+metrics" is not worth withholding. Nothing leaks: the registry is never read on that path.
+
+✅ **This closes the security justification EDG-01 was ranked P1 on.** `/metrics` is a `PUBLIC_PATH` on an
+edition that ships no authenticator and binds every interface, so a Personal install served its full
+operational telemetry to anything that could reach the port, while its own matrix cell said the feature was
+not in the edition. ⚠ Only the EXPOSITION is gated — `MetricRegistry` is called by nine classes across three modules
+and stays in core, so the counters still run; nothing reads them out over HTTP.
+
+⛔ `/metrics/acquisition` is deliberately untouched: it belongs to `AcquisitionRoutes` and is Data-Acquisition
+telemetry, a core capability, not CP-13.
+
+### 🔴 What the first verification caught — four core tests assumed `/metrics` answers 200
+
+⚠ **This cell had a bigger test blast radius than the previous four, and only the reactor found it.** Cells
+1–4 moved features nothing else asserted on; `/metrics` is a probe other suites *use*. Four tests in
+`inspecto-processor` failed on the first run — none of them about metrics gating, all of them reading the
+scrape:
+
+| Test | Was | Now |
+|---|---|---|
+| `ControlApiTest.metricsEndpointIsOpenAndReflectsARun` | scraped `/metrics`, asserted 200 + exposition | **MOVED** to `inspecto-metrics`' `MetricsExpositionTest` — the assertions are still true, just no longer of the default build |
+| `ControlApiMultiSpaceTest.awaitMetric` | polled `GET /metrics` for a per-space label | reads `MetricRegistry.global().scrape()` in-process — the same string `MetricsRoutes` serves |
+| `ControlApiVersionedSurfaceTest.noSunsetSignallingRemains` | scraped, asserted the retired metric absent | reads the registry — the claim was never about HTTP |
+| `ControlApiVersionedSurfaceTest.infraProbesStayUnversioned` | demanded 200 at the bare `/metrics` | accepts **200 or 503**; a 404 is what would mean "no longer unversioned" |
+
+🔴 **The rule this cell adds: gating a route means finding every test that USES it, not just the tests that
+are ABOUT it.** Three of these four are testing something else entirely (space isolation, API versioning,
+sunset retirement) and merely reached for the scrape as a convenient read-out.
+
+⚠ Two of the four re-seat onto `MetricRegistry.global().scrape()` — which is **not** a weakening, because
+that is the exact string `MetricsRoutes` returns. The one assertion that genuinely could not survive in core
+is the raw-`text/plain`-not-an-envelope shape: there is no exposition on Personal to have a shape, so it
+moved to the module, where `MetricsExpositionTest` also pins the `version=0.0.4` content type.
+
+⛔ Do not "fix" a future failure here by asserting 404 on `/metrics`. 503-not-404 is the absent-module
+contract (EDITIONS §4), and the bare path staying served is what `infraProbesStayUnversioned` exists to prove.
+
+### 🔴 Two calls left, and both are the operator's — not mine to assume
+
+**1. `CP-13`'s events-feed half.** The matrix row also covers the events feed and the audit CSV export.
+`EventRoutes` is a normal `RouteModule` and could move whole (note its `GET /events/([^/]+)` catch-all is
+registered after its literal siblings, so it must move as a unit). ⚠ But that removes `/events` — the event
+log the Events screen is built on — from Personal entirely, which is a visible product change of a different
+character from a scrape endpoint nobody browses. The 2026-09-02 decision covers the row; the *size* of this
+half deserves confirming before it is built. Options: gate the whole feed, gate only
+`/events/export?format=csv&type=AUDIT` (the audit-export half the compliance story names), or leave the feed
+in every edition and mark the row partial-by-decision.
+
+**2. `CP-11` operational objects — the fork measured in §18.** `com.gamma.ops` is 12 classes in
+`inspecto-engine`, a MANDATORY module, with 13 classes in that same module depending on it, several holding
+typed `ObjectService` fields. Full extraction means inventing an `ObjectAccess` SPI and retyping all of them
+— the largest single piece of work in EDG-01. Gating just the routes + `incident_purge` is a fraction of the
+cost and is arguably what the cell claims, since `CP-11` is about the operational-objects *surface*.
+⚠ Recommend putting both to the operator together; §18 has the measurement for CP-11, this section for CP-13.

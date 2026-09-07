@@ -414,9 +414,11 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         // MNT-15: per-subsystem health — deeper than the liveness probe, auth-gated (not a public path).
         get ("/health/details", (e, m) -> HealthDetails.of(this));
         get ("/ready",  (e, m) -> Map.of("status", "READY", "pipelines", service().pipelines().size()));
-        // Prometheus scrape endpoint — text exposition, open (scrapers don't carry tokens)
-        get("/metrics", (e, m) ->
-                respondText(e, com.gamma.metrics.MetricRegistry.global().scrape()));
+        // ⚠ GET /metrics moved to the optional inspecto-metrics module (EDG-01 cell 5, EDITIONS CP-13).
+        // Only the EXPOSITION moved — MetricRegistry is called by nine classes across three modules and stays
+        // core. It remains in PUBLIC_PATHS and isInfraRoute below so the module's route is reachable
+        // unauthenticated at the bare path a scraper expects; absent the module, AbsentMetricsRoutes
+        // answers 503 there instead.
 
         // The API contract itself (HARD-4): byte-equal to docs/api/openapi-v1.json at build time.
         // Auth-gated like the rest of /api/v1; loaded lazily on first request so tests and CLI runs
@@ -460,6 +462,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         // stub would win first-match and the module's real handler would never run.
         new AbsentGeoLinkRoutes().register(this);
         new AbsentExchangeRoutes().register(this);
+        new AbsentMetricsRoutes().register(this);
     }
 
     // ── dispatch: a composable middleware chain (S6) ─────────────────────────────

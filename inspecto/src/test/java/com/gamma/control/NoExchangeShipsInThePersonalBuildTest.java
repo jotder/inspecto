@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * EDG-01 cell 4 — the assertion that makes the SEC-10 gating REAL rather than claimed, on the DEFAULT
  * (Personal) build, over real HTTP.
  *
- * <p>Five facts, each of which a plausible regression breaks on its own:
+ * <p>Six facts, each of which a plausible regression breaks on its own:
  * <ol>
  *   <li>all eleven {@code /exchange} paths answer <b>503 with the edition message</b> — not 404 (the stub
  *       lost a path), not 200 (the module is back in Personal);</li>
@@ -36,7 +36,9 @@ import static org.junit.jupiter.api.Assertions.*;
  *       so a role file authored on Standard still validates here. Dead vocabulary is not a hole; a
  *       per-edition validator would be a portability break;</li>
  *   <li>the core's component delete fence asks {@link SharedItemConsumers} and gets "nobody" — the coupling
- *       an import-based census could not see, because {@code ComponentRoutes} used a fully-qualified name.</li>
+ *       an import-based census could not see, because {@code ComponentRoutes} used a fully-qualified name;</li>
+ *   <li>{@code GET /metrics} answers 503 and leaks no exposition (cell 5, {@code CP-13}) — the
+ *       unauthenticated scrape surface that made EDG-01 P1 in the first place.</li>
  * </ol>
  *
  * <p>⛔ Do not "fix" a failure here by deleting this test. A 200 means an optional module is in the Personal
@@ -120,6 +122,27 @@ class NoExchangeShipsInThePersonalBuildTest {
                 "no module installed a consumers lookup");
         assertEquals(List.of(), SharedItemConsumers.global().consumersOf("dataset", "orders"),
                 "so a component delete is not fenced by a grant that cannot exist here");
+    }
+
+    /**
+     * EDG-01 cell 5 (EDITIONS {@code CP-13}): {@code GET /metrics} — an INFRA path, served at the bare URL
+     * with no {@code /api/v1} prefix and deliberately unauthenticated, because a Prometheus scraper carries
+     * no token. That combination is exactly why it mattered: Personal ships no authenticator and binds every
+     * interface, so this route served the deployment's full telemetry to anything that could reach the port.
+     *
+     * <p>⚠ Only the EXPOSITION is gated. {@code MetricRegistry} is called by nine classes across three modules
+     * and stays in core — the counters still run here, nothing reads them out over HTTP.
+     */
+    @Test
+    void theMetricsScrapeEndpointIsNotExposedOnThePersonalBuild(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            HttpResponse<String> res = client.send(HttpRequest.newBuilder(
+                    URI.create("http://localhost:" + c.port + "/metrics")).GET().build(), BodyHandlers.ofString());
+            assertEquals(503, res.statusCode(), "expected 'not installed', got: " + res.body());
+            assertTrue(res.body().contains("inspecto-metrics"), "the refusal names the module: " + res.body());
+            // …and it leaks nothing: the body is the refusal, not a scrape.
+            assertFalse(res.body().contains("# HELP"), "no Prometheus exposition may appear: " + res.body());
+        }
     }
 
     /**

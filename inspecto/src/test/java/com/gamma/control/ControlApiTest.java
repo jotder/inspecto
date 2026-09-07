@@ -286,29 +286,12 @@ class ControlApiTest {
         }
     }
 
-    @Test
-    void metricsEndpointIsOpenAndReflectsARun(@TempDir Path dir) throws Exception {
-        try (Ctx c = open(dir)) {
-            c.svc.start();   // wires MetricsService onto the bus + runs an immediate poll cycle
-            // wait for the scheduled cycle to commit at least one batch
-            long deadline = System.nanoTime() + 8_000_000_000L;
-            String body = "";
-            while (System.nanoTime() < deadline) {
-                HttpResponse<String> m = send(c.port, "GET", "/metrics", null);  // open, no token
-                assertEquals(200, m.statusCode());
-                assertTrue(m.headers().firstValue("Content-Type").orElse("").startsWith("text/plain"));
-                body = m.body();
-                if (body.contains("inspecto_batches_total")) break;
-                Thread.sleep(150);
-            }
-            assertTrue(body.contains("# TYPE inspecto_batches_total counter"), "Prometheus exposition present");
-            assertTrue(body.contains("inspecto_batches_total{pipeline=\"test_etl\",status=\"SUCCESS\"}"),
-                    "a committed batch was counted:\n" + body);
-            assertTrue(body.contains("inspecto_poll_cycles_total"), "poll cycle counted");
-            assertTrue(body.contains("inspecto_committed_batches{pipeline=\"test_etl\"}"),
-                    "scrape-time gauge populated");
-        }
-    }
+    // ⚠ metricsEndpointIsOpenAndReflectsARun MOVED to inspecto-metrics' MetricsExpositionTest
+    // (EDG-01 cell 5, EDITIONS CP-13). The exposition is no longer in the DEFAULT build, so the assertions
+    // only hold where the module is on the classpath — they were moved there intact, not weakened here.
+    // On this build the same path answers 503: NoExchangeShipsInThePersonalBuildTest.
+    // The instrumentation itself still runs here and is still asserted — ControlApiMultiSpaceTest reads
+    // MetricRegistry.global().scrape() directly, which is byte-for-byte what the endpoint would have served.
 
     @Test
     void statusAndBatchReportEndpoints(@TempDir Path dir) throws Exception {

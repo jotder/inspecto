@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>inspecto-metrics</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Inspecto — Prometheus scrape endpoint (Standard edition, optional)</name>
+    <description>
+        OPTIONAL Standard-edition metrics EXPOSITION (EDITIONS.md CP-13): GET /metrics, the Prometheus text
+        endpoint, contributed through the core's public com.gamma.control.RouteModule ServiceLoader seam.
+
+        WHY ONLY THE EXPOSITION (EDG-01 cell 5, 2026-09-07). MetricRegistry is called by nine classes across
+        three modules outside its own package -- CollectorProcessor, JobService, PipelineScheduler, EventLog,
+        MetricsService and more -- so the instrumentation is load-bearing core plumbing and stays in
+        inspecto-event. This module carries the HTTP surface alone; that is why CP-13 is a partial by nature,
+        not by choice.
+
+        The gap it closes is real: /metrics sits in ControlApi.PUBLIC_PATHS (unauthenticated -- scrapers carry
+        no token) while Personal ships no authenticator and binds every interface by default, so a Personal
+        install served its full operational telemetry to any host that could reach the port.
+
+        Built only under the "edition-standard"/"edition-enterprise" profiles, so a routine "mvn -o clean
+        test" (= Personal, the DEFAULT build) never compiles it.
+    </description>
+
+    <dependencies>
+        <!-- The core: RouteModule/ApiContext (public since cell 3a) and MetricRegistry (inspecto-event,
+             transitively). Compile scope, as the other optional route modules do. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-processor</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- fp-etl test-jar: com.gamma.etl.TestConfigs / PipelineConfigBatchTest boot a real CollectorService
+             + ControlApi in MetricsExpositionTest, which moved here with the route (the inspecto-exchange /
+             inspecto-geo-link pattern; test scope is not transitive, so declared here). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-etl</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

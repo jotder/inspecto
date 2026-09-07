@@ -94,7 +94,7 @@ class ControlApiMultiSpaceTest {
                     "beta's audit store saw none of alpha's commits");
 
             // metrics: alpha's batch counter carries space="alpha"; no beta-labelled batch counter exists yet
-            String metrics = awaitMetric(c.port, "inspecto_batches_total{pipeline=\"test_etl\",space=\"alpha\"");
+            String metrics = awaitMetric("inspecto_batches_total{pipeline=\"test_etl\",space=\"alpha\"");
             assertFalse(metrics.contains("inspecto_batches_total{pipeline=\"test_etl\",space=\"beta\""),
                     "beta has run no batch — its batch counter must not appear:\n" + metrics);
 
@@ -106,18 +106,27 @@ class ControlApiMultiSpaceTest {
                     awaitRun(c.port, "/spaces/beta/runs/runs/" + json(betaRun).get("runId").asText()));
             assertFalse(json(send(c.port, "GET", "/spaces/beta/runs/test_etl/commits", null)).isEmpty(),
                     "beta now has its own committed batch");
-            String both = awaitMetric(c.port, "inspecto_batches_total{pipeline=\"test_etl\",space=\"beta\"");
+            String both = awaitMetric("inspecto_batches_total{pipeline=\"test_etl\",space=\"beta\"");
             assertTrue(both.contains("inspecto_batches_total{pipeline=\"test_etl\",space=\"alpha\""),
                     "alpha's batch counter is still present and distinct");
         }
     }
 
-    /** Poll {@code /metrics} until {@code needle} appears (batch events deliver synchronously, but allow slack). */
-    private String awaitMetric(int port, String needle) throws Exception {
+    /**
+     * Poll the metric registry until {@code needle} appears (batch events deliver synchronously, but allow
+     * slack).
+     *
+     * <p>⚠ Reads {@link MetricRegistry#scrape()} IN-PROCESS rather than over {@code GET /metrics}, because the
+     * HTTP exposition is edition-gated as of EDG-01 cell 5 and is absent from this (Personal) build — the path
+     * answers 503 here. That is not a weakening: {@code MetricsRoutes} serves exactly this string, so the
+     * needles are unchanged, and the subject of this test is per-space LABEL ISOLATION, which lives in the
+     * registry the endpoint merely renders. The exposition itself is asserted in inspecto-metrics.
+     */
+    private String awaitMetric(String needle) throws Exception {
         long deadline = System.nanoTime() + 8_000_000_000L;
         String body = "";
         while (System.nanoTime() < deadline) {
-            body = send(port, "GET", "/metrics", null).body();
+            body = MetricRegistry.global().scrape();
             if (body.contains(needle)) return body;
             Thread.sleep(100);
         }

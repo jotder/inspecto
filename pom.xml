@@ -86,6 +86,9 @@
                 <!-- EDG-01 cell 4 (2026-09-07): cross-space exchange / sharing. SEC-10 is "not for Personal";
                      the com.gamma.exchange domain + ExchangeRoutes lived in the core. -->
                 <module>inspecto-exchange</module>
+                <!-- EDG-01 cell 5 (2026-09-07): the Prometheus scrape endpoint. CP-13 is "not for Personal";
+                     only the EXPOSITION moves — MetricRegistry stays core, it has 14 dependants. -->
+                <module>inspecto-metrics</module>
             </modules>
         </profile>
         <!-- Enterprise = Standard + the ABAC policy engine (rbac-abac-plan §5): the same one-version
@@ -100,6 +103,7 @@
                 <module>inspecto-backup</module>
                 <module>inspecto-geo-link</module>
                 <module>inspecto-exchange</module>
+                <module>inspecto-metrics</module>
             </modules>
         </profile>
         <!-- M5 (A2): JaCoCo lives in the PARENT so every module instruments in one reactor pass —
