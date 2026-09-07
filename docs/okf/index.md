@@ -25,6 +25,12 @@ a new distilled section for the agentic framework.
   `C:/sandbox/agent-brainstorm`) that supplies Inspecto's model transport — distilled map + the
   Inspecto integration seam. The framework's authoritative docs live in its own repo.
 
+## Cross-cutting
+
+* [`living-operational-system.md`](living-operational-system.md) — the platform-wide **north star**: seven
+  cooperating networks over one metadata model, why AI is just another decision engine, and the
+  principle→enforcement table. Shape, not state — each network points at its own as-built concept.
+
 ## How to read this tier
 
 **The `okf/` tier is a constraint register, not a backlog.** Its invariants and traps are the rules

@@ -28,7 +28,7 @@ Three convictions anchor every requirement:
 3. **Operable by design** — every Run is crash-isolated and idempotent; everything is captured as
    Signals, Metrics, audit, and managed objects.
 
-The north star ([`superpower/living-operational-system.md`](superpower/living-operational-system.md))
+The north star ([`okf/living-operational-system.md`](okf/living-operational-system.md))
 frames the platform as **seven cooperating networks over one Component metamodel** (Data · Signal ·
 Decision · Execution · Metadata · Presentation · Security), so it can evolve from deterministic rules to
 AI-driven autonomy without redesign.
@@ -411,7 +411,7 @@ template gallery + apply).*
 |---|---|
 | [`archived-documents/plans-archive/feature-matrix-editions.md`](archived-documents/plans-archive/feature-matrix-editions.md) | Original H/M/S/N ratings + edition tiers (2026-07-02 planning view) |
 | [`archived-documents/plans-archive/api-contract-design.md`](archived-documents/plans-archive/api-contract-design.md) | 33 product-owner API guidelines; W1–W7 delivery worklog |
-| [`superpower/living-operational-system.md`](superpower/living-operational-system.md) | Seven-network north star; R1–R6 rework (shipped) |
+| [`okf/living-operational-system.md`](okf/living-operational-system.md) | Seven-network north star (the R1–R6 rework shipped 2026-07-06; plan archived 2026-09-07) |
 | [`archived-documents/plans-archive/backend-backlog.md`](archived-documents/plans-archive/backend-backlog.md) | Component-store seam history; Matrix/job-template sequencing |
 | [`archived-documents/plans-archive/embedded-intelligence-plan.md`](archived-documents/plans-archive/embedded-intelligence-plan.md) | AGT-5 phases P0–P5, autonomy ladder (COMPLETE 2026-07-21; archived) |
 | [`roadmap/ROADMAP.md`](roadmap/ROADMAP.md) · [`roadmap/STAKEHOLDER_OVERVIEW.md`](roadmap/STAKEHOLDER_OVERVIEW.md) | Horizons; value proposition; maturity |

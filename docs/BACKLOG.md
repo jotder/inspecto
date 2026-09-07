@@ -163,11 +163,11 @@ a test that post-dates it. What is left is one release-gated wire change.)*
 
 - **Doc-lifecycle violations** (shipped work still in `docs/superpower/`; the rule is distil → `git mv` to
   `plans-archive/` → update `INDEX.md`). Re-grounded 2026-09-07 — **two of the four listed rows were wrong**:
-  - `living-operational-system.md` — **genuine, still open.** R1–R6 all shipped 2026-07-06. Distil §1/§2/§3/§7
-    (the thesis, the seven-network map, the Component-kind coverage map, the principle→enforcement table) into
-    `okf/backend/architecture.md`; there is no OKF concept for it today. 🔴 Re-ground §5's as-built first — it
-    cites `inspecto/mock/signals.ts` and `inspecto/mock/decision.ts`, both **deleted** with the mock backend.
-    ⚠ Cited by 4 other docs (`GLOSSARY.md` §Signal, `REQUIREMENTS.md` ×2, this page) — repoint in the same change.
+  - ✅ `living-operational-system.md` — **DISTILLED + ARCHIVED 2026-09-07.** The north star is now the OKF
+    concept `okf/living-operational-system.md`; every citation (`GLOSSARY.md`, `REQUIREMENTS.md` ×2, this
+    page) was repointed in the same change. 🔴 Its "what exists today" column was deliberately **not**
+    carried — it described gaps its own R4/R5 slices had closed and cited two files deleted with the mock
+    backend, which is the general lesson: a north star states shape, a state column rots.
   - `consignment-elt-architecture.md` — **newly identified, open.** Its own header says "nothing in the plan has
     code waiting on it any more"; the built parts are distilled into `okf/backend/engine/db-layer.md` §3.9.
     ⛔ Do §3's completeness-KPI **K5** first: §8 carries its SUPERSEDED banner but §11.4's heading does not.
@@ -243,7 +243,7 @@ One line each; the reasoning is in the pointer. Reopen only on the stated trigge
 - **Vocabulary: the living-system terms are ADOPTED, not proposed** (row corrected 2026-09-07) — `GLOSSARY.md`
   already carries **Signal**, **Consequence**, **Decision Engine** and **Result Set** as binding (the last three
   annotated "§6-proposed → binding (R5)"). Only *Query* and *Parameter* were never formally adopted; use them
-  as ordinary words, not as capitalized concepts. → `superpower/living-operational-system.md` §6
+  as ordinary words, not as capitalized concepts. → `okf/living-operational-system.md` §Vocabulary
 - **PKG-5** agent-absent is the intended shipped default; ⛔ no `package.ps1` switch until the JDK 25+ vs Java 24+ floor is resolved → `okf/backend/build-run/build-test.md`
 - **D11 caps** — `max_temp_directory_size` gets no default; preview/dry-run connections stay uncapped; the semaphore-computed cap is rejected → `okf/backend/engine/duckdb.md`
 - **D7 startup backfill** full object scan (`ObjectService.backfillTagAssignments:479`, called from

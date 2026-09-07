@@ -797,8 +797,15 @@ former root reference docs** (each index lists them):
   append-only event trail **survives** a purge. ⚠ Two premises the plan itself corrected or got wrong are
   recorded there: the `ARCHIVED` state was never the blocker, and G4's four `JobService` store hooks were
   never needed.
-- [`superpower/living-operational-system.md`](superpower/living-operational-system.md) — standing
-  **architecture north-star** (seven networks over one Component metamodel); R1–R6 all shipped.
+- ~~`superpower/living-operational-system.md`~~ — **ARCHIVED 2026-09-07** (R1–R6 all shipped 2026-07-06;
+  the north star is current knowledge, so it was promoted out of the plans tier rather than kept there) →
+  [`archived-documents/plans-archive/living-operational-system.md`](archived-documents/plans-archive/living-operational-system.md).
+  **The philosophy now lives at [`okf/living-operational-system.md`](okf/living-operational-system.md)** —
+  the thesis, the seven networks with a pointer to each one's as-built concept, the Component-kind coverage
+  rule, and the principle→enforcement table. 🔴 The plan's "what exists today" column is exactly what was
+  NOT carried: it had gone stale (it still described gaps its own R4/R5 slices closed, and cited
+  `inspecto/mock/signals.ts` / `inspecto/mock/decision.ts`, deleted with the mock backend). A north star
+  states shape, not state — read the per-network pointers for state.
 - ~~`superpower/geo-map-case-studies.md`~~ — **ARCHIVED 2026-09-06** (CS1–CS5 shipped and spec-pinned;
   distilled into [`okf/frontend/features/geo-map.md`](okf/frontend/features/geo-map.md) §Case studies) →
   `archived-documents/plans-archive/geo-map-case-studies.md`.

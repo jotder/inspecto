@@ -561,7 +561,7 @@ C9 — `archived-documents/superpower-reviews/reconciliation.md`.)*
 ## 8. Observability
 
 **Signal** — A lightweight **emitted fact** — it *announces, never decides* (the Signal network,
-living-operational-system §1). One envelope `{ signalId, type, at, source, correlationId, severity?, payload }`
+okf/living-operational-system, The thesis). One envelope `{ signalId, type, at, source, correlationId, severity?, payload }`
 where `source` is a metadata **Ref** (`rel:'emits'`) to the producer. Every run, job, Alert Rule firing, failed
 Expectation, Decision Consequence and operator action emits one, to a single **signal ledger**. **Event, Alert and
 Notification are *views* over this one ledger, not parallel stores** (unified in R4). ⚠️ §6-proposed → **binding**.
