@@ -1,5 +1,7 @@
 package com.gamma.ops;
 
+import com.gamma.util.AbstractJdbcStore;
+
 import com.gamma.util.JdbcDrivers;
 import com.gamma.util.JsonAttributes;
 import org.slf4j.Logger;

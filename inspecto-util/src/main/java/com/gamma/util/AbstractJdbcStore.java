@@ -1,6 +1,5 @@
-package com.gamma.ops;
+package com.gamma.util;
 
-import com.gamma.util.BrowsableStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -9,8 +8,16 @@ import java.sql.SQLException;
 import java.util.List;
 
 /**
- * The shared skeleton of the four JDBC-backed operational stores (JAVA-5): {@link DbObjectStore},
- * {@code DbLinkStore}, {@code DbNoteStore} and {@code DbTagAssignmentStore}.
+ * The shared skeleton of the JDBC-backed stores (JAVA-5): {@code DbObjectStore}, {@code DbLinkStore},
+ * {@code DbNoteStore}, {@code DbTagAssignmentStore} and {@code DbDeliveryReceiptStore}.
+ *
+ * <p>⚠ <b>Moved here from {@code com.gamma.ops} in EDG-01 cell 7 (2026-09-08), and the move is the point.</b>
+ * This is generic JDBC scaffolding — a connection field, the {@link BrowsableStore} seam, and a {@code close()}
+ * that swallows a close failure into one warning — that merely happened to live in the operational-objects
+ * package because four of its five subclasses are operational stores. The fifth,
+ * {@code com.gamma.notify.DbDeliveryReceiptStore}, is not: so when CP-11 moved {@code com.gamma.ops} out of
+ * the mandatory build into an optional edition module, this class could not travel with it without taking an
+ * unrelated core store hostage. It is infrastructure, not domain, and now lives where that is legible.
  *
  * <p>Each carried the same connection field, the same four-line {@link BrowsableStore} seam differing
  * only in two labels and a table name, and the same {@code close()} that swallows a close failure into

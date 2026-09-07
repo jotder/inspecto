@@ -1,5 +1,7 @@
 package com.gamma.ops.note;
 
+import com.gamma.util.AbstractJdbcStore;
+
 import com.gamma.ops.AnnotationKinds;
 
 import com.gamma.util.JdbcDrivers;
@@ -26,7 +28,7 @@ import java.util.Map;
  * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
-public final class DbNoteStore extends com.gamma.ops.AbstractJdbcStore implements NoteStore {
+public final class DbNoteStore extends AbstractJdbcStore implements NoteStore {
 
     private static final Logger log = LoggerFactory.getLogger(DbNoteStore.class);
 

@@ -1,5 +1,7 @@
 package com.gamma.notify;
 
+import com.gamma.util.AbstractJdbcStore;
+
 import com.gamma.util.JdbcDrivers;
 import com.gamma.util.JsonAttributes;
 
@@ -18,7 +20,7 @@ import java.util.Optional;
 
 /**
  * Database-backed {@link DeliveryReceiptStore} — the durable twin of {@link InMemoryDeliveryReceiptStore},
- * built on the same {@link com.gamma.ops.AbstractJdbcStore} idiom as {@link com.gamma.ops.note.DbNoteStore}
+ * built on the same {@link AbstractJdbcStore} idiom as {@link com.gamma.ops.note.DbNoteStore}
  * (plain JDBC over the bundled DuckDB, or a {@code jdbc:postgresql://…} URL; one shared connection, every
  * access serialised on the store's monitor).
  *
@@ -43,7 +45,7 @@ import java.util.Optional;
  * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
-public final class DbDeliveryReceiptStore extends com.gamma.ops.AbstractJdbcStore
+public final class DbDeliveryReceiptStore extends AbstractJdbcStore
         implements DeliveryReceiptStore {
 
     private static final String TABLE = "inspecto_delivery_receipts";

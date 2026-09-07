@@ -1,5 +1,7 @@
 package com.gamma.ops.link;
 
+import com.gamma.util.AbstractJdbcStore;
+
 import com.gamma.ops.ObjectType;
 import com.gamma.util.JdbcDrivers;
 import org.slf4j.Logger;
@@ -26,7 +28,7 @@ import java.util.List;
  * @since 4.0.0
  */
 @com.gamma.api.PublicApi(since = "4.0.0")
-public final class DbLinkStore extends com.gamma.ops.AbstractJdbcStore implements LinkStore {
+public final class DbLinkStore extends AbstractJdbcStore implements LinkStore {
 
     private static final Logger log = LoggerFactory.getLogger(DbLinkStore.class);
 
