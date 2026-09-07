@@ -28,9 +28,12 @@ indicting the real risk, because the test supplies what production must supply.
 - Every connector test lives inside `inspecto-connectors`, where the classes and their
   `META-INF/services` file are trivially on the test classpath. They passed for 85 days while the module
   reached no deployment at all (CONNECTORS-BUNDLE-1).
-- `inspecto-security`'s tests pass because Nimbus is a compile dependency **there**; the shipped 16 KB
-  jar carries none of it. The core-side auth tests pass because they inject a lambda through
-  `Authenticators.forTest`. Both halves green, the join untested.
+- `inspecto-security`'s tests passed because Nimbus is a compile dependency **there**, while the shipped
+  16 KB jar carried none of it and every Standard/Enterprise bundle failed to boot; the core-side auth
+  tests passed because they inject a lambda through `Authenticators.forTest`. Both halves green, the join
+  untested. ✅ Fixed 2026-09-07 the same way as the connectors: a shaded `-sidecar` artifact with the core
+  `provided`, plus a staged-artifact check in `package.ps1` asserting `com/nimbusds` and all three SPI
+  registrations are present.
 
 ⚠ **The generalisation:** an SPI verified with an ambient-classpath `ServiceLoader.load(X.class)` *inside
 the module that provides X* proves the class works, never that it is reachable. The one test in the
@@ -52,9 +55,15 @@ separate `URLClassLoader`, filtering to providers that actually came from it. Co
 3. **Anchor a source scan and assert the anchor.** `MapNodeKeyContractTest` asserts its scanned region
    was actually found before trusting the scan — *"the map-path region moved or was renamed — re-anchor
    this scan before trusting it"*. Without that, a moved region silently scans nothing.
-4. **Prefer an assertion to an assumption.** `assumeTrue` on corpus presence disarms the guard silently
-   if a fixture path moves. `MappingMigrationTest` gets it right: *"the corpus must not be empty — this
-   test would prove nothing"*.
+4. **Prefer an assertion to an assumption — and where a skip is genuinely right, make it VISIBLE.**
+   `assumeTrue` on corpus presence disarms the guard silently if a fixture path moves.
+   `MappingMigrationTest` gets it right: *"the corpus must not be empty — this test would prove nothing"*.
+   ⚠ When a test legitimately needs something the environment may not have (an external server, a native
+   binary), put the assumption in **`@BeforeEach`, never `@BeforeAll`**: an aborted container reports
+   `Tests run: 0, Skipped: 0` and the class vanishes from the totals, whereas per-test it reports
+   `Skipped: N` *with the reason*. `PostgresStateStoreTest` is the reference — 11 skipped, each naming the
+   property that turns it back on. Absent coverage you can see is a decision; absent coverage you cannot
+   is the disease.
 5. **Check the STAGED artifact, not the build output.** `package.ps1` verifies the bundled connector
    sidecar (8 factories registered, sshj present, javax.mail present). That check is the only thing in
    the repo that inspects a packaged artifact, and it is the only one that would have caught

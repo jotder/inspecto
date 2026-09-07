@@ -236,10 +236,15 @@ if ($Edition -ne 'Personal') {
         Pop-Location
     }
     $securityTargetDir = Join-Path $sandboxRoot 'inspecto-security\target'
-    $securityJarSrc = Get-ChildItem -Path $securityTargetDir -Filter 'inspecto-security-*.jar' -ErrorAction SilentlyContinue |
+    # SEC-SIDECAR-BOOT-1 (2026-09-07): the SHADED jar, not the thin one. Until now this copied the plain
+    # 16 KB artifact, which carries no com/nimbusds classes at all - so every Standard/Enterprise bundle
+    # died at boot, because ControlApi resolves the Authenticator SPI during startup through an unguarded
+    # ServiceLoader and OidcAuthenticator needs Nimbus. The glob is '-sidecar' on purpose: a bare
+    # 'inspecto-security-*.jar' now matches BOTH artifacts and would pick one by luck.
+    $securityJarSrc = Get-ChildItem -Path $securityTargetDir -Filter 'inspecto-security-*-sidecar.jar' -ErrorAction SilentlyContinue |
                        Select-Object -First 1 -ExpandProperty FullName
     if (-not $securityJarSrc -or -not (Test-Path $securityJarSrc)) {
-        throw "$Edition edition requested but no JAR found matching $securityTargetDir\inspecto-security-*.jar."
+        throw "$Edition edition requested but no SHADED JAR found matching $securityTargetDir\inspecto-security-*-sidecar.jar. The thin jar is not usable - it carries no Nimbus classes."
     }
     if ($Edition -eq 'Enterprise') {
         $policyTargetDir = Join-Path $sandboxRoot 'inspecto-policy\target'
@@ -267,6 +272,23 @@ Copy-Item $jarSrc "$bundleDir\inspecto.jar"
 if ($securityJarSrc) {
     Copy-Item $securityJarSrc "$bundleDir\inspecto-security.jar"
     Write-Host "Bundled Standard-edition security module → inspecto-security.jar" -ForegroundColor Green
+
+    # Verify the STAGED artifact, the same way the connector sidecar is verified. This is the check that
+    # would have caught SEC-SIDECAR-BOOT-1: the module's own tests pass with Nimbus on the compile
+    # classpath, and the core-side auth tests inject a lambda, so nothing else can see the thin jar.
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $secZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-security.jar")
+    try {
+        if (-not ($secZip.Entries | Where-Object { $_.FullName -like 'com/nimbusds/*' })) {
+            throw "inspecto-security.jar carries no com/nimbusds classes - OidcAuthenticator would throw NoClassDefFoundError while ControlApi resolves the Authenticator SPI, and the bundle would not boot."
+        }
+        foreach ($spi in @('com.gamma.control.Authenticator', 'com.gamma.control.TokenRelay', 'com.gamma.acquire.SecretsProvider')) {
+            if (-not ($secZip.Entries | Where-Object { $_.FullName -eq "META-INF/services/$spi" })) {
+                throw "inspecto-security.jar has no META-INF/services/$spi - the shade dropped the ServicesResourceTransformer, so the bundle would silently fall back to auth-free."
+            }
+        }
+        Write-Host "  verified: Nimbus classes + 3 SPI registrations present in the security sidecar" -ForegroundColor DarkGray
+    } finally { $secZip.Dispose() }
 }
 if ($policyJarSrc) {
     Copy-Item $policyJarSrc "$bundleDir\inspecto-policy.jar"

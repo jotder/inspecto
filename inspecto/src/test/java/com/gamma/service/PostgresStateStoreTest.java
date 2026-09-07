@@ -27,13 +27,16 @@ import com.gamma.ops.note.ObjectNote;
 import com.gamma.ops.note.NoteKind;
 import com.gamma.pipeline.exec.DbProvenanceStore;
 import com.gamma.pipeline.exec.ProvenanceRow;
-import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -41,32 +44,80 @@ import java.util.OptionalLong;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * DAT-6 — proves the ten JDBC-backed stores actually run on <b>real PostgreSQL</b>, not just the
- * bundled DuckDB. A single embedded Postgres (io.zonky, test-scope only — never shipped) is booted
- * once and every store opens against it, runs {@code initSchema}, and does a write→read round-trip. The
- * stores use distinct table names, so they coexist in one database without collision.
+ * bundled DuckDB. Every store opens against one database, runs {@code initSchema}, and does a
+ * write→read round-trip. The stores use distinct table names, so they coexist without collision.
  *
  * <p>The critical case is {@link DbJobRunStore#metrics} (p50/p95): those percentiles are the one piece of
  * non-portable SQL — DuckDB's {@code quantile_cont} vs Postgres's {@code percentile_cont(..) WITHIN GROUP}
  * — and this test exercises them against the real engine to pin the dialect fix.
+ *
+ * <p><b>It runs against an EXISTING server</b> (operator decision 2026-09-07). The embedded-Postgres
+ * harness and its per-platform binaries were removed: only the JDBC <em>client driver</em> stays, so
+ * Postgres is installed separately or pointed at. Enable with either
+ * {@code -Dinspecto.test.pg.url=jdbc:postgresql://host:5432/db?user=…&password=…} or the environment
+ * variable {@code INSPECTO_TEST_PG_URL}; with neither, the class SKIPS.
+ *
+ * <p>⚠ Skipping means this coverage does not run by default — including in CI. That is the deliberate
+ * cost of dropping the embedded engine, and it is the shape
+ * {@code okf/backend/build-run/guard-coverage.md} warns about, so the skip message names exactly how to
+ * turn it back on rather than passing quietly.
+ *
+ * <p>🔴 The assertions are exact counts ({@code total == 6}, {@code all.size() == 2}), so they need a
+ * clean database — which a shared server is not. Each run therefore creates its own uniquely-named
+ * SCHEMA, points the stores at it through {@code currentSchema}, and drops it afterwards. Never let this
+ * test write into the caller's default schema: it would pass once and then fail forever.
  */
 class PostgresStateStoreTest {
 
-    private static EmbeddedPostgres pg;
+    /** System property (or {@code INSPECTO_TEST_PG_URL} env var) naming the server to test against. */
+    private static final String URL_PROPERTY = "inspecto.test.pg.url";
+
+    private static String adminUrl;
+    private static String schema;
     private static String url;
 
     @BeforeAll
-    static void startPostgres() throws Exception {
-        pg = EmbeddedPostgres.builder().start();
-        // URL carries user=postgres, so the no-credential open(url) factories (jobs/provenance) work too.
-        url = pg.getJdbcUrl("postgres", "postgres");
+    static void connectToAnExistingPostgres() throws Exception {
+        adminUrl = System.getProperty(URL_PROPERTY);
+        if (adminUrl == null || adminUrl.isBlank()) adminUrl = System.getenv("INSPECTO_TEST_PG_URL");
+        if (adminUrl == null || adminUrl.isBlank()) return;   // unconfigured: @BeforeEach reports the skip
+
+        // One throwaway schema per run: the assertions below count rows exactly, so they need a clean
+        // database, and a server someone else supplied is not one.
+        schema = "inspecto_test_" + Long.toHexString(System.nanoTime());
+        try (Connection c = DriverManager.getConnection(adminUrl); Statement s = c.createStatement()) {
+            s.execute("CREATE SCHEMA " + schema);
+        }
+        url = adminUrl + (adminUrl.contains("?") ? "&" : "?") + "currentSchema=" + schema;
+    }
+
+    /**
+     * The skip lives HERE, not in {@link #connectToAnExistingPostgres()}, and that is deliberate.
+     *
+     * <p>An {@code assumeTrue} inside {@code @BeforeAll} aborts the whole container, and surefire then
+     * reports <b>"Tests run: 0, Skipped: 0"</b> — the class disappears from the totals with no trace of
+     * why, which is the silently-disarmed guard this repo keeps paying for
+     * ({@code okf/backend/build-run/guard-coverage.md}). Per-test, every method is reported as SKIPPED
+     * <em>with this message</em>, so the absent coverage is visible in the count and in the report.
+     */
+    @BeforeEach
+    void requireAConfiguredServer() {
+        assumeTrue(url != null,
+                "DAT-6 needs a PostgreSQL server: pass -D" + URL_PROPERTY
+                        + "=jdbc:postgresql://host:5432/db?user=…&password=… or set INSPECTO_TEST_PG_URL. "
+                        + "The embedded harness was removed 2026-09-07 — only the JDBC client driver ships.");
     }
 
     @AfterAll
-    static void stopPostgres() throws Exception {
-        if (pg != null) pg.close();
+    static void dropTheThrowawaySchema() throws Exception {
+        if (schema == null || adminUrl == null) return;
+        try (Connection c = DriverManager.getConnection(adminUrl); Statement s = c.createStatement()) {
+            s.execute("DROP SCHEMA IF EXISTS " + schema + " CASCADE");
+        }
     }
 
     @Test

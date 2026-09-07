@@ -679,3 +679,26 @@ Incident with the same correlation id; there is **no uniqueness constraint** in 
 evaluations can therefore open duplicates. Treat the dedup as best-effort and do not build a guarantee on it.
 
 *Distilled 2026-09-07 from `consignment-elt-architecture.md` when that plan was archived ([archive copy](../../../archived-documents/plans-archive/consignment-elt-architecture.md)).*
+
+## Proving the JDBC stores on real PostgreSQL (DAT-6)
+
+`PostgresStateStoreTest` opens all ten JDBC-backed stores against a real server and round-trips each one.
+Its load-bearing case is `DbJobRunStore.metrics`: p50/p95 are the one piece of non-portable SQL — DuckDB's
+`quantile_cont` versus Postgres's `percentile_cont(..) WITHIN GROUP` — so only a real engine pins the
+dialect fix.
+
+**It needs a server you supply** (operator decision 2026-09-07). The embedded-Postgres harness and its
+per-platform binaries are gone; only the JDBC *client driver* remains, so Postgres is installed separately
+or pointed at:
+
+```bash
+mvn -o test -pl inspecto -am -Dtest=PostgresStateStoreTest     -Dinspecto.test.pg.url='jdbc:postgresql://localhost:5432/postgres?user=postgres&password=…'
+```
+
+`INSPECTO_TEST_PG_URL` works too. With neither, all 11 methods report **SKIPPED with the reason** — the
+skip is per-test, not on `@BeforeAll`, because an assumption there aborts the container and surefire
+prints `Tests run: 0, Skipped: 0`, hiding the absent coverage entirely.
+
+⚠ **Each run creates and drops its own schema** (`inspecto_test_<nanos>`, reached via `currentSchema`).
+The assertions are exact counts, so they need a clean database and a shared server is not one — never
+point this at a default schema you care about, and never remove the `@AfterAll` drop.

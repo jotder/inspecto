@@ -83,27 +83,13 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - **P2** · **WORKBENCH-S4** — the one-surface Step workbench. **Operator 2026-09-06: design now, build later** — the design is written and awaiting review: `superpower/step-workbench-s4-design.md` (three UI-only slices S4a field list+filter · S4b input strip · S4c summarize grouping; NO new endpoint — the canvas edges are the input-relation truth). Build only after the two open questions in its §5 are answered.
 
 - **P2** · **AUTHORING-REDESIGN-1** — open letters (⚠ the old "(j)(l)(n2)(o) are in §1" clause was stale in all four: (o) is now the WORKBENCH-S4 row above, (l) and (n2) SHIPPED, (j) `engine: auto` was already answered by shipped code; (f)(g)(m) SHIPPED 2026-09-06 — `JOIN_REFERENCE_MISSING`/`JOIN_ON_MISSING`/`UNKNOWN_JOIN_REFERENCE` at save, `SchemaMappingDrift` on all three schema save paths, `?pipeline=` sent by the UI): (c) v2 structured AST table over the SQL for WHERE/JOIN editing — 🔴 precondition: probe that the `json` extension loads on the SEALED `SqlSandbox` connection; (d) v3 macros as the UDF registry (per-connection re-creation in `EnrichmentEngine`, `PipelineJobRunner`, `BatchIngestStrategy`, preview) — demand-gated; (e) column metadata editing on the Transform pane (Parse D2) — needs a backend home for metadata on a `transform.sql` node first; (i) per-row "sample resolves to" line — no host resolves a sample against an `AttributeSpec`. Still open on (f): which COLUMNS the reference carries is the dry-run's question (it reads the store); the save checks existence and `on` presence only. → `okf/frontend/features/schema-mapping-authoring.md` §0
-- **P1** · **SEC-SIDECAR-BOOT-1** — 🔴 **every Standard and Enterprise bundle cannot boot.**
-  `inspecto-security/pom.xml` declares `nimbus-jose-jwt` at compile scope and has **no `<build>` section
-  and no shade plugin**, so the jar `package.ps1` copies is 16 KB / 18 files with **zero `com/nimbusds`
-  classes** — verified on disk. `OidcAuthenticator` has 9 direct `com.nimbusds` imports;
-  `ControlApi:263` calls `Authenticators.active()` **during startup**, and `SpiSlot.active()` iterates
-  `ServiceLoader` with no try/catch. The only `nimbus` mention in `package.ps1` is a jlink comment that
-  *assumes* the jar carries it. Exactly the CONNECTORS-BUNDLE-1 trap, one module over and worse — a boot
-  failure, not a degraded feature. Fix: shade `inspecto-security` (classifier `sidecar`, core `provided`)
-  and extend `package.ps1`'s staged-artifact check to assert `com/nimbusds` is present. ⚠ Nothing goes
-  red today because the module's own tests have Nimbus on the compile classpath and the core-side tests
-  inject a lambda via `Authenticators.forTest`. → `okf/backend/build-run/guard-coverage.md`
-- **P1** · **CI-RED-1** — 🔴 **CI has failed on `master` for 100 of the last 100 runs** and nobody noticed;
-  a permanently-red build trains everyone to ignore it. Two Linux-only test failures, both test defects
-  rather than product bugs: `DbConsignmentOutputStoreTest.mapsReadPathsBackToTheirLiveConsignments` feeds
-  a Windows-spelled path and expects `norm()` (`Path.of(...).toAbsolutePath()`, platform-native) to match
-  it — true on Windows, false on Linux where `\` is a legal filename char; and
-  `RunContextCausationTest.aSignalTriggeredRunStampsItsTriggerAsTheCauseOfEverythingItEmits` counts ALL
-  `job.run.started` signals in a globally-installed store (expected 1, got 11). ⛔ Fix the tests, not
-  `norm()` — making it separator-normalising would break legitimate Linux filenames, and that is a
-  product call. **Consequence while red:** `ci.yml`'s lean-core and dependency-lock guards sit AFTER the
-  test step and have therefore never executed on master.
+- **P2** · **DAT-6-CI-1** — the Postgres store verification is now OPT-IN and therefore runs **nowhere
+  automated**. The embedded harness was removed 2026-09-07 (operator: install separately or point at an
+  existing server), so `PostgresStateStoreTest` reports 11 SKIPPED unless `-Dinspecto.test.pg.url` /
+  `INSPECTO_TEST_PG_URL` is set — visible in the count by design, but still absent coverage on the one
+  test that proves `percentile_cont` and the other non-portable SQL work. Cheapest restoration: a
+  `services: postgres:16` container in `ci.yml` plus that env var — a service container IS "an existing
+  server", so it honours the decision rather than reversing it. → `okf/backend/engine/db-layer.md`
 - **P1** · **RUNSH-CP-1** — 🔴 the connector sidecar does not reach the one-shot ETL path.
   `run.sh`/`run.bat` launch `java -jar inspecto.jar`, and `-jar` ignores `-cp`; the manifest carries no
   `Class-Path`. So all 12 sidecar providers stay unreachable there, while `serve.sh`/`serve.bat` (which

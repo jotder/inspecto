@@ -66,6 +66,16 @@ the vendored kernel + eoiagent model transport.
 `inspecto-security` and `inspecto-policy`. They build in an ordinary `mvn test` run; they are simply never
 *bundled*.
 
+⚠ **`inspecto-security` ships SHADED too, for the same reason** (SEC-SIDECAR-BOOT-1, 2026-09-07). It is
+profile-gated (`-Pedition-standard` / `-Pedition-enterprise`), but until that date `package.ps1` staged its
+plain 16 KB jar — which carries **no `com/nimbusds` classes**, while `OidcAuthenticator` has nine direct
+Nimbus imports and `ControlApi` resolves the `Authenticator` SPI *during startup* through an unguarded
+`ServiceLoader`. Every Standard and Enterprise bundle failed to boot. It now builds an
+`inspecto-security-*-sidecar.jar` (core and slf4j `provided`, so the shade carries Nimbus and nothing else),
+`package.ps1` stages that one, and verifies the STAGED artifact for `com/nimbusds` plus all three SPI
+registrations. `inspecto-policy` needs none of this — it has no third-party dependencies, so its thin jar
+is genuinely complete.
+
 🔴 **`inspecto-connectors` was in that list until 2026-09-07, and that was a defect, not a design.** It is
 still a plain default module, but it is now **bundled in every edition** as `inspecto-connectors.jar`
 (CONNECTORS-BUNDLE-1). Before that it was built and unit-tested by CI and shipped by nothing, so SFTP,

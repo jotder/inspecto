@@ -125,56 +125,6 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- DAT-6: embedded PostgreSQL to prove the JDBC state stores really run on Postgres.
-             TEST SCOPE ONLY — must never leak into the shipped fat-JAR / SBOM; the lean core
-             runtime stays JDBC-driver-free by design (the PG driver ships in inspecto-connectors).
-             Exclusions keep OFFLINE resolution clean: the default binaries version (14.10.1) and
-             commons-codec 1.15 are NOT cached, and flyway/liquibase/junit4/mockito/slf4j-simple are
-             unwanted, so we strip them and pin the cached windows-amd64 16.4.0 binary, commons-codec
-             1.18.0 and postgresql 42.7.4 explicitly. (commons-io is also stripped+pinned to 2.20.0, but for
-             a different reason — it IS cached, just too old for embedded-postgres; see its inline note below.) -->
-        <dependency>
-            <groupId>io.zonky.test</groupId>
-            <artifactId>embedded-postgres</artifactId>
-            <version>2.0.7</version>
-            <scope>test</scope>
-            <exclusions>
-                <exclusion><groupId>org.flywaydb</groupId><artifactId>flyway-core</artifactId></exclusion>
-                <exclusion><groupId>org.liquibase</groupId><artifactId>liquibase-core</artifactId></exclusion>
-                <exclusion><groupId>junit</groupId><artifactId>junit</artifactId></exclusion>
-                <exclusion><groupId>org.mockito</groupId><artifactId>mockito-core</artifactId></exclusion>
-                <exclusion><groupId>org.slf4j</groupId><artifactId>slf4j-simple</artifactId></exclusion>
-                <exclusion><groupId>commons-codec</groupId><artifactId>commons-codec</artifactId></exclusion>
-                <exclusion><groupId>commons-io</groupId><artifactId>commons-io</artifactId></exclusion>
-                <exclusion><groupId>org.postgresql</groupId><artifactId>postgresql</artifactId></exclusion>
-                <exclusion><groupId>io.zonky.test.postgres</groupId><artifactId>embedded-postgres-binaries-windows-amd64</artifactId></exclusion>
-                <exclusion><groupId>io.zonky.test.postgres</groupId><artifactId>embedded-postgres-binaries-darwin-amd64</artifactId></exclusion>
-                <exclusion><groupId>io.zonky.test.postgres</groupId><artifactId>embedded-postgres-binaries-linux-amd64</artifactId></exclusion>
-                <exclusion><groupId>io.zonky.test.postgres</groupId><artifactId>embedded-postgres-binaries-linux-amd64-alpine</artifactId></exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>io.zonky.test.postgres</groupId>
-            <artifactId>embedded-postgres-binaries-windows-amd64</artifactId>
-            <version>16.4.0</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>commons-codec</groupId>
-            <artifactId>commons-codec</artifactId>
-            <version>1.18.0</version>
-            <scope>test</scope>
-        </dependency>
-        <!-- embedded-postgres 2.0.7 declares commons-io 2.11.0 directly (Maven nearest-wins), but its
-             EmbeddedPostgres.extractTxz uses IOIterator (commons-io >= 2.12) -> NoClassDefFoundError at
-             test time. Its own tree also wants 2.20.0 transitively (omitted for the 2.11.0 conflict), so we
-             exclude its commons-io above and pin the cached 2.20.0 it expects explicitly here. Test scope. -->
-        <dependency>
-            <groupId>commons-io</groupId>
-            <artifactId>commons-io</artifactId>
-            <version>2.20.0</version>
-            <scope>test</scope>
-        </dependency>
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
@@ -232,34 +182,4 @@
         </plugins>
     </build>
 
-    <profiles>
-        <!-- DAT-6 / CI-RED-1 (2026-09-07): the embedded-Postgres binaries are PER-PLATFORM, and the
-             dependency block above excludes all four then adds back only windows-amd64 — the one cached
-             for this Windows sandbox's offline builds. On the Linux CI runner that leaves zonky with no
-             binaries at all, so `PostgresStateStoreTest` errored with "Missing embedded postgres binaries"
-             on every run. It was the LAST failure keeping CI red, behind two others that masked it.
-
-             Activated by OS, so nothing changes for the offline Windows build (the profile is simply
-             inactive and no new artifact has to be cached), while CI — which resolves online — picks up
-             the Linux binary and actually RUNS the test rather than skipping it. ⛔ Do not "fix" this with
-             an assumeTrue: a test disarmed by its environment is the failure mode this repo keeps paying
-             for (see okf/backend/build-run/guard-coverage.md).
-
-             `family=unix` + `arch=amd64` targets Linux x86_64 specifically — macOS reports x86_64/aarch64,
-             so a darwin runner would need its own binary added here. -->
-        <profile>
-            <id>embedded-pg-linux</id>
-            <activation>
-                <os><family>unix</family><arch>amd64</arch></os>
-            </activation>
-            <dependencies>
-                <dependency>
-                    <groupId>io.zonky.test.postgres</groupId>
-                    <artifactId>embedded-postgres-binaries-linux-amd64</artifactId>
-                    <version>16.4.0</version>
-                    <scope>test</scope>
-                </dependency>
-            </dependencies>
-        </profile>
-    </profiles>
 </project>
