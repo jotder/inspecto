@@ -154,8 +154,12 @@ const DOC_ALLOW = {
         'Subject matter: the §1 ban table and §13 rename-map rows for Source → Collector / Stream / Reference.',
     'docs/GLOSSARY.md::cube-noun':
         'Subject matter: the §13 rename-map rows for Cube → Matrix.',
-    'docs/INDEX.md::bare-flow':
-        'Subject matter: the one hit names the Flow→Pipeline rename as the largest remaining blast radius (517 files / 39 @PublicApi).',
+    // A `docs/INDEX.md::bare-flow` entry lived here from 2026-08-29 to 2026-09-07. It is gone because the
+    // 2026-09-07 consolidation DELETED the line rather than kept the exemption — the preferred outcome this
+    // file argues for. The line claimed Batch→Consignment superseded Flow→Pipeline as "the largest blast
+    // radius (517 Java files)", a figure the Tier-3 sweep had already taken to 166, inside a per-plan
+    // narrative that moved to `archived-documents/index-snapshot-2026-09-07.md`. The rename map that owns
+    // the claim is GLOSSARY §13, which has its own subject-matter exemption below.
     'docs/PROJECT_NOTES.md::bare-flow':
         'Subject matter: the one hit records that CONFIG_ALLOW doubles as the Flow→Pipeline Tier-3 ledger. The other four hits in this file were stale and were fixed 2026-08-29.',
 };

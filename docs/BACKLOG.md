@@ -178,14 +178,14 @@ a test that post-dates it. What is left is one release-gated wire change.)*
   - ✅ `gate-register.md` — **ARCHIVED 2026-09-07.** Its own retirement trigger had fired and it had become
     actively misleading (§3.5 and §3.3 still framed items resolved weeks earlier as open calls). Its one durable
     note is now `okf/index.md` §*How to read this tier*.
-- 🔴 **`INDEX.md` has become an archive log, not a map** — 879 lines, of which **44 are struck-through tombstones**
-  for plans already in `plans-archive/`, sitting under a heading that reads "plans live here ONLY while active",
-  against just **12 real plan files**. This is the same failure the 2026-09-06 BACKLOG consolidation cured
-  (505 KB → 43 KB). Wanted: freeze the current page as an archived snapshot, then rewrite INDEX as a true
-  curated map (root canon · OKF · contracts · genuinely in-flight plans · one pointer to `plans-archive/`).
-  ⚠ **Trap**: `DOC_ALLOW['docs/INDEX.md::bare-flow']` protects exactly one line (the Batch→Consignment
-  "largest blast radius" claim, whose *517 Java files* figure is itself stale — the Tier-3 sweep took it to 166).
-  Delete that waiver in the same change or the guard's stale-allowlist rule fails the build.
+- ✅ **`INDEX.md` CONSOLIDATED 2026-09-07** — 879 lines → 150. It had become an archive log: **46
+  struck-through per-plan narratives (443 lines)** for plans already in `plans-archive/`, under a heading
+  saying plans live there only while active, against 12 real ones. The narratives are frozen in
+  `archived-documents/index-snapshot-2026-09-07.md`; the part worth keeping — which OKF concept each
+  archived plan's truth went into — is now a 46-row routing table. Verified no live-doc pointer was lost
+  (every dropped link is reachable from its own OKF sub-index). The `DOC_ALLOW['docs/INDEX.md::bare-flow']`
+  waiver was **deleted rather than kept** — the guard's own preferred outcome — and the removal was
+  falsified in both directions (the guard fires on a bare banned word in INDEX, and passes when clean).
 - **REQUIREMENTS MoSCoW / edition columns** — §3.1 ACQ-4, §3.9 SPC-5 and §3.15 UI-8 were **fixed 2026-09-07**
   (all three were contradicted by their own §5 and by the code; UI-8 had read "IN-FLIGHT, uncommitted, another
   session" for two months over a pane that shipped 2026-07-07). An authority note now says `EDITIONS.md`'s matrix
