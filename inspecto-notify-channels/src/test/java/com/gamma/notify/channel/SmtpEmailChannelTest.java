@@ -1,4 +1,4 @@
-package com.gamma.connect.notify;
+package com.gamma.notify.channel;
 
 import com.gamma.notify.Notification;
 import org.junit.jupiter.api.Test;
@@ -85,7 +85,11 @@ class SmtpEmailChannelTest {
         MimeMessage m = ch.message(sample(), "ops@example.com", "abc123");
         assertEquals("<inspecto.abc123@example.com>", m.getHeader("Message-ID")[0],
                 "the domain comes from the sender address, and the id is what a callback echoes back");
-        assertEquals("abc123", DeliveryIds.fromMessageId(m.getHeader("Message-ID")[0]),
+        // ⚠ Asserted against the SHAPE, not via DeliveryIds.fromMessageId — that helper is
+        // package-private and stayed in inspecto-connectors with the adapters that use it (EDG-01 cell 1).
+        // Its pattern is `inspecto\.([A-Za-z0-9]+)@`, so matching it here keeps the round-trip pinned on
+        // both sides without this module depending on the one it was split from.
+        assertTrue(m.getHeader("Message-ID")[0].matches("<inspecto\\.abc123@.+>"),
                 "the round trip closes: what we write is what the adapter parses back out");
 
         // saveChanges() is what Transport.send calls, and stock MimeMessage regenerates Message-ID there —
@@ -104,6 +108,6 @@ class SmtpEmailChannelTest {
         assertNull(m.getHeader("Message-ID"), "nothing set before the send");
         m.saveChanges();
         assertNotNull(m.getHeader("Message-ID")[0], "javax.mail still generates its own");
-        assertNull(DeliveryIds.fromMessageId(m.getHeader("Message-ID")[0]), "and it is not one of ours");
+        assertFalse(m.getHeader("Message-ID")[0].contains("inspecto."), "and it is not one of ours");
     }
 }

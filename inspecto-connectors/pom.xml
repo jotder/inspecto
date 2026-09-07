@@ -31,7 +31,6 @@
         <sshj.version>0.39.0</sshj.version>
         <commons-net.version>3.6</commons-net.version>
         <!-- postgresql.version managed by the parent (M1) — shared with the core test-scope pin. -->
-        <javax-mail.version>1.6.2</javax-mail.version>
         <kafka.version>3.9.2</kafka.version>
         <!-- test-only embedded servers -->
         <sshd.version>2.12.1</sshd.version>
@@ -92,14 +91,6 @@
             <version>${kafka.version}</version>
         </dependency>
 
-        <!-- SMTP client (CDDL/GPLv2+CE) for the email notification channel (SmtpEmailChannel) —
-             network delivery deps stay out of the lean core per the SBOM rule. Confined to this module. -->
-        <dependency>
-            <groupId>com.sun.mail</groupId>
-            <artifactId>javax.mail</artifactId>
-            <version>${javax-mail.version}</version>
-        </dependency>
-
         <!-- JSON parsing (Apache 2.0) for the native GCS JSON API + OAuth2 token responses (GcsConnector).
              Version is parent-managed (M1); already on the classpath transitively via the core, declared
              directly here for compile honesty. No new jar reaches the fat JAR. -->
@@ -141,9 +132,11 @@
         <plugins>
             <!-- CONNECTORS-BUNDLE-1 (2026-09-07): the DELIVERY half this module's description promised in
                  its founding commit and nobody ever built. A thin jar is useless as a drop-in — sshj,
-                 commons-net, kafka-clients and javax.mail would be missing, and `NotificationService`
-                 discovering `SmtpEmailChannel` without javax.mail kills boot with
-                 `NoClassDefFoundError: javax/mail/Message` (PROJECT_NOTES §6). So the sidecar is SHADED.
+                 commons-net and kafka-clients would be missing. So the sidecar is SHADED. ⚠ The
+                 javax.mail half of that argument moved out with `SmtpEmailChannel` on 2026-09-07 (EDG-01
+                 cell 1) — see `inspecto-notify-channels`, which now carries the identical reasoning for
+                 its own shade. Removing the dependency also drops a CDDL/GPLv2+CE artifact from the
+                 sidecar Personal ships.
                  The core is `provided` above, so it and its deps are excluded by construction; what lands
                  here is exactly the network-client set this module exists to confine. -->
             <plugin>
@@ -164,7 +157,13 @@
                             <shadedClassifierName>sidecar</shadedClassifierName>
                             <transformers>
                                 <!-- The whole point: MERGE the ServiceLoader registrations, or the eight
-                                     CollectorConnectorFactory entries and SmtpEmailChannel are lost. -->
+                                     CollectorConnectorFactory entries and the two DeliveryStatusAdapter
+                                     entries are lost. ⚠ SmtpEmailChannel used to be in this list; it moved
+                                     to inspecto-notify-channels on 2026-09-07 (EDG-01 cell 1) because this
+                                     sidecar is bundled in EVERY edition and CP-15 is not for Personal. The
+                                     inbound DeliveryStatusAdapters stay: they are inert without a
+                                     configured signing key and DeliveryStatusRoutes 404s an unconfigured
+                                     adapter. -->
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                             </transformers>
                             <filters>

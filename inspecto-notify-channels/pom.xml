@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>inspecto-notify-channels</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Inspecto — notification delivery channels (Standard edition, optional)</name>
+    <description>
+        OPTIONAL external notification transports (EDITIONS.md CP-15, "Delivery channels"): the webhook
+        POST channel and the SMTP email channel, discovered through the core's
+        com.gamma.notify.NotificationChannel ServiceLoader seam.
+
+        WHY THIS MODULE EXISTS (EDG-01 cell 1, 2026-09-07). CP-15 was decided "not for Personal" on
+        2026-09-02, and both transports nonetheless reached every bundle: WebhookChannel sat in
+        inspecto-engine (an unconditional dependency of the app) and SmtpEmailChannel sat in
+        inspecto-connectors, whose sidecar package.ps1 copies into EVERY edition by explicit decision. The
+        matrix cell was a product decision the build did not apply. Personal now bundles no channel at all,
+        so IN-APP delivery -- which is intrinsic to NotificationService and not a channel -- is the only
+        delivery it has, exactly as NotificationChannel's own Javadoc has always claimed.
+
+        Built only under the "edition-standard"/"edition-enterprise" profiles (see the parent pom's
+        profile-scoped &lt;modules&gt;), so a routine "mvn -o clean test" (= Personal, the DEFAULT build --
+        there is no -Pedition-personal) never compiles it and never resolves javax.mail.
+    </description>
+
+    <properties>
+        <!-- Same pin inspecto-connectors used while SmtpEmailChannel lived there; moved with the class. -->
+        <javax-mail.version>1.6.2</javax-mail.version>
+    </properties>
+
+    <dependencies>
+        <!-- The core: Notification, NotificationChannel, Values.trimToNull. PROVIDED on purpose, the same
+             idiom as inspecto-connectors and inspecto-security: this jar is dropped onto a running engine's
+             classpath where inspecto.jar already supplies all of it, and compile scope would drag the whole
+             core into the shaded sidecar below. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-processor</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Jackson: WebhookChannel serialises the notification body. PROVIDED — the core fat jar already
+             ships Jackson, and a second copy in the sidecar is how you get two ObjectMappers and a
+             NoClassDefFoundError argument at run time. ⚠ It used to arrive as a transitive of the core,
+             which `provided` above does not propagate, so it is declared here directly. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- slf4j facade — declared directly for the same reason as Jackson, and PROVIDED because the
+             running engine supplies the api plus its logback binding. -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- SMTP client (CDDL/GPLv2+CE) for SmtpEmailChannel. ⚠ COMPILE, not provided: this is the one
+             dependency the core genuinely does not have, and it is the whole reason the sidecar is shaded.
+             NotificationService discovering SmtpEmailChannel without javax.mail kills boot with
+             NoClassDefFoundError: javax/mail/Message (PROJECT_NOTES §6). -->
+        <dependency>
+            <groupId>com.sun.mail</groupId>
+            <artifactId>javax.mail</artifactId>
+            <version>${javax-mail.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- SHADED, for the reason inspecto-connectors is: a thin jar is useless as a drop-in, because
+                 javax.mail would be missing and discovering SmtpEmailChannel without it kills boot. The
+                 core is `provided` above, so it and its deps are excluded by construction; what lands here
+                 is exactly the mail client this module exists to confine. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <!-- Pinned: the offline reactor resolves no plugin version from a repository, and this is
+                     the version the core fat jar and the other two sidecars already use. -->
+                <version>3.5.2</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals><goal>shade</goal></goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <!-- `sidecar` so the reactor's own thin artifact stays the installed one and
+                                 only the bundle carries the fat copy. -->
+                            <shadedArtifactAttached>true</shadedArtifactAttached>
+                            <shadedClassifierName>sidecar</shadedClassifierName>
+                            <transformers>
+                                <!-- The whole point: MERGE the ServiceLoader registrations, or BOTH
+                                     NotificationChannel entries are lost and the bundle silently has no
+                                     external delivery — which looks exactly like Personal. -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <!-- Signed jars: a retained signature throws SecurityException at
+                                             run time. Same filter as the core fat jar. -->
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                        <!-- Never ship a second logging config; the core owns it. -->
+                                        <exclude>logback.xml</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

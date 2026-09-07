@@ -1,4 +1,9 @@
-package com.gamma.connect.notify;
+package com.gamma.notify.channel;
+
+// ⚠ Relocated from com.gamma.connect.notify (inspecto-connectors) into this module on 2026-09-07,
+// EDG-01 cell 1. The package moved with it deliberately: leaving it in com.gamma.connect.notify would
+// SPLIT that package across two jars, because DeliveryIds and the two DeliveryStatusAdapters stay in
+// inspecto-connectors. Not a @PublicApi type, and the only reference to its old name was one doc path.
 
 import com.gamma.notify.Notification;
 import com.gamma.notify.NotificationChannel;

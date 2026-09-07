@@ -1,6 +1,6 @@
 # EDG-01 — gating the six "not for Personal" features (BUILD PLAN, in flight)
 
-> **Status 2026-09-07: mechanism DECIDED, first cell not yet built.** BACKLOG `EDG-01`, ranked **P1** — the
+> **Status 2026-09-07: mechanism DECIDED; ✅ cell 1 (`CP-15`) SHIPPED, five cells remain.** BACKLOG `EDG-01`, ranked **P1** — the
 > only substantive Personal-scoped work on the board. Parent truth:
 > [`../EDITIONS.md`](../EDITIONS.md) §Feature × edition matrix + §Edition-gating debt.
 
@@ -116,7 +116,7 @@ ships **no** channel"*. `inspecto-engine/src/main/resources/META-INF/services/co
 registers `WebhookChannel`, and `inspecto-engine` is an unconditional dependency of `inspecto`. The class
 documents a property the build does not have.
 
-## 5c. Cell 1 — `CP-15` delivery channels (the pattern-setter)
+## 5c. Cell 1 — `CP-15` delivery channels — ✅ SHIPPED 2026-09-07 (the pattern-setter)
 
 Chosen first because it is the only cell whose **seam already exists and is already correct**:
 `NotificationChannel` is a `@PublicApi` ServiceLoader SPI, discovered in `NotificationService:98` and
@@ -173,3 +173,57 @@ A cell is done when **all** of these hold:
   not exist is not work.
 * ⛔ No `if (edition == …)` anywhere in core. That is the standing rule EDITIONS §Assembly sets, and the
   whole reason the answer is modules.
+
+## 8. Cell 1 as built — and the three things the plan did not predict
+
+New module **`inspecto-notify-channels`** (parent POM's `edition-standard` AND `edition-enterprise`
+profiles), holding both transports in one package `com.gamma.notify.channel`, shaded as a `-sidecar`
+artifact, bundled by `package.ps1` for Standard/Enterprise only, on the classpath of all four launchers.
+
+🔴 **1. The connector-sidecar verification DID assert `javax.mail` — I had said it did not.** §5c claimed
+the check only looked at `META-INF/services/com.gamma.acquire.CollectorConnectorFactory`. It also asserted
+`javax/mail/*` classes were present, with a message about `NotificationService.discoverChannels`. Removing
+the now-unused dependency from `inspecto-connectors` would have failed packaging on the very next run. The
+assertion moved to the new module's check, with the class that needs it. ⚠ **I read one assertion in that
+block and generalised about the block** — grep the claim, not the file the claim names.
+
+🔴 **2. `package.ps1` emits TWO sh launchers and TWO bat launchers**, not one of each — `run.sh`/`run.bat`
+and `serve.sh`/`serve.bat` (the parity was itself a 2026-09-07 fix). Every classpath edit is four sites plus
+the boot-smoke array. Patching "the launcher" would have left half the bundles unable to see the jar.
+
+🔴 **3. The mail channel had to change package, and its test had to lose a helper.** Leaving
+`SmtpEmailChannel` in `com.gamma.connect.notify` would have **split that package across two jars**, because
+`DeliveryIds` and both `DeliveryStatusAdapter`s stay in `inspecto-connectors`. It moved to
+`com.gamma.notify.channel` (not `@PublicApi`; one doc path was the only reference). Its test used the
+package-private `DeliveryIds.fromMessageId`, so those two assertions now match the Message-ID **shape**
+directly — the round trip stays pinned on both sides without the module depending on the one it left.
+
+⚠ Also done, because the change made it dead: `javax.mail` is removed from `inspecto-connectors`. That
+drops a CDDL/GPLv2+CE artifact out of the sidecar **Personal ships**, which is a small win in the same
+direction as the cell itself.
+
+⚠ **Residual, deliberate:** the inbound `DeliveryStatusAdapter`s (`Hmac`, `SendGrid`) stay in
+`inspecto-connectors` and therefore still reach Personal. They are inert without a configured signing key,
+and `DeliveryStatusRoutes` answers 404 for an unconfigured adapter — so nothing is reachable. Gating them
+means splitting the connectors sidecar by edition, which is a different (and larger) decision than this
+cell. ⛔ Do not treat CP-15 as "not done" for this; treat it as the next question if the sidecar is ever
+edition-split.
+
+## 9. Cell 1 against §6's acceptance — including the two it does NOT meet cleanly
+
+| # | Criterion | Result |
+|---|---|---|
+| 1 | Module absent from the default build | ✅ `inspecto-notify-channels` does not appear in the `mvn -o clean test` reactor at all |
+| 2 | Personal bundle lacks the jar, Standard/Enterprise keep it — **proven by packaging, not by reading the POM** | ✅ `package.ps1 -Edition Personal` → `inspecto.jar`, `inspecto-connectors.jar` only. `-Edition Standard` → adds `inspecto-notify-channels.jar`, and the script's own staged-artifact check prints *"verified: javax.mail classes + both NotificationChannel registrations present"* |
+| 3 | Absent module ⇒ the feature's HTTP paths answer **503**, not 404 | ⚠ **N/A for this cell, and that is not a dodge.** CP-15 gates *transports*, and a transport has no HTTP path of its own. `NotificationRoutes` / `DeliveryStatusRoutes` stay in core and are designed to work with zero channels registered. ⛔ The criterion still binds every route-based cell (CP-09, SEC-10, CP-11, CP-13) |
+| 4 | Existing tests pass **unmoved in meaning** | ⚠ **All but two assertions.** `SmtpEmailChannelTest` used the package-private `DeliveryIds.fromMessageId`, which stayed in `inspecto-connectors` with the adapters that use it; those two assertions now match the Message-ID **shape** directly. §6 says a weakened test signals a wrong seam — here the fact under test is unchanged (the delivery id round-trips into `Message-ID`), only the route to asserting it. Recording it rather than letting it pass silently |
+| 5 | `CapabilityManifest` still agrees; routes exercised by a real-HTTP test | ✅ Vacuous here — no route changed |
+| 6 | The matrix cell becomes plain `—` | ✅ `EDITIONS.md` CP-15/P updated, with what changed |
+
+**Verified:** `mvn -o clean test` (Personal) **4036/0/0/16**, reconciling exactly as `4045 − 4 − 7 + 2`;
+`mvn -o clean test -Pedition-enterprise` **4101/0/0/16** with the new module SUCCESS; both packaging runs
+clean; `check-dependencies` unchanged at 95 artifacts.
+
+⚠ **`NoChannelShipsInThePersonalBuildTest` passes under BOTH profiles**, and that is correct rather than a
+weak test: it lives in `inspecto-engine`, whose classpath never contains the channels module because the
+dependency points the other way. It answers "what does the CORE see", which is exactly the question.

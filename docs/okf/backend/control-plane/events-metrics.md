@@ -58,7 +58,8 @@ timestamp: 2026-07-16T00:00:00Z
   state-changing request plus non-GET forbidden-route attempts (actor/action/target, secret
   scrubbing, immutable store). One seam covers all routes; 405 immutability is inherent to dispatch.
 * **Email/SMTP channel wired to `deliver(n, target)`** (2026-07-20) — `SmtpEmailChannel`
-  (`inspecto-connectors/src/main/java/com/gamma/connect/notify/SmtpEmailChannel.java`, id `email`,
+  (`inspecto-notify-channels/src/main/java/com/gamma/notify/channel/SmtpEmailChannel.java`, id `email`,
+  ⚠ **relocated from `inspecto-connectors` 2026-09-07, EDG-01 cell 1** — CP-15 is not for Personal and that sidecar ships in every edition,
   already discovered via `ServiceLoader` and configured from `notify.smtp.*` system properties, the
   same idiom as `WebhookChannel`) now overrides `deliver(Notification n, String target)` to address
   the mail to the persisted `ChannelConfig`'s own `target` (comma-separated addresses supported),

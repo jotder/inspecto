@@ -214,8 +214,8 @@ if (-not $jarSrc -or -not (Test-Path $jarSrc)) {
 # no copy step existed, so SFTP/FTP/FTPS/S3/GCS/Azure/Kafka and SmtpEmailChannel were unreachable in every
 # bundle. Its founding commit described the drop-in ("dropping THIS jar on the classpath is what lights up
 # the sftp:/ftp: schemes") but the delivery half was never built. It ships SHADED (classifier `sidecar`)
-# because a thin jar is useless: sshj/commons-net/kafka-clients/javax.mail would be missing, and
-# NotificationService discovering SmtpEmailChannel without javax.mail kills boot (PROJECT_NOTES section 6).
+# because a thin jar is useless: sshj/commons-net/kafka-clients would be missing. (The javax.mail half of
+# that argument moved to inspecto-notify-channels with SmtpEmailChannel on 2026-09-07, EDG-01 cell 1.)
 $connectorsTargetDir = Join-Path $sandboxRoot 'inspecto-connectors\target'
 $connectorsJarSrc = Get-ChildItem -Path $connectorsTargetDir -Filter 'inspecto-connectors-*-sidecar.jar' -ErrorAction SilentlyContinue |
           Select-Object -First 1 -ExpandProperty FullName
@@ -230,10 +230,13 @@ if (-not $connectorsJarSrc -or -not (Test-Path $connectorsJarSrc)) {
 # so it bundles the security jar too — an Enterprise deployment authenticates AND authorizes.
 $securityJarSrc = $null
 $policyJarSrc   = $null
+$channelsJarSrc = $null
 if ($Edition -ne 'Personal') {
     # NB: not $profile — that is a PowerShell automatic variable.
     $editionProfile = if ($Edition -eq 'Enterprise') { 'edition-enterprise' } else { 'edition-standard' }
-    $modules = if ($Edition -eq 'Enterprise') { 'inspecto-security,inspecto-policy' } else { 'inspecto-security' }
+    # EDG-01 cell 1: inspecto-notify-channels rides with security in BOTH non-Personal editions — CP-15
+    # is "Standard and above", and Enterprise is a superset of Standard.
+    $modules = if ($Edition -eq 'Enterprise') { 'inspecto-security,inspecto-policy,inspecto-notify-channels' } else { 'inspecto-security,inspecto-notify-channels' }
     if (-not $NoBuild) {
         Write-Host "Building $modules ($Edition edition, -P$editionProfile)..." -ForegroundColor Cyan
         Push-Location $sandboxRoot
@@ -251,6 +254,16 @@ if ($Edition -ne 'Personal') {
                        Select-Object -First 1 -ExpandProperty FullName
     if (-not $securityJarSrc -or -not (Test-Path $securityJarSrc)) {
         throw "$Edition edition requested but no SHADED JAR found matching $securityTargetDir\inspecto-security-*-sidecar.jar. The thin jar is not usable - it carries no Nimbus classes."
+    }
+    # The channels sidecar (EDG-01 cell 1). SHADED for the same reason the security one is: the thin jar
+    # carries no javax.mail, and NotificationService discovering SmtpEmailChannel without it kills boot
+    # with NoClassDefFoundError: javax/mail/Message. The '-sidecar' glob is deliberate - a bare
+    # 'inspecto-notify-channels-*.jar' matches BOTH artifacts and would pick one by luck.
+    $channelsTargetDir = Join-Path $sandboxRoot 'inspecto-notify-channels\target'
+    $channelsJarSrc = Get-ChildItem -Path $channelsTargetDir -Filter 'inspecto-notify-channels-*-sidecar.jar' -ErrorAction SilentlyContinue |
+                       Select-Object -First 1 -ExpandProperty FullName
+    if (-not $channelsJarSrc -or -not (Test-Path $channelsJarSrc)) {
+        throw "$Edition edition requested but no SHADED JAR found matching $channelsTargetDir\inspecto-notify-channels-*-sidecar.jar. The thin jar is not usable - it carries no javax.mail classes."
     }
     if ($Edition -eq 'Enterprise') {
         $policyTargetDir = Join-Path $sandboxRoot 'inspecto-policy\target'
@@ -296,6 +309,34 @@ if ($securityJarSrc) {
         Write-Host "  verified: Nimbus classes + 3 SPI registrations present in the security sidecar" -ForegroundColor DarkGray
     } finally { $secZip.Dispose() }
 }
+if ($channelsJarSrc) {
+    Copy-Item $channelsJarSrc "$bundleDir\inspecto-notify-channels.jar"
+    Write-Host "Bundled Standard-edition delivery channels -> inspecto-notify-channels.jar" -ForegroundColor Green
+
+    # Verify the STAGED artifact, exactly as the security and connector sidecars are. Both halves matter:
+    # javax.mail missing means SmtpEmailChannel throws NoClassDefFoundError the moment NotificationService
+    # enumerates channels, and a dropped ServicesResourceTransformer means the jar ships but registers
+    # NOTHING - which looks identical to Personal, i.e. the bug this module exists to fix.
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $chZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-notify-channels.jar")
+    try {
+        if (-not ($chZip.Entries | Where-Object { $_.FullName -like 'javax/mail/*' })) {
+            throw "inspecto-notify-channels.jar carries no javax/mail classes - SmtpEmailChannel would throw NoClassDefFoundError as soon as NotificationService enumerates channels."
+        }
+        $spiEntry = $chZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.notify.NotificationChannel' }
+        if (-not $spiEntry) {
+            throw "inspecto-notify-channels.jar has no META-INF/services/com.gamma.notify.NotificationChannel - the shade dropped the ServicesResourceTransformer, so the bundle would ship with NO external delivery and look exactly like Personal."
+        }
+        $reader = New-Object System.IO.StreamReader($spiEntry.Open())
+        try { $spiBody = $reader.ReadToEnd() } finally { $reader.Dispose() }
+        foreach ($impl in @('com.gamma.notify.channel.WebhookChannel', 'com.gamma.notify.channel.SmtpEmailChannel')) {
+            if ($spiBody -notmatch [regex]::Escape($impl)) {
+                throw "inspecto-notify-channels.jar registers no $impl - the SPI file lists only: $spiBody"
+            }
+        }
+        Write-Host "  verified: javax.mail classes + both NotificationChannel registrations present" -ForegroundColor DarkGray
+    } finally { $chZip.Dispose() }
+}
 if ($policyJarSrc) {
     Copy-Item $policyJarSrc "$bundleDir\inspecto-policy.jar"
     Write-Host "Bundled Enterprise-edition policy module → inspecto-policy.jar" -ForegroundColor Green
@@ -325,10 +366,11 @@ try {
     if (-not ($connZip.Entries | Where-Object { $_.FullName -like 'net/schmizz/sshj/*' })) {
         throw "inspecto-connectors.jar carries no sshj classes - it is a THIN jar; SFTP would fail with NoClassDefFoundError at run time."
     }
-    if (-not ($connZip.Entries | Where-Object { $_.FullName -like 'javax/mail/*' })) {
-        throw "inspecto-connectors.jar carries no javax.mail classes - NotificationService.discoverChannels would kill boot with NoClassDefFoundError: javax/mail/Message."
-    }
-    Write-Host "  verified: $factories connector factories + sshj + javax.mail present in the sidecar" -ForegroundColor DarkGray
+    # EDG-01 cell 1 (2026-09-07): the javax.mail assertion that used to sit here MOVED to the
+    # inspecto-notify-channels check, with the class that needed it. Leaving it would have been the first
+    # thing to fail at package time, since the dependency is gone from this module's pom - and keeping it
+    # would assert a property this jar is no longer supposed to have.
+    Write-Host "  verified: $factories connector factories + sshj present in the sidecar" -ForegroundColor DarkGray
 } finally { $connZip.Dispose() }
 
 # ── step 3a: Standard/Enterprise — bundle the PostgreSQL JDBC driver as a sidecar (PG-1) ─────────
@@ -496,6 +538,11 @@ fi
 # classpath the same way now. Every entry is inert unless a config asks for it.
 CP="inspecto.jar"
 [ -f inspecto-connectors.jar ] && CP="${CP}:inspecto-connectors.jar"
+# Delivery channels (EDG-01 cell 1): Standard/Enterprise bundles only, and honoured on ANY bundle so a
+# drop-in works. Personal never carries the jar, so it has no external transport at all -- in-app
+# delivery is intrinsic to NotificationService and is not a channel. The classpath entry IS the switch:
+# the module is found via META-INF/services/com.gamma.notify.NotificationChannel.
+[ -f inspecto-notify-channels.jar ] && CP="${CP}:inspecto-notify-channels.jar"
 [ -f inspecto-security.jar ]   && CP="${CP}:inspecto-security.jar"
 [ -f postgresql.jar ]          && CP="${CP}:postgresql.jar"
 exec "$JAVA" "${JAVA_OPTS[@]}" \
@@ -564,6 +611,8 @@ rem RUNSH-CP-1 (2026-09-07): -cp, never -jar. See run.sh for why - `java -jar` i
 rem classpath, so every sidecar (connectors above all) was unreachable on this one-shot ETL path.
 set "CP=inspecto.jar"
 if exist inspecto-connectors.jar set "CP=%CP%;inspecto-connectors.jar"
+rem Delivery channels (EDG-01 cell 1) - Standard/Enterprise only; see serve.sh for the reasoning.
+if exist inspecto-notify-channels.jar set "CP=%CP%;inspecto-notify-channels.jar"
 if exist inspecto-security.jar set "CP=%CP%;inspecto-security.jar"
 if exist postgresql.jar set "CP=%CP%;postgresql.jar"
 "%JAVA%" %OPTS% ^
@@ -688,6 +737,11 @@ fi
 # bundle so a drop-in works. Inert until a pipeline names a non-local `collector.connector` --
 # without it CollectorConnectors.forConfig throws, naming this jar as the thing that is missing.
 [ -f inspecto-connectors.jar ] && CP="${CP}:inspecto-connectors.jar"
+# Delivery channels (EDG-01 cell 1): Standard/Enterprise bundles only, and honoured on ANY bundle so a
+# drop-in works. Personal never carries the jar, so it has no external transport at all -- in-app
+# delivery is intrinsic to NotificationService and is not a channel. The classpath entry IS the switch:
+# the module is found via META-INF/services/com.gamma.notify.NotificationChannel.
+[ -f inspecto-notify-channels.jar ] && CP="${CP}:inspecto-notify-channels.jar"
 [ -f postgresql.jar ] && CP="${CP}:postgresql.jar"
 # Operational stores on PostgreSQL (2026-08-31). The three ledgers (status/batches/lineage) are now
 # SERVED from a database by default; Personal stays on the bundled DuckDB with zero configuration,
@@ -765,6 +819,8 @@ rem PostgreSQL JDBC driver sidecar (PG-1): present in Standard/Enterprise bundle
 rem bundle so a drop-in works - the classpath entry is inert until -Dinspecto.db=postgres selects it.
 rem Remote connector sidecar (CONNECTORS-BUNDLE-1) - see serve.sh for why it is unconditional.
 if exist inspecto-connectors.jar set "CP=%CP%;inspecto-connectors.jar"
+rem Delivery channels (EDG-01 cell 1) - Standard/Enterprise only; see serve.sh for the reasoning.
+if exist inspecto-notify-channels.jar set "CP=%CP%;inspecto-notify-channels.jar"
 if exist postgresql.jar set "CP=%CP%;postgresql.jar"
 rem Operational stores on PostgreSQL (2026-08-31) - the edition seam; see serve.sh for the reasoning.
 rem The URL is the signal, never the driver's presence: postgres without a URL fails the boot.
@@ -937,7 +993,7 @@ if (-not $SkipBootCheck) {
             else { 'java' }
     # The same classpath the generated launchers build -- deliberately re-derived from the staged files
     # rather than hardcoded, so a sidecar that fails to stage is a boot failure here too.
-    $cp = @('inspecto.jar') + @('inspecto-security.jar','inspecto-policy.jar','inspecto-connectors.jar','postgresql.jar' |
+    $cp = @('inspecto.jar') + @('inspecto-security.jar','inspecto-policy.jar','inspecto-connectors.jar','inspecto-notify-channels.jar','postgresql.jar' |
         Where-Object { Test-Path (Join-Path $bundleDir $_) })
     $sep = if ($IsWindows -or $env:OS -eq 'Windows_NT') { ';' } else { ':' }
     $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)

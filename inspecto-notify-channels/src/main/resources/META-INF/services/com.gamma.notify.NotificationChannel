@@ -1,0 +1,2 @@
+com.gamma.notify.channel.WebhookChannel
+com.gamma.notify.channel.SmtpEmailChannel

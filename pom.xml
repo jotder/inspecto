@@ -59,15 +59,22 @@
 
     <!--
         Edition assembly (docs/EDITIONS.md): inspecto-security (W6 — the Authenticator SPI's OIDC
-        implementation) is Standard-edition-only. It is NOT in the default <modules> above, so a
-        routine "mvn -o clean test" (Personal) never compiles/tests it and never resolves its new
-        Nimbus JOSE+JWT dependency. Build it explicitly with "mvn -o clean test -Pedition-standard".
+        implementation) and inspecto-notify-channels (CP-15 — the webhook + SMTP transports) are
+        Standard-edition-only. Neither is in the default <modules> above, so a routine
+        "mvn -o clean test" (= PERSONAL, the default build; there is no -Pedition-personal) never
+        compiles/tests them and never resolves Nimbus JOSE+JWT or javax.mail. Build them explicitly
+        with "mvn -o clean test -Pedition-standard".
     -->
     <profiles>
         <profile>
             <id>edition-standard</id>
             <modules>
                 <module>inspecto-security</module>
+                <!-- EDG-01 cell 1 (2026-09-07): the external notification transports. CP-15 is "not for
+                     Personal", and both channels used to reach every bundle — WebhookChannel from
+                     inspecto-engine (an unconditional dependency) and SmtpEmailChannel from the
+                     inspecto-connectors sidecar, which package.ps1 copies into EVERY edition. -->
+                <module>inspecto-notify-channels</module>
             </modules>
         </profile>
         <!-- Enterprise = Standard + the ABAC policy engine (rbac-abac-plan §5): the same one-version
@@ -78,6 +85,7 @@
             <modules>
                 <module>inspecto-security</module>
                 <module>inspecto-policy</module>
+                <module>inspecto-notify-channels</module>
             </modules>
         </profile>
         <!-- M5 (A2): JaCoCo lives in the PARENT so every module instruments in one reactor pass —
