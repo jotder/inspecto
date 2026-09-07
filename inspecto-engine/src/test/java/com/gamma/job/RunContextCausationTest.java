@@ -38,14 +38,21 @@ class RunContextCausationTest {
         ctx("corr-1", "sig-parent").signals()
                 .emit("job.run.started", Severity.INFO, Map.of("job", "loader"));
 
+        // 🔴 Filter by THIS test's correlation id, not by type alone. `EventLog.current().installStore` swaps
+        // a process-wide store, and `JobService` emits `job.run.started` in production code — so background
+        // emissions from other test classes in the same surefire JVM land here too. Counting every
+        // `job.run.started` expected 1 and saw 11 on the Linux runner (order and timing differ from Windows),
+        // which is one of the two failures that kept CI red for 100 consecutive runs.
+        // Filtering on the correlation id is not circular: it is precisely what proves correlation survived
+        // the emit — if it did not, this finds zero and the size assertion fails.
         List<Signal> emitted = store.query(com.gamma.event.EventQuery.recent(100)).stream()
-                .map(Signal::fromEvent).filter(s -> "job.run.started".equals(s.type())).toList();
-        assertEquals(1, emitted.size(), "the run emitted its signal");
+                .map(Signal::fromEvent)
+                .filter(s -> "job.run.started".equals(s.type()) && "corr-1".equals(s.correlationId()))
+                .toList();
+        assertEquals(1, emitted.size(), "the run emitted its signal, carrying its correlation id");
         Signal s = emitted.get(0);
         assertEquals("sig-parent", s.causationId(),
                 "🔴 the triggering signal is the CAUSE — without this /signals/tree is flat");
-        assertEquals("corr-1", s.correlationId(),
-                "…and correlation is a DIFFERENT axis, still carried independently");
 
         // The payoff: the emitted signal nests under its cause instead of standing as a second root.
         Signal parent = new Signal("sig-parent", "pipeline.commit", s.at().minusMillis(10),
@@ -65,8 +72,11 @@ class RunContextCausationTest {
 
         ctx("r1", null).signals().emit("job.run.started", Severity.INFO, Map.of("job", "loader"));
 
+        // Same isolation as above — `findFirst()` on the type alone could pick up another class's emission
+        // and assert against the wrong signal. It had not failed yet; that is luck, not coverage.
         Signal s = store.query(com.gamma.event.EventQuery.recent(100)).stream()
-                .map(Signal::fromEvent).filter(x -> "job.run.started".equals(x.type()))
+                .map(Signal::fromEvent)
+                .filter(x -> "job.run.started".equals(x.type()) && "r1".equals(x.correlationId()))
                 .findFirst().orElseThrow();
         assertNull(s.causationId(),
                 "a cron/manual run is caused by no SIGNAL — a null here is the honest answer, "

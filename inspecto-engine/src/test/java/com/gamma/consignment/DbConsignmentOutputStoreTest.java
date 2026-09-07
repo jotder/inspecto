@@ -643,14 +643,30 @@ class DbConsignmentOutputStoreTest {
                     out("c3", "/w/cdr/dt=2026-08-04/c3.parquet",   30, State.SUPERSEDED), // not LIVE: never a source
                     out("c4", "/w/cdr/dt=2026-08-04/c4.parquet",   40, State.LIVE)));    // LIVE but not read
 
-            // the selector hands back DuckDB's glob spelling; c2 arrives with the other separator
+            // The selector hands back DuckDB's glob spelling, which need not match the stored one — norm()
+            // normalises BOTH sides so a re-spelling cannot silently drop a source. c2 arrives with a
+            // redundant `/./` segment, which normalize() collapses on every platform.
             List<ConsignmentSource> sources = db.sourcesForPaths("cdr", List.of(
                     "/w/cdr/dt=2026-08-04/c1-a.parquet",
                     "/w/cdr/dt=2026-08-04/c1-b.parquet",
-                    "\\w\\cdr\\dt=2026-08-04\\c2.parquet",
+                    "/w/cdr/./dt=2026-08-04/c2.parquet",
                     "/w/cdr/dt=2026-08-04/c3.parquet"));
             assertEquals(List.of("c1", "c2"), sources.stream().map(ConsignmentSource::consignmentId).toList(),
-                    "c1 once (two files), c2 despite the separator, c3 superseded, c4 unread");
+                    "c1 once (two files), c2 despite the re-spelling, c3 superseded, c4 unread");
+
+            // 🔴 Cross-SEPARATOR tolerance is a WINDOWS property, not a universal one, and this assertion
+            // used to be unconditional. `norm()` is `Path.of(...).toAbsolutePath()` — platform-native — so a
+            // backslash is a separator on Windows but a legal FILENAME CHARACTER on Linux. Asserting it
+            // everywhere kept CI red on the Linux runner while passing on every developer's Windows box.
+            // ⛔ Do not "fix" this by making norm() replace '\' with '/': that would corrupt legitimate
+            // Linux filenames containing a backslash. Whether a Windows-spelled path should resolve on a
+            // Linux server is a product question, not a test detail.
+            if (java.io.File.separatorChar == '\\') {
+                assertEquals(List.of("c2"),
+                        db.sourcesForPaths("cdr", List.of("\\w\\cdr\\dt=2026-08-04\\c2.parquet"))
+                                .stream().map(ConsignmentSource::consignmentId).toList(),
+                        "on Windows the other separator still resolves to the same file");
+            }
             assertEquals("cdr", sources.get(0).tableName());
 
             assertEquals(List.of(), db.sourcesForPaths("cdr", List.of()), "no files read ⇒ no sources");
