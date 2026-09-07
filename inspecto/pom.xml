@@ -231,4 +231,35 @@
                  moved to the parent so every module reports coverage in one reactor pass). -->
         </plugins>
     </build>
+
+    <profiles>
+        <!-- DAT-6 / CI-RED-1 (2026-09-07): the embedded-Postgres binaries are PER-PLATFORM, and the
+             dependency block above excludes all four then adds back only windows-amd64 — the one cached
+             for this Windows sandbox's offline builds. On the Linux CI runner that leaves zonky with no
+             binaries at all, so `PostgresStateStoreTest` errored with "Missing embedded postgres binaries"
+             on every run. It was the LAST failure keeping CI red, behind two others that masked it.
+
+             Activated by OS, so nothing changes for the offline Windows build (the profile is simply
+             inactive and no new artifact has to be cached), while CI — which resolves online — picks up
+             the Linux binary and actually RUNS the test rather than skipping it. ⛔ Do not "fix" this with
+             an assumeTrue: a test disarmed by its environment is the failure mode this repo keeps paying
+             for (see okf/backend/build-run/guard-coverage.md).
+
+             `family=unix` + `arch=amd64` targets Linux x86_64 specifically — macOS reports x86_64/aarch64,
+             so a darwin runner would need its own binary added here. -->
+        <profile>
+            <id>embedded-pg-linux</id>
+            <activation>
+                <os><family>unix</family><arch>amd64</arch></os>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>io.zonky.test.postgres</groupId>
+                    <artifactId>embedded-postgres-binaries-linux-amd64</artifactId>
+                    <version>16.4.0</version>
+                    <scope>test</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
 </project>
