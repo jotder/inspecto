@@ -4,6 +4,15 @@
 restore-into-a-new-space. Everything here runs through the `maintenance` Job Type; no shell scripts.
 Plan of record: `docs/superpower/system-maintenance-plan.md`.
 
+## ⚠ Edition — Standard and above only (since 2026-09-07)
+
+`backup`, `backup_verify` and `restore` are contributed by the optional **`inspecto-backup`** module, which
+Standard and Enterprise bundles carry and **Personal does not** (EDITIONS `OPS-06`). On a Personal install
+every job naming one of them fails at run with *unknown maintenance task '…' — not built into this bundle, and
+no installed module provides it*. That is deliberate and loud: a silent skip would let a chained job proceed
+as if the backup had happened. ⚠ The bundled `spaces/demo` nightly chain therefore stops at `config_backup`
+on Personal; see EDITIONS `OPS-06`.
+
 ## ⚠ Path containment — read this before pointing a job outside the server root
 
 Every path field on a maintenance job (`dir`, `backup_dir`, `archive_dir`, `archive`, `target_dir`,

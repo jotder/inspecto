@@ -231,12 +231,14 @@ if (-not $connectorsJarSrc -or -not (Test-Path $connectorsJarSrc)) {
 $securityJarSrc = $null
 $policyJarSrc   = $null
 $channelsJarSrc = $null
+$backupJarSrc   = $null
 if ($Edition -ne 'Personal') {
     # NB: not $profile — that is a PowerShell automatic variable.
     $editionProfile = if ($Edition -eq 'Enterprise') { 'edition-enterprise' } else { 'edition-standard' }
     # EDG-01 cell 1: inspecto-notify-channels rides with security in BOTH non-Personal editions — CP-15
     # is "Standard and above", and Enterprise is a superset of Standard.
-    $modules = if ($Edition -eq 'Enterprise') { 'inspecto-security,inspecto-policy,inspecto-notify-channels' } else { 'inspecto-security,inspecto-notify-channels' }
+    # EDG-01 cell 2: inspecto-backup (OPS-06) rides alongside, Standard and above.
+    $modules = if ($Edition -eq 'Enterprise') { 'inspecto-security,inspecto-policy,inspecto-notify-channels,inspecto-backup' } else { 'inspecto-security,inspecto-notify-channels,inspecto-backup' }
     if (-not $NoBuild) {
         Write-Host "Building $modules ($Edition edition, -P$editionProfile)..." -ForegroundColor Cyan
         Push-Location $sandboxRoot
@@ -264,6 +266,15 @@ if ($Edition -ne 'Personal') {
                        Select-Object -First 1 -ExpandProperty FullName
     if (-not $channelsJarSrc -or -not (Test-Path $channelsJarSrc)) {
         throw "$Edition edition requested but no SHADED JAR found matching $channelsTargetDir\inspecto-notify-channels-*-sidecar.jar. The thin jar is not usable - it carries no javax.mail classes."
+    }
+    # The backup module (EDG-01 cell 2). THIN like inspecto-policy - nothing beyond the core - so the plain
+    # artifact is the right one and there is no -sidecar classifier to prefer.
+    $backupTargetDir = Join-Path $sandboxRoot 'inspecto-backup\target'
+    $backupJarSrc = Get-ChildItem -Path $backupTargetDir -Filter 'inspecto-backup-*.jar' -ErrorAction SilentlyContinue |
+                     Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
+                     Select-Object -First 1 -ExpandProperty FullName
+    if (-not $backupJarSrc -or -not (Test-Path $backupJarSrc)) {
+        throw "$Edition edition requested but no JAR found matching $backupTargetDir\inspecto-backup-*.jar."
     }
     if ($Edition -eq 'Enterprise') {
         $policyTargetDir = Join-Path $sandboxRoot 'inspecto-policy\target'
@@ -336,6 +347,26 @@ if ($channelsJarSrc) {
         }
         Write-Host "  verified: javax.mail classes + both NotificationChannel registrations present" -ForegroundColor DarkGray
     } finally { $chZip.Dispose() }
+}
+if ($backupJarSrc) {
+    Copy-Item $backupJarSrc "$bundleDir\inspecto-backup.jar"
+    Write-Host "Bundled Standard-edition backup module -> inspecto-backup.jar" -ForegroundColor Green
+    # A thin jar cannot lose classes to a shade, so the only way it ships INERT is a missing
+    # META-INF/services entry - and inert here looks exactly like Personal, i.e. the bug this fixes.
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $bkZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-backup.jar")
+    try {
+        $spiEntry = $bkZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.job.MaintenanceTaskProvider' }
+        if (-not $spiEntry) {
+            throw "inspecto-backup.jar has no META-INF/services/com.gamma.job.MaintenanceTaskProvider - backup/backup_verify/restore would be unknown tasks on a bundle that is supposed to have them."
+        }
+        $reader = New-Object System.IO.StreamReader($spiEntry.Open())
+        try { $spiBody = $reader.ReadToEnd() } finally { $reader.Dispose() }
+        if ($spiBody -notmatch 'com\.gamma\.backup\.BackupTaskProvider') {
+            throw "inspecto-backup.jar's MaintenanceTaskProvider file does not name BackupTaskProvider: $spiBody"
+        }
+        Write-Host "  verified: MaintenanceTaskProvider registration present in the backup module" -ForegroundColor DarkGray
+    } finally { $bkZip.Dispose() }
 }
 if ($policyJarSrc) {
     Copy-Item $policyJarSrc "$bundleDir\inspecto-policy.jar"
@@ -543,6 +574,8 @@ CP="inspecto.jar"
 # delivery is intrinsic to NotificationService and is not a channel. The classpath entry IS the switch:
 # the module is found via META-INF/services/com.gamma.notify.NotificationChannel.
 [ -f inspecto-notify-channels.jar ] && CP="${CP}:inspecto-notify-channels.jar"
+# Backup / restore tasks (EDG-01 cell 2): Standard/Enterprise only; same contract as the line above.
+[ -f inspecto-backup.jar ] && CP="${CP}:inspecto-backup.jar"
 [ -f inspecto-security.jar ]   && CP="${CP}:inspecto-security.jar"
 [ -f postgresql.jar ]          && CP="${CP}:postgresql.jar"
 exec "$JAVA" "${JAVA_OPTS[@]}" \
@@ -613,6 +646,8 @@ set "CP=inspecto.jar"
 if exist inspecto-connectors.jar set "CP=%CP%;inspecto-connectors.jar"
 rem Delivery channels (EDG-01 cell 1) - Standard/Enterprise only; see serve.sh for the reasoning.
 if exist inspecto-notify-channels.jar set "CP=%CP%;inspecto-notify-channels.jar"
+rem Backup / restore tasks (EDG-01 cell 2) - Standard/Enterprise only.
+if exist inspecto-backup.jar set "CP=%CP%;inspecto-backup.jar"
 if exist inspecto-security.jar set "CP=%CP%;inspecto-security.jar"
 if exist postgresql.jar set "CP=%CP%;postgresql.jar"
 "%JAVA%" %OPTS% ^
@@ -742,6 +777,8 @@ fi
 # delivery is intrinsic to NotificationService and is not a channel. The classpath entry IS the switch:
 # the module is found via META-INF/services/com.gamma.notify.NotificationChannel.
 [ -f inspecto-notify-channels.jar ] && CP="${CP}:inspecto-notify-channels.jar"
+# Backup / restore tasks (EDG-01 cell 2): Standard/Enterprise only; same contract as the line above.
+[ -f inspecto-backup.jar ] && CP="${CP}:inspecto-backup.jar"
 [ -f postgresql.jar ] && CP="${CP}:postgresql.jar"
 # Operational stores on PostgreSQL (2026-08-31). The three ledgers (status/batches/lineage) are now
 # SERVED from a database by default; Personal stays on the bundled DuckDB with zero configuration,
@@ -821,6 +858,8 @@ rem Remote connector sidecar (CONNECTORS-BUNDLE-1) - see serve.sh for why it is 
 if exist inspecto-connectors.jar set "CP=%CP%;inspecto-connectors.jar"
 rem Delivery channels (EDG-01 cell 1) - Standard/Enterprise only; see serve.sh for the reasoning.
 if exist inspecto-notify-channels.jar set "CP=%CP%;inspecto-notify-channels.jar"
+rem Backup / restore tasks (EDG-01 cell 2) - Standard/Enterprise only.
+if exist inspecto-backup.jar set "CP=%CP%;inspecto-backup.jar"
 if exist postgresql.jar set "CP=%CP%;postgresql.jar"
 rem Operational stores on PostgreSQL (2026-08-31) - the edition seam; see serve.sh for the reasoning.
 rem The URL is the signal, never the driver's presence: postgres without a URL fails the boot.
@@ -993,7 +1032,7 @@ if (-not $SkipBootCheck) {
             else { 'java' }
     # The same classpath the generated launchers build -- deliberately re-derived from the staged files
     # rather than hardcoded, so a sidecar that fails to stage is a boot failure here too.
-    $cp = @('inspecto.jar') + @('inspecto-security.jar','inspecto-policy.jar','inspecto-connectors.jar','inspecto-notify-channels.jar','postgresql.jar' |
+    $cp = @('inspecto.jar') + @('inspecto-security.jar','inspecto-policy.jar','inspecto-connectors.jar','inspecto-notify-channels.jar','inspecto-backup.jar','postgresql.jar' |
         Where-Object { Test-Path (Join-Path $bundleDir $_) })
     $sep = if ($IsWindows -or $env:OS -eq 'Windows_NT') { ';' } else { ':' }
     $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)

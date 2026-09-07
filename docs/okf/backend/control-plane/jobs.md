@@ -297,10 +297,15 @@ via `NotificationStore.prune`/`countPrunable`, the per-space feed attached to `J
 (CHECKPOINT/VACUUM over the live stores via host seams), `storage_report` (per-axis usage; on a real run
 also appends a queryable per-axis sample to the `maintenance_storage` catalog Dataset — the `BackupTask`
 idiom, skipped on dry-run), `storage_trend` (growth-trend analysis over that series), `scheduler_audit`,
-`metadata_validate` (broken refs / duplicates / missing physical data), `file_repository_audit`, `backup`
-(timestamped zip + SHA-256 sidecar manifest via `Checksums`) / `backup_verify` (archive hash first,
-fail-closed) / `restore` (manifest validation before any write, zip-slip jail, conflict preview; archive-based,
-*not* bundle import — it covers the whole config tree). Findings emit `maintenance.*` signals for Alert Rules.
+`metadata_validate` (broken refs / duplicates / missing physical data), `file_repository_audit`. **Contributed,
+not built in (since 2026-09-07, EDG-01 cell 2):** `backup` (timestamped zip + SHA-256 sidecar manifest via
+`Checksums`) / `backup_verify` (archive hash first, fail-closed) / `restore` (manifest validation before any
+write, zip-slip jail, conflict preview; archive-based, *not* bundle import — it covers the whole config tree) —
+these three live in the optional `inspecto-backup` module (Standard+, EDITIONS `OPS-06`) and reach the switch
+through the **`MaintenanceTaskProvider`** ServiceLoader seam: the built-in `switch` always wins first, and its
+`default` arm consults discovered providers before throwing *unknown maintenance task*. A task claimed by two
+providers is refused fail-closed rather than resolved by classpath order. Findings emit `maintenance.*` signals
+for Alert Rules.
 
 * **Dry run (MNT-1)** — `POST /jobs/{name}/trigger?dryRun=true` (v1 202 body echoes it); `JobContext.dryRun()`;
   tasks with no preview do nothing on a dry run (fail-closed).

@@ -64,9 +64,11 @@ import java.time.Instant;
  *       Maintenance COULD tier). See {@link StorageTrendTask}.</li>
  *   <li>{@code scheduler_audit} — read-only hygiene audit of the Job registry: disabled jobs, duplicate
  *       names/specs, orphan triggers (MNT-4). See {@link SchedulerAuditTask}.</li>
- *   <li>{@code backup} / {@code backup_verify} / {@code restore} — zip + SHA-256-manifest archive of a
- *       directory, hash verification against the sidecar manifest, and fail-closed restore with preview
- *       and conflict detection (MNT-5/MNT-6). See {@link BackupTask}.</li>
+ *   <li>{@code backup} / {@code backup_verify} / {@code restore} — <b>not in the core since 2026-09-07</b>
+ *       (EDG-01 cell 2; EDITIONS {@code OPS-06} is "not for Personal"). They are contributed through the
+ *       {@link MaintenanceTaskProvider} seam by the optional {@code inspecto-backup} module, which Standard
+ *       and Enterprise bundle and Personal does not. On a bundle without it the task is unknown — see the
+ *       {@code default} arm of {@link #execute}.</li>
  *   <li>{@code metadata_validate} — read-only cross-component integrity audit: broken references,
  *       duplicate definitions, missing physical data (MNT-7). See {@link MetadataValidateTask}.</li>
  *   <li>{@code file_repository_audit} — read-only data-root audit: unregistered stores + stale
@@ -160,12 +162,8 @@ final class MaintenanceJob implements Job {
             case "storage_report"     -> StorageReportTask.run(cfg, dataDir, ctx);
             case "storage_trend"      -> StorageTrendTask.run(cfg, dataDir, ctx);
             case "scheduler_audit"    -> SchedulerAuditTask.run(host, ctx);
-            case "backup_verify"      -> BackupTask.verify(cfg, ctx);
             case "metadata_validate"  -> MetadataValidateTask.run(ctx, dataDir);
             case "file_repository_audit" -> FileRepositoryAuditTask.run(cfg, dataDir, ctx);
-            // Phase-2 write tasks with real previews (MNT-5/MNT-6).
-            case "backup"             -> BackupTask.backup(cfg, ctx, dryRun, dataDir);
-            case "restore"            -> BackupTask.restore(cfg, ctx, dryRun);
             case "db_maintenance"     -> dryRun
                     ? JobResult.ok("db_maintenance[dry-run]: would run CHECKPOINT/VACUUM on the ledger store", 0L)
                     : DbMaintenanceTask.run(host);
@@ -182,8 +180,53 @@ final class MaintenanceJob implements Job {
                 if (ms > 0) Thread.sleep(ms);
                 yield JobResult.ok("heartbeat", ms);
             }
-            default -> throw new IllegalArgumentException("unknown maintenance task '" + task + "'");
+            // Not built in: ask the providers on the classpath (MaintenanceTaskProvider). The switch above
+            // always wins first, so a provider can never shadow a built-in; and a bundle with no provider
+            // behaves exactly as before for everything except the tasks that were deliberately moved out.
+            default -> {
+                MaintenanceTaskProvider provider = CONTRIBUTED.get(task);
+                if (provider == null) {
+                    throw new IllegalArgumentException("unknown maintenance task '" + task + "' - not built into "
+                            + "this bundle, and no installed module provides it. A task supplied by an optional "
+                            + "edition module is only available where that module is bundled (docs/EDITIONS.md).");
+                }
+                yield provider.run(task, new MaintenanceTaskContext(cfg, ctx, dryRun, dataDir, auditDir, runStore, host));
+            }
         };
+    }
+
+    /**
+     * Task name → the provider that runs it, discovered once per JVM. ⚠ A name claimed by two providers is a
+     * deployment error, and it is handled fail-closed: the name maps to a provider that REFUSES, so neither
+     * implementation silently wins by classpath order — that would be the same class of bug as the
+     * first-match route table, decided by whichever jar was listed first.
+     */
+    private static final java.util.Map<String, MaintenanceTaskProvider> CONTRIBUTED = discoverContributed();
+
+    private static java.util.Map<String, MaintenanceTaskProvider> discoverContributed() {
+        java.util.Map<String, MaintenanceTaskProvider> byTask = new java.util.HashMap<>();
+        java.util.Map<String, java.util.List<String>> claimants = new java.util.HashMap<>();
+        for (MaintenanceTaskProvider p : java.util.ServiceLoader.load(MaintenanceTaskProvider.class)) {
+            for (String raw : p.tasks()) {
+                String name = raw == null ? "" : raw.trim().toLowerCase();
+                if (name.isEmpty()) continue;
+                claimants.computeIfAbsent(name, k -> new java.util.ArrayList<>()).add(p.getClass().getName());
+                byTask.put(name, p);
+            }
+        }
+        for (var e : claimants.entrySet()) {
+            if (e.getValue().size() > 1) {
+                String who = String.join(", ", e.getValue());
+                byTask.put(e.getKey(), new MaintenanceTaskProvider() {
+                    @Override public java.util.Set<String> tasks() { return java.util.Set.of(e.getKey()); }
+                    @Override public JobResult run(String task, MaintenanceTaskContext ctx) {
+                        throw new IllegalStateException("maintenance task '" + task + "' is claimed by more than one "
+                                + "installed module (" + who + ") - refusing to pick one by classpath order");
+                    }
+                });
+            }
+        }
+        return java.util.Map.copyOf(byTask);
     }
 
     private static JobResult noPreview(String task) {

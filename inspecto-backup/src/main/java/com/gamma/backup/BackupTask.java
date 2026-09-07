@@ -1,4 +1,8 @@
-package com.gamma.job;
+package com.gamma.backup;
+
+import com.gamma.job.JobConfig;
+import com.gamma.job.JobContext;
+import com.gamma.job.JobResult;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.acquire.Checksums;
@@ -35,7 +39,14 @@ import java.util.zip.ZipOutputStream;
 /**
  * The System Maintenance backup task family (Phase 2, {@code docs/superpower/system-maintenance-plan.md}):
  * {@code backup} (MNT-5), {@code backup_verify} (MNT-5) and {@code restore} (MNT-6) on the
- * {@code maintenance} Job Type — mirrors the {@link MaterializeTask} one-class-per-complex-task shape.
+ * {@code maintenance} Job Type — mirrors the core's {@code MaterializeTask} one-class-per-complex-task shape.
+ *
+ * <p>⚠ <b>Relocated from {@code com.gamma.job} in {@code inspecto-engine} on 2026-09-07 (EDG-01 cell 2).</b>
+ * EDITIONS {@code OPS-06} is "not for Personal", and this class shipped in every bundle because the engine is
+ * an unconditional dependency. It now reaches {@code MaintenanceJob} only through the
+ * {@link com.gamma.job.MaintenanceTaskProvider} seam ({@link BackupTaskProvider}), from a module the Personal
+ * build does not include. The package moved with it: leaving it in {@code com.gamma.job} would split that
+ * package across two jars. Nothing in the three methods changed.
  *
  * <p><b>Archive format.</b> A plain zip of the source tree (relative paths, forward slashes) plus a
  * {@code backup-manifest.json} entry, and a <b>sidecar</b> {@code <archive>.manifest.json} next to the

@@ -106,36 +106,10 @@ class JobPathContainmentTest {
     }
 
     // ── backup / backup_verify / restore ─────────────────────────────────────────
+    // MOVED 2026-09-07 (EDG-01 cell 2) to inspecto-backup/src/test/java/com/gamma/job/BackupPathContainmentTest.java
+    // with the tasks themselves (OPS-06 is "not for Personal"). The verify case that used to sit after
+    // the report-delivery one moved too.
 
-    @Test
-    void backupRefusesABackupDirOutsideTheAllowedRoots(@TempDir Path root) throws Exception {
-        jailTo(root);
-        Path src = Files.createDirectories(root.resolve("src"));
-        Files.writeString(src.resolve("a.txt"), "x");
-        String outside = escapesTo(root, "backups");
-        PathJail.Escape e = assertThrows(PathJail.Escape.class,
-                () -> new MaintenanceJob(job(Map.of("task", "backup", "dir", src.toString(),
-                        "backup_dir", outside))).run());
-        assertEquals("backup_dir", e.field());
-    }
-
-    @Test
-    void restoreRefusesATargetDirOutsideTheAllowedRoots(@TempDir Path root) throws Exception {
-        jailTo(root);
-        Path archive = root.resolve("b.zip");
-        Files.writeString(archive, "not really a zip");
-        String outside = escapesTo(root, "restored");
-        PathJail.Escape e = assertThrows(PathJail.Escape.class,
-                () -> new MaintenanceJob(job(Map.of("task", "restore", "archive", archive.toString(),
-                        "target_dir", outside))).run());
-        assertEquals("target_dir", e.field(),
-                "target_dir must be jailed BEFORE the archive is opened, not after");
-    }
-
-    /**
-     * {@code archive} on backup_verify names a file inside {@code backup_dir}, so it is jailed against
-     * that dir — a traversal here reads back out of the box even though backup_dir itself is legal.
-     */
     // ── report delivery ──────────────────────────────────────────────────────────
 
     /**
@@ -164,14 +138,4 @@ class JobPathContainmentTest {
         }
     }
 
-    @Test
-    void verifyRefusesAnArchiveThatTraversesOutOfTheBackupDir(@TempDir Path root) throws Exception {
-        jailTo(root);
-        Path backups = Files.createDirectories(root.resolve("backups"));
-        Files.writeString(root.resolve("outside.zip"), "x");
-        PathJail.Escape e = assertThrows(PathJail.Escape.class,
-                () -> new MaintenanceJob(job(Map.of("task", "backup_verify",
-                        "backup_dir", backups.toString(), "archive", "../outside.zip"))).run());
-        assertEquals("archive", e.field());
-    }
 }

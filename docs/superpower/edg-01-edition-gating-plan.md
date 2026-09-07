@@ -1,6 +1,6 @@
 # EDG-01 — gating the six "not for Personal" features (BUILD PLAN, in flight)
 
-> **Status 2026-09-07: mechanism DECIDED; ✅ cell 1 (`CP-15`) SHIPPED, five cells remain.** BACKLOG `EDG-01`, ranked **P1** — the
+> **Status 2026-09-07: mechanism DECIDED; ✅ cells 1 (`CP-15`) and 2 (`OPS-06`) SHIPPED, four cells remain.** BACKLOG `EDG-01`, ranked **P1** — the
 > only substantive Personal-scoped work on the board. Parent truth:
 > [`../EDITIONS.md`](../EDITIONS.md) §Feature × edition matrix + §Edition-gating debt.
 
@@ -227,3 +227,116 @@ clean; `check-dependencies` unchanged at 95 artifacts.
 ⚠ **`NoChannelShipsInThePersonalBuildTest` passes under BOTH profiles**, and that is correct rather than a
 weak test: it lives in `inspecto-engine`, whose classpath never contains the channels module because the
 dependency points the other way. It answers "what does the CORE see", which is exactly the question.
+
+## 10. Cell 2 as built — `OPS-06` backup / restore, ✅ SHIPPED 2026-09-07
+
+**The seam that did not exist:** `MaintenanceTaskProvider` (+ `MaintenanceTaskContext`), a ServiceLoader SPI
+consulted by **the `default` arm** of `MaintenanceJob`'s switch. The switch itself is untouched apart from the
+three `case` lines that left, so a built-in can never be shadowed by a provider, and a bundle with no provider
+behaves byte-identically to before for every task except the three that were deliberately moved.
+
+**The module:** `inspecto-backup` — THIN like `inspecto-policy` (nothing beyond the core, no shade, no
+`-sidecar` classifier), holding `BackupTask` (relocated to `com.gamma.backup`, three methods unchanged) and
+`BackupTaskProvider`, registered via `META-INF/services/com.gamma.job.MaintenanceTaskProvider`.
+
+🔴 **Refuse, never skip — and this is the design decision of the cell.** On Personal, `task: backup` is an
+*unknown maintenance task* and the run FAILS with a message naming the cause. The tempting alternative, a
+SKIPPED result, would read to a chained job downstream as a successful no-op — the `ConservationCheck` shape
+again. Pinned by `NoBackupTaskShipsInThePersonalBuildTest` in the default build, which also asserts a built-in
+still runs (the switch was cut, not broken) and that NO provider is on that classpath.
+
+⚠ **Product-facing consequence, stated rather than hidden:** the bundled `spaces/demo` has a nightly chain
+`runlog_retention → db_maintenance → config_backup → backup_verify → maintenance_report` (cron `15 3 * * *`).
+On a Personal install it now stops at `config_backup` with a FAILED run; the chain's halt-on-failure guard
+stops the rest. That is the edition boundary doing its job. Recorded in EDITIONS `OPS-06` and the
+backup/restore runbook.
+
+🔴 **A task claimed by two providers is refused fail-closed**, mapped to a provider that throws naming both
+claimants — never resolved by classpath order, which would be the route-table first-match bug in a new coat.
+
+**Tests moved VERBATIM, in package `com.gamma.job`** — a test-scope split package, on purpose: the five
+`MaintenanceLibraryTest` cases and three `JobPathContainmentTest` cases construct `MaintenanceJob`,
+`RunContext`, `RunLogStore` and `RunArtifactStore`, all package-private. Keeping the package keeps them
+unchanged in meaning (§6 criterion 4 met **fully** this time, unlike cell 1), and because they drive
+`MaintenanceJob` end to end, every one of them also proves the SPI discovery.
+
+**Against §6:** (1) ✅ absent from the default reactor · (2) ✅ proven by packaging (below) · (3) ⚠ N/A —
+a maintenance task has no HTTP path; the unknown-task refusal is its equivalent, and it is LOUD ·
+(4) ✅ eight tests moved unchanged · (5) ✅ vacuous, no route · (6) ✅ EDITIONS `OPS-06` updated.
+
+## 11. Cell 3 grounding — `CP-09` geo map + link analysis, the UI half (2026-09-07)
+
+The first route-based cell, and the UI grounding says it is **not** just "stop registering two RouteModules":
+
+* **Callers.** `GeoService.project()/routes()` → `POST /geo/projection`, `/geo/routes`
+  (`inspecto/api/geo.service.ts:68,72`); `InvService.project()/neighbors()` → `POST /inv/projection`,
+  `/inv/projection/neighbors` (`inv.service.ts:52,57`). Rendered by `GeoMapComponent` (`/studio/geo-map`) and
+  `LinkAnalysisComponent` (`/studio/link-analysis`), and **also as dashboard widgets** (`geo-view-widget`,
+  `link-view-widget`, offered in `menu-attach.dialog.ts:26-27`). Nav entries are **static, unconditional
+  array literals** (`core/navigation/navigation-data.ts:191-209`).
+
+* 🔴 **Neither feature follows the 503-latch convention today.** Both components wrap `.query()` in a plain
+  `try/catch` and set a generic inline `loadError` with **no status-code branching**
+  (`geo-map.component.ts:481-483`, `link-analysis.component.ts:481-485`) — a 404 and a 503 render the same
+  text, after the user has already navigated in. So plan §4's "the convention exists and is not new work"
+  is true of the *assist panel*, not of these two. For CP-09 the UI half IS work.
+
+* **The precedent that fits:** `SessionService.exchangeEnabled` — a plain boolean signal read once from
+  `GET /bootstrap`'s `features.exchange` (`session.service.ts:36,67,93`), consumed to hide affordances
+  (`datasets.component.ts:64`, `widgets.component.ts:71`, and `link-analysis.component.ts:169` already uses it
+  for its *share* button). CP-09 needs the same shape — `features.geo` / `features.linkAnalysis` (or one
+  flag) — **not** a `LensService` computed, which is RBAC, not module presence.
+
+* ⚠ **There is no filtered-nav precedent to copy.** Exchange has no nav entry, so nobody has yet hidden a
+  `navigation-data.ts` item on a bootstrap flag. CP-09 will be the first; it needs either a filtered array at
+  construction (inject `SessionService`) or a per-item `visible` predicate. Decide once, then it is the
+  pattern for CP-11 too.
+
+* Vitest specs for both features mock the backend (`HttpTestingController`/spies) and are unaffected by
+  the backend module's presence — 8 geo specs, 5 link-analysis specs. They stay in the UI.
+
+* ⚠ Gotcha found on the way: `entity-projection.ts:26`'s comment claims "on any failure … falling back to
+  the client sample fold", but `queryOne` (`:194-208`) has no catch — it throws. Do not reason from that
+  comment about degrade behaviour.
+
+**Implication for the cell's shape.** Backend: the two `RouteModule`s + their `CapabilityManifest` entries
+move to an optional module discovered by an APPENDED `ServiceLoader` pass (§3), and `/bootstrap` gains a
+`features` flag the same way `exchange` has one. UI: a `SessionService` flag mirroring `exchangeEnabled`, the
+two nav items hidden on it, and the two widget offers gated on it. §4's core 503 stub is *still* wanted for
+non-SPA clients and for the widget path, but the honest UI behaviour is "not offered", not "offered and then
+explained".
+
+## 12. Cell 3 grounding — `CP-09`, the backend half (2026-09-07) — and the blocker the census missed
+
+The census said "no seam to invent; stop registering the two modules". That is true of the *routes* and
+false of the *mechanism*: **a `RouteModule` contributed from another jar cannot exist today.**
+
+* 🔴 **`RouteModule`, `ApiContext` and `Handler` are all package-private** (`RouteModule.java:8`,
+  `ApiContext.java:26`, `Handler.java:9`), and so are `ApiException` and `WriteGates`, which `GeoRoutes` /
+  `InvRoutes` use directly. All 50 implementors live in `com.gamma.control`. So §3's "append
+  ServiceLoader-discovered modules" needs a **public route SPI first** — a `@PublicApi` surface expansion, not
+  a gating pass. This is the real first task of cell 3, and it is the seam every later route-based cell
+  (SEC-10, CP-11) reuses.
+* ✅ Appending after the hard-coded list is otherwise safe: nothing after `ControlApi:443` assumes a complete
+  route set (`openApiContract()` is a static file read, no reflective enumeration).
+* ✅ `GeoRoutes`/`InvRoutes` have **no** `withCapability` gates and **no** `CapabilityManifest` entries (the
+  `/settings/geo` entry at `:135` belongs to `SettingsRoutes` and stays). `docs/api/openapi-v1.json`
+  documents **neither** `/geo/*` nor `/inv/*`, and `ApiContractTest` compares the served file to the doc
+  byte-for-byte — so the API contract is untouched by their removal.
+* 🔴 **Guard-scope exemption, found in passing:** `CapabilityManifestTest` finds `withCapability(` call sites
+  by **regex-scanning the directory `src/main/java/com/gamma/control`** (`:28 ROUTES_DIR`). A gated route
+  moved to any other module's source tree silently drops out of the guard. Not live for CP-09 (no gates), but
+  ⛔ it must be widened before CP-11 (which is gated) is extracted, or the drift test the whole
+  five-site rule rests on stops seeing those sites.
+* Tests: `ControlApiGeoProjectionTest` and `ControlApiInvProjectionTest` are the only `/geo`/`/inv` HTTP
+  tests. They construct `new ControlApi(svc, 0)` (package-private ctor) and use `V1Body`, a package-private
+  **test-tree** helper — so either they move with a test-scope split package (the cell-2 technique) or
+  `V1Body` is promoted to a shared test-fixtures artifact.
+* The 503-when-absent idiom exists and is reusable verbatim: `AssistRoutes:47-49`
+  `service().assistAgent().orElseThrow(() -> new ApiException(503, …))` — an `Optional` accessor on the
+  service, checked first by every route. §4's core stub for CP-09 is that shape.
+
+**Cell 3 is therefore two commits, not one:** (a) make the route SPI public — `RouteModule`, `ApiContext`,
+`Handler`, `ApiException`, `WriteGates` (or an `ApiContext`-exposed subset), plus the ServiceLoader append in
+`ControlApi` and a widened `CapabilityManifestTest` scan; (b) move geo + link analysis behind it, with the
+`/bootstrap` `features` flag (§11) and the UI hiding. (a) is the pattern-setter for SEC-10 and CP-11.

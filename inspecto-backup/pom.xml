@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>inspecto-backup</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Inspecto — backup / restore maintenance tasks (Standard edition, optional)</name>
+    <description>
+        OPTIONAL Standard-edition maintenance tasks (EDITIONS.md OPS-06, "Backup / restore"): the
+        `backup`, `backup_verify` and `restore` tasks of the `maintenance` Job Type, contributed through the
+        core's com.gamma.job.MaintenanceTaskProvider ServiceLoader seam.
+
+        WHY THIS MODULE EXISTS (EDG-01 cell 2, 2026-09-07). OPS-06 was decided "not for Personal" on
+        2026-09-02, and BackupTask nonetheless shipped in every bundle because it lived in inspecto-engine,
+        an unconditional dependency of the app. The matrix cell was a product decision the build did not
+        apply. Dropping THIS jar on the classpath is what makes the three tasks exist; on a Personal bundle
+        they are unknown maintenance tasks, refused loudly, never silently skipped.
+
+        THIN, like inspecto-policy: it needs nothing beyond what the core already supplies (Jackson, slf4j,
+        Checksums, PathJail, ComponentStore), so there is no shade and no sidecar classifier.
+
+        Built only under the "edition-standard"/"edition-enterprise" profiles (see the parent pom's
+        profile-scoped &lt;modules&gt;), so a routine "mvn -o clean test" (= Personal, the DEFAULT build --
+        there is no -Pedition-personal) never compiles or tests it.
+    </description>
+
+    <dependencies>
+        <!-- The core: MaintenanceTaskProvider, MaintenanceTaskContext, JobConfig/JobContext/JobResult,
+             Checksums, PathJail, ComponentStore, Severity. Compile scope, as inspecto-policy does — a thin
+             jar dropped beside inspecto.jar resolves all of it from there at run time. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-processor</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>
