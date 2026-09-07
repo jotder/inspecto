@@ -37,6 +37,16 @@ jobs:
       - name: Guard — no committed secrets
         run: node tools/check-secrets.mjs
 
+      # Step Processors board guard (CONNECTORS-BUNDLE-1 follow-up, 2026-09-07). docs/EDITIONS.md's
+      # `| SP-*` rows are GENERATED from inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json
+      # (itself written by ProcessorCatalogContractTest), plus the per-edition decisions the renderer holds
+      # in code. The script has advertised a `--check` mode as CI-friendly since it was written, and nothing
+      # ran it — so the board could drift from the catalog silently, which is the one thing generating it was
+      # meant to prevent. It had in fact drifted by the time this step was added. Pure Node, ~instant; the
+      # fix when it fails is `node tools/render-processor-board.mjs`, never a hand-edited `| SP-` row.
+      - name: Guard — Step Processors board is generated, not hand-edited
+        run: node tools/render-processor-board.mjs --check
+
       - name: Set up JDK 25
         uses: actions/setup-java@v4
         with:
