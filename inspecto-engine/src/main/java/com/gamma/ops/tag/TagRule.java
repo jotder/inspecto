@@ -2,7 +2,7 @@ package com.gamma.ops.tag;
 
 import com.gamma.config.io.ConfigCodec;
 import com.gamma.ops.ObjectService;
-import com.gamma.ops.ObjectType;
+import com.gamma.objects.ObjectType;
 import com.gamma.ops.OperationalObject;
 import com.gamma.util.Values;
 

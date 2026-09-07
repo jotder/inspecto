@@ -1,5 +1,7 @@
 package com.gamma.ops.findings;
 
+import com.gamma.objects.FindingsSpec;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 

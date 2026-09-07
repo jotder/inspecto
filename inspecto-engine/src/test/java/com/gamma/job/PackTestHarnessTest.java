@@ -2,7 +2,7 @@ package com.gamma.job;
 
 import com.gamma.notify.Notification;
 import com.gamma.notify.NotificationAccess;
-import com.gamma.ops.IncidentAccess;
+import com.gamma.objects.IncidentAccess;
 import com.gamma.util.OperationsZone;
 import org.junit.jupiter.api.Test;
 

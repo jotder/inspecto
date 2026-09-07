@@ -1,7 +1,7 @@
 package com.gamma.job;
 
 import com.gamma.ops.ObjectService;
-import com.gamma.ops.ObjectType;
+import com.gamma.objects.ObjectType;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;

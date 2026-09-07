@@ -3,7 +3,7 @@ package com.gamma.control;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
-import com.gamma.ops.ObjectType;
+import com.gamma.objects.ObjectType;
 import com.gamma.ops.OperationalObject;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.service.CollectorService;

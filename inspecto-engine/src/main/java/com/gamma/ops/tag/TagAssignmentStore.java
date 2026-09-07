@@ -1,5 +1,7 @@
 package com.gamma.ops.tag;
 
+import com.gamma.objects.TagAssignment;
+
 import java.util.List;
 
 /**

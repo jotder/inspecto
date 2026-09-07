@@ -3,7 +3,7 @@ package com.gamma.ops.tag;
 import com.gamma.ops.InMemoryObjectStore;
 import com.gamma.ops.ObjectService;
 import com.gamma.ops.ObjectStore;
-import com.gamma.ops.ObjectType;
+import com.gamma.objects.ObjectType;
 import com.gamma.ops.OperationalObject;
 import com.gamma.ops.link.InMemoryLinkStore;
 import com.gamma.ops.note.InMemoryNoteStore;

@@ -4,7 +4,7 @@ import com.gamma.alert.Alert;
 import com.gamma.alert.AlertAccess;
 import com.gamma.notify.Notification;
 import com.gamma.notify.NotificationAccess;
-import com.gamma.ops.IncidentAccess;
+import com.gamma.objects.IncidentAccess;
 import com.gamma.ops.OperationalObject;
 import com.gamma.util.RunLog;
 
@@ -53,7 +53,7 @@ final class DryRunServices implements PlatformServices {
             return Optional.of((T) (IncidentAccess) (title, message, severity, scope, attributes, dedupeAttribute) -> {
                 log.info("dry run: would open incident", "title", title, "severity", severity,
                         "scope", scope, "dedupeAttribute", dedupeAttribute);
-                return Optional.<OperationalObject>empty();
+                return Optional.<String>empty();
             });
         }
         if (type == AlertAccess.class) {

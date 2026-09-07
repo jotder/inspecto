@@ -1,7 +1,7 @@
 package com.gamma.control;
 
-import com.gamma.ops.AnnotationKinds;
-import com.gamma.ops.tag.TagAssignment;
+import com.gamma.objects.AnnotationKinds;
+import com.gamma.objects.TagAssignment;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import org.slf4j.Logger;

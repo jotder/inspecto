@@ -1,6 +1,6 @@
 package com.gamma.service;
 
-import com.gamma.ops.rca.RcaTemplate;
+import com.gamma.objects.RcaTemplate;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

@@ -6,11 +6,11 @@ import com.gamma.notify.InMemoryNotificationStore;
 import com.gamma.notify.Notification;
 import com.gamma.notify.NotificationAccess;
 import com.gamma.notify.NotificationStore;
-import com.gamma.ops.IncidentAccess;
+import com.gamma.objects.IncidentAccess;
 import com.gamma.ops.InMemoryObjectStore;
 import com.gamma.ops.ObjectQuery;
 import com.gamma.ops.ObjectService;
-import com.gamma.ops.ObjectType;
+import com.gamma.objects.ObjectType;
 import com.gamma.util.RunLog;
 import org.junit.jupiter.api.Test;
 
@@ -51,7 +51,7 @@ class DryRunServicesTest {
             feed.add(n);
             return Optional.of(n);
         });
-        registry.register("incidents", IncidentAccess.class, IncidentAccess.over(() -> objects));
+        registry.register("incidents", IncidentAccess.class, IncidentAccess.over(objects::access));
         registry.register("alerts", AlertAccess.class, () -> {
             evaluations.add("evaluated");
             return List.of(new Alert("r1", "error", "orders", "failed_batches", 5, ">", 3, "1h", 0L, "m"));

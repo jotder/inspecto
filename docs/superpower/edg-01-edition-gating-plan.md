@@ -711,3 +711,108 @@ layer, not the routes: `ServiceBootstrap`/`ServiceStores` decide what the SPI ha
 route modules follow. Apply recipe items 11–16 in the editions concept — in particular, census the **UI**
 consumers of `/objects*` and read the other `EDITIONS` rows for what they promise Personal, before assuming
 this cell costs only the Incidents/Cases screens.
+
+## 22. Cell 7 — `CP-11` operational objects: the design, grounded 2026-09-08
+
+**Operator call (2026-09-08): FULL extraction behind an `ObjectAccess` SPI, and amend the two rows it
+collides with.** The collisions were found by applying recipe item 12 (read the OTHER matrix rows for what
+they promise the edition you are gating) and are real:
+
+* **`OPS-01`** — "Operational stores on DuckDB (status, **objects**, jobs, dedup ledger, outputs,
+  provenance)", Personal ✅ — and `ServiceStores` in mandatory core opens `DbObjectStore`, `DbLinkStore`,
+  `DbNoteStore`, `DbTagAssignmentStore`. **To amend: drop `objects` from OPS-01's Personal column.**
+* **`SP-CTL-02`** — gap watchdog, Personal ✅, "gaps raise ALERT objects via the `EventObjectBridge`" — and
+  `CollectorService:483` builds `new com.gamma.ops.EventObjectBridge(this.objects)` unconditionally, **by
+  fully-qualified name with no import** (the cell-4 trap again — an import census cannot see it).
+  **To amend: on Personal a gap raises the EVENT but no ALERT object.**
+* ⛔ **`/alerts*` is NOT in this cell.** The nav "Alerts" pane is `AlertsService` over config-authored
+  alert RULES (`/alerts`, `/alerts/rules`) — a different domain from an `OperationalObject` whose
+  `objectType` is `ALERT`. Do not gate it, and do not merge the two vocabularies.
+
+### Corrected measurements (§21's were wrong in three ways)
+
+| §21 said | Ground truth |
+|---|---|
+| 37 files in `com.gamma.ops` | **36.** `AbstractJdbcStore` was generic JDBC scaffolding, not domain — its fifth subclass is core's `com.gamma.notify.DbDeliveryReceiptStore`, so it could not travel with the domain. Relocated to `com.gamma.util` in `dc7601ff`. |
+| 27 dependants | **23 in CODE.** Four are `{@link}`-only: `notify/NotificationStore`, `notify/InMemoryNotificationStore`, `job/PipelineJobRunner`, `alert/AlertAccess`. Strip comments before quoting a count. |
+| "costs the Incidents/Cases screens" | **3 whole panes** (`/cases`, `/incidents`, `/tags`) **+ 6 partial-degrade sites**: `TagAssignmentDialog` is wired into five Studio panes (Dashboards, Datasets, Widgets, Geo Map, Link Analysis) and Link Analysis also loses its per-view Comments dialog. |
+
+### The move that shrinks everything: five types were filed by TOPIC, not coupling
+
+`ObjectType`, `AnnotationKinds`, `TagAssignment`, `RcaTemplate` and `FindingsSpec` have **no store or
+service coupling at all** — they sat in `com.gamma.ops` by convention. Relocated to a new core package
+**`com.gamma.objects`** (81 files rewritten). That alone means `ComponentRoutes` and `RcaTemplateRegistry`
+need **no SPI**, and `ExpectationRoutes` / `DecisionRoutes` / `ReconRunJob` reduce to two methods.
+
+⚠ **A prefix collision to avoid if this is ever redone:** rewriting `com.gamma.ops.tag.TagAssignment` also
+rewrites `TagAssignmentStore`, which stays in the module. Four files broke; the compiler caught it.
+
+### The second shrink: narrow `IncidentAccess.openIncident`'s return type
+
+It returns `Optional<OperationalObject>`, but the only production reader (`AlertService:327`) does
+`.ifPresent(incident -> objects.link(incident.id(), …))` — **`.id()` and nothing else**. Narrowing to
+`Optional<String>` deletes `PackTestHarness.recordIncident`'s hand-built 13-argument
+`new OperationalObject(...)` (in a mandatory file) and `DryRunServices`' `OperationalObject` import.
+
+### The proposed `ObjectAccess` — six methods, all core types
+
+    boolean hasActive(ObjectType kind, String scope);
+    boolean hasActiveMatching(ObjectType kind, String scope, Map<String,String> matchAttributes);
+    String  open(ObjectType kind, String title, String description, String severity,
+                 String scope, Map<String,String> attributes);
+    void    link(String fromId, String toId, String relationship, String actor);
+    void    addTag(String tag, String targetKind, String targetId, String actor);
+    List<String> tagsOf(String targetKind, String targetId);
+    List<String> targetIdsForTag(String tag, String targetKind);
+    Optional<Map<String,Object>> summary(String objectId);
+    Optional<Consumer<Event>> eventSubscriber();
+
+⚠ Two constraints that shaped it. `link` takes the relationship as a **String**, not the
+`LinkRelationship` enum, which stays in the module. And `summary` returns plain data rather than doing the
+SEC-7d visibility check itself: `ObjectAccess` is declared in `inspecto-engine`, which **cannot** import
+`com.gamma.control.ApiContext` — `inspecto` depends on `inspecto-engine`, never the reverse — so core keeps
+the ABAC check and applies it to the map (the shape `ComponentAccess.requireView` already uses).
+
+### MOVE to the module
+
+`com.gamma.ops` (36 files) · `ObjectRoutes` (43 code refs) · `NoteRoutes` · `QueueRoutes` · `TagRoutes` ·
+`ObjectsAnalyticsJob` · `CaseRuleEvalJob` · `IncidentPurgeTask` · `EventObjectBridge` · and
+`ServiceBootstrap`'s six ops config loaders (`_queue`, `_rca`, `_caserule`, `_tag`, `_tagrule`,
+`_workflow`).
+
+**Seams available:** the two ops JOBS ride `JobService:507`'s existing
+`ServiceLoader.load(JobTypeProvider.class)` — no new seam needed. ⚠ `IncidentPurgeTask` is hardcoded in
+`MaintenanceJob`'s `task` switch, so it needs cell 2's `MaintenanceTaskProvider` — its **first reuse**.
+`EventObjectBridge` needs `CollectorService` to register `ObjectAccess.eventSubscriber()` conditionally
+instead of constructing the bridge outright.
+
+### Deliberate consequences to state, not discover
+
+* `spaces/demo/config/ops/` ships **five** ops config files (`_queue`, `_rca`, `_caserule`, `_tag`,
+  `_tagrule`). Personal stops loading them — the same deliberate breakage cell 2 accepted for demo's
+  nightly backup chain.
+* `AnnotationKinds.KINDS` still contains `"object"` on every edition (the vocabulary stays static per
+  recipe item 10), so `AnnotationTargets` must treat `"object"` as unknown when `ObjectAccess` is absent.
+  That behaviour does not exist today, because ops is currently mandatory.
+
+### 🔴 Do not edit the tree while a verify agent is running
+
+Stage B1's Enterprise verification reported a compile error and blamed "another concurrent session". It was
+**this session**: a `ps -W | grep java` check came back empty, so editing resumed — but the agent runs its
+builds **sequentially**, and the second one started afterwards. It then hit a Windows file-lock on
+`asn-core-0.1.0-SNAPSHOT.jar` from the competing JVM and produced two untrustworthy verdicts.
+
+⚠ An empty process check is not "the agent is done" — only its completion notification is. And note how the
+failure presented: a *transient* broken state mid-refactor, reported as a real defect, with mtimes as the
+only evidence that the tree had moved under it. The Personal run had already completed cleanly before the
+edits (**4004 tests, 23/23 modules, zero count deviation**), which is the verdict that actually validated
+B1; the Enterprise pair had to be re-run.
+
+### Staging (each stage verified and committed on its own)
+
+* **A ✅ `dc7601ff`** — `AbstractJdbcStore` → `com.gamma.util`.
+* **B1 ✅** — the five types → `com.gamma.objects`.
+* **B2** — declare `ObjectAccess`; narrow `IncidentAccess` to `Optional<String>`.
+* **C** — new `inspecto-ops` module; move the domain + routes + jobs; retype core dependants.
+* **D** — UI: `features.ops`, nav ids `incidents`/`cases`/`tags`, the 6 partial-degrade sites.
+* **E** — docs: amend `OPS-01` + `SP-CTL-02`, close `CP-11`, EDITIONS/BACKLOG/OKF.

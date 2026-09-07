@@ -3,8 +3,8 @@ package com.gamma.job;
 import com.gamma.api.PublicApi;
 import com.gamma.notify.Notification;
 import com.gamma.notify.NotificationAccess;
-import com.gamma.ops.IncidentAccess;
-import com.gamma.ops.ObjectType;
+import com.gamma.objects.IncidentAccess;
+import com.gamma.objects.ObjectType;
 import com.gamma.ops.OperationalObject;
 import com.gamma.signal.Severity;
 import com.gamma.signal.SignalEmitter;
@@ -211,19 +211,24 @@ public final class PackTestHarness {
         return Optional.of(n);
     }
 
-    /** Honours the active-object convention: a second open for the same scope + dedupe value is empty. */
-    private Optional<OperationalObject> recordIncident(String title, String message, String severity,
-                                                      String scope, Map<String, String> attributes,
-                                                      String dedupeAttribute) {
+    /**
+     * Honours the active-object convention: a second open for the same scope + dedupe value is empty.
+     *
+     * <p>⚠ Returns the id only (EDG-01 cell 7). This used to hand back a hand-built 13-argument
+     * {@code new OperationalObject(...)} purely to satisfy the old return type — the sole reason a
+     * mandatory test harness named an operational-object type at all. {@code IncidentAccess} now returns
+     * {@code Optional<String>}, so a random id is a faithful stand-in and the coupling is gone.
+     */
+    private Optional<String> recordIncident(String title, String message, String severity,
+                                            String scope, Map<String, String> attributes,
+                                            String dedupeAttribute) {
         Map<String, String> attrs = attributes == null ? Map.of() : Map.copyOf(attributes);
         String key = attrs.get(dedupeAttribute);
         boolean active = incidents.stream().anyMatch(prev -> prev.scope().equals(scope)
                 && java.util.Objects.equals(key, prev.attributes().get(dedupeAttribute)));
         if (active) return Optional.empty();
         incidents.add(new OpenedIncident(title, message, severity, scope, attrs, dedupeAttribute));
-        long now = System.currentTimeMillis();
-        return Optional.of(new OperationalObject(UUID.randomUUID().toString(), ObjectType.INCIDENT,
-                title, message, "IDENTIFIED", severity, null, null, null, scope, attrs, now, now, 0L));
+        return Optional.of(UUID.randomUUID().toString());
     }
 
     // ── the context ────────────────────────────────────────────────────────────

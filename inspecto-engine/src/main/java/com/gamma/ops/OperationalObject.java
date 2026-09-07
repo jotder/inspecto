@@ -1,5 +1,7 @@
 package com.gamma.ops;
 
+import com.gamma.objects.ObjectType;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;

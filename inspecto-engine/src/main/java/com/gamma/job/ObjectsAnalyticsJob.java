@@ -1,7 +1,7 @@
 package com.gamma.job;
 
 import com.gamma.ops.ObjectService;
-import com.gamma.ops.ObjectType;
+import com.gamma.objects.ObjectType;
 import com.gamma.signal.Severity;
 
 import org.slf4j.Logger;

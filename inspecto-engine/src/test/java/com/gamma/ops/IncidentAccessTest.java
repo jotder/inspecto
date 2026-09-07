@@ -1,5 +1,8 @@
 package com.gamma.ops;
 
+import com.gamma.objects.IncidentAccess;
+import com.gamma.objects.ObjectType;
+
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -10,19 +13,25 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * The {@code incidents} Platform Service (S1-4): opening under the active-object convention — one
  * active INCIDENT per scope + dedupe-attribute value, never a clone for an operator mid-triage.
+ *
+ * <p>⚠ Since EDG-01 cell 7 (2026-09-08) {@code openIncident} returns the <b>id</b>, not the object, so the
+ * two assertions that read {@code status()}/{@code correlationId()} now fetch the record back through
+ * {@code objects.get(id)}. They are kept rather than dropped: they are what proves the opened Incident
+ * really lands in its workflow's initial state and in the right scope, which an id alone cannot show.
  */
 class IncidentAccessTest {
 
     @Test
     void opensAnIncidentAndSuppressesAnActiveDuplicate() {
         ObjectService objects = new ObjectService(new InMemoryObjectStore());
-        IncidentAccess incidents = IncidentAccess.over(() -> objects);
+        IncidentAccess incidents = IncidentAccess.over(objects::access);
 
-        Optional<OperationalObject> first = incidents.openIncident("recon breach on orders", "3 rows off",
+        Optional<String> first = incidents.openIncident("recon breach on orders", "3 rows off",
                 "critical", "orders", Map.of("rule", "recon-daily"), "rule");
         assertTrue(first.isPresent());
-        assertEquals("IDENTIFIED", first.get().status());
-        assertEquals("orders", first.get().correlationId());
+        OperationalObject opened = objects.get(first.orElseThrow()).orElseThrow();
+        assertEquals("IDENTIFIED", opened.status());
+        assertEquals("orders", opened.correlationId());
 
         assertTrue(incidents.openIncident("recon breach on orders", "again", "critical", "orders",
                 Map.of("rule", "recon-daily"), "rule").isEmpty(), "an active duplicate is suppressed");
@@ -32,7 +41,7 @@ class IncidentAccessTest {
     @Test
     void aDifferentScopeOrDedupeValueOpensItsOwnIncident() {
         ObjectService objects = new ObjectService(new InMemoryObjectStore());
-        IncidentAccess incidents = IncidentAccess.over(() -> objects);
+        IncidentAccess incidents = IncidentAccess.over(objects::access);
         incidents.openIncident("t", "m", "error", "orders", Map.of("rule", "r1"), "rule");
 
         assertTrue(incidents.openIncident("t", "m", "error", "billing",
@@ -48,7 +57,7 @@ class IncidentAccessTest {
         // dedupe key used to "match" any other active Incident in the same scope that also lacked it —
         // two unrelated Incidents, the second silently swallowed. Nothing requires a caller to include it.
         ObjectService objects = new ObjectService(new InMemoryObjectStore());
-        IncidentAccess incidents = IncidentAccess.over(() -> objects);
+        IncidentAccess incidents = IncidentAccess.over(objects::access);
 
         assertTrue(incidents.openIncident("first", "m", "error", "orders",
                 Map.of("owner", "a"), "rule").isPresent());
@@ -63,14 +72,14 @@ class IncidentAccessTest {
     @Test
     void anArchivedIncidentNoLongerSuppresses() {
         ObjectService objects = new ObjectService(new InMemoryObjectStore());
-        IncidentAccess incidents = IncidentAccess.over(() -> objects);
-        OperationalObject first = incidents.openIncident("t", "m", "error", "orders",
+        IncidentAccess incidents = IncidentAccess.over(objects::access);
+        String first = incidents.openIncident("t", "m", "error", "orders",
                 Map.of("rule", "r1"), "rule").orElseThrow();
-        objects.transition(first.id(), "accept", "tester");   // DIAGNOSING is still non-terminal
+        objects.transition(first, "accept", "tester");   // DIAGNOSING is still non-terminal
         assertTrue(incidents.openIncident("t", "m", "error", "orders",
                 Map.of("rule", "r1"), "rule").isEmpty(), "an incident mid-triage still suppresses");
 
-        objects.transition(first.id(), "archive", "tester");   // ARCHIVED is the terminal state
+        objects.transition(first, "archive", "tester");   // ARCHIVED is the terminal state
         assertTrue(incidents.openIncident("t", "m", "error", "orders",
                 Map.of("rule", "r1"), "rule").isPresent(), "a terminal incident is out of the convention");
     }

@@ -1,4 +1,4 @@
-package com.gamma.ops;
+package com.gamma.objects;
 
 import java.util.Locale;
 

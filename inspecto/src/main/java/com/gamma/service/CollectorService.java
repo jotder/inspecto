@@ -420,8 +420,10 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // Delivery still goes through the configured email NotificationChannel, so SMTP lives in one place.
         platformServices.register("mail", com.gamma.notify.MailAccess.class,
                 com.gamma.notify.MailAccess.overChannels());
-        platformServices.register("incidents", com.gamma.ops.IncidentAccess.class,
-                com.gamma.ops.IncidentAccess.over(this::objects));
+        // ⚠ Supplies the ObjectAccess SEAM, not the ObjectService (EDG-01 cell 7): com.gamma.ops becomes
+        // an optional edition module, so this mandatory boot path must not name a type that leaves with it.
+        platformServices.register("incidents", com.gamma.objects.IncidentAccess.class,
+                com.gamma.objects.IncidentAccess.over(() -> objects().access()));
         platformServices.register("schema", com.gamma.pipeline.SchemaAccess.class,
                 com.gamma.pipeline.SchemaAccess.over(this::componentRegistry));
         platformServices.register("consignment-status",
@@ -767,18 +769,18 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         return tagAssignmentStore;
     }
 
-    /** Register an RCA template (Phase 4), keyed by {@link com.gamma.ops.rca.RcaTemplate#name()}; {@code null} ignored. */
-    public void registerRcaTemplate(com.gamma.ops.rca.RcaTemplate template) {
+    /** Register an RCA template (Phase 4), keyed by {@link com.gamma.objects.RcaTemplate#name()}; {@code null} ignored. */
+    public void registerRcaTemplate(com.gamma.objects.RcaTemplate template) {
         rcaTemplates.register(template);
     }
 
     /** All registered RCA templates by name (Phase 4) — backs {@code GET /rca/templates}. */
-    public Map<String, com.gamma.ops.rca.RcaTemplate> rcaTemplates() {
+    public Map<String, com.gamma.objects.RcaTemplate> rcaTemplates() {
         return rcaTemplates.all();
     }
 
     /** A registered RCA template by name, if any (Phase 4). */
-    public java.util.Optional<com.gamma.ops.rca.RcaTemplate> rcaTemplate(String name) {
+    public java.util.Optional<com.gamma.objects.RcaTemplate> rcaTemplate(String name) {
         return rcaTemplates.byName(name);
     }
 

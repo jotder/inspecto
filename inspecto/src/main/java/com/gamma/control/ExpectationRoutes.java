@@ -6,7 +6,7 @@ import com.gamma.event.EventLog;
 import com.gamma.event.EventType;
 import com.gamma.expectation.Expectation;
 import com.gamma.expectation.ExpectationEvaluator;
-import com.gamma.ops.ObjectType;
+import com.gamma.objects.ObjectType;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.signal.Ref;

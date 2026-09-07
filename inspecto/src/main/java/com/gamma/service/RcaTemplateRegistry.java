@@ -1,6 +1,6 @@
 package com.gamma.service;
 
-import com.gamma.ops.rca.RcaTemplate;
+import com.gamma.objects.RcaTemplate;
 
 import java.util.Map;
 import java.util.Optional;

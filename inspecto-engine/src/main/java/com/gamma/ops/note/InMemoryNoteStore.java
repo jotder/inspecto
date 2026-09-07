@@ -1,6 +1,6 @@
 package com.gamma.ops.note;
 
-import com.gamma.ops.AnnotationKinds;
+import com.gamma.objects.AnnotationKinds;
 
 import java.util.ArrayList;
 import java.util.List;

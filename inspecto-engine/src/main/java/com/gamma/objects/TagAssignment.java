@@ -1,6 +1,5 @@
-package com.gamma.ops.tag;
+package com.gamma.objects;
 
-import com.gamma.ops.AnnotationKinds;
 
 import java.util.LinkedHashMap;
 import java.util.Locale;

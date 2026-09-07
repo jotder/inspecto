@@ -1,4 +1,4 @@
-package com.gamma.ops;
+package com.gamma.objects;
 
 import com.gamma.pipeline.ComponentStore;
 

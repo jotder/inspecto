@@ -1,4 +1,4 @@
-package com.gamma.ops;
+package com.gamma.objects;
 
 import com.gamma.api.PublicApi;
 
@@ -18,6 +18,14 @@ import java.util.function.Supplier;
  * Under a dry run the framework substitutes a recording stand-in: {@link #openIncident} logs the
  * would-be Incident to the RunLog and opens nothing, returning empty.
  *
+ * <p>⚠ <b>Relocated to core and narrowed in EDG-01 cell 7</b> (2026-09-08). It used to live in
+ * {@code com.gamma.ops} and return the whole {@code OperationalObject}; both had to change when that
+ * package became the optional {@code inspecto-ops} module. The return type is now {@link Optional} of the
+ * <b>id</b>, which cost nothing: the only production reader ({@code AlertService}) did
+ * {@code .ifPresent(i -> objects.link(i.id(), …))} and read nothing else. That one narrowing also deleted
+ * a hand-built 13-argument {@code new OperationalObject(...)} from {@code PackTestHarness}, a mandatory
+ * file, and an import from {@code DryRunServices}.
+ *
  * @since 4.0.0
  */
 @PublicApi(since = "4.0.0")
@@ -28,17 +36,23 @@ public interface IncidentAccess {
      * same value for {@code dedupeAttribute} — the caller-supplied business key inside
      * {@code attributes} (e.g. {@code "rule"} for alert promotion).
      *
-     * @return the opened Incident, or empty when suppressed as a duplicate (or under a dry run)
+     * @return the opened Incident's <b>id</b>, or empty when suppressed as a duplicate (or under a dry run)
      */
-    Optional<OperationalObject> openIncident(String title, String message, String severity,
-                                             String scope, Map<String, String> attributes,
-                                             String dedupeAttribute);
+    Optional<String> openIncident(String title, String message, String severity,
+                                  String scope, Map<String, String> attributes,
+                                  String dedupeAttribute);
 
-    /** The production implementation over an {@link ObjectService}, resolved lazily so boot wiring
-     *  can register the service before the Object Engine is constructed. */
-    static IncidentAccess over(Supplier<ObjectService> objects) {
+    /**
+     * The production implementation over the {@link ObjectAccess} seam, resolved lazily so boot wiring can
+     * register the service before the Object Engine is constructed.
+     *
+     * <p>⚠ It takes {@code Supplier<ObjectAccess>} rather than the module's {@code ObjectService}, which is
+     * why this factory could stay in core at all: the dedupe-and-open logic below needs exactly two SPI
+     * methods, so none of it has to travel with the domain.
+     */
+    static IncidentAccess over(Supplier<ObjectAccess> objects) {
         return (title, message, severity, scope, attributes, dedupeAttribute) -> {
-            ObjectService svc = objects.get();
+            ObjectAccess svc = objects.get();
             // ⚠ No dedupe VALUE means no dedupe — never a match. `Objects.equals(null, null)` is true, so
             // comparing an absent key against another Incident that also lacks it made two unrelated
             // Incidents in the same scope look like duplicates and SILENTLY swallowed the second. Nothing in
@@ -47,8 +61,7 @@ public interface IncidentAccess {
             // beats an Incident that never opened.
             String key = dedupeAttribute == null ? null : attributes.get(dedupeAttribute);
             boolean active = key != null && !key.isBlank()
-                    && svc.active(ObjectType.INCIDENT, scope).stream()
-                        .anyMatch(o -> key.equals(o.attributes().get(dedupeAttribute)));
+                    && svc.hasActiveMatching(ObjectType.INCIDENT, scope, Map.of(dedupeAttribute, key));
             if (active) return Optional.empty();
             return Optional.of(svc.open(ObjectType.INCIDENT, title, message, severity, scope, attributes));
         };

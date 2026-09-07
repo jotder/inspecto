@@ -1,4 +1,4 @@
-package com.gamma.ops.rca;
+package com.gamma.objects;
 
 import com.gamma.config.io.ConfigCodec;
 
@@ -16,8 +16,8 @@ import static com.gamma.util.Values.trimToNull;
  * "RCA templates as authored {@code .toon}" of the Operational Intelligence Platform (Phase 4
  * follow-up). Per the requirement's "configuration over custom code" principle a template is authored
  * as an {@code *_rca.toon} ({@code rca { name, sections[…] }}) and parsed with the same
- * {@link ConfigCodec} the rest of the platform uses; {@link com.gamma.ops.ObjectService#applyRca} seeds
- * a case with one {@link com.gamma.ops.note.NoteKind#COMMENT} per section, giving the operator a
+ * {@link ConfigCodec} the rest of the platform uses; {@code ObjectService.applyRca} seeds
+ * a case with one {@code NoteKind.COMMENT} per section, giving the operator a
  * structured skeleton to complete.
  *
  * @since 4.0.0

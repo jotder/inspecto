@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
-import com.gamma.ops.ObjectType;
+import com.gamma.objects.ObjectType;
 import com.gamma.ops.OperationalObject;
 import com.gamma.service.CollectorService;
 import org.junit.jupiter.api.Test;
@@ -237,7 +237,7 @@ class ControlApiObjectsTest {
     @Test
     void rcaTemplateRegistryAndApplyByName(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            c.svc.registerRcaTemplate(com.gamma.ops.rca.RcaTemplate.fromMap(Map.of(
+            c.svc.registerRcaTemplate(com.gamma.objects.RcaTemplate.fromMap(Map.of(
                     "name", "incident", "sections", List.of("Summary", "Root cause"))));
             OperationalObject caseObj = c.svc.objects().open(ObjectType.CASE, "inv", "d", "HIGH", null, Map.of());
 

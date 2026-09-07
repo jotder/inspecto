@@ -1,6 +1,6 @@
 package com.gamma.ops.link;
 
-import com.gamma.ops.ObjectType;
+import com.gamma.objects.ObjectType;
 
 import java.util.LinkedHashMap;
 import java.util.Locale;

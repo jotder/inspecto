@@ -1,5 +1,7 @@
 package com.gamma.ops;
 
+import com.gamma.objects.ObjectType;
+
 import com.gamma.util.AbstractJdbcStore;
 
 import com.gamma.util.JdbcDrivers;

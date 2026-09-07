@@ -6,7 +6,7 @@ import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.job.JobConfig;
 import com.gamma.ops.EscalationPolicy;
 import com.gamma.ops.queue.Queue;
-import com.gamma.ops.rca.RcaTemplate;
+import com.gamma.objects.RcaTemplate;
 import com.gamma.ops.tag.CaseRule;
 import com.gamma.ops.tag.Tag;
 import com.gamma.ops.tag.TagRule;

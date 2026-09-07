@@ -2,7 +2,7 @@ package com.gamma.service;
 
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
-import com.gamma.ops.ObjectType;
+import com.gamma.objects.ObjectType;
 import com.gamma.ops.workflow.Workflow;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

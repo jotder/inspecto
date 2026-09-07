@@ -1,6 +1,8 @@
 package com.gamma.ops.findings;
 
-import com.gamma.ops.ObjectType;
+import com.gamma.objects.FindingsSpec;
+
+import com.gamma.objects.ObjectType;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;

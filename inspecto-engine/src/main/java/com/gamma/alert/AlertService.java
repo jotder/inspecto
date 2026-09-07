@@ -8,7 +8,7 @@ import com.gamma.event.EventLevel;
 import com.gamma.event.EventLog;
 import com.gamma.event.EventType;
 import com.gamma.ops.ObjectService;
-import com.gamma.ops.ObjectType;
+import com.gamma.objects.ObjectType;
 import com.gamma.ops.OperationalObject;
 import com.gamma.ops.link.LinkRelationship;
 import com.gamma.etl.StatusStore;
@@ -65,7 +65,7 @@ public final class AlertService {
     private final ObjectService objects;
     /** The {@code incidents} Platform Service view over {@link #objects} (S1-4) — high-severity
      *  promotion opens through the same interface a granted Run uses; {@code null} = events-only. */
-    private final com.gamma.ops.IncidentAccess incidents;
+    private final com.gamma.objects.IncidentAccess incidents;
     private final Deque<Alert> fired = new ArrayDeque<>();
     private final int capacity;
     private final Map<String, Long> lastFired = new ConcurrentHashMap<>();
@@ -96,7 +96,7 @@ public final class AlertService {
         this.configs = configs;
         this.status = status;
         this.objects = objects;
-        this.incidents = objects == null ? null : com.gamma.ops.IncidentAccess.over(() -> objects);
+        this.incidents = objects == null ? null : com.gamma.objects.IncidentAccess.over(objects::access);
         this.capacity = Math.max(1, capacity);
     }
 
@@ -324,7 +324,9 @@ public final class AlertService {
         incidents.openIncident(rule.name() + " on " + pipeline, alert.message(),
                         rule.severity(), pipeline, new LinkedHashMap<>(attrs), "rule")
                 // Machine actor, mirroring the Case Rules auto-linker's `case-rule:<name>` convention.
-                .ifPresent(incident -> objects.link(incident.id(), alertObjectId,
+                // ⚠ `incidentId` is the id itself since EDG-01 cell 7 — this was the only reader of the
+                // opened object, and it only ever wanted .id().
+                .ifPresent(incidentId -> objects.link(incidentId, alertObjectId,
                         LinkRelationship.ESCALATED_FROM, "alert-rule:" + rule.name()));
     }
 

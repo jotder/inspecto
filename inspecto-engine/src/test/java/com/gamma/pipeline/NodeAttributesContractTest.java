@@ -120,12 +120,12 @@ class NodeAttributesContractTest {
 
     /**
      * The control vocabulary must stay single-sourced. {@link NodeAttribute} delegates to
-     * {@link com.gamma.ops.findings.FindingsSpec}, so widening one widens both — this pins that, because
+     * {@link com.gamma.objects.FindingsSpec}, so widening one widens both — this pins that, because
      * two independently-declared unions is how the renderer ends up asked to draw a type it cannot.
      */
     @Test
     void theControlVocabularyIsSharedWithTheOtherSpecSurface() {
-        assertSame(com.gamma.ops.findings.FindingsSpec.TYPES, NodeAttribute.TYPES);
-        assertSame(com.gamma.ops.findings.FindingsSpec.TIERS, NodeAttribute.TIERS);
+        assertSame(com.gamma.objects.FindingsSpec.TYPES, NodeAttribute.TYPES);
+        assertSame(com.gamma.objects.FindingsSpec.TIERS, NodeAttribute.TIERS);
     }
 }

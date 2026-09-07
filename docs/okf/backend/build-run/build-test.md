@@ -73,6 +73,14 @@ modules / 4004 tests**; `-Pedition-enterprise` is **31 modules / 4125** (`inspec
 contributes 3). A run that stops at a failing module reports a PARTIAL sum and SKIPS the trailing modules —
 do not read that as the total, and do not conclude a module "failed" when the build never reached it.
 
+🔴 **Never edit the tree while a verification is running, and do not trust a process check to tell you it
+finished.** A verify pass runs several builds in sequence, so an empty `ps -W | grep java` between them
+looks identical to "done". Editing into that gap produces two distinct false failures: a *transient*
+mid-refactor compile error reported as a real defect, and then a Windows **file-lock** on a `target/*.jar`
+held by the competing JVM (`maven-clean-plugin ... Failed to delete ...asn-core-0.1.0-SNAPSHOT.jar`), which
+aborts the reactor in under two seconds before compiling anything. Only the completion notification means
+finished. Cost: one wasted Enterprise verification during EDG-01 cell 7.
+
 🔴 **An optional module's tests can be absent from BOTH numbers while everything looks green.** An
 edition module is not in the default `<modules>`, so `mvn -o clean test` never compiles it: a broken one
 leaves the everyday build fully green. And if the Enterprise reactor dies in an earlier module, the later

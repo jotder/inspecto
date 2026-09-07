@@ -1,5 +1,7 @@
 package com.gamma.ops;
 
+import com.gamma.objects.ObjectType;
+
 import com.gamma.ops.link.DbLinkStore;
 import com.gamma.ops.link.InMemoryLinkStore;
 import com.gamma.ops.link.LinkStore;
@@ -10,7 +12,7 @@ import com.gamma.ops.note.NoteStore;
 import com.gamma.ops.note.ObjectNote;
 import com.gamma.ops.tag.DbTagAssignmentStore;
 import com.gamma.ops.tag.InMemoryTagAssignmentStore;
-import com.gamma.ops.tag.TagAssignment;
+import com.gamma.objects.TagAssignment;
 import com.gamma.ops.tag.TagAssignmentStore;
 import org.junit.jupiter.api.Test;
 

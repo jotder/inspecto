@@ -15,7 +15,7 @@ import java.util.function.Supplier;
  * Detection is declarative: an Alert Rule states {@code metric}/{@code window}/{@code threshold} and
  * {@link AlertService} owns the window arithmetic, the severity mapping, the cooldown and the
  * Alert→Incident promotion. A plugin that wanted to raise something directly wants
- * {@link com.gamma.ops.IncidentAccess} or a Signal, not this. This service exists because
+ * {@link com.gamma.objects.IncidentAccess} or a Signal, not this. This service exists because
  * {@code alert.evaluate} needs a **clock over the existing rules** — the demand the v1 menu
  * deliberately waited for (platform-services **D7**: the Job could not honestly declare
  * {@code incidents}, because the Incidents it causes are opened inside {@code AlertService}, not by

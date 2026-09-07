@@ -1,7 +1,7 @@
 package com.gamma.ops.workflow;
 
 import com.gamma.config.io.ConfigCodec;
-import com.gamma.ops.ObjectType;
+import com.gamma.objects.ObjectType;
 
 import java.io.IOException;
 import java.nio.file.Files;

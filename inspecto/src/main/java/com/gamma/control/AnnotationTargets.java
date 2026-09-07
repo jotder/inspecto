@@ -1,6 +1,6 @@
 package com.gamma.control;
 
-import com.gamma.ops.AnnotationKinds;
+import com.gamma.objects.AnnotationKinds;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.sun.net.httpserver.HttpExchange;

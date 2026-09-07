@@ -600,7 +600,7 @@ Incidents UI, 2026-07-12 — see §13.)*
 **Annotation** — The umbrella term for **user-authored metadata hung off some other entity**: today a
 **Note**/attachment (D10) or a **Tag** assignment (D7). Every Annotation addresses its subject as an
 **Annotation Target** — a `(targetKind, targetId)` pair — and the valid `targetKind` set is one shared
-vocabulary (`com.gamma.ops.AnnotationKinds`), never a per-feature list. ⛔ never "attachment" for the
+vocabulary (`com.gamma.objects.AnnotationKinds`), never a per-feature list. ⛔ never "attachment" for the
 umbrella (that is one specific Note kind), ⛔ never "metadata" (that is Catalog vocabulary, §3).
 
 **Annotation Target** — What an Annotation is attached to: `"object"` (an Incident/Case) plus every

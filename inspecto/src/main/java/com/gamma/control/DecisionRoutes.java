@@ -2,7 +2,7 @@ package com.gamma.control;
 
 import com.gamma.event.EventLog;
 import com.gamma.job.JobService;
-import com.gamma.ops.ObjectType;
+import com.gamma.objects.ObjectType;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.query.ConditionTree;

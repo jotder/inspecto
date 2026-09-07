@@ -2,7 +2,7 @@ package com.gamma.ops.note;
 
 import com.gamma.util.AbstractJdbcStore;
 
-import com.gamma.ops.AnnotationKinds;
+import com.gamma.objects.AnnotationKinds;
 
 import com.gamma.util.JdbcDrivers;
 import com.gamma.util.JsonAttributes;

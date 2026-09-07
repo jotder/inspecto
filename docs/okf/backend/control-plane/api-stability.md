@@ -74,7 +74,7 @@ above the generated commit list.
 
 **Breaking — Java `@PublicApi` (binds only within a released major; none of this was published in 3.x)**
 - Three store interfaces gained abstract methods for `incident_purge` (MNT-14, 2026-07-27).
-- `com.gamma.ops.NoteTargets` → `com.gamma.ops.AnnotationKinds` (no alias).
+- `com.gamma.ops.NoteTargets` → `com.gamma.ops.AnnotationKinds` (no alias). ⚠ Relocated again in EDG-01 cell 7 (2026-09-08) to **`com.gamma.objects.AnnotationKinds`** — it is core vocabulary with no store coupling, so it stayed in the mandatory build when `com.gamma.ops` became an optional module.
 - Maven artifactIds `file-processor-*` → `inspecto-*` (2026-08-10); the deployment bundle name is
   unchanged — renaming it is a separate, unmade decision.
 

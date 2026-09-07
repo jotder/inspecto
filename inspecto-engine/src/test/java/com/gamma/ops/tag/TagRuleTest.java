@@ -1,7 +1,7 @@
 package com.gamma.ops.tag;
 
 import com.gamma.config.io.ConfigCodec;
-import com.gamma.ops.ObjectType;
+import com.gamma.objects.ObjectType;
 import com.gamma.ops.OperationalObject;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

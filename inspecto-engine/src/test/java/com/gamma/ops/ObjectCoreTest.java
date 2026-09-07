@@ -1,5 +1,7 @@
 package com.gamma.ops;
 
+import com.gamma.objects.ObjectType;
+
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;

@@ -22,7 +22,7 @@ import java.util.List;
  * not honour "what was promised when this was archived". If that guarantee is ever needed it becomes a
  * stamped attribute — cheap to add then, so it is not pre-built.
  *
- * <p>Scoped to {@link com.gamma.ops.ObjectType#INCIDENT} because {@code ARCHIVED} exists only in the
+ * <p>Scoped to {@link com.gamma.objects.ObjectType#INCIDENT} because {@code ARCHIVED} exists only in the
  * Incident workflow today. Generalise when a second type gains a terminal archive state; inventing
  * retention policy for Cases and Alerts now would be policy without a requirement.
  *
@@ -57,7 +57,7 @@ final class IncidentPurgeTask {
 
         long cutoff = System.currentTimeMillis() - Duration.ofDays(days).toMillis();
         List<com.gamma.ops.OperationalObject> candidates =
-                objects.purgeEligible(com.gamma.ops.ObjectType.INCIDENT, "ARCHIVED", cutoff, limit);
+                objects.purgeEligible(com.gamma.objects.ObjectType.INCIDENT, "ARCHIVED", cutoff, limit);
         List<com.gamma.ops.OperationalObject> purgeable = candidates.stream()
                 .filter(o -> !com.gamma.ops.ObjectService.hasLegalHold(o)).toList();
         int held = candidates.size() - purgeable.size();

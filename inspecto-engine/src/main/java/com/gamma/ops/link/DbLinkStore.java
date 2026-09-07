@@ -2,7 +2,7 @@ package com.gamma.ops.link;
 
 import com.gamma.util.AbstractJdbcStore;
 
-import com.gamma.ops.ObjectType;
+import com.gamma.objects.ObjectType;
 import com.gamma.util.JdbcDrivers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

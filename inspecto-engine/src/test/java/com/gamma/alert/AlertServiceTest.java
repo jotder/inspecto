@@ -9,7 +9,7 @@ import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.ops.InMemoryObjectStore;
 import com.gamma.ops.ObjectQuery;
 import com.gamma.ops.ObjectService;
-import com.gamma.ops.ObjectType;
+import com.gamma.objects.ObjectType;
 import com.gamma.ops.OperationalObject;
 import com.gamma.ops.link.ObjectLink;
 import com.gamma.event.EventLog;

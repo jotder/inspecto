@@ -98,7 +98,7 @@ final class TagRoutes implements RouteModule {
         WidgetTags.backfillOnce(api, n -> ensureTag(api, n));   // a widget must be findable here too
         return RouteErrors.mapErrors(() -> api.service().tagAssignments().forTag(name).stream()
                 .filter(a -> AnnotationTargets.visible(api, ex, a.targetKind(), a.targetId()))
-                .map(com.gamma.ops.tag.TagAssignment::toMap)
+                .map(com.gamma.objects.TagAssignment::toMap)
                 .toList());
     }
 
@@ -130,11 +130,11 @@ final class TagRoutes implements RouteModule {
             // An object's `tags` attribute is a projection of the assignment store (D7 phase 2), so object
             // targets go through ObjectService — writing the store directly would leave the CSV stale and
             // recreate exactly the split-brain phase 2 exists to remove.
-            if (com.gamma.ops.AnnotationKinds.OBJECT.equals(targetKind)) {
+            if (com.gamma.objects.AnnotationKinds.OBJECT.equals(targetKind)) {
                 api.service().objects().applyTag(targetId, tag, actor);
             } else {
                 api.service().tagAssignments()
-                        .add(com.gamma.ops.tag.TagAssignment.of(tag, targetKind, targetId, actor));
+                        .add(com.gamma.objects.TagAssignment.of(tag, targetKind, targetId, actor));
                 // A widget's `tags` array is the same kind of projection (D7 (c)) — the chips on its
                 // gallery card are drawn from the config, so the edge alone would leave them stale.
                 WidgetTags.reproject(api, List.of(targetId));
@@ -155,7 +155,7 @@ final class TagRoutes implements RouteModule {
         return RouteErrors.mapErrors(() -> {
             requireVisibleTarget(api, ex, targetKind, targetId);
             boolean removed;
-            if (com.gamma.ops.AnnotationKinds.OBJECT.equals(targetKind)) {
+            if (com.gamma.objects.AnnotationKinds.OBJECT.equals(targetKind)) {
                 removed = api.service().tagAssignments().tagsOf(targetKind, targetId).contains(tag);
                 api.service().objects().removeTag(targetId, tag);   // also re-projects the CSV
             } else {

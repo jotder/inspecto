@@ -1,5 +1,7 @@
 package com.gamma.ops;
 
+import com.gamma.objects.ObjectType;
+
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
 import com.gamma.event.EventType;

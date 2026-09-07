@@ -1,5 +1,7 @@
 package com.gamma.ops;
 
+import com.gamma.objects.ObjectType;
+
 import com.gamma.ops.link.LinkRelationship;
 import com.gamma.ops.link.ObjectLink;
 import org.junit.jupiter.api.Test;

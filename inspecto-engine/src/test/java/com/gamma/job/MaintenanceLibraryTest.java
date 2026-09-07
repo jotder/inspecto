@@ -318,7 +318,7 @@ class MaintenanceLibraryTest {
 
     /** Archive {@code o} {@code daysAgo} days back — retention is measured from {@code closedAt}. */
     private static String archivedDaysAgo(Ops ops, String title, int daysAgo) {
-        var o = ops.objects.open(com.gamma.ops.ObjectType.INCIDENT, title, "d", "WARNING", null, Map.of());
+        var o = ops.objects.open(com.gamma.objects.ObjectType.INCIDENT, title, "d", "WARNING", null, Map.of());
         ops.objects.comment(o.id(), "alice", "note that must go with it");
         ops.store.update(o.withStatus("ARCHIVED",
                 System.currentTimeMillis() - Duration.ofDays(daysAgo).toMillis(), true));

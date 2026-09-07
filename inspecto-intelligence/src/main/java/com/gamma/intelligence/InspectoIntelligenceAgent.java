@@ -573,7 +573,7 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
         List<OpsMonitor.Finding> findings = new java.util.ArrayList<>();
         try {
             var query = com.gamma.ops.ObjectQuery.builder()
-                    .objectType(com.gamma.ops.ObjectType.ALERT).status("OPEN").build();
+                    .objectType(com.gamma.objects.ObjectType.ALERT).status("OPEN").build();
             for (var obj : service.objects().query(query)) {
                 Map<String, Object> subject = new HashMap<>();
                 subject.put("alertId", obj.id());

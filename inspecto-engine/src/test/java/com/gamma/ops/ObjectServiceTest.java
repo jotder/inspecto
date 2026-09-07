@@ -1,5 +1,7 @@
 package com.gamma.ops;
 
+import com.gamma.objects.ObjectType;
+
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
 import com.gamma.event.EventQuery;
@@ -8,7 +10,7 @@ import com.gamma.event.InMemoryEventStore;
 import com.gamma.ops.link.ObjectLink;
 import com.gamma.ops.note.NoteKind;
 import com.gamma.ops.note.ObjectNote;
-import com.gamma.ops.rca.RcaTemplate;
+import com.gamma.objects.RcaTemplate;
 import com.gamma.util.JsonAttributes;
 import org.junit.jupiter.api.Test;
 
@@ -316,8 +318,8 @@ class ObjectServiceTest {
         OperationalObject caseObj = svc.open(ObjectType.CASE, "investigation", "d", "HIGH", null, Map.of());
 
         ObjectNote c = svc.comment(caseObj.id(), "alice", "hi");
-        assertEquals(com.gamma.ops.AnnotationKinds.OBJECT, c.targetKind());
-        assertEquals(1, svc.noteStore().forTarget(com.gamma.ops.AnnotationKinds.OBJECT, caseObj.id(), null).size());
+        assertEquals(com.gamma.objects.AnnotationKinds.OBJECT, c.targetKind());
+        assertEquals(1, svc.noteStore().forTarget(com.gamma.objects.AnnotationKinds.OBJECT, caseObj.id(), null).size());
         assertTrue(svc.noteStore().forTarget("link-analysis-view", caseObj.id(), null).isEmpty(),
                 "an object note is not readable as a view note");
     }

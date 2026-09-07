@@ -1,7 +1,6 @@
-package com.gamma.ops.findings;
+package com.gamma.objects;
 
 import com.gamma.api.PublicApi;
-import com.gamma.ops.ObjectType;
 import com.gamma.pipeline.NodeAttribute;
 
 import java.util.ArrayList;

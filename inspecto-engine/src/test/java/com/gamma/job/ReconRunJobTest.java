@@ -99,7 +99,7 @@ class ReconRunJobTest {
 
     private static int incidentCount(com.gamma.ops.ObjectService objects) {
         return objects.query(com.gamma.ops.ObjectQuery.builder()
-                .objectType(com.gamma.ops.ObjectType.INCIDENT).build()).size();
+                .objectType(com.gamma.objects.ObjectType.INCIDENT).build()).size();
     }
 
     @Test

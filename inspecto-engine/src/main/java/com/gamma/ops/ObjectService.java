@@ -1,5 +1,8 @@
 package com.gamma.ops;
 
+import com.gamma.objects.AnnotationKinds;
+import com.gamma.objects.ObjectType;
+
 import com.gamma.event.Event;
 import com.gamma.event.EventLevel;
 import com.gamma.event.EventLog;
@@ -17,7 +20,7 @@ import com.gamma.ops.queue.InMemoryQueueStore;
 import com.gamma.ops.queue.Queue;
 import com.gamma.ops.queue.QueueRouter;
 import com.gamma.ops.queue.QueueStore;
-import com.gamma.ops.rca.RcaTemplate;
+import com.gamma.objects.RcaTemplate;
 import com.gamma.ops.tag.CaseRule;
 import com.gamma.ops.tag.Tag;
 import com.gamma.ops.tag.TagRule;
@@ -442,27 +445,42 @@ public final class ObjectService {
     public record TagRuleApplication(int matched, int updated) {}
 
     /** This service's view of the cross-entity tag graph (D7) — the truth behind the {@link #ATTR_TAGS} CSV. */
+    /**
+     * This service seen through the core {@link com.gamma.objects.ObjectAccess} seam (EDG-01 cell 7).
+     *
+     * <p>Cached, because {@code IncidentAccess.over(...)} resolves its supplier per call and a fresh
+     * adapter per open would allocate for nothing. Core holds the returned interface and never names this
+     * class, which is what lets {@code com.gamma.ops} become an optional edition module.
+     */
+    public com.gamma.objects.ObjectAccess access() {
+        com.gamma.objects.ObjectAccess a = this.access;
+        if (a == null) this.access = a = new ObjectServiceAccess(this);
+        return a;
+    }
+
+    private com.gamma.objects.ObjectAccess access;
+
     public com.gamma.ops.tag.TagAssignmentStore tagAssignments() {
         return tagAssignments;
     }
 
     /** An object's tags, alphabetical, read from the assignment store (never from the CSV projection). */
     public List<String> tagsOf(String objectId) {
-        return tagAssignments.tagsOf(com.gamma.ops.AnnotationKinds.OBJECT, objectId);
+        return tagAssignments.tagsOf(com.gamma.objects.AnnotationKinds.OBJECT, objectId);
     }
 
     /** Apply one tag to an object and re-project the CSV. Idempotent; returns the updated object. */
     public OperationalObject applyTag(String objectId, String tag, String actor) {
         OperationalObject o = require(objectId);
-        tagAssignments.add(com.gamma.ops.tag.TagAssignment.of(
-                tag, com.gamma.ops.AnnotationKinds.OBJECT, objectId, actor));
+        tagAssignments.add(com.gamma.objects.TagAssignment.of(
+                tag, com.gamma.objects.AnnotationKinds.OBJECT, objectId, actor));
         return projectTags(o, System.currentTimeMillis());
     }
 
     /** Remove one tag from an object and re-project the CSV. Idempotent; returns the updated object. */
     public OperationalObject removeTag(String objectId, String tag) {
         OperationalObject o = require(objectId);
-        tagAssignments.remove(tag, com.gamma.ops.AnnotationKinds.OBJECT, objectId);
+        tagAssignments.remove(tag, com.gamma.objects.AnnotationKinds.OBJECT, objectId);
         return projectTags(o, System.currentTimeMillis());
     }
 
@@ -484,8 +502,8 @@ public final class ObjectService {
             List<String> known = tagsOf(o.id());
             for (String tag : csv) {
                 if (known.contains(tag)) continue;
-                tagAssignments.add(com.gamma.ops.tag.TagAssignment.of(
-                        tag, com.gamma.ops.AnnotationKinds.OBJECT, o.id(), "migration"));
+                tagAssignments.add(com.gamma.objects.TagAssignment.of(
+                        tag, com.gamma.objects.AnnotationKinds.OBJECT, o.id(), "migration"));
                 created++;
             }
         }
@@ -555,8 +573,8 @@ public final class ObjectService {
     /** The ids of the objects currently carrying {@code tag} (component targets have no CSV to project). */
     private List<String> objectTargetsOf(String tag) {
         return tagAssignments.forTag(tag).stream()
-                .filter(a -> com.gamma.ops.AnnotationKinds.OBJECT.equals(a.targetKind()))
-                .map(com.gamma.ops.tag.TagAssignment::targetId)
+                .filter(a -> com.gamma.objects.AnnotationKinds.OBJECT.equals(a.targetKind()))
+                .map(com.gamma.objects.TagAssignment::targetId)
                 .distinct()
                 .toList();
     }
@@ -587,8 +605,8 @@ public final class ObjectService {
     /** Mirror a freshly-created object's authored/rule-applied CSV tags into the assignment store. */
     private void adoptTags(OperationalObject stored) {
         for (String tag : csvTags(stored.attributes().get(ATTR_TAGS)))
-            tagAssignments.add(com.gamma.ops.tag.TagAssignment.of(
-                    tag, com.gamma.ops.AnnotationKinds.OBJECT, stored.id(), "system"));
+            tagAssignments.add(com.gamma.objects.TagAssignment.of(
+                    tag, com.gamma.objects.AnnotationKinds.OBJECT, stored.id(), "system"));
     }
 
     /**
@@ -1018,8 +1036,8 @@ public final class ObjectService {
         }
         // D7: the survivor absorbs the union in the assignment store; the CSV below is its projection.
         for (String tag : tags)
-            tagAssignments.add(com.gamma.ops.tag.TagAssignment.of(
-                    tag, com.gamma.ops.AnnotationKinds.OBJECT, survivorId, actor));
+            tagAssignments.add(com.gamma.objects.TagAssignment.of(
+                    tag, com.gamma.objects.AnnotationKinds.OBJECT, survivorId, actor));
         Map<String, String> union = new LinkedHashMap<>();
         if (!tags.isEmpty()) union.put(ATTR_TAGS, String.join(",", tagsOf(survivorId)));
         if (!watchers.isEmpty()) union.put(ATTR_WATCHERS, String.join(",", watchers));

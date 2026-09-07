@@ -1,6 +1,8 @@
 package com.gamma.ops.tag;
 
-import com.gamma.ops.AnnotationKinds;
+import com.gamma.objects.TagAssignment;
+
+import com.gamma.objects.AnnotationKinds;
 
 import java.util.ArrayList;
 import java.util.List;

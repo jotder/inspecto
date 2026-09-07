@@ -1,8 +1,10 @@
 package com.gamma.ops.tag;
 
+import com.gamma.objects.TagAssignment;
+
 import com.gamma.util.AbstractJdbcStore;
 
-import com.gamma.ops.AnnotationKinds;
+import com.gamma.objects.AnnotationKinds;
 import com.gamma.util.JdbcDrivers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

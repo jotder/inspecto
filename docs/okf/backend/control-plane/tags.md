@@ -16,7 +16,7 @@ and keeping them apart is what makes the feature coherent:
 | Concept | Type | Lives in | Meaning |
 |---|---|---|---|
 | **Tag** | `ops.tag.Tag` | registry, one `<name>_tag.toon` per tag under the write root | the label itself; exists independently of anything it labels |
-| **Tag Assignment** | `ops.tag.TagAssignment` | `TagAssignmentStore` (`inspecto_ops_tag_assignments`) | the edge "this tag is applied to `(targetKind, targetId)`" |
+| **Tag Assignment** | `objects.TagAssignment` | `TagAssignmentStore` (`inspecto_ops_tag_assignments`) | the edge "this tag is applied to `(targetKind, targetId)`" |
 | **Tag Rule** | `ops.tag.TagRule` | registry, `<name>_tagrule.toon` | a saved filter that auto-applies a tag when an object opens |
 
 A tag's existence does not depend on any target, and a target's existence does not depend on any tag.
@@ -32,7 +32,7 @@ Targets are addressed exactly as **D10 notes** are, through the same vocabulary 
 same shape of problem (user-authored metadata hung off an arbitrary entity), and two addressing schemes
 would drift. Widening `WRITABLE_TYPES` widens both features at once, for free.
 
-⚠ **Two similarly-named classes, two different questions.** `com.gamma.ops.AnnotationKinds` (engine) is the
+⚠ **Two similarly-named classes, two different questions.** `com.gamma.objects.AnnotationKinds` (engine core) is the
 *vocabulary* — "is that a real kind of thing to annotate". `com.gamma.control.AnnotationTargets` (control
 plane) is the *gate* — "may this caller see or annotate that specific target". The split exists because the
 engine stays identity-agnostic; don't merge them. *(Renamed from `NoteTargets` and moved out of

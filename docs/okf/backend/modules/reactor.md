@@ -268,7 +268,7 @@ from **`v3.11.0`**, the newest release tag that is an ancestor of `master`:
 | `consignment/ConsignmentProcessJobType` | `5.0.0` → **`4.0.0`** | the whole of C2's reverse edge | **absent** (no `consignment` pkg) |
 | `consignment/ProcessorContext` | `5.0.0` → **`4.0.0`** | C2's sibling edge (`job.RunLog` delegation) | **absent** |
 | `ops/AnnotationKinds` | `4.9.0` → **`4.0.0`** | C1 edge 1 → `pipeline.ComponentStore` | **absent** (no `ops` pkg) |
-| `ops/findings/FindingsSpec` | `4.6.0` → **`4.0.0`** | C1 edge 2's target (stays put either way) | **absent** |
+| `objects/FindingsSpec` (was `ops/findings/`) | `4.6.0` → **`4.0.0`** | C1 edge 2's target (stays put either way) | **absent** |
 | `pipeline/ComponentStore` | `4.3.0` → **`4.0.0`** | C1 edge 1's target (stays put either way) | **absent** (no `pipeline` pkg) |
 | `pipeline/NodeAttribute` | **unmarked** | C1 edge 2's source | **absent** |
 

@@ -68,7 +68,7 @@ final class ServiceBootstrap {
         int  maxRuns     = Integer.getInteger("service.max.runs", Math.max(1, registry.size()));
         CollectorService svc = new CollectorService(registry, enrichJobs, jobConfigs, semantics, alertRules,
                 pollSeconds, maxRuns, ServiceStores.openStatusStore(root), root);
-        for (com.gamma.ops.rca.RcaTemplate t : loadRcaTemplates(resolveBySuffix(paths, "_rca.toon")))
+        for (com.gamma.objects.RcaTemplate t : loadRcaTemplates(resolveBySuffix(paths, "_rca.toon")))
             svc.registerRcaTemplate(t);
         for (com.gamma.acquire.ConnectionProfile c : loadConnections(resolveBySuffix(paths, "_connection.toon")))
             svc.registerConnection(c);
@@ -170,11 +170,11 @@ final class ServiceBootstrap {
     }
 
     /** Load each {@code *_rca.toon} (Phase 4); a bad one is warned and skipped (others still register). */
-    static List<com.gamma.ops.rca.RcaTemplate> loadRcaTemplates(List<Path> paths) {
-        List<com.gamma.ops.rca.RcaTemplate> out = new ArrayList<>();
+    static List<com.gamma.objects.RcaTemplate> loadRcaTemplates(List<Path> paths) {
+        List<com.gamma.objects.RcaTemplate> out = new ArrayList<>();
         for (Path p : paths) {
             try {
-                com.gamma.ops.rca.RcaTemplate t = com.gamma.ops.rca.RcaTemplate.load(p);
+                com.gamma.objects.RcaTemplate t = com.gamma.objects.RcaTemplate.load(p);
                 out.add(t);
                 log.info("Loaded RCA template '{}' ({} section(s)) from {}", t.name(), t.sections().size(), p);
             } catch (Exception e) {

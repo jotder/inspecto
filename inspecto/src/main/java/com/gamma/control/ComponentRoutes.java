@@ -9,7 +9,7 @@ import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.config.spec.Finding;
 import com.gamma.config.spec.Severity;
 import com.gamma.etl.TypeFlow;
-import com.gamma.ops.findings.FindingsSpec;
+import com.gamma.objects.FindingsSpec;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.MappingRules;
 import com.gamma.pipeline.ComponentStore;

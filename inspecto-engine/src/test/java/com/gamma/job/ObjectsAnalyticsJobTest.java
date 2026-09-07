@@ -3,7 +3,7 @@ package com.gamma.job;
 import com.gamma.etl.ConsignmentEventBus;
 import com.gamma.ops.InMemoryObjectStore;
 import com.gamma.ops.ObjectService;
-import com.gamma.ops.ObjectType;
+import com.gamma.objects.ObjectType;
 import com.gamma.query.DatasetRelation;
 import com.gamma.signal.Severity;
 import com.gamma.signal.SignalEmitter;
