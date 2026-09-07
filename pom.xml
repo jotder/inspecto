@@ -62,7 +62,8 @@
         implementation), inspecto-notify-channels (CP-15 — the webhook + SMTP transports), inspecto-backup (OPS-06 — the
         backup/backup_verify/restore tasks) inspecto-geo-link (CP-09 — the geo map + link analysis
         routes), inspecto-exchange (SEC-10 — cross-space sharing), inspecto-metrics (CP-13 — the
-        Prometheus exposition) and inspecto-events (CP-13 — the /events* feed) are Standard-edition-only.
+        Prometheus exposition), inspecto-events (CP-13 — the /events* feed) and inspecto-ops (CP-11 —
+        operational objects) are Standard-edition-only.
         None is in the default <modules> above, so a routine
         "mvn -o clean test" (= PERSONAL, the default build; there is no -Pedition-personal) never
         compiles/tests them and never resolves Nimbus JOSE+JWT or javax.mail. Build them explicitly
@@ -95,6 +96,14 @@
                      GET /events/export, so gating it alone would be an `if` in a core route. ⚠ Personal
                      loses the Events SCREEN; recording (EventStore/EventLog) stays core and ungated. -->
                 <module>inspecto-events</module>
+                <!-- EDG-01 cell 7 (2026-09-08): CP-11 operational objects — the com.gamma.ops domain, its
+                     four stores, the /objects|/notes|/queues|/tags routes, two Job Types and the
+                     incident_purge task. The largest cell: 31 domain files, 23 code dependants, several of
+                     which CONSTRUCTED it — core now reaches it via com.gamma.objects.ObjectAccess.
+                     ⚠ Amends OPS-01 (drops `objects` from Personal's stores) and SP-CTL-02 (a gap raises
+                     the EVENT on Personal but no ALERT object). ⛔ NOT /alerts* — that is AlertsService
+                     over config alert RULES, a different domain, and it stays in core. -->
+                <module>inspecto-ops</module>
             </modules>
         </profile>
         <!-- Enterprise = Standard + the ABAC policy engine (rbac-abac-plan §5): the same one-version
@@ -111,6 +120,7 @@
                 <module>inspecto-exchange</module>
                 <module>inspecto-metrics</module>
                 <module>inspecto-events</module>
+                <module>inspecto-ops</module>
             </modules>
         </profile>
         <!-- M5 (A2): JaCoCo lives in the PARENT so every module instruments in one reactor pass —

@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>inspecto-ops</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Inspecto — Operational objects (Standard edition, optional)</name>
+    <description>
+        OPTIONAL Standard-edition operational objects (EDITIONS.md CP-11): Alerts -> Incidents -> Cases ->
+        Tasks, their notes, links, tags, queues, RCA templates, findings and workflow — the com.gamma.ops
+        domain, its four DuckDB-backed stores, the /objects, /notes, /queues and /tags route families, the
+        object-analytics and case-rule Job Types, and the incident_purge maintenance task.
+
+        WHY THIS IS THE LARGEST EDG-01 CELL. Unlike the other six, this feature was never a leaf: 31 domain
+        files with 23 code dependants across the mandatory inspecto-engine and inspecto modules, several of
+        which CONSTRUCTED it (ServiceStores opened the stores, ServiceBootstrap loaded six config types,
+        CollectorService built the ObjectService and wired its event bridge). So core reaches it through the
+        com.gamma.objects.ObjectAccess seam and an ObjectEngineProvider, never by naming a type here.
+
+        WHAT PERSONAL LOSES, DELIBERATELY (operator decision 2026-09-08). Two EDITIONS rows were amended in
+        the same change rather than left to contradict the build:
+          * OPS-01 no longer lists `objects` among the operational stores Personal carries.
+          * SP-CTL-02's gap watchdog still raises the EVENT on Personal but no longer promotes it to an
+            ALERT object — the promotion is EventObjectBridge, which lives here.
+        Event RECORDING is untouched in every edition; only the promotion and the managed objects are gated.
+
+        NOT IN THIS MODULE: /alerts and /alerts/rules. That is AlertsService over config-authored alert
+        RULES — a different domain from an OperationalObject whose objectType is ALERT. AlertService stays
+        in core and reaches this module through the seam.
+
+        Built only under the "edition-standard"/"edition-enterprise" profiles, so a routine "mvn -o clean
+        test" (= Personal, the DEFAULT build) never compiles it.
+    </description>
+
+    <dependencies>
+        <!-- The core: com.gamma.objects (ObjectAccess/ObjectType/AnnotationKinds/TagAssignment/RcaTemplate/
+             FindingsSpec/IncidentAccess), the event log, the component store, and com.gamma.util's
+             AbstractJdbcStore + BrowsableStore. Compile scope, as the other optional modules do. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-processor</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- fp-etl test-jar: the shared fixtures com.gamma.etl.TestConfigs / PipelineConfigBatchTest boot a
+             real CollectorService + ControlApi in the HTTP tests that move here with the routes (the
+             inspecto-events / inspecto-exchange pattern; test scope is not transitive). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-etl</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

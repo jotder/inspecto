@@ -808,6 +808,58 @@ only evidence that the tree had moved under it. The Personal run had already com
 edits (**4004 tests, 23/23 modules, zero count deviation**), which is the verdict that actually validated
 B1; the Enterprise pair had to be re-run.
 
+## 23. Stage C's shape, grounded 2026-09-08 — and why it CANNOT be split
+
+Two corrections to §22's design, both from reading the construction path rather than the consumers.
+
+### 🔴 The provider SPI must be declared in the HOST module, not the engine
+
+`ObjectAccess` itself lives in `inspecto-engine` (`com.gamma.objects`) and that is right — it is expressed
+in engine types. But the **provider** cannot: opening the four stores needs `com.gamma.service.SpaceRoot`
+and `OperationalDb.Family`, which live in the **host** module (`inspecto`/`inspecto-processor`), *above*
+the engine. An engine-declared provider could not name them, and the dependency may not be inverted.
+
+So `ObjectAccessProvider` is declared in `com.gamma.service` — the `RouteModule` precedent, not the
+`MaintenanceTaskProvider` one — and `inspecto-ops` depends on `inspecto-processor` like every other
+optional module. It returns a **handle**, because `ObjectAccess`'s nine methods do not cover two things
+core still needs: the boot-time tag-assignment backfill count it logs, and `close()` for the four stores
+(closed explicitly today at `CollectorService:1264` and `:1691-1694`).
+
+### 🔴 Stage C is ATOMIC — the move and the type-flip must land together
+
+`inspecto-engine`, the mandatory module, hard-imports `com.gamma.ops.ObjectService` in **four** places
+beyond the `service/` wiring: `JobService` (field, setter, getter), `AlertService` (constructor parameter
+and field), `CaseRuleEvalJob` and `ObjectsAnalyticsJob`. So the core→domain dependency has to flip in the
+same commit that moves the domain, or nothing compiles in between:
+
+* `AlertService` — every direct `objects.*` call **is** expressible through the seam
+  (`active`+attribute filter → `hasActiveMatching`; `open(...).id()` → `open` returns the id;
+  `link(..., LinkRelationship.ESCALATED_FROM, ...)` → the `"ESCALATED_FROM"` String). Only the field and
+  parameter types need retyping.
+* `JobService` — retype the field/setter/getter to `ObjectAccess`. ⚠ `ReconRunJob` reads
+  `host.objects()` and needs only `hasActive`/`open`, so it survives the retype.
+* `CaseRuleEvalJob` + `ObjectsAnalyticsJob` — ⛔ **not expressible at all**: they call
+  `evaluateCaseRule` and the analytics rollups, which have no seam equivalent and should not get one
+  (they are whole ops features, not narrow consumers). They **MOVE** to the module and register through
+  `JobService:507`'s existing `ServiceLoader.load(JobTypeProvider.class)` loop.
+
+### Registration order is already fail-closed in both seams — rely on it, don't rebuild it
+
+* `JobService`: every hardcoded `registry.register(...)` runs at L351-503, **strictly before** the
+  ServiceLoader loop at L507, and `registerClasspath` warns-and-skips an id collision. A built-in always
+  wins; a contributed Job Type can never shadow one.
+* `MaintenanceJob`: the named `switch` cases (L151-182) always win over `CONTRIBUTED` (L186-194), and two
+  providers claiming one task name map to a synthetic provider that **throws** — fail-closed, never
+  "first jar wins". So `incident_purge` must be **removed from the switch** (L159) to become
+  provider-supplied; leaving it would silently keep the built-in.
+
+### Correction: which config suffixes are ops, and which is not
+
+§22 listed the wrong six. `_rca.toon` parses into `RcaTemplate`, which is **core** since B1 and is handed
+to `CollectorService.registerRcaTemplate` — it **stays** in `ServiceBootstrap`. The six that move are
+`_queue`, **`_escalation`** (missed in §22), `_tag`, `_tagrule`, `_caserule`, `_workflow`, each of which
+calls a static `load(Path)` on an ops-owned type and hands the result to `svc.objects().registerX(...)`.
+
 ### Staging (each stage verified and committed on its own)
 
 * **A ✅ `dc7601ff`** — `AbstractJdbcStore` → `com.gamma.util`.
