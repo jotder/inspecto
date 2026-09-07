@@ -74,6 +74,8 @@ public final class DbDeliveryReceiptStore extends com.gamma.ops.AbstractJdbcStor
             // without these. Harmless if the engine ignores the hint.
             st.execute("CREATE INDEX IF NOT EXISTS " + TABLE + "_notification ON " + TABLE + " (notification_id)");
             st.execute("CREATE INDEX IF NOT EXISTS " + TABLE + "_sent_at ON " + TABLE + " (sent_at)");
+            // latestWithStatus() — the per-recipient suppression lookup, run once per external delivery.
+            st.execute("CREATE INDEX IF NOT EXISTS " + TABLE + "_target ON " + TABLE + " (target)");
         } catch (SQLException e) {
             throw new IllegalStateException("could not initialise " + TABLE + ": " + e.getMessage(), e);
         }
@@ -184,6 +186,43 @@ public final class DbDeliveryReceiptStore extends com.gamma.ops.AbstractJdbcStor
             return ps.executeUpdate();
         } catch (SQLException e) {
             throw new IllegalStateException("could not prune receipts: " + e.getMessage(), e);
+        }
+    }
+
+    /** Receipts live in a database and are removed only by an explicit {@link #prune}. */
+    @Override
+    public boolean durable() {
+        return true;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Overridden because the interface default scans a bounded window of recent receipts, which is the
+     * one thing a durable store must not do — the whole point of persisting receipts is that the bounce
+     * being looked up may be older than any window.
+     *
+     * <p>⚠ The {@code LIKE} is a <b>pre-filter, not the decision</b>. {@code status_at} is our own JSON
+     * ({@code {"BOUNCED_HARD":"1700000000000"}}), so matching the quoted key name narrows the scan in
+     * SQL; the row is then parsed and re-checked against the real map, so a substring that happened to
+     * appear inside {@code provider_raw}-shaped data could never produce a false suppression.
+     */
+    @Override
+    public synchronized Optional<DeliveryReceipt> latestWithStatus(String target, DeliveryStatus status) {
+        if (target == null || target.isBlank() || status == null) return Optional.empty();
+        String sql = "SELECT " + COLS + " FROM " + TABLE
+                + " WHERE target = ? AND status_at LIKE ? ORDER BY sent_at DESC LIMIT 1";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, target);
+            ps.setString(2, "%\"" + status.name() + "\"%");
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return Optional.empty();
+                DeliveryReceipt r = read(rs);
+                return r.statusAt().containsKey(status) ? Optional.of(r) : Optional.empty();
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("could not look up " + status + " for " + target + ": "
+                    + e.getMessage(), e);
         }
     }
 

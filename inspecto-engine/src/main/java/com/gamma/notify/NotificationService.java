@@ -55,6 +55,9 @@ public final class NotificationService implements NotificationAccess, AutoClosea
     private java.util.concurrent.ScheduledExecutorService digestTimer;
     /** Delivery-status receipts (D8), or {@code null} when tracking is not wired (the lean default). */
     private volatile DeliveryReceiptStore receipts;
+
+    /** Per-recipient suppression (D8-SUPPRESS-1); disarmed until a DURABLE receipt store is wired. */
+    private volatile SuppressionList suppression = SuppressionList.fromProperties(null);
     private final CopyOnWriteArrayList<Consumer<Notification>> listeners = new CopyOnWriteArrayList<>();
     /** Callbacks run on {@link #close()} to unblock open SSE streams (each interrupts its blocked thread). */
     private final CopyOnWriteArrayList<Runnable> streamClosers = new CopyOnWriteArrayList<>();
@@ -116,6 +119,23 @@ public final class NotificationService implements NotificationAccess, AutoClosea
      */
     public void deliveryReceipts(DeliveryReceiptStore receipts) {
         this.receipts = receipts;
+        this.suppression = SuppressionList.fromProperties(receipts);
+        // 🔴 The one thing that must never be silent: a TTL configured over a store that cannot honour it.
+        // Suppressing nothing looks exactly like having nothing to suppress, so say so at wiring time —
+        // the operator set a property and is entitled to know it does not apply.
+        if (!suppression.armed() && System.getProperty(SuppressionList.TTL_PROPERTY) != null) {
+            log.warn("-D{} is set but delivery suppression is NOT armed ({}). Hard bounces and complaints "
+                            + "will NOT stop further sends. Set -Ddelivery.receipts.backend to a durable "
+                            + "store (see okf/backend/engine/db-layer.md §3.12).",
+                    SuppressionList.TTL_PROPERTY,
+                    receipts == null ? "no receipt store wired"
+                            : "the receipt store is in-memory, so bounce evidence is evicted");
+        }
+    }
+
+    /** The suppression policy in force. Disarmed unless a durable receipt store is wired (D8-SUPPRESS-1). */
+    public SuppressionList suppression() {
+        return suppression;
     }
 
     /** The receipt store, or {@code null} when delivery-status tracking is not wired. */
@@ -202,6 +222,10 @@ public final class NotificationService implements NotificationAccess, AutoClosea
                 if (!prefs.enabled(n.category(), ch.id())) continue;
                 // No ChannelConfig and no explicit target: the channel resolves its destination from its
                 // own notify.* flags, so the receipt records the attempt with neither (D8).
+                // ⚠ D8-SUPPRESS-1 therefore CANNOT apply on this path — with no target there is nothing to
+                // match a bounce against. A channel whose destination is a -D flag is operator-configured
+                // rather than recipient-supplied, so the address is not the kind that goes stale; the
+                // documented boundary is that suppression covers persisted ChannelConfig destinations.
                 String deliveryId = openReceipt(n.id(), null, null, false);
                 try {
                     if (deliveryId == null) ch.deliver(n);
@@ -226,6 +250,15 @@ public final class NotificationService implements NotificationAccess, AutoClosea
                 // single combined notification once the window elapses (0 = immediate, the default).
                 if (cfg.digestMinutes() > 0) {
                     bufferForDigest(cfg, toDeliver);
+                    continue;
+                }
+                // D8-SUPPRESS-1: an address the provider already told us is bad is not delivered to.
+                // ⚠ Checked HERE and not inside openReceipt: a suppressed send must write no receipt
+                // either, or the next check would read its own non-delivery as delivery history.
+                java.util.Optional<String> suppressed = suppression.reasonToSuppress(
+                        cfg.target(), System.currentTimeMillis());
+                if (suppressed.isPresent()) {
+                    log.info("channel {} → {} SUPPRESSED: {}", ch.id(), cfg.target(), suppressed.get());
                     continue;
                 }
                 String deliveryId = openReceipt(toDeliver.id(), cfg.id(), cfg.target(), false);

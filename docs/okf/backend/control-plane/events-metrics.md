@@ -212,4 +212,33 @@ Production-investigation detail: [`docs/ADVANCED_GUIDE.md`](../../../ADVANCED_GU
 **Decided:** no auto-disable of a channel (one bad address must not silence a channel); when a DB-backed
 receipt store exists, build a **per-recipient suppression list** — TTL for hard bounces, permanent for
 complaints — consulted before delivery, with `GET/DELETE /notifications/suppressions`. Until then the
-`enabled` flag is the operator's tool. (BACKLOG §3 P3 `D8-SUPPRESS-1`, gated on receipt persistence.)
+`enabled` flag is the operator's tool. (BACKLOG §3 `D8-SUPPRESS-1`, gated on receipt persistence.)
+
+### Discharged 2026-09-07 — the store, then the policy
+
+`DbDeliveryReceiptStore` shipped (`db-layer.md` §3.12), and with it the **suppression policy**:
+`SuppressionList` in `notify/`, consulted in `NotificationService`'s ChannelConfig delivery loop before
+the transport is called.
+
+* **Complaint ⇒ permanent.** No elapsed time makes sending after a spam report acceptable.
+* **Hard bounce ⇒ a TTL** (`-Dnotify.suppression.bounce.ttl`, ISO-8601, default `P30D`). Addresses get
+  recreated, so this expires. ⛔ **Soft bounce never suppresses** — that is the whole reason
+  `DeliveryStatus` splits hard from soft; collapsing them would stop mail to anyone once over quota.
+* **Off switch:** `-Dnotify.suppression=off`.
+
+🔴 **It arms itself only over a DURABLE store** (`DeliveryReceiptStore.durable()`, default `false`). Asking
+an evicting cache "has this address ever bounced" answers "no" both for a clean address and for evidence
+it forgot, and those must not collapse into a silent "deliver". When a TTL is configured but the store
+cannot honour it, `NotificationService` logs a WARNING naming the reason — the alternative, suppressing
+nothing while appearing configured, is this codebase's most-repeated failure shape.
+
+⚠ **Two documented boundaries.** (1) Suppression covers **persisted `ChannelConfig` destinations only**;
+the SPI-channel path passes no target (the channel resolves its own destination from `notify.*` flags), so
+there is nothing to match a bounce against — and such a destination is operator-configured rather than
+recipient-supplied, so it is not the kind that goes stale. (2) A suppressed send writes **no receipt**, or
+the next check would read its own non-delivery as delivery history.
+
+**Still owed from the 2026-09-06 decision: `GET/DELETE /notifications/suppressions`.** ⚠ `DELETE` carries a
+real question rather than being mechanical — the list is DERIVED from receipts, so "unsuppress" means
+either forgetting that target's bounce/complaint evidence (audit loss) or introducing an override table
+(new state). Decide before building. Tests: `SuppressionListTest`.

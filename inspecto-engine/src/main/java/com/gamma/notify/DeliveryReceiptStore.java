@@ -39,6 +39,46 @@ public interface DeliveryReceiptStore extends AutoCloseable {
     /** Permanently forget receipts sent before {@code cutoffMs}; returns how many were removed. */
     int prune(long cutoffMs);
 
+    /**
+     * The most recent receipt for {@code target} that carries {@code status}, or empty. The lookup
+     * per-recipient suppression is built on (D8-SUPPRESS-1): "has this address ever complained", "has it
+     * hard-bounced lately".
+     *
+     * <p><b>A default rather than an abstract method</b>, so an existing implementation keeps compiling:
+     * the scan below is correct for any store, and {@link DbDeliveryReceiptStore} overrides it with a
+     * targeted query. ⚠ The scan is bounded by {@link #SUPPRESSION_SCAN} — a bound is exactly what makes
+     * this safe on the in-memory store (itself capped at 5000) and exactly what makes it WRONG on a large
+     * durable one, which is why the durable store must not inherit it.
+     *
+     * @since 4.0.0
+     */
+    default Optional<DeliveryReceipt> latestWithStatus(String target, DeliveryStatus status) {
+        if (target == null || target.isBlank() || status == null) return Optional.empty();
+        for (DeliveryReceipt r : recent(SUPPRESSION_SCAN)) {          // already newest-first
+            if (target.equals(r.target()) && r.statusAt().containsKey(status)) return Optional.of(r);
+        }
+        return Optional.empty();
+    }
+
+    /** How far back {@link #latestWithStatus}'s default scan looks. See its note. */
+    int SUPPRESSION_SCAN = 5000;
+
+    /**
+     * Whether this store persists receipts beyond the process, and beyond a bound.
+     *
+     * <p>Exists so {@link SuppressionList} can ARM ITSELF only where suppression can be honest. The
+     * in-memory store is capped and evicts oldest-first, so asking it "has this address ever bounced"
+     * returns "no" both when the address is clean and when the evidence was evicted — and those two
+     * answers must not be conflated into a silent "deliver". ⚠ Default {@code false}: a new implementation
+     * is assumed non-durable until it says otherwise, because the failure of guessing wrong in that
+     * direction is a suppression list that quietly does nothing.
+     *
+     * @since 4.0.0
+     */
+    default boolean durable() {
+        return false;
+    }
+
     @Override
     default void close() {}
 }
