@@ -43,7 +43,7 @@
 | Mechanism | Used for |
 |---|---|
 | **Separate Maven module** (e.g. `inspecto-security`) | Standard-only code (OIDC resource-server, TLS, RBAC). Personal simply doesn't bundle it. |
-| **Maven profiles** (`-Pedition-personal` / `-Pedition-standard` / `-Pedition-enterprise`) | Which modules + shade includes go into the fat-JAR. `edition-enterprise` = `edition-standard` + `inspecto-policy`. |
+| **Maven profiles** (`-Pedition-standard` / `-Pedition-enterprise`) | Which modules + shade includes go into the fat-JAR. `edition-enterprise` = `edition-standard` + `inspecto-policy`. 🔴 **Corrected 2026-09-07: there is no `edition-personal` profile** — the parent POM declares exactly two (`pom.xml:68,77`). **Personal is the DEFAULT**, i.e. the reactor with no profile at all, which is what `package.ps1` does (`if ($Edition -ne 'Personal')` guards every Standard+ step). ⚠ The old text named a third flag; Maven only *warns* on a profile that does not exist and then builds the default, so a shift following this table would have got the right bundle for the wrong reason and learnt nothing from the build. |
 | **`ServiceLoader`** | Runtime discovery — absent module ⇒ the no-op impl is the only one found (mirrors the optional assist agent). |
 | **`-D` flags** (`-Dauth.mode`, TLS on/off) | Runtime toggles within an edition. |
 | **`package.ps1 -Edition …`** | Emits the per-edition bundles from one build. |
@@ -355,7 +355,7 @@ E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for P
 | CMP-04 | Audit retention (`event_prune`, one-year window) | ✅ | ✅ | ✅ | 2026-09-02 (COMPLY-3); operator-scheduled |
 | CMP-05 | Control matrix + auditor evidence (`compliance/`) | — | ✅ | ✅ | P has no compliance scope by definition |
 | CMP-06 | FIPS mode (G9) | — | 🔲 | 🔲 | matrix gap G9, open |
-| CMP-07 | RBAC R5 residual (G8) | — | 🔲 | 🔲 | matrix gap G8, open |
+| CMP-07 | RBAC R5 residual (G8) | — | ✅ | ✅ | 🔴 **Cell corrected 2026-09-07 — it was STALE.** It read `🔲 planned` citing "matrix gap G8, open", but `compliance/controls-matrix.md` records **G8 CLOSED 2026-08-28** → `evidence/access-review.md`, grounded against the shipped R5 view (the Roles tab renders role-level effective grants with the profile-deny overlay). The work was done six weeks before this board was opened; only the cell was behind. ⚠ A cell that cites another file's gap ID inherits that file's state — re-read it before trusting the cell. |
 | CMP-08 | Certifications (SOC 2 Type II, ISO 27001, FedRAMP…) | — | — | 🔲 | **decided 2026-09-02 (operator): Enterprise only.** Org-paced (NFR-7); C1 scope statement is org-gated |
 
 **No open ❓ cell** — SEC-07 decided 2026-09-06 (see its row). SEC-08 and CMP-08 were

@@ -176,8 +176,12 @@ git push origin <branch> --tags
 # the GitHub release. The manual block below is the pre-pipeline procedure, kept for an air-gapped
 # emergency only — and note it cannot produce a pipeline-signed release (the key is not held locally).
 # Build + publish both edition artifacts from the tagged commit:
-#   mvn -Pedition-personal package   → inspecto-processor-X.Y.Z-personal.jar
+#   mvn package                      → the PERSONAL artifact (no profile — Personal IS the default;
+#                                      corrected 2026-09-07: `-Pedition-personal` does not exist, and
+#                                      Maven only warns on an unknown profile, so the old line here
+#                                      built the right jar while teaching the wrong mechanism)
 #   mvn -Pedition-standard package   → inspecto-processor-X.Y.Z-standard.jar
+#   mvn -Pedition-enterprise package → the Enterprise artifact (= standard + inspecto-policy)
 # Release integrity (SOC 2 CC8-04): publish a SHA-256 checksum + a GPG detached signature for EVERY
 # artifact so customers can verify integrity AND authenticity. package.ps1 emits .sha256/.asc for the
 # deploy zips; for the raw edition JARs, generate them here (INSPECTO_SIGNING_KEY = the release key id;

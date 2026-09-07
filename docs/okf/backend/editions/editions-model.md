@@ -15,8 +15,12 @@ every edition inherits it at build time — no cross-line cherry-picking. Author
 
 Assembly mechanisms:
 
-* **Maven profiles** — `-Pedition-personal` / `-Pedition-standard` control which modules + shade includes
-  enter the fat-JAR.
+* **Maven profiles** — `-Pedition-standard` / `-Pedition-enterprise` control which modules + shade
+  includes enter the fat-JAR. 🔴 **There is no `edition-personal` profile** (corrected 2026-09-07; the
+  parent POM declares exactly two, `pom.xml:68,77`): **Personal is the default build**, no profile at all.
+  ⚠ Maven only *warns* on a profile that does not exist and then builds the default, so the old
+  `-Pedition-personal` produced a correct Personal jar for an incorrect reason — the kind of instruction
+  that survives because it appears to work.
 * **An optional Maven module** — `inspecto-security` holds Standard-only code (OIDC via Nimbus, role
   mapping, token relay); it joins the reactor only under the `edition-standard` profile, so Personal never
   even compiles it. See [auth & security](auth-security.md).
