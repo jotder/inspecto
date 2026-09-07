@@ -89,3 +89,13 @@ declares the header explicitly). Readers parse **by header name per file** (`Csv
 [output-sinks](output-sinks.md) (quarantine) · [live-execution](../pipeline-graph/live-execution.md) ·
 [events-metrics](../control-plane/events-metrics.md) · [jobs](../control-plane/jobs.md) ·
 GLOSSARY §2 *Consignment* / §6-B
+
+## Intrinsic and inherited status must not collapse into one enum
+
+A file's own outcome and the outcome of the Consignment containing it are different facts, and both are
+needed: a `COMMITTED` file inside a `FAILED` Consignment is a real and common state (the file landed; the
+Consignment failed later, on another file or at commit). Folding them into a single status loses the ability
+to answer "which files actually made it?" after a partial failure — which is exactly the question reprocessing
+asks.
+
+*Distilled 2026-09-07 from `consignment-elt-architecture.md` when that plan was archived ([archive copy](../../../archived-documents/plans-archive/consignment-elt-architecture.md)).*

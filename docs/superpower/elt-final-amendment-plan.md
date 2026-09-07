@@ -26,7 +26,7 @@ Document/§5.1, the dedup boundary/§2.4, and schema-registry semantics/§3.4 be
 >   separate from the UI abstraction"*) is **this plan's execution model**, recorded 2026-08-01.
 >   Stage A 1–3 shipped (dormant graph-execution machinery), Stage B CLOSED (B1–B5), and **Stage C
 >   (per-file stage housekeeping) folds into §4.5 here — this plan is its sign-off vehicle** (§9 D-5).
-> - [`consignment-elt-architecture.md`](consignment-elt-architecture.md) — vocabulary (§3),
+> - [`consignment-elt-architecture.md`](../archived-documents/plans-archive/consignment-elt-architecture.md) — vocabulary (§3),
 >   processor blocks (§4), storage invariants (§5–6), summary semantics (§7), persistence (§11.3
 >   built), `ProcessorContext` (§14 built). This plan operationalizes it for the end user.
 > - The **already-MAJOR release**: four breaking reasons are banked (BACKLOG — D15 OIDC flag, D4
@@ -509,7 +509,10 @@ Append-only / no catalog / no Iceberg · no streaming runtime, no inter-node que
 sanctioned spill-edge escalation already exercised by B4) · single-node ceiling accepted (NFR-8) ·
 editions = build flavors, never branches · no component version pinning in v1 · ConfigSafetyValidator
 fail-closed gates · the DuckDB native-access launch flag · markers-LAST · algebraic-only measures ·
-sealing/completeness tier (consignment doc §8–9) unchanged and out of this plan's critical path.
+sealing/completeness tier out of this plan's critical path. ⚠ **Superseded 2026-08-30**: sealing was not
+merely left alone, it was **dropped** — the operator replaced the consignment doc's §8 state machine with a
+scheduled completeness KPI (`superpower/completeness-kpi-plan.md`). There is no `OPEN/SEALED/REOPENED`, no
+lateness horizon and no `partition_state` table to come back to.
 
 ---
 
@@ -1413,8 +1416,10 @@ minor can now be cut; the deletion still waits for it to ship. ⛔ Do not start 
   read surface. The recipe editor is additive until Phase 6.
 - **R5 Signal-path coupling.** Table-entry pipelines ride `pipeline.commit` — keep the
   `consignment.process` contract (`consignmentId` correlation) frozen; plugins already depend on it.
-- **R6 Scope gravity.** This plan deliberately does not touch sealing/completeness (§8–9 of the
-  consignment doc), Kafka, or Postgres multi-user. If an iteration pulls them in, that is a new plan.
+- **R6 Scope gravity.** This plan deliberately does not touch sealing/completeness, Kafka, or Postgres
+  multi-user. If an iteration pulls them in, that is a new plan. ⚠ The sealing half of this risk is now
+  moot: sealing was **dropped** on 2026-08-30 and replaced by the scheduled completeness KPI, so there is
+  no §8–9 design left to pull in.
 - **R7 The document mistaken for the truth.** Business will treat a signed-off Pipeline Document as
   the contract while config evolves underneath. Mitigation: the config fingerprint in the header
   (§5.1) makes staleness detectable and cheap to surface ("approval predates current config");

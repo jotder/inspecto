@@ -1,6 +1,28 @@
 # Consignment-based ELT: one execution model, batch as the unit of work
 
-**Status:** IN FLIGHT — brainstorm captured 2026-08-03; **first code landed 2026-08-04** (`cf3742a5`).
+> 🔴 **ARCHIVED 2026-09-07 — history, not current truth.** Everything this plan got built is distilled into
+> the OKF tier; read that, never this file, for how the system behaves:
+> [`okf/backend/engine/db-layer.md`](../okf/backend/engine/db-layer.md) §3.9 (§11.3 `consignment_outputs`) ·
+> [`okf/backend/control-plane/jobs.md`](../okf/backend/control-plane/jobs.md) (§14 `ProcessorContext`, §7.2/§7.3
+> summary tier) · [`okf/backend/engine/consignment-addressing.md`](../okf/backend/engine/consignment-addressing.md)
+> (§5 storage invariants, §10.1 bounds) · [`okf/backend/engine/duckdb.md`](../okf/backend/engine/duckdb.md)
+> (§7.5's aggregate-state probe, §10.2 zones) ·
+> [`okf/backend/engine/post-sync-step-chains.md`](../okf/backend/engine/post-sync-step-chains.md) (§5.3/§6 compaction).
+>
+> 🔴 **SEALING IS DROPPED, NOT DEFERRED (operator, 2026-08-30) — this supersedes EVERY sealing mention below,
+> not only the two that carry their own banner.** The completeness requirement is a **scheduled per-pipeline KPI
+> job** ([`completeness-kpi-plan.md`](completeness-kpi-plan.md)); the operator was shown this file's contrary
+> central claim ("end of day is a condition, not a clock … no schedule anywhere") and chose the schedule. There
+> is no `OPEN/SEALED/REOPENED` state, no lateness horizon, no seal signals and no `partition_state` table.
+> Superseded in full, whether or not the section says so locally: **§8** (incl. **§8.4**'s SLA object, which the
+> local §8 banner does not name) · **§9.3**'s "only `sealed-complete` days feed the baseline" · **§10.2**'s
+> "a record-day seal policy is a 422 at authoring time" · **§11.4** · **§11.5**'s `partition.sealed` /
+> `partition.reopened` signals · **§11.6**'s sealed-on-timeout and SLA-at-risk rows · **§13**'s `partition_state`,
+> partition-state-machine and SLA-config rows · **§15**'s open decision naming §11.4. *(This banner is how
+> completeness-KPI **K5** is discharged: one authoritative statement beats a dozen scattered edits that can
+> miss one.)*
+
+**Status (as it stood at archival):** brainstorm captured 2026-08-03; **first code landed 2026-08-04** (`cf3742a5`).
 This began as the record of a design conversation, so the bulk below is still design. What has moved:
 
 | Piece | State as of 2026-08-04 |
@@ -8,12 +30,14 @@ This began as the record of a design conversation, so the bulk below is still de
 | §11.3 `consignment_outputs` | **COMPLETE — slices 1, 2, 3 + state mutators, all BUILT + VERIFIED.** Default-off store with production callers on all three write paths and real per-file `row_count`; `supersede`/`markCompactedAway` wired to `ReprocessCommand` + `PartitionCompactor`; the `batch_id` → `consignment_id` rename done for the ledgers + manifest (DDL columns, `__batch_id` and the `.toon` config key deliberately deferred) |
 | §14 `ProcessorContext` | **BUILT + VERIFIED (all of §14.4)** — `ConsignmentProcessor` SPI, `ProcessorContext`, the `consignment.process` `JobTypeProvider` adapter, `ConsignmentReader`, and `SummaryEmitter`'s §7.2 guardrails. As-built in [`okf/backend/control-plane/jobs.md`](../okf/backend/control-plane/jobs.md) |
 | §7.2 + §7.3 summary tier | **BUILT + VERIFIED** — `GuardedSummaryEmitter` guards composability, `SummaryWriter` persists one Parquet file per (Consignment × record-day) with a `_measures.csv` composability sidecar, registered in the §11.3 registry under `<target>__summary`. **§7.4's rollup cache deliberately not built** |
-| Everything else (§2, §4–§6, §8–§10, §11.4, §12, §13) | design only, nothing implemented |
+| §8, §8.4, §11.4 (+ the sealing rows of §9.3/§10.2/§11.5/§11.6/§13) | 🔴 **SUPERSEDED 2026-08-30 — dropped, not deferred.** Replaced by the scheduled completeness KPI |
+| Everything else (§2, §4–§6, §9–§10, §12, §13) | design only, nothing implemented |
 
-**Next: §11.3, §14 and the §7.2/§7.3 summary tier are all closed — nothing in the plan has code waiting on it any
-more.** What remains is design, and the next piece needs a decision rather than an implementation: §8's
-end-of-period pass (which §7.5 defers non-additive measures to) is the only remaining dependency of anything
-built. Open items deliberately carried to `docs/BACKLOG.md` §4 rather than tracked here: §7.4's rollup cache, the
+**§11.3, §14 and the §7.2/§7.3 summary tier are all closed — nothing in the plan had code waiting on it when it
+was archived.** The one dependency that remained — §8's end-of-period pass, which §7.5 defers non-additive
+measures to — was **resolved by dropping sealing**: the scheduled completeness KPI replaced it, and §7.5's own
+live probe had already settled the representation (a fixed-bucket histogram, because DuckDB exposes no
+restorable aggregate state). Open items deliberately carried to `docs/BACKLOG.md` §4 rather than tracked here: §7.4's rollup cache, the
 three deferred `batch_id` renames (the `DbProvenanceStore`/`DbStatusStore` **DDL columns**, `__batch_id` where
 accept-both-on-read is impossible, and the **`.toon` config key**), and §7.5's histogram-vs-sketch question —
 whose "DuckDB `approx_quantile` exposes no mergeable state" premise was **VERIFIED 2026-08-28** (live probe, §7.5 — histogram wins).

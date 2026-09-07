@@ -917,9 +917,11 @@ the deep design incl. its §14 backlog), `live-execution.md`, `multi-location-in
 `step-park-drain.md` · `okf/backend/engine/` — `node-types.md`, `plugins.md`, `stage1-architecture.md`,
 `ingestion.md`, `branch-aware-ingest.md`, `consignment-status-flow.md`, `consignment-addressing.md`,
 `consignment-concurrency.md`, `parser-plugins.md`, `output-sinks.md`, `transforms-seams.md`,
-`unpack-stage.md`, `pipeline-test-run.md` · `superpower/` — `elt-final-amendment-plan.md` (114 KB),
-`consignment-elt-architecture.md` (87 KB), `open-dag-pipeline-design.md`, `step-workbench-design.md`,
-`mid-branch-transforms-design.md` (BUILT 2026-09-02 as R3 → `archived-documents/plans-archive/`).
+`unpack-stage.md`, `pipeline-test-run.md` · `superpower/` — `elt-final-amendment-plan.md` (114 KB).
+⚠ Four entries left this list once they were archived rather than retired in place:
+`consignment-elt-architecture.md` (2026-09-07, distilled into six OKF concepts),
+`open-dag-pipeline-design.md` (2026-09-06), `step-workbench-design.md` (2026-09-06) and
+`mid-branch-transforms-design.md` (BUILT 2026-09-02 as R3) — all in `archived-documents/plans-archive/`.
 
 ⚠ **Retirement is deliberately NOT done yet.** Those files describe what is live; they should be
 archived only as the rewrite replaces each area, not in advance of it.

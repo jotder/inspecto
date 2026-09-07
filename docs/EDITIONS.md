@@ -174,9 +174,9 @@ E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for P
 | SP-ACQ-03 | 🗄️ JDBC / SQL query batch reader (`acquisition.db.jdbc`) | Collectors & Ingestion | ✅ | ✅ | ✅ | `acquisition` | the db-export connector (`connector: db`, watermark column) |
 | SP-ACQ-04 | 🧱 Dataset entry (re-ingest a registered Dataset) (`acquisition.dataset`) | Collectors & Ingestion | ✅ | ✅ | ✅ | `acquisition` | UI-S7: `connector: dataset` + `on:dataset` trigger |
 | SP-ACQ-05 | 📑 Multi-sheet Excel workbook ingest (`acquisition.file.excel`) | Collectors & Ingestion | 🟡 | 🟡 | 🟡 | `parser.xlsx` | the xlsx PARSER is delivered; per-sheet workbook fan-out as an acquisition is not |
-| SP-ACQ-06 | ☁️ AWS S3 object ingest (`acquisition.file.s3`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ACQ-06 | ☁️ AWS S3 object ingest (`acquisition.file.s3`) | Collectors & Ingestion | 🟡 | 🟡 | 🟡 | `acquisition` | Connection kind exists (s3 connector, SDK-free SigV4; covers MinIO / GCS-interop); no proven end-to-end acquisition-node run |
 | SP-ACQ-07 | 🌐 Azure Blob & ADLS Gen2 ingest (`acquisition.file.azure`) | Collectors & Ingestion | 🟡 | 🟡 | 🟡 | `acquisition` | Connection kind exists (azure blob connector); ADLS Gen2 semantics not proven |
-| SP-ACQ-08 | 🪣 Google Cloud Storage ingest (`acquisition.file.gcs`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ACQ-08 | 🪣 Google Cloud Storage ingest (`acquisition.file.gcs`) | Collectors & Ingestion | 🟡 | 🟡 | 🟡 | `acquisition` | Connection kind exists (gcs connector, native JSON API + service-account OAuth2); no proven end-to-end acquisition-node run |
 | SP-ACQ-09 | 📤 Apache Kafka consumer (`acquisition.stream.kafka`) | Collectors & Ingestion | 🟡 | 🟡 | 🟡 | `acquisition` | Connection kind exists (kafka); consumer-group ingest as a Collector not proven |
 | SP-ACQ-10 | 📨 Apache Pulsar consumer (`acquisition.stream.pulsar`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
 | SP-ACQ-11 | 📬 AWS Kinesis / SQS ingest (`acquisition.stream.kinesis`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
@@ -289,7 +289,9 @@ E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for P
 | SP-SNK-14 | 🪝 Outbound webhook dispatcher (`sink.api.webhook`) | Sinks, Storage & Destinations | — | 🟡 | 🟡 | `channel` | webhook notification channel exists; not a chain sink |
 | SP-SNK-15 | 🕳️ Dead-letter queue (`sink.dlq`) | Sinks, Storage & Destinations | 🔲 | 🔲 | 🔲 | — |  |
 
-**Count:** 119 processors — 34 delivered, 16 partial, 69 planned.
+**Count:** 119 processors — 34 delivered, 18 partial, 67 planned.
+
+
 
 | ~~SP-DQ-09~~ | ~~🧹 Whitespace & string sanitizer (`quality.cleanse.trim`)~~ | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `transform.sql` | **FOLDED into SP-XFM-01 (Record Transformer) 2026-09-04** — it is the `text.trim` / `text.pad_left` / `text.replace` rows of that grid, no longer a separate catalog entry |
 | ~~SP-XFM-02~~ | ~~🔄 Field type cast & renamer matrix (`transform.cast`)~~ | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.sql` | **FOLDED into SP-XFM-01 2026-09-04** — cast is the `convert.type` row, rename is the Field-name alias |

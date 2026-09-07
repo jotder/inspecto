@@ -285,3 +285,19 @@ time, so a value stops depending on which box processed it.
   `buildCastExpr` at `TransformCompiler:209` does).
 
 Output is written via DuckDB `COPY` — see [output & sinks](output-sinks.md).
+
+## Aggregate state cannot be persisted and restored (§7.5 probe)
+
+Measured on a live connection, and it decides the summary tier's representation:
+
+* `approx_quantile` **cannot** `EXPORT_STATE` at all — DuckDB rejects it ("custom binders"). There is no
+  mergeable state to persist.
+* `approx_count_distinct` **can** export state; it casts to `BLOB` and survives a Parquet round trip — but
+  there is **no `BLOB → AGGREGATE_STATE` cast back**. So it is *persistable but not restorable*, which for a
+  rollup cache is the same as useless.
+
+⇒ **The fixed-bucket histogram is the decided representation** for non-additive measures. Sketches would mean
+pulling in Java DataSketches, which is a dependency decision, not a query trick. ⛔ Do not re-litigate this by
+reading DuckDB's docs — the docs describe `EXPORT_STATE`; the probe is what found the missing return cast.
+
+*Distilled 2026-09-07 from `consignment-elt-architecture.md` when that plan was archived ([archive copy](../../../archived-documents/plans-archive/consignment-elt-architecture.md)).*

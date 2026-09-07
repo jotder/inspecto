@@ -101,7 +101,6 @@ to the table below — all in the same change.
 | [`pipeline-spec.md`](superpower/pipeline-spec.md) | IN FLIGHT | The consolidated Pipeline specification (2026-08-30) + §12's wave plan and §13's ten decisions. **16 of 17 waves done**; only row 15 remains. ⚠ Widest inbound surface of any plan here — 7 other docs cite it. |
 | [`pipeline-waves-drain-plan.md`](superpower/pipeline-waves-drain-plan.md) | IN FLIGHT | The drain of those waves; §3 is the D-9 design pass. Archive **together with `pipeline-spec.md`** when row 15 closes. |
 | [`elt-final-amendment-plan.md`](superpower/elt-final-amendment-plan.md) | PARTLY SHIPPED | Phases 0–5 done and Phase 6's slices A–C2 shipped; the **Phase 6 deletion half is row 15**, release-gated (BACKLOG §2). D-8/D-11 are P3. |
-| [`consignment-elt-architecture.md`](superpower/consignment-elt-architecture.md) | 🔴 DISTIL → ARCHIVE | Its own header says nothing in it has code waiting on it. The built parts are in `okf/backend/engine/db-layer.md` §3.9. ⛔ Do BACKLOG §3's completeness-KPI **K5** first — §11.4 still lacks its SUPERSEDED banner. |
 | [`deployment-topology-plan.md`](superpower/deployment-topology-plan.md) | DECISIONS SIGNED | §10's D1–D8 signed 2026-09-06 (D3 = the shipped 2GB cap), so the gate this entry used to name is gone. Phases 0–5 all unbuilt; T2/T3/T4 need a real deployment (BACKLOG §2 · §3). |
 | [`compliance-certifications-plan.md`](superpower/compliance-certifications-plan.md) | PARTLY SHIPPED | **C2 delivered 2026-08-28** → `compliance/controls-matrix.md`. C1/C3-remainder/C5/C6 are open and org-gated — this is **not** a doc-lifecycle violation. |
 | [`agt-6-plan.md`](superpower/agt-6-plan.md) | PARTLY SHIPPED | A1–A5 shipped 2026-07-26/27. Left: the `kpi_report_builder` host (no viable pane — a new surface) and all of AGT-6b, blocked upstream on eoiagent. |
@@ -124,6 +123,7 @@ this index used to narrate, newest first:
 
 | Archived plan | Archived | Its truth now lives in |
 |---|---|---|
+| [`consignment-elt-architecture`](archived-documents/plans-archive/consignment-elt-architecture.md) | 2026-09-07 | [`okf/backend/engine/db-layer.md`](okf/backend/engine/db-layer.md) · [`okf/backend/control-plane/jobs.md`](okf/backend/control-plane/jobs.md) · [`okf/backend/engine/consignment-addressing.md`](okf/backend/engine/consignment-addressing.md) · [`okf/backend/engine/duckdb.md`](okf/backend/engine/duckdb.md) · [`okf/backend/engine/post-sync-step-chains.md`](okf/backend/engine/post-sync-step-chains.md) · [`okf/backend/engine/consignment-status-flow.md`](okf/backend/engine/consignment-status-flow.md) |
 | [`gate-register`](archived-documents/plans-archive/gate-register.md) | 2026-09-07 | [`okf/index.md`](okf/index.md) |
 | [`living-operational-system`](archived-documents/plans-archive/living-operational-system.md) | 2026-09-07 | [`okf/living-operational-system.md`](okf/living-operational-system.md) |
 | [`open-dag-pipeline-design`](archived-documents/plans-archive/open-dag-pipeline-design.md) | 2026-09-06 | [`okf/backend/engine/post-sync-step-chains.md`](okf/backend/engine/post-sync-step-chains.md) |

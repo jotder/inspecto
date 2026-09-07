@@ -88,8 +88,10 @@
     "label" : "AWS S3 object ingest",
     "emoji" : "☁️",
     "icon" : "heroicons_outline:cloud-arrow-down",
-    "status" : "planned",
-    "addable" : false
+    "status" : "partial",
+    "nodeType" : "acquisition",
+    "note" : "Connection kind exists (s3 connector, SDK-free SigV4; covers MinIO / GCS-interop); no proven end-to-end acquisition-node run",
+    "addable" : true
   }, {
     "id" : "acquisition.file.azure",
     "family" : "ACQ",
@@ -106,8 +108,10 @@
     "label" : "Google Cloud Storage ingest",
     "emoji" : "🪣",
     "icon" : "heroicons_outline:cloud-arrow-down",
-    "status" : "planned",
-    "addable" : false
+    "status" : "partial",
+    "nodeType" : "acquisition",
+    "note" : "Connection kind exists (gcs connector, native JSON API + service-account OAuth2); no proven end-to-end acquisition-node run",
+    "addable" : true
   }, {
     "id" : "acquisition.stream.kafka",
     "family" : "ACQ",

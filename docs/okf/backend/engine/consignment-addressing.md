@@ -271,3 +271,23 @@ closed on that basis rather than built. As-built detail:
 [operations-reference.md](../build-run/operations-reference.md) (`retire_superseded`) ·
 [output-sinks.md](output-sinks.md) · [transforms-seams.md](transforms-seams.md) ·
 [GLOSSARY.md](../../../GLOSSARY.md) §6-B
+
+## Three storage invariants that are cheap now and unfixable later
+
+**A partition-affecting config must be PINNED in the manifest at load time.** Any setting that decides which
+partition a row lands in (the partition expression, the event-time field, the time zone) is recorded with the
+Consignment and **reprocessing must use the pinned value, never the current config**. Otherwise editing a
+pipeline silently re-partitions only the rows reprocessed after the edit — *partition drift*, which reads as
+data corruption and has no cheap repair. ⚠ This is trivial to add before there is data and effectively
+impossible to retrofit after.
+
+**No output file ever contains rows from two Consignments.** One-directional: one Consignment may write many
+files, but a file belongs to exactly one. This is what makes a Consignment's output deletable by unlinking
+whole files, and it is why compaction (which merges across Consignments) is the one operation that has to be
+handled specially — see [post-sync step chains](post-sync-step-chains.md).
+
+**Two kinds of delete, only one of which is safe.** Unlinking a whole file owned by a single Consignment is
+fine. **Rewriting** a file that holds several Consignments' rows to remove one of them is the read-modify-write
+this model exists to avoid — it is the operation that loses data when it fails halfway.
+
+*Distilled 2026-09-07 from `consignment-elt-architecture.md` when that plan was archived ([archive copy](../../../archived-documents/plans-archive/consignment-elt-architecture.md)).*

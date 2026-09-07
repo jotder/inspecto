@@ -391,7 +391,7 @@ an operator act exactly like `receipt_prune`.
 ## `consignment.process` — the third-party Consignment SPI (shipped 2026-08-04)
 
 The Job Type that lets someone outside this repo do work over one committed Consignment, from the
-[consignment-ELT plan](../../../superpower/consignment-elt-architecture.md) §14. It is the framework half of a
+[consignment-ELT plan](../../../archived-documents/plans-archive/consignment-elt-architecture.md) §14. It is the framework half of a
 two-sided seam:
 
 | Side | Type | Who writes it |
@@ -476,3 +476,23 @@ mutable-looking thing in the system ahead of evidence.
 
 ⚠ **No data root ⇒ summary persistence is off** (the no-arg `ConsignmentProcessJobType`); the guardrail still runs
 and the Run warns that validated rows were not stored.
+
+## Three corrections worth keeping about commit-fired work
+
+🔴 **There is no `on_commit` Job trigger, and `ON_COMMIT_SAME_GRAPH` is not the at-rest enforcement.**
+`on_commit` is a *pipeline-edge* relation (`PipelineRel.ON_COMMIT`, cross-pipeline only). Commit-fired Jobs
+ride the **Signal** bus — `JobService.mirrorPipelineCommit` turns a commit into a signal a Job trigger
+matches. `ON_COMMIT_SAME_GRAPH` is a **graph-structure refusal** (it stops an edge pointing back into its own
+graph); ⛔ do not cite it as the thing that keeps Job work at rest. The real reason Jobs are the at-rest seam
+is simply that a Job is the only SPI that reads data already written.
+
+⚠ **Do not grow the `EventType` enum for new facts — emit a `Signal`.** And **per-file facts belong in a
+ledger row, not a signal**: a signal per file floods the bus on a large Consignment. There is deliberately no
+signal-type constants class; the type is a string the emitter owns.
+
+**`ProcessorContext` withholds more than the connection.** Beyond the writable `Connection` and `job()`, it
+also does not expose `PipelineConfig` (a processor must read the **pinned** manifest values, not live config —
+see the partition-drift rule in [consignment-addressing](../engine/consignment-addressing.md)), the path
+builders, or `Batch`/`PipelineNode`. Each omission is a decision, not an oversight.
+
+*Distilled 2026-09-07 from `consignment-elt-architecture.md` when that plan was archived ([archive copy](../../../archived-documents/plans-archive/consignment-elt-architecture.md)).*

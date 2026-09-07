@@ -210,3 +210,19 @@ that claim is STALE as of 2026-08-31.
 **Provenance:** distilled from
 [`open-dag-pipeline-design.md`](../../../archived-documents/plans-archive/open-dag-pipeline-design.md)
 (design 2026-08-29, stages shipped 2026-08-29/31, Q1/Q3/Q4 ratified 2026-09-06).
+
+## Compaction is the only operation that can duplicate rows
+
+Every other write path is append-or-replace. Compaction merges several files into one, so it has both failure
+modes available — and they are not symmetric: **unlink-first loses data, which is worse than the duplicate**.
+Hence the protocol: stage the merged output under a `_v2/` sibling, flip **one** marker to reveal it, then
+unlink the originals lazily. A crash before the flip leaves the originals authoritative; a crash after leaves
+the merged copy authoritative; neither leaves both readable. The operation must therefore be **re-runnable on
+an already-compacted partition**, because a retry cannot tell which side of the flip it died on.
+
+**The horizon is per-table and `none` must remain a legal value.** A compaction horizon is an SLA on how far
+back reprocessing stays cheap, not a storage-tuning knob — so a table whose rows are never reprocessed is
+entitled to `none`, and one feeding a 30-day correction window is entitled to a long horizon. ⛔ Do not make it
+a single global setting.
+
+*Distilled 2026-09-07 from `consignment-elt-architecture.md` when that plan was archived ([archive copy](../../../archived-documents/plans-archive/consignment-elt-architecture.md)).*

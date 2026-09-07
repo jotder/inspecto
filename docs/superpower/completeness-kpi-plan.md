@@ -18,7 +18,7 @@ horizon, no schedule anywhere). The operator's actual requirement is different: 
 analysis and file/record count deviation, as a KPI that is not a Consignment concept, computed by a
 daily or scheduled job per pipeline.**
 
-🔴 **This deliberately overrides `consignment-elt-architecture.md` §8's central claim** — *"'End of
+🔴 **This deliberately overrides `archived-documents/plans-archive/consignment-elt-architecture.md` §8's central claim** — *"'End of
 day' is a completeness condition, not a clock"* and *"this solves the motivating 'scheduled
 end-of-day summary' problem with no schedule anywhere"*. The operator was shown that contradiction
 explicitly and chose the scheduled job (2026-08-30). **§8's sealing design and §11.4's
@@ -152,7 +152,7 @@ or the Collector's with an override).
 | **K2** | ✅ **ANALYSIS HALF SHIPPED 2026-08-30** (`14c6ef0e`) — `FileSequenceGaps`, pure, 10/0/0/0. ⚠ **The wiring half is NOT built** — see §2b for the blocker | ✅ a window-edge silent hour is found; an interior hole is exact; the undetectable tail and the uncountable empty bucket are both pinned |
 | **K3** | ✅ **SHIPPED 2026-08-30** — `VolumeBaseline.assess(series, day, window, minBaselineDays, tolerance)`, pure, 15/0/0/0. 🔴 **A day absent from K1's series is not a zero** (K1 invents no calendar, so absence covers both "received nothing" and "was not expected to run"): absent days never enter the baseline, and an absent target day is `NO_OBSERVATION`. Baseline is the **lower median**, not a mean, so one recompute spike neither manufactures nor masks the next day's breach. A **zero baseline** yields a null deviation — undefined, not −100% | ✅ steady reports no deviation; a halved day breaches; an empty history reads `NO_BASELINE`; the unknown-day bucket neither raises the baseline nor stands in for a missing target day |
 | **K4** | The `kpi.completeness` job type: `JobTypeProvider` + descriptor + `ParameterDecl`s, cron'd, **one config per pipeline** (`ReconRunJob` shape). Emits a signal; opens a deduped Incident on breach | Real cron arming; a breach opens exactly one Incident across repeated runs; a pipeline whose registry is off fails the run visibly |
-| **K5** | Retire §8/§11.4: mark the design sections superseded by this plan, with the reason | No doc still presents sealing as pending work |
+| **K5** | ✅ **SHIPPED 2026-09-07.** The consignment-ELT plan was archived carrying ONE authoritative banner that enumerates every superseded sealing site — §8 **incl. §8.4** (whose SLA object §8's own banner never named), §9.3's `sealed-complete` baseline rule, §10.2's seal-policy 422, §11.4, §11.5's `partition.sealed`/`partition.reopened` signals, §11.6's two rows and §13's three — plus the header status table. `elt-final-amendment-plan.md`'s two "out of scope" mentions were corrected to say **dropped**. 🔴 The blocker recorded in BACKLOG/INDEX for a week was itself wrong: §11.4 had carried a banner since `51ca57f7`, the same commit as §8's | ✅ no live doc presents sealing as pending work |
 
 **K1 is the whole risk.** K2–K4 are assembly over existing parts; K1 is the only slice that has to be
 right about what the data actually says.

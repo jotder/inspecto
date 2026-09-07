@@ -362,7 +362,7 @@ also cannot `max(written_at)` as text — that column is `Instant.toString()`, w
 is safe to `max()` as text only because §3.1 writes it in a fixed-width format.
 
 The durable output registry from the
-[consignment-ELT plan](../../../superpower/consignment-elt-architecture.md) §11.3 — the catalog substitute
+[consignment-ELT plan](../../../archived-documents/plans-archive/consignment-elt-architecture.md) §11.3 — the catalog substitute
 its no-catalog decision implies, answering *"every file this Consignment wrote, across all partitions"* with
 lifecycle state attached.
 
@@ -664,3 +664,18 @@ The **Data Browser** pane (a per-space DB client) browses these stores live. Bac
   [`util/BrowsableStore.java`](../../../../inspecto-util/src/main/java/com/gamma/util/BrowsableStore.java) —
   reads are `synchronized` on the store (single-writer lock) and appear only when that capability runs on
   a `db`/`postgres` backend. Every `Db*Store` in §2/§3 implements this seam.
+
+## Why `__consignment_id` is on the row, not just in the registry
+
+It is not redundant with the output registry. The column is what stops compaction being a **one-way door**:
+once files from several Consignments are merged, the registry can still say which files *were* produced, but
+without a per-row id nothing can say which rows came from which Consignment — so a targeted supersede or a
+replace-by-Consignment becomes impossible on compacted data. It is also a sortable id, so range scans over it
+are cheap. ⚠ Add it **before there is data that lacks it**; backfilling it means re-deriving provenance that
+no longer exists.
+
+**Incident dedup by `correlationId` is advisory, not enforced.** `ObjectService.active(...)` looks for an open
+Incident with the same correlation id; there is **no uniqueness constraint** in the schema. Concurrent
+evaluations can therefore open duplicates. Treat the dedup as best-effort and do not build a guarantee on it.
+
+*Distilled 2026-09-07 from `consignment-elt-architecture.md` when that plan was archived ([archive copy](../../../archived-documents/plans-archive/consignment-elt-architecture.md)).*
