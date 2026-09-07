@@ -74,8 +74,16 @@ jobs:
       # Build the whole reactor from the root POM so the optional agent module and
       # the cross-module AssistAgent SPI wiring are exercised, not just the core.
       # eoiagent resolves from the local .m2 build above.
-      - name: Run tests
-        run: mvn --batch-mode --no-transfer-progress test
+      #
+      # `install`, not `test` (2026-09-07): the dependency guard below shells its own
+      # `mvn dependency:list`, a fresh session that resolves reactor SNAPSHOTs from `~/.m2` — and on a
+      # clean runner nothing has been installed there, so it died with "Could not find artifact
+      # com.gamma.asn:asn-core:0.1.0-SNAPSHOT" the first time it ever got to run. It had looked healthy
+      # locally only because a developer's `~/.m2` is warm from past builds: a guard passing on
+      # environment state rather than on the thing it checks. Installing here costs one shade pass and
+      # makes the guard actually executable. See okf/backend/build-run/guard-coverage.md.
+      - name: Run tests (and install, so the dependency guard below can resolve the reactor)
+        run: mvn --batch-mode --no-transfer-progress install
 
       # Boundary law (U1): the lean ETL core never gains a kernel dependency. Kernel types live
       # ONLY in the optional inspecto-agent module, behind the AssistAgent SPI. This guard
