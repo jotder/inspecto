@@ -496,7 +496,9 @@ export class PipelineConfigDefinitionComponent {
                         .map((f) => String(f['name'] ?? ''))
                         .filter((n) => n !== ''),
                 );
-                this.partitionSeed.set(Array.isArray(cfg['partitions']) ? (cfg['partitions'] as SchemaPartitionRow[]) : []);
+                this.partitionSeed.set(
+                    Array.isArray(cfg['partitions']) ? (cfg['partitions'] as SchemaPartitionRow[]) : [],
+                );
                 this.partitionsState.set('ok');
             },
             // No schema on disk yet (or unreachable) — offer nothing to edit rather than an error over
@@ -522,20 +524,18 @@ export class PipelineConfigDefinitionComponent {
         if (!partitions.length) delete (draft as Record<string, unknown>)['partitions'];
         this.partitionsSaving.set(true);
         this.partitionsError.set(null);
-        this.configApi
-            .write('schema', draft, { overwrite: true, subdir: this.satelliteSubdir() })
-            .subscribe({
-                next: () => {
-                    this.partitionsSaving.set(false);
-                    this.partitionsSchemaConfig = draft;
-                    editor.markPristine();
-                    this.toastr.success('Partitioning saved.');
-                },
-                error: (e) => {
-                    this.partitionsSaving.set(false);
-                    this.partitionsError.set(apiErrorMessage(e, 'Could not save partitioning.'));
-                },
-            });
+        this.configApi.write('schema', draft, { overwrite: true, subdir: this.satelliteSubdir() }).subscribe({
+            next: () => {
+                this.partitionsSaving.set(false);
+                this.partitionsSchemaConfig = draft;
+                editor.markPristine();
+                this.toastr.success('Partitioning saved.');
+            },
+            error: (e) => {
+                this.partitionsSaving.set(false);
+                this.partitionsError.set(apiErrorMessage(e, 'Could not save partitioning.'));
+            },
+        });
     }
 
     /** Dirty is derived on interaction, not streamed — the Collection/Parse pane contract. */

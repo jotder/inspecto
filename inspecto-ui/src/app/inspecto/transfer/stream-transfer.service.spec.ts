@@ -30,9 +30,9 @@ describe('StreamTransferService.exportPipeline', () => {
 
     it('derives the reference kind from the config’s own `produces`', async () => {
         const { service, read } = make({ name: 'demo', produces: 'reference' });
-        const { bundle } = await new Promise<{ bundle: { kind: string; source: { name: string; space: string | null } } }>(
-            (resolve) => service.exportPipeline('demo').subscribe(resolve),
-        );
+        const { bundle } = await new Promise<{
+            bundle: { kind: string; source: { name: string; space: string | null } };
+        }>((resolve) => service.exportPipeline('demo').subscribe(resolve));
 
         expect(read).toHaveBeenCalledWith('pipeline', 'demo');
         expect(bundle.kind).toBe('reference');

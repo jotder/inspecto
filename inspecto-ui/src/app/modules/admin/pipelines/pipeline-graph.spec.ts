@@ -180,7 +180,13 @@ describe('toCombinedG6Data', () => {
             { name: 'orders_rollup', active: true },
         ],
         nodes: [
-            { id: 'orders_etl/acq', type: 'acquisition', category: 'SOURCE', label: 'Acquisition', pipeline: 'orders_etl' },
+            {
+                id: 'orders_etl/acq',
+                type: 'acquisition',
+                category: 'SOURCE',
+                label: 'Acquisition',
+                pipeline: 'orders_etl',
+            },
             {
                 id: 'orders_etl/sink',
                 type: 'sink.persistent',

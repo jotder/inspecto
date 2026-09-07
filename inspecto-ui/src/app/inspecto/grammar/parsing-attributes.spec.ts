@@ -59,7 +59,12 @@ describe('parsingAttributesFor — delimited error handling', () => {
     it('keeps no default where writing one would change or over-specify behaviour', () => {
         expect(spec('delimited__rejects_limit')!.default, 'no natural value — blank = unlimited').toBeUndefined();
         expect(spec('delimited__engine')!.default, 'engine keeps no default — blank IS auto').toBeUndefined();
-        for (const key of ['delimited__comment', 'delimited__date_formats', 'delimited__timestamp_formats', 'delimited__null_strings']) {
+        for (const key of [
+            'delimited__comment',
+            'delimited__date_formats',
+            'delimited__timestamp_formats',
+            'delimited__null_strings',
+        ]) {
             expect(spec(key)!.default, `${key}: writing a value changes parsing`).toBeUndefined();
             expect(spec(key)!.placeholder, `${key}: suggestion lives in help, not a placeholder`).toBeUndefined();
         }

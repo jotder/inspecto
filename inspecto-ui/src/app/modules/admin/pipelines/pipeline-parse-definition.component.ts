@@ -230,7 +230,12 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                 }
             </ng-template>
             @if (grammarMissing(); as missing) {
-                <inspecto-alert class="mb-2 mt-2 block" variant="warning" title="Grammar template missing" data-testid="grammar-missing">
+                <inspecto-alert
+                    class="mb-2 mt-2 block"
+                    variant="warning"
+                    title="Grammar template missing"
+                    data-testid="grammar-missing"
+                >
                     This Step binds the Grammar template '{{ missing }}', which no longer exists. The settings below
                     start from a blank {{ frontend() }} Grammar; Apply writes them inline in place of the binding.
                 </inspecto-alert>

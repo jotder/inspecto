@@ -77,8 +77,8 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
                 @if (parked().length) {
                     <div class="mt-4 font-semibold">Parked at ({{ parked().length }})</div>
                     <inspecto-alert variant="warning">
-                        This Consignment is uncommitted: its rows for the Steps below are held durably in the
-                        park tables listed. Re-enable the Step, then drain it from the Batches tab.
+                        This Consignment is uncommitted: its rows for the Steps below are held durably in the park
+                        tables listed. Re-enable the Step, then drain it from the Batches tab.
                     </inspecto-alert>
                     <table class="mt-1 text-sm" data-testid="parked-table">
                         <thead>

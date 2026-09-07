@@ -127,7 +127,9 @@ export interface PipelineOpenData {
                     }
                 }
                 @if (pinnedRows().length || recentRows().length) {
-                    <p class="px-1 pb-0.5 pt-1 text-xs font-semibold uppercase tracking-wide opacity-60">All pipelines</p>
+                    <p class="px-1 pb-0.5 pt-1 text-xs font-semibold uppercase tracking-wide opacity-60">
+                        All pipelines
+                    </p>
                 }
                 @for (p of filtered(); track p.name) {
                     <ng-container *ngTemplateOutlet="row; context: { $implicit: p }" />
@@ -213,9 +215,7 @@ export class PipelineOpenDialog {
     });
 
     /** Pinned section — served, search-filtered rows only (a stale pinned id simply never renders). */
-    readonly pinnedRows = computed<PipelineSummary[]>(() =>
-        this.filtered().filter((p) => this.pinned().has(p.name)),
-    );
+    readonly pinnedRows = computed<PipelineSummary[]>(() => this.filtered().filter((p) => this.pinned().has(p.name)));
 
     /** Recent section — MRU order, deduped against Pinned so a pinned row never repeats here. */
     readonly recentRows = computed<PipelineSummary[]>(() => {

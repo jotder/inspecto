@@ -146,9 +146,7 @@ describe('PipelineOpenDialog', () => {
         c.confirm();
 
         // p1..p3 newly ticked (b was already open — NOT recent); prior list follows, p1 deduped, cap 8.
-        expect(JSON.parse(localStorage.getItem(MRU_KEY)!)).toEqual([
-            'p1', 'p2', 'p3', 'm1', 'm2', 'm3', 'm4', 'm5',
-        ]);
+        expect(JSON.parse(localStorage.getItem(MRU_KEY)!)).toEqual(['p1', 'p2', 'p3', 'm1', 'm2', 'm3', 'm4', 'm5']);
     });
 
     /** Confirming with nothing newly ticked (or only unticks) leaves the stored MRU alone. */

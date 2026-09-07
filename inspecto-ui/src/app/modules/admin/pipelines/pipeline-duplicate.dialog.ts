@@ -53,8 +53,8 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
         <h2 mat-dialog-title>Duplicate pipeline</h2>
         <mat-dialog-content>
             <inspecto-alert variant="info" title="Copies the saved configuration">
-                '{{ data.sourceId }}' and its schema, segment schemas and enrichment are copied under the new name.
-                The copy lands as an inactive draft with its own directories — activate it when you are ready.
+                '{{ data.sourceId }}' and its schema, segment schemas and enrichment are copied under the new name. The
+                copy lands as an inactive draft with its own directories — activate it when you are ready.
             </inspecto-alert>
             <form [formGroup]="form" (ngSubmit)="save()" class="mt-4 flex flex-col gap-3">
                 <mat-form-field class="w-full" subscriptSizing="dynamic">
@@ -82,10 +82,7 @@ export class PipelineDuplicateDialog {
     readonly data = inject<PipelineDuplicateData>(MAT_DIALOG_DATA);
 
     readonly form = this.fb.group({
-        name: [
-            `${this.data.sourceId}_copy`,
-            [Validators.required, uniqueNameValidator(this.data.existingNames ?? [])],
-        ],
+        name: [`${this.data.sourceId}_copy`, [Validators.required, uniqueNameValidator(this.data.existingNames ?? [])]],
     });
 
     readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);

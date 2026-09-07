@@ -2252,9 +2252,7 @@ describe('PipelineEditorComponent', () => {
             c.setNodeEnabled(c.model()!.nodes[1], false);
             c.findings.set([{ severity: 'error', nodeId: 'x', message: 'boom' }]);
             fixture.detectChanges();
-            const btn = fixture.nativeElement.querySelector(
-                'button[aria-label="Save pipeline"]',
-            ) as HTMLButtonElement;
+            const btn = fixture.nativeElement.querySelector('button[aria-label="Save pipeline"]') as HTMLButtonElement;
             expect(btn).toBeTruthy();
             expect(btn.disabled).toBe(false); // drafts may save with problems
             expect(btn.querySelector('mat-icon')!.classList.contains('text-warn')).toBe(true);
@@ -2290,9 +2288,7 @@ describe('PipelineEditorComponent', () => {
                 },
                 { severity: 'warning', message: 'meh' },
             ]);
-            const items = Array.from(
-                fixture.nativeElement.querySelectorAll('#pipe-panel-output li'),
-            ) as HTMLElement[];
+            const items = Array.from(fixture.nativeElement.querySelectorAll('#pipe-panel-output li')) as HTMLElement[];
             expect(items).toHaveLength(2);
             expect(items[0].querySelector('code')!.textContent!.trim()).toBe('ERR_ROUTE_UNARMABLE');
             const guidance = items[0].querySelector('[data-finding-guidance]')!;
@@ -2315,7 +2311,9 @@ describe('PipelineEditorComponent', () => {
             expect(rendered()).toHaveLength(3);
 
             const toggles = Array.from(
-                fixture.nativeElement.querySelectorAll('mat-button-toggle-group[aria-label="Filter findings by severity"] mat-button-toggle button'),
+                fixture.nativeElement.querySelectorAll(
+                    'mat-button-toggle-group[aria-label="Filter findings by severity"] mat-button-toggle button',
+                ),
             ) as HTMLButtonElement[];
             expect(toggles).toHaveLength(3); // All / Errors / Warnings
 
@@ -2324,9 +2322,7 @@ describe('PipelineEditorComponent', () => {
             expect(rendered()).toHaveLength(1);
             expect(rendered()[0]).toContain('boom');
             // The tab badge stays the FULL count — the filter narrows the list, never the tally.
-            expect(
-                fixture.nativeElement.querySelector('#pipe-tab-validation span')!.textContent!.trim(),
-            ).toBe('3');
+            expect(fixture.nativeElement.querySelector('#pipe-tab-validation span')!.textContent!.trim()).toBe('3');
 
             toggles[2].click(); // Warnings
             fixture.detectChanges();
@@ -2502,7 +2498,8 @@ describe('PipelineEditorComponent', () => {
                                     fieldPath: 'route',
                                     message: "branch 'apac' has no where:",
                                     code: 'ERR_ROUTE_UNARMABLE',
-                                    guidance: 'Type the branch predicate in the Recipe view, or keep the draft inactive.',
+                                    guidance:
+                                        'Type the branch predicate in the Recipe view, or keep the draft inactive.',
                                 },
                                 { severity: 'WARNING', fieldPath: 'processing.threads', message: 'noise' },
                             ],

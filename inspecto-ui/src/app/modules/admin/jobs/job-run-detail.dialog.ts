@@ -48,7 +48,9 @@ import { fmtDuration } from './jobs.component';
             @if (data.derivedFrom?.length) {
                 <div data-testid="derived-from">
                     <div class="text-secondary mb-1 text-sm font-medium">
-                        derived from ({{ data.derivedFrom!.length }} Consignment{{ data.derivedFrom!.length === 1 ? '' : 's' }})
+                        derived from ({{ data.derivedFrom!.length }} Consignment{{
+                            data.derivedFrom!.length === 1 ? '' : 's'
+                        }})
                     </div>
                     <ul class="space-y-1 text-xs">
                         @for (src of data.derivedFrom; track src.consignmentId) {

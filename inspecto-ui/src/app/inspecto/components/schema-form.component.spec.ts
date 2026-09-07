@@ -534,7 +534,9 @@ describe('InspectoSchemaFormComponent', () => {
             const [since, threads] = Array.from(fixture.nativeElement.querySelectorAll('input')) as HTMLInputElement[];
             expect(since.type).toBe('text');
             expect(threads.type).toBe('number');
-            expect(pickers(fixture).map((b) => b.getAttribute('aria-label'))).toEqual(['Insert a runtime token into Since']);
+            expect(pickers(fixture).map((b) => b.getAttribute('aria-label'))).toEqual([
+                'Insert a runtime token into Since',
+            ]);
             expect(pickers(fixture)[0].closest('.mat-mdc-form-field-icon-suffix')).not.toBeNull();
 
             const control = fixture.componentInstance.form.get('since')!;

@@ -48,7 +48,12 @@ describe('stageChecklist', () => {
     });
 
     it('an unconfigured or dangling node BLOCKS its stage — the same thing the canvas warns about', () => {
-        const chips = stageChecklist(pipeline(FULL), TYPE_CAT, (n) => (n.id === 'parse' ? 'dangling' : 'configured'), []);
+        const chips = stageChecklist(
+            pipeline(FULL),
+            TYPE_CAT,
+            (n) => (n.id === 'parse' ? 'dangling' : 'configured'),
+            [],
+        );
         expect(chip(chips, 'parse').status).toBe('blocked');
         expect(chip(chips, 'collect').status).toBe('configured');
     });
@@ -57,7 +62,12 @@ describe('stageChecklist', () => {
         const tested = stageChecklist(pipeline(FULL), TYPE_CAT, (n) => (n.id === 'src' ? 'tested' : 'configured'), []);
         expect(chip(tested, 'collect').status).toBe('validated');
         // Rows were dropped — a ✓ would be a lie; the warning shows up as the chip's finding count.
-        const rejects = stageChecklist(pipeline(FULL), TYPE_CAT, (n) => (n.id === 'src' ? 'rejects' : 'configured'), []);
+        const rejects = stageChecklist(
+            pipeline(FULL),
+            TYPE_CAT,
+            (n) => (n.id === 'src' ? 'rejects' : 'configured'),
+            [],
+        );
         expect(chip(rejects, 'collect').status).toBe('configured');
     });
 

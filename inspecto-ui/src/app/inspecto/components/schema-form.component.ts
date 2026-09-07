@@ -103,53 +103,68 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
                     }
                 </div>
             } @else {
-            @if (tiers().advanced.length) {
-                <div class="flex justify-end">
-                    <button
-                        mat-icon-button
-                        type="button"
-                        matTooltip="Advanced settings"
-                        [attr.aria-label]="showAdvanced() ? 'Hide advanced settings' : 'Show advanced settings'"
-                        [attr.aria-expanded]="showAdvanced()"
-                        (click)="showAdvanced.set(!showAdvanced())"
-                    >
-                        <mat-icon svgIcon="heroicons_outline:cog-6-tooth"></mat-icon>
-                    </button>
-                </div>
-            }
-
-            @for (g of groupsOf(tiers().required); track g.name; let gi = $index) {
-                @if (g.name) {
-                    <div class="text-secondary pb-1 pt-2 text-sm font-medium" role="heading" aria-level="3">
-                        {{ g.name }}
+                @if (tiers().advanced.length) {
+                    <div class="flex justify-end">
+                        <button
+                            mat-icon-button
+                            type="button"
+                            matTooltip="Advanced settings"
+                            [attr.aria-label]="showAdvanced() ? 'Hide advanced settings' : 'Show advanced settings'"
+                            [attr.aria-expanded]="showAdvanced()"
+                            (click)="showAdvanced.set(!showAdvanced())"
+                        >
+                            <mat-icon svgIcon="heroicons_outline:cog-6-tooth"></mat-icon>
+                        </button>
                     </div>
                 }
-                @for (spec of g.specs; track spec.key; let i = $index) {
-                    <ng-container
-                        *ngTemplateOutlet="field; context: { spec, first: gi === 0 && i === 0 }"
-                    ></ng-container>
-                }
-            }
 
-            @if (tiers().optional.length) {
-                <button
-                    type="button"
-                    class="text-secondary flex items-center gap-1 self-start py-1 text-sm font-medium"
-                    [attr.aria-expanded]="showOptional()"
-                    (click)="showOptional.set(!showOptional())"
-                >
-                    <mat-icon
-                        class="icon-size-4"
-                        [svgIcon]="
-                            showOptional() ? 'heroicons_outline:chevron-down' : 'heroicons_outline:chevron-right'
-                        "
-                    ></mat-icon>
-                    Optional settings ({{ tiers().optional.length }})
-                </button>
-                @if (showOptional()) {
-                    @for (g of groupsOf(tiers().optional); track g.name) {
+                @for (g of groupsOf(tiers().required); track g.name; let gi = $index) {
+                    @if (g.name) {
+                        <div class="text-secondary pb-1 pt-2 text-sm font-medium" role="heading" aria-level="3">
+                            {{ g.name }}
+                        </div>
+                    }
+                    @for (spec of g.specs; track spec.key; let i = $index) {
+                        <ng-container
+                            *ngTemplateOutlet="field; context: { spec, first: gi === 0 && i === 0 }"
+                        ></ng-container>
+                    }
+                }
+
+                @if (tiers().optional.length) {
+                    <button
+                        type="button"
+                        class="text-secondary flex items-center gap-1 self-start py-1 text-sm font-medium"
+                        [attr.aria-expanded]="showOptional()"
+                        (click)="showOptional.set(!showOptional())"
+                    >
+                        <mat-icon
+                            class="icon-size-4"
+                            [svgIcon]="
+                                showOptional() ? 'heroicons_outline:chevron-down' : 'heroicons_outline:chevron-right'
+                            "
+                        ></mat-icon>
+                        Optional settings ({{ tiers().optional.length }})
+                    </button>
+                    @if (showOptional()) {
+                        @for (g of groupsOf(tiers().optional); track g.name) {
+                            @if (g.name) {
+                                <div class="text-secondary pb-1 pt-2 text-sm font-medium" role="heading" aria-level="3">
+                                    {{ g.name }}
+                                </div>
+                            }
+                            @for (spec of g.specs; track spec.key) {
+                                <ng-container *ngTemplateOutlet="field; context: { spec }"></ng-container>
+                            }
+                        }
+                    }
+                }
+
+                @if (showAdvanced()) {
+                    <div class="text-secondary py-1 text-sm font-medium" role="heading" aria-level="3">Advanced</div>
+                    @for (g of groupsOf(tiers().advanced); track g.name) {
                         @if (g.name) {
-                            <div class="text-secondary pb-1 pt-2 text-sm font-medium" role="heading" aria-level="3">
+                            <div class="text-secondary pb-1 pt-2 text-sm font-medium" role="heading" aria-level="4">
                                 {{ g.name }}
                             </div>
                         }
@@ -158,21 +173,6 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
                         }
                     }
                 }
-            }
-
-            @if (showAdvanced()) {
-                <div class="text-secondary py-1 text-sm font-medium" role="heading" aria-level="3">Advanced</div>
-                @for (g of groupsOf(tiers().advanced); track g.name) {
-                    @if (g.name) {
-                        <div class="text-secondary pb-1 pt-2 text-sm font-medium" role="heading" aria-level="4">
-                            {{ g.name }}
-                        </div>
-                    }
-                    @for (spec of g.specs; track spec.key) {
-                        <ng-container *ngTemplateOutlet="field; context: { spec }"></ng-container>
-                    }
-                }
-            }
             }
 
             <ng-template #field let-spec="spec" let-first="first">
@@ -410,8 +410,11 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
                     >
                         <span class="text-secondary flex w-40 shrink-0 items-center gap-1 text-sm">
                             <span class="truncate" [id]="labelId(spec)" [title]="spec.label"
-                                >{{ spec.label }}@if (isRequiredSpec(spec)) {<span class="text-warn" aria-hidden="true">*</span>}</span
-                            >
+                                >{{ spec.label }}
+                                @if (isRequiredSpec(spec)) {
+                                    <span class="text-warn" aria-hidden="true">*</span>
+                                }
+                            </span>
                             @if (spec.help) {
                                 <mat-icon
                                     class="icon-size-4 shrink-0"
@@ -451,7 +454,11 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
                                 @case ('list') {
                                     @if (isEditing(spec)) {
                                         <div class="flex min-w-0 flex-1 flex-col gap-1">
-                                            <mat-form-field class="sf-dense w-full" appearance="outline" subscriptSizing="dynamic">
+                                            <mat-form-field
+                                                class="sf-dense w-full"
+                                                appearance="outline"
+                                                subscriptSizing="dynamic"
+                                            >
                                                 <input
                                                     matInput
                                                     type="text"
@@ -502,7 +509,9 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
                                             (click)="startEditing(spec)"
                                         >
                                             @for (item of listValue(spec.key); track $index) {
-                                                <inspecto-chip variant="soft"><span class="font-mono">{{ item }}</span></inspecto-chip>
+                                                <inspecto-chip variant="soft"
+                                                    ><span class="font-mono">{{ item }}</span></inspecto-chip
+                                                >
                                             } @empty {
                                                 <span class="text-secondary font-mono text-sm">—</span>
                                             }
@@ -511,7 +520,11 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
                                 }
                                 @default {
                                     @if (isEditing(spec)) {
-                                        <mat-form-field class="sf-dense w-full" appearance="outline" subscriptSizing="dynamic">
+                                        <mat-form-field
+                                            class="sf-dense w-full"
+                                            appearance="outline"
+                                            subscriptSizing="dynamic"
+                                        >
                                             @switch (spec.type) {
                                                 @case ('autocomplete') {
                                                     <input
@@ -523,7 +536,10 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
                                                         (focus)="loadOptionsFor(spec)"
                                                         (keydown.enter)="stopEditing()"
                                                     />
-                                                    <mat-autocomplete #ac="matAutocomplete" (optionSelected)="stopEditing()">
+                                                    <mat-autocomplete
+                                                        #ac="matAutocomplete"
+                                                        (optionSelected)="stopEditing()"
+                                                    >
                                                         @for (opt of filteredOptions(spec); track opt.value) {
                                                             <mat-option [value]="opt.value">{{ opt.label }}</mat-option>
                                                         }

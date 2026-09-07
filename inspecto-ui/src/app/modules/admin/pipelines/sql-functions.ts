@@ -72,7 +72,16 @@ export interface SqlFunction {
 }
 
 /** DuckDB types offered wherever a type must be chosen, in the order a business user thinks of them. */
-export const SQL_TYPES = ['VARCHAR', 'BIGINT', 'DOUBLE', 'DECIMAL(18,2)', 'BOOLEAN', 'DATE', 'TIMESTAMP', 'TIME'] as const;
+export const SQL_TYPES = [
+    'VARCHAR',
+    'BIGINT',
+    'DOUBLE',
+    'DECIMAL(18,2)',
+    'BOOLEAN',
+    'DATE',
+    'TIMESTAMP',
+    'TIME',
+] as const;
 
 const DATE_PARTS = ['YEAR', 'QUARTER', 'MONTH', 'WEEK', 'DAY', 'HOUR', 'MINUTE', 'SECOND'] as const;
 const COMPARISONS = ['=', '<>', '>', '>=', '<', '<=', 'LIKE'] as const;
@@ -110,7 +119,14 @@ export const SQL_FUNCTIONS: readonly SqlFunction[] = [
         template: 'REPLACE({source}, {find}, {replacement})',
         params: [
             { name: 'find', label: 'Find', type: 'text', placeholder: '-' },
-            { name: 'replacement', label: 'Replace with', type: 'text', default: '', optional: true, placeholder: 'leave blank to delete' },
+            {
+                name: 'replacement',
+                label: 'Replace with',
+                type: 'text',
+                default: '',
+                optional: true,
+                placeholder: 'leave blank to delete',
+            },
         ],
     },
     {
@@ -138,7 +154,7 @@ export const SQL_FUNCTIONS: readonly SqlFunction[] = [
         id: 'text.join',
         label: 'Join with another column',
         category: 'Text',
-        template: "CONCAT({source}, {separator}, {other})",
+        template: 'CONCAT({source}, {separator}, {other})',
         params: [
             { name: 'separator', label: 'Separator', type: 'text', default: ' ' },
             { name: 'other', label: 'Other column', type: 'column' },
@@ -209,7 +225,7 @@ export const SQL_FUNCTIONS: readonly SqlFunction[] = [
         id: 'date.truncate',
         label: 'Start of the period',
         category: 'Dates',
-        template: "DATE_TRUNC({unit}, {source})",
+        template: 'DATE_TRUNC({unit}, {source})',
         params: [{ name: 'unit', label: 'Period', type: 'text', default: 'month' }],
         help: 'A date in March with period "month" becomes the 1st of March.',
     },
