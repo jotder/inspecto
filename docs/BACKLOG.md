@@ -38,10 +38,14 @@ evidence note), and four were re-ranked because the row hid a gate — a design 
 a new dependency — not a build. The rule that fell out: **a P1 must name the file it changes.** A row that
 cannot is a decision (§1) or a design (P2).
 
-Do next, in order:
-1. **NAME-DIRS-1** (§3) — the one P1 that names its file; decided 2026-09-06, filed 2026-09-07.
-2. **Release notes for the next MAJOR** — keep appending (§2).
-3. **Step Processor catalog** — pick a partial by name (§3).
+Do next, in order (refreshed 2026-09-07 after the guard sweep filed two more P1s):
+1. **RUNSH-CP-1** (§3) — finish CONNECTORS-BUNDLE-1: the sidecar reaches `serve.sh` but not `run.sh`,
+   so the one-shot ETL path still cannot resolve a remote connector. Half a shipped feature.
+2. **NAME-DIRS-1** (§3) — decided 2026-09-06, filed 2026-09-07; names the file it changes.
+3. **GUARD-SWEEP-1 (a)** (§3) — one CI step (`mvn test -Pedition-enterprise`) puts 54 OIDC/ABAC test
+   methods under automation for the first time. Cheapest real coverage on the board.
+4. **Release notes for the next MAJOR** — keep appending (§2).
+5. **Step Processor catalog** — pick a partial by name (§3).
 
 ## 1. Operator decisions pending
 
