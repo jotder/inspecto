@@ -1,13 +1,12 @@
-package com.gamma.control;
+package com.gamma.exchange;
+
+import com.gamma.control.ApiContext;
+import com.gamma.control.ApiException;
+import com.gamma.control.RouteModule;
 
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
 import com.gamma.event.EventType;
-import com.gamma.exchange.Exchange;
-import com.gamma.exchange.ExchangeSnapshots;
-import com.gamma.exchange.ExchangeSnapshotWriter;
-import com.gamma.exchange.Offer;
-import com.gamma.exchange.ShareGrant;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.service.SpaceContext;
@@ -41,10 +40,37 @@ import java.util.NoSuchElementException;
  * ({@link ApiContext#withCapability}) — a no-op on Personal edition (no {@link Subject}), enforced on
  * Standard. Every mutation emits an {@code EXCHANGE_*} signal (audit rides the central {@code AuditTrail}).
  */
-final class ExchangeRoutes implements RouteModule {
+/*
+ * ⚠ Relocated from com.gamma.control (inspecto) on 2026-09-07, EDG-01 cell 4 — EDITIONS SEC-10 is "not for
+ * Personal", and this class shipped in every bundle because it sat in the core. It reaches ControlApi only
+ * through the public RouteModule SPI (META-INF/services), from a module the Personal build does not include,
+ * and it installs the SharedRefResolver seam that used to be wired in ControlApi's constructor. It joined the
+ * com.gamma.exchange package it already served, so no package is split across jars. Handlers are unchanged.
+ */
+public final class ExchangeRoutes implements RouteModule {
 
     @Override
     public void register(ApiContext api) {
+        // The seam ControlApi's constructor used to wire (`SharedRefResolver.install(new
+        // ExchangeRefResolver(spaces))`, deleted there in EDG-01 cell 4). Doing it HERE is what makes it
+        // edition-correct: without this module DatasetRelation keeps SharedRefResolver.NONE and every
+        // `shared/<owner>/<item>` ref fails to resolve — fail-closed, with zero wiring. `install` is a
+        // public idempotent static, so registering twice is harmless.
+        com.gamma.query.SharedRefResolver.install(new ExchangeRefResolver(api.spaces()));
+        // The core's delete fence (ComponentRoutes) asks THIS for "is the item still shared?" — it used to
+        // reach into com.gamma.exchange by fully-qualified name, which is why an import census missed it and
+        // why the core could not drop this package. Absent module ⇒ SharedItemConsumers.NONE ⇒ empty, which
+        // is right: with no Exchange nothing can have been offered, so no consumer can be harmed.
+        com.gamma.control.SharedItemConsumers.install((type, id) -> {
+            Exchange ex = Exchange.under(api.spaces().containerRoot());
+            if (!ex.enabled()) return java.util.List.of();
+            String owner = com.gamma.event.EventLog.currentSpaceId();
+            return ex.grants().stream()
+                    .filter(g -> ShareGrant.ACTIVE.equals(g.status())
+                            && type.equals(g.kind()) && id.equals(g.item()) && owner.equals(g.owner()))
+                    .map(ShareGrant::consumer)
+                    .toList();
+        });
         api.get("/exchange/offers", (e, m) -> listOffers(api, e));
         api.post("/exchange/offers", ApiContext.withCapability("canOfferDatasets",
                 (e, m) -> putOffer(api, e)));

@@ -245,9 +245,11 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         this.writeRoot = blank(wr) ? null : Path.of(wr.trim()).toAbsolutePath().normalize();
         this.http    = createServer(port);
         this.http.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
-        // Teach DatasetRelation to resolve shared/<owner>/<item> refs to the owner's Exchange snapshot,
-        // grant-checked for the calling space (a no-op resolver until installed — fail-closed).
-        com.gamma.query.SharedRefResolver.install(new ExchangeRefResolver(spaces));
+        // ⚠ SharedRefResolver.install(new ExchangeRefResolver(spaces)) used to sit here. It moved into
+        // inspecto-exchange's ExchangeRoutes.register (EDG-01 cell 4): the resolver is the exchange
+        // module's, so installing it from core would teach every Personal bundle to resolve shared refs
+        // for a feature it does not have. Absent module ⇒ SharedRefResolver stays NONE ⇒ every
+        // shared/<owner>/<item> ref fails to resolve, which is the fail-closed answer.
         registerRoutes();
         // S6 — compose the request pipeline once (outermost first): correlation and CORS wrap the error
         // boundary so error/preflight responses still carry the Correlation-ID + CORS headers; path
@@ -431,7 +433,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         // Feature route modules extracted from this class (see RouteModule); each owns its own routes + docs.
         for (RouteModule module : List.of(
                 new BootstrapRoutes(), new AuthRoutes(),
-                new SpaceRoutes(), new ExchangeRoutes(), new DataSourceRoutes(),
+                new SpaceRoutes(), new DataSourceRoutes(),   // ExchangeRoutes moved to inspecto-exchange (EDG-01 cell 4)
                 new RunRoutes(),
                 new ConnectionRoutes(), new ViewRoutes(), new PipelineListRoutes(), new PipelineGraphRoutes(), new PipelineSettingsRoutes(), new PipelineRenameRoutes(), new PipelineRelatedRoutes(), new PipelineBundleRoutes(), new ComponentRoutes(), new BundleRoutes(),
                 new EventRoutes(), new ObjectRoutes(), new NoteRoutes(), new QueueRoutes(), new TagRoutes(), new CatalogRoutes(), new ConfigPreviewRoutes(), new ConfigWriteRoutes(), new ConfigReadRoutes(), new ParserRoutes(),
@@ -457,6 +459,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         // EDITIONS §4 contract for every client, not just the SPA. Order matters: after discovery, or the
         // stub would win first-match and the module's real handler would never run.
         new AbsentGeoLinkRoutes().register(this);
+        new AbsentExchangeRoutes().register(this);
     }
 
     // ── dispatch: a composable middleware chain (S6) ─────────────────────────────

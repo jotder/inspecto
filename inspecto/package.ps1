@@ -233,6 +233,7 @@ $policyJarSrc   = $null
 $channelsJarSrc = $null
 $backupJarSrc   = $null
 $geoLinkJarSrc  = $null
+$exchangeJarSrc = $null
 if ($Edition -ne 'Personal') {
     # NB: not $profile — that is a PowerShell automatic variable.
     $editionProfile = if ($Edition -eq 'Enterprise') { 'edition-enterprise' } else { 'edition-standard' }
@@ -240,7 +241,8 @@ if ($Edition -ne 'Personal') {
     # is "Standard and above", and Enterprise is a superset of Standard.
     # EDG-01 cell 2: inspecto-backup (OPS-06) rides alongside, Standard and above.
     # EDG-01 cell 3b: inspecto-geo-link (CP-09) rides alongside, Standard and above.
-    $modules = if ($Edition -eq 'Enterprise') { 'inspecto-security,inspecto-policy,inspecto-notify-channels,inspecto-backup,inspecto-geo-link' } else { 'inspecto-security,inspecto-notify-channels,inspecto-backup,inspecto-geo-link' }
+    # EDG-01 cell 4: inspecto-exchange (SEC-10) rides alongside, Standard and above.
+    $modules = if ($Edition -eq 'Enterprise') { 'inspecto-security,inspecto-policy,inspecto-notify-channels,inspecto-backup,inspecto-geo-link,inspecto-exchange' } else { 'inspecto-security,inspecto-notify-channels,inspecto-backup,inspecto-geo-link,inspecto-exchange' }
     if (-not $NoBuild) {
         Write-Host "Building $modules ($Edition edition, -P$editionProfile)..." -ForegroundColor Cyan
         Push-Location $sandboxRoot
@@ -285,6 +287,14 @@ if ($Edition -ne 'Personal') {
                       Select-Object -First 1 -ExpandProperty FullName
     if (-not $geoLinkJarSrc -or -not (Test-Path $geoLinkJarSrc)) {
         throw "$Edition edition requested but no JAR found matching $geoLinkTargetDir\inspecto-geo-link-*.jar."
+    }
+    # The exchange module (EDG-01 cell 4). THIN like policy/backup/geo-link.
+    $exchangeTargetDir = Join-Path $sandboxRoot 'inspecto-exchange\target'
+    $exchangeJarSrc = Get-ChildItem -Path $exchangeTargetDir -Filter 'inspecto-exchange-*.jar' -ErrorAction SilentlyContinue |
+                       Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
+                       Select-Object -First 1 -ExpandProperty FullName
+    if (-not $exchangeJarSrc -or -not (Test-Path $exchangeJarSrc)) {
+        throw "$Edition edition requested but no JAR found matching $exchangeTargetDir\inspecto-exchange-*.jar."
     }
     if ($Edition -eq 'Enterprise') {
         $policyTargetDir = Join-Path $sandboxRoot 'inspecto-policy\target'
@@ -395,6 +405,20 @@ if ($geoLinkJarSrc) {
         }
         Write-Host "  verified: both RouteModule registrations present in the geo/link module" -ForegroundColor DarkGray
     } finally { $glZip.Dispose() }
+}
+if ($exchangeJarSrc) {
+    Copy-Item $exchangeJarSrc "$bundleDir\inspecto-exchange.jar"
+    Write-Host "Bundled Standard-edition exchange module -> inspecto-exchange.jar" -ForegroundColor Green
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $exZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-exchange.jar")
+    try {
+        $spiEntry = $exZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.control.RouteModule' }
+        if (-not $spiEntry) { throw "inspecto-exchange.jar has no META-INF/services/com.gamma.control.RouteModule - ExchangeRoutes would never be discovered and the shared-ref resolver would never install." }
+        $reader = New-Object System.IO.StreamReader($spiEntry.Open())
+        try { $spiBody = $reader.ReadToEnd() } finally { $reader.Dispose() }
+        if ($spiBody -notmatch 'com\.gamma\.exchange\.ExchangeRoutes') { throw "inspecto-exchange.jar registers no ExchangeRoutes - the SPI file lists only: $spiBody" }
+        Write-Host "  verified: RouteModule registration present in the exchange module" -ForegroundColor DarkGray
+    } finally { $exZip.Dispose() }
 }
 if ($policyJarSrc) {
     Copy-Item $policyJarSrc "$bundleDir\inspecto-policy.jar"
@@ -606,6 +630,8 @@ CP="inspecto.jar"
 [ -f inspecto-backup.jar ] && CP="${CP}:inspecto-backup.jar"
 # Geo map + link analysis routes (EDG-01 cell 3b): Standard/Enterprise only; same contract as above.
 [ -f inspecto-geo-link.jar ] && CP="${CP}:inspecto-geo-link.jar"
+# Cross-space exchange (EDG-01 cell 4): Standard/Enterprise only; same contract as above.
+[ -f inspecto-exchange.jar ] && CP="${CP}:inspecto-exchange.jar"
 [ -f inspecto-security.jar ]   && CP="${CP}:inspecto-security.jar"
 [ -f postgresql.jar ]          && CP="${CP}:postgresql.jar"
 exec "$JAVA" "${JAVA_OPTS[@]}" \
@@ -680,6 +706,8 @@ rem Backup / restore tasks (EDG-01 cell 2) - Standard/Enterprise only.
 if exist inspecto-backup.jar set "CP=%CP%;inspecto-backup.jar"
 rem Geo map + link analysis routes (EDG-01 cell 3b) - Standard/Enterprise only.
 if exist inspecto-geo-link.jar set "CP=%CP%;inspecto-geo-link.jar"
+rem Cross-space exchange (EDG-01 cell 4) - Standard/Enterprise only.
+if exist inspecto-exchange.jar set "CP=%CP%;inspecto-exchange.jar"
 if exist inspecto-security.jar set "CP=%CP%;inspecto-security.jar"
 if exist postgresql.jar set "CP=%CP%;postgresql.jar"
 "%JAVA%" %OPTS% ^
@@ -813,6 +841,8 @@ fi
 [ -f inspecto-backup.jar ] && CP="${CP}:inspecto-backup.jar"
 # Geo map + link analysis routes (EDG-01 cell 3b): Standard/Enterprise only; same contract as above.
 [ -f inspecto-geo-link.jar ] && CP="${CP}:inspecto-geo-link.jar"
+# Cross-space exchange (EDG-01 cell 4): Standard/Enterprise only; same contract as above.
+[ -f inspecto-exchange.jar ] && CP="${CP}:inspecto-exchange.jar"
 [ -f postgresql.jar ] && CP="${CP}:postgresql.jar"
 # Operational stores on PostgreSQL (2026-08-31). The three ledgers (status/batches/lineage) are now
 # SERVED from a database by default; Personal stays on the bundled DuckDB with zero configuration,
@@ -896,6 +926,8 @@ rem Backup / restore tasks (EDG-01 cell 2) - Standard/Enterprise only.
 if exist inspecto-backup.jar set "CP=%CP%;inspecto-backup.jar"
 rem Geo map + link analysis routes (EDG-01 cell 3b) - Standard/Enterprise only.
 if exist inspecto-geo-link.jar set "CP=%CP%;inspecto-geo-link.jar"
+rem Cross-space exchange (EDG-01 cell 4) - Standard/Enterprise only.
+if exist inspecto-exchange.jar set "CP=%CP%;inspecto-exchange.jar"
 if exist postgresql.jar set "CP=%CP%;postgresql.jar"
 rem Operational stores on PostgreSQL (2026-08-31) - the edition seam; see serve.sh for the reasoning.
 rem The URL is the signal, never the driver's presence: postgres without a URL fails the boot.
@@ -1068,7 +1100,7 @@ if (-not $SkipBootCheck) {
             else { 'java' }
     # The same classpath the generated launchers build -- deliberately re-derived from the staged files
     # rather than hardcoded, so a sidecar that fails to stage is a boot failure here too.
-    $cp = @('inspecto.jar') + @('inspecto-security.jar','inspecto-policy.jar','inspecto-connectors.jar','inspecto-notify-channels.jar','inspecto-backup.jar','inspecto-geo-link.jar','postgresql.jar' |
+    $cp = @('inspecto.jar') + @('inspecto-security.jar','inspecto-policy.jar','inspecto-connectors.jar','inspecto-notify-channels.jar','inspecto-backup.jar','inspecto-geo-link.jar','inspecto-exchange.jar','postgresql.jar' |
         Where-Object { Test-Path (Join-Path $bundleDir $_) })
     $sep = if ($IsWindows -or $env:OS -eq 'Windows_NT') { ';' } else { ':' }
     $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)

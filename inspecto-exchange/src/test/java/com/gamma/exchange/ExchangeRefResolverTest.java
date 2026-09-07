@@ -1,12 +1,7 @@
-package com.gamma.control;
+package com.gamma.exchange;
 
 import com.gamma.event.EventLog;
-import com.gamma.exchange.Exchange;
-import com.gamma.exchange.ExchangeSnapshots;
 import com.gamma.exchange.ExchangeSnapshots.SnapshotMeta;
-import com.gamma.exchange.ExchangeSnapshotWriter;
-import com.gamma.exchange.Offer;
-import com.gamma.exchange.ShareGrant;
 import com.gamma.metrics.MetricRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.query.SharedRefResolver;

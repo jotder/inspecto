@@ -60,8 +60,8 @@
     <!--
         Edition assembly (docs/EDITIONS.md): inspecto-security (W6 — the Authenticator SPI's OIDC
         implementation), inspecto-notify-channels (CP-15 — the webhook + SMTP transports), inspecto-backup (OPS-06 — the
-        backup/backup_verify/restore tasks) and inspecto-geo-link (CP-09 — the geo map + link analysis
-        routes) are Standard-edition-only.
+        backup/backup_verify/restore tasks) inspecto-geo-link (CP-09 — the geo map + link analysis
+        routes) and inspecto-exchange (SEC-10 — cross-space sharing) are Standard-edition-only.
         None is in the default <modules> above, so a routine
         "mvn -o clean test" (= PERSONAL, the default build; there is no -Pedition-personal) never
         compiles/tests them and never resolves Nimbus JOSE+JWT or javax.mail. Build them explicitly
@@ -83,6 +83,9 @@
                 <!-- EDG-01 cell 3b (2026-09-07): geo map + link analysis routes. CP-09 is "not for Personal";
                      GeoRoutes/InvRoutes lived in the core and so shipped in every bundle. -->
                 <module>inspecto-geo-link</module>
+                <!-- EDG-01 cell 4 (2026-09-07): cross-space exchange / sharing. SEC-10 is "not for Personal";
+                     the com.gamma.exchange domain + ExchangeRoutes lived in the core. -->
+                <module>inspecto-exchange</module>
             </modules>
         </profile>
         <!-- Enterprise = Standard + the ABAC policy engine (rbac-abac-plan §5): the same one-version
@@ -96,6 +99,7 @@
                 <module>inspecto-notify-channels</module>
                 <module>inspecto-backup</module>
                 <module>inspecto-geo-link</module>
+                <module>inspecto-exchange</module>
             </modules>
         </profile>
         <!-- M5 (A2): JaCoCo lives in the PARENT so every module instruments in one reactor pass —

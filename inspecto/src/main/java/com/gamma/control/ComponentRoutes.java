@@ -513,16 +513,15 @@ final class ComponentRoutes implements RouteModule {
         return t == null ? "" : t.toString();
     }
 
-    /** Consumer Spaces holding an <em>active</em> Exchange grant on {@code type/id} owned by the bound Space. */
+    /**
+     * Consumer Spaces holding an <em>active</em> Exchange grant on {@code type/id} owned by the bound Space.
+     *
+     * <p>⚠ Asked through {@link SharedItemConsumers}, not of {@code com.gamma.exchange} directly (EDG-01 cell
+     * 4): the exchange domain moved to an optional module, and this fence is core. With no module installed
+     * the answer is an empty list, which is correct rather than degraded — see that interface's note.
+     */
     private static List<String> activeConsumers(ApiContext api, String type, String id) {
-        com.gamma.exchange.Exchange ex = com.gamma.exchange.Exchange.under(api.spaces().containerRoot());
-        if (!ex.enabled()) return List.of();
-        String owner = com.gamma.event.EventLog.currentSpaceId();
-        return ex.grants().stream()
-                .filter(g -> com.gamma.exchange.ShareGrant.ACTIVE.equals(g.status())
-                        && type.equals(g.kind()) && id.equals(g.item()) && owner.equals(g.owner()))
-                .map(com.gamma.exchange.ShareGrant::consumer)
-                .toList();
+        return SharedItemConsumers.global().consumersOf(type, id);
     }
 
     private static boolean componentExists(ComponentStore store, String type, String id) {

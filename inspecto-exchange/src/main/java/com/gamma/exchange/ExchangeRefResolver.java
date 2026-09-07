@@ -1,9 +1,6 @@
-package com.gamma.control;
+package com.gamma.exchange;
 
 import com.gamma.event.EventLog;
-import com.gamma.exchange.Exchange;
-import com.gamma.exchange.ExchangeSnapshots;
-import com.gamma.exchange.ShareGrant;
 import com.gamma.query.SharedRefResolver;
 import com.gamma.service.SpaceId;
 import com.gamma.service.SpaceManager;

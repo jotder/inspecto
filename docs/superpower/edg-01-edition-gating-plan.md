@@ -1,6 +1,6 @@
 # EDG-01 — gating the six "not for Personal" features (BUILD PLAN, in flight)
 
-> **Status 2026-09-07: mechanism DECIDED; ✅ cells 1 (`CP-15`), 2 (`OPS-06`) and 3a (public route SPI) SHIPPED; 3b (`CP-09`) BUILT, verification pending; three cells remain (SEC-10 · CP-13 · CP-11).** BACKLOG `EDG-01`, ranked **P1** — the
+> **Status 2026-09-07: mechanism DECIDED; ✅ cells 1 (`CP-15`), 2 (`OPS-06`), 3a (public route SPI) and 3b (`CP-09`) SHIPPED; cell 4 (`SEC-10`) BUILT, verification pending; two cells remain (CP-13 · CP-11).** BACKLOG `EDG-01`, ranked **P1** — the
 > only substantive Personal-scoped work on the board. Parent truth:
 > [`../EDITIONS.md`](../EDITIONS.md) §Feature × edition matrix + §Edition-gating debt.
 
@@ -482,3 +482,78 @@ added to one and not the other shows up as a 404 on Personal — in the core tes
   `AbsentExchangeRoutes` (11 pairs → 503, `hasRoute`-skipped, registered last) and the `hasRoute`-derived
   flag; `NoExchangeShipsInThePersonalBuildTest` proves 503 × 11, `features.exchange=false`, and
   `SharedRefResolver.global() == NONE` on the default build.
+
+## 17. Cell 4 as built — `SEC-10` exchange / sharing (2026-09-07)
+
+`inspecto-exchange` takes the whole `com.gamma.exchange` package (7 classes, unmoved — it was already its
+own package) plus `ExchangeRoutes` and `ExchangeRefResolver`, both relocated into it from
+`com.gamma.control` so no package is split. `ExchangeRoutes.register` now performs the two installs the core
+used to do in its constructor. Core keeps the manifest entries, gains `AbsentExchangeRoutes` (11 stubs), and
+its `features.exchange` flag stops guessing.
+
+🔴 **The census was wrong about the coupling, and the compiler found it — not review.**
+`ComponentRoutes.deleteComponent` reaches into the exchange domain by **fully-qualified name**
+(`com.gamma.exchange.Exchange.under(...)`, `ShareGrant.ACTIVE`) and therefore never imports it — so the
+`grep "^import com.gamma.exchange"` census that reported "one importer" could not see it. ⚠ **An
+import-based census cannot see fully-qualified use.** It is a real fence, not incidental: a component another
+Space still holds an ACTIVE grant on must not be deleted out from under its consumer.
+
+**The seam it needed:** `SharedItemConsumers` — the `SharedRefResolver` shape (installed singleton, `NONE`
+default), installed by the module. 🔴 Its empty default is **correct, not degraded**, and the class says so:
+the fence protects consumers of Exchange grants, and with no exchange module there is no Exchange, so nothing
+can have been offered and no consumer can be harmed. The fence has nothing to guard rather than failing to
+guard something. ⚠ That distinction is worth stating because "empty ⇒ allow" usually IS the degraded answer;
+here the premise of the check cannot hold.
+
+**Two decisions from §16, both held:**
+* ⛔ The six `/exchange` capability entries **stay in core's `CapabilityManifest` on every edition** — deriving
+  the grantable vocabulary from registered routes would make a role file authored on Standard fail validation
+  on Personal. Dead vocabulary is not a hole; a per-edition validator is a portability break. Asserted, so
+  nobody "fixes" it the other way.
+* ✅ `features.exchange` becomes `containerRoot() != null && hasRoute("POST","/exchange/offers")`. Until now
+  it was the `containerRoot` check alone — so a Personal install with `-Dspaces.root` advertised an Exchange
+  it did not have and the SPA's Share buttons 404'd on click. **No UI change was needed**: `exchangeEnabled`
+  already gated every affordance; only its source of truth was wrong.
+
+**Tests:** seven classes moved (four HTTP in package `com.gamma.control` with the local `json()` peel; three
+domain in `com.gamma.exchange`), 23 tests. `NoExchangeShipsInThePersonalBuildTest` (5) asserts the 11 stubs,
+both flags, both seams' `NONE`, and the retained vocabulary.
+
+## 18. The last two cells, grounded 2026-09-07 — read this before starting either
+
+Both were checked with the lesson cell 4 taught: **grep the fully-qualified package name, not just the
+import line.** It changes the answer for CP-11 substantially.
+
+### `CP-13` — metrics / events / audit export (rank 5). A PARTIAL, by nature.
+
+Three core edits, no module move for the registry: `/metrics` is registered inline at `ControlApi:418`, is
+listed in `PUBLIC_PATHS:196`, and is special-cased in `isInfraRoute:1113` (alongside `/metrics/acquisition`,
+which `AcquisitionRoutes` owns and is arguably not CP-13). `MetricRegistry` is referenced by **14 files
+outside its own package** — load-bearing instrumentation that cannot leave the core. So the cell gates the
+**HTTP exposition only**, and the row must keep saying so. ⚠ This is the cell that closes the actual security
+point of EDG-01: `/metrics` is a `PUBLIC_PATH`, so an auth-free Personal install serves it unauthenticated to
+every interface it binds. `EventRoutes` IS a normal `RouteModule` and could move; note its
+`GET /events/([^/]+)` catch-all is registered after its literal siblings, so it must move as a whole.
+
+### `CP-11` — operational objects (rank 6). 🔴 The census under-stated this one.
+
+`com.gamma.ops` is **12 classes in `inspecto-engine`** — a MANDATORY module — and **13 classes in that same
+module, outside `ops`, depend on it**: `alert/{AlertAccess,AlertService}`,
+`job/{CaseRuleEvalJob,DryRunServices,IncidentPurgeTask,JobService,ObjectsAnalyticsJob,PackTestHarness,
+PipelineJobRunner,ReconRunJob}`, `notify/{DbDeliveryReceiptStore,InMemoryNotificationStore,NotificationStore}`.
+Several hold **typed fields** (`AlertService:65 private final ObjectService objects`,
+`JobService:248 private volatile com.gamma.ops.ObjectService objects`), which is what forces the shape: an
+SPI would have to replace the *type* at every field and signature, not just the call sites — and the ones in
+`com.gamma.job` reference it fully-qualified, so an import census misses them entirely.
+
+**So CP-11 is a fork, and it is the operator's, not mine:**
+* **(a) Full extraction** — invent an `ObjectAccess` SPI (the `SharedItemConsumers`/`SharedRefResolver`
+  shape), retype 13 engine classes plus the routes, and move `com.gamma.ops` to an optional module. Faithful
+  to "ServiceLoader modules for all six", and by far the largest piece of work in EDG-01.
+* **(b) Partial, like CP-13** — gate the *routes* (`ObjectRoutes`, `NoteRoutes`, `QueueRoutes`, `TagRoutes`)
+  and `MaintenanceJob`'s `incident_purge`, leaving the domain in the engine where the engine already needs
+  it. Personal then carries the object model but exposes none of it — which is what the matrix cell actually
+  claims, since `CP-11` is about the operational-objects *surface*.
+
+⚠ **(b) is the honest reading of the cell and a fraction of the cost**; (a) is the letter of the mechanism
+decision. Worth putting to the operator before either is started, with this measurement in hand.

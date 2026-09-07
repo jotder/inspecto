@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>inspecto-exchange</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Inspecto — cross-space exchange / sharing (Standard edition, optional)</name>
+    <description>
+        OPTIONAL Standard-edition cross-space Exchange (EDITIONS.md SEC-10, "Exchange / sharing grants between
+        spaces"): the com.gamma.exchange domain (offers, share grants, snapshots, ledger) plus ExchangeRoutes
+        (11 routes under /exchange, six of them capability-gated) contributed through the core's public
+        com.gamma.control.RouteModule ServiceLoader seam, and ExchangeRefResolver, which installs the core's
+        com.gamma.query.SharedRefResolver singleton so DatasetRelation can resolve shared/&lt;owner&gt;/&lt;item&gt; refs.
+
+        WHY THIS MODULE EXISTS (EDG-01 cell 4, 2026-09-07). SEC-10 was decided "not for Personal" on
+        2026-09-02 and all of it shipped in every bundle because it sat in the core. Dropping THIS jar on the
+        classpath is what makes the 11 paths exist and what installs the shared-ref resolver; without it the
+        core answers those paths with 503 "not installed" (AbsentExchangeRoutes), /bootstrap reports
+        features.exchange=false, and SharedRefResolver stays NONE so every shared ref fails closed.
+
+        ⚠ The six /exchange capability entries stay in the core's CapabilityManifest by decision: deriving the
+        grantable vocabulary from registered routes would make a role file authored on Standard fail
+        validation on Personal. Dead vocabulary is not a hole — there is no route behind it.
+
+        THIN, like inspecto-policy: nothing beyond what the core already supplies. Built only under the
+        "edition-standard"/"edition-enterprise" profiles, so a routine "mvn -o clean test" (= Personal, the
+        DEFAULT build) never compiles or tests it.
+    </description>
+
+    <dependencies>
+        <!-- The core: RouteModule/ApiContext/ApiException (public since cell 3a), SharedRefResolver, the
+             component/view stores, the event log, SpaceManager/SpaceId. Compile scope, as inspecto-policy
+             does — a thin jar dropped beside inspecto.jar resolves all of it from there at run time. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-processor</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- fp-etl test-jar: the shared fixtures com.gamma.etl.TestConfigs / PipelineConfigBatchTest boot a
+             real CollectorService + ControlApi in the four HTTP tests that moved here with the routes (the
+             inspecto-policy / inspecto-geo-link pattern; test scope is not transitive, so declared here). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-etl</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

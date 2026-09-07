@@ -22,6 +22,13 @@ import static org.junit.jupiter.api.Assertions.*;
  * view), it is live-mode only, and only an {@code entity-projection} view is shareable at all — the other
  * graph sources' roots are Pipelines/catalog assets the Exchange cannot grant.
  */
+/*
+ * ⚠ Package com.gamma.control, in the inspecto-exchange module — a TEST-SCOPE split package, the technique
+ * inspecto-policy and inspecto-geo-link already use: this test constructs `new ControlApi(svc, 0)`
+ * (package-private) so it drives the real dispatcher, and with the module on this classpath ExchangeRoutes is
+ * discovered via META-INF/services exactly as in a Standard bundle. Moved verbatim from inspecto on
+ * 2026-09-07 (EDG-01 cell 4); the only edit is V1Body -> the local json() helper below.
+ */
 class ControlApiExchangeViewTest {
 
     private static final String VIEW = "link-analysis-view";
@@ -186,5 +193,12 @@ class ControlApiExchangeViewTest {
         return client.send(b.build(), BodyHandlers.ofString());
     }
 
-    private JsonNode json(HttpResponse<String> r) throws Exception { return V1Body.of(r.body()); }
+    private JsonNode json(HttpResponse<String> r) throws Exception { return json(r.body()); }
+
+    /** Parse a v1 response and peel the envelope's {@code data} (mirrors the control module's V1Body, which
+     *  lives in inspecto's TEST tree and is not visible from another module — the inspecto-policy precedent). */
+    private static com.fasterxml.jackson.databind.JsonNode json(String raw) throws Exception {
+        com.fasterxml.jackson.databind.JsonNode n = new com.fasterxml.jackson.databind.ObjectMapper().readTree(raw);
+        return n.has("data") ? n.get("data") : n;
+    }
 }
