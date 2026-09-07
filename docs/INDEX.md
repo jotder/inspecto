@@ -183,9 +183,15 @@ former root reference docs** (each index lists them):
   X4 record-replay shape · X5 StepInfo envelope feeding Phase 7 · X6 consignment-identity already
   held), plus the R3 unblock verdict. The same-shift build package (default-on orphan gate · D-9
   finish via the ExecutionContext seam · `POST /jobs/runs/{runId}/replay`) is recorded there.
-- [`superpower/gate-register.md`](superpower/gate-register.md) — the 2026-08-29 register of decision-gated
-  rows: what each is waiting on and who owns the call. Its pending decisions and unbuilt list were folded
-  into `BACKLOG.md` §1–§3 on 2026-09-06; BACKLOG is the board of record, the register is the method.
+- ~~`superpower/gate-register.md`~~ — **ARCHIVED 2026-09-07** →
+  [`archived-documents/plans-archive/gate-register.md`](archived-documents/plans-archive/gate-register.md).
+  Its own retirement trigger fired: §2's five clusters are answered (A closed, C answered, B/D/E are
+  `BACKLOG.md` §2 rows with their gates named), §3/§4 were folded into BACKLOG on 2026-09-06 and §5 became
+  BACKLOG §6. 🔴 It was actively misleading by the end — §3.5 still framed the three-name-rules
+  disagreement as an open call three weeks after `okf/backend/control-plane/pipeline-identity.md` resolved
+  it (2026-08-17), and §3.3 did the same for the `batch_id` trio. Its one durable framing note (**the
+  `okf/` tier is a constraint register, not a backlog**) is distilled into
+  [`okf/index.md`](okf/index.md) §*How to read this tier*.
 - [`superpower/pipeline-waves-drain-plan.md`](superpower/pipeline-waves-drain-plan.md) — **IN FLIGHT
   2026-08-31**, the drain of `pipeline-spec.md`'s remaining waves. §1 records what grounding found the
   spec's own wave tables got wrong (three of six rows), §2 the work left and its single gate, **§3 the
@@ -276,11 +282,11 @@ former root reference docs** (each index lists them):
   header instead of from the code. **A plan with no status header has an UNKNOWN status, not an unbuilt
   one** — grep for its deliverables before writing a status into this index.
 - [`superpower/deployment-topology-plan.md`](superpower/deployment-topology-plan.md) — **DRAFT for
-  stakeholder review (2026-07-24), decision asks in §10 unsigned** (listed here 2026-08-28, same
-  omission). Deployment offerings — topologies, security overlays, scaling/DR posture — plus the
-  script/preflight workstreams. Phases 0–1 look like plain build work but ride the same unsigned §10
-  decisions (container image, Postgres driver bundling, DuckDB cap default, OS matrix, RPO/RTO, IAM
-  pairing), so nothing here is schedulable until those are answered.
+  stakeholder review (2026-07-24), §10 decisions SIGNED 2026-09-06** (D3 = the shipped 2GB cap).
+  Deployment offerings — topologies, security overlays, scaling/DR posture — plus the script/preflight
+  workstreams. Phases 0–5 are all unbuilt; the sign-off cleared the gate this entry used to name, so what
+  is left is build work (`BACKLOG.md` §3 GAP-2…GAP-10) plus the T2/T3/T4 reference deployments only a real
+  deployment can validate (§2).
 - [`superpower/parser-field-tiers-interview-plan.md`](superpower/parser-field-tiers-interview-plan.md) —
   **READY TO RUN 2026-08-28**: the D13 observation-session kit (protocol, per-lane capture sheets,
   the grounded field inventory, and the pre-agreed analysis rule). D13 stays parked until the
@@ -515,17 +521,6 @@ former root reference docs** (each index lists them):
   **always** been flat snake_case with unknown keys absorbed as parameters, so every UI-authored event
   trigger was silently inert until step 16. Deferrals (no CC on `mail.send`; INTEGER tokens unreachable
   from the UI because a native number input cannot display one) → [`BACKLOG.md`](BACKLOG.md) §4.
-
-- [`superpower/gate-register.md`](superpower/gate-register.md) — **the gate register (2026-08-29)** —
-  every item currently gated, blocked or restricted across BACKLOG, the active plans, the root canon +
-  `compliance/` and the OKF tier, deduplicated and sorted by **who can actually lift the gate**. Three
-  findings: much of what reads as blocked is doc-rot whose gate is already gone (§1, corrected in place
-  that day); the real external gates collapse into **five clusters**, not fifty rows (§2); and the
-  restriction register — write-root gate, PathJail, ExpressionGuard, SqlGuard, edition boundaries,
-  air-gap posture, append-only registry — is reasoned design that must NOT be "resolved" (§5). ⚠ It
-  records two of its own rows as wrong (Platform Services Stage 2's gate survives in a different shape;
-  `DbAcquisitionLedger` was already fixed) — sweeps read struck-through annotations badly, so verify a
-  row against the repo before acting on it. Retire this file once §2's clusters are answered.
 
 - [`superpower/elt-final-amendment-plan.md`](superpower/elt-final-amendment-plan.md) —
   **APPROVED v1.0 (2026-08-05) — the ELT final amendment: one model, one vocabulary, one authoring

@@ -1,8 +1,11 @@
 # Deployment Topology & Operations Plan — Inspecto
 
-> **Status: DRAFT for stakeholder review — 2026-07-24.** Proposes the deployment offerings (topologies,
-> security overlays, scaling/DR posture) and the engineering workstreams (scripts, preflight checks,
-> post-deploy verification) needed to sell and operate them. Decision asks in §10 need product/ops sign-off.
+> **Status: decisions SIGNED, build not started — 2026-07-24, §10 signed 2026-09-06.** Proposes the
+> deployment offerings (topologies, security overlays, scaling/DR posture) and the engineering workstreams
+> (scripts, preflight checks, post-deploy verification) needed to sell and operate them. **§10's D1–D8 were
+> signed as recommended on 2026-09-06** (D3 = the shipped 2GB cap) — see §10. What remains is Phases 0–5,
+> all unbuilt, plus the T2/T3/T4 reference deployments that only a real deployment can validate
+> (`BACKLOG.md` §2 · §3).
 >
 > Companions: [`EDITIONS.md`](../EDITIONS.md) (edition assembly) · [`BRANCHING.md`](../BRANCHING.md)
 > (versions/releases) · [`api/deployment/`](../api/deployment/README.md) (WSO2 + Keycloak blueprints) ·

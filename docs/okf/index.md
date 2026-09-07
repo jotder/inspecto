@@ -25,6 +25,16 @@ a new distilled section for the agentic framework.
   `C:/sandbox/agent-brainstorm`) that supplies Inspecto's model transport — distilled map + the
   Inspecto integration seam. The framework's authoritative docs live in its own repo.
 
+## How to read this tier
+
+**The `okf/` tier is a constraint register, not a backlog.** Its invariants and traps are the rules
+future work must not break — every `writeAndTrace` caller declares a write scope; the UI offers the Step
+switch on the `route:<key>` relation and never the lift's `sink__d<i>` spelling; `supersedeOtherRevisions`
+is full-recompute-only and `keep` is required; a stale `branch_commit_<batchId>.log` in a shared `%TEMP%`
+makes a batch write **nothing**. Several are recorded precisely because the repo has already paid for
+violating them. A trap here is not an open item — open work lives in [`BACKLOG.md`](../BACKLOG.md).
+*(Distilled 2026-09-07 from `gate-register.md` §6 when that register was archived.)*
+
 ## Companions
 
 * Current platform requirements + MoSCoW: [`REQUIREMENTS.md`](../REQUIREMENTS.md)

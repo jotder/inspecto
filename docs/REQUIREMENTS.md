@@ -64,6 +64,9 @@ AI-driven autonomy without redesign.
   progress) · `DESIGN` (design-of-record exists, no code) · `PLANNED` (agreed, not started).
 - **Edition** — `P` Personal · `S` Standard · `E` Enterprise · `All` edition-neutral.
 - IDs are stable handles for traceability (`ACQ-3`, `NFR-2`, …); they do not imply sequence.
+- ⚠ **`EDITIONS.md`'s feature × edition matrix is AUTHORITATIVE for the Edition column**; §3 mirrors it.
+  Several rows here predate the 2026-09-02 "not for Personal" gating decisions and the EDG-01 gating debt,
+  so where the two disagree the matrix wins and this table is the one to correct.
 
 ---
 
@@ -76,7 +79,7 @@ AI-driven autonomy without redesign.
 | ACQ-1 | **Connections**: named endpoint+credential definitions (SFTP/FTP/FTPS, database), reused by many Collectors | Must | SHIPPED | All |
 | ACQ-2 | **Collectors**: configured collection tasks (paths/queries, cadence, filename patterns, dedup policy) bound to one Connection | Must | SHIPPED | All |
 | ACQ-3 | Acquisition framework: ledgers, dedup, watermarks, gap detection, retry (Phases A–F) | Must | SHIPPED | All |
-| ACQ-4 | Object-storage (S3/GCS/Azure/MinIO) + network-share (NFS/SMB) connectors on the connector SPI | **Must** | SHIPPED (2026-07-08: `connector: s3` — SDK-free SigV4, covers S3/MinIO/GCS-interop; `connector: azure` — SDK-free SharedKey signing over JDK HttpClient, List Blobs pagination + Range resume + copy-status-guarded MOVE, etags feed ACQ-7, Azurite-compatible for LAN testing; NFS/SMB = documented OS-mounted-share pattern, UNC stays jail-rejected by design. GCS *native* API remains demand-gated — interop mode covers it today) | All |
+| ACQ-4 | Object-storage (S3/GCS/Azure/MinIO) + network-share (NFS/SMB) connectors on the connector SPI | **Must** | SHIPPED (2026-07-08: `connector: s3` — SDK-free SigV4, covers S3/MinIO/GCS-interop; `connector: azure` — SDK-free SharedKey signing over JDK HttpClient, List Blobs pagination + Range resume + copy-status-guarded MOVE, etags feed ACQ-7, Azurite-compatible for LAN testing; NFS/SMB = documented OS-mounted-share pattern, UNC stays jail-rejected by design. `connector: gcs` — native GCS JSON API + service-account OAuth2, SDK-free RS256 JWT→bearer on JDK crypto, shipped 2026-07-22, closing the tier) | All |
 | ACQ-5 | Streaming source consumer (e.g. a Kafka topic drained by a Collector) | Should | SHIPPED (2026-07-08: `connector: kafka` — a topic drained per scan cycle into virtual slice files on the existing CollectorConnector SPI, no core-engine change; `assign()`+`seek()`, no consumer group — the consumed frontier rides the ledger watermark and is persisted only post-commit (at-least-once, DB-export machinery); envelope-NDJSON or raw-value payloads, retention clamp + `max_records` cap, optional SASL PLAIN; kafka-clients 3.9.2 confined to inspecto-connectors, tested offline via in-jar `MockConsumer`, no broker) | All |
 | ACQ-6 | Push/event-driven file discovery (replace poll where the remote can notify) | Could | SHIPPED (2026-07-08: `POST /sources/{id}/notify` — external systems trigger an immediate scan, 202+runId on v1, `canOperateRuns`-gated, audited as `source.notified`; plus `source.discovery: watch` — WatchService push for local/mounted inboxes, debounced, poll loop stays on as backstop) | All |
 | ACQ-7 | etag/version-aware dedup dimensions | Should | SHIPPED (2026-07-08: `source.duplicate.mode: etag` — pre-fetch skip on the connector's listing etag/object version; ledger columns `etag`/`object_version` with in-place migration; degrades to size+mtime when the connector supplies neither) | All |
@@ -166,7 +169,7 @@ AI-driven autonomy without redesign.
 | SPC-2 | Whole-Space zip export/import with dry-run preview | Must | SHIPPED | All |
 | SPC-3 | **Space Templates** (vertical blueprints: Telecom RA, Fraud, Financial Audit, Link Analysis) | Should | SHIPPED (UI seed packs) | All |
 | SPC-4 | **Metadata Bundle v2**: selective config-only transfer with lineage refs, provenance/contentHash, `requires`, drift fit-check | Should | SHIPPED (2026-07-07: `BundleRoutes` export/preview/import over the `ComponentStore` kinds — real content+contentHash, drift fit-check, idempotent import; connection/pipeline/job/view kinds deferred to their own stores) | All |
-| SPC-5 | Per-tenant ABAC | Could | PLANNED | E |
+| SPC-5 | Per-tenant ABAC | Could | SHIPPED (2026-07-24: `PolicyEngine.SEED` — engine-resident `space-isolation` / `space-isolation-rows` deny policies on the `AccessDecider` seam; engage once a `space` claim is mapped via `roles.toon`, exempt `canConfigureAccess` holders, tailorable in `access-policies.toon`) | E |
 
 ### 3.10 Component metamodel & Catalog (MET)
 
@@ -239,7 +242,7 @@ AI-driven autonomy without redesign.
 | UI-5 | Responsive sweep (32 routes × 2 breakpoints) | Must | SHIPPED | All |
 | UI-6 | **Requirement** intake: Business submits (KPI/Report/Reconciliation/Rule), Builder triages, delivery recorded | Should | SHIPPED (2026-07-07: `RequirementRoutes` — `/requirements` submit/list + `/requirements/{id}/decision`+`/deliver` over the `requirement` component store; UI moved off generic component CRUD to these routes; offline mock parity) | All |
 | UI-7 | **Reconciliation** + **Breaks** (auto-close on re-match; manual resolutions preserved) | Must | SHIPPED | All |
-| UI-8 | Settings drawer + consolidated admin settings pane | Should | IN-FLIGHT (uncommitted, another session) | All |
+| UI-8 | Settings drawer + consolidated admin settings pane | Should | SHIPPED (2026-07-07, `7e06463`/`12ead9c`: `SettingsDrawerComponent` + the master-detail `/settings/<section>` pane; later host for Settings ▸ Scheduler 2026-08-25 and Settings ▸ Operational database) | All |
 
 ### 3.16 Packaging & editions (PKG)
 
@@ -338,8 +341,6 @@ scope cuts and the P1–P5 phasing, all since shipped).*
   `/share/{token}` viewer URL with copy + expiry; 503 (no `-Dbi.share.secret`) → writes-disabled notice.
   BI-6 (embed viewer) + BI-8 (template gallery) shipped 2026-07-08. **BI-6 is now fully shipped.**
 - **MET-5** Component version history — *scoped (see §3.10 row): ~1 shift, no migration.*
-- **SPC-5** Per-tenant ABAC — *Enterprise-tier, demand-gated; design rides SEC-7's grants model —
-  do not start before the SEC-7 product decision lands.*
 - ~~**AGT-5 P1–P5**~~ — **COMPLETE 2026-07-21** (+ polish): phased per the now-archived
   `plans-archive/embedded-intelligence-plan.md` §8; the EOI-7(a) gate lifted 2026-07-08 (pinned v0.1.0, no
   moving SNAPSHOT) and P1–P5 all shipped. As-built in `okf/backend/agent/embedded-intelligence.md`; only the

@@ -1,12 +1,14 @@
 # Backlog — every OPEN item, one page
 
-**Updated:** 2026-09-06 — consolidated. The previous page (505 KB, 3,288 lines, roughly half of its rows
+**Updated:** 2026-09-07 — §4–§7 re-grounded and drained (see each section's note).
+**2026-09-06 — consolidated.** The previous page (505 KB, 3,288 lines, roughly half of its rows
 already closed) is frozen as
 [`archived-documents/backlog-snapshot-2026-09-06.md`](archived-documents/backlog-snapshot-2026-09-06.md);
 every closed row's as-built narrative, commit SHAs and refuted premises live there and in git history.
-This rewrite also folded in the open items that had been living outside this page: the gate register's
-pending decisions and "simply unbuilt" list (`superpower/gate-register.md` §3/§4, 2026-08-29), the
-remainders of every plan still in `docs/superpower/`, and the last handoff's next steps.
+That rewrite also folded in the open items that had been living outside this page: the gate register's
+pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that register was itself archived
+2026-09-07, its retirement trigger having fired), the remainders of every plan still in
+`docs/superpower/`, and the last handoff's next steps.
 
 **What this page is.** The single board of open work, grouped by what has to happen next. Each row is
 one line of *what remains* plus a pointer to the document that owns the detail. It lists **open work
@@ -36,8 +38,10 @@ evidence note), and four were re-ranked because the row hid a gate — a design 
 a new dependency — not a build. The rule that fell out: **a P1 must name the file it changes.** A row that
 cannot is a decision (§1) or a design (P2).
 
-Do next, in order (all decided 2026-09-06, all P1):
-2. **Release notes for the next MAJOR** — keep appending (§2). **Step Processor catalog** — pick a partial by name (§3).
+Do next, in order:
+1. **NAME-DIRS-1** (§3) — the one P1 that names its file; decided 2026-09-06, filed 2026-09-07.
+2. **Release notes for the next MAJOR** — keep appending (§2).
+3. **Step Processor catalog** — pick a partial by name (§3).
 
 ## 1. Operator decisions pending
 
@@ -78,10 +82,17 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 
 - **P2** · **WORKBENCH-S4** — the one-surface Step workbench. **Operator 2026-09-06: design now, build later** — the design is written and awaiting review: `superpower/step-workbench-s4-design.md` (three UI-only slices S4a field list+filter · S4b input strip · S4c summarize grouping; NO new endpoint — the canvas edges are the input-relation truth). Build only after the two open questions in its §5 are answered.
 
-- **P2** · **AUTHORING-REDESIGN-1** — open letters (decisions (j)(l)(n2)(o) are in §1; (f)(g)(m) SHIPPED 2026-09-06 — `JOIN_REFERENCE_MISSING`/`JOIN_ON_MISSING`/`UNKNOWN_JOIN_REFERENCE` at save, `SchemaMappingDrift` on all three schema save paths, `?pipeline=` sent by the UI): (c) v2 structured AST table over the SQL for WHERE/JOIN editing — 🔴 precondition: probe that the `json` extension loads on the SEALED `SqlSandbox` connection; (d) v3 macros as the UDF registry (per-connection re-creation in `EnrichmentEngine`, `PipelineJobRunner`, `BatchIngestStrategy`, preview) — demand-gated; (e) column metadata editing on the Transform pane (Parse D2) — needs a backend home for metadata on a `transform.sql` node first; (i) per-row "sample resolves to" line — no host resolves a sample against an `AttributeSpec`. Still open on (f): which COLUMNS the reference carries is the dry-run's question (it reads the store); the save checks existence and `on` presence only. → `okf/frontend/features/schema-mapping-authoring.md` §0
+- **P2** · **AUTHORING-REDESIGN-1** — open letters (⚠ the old "(j)(l)(n2)(o) are in §1" clause was stale in all four: (o) is now the WORKBENCH-S4 row above, (l) and (n2) SHIPPED, (j) `engine: auto` was already answered by shipped code; (f)(g)(m) SHIPPED 2026-09-06 — `JOIN_REFERENCE_MISSING`/`JOIN_ON_MISSING`/`UNKNOWN_JOIN_REFERENCE` at save, `SchemaMappingDrift` on all three schema save paths, `?pipeline=` sent by the UI): (c) v2 structured AST table over the SQL for WHERE/JOIN editing — 🔴 precondition: probe that the `json` extension loads on the SEALED `SqlSandbox` connection; (d) v3 macros as the UDF registry (per-connection re-creation in `EnrichmentEngine`, `PipelineJobRunner`, `BatchIngestStrategy`, preview) — demand-gated; (e) column metadata editing on the Transform pane (Parse D2) — needs a backend home for metadata on a `transform.sql` node first; (i) per-row "sample resolves to" line — no host resolves a sample against an `AttributeSpec`. Still open on (f): which COLUMNS the reference carries is the dry-run's question (it reads the store); the save checks existence and `on` presence only. → `okf/frontend/features/schema-mapping-authoring.md` §0
+- **P1** · **NAME-DIRS-1** — the UI scaffold still derives every `dirs.*` from the **raw display name**, so a
+  pipeline named `my order feed` gets paths with spaces in them. Decided 2026-09-06: `dirs.*` derive from the
+  **slug id**, one identity for id, file and paths; existing pipelines are untouched (dirs are stored, not
+  re-derived). Names the file it changes: `inspecto-ui/src/app/inspecto/component-model/pipeline-scaffold.ts`
+  + its spec. *(Filed 2026-09-07 — `okf/backend/control-plane/pipeline-identity.md` §Decision 2026-09-06 has
+  cited this row since the day it was decided, but the row was never created.)*
+  → `okf/backend/control-plane/pipeline-identity.md`
 - **P2** · **Step Processor catalog** — 121 processors: 34 delivered / **16 partial / 69 planned** (`transform.lookup` DELIVERED 2026-09-06). Each partial is a product decision (Kafka consumer, XPath grammar, drift report, profiler, resampler, KPI layer, Jinja, graph tagging, commit controller, SLA object, view/email/webhook sinks…) — pick one by name. → `EDITIONS.md` §Step Processors · `okf/backend/pipeline-graph/step-catalog.md`
-- **P2** · **P4 Test mapping on a generic `parser` node** — only reachable where the parse node is per-format; blocked on §1 decision (l). ⚠ Offline, non-`DIRECT` types show blank (mock has no SQL engine) — recorded. → `okf/frontend/features/pipeline-editor.md`
-- **P2** · **`kpi_report_builder` host (AGT-6a)** — no viable host pane; a new surface, not an adoption. Plus one cosmetic defect: `projection_author` stale `columns.items` (plan §3.4.8). This row is what keeps `superpower/agt-6-plan.md` out of the archive. → `superpower/agt-6-plan.md`
+- **P2** · **P4 Test mapping on a generic `parser` node** — only reachable where the parse node is per-format. ⚠ The "blocked on §1 decision (l)" gate is **discharged** — (l) was decided and shipped 2026-09-06 (`okf/frontend/features/pipeline-editor.md`); re-scope this row before building. ⚠ Offline, non-`DIRECT` types show blank (mock has no SQL engine) — recorded. → `okf/frontend/features/pipeline-editor.md`
+- **P2** · **`kpi_report_builder` host (AGT-6a)** — no viable host pane; a new surface, not an adoption. (Its `projection_author` ‘stale `columns.items`’ half was **fixed 2026-07-28** and the clause is retired.) This row is what keeps `superpower/agt-6-plan.md` out of the archive. → `superpower/agt-6-plan.md`
 - **P2** · **Canonical-pipeline selective bundle export/import** — the metadata bundle's `authored-pipeline` kind still targets the RETIRED `*_flow.toon` `PipelineStore`; a canonical `*_pipeline.toon` transfers only via the datasource zip or the client-side stream-config bundle. Wanted: one selective export/import with dependency closure (schemas, per-segment schemas, grammar/enrichment companions, Connection as secret-free requirement) and retire/repoint the `authored-pipeline` kind. **Decided 2026-09-06 (operator): in bundle manifests `schema` = the REGISTRY id (`registry/schemas/<id>`); a pipeline-owned `<name>_schema.toon` (+ its `_mapping.csv`/`_structure.csv` siblings) travels under its own kind, not as `schema`.** Apply this in `BundleRoutes`/`transfer/bundle.ts` when the row is built → `okf/frontend/features/onboarding.md`
 
 - **P3** · **AI drafting has no applicable component kind** — restore `<inspecto-ai-assist>`/`component_draft` for a kind: either give `grammar`/`transform`/`sink` a backend `ConfigSpec` (none has one; `ConfigSpecs.TYPES` excludes them) or rework `SchemaEditorDialog`. No low-risk slice survives — design first. → `okf/frontend/features/inline-ai-authoring.md`
@@ -97,7 +108,7 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 ### Execution, Consignments, Pipeline graph
 
 
-- **P2** · **Branch-aware executor residuals** — ((b) and (c) are design passes before code; (d)–(g) wait for a real need) — (b) multi-schema + route needs a **segment-scoped lift** (`writeAndTrace` runs once per segment while the divert lifts the whole graph) — ⛔ do NOT just lift the refusal; (c) mid-branch transforms in the recipe route verb — no per-branch scaffolding in `RecipeCompiler.route()` / `PipelineLift.branch()`, design pass written; (d) still unimplemented anywhere: `adapter`, `alert`, `event`; still refused at lowering as flat homes: `transform.select/derive/validate/split/merge`, `sink.materialized/view` on ingest; (e) acquisition-side "listed remotely, not yet fetched" gauge — name it first; (f) `acquire.maxFilesPerCycle` — only if overshoot is real; (g) `sinks:` follow-ups: per-sink `ducklake` block in flat `.toon`, decision-rule routing with `sinks>1`, versioned reference store with `sinks>1`, and a `ConfigSpecs`/`ConfigJsonSchema` structural spec for `sinks:`. ((a) `mode: clone` is a §1 decision.) → `okf/backend/engine/branch-aware-ingest.md` · `okf/backend/engine/output-sinks.md` · `archived-documents/plans-archive/mid-branch-transforms-design.md`
+- **P2** · **Branch-aware executor residuals** — ((b) and (c) are design passes before code; (d)–(g) wait for a real need) — (b) multi-schema + route needs a **segment-scoped lift** (`writeAndTrace` runs once per segment while the divert lifts the whole graph) — ⛔ do NOT just lift the refusal; (c) mid-branch transforms in the recipe route verb — no per-branch scaffolding in `RecipeCompiler.route()` / `PipelineLift.branch()`, design pass written; (d) still unimplemented anywhere: `adapter`, `alert`, `event`; still refused at lowering as flat homes: `transform.select/derive/validate/split/merge`, `sink.materialized/view` on ingest; (e) acquisition-side "listed remotely, not yet fetched" gauge — name it first; (f) `acquire.maxFilesPerCycle` — only if overshoot is real; (g) `sinks:` follow-ups: per-sink `ducklake` block in flat `.toon`, decision-rule routing with `sinks>1`, versioned reference store with `sinks>1`, and a `ConfigSpecs`/`ConfigJsonSchema` structural spec for `sinks:`. ((a) `mode: clone` **shipped 2026-09-06** — `RouteArming` no longer refuses it.) → `okf/backend/engine/branch-aware-ingest.md` · `okf/backend/engine/output-sinks.md` · `archived-documents/plans-archive/mid-branch-transforms-design.md`
 - **P2** · **Platform Services Stage 2 / 3** — (gated on the at-rest execution decision + the S2-2 spike) — Stage 2 open Step-kind registry (`StepTypeProvider` with `LOWERED`/`EXECUTED`, `StepContext`, failure mapping, watchdog): needs the decision to execute an intervening node at rest (the `graphLaneCarries` boundary = Phase 6 precondition) plus the S2-2 bridge spike (rows/s through a no-op `EXECUTED` Step vs fused) before GA; ⛔ third-party `LOWERED` stays closed until a SQL-fragment guard exists. Stage 3 pack-contributed services (`ServiceProvider` SPI; collision fails the pack atomically; reference-tracked quiesce). `DatasetAccess` after the Consignment Selector. No Job-side watchdog (R1) — a hanging Job is a recorded gap. Filtered `services()` on `ProcessorContext` (D4) and a devkit jar (D5) only on demand. → `okf/backend/control-plane/platform-services.md`
 - **P2** · **Consignment addressing** — (torn multi-file reads: CLOSED 2026-08-29 by the pinned `ConsignmentSelector` list — this row said "open" for a week; the two readers that still re-globbed, `DbBrowserRoutes.browseStore` and `ExpectationEvaluator`, were pinned 2026-09-06) `generation` is a dead field (always 0, never read); ⚠ `retire_superseded` must be configured or every full recompute leaves a complete extra copy on disk; ingest-side Consignment-scoped accessor waits for a consumer; ⚠ `DatasetRelation.temporalColumn` has no caller and cannot safely gain one on a write path. → `okf/backend/engine/consignment-addressing.md`
 - **P2** · **EXECUTION-RESIDUALS X4 + X1 deferrals** — X4 record-level replay from quarantine: sidecar error manifests (offset/reason), all-or-nothing vs eject-and-continue as per-pipeline CONFIG — ⛔ no build without a driver (same item as the run-detail "reprocess is whole-batch only" note). X1 deferrals: per-pipeline `processing.retry` block (regenerate node-attributes + step-types contracts); operator cancel / retry-now affordance (today: delete the sidecar under `<status_dir>/retries/`, or `reprocess`). → `okf/backend/pipeline-graph/execution-lanes.md` · `archived-documents/plans-archive/execution-residuals-plan.md`
@@ -125,38 +136,128 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - **P3** · **D8-SUPPRESS-1** — per-recipient suppression list (TTL for hard bounces, permanent for complaints) — gated on a DB-backed `DeliveryReceiptStore`. → `okf/backend/control-plane/events-metrics.md` §Decision
 
 - **P2** · **Deployment topology gaps** (after §1 D1–D8 are signed) — GAP-2 Enterprise packaging (SCR-8) · GAP-3 service wrappers (SCR-3) · GAP-4 DuckDB cap default · GAP-5 T15 surge admission · GAP-6 Vault/KMS (SEC-8) · GAP-8 Postgres driver · GAP-9 launcher token-line debris (SCR-9) · GAP-10 bundle missing 13 archived docs (SCR-10). Phases 0–5 all unbuilt. → `superpower/deployment-topology-plan.md` §11
-- **P2** · **Postgres multi-user (after the §1 decision)** — P1 pool behind `JdbcDrivers` (each `Db*Store` holds ONE `synchronized` connection); P2 replace `browseConnection()` (F2: it hands out the store's long-lived connection, a pool has no such thing); P3 **schema**-per-space URL wiring (NOT db-per-space); P4 `CaseStore` interface + PG impl (JSONL ring today); `PostgresStateStoreTest` over the three uncovered stores + a concurrency test. Keep events on Parquet. ⚠ Not the same work as `OperationalDb`/PG-1 (shipped). → `superpower/postgres-multi-user-plan.md` §5–6
+- **P3** · **Postgres multi-user** — ⛔ **PARKED by §6** until a multi-operator install exists; the old "(after the §1 decision)" heading outlived its decision, which was *park it*. Kept for the shape when it lifts: P1 pool behind `JdbcDrivers` (each `Db*Store` holds ONE `synchronized` connection); P2 replace `browseConnection()` (F2: it hands out the store's long-lived connection, a pool has no such thing); P3 **schema**-per-space URL wiring (NOT db-per-space); P4 `CaseStore` interface + PG impl (JSONL ring today); `PostgresStateStoreTest` over the three uncovered stores + a concurrency test. Keep events on Parquet. ⚠ Not the same work as `OperationalDb`/PG-1 (shipped). → `archived-documents/plans-archive/postgres-multi-user-plan.md` §5–6
 
 ## 4. Engineering / tech-debt
 
+*(Drained 2026-09-07. Three of the five rows here were standing refusals wearing a tech-debt label — a
+"LEAVE unless someone is already in the file" is not work — and moved to §6. A fourth was already closed by
+a test that post-dates it. What is left is one release-gated wire change.)*
 
-- **P3** · **PATH-2 (residual, untidy only)** — (the `BackupTask.restore` zip-slip jail is PINNED 2026-09-06 by `MaintenanceLibraryTest.restoreRefusesASidecarEntryThatEscapesTheTargetBeforeWritingAnything`.) Family (a) three store `fileFor` helpers: LEAVE unless someone is in those files anyway. ⚠ Routing `ControlApi.serveStatic` through `PathJail.contains` is a posture change needing an operator call — ⛔ grounded 2026-08-26 "do not build it". → `okf/backend/config/config-safety.md`
-- **P3** · **Vocabulary rollout, Tier 3** — the bare-identifier sweep ran 2026-09-06 (Java 454 → 166 bare `flow` words, TS 201 → 96; every survivor is a wire key, a `*_flow.toon`/`flow-graph` format citation, the agent-tool `flow` argument, or another sense of the word — max-flow, OAuth flow, control flow). Left by decision, each a wire change: the `ViewDefinition.flow` record component (dual-emitted with `pipeline`; `ViewRoutes` reads it), the UI DTO fields `DownstreamFlow.flow` / `ViewSummary.flow` / combined-topology `flow?` (switch to reading `pipeline` once every emitter provably dual-emits), the `flow` job type id + its `'Flow'` label in `job-display.ts`, `"flow"` test-data literals. → `GLOSSARY.md` §13 · `PROJECT_NOTES.md`
+- **P3** · **Vocabulary rollout, Tier 3 — the release-gated remainder.** The **UI half SHIPPED 2026-09-07**:
+  every emitter was verified to dual-emit (`LineageRoutes:112/113`, `ViewRoutes:100/101`,
+  `PipelineProjection:198/207/242`), so the DTO fields now read the canonical key — `DownstreamPipeline.pipeline`,
+  `PipelineViewSummary.pipeline`, `CombinedNode.pipeline` / `CombinedEdge.pipeline` / `PipelineCombined.pipelines`.
+  What remains is **wire and needs the MAJOR** (§2 release notes): dropping `flow` from the Java JSON
+  (`ViewDefinition.toMap:52`, `LineageRoutes:113`, `PipelineProjection:199/208/243`) and renaming the
+  `ViewDefinition.flow` record component, which carries `@PublicApi(since="4.0.0")` — GLOSSARY §13 already
+  puts an `@PublicApi` member rename at Tier 2 as "a tier boundary on its own". ⛔ Do **not** rename the
+  `"flow"` test literals: `ViewStoreTest:66/71` and `ControlApiViewsTest:98` are the only proof the dual-read
+  compatibility path works, and `PipelineJobRunnerTest`/`JobServiceTest` cover the legacy job param. The
+  agent-tool `flow` argument stays until it dual-accepts (`SOURCE_ALLOW` records it as tracked debt).
+  ⚠ When the dual-emit ends, delete `CONFIG_ALLOW['spaces/ucc/config/views/sites_active_view.toon::flow-key']`
+  — the guard's stale-allowlist rule fails the build until you do, which is the rename announcing itself.
+  → `GLOSSARY.md` §13 · `PROJECT_NOTES.md`
 
+## 5. Docs & hygiene
 
-- **P3** · **Vocabulary: GLOSSARY adoption of the living-system terms** — Signal, Consequence, Query, Parameter, Result Set, Decision Engine are proposed, not adopted — do not use unilaterally. → `superpower/living-operational-system.md` §6
-- **P3** · **Unpack (10) crash mid-archive** — re-ingests committed members; relies on `OVERWRITE_OR_IGNORE` idempotence. By design today; revisit only with a measured cost. → `okf/backend/engine/unpack-stage.md`
-- **P3** · **`fp-query`/`fp-job`/`fp-enrich` module extraction** — build only on explicit request; not a single clean increment (`query`/`job` depend on `signal` + `ops`; `SharedDottedPathGrammarTest` cut needed). → `okf/backend/modules/reactor.md`## 5. Docs & hygiene
-
-- **Doc-lifecycle violations** (shipped work still in `docs/superpower/`; the rule is distil → `git mv` to `plans-archive/` → update `INDEX.md`): `living-operational-system.md` (R1–R6 shipped; INDEX calls it a standing north-star — decide reference vs archive) · (`geo-map-case-studies.md` ARCHIVED 2026-09-06, distilled into `okf/frontend/features/geo-map.md`) · `compliance-certifications-plan.md` C2 half (delivered; home is `compliance/controls-matrix.md`) · `step-workbench-design.md` (§1 decision (o)) · `pipeline-spec.md` and `pipeline-waves-drain-plan.md` (archive together when Row 15 closes).
-- ~~Stale statements inside live docs~~ — the seven-item pass ran 2026-09-06 (pipeline-spec D-9 · waves-plan flag · INDEX A5 · topology GAP-1 · consignment-elt §7.5 · gate-register Q2 numbering collision · release-verification caveat); the audit-log entry had been fixed the same morning. Re-open with new items, not this list
-- **Hand-authored space fixtures must be in the editor's canonical form** — `route_step_pipeline.toon` shipped 2026-09-06 with a `dirs.database` that was not its first destination and failed `RecipeConverterTest`'s round trip on master for a day (lower() makes `dirs.database` = the first destination when `sinks:` has several). Save a new fixture through the editor once, or run that test before committing it.
-- **REQUIREMENTS MoSCoW columns** — §3.1 ACQ-4 / §3.9 SPC-5 / §3.15 UI-8 are contradicted by `EDITIONS.md` and `INDEX.md`. → `REQUIREMENTS.md`
-- **Template seed-pack enrichment (frontend C7)** — ongoing, not a discrete item: `kpi-overview`, `quality-monitor`, `trend-monitor` today. → `okf/frontend/features/studio.md`
-- **GRAPHIFY-1 tool sync** — re-sync `.claude/skills/graphify/` after every `graphify install`; optional `pip install "graphifyy[sql]"`.
+- **Doc-lifecycle violations** (shipped work still in `docs/superpower/`; the rule is distil → `git mv` to
+  `plans-archive/` → update `INDEX.md`). Re-grounded 2026-09-07 — **two of the four listed rows were wrong**:
+  - `living-operational-system.md` — **genuine, still open.** R1–R6 all shipped 2026-07-06. Distil §1/§2/§3/§7
+    (the thesis, the seven-network map, the Component-kind coverage map, the principle→enforcement table) into
+    `okf/backend/architecture.md`; there is no OKF concept for it today. 🔴 Re-ground §5's as-built first — it
+    cites `inspecto/mock/signals.ts` and `inspecto/mock/decision.ts`, both **deleted** with the mock backend.
+    ⚠ Cited by 4 other docs (`GLOSSARY.md` §Signal, `REQUIREMENTS.md` ×2, this page) — repoint in the same change.
+  - `consignment-elt-architecture.md` — **newly identified, open.** Its own header says "nothing in the plan has
+    code waiting on it any more"; the built parts are distilled into `okf/backend/engine/db-layer.md` §3.9.
+    ⛔ Do §3's completeness-KPI **K5** first: §8 carries its SUPERSEDED banner but §11.4's heading does not.
+  - ~~`compliance-certifications-plan.md`~~ — **NOT a violation.** Only C2 of six workstreams is delivered; C1/C3/C5/C6
+    are open and org-gated (§2). It stays live; `INDEX.md` already records the C2 half correctly.
+  - ~~`step-workbench-design.md`~~ — **was already archived 2026-09-06.** Row was doubly stale (file moved; decision made).
+  - `pipeline-spec.md` + `pipeline-waves-drain-plan.md` — correctly live; archive together when Row 15 closes (§2).
+  - ✅ `gate-register.md` — **ARCHIVED 2026-09-07.** Its own retirement trigger had fired and it had become
+    actively misleading (§3.5 and §3.3 still framed items resolved weeks earlier as open calls). Its one durable
+    note is now `okf/index.md` §*How to read this tier*.
+- 🔴 **`INDEX.md` has become an archive log, not a map** — 879 lines, of which **44 are struck-through tombstones**
+  for plans already in `plans-archive/`, sitting under a heading that reads "plans live here ONLY while active",
+  against just **12 real plan files**. This is the same failure the 2026-09-06 BACKLOG consolidation cured
+  (505 KB → 43 KB). Wanted: freeze the current page as an archived snapshot, then rewrite INDEX as a true
+  curated map (root canon · OKF · contracts · genuinely in-flight plans · one pointer to `plans-archive/`).
+  ⚠ **Trap**: `DOC_ALLOW['docs/INDEX.md::bare-flow']` protects exactly one line (the Batch→Consignment
+  "largest blast radius" claim, whose *517 Java files* figure is itself stale — the Tier-3 sweep took it to 166).
+  Delete that waiver in the same change or the guard's stale-allowlist rule fails the build.
+- **REQUIREMENTS MoSCoW / edition columns** — §3.1 ACQ-4, §3.9 SPC-5 and §3.15 UI-8 were **fixed 2026-09-07**
+  (all three were contradicted by their own §5 and by the code; UI-8 had read "IN-FLIGHT, uncommitted, another
+  session" for two months over a pane that shipped 2026-07-07). An authority note now says `EDITIONS.md`'s matrix
+  wins for the Edition column. Still open, same root cause — the column predates the 2026-09-02 "not for Personal"
+  decisions: **SEC-8** (says PARTIAL/`S/E`; EDITIONS SEC-07 says shipped 2026-09-06 with a three-edition split),
+  **OPS-2**, **INC-3**, **INV-2** (all say `All`; EDITIONS gates them Standard+), and **DAT-6** wants a caveat that
+  the multi-user half is unbuilt. ⚠ ACQ-4's *other* half is unresolved and needs grounding, not a doc edit:
+  EDITIONS' generated board marks `SP-ACQ-06`/`SP-ACQ-08` (S3/GCS) planned while the **connectors** ship with tests
+  — check whether the *Step processor* exists before flipping `ProcessorCatalog`, because a connector is not a Step.
+  → `REQUIREMENTS.md` · `EDITIONS.md`
+- **Template seed-pack enrichment (frontend C7)** — ongoing, not a discrete item: `kpi-overview`,
+  `quality-monitor`, `trend-monitor` today. → `okf/frontend/features/studio.md`
+- **GRAPHIFY-1 tool sync** — ⚠ the row's own check is blind: `.graphify_version` and `graphify --version` both
+  read `0.9.53` while `.claude/skills/graphify/SKILL.md` differs from the installed package's copy by ~300 lines
+  (the repo copy carries a uv/pipx detection block labelled "fixes #831" that 0.9.53 does not). Either re-sync from
+  the package or record why the repo copy deliberately diverges — comparing version markers will never tell you.
+  (The optional `graphifyy[sql]` half is **already satisfied** — `tree-sitter-sql 0.3.11` is installed.)
 
 ## 6. Standing refusals and won't-do (not work — keep so nobody re-files)
 
 One line each; the reasoning is in the pointer. Reopen only on the stated trigger.
+*(Triggers audited 2026-09-07 — every countable one was recounted against the code; none had fired.)*
 
-- **ARCH-OPS-SCC** LEAVE (85-file ripple, cannot block anything) · **ARCH-F-CARVEOUT** LEAVE (148 refs / 28 files) · `{etl, etl.unpack}` and `{agent.kernel.*}` SCCs LEAVE · intra-module `ops↔ops.link/workflow`, `catalog↔catalog.spi` cycles are same-family · **M2** `CollectorService` decomposition · **C2** store-pair base (reopen at the 7th store) · **C4** BOM (reopen on an external consumer) · **C6** connection reuse (warm open 24 ms) → `okf/backend/modules/reactor.md`
+- **ARCH-OPS-SCC** LEAVE (85-file ripple — recounted 2026-09-07, still **exactly** 85) · **ARCH-F-CARVEOUT**
+  LEAVE (148 refs / 28 files — recounted, 27 files, module split unchanged) · `{etl, etl.unpack}` and
+  `{agent.kernel.*}` SCCs LEAVE · intra-module `ops↔ops.link/workflow`, `catalog↔catalog.spi` cycles are
+  same-family · **M2** `CollectorService` decomposition → `okf/backend/modules/reactor.md`
+- **C2** store-pair base — reopen at the **7th** store; recounted 2026-09-07: **4 true `InMemory*`/`Db*` pairs**
+  (Object, Link, Note, TagAssignment), 5 counting `DbStatusStore` by shape. Not close. · **C4** BOM — reopen on
+  an external consumer; there is none and **nothing is published as a Maven artifact** (releases ship zip
+  bundles; eoiagent is an upstream dependency, not a consumer). · **C6** connection reuse — warm open **24 ms**
+  (min 23 / max 27, n=20), no contradicting measurement exists. 🔴 These three are **not** in `reactor.md`,
+  which this page pointed at — they survive only in
+  `archived-documents/plans-archive/modularization-optimization-plan.md` and the 2026-09-06 snapshot. They were
+  archived without being distilled into an OKF concept; that is the real residual here.
+- **PATH-2 residual** (moved from §4 2026-09-07 — it is a LEAVE, not work) — the `BackupTask.restore` zip-slip
+  jail is PINNED by `MaintenanceLibraryTest.restoreRefusesAnArchiveEntryThatEscapesTheTargetBeforeWritingAnything`
+  (the page cited a `…ASidecarEntry…` variant that does not exist — a tampered sidecar is refused a layer
+  earlier). Family (a), the three store `fileFor` helpers — `ViewStore:100`, `PipelineStore:101`,
+  `ComponentStore:351`, none importing `PathJail` — LEAVE unless someone is in those files anyway; their line
+  numbers have now drifted three times, which is itself the argument. ⛔ Routing `ControlApi.serveStatic:866`
+  through `PathJail.contains` is a posture change needing an operator call — grounded 2026-08-26 "do not build it".
+  → `okf/backend/config/config-safety.md`
+- **Unpack (10) crash mid-archive** (moved from §4) — re-ingests committed members; relies on
+  `OVERWRITE_OR_IGNORE` idempotence (`PartitionWriter:186`, documented at `UnpackOrigins:32` and
+  `ConsignmentIngestor:284/508`). By design; revisit only with a measured cost. ⚠ X1's `CommitRetry` does **not**
+  cover this — it records only a *returned* FAILED, and a crash writes no attempt record.
+  → `okf/backend/engine/unpack-stage.md`
+- **`inspecto-query`/`inspecto-job`/`inspecto-enrich` module extraction** (moved from §4; the row said
+  `fp-*`, stale since the artifactIds became `inspecto-*`) — build only on explicit request. Measured
+  2026-09-07: `job` → `signal` + `ops`, but **`query` → `signal` only** and **`enrich` → neither**, so the
+  old "`query`/`job` depend on `signal` + `ops`" claim was over-broad and `enrich` is the one clean
+  candidate. `SharedDottedPathGrammarTest` still up-imports `notify` and would still need cutting.
+  → `okf/backend/modules/reactor.md`
+- **Vocabulary: the living-system terms are ADOPTED, not proposed** (row corrected 2026-09-07) — `GLOSSARY.md`
+  already carries **Signal**, **Consequence**, **Decision Engine** and **Result Set** as binding (the last three
+  annotated "§6-proposed → binding (R5)"). Only *Query* and *Parameter* were never formally adopted; use them
+  as ordinary words, not as capitalized concepts. → `superpower/living-operational-system.md` §6
 - **PKG-5** agent-absent is the intended shipped default; ⛔ no `package.ps1` switch until the JDK 25+ vs Java 24+ floor is resolved → `okf/backend/build-run/build-test.md`
 - **D11 caps** — `max_temp_directory_size` gets no default; preview/dry-run connections stay uncapped; the semaphore-computed cap is rejected → `okf/backend/engine/duckdb.md`
-- **D7 startup backfill** full object scan — deliberately unfixed; trigger = shows up in measured startup time → `okf/backend/control-plane/tags.md`
+- **D7 startup backfill** full object scan (`ObjectService.backfillTagAssignments:479`, called from
+  `CollectorService:475`) — deliberately unfixed. ⚠ **The stated trigger cannot fire as written**: "shows up in
+  measured startup time", but nothing in the repo measures startup — no JMH, no timing test, no recorded
+  baseline. Reopening it means *first* adding a startup measurement. → `okf/backend/control-plane/tags.md`
 - **MNT-14** — no UI surface / no shipped Job instance (operator opts in); retention derived not stamped; scoped to `ObjectType.INCIDENT`; ⚠ `ObjectQuery`'s 9-arg constructor is load-bearing → `okf/backend/control-plane/jobs.md`
 - **`mail.send` has no true CC** — needs a CC-aware `@PublicApi` SPI overload, not until a second caller asks; ⛔ never a second SMTP transport
 - **WRITE-1** — the implicit adoption ambiguity stays, documented at the code; ⛔ never teach the server the UI slug rule
 - **`AiDraft.prerequisites` shared applier** — single producer; extract only when a second tool gains prerequisites
+- **AGT-6a tool `args` runtime validation** declined (contract test instead) — revisit after all **23** tool
+  schemas are audited; still 23 (`InspectoPackTest:61` pins the count) and the audit has **not** run: the
+  2026-07-27 cross-adopter pass covers **6 of 23** (`ToolSchemaAdopterContractTest`). Precondition unmet.
+- **AGT-5 embedding recall** parked (`CaseStore` is a 256-cap ring)
 - **D8** digest deliveries correlate to the digest, not per notification; `deliverWithReceipt` escape hatch only if a provider won't echo `Message-ID`
 - **Time zone of incoming data (a)** — no editor for `raw.fields[].timezone_column` by decision; a fifth "data offset wins" tier is a separate build; ⛔ never reached by relaxing the `%z`/`%Z` gate → `okf/backend/engine/duckdb.md`
 - **Unpack (5)(8)** — a partial archive never fails its Consignment; nested archives refused (`depth` = 1); with `processing.unpack.enabled: false` the same-file engine divergence returns (operator opt-out)
@@ -164,24 +265,33 @@ One line each; the reasoning is in the pointer. Reopen only on the stated trigge
 - **Geo map** — DuckDB `spatial` extension deferred (zero `ST_*` demand); progressive loading obsoleted by `GEO_POINT_CAP = 5000` → `okf/frontend/features/geo-map.md`
 - **Catalog** — offline `/db/query` returns 501 (honest degrade); `EntityProjectionGraphSource`, Geo point/route sources, `ReconExecService` stay offline arms; ⛔ "backfill the `table` attr" REFUTED — do not re-file → `okf/frontend/features/catalog.md`
 - **`endSessionUrl` / server-published OIDC config** — not buildable as scoped; 🔴 if ever built, `session.service.ts` uses `??` so a server-sent empty string beats `environment.oidc` → `okf/backend/editions/auth-security.md`
-- **AGT-5 embedding recall** parked (`CaseStore` is a 256-cap ring) · **AGT-6a tool `args` runtime validation** declined (contract test instead; revisit after all 23 tool schemas are audited)
 - **EXPR-1** — expression interpolation inside a longer string only ever per-declaration opt-in, never global
 - **BUNDLE-1 perf question** — `no-cache` on content-hashed chunks vs `immutable`; unmeasured; only if a revalidation storm is observed
-- **Decided 2026-09-06, keep as designed:** the fetch lane stays FIFO (revisit on the first observed fetch-lane wait) · `requireTopLevelSinks` is a depth rule, not a jail · bounce/complaint handling stays manual until receipts persist · JAVA-SIMP-2 stops at seam #2 (no defect hangs on the sink casts) · the `batch_id` trio rides the MAJOR (release notes hold it) · D-7 `materialized` is done-by-absence · Postgres multi-user is PARKED until a multi-operator install exists · unpack roll-up + entry grain ratified · SEC-07 Vault/KMS only when a client policy requires it · deployment D1–D8 signed as recommended (D3 = the shipped 2GB cap).
-- **Working as designed** (gate register §5): write-root 503 · `ConfigSafetyValidator` 422 · `PathJail` 403 · 409 conflict · `ExpressionGuard` · `SqlGuard` · BI share tokens · active-pipeline delete refusal · Incident resolution backend-gated · editions = build flavors · AuditTrail has no auth events (⚠ disclose) · air-gap CI · append-only registry · manifest owns existence · nothing prunes by default · `-Djobs.maxConcurrentRuns` is the only bound · refused: Spring/Quarkus, distributed-by-default, per-record lineage, Lens-as-permission, PIP-1, sink-owned `partitions`, Decision-Rule + `route:`, raw `Connection`, `CREATE MACRO` outside AUTHORING-REDESIGN-1 (d), step-workbench S3.
+- **Decided 2026-09-06, keep as designed:** the fetch lane stays FIFO (revisit on the first observed fetch-lane wait) · `requireTopLevelSinks` is a depth rule, not a jail · bounce/complaint handling stays manual until receipts persist · JAVA-SIMP-2 stops at seam #2 (no defect hangs on the sink casts) · the `batch_id` trio rides the MAJOR (release notes hold it) · D-7 `materialized` is done-by-absence · **Postgres multi-user is PARKED** until a multi-operator install exists · unpack roll-up + entry grain ratified · SEC-07 Vault/KMS only when a client policy requires it · deployment D1–D8 signed as recommended (D3 = the shipped 2GB cap).
+- **Working as designed** (from the archived gate register §5): write-root 503 · `ConfigSafetyValidator` 422 · `PathJail` 403 · 409 conflict · `ExpressionGuard` · `SqlGuard` · BI share tokens · active-pipeline delete refusal · Incident resolution backend-gated · editions = build flavors · AuditTrail has no auth events (⚠ disclose) · air-gap CI · append-only registry · manifest owns existence · nothing prunes by default · `-Djobs.maxConcurrentRuns` is the only bound · refused: Spring/Quarkus, distributed-by-default, per-record lineage, Lens-as-permission, PIP-1, sink-owned `partitions`, Decision-Rule + `route:`, raw `Connection`, `CREATE MACRO` outside AUTHORING-REDESIGN-1 (d), step-workbench S3.
 
 ## 7. Duplicate map (same work, several names — update all when closing)
 
+*(Rebuilt 2026-09-07. The previous table carried six dead aliases, two canonical rows pointing at the now-empty
+§1, and four duplicate pairs it never recorded. A dead alias is worse than none: it makes a closed row look open.)*
+
 | Canonical row | Also appears as |
 |---|---|
-| Row 15 — ELT Phase 6 deletion half (§2) | PIPELINE-WAVES-REMAINDER · pipeline-spec §12 row 15 · Platform Services Stage 2 precondition (§3) · `BatchGraphRunner` parity blocker (§3 Pipeline graph) · RECORD-TRANSFORMER-1 (d) ingest cascade |
-| Three disagreeing name rules (§1) | BUILDER-1 residual · Onboarding id-pattern decision · gate register §3.5 |
-| D13 parser field tiers (§2) | §5 UI attribute tiers · interview #2 · gate register Cluster E |
-| AGT-5 `DryRunProvider` (§2) | AGT-6b prerequisite · agt-6-plan §4.2 G2 · gate register Cluster D |
-| X4 record-level replay (§3) | Quarantine / D-ETL "reprocess is whole-batch only" · EXECUTION-RESIDUALS-SKETCHES |
-| `batch_id` rename trio (§1) | Consignment ELT deferred renames · ELT Phase 7 residue · gate register §3.3 |
-| Step-workbench S4 (§1 (o); `RowShaper.fuse` deleted 2026-09-06) | AUTHORING-REDESIGN-1 (o) · `step-workbench-design.md` |
-| X-Actor full removal (§2) | API v1 row · security-module residuals |
+| Row 15 — ELT Phase 6 deletion half (§2) | pipeline-spec §12 row 15 · Platform Services Stage 2 precondition (§3) · `BatchGraphRunner` parity blocker (§3) · §5 "archive pipeline-spec + waves-plan when Row 15 closes" |
+| D13 parser field tiers (§2) | `superpower/parser-field-tiers-interview-plan.md` (the interview-#2 kit) |
+| AGT-5 `DryRunProvider` (§2) | AGT-6b row (§2) · `superpower/agt-6-plan.md` §4.2 G2 |
+| EXECUTION-RESIDUALS X4 record-level replay (§3) | `okf/frontend/features/run-detail.md` + `USER_GUIDE.md` "reprocess is whole-batch only" · `INDEX.md`'s `EXECUTION-RESIDUALS-SKETCHES` pointer (which cites §4 — the row is in §3) |
+| `batch_id` rename trio — §6 (decided: rides the MAJOR) + §2 release notes | `okf/backend/control-plane/api-stability.md` §Release notes (D-12) · `consignment-elt-architecture.md` deferred renames · `elt-final-amendment-plan.md` D-12 / Phase 7 · `okf/backend/engine/db-layer.md` (cites §4 — no such row) |
+| WORKBENCH-S4 (§3) | AUTHORING-REDESIGN-1 (o) (§3) · `superpower/step-workbench-s4-design.md` |
+| X-Actor full removal (§2) | `okf/backend/editions/auth-security.md` §Still-open · `EDITIONS.md` SEC-11 · `REQUIREMENTS.md` R4. 🔴 The §2 row's stated gate ("the API-v1 sunset") names apparatus **deleted 2026-07-25**, and `api-v1.md` never mentions X-Actor — re-state the gate before working it |
+| Completeness KPI hold (§2) | Completeness KPI K2/K4/K5 (§3) · `superpower/completeness-kpi-plan.md` |
+| Compliance program NFR-7 (§2) | SOC 2 Type II window (§2) — the same observation window, twice in one table |
+| Deployment topology live validation (§2) | Deployment topology gaps (§3) · §6 "D1–D8 signed as recommended" — the §3 row's gate is already discharged |
+| Postgres multi-user — §6 PARKED | §3 Postgres multi-user row, which contradicts §6; its plan pointer is dead (the file is in `plans-archive/`) |
+
+**Deleted 2026-09-07:** *Three disagreeing name rules* — resolved **2026-08-17**
+(`okf/backend/control-plane/pipeline-identity.md`), not on 2026-09-06, and all three of its aliases were dead or
+stale. Its live successor is the new §3 row **NAME-DIRS-1**.
 
 ---
 
