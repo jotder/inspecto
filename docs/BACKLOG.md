@@ -38,14 +38,17 @@ evidence note), and four were re-ranked because the row hid a gate — a design 
 a new dependency — not a build. The rule that fell out: **a P1 must name the file it changes.** A row that
 cannot is a decision (§1) or a design (P2).
 
-Do next, in order (refreshed 2026-09-07 after the guard sweep filed two more P1s):
-1. **RUNSH-CP-1** (§3) — finish CONNECTORS-BUNDLE-1: the sidecar reaches `serve.sh` but not `run.sh`,
-   so the one-shot ETL path still cannot resolve a remote connector. Half a shipped feature.
-2. **NAME-DIRS-1** (§3) — decided 2026-09-06, filed 2026-09-07; names the file it changes.
-3. **GUARD-SWEEP-1 (a)** (§3) — one CI step (`mvn test -Pedition-enterprise`) puts 54 OIDC/ABAC test
-   methods under automation for the first time. Cheapest real coverage on the board.
-4. **Release notes for the next MAJOR** — keep appending (§2).
-5. **Step Processor catalog** — pick a partial by name (§3).
+Do next, in order (refreshed again 2026-09-07 — the three above it are done):
+1. **GUARD-SWEEP-1 (b)–(i)** (§3) — the rest of the enforcement gaps, headed by `check-secrets.mjs`
+   having no emptiness floor and the dependency lock/SBOM resolving without an edition profile.
+2. **Release notes for the next MAJOR** — keep appending (§2).
+3. **Step Processor catalog** — pick a partial by name (§3).
+
+⚠ **`NAME-DIRS-1` was deleted unbuilt on 2026-09-07: it had already shipped** in `70473c94` the day
+before ("dirs from the slug"), implemented AND pinned by a spec asserting no space, dot or dash reaches
+any dir. It was filed because `pipeline-identity.md` cited a §3 row that did not exist — the *row* was
+missing, the *work* was not. ⛔ A decision that "unblocks" a row does not mean the row is open: grep the
+code before filing, not just the board.
 
 ## 1. Operator decisions pending
 
@@ -94,16 +97,10 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   test that proves `percentile_cont` and the other non-portable SQL work. Cheapest restoration: a
   `services: postgres:16` container in `ci.yml` plus that env var — a service container IS "an existing
   server", so it honours the decision rather than reversing it. → `okf/backend/engine/db-layer.md`
-- **P1** · **RUNSH-CP-1** — 🔴 the connector sidecar does not reach the one-shot ETL path.
-  `run.sh`/`run.bat` launch `java -jar inspecto.jar`, and `-jar` ignores `-cp`; the manifest carries no
-  `Class-Path`. So all 12 sidecar providers stay unreachable there, while `serve.sh`/`serve.bat` (which
-  use `-cp`) get them. `CollectorProcessor` — the `-jar` main class — is the very caller that reaches
-  `CollectorConnectors.forConfig`. Fix: put `run.sh`/`run.bat` on a `-cp` like `serve.sh`. *(Filed
-  2026-09-07 — an incompleteness in the same day's CONNECTORS-BUNDLE-1 fix.)*
-- **P2** · **GUARD-SWEEP-1** — the rest of the 2026-09-07 sweep, ranked. (a) `mvn test` runs **no
-  edition profile**, so **54 test methods never run anywhere automated** — all OIDC auth, token relay,
-  ABAC policy and keystore-secret coverage; `release.yml` builds Enterprise with `-DskipTests`. One CI
-  step fixes it: `mvn test -Pedition-enterprise` (the superset). (b) `check-dependencies.mjs` and
+- **P2** · **GUARD-SWEEP-1** — the rest of the 2026-09-07 sweep, ranked. (a) ✅ **DONE 2026-09-07** — `ci.yml`'s reactor
+  step now runs `-Pedition-enterprise` (the profile is modules-only, so one flag adds `inspecto-security`
+  + `inspecto-policy` in the same pass), putting those **54 OIDC / token-relay / ABAC / keystore test
+  methods** under automation for the first time. (b) `check-dependencies.mjs` and
   `sbom.mjs` resolve without a profile, so `inspecto-security`'s Nimbus tree is never locked — while
   `compliance/controls-matrix.md` marks **G7 CLOSED**. (c) `check-secrets.mjs` has **no emptiness floor**
   and falls back to walking the tree when `git ls-files` throws — it can read zero files and exit green;
@@ -114,13 +111,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   fully unhashed SBOM ships green. (g) No coverage gate and no compiler-lint (`-Xlint`/`-Werror`)
   anywhere. (h) `addable >= 10` against 35 actual, asserted in both Java and TS. (i) five corpus sweeps
   disarm themselves with `assumeTrue` if a fixture path moves. → `okf/backend/build-run/guard-coverage.md`
-- **P1** · **NAME-DIRS-1** — the UI scaffold still derives every `dirs.*` from the **raw display name**, so a
-  pipeline named `my order feed` gets paths with spaces in them. Decided 2026-09-06: `dirs.*` derive from the
-  **slug id**, one identity for id, file and paths; existing pipelines are untouched (dirs are stored, not
-  re-derived). Names the file it changes: `inspecto-ui/src/app/inspecto/component-model/pipeline-scaffold.ts`
-  + its spec. *(Filed 2026-09-07 — `okf/backend/control-plane/pipeline-identity.md` §Decision 2026-09-06 has
-  cited this row since the day it was decided, but the row was never created.)*
-  → `okf/backend/control-plane/pipeline-identity.md`
 - **P2** · **Step Processor catalog** — 121 processors: 34 delivered / **16 partial / 69 planned** (`transform.lookup` DELIVERED 2026-09-06). Each partial is a product decision (Kafka consumer, XPath grammar, drift report, profiler, resampler, KPI layer, Jinja, graph tagging, commit controller, SLA object, view/email/webhook sinks…) — pick one by name. → `EDITIONS.md` §Step Processors · `okf/backend/pipeline-graph/step-catalog.md`
 - **P2** · **P4 Test mapping on a generic `parser` node** — only reachable where the parse node is per-format. ⚠ The "blocked on §1 decision (l)" gate is **discharged** — (l) was decided and shipped 2026-09-06 (`okf/frontend/features/pipeline-editor.md`); re-scope this row before building. ⚠ Offline, non-`DIRECT` types show blank (mock has no SQL engine) — recorded. → `okf/frontend/features/pipeline-editor.md`
 - **P2** · **`kpi_report_builder` host (AGT-6a)** — no viable host pane; a new surface, not an adoption. (Its `projection_author` ‘stale `columns.items`’ half was **fixed 2026-07-28** and the clause is retired.) This row is what keeps `superpower/agt-6-plan.md` out of the archive. → `superpower/agt-6-plan.md`

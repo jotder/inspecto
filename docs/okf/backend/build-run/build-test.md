@@ -66,6 +66,15 @@ the vendored kernel + eoiagent model transport.
 `inspecto-security` and `inspecto-policy`. They build in an ordinary `mvn test` run; they are simply never
 *bundled*.
 
+⚠ **Every bundled launcher uses `-cp`, never `java -jar`** (RUNSH-CP-1, 2026-09-07). `-jar` ignores
+`-cp` and `CLASSPATH` outright, and `inspecto.jar`'s manifest carries no `Class-Path`, so a `-jar`
+launcher can reach **no sidecar at all**. `serve.sh`/`serve.bat` were already on a classpath while
+`run.sh`/`run.bat` — the one-shot ETL path, whose main class `CollectorProcessor` is the very caller that
+resolves collector connectors — were still on `-jar`. The connectors fix therefore worked for a served
+deployment and silently did nothing for a one-shot run. 🔴 The divergence is the lesson: two launchers
+with two different classpath rules meant fixing one looked like fixing both. All four now build the
+classpath the same way, each sidecar inert unless a config asks for it.
+
 ⚠ **`inspecto-security` ships SHADED too, for the same reason** (SEC-SIDECAR-BOOT-1, 2026-09-07). It is
 profile-gated (`-Pedition-standard` / `-Pedition-enterprise`), but until that date `package.ps1` staged its
 plain 16 KB jar — which carries **no `com/nimbusds` classes**, while `OidcAuthenticator` has nine direct

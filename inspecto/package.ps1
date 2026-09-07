@@ -482,8 +482,18 @@ if [ -n "${EXTRA_OPTS}" ]; then
     JAVA_OPTS+=("${_extra_opts[@]}")
     echo "[run.sh] extra JVM opts: ${EXTRA_OPTS}"
 fi
+# RUNSH-CP-1 (2026-09-07): `-cp`, never `-jar`. `java -jar` IGNORES -cp and CLASSPATH entirely, and
+# inspecto.jar's manifest has no Class-Path, so every sidecar was unreachable on this one-shot ETL
+# path -- including inspecto-connectors.jar, whose whole purpose is remote acquisition and whose
+# caller (CollectorProcessor, this jar's own Main-Class) is exactly what this script launches.
+# serve.sh had the sidecars and run.sh did not; that divergence is what hid it, so both build the
+# classpath the same way now. Every entry is inert unless a config asks for it.
+CP="inspecto.jar"
+[ -f inspecto-connectors.jar ] && CP="${CP}:inspecto-connectors.jar"
+[ -f inspecto-security.jar ]   && CP="${CP}:inspecto-security.jar"
+[ -f postgresql.jar ]          && CP="${CP}:postgresql.jar"
 exec "$JAVA" "${JAVA_OPTS[@]}" \
-          -jar inspecto.jar \
+          -cp "$CP" com.gamma.inspector.CollectorProcessor \
           "$PIPELINE"
 '@
 Write-LfScript -Path "$bundleDir\run.sh" -Content $runShContent
@@ -524,7 +534,7 @@ set "JAVA=java"
 if exist "runtime\bin\java.exe" set "JAVA=runtime\bin\java.exe"
 rem Extra JVM flags from the operator, same contract as serve.bat: INSPECTO_JAVA_OPTS (fallback
 rem EXTRA_JAVA_OPTS), appended AFTER the mandatory --enable-native-access=ALL-UNNAMED and BEFORE
-rem -jar (a JVM flag after it would be parsed as a program argument). Not read from JAVA_OPTS:
+rem -cp (a JVM flag after it would be parsed as a program argument). Not read from JAVA_OPTS:
 rem that name is assigned, so it is silently discarded.
 set "OPTS=--enable-native-access=ALL-UNNAMED"
 rem Path-jail roots (PKG-6). The one-shot CollectorProcessor runs no space discovery -- unlike
@@ -544,8 +554,14 @@ set "EXTRA_OPTS=%INSPECTO_JAVA_OPTS%"
 if "%EXTRA_OPTS%"=="" set "EXTRA_OPTS=%EXTRA_JAVA_OPTS%"
 if not "%EXTRA_OPTS%"=="" set "OPTS=%OPTS% %EXTRA_OPTS%"
 if not "%EXTRA_OPTS%"=="" echo [run.bat] extra JVM opts: %EXTRA_OPTS%
+rem RUNSH-CP-1 (2026-09-07): -cp, never -jar. See run.sh for why - `java -jar` ignores the
+rem classpath, so every sidecar (connectors above all) was unreachable on this one-shot ETL path.
+set "CP=inspecto.jar"
+if exist inspecto-connectors.jar set "CP=%CP%;inspecto-connectors.jar"
+if exist inspecto-security.jar set "CP=%CP%;inspecto-security.jar"
+if exist postgresql.jar set "CP=%CP%;postgresql.jar"
 "%JAVA%" %OPTS% ^
-     -jar inspecto.jar ^
+     -cp "%CP%" com.gamma.inspector.CollectorProcessor ^
      "%PIPELINE%"
 '@
 Write-CrlfScript -Path "$bundleDir\run.bat" -Content $runBatContent
