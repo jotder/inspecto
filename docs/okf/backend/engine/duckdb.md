@@ -171,6 +171,14 @@ time, so a value stops depending on which box processed it.
   and named-zone arithmetic **survives the `SqlSandbox` seal** (`autoload_known_extensions=false` +
   `enable_external_access=false` + `lock_configuration=true`). This was the build's biggest assumed risk
   and it was not one.
+* **JSON needed no work either, and the same is true for the same reason** (measured 2026-09-07 on
+  `duckdb_jdbc 1.5.2.1`). `json` is statically linked, so `autoload_known_extensions=false` and a locked
+  configuration are irrelevant to it: `json_extract`, `json_structure`, the `->>` operator and
+  **`json_serialize_sql`** — which returns a statement's whole parsed AST as JSON — all work on a SEALED
+  `SqlSandbox`, while `INSTALL excel` and re-opening `enable_external_access` still fail. Pinned by
+  `SqlSandboxTest.jsonWorksOnASealedConnection`; it discharged AUTHORING-REDESIGN-1 (c)'s precondition.
+  ⚠ **Do not generalise "statically linked" to every extension** — `excel` is the counter-example, and it
+  is loaded through a 3-layer fail-closed path precisely because it is not.
 * **DST-ambiguous and non-existent local times raise nothing** — Berlin `02:30` on both switch days
   resolves silently to `01:30` UTC. Nothing to guard; worth knowing.
 * ⚠ **A blank cell in TOON's tabular field form is ABSENT, not empty.** `fields[N]{…}` declares one
