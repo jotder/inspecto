@@ -445,6 +445,9 @@ The Parse surface itself — tabs, options, columns grid, Grammar CSV round-trip
     `transform.merge` declares no attributes at all and takes its inputs as a positional list the executor
     builds from the graph edges (`RowShaper.merge`), and `transform.join`'s second input is a `reference`,
     not an inbound edge. A picker would have written a key nothing reads. Edges stay authored on the canvas.
+    ⛔ Stronger than that, grounded the same day: `transform.merge` is absent from `PipelineEditable.LOWERABLE`
+    **by decision**, so a graph carrying one **refuses at save** with `UNSUPPORTED_NODE`. It is executable code
+    with no authoring route at all — do not build it a config surface (BACKLOG §6).
 - **Summarize grouping (`summarize-editor.component.ts`, `summarize-editor.ts`).** A group-by chip row and a
   measures table in place of two bare `list` controls, hosted as a REGION INSIDE the generic
   `pipeline-config-definition` pane — not a fourth routing arm, because that pane's S2 decision is explicitly

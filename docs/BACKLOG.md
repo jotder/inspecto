@@ -39,8 +39,11 @@ a new dependency — not a build. The rule that fell out: **a P1 must name the f
 cannot is a decision (§1) or a design (P2).
 
 Do next, in order (refreshed again 2026-09-07 — GUARD-SWEEP-1 and DAT-6-CI-1 are now done too):
-1. **MERGE-ATTRS-1** (§4) — `transform.merge` reads `type` and `on` off its config and declares neither,
-   so the node can only ever run as a `union` unless someone hand-edits TOON. One `List<NodeAttribute>`.
+1. **Nothing is queued.** MERGE-ATTRS-1, filed hours earlier the same day, was **refuted on grounding**
+   within one shift of being written and moved to §6 — `transform.merge` is deliberately not authorable, so
+   declaring attributes for it would give a config pane to a node that refuses to save. Pick from §3/§5 by
+   rank, or take the two §2 rows whose first action is **not** external (the SOC-2 window start date and
+   the completeness-KPI query).
 2. **Release notes for the next MAJOR** — keep appending (§2).
 3. **Step Processor catalog** — pick a partial by name (§3).
 
@@ -62,6 +65,17 @@ half of a fourth (the id slug). New decisions get a row here at handoff time.
 
 Nothing a shift can close from this checkout. Listed so the gate is named, not guessed.
 
+**Every gate below was RUN on 2026-09-07** (second pass), not just read. Results: **13 of 15 still gated,
+0 discharged, 2 corrections.** The `git tag` gates are unmoved (newest master-ancestor tag is `v3.11.0`;
+`v3.12.0` is on the retired `3.x` line). OPS-5's outcome log exists but says `_(empty — awaiting the first
+live deployment)_`. `rto-rpo-statement.md` still carries 2 `<OPERATOR TO STATE>` placeholders. The
+controls-matrix has **no** SOC-2 window start date and **no** dated CC6.1 line for the SEC-INCIDENT-1
+carry-forwards. `PROJECT_NOTES.md` §DATA-GOV-1 records the decision but no archive location or fetch-script
+path. `ci.yml` still builds `jotder/inspect-agent` from source (3 references). The interview plan has no
+session record. No prospect is named anywhere. 🔴 **The correction that matters: Row 15's gate was
+unfalsifiable BY CONSTRUCTION** — see its row. Writing a gate as a command is not enough; the command has to
+be one that CAN return 0.
+
 **Rewritten 2026-09-07.** Every gate now states something a shift can CHECK from this repo. Before, most
 named an event nobody watches for ("a live deployment", "demand", "a client policy") — unfalsifiable by
 construction, so the row could never move and nobody could tell whether it should. Where the trigger is
@@ -71,7 +85,7 @@ it was; both are corrected below.
 
 | Item | Remains | Gate — how a shift CHECKS it |
 |---|---|---|
-| **Row 15 — ELT Phase 6 deletion half** | Delete the legacy flat read path (amendment §6 step 4). The `-Dingest.lane=auto\|graph\|flat` flag exists (`ConsignmentIngestStrategy.admittedLift`, 2026-09-02); the verification minor must SHIP first. ⛔ Not closable by code; ⛔ do not start it on momentum. Then `withMappingContext` → `PipelineLift` comes due only if the graph lane executes the map node. The waves board is 16 of 17. Also absorbs RECORD-TRANSFORMER-1 (d): the ingest lane runs exactly one projection slot, so a second `transform.sql` cascades only once the graph lane carries ingest. | ✅ **Best-formed gate here — one command:** `git merge-base --is-ancestor v3.12.0 master`. Non-zero ⇒ still gated (verified 2026-09-07). D-2 is defined at `elt-final-amendment-plan.md:1392`. |
+| **Row 15 — ELT Phase 6 deletion half** | Delete the legacy flat read path (amendment §6 step 4). The `-Dingest.lane=auto\|graph\|flat` flag exists (`ConsignmentIngestStrategy.admittedLift`, 2026-09-02); the verification minor must SHIP first. ⛔ Not closable by code; ⛔ do not start it on momentum. Then `withMappingContext` → `PipelineLift` comes due only if the graph lane executes the map node. The waves board is 16 of 17. Also absorbs RECORD-TRANSFORMER-1 (d): the ingest lane runs exactly one projection slot, so a second `transform.sql` cascades only once the graph lane carries ingest. | 🔴 **Gate CORRECTED 2026-09-07 (second pass) — the one I wrote a few hours earlier was itself unfalsifiable.** `git merge-base --is-ancestor v3.12.0 master` can never return 0: **`v3.12.0` is a tag on `origin/3.x`**, a retired line, cut 2026-06-05 — it is not an ancestor of master and never will be. The newest master-ancestor tag is **`v3.11.0`**. D-2 (`elt-final-amendment-plan.md` §9) says "Converter + **one flagged verification minor**, then the legacy readers are deleted", so the gate is a MINOR **on master** after v3.11.0 that ships the converter and the `-Dingest.lane` flag. **Check: `git tag --merged master --sort=-v:refname \| head -1` — still `v3.11.0` on 2026-09-07 ⇒ gated.** |
 | **Release notes for the next MAJOR** | **Drafted** in `okf/backend/control-plane/api-stability.md` §Release notes; append there with every further `feat!:`. ⚠ The `batch_id` rename trio rides this release and is NOT enumerated in that list — see §7. | `git tag` — the next MAJOR tag. |
 | **X5 cross-lane drill-down + StepInfo envelope** | One-Consignment drill-down across lanes; ~1 KB pointer+schema+diagnostics envelope, failure routed by PORT. Phase-7 convergence. | `git tag` — the next MAJOR (pipeline-spec §13 D2). → `okf/backend/pipeline-graph/execution-lanes.md` |
 | **X-Actor full removal** | Remove the header path entirely (already rejected outright on Standard/Enterprise). | 🔴 **Gate restated 2026-09-07.** It used to read "client migration with the API-v1 sunset" — but that apparatus was **deleted 2026-07-25**, and `api-v1.md` contains **zero** occurrences of "Actor", so the gate pointed at something that no longer exists. The only remaining exposure is Personal; a MAJOR is the sanctioned break. **Gate: the next MAJOR tag.** → `okf/backend/editions/auth-security.md` · `EDITIONS.md` SEC-11 |
@@ -128,7 +142,7 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 
 
 - **P2** · **Branch-aware executor residuals** — ((b) and (c) are design passes before code; (d)–(g) wait for a real need) — (b) multi-schema + route needs a **segment-scoped lift** (`writeAndTrace` runs once per segment while the divert lifts the whole graph) — ⛔ do NOT just lift the refusal; (c) mid-branch transforms in the recipe route verb — no per-branch scaffolding in `RecipeCompiler.route()` / `PipelineLift.branch()`, design pass written; (d) still unimplemented anywhere: `adapter`, `alert`, `event`; still refused at lowering as flat homes: `transform.select/derive/validate/split/merge`, `sink.materialized/view` on ingest; (e) acquisition-side "listed remotely, not yet fetched" gauge — name it first; (f) `acquire.maxFilesPerCycle` — only if overshoot is real; (g) `sinks:` follow-ups: per-sink `ducklake` block in flat `.toon`, decision-rule routing with `sinks>1`, versioned reference store with `sinks>1`, and a `ConfigSpecs`/`ConfigJsonSchema` structural spec for `sinks:`. ((a) `mode: clone` **shipped 2026-09-06** — `RouteArming` no longer refuses it.) → `okf/backend/engine/branch-aware-ingest.md` · `okf/backend/engine/output-sinks.md` · `archived-documents/plans-archive/mid-branch-transforms-design.md`
-- **P2** · **Platform Services Stage 2 / 3** — (gated on the at-rest execution decision + the S2-2 spike) — Stage 2 open Step-kind registry (`StepTypeProvider` with `LOWERED`/`EXECUTED`, `StepContext`, failure mapping, watchdog): needs the decision to execute an intervening node at rest (the `graphLaneCarries` boundary = Phase 6 precondition) plus the S2-2 bridge spike (rows/s through a no-op `EXECUTED` Step vs fused) before GA; ⛔ third-party `LOWERED` stays closed until a SQL-fragment guard exists. Stage 3 pack-contributed services (`ServiceProvider` SPI; collision fails the pack atomically; reference-tracked quiesce). `DatasetAccess` after the Consignment Selector. No Job-side watchdog (R1) — a hanging Job is a recorded gap. Filtered `services()` on `ProcessorContext` (D4) and a devkit jar (D5) only on demand. → `okf/backend/control-plane/platform-services.md`
+- **P2** · **Platform Services Stage 2 / 3** — (gated on the at-rest execution decision + the S2-2 spike) — Stage 2 open Step-kind registry (`StepTypeProvider` with `LOWERED`/`EXECUTED`, `StepContext`, failure mapping, watchdog) — ✅ **gate RUN 2026-09-07: holds**, no `StepTypeProvider` exists in any module: needs the decision to execute an intervening node at rest (the `graphLaneCarries` boundary = Phase 6 precondition) plus the S2-2 bridge spike (rows/s through a no-op `EXECUTED` Step vs fused) before GA; ⛔ third-party `LOWERED` stays closed until a SQL-fragment guard exists. Stage 3 pack-contributed services (`ServiceProvider` SPI; collision fails the pack atomically; reference-tracked quiesce). `DatasetAccess` after the Consignment Selector. No Job-side watchdog (R1) — a hanging Job is a recorded gap. Filtered `services()` on `ProcessorContext` (D4) and a devkit jar (D5) only on demand. → `okf/backend/control-plane/platform-services.md`
 - **P2** · **Consignment addressing** — (torn multi-file reads: CLOSED 2026-08-29 by the pinned `ConsignmentSelector` list — this row said "open" for a week; the two readers that still re-globbed, `DbBrowserRoutes.browseStore` and `ExpectationEvaluator`, were pinned 2026-09-06) `generation` is a dead field (always 0, never read); ⚠ `retire_superseded` must be configured or every full recompute leaves a complete extra copy on disk; ingest-side Consignment-scoped accessor waits for a consumer; ⚠ `DatasetRelation.temporalColumn` has no caller and cannot safely gain one on a write path. → `okf/backend/engine/consignment-addressing.md`
 - **P2** · **EXECUTION-RESIDUALS X4 + X1 deferrals** — X4 record-level replay from quarantine: sidecar error manifests (offset/reason), all-or-nothing vs eject-and-continue as per-pipeline CONFIG — ⛔ no build without a driver (same item as the run-detail "reprocess is whole-batch only" note). X1 deferrals: per-pipeline `processing.retry` block (regenerate node-attributes + step-types contracts); operator cancel / retry-now affordance (today: delete the sidecar under `<status_dir>/retries/`, or `reprocess`). → `okf/backend/pipeline-graph/execution-lanes.md` · `archived-documents/plans-archive/execution-residuals-plan.md`
 - **P2** · **Pipeline graph** — flip the intake cap on by default (needs a soak); a pre-materialise cap to save remote-fetch bandwidth (cap applies post-dedup); ⚠ four kinds still last-one-wins, deliberately out of A2 scope: `acquisition`, `parser`, `gap`, `dedup.marker`; ⛔ `BatchGraphRunner` has zero production callers, blocked on ingest output parity (Phase 6) — do not discharge by wiring `engages()`; → `okf/backend/pipeline-graph/pipeline-graph-design.md` §14
@@ -152,7 +166,7 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - **P3** · **Security: policy-authoring UX** — a matrix/create editor beyond hand-authored TOON (seed visibility, "why denied?" endpoint and read-only Policies tab already shipped). Non-blocking. → `okf/backend/editions/auth-security.md`
 ### Deployment & packaging
 
-- **P3** · **D8-SUPPRESS-1** — per-recipient suppression list (TTL for hard bounces, permanent for complaints) — gated on a DB-backed `DeliveryReceiptStore`. → `okf/backend/control-plane/events-metrics.md` §Decision
+- **P3** · **D8-SUPPRESS-1** — per-recipient suppression list (TTL for hard bounces, permanent for complaints) — gated on a DB-backed `DeliveryReceiptStore`. ✅ **Gate RUN 2026-09-07: holds** — `InMemoryDeliveryReceiptStore` is still the only implementor of the interface. → `okf/backend/control-plane/events-metrics.md` §Decision
 
 - **P2** · **Deployment topology gaps** (after §1 D1–D8 are signed) — GAP-2 Enterprise packaging (SCR-8) · GAP-3 service wrappers (SCR-3) · GAP-4 DuckDB cap default · GAP-5 T15 surge admission · GAP-6 Vault/KMS (SEC-8) · GAP-8 Postgres driver · GAP-9 launcher token-line debris (SCR-9) · GAP-10 bundle missing 13 archived docs (SCR-10). Phases 0–5 all unbuilt. → `superpower/deployment-topology-plan.md` §11
 - **P3** · **Postgres multi-user** — ⛔ **PARKED by §6** until a multi-operator install exists; the old "(after the §1 decision)" heading outlived its decision, which was *park it*. Kept for the shape when it lifts: P1 pool behind `JdbcDrivers` (each `Db*Store` holds ONE `synchronized` connection); P2 replace `browseConnection()` (F2: it hands out the store's long-lived connection, a pool has no such thing); P3 **schema**-per-space URL wiring (NOT db-per-space); P4 `CaseStore` interface + PG impl (JSONL ring today); `PostgresStateStoreTest` over the three uncovered stores + a concurrency test. Keep events on Parquet. ⚠ Not the same work as `OperationalDb`/PG-1 (shipped). → `archived-documents/plans-archive/postgres-multi-user-plan.md` §5–6
@@ -162,17 +176,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 *(Drained 2026-09-07. Three of the five rows here were standing refusals wearing a tech-debt label — a
 "LEAVE unless someone is already in the file" is not work — and moved to §6. A fourth was already closed by
 a test that post-dates it. What is left is one release-gated wire change.)*
-
-- **P2** · **MERGE-ATTRS-1 — `transform.merge` reads two config keys it never declares.** Found while
-  grounding WORKBENCH-S4's S4b (2026-09-07). `RowShaper.merge` reads `type`
-  (`union`|`inner`|`left`, default `union`) and `on` (the join columns) off the node's config —
-  `RowShaper.java:57-58,756` — but `NodeAttributes` has **no `TRANSFORM_MERGE` entry** and its type→attrs
-  map registers none, so the config pane offers neither key and the server publishes no spec for them. A
-  merge node can therefore only ever run as a `union`: the inner/left arms are reachable by hand-editing
-  TOON and by nothing else. ⚠ This is the mirror of the usual defect — not config written and never read,
-  but config **read and never declared**, which no round-trip test can catch because the key never enters
-  the round trip. Fix is one `List<NodeAttribute>` plus the map entry; `NodeConfigNameContractTest` then
-  pins the names like every other kind's.
 
 - **P3** · **Vocabulary rollout, Tier 3 — the release-gated remainder.** The **UI half SHIPPED 2026-09-07**:
   every emitter was verified to dual-emit (`LineageRoutes:112/113`, `ViewRoutes:100/101`,
@@ -292,6 +295,21 @@ One line each; the reasoning is in the pointer. Reopen only on the stated trigge
   measured startup time", but nothing in the repo measures startup — no JMH, no timing test, no recorded
   baseline. Reopening it means *first* adding a startup measurement. → `okf/backend/control-plane/tags.md`
 - **MNT-14** — no UI surface / no shipped Job instance (operator opts in); retention derived not stamped; scoped to `ObjectType.INCIDENT`; ⚠ `ObjectQuery`'s 9-arg constructor is load-bearing → `okf/backend/control-plane/jobs.md`
+- **`transform.merge` attributes — REFUSED 2026-09-07, the same day MERGE-ATTRS-1 was filed as a defect.**
+  The row was right that `RowShaper.merge` reads `type` (`union`|`inner`|`left`) and `on` off the node config
+  and that `NodeAttributes` declares neither. Its **cause and severity were both wrong.** `transform.merge`
+  is absent from `PipelineEditable.LOWERABLE` and from `RECIPE_VERBS` **by decision** — the same set as
+  `transform.split`/`select`/`derive`/`validate`, and `PipelineEditable:196` says admitting them would
+  "silently reverse all of those". A graph carrying one therefore **refuses at save** with
+  `UNSUPPORTED_NODE` (422; pinned by `ControlApiPipelineCrudTest` on the sibling `transform.derive`), and
+  neither `PipelineJobRunner` graph source can carry one: the flat `pipeline_config:` path has no home for
+  it, and the `pipeline:` path reads the store that refused it. So the node is executable code with **no
+  authoring or persistence route at all** — it is not "stuck on union", it is unreachable. ⛔ Declaring
+  attributes would hand a config pane to a node that cannot be saved, which is the exact defect the
+  `transform.sql` flat-config-home lesson records. The authorable successor is the PLANNED Step Processor
+  `transform.join.merge`, whose catalog entry already calls `transform.merge` "the grandfathered … read-only
+  ancestor". Reopen only as an operator decision to make merge authorable — that is the four-registration
+  recipe plus a deliberate reversal of a standing refusal, not a one-line attribute table.
 - **`mail.send` has no true CC** — needs a CC-aware `@PublicApi` SPI overload, not until a second caller asks; ⛔ never a second SMTP transport
 - **WRITE-1** — the implicit adoption ambiguity stays, documented at the code; ⛔ never teach the server the UI slug rule
 - **`AiDraft.prerequisites` shared applier** — single producer; extract only when a second tool gains prerequisites

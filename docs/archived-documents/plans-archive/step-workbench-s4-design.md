@@ -140,6 +140,12 @@ and names the relation whenever it is not a plain `DATA` edge, because a route b
 (`union`|`inner`|`left`) and `on` off the node config, and neither is declared anywhere, so a merge node can
 only ever run as a `union` unless someone hand-edits TOON. That is the mirror of the usual defect: config
 **read and never declared**, which no round-trip test can catch because the key never enters the round trip.
+>
+> 🔴 **CORRECTION (same day, second grounding pass): the row above is WRONG about cause and severity, and was
+> refused.** `transform.merge` is absent from `PipelineEditable.LOWERABLE` **by decision**, so a graph carrying
+> one refuses at save with `UNSUPPORTED_NODE` — the node has no authoring or persistence route at all, it is not
+> "stuck on union". See BACKLOG §6 `transform.merge` attributes. Left here as provenance for how a plausible
+> defect row survives one grounding pass and dies on the next.
 
 ## 8. As built — S4c (2026-09-07)
 
