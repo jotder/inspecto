@@ -6,17 +6,21 @@ import { SessionService } from 'app/inspecto/api/session.service';
 import { NavigationService } from './navigation.service';
 
 /**
- * EDG-01 cell 3b (EDITIONS CP-09): the geo map and link analysis nav entries follow the backend module.
- * Both directions are asserted — a filter that always hid them, or never did, would pass a one-sided test.
+ * EDG-01 cells 3b + 6: nav entries whose backend lives in an optional module follow that module. Every
+ * case is asserted in BOTH directions — a filter that always hid an entry, or never did, would pass a
+ * one-sided test.
  */
 describe('NavigationService — optional-module nav entries', () => {
-    function mount(geoLinkEnabled: boolean) {
+    function mount(geoLinkEnabled: boolean, eventsEnabled = true) {
         TestBed.resetTestingModule();
         TestBed.configureTestingModule({
             providers: [
                 NavigationService,
                 // Only the one signal the filter reads; the real service does an HTTP bootstrap.
-                { provide: SessionService, useValue: { geoLinkEnabled: signal(geoLinkEnabled) } },
+                {
+                    provide: SessionService,
+                    useValue: { geoLinkEnabled: signal(geoLinkEnabled), eventsEnabled: signal(eventsEnabled) },
+                },
             ],
         });
         return TestBed.inject(NavigationService);
@@ -72,5 +76,29 @@ describe('NavigationService — optional-module nav entries', () => {
             expect(ids).not.toContain('studio-geo-map');
             expect(ids).not.toContain('studio-link-analysis');
         }
+    });
+
+    /**
+     * EDG-01 cell 6 (EDITIONS CP-13): the Events entry follows `inspecto-events`.
+     *
+     * ⛔ The third assertion is the one that matters most — `audit` must SURVIVE. The Audit log reads the
+     * core `/audit/*` routes, which every edition serves, and EDITIONS §Audit promises Personal "local
+     * append-only logs"; hiding it here would take away a documented capability. It is also the adjacent
+     * nav id, so a filter written slightly too wide would catch it and nothing else would notice.
+     */
+    it('shows Events when the feed module registered its routes', async () => {
+        const nav = await firstValueFrom(mount(true, true).get());
+        expect(findById(nav.default as never, 'events')).toBeDefined();
+    });
+
+    it('hides Events when the feed module is absent (Personal) — but never the Audit log', async () => {
+        const nav = await firstValueFrom(mount(true, false).get());
+        expect(findById(nav.default as never, 'events')).toBeUndefined();
+        expect(
+            findById(nav.default as never, 'audit'),
+            'the Audit log reads core /audit/* and must stay — EDITIONS promises Personal an audit trail',
+        ).toBeDefined();
+        // Its other siblings are untouched too: an over-wide filter would empty the group.
+        expect(findById(nav.default as never, 'processing-status')).toBeDefined();
     });
 });

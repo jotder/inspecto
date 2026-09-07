@@ -13,6 +13,7 @@ import {
     ReportsService,
     ServiceReport,
     StatusReport,
+    SessionService,
 } from 'app/inspecto/api';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
@@ -67,6 +68,10 @@ function create(overrides: { ready?: ReadyStatus | null; status?: StatusReport |
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
         ],
     });
+    // EDG-01 cell 6: SessionService.eventsEnabled defaults to FALSE (the absent-module state),
+    // where the events section explains itself and no API call is made. Arm it for the
+    // INSTALLED path these specs assert.
+    TestBed.inject(SessionService).eventsEnabled.set(true);
     const fixture = TestBed.createComponent(DashboardComponent);
     fixture.detectChanges(); // runs ngOnInit (initial refresh)
     return fixture;

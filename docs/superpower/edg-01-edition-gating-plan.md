@@ -620,3 +620,94 @@ typed `ObjectService` fields. Full extraction means inventing an `ObjectAccess` 
 — the largest single piece of work in EDG-01. Gating just the routes + `incident_purge` is a fraction of the
 cost and is arguably what the cell claims, since `CP-11` is about the operational-objects *surface*.
 ⚠ Recommend putting both to the operator together; §18 has the measurement for CP-11, this section for CP-13.
+
+## 20. Cell 6 as built — `CP-13`'s events feed, and the promise it nearly broke (2026-09-08)
+
+**Operator calls taken before starting** (§19 asked for both): CP-13's other half moves **whole**, and
+`CP-11` gets the **full extraction** behind an `ObjectAccess` SPI.
+
+### Built: the whole `/events*` surface → `inspecto-events`
+
+All seven registrations moved as a unit into `com.gamma.eventsapi.EventRoutes` (public, ServiceLoader-
+contributed). Core keeps `AbsentEventsRoutes`, whose stub array mirrors the module's **registration order**
+because `/events/([^/]+)` is a catch-all that would otherwise swallow `/events/search|export|views`.
+`/bootstrap` gains `features.events`, derived from `hasRoute("GET", "/events/search")` — a **literal** path,
+deliberately not the catch-all's regex and not bare `/events`.
+
+⚠ **Why whole, not the export alone.** The audit CSV is not a route: it is a `?format=csv&type=AUDIT` branch
+inside `exportEvents`. Gating that alone would have been an `if` inside a core route — the one mechanism
+`EDITIONS` §Assembly bans — so "gate only the audit CSV" was never actually available at route granularity,
+whatever §19 implied.
+
+### 🔴 The plan under-stated the blast radius by 4×, and nearly withdrew a promised capability
+
+§19 said this removes "the Events screen's data source". Ground truth: **four** SPA panes inject
+`EventsService` — Events, **Audit log**, Dashboard, and the Incident/Case detail pane. And the Audit-log
+pane read the trail through `GET /events/search?type=AUDIT`, while `EDITIONS.md` §Audit **promises Personal**
+"local append-only logs". Gating the feed alone would therefore have taken away Personal's ability to read
+its own audit trail while a matrix row still promised it — a compliance regression dressed as a packaging
+change, and nothing in the plan would have caught it.
+
+**Resolution (operator, 2026-09-08): keep the audit read in core.** New `AuditLogRoutes` serves
+`/audit/search` + `/audit/export`, **fail-closed to a closed `{AUDIT, ACCESS_DENIED}` type set** — a missing
+or foreign type is a 400, because a permissive version would simply be the gated feed under a new name.
+`AuditLogRoutesTest` probes the refusals, not just the reads. The SPA's Audit-log pane now reads a new
+`AuditService` and deliberately does **not** gate on `features.events`.
+
+### Two shared helpers had to go public in core, not travel with the module
+
+`Cursor` (the keyset codec `/events`, `/jobs/runs` and `/objects` all page with) and the newly extracted
+`TimeBounds` (the operations-zone bound parser, formerly `EventRoutes.epochMillis`) are used on both sides of
+the split. A second copy of either drifts silently — mis-paged results, or a bound read in the wrong zone.
+`EventRoutesTimeBoundTest` became core's `TimeBoundsTest`.
+
+### UI: hide the entry, and fix the landing route the entry cannot protect
+
+Nav drops `events` (and **never** `audit` — the spec asserts that explicitly, it being the adjacent id an
+over-wide filter would eat). `LENS_HOME.ops` pointed at `events`, so `/` would have dropped an Ops-lens user
+straight onto a dead pane; it now falls back to `pipelines` when the feed is absent. Events, Dashboard and
+Incident-detail render an explained `<inspecto-alert>` (operator's choice over hiding), never a 503 toast.
+
+### Test fallout: 4 files MOVED, 10 methods RE-SEATED, 7 false matches
+
+Classified before editing. **Moved** to the module: `ControlApiEventsTest`, `ControlApiEventsPageTest`, and
+`ControlApiAuditTest.eventRoutesAreAppendOnly` (which changed meaning and was kept for the new one — the
+stub is GET-only, so the 405 still proves the feed is un-mutatable). **Re-seated** onto
+`svc.events().page(200, null, null)` — the exact call the v1 route made — 10 methods across
+`ControlApiAuditTest`, `ControlApiAgentInvokeTest`, `ControlApiBundleNewKindsTest` and
+`ControlApiPolicyEnforcementTest`; every one of them was testing audit/agent/bundle/ABAC behaviour and merely
+used the feed as a read-out. ⚠ The policy test got **stronger**: it no longer repairs the broken policies doc
+before reading, because a store read needs no policy decision, so the fail-closed deny is now asserted while
+the deployment is still fail-closed. **False matches** (7): table names, fixture directories, and
+`AuditTrailTest`'s pure `classify("GET", "/events/export")` string.
+
+🔴 **The `V1Body` trap, and why two green verifications did not catch it.** The moved HTTP tests used
+`V1Body`, the envelope unwrapper in `inspecto`'s **test** tree — published to nothing, so invisible from
+another module. Fixed the house way (a local `json()`/`envelope()` helper, the cell-4 precedent), but note
+the failure mode: `inspecto-events` is not in the default `<modules>`, so `mvn -o clean test` never compiles
+it and stayed **green at 4004 tests** while the module was broken. And when the Enterprise reactor died
+earlier at `inspecto-policy`, the module was merely SKIPPED — a summary counting only failures reported
+none. **Two verifications passed (4004 and 4122 tests) while the module had never compiled once.** Ask
+whether the new module CONTRIBUTED TESTS, not whether the build passed.
+
+⚠ Two more self-inflicted defects worth remembering: a default-`false` `SessionService.eventsEnabled` silently
+re-pointed three component specs at the absent-module branch (armed in setup); and the first falsification
+test asserted `PUT /access/roles` → 200, which 503s on that fixture for want of a **write root** — an
+unknown-route mutation (audited unconditionally as `ACCESS_DENIED`) is the stable probe.
+
+## 21. What remains: `CP-11` only — full extraction, grounded 2026-09-08
+
+⛔ **The `com.gamma.ops` figures in §18 were low.** Measured on `inspecto-engine`:
+
+* **37 files** in `com.gamma.ops` (12 top-level + 25 across `findings`, `link`, `note`, `queue`, `rca`,
+  `tag`, `workflow`) — §18's "12 classes" counted only the top level.
+* **27 dependants**, not 13: the 13 in `inspecto-engine` §18 lists, **plus 14 in `inspecto`** it never
+  counted — `ObjectRoutes`, `NoteRoutes`, `QueueRoutes`, `TagRoutes`, `DecisionRoutes`,
+  `ComponentRoutes`, `ExpectationRoutes`, `AnnotationTargets`, `WidgetTags`, and the service layer
+  (`ServiceBootstrap`, `ServiceStores`, `ReadModel`, `CollectorService`, `RcaTemplateRegistry`).
+
+The operator chose full extraction behind a new `ObjectAccess` SPI on those numbers. Start from the service
+layer, not the routes: `ServiceBootstrap`/`ServiceStores` decide what the SPI has to expose, and the five
+route modules follow. Apply recipe items 11–16 in the editions concept — in particular, census the **UI**
+consumers of `/objects*` and read the other `EDITIONS` rows for what they promise Personal, before assuming
+this cell costs only the Incidents/Cases screens.

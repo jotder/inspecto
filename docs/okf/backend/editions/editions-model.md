@@ -21,11 +21,12 @@ Assembly mechanisms:
   ⚠ Maven only *warns* on a profile that does not exist and then builds the default, so the old
   `-Pedition-personal` produced a correct Personal jar for an incorrect reason — the kind of instruction
   that survives because it appears to work.
-* **An optional Maven module** — the primary mechanism, and as of 2026-09-07 there are **seven**:
+* **An optional Maven module** — the primary mechanism, and as of 2026-09-08 there are **eight**:
   `inspecto-security` (OIDC/Nimbus, role mapping, token relay — see [auth & security](auth-security.md)),
   `inspecto-policy` (Enterprise ABAC), and the five EDG-01 modules `inspecto-notify-channels`,
-  `inspecto-backup`, `inspecto-geo-link`, `inspecto-exchange`, `inspecto-metrics`. Each joins the reactor
-  only under `edition-standard`/`edition-enterprise`, so Personal never even compiles it.
+  `inspecto-backup`, `inspecto-geo-link`, `inspecto-exchange`, `inspecto-metrics`, `inspecto-events`.
+  Each joins the reactor only under `edition-standard`/`edition-enterprise`, so Personal never even
+  compiles it.
 * **`ServiceLoader`** — an absent module means the no-op impl is the only one discovered (same pattern as the
   optional [assist agent](../agent/assist-agent.md) and [connectors](../modules/connectors.md)).
 * **`-D` flags** — e.g. `-Dauth.mode=none` (Personal) vs `-Dauth.mode=oidc` (Standard).
@@ -36,10 +37,10 @@ Assembly mechanisms:
 One version spans all editions; artifacts differ by classifier. The matching branch policy is in
 [branching & release](branching-release.md).
 
-## Extracting a feature into an edition module — the as-built recipe (EDG-01, 2026-09-07)
+## Extracting a feature into an edition module — the as-built recipe (EDG-01, 2026-09-07/08)
 
-Five features were gated out of Personal this way (`9fdb99f8` · `c323f35c` · `91b6c9de`+`1de693a3` ·
-`f39b531f` · `d409921a`). The shape that worked, and the traps that cost a rebuild each:
+Six features were gated out of Personal this way (`9fdb99f8` · `c323f35c` · `91b6c9de`+`1de693a3` ·
+`f39b531f` · `d409921a` · cell 6). The shape that worked, and the traps that cost a rebuild each:
 
 1. **Contribute through an SPI, never an `if (edition == …)`.** Routes go through the public
    `com.gamma.control.RouteModule` (made public + `@PublicApi` in `91b6c9de`); maintenance tasks through
@@ -71,3 +72,49 @@ Five features were gated out of Personal this way (`9fdb99f8` · `c323f35c` · `
 10. ⛔ **Grantable capability vocabulary stays static across editions.** Deriving it from registered routes
     would make a role file authored on Standard fail validation on Personal. Dead vocabulary is not a hole;
     there is no route behind it.
+
+11. 🔴 **Census the CONSUMERS of the surface, not just its providers — and count UI panes, not only Java
+    classes.** Cell 6's plan said gating `/events*` costs "the Events screen". It actually reached **four**
+    SPA panes (Events, **Audit log**, Dashboard, Incident/Case detail), because they all inject the same
+    `EventsService`. One `grep -rln` on the service in the UI would have found them; the plan had only ever
+    looked at the backend. Scope a cell from the consumer census, or you promise a product change you have
+    not measured.
+12. 🔴 **A gated surface can carry a capability another matrix row PROMISES.** `EDITIONS` §Audit gives
+    Personal "local append-only logs", and the Audit-log screen read them through the very
+    `/events/search` cell 6 was gating — so the packaging change would have silently withdrawn a documented
+    compliance capability. The fix is a **narrow core route** (`AuditLogRoutes`: `/audit/search`,
+    `/audit/export`) that serves only the audit projection, **fail-closed to a closed type set** so it
+    cannot become the feed under a new name. ⚠ Before gating anything, read the OTHER rows of the matrix
+    for what they promise the edition you are gating.
+13. ⚠ **Gate the landing route too, not just the nav entry.** Hiding a nav item protects a user who
+    clicks; it does nothing for `/`. `LENS_HOME.ops` pointed at `events`, so an Ops-lens user on Personal
+    would have been redirected straight onto a pane whose every call 503s — the one path a hidden entry
+    cannot cover, because nothing was clicked. Any per-persona or default home target that names a gated
+    screen needs a fallback.
+14. ⚠ **A shared helper stops being the route's private business the moment the route leaves.** `Cursor`
+    (the keyset codec `/events`, `/jobs/runs` and `/objects` all page with) and `TimeBounds` (the
+    operations-zone bound parser) both had to go **public in core** rather than travel with the module — a
+    second copy of either drifts silently, and drifted pagination or a bound read in the wrong zone is
+    invisible until it is wrong in production.
+15. ⚠ **Absent-module stubs are an ORDERED surface, not a set.** `/events/([^/]+)` is a catch-all that
+    swallows `/events/search`, `/events/export` and `/events/views` if stubbed first, because matching is
+    first-match. The stub array's order has to mirror the module's registration order, and the
+    falsification test must probe the specific literal paths — every one of them 503s either way, so a
+    status-code-only test cannot tell a correct stub from a catch-all that ate its siblings.
+16. 🔴 **A default-false feature flag silently re-points existing specs at the gated path.** Adding
+    `SessionService.eventsEnabled` (false by default, the honest Personal state) made three component
+    specs exercise the absent-module branch, where the component makes no HTTP call at all — so their
+    event assertions would have failed for a reason unrelated to what they test. Arm the flag in the
+    spec setup; and remember the geoLink precedent that a `SessionService` stub must name every signal the
+    code under test reads.
+
+17. 🔴 **A moved test cannot see the core module's TEST tree — and the compiler only says so under the
+    edition profile.** `V1Body` (the v1-envelope unwrapper every control-plane test uses) lives in
+    `inspecto/src/test`, which is published to nothing, so a test moved into an optional module fails
+    `testCompile` with a bare "cannot find symbol". Cells 4 and 6 both hit it; the established fix is a
+    **small local `json()`/`envelope()` helper per module**, not a `test-jar` dependency. ⚠ Two ways this
+    bites late: the DEFAULT build never compiles the module, so `mvn -o clean test` stays green while the
+    Standard/Enterprise build is broken — always run **both** profiles before calling a cell done; and if
+    the reactor dies in an earlier module, the new module is merely SKIPPED, which reads like success in a
+    summary that only counts failures. Check the module actually **contributed tests**, not just that the
+    build passed.

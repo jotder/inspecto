@@ -69,6 +69,12 @@ final class BootstrapRoutes implements RouteModule {
         // registered its routes — derived, never an edition guess. The SPA hides the two nav entries and
         // the two widget offers on it.
         f.put("geoLink", api.hasRoute("POST", "/geo/projection") && api.hasRoute("POST", "/inv/projection"));
+        // EDITIONS CP-13 second half (EDG-01 cell 6): true only when the optional inspecto-events module
+        // registered the feed. ⚠ Probed on /events/search, a LITERAL path — not on /events/([^/]+), whose
+        // regex would also be the shape of a catch-all, and not on /events, which is the one path a future
+        // core route is most likely to reclaim. The SPA drops the Events nav entry and falls the Ops lens
+        // home back to pipelines when this is false, so nobody lands on a screen that only 503s.
+        f.put("events", api.hasRoute("GET", "/events/search"));
         f.put("authMode", System.getProperty("auth.mode", "none"));
         return f;
     }

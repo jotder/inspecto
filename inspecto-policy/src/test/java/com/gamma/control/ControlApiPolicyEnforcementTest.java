@@ -5,6 +5,7 @@ import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
 import com.gamma.ops.ObjectType;
 import com.gamma.ops.OperationalObject;
+import com.gamma.event.EventQuery;
 import com.gamma.service.CollectorService;
 import dev.toonformat.jtoon.JToon;
 import org.junit.jupiter.api.AfterEach;
@@ -150,12 +151,12 @@ class ControlApiPolicyEnforcementTest {
             assertEquals(200, send(c.port, "GET", "/objects", null, "ana").statusCode());
             assertEquals(403, send(c.port, "PUT", "/access/roles", "{\"roles\":[]}", "carl:contractor").statusCode());
 
-            String denied = send(c.port, "GET", "/events?type=ACCESS_DENIED", null, "root").body();
+            String denied = eventsOfType(c, "ACCESS_DENIED");
             assertTrue(denied.contains("access.denied"), denied);
             assertTrue(denied.contains("freeze-contractor"),
                     "the deny audit names the matched policy: " + denied);
 
-            String audit = send(c.port, "GET", "/events?type=AUDIT", null, "root").body();
+            String audit = eventsOfType(c, "AUDIT");
             assertTrue(audit.contains("access.granted"), audit);
             assertTrue(audit.contains("allow-reads"),
                     "the policy-matched allow is audited with its policy name: " + audit);
@@ -167,12 +168,27 @@ class ControlApiPolicyEnforcementTest {
         try (Ctx c = open(dir)) {
             Files.writeString(c.writeRoot().resolve("access-policies.toon"), "policies: [ broken");
             assertEquals(403, send(c.port, "GET", "/objects", null, "ana").statusCode());
-            // repair so the events read is allowed again, then confirm the fail-closed deny was recorded
-            writePolicies(c, List.of());
-            String denied = send(c.port, "GET", "/events?type=ACCESS_DENIED", null, "root").body();
+            // ⚠ The policies doc is left BROKEN on purpose. Until EDG-01 cell 6 this line was followed by
+            // writePolicies(c, List.of()) to repair it, because the read-out was GET /events and the PEP
+            // would otherwise fail-close on that too. Reading the store needs no policy decision, so the
+            // repair is gone — and the test is strictly stronger for it: the fail-closed deny is now
+            // asserted while the deployment is still fail-closed.
+            String denied = eventsOfType(c, "ACCESS_DENIED");
             assertTrue(denied.contains("<policies-unreadable>"),
                     "a fail-closed deny is audited with the unreadable marker: " + denied);
         }
+    }
+
+    /**
+     * Audit read-out, re-seated off {@code GET /events?type=} (EDG-01 cell 6, 2026-09-08). This class is
+     * about ABAC policy decisions being audited with the policy that matched — the events feed was only the
+     * read-out, and it now lives in the optional {@code inspecto-events} module. Serialised to a string so
+     * the existing {@code contains} assertions are unchanged.
+     */
+    private String eventsOfType(Ctx c, String type) {
+        return c.svc.events()
+                .query(EventQuery.builder().type(type).limit(EventQuery.MAX_LIMIT).build())
+                .stream().map(e -> String.valueOf(e.toMap())).collect(java.util.stream.Collectors.joining("\n"));
     }
 
     @Test

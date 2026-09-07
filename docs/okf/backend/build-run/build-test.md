@@ -65,13 +65,23 @@ the vendored kernel + eoiagent model transport.
 `inspecto-intelligence` are plain default `<modules>` in the root POM. The profile-gated modules are the
 **seven** edition modules: `inspecto-security`, `inspecto-policy`, and the five EDG-01 ones
 (`inspecto-notify-channels`, `inspecto-backup`, `inspecto-geo-link`, `inspecto-exchange`,
-`inspecto-metrics`) — see [editions model](../editions/editions-model.md). The agent modules build in an
+`inspecto-metrics`, `inspecto-events`) — see [editions model](../editions/editions-model.md). The agent modules build in an
 ordinary `mvn test` run; they are simply never *bundled*.
 
-⚠ **Two reactor sizes, two baselines** (2026-09-07, `d409921a`): the default (Personal) build is **23
-modules / 4000 tests**; `-Pedition-enterprise` is **30 modules / 4118**. A run that stops at a failing module
-reports a PARTIAL sum and SKIPS the trailing modules — do not read that as the total, and do not conclude a
-module "failed" when the build never reached it.
+⚠ **Two reactor sizes, two baselines** (2026-09-08, EDG-01 cell 6): the default (Personal) build is **23
+modules / 4004 tests**; `-Pedition-enterprise` is **31 modules / 4125** (`inspecto-events` is the 31st, and
+contributes 3). A run that stops at a failing module reports a PARTIAL sum and SKIPS the trailing modules —
+do not read that as the total, and do not conclude a module "failed" when the build never reached it.
+
+🔴 **An optional module's tests can be absent from BOTH numbers while everything looks green.** An
+edition module is not in the default `<modules>`, so `mvn -o clean test` never compiles it: a broken one
+leaves the everyday build fully green. And if the Enterprise reactor dies in an earlier module, the later
+one is merely SKIPPED, which a summary counting only failures reports as nothing wrong. During cell 6 two
+verifications passed (4004 and 4122 tests) while `inspecto-events` had never once compiled. **Ask whether
+the module CONTRIBUTED TESTS — by name, from its own `Results:` block — not whether the build passed.**
+⚠ And check the name carefully: `inspecto-event` (the core event store, position 16, 26 tests) and
+`inspecto-events` (the optional Event Viewer, position 31, 3 tests) differ by one letter, and a verify
+agent misattributed one for the other on this very build.
 
 ⚠ **Every bundled launcher uses `-cp`, never `java -jar`** (RUNSH-CP-1, 2026-09-07). `-jar` ignores
 `-cp` and `CLASSPATH` outright, and `inspecto.jar`'s manifest carries no `Class-Path`, so a `-jar`

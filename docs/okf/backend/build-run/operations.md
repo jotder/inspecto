@@ -30,5 +30,5 @@ Plus `--enable-native-access=ALL-UNNAMED` is always required (see [build & test]
 
 The living production-investigation guide (process/events/metrics/state/Control API/troubleshooting) is
 `docs/ADVANCED_GUIDE.md`. Observability primitives: [events & metrics](../control-plane/events-metrics.md)
-(`/metrics` Prometheus text, `/events/search`). Performance tuning: [`performance.md`](performance.md);
+(`/metrics` Prometheus text, `/events/search` — both OPTIONAL modules since EDG-01, 503 on Personal; the core audit read is `/audit/search`). Performance tuning: [`performance.md`](performance.md);
 the full utilities/batching/output/deployment reference is [`operations-reference.md`](operations-reference.md).

@@ -31,6 +31,14 @@ import static org.junit.jupiter.api.Assertions.*;
  * unambiguously) with no overlap. (The null terminator is covered by the {@code /jobs} adopter's walk —
  * here service-generated events trail the fixtures, so the history has no fixed end.) Events are appended
  * straight onto the store the route reads.
+ *
+ * <p>Moved here from {@code inspecto} with {@code EventRoutes} (EDG-01 cell 6, 2026-09-08). ⚠ Note what it
+ * now also guards: {@code Cursor} went public in that cell so this out-of-package module could encode
+ * cursors identically to core's {@code /jobs/runs} and {@code /objects} pagers. A second cursor codec would
+ * make pages drift, and this walk is what would catch it.
+ *
+ * <p>⚠ Lives in package {@code com.gamma.control} so it can construct the package-private
+ * {@code ControlApi}.
  */
 class ControlApiEventsPageTest {
 
@@ -107,5 +115,14 @@ class ControlApiEventsPageTest {
                 BodyHandlers.ofString());
     }
 
-    private JsonNode json(HttpResponse<String> r) throws Exception { return V1Body.envelope(r.body()); }
+    private JsonNode json(HttpResponse<String> r) throws Exception { return envelope(r.body()); }
+
+    /**
+     * The envelope itself, UN-peeled — this test asserts on {@code metadata.pagination}, not on the
+     * resource, so it must not unwrap {@code data} (mirrors the control module's {@code V1Body.envelope};
+     * that class is in inspecto's TEST tree and not visible from another module).
+     */
+    private static JsonNode envelope(String raw) throws Exception {
+        return JSON.readTree(raw);
+    }
 }

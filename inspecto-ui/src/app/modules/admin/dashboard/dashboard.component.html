@@ -114,7 +114,18 @@
             </div>
         }
 
-        @if (recentEvents().length) {
+        @if (!eventsEnabled()) {
+            <!-- EDG-01 cell 6: the feed is the optional inspecto-events module. Explained in place, never a
+                 toast — an absent optional module is a deployment state, not a failure. -->
+            <div class="bg-card rounded-2xl p-6 shadow">
+                <div class="mb-3 font-semibold">Recent activity</div>
+                <inspecto-alert variant="info" title="Events feed not installed">
+                    The operational events feed is provided by the optional events module (Standard edition and above).
+                    Events are still recorded — including the audit trail, which stays available on the Audit log
+                    screen.
+                </inspecto-alert>
+            </div>
+        } @else if (recentEvents().length) {
             <!-- Recent activity feed -->
             <div class="bg-card rounded-2xl p-6 shadow">
                 <div class="mb-3 flex items-center justify-between">

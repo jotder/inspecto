@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>inspecto-events</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Inspecto — Operational Event Viewer (Standard edition, optional)</name>
+    <description>
+        OPTIONAL Standard-edition events feed (EDITIONS.md CP-13, second half): the whole /events* surface —
+        recent/live-tail, filtered search, by-id, CSV-or-JSON export incl. the audit-shaped CSV, and saved
+        filter views — contributed through the core's public com.gamma.control.RouteModule ServiceLoader seam.
+
+        WHY THE WHOLE FEED (EDG-01 cell 6, 2026-09-07, operator decision). Cell 5 gated only the /metrics
+        EXPOSITION, leaving CP-13 half true: the events feed and the audit CSV export still shipped in every
+        bundle. The operator's call was to move the feed WHOLE rather than gate the export alone, because the
+        audit CSV is not a route -- it is a ?format=csv&amp;type=AUDIT branch INSIDE GET /events/export, so
+        gating it alone would mean an `if` inside a core route, which is precisely the mechanism EDITIONS
+        Assembly bans.
+
+        ⚠ Accept what that costs: Personal loses the Events SCREEN, not just an endpoint nobody browses.
+        The core answers every /events* path with 503 naming this module (AbsentEventsRoutes), /bootstrap
+        reports features.events=false, the UI drops the nav entry, and the Ops lens home falls back to
+        pipelines -- otherwise an Ops user on Personal would land on a dead screen.
+
+        ⚠ Only the HTTP SURFACE moves. EventStore/EventLog/EventQuery stay in inspecto-event: events are
+        still RECORDED in every edition (the audit trail is a compliance obligation, not a feature), and
+        AuditTrailTest still proves that on Personal. What Personal loses is the ability to READ the feed
+        back over HTTP.
+
+        Built only under the "edition-standard"/"edition-enterprise" profiles, so a routine "mvn -o clean
+        test" (= Personal, the DEFAULT build) never compiles it.
+    </description>
+
+    <dependencies>
+        <!-- The core: RouteModule/ApiContext/ApiException/Cursor (public since cell 3a; Cursor joined them
+             in cell 6, being the shared keyset codec /events, /jobs/runs and /objects all page with). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-processor</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- fp-etl test-jar: com.gamma.etl.TestConfigs boots a real CollectorService + ControlApi in the
+             tests that moved here with the route (the inspecto-metrics / inspecto-exchange pattern; test
+             scope is not transitive, so declared here). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-etl</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

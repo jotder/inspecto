@@ -29,7 +29,7 @@ is the defensible one. An auditor who disproves an overclaim discredits the cont
 | Claim | Evidence |
 |---|---|
 | Each flush writes a **new** file; nothing is overwritten | `inspecto-event/src/main/java/com/gamma/event/ParquetEventStore.java:166-168` — the base name is `"events_" + timestamp + "_" + flushSeq`; `:81-82` states the uniqueness is deliberate ("no overwrite") |
-| No delete/overwrite/truncate path exists against the event directory | No `Files.delete`, `deleteIfExists` or truncate call anywhere in `inspecto-event`. ⚠ The one nearby `delete` — `EventRoutes.java:34`, `/events/views/{name}/delete` — removes a **saved query view**, not event data (`AuditTrail.java:158`) |
+| No delete/overwrite/truncate path exists against the event directory | No `Files.delete`, `deleteIfExists` or truncate call anywhere in `inspecto-event`. ⚠ The one nearby `delete` — `/events/views/{name}/delete`, since EDG-01 cell 6 (2026-09-08) at `inspecto-events/src/main/java/com/gamma/eventsapi/EventRoutes.java` — removes a **saved query view**, not event data (`AuditTrail.java:158`). ⛔ That route is now in an OPTIONAL module absent from Personal, which only narrows this surface further; event recording and the core audit read (`AuditLogRoutes`) are unaffected |
 | One dispatch seam | `EventLog.emit` (`inspecto-event/src/main/java/com/gamma/event/EventLog.java:142`) is the sole entry point; the SLF4J capture appender (`EventStoreAppender.java:44`), direct callers and the batch-event bridge all route through it |
 | The API contract excludes update/delete | `EventStore.java:15-16` — "intentionally no update or delete" |
 | A transient write failure retries rather than silently dropping | `ParquetEventStore.java:170-186`; the drop path itself logs at ERROR (`:182`) |

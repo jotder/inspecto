@@ -36,6 +36,16 @@ export class NavigationService {
      */
     private static readonly GEO_LINK_NAV_IDS = new Set(['studio-link-analysis', 'studio-geo-map']);
 
+    /**
+     * The Events screen, whose whole data source is the optional `inspecto-events` module (EDITIONS CP-13,
+     * EDG-01 cell 6). Hidden — not disabled — when `/bootstrap` reports the feed absent: every `/events*`
+     * path 503s on a Personal build, so offering the entry would lead straight to a dead screen.
+     *
+     * ⛔ `audit` is deliberately NOT in this set. The Audit log reads the core `/audit/*` routes, which
+     * every edition serves — gating it here would hide a capability EDITIONS §Audit promises Personal.
+     */
+    private static readonly EVENTS_NAV_IDS = new Set(['events']);
+
     /** Remove every item whose id is in `ids`, at any depth, in place. */
     private static dropIds(items: GammaNavigationItem[], ids: Set<string>): void {
         for (const item of items) {
@@ -85,6 +95,9 @@ export class NavigationService {
             // silently filters nothing — which is exactly what the first version of this did, and the
             // two-directional spec caught it because the "shows" case found no studio-group either.
             NavigationService.dropIds(_default, NavigationService.GEO_LINK_NAV_IDS);
+        }
+        if (!this.session.eventsEnabled()) {
+            NavigationService.dropIds(_default, NavigationService.EVENTS_NAV_IDS);
         }
         const _compact = cloneDeep(compactNavigation);
         const _futuristic = cloneDeep(futuristicNavigation);

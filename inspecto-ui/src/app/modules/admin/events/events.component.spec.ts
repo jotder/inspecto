@@ -4,7 +4,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
-import { EventFilter, EventRow, EventsService, SavedEventView } from 'app/inspecto/api';
+import { EventFilter, EventRow, EventsService, SavedEventView, SessionService } from 'app/inspecto/api';
 import { AiStatusDialog } from 'app/inspecto/ai-assist/ai-status.dialog';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
@@ -56,6 +56,13 @@ async function create(overrides: Partial<Record<keyof EventsService, unknown>> =
     // The data-table injects the real MatDialog, so a stub must be OVERRIDDEN, not just provided.
     TestBed.overrideProvider(MatDialog, { useValue: dialog });
     await TestBed.compileComponents(); // data-table @defer block
+    // EDG-01 cell 6: SessionService.eventsEnabled defaults to FALSE (the Personal/absent-module state),
+    // where this screen renders the explained alert and never calls the API. These specs exercise the
+    // INSTALLED path, so arm the flag before the component reads it in ngOnInit.
+    // ⚠ AFTER overrideProvider, never before: TestBed.inject() INSTANTIATES the test module, and Angular
+    // then refuses any further overrideProvider ("Cannot override provider when the test module has
+    // already been instantiated") — which failed all 9 tests in this file, not just the events ones.
+    TestBed.inject(SessionService).eventsEnabled.set(true);
     const fixture = TestBed.createComponent(EventsComponent);
     fixture.detectChanges(); // ngOnInit → load() + loadViews()
     return { fixture, api };

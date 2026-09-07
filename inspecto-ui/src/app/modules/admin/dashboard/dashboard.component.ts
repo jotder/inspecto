@@ -17,6 +17,7 @@ import {
     DEFAULT_REFRESH_MS,
     EventRow,
     EventsService,
+    SessionService,
     HealthService,
     ReadyStatus,
     ReportsService,
@@ -25,6 +26,7 @@ import {
     StatusReport,
     visibleInterval,
 } from 'app/inspecto/api';
+import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoChartComponent } from 'app/inspecto/components/chart.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { StatusBadgeComponent, statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
@@ -46,6 +48,7 @@ import { CHART_SERIES } from 'app/inspecto/theme/chart-tokens';
         MatIconModule,
         MatSlideToggleModule,
         MatTooltipModule,
+        InspectoAlertComponent,
         InspectoChartComponent,
         InspectoSkeletonComponent,
         StatusBadgeComponent,
@@ -59,6 +62,14 @@ export class DashboardComponent implements OnInit {
     private reports = inject(ReportsService);
     private acqApi = inject(AcquisitionMetricsService);
     private eventsApi = inject(EventsService);
+    private session = inject(SessionService);
+
+    /**
+     * `bootstrap.features.events` — the recent-activity feed comes from the optional `inspecto-events`
+     * module (EDITIONS CP-13, EDG-01 cell 6). False on Personal, where the tile renders an explained
+     * `<inspecto-alert>` instead of a silently missing section.
+     */
+    readonly eventsEnabled = this.session.eventsEnabled;
     private toastr = inject(ToastrService);
     private destroyRef = inject(DestroyRef);
 
@@ -161,6 +172,9 @@ export class DashboardComponent implements OnInit {
             next: (m) => this.buildAcq(m),
             error: () => this.acqCards.set([]),
         });
+        // ⚠ Don't even ask when the module is absent: every /events* path 503s, and a 503 from an
+        // optional-module route is an expected deployment state, not an error to report.
+        if (!this.eventsEnabled()) return;
         this.eventsApi.search({ limit: 8 }).subscribe({
             next: (e) => this.recentEvents.set(e),
             error: () => this.recentEvents.set([]),

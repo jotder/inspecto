@@ -25,10 +25,12 @@ import {
     EventFilter,
     EventRow,
     EventsService,
+    SessionService,
     SavedEventView,
     visibleInterval,
 } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
@@ -61,6 +63,7 @@ const LIVE_TAIL_SECONDS = [2, 5, 10, 30, 60] as const;
         MatSlideToggleModule,
         MatTooltipModule,
         ChipComponent,
+        InspectoAlertComponent,
         InspectoEmptyStateComponent,
         DataTableComponent,
     ],
@@ -73,6 +76,14 @@ export class EventsComponent implements OnInit, OnDestroy {
     private dialog = inject(MatDialog);
     private confirm = inject(InspectoConfirmService);
     private toastr = inject(ToastrService);
+    private session = inject(SessionService);
+
+    /**
+     * `bootstrap.features.events` — this whole screen is the optional `inspecto-events` module (EDITIONS
+     * CP-13, EDG-01 cell 6). The nav entry is hidden when false, but a bookmark or a typed URL still lands
+     * here, so the screen explains itself instead of toasting "Failed to load events" nine times.
+     */
+    readonly eventsEnabled = this.session.eventsEnabled;
 
     readonly levels = EVENT_LEVELS;
     readonly types = EVENT_TYPES;
@@ -185,6 +196,7 @@ export class EventsComponent implements OnInit, OnDestroy {
     /** Fetch the NEXT offset page and append — true offset paging (R6; no refetch from 0).
      *  Any full refetch (filter change, refresh, live-tail tick) resets back to page 0. */
     loadMore(): void {
+        if (!this.eventsEnabled()) return;
         this.loading.set(true);
         this.api.search({ ...this.buildFilter(), offset: this.events().length }).subscribe({
             next: (rows) => {
@@ -201,6 +213,12 @@ export class EventsComponent implements OnInit, OnDestroy {
 
     /** Run the current query. `silent` (live-tail tick) keeps the grid visible instead of flashing the loader. */
     load(silent = false): void {
+        // ⚠ An absent optional module is an expected deployment state, not a failure: never call, never
+        // toast. The template renders the explained alert in place of the grid.
+        if (!this.eventsEnabled()) {
+            this.loading.set(false);
+            return;
+        }
         if (!silent) this.loading.set(true);
         this.api.search(this.buildFilter()).subscribe({
             next: (rows) => {

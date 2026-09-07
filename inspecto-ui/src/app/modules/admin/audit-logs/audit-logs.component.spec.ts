@@ -48,7 +48,7 @@ describe('AuditLogsComponent', () => {
     /** Flush both audit searches; the AUDIT one gets `rows`, ACCESS_DENIED gets none. */
     function flush(rows: unknown[]): void {
         const http = TestBed.inject(HttpTestingController);
-        http.match((r) => r.url.includes('/events/search')).forEach((r) =>
+        http.match((r) => r.url.includes('/audit/search')).forEach((r) =>
             r.flush(r.request.params.get('type') === 'AUDIT' ? rows : []),
         );
     }
@@ -94,11 +94,11 @@ describe('AuditLogsComponent', () => {
         c.loadMore();
         const http = TestBed.inject(HttpTestingController);
         // The next AUDIT page is fetched at offset = rows already fetched for that type — no refetch from 0.
-        const reqs = http.match((r) => r.url.includes('/events/search') && r.params.get('type') === 'AUDIT');
+        const reqs = http.match((r) => r.url.includes('/audit/search') && r.params.get('type') === 'AUDIT');
         expect(reqs[0].request.params.get('limit')).toBe('1000');
         expect(reqs[0].request.params.get('offset')).toBe('1000');
         reqs.forEach((r) => r.flush([{ ...AUDIT_EVENT, eventId: 'extra' }]));
-        http.match((r) => r.url.includes('/events/search')).forEach((r) => r.flush([]));
+        http.match((r) => r.url.includes('/audit/search')).forEach((r) => r.flush([]));
         fixture.detectChanges();
         // The page is appended to the already-loaded rows, and a short page clears hasMore.
         expect(c.rows().length).toBe(1001);

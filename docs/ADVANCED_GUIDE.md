@@ -456,7 +456,12 @@ infra probes: `/health`, `/ready`, `/metrics`, `/metrics/acquisition`.
 - **Collectors:** `GET /collectors` (incl. current DB watermark).
 - **Connections:** `GET /connections`, `GET /connections/{id}`, `POST /connections/{id}/test`,
   `POST /connections` *(503)*, `PUT/DELETE /connections/{id}` *(503; DELETE 409 if in use)*.
-- **Events:** `GET /events`, `/events/search`, `/events/{id}`, `/events/export`, `GET/POST /events/views`,
+- **Audit (core, every edition):** `GET /audit/search`, `/audit/export[?format=csv]` — `type` is required
+  and must be `AUDIT` or `ACCESS_DENIED` (fail-closed; anything else is a 400). This is the audit read on
+  every edition, Personal included.
+- **Events** (⚠ the optional `inspecto-events` module — Standard edition and above; **503 on Personal**,
+  where events are still recorded but the feed is not served): `GET /events`, `/events/search`,
+  `/events/{id}`, `/events/export`, `GET/POST /events/views`,
   `POST /events/views/{name}/delete`.
 - **Alerts:** `GET /alerts`, `/alerts/rules`, `POST /alerts/evaluate` (503 if no rules).
 - **Objects:** `GET/POST /objects`, `GET /objects/{id}`, `POST /objects/{id}/ack|resolve|transition|links|comments|attachments|rca`,
@@ -530,7 +535,8 @@ exact gating): `/bi/*`, `/access/*`, `/datasources*`, `/export`/`/import*`, `/li
 
 ## 11. Troubleshooting playbooks (symptom → investigate → fix)
 
-> General first move: `GET /events/search?pipeline=<p>&from=…` for the timeline, `GET /metrics` for rates,
+> General first move: `GET /events/search?pipeline=<p>&from=…` for the timeline (Standard and above — on
+> Personal use `GET /audit/search?type=AUDIT` for the audited actions), `GET /metrics` for rates,
 > and the pipeline's audit CSVs / `GET /pipelines/{n}/batches|files|quarantine` for per-file detail.
 
 **Files not being picked up.**

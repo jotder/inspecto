@@ -60,6 +60,22 @@ describe('SessionService (W6d edition switch)', () => {
         expect(svc.geoLinkEnabled()).toBe(false);
     });
 
+    it('reads features.events (EDG-01 cell 6 — the optional events feed module)', async () => {
+        const init = svc.init();
+        httpMock
+            .expectOne(`${base}/bootstrap`)
+            .flush({ edition: 'standard', features: { authMode: 'none', events: true } });
+        await init;
+        expect(svc.eventsEnabled()).toBe(true);
+    });
+
+    it('events defaults to false when /bootstrap does not mention it — never assumed present', async () => {
+        const init = svc.init();
+        httpMock.expectOne(`${base}/bootstrap`).flush({ edition: 'personal', features: { authMode: 'none' } });
+        await init;
+        expect(svc.eventsEnabled()).toBe(false);
+    });
+
     it('OIDC bootstrap + refresh 401 ⇒ authenticated false, loginRequired true', async () => {
         const done = svc.init();
         httpMock.expectOne(`${base}/bootstrap`).flush({ edition: 'standard', features: { authMode: 'oidc' } });

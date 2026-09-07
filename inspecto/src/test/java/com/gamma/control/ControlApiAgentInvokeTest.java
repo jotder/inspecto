@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
+import com.gamma.event.Event;
 import com.gamma.service.CollectorService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -68,7 +69,7 @@ class ControlApiAgentInvokeTest {
             // the non-authoring lastSimulation stamp already covered by ControlApiDecisionRulesTest.
             json(send(c.port, "POST", "/decision-rules/invoke_me/simulate", "{\"sampleRows\":[]}"));
 
-            long auditEventsBeforeApply = countAuditEvents(c.port, "invoke_me");
+            long auditEventsBeforeApply = countAuditEvents(c, "invoke_me");
             // The human never clicks "Confirm & Apply" — nothing further happens. No audit record for
             // an apply, no signal emitted, no state mutated.
             assertEquals(0, auditEventsBeforeApply, "declining (no apply call) must leave zero audit trace for this rule");
@@ -86,7 +87,7 @@ class ControlApiAgentInvokeTest {
                     "X-Agent-Session", "sess-42"));
             assertEquals("executed", result.get("executed").get(0).get("status").asText());
 
-            JsonNode audit = findAuditEvent(c.port, "invoke_me");
+            JsonNode audit = findAuditEvent(c, "invoke_me");
             assertNotNull(audit, "an apply must be audited");
             assertEquals("agent:sess-42", audit.get("attributes").get("actor").asText());
             assertEquals("agent", audit.get("attributes").get("actor_type").asText());
@@ -99,7 +100,7 @@ class ControlApiAgentInvokeTest {
             send(c.port, "POST", "/decision-rules", RULE);
             json(send(c.port, "POST", "/decision-rules/invoke_me/apply", null));
 
-            JsonNode audit = findAuditEvent(c.port, "invoke_me");
+            JsonNode audit = findAuditEvent(c, "invoke_me");
             assertNotNull(audit, "an apply must be audited");
             assertEquals("user", audit.get("attributes").get("actor_type").asText(),
                     "the default (no agent header) path must keep stamping actorType=user, unchanged");
@@ -161,15 +162,22 @@ class ControlApiAgentInvokeTest {
             assertTrue(r.statusCode() == 200 || r.statusCode() == 201,
                     "agent component create via loopback should succeed: " + r.statusCode() + " " + r.body());
 
-            JsonNode audit = findAuditByPath(c.port, "/components/expectation");
+            JsonNode audit = findAuditByPath(c, "/components/expectation");
             assertNotNull(audit, "the component write must be audited");
             assertEquals("agent:sess-99", audit.get("attributes").get("actor").asText());
             assertEquals("agent", audit.get("attributes").get("actor_type").asText());
         }
     }
 
-    private JsonNode findAuditByPath(int port, String pathFragment) throws Exception {
-        JsonNode events = json(send(port, "GET", "/events?limit=200", null));
+        /**
+     * Audit read-outs, re-seated off HTTP (EDG-01 cell 6, 2026-09-08). These tests are about agent-attributed audit stamping,
+     * not the events feed — the feed was only ever a convenient way to see what got recorded. It moved to
+     * the optional {@code inspecto-events} module, so on this (default, Personal) build {@code /events}
+     * answers 503; reading the store keeps every assertion and drops the accidental dependency on an
+     * edition-gated surface. {@code page(200, null, null)} is the exact call the v1 route made.
+     */
+    private JsonNode findAuditByPath(Ctx c, String pathFragment) {
+        JsonNode events = recentEvents(c);
         for (JsonNode e : events) {
             if ("AUDIT".equals(e.get("type").asText())
                     && e.get("attributes").get("http_path").asText().contains(pathFragment)) return e;
@@ -178,6 +186,10 @@ class ControlApiAgentInvokeTest {
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────────
+
+    private JsonNode recentEvents(Ctx c) {
+        return JSON.valueToTree(c.svc.events().page(200, null, null).stream().map(Event::toMap).toList());
+    }
 
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
         return sendWithHeader(port, method, path, body, null, null);
@@ -199,8 +211,8 @@ class ControlApiAgentInvokeTest {
     /** Every {@code AUDIT}-type event mentioning {@code ruleName} in its message (the apply route's
      *  audited action is {@code decision-rule.updated}-style; matching on message text keeps this test
      *  independent of the exact classify() verb). */
-    private int countAuditEvents(int port, String ruleName) throws Exception {
-        JsonNode events = json(send(port, "GET", "/events?limit=200", null));
+    private int countAuditEvents(Ctx c, String ruleName) {
+        JsonNode events = recentEvents(c);
         int n = 0;
         for (JsonNode e : events) {
             if ("AUDIT".equals(e.get("type").asText()) && e.get("message").asText().contains(ruleName)
@@ -209,8 +221,8 @@ class ControlApiAgentInvokeTest {
         return n;
     }
 
-    private JsonNode findAuditEvent(int port, String ruleName) throws Exception {
-        JsonNode events = json(send(port, "GET", "/events?limit=200", null));
+    private JsonNode findAuditEvent(Ctx c, String ruleName) {
+        JsonNode events = recentEvents(c);
         for (JsonNode e : events) {
             if ("AUDIT".equals(e.get("type").asText()) && e.get("attributes").get("http_path").asText().contains(ruleName)
                     && e.get("attributes").get("http_path").asText().contains("apply")) return e;

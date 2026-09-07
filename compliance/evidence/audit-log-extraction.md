@@ -46,7 +46,7 @@ Beyond the common Event fields (`eventId`, `ts`, `timestamp`, `level`, `type`, `
 
 ## 3. CSV and JSON are both audit-complete — ✅ FIXED 2026-08-28 (was AUDIT-CSV-1 / G10)
 
-`GET /events/export?format=csv&type=AUDIT` (and `type=ACCESS_DENIED`) now emits the audit-shaped
+`GET /audit/export?format=csv&type=AUDIT` (and `type=ACCESS_DENIED`) emits the audit-shaped
 CSV: the seven base columns plus one column per §2 attribute key, in the order declared by
 `AuditAttrs.ALL` (the projection derives its columns from that one list; a reflection test pins the
 list against the constants so a new key cannot miss the export):
@@ -61,24 +61,42 @@ the attributes); JSON additionally carries `payload`.
 
 *History:* before 2026-08-28 the CSV silently dropped every audit attribute — an audit CSV looked
 complete (right row count, right timestamps) while omitting everything the audit records. Filed as
-AUDIT-CSV-1 / matrix G10; fixed by the audit-shaped projection in `EventRoutes.eventsCsv`.
+AUDIT-CSV-1 / matrix G10; fixed by the audit-shaped projection, which since EDG-01 cell 6 (2026-09-08) lives in **core** at `inspecto/src/main/java/com/gamma/control/AuditLogRoutes.java` (`/audit/export?format=csv`). ⚠ It was moved there deliberately: the general `/events*` feed became the optional `inspecto-events` module (EDITIONS CP-13), and leaving the audit CSV inside it would have made this evidence unobtainable on the Personal edition. `AuditLogRoutes` is fail-closed to the `AUDIT`/`ACCESS_DENIED` types, so it serves the audit projection and nothing wider.
 
 ## 4. The extraction
 
 All routes are `GET` and read-only. Substitute your host, and authenticate as your deployment
 requires.
 
+🔴 **Which routes exist depends on the edition (EDG-01 cell 6, 2026-09-08).** The `/audit/*` routes
+below are **core — every edition, Personal included**, because this evidence must be obtainable on
+any deployment. The wider `/events/*` feed is the optional `inspecto-events` module (EDITIONS
+CP-13): on Personal it answers **503 naming the module**, so an auditor's procedure must not depend
+on it. Everything an audit needs is under `/audit/*`; the `/events/*` calls further down are
+**Standard edition and above** and are for operational triage, not for this evidence pack.
+
 **A dated slice of the audit trail (JSON — preferred because it also carries `payload`; a CSV export
 filtered to `type=AUDIT` is equally audit-complete on the §2 attributes):**
 
 ```bash
-curl -s 'http://<host>/events/export?type=AUDIT&from=2026-01-01T00:00:00Z&to=2026-03-31T23:59:59Z' > audit-q1.json
+curl -s 'http://<host>/api/v1/audit/export?type=AUDIT&from=2026-01-01T00:00:00Z&to=2026-03-31T23:59:59Z' > audit-q1.json
 ```
 
-`from`/`to` are timestamps; `type=AUDIT` restricts to audit records. Export uses the **maximum**
-row limit (10 000 — `EventQuery.MAX_LIMIT`), so **a window that returns exactly 10 000 rows is
-almost certainly truncated**: narrow the window and pull again rather than assuming that is all
-there was.
+`from`/`to` are timestamps; `type` is **required** and must be `AUDIT` or `ACCESS_DENIED` — the
+route is fail-closed, so a blank or any other type is a `400` rather than a silently wider export.
+Export uses the **maximum** row limit (10 000 — `EventQuery.MAX_LIMIT`), so **a window that returns
+exactly 10 000 rows is almost certainly truncated**: narrow the window and pull again rather than
+assuming that is all there was.
+
+**Narrowing further** — `/audit/search` takes the same `type` plus `pipeline`, `correlationId`,
+`q` (text contains), `from`, `to`, `limit`, `offset`. `correlationId` is the one to reach for when
+tracing a single request end to end across subsystems. Pull the two types separately and merge; the
+closed type set is what keeps this route an audit read rather than a general event feed.
+
+### Standard edition and above only — the operational feed
+
+⚠ Everything in this subsection is served by the optional `inspecto-events` module and **503s on
+Personal**. Do not build an evidence procedure on it.
 
 **Paging the full retained history** (buffer **and** Parquet, newest first, stable under concurrent
 writes because it is keyset-paginated on `(ts, eventId)`):
@@ -91,11 +109,11 @@ curl -s 'http://<host>/api/v1/events?limit=500'
 until it is absent. ⚠ Use this, not the legacy `GET /events?limit=`, for anything historical: the
 legacy shape serves only the **live-tail ring**, so it silently answers from a small recent window.
 
-**Narrowing further** — `/events/search` accepts `level`, `type`, `pipeline`, `correlationId`,
-`q` (text contains), `from`, `to`, `limit`, `offset`. `correlationId` is the one to reach for when
-tracing a single request end to end across subsystems.
-
 **A single record:** `GET /events/{eventId}`.
+
+⛔ **Recording is never edition-gated.** `EventStore`/`EventLog` stay in core, so a Personal
+deployment writes exactly the same audit trail — it simply reads it back through `/audit/*` instead
+of the feed. §5's chain-of-custody argument is unaffected.
 
 ## 5. Chain of custody
 

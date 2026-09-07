@@ -3,7 +3,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { ColDef } from 'ag-grid-community';
 import { forkJoin } from 'rxjs';
-import { EventRow, EventsService } from 'app/inspecto/api';
+import { AuditService, EventRow } from 'app/inspecto/api';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime } from 'app/inspecto/grid';
 
@@ -65,7 +65,11 @@ interface AuditRow {
     `,
 })
 export class AuditLogsComponent implements OnInit {
-    private api = inject(EventsService);
+    // ⚠ AuditService, NOT EventsService (EDG-01 cell 6, 2026-09-08). The full /events* feed is the
+    // optional inspecto-events module and 503s on Personal, but EDITIONS §Audit promises Personal
+    // "local append-only logs" — so this screen reads the CORE /audit/* routes every edition serves,
+    // and it deliberately does NOT gate on SessionService.eventsEnabled.
+    private api = inject(AuditService);
 
     readonly rows = signal<AuditRow[]>([]);
     readonly loading = signal(false);

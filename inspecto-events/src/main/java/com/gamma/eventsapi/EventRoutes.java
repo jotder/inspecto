@@ -1,12 +1,16 @@
-package com.gamma.control;
+package com.gamma.eventsapi;
 
+import com.gamma.control.ApiContext;
+import com.gamma.control.ApiException;
+import com.gamma.control.Cursor;
+import com.gamma.control.RouteModule;
+import com.gamma.control.TimeBounds;
 import com.gamma.event.AuditAttrs;
 import com.gamma.event.Event;
 import com.gamma.event.EventLevel;
 import com.gamma.event.EventQuery;
 import com.gamma.event.EventType;
 import com.gamma.event.SavedView;
-import com.gamma.util.OperationsZone;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -17,9 +21,26 @@ import java.util.Map;
 /**
  * Operational Event Viewer routes ({@code /events*}, v4.2.0 Phase 1): the append-only "what
  * happened" feed (recent / filtered search / by-id), CSV-or-JSON export, and saved filter views.
- * Extracted verbatim from {@link ControlApi}: identical routes, order, statuses and CSV shape.
+ *
+ * <p>EDITIONS {@code CP-13} "not for Personal", second half — EDG-01 <b>cell 6</b>, 2026-09-08. Cell 5
+ * moved the {@code /metrics} exposition and left this half in core, so CP-13 was half true. The operator's
+ * call was to move the feed <b>whole</b>: the audit CSV is not a route of its own but a
+ * {@code ?format=csv&type=AUDIT} branch inside {@link #exportEvents}, so gating the export alone would
+ * mean an {@code if} inside a core route — the one mechanism EDITIONS §Assembly bans.
+ *
+ * <p>⚠ <b>This is a visible product change, unlike cell 5.</b> Personal loses the Events <i>screen</i>, not
+ * an endpoint nobody browses. Absent this module the core's {@code AbsentEventsRoutes} answers every
+ * {@code /events*} path with 503 naming the module, {@code /bootstrap} reports
+ * {@code features.events=false}, the UI drops the nav entry, and the Ops lens home falls back to
+ * {@code pipelines} so an Ops user does not land on a dead screen.
+ *
+ * <p>⛔ <b>Recording is NOT gated.</b> {@code EventStore}/{@code EventLog} stay in {@code inspecto-event}
+ * and every edition still writes the audit trail — that is a compliance obligation, not a feature
+ * (AUDIT-CSV-1 / compliance G10). What Personal loses is reading the feed back over HTTP.
+ *
+ * <p>Extracted verbatim from {@code ControlApi}: identical routes, order, statuses and CSV shape.
  */
-final class EventRoutes implements RouteModule {
+public final class EventRoutes implements RouteModule {
 
     @Override
     public void register(ApiContext api) {
@@ -90,37 +111,11 @@ final class EventRoutes implements RouteModule {
                 .pipeline(ApiContext.query(ex, "pipeline"))
                 .correlationId(ApiContext.query(ex, "correlationId"))
                 .textContains(ApiContext.query(ex, "q"))
-                .from(epochMillis(ApiContext.query(ex, "from")))
-                .to(epochMillis(ApiContext.query(ex, "to")))
+                .from(TimeBounds.epochMillis(ApiContext.query(ex, "from")))
+                .to(TimeBounds.epochMillis(ApiContext.query(ex, "to")))
                 .limit(ApiContext.parseIntOr(ApiContext.query(ex, "limit"), defaultLimit))
                 .offset(ApiContext.parseIntOr(ApiContext.query(ex, "offset"), 0))
                 .build();
-    }
-
-    /**
-     * Parse a time bound as epoch millis (all-digits) or a {@code yyyy-MM-dd[ HH:mm:ss]} string; null when blank.
-     *
-     * <p>A bare local timestamp is an <b>operator's</b> wall clock — someone typed "from 2026-08-15" into a
-     * console — so it is anchored in the {@linkplain OperationsZone operations zone}, the same zone their
-     * schedule and {@code $today} already resolve in. ⚠ Resolved OUTSIDE the try: a misconfigured
-     * {@code -Dops.timezone} throws, and inside it that would be caught as {@code RuntimeException} and
-     * reported as a 400 blaming the query the operator just typed.
-     */
-    static Long epochMillis(String s) {
-        if (s == null || s.isBlank()) return null;
-        String t = s.trim();
-        if (t.chars().allMatch(Character::isDigit)) {
-            try { return Long.parseLong(t); } catch (NumberFormatException ignore) { return null; }
-        }
-        java.time.ZoneId zone = OperationsZone.resolve();
-        try {
-            String norm = (t.length() <= 10 ? t + " 00:00:00" : t.replace('T', ' ')).substring(0, 19);
-            return java.time.LocalDateTime.parse(norm,
-                            java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-                    .atZone(zone).toInstant().toEpochMilli();
-        } catch (RuntimeException e) {
-            throw new ApiException(400, "invalid time '" + s + "' (use epoch millis or yyyy-MM-dd[ HH:mm:ss])");
-        }
     }
 
     /** {@code GET /events/{id}} — scan the newest events (buffer + Parquet) for an exact id, else 404. */

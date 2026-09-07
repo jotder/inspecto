@@ -10,7 +10,7 @@ timestamp: 2026-06-28T00:00:00Z
 # Events & Activity
 
 Route `/events` (Operations nav group). The newest-first operational event stream
-(`GET /events/search`). A header filter toolbar (min level · type · pipeline · free-text · limit) drives the
+(`GET /events/search`). 🔴 **Edition-gated since EDG-01 cell 6 (2026-09-08):** this pane's whole data source is the optional `inspecto-events` module, so on Personal `bootstrap.features.events` is false — the nav entry is dropped, the Ops lens home falls back to `pipelines`, and the pane renders an explained `<inspecto-alert>`. ⛔ The **Audit log** pane is deliberately NOT gated with it: it reads the core `/audit/*` routes via `AuditService`, because EDITIONS §Audit promises Personal an audit trail. A header filter toolbar (min level · type · pipeline · free-text · limit) drives the
 query; a **live-tail** toggle polls via `visibleInterval` while the tab is visible; a saved-views menu
 persists filter sets; matching rows export to CSV. The grid is a **pro** [data-table](../design-system/data-table.md)
 with `[searchable]="false"` `[exportable]="false"` (backend search/export are kept) and an Actions column

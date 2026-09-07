@@ -117,6 +117,8 @@ import java.util.regex.Pattern;
  *   GET  /settings/branding                   per-space UI branding {logoDataUrl,caption,footerText}  [v4.10.0]
  *   PUT  /settings/branding                   replace per-space UI branding (write-root gated)         [v4.10.0]
  *   POST /queries/{id}/run                     run a persisted query ($-params resolved, Result Set contract) [v4.8.0]
+ *   -- /events* is served by the OPTIONAL inspecto-events module (EDG-01 cell 6, EDITIONS CP-13);
+ *      absent it, AbsentEventsRoutes answers 503 on every path below. Recording is NOT gated.
  *   GET  /events[?limit=]                     recent events, newest-first (live tail)       [v4.2.0]
  *   GET  /events/search[?level=&type=&pipeline=&correlationId=&q=&from=&to=&limit=&offset=] filtered events [v4.2.0]
  *   GET  /events/{id}                         one event by id                               [v4.2.0]
@@ -438,11 +440,12 @@ public final class ControlApi implements AutoCloseable, ApiContext {
                 new SpaceRoutes(), new DataSourceRoutes(),   // ExchangeRoutes moved to inspecto-exchange (EDG-01 cell 4)
                 new RunRoutes(),
                 new ConnectionRoutes(), new ViewRoutes(), new PipelineListRoutes(), new PipelineGraphRoutes(), new PipelineSettingsRoutes(), new PipelineRenameRoutes(), new PipelineRelatedRoutes(), new PipelineBundleRoutes(), new ComponentRoutes(), new BundleRoutes(),
-                new EventRoutes(), new ObjectRoutes(), new NoteRoutes(), new QueueRoutes(), new TagRoutes(), new CatalogRoutes(), new ConfigPreviewRoutes(), new ConfigWriteRoutes(), new ConfigReadRoutes(), new ParserRoutes(),
+                new ObjectRoutes(), new NoteRoutes(), new QueueRoutes(), new TagRoutes(), new CatalogRoutes(), new ConfigPreviewRoutes(), new ConfigWriteRoutes(), new ConfigReadRoutes(), new ParserRoutes(),   // EventRoutes moved to inspecto-events (EDG-01 cell 6)
                 new QueryRoutes(), new BiRoutes(), new DbBrowserRoutes(), new ReconRoutes(), new ShareRoutes(),   // InvRoutes + GeoRoutes moved to inspecto-geo-link (EDG-01 cell 3b)
                 new ExpectationRoutes(), new RequirementRoutes(),
                 new JobRoutes(), new SignalRoutes(), new LineageRoutes(), new EnrichmentRoutes(), new AlertRoutes(), new DecisionRoutes(), new RuleRoutes(), new AcquisitionRoutes(),
                 new NotificationRoutes(), new DeliveryStatusRoutes(), new SettingsRoutes(), new NavRoutes(), new AccessRoutes(),
+                new AuditLogRoutes(),   // the audit projection stays CORE though the /events feed is gated (EDG-01 cell 6)
                 new AssistRoutes(), new AgentRoutes(), new SystemRoutes(), new SchedulerRoutes()))
             module.register(this);
 
@@ -463,6 +466,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         new AbsentGeoLinkRoutes().register(this);
         new AbsentExchangeRoutes().register(this);
         new AbsentMetricsRoutes().register(this);
+        new AbsentEventsRoutes().register(this);
     }
 
     // ── dispatch: a composable middleware chain (S6) ─────────────────────────────

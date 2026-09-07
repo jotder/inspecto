@@ -722,7 +722,7 @@ to disable):
 ```bash
 java -cp inspecto.jar com.gamma.control.ControlApi \
      -Dcontrol.token=secret -Dobjects.sla.sweep.seconds=30 config/
-# find breached issues via the event feed
+# find breached incidents via the event feed (Standard and above: optional inspecto-events module)
 curl -s -H "Authorization: Bearer secret" "localhost:8080/api/v1/events/search?type=OBJECT_SLA_BREACH"
 ```
 
@@ -744,7 +744,7 @@ curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/api/v1/objects/
 # the case's neighbourhood, and a 2-hop correlation subgraph (nodes + edges)
 curl -s -H "Authorization: Bearer secret" "localhost:8080/api/v1/objects/<caseId>/links"
 curl -s -H "Authorization: Bearer secret" "localhost:8080/api/v1/objects/<caseId>/graph?depth=2"
-# every correlation also lands in the event feed
+# every correlation also lands in the event feed (Standard and above: optional inspecto-events module)
 curl -s -H "Authorization: Bearer secret" "localhost:8080/api/v1/events/search?type=OBJECT_LINKED"
 ```
 

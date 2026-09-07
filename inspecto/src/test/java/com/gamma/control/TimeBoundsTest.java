@@ -17,8 +17,12 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * <p>⚠ Every zone here is named explicitly. A test that asserts against {@code systemDefault()} passes on
  * every box and proves nothing, which is the trap {@code OperationsZoneTest} calls out.
+ *
+ * <p>Was {@code EventRoutesTimeBoundTest}; renamed with the EDG-01 cell 6 extraction (2026-09-08). The
+ * helper it covers stayed in CORE rather than leaving with the {@code /events*} feed, because
+ * {@link AuditLogRoutes} parses bounds the same way and a second copy would let the two drift.
  */
-class EventRoutesTimeBoundTest {
+class TimeBoundsTest {
 
     @AfterEach
     void clearZone() {
@@ -32,10 +36,10 @@ class EventRoutesTimeBoundTest {
     @Test
     void aBareDateIsMidnightInTheOperationsZone() {
         System.setProperty(OperationsZone.PROPERTY, "UTC");
-        assertEquals(expected("2026-08-15 00:00:00", "UTC"), EventRoutes.epochMillis("2026-08-15"));
+        assertEquals(expected("2026-08-15 00:00:00", "UTC"), TimeBounds.epochMillis("2026-08-15"));
 
         System.setProperty(OperationsZone.PROPERTY, "Asia/Kolkata");
-        assertEquals(expected("2026-08-15 00:00:00", "Asia/Kolkata"), EventRoutes.epochMillis("2026-08-15"));
+        assertEquals(expected("2026-08-15 00:00:00", "Asia/Kolkata"), TimeBounds.epochMillis("2026-08-15"));
     }
 
     /** The behaviour change, stated as a difference rather than a value: the same text is a different
@@ -43,9 +47,9 @@ class EventRoutesTimeBoundTest {
     @Test
     void theSameTextResolvesToADifferentInstantPerZone() {
         System.setProperty(OperationsZone.PROPERTY, "UTC");
-        long utc = EventRoutes.epochMillis("2026-08-15 06:00:00");
+        long utc = TimeBounds.epochMillis("2026-08-15 06:00:00");
         System.setProperty(OperationsZone.PROPERTY, "Asia/Kolkata");
-        long kolkata = EventRoutes.epochMillis("2026-08-15 06:00:00");
+        long kolkata = TimeBounds.epochMillis("2026-08-15 06:00:00");
 
         assertEquals(19800_000L, utc - kolkata, "+05:30 means the Kolkata reading is the earlier instant");
     }
@@ -54,8 +58,8 @@ class EventRoutesTimeBoundTest {
     @Test
     void anEpochMillisBoundIsZoneIndependent() {
         System.setProperty(OperationsZone.PROPERTY, "Pacific/Kiritimati");
-        assertEquals(1_755_000_000_000L, EventRoutes.epochMillis("1755000000000"));
-        assertNull(EventRoutes.epochMillis("  "));
+        assertEquals(1_755_000_000_000L, TimeBounds.epochMillis("1755000000000"));
+        assertNull(TimeBounds.epochMillis("  "));
     }
 
     /**
@@ -67,7 +71,7 @@ class EventRoutesTimeBoundTest {
     void anUnresolvableOperationsZoneIsNotBlamedOnTheQuery() {
         System.setProperty(OperationsZone.PROPERTY, "Mars/Olympus_Mons");
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                () -> EventRoutes.epochMillis("2026-08-15"));
+                () -> TimeBounds.epochMillis("2026-08-15"));
         assertTrue(e.getMessage().contains(OperationsZone.PROPERTY), e.getMessage());
     }
 }

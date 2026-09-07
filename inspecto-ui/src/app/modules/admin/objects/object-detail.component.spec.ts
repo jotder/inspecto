@@ -4,7 +4,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
-import { EventsService, ObjectsService, OperationalObject } from 'app/inspecto/api';
+import { EventsService, ObjectsService, OperationalObject, SessionService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ToastrService } from 'ngx-toastr';
 import { ObjectDetailComponent } from './object-detail.component';
@@ -55,6 +55,10 @@ function create(overrides: Partial<Record<keyof ObjectsService, unknown>> = {}) 
             },
         ],
     });
+    // EDG-01 cell 6: SessionService.eventsEnabled defaults to FALSE (the absent-module state),
+    // where the events section explains itself and no API call is made. Arm it for the
+    // INSTALLED path these specs assert.
+    TestBed.inject(SessionService).eventsEnabled.set(true);
     const fixture = TestBed.createComponent(ObjectDetailComponent);
     fixture.detectChanges(); // ngOnInit → loadObject()
     return { fixture, api };

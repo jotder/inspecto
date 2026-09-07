@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
+import com.gamma.event.Event;
 import com.gamma.service.CollectorService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -55,7 +56,7 @@ class ControlApiAuditTest {
             assertEquals(202, run.statusCode(), run.body());
             assertEquals("SUCCESS", awaitRun(c.port, "/runs/runs/" + json(run).get("runId").asText()));
 
-            JsonNode events = json(send(c.port, "GET", "/events?limit=200", null));
+            JsonNode events = recentEvents(c);
             JsonNode audit = null;
             for (JsonNode e : events) {
                 // The default space's event store is process-global (SpaceRoot.legacy()), so /events can carry
@@ -86,7 +87,7 @@ class ControlApiAuditTest {
                     .POST(BodyPublishers.noBody()).build();
             assertEquals(200, client.send(req, BodyHandlers.ofString()).statusCode());
 
-            JsonNode events = json(send(c.port, "GET", "/events?limit=200", null));
+            JsonNode events = recentEvents(c);
             boolean found = false;
             for (JsonNode e : events) {
                 if ("AUDIT".equals(e.get("type").asText())
@@ -97,20 +98,11 @@ class ControlApiAuditTest {
     }
 
     @Test
-    void eventRoutesAreAppendOnly(@TempDir Path dir) throws Exception {
-        try (Ctx c = open(dir)) {
-            // /events/{id} is a GET-only route → a mutation method is rejected (immutability guard).
-            assertEquals(405, send(c.port, "DELETE", "/events/whatever", null).statusCode());
-            assertEquals(405, send(c.port, "PUT", "/events/whatever", null).statusCode());
-        }
-    }
-
-    @Test
     void forbiddenRouteAttemptIsAudited(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
             assertEquals(404, send(c.port, "DELETE", "/nonexistent-secret-route", null).statusCode());
 
-            JsonNode events = json(send(c.port, "GET", "/events?limit=200", null));
+            JsonNode events = recentEvents(c);
             boolean denied = false;
             for (JsonNode e : events) {
                 if ("ACCESS_DENIED".equals(e.get("type").asText())
@@ -119,6 +111,23 @@ class ControlApiAuditTest {
             }
             assertTrue(denied, "a non-GET attempt at an unknown route is recorded as ACCESS_DENIED");
         }
+    }
+
+    /**
+     * The audit read-out, re-seated off HTTP (EDG-01 cell 6, 2026-09-08). These tests are about the AUDIT
+     * TRAIL, not the events feed — they only ever used {@code GET /api/v1/events?limit=200} as a convenient
+     * way to see what was recorded. The feed moved to the optional {@code inspecto-events} module, so on
+     * this (default, Personal) build that path now answers 503; reading the store directly keeps the
+     * assertions and drops the accidental dependency on an edition-gated surface.
+     *
+     * <p>⛔ This is the point of the cell that must NOT be lost: audit events are still RECORDED on
+     * Personal. Had these tests been deleted rather than re-seated, nothing would prove that.
+     *
+     * <p>{@code page(200, null, null)} is the exact store call the v1 route made — newest-first over the
+     * full retained history, not the live-tail ring — so the rows seen here are the rows it served.
+     */
+    private JsonNode recentEvents(Ctx c) {
+        return JSON.valueToTree(c.svc.events().page(200, null, null).stream().map(Event::toMap).toList());
     }
 
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {

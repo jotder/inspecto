@@ -187,7 +187,15 @@
             <!-- Events -->
             <mat-tab label="Events">
                 <div class="pt-6">
-                    @if (!obj()?.correlationId) {
+                    @if (!eventsEnabled()) {
+                        <!-- EDG-01 cell 6: the feed is the optional inspecto-events module. Explained, not
+                             an empty state — "no events" would misreport a feed we cannot read at all. -->
+                        <inspecto-alert variant="info" title="Events feed not installed">
+                            The operational events feed is provided by the optional events module (Standard edition and
+                            above), so this timeline cannot be shown in this bundle. Events are still recorded — the
+                            audit trail remains available on the Audit log screen.
+                        </inspecto-alert>
+                    } @else if (!obj()?.correlationId) {
                         <inspecto-empty-state
                             icon="heroicons_outline:queue-list"
                             message="This {{

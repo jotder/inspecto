@@ -33,7 +33,7 @@ export interface OidcConfig {
 /** The slice of `GET /bootstrap` this service consumes (edition switch + session). */
 interface Bootstrap {
     edition?: string;
-    features?: { authMode?: string; exchange?: boolean; geoLink?: boolean };
+    features?: { authMode?: string; exchange?: boolean; geoLink?: boolean; events?: boolean };
     session?: { authenticated?: boolean; actor?: string; capabilities?: string[] };
     auth?: Partial<OidcConfig>;
 }
@@ -72,6 +72,17 @@ export class SessionService {
      * ⚠ Set by `init()`, an APP_INITIALIZER, so it is settled before any route resolver builds the nav.
      */
     readonly geoLinkEnabled = signal(false);
+    /**
+     * `bootstrap.features.events` — the operational events FEED is registered in this bundle (EDITIONS
+     * CP-13: the optional `inspecto-events` module, Standard and above; EDG-01 cell 6).
+     *
+     * ⛔ This is NOT "auditing is off". The audit trail is still RECORDED in every edition and still
+     * READABLE through the core `/audit/*` routes, which is why the Audit log screen does not gate on this
+     * flag. Only browsing the full feed — the Events screen, the Dashboard's recent-events tile, the
+     * Incident timeline — depends on the module.
+     * ⚠ Set by `init()`, an APP_INITIALIZER, so it is settled before any route resolver builds the nav.
+     */
+    readonly eventsEnabled = signal(false);
 
     private readonly accessToken = signal<string | null>(null);
     private oidc: OidcConfig | null = null;
@@ -99,6 +110,7 @@ export class SessionService {
         this.capabilities.set(boot.session?.capabilities ?? []);
         this.exchangeEnabled.set(boot.features?.exchange === true);
         this.geoLinkEnabled.set(boot.features?.geoLink === true);
+        this.eventsEnabled.set(boot.features?.events === true);
 
         if (mode !== 'oidc') return; // Personal / offline — done, no login path.
 

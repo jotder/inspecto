@@ -24,6 +24,7 @@ import {
     apiErrorMessage,
     EventRow,
     EventsService,
+    SessionService,
     NodeKind,
     ObjectGraph,
     ObjectGraphNode,
@@ -33,6 +34,7 @@ import {
 } from 'app/inspecto/api';
 import { AiStatusComponent } from 'app/inspecto/ai-assist/ai-status.component';
 import { InspectoBreadcrumbComponent } from 'app/inspecto/components/breadcrumb.component';
+import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
@@ -73,6 +75,7 @@ interface MemberTimelineEntry {
         AiStatusComponent,
         GraphViewComponent,
         InspectoBreadcrumbComponent,
+        InspectoAlertComponent,
         InspectoEmptyStateComponent,
         InspectoSkeletonComponent,
         StatusBadgeComponent,
@@ -84,6 +87,14 @@ interface MemberTimelineEntry {
 export class ObjectDetailComponent implements OnInit {
     private api = inject(ObjectsService);
     private eventsApi = inject(EventsService);
+    private session = inject(SessionService);
+
+    /**
+     * `bootstrap.features.events` — the correlation timeline reads the optional `inspecto-events` module
+     * (EDITIONS CP-13, EDG-01 cell 6). False on Personal, where the Events tab explains itself rather than
+     * showing "no events recorded", which would be a lie about the data.
+     */
+    readonly eventsEnabled = this.session.eventsEnabled;
     private route = inject(ActivatedRoute);
     private destroyRef = inject(DestroyRef);
     private router = inject(Router);
@@ -278,6 +289,9 @@ export class ObjectDetailComponent implements OnInit {
             this.eventsLoaded.set(true);
             return;
         }
+        // ⚠ Skip the call entirely when the module is absent — every /events* path 503s there, and the tab
+        // must not report "no events" for a feed it simply cannot read.
+        if (!this.eventsEnabled()) return;
         this.eventsApi.search({ correlationId: cid, limit: 200 }).subscribe({
             next: (e) => {
                 this.relatedEvents.set(e);

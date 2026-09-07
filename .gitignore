@@ -93,6 +93,7 @@ inspecto-consignment-outputs.db.wal
 /inspecto-geo-link/target/
 /inspecto-exchange/target/
 /inspecto-metrics/target/
+/inspecto-events/target/
 /inspecto-security/target/
 /inspecto-policy/target/
 /inspecto-intelligence/target/

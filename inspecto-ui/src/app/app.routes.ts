@@ -1,7 +1,7 @@
 import { inject } from '@angular/core';
 import { Route } from '@angular/router';
 import { initialDataResolver } from 'app/app.resolvers';
-import { authGuard, Lens, LensService } from 'app/inspecto/api';
+import { authGuard, Lens, LensService, SessionService } from 'app/inspecto/api';
 import { LayoutComponent } from 'app/layout/layout.component';
 
 /** The default landing route per persona lens (W4 — plan §1's per-lens home page). Each target is the
@@ -14,10 +14,21 @@ export const LENS_HOME: Record<Lens, string> = {
     ops: 'events',
 };
 
+/** Where the Ops lens lands when the events feed is not installed (EDG-01 cell 6). Pipelines is the
+ *  Builder home and the nearest operational surface that exists in every edition. */
+const OPS_HOME_WITHOUT_EVENTS = 'pipelines';
+
 /** Route-level redirect target for `''` — reads the persisted lens (no route data/resolver needed since
- *  `LensService` restores synchronously from `localStorage` in its constructor). */
+ *  `LensService` restores synchronously from `localStorage` in its constructor).
+ *
+ *  ⚠ The Ops home is conditional (EDG-01 cell 6, 2026-09-08): `events` is the optional `inspecto-events`
+ *  module's screen, so on a Personal build landing "/" there would drop an Ops user straight onto a pane
+ *  whose every call 503s — the one place a hidden nav entry cannot save them, because nothing was clicked.
+ *  `SessionService.init()` is an APP_INITIALIZER, so the flag is settled before this resolver runs. */
 export function lensHomeRedirect(): string {
-    return LENS_HOME[inject(LensService).currentLens()];
+    const lens = inject(LensService).currentLens();
+    if (lens === 'ops' && !inject(SessionService).eventsEnabled()) return OPS_HOME_WITHOUT_EVENTS;
+    return LENS_HOME[lens];
 }
 
 // @formatter:off

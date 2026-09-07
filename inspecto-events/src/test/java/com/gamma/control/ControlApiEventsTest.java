@@ -24,6 +24,17 @@ import static org.junit.jupiter.api.Assertions.*;
  * Integration tests for the Phase-1 Event Viewer routes over real HTTP: the live-tail feed
  * ({@code /events}), filtered search, event-by-id, CSV/JSON export, and saved-view CRUD. A pipeline
  * trigger generates a {@code BATCH_COMMITTED} domain event (plus captured INFO logs) to query against.
+ *
+ * <p><b>Moved here from {@code inspecto} with {@link EventRoutes}</b> (EDG-01 cell 6, 2026-09-08), not
+ * deleted: these assertions are the feed's contract and still hold — just no longer of the DEFAULT
+ * (Personal) build, where the module is absent and {@code AbsentEventsRoutes} answers 503. The halves are
+ * paired on purpose: this class proves the feed WITH the module,
+ * {@code NoExchangeShipsInThePersonalBuildTest} proves the 503 WITHOUT it, so a path that drifted out of
+ * step fails one of them.
+ *
+ * <p>⚠ Lives in package {@code com.gamma.control} so it can construct the package-private
+ * {@code ControlApi} — the same split-package arrangement {@code inspecto-metrics} and
+ * {@code inspecto-exchange} use.
  */
 class ControlApiEventsTest {
 
@@ -132,7 +143,7 @@ class ControlApiEventsTest {
     }
 
     private JsonNode json(HttpResponse<String> r) throws Exception {
-        return V1Body.of(r.body());
+        return json(r.body());
     }
 
     /** Poll an accepted run (W5b) to its terminal status, or fail after 10s. */
@@ -144,5 +155,15 @@ class ControlApiEventsTest {
             Thread.sleep(50);
         }
         return fail("run " + runPath + " did not reach a terminal status within 10s");
+    }
+
+    /**
+     * Parse a v1 response and peel the envelope's {@code data} (mirrors the control module's
+     * {@code V1Body.of}, which lives in inspecto's TEST tree and so is not visible from another module —
+     * the inspecto-policy / inspecto-exchange precedent).
+     */
+    private static JsonNode json(String raw) throws Exception {
+        JsonNode n = JSON.readTree(raw);
+        return n.has("data") ? n.get("data") : n;
     }
 }
