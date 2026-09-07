@@ -33,7 +33,7 @@ export interface OidcConfig {
 /** The slice of `GET /bootstrap` this service consumes (edition switch + session). */
 interface Bootstrap {
     edition?: string;
-    features?: { authMode?: string; exchange?: boolean };
+    features?: { authMode?: string; exchange?: boolean; geoLink?: boolean };
     session?: { authenticated?: boolean; actor?: string; capabilities?: string[] };
     auth?: Partial<OidcConfig>;
 }
@@ -65,6 +65,13 @@ export class SessionService {
     readonly capabilities = signal<string[]>([]);
     /** `bootstrap.features.exchange` — the multi-space runtime hosts the cross-Space Exchange. */
     readonly exchangeEnabled = signal(false);
+    /**
+     * `bootstrap.features.geoLink` — the geo map + link analysis routes are REGISTERED in this bundle
+     * (EDITIONS CP-09: an optional module Standard and Enterprise carry and Personal does not). The
+     * backend derives it from what actually registered, so this is never a guess about the edition.
+     * ⚠ Set by `init()`, an APP_INITIALIZER, so it is settled before any route resolver builds the nav.
+     */
+    readonly geoLinkEnabled = signal(false);
 
     private readonly accessToken = signal<string | null>(null);
     private oidc: OidcConfig | null = null;
@@ -91,6 +98,7 @@ export class SessionService {
         this.authMode.set(mode);
         this.capabilities.set(boot.session?.capabilities ?? []);
         this.exchangeEnabled.set(boot.features?.exchange === true);
+        this.geoLinkEnabled.set(boot.features?.geoLink === true);
 
         if (mode !== 'oidc') return; // Personal / offline — done, no login path.
 

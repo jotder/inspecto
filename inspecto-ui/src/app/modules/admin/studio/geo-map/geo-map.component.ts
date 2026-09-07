@@ -480,7 +480,16 @@ export class GeoMapComponent implements OnInit, OnDestroy {
             this.queryOpen.set(false);
         } catch (err) {
             this.geo.set(null);
-            this.loadError.set(err instanceof Error ? err.message : apiErrorMessage(err, 'The query failed.'));
+            // EDITIONS CP-09: a 503 means the backend module is absent in this bundle, not that the query
+            // was bad — say so, instead of a generic failure the user will retry (the assist-panel idiom).
+            // The nav entry is hidden on the same flag; this is the belt for a bookmarked/deep-linked URL.
+            this.loadError.set(
+                (err as { status?: number } | null)?.status === 503
+                    ? 'Geo map is not available in this edition — its backend module is not installed in this bundle.'
+                    : err instanceof Error
+                      ? err.message
+                      : apiErrorMessage(err, 'The query failed.'),
+            );
         } finally {
             this.loading.set(false);
         }

@@ -44,6 +44,22 @@ describe('SessionService (W6d edition switch)', () => {
         httpMock.expectNone(`${base}/auth/refresh`); // never attempts a session under Personal
     });
 
+    it('reads features.geoLink, and treats an absent flag as NOT enabled (Personal ships no geo/link module)', async () => {
+        const init = svc.init();
+        httpMock
+            .expectOne(`${base}/bootstrap`)
+            .flush({ edition: 'standard', features: { authMode: 'none', geoLink: true } });
+        await init;
+        expect(svc.geoLinkEnabled()).toBe(true);
+    });
+
+    it('geoLink defaults to false when /bootstrap does not mention it — never assumed present', async () => {
+        const init = svc.init();
+        httpMock.expectOne(`${base}/bootstrap`).flush({ edition: 'personal', features: { authMode: 'none' } });
+        await init;
+        expect(svc.geoLinkEnabled()).toBe(false);
+    });
+
     it('OIDC bootstrap + refresh 401 ⇒ authenticated false, loginRequired true', async () => {
         const done = svc.init();
         httpMock.expectOne(`${base}/bootstrap`).flush({ edition: 'standard', features: { authMode: 'oidc' } });

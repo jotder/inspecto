@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>inspecto-geo-link</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Inspecto — geo map + link analysis routes (Standard edition, optional)</name>
+    <description>
+        OPTIONAL Standard-edition control-plane route groups (EDITIONS.md CP-09, "Geo map + link analysis"):
+        GeoRoutes (/geo/projection, /geo/routes) and InvRoutes (/inv/projection, /inv/projection/neighbors,
+        /inv/schema/relationships), contributed through the core's public com.gamma.control.RouteModule
+        ServiceLoader seam (EDG-01 cell 3a) and registered AFTER the core's built-in route list.
+
+        WHY THIS MODULE EXISTS (EDG-01 cell 3b, 2026-09-07). CP-09 was decided "not for Personal" on
+        2026-09-02 and both route groups nonetheless shipped in every bundle because they sat in the core.
+        Dropping THIS jar on the classpath is what makes the five paths exist; without it the core answers
+        them with 503 "not installed" (AbsentGeoLinkRoutes) and /bootstrap reports features.geoLink=false,
+        on which the SPA hides the two nav entries and the two widget offers.
+
+        THIN, like inspecto-policy: nothing beyond what the core already supplies (the query engine, the
+        component/view stores, Jackson), so there is no shade and no sidecar classifier.
+
+        Built only under the "edition-standard"/"edition-enterprise" profiles (see the parent pom's
+        profile-scoped &lt;modules&gt;), so a routine "mvn -o clean test" (= Personal, the DEFAULT build --
+        there is no -Pedition-personal) never compiles or tests it.
+    </description>
+
+    <dependencies>
+        <!-- The core: RouteModule/ApiContext/ApiException/WriteGates (public since cell 3a), the query
+             engine and the component/view stores. Compile scope, as inspecto-policy does — a thin jar
+             dropped beside inspecto.jar resolves all of it from there at run time. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-processor</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- fp-etl test-jar: the shared fixtures com.gamma.etl.TestConfigs / PipelineConfigBatchTest boot a
+             real CollectorService + ControlApi in the two HTTP tests that moved here with the routes (same
+             pattern as inspecto-policy; test scope is not transitive, so declared explicitly). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-etl</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

@@ -28,6 +28,13 @@ import static org.junit.jupiter.api.Assertions.*;
  * route aggregation with summed weight, truncation, and the fail-closed gates. Also covers the ComponentStore
  * widening: a {@code geo-map-view} component persists via /components.
  */
+/*
+ * ⚠ Package com.gamma.control, in the inspecto-geo-link module — a TEST-SCOPE split package, on purpose, and the
+ * same technique inspecto-policy's ControlApiPolicyEnforcementTest uses: this test constructs `new ControlApi(svc, 0)`
+ * (package-private) so it drives the real dispatcher, and with the module on this classpath the routes are
+ * discovered via META-INF/services exactly as in a Standard bundle. Moved verbatim from inspecto on 2026-09-07
+ * (EDG-01 cell 3b); the only edit is V1Body → the local json() helper below.
+ */
 class ControlApiGeoProjectionTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -76,7 +83,7 @@ class ControlApiGeoProjectionTest {
             HttpResponse<String> r = post(c.port, "geo/projection", """
                     {"dataset":"sights_ds","latCol":"lat","lonCol":"lon","entityCol":"who","kindCol":"kind"}""");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode data = V1Body.of(r.body());
+            JsonNode data = json(r.body());
             assertEquals(3, data.get("points").size(), "two bad coordinates are excluded: " + data);
             assertEquals(2, data.get("skipped").asInt(), "out-of-range + NULL rows are skipped");
             assertFalse(data.get("truncated").asBoolean());
@@ -94,7 +101,7 @@ class ControlApiGeoProjectionTest {
             HttpResponse<String> r = post(c.port, "geo/projection",
                     "{\"dataset\":\"sights_ds\",\"latCol\":\"lat\",\"lonCol\":\"lon\"}");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode points = V1Body.of(r.body()).at("/points");
+            JsonNode points = json(r.body()).at("/points");
             assertEquals(3, points.size());
             assertEquals("point", points.get(0).get("kind").asText(), "no kindCol → the 'point' default");
         }
@@ -107,7 +114,7 @@ class ControlApiGeoProjectionTest {
             HttpResponse<String> r = post(c.port, "geo/projection", """
                     {"dataset":"sights_ds","latCol":"lat","lonCol":"lon","limit":2}""");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode data = V1Body.of(r.body());
+            JsonNode data = json(r.body());
             assertEquals(2, data.get("points").size());
             assertTrue(data.get("truncated").asBoolean());
             assertEquals(2, data.get("skipped").asInt(), "skipped counts all bad rows, independent of the limit");
@@ -121,7 +128,7 @@ class ControlApiGeoProjectionTest {
             HttpResponse<String> r = post(c.port, "geo/projection", """
                     {"dataset":"sights_ds","latCol":"lat","lonCol":"lon","attrCols":["who"]}""");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode points = V1Body.of(r.body()).at("/points");
+            JsonNode points = json(r.body()).at("/points");
             assertEquals("alice", points.get(0).get("attrs").get("who").asText());
         }
     }
@@ -147,7 +154,7 @@ class ControlApiGeoProjectionTest {
                     {"dataset":"trips_ds","fromLatCol":"alat","fromLonCol":"alon","toLatCol":"blat","toLonCol":"blon",
                      "fromCol":"a","toCol":"b","kindCol":"kind"}""");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode data = V1Body.of(r.body());
+            JsonNode data = json(r.body());
             assertEquals(2, data.get("routes").size(), "two distinct O/D+kind routes survive: " + data);
             assertEquals(3, data.get("points").size(), "alice, bob, carol fold into 3 endpoints");
             assertEquals(1, data.get("skipped").asInt(), "the out-of-range destination row is skipped");
@@ -189,5 +196,12 @@ class ControlApiGeoProjectionTest {
             assertTrue(new ComponentStore(c.root.resolve("registry")).get("geo-map-view", "dhaka-map").isPresent(),
                     "saved geo view lands in the real component store");
         }
+    }
+
+    /** Parse a v1 response and peel the envelope's {@code data} (mirrors the control module's V1Body, which
+     *  lives in inspecto's TEST tree and is not visible from another module — the inspecto-policy precedent). */
+    private static com.fasterxml.jackson.databind.JsonNode json(String raw) throws Exception {
+        com.fasterxml.jackson.databind.JsonNode n = new com.fasterxml.jackson.databind.ObjectMapper().readTree(raw);
+        return n.has("data") ? n.get("data") : n;
     }
 }

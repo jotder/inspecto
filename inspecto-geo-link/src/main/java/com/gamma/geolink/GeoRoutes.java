@@ -1,4 +1,9 @@
-package com.gamma.control;
+package com.gamma.geolink;
+
+import com.gamma.control.ApiContext;
+import com.gamma.control.ApiException;
+import com.gamma.control.RouteModule;
+import com.gamma.control.WriteGates;
 
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
@@ -37,7 +42,13 @@ import java.util.regex.Pattern;
  * statement. Deliberately plain SQL: no DuckDB {@code spatial} extension (no geometry op is needed here, and
  * the hardened {@code SqlSandbox} disables extension loading) — see the plan's Phase 4 note.
  */
-final class GeoRoutes implements RouteModule {
+/*
+ * ⚠ Relocated from com.gamma.control (inspecto) on 2026-09-07, EDG-01 cell 3b — EDITIONS CP-09 is "not for
+ * Personal", and this class shipped in every bundle because it sat in the core. It now reaches ControlApi only
+ * through the public RouteModule SPI (META-INF/services), from a module the Personal build does not include.
+ * The package moved with it so com.gamma.control is not split across two jars. Nothing in the handlers changed.
+ */
+public final class GeoRoutes implements RouteModule {
 
     private static final Pattern SAFE_IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
     /** Mirrors the client's GEO_POINT_CAP; the server can scale far higher on request. */

@@ -9,6 +9,13 @@ timestamp: 2026-07-07T00:00:00Z
 
 # Geo Map Analysis
 
+> **Edition (2026-09-07, EDG-01 cell 3b).** Geo map's backend routes live in the optional `inspecto-geo-link` module —
+> Standard and Enterprise only (EDITIONS `CP-09`). `SessionService.geoLinkEnabled` mirrors `/bootstrap`
+> `features.geoLink`; when false the nav entry and the Menu-Builder widget offer are **hidden**, and a deep link
+> that still reaches the page gets a 503 from the core stub, which the component renders as an edition message
+> rather than a generic query failure. ⚠ The flag is derived server-side from what actually registered, never
+> guessed from the edition string.
+
 The Builder-lens studio at `/studio/geo-map` for the *where* of an investigation (sibling of
 [Link Analysis](link-analysis.md)'s *who-connects-to-whom*). Vocabulary:
 [`GLOSSARY.md`](../../../GLOSSARY.md) §11-Geo (GeoSource, GeoQuery, GeoPoint/GeoRoute, Geo View, Layer,

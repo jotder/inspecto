@@ -3,7 +3,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { ColDef } from 'ag-grid-community';
 import { forkJoin } from 'rxjs';
-import { ComponentDef, ComponentsService, ComponentType } from 'app/inspecto/api';
+import { ComponentDef, ComponentsService, ComponentType, SessionService } from 'app/inspecto/api';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { MenuBinding, PlaceableKind } from 'app/inspecto/menu';
 
@@ -60,6 +60,16 @@ const KINDS: { kind: PlaceableKind; label: string }[] = [
 export class MenuAttachDialog {
     readonly ref = inject<MatDialogRef<MenuAttachDialog, MenuAttachResult>>(MatDialogRef);
     private components = inject(ComponentsService);
+    private readonly session = inject(SessionService);
+
+    /**
+     * The kinds this bundle can actually place. Geo view and Link view ride on an optional backend module
+     * (EDITIONS CP-09); when `/bootstrap` says it is absent they are not OFFERED — offering them and then
+     * failing on the query would be the dishonest half of the same edition boundary.
+     */
+    private readonly kinds = this.session.geoLinkEnabled()
+        ? KINDS
+        : KINDS.filter((k) => k.kind !== 'geo-map-view' && k.kind !== 'link-analysis-view');
 
     readonly rows = signal<PickRow[]>([]);
     readonly loading = signal(true);
@@ -70,11 +80,11 @@ export class MenuAttachDialog {
     ];
 
     constructor() {
-        forkJoin(KINDS.map((k) => this.components.list(k.kind as ComponentType))).subscribe({
+        forkJoin(this.kinds.map((k) => this.components.list(k.kind as ComponentType))).subscribe({
             next: (lists) => {
                 const rows: PickRow[] = [];
                 lists.forEach((defs: ComponentDef[], i) => {
-                    const { kind, label } = KINDS[i];
+                    const { kind, label } = this.kinds[i];
                     for (const d of defs) rows.push({ name: d.name, kind, kindLabel: label, componentId: d.name });
                 });
                 this.rows.set(rows.sort((a, b) => a.name.localeCompare(b.name)));

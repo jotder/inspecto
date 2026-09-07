@@ -1,6 +1,6 @@
 # EDG-01 — gating the six "not for Personal" features (BUILD PLAN, in flight)
 
-> **Status 2026-09-07: mechanism DECIDED; ✅ cells 1 (`CP-15`) and 2 (`OPS-06`) SHIPPED; cell 3a (the public route SPI) BUILT, verification pending; 3b + three cells remain.** BACKLOG `EDG-01`, ranked **P1** — the
+> **Status 2026-09-07: mechanism DECIDED; ✅ cells 1 (`CP-15`), 2 (`OPS-06`) and 3a (public route SPI) SHIPPED; 3b (`CP-09`) BUILT, verification pending; three cells remain (SEC-10 · CP-13 · CP-11).** BACKLOG `EDG-01`, ranked **P1** — the
 > only substantive Personal-scoped work on the board. Parent truth:
 > [`../EDITIONS.md`](../EDITIONS.md) §Feature × edition matrix + §Edition-gating debt.
 
@@ -401,3 +401,84 @@ also settled.)
 ⚠ Spec gotcha, house idiom: the dialog renders `<inspecto-data-table>`, whose theme service walks up to
 `GAMMA_APP_CONFIG` — stub `InspectoGridThemeService` with `{ theme: () => INSPECTO_GRID_DARK }`, as the
 config-pane spec does, or every case dies in DI before the assertion.
+
+## 15. Cell 3b as built — the backend half (2026-09-07)
+
+Everything §11/§12 asked for, and the shape it settled into:
+
+* **`ApiContext.hasRoute(method, pattern)`** — one exact-string question, implemented off `ControlApi`'s
+  duplicate-guard set. It is what lets two things be **derived from what actually registered** rather than
+  guessed from the edition: `/bootstrap`'s `features.geoLink` (`BootstrapRoutes`), and the absent-module stub.
+* **`inspecto-geo-link`** — thin like `inspecto-policy`; `GeoRoutes` + `InvRoutes` relocated to
+  `com.gamma.geolink` (so `com.gamma.control` is not split across jars), made `public` for `ServiceLoader`'s
+  no-arg construction, registered via `META-INF/services/com.gamma.control.RouteModule`. The handlers are
+  untouched; two `{@link}`s to core types became `{@code}`.
+* **`AbsentGeoLinkRoutes`** (core) — registered **last**, after discovery, through **`ApiContext.stub`**, and
+  only for the five `(method, pattern)` pairs `hasRoute` says nobody claimed; each answers 503 naming the
+  module and the editions. Registering it earlier would shadow the real module; registering it without the
+  `hasRoute` skip would trip the duplicate guard. Both orderings are load-bearing and commented at the site.
+
+  🔴 **The first build got this wrong, and the falsification test caught it.** The stub registered through the
+  ordinary `api.post/get`, so `hasRoute` answered true for the stub's own pattern — and `/bootstrap` reported
+  `geoLink: true` on a Personal build with no module present. "A route exists" and "the feature is installed"
+  are different questions; the flag had been derived from the wrong one. Fix: stubs register through their own
+  door (`stub`), occupy the route table (so the path 503s, not 404s) but do **not** count for `hasRoute`; a
+  real registration over a stub, or a stub over a real route, is refused. `NoGeoLinkShipsInThePersonalBuildTest`
+  asserts the flag is present-and-false — that exact assertion is what failed, which is the point of it.
+* **Tests moved with the routes** — `ControlApiGeoProjectionTest`/`ControlApiInvProjectionTest` in package
+  `com.gamma.control` inside the module (the `inspecto-policy` precedent), `V1Body.of` → a 4-line local
+  `json()` peel, fixtures from the `inspecto-etl` test-jar. **`NoGeoLinkShipsInThePersonalBuildTest`** stays
+  in core: over real HTTP on the default build, all five paths **503** (not 404 — that would mean the stub lost
+  a path; not 200 — that would mean the module leaked), `features.geoLink` is present-and-false, and the only
+  discovered `RouteModule` is the test vehicle.
+
+⚠ **The stub's five pairs are a second copy of the module's surface.** They are kept in step from both
+sides: the core test proves each 503s without the module, the module's tests prove each 200s with it. A path
+added to one and not the other shows up as a 404 on Personal — in the core test, by design.
+
+**Against §6:** (1) ✅ absent from the default reactor · (2) ✅ proven by packaging (both bundles) ·
+(3) ✅ **met for the first time** — absent module ⇒ 503 with an explanation, over real HTTP ·
+(4) ✅ the two HTTP test classes moved unchanged apart from the peel helper · (5) ✅ vacuous, no gates ·
+(6) ✅ EDITIONS `CP-09` updated.
+
+## 16. Cell 4 grounding — `SEC-10` exchange / sharing, the first GATED cell (2026-09-07)
+
+* **Surface:** 11 routes in `ExchangeRoutes` (`:44-68`), 6 of them gated (`canOfferDatasets` ×2,
+  `canRequestShares` ×2, `canApproveShares` ×2) with matching `CapabilityManifest` entries (`:65-71`).
+  Everything it uses outside `com.gamma.exchange` is already public and in another module
+  (`ComponentRegistry`/`ComponentStore`, `Event`/`EventLog`/`EventType`, `SpaceContext`/`SpaceId`); its helpers
+  are private statics. **No package-private core type is touched.**
+
+* ✅ **Q2 resolved — the manifest test survives the move.** `CapabilityManifestTest` walks every reactor
+  module's `src/main/java` since 3a, so the six gated sites are found wherever they live; the manifest stays
+  in core and the drift check stays exact in both directions. At runtime, `capabilityFor` is consulted only for
+  a path that actually dispatched, so phantom entries for unregistered routes are never reached.
+
+* ⚠ **Residual, runtime only, and a decision:** `Roles.KNOWN_CAPABILITIES = Set.copyOf(CapabilityManifest.
+  capabilities())` (`Roles:79`) keeps the three exchange capability names grantable on Personal — a role or
+  policy may name `canOfferDatasets` and it grants nothing. **Decision: leave the vocabulary static.** Deriving
+  it from registered routes would make a role file authored on Standard fail validation on Personal — a
+  portability break worse than dead vocabulary, and a per-edition difference in a *validator*. Dead vocabulary
+  is not a hole: there is no route behind it. Recorded here so nobody "fixes" it into the worse shape.
+
+* 🔴 **`features.exchange` has the exact defect CP-09 fixed for geo-link.** `BootstrapRoutes:62` computes it
+  as `containerRoot() != null` — a guess about the deployment, not a fact about the bundle. A Personal install
+  with `-Dspaces.root` set would report `exchange: true` with no module present, and the SPA's `canShare`
+  buttons (`datasets`, `widgets`, `link-analysis`; `catalog` branches nav on it) would 404 on click. Fix:
+  `containerRoot() != null && api.hasRoute("POST", "/exchange/offers")`. **No UI change is needed** —
+  `exchangeEnabled` already gates every affordance; only its source of truth was wrong.
+
+* **Seam:** `SharedRefResolver` (`inspecto-engine`, `:18-44`) is an installed-singleton SPI whose `NONE`
+  resolves nothing — fail-closed, and `install()` is a public idempotent static. So `ControlApi:250`'s
+  `SharedRefResolver.install(new ExchangeRefResolver(spaces))` is deleted from core and the module's
+  `RouteModule.register` performs it; absent module ⇒ `DatasetRelation` sees `NONE` and every `shared/` ref
+  fails to resolve, which is the correct answer with zero wiring. `ExchangeRefResolver` moves with the routes.
+
+* **Tests:** four HTTP classes (`ControlApiExchange{,Snapshot,View,Widget}Test`) move with the cell-3b recipe
+  (package `com.gamma.control` in the module, local `json()` peel). No test asserts `ENTRIES` size.
+
+* **Shape, then:** `inspecto-exchange` = `com.gamma.exchange.*` + `ExchangeRoutes` + `ExchangeRefResolver`
+  (relocated packages, public no-arg ctor), thin like policy; core keeps the manifest entries, gains
+  `AbsentExchangeRoutes` (11 pairs → 503, `hasRoute`-skipped, registered last) and the `hasRoute`-derived
+  flag; `NoExchangeShipsInThePersonalBuildTest` proves 503 × 11, `features.exchange=false`, and
+  `SharedRefResolver.global() == NONE` on the default build.

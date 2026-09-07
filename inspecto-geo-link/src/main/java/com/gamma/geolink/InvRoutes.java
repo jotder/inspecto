@@ -1,4 +1,9 @@
-package com.gamma.control;
+package com.gamma.geolink;
+
+import com.gamma.control.ApiContext;
+import com.gamma.control.ApiException;
+import com.gamma.control.RouteModule;
+import com.gamma.control.WriteGates;
 
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
@@ -36,7 +41,7 @@ import java.util.regex.Pattern;
  * {@code value}: the one-hop neighborhood of that entity (rows where it's either endpoint), so the
  * Studio's "expand node" action can grow the canvas without re-fetching the whole relation.
  *
- * <p>Fail-closed like {@link BiRoutes}: write root unset → 503; unknown dataset → 404; a non-identifier
+ * <p>Fail-closed like {@code BiRoutes}: write root unset → 503; unknown dataset → 404; a non-identifier
  * column or unusable dataset → 422. Column names are validated identifiers — no caller SQL text enters
  * the statement — and NULL endpoints are excluded (a link needs both ends).
  *
@@ -44,7 +49,13 @@ import java.util.regex.Pattern;
  * naming-convention FK suggestions across every Dataset, so the Studio can pre-fill multi-mapping
  * projections instead of requiring every column pair to be hand-picked. See {@link #schemaRelationships}.
  */
-final class InvRoutes implements RouteModule {
+/*
+ * ⚠ Relocated from com.gamma.control (inspecto) on 2026-09-07, EDG-01 cell 3b — EDITIONS CP-09 is "not for
+ * Personal", and this class shipped in every bundle because it sat in the core. It now reaches ControlApi only
+ * through the public RouteModule SPI (META-INF/services), from a module the Personal build does not include.
+ * The package moved with it so com.gamma.control is not split across two jars. Nothing in the handlers changed.
+ */
+public final class InvRoutes implements RouteModule {
 
     private static final Pattern SAFE_IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
     private static final int DEFAULT_LIMIT = 2_000;

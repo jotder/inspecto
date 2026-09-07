@@ -60,6 +60,10 @@ final class BootstrapRoutes implements RouteModule {
         f.put("authoring", api.writeRoot() != null);      // write-root set ⇒ config authoring enabled
         f.put("multiSpace", api.spaces().supportsCrud());
         f.put("exchange", api.spaces().containerRoot() != null);   // cross-space sharing needs -Dspaces.root
+        // EDITIONS CP-09 (EDG-01 cell 3b): true only when the optional inspecto-geo-link module actually
+        // registered its routes — derived, never an edition guess. The SPA hides the two nav entries and
+        // the two widget offers on it.
+        f.put("geoLink", api.hasRoute("POST", "/geo/projection") && api.hasRoute("POST", "/inv/projection"));
         f.put("authMode", System.getProperty("auth.mode", "none"));
         return f;
     }

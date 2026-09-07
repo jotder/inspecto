@@ -208,6 +208,30 @@ public interface ApiContext {
 
     void delete(String pattern, Handler h);
 
+    /**
+     * Whether a REAL handler owns {@code METHOD pattern} — the exact string a {@link RouteModule} passed, not a
+     * path to match — <b>excluding</b> absent-module stubs registered through {@link #stub}. Added 2026-09-07
+     * (EDG-01 cell 3b) so two things can be DERIVED from what actually registered rather than guessed from
+     * the edition: the {@code /bootstrap} {@code features} flags, and the stubs themselves, which register
+     * only where the module did not.
+     *
+     * <p>🔴 The exclusion is the whole point, learned the hard way: the first version counted stubs, so
+     * {@code /bootstrap} reported {@code geoLink: true} on a Personal build because the 503 stub had claimed
+     * the pattern. "A route exists" and "the feature is installed" are different questions.
+     */
+    boolean hasRoute(String method, String pattern);
+
+    /**
+     * Register an <b>absent-module stub</b>: a handler that answers for an optional feature's path when the
+     * feature's module is not on the classpath (typically a 503 that explains itself). It occupies the route
+     * table like any handler — first-match dispatch, duplicate-refused — but does NOT make {@link #hasRoute}
+     * true, so a capability flag derived from {@code hasRoute} stays honest. Register stubs LAST, after
+     * {@code ServiceLoader} discovery, and only for patterns {@code hasRoute} reports unclaimed.
+     *
+     * @since 4.0.0
+     */
+    void stub(String method, String pattern, Handler h);
+
     /** Parse the request body as a JSON object map (an empty map when the body is empty). */
     Map<String, Object> body(HttpExchange ex) throws IOException;
 

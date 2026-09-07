@@ -435,7 +435,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
                 new RunRoutes(),
                 new ConnectionRoutes(), new ViewRoutes(), new PipelineListRoutes(), new PipelineGraphRoutes(), new PipelineSettingsRoutes(), new PipelineRenameRoutes(), new PipelineRelatedRoutes(), new PipelineBundleRoutes(), new ComponentRoutes(), new BundleRoutes(),
                 new EventRoutes(), new ObjectRoutes(), new NoteRoutes(), new QueueRoutes(), new TagRoutes(), new CatalogRoutes(), new ConfigPreviewRoutes(), new ConfigWriteRoutes(), new ConfigReadRoutes(), new ParserRoutes(),
-                new QueryRoutes(), new BiRoutes(), new DbBrowserRoutes(), new ReconRoutes(), new ShareRoutes(), new InvRoutes(), new GeoRoutes(),
+                new QueryRoutes(), new BiRoutes(), new DbBrowserRoutes(), new ReconRoutes(), new ShareRoutes(),   // InvRoutes + GeoRoutes moved to inspecto-geo-link (EDG-01 cell 3b)
                 new ExpectationRoutes(), new RequirementRoutes(),
                 new JobRoutes(), new SignalRoutes(), new LineageRoutes(), new EnrichmentRoutes(), new AlertRoutes(), new DecisionRoutes(), new RuleRoutes(), new AcquisitionRoutes(),
                 new NotificationRoutes(), new DeliveryStatusRoutes(), new SettingsRoutes(), new NavRoutes(), new AccessRoutes(),
@@ -452,6 +452,11 @@ public final class ControlApi implements AutoCloseable, ApiContext {
             module.register(this);
             log.info("route module discovered: {}", module.getClass().getName());
         }
+        // Absent-module stubs, LAST of all: they register only the paths no discovered module claimed
+        // (hasRoute), so an optional feature's paths answer 503 "not installed" rather than 404 — the
+        // EDITIONS §4 contract for every client, not just the SPA. Order matters: after discovery, or the
+        // stub would win first-match and the module's real handler would never run.
+        new AbsentGeoLinkRoutes().register(this);
     }
 
     // ── dispatch: a composable middleware chain (S6) ─────────────────────────────
@@ -1069,11 +1074,26 @@ public final class ControlApi implements AutoCloseable, ApiContext {
      * modules now discoverable from other jars (EDG-01 cell 3a) it is the failure most worth preventing.
      * Census before adding this: 0 duplicates among the 332 built-in registrations.
      */
+    /** Absent-module stubs (ApiContext.stub) — in the route table, but NOT counted by hasRoute. */
+    private final java.util.Set<String> stubbedRoutes = new java.util.HashSet<>();
+
+    @Override public boolean hasRoute(String method, String pattern) { return registeredRoutes.contains(method + " " + pattern); }
+
+    @Override public void stub(String method, String pattern, Handler h) {
+        String key = method + " " + pattern;
+        if (registeredRoutes.contains(key) || !stubbedRoutes.add(key)) {
+            throw new IllegalStateException("stub " + key + " would shadow or duplicate an existing route - stubs "
+                    + "register LAST and only for patterns hasRoute() reports unclaimed.");
+        }
+        routes.add(new Route(method, Pattern.compile("^" + pattern + "$"), h));
+    }
+
     private void register(String method, String pattern, Handler h) {
-        if (!registeredRoutes.add(method + " " + pattern)) {
-            throw new IllegalStateException("route " + method + " " + pattern + " is registered twice - the "
+        String key = method + " " + pattern;
+        if (stubbedRoutes.contains(key) || !registeredRoutes.add(key)) {
+            throw new IllegalStateException("route " + key + " is registered twice - the "
                     + "second registration would never match (first-match dispatch). If an optional module "
-                    + "added it, that module collides with a built-in route.");
+                    + "added it, that module collides with a built-in route or registered after the stubs.");
         }
         routes.add(new Route(method, Pattern.compile("^" + pattern + "$"), h));
     }

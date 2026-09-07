@@ -76,4 +76,28 @@ class RouteModuleDiscoveryTest {
             assertDoesNotThrow(() -> c.api.post(TestDiscoveredRoutes.PATH, (ex, m) -> "ok"));
         }
     }
+
+    /**
+     * 🔴 The bug the first 3b build shipped, in miniature: a stub occupied a pattern and {@code hasRoute}
+     * counted it, so {@code /bootstrap} reported the module present on a Personal build. A stub must answer
+     * (here: 503) WITHOUT being a "real" route, and a real registration over a stub must be refused rather
+     * than silently losing every match to the stub registered before it.
+     */
+    @Test
+    void aStubAnswersButDoesNotCountAsARealRoute(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            String path = "/test-discovered/stubbed";
+            c.api.stub("GET", path, (e, m) -> { throw new ApiException(503, "stubbed"); });
+
+            assertFalse(c.api.hasRoute("GET", path), "a stub is not a real route — a derived feature flag must read false");
+            HttpResponse<String> r = client.send(HttpRequest.newBuilder(
+                    URI.create("http://localhost:" + c.port + "/api/v1" + path)).GET().build(), BodyHandlers.ofString());
+            assertEquals(503, r.statusCode(), "…yet the path answers, so a client sees 'not installed', not 404");
+
+            assertThrows(IllegalStateException.class, () -> c.api.get(path, (e, m) -> "real"),
+                    "a real handler registered AFTER the stub would never match — refuse it loudly");
+            assertThrows(IllegalStateException.class, () -> c.api.stub("GET", TestDiscoveredRoutes.PATH, (e, m) -> null),
+                    "and a stub over a real route would shadow it — refuse that too");
+        }
+    }
 }
