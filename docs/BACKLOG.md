@@ -99,29 +99,20 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - **P2** · **WORKBENCH-S4** — the one-surface Step workbench. **Operator 2026-09-06: design now, build later** — the design is written and awaiting review: `superpower/step-workbench-s4-design.md` (three UI-only slices S4a field list+filter · S4b input strip · S4c summarize grouping; NO new endpoint — the canvas edges are the input-relation truth). Build only after the two open questions in its §5 are answered.
 
 - **P2** · **AUTHORING-REDESIGN-1** — open letters (⚠ the old "(j)(l)(n2)(o) are in §1" clause was stale in all four: (o) is now the WORKBENCH-S4 row above, (l) and (n2) SHIPPED, (j) `engine: auto` was already answered by shipped code; (f)(g)(m) SHIPPED 2026-09-06 — `JOIN_REFERENCE_MISSING`/`JOIN_ON_MISSING`/`UNKNOWN_JOIN_REFERENCE` at save, `SchemaMappingDrift` on all three schema save paths, `?pipeline=` sent by the UI): (c) v2 structured AST table over the SQL for WHERE/JOIN editing — 🔴 precondition: probe that the `json` extension loads on the SEALED `SqlSandbox` connection; (d) v3 macros as the UDF registry (per-connection re-creation in `EnrichmentEngine`, `PipelineJobRunner`, `BatchIngestStrategy`, preview) — demand-gated; (e) column metadata editing on the Transform pane (Parse D2) — needs a backend home for metadata on a `transform.sql` node first; (i) per-row "sample resolves to" line — no host resolves a sample against an `AttributeSpec`. Still open on (f): which COLUMNS the reference carries is the dry-run's question (it reads the store); the save checks existence and `on` presence only. → `okf/frontend/features/schema-mapping-authoring.md` §0
-- **P2** · **DAT-6-CI-1** — the Postgres store verification is now OPT-IN and therefore runs **nowhere
-  automated**. The embedded harness was removed 2026-09-07 (operator: install separately or point at an
-  existing server), so `PostgresStateStoreTest` reports 11 SKIPPED unless `-Dinspecto.test.pg.url` /
-  `INSPECTO_TEST_PG_URL` is set — visible in the count by design, but still absent coverage on the one
-  test that proves `percentile_cont` and the other non-portable SQL work. Cheapest restoration: a
-  `services: postgres:16` container in `ci.yml` plus that env var — a service container IS "an existing
-  server", so it honours the decision rather than reversing it. → `okf/backend/engine/db-layer.md`
-- **P2** · **GUARD-SWEEP-1** — the rest of the 2026-09-07 sweep, ranked. (a) ✅ **DONE 2026-09-07** — `ci.yml`'s reactor
-  step now runs `-Pedition-enterprise` (the profile is modules-only, so one flag adds `inspecto-security`
-  + `inspecto-policy` in the same pass), putting those **54 OIDC / token-relay / ABAC / keystore test
-  methods** under automation for the first time. (b) ✅ **DONE 2026-09-07** —
-  `check-dependencies.mjs` now resolves `-Pedition-enterprise`, so the lock covers 25 modules and gained
-  `com.nimbusds:nimbus-jose-jwt:10.9.1`; the G7 row records the corrected scope. (`sbom.mjs` already
-  resolved per edition — that half of the finding was wrong.) (c) ✅ **DONE 2026-09-07** —
-  `check-secrets.mjs` gained an emptiness floor (`MIN_SCANNED_FILES = 1000`, set from a measured 3366
-  scanned; falsified in both directions). ⚠ Still open in that row: `MIN_SECRET_LEN = 16`, so a 15-char
-  key passes, and the length test is not entropy. (d) Conventional-
-  commit lint is gated on `pull_request` and this team opens none. (e) No `typecheck` script exists and
-  CI checks only `tsconfig.app.json` — the gap that let a renamed DTO field reach an AOT failure on
-  2026-09-07. (f) `sbom.mjs` is tag-only and its `unhashed`/`unlicensed` counters are warn-only, so a
-  fully unhashed SBOM ships green. (g) No coverage gate and no compiler-lint (`-Xlint`/`-Werror`)
-  anywhere. (h) `addable >= 10` against 35 actual, asserted in both Java and TS. (i) five corpus sweeps
-  disarm themselves with `assumeTrue` if a fixture path moves. → `okf/backend/build-run/guard-coverage.md`
+- **P2** · **GUARD-SWEEP-1 — (g) only.** (a)–(f), (h), (i) all shipped 2026-09-07: the edition profile in
+  CI · the dependency-lock scope · the secrets emptiness floor · commit-lint on the push range (it was
+  gated on `pull_request` in a repo that opens none, so it had never run) · a `typecheck` script covering
+  all three tsconfigs, wired into `ui.yml` (CI checked only `tsconfig.app.json` — the gap that let a
+  renamed DTO field reach an AOT failure that morning) · the SBOM's warn-only counters became a RULE (no
+  component unhashed; only first-party may be unlicensed — measured 0 and 4, falsified both ways) · the
+  catalog floors reset from measurement (`addable >= 30` against 35, was `>= 10`; the perverse floor on
+  PLANNED work removed) · three corpus sweeps turned from `assumeTrue` into assertions, so a broken walk
+  fails instead of silently disarming.
+  **(g) — no coverage gate anywhere** — jacoco is behind a profile CI never activates and is report-only
+  (no `check` goal, no minimum); the UI has no vitest coverage config at all. ⛔ Deliberately NOT built
+  today: choosing a threshold for 4074 tests with no baseline is a policy decision about what number
+  blocks whom, not a task. Wanted first: turn coverage REPORTING on to establish the baseline, then pick
+  the number with that in hand. → `okf/backend/build-run/guard-coverage.md`
 - **P2** · **Step Processor catalog** — 121 processors: 34 delivered / **16 partial / 69 planned** (`transform.lookup` DELIVERED 2026-09-06). Each partial is a product decision (Kafka consumer, XPath grammar, drift report, profiler, resampler, KPI layer, Jinja, graph tagging, commit controller, SLA object, view/email/webhook sinks…) — pick one by name. → `EDITIONS.md` §Step Processors · `okf/backend/pipeline-graph/step-catalog.md`
 - **P2** · **P4 Test mapping on a generic `parser` node** — only reachable where the parse node is per-format. ⚠ The "blocked on §1 decision (l)" gate is **discharged** — (l) was decided and shipped 2026-09-06 (`okf/frontend/features/pipeline-editor.md`); re-scope this row before building. ⚠ Offline, non-`DIRECT` types show blank (mock has no SQL engine) — recorded. → `okf/frontend/features/pipeline-editor.md`
 - **P2** · **`kpi_report_builder` host (AGT-6a)** — no viable host pane; a new surface, not an adoption. (Its `projection_author` ‘stale `columns.items`’ half was **fixed 2026-07-28** and the clause is retired.) This row is what keeps `superpower/agt-6-plan.md` out of the archive. → `superpower/agt-6-plan.md`

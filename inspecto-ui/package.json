@@ -12,6 +12,7 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "test:ci": "ng test --no-watch",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json && tsc -p tsconfig.json --noEmit",
     "lint:tokens": "node tools/check-design-tokens.mjs",
     "format:check": "prettier --check \"src/**/*.{ts,html,scss,json}\"",
     "format": "prettier --write \"src/**/*.{ts,html,scss,json}\""

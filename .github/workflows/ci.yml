@@ -19,6 +19,23 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # DAT-6-CI-1 (2026-09-07). The embedded-Postgres harness was removed by operator decision — Postgres is
+    # installed separately or pointed at — which left `PostgresStateStoreTest` reporting 11 SKIPPED and the
+    # only proof that the JDBC stores run on real Postgres (chiefly `percentile_cont`, the one piece of
+    # non-portable SQL) executing NOWHERE. A service container IS "an existing server", so this restores the
+    # coverage without reversing the decision: no embedded engine, no per-platform binaries, just a URL.
+    # ⚠ The test creates and drops its own schema per run, so a shared container is safe.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -91,7 +108,9 @@ jobs:
       # -DskipTests, so a compile break was caught at tag time and a test regression never was.
       # Enterprise is the superset, so this one flag covers Standard too, in the same reactor pass.
       - name: Run tests (all editions) and install, so the dependency guard below can resolve the reactor
-        run: mvn --batch-mode --no-transfer-progress install -Pedition-enterprise
+        run: >-
+          mvn --batch-mode --no-transfer-progress install -Pedition-enterprise
+          '-Dinspecto.test.pg.url=jdbc:postgresql://localhost:5432/postgres?user=postgres&password=postgres'
 
       # Boundary law (U1): the lean ETL core never gains a kernel dependency. Kernel types live
       # ONLY in the optional inspecto-agent module, behind the AssistAgent SPI. This guard

@@ -55,6 +55,14 @@ jobs:
 
       # Unit tests (Vitest via @angular/build:unit-test, jsdom); single run, no watch.
       # The guarded e2e backend smoke (src/e2e) self-skips without E2E_BASE_URL.
+      # GUARD-SWEEP-1e (2026-09-07). `npm run build` type-checks ONLY tsconfig.app.json, and the unit-test
+      # target only tsconfig.spec.json — the ROOT tsconfig.json was checked by nothing. The angular-ui skill
+      # has required all three for months ("`npm run build` covers only the app one"); nothing enforced it.
+      # ⚠ The root config is a genuinely DIFFERENT gate, not a superset: it sets no `types`, so a spec using
+      # a vitest-only matcher type-errors there while passing test:ci and both other configs.
+      - name: Typecheck (all three tsconfigs)
+        run: npm run typecheck
+
       - name: Unit tests
         run: npm run test:ci
 

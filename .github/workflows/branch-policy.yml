@@ -24,8 +24,12 @@ jobs:
           echo "branch '$ref' is supported."
 
   commit-lint:
-    # Conventional Commits on the commits a PR would merge.
-    if: github.event_name == 'pull_request'
+    # Conventional Commits.
+    #
+    # GUARD-SWEEP-1d (2026-09-07): this job was `if: github.event_name == 'pull_request'` — while CLAUDE.md
+    # states work lands directly on `master` with no PRs. Zero PRs meant it had NEVER run: a guard that
+    # exists, is referenced in the branch policy, and is structurally unreachable. It now lints the PUSH
+    # RANGE too, which is the only range that exists in this repo's actual workflow.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,11 +37,24 @@ jobs:
           fetch-depth: 0
       - name: Lint commit subjects (Conventional Commits)
         run: |
-          base="${{ github.event.pull_request.base.sha }}"
-          head="${{ github.event.pull_request.head.sha }}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+          else
+            base="${{ github.event.before }}"
+            head="${{ github.sha }}"
+            # A new branch, or the first push after a force-push, reports an all-zero `before` and there is
+            # no range to walk. Lint the tip alone rather than exploding or silently passing.
+            if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]                || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+              base="${head}~1"
+              git cat-file -e "$base^{commit}" 2>/dev/null || base="$head"
+            fi
+          fi
+          echo "linting $base..$head"
           re='^(feat|fix|chore|docs|refactor|test|build|ci|perf|style|revert)(\([a-z0-9._/-]+\))?!?: .+'
           fail=0
-          for sha in $(git rev-list "$base..$head"); do
+          range=$([ "$base" = "$head" ] && echo "-1 $head" || echo "$base..$head")
+          for sha in $(git rev-list $range); do
             # skip merge commits
             if [ "$(git rev-list --no-walk --merges --count "$sha")" = "1" ]; then continue; fi
             subj=$(git log -1 --format=%s "$sha")

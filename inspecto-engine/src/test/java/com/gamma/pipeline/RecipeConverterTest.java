@@ -42,7 +42,11 @@ class RecipeConverterTest {
     @Test
     void everyRepoFixtureRoundTripsThroughTheRecipeProjection() throws Exception {
         List<Path> fixtures = pipelineFixtures();
-        assumeTrue(!fixtures.isEmpty(), "no spaces/ tree next to the module — nothing to gate");
+        // ASSERTION, not an assumption (2026-09-07). The corpus is COMMITTED — `spaces/**` is in the
+        // repo — so an empty sweep never means "nothing to gate", it means the walk stopped finding it:
+        // a module move, a surefire CWD change, a renamed directory. `assumeTrue` turned that into a
+        // silent green and the gate would be off with nobody told.
+        assertFalse(fixtures.isEmpty(), "found NO *_pipeline.toon under spaces/ — the walk is broken, not the corpus; this sweep would prove nothing");
 
         List<String> failures = new ArrayList<>();
         for (Path f : fixtures) {

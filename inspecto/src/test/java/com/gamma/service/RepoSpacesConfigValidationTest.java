@@ -41,7 +41,11 @@ class RepoSpacesConfigValidationTest {
     @Test
     void everyAuthoredSpaceConfigParses() throws IOException {
         Path root = spacesRoot();
-        assumeTrue(root != null, "no repo spaces/ tree next to the module — skipping");
+        // ASSERTION, not an assumption (2026-09-07). The corpus is COMMITTED — `spaces/**` is in the
+        // repo — so an empty sweep never means "nothing to gate", it means the walk stopped finding it:
+        // a module move, a surefire CWD change, a renamed directory. `assumeTrue` turned that into a
+        // silent green and the gate would be off with nobody told.
+        assertNotNull(root, "found NO spaces/ tree — the walk-up is broken, not the corpus; this sweep would prove nothing");
         List<String> failures = new ArrayList<>();
         try (Stream<Path> walk = Files.walk(root)) {
             for (Path f : walk.filter(Files::isRegularFile)

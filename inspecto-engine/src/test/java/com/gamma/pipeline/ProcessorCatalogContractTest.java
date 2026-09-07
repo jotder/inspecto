@@ -60,7 +60,11 @@ class ProcessorCatalogContractTest {
             if ("planned".equals(m.get("status"))) assertFalse(isAddable, m.get("id") + ": a PLANNED processor can never be addable");
             if (isAddable) { addable++; assertTrue(PipelineEditable.isAuthorable((String) nodeType)); }
         }
-        assertTrue(addable >= 10, "the delivered core (collector, parsers, map, filter, route, dedup, join, summarize, sink) is addable: " + addable);
+        // Floor SET FROM THE MEASUREMENT (35 addable on 2026-09-07), not a round number far below it:
+        // `>= 10` let 25 palette entries vanish silently, which is not a ratchet, it is decoration.
+        // A floor rather than an equality because addable GROWS as processors are delivered; 30 catches
+        // a collapse while leaving room for a deliberate removal or two.
+        assertTrue(addable >= 30, "the addable palette collapsed: " + addable + " (35 when this floor was set)");
         assertEquals(ProcessorCatalog.PROCESSORS.size(), procs.size());
     }
 }

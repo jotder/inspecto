@@ -27,8 +27,16 @@ describe('processor-catalog contract', () => {
             if (p.status === 'planned') expect(p.addable, p.id).toBe(false);
             if (p.addable) expect(p.nodeType, p.id).toBeTruthy();
         }
-        expect(catalog.processors.filter((p) => p.addable).length).toBeGreaterThanOrEqual(10);
-        expect(catalog.processors.filter((p) => p.status === 'planned').length).toBeGreaterThan(50);
+        // Floors SET FROM MEASUREMENT (35 addable, 2026-09-07). `>= 10` allowed 25 palette entries to
+        // disappear with the spec still green.
+        expect(catalog.processors.filter((p) => p.addable).length).toBeGreaterThanOrEqual(30);
+        // ⚠ A floor on PLANNED work used to sit here (`> 50`, actual 67) — perverse: delivering 17 more
+        // processors would have turned it red for a good reason. What it was reaching for is that the
+        // statuses partition the catalog, which is checkable without punishing progress.
+        const byStatus = ['delivered', 'partial', 'planned'].map(
+            (s) => catalog.processors.filter((p) => p.status === s).length,
+        );
+        expect(byStatus.reduce((a, b) => a + b, 0)).toBe(catalog.processors.length);
     });
 
     it('every processor carries its own heroicons_outline icon', () => {

@@ -199,7 +199,7 @@ for (const c of thirdParty) {
     const lic = licenseOf(c);
     if (!hash) unhashed++;
     if (!lic) unlicensed++;
-    components.push({ ...c, firstParty: false, purl: purl(c), sha256: hash, license: lic });
+    components.push({ ...c, firstParty: false, purl: purl(c), sha256: hash, license: lic, licenseMissing: !lic });
 }
 // first-party: the bundle's own jars, hashed AS SHIPPED (the shaded fat jar is what the customer runs)
 for (const [artifactId, file] of Object.entries(SHIPPED)) {
@@ -289,5 +289,24 @@ writeFileSync(spdxPath, JSON.stringify(spdx, null, 2) + '\n');
 const third = components.filter((c) => !c.firstParty).length;
 console.log(`✓ SBOM (${edition}): ${third} third-party + ${components.length - third} first-party component(s) → sbom/`);
 console.log(`  ${cdxPath}\n  ${spdxPath}`);
-if (unhashed) console.warn(`  ⚠ ${unhashed} component(s) without a resolvable artifact file in ${M2} — no hash recorded`);
-if (unlicensed) console.warn(`  ⚠ ${unlicensed} component(s) declare no licence in their POM chain — recorded as NOASSERTION`);
+// GUARD-SWEEP-1f (2026-09-07): these were WARN-ONLY with no ceiling, so an SBOM in which every component
+// was unhashed and unlicensed exited 0 and shipped to an auditor. A document whose integrity and licence
+// columns are empty is not evidence of anything. Measured on the Enterprise bundle that day: 45 components,
+// 0 unhashed, 4 unlicensed — and all four unlicensed are OUR OWN modules, whose poms declare no licence.
+// So the honest gate is a RULE, not a count: no component may be unhashed, and only first-party components
+// may be unlicensed.
+const unlicensedThirdParty = components.filter((c) => !c.firstParty && c.licenseMissing);
+if (unhashed || unlicensedThirdParty.length) {
+    if (unhashed) {
+        console.error(`\n✖ SBOM (${edition}): ${unhashed} component(s) have no resolvable artifact in ${M2}, so no hash was recorded.`);
+        console.error('  An SBOM without integrity hashes cannot support a release-verification claim.');
+    }
+    for (const c of unlicensedThirdParty) {
+        console.error(`✖ SBOM (${edition}): third-party component ${c.group}:${c.artifact} declares no licence (NOASSERTION).`);
+    }
+    console.error('  Fix the resolve or declare the licence; do not ship an SBOM that asserts nothing.\n');
+    process.exit(1);
+}
+if (unlicensed) {
+    console.log(`  ${unlicensed} first-party component(s) declare no licence in their POM chain — recorded as NOASSERTION (expected: our own modules).`);
+}
