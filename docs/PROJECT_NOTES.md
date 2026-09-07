@@ -101,6 +101,15 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   `Authenticator`/`Subject`/`TokenRelay` SPIs (`com.gamma.control`), plus HTTPS (`HttpsServer`) and the BFF
   `/auth/exchange|refresh|logout` routes; Angular uses OIDC Auth-Code+PKCE driven by `bootstrap.features.authMode`
   (no-op on Personal). **The `-Dassist.write.root` 503 write-gate is SEPARATE from auth and stays.**
+- **Edition gating is real as of 2026-09-07, not just a matrix claim (EDG-01).** Five "not for Personal"
+  features left the core into optional modules — `inspecto-notify-channels` (CP-15), `inspecto-backup`
+  (OPS-06), `inspecto-geo-link` (CP-09), `inspecto-exchange` (SEC-10) and `inspecto-metrics` (CP-13's
+  exposition) — joining `inspecto-security` and `inspecto-policy`. Personal answers their surfaces **503
+  naming the module**, never 404. 🔴 The load-bearing one was `/metrics`: a `PUBLIC_PATH` on an edition
+  that ships no authenticator and binds every interface. Recipe + traps:
+  [editions model](okf/backend/editions/editions-model.md). Two cells remain and BOTH await an operator call
+  on scope — CP-13's events feed and CP-11 operational objects (`superpower/edg-01-edition-gating-plan.md`
+  §§18–19).
 - **Keep the core lean.** All network deps live in `inspecto-connectors`; hosted-AI SDKs in
   `inspecto-agent-hosted` (physically absent from air-gapped builds). The zero-new-dep rule was retired
   2026-06-13 (logback replaced slf4j-simple, user-approved) — still no gratuitous deps.

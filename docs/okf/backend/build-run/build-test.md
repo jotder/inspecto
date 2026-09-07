@@ -62,9 +62,16 @@ example). A bundle without the agent is a **valid deployment, not a broken one**
 the vendored kernel + eoiagent model transport.
 
 ⚠ **They are NOT edition-gated modules.** `inspecto-agent`, `inspecto-agent-hosted` and
-`inspecto-intelligence` are plain default `<modules>` in the root POM — the only profile-gated modules are
-`inspecto-security` and `inspecto-policy`. They build in an ordinary `mvn test` run; they are simply never
-*bundled*.
+`inspecto-intelligence` are plain default `<modules>` in the root POM. The profile-gated modules are the
+**seven** edition modules: `inspecto-security`, `inspecto-policy`, and the five EDG-01 ones
+(`inspecto-notify-channels`, `inspecto-backup`, `inspecto-geo-link`, `inspecto-exchange`,
+`inspecto-metrics`) — see [editions model](../editions/editions-model.md). The agent modules build in an
+ordinary `mvn test` run; they are simply never *bundled*.
+
+⚠ **Two reactor sizes, two baselines** (2026-09-07, `d409921a`): the default (Personal) build is **23
+modules / 4000 tests**; `-Pedition-enterprise` is **30 modules / 4118**. A run that stops at a failing module
+reports a PARTIAL sum and SKIPS the trailing modules — do not read that as the total, and do not conclude a
+module "failed" when the build never reached it.
 
 ⚠ **Every bundled launcher uses `-cp`, never `java -jar`** (RUNSH-CP-1, 2026-09-07). `-jar` ignores
 `-cp` and `CLASSPATH` outright, and `inspecto.jar`'s manifest carries no `Class-Path`, so a `-jar`
