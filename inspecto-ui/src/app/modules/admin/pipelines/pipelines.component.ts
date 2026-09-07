@@ -117,8 +117,8 @@ export class PipelinesComponent {
         const c = this.combined();
         if (!c) return null;
         const sel = this.combinedSelected();
-        const active = sel.length ? new Set(sel) : new Set(c.flows.map((f) => f.name));
-        const nodes = c.nodes.filter((n) => !n.flow || active.has(n.flow));
+        const active = sel.length ? new Set(sel) : new Set(c.pipelines.map((p) => p.name));
+        const nodes = c.nodes.filter((n) => !n.pipeline || active.has(n.pipeline));
         const ids = new Set(nodes.map((n) => n.id));
         const edges = c.edges.filter((e) => ids.has(e.from) && ids.has(e.to));
         return toCombinedG6Data({ ...c, nodes, edges }, this.iconMap());
@@ -128,13 +128,13 @@ export class PipelinesComponent {
     readonly combinedPipelineOptions = computed<string[]>(() =>
         this.filterNames(
             this.combinedSearch(),
-            (this.combined()?.flows ?? []).map((f) => f.name),
+            (this.combined()?.pipelines ?? []).map((p) => p.name),
         ),
     );
 
     /** Every pipeline in the topology as transfer references — what the export/import menu offers. */
     readonly transferItems = computed(() =>
-        (this.combined()?.flows ?? []).map((f) => ({ kind: 'authored-pipeline' as const, id: f.name })),
+        (this.combined()?.pipelines ?? []).map((p) => ({ kind: 'authored-pipeline' as const, id: p.name })),
     );
 
     readonly nodeDisplayLabel = nodeDisplayLabel;
@@ -170,7 +170,7 @@ export class PipelinesComponent {
         this.api.combined().subscribe({
             next: (c) => {
                 this.combined.set(c);
-                if (!this.combinedSelected().length) this.combinedSelected.set(c.flows.map((f) => f.name));
+                if (!this.combinedSelected().length) this.combinedSelected.set(c.pipelines.map((p) => p.name));
                 this.combinedLoading.set(false);
             },
             error: () => {

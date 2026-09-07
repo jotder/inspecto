@@ -33,7 +33,7 @@ describe('LineageService', () => {
                     rowCount: 1234,
                 },
             ],
-            downstream: [{ flow: 'events_rollup', sinks: ['events_daily'] }],
+            downstream: [{ pipeline: 'events_rollup', sinks: ['events_daily'] }],
         };
         let got: StoreLineage | undefined;
         svc.lineage('events_raw').subscribe((d) => (got = d));

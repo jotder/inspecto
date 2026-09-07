@@ -65,7 +65,7 @@
                             </mat-select>
                         </mat-form-field>
                         <span class="text-secondary text-xs">
-                            {{ combinedSelected().length || c.flows.length }} of {{ c.flows.length }} shown
+                            {{ combinedSelected().length || c.pipelines.length }} of {{ c.pipelines.length }} shown
                             @if (c.links.length) {
                                 · {{ c.links.length }} store link{{ c.links.length === 1 ? '' : 's' }}
                             }
@@ -197,10 +197,10 @@
                 <dt class="text-secondary text-xs">Category</dt>
                 <dd class="text-sm">{{ n.category }}</dd>
             </div>
-            @if (n.flow) {
+            @if (n.pipeline) {
                 <div>
                     <dt class="text-secondary text-xs">Pipeline</dt>
-                    <dd class="font-mono text-sm">{{ n.flow }}</dd>
+                    <dd class="font-mono text-sm">{{ n.pipeline }}</dd>
                 </div>
             }
             @if (n.use) {

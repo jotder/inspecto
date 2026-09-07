@@ -163,7 +163,7 @@ export interface ProcessorCatalog {
 }
 
 export interface CombinedNode extends PipelineNode {
-    flow?: string; // the owning flow (absent on synthetic store nodes)
+    pipeline?: string; // the owning pipeline (absent on synthetic store nodes)
 }
 
 /** An edge in the combined topology; `kind:'store'` is a producer→store or store→consumer join edge. */
@@ -174,12 +174,12 @@ export interface CombinedEdge {
     kind: 'data' | 'control' | 'route' | 'store';
     routeKey?: string;
     restsOnDisk?: boolean; // on store edges: whether the joined store rests on disk
-    flow?: string;
+    pipeline?: string;
 }
 
-/** The combined pipeline+job topology (GET /pipelines/combined): flows joined at shared store nodes (T24). */
+/** The combined pipeline+job topology (GET /pipelines/combined): pipelines joined at shared store nodes (T24). */
 export interface PipelineCombined {
-    flows: { name: string; active: boolean }[];
+    pipelines: { name: string; active: boolean }[];
     nodes: CombinedNode[];
     edges: CombinedEdge[];
     links: { producer: string; store: string; consumer: string }[];

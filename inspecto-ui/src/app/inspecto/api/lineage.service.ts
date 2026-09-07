@@ -13,16 +13,16 @@ export interface UpstreamRow {
 }
 
 /** An authored pipeline that reads a store as a source, with the sink stores it produces. */
-export interface DownstreamFlow {
-    flow: string;
+export interface DownstreamPipeline {
+    pipeline: string;
     sinks: string[];
 }
 
-/** Cross-engine lineage around one store: files in (ingest) + flows out (authored). */
+/** Cross-engine lineage around one store: files in (ingest) + pipelines out (authored). */
 export interface StoreLineage {
     store: string;
     upstream: UpstreamRow[];
-    downstream: DownstreamFlow[];
+    downstream: DownstreamPipeline[];
 }
 
 /**

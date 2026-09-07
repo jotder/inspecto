@@ -12,12 +12,21 @@ describe('job-display', () => {
     it('typeLabel maps known types and passes others through', () => {
         expect(typeLabel('report')).toBe('Report');
         expect(typeLabel('custom')).toBe('custom');
+        // `pipeline` is the live built-in id (JobType.PIPELINE) — it fell through to the raw
+        // lowercase string while the map still carried the retired `flow` spelling instead.
+        expect(typeLabel('pipeline')).toBe('Pipeline');
     });
 
     it('whatScheduled adds a param hint when one is present', () => {
         expect(whatScheduled({ type: 'report', params: { report: 'daily_summary' } })).toBe('Report · daily_summary');
-        expect(whatScheduled({ type: 'flow', params: { flow: 'cdr_export' } })).toBe('Flow · cdr_export');
+        expect(whatScheduled({ type: 'pipeline', params: { pipeline: 'cdr_export' } })).toBe('Pipeline · cdr_export');
         expect(whatScheduled({ type: 'ingest' })).toBe('Ingest');
+    });
+
+    // The engine dual-reads this param and prefers `pipeline`; a job persisted with the pre-Tier-3
+    // `flow` spelling must still show its hint, so the fallback is coverage, not dead code.
+    it('whatScheduled still reads the legacy `flow` param', () => {
+        expect(whatScheduled({ type: 'pipeline', params: { flow: 'cdr_export' } })).toBe('Pipeline · cdr_export');
     });
 
     it('scheduleSummary covers cron / event / signal / manual', () => {

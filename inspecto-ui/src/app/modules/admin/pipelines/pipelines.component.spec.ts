@@ -48,8 +48,8 @@ const TYPES: PipelineNodeType[] = [
  * precisely because nothing is open on arrival: no tab ⇒ no G6 canvas ⇒ the empty state renders.
  */
 const COMBINED: PipelineCombined = {
-    flows: [{ name: 'cdr_etl', active: true }],
-    nodes: [{ id: 'cdr_etl/acq', type: 'acquisition', category: 'SOURCE', label: 'Acquisition', flow: 'cdr_etl' }],
+    pipelines: [{ name: 'cdr_etl', active: true }],
+    nodes: [{ id: 'cdr_etl/acq', type: 'acquisition', category: 'SOURCE', label: 'Acquisition', pipeline: 'cdr_etl' }],
     edges: [],
     links: [],
 };
@@ -140,7 +140,7 @@ describe('PipelinesComponent', () => {
 
             fixture.componentInstance.setMode('topology');
             expect(combinedCalls).toBe(1);
-            expect(fixture.componentInstance.combined()?.flows.length).toBe(1);
+            expect(fixture.componentInstance.combined()?.pipelines.length).toBe(1);
             // Every pipeline is pre-selected so the first look shows the whole picture.
             expect(fixture.componentInstance.combinedSelected()).toEqual(['cdr_etl']);
         });

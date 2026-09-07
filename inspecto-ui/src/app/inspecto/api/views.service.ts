@@ -6,7 +6,7 @@ import { apiUrl, toParams } from './api-base';
 /** A `sink.view` node's projected identity (GET /views) — a non-persistent logical store. */
 export interface PipelineViewSummary {
     store: string;
-    flow: string;
+    pipeline: string;
     source_store: string[];
     has_derived_sql: boolean;
     defined_at: string;

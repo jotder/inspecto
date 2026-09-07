@@ -42,15 +42,15 @@ import { InspectoRowAction } from 'app/inspecto/grid';
             <div class="mb-1 mt-4 text-sm font-semibold">Consumed by ({{ d.downstream.length }})</div>
             @if (d.downstream.length) {
                 <ul class="text-sm">
-                    @for (f of d.downstream; track f.flow) {
+                    @for (f of d.downstream; track f.pipeline) {
                         <li class="py-0.5">
-                            <span class="font-mono">{{ f.flow }}</span>
+                            <span class="font-mono">{{ f.pipeline }}</span>
                             <span class="text-secondary"> → {{ f.sinks.length ? f.sinks.join(', ') : '—' }}</span>
                         </li>
                     }
                 </ul>
             } @else {
-                <p class="text-secondary text-sm">No flows consume this store.</p>
+                <p class="text-secondary text-sm">No pipelines consume this store.</p>
             }
         }
     `,

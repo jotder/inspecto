@@ -175,19 +175,19 @@ describe('nodeLastRunTotal', () => {
 
 describe('toCombinedG6Data', () => {
     const combined: PipelineCombined = {
-        flows: [
+        pipelines: [
             { name: 'orders_etl', active: true },
             { name: 'orders_rollup', active: true },
         ],
         nodes: [
-            { id: 'orders_etl/acq', type: 'acquisition', category: 'SOURCE', label: 'Acquisition', flow: 'orders_etl' },
+            { id: 'orders_etl/acq', type: 'acquisition', category: 'SOURCE', label: 'Acquisition', pipeline: 'orders_etl' },
             {
                 id: 'orders_etl/sink',
                 type: 'sink.persistent',
                 category: 'SINK',
                 label: 'Sink',
                 store: 'orders',
-                flow: 'orders_etl',
+                pipeline: 'orders_etl',
             },
             {
                 id: 'orders_rollup/src',
@@ -195,7 +195,7 @@ describe('toCombinedG6Data', () => {
                 category: 'TRANSFORM',
                 label: 'Read',
                 sourceStore: 'orders',
-                flow: 'orders_rollup',
+                pipeline: 'orders_rollup',
             },
             { id: 'store:orders', type: 'store', category: 'STORE', label: 'orders', store: 'orders' },
         ],

@@ -23,7 +23,7 @@ const LINEAGE: StoreLineage = {
             rowCount: 1234,
         },
     ],
-    downstream: [{ flow: 'events_rollup', sinks: ['events_daily'] }],
+    downstream: [{ pipeline: 'events_rollup', sinks: ['events_daily'] }],
 };
 
 describe('StoreLineageComponent', () => {
@@ -59,7 +59,7 @@ describe('StoreLineageComponent', () => {
         TestBed.resetTestingModule();
     });
 
-    it('renders upstream count and downstream flows for a store', async () => {
+    it('renders upstream count and downstream pipelines for a store', async () => {
         const fixture = await create('events_raw', LINEAGE);
         const text = fixture.nativeElement.textContent as string;
         expect(text).toContain('Files into this store (1)');
@@ -67,9 +67,9 @@ describe('StoreLineageComponent', () => {
         expect(text).toContain('events_rollup');
     });
 
-    it('shows an empty message when no flows consume the store', async () => {
+    it('shows an empty message when no pipelines consume the store', async () => {
         const fixture = await create('events_raw', { ...LINEAGE, downstream: [] });
-        expect(fixture.nativeElement.textContent).toContain('No flows consume this store.');
+        expect(fixture.nativeElement.textContent).toContain('No pipelines consume this store.');
     });
 
     it('has no a11y violations', async () => {

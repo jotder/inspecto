@@ -15,7 +15,7 @@ const TYPE_LABEL: Record<string, string> = {
     enrich: 'Enrich',
     report: 'Report',
     maintenance: 'Maintenance',
-    flow: 'Flow',
+    pipeline: 'Pipeline',
 };
 
 /** Friendly label for a job type. */
@@ -27,7 +27,9 @@ export function typeLabel(type: string): string {
 export function whatScheduled(job: { type: string; params?: Record<string, unknown> }): string {
     const label = typeLabel(job.type);
     const p = job.params ?? {};
-    const hint = p['report'] ?? p['flow'] ?? p['task'] ?? p['scope'] ?? p['source'];
+    // `pipeline` first, `flow` second: the engine dual-reads the same param and prefers the canonical
+    // spelling (PipelineJobRunner, JobService, ParameterResolver), so a job authored either way shows a hint.
+    const hint = p['report'] ?? p['pipeline'] ?? p['flow'] ?? p['task'] ?? p['scope'] ?? p['source'];
     return hint ? `${label} · ${hint}` : label;
 }
 
