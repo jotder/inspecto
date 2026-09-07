@@ -39,8 +39,10 @@ a new dependency — not a build. The rule that fell out: **a P1 must name the f
 cannot is a decision (§1) or a design (P2).
 
 Do next, in order (refreshed again 2026-09-07 — the three above it are done):
-1. **GUARD-SWEEP-1 (b)–(i)** (§3) — the rest of the enforcement gaps, headed by `check-secrets.mjs`
-   having no emptiness floor and the dependency lock/SBOM resolving without an edition profile.
+1. **GUARD-SWEEP-1 (d)–(i)** (§3) — the rest of the enforcement gaps ((a)(b)(c) shipped 2026-09-07).
+   Now headed by: commit-lint gated on `pull_request` in a repo that opens none; no `typecheck` script
+   (CI checks one of three tsconfigs); `sbom.mjs` tag-only with warn-only unhashed/unlicensed counters;
+   no coverage gate and no compiler lint anywhere; `addable >= 10` against 35 actual.
 2. **Release notes for the next MAJOR** — keep appending (§2).
 3. **Step Processor catalog** — pick a partial by name (§3).
 
@@ -62,24 +64,31 @@ half of a fourth (the id slug). New decisions get a row here at handoff time.
 
 Nothing a shift can close from this checkout. Listed so the gate is named, not guessed.
 
-| Item | Remains | Gate |
+**Rewritten 2026-09-07.** Every gate now states something a shift can CHECK from this repo. Before, most
+named an event nobody watches for ("a live deployment", "demand", "a client policy") — unfalsifiable by
+construction, so the row could never move and nobody could tell whether it should. Where the trigger is
+genuinely external, it is now phrased as **"when X is recorded in \<file\>"**: naming the landing place
+turns an unwatchable event into a file check. ⚠ Two rows also cited evidence that was not where they said
+it was; both are corrected below.
+
+| Item | Remains | Gate — how a shift CHECKS it |
 |---|---|---|
-| **Row 15 — ELT Phase 6 deletion half** | Delete the legacy flat read path (amendment §6 step 4). The `-Dingest.lane=auto|graph|flat` flag exists (`ConsignmentIngestStrategy.admittedLift`, 2026-09-02); the verification minor must SHIP first. ⛔ Not closable by code; ⛔ do not start it on momentum. Then `withMappingContext` → `PipelineLift` comes due only if the graph lane executes the map node. The waves board is 16 of 17. Also absorbs RECORD-TRANSFORMER-1 (d): the ingest lane runs exactly one projection slot, so a second `transform.sql` cascades only once the graph lane carries ingest — not by wrapping the SELECT N times in `DataTransformer.materialize`, which would run chain Steps at ingest against the at-rest decision. | Release — newest tag `v3.12.0` is not an ancestor of `master`; D-2 verification window. `superpower/pipeline-waves-drain-plan.md` · `superpower/elt-final-amendment-plan.md` Phase 6 |
-| **Release notes for the next MAJOR** | **Drafted 2026-09-06** in `okf/backend/control-plane/api-stability.md` §Release notes; append there with every further `feat!:`. Covers: three `@PublicApi` store abstract methods (MNT-14) · `-Dauth.oidc.tokenEndpoint` required (D15) · `DELETE /spaces/{id}?purge=true` 409 (D4) · dedup folded into acquisition, `transform.dedup.fingerprint` removed (`61dc8280`) · `$`-token evaluation, REJECTED + `$$` escape (`e8a8a755`, `8504b782`) · `consignment.outputs.backend=duckdb` default + `ReprocessCommand` refusal · `<pipeline>_<batchId>` sink naming (define a `retire_superseded` job) · blank `partitions[].column` fails the sink branch · artifacts `timeRange` → `event_time_min`/`event_time_max` · artifactId rename `file-processor-*` → `inspecto-*` (bundle name unchanged — a separate unmade decision) · `mail.send` "SUCCESS, nothing sent" · `transform.map` deleted (`42fa41fe`) · `NoteTargets` → `AnnotationKinds`. §11 token *runtime* model deferred to the same release (pipeline-spec D2). | The tag cut |
-| **X5 cross-lane drill-down + StepInfo envelope** | One-Consignment drill-down across lanes; ~1 KB pointer+schema+diagnostics envelope, failure routed by PORT. Phase-7 convergence. | Major bump (pipeline-spec §13 D2). `okf/backend/pipeline-graph/execution-lanes.md` |
-| **OPS-5 provenance conservation** | Live-feed soak only — no code left; feature built, off by default. | A live deployment. `docs/ops/provenance-conservation-verification.md` |
-| **Deployment topology live validation** | T2/T3/T4 reference deployments, the D8 IAM pair, GAP-7 blueprints; G6 RTO/RPO statement still carries `<OPERATOR TO STATE>` placeholders and a drill table with zero rows; grammar-config live smoke. | A reference deployment. `superpower/deployment-topology-plan.md` · `docs/ops/backup-restore-runbook.md` |
-| **Compliance program (NFR-7)** | C1 applicability statements, ISMS boundary, auditor engagement, pen test, incident-response + crypto policy content (C5), FedRAMP Moderate package + FIPS test leg (C6, demand-gated), Type II observation window, ISO 8.8 advisory-watch process. Repo-side remainder: customer verification runbook (G2 half), CI-evidence doc, G6 recorded restore drill, G8 (RBAC R5 evidence), G9 FIPS. | Org action + external parties. `superpower/compliance-certifications-plan.md` · `compliance/controls-matrix.md` §4 |
-| **D13 parser field tiers** | Run the onboarding-observation session with the READY kit. Second question for the session: every `tier:'required'` field ships `required:false` validators — should "required" validate? ⛔ Explicitly NOT an engineering guess. The UI's attribute tiers stay a best guess until then. | A real onboarding user. `superpower/parser-field-tiers-interview-plan.md` |
-| **SEC-INCIDENT-1 carry-forwards** | Incident CLOSED BY DECOMMISSION 2026-08-29. 🔴 Due on closure and NOT done: delete the off-repo pre-rewrite backup bundle (five cleartext secrets; retention condition lapsed). Also: one confirmation none of the five values was reused elsewhere; internal hostnames/IPs still published in-repo (lower severity). | Operator, off-repo. `compliance/controls-matrix.md` CC6.1 · `PROJECT_NOTES.md` |
-| **EOI-7b** | Publish eoiagent `0.1.0` artifacts to a registry; CI rebuilds from tag meanwhile. | Infra call (cross-repo) |
-| **AGT-6b multi-step agent graphs** | First cut = generalize `RunbookActions`, never free-form ReAct over mutating tools. Blocked upstream: the eoiagent approval gate is synchronous per-call (nested gates deadlock) and there is no per-tool `DryRunProvider` seam. | Demand + eoiagent. `superpower/agt-6-plan.md` §4 |
-| **AGT-5 `DryRunProvider` + `incident_explain`** | Per-tool preview seam on `PlatformBuilder` (lets inspecto drop its parallel `AgentApprovals` previewer); `incident_explain` waits on the eoiagent host seam. Local-models-only scope cut stands. | Cross-repo `jotder/inspect-agent`. `superpower/agt-6-plan.md` §4.2 G2 |
-| **X-Actor full removal** | Remove the header path entirely (already rejected outright on Standard/Enterprise). | Client migration with the API-v1 sunset. `okf/backend/control-plane/api-v1.md` |
-| **E1 Enterprise distributed tier / Stage-2 streaming** | Unscoped. | Demand |
-| **SOC 2 Type II window** | Open the 6-month observation window now (decided 2026-09-06); the HIPAA/PCI framework choice stays deferred until a prospect is named. | Org action. `superpower/compliance-certifications-plan.md` §6 |
-| **DATA-GOV-1 archive** | Move the real carrier corpus to an encrypted out-of-band archive on company storage with a fetch script; access held by the data-agreement owner. | Org action (data-agreement owner + ASN shift). `PROJECT_NOTES.md` §DATA-GOV-1 |
-| **Completeness KPI hold** | Stays on hold: whether `{seq}` restarts per hour is a carrier fact not yet confirmed. | The carrier's feed spec. `superpower/completeness-kpi-plan.md` §2b |
+| **Row 15 — ELT Phase 6 deletion half** | Delete the legacy flat read path (amendment §6 step 4). The `-Dingest.lane=auto\|graph\|flat` flag exists (`ConsignmentIngestStrategy.admittedLift`, 2026-09-02); the verification minor must SHIP first. ⛔ Not closable by code; ⛔ do not start it on momentum. Then `withMappingContext` → `PipelineLift` comes due only if the graph lane executes the map node. The waves board is 16 of 17. Also absorbs RECORD-TRANSFORMER-1 (d): the ingest lane runs exactly one projection slot, so a second `transform.sql` cascades only once the graph lane carries ingest. | ✅ **Best-formed gate here — one command:** `git merge-base --is-ancestor v3.12.0 master`. Non-zero ⇒ still gated (verified 2026-09-07). D-2 is defined at `elt-final-amendment-plan.md:1392`. |
+| **Release notes for the next MAJOR** | **Drafted** in `okf/backend/control-plane/api-stability.md` §Release notes; append there with every further `feat!:`. ⚠ The `batch_id` rename trio rides this release and is NOT enumerated in that list — see §7. | `git tag` — the next MAJOR tag. |
+| **X5 cross-lane drill-down + StepInfo envelope** | One-Consignment drill-down across lanes; ~1 KB pointer+schema+diagnostics envelope, failure routed by PORT. Phase-7 convergence. | `git tag` — the next MAJOR (pipeline-spec §13 D2). → `okf/backend/pipeline-graph/execution-lanes.md` |
+| **X-Actor full removal** | Remove the header path entirely (already rejected outright on Standard/Enterprise). | 🔴 **Gate restated 2026-09-07.** It used to read "client migration with the API-v1 sunset" — but that apparatus was **deleted 2026-07-25**, and `api-v1.md` contains **zero** occurrences of "Actor", so the gate pointed at something that no longer exists. The only remaining exposure is Personal; a MAJOR is the sanctioned break. **Gate: the next MAJOR tag.** → `okf/backend/editions/auth-security.md` · `EDITIONS.md` SEC-11 |
+| **OPS-5 provenance conservation** | Live-feed soak only — no code left; feature built, off by default. The discharge criterion is well written (`docs/ops/provenance-conservation-verification.md` steps 1–3, ground-truth `recordsIn`/`recordsOut`). | **Close when that file gains a dated results section.** Nothing in-repo would otherwise show the soak had been run — the work could be done and the row would still read open. |
+| **Deployment topology live validation** | T2/T3/T4 reference deployments, the D8 IAM pair, GAP-7 blueprints, grammar-config live smoke. ⚠ **Evidence pointer corrected 2026-09-07:** the RTO/RPO statement with its `<OPERATOR TO STATE>` placeholders and empty drill table is `compliance/evidence/rto-rpo-statement.md`, **not** `docs/ops/backup-restore-runbook.md`, which the row cited and which contains none of it. | A reference deployment. **Repo-side half is checkable now:** close it when `rto-rpo-statement.md` carries stated targets and ≥1 drill row. → `superpower/deployment-topology-plan.md` (§10 D1–D8 signed 2026-09-06) |
+| **Compliance program (NFR-7)** | External only: C1 applicability statements, ISMS boundary, auditor engagement, pen test, C5 policy content, C6 FedRAMP package + FIPS leg (demand-gated), the ISO 8.8 advisory-watch process. | Org action + external parties. ⚠ The five REPO-SIDE artifacts this row used to carry (customer verification runbook, CI-evidence doc, recorded restore drill, G8 RBAC evidence, G9 FIPS) are file-existence checks, not external gates — they moved to §5 where a shift can act on them. → `compliance/controls-matrix.md` §4 |
+| **SOC 2 Type II window** | Opening the 6-month observation window was **decided 2026-09-06**. The HIPAA/PCI framework choice stays deferred until a prospect is named. | 🔴 **No start date is recorded anywhere**, so the 6-month end cannot be computed and nobody can tell whether the window is running. **First action is not external: record the start date in `compliance/controls-matrix.md`.** The gate then becomes `start + 6 months` — arithmetic. |
+| **D13 parser field tiers** | Run the onboarding-observation session with the READY kit. Second question for the session: every `tier:'required'` field ships `required:false` validators — should "required" validate? ⛔ Explicitly NOT an engineering guess. | A real onboarding user. **Close when `superpower/parser-field-tiers-interview-plan.md` gains a dated session record** — otherwise the session could happen and nothing here would change. |
+| **SEC-INCIDENT-1 carry-forwards** | Incident CLOSED BY DECOMMISSION 2026-08-29. 🔴 Due on closure and NOT done: delete the off-repo pre-rewrite backup bundle (five cleartext secrets; retention condition lapsed); confirm none of the five values was reused elsewhere. Internal hostnames/IPs still published in-repo (lower severity). | Operator, off-repo. **Close when `compliance/controls-matrix.md` CC6.1 carries a dated line confirming the deletion and the no-reuse check.** ⚠ Deleting an off-repo bundle leaves no repo trace, so without that line this overdue item can never be marked done or chased. |
+| **DATA-GOV-1 archive** | Move the real carrier corpus to an encrypted out-of-band archive on company storage with a fetch script; access held by the data-agreement owner. | Org action. **Close when `PROJECT_NOTES.md` §DATA-GOV-1 carries the dated archive location and the fetch-script path.** |
+| **EOI-7b** | Publish eoiagent `0.1.0` artifacts to a registry; CI rebuilds from tag meanwhile. | ✅ **Checkable in one grep:** close when `.github/workflows/ci.yml` no longer checks out and builds `jotder/inspect-agent` from source (3 references today). |
+| **AGT-5 `DryRunProvider` + `incident_explain`** | Per-tool preview seam on `PlatformBuilder` (lets inspecto drop its parallel `AgentApprovals` previewer); `incident_explain` waits on the eoiagent host seam. Local-models-only scope cut stands. | Cross-repo `jotder/inspect-agent`: **reopen when it ships a per-tool `DryRunProvider` seam.** ("Demand" dropped — it named no watcher and no definition.) → `superpower/agt-6-plan.md` §4.2 G2 |
+| **AGT-6b multi-step agent graphs** | First cut = generalize `RunbookActions`, never free-form ReAct over mutating tools. | Same upstream repo, two concrete preconditions: the eoiagent approval gate is synchronous per-call (nested gates deadlock) and there is no per-tool `DryRunProvider` seam. Reopen when both are gone. → `superpower/agt-6-plan.md` §4 |
+| **E1 Enterprise distributed tier / Stage-2 streaming** | Unscoped. | **Reopen when a named prospect requiring a distributed tier is recorded in `PROJECT_NOTES.md`.** (Was "Demand" with no scope, no definition and no watcher — the textbook unfalsifiable gate.) |
+| **Completeness KPI hold** | K2 wiring / K4 / K5 held: whether `{seq}` restarts per hour is a carrier fact. | 🔴 **Not actually external.** The plan records the filename shape `CDR_{yyyyMMddHH}_{seq}_*` and `GapDetector` already parses those tokens, so **a query over one month of landed filenames answers it** without the carrier. Reopen by running that query — it is roughly half an hour of work, not a blocked dependency. → `superpower/completeness-kpi-plan.md` §2b |
 
 ## 3. Product features — decided or unblocked, simply unbuilt
 
@@ -100,11 +109,13 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - **P2** · **GUARD-SWEEP-1** — the rest of the 2026-09-07 sweep, ranked. (a) ✅ **DONE 2026-09-07** — `ci.yml`'s reactor
   step now runs `-Pedition-enterprise` (the profile is modules-only, so one flag adds `inspecto-security`
   + `inspecto-policy` in the same pass), putting those **54 OIDC / token-relay / ABAC / keystore test
-  methods** under automation for the first time. (b) `check-dependencies.mjs` and
-  `sbom.mjs` resolve without a profile, so `inspecto-security`'s Nimbus tree is never locked — while
-  `compliance/controls-matrix.md` marks **G7 CLOSED**. (c) `check-secrets.mjs` has **no emptiness floor**
-  and falls back to walking the tree when `git ls-files` throws — it can read zero files and exit green;
-  its siblings both fail closed. Also `MIN_SECRET_LEN = 16`, so a 15-char key passes. (d) Conventional-
+  methods** under automation for the first time. (b) ✅ **DONE 2026-09-07** —
+  `check-dependencies.mjs` now resolves `-Pedition-enterprise`, so the lock covers 25 modules and gained
+  `com.nimbusds:nimbus-jose-jwt:10.9.1`; the G7 row records the corrected scope. (`sbom.mjs` already
+  resolved per edition — that half of the finding was wrong.) (c) ✅ **DONE 2026-09-07** —
+  `check-secrets.mjs` gained an emptiness floor (`MIN_SCANNED_FILES = 1000`, set from a measured 3366
+  scanned; falsified in both directions). ⚠ Still open in that row: `MIN_SECRET_LEN = 16`, so a 15-char
+  key passes, and the length test is not entropy. (d) Conventional-
   commit lint is gated on `pull_request` and this team opens none. (e) No `typecheck` script exists and
   CI checks only `tsconfig.app.json` — the gap that let a renamed DTO field reach an AOT failure on
   2026-09-07. (f) `sbom.mjs` is tag-only and its `unhashed`/`unlicensed` counters are warn-only, so a
@@ -222,6 +233,12 @@ a test that post-dates it. What is left is one release-gated wire change.)*
   EDITIONS' generated board marks `SP-ACQ-06`/`SP-ACQ-08` (S3/GCS) planned while the **connectors** ship with tests
   — check whether the *Step processor* exists before flipping `ProcessorCatalog`, because a connector is not a Step.
   → `REQUIREMENTS.md` · `EDITIONS.md`
+- **Compliance repo-side artifacts (moved out of §2, 2026-09-07)** — these are file-existence checks, not
+  external gates, and sitting in "externally gated" made them look unactionable: the **customer
+  verification runbook** (G2 half), the **CI-evidence doc**, a **recorded restore drill** (G6 — the
+  statement exists at `compliance/evidence/rto-rpo-statement.md` with operator-fill targets and an empty
+  drill table), **G8** RBAC R5 evidence and **G9** FIPS. Each closes when its file says so.
+  → `compliance/controls-matrix.md` §4
 - **Template seed-pack enrichment (frontend C7)** — ongoing, not a discrete item: `kpi-overview`,
   `quality-monitor`, `trend-monitor` today. → `okf/frontend/features/studio.md`
 - **GRAPHIFY-1 tool sync** — ⚠ the row's own check is blind: `.graphify_version` and `graphify --version` both

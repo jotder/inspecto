@@ -43,10 +43,13 @@ separate `URLClassLoader`, filtering to providers that actually came from it. Co
 ## Writing a guard that can fail
 
 1. **Give it an emptiness floor.** A scan that matches nothing must fail, not pass. `check-dependencies.mjs`
-   and `sbom.mjs` both exit 2 on a zero-result resolve; `PipelineKeyCoverageContractTest` asserts
+   and `sbom.mjs` exit 2 on a zero-result resolve; `PipelineKeyCoverageContractTest` asserts
    `read.size() >= 35` with the comment *"a scan that silently matches nothing passes every assertion
-   above"*. ⚠ `check-secrets.mjs` has no such floor and degrades to walking the tree when `git ls-files`
-   throws — the one guard that exists *because* secrets already leaked.
+   above"*. ✅ `check-secrets.mjs` gained one 2026-09-07 (`MIN_SCANNED_FILES`) — it had none while being
+   the one guard that exists *because* secrets already leaked, and it degrades to a filesystem walk when
+   `git ls-files` throws, so a bad root printed the same green tick as a clean repo. ⚠ Set the floor
+   **from a measurement** (3366 files scanned ⇒ floor 1000), not from a round number far below it — see
+   rule 6.
 2. **Ratchet both ways.** An allowlist entry that stops suppressing anything is debt already paid, and a
    stale exemption silently forgives the next regression. `check-vocabulary.mjs` does this for all three
    of its file allowlists (`DOC_ALLOW`/`CONFIG_ALLOW`/`SOURCE_ALLOW`) and `PipelineKeyCoverageContractTest`
@@ -64,10 +67,14 @@ separate `URLClassLoader`, filtering to providers that actually came from it. Co
    `Skipped: N` *with the reason*. `PostgresStateStoreTest` is the reference — 11 skipped, each naming the
    property that turns it back on. Absent coverage you can see is a decision; absent coverage you cannot
    is the disease.
-5. **Check the STAGED artifact, not the build output.** `package.ps1` verifies the bundled connector
-   sidecar (8 factories registered, sshj present, javax.mail present). That check is the only thing in
-   the repo that inspects a packaged artifact, and it is the only one that would have caught
-   CONNECTORS-BUNDLE-1.
+5. **Check the STAGED artifact — and where the risk is "does it work", RUN it.** `package.ps1` verifies
+   the staged connector sidecar (8 factories, sshj, javax.mail) and the security sidecar (Nimbus + 3 SPI
+   registrations); those are the only checks in the repo that inspect a packaged artifact. But
+   SEC-SIDECAR-BOOT-1 proved inspection is not enough: every jar was *present* and the bundle still could
+   not boot, because `ControlApi` resolves the Authenticator SPI at startup. So packaging now also
+   **launches the bundle it just staged and waits for `/health`** — the one check that exercises the
+   assembled classpath as a running process. ⚠ Assert the artifact's PROPERTIES for what you can enumerate;
+   RUN it for what you cannot.
 6. **A floor far below the actual is not a ratchet.** `addable >= 10` against 35 actual leaves 25 palette
    entries of silent headroom; asserted twice, Java and TS.
 
@@ -92,5 +99,8 @@ the trigger is *"when X is recorded in \<file\>"*, never *"when X happens"*.
 
 A guard's SCOPE exempts more than its allowlist does, and nothing announces it:
 `check-design-tokens.mjs` scans two roots, so `src/app/layout/**` — real inspecto-authored components —
-can hardcode colours freely. `check-dependencies.mjs` and the SBOM resolve without a profile, so
-`inspecto-security`'s Nimbus tree is never locked or reviewed. Audit a guard's scope apart from its rules.
+can hardcode colours freely. ✅ `check-dependencies.mjs` resolved without an edition profile until
+2026-09-07, so `inspecto-security`'s Nimbus tree — the one dependency tree a security reviewer most wants
+under review — was the only one the lock never saw, while `compliance/controls-matrix.md` marked G7
+CLOSED. It now resolves `-Pedition-enterprise` (25 modules, not 23). Audit a guard's scope apart from its
+rules: the scope is where the silent exemptions live.

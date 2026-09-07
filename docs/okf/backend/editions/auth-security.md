@@ -281,3 +281,23 @@ filesystem gate on mutation routes (config writes, connection writes, authored-P
 those routes return **`503`**; present → writes are jailed to that root and validated by
 [`ConfigSafetyValidator`](../config/config-safety.md). It is an ops decision about whether this instance may
 write — not authentication.
+
+## A Standard/Enterprise bundle does not boot without OIDC configuration
+
+Discovered 2026-09-07 by the packaging boot smoke, and worth stating plainly because it is a deployment
+precondition, not a runtime one:
+
+* `ControlApi` calls `Authenticators.active()` **during construction**, and `SpiSlot` runs
+  `ServiceLoader` **regardless of `-Dauth.mode`**. So the mere PRESENCE of `inspecto-security.jar` on the
+  classpath makes `OidcAuthenticator`'s constructor mandatory.
+* That constructor requires **`-Dauth.oidc.jwksUri`** and **`-Dauth.oidc.issuer`**, and fails closed with
+  a named message (`inspecto-security requires -Dauth.oidc.jwksUri (Standard edition …)`) otherwise.
+
+⇒ Dropping the security sidecar into a bundle without also supplying the `AUTH_OIDC_*` environment
+variables `serve.sh` reads is not a degraded deployment — it is one that **exits at startup**. The
+message names the missing property, so the failure is legible; it is the *timing* that surprises, since
+nothing about "auth is optional per edition" suggests the process will not start.
+
+⚠ There is no way to run a Standard/Enterprise bundle "with the module present but auth off". If that is
+ever wanted, it needs a guard around the SPI resolution, not a config flag — `SpiSlot.active()` has no
+try/catch, which is also why a missing transitive there is a boot failure (SEC-SIDECAR-BOOT-1).

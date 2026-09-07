@@ -47,6 +47,12 @@ param(
     [switch]$NoBuild,   # skip mvn build; use existing JAR in target/
     [switch]$NoUi,      # skip the Angular UI build/bundle (inspecto-ui/ is optional)
     [switch]$NoRuntime, # skip embedding a trimmed Java runtime (target server must then provide Java 24+)
+    # Boot smoke (SEC-SIDECAR-BOOT-1 follow-up, 2026-09-07). The staged-artifact checks below assert that
+    # Nimbus and the SPI files are PRESENT; that is not the same as ControlApi actually starting. The bug
+    # they were written for was a boot failure that every green test suite missed, so packaging now
+    # launches the bundle it just built and waits for /health. -SkipBootCheck opts out for a fast local
+    # package; CI and releases must never pass it.
+    [switch]$SkipBootCheck,
     # Editions are build flavors (docs/EDITIONS.md), never branches. 'Standard' additionally builds
     # and bundles inspecto-security (W6, the Authenticator SPI's OIDC implementation) alongside the
     # core jar; serve.sh/serve.bat auto-detect its presence and wire -Dauth.mode=oidc from env vars.
@@ -914,6 +920,67 @@ if ($duckdbExtCacheDir) {
     }
 } else {
     Write-Host "  (skipping excel extension bundling — no cache resolved; xlsx pipelines need network on first run, or a manual -Dduckdb.extension.dir)" -ForegroundColor Yellow
+}
+
+# -- step 6e: BOOT SMOKE -- does the FULLY ASSEMBLED bundle actually START? ----------------------
+# The only check here that exercises the assembled classpath as a running process. Everything else
+# inspects jars. SEC-SIDECAR-BOOT-1 shipped a bundle whose ControlApi threw while resolving the
+# Authenticator SPI during startup, with every unit suite green and every jar present -- exactly the
+# gap this closes. It runs LAST, after every stage step: an earlier placement failed on 'no spaces'
+# because the spaces tree is copied in step 4, and a boot check that dies for a reason unrelated to
+# what it tests is worse than none -- it trains you to read its failure as noise.
+# Standard/Enterprise matter most (they load inspecto-security), but Personal is
+# smoked too: a broken core is the same class of failure.
+if (-not $SkipBootCheck) {
+    $java = if (Test-Path "$bundleDir/runtime/bin/java.exe") { "$bundleDir/runtime/bin/java.exe" }
+            elseif (Test-Path "$bundleDir/runtime/bin/java") { "$bundleDir/runtime/bin/java" }
+            else { 'java' }
+    # The same classpath the generated launchers build -- deliberately re-derived from the staged files
+    # rather than hardcoded, so a sidecar that fails to stage is a boot failure here too.
+    $cp = @('inspecto.jar') + @('inspecto-security.jar','inspecto-policy.jar','inspecto-connectors.jar','postgresql.jar' |
+        Where-Object { Test-Path (Join-Path $bundleDir $_) })
+    $sep = if ($IsWindows -or $env:OS -eq 'Windows_NT') { ';' } else { ':' }
+    $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+    $listener.Start(); $port = $listener.LocalEndpoint.Port; $listener.Stop()
+    # A Standard/Enterprise bundle CANNOT CONSTRUCT ITS AUTHENTICATOR WITHOUT OIDC CONFIG -- the boot
+    # smoke discovered this, which is precisely what it is for. ControlApi calls Authenticators.active()
+    # at startup and SpiSlot runs ServiceLoader regardless of -Dauth.mode, so the mere PRESENCE of
+    # inspecto-security.jar makes OidcAuthenticator's constructor mandatory -- and it requires
+    # -Dauth.oidc.jwksUri and -Dauth.oidc.issuer, failing closed with a named message otherwise.
+    # serve.sh supplies both from AUTH_OIDC_* env vars; a deployment that omits them does not start.
+    # These placeholders exist ONLY so the constructor completes: RemoteJWKSet wraps the URL and fetches
+    # lazily, so nothing is contacted. Never mistake them for a working auth configuration.
+    $oidcArgs = @()
+    if (Test-Path (Join-Path $bundleDir 'inspecto-security.jar')) {
+        $oidcArgs = @('-Dauth.oidc.jwksUri=http://127.0.0.1:1/boot-smoke-never-fetched',
+                      '-Dauth.oidc.issuer=http://127.0.0.1:1/boot-smoke')
+    }
+    $out = Join-Path ([System.IO.Path]::GetTempPath()) "inspecto-boot-$port.log"
+    Write-Host "Boot smoke: starting the staged bundle on :$port ..." -ForegroundColor Cyan
+    # Build the argument list by CONCATENATION, not by nesting $oidcArgs inside an array literal:
+    # PowerShell does not flatten a nested array there, so -ArgumentList (which wants string[]) receives
+    # an Object[] element and Start-Process throws before Java is ever launched. `+` does flatten, and an
+    # empty @() contributes nothing, so the Personal path stays clean.
+    $argList = @('--enable-native-access=ALL-UNNAMED', "-Dcontrol.port=$port", '-Dspaces.root=spaces') +
+               $oidcArgs +
+               @('-cp', ($cp -join $sep), 'com.gamma.control.ControlApi')
+    $proc = Start-Process -FilePath $java -WorkingDirectory $bundleDir -PassThru -NoNewWindow -RedirectStandardOutput $out -RedirectStandardError "$out.err" -ArgumentList $argList
+    $healthy = $false
+    foreach ($i in 1..60) {
+        if ($proc.HasExited) { break }
+        try {
+            $r = Invoke-WebRequest -Uri "http://127.0.0.1:$port/health" -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
+            if ($r.StatusCode -eq 200) { $healthy = $true; break }
+        } catch { Start-Sleep -Milliseconds 500 }
+    }
+    if (-not $proc.HasExited) { $proc.Kill(); $proc.WaitForExit(5000) }
+    if (-not $healthy) {
+        Write-Host "---- boot output ----" -ForegroundColor Yellow
+        foreach ($f in @($out, "$out.err")) { if (Test-Path $f) { Get-Content $f -Tail 40 | Write-Host } }
+        throw "BOOT SMOKE FAILED: the staged $Edition bundle never answered /health on :$port. The jars are present but the process does not start - this is the SEC-SIDECAR-BOOT-1 shape (a missing transitive on the assembled classpath). Output above."
+    }
+    Remove-Item $out, "$out.err" -ErrorAction SilentlyContinue
+    Write-Host "  verified: the staged $Edition bundle boots and answers /health" -ForegroundColor DarkGray
 }
 
 # ── step 7: copy README + docs tree ─────────────────────────────────────────────

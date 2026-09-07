@@ -61,7 +61,12 @@ function mvn() {
 }
 
 function resolve() {
-    const args = ['-B', 'dependency:list', '-DincludeScope=runtime'];
+    // `-Pedition-enterprise` (2026-09-07): the profile is MODULES-ONLY, so it adds inspecto-security and
+    // inspecto-policy to the resolve. Without it the lock covered only the DEFAULT reactor, which meant
+    // the one dependency tree a security reviewer most wants under review — inspecto-security's Nimbus
+    // JOSE+JWT — was the one the guard never saw, while compliance/controls-matrix.md marked G7 CLOSED.
+    // Enterprise is the superset, so this single flag covers Standard too.
+    const args = ['-B', 'dependency:list', '-DincludeScope=runtime', '-Pedition-enterprise'];
     if (process.env.MVN_OFFLINE === '1') args.unshift('-o');
     let out;
     try {

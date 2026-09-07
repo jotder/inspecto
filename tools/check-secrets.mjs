@@ -119,6 +119,12 @@ const PLACEHOLDER = [
 // Real credentials are long. Below this, the false-positive rate dwarfs the signal.
 const MIN_SECRET_LEN = 16;
 
+/** Floor for the tree scan - see scanWorkingTree. MEASURED 2026-09-07: 3366 files scanned of 3804
+ *  tracked. 1000 leaves room for a legitimate narrowing (a new SKIP_DIR could halve it and still pass)
+ *  while catching a scan that COLLAPSED - the failure this exists for is reading ~nothing, not reading
+ *  slightly less. A floor far below the actual is barely a check, so it is set from the measurement. */
+const MIN_SCANNED_FILES = 1000;
+
 function isPlaceholder(value) {
     return PLACEHOLDER.some((re) => re.test(value));
 }
@@ -196,6 +202,7 @@ function scannablePath(rel) {
 // HEAD.
 function scanWorkingTree() {
     const found = [];
+    let scanned = 0;
     for (const file of trackedFiles()) {
         const rel = toPosix(relative(repoRoot, file));
         if (!scannablePath(rel)) continue;
@@ -205,10 +212,26 @@ function scanWorkingTree() {
         } catch {
             continue;
         }
+        scanned++;
         lines.forEach((line, i) => {
             const hit = scanLine(line);
             if (hit) found.push({ rel, line: i + 1, ...hit });
         });
+    }
+
+    // EMPTINESS FLOOR (2026-09-07). Without it the guard's happy path is indistinguishable from its
+    // blindfolded one: `git ls-files` throwing falls back to a filesystem walk, and a walk that finds
+    // nothing - a bad root, a path change, a sparse checkout - returns [] and prints the same green tick.
+    // This is the ONE guard that exists because secrets already reached a public remote, and at pre-push
+    // it is the last preventive layer, so a silent zero-file scan is the worst failure it has. Both
+    // siblings already fail closed this way (check-dependencies.mjs and sbom.mjs exit 2 on an empty
+    // resolve); this one did not. Deliberately a small constant, not a ratchet: it answers only 'did the
+    // scan read the repo at all', which is the one question a floor can honestly answer.
+    if (scanned < MIN_SCANNED_FILES) {
+        console.error(`\n\u2716 Committed-secret guard: CANNOT RUN - scanned only ${scanned} file(s).`);
+        console.error('  A green result here would mean only that the guard read nothing. Expected at least');
+        console.error(`  ${MIN_SCANNED_FILES}. Check this is a git checkout and that SKIP_DIRS/EXTS still match the tree.`);
+        process.exit(2);
     }
     return found;
 }
