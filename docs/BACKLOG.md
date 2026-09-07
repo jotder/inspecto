@@ -38,11 +38,9 @@ evidence note), and four were re-ranked because the row hid a gate — a design 
 a new dependency — not a build. The rule that fell out: **a P1 must name the file it changes.** A row that
 cannot is a decision (§1) or a design (P2).
 
-Do next, in order (refreshed again 2026-09-07 — the three above it are done):
-1. **GUARD-SWEEP-1 (d)–(i)** (§3) — the rest of the enforcement gaps ((a)(b)(c) shipped 2026-09-07).
-   Now headed by: commit-lint gated on `pull_request` in a repo that opens none; no `typecheck` script
-   (CI checks one of three tsconfigs); `sbom.mjs` tag-only with warn-only unhashed/unlicensed counters;
-   no coverage gate and no compiler lint anywhere; `addable >= 10` against 35 actual.
+Do next, in order (refreshed again 2026-09-07 — GUARD-SWEEP-1 and DAT-6-CI-1 are now done too):
+1. **MERGE-ATTRS-1** (§4) — `transform.merge` reads `type` and `on` off its config and declares neither,
+   so the node can only ever run as a `union` unless someone hand-edits TOON. One `List<NodeAttribute>`.
 2. **Release notes for the next MAJOR** — keep appending (§2).
 3. **Step Processor catalog** — pick a partial by name (§3).
 
@@ -96,9 +94,7 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 
 ### Authoring (Parse / Transform / pipeline editor)
 
-- **P2** · **WORKBENCH-S4** — the one-surface Step workbench. **Operator 2026-09-06: design now, build later** — the design is written and awaiting review: `superpower/step-workbench-s4-design.md` (three UI-only slices S4a field list+filter · S4b input strip · S4c summarize grouping; NO new endpoint — the canvas edges are the input-relation truth). Build only after the two open questions in its §5 are answered.
-
-- **P2** · **AUTHORING-REDESIGN-1** — open letters (⚠ the old "(j)(l)(n2)(o) are in §1" clause was stale in all four: (o) is now the WORKBENCH-S4 row above, (l) and (n2) SHIPPED, (j) `engine: auto` was already answered by shipped code; (f)(g)(m) SHIPPED 2026-09-06 — `JOIN_REFERENCE_MISSING`/`JOIN_ON_MISSING`/`UNKNOWN_JOIN_REFERENCE` at save, `SchemaMappingDrift` on all three schema save paths, `?pipeline=` sent by the UI): (c) v2 structured AST table over the SQL for WHERE/JOIN editing — 🔴 precondition: probe that the `json` extension loads on the SEALED `SqlSandbox` connection; (d) v3 macros as the UDF registry (per-connection re-creation in `EnrichmentEngine`, `PipelineJobRunner`, `BatchIngestStrategy`, preview) — demand-gated; (e) column metadata editing on the Transform pane (Parse D2) — needs a backend home for metadata on a `transform.sql` node first; (i) per-row "sample resolves to" line — no host resolves a sample against an `AttributeSpec`. Still open on (f): which COLUMNS the reference carries is the dry-run's question (it reads the store); the save checks existence and `on` presence only. → `okf/frontend/features/schema-mapping-authoring.md` §0
+- **P2** · **AUTHORING-REDESIGN-1** — open letters (⚠ the old "(j)(l)(n2)(o) are in §1" clause was stale in all four: (o) SHIPPED 2026-09-07 as WORKBENCH-S4 — all three slices, (l) and (n2) SHIPPED, (j) `engine: auto` was already answered by shipped code; (f)(g)(m) SHIPPED 2026-09-06 — `JOIN_REFERENCE_MISSING`/`JOIN_ON_MISSING`/`UNKNOWN_JOIN_REFERENCE` at save, `SchemaMappingDrift` on all three schema save paths, `?pipeline=` sent by the UI): (c) v2 structured AST table over the SQL for WHERE/JOIN editing — 🔴 precondition: probe that the `json` extension loads on the SEALED `SqlSandbox` connection; (d) v3 macros as the UDF registry (per-connection re-creation in `EnrichmentEngine`, `PipelineJobRunner`, `BatchIngestStrategy`, preview) — demand-gated; (e) column metadata editing on the Transform pane (Parse D2) — needs a backend home for metadata on a `transform.sql` node first; (i) per-row "sample resolves to" line — no host resolves a sample against an `AttributeSpec`. Still open on (f): which COLUMNS the reference carries is the dry-run's question (it reads the store); the save checks existence and `on` presence only. → `okf/frontend/features/schema-mapping-authoring.md` §0
 - **P2** · **GUARD-SWEEP-1 — (g) only.** (a)–(f), (h), (i) all shipped 2026-09-07: the edition profile in
   CI · the dependency-lock scope · the secrets emptiness floor · commit-lint on the push range (it was
   gated on `pull_request` in a repo that opens none, so it had never run) · a `typecheck` script covering
@@ -166,6 +162,17 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 *(Drained 2026-09-07. Three of the five rows here were standing refusals wearing a tech-debt label — a
 "LEAVE unless someone is already in the file" is not work — and moved to §6. A fourth was already closed by
 a test that post-dates it. What is left is one release-gated wire change.)*
+
+- **P2** · **MERGE-ATTRS-1 — `transform.merge` reads two config keys it never declares.** Found while
+  grounding WORKBENCH-S4's S4b (2026-09-07). `RowShaper.merge` reads `type`
+  (`union`|`inner`|`left`, default `union`) and `on` (the join columns) off the node's config —
+  `RowShaper.java:57-58,756` — but `NodeAttributes` has **no `TRANSFORM_MERGE` entry** and its type→attrs
+  map registers none, so the config pane offers neither key and the server publishes no spec for them. A
+  merge node can therefore only ever run as a `union`: the inner/left arms are reachable by hand-editing
+  TOON and by nothing else. ⚠ This is the mirror of the usual defect — not config written and never read,
+  but config **read and never declared**, which no round-trip test can catch because the key never enters
+  the round trip. Fix is one `List<NodeAttribute>` plus the map entry; `NodeConfigNameContractTest` then
+  pins the names like every other kind's.
 
 - **P3** · **Vocabulary rollout, Tier 3 — the release-gated remainder.** The **UI half SHIPPED 2026-09-07**:
   every emitter was verified to dual-emit (`LineageRoutes:112/113`, `ViewRoutes:100/101`,
@@ -327,7 +334,6 @@ One line each; the reasoning is in the pointer. Reopen only on the stated trigge
 | AGT-5 `DryRunProvider` (§2) | AGT-6b row (§2) · `superpower/agt-6-plan.md` §4.2 G2 |
 | EXECUTION-RESIDUALS X4 record-level replay (§3) | `okf/frontend/features/run-detail.md` + `USER_GUIDE.md` "reprocess is whole-batch only" · `INDEX.md`'s `EXECUTION-RESIDUALS-SKETCHES` pointer (which cites §4 — the row is in §3) |
 | `batch_id` rename trio — §6 (decided: rides the MAJOR) + §2 release notes | `okf/backend/control-plane/api-stability.md` §Release notes (D-12) · `archived-documents/plans-archive/consignment-elt-architecture.md` deferred renames · `elt-final-amendment-plan.md` D-12 / Phase 7 · `okf/backend/engine/db-layer.md` (cites §4 — no such row) |
-| WORKBENCH-S4 (§3) | AUTHORING-REDESIGN-1 (o) (§3) · `superpower/step-workbench-s4-design.md` |
 | X-Actor full removal (§2) | `okf/backend/editions/auth-security.md` §Still-open · `EDITIONS.md` SEC-11 · `REQUIREMENTS.md` R4. 🔴 The §2 row's stated gate ("the API-v1 sunset") names apparatus **deleted 2026-07-25**, and `api-v1.md` never mentions X-Actor — re-state the gate before working it |
 | Completeness KPI hold (§2) | Completeness KPI K2/K4/K5 (§3) · `superpower/completeness-kpi-plan.md` |
 | Compliance program NFR-7 (§2) | SOC 2 Type II window (§2) — the same observation window, twice in one table |

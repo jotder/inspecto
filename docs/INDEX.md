@@ -106,7 +106,6 @@ to the table below — all in the same change.
 | [`agt-6-plan.md`](superpower/agt-6-plan.md) | PARTLY SHIPPED | A1–A5 shipped 2026-07-26/27. Left: the `kpi_report_builder` host (no viable pane — a new surface) and all of AGT-6b, blocked upstream on eoiagent. |
 | [`completeness-kpi-plan.md`](superpower/completeness-kpi-plan.md) | ⏸ ON HOLD | K1/K3 and K2's analysis half shipped. K2-wiring/K4/K5 held by operator: whether `{seq}` restarts per hour is a carrier fact nobody has confirmed. |
 | [`parser-field-tiers-interview-plan.md`](superpower/parser-field-tiers-interview-plan.md) | READY TO RUN | The D13 observation-session kit. Needs a real onboarding user — ⛔ explicitly not an engineering guess. |
-| [`step-workbench-s4-design.md`](superpower/step-workbench-s4-design.md) | DESIGN | The one-surface Step workbench, three UI-only slices. Operator: design now, build later — awaiting answers to its §5 two questions (BACKLOG `WORKBENCH-S4`). |
 | [`design/record-transformer-review/`](superpower/design/record-transformer-review/) | WORKING FILES | Design-canvas sources for the Record Transformer review (2026-09-05). Re-seed from these; never edit the assembled `.html`. |
 | [`assets/`](superpower/assets/) | TOOLING | `pkggraph.py` / `edgeholders.py` / `fanmatrix2.py` — reproduce any reactor or package metric quoted in `okf/backend/modules/reactor.md`. |
 
@@ -118,11 +117,12 @@ status header has an **unknown** status, not an unbuilt one: this index once cal
 "NOT APPROVED, NOTHING BUILT" for two days because the status was inferred from a missing header instead of
 from the code.
 
-Full list: [`archived-documents/plans-archive/`](archived-documents/plans-archive/) (138 files). The 46 that
+Full list: [`archived-documents/plans-archive/`](archived-documents/plans-archive/) (143 files). The 46 that
 this index used to narrate, newest first:
 
 | Archived plan | Archived | Its truth now lives in |
 |---|---|---|
+| [`step-workbench-s4-design`](archived-documents/plans-archive/step-workbench-s4-design.md) | 2026-09-07 | [`okf/frontend/features/pipeline-editor.md`](okf/frontend/features/pipeline-editor.md) §"The step workbench" |
 | [`consignment-elt-architecture`](archived-documents/plans-archive/consignment-elt-architecture.md) | 2026-09-07 | [`okf/backend/engine/db-layer.md`](okf/backend/engine/db-layer.md) · [`okf/backend/control-plane/jobs.md`](okf/backend/control-plane/jobs.md) · [`okf/backend/engine/consignment-addressing.md`](okf/backend/engine/consignment-addressing.md) · [`okf/backend/engine/duckdb.md`](okf/backend/engine/duckdb.md) · [`okf/backend/engine/post-sync-step-chains.md`](okf/backend/engine/post-sync-step-chains.md) · [`okf/backend/engine/consignment-status-flow.md`](okf/backend/engine/consignment-status-flow.md) |
 | [`gate-register`](archived-documents/plans-archive/gate-register.md) | 2026-09-07 | [`okf/index.md`](okf/index.md) |
 | [`living-operational-system`](archived-documents/plans-archive/living-operational-system.md) | 2026-09-07 | [`okf/living-operational-system.md`](okf/living-operational-system.md) |

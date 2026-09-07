@@ -50,331 +50,371 @@
     </inspecto-alert>
 }
 
-@if (view() === 'sql') {
-    <div class="rounded-lg border border-gray-200 dark:border-gray-700">
-        <inspecto-sql-codemirror [value]="sqlText()" (valueChange)="onSqlEdited($event)" />
-    </div>
-    <p class="text-secondary m-0 mt-1 text-xs">
-        The relation is always <code>input</code>. Filtering belongs to a Filter Step.
-        @if (fieldsDisabledReason(); as why) {
-            <span role="status">{{ why }}</span>
+<!-- S4a: the pane body and the step workbench rail, side by side. The rail is the SAME list in both
+     views — in Fields it says which upstream columns the generated SQL touches, in SQL it says which ones
+     the hand-written SQL touches, and in both a click goes to pickField(). -->
+<div class="flex items-start gap-3">
+    <div class="min-w-0 flex-1">
+        @if (view() === 'sql') {
+            <div class="rounded-lg border border-gray-200 dark:border-gray-700">
+                <inspecto-sql-codemirror [value]="sqlText()" (valueChange)="onSqlEdited($event)" />
+            </div>
+            <p class="text-secondary m-0 mt-1 text-xs">
+                The relation is always <code>input</code>. Filtering belongs to a Filter Step.
+                @if (fieldsDisabledReason(); as why) {
+                    <span role="status">{{ why }}</span>
+                } @else {
+                    Switching to Fields keeps every column; an expression the catalog does not know stays as custom SQL.
+                }
+            </p>
         } @else {
-            Switching to Fields keeps every column; an expression the catalog does not know stays as custom SQL.
-        }
-    </p>
-} @else {
-    <!-- toolbar: search + view-only lenses. Neither changes what is written. -->
-    <div class="mb-2 flex flex-wrap items-center gap-2">
-        <div class="relative flex items-center">
-            <mat-icon
-                class="icon-size-4 text-secondary pointer-events-none absolute left-2"
-                svgIcon="heroicons_outline:magnifying-glass"
-            ></mat-icon>
-            <input
-                type="search"
-                class="h-8 w-56 rounded-md border border-gray-300 bg-transparent pl-8 pr-2 text-sm dark:border-gray-600"
-                placeholder="Find a field…"
-                aria-label="Find a field"
-                [value]="query()"
-                (input)="setQuery($any($event.target).value)"
-            />
-        </div>
-        @for (chip of filterChips(); track chip.key) {
-            <button
-                type="button"
-                class="h-7 rounded-full border px-3 text-xs font-medium"
-                [class.border-primary]="chip.active"
-                [class.text-primary]="chip.active"
-                [class.border-gray-300]="!chip.active"
-                [class.dark:border-gray-600]="!chip.active"
-                [attr.aria-pressed]="chip.active"
-                (click)="setFilter(chip.key)"
-            >
-                {{ chip.label }} <span class="opacity-60">{{ chip.count }}</span>
-            </button>
-        }
-        <span class="text-secondary ml-auto text-xs">{{ showing() }}</span>
-    </div>
+            <!-- toolbar: search + view-only lenses. Neither changes what is written. -->
+            <div class="mb-2 flex flex-wrap items-center gap-2">
+                <div class="relative flex items-center">
+                    <mat-icon
+                        class="icon-size-4 text-secondary pointer-events-none absolute left-2"
+                        svgIcon="heroicons_outline:magnifying-glass"
+                    ></mat-icon>
+                    <input
+                        type="search"
+                        class="h-8 w-56 rounded-md border border-gray-300 bg-transparent pl-8 pr-2 text-sm dark:border-gray-600"
+                        placeholder="Find a field…"
+                        aria-label="Find a field"
+                        [value]="query()"
+                        (input)="setQuery($any($event.target).value)"
+                    />
+                </div>
+                @for (chip of filterChips(); track chip.key) {
+                    <button
+                        type="button"
+                        class="h-7 rounded-full border px-3 text-xs font-medium"
+                        [class.border-primary]="chip.active"
+                        [class.text-primary]="chip.active"
+                        [class.border-gray-300]="!chip.active"
+                        [class.dark:border-gray-600]="!chip.active"
+                        [attr.aria-pressed]="chip.active"
+                        (click)="setFilter(chip.key)"
+                    >
+                        {{ chip.label }} <span class="opacity-60">{{ chip.count }}</span>
+                    </button>
+                }
+                <span class="text-secondary ml-auto text-xs">{{ showing() }}</span>
+            </div>
 
-    <!-- D10: the grid opens on Changed, so say what is NOT on screen instead of listing it. -->
-    @if (passthroughNote(); as note) {
-        <div class="text-secondary mb-2 flex items-center gap-2 text-xs">
-            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrow-right"></mat-icon>
-            <span>{{ note }}</span>
-            <button type="button" class="underline" (click)="setFilter('all')">Show them</button>
-        </div>
-    }
+            <!-- D10: the grid opens on Changed, so say what is NOT on screen instead of listing it. -->
+            @if (passthroughNote(); as note) {
+                <div class="text-secondary mb-2 flex items-center gap-2 text-xs">
+                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrow-right"></mat-icon>
+                    <span>{{ note }}</span>
+                    <button type="button" class="underline" (click)="setFilter('all')">Show them</button>
+                </div>
+            }
 
-    <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-        <table class="w-full border-collapse">
-            <thead>
-                <tr class="text-secondary text-left text-xs font-semibold uppercase tracking-wider">
-                    <th class="w-12 px-2 py-1">#</th>
-                    <th class="px-2 py-1">Field name</th>
-                    <th class="px-2 py-1">From</th>
-                    <th class="px-2 py-1">What to do</th>
-                    <th class="w-28 px-2 py-1">Comes out as</th>
-                    <th class="w-40 px-2 py-1">Sample</th>
-                    <th class="w-8 px-2 py-1"><span class="sr-only">Leave out</span></th>
-                </tr>
-            </thead>
-            <tbody>
-                @for (row of pagedRows(); track row.field.id) {
-                    <tr class="border-t align-top">
-                        <td class="text-secondary px-2 py-1 font-mono text-xs">
-                            <div class="flex items-center gap-1">
-                                <span>{{ row.seq }}</span>
-                                <div class="inline-flex flex-col">
-                                    <button
-                                        type="button"
-                                        class="h-3 w-3 flex items-center justify-center p-0 text-secondary hover:text-primary disabled:opacity-20"
-                                        [attr.aria-label]="'Move up ' + row.field.name"
-                                        [disabled]="row.seq === 1"
-                                        (click)="moveUp(row.field.id)"
-                                    >
-                                        <mat-icon class="icon-size-3" svgIcon="heroicons_outline:chevron-up"></mat-icon>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        class="h-3 w-3 flex items-center justify-center p-0 text-secondary hover:text-primary disabled:opacity-20"
-                                        [attr.aria-label]="'Move down ' + row.field.name"
-                                        [disabled]="row.seq === allRows().length"
-                                        (click)="moveDown(row.field.id)"
-                                    >
-                                        <mat-icon
-                                            class="icon-size-3"
-                                            svgIcon="heroicons_outline:chevron-down"
-                                        ></mat-icon>
-                                    </button>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="px-2 py-1">
-                            <input
-                                type="text"
-                                class="h-8 w-full rounded-md border border-gray-300 bg-transparent px-2 text-sm dark:border-gray-600"
-                                [attr.aria-label]="'Field name, row ' + row.seq"
-                                [value]="row.field.name"
-                                (input)="rename(row.field.id, $any($event.target).value)"
-                            />
-                        </td>
-                        <td class="px-2 py-1">
-                            @if (row.definition && !row.definition.template.includes('{source}')) {
-                                <span class="text-secondary text-xs">— calculated —</span>
-                            } @else {
-                                <select
-                                    class="h-8 w-full rounded-md border border-gray-300 bg-transparent px-1 text-sm dark:border-gray-600"
-                                    [attr.aria-label]="'Source column, row ' + row.seq"
-                                    [value]="row.field.from"
-                                    (change)="setSource(row.field.id, $any($event.target).value)"
-                                >
-                                    <option value="">Pick a column…</option>
-                                    @for (col of upstreamColumns(); track col) {
-                                        <option [value]="col" [selected]="col === row.field.from">{{ col }}</option>
+            <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                <table class="w-full border-collapse">
+                    <thead>
+                        <tr class="text-secondary text-left text-xs font-semibold uppercase tracking-wider">
+                            <th class="w-12 px-2 py-1">#</th>
+                            <th class="px-2 py-1">Field name</th>
+                            <th class="px-2 py-1">From</th>
+                            <th class="px-2 py-1">What to do</th>
+                            <th class="w-28 px-2 py-1">Comes out as</th>
+                            <th class="w-40 px-2 py-1">Sample</th>
+                            <th class="w-8 px-2 py-1"><span class="sr-only">Leave out</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (row of pagedRows(); track row.field.id) {
+                            <tr class="border-t align-top">
+                                <td class="text-secondary px-2 py-1 font-mono text-xs">
+                                    <div class="flex items-center gap-1">
+                                        <span>{{ row.seq }}</span>
+                                        <div class="inline-flex flex-col">
+                                            <button
+                                                type="button"
+                                                class="h-3 w-3 flex items-center justify-center p-0 text-secondary hover:text-primary disabled:opacity-20"
+                                                [attr.aria-label]="'Move up ' + row.field.name"
+                                                [disabled]="row.seq === 1"
+                                                (click)="moveUp(row.field.id)"
+                                            >
+                                                <mat-icon
+                                                    class="icon-size-3"
+                                                    svgIcon="heroicons_outline:chevron-up"
+                                                ></mat-icon>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                class="h-3 w-3 flex items-center justify-center p-0 text-secondary hover:text-primary disabled:opacity-20"
+                                                [attr.aria-label]="'Move down ' + row.field.name"
+                                                [disabled]="row.seq === allRows().length"
+                                                (click)="moveDown(row.field.id)"
+                                            >
+                                                <mat-icon
+                                                    class="icon-size-3"
+                                                    svgIcon="heroicons_outline:chevron-down"
+                                                ></mat-icon>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-2 py-1">
+                                    <input
+                                        type="text"
+                                        class="h-8 w-full rounded-md border border-gray-300 bg-transparent px-2 text-sm dark:border-gray-600"
+                                        [attr.aria-label]="'Field name, row ' + row.seq"
+                                        [value]="row.field.name"
+                                        (input)="rename(row.field.id, $any($event.target).value)"
+                                    />
+                                </td>
+                                <td class="px-2 py-1">
+                                    @if (row.definition && !row.definition.template.includes('{source}')) {
+                                        <span class="text-secondary text-xs">— calculated —</span>
+                                    } @else {
+                                        <select
+                                            class="h-8 w-full rounded-md border border-gray-300 bg-transparent px-1 text-sm dark:border-gray-600"
+                                            [attr.aria-label]="'Source column, row ' + row.seq"
+                                            [value]="row.field.from"
+                                            (change)="setSource(row.field.id, $any($event.target).value)"
+                                        >
+                                            <option value="">Pick a column…</option>
+                                            @for (col of upstreamColumns(); track col) {
+                                                <option [value]="col" [selected]="col === row.field.from">
+                                                    {{ col }}
+                                                </option>
+                                            }
+                                        </select>
                                     }
-                                </select>
-                            }
-                        </td>
-                        <td class="px-2 py-1">
-                            <select
-                                class="h-8 w-full rounded-md border border-gray-300 bg-transparent px-1 text-sm dark:border-gray-600"
-                                [attr.aria-label]="'What to do, row ' + row.seq"
-                                (change)="setFunction(row.field.id, $any($event.target).value)"
-                            >
-                                @for (group of functionGroups; track group.category) {
-                                    <optgroup [label]="group.category">
-                                        @for (fn of group.functions; track fn.id) {
-                                            <option [value]="fn.id" [selected]="fn.id === row.field.fn">
-                                                {{ fn.label }}
-                                            </option>
+                                </td>
+                                <td class="px-2 py-1">
+                                    <select
+                                        class="h-8 w-full rounded-md border border-gray-300 bg-transparent px-1 text-sm dark:border-gray-600"
+                                        [attr.aria-label]="'What to do, row ' + row.seq"
+                                        (change)="setFunction(row.field.id, $any($event.target).value)"
+                                    >
+                                        @for (group of functionGroups; track group.category) {
+                                            <optgroup [label]="group.category">
+                                                @for (fn of group.functions; track fn.id) {
+                                                    <option [value]="fn.id" [selected]="fn.id === row.field.fn">
+                                                        {{ fn.label }}
+                                                    </option>
+                                                }
+                                            </optgroup>
                                         }
-                                    </optgroup>
-                                }
-                            </select>
-                            <!-- one control per declared parameter — the row's source binds to {source} itself -->
-                            @if (row.definition?.params?.length) {
-                                <div class="mt-1 flex flex-wrap gap-1">
-                                    @for (param of row.definition!.params!; track param.name) {
-                                        <label class="flex items-center gap-1 text-xs">
-                                            <span class="text-secondary">{{ param.label }}</span>
-                                            @if (param.type === 'enum') {
-                                                <select
-                                                    class="h-7 rounded-md border border-gray-300 bg-transparent px-1 text-xs dark:border-gray-600"
-                                                    [value]="row.field.args[param.name] ?? param.default ?? ''"
-                                                    (change)="
-                                                        setArg(row.field.id, param.name, $any($event.target).value)
-                                                    "
-                                                >
-                                                    @for (opt of param.options ?? []; track opt) {
-                                                        <option
-                                                            [value]="opt"
-                                                            [selected]="
-                                                                opt === (row.field.args[param.name] ?? param.default)
+                                    </select>
+                                    <!-- one control per declared parameter — the row's source binds to {source} itself -->
+                                    @if (row.definition?.params?.length) {
+                                        <div class="mt-1 flex flex-wrap gap-1">
+                                            @for (param of row.definition!.params!; track param.name) {
+                                                <label class="flex items-center gap-1 text-xs">
+                                                    <span class="text-secondary">{{ param.label }}</span>
+                                                    @if (param.type === 'enum') {
+                                                        <select
+                                                            class="h-7 rounded-md border border-gray-300 bg-transparent px-1 text-xs dark:border-gray-600"
+                                                            [value]="row.field.args[param.name] ?? param.default ?? ''"
+                                                            (change)="
+                                                                setArg(
+                                                                    row.field.id,
+                                                                    param.name,
+                                                                    $any($event.target).value
+                                                                )
                                                             "
                                                         >
-                                                            {{ opt }}
-                                                        </option>
-                                                    }
-                                                </select>
-                                            } @else if (param.type === 'column') {
-                                                <select
-                                                    class="h-7 rounded-md border border-gray-300 bg-transparent px-1 text-xs dark:border-gray-600"
-                                                    [value]="row.field.args[param.name] ?? ''"
-                                                    (change)="
-                                                        setArg(row.field.id, param.name, $any($event.target).value)
-                                                    "
-                                                >
-                                                    <option value="">Pick…</option>
-                                                    @for (col of upstreamColumns(); track col) {
-                                                        <option
-                                                            [value]="col"
-                                                            [selected]="col === row.field.args[param.name]"
+                                                            @for (opt of param.options ?? []; track opt) {
+                                                                <option
+                                                                    [value]="opt"
+                                                                    [selected]="
+                                                                        opt ===
+                                                                        (row.field.args[param.name] ?? param.default)
+                                                                    "
+                                                                >
+                                                                    {{ opt }}
+                                                                </option>
+                                                            }
+                                                        </select>
+                                                    } @else if (param.type === 'column') {
+                                                        <select
+                                                            class="h-7 rounded-md border border-gray-300 bg-transparent px-1 text-xs dark:border-gray-600"
+                                                            [value]="row.field.args[param.name] ?? ''"
+                                                            (change)="
+                                                                setArg(
+                                                                    row.field.id,
+                                                                    param.name,
+                                                                    $any($event.target).value
+                                                                )
+                                                            "
                                                         >
-                                                            {{ col }}
-                                                        </option>
+                                                            <option value="">Pick…</option>
+                                                            @for (col of upstreamColumns(); track col) {
+                                                                <option
+                                                                    [value]="col"
+                                                                    [selected]="col === row.field.args[param.name]"
+                                                                >
+                                                                    {{ col }}
+                                                                </option>
+                                                            }
+                                                        </select>
+                                                    } @else {
+                                                        <input
+                                                            [type]="param.type === 'number' ? 'number' : 'text'"
+                                                            class="h-7 w-28 rounded-md border border-gray-300 bg-transparent px-1 text-xs dark:border-gray-600"
+                                                            [class.w-56]="param.type === 'sql'"
+                                                            [placeholder]="param.placeholder ?? ''"
+                                                            [value]="row.field.args[param.name] ?? param.default ?? ''"
+                                                            (input)="
+                                                                setArg(
+                                                                    row.field.id,
+                                                                    param.name,
+                                                                    $any($event.target).value
+                                                                )
+                                                            "
+                                                        />
                                                     }
-                                                </select>
-                                            } @else {
-                                                <input
-                                                    [type]="param.type === 'number' ? 'number' : 'text'"
-                                                    class="h-7 w-28 rounded-md border border-gray-300 bg-transparent px-1 text-xs dark:border-gray-600"
-                                                    [class.w-56]="param.type === 'sql'"
-                                                    [placeholder]="param.placeholder ?? ''"
-                                                    [value]="row.field.args[param.name] ?? param.default ?? ''"
-                                                    (input)="
-                                                        setArg(row.field.id, param.name, $any($event.target).value)
-                                                    "
-                                                />
+                                                </label>
                                             }
-                                        </label>
+                                        </div>
                                     }
-                                </div>
-                            }
-                            @if (row.problem) {
-                                <p class="text-warn m-0 mt-1 text-xs" role="alert">{{ row.problem }}</p>
-                            } @else if (row.definition?.help) {
-                                <p class="text-secondary m-0 mt-1 text-xs">{{ row.definition!.help }}</p>
-                            }
-                        </td>
-                        <td class="px-2 py-1">
-                            @if (row.outType) {
-                                <span
-                                    class="rounded bg-gray-100 px-2 py-0.5 font-mono text-xs font-medium dark:bg-gray-800"
-                                    >{{ row.outType }}</span
-                                >
-                            } @else if (isDeriving()) {
-                                <span class="text-secondary text-xs italic">deriving…</span>
-                            } @else {
-                                <span class="text-secondary text-xs">after a test</span>
-                            }
-                        </td>
-                        <td class="text-secondary truncate px-2 py-1 font-mono text-xs">{{ row.sample }}</td>
-                        <td class="px-2 py-1">
-                            <button
-                                type="button"
-                                mat-icon-button
-                                [attr.aria-label]="'Leave out ' + row.field.name"
-                                (click)="removeField(row.field.id)"
-                            >
-                                <mat-icon class="icon-size-4" svgIcon="heroicons_outline:x-mark"></mat-icon>
-                            </button>
-                        </td>
-                    </tr>
-                } @empty {
-                    <tr>
-                        <td colspan="7" class="text-secondary px-2 py-3 text-center text-sm">
-                            @if (!allRows().length) {
-                                @if (upstreamColumns().length) {
-                                    No fields yet. Add a calculated field below.
-                                } @else {
-                                    Test the parse step first, then the columns it produces appear here as fields.
-                                }
-                            } @else if (filter() === 'changed' && !query()) {
-                                Nothing is changed yet — every field passes through as it is. Pick a row from
-                                <button type="button" class="underline" (click)="setFilter('all')">All</button>
-                                to change one.
-                            } @else {
-                                No field matches this search or filter.
-                            }
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
+                                    @if (row.problem) {
+                                        <p class="text-warn m-0 mt-1 text-xs" role="alert">{{ row.problem }}</p>
+                                    } @else if (row.definition?.help) {
+                                        <p class="text-secondary m-0 mt-1 text-xs">{{ row.definition!.help }}</p>
+                                    }
+                                </td>
+                                <td class="px-2 py-1">
+                                    @if (row.outType) {
+                                        <span
+                                            class="rounded bg-gray-100 px-2 py-0.5 font-mono text-xs font-medium dark:bg-gray-800"
+                                            >{{ row.outType }}</span
+                                        >
+                                    } @else if (isDeriving()) {
+                                        <span class="text-secondary text-xs italic">deriving…</span>
+                                    } @else {
+                                        <span class="text-secondary text-xs">after a test</span>
+                                    }
+                                </td>
+                                <td class="text-secondary truncate px-2 py-1 font-mono text-xs">{{ row.sample }}</td>
+                                <td class="px-2 py-1">
+                                    <button
+                                        type="button"
+                                        mat-icon-button
+                                        [attr.aria-label]="'Leave out ' + row.field.name"
+                                        (click)="removeField(row.field.id)"
+                                    >
+                                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:x-mark"></mat-icon>
+                                    </button>
+                                </td>
+                            </tr>
+                        } @empty {
+                            <tr>
+                                <td colspan="7" class="text-secondary px-2 py-3 text-center text-sm">
+                                    @if (!allRows().length) {
+                                        @if (upstreamColumns().length) {
+                                            No fields yet. Add a calculated field below.
+                                        } @else {
+                                            Test the parse step first, then the columns it produces appear here as
+                                            fields.
+                                        }
+                                    } @else if (filter() === 'changed' && !query()) {
+                                        Nothing is changed yet — every field passes through as it is. Pick a row from
+                                        <button type="button" class="underline" (click)="setFilter('all')">All</button>
+                                        to change one.
+                                    } @else {
+                                        No field matches this search or filter.
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
 
-    <!-- pager: # above is the position in the FULL list, so page 2 starts at 11, not 1 -->
-    <div class="text-secondary mt-1 flex items-center gap-2 text-xs">
-        <span class="ml-auto">Rows per page</span>
-        <select
-            class="h-7 rounded-md border border-gray-300 bg-transparent px-1 text-xs dark:border-gray-600"
-            aria-label="Rows per page"
-            (change)="setPageSize(+$any($event.target).value)"
-        >
-            @for (size of pageSizes; track size) {
-                <option [value]="size" [selected]="size === pageSize()">{{ size }}</option>
-            }
-        </select>
-        <span>{{ pageLabel() }}</span>
-        <button
-            type="button"
-            mat-icon-button
-            aria-label="Previous page"
-            [disabled]="currentPage() === 0"
-            (click)="prevPage()"
-        >
-            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:chevron-left"></mat-icon>
-        </button>
-        <button
-            type="button"
-            mat-icon-button
-            aria-label="Next page"
-            [disabled]="currentPage() >= pageCount() - 1"
-            (click)="nextPage()"
-        >
-            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:chevron-right"></mat-icon>
-        </button>
-    </div>
-
-    <div class="mt-2 flex flex-wrap items-center gap-2">
-        <button type="button" mat-stroked-button (click)="addCalculated()">
-            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:plus"></mat-icon>
-            <span class="ml-1">Add a calculated field</span>
-        </button>
-        @if (leftOut().length) {
-            <span class="text-secondary text-xs">Left out:</span>
-            @for (col of leftOut(); track col) {
+            <!-- pager: # above is the position in the FULL list, so page 2 starts at 11, not 1 -->
+            <div class="text-secondary mt-1 flex items-center gap-2 text-xs">
+                <span class="ml-auto">Rows per page</span>
+                <select
+                    class="h-7 rounded-md border border-gray-300 bg-transparent px-1 text-xs dark:border-gray-600"
+                    aria-label="Rows per page"
+                    (change)="setPageSize(+$any($event.target).value)"
+                >
+                    @for (size of pageSizes; track size) {
+                        <option [value]="size" [selected]="size === pageSize()">{{ size }}</option>
+                    }
+                </select>
+                <span>{{ pageLabel() }}</span>
                 <button
                     type="button"
-                    class="h-7 rounded-full border border-dashed border-gray-300 px-3 text-xs dark:border-gray-600"
-                    [attr.aria-label]="'Put ' + col + ' back'"
-                    (click)="restore(col)"
+                    mat-icon-button
+                    aria-label="Previous page"
+                    [disabled]="currentPage() === 0"
+                    (click)="prevPage()"
                 >
-                    {{ col }} +
+                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:chevron-left"></mat-icon>
                 </button>
+                <button
+                    type="button"
+                    mat-icon-button
+                    aria-label="Next page"
+                    [disabled]="currentPage() >= pageCount() - 1"
+                    (click)="nextPage()"
+                >
+                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:chevron-right"></mat-icon>
+                </button>
+            </div>
+
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+                <button type="button" mat-stroked-button (click)="addCalculated()">
+                    <mat-icon class="icon-size-5" svgIcon="heroicons_outline:plus"></mat-icon>
+                    <span class="ml-1">Add a calculated field</span>
+                </button>
+                @if (leftOut().length) {
+                    <span class="text-secondary text-xs">Left out:</span>
+                    @for (col of leftOut(); track col) {
+                        <button
+                            type="button"
+                            class="h-7 rounded-full border border-dashed border-gray-300 px-3 text-xs dark:border-gray-600"
+                            [attr.aria-label]="'Put ' + col + ' back'"
+                            (click)="restore(col)"
+                        >
+                            {{ col }} +
+                        </button>
+                    }
+                }
+            </div>
+
+            <!-- the generated SQL, on demand: the grid is the surface, this is what it produced -->
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+                <button type="button" mat-stroked-button (click)="showSql.set(!showSql())">
+                    <mat-icon class="icon-size-5" svgIcon="heroicons_outline:code-bracket"></mat-icon>
+                    <span class="ml-1">{{ showSql() ? 'Hide' : 'Show' }} the SQL this produces</span>
+                </button>
+                <button type="button" mat-stroked-button (click)="showSqlView()">
+                    <mat-icon class="icon-size-5" svgIcon="heroicons_outline:pencil-square"></mat-icon>
+                    <span class="ml-1">Edit as SQL</span>
+                </button>
+            </div>
+            @if (showSql()) {
+                <pre
+                    class="mt-1 overflow-x-auto rounded-lg border border-gray-200 p-2 font-mono text-xs dark:border-gray-700"
+                    >{{ generatedSql() }}</pre
+                >
+                <p class="text-secondary m-0 mt-1 text-xs">Regenerated from the field list as you edit it.</p>
             }
         }
     </div>
 
-    <!-- the generated SQL, on demand: the grid is the surface, this is what it produced -->
-    <div class="mt-3 flex flex-wrap items-center gap-2">
-        <button type="button" mat-stroked-button (click)="showSql.set(!showSql())">
-            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:code-bracket"></mat-icon>
-            <span class="ml-1">{{ showSql() ? 'Hide' : 'Show' }} the SQL this produces</span>
-        </button>
-        <button type="button" mat-stroked-button (click)="showSqlView()">
-            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:pencil-square"></mat-icon>
-            <span class="ml-1">Edit as SQL</span>
-        </button>
-    </div>
-    @if (showSql()) {
-        <pre
-            class="mt-1 overflow-x-auto rounded-lg border border-gray-200 p-2 font-mono text-xs dark:border-gray-700"
-            >{{ generatedSql() }}</pre
-        >
-        <p class="text-secondary m-0 mt-1 text-xs">Regenerated from the field list as you edit it.</p>
-    }
-}
+    <aside
+        class="w-56 shrink-0 rounded-lg border border-gray-200 p-2 dark:border-gray-700"
+        aria-label="Upstream fields"
+    >
+        <div class="text-secondary mb-1 text-xs font-semibold uppercase opacity-70">Upstream fields</div>
+        <inspecto-step-workbench
+            [columns]="upstreamColumns()"
+            [types]="upstreamColumnTypes()"
+            [sql]="generatedSql()"
+            [inputs]="inputs()"
+            (fieldPicked)="pickField($event)"
+        />
+    </aside>
+</div>
 
 <!-- Test this Step — reuses ComponentsService.previewTransform verbatim, the SAME route every
      other transform.* node type tests against. -->

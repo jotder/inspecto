@@ -263,8 +263,10 @@ relation. What shipped of it: S1 `RelationPreview.columnTypes` + `Result.sql` on
 derived-schema half as `POST /components/transform/describe` (`TypeFlow.describe`). S3 was refuted. Two durable
 facts: a chain preview must run each Step's `shape` in order over the previous relation (never fuse — `RowShaper.fuse`,
 "last projection wins" and caller-less, was **deleted 2026-09-06** rather than wired); and a preview publishes at two
-points — the relation and the derived schema — which must agree. S4, the one-surface workbench (input-relation
-picker, column filter, grouping beside the field list), is BACKLOG §3 `WORKBENCH-S4` — operator 2026-09-06: design now, build later; the design is `superpower/step-workbench-s4-design.md`. Grounding
-2026-09-06 found no picker/filter/grouping control exists, only the S1/S2/S5 plumbing it would host
-(`upstreamColumns` into the SQL pane, `POST /components/transform/describe`, the two preview components) and no
-endpoint that lists a node's input relations — the relation is implicit (the upstream node's output).
+points — the relation and the derived schema — which must agree. S4, the one-surface workbench, **SHIPPED 2026-09-07** — all three
+slices, UI-only, no new endpoint. As-built:
+[`okf/frontend/features/pipeline-editor.md`](../../frontend/features/pipeline-editor.md) §"The step workbench".
+🔴 Its planned merge/join input PICKER was refused on grounding: `transform.merge` declares no attributes and
+takes its inputs as a positional list the executor builds from the graph edges, so a picker would have written
+a key nothing reads. The 2026-09-06 grounding above still holds for why no endpoint was needed — the input
+relation is implicit in the authored `edges[]`, which the editor already holds.

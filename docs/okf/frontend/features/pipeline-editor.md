@@ -413,6 +413,53 @@ The Parse surface itself — tabs, options, columns grid, Grammar CSV round-trip
   *Cross-Step fields* facts above still hold (`output.filename_column` lives on the SINK; the Parse
   checkbox that appends a read-only `file_name` row is default OFF for exactly that reason).
 
+## The step workbench: what a Step reads, and which of it the Step uses (SHIPPED 2026-09-07)
+
+> Three authoring controls that did not exist anywhere in `modules/admin/pipelines/` before this, built as
+> WORKBENCH-S4 (design: `archived-documents/plans-archive/step-workbench-s4-design.md`). **No new endpoint** —
+> every fact on screen is one the editor already held.
+
+- **Field list (`step-workbench.component.ts`, `step-workbench-fields.ts`).** The upstream columns with their
+  declared types, split into **used by this step** / **not used**, filtered by a type-ahead, clickable. It
+  rides beside the `transform.sql` pane in BOTH views: in Fields it reflects the generated SQL, in SQL the
+  hand-written one.
+  - 🔴 **Reference detection cannot use ``.** `_` is a word character, so `amount` matches inside
+    `total_amount` and the list would claim a column is used when nothing reads it. The match requires a
+    non-identifier character on each side — which is what a SQL identifier boundary actually is. Both specs
+    pin the `amount` / `total_amount` pair.
+  - ⚠ It is a **lexical scan, not a parser**, on purpose: a SQL parser here would be a second implementation
+    of the dialect the engine owns. The failure mode is a field shown in the wrong GROUP — cosmetic — never
+    a wrong config write, because the workbench **writes nothing**. It emits a name; the host decides.
+  - **Operator decision 2026-09-07:** the list is capped (`FIELD_LIST_CAP = 50`) with the filter always
+    visible. 🔴 The cap applies to what is RENDERED, never to what is SEARCHED — filtering runs over every
+    column and the result is then capped, so a column at position 300 is one keystroke away. A cap that also
+    narrowed the search would hide columns with no way to reach them.
+  - **A click** inserts the quoted identifier at the caret in the SQL view (`SqlCodemirrorComponent.insertAtCursor`,
+    which dispatches through the editor's own update path so `valueChange` carries the new document), and in
+    the Fields view adds a `keep` row — or, when the column is ALREADY an output, searches the grid for it
+    rather than adding a surprising duplicate.
+- **Input strip (`step-workbench-inputs.ts`).** One line saying what the Step reads, from the authored
+  `edges[]` — the canvas is the source of truth for edges, so this is a projection of the model, not a fetch.
+  The relation is named whenever it is not a plain `DATA` edge, because a route branch is a different input.
+  - 🔴 **The planned merge/join input PICKER was refused on grounding.** There are no "input keys" to write:
+    `transform.merge` declares no attributes at all and takes its inputs as a positional list the executor
+    builds from the graph edges (`RowShaper.merge`), and `transform.join`'s second input is a `reference`,
+    not an inbound edge. A picker would have written a key nothing reads. Edges stay authored on the canvas.
+- **Summarize grouping (`summarize-editor.component.ts`, `summarize-editor.ts`).** A group-by chip row and a
+  measures table in place of two bare `list` controls, hosted as a REGION INSIDE the generic
+  `pipeline-config-definition` pane — not a fourth routing arm, because that pane's S2 decision is explicitly
+  one pane for every remaining kind. It writes the same two flat string lists it always did.
+  - 🔴 **Two traps this shape creates, both spec-pinned.** (1) Two surfaces for one key: the schema form must
+    STOP rendering `group_by`/`measures`, which `formSpecs()` does — while `specs()` stays whole, because
+    `buildConfiguredNode` reads the spec list to place each key. (2) Apply would DELETE both keys once the
+    form no longer carries them, so `buildNode()` merges the editor's values back in.
+  - ⛔ The aggregate options are `MEASURE_AGGS`, read from `measure-grammar.contract.json` and pinned to the
+    engine's `MeasureCompiler.AGGS` by `MeasureGrammarContractTest`. The component spec asserts the rendered
+    `<option>` list equals it, so a hard-coded list cannot creep back.
+  - 🔴 **A measure this UI cannot parse round-trips verbatim** (`MeasureRow.raw`) and is refused by
+    `validate()` with the grammar's own message — never dropped. Opening a node and pressing Apply must not
+    be a way to lose what someone wrote.
+
 ## Load: the projection slot is a Record Transformer; schema on the parser
 
 > **2026-09-05 — `transform.map` is DELETED.** The projection slot `PipelineLift` fills between parser and

@@ -916,4 +916,74 @@ describe('PipelineConfigDefinitionComponent', () => {
             expect(fixture.componentInstance.partitionsError()).toContain('Every partition segment needs a name');
         });
     });
+
+    // ── transform.summarize (WORKBENCH-S4c) ─────────────────────────────────────────────────────────
+    describe('transform.summarize', () => {
+        const SUMMARIZE: AuthoredNode = {
+            id: 'rollup',
+            type: 'transform.summarize',
+            config: { group_by: ['region'], measures: ['count', 'sum(amount)'] },
+        };
+
+        it('renders the structured editor INSTEAD of the two list controls, not beside them', async () => {
+            // The per-spec-form trap: two surfaces for one key means two ways to write it and one of them
+            // wins silently. `formSpecs()` removes the keys the editor owns from what the form renders.
+            const fixture = await create({ node: SUMMARIZE });
+            expect(fixture.debugElement.query(By.css('inspecto-summarize-editor'))).not.toBeNull();
+            expect(fixture.componentInstance.formSpecs()).toEqual([]);
+            expect(fixture.debugElement.query(By.directive(InspectoSchemaFormComponent))).toBeNull();
+            // …but `specs()` is untouched, because buildConfiguredNode places each key by the spec list.
+            expect(fixture.componentInstance.specs().map((s) => s.key)).toEqual(['group_by', 'measures']);
+        });
+
+        it('Apply carries both keys through — the form no longer renders them, so a merge is the only path', async () => {
+            const fixture = await create({ node: SUMMARIZE });
+            const applied: AuthoredNode[] = [];
+            fixture.componentInstance.applied.subscribe((n: AuthoredNode) => applied.push(n));
+
+            fixture.componentInstance.submit();
+
+            expect(applied).toHaveLength(1);
+            // 🔴 Without the merge in buildNode() this is where both keys would arrive DELETED.
+            expect(applied[0].config?.['group_by']).toEqual(['region']);
+            expect(applied[0].config?.['measures']).toEqual(['count', 'sum(amount)']);
+        });
+
+        it('an edit in the editor makes the pane dirty, and Apply writes the edited value', async () => {
+            const fixture = await create({ node: SUMMARIZE });
+            const dirty: boolean[] = [];
+            fixture.componentInstance.dirtyChange.subscribe((d: boolean) => dirty.push(d));
+            const editor = fixture.debugElement.query(By.css('inspecto-summarize-editor')).componentInstance as {
+                addGroup: (c: string) => void;
+            };
+
+            editor.addGroup('day');
+            fixture.detectChanges();
+            fixture.componentInstance.onInteraction();
+
+            expect(dirty.at(-1)).toBe(true);
+            const applied: AuthoredNode[] = [];
+            fixture.componentInstance.applied.subscribe((n: AuthoredNode) => applied.push(n));
+            fixture.componentInstance.submit();
+            expect(applied[0].config?.['group_by']).toEqual(['region', 'day']);
+        });
+
+        it('REFUSES Apply while a measure is invalid, rather than saving something the Job throws on', async () => {
+            const fixture = await create({
+                node: { ...SUMMARIZE, config: { group_by: [], measures: ['median(x)'] } },
+            });
+            const applied: AuthoredNode[] = [];
+            fixture.componentInstance.applied.subscribe((n: AuthoredNode) => applied.push(n));
+
+            fixture.componentInstance.submit();
+
+            expect(applied).toHaveLength(0);
+        });
+
+        it('leaves every other node type on the schema form', async () => {
+            const fixture = await create({ node: { id: 'j', type: 'transform.join', config: {} } });
+            expect(fixture.debugElement.query(By.css('inspecto-summarize-editor'))).toBeNull();
+            expect(fixture.componentInstance.formSpecs()).toEqual(fixture.componentInstance.specs());
+        });
+    });
 });

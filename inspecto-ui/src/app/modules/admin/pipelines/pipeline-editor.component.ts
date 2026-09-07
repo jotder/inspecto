@@ -138,6 +138,7 @@ import {
     ProcessorGroup,
 } from './pipeline-graph';
 import { PipelineChecklistComponent } from './pipeline-checklist.component';
+import { inputRelations } from './step-workbench-inputs';
 import { incompleteStages, pipelineLifecycle, PipelineStageId, StageChip, stageChecklist } from './pipeline-stages';
 
 /** The `use:` prefix a Grammar component is referenced by — also how its ref is keyed in `validRefs`. */
@@ -2458,6 +2459,16 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
      * blocked Apply. A false refusal in an authoring pane is worse than no derivation at all. Keyed by
      * name, so it applies whether the column list came from the sample rows or from the schema.
      */
+    /**
+     * The inbound edges of the node the definition drawer is open on — the step workbench's input strip
+     * (S4b). It comes straight off the authored model: the canvas IS the source of truth for which
+     * relation feeds a Step, so there is no endpoint here and no state to keep in sync.
+     */
+    readonly definitionInputs = computed(() => {
+        const n = this.definitionNode();
+        return n ? inputRelations(this.model(), n.id) : [];
+    });
+
     readonly upstreamColumnTypes = computed<Record<string, string>>(() => {
         const out: Record<string, string> = {};
         for (const f of this.parserSchemaFields()) if (f.type) out[f.name] = f.type;

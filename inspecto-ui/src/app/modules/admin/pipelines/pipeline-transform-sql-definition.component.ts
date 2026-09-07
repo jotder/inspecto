@@ -8,6 +8,7 @@ import {
     input,
     output,
     signal,
+    viewChild,
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -26,7 +27,9 @@ import {
     seedFields,
 } from './pipeline-transform-sql';
 import { ReconcileResult, reconcileSql } from './pipeline-transform-sql-reconcile';
-import { SqlFunction, sqlFunctionsByCategory, usesSource } from './sql-functions';
+import { SqlFunction, quoteIdentifier, sqlFunctionsByCategory, usesSource } from './sql-functions';
+import { InputRelation } from './step-workbench-inputs';
+import { StepWorkbenchComponent } from './step-workbench.component';
 
 /** How many rows an inline "Try it on the sample" test posts (mirrors the config pane's cap). */
 const MAX_TEST_ROWS = 50;
@@ -91,6 +94,7 @@ export interface FieldRow extends CompiledField {
         StepPreviewResultComponent,
         InspectoAlertComponent,
         SqlCodemirrorComponent,
+        StepWorkbenchComponent,
     ],
     templateUrl: './pipeline-transform-sql-definition.component.html',
 })
@@ -108,6 +112,8 @@ export class PipelineTransformSqlDefinitionComponent {
      * "No function matches … *(VARCHAR, INTEGER)") and that refusal blocked Apply.
      */
     readonly upstreamColumnTypes = input<Record<string, string>>({});
+    /** The inbound edges feeding this node, for the workbench's input strip. Pass-through only. */
+    readonly inputs = input<readonly InputRelation[]>([]);
 
     readonly applied = output<AuthoredNode>();
     readonly dirtyChange = output<boolean>();
@@ -119,6 +125,9 @@ export class PipelineTransformSqlDefinitionComponent {
     readonly view = signal<TransformView>('fields');
     /** The SQL under edit in the SQL view. In the Fields view it is regenerated from the rows. */
     readonly sqlText = signal('');
+
+    /** Present only while the SQL view is rendered — the workbench inserts a picked field through it. */
+    private readonly editor = viewChild(SqlCodemirrorComponent);
 
     readonly generatedSql = computed(() => (this.view() === 'sql' ? this.sqlText() : generateSql(this.fields())));
 
@@ -490,6 +499,29 @@ export class PipelineTransformSqlDefinitionComponent {
         this.fields.update((rows) => rows.filter((f) => f.id !== id));
         if (row?.from) this.leftOut.update((names) => (names.includes(row.from) ? names : [...names, row.from]));
         this.touched();
+    }
+
+    /**
+     * The workbench's field list was clicked. What that MEANS is the host's call, which is why the
+     * workbench emits a name and writes nothing itself:
+     *
+     * <ul>
+     *   <li><b>SQL view</b> — insert the identifier at the cursor (quoted only when it has to be).</li>
+     *   <li><b>Fields view</b> — add a `keep` row for a column that is not an output yet. When it already
+     *       is one, adding a duplicate would be a surprise, so the grid SEARCHES for it instead: the row
+     *       the author was looking for comes on screen, which on a 600-column feed is the actual ask.</li>
+     * </ul>
+     */
+    pickField(column: string): void {
+        if (this.view() === 'sql') {
+            this.editor()?.insertAtCursor(quoteIdentifier(column));
+            return;
+        }
+        if (this.fields().some((f) => f.from === column)) {
+            this.setQuery(column);
+            return;
+        }
+        this.restore(column);
     }
 
     restore(column: string): void {

@@ -42,6 +42,7 @@ import { companionSchemaName } from 'app/inspecto/segments';
 import { buildConfiguredNode, splitNodeConfig } from './node-config-build';
 import { PipelineExtraConfigComponent } from './pipeline-extra-config.component';
 import { groupByValidator, measuresValidator } from './measure-grammar';
+import { SummarizeEditorComponent } from './summarize-editor.component';
 import { nodeAttributesFor } from './node-attributes';
 
 /** What the HOST pipeline can tell an `enrichment` node about itself, so its wiring form seeds
@@ -85,6 +86,22 @@ const MAX_TEST_ROWS = 50;
  * in-memory model. The one exception is the enrichment companion config, whose write+register is the
  * whole point of that surface (the Parse pane set that precedent).
  */
+/** A stored config value as a string list. A non-array, or a non-string entry, is DROPPED rather than
+ *  stringified: coercing `{a: 1}` into `"[object Object]"` would write that back on the next Apply. */
+function asStringList(value: unknown): string[] {
+    return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
+}
+
+/** The schema form's values with a bespoke editor's keys merged over them. Returns `null` only when there
+ *  is nothing at all to write — `buildConfiguredNode` treats `null` as "this pane has no form". */
+function mergeFormValues(
+    formValues: Record<string, unknown> | null,
+    owned: Record<string, unknown> | undefined,
+): Record<string, unknown> | null {
+    if (!owned) return formValues;
+    return { ...(formValues ?? {}), ...owned };
+}
+
 @Component({
     selector: 'app-pipeline-config-definition',
     standalone: true,
@@ -102,6 +119,7 @@ const MAX_TEST_ROWS = 50;
         InspectoSchemaPartitionsEditorComponent,
         PipelineExtraConfigComponent,
         StepPreviewResultComponent,
+        SummarizeEditorComponent,
     ],
     template: `
         <!-- Enrichment (W4b): the node authors the REAL companion config through the shared editor —
@@ -135,14 +153,28 @@ const MAX_TEST_ROWS = 50;
                 ></inspecto-schema-form>
                 <inspecto-enrichment-editor [referenceOptions]="refOptions()" />
             }
-        } @else if (specs().length) {
+        } @else if (isSummarize()) {
+            <!--
+                transform.summarize (S4c): the group-by chip row + measures table replace the two bare
+                "list" controls the schema form rendered. Same two keys, same flat string lists on the
+                node — a different way to TYPE them. The remaining schema keys, if the type ever grows
+                any, still render below through formSpecs(). ⚠ No backticks in this template literal.
+            -->
+            <inspecto-summarize-editor
+                [columns]="upstreamColumns()"
+                [initialGroupBy]="summarizeSeed().group_by"
+                [initialMeasures]="summarizeSeed().measures"
+                (changed)="onInteraction()"
+            />
+        }
+        @if (!isEnrichment() && formSpecs().length) {
             <!-- Schema-driven config for known node types, rendered FLAT (redesign R6): one idiom
                  across Parser · Map · Sink — uppercase section header → fields, single column, no
                  tier disclosures. -->
             <div class="mb-1 text-xs font-semibold uppercase opacity-70">Config</div>
             <inspecto-schema-form
                 #config
-                [specs]="specs()"
+                [specs]="formSpecs()"
                 [initial]="split().schemaInitial"
                 [optionLoaders]="configLoaders"
                 [extraValidators]="configValidators"
@@ -306,6 +338,35 @@ export class PipelineConfigDefinitionComponent {
 
     readonly isEnrichment = computed(() => this.node().type === 'enrichment');
     readonly specs = computed<AttributeSpec[]>(() => this.attributes() ?? nodeAttributesFor(this.node().type) ?? []);
+
+    /** The two keys the S4c editor OWNS. They stay in {@link specs} — only the schema FORM stops rendering
+     *  them — because `buildConfiguredNode` reads the spec list to place each key, and dropping them there
+     *  would change where they are written. */
+    private static readonly SUMMARIZE_KEYS = ['group_by', 'measures'];
+
+    readonly isSummarize = computed(() => this.node().type === 'transform.summarize');
+
+    /** What the generic schema form renders: everything except the keys a bespoke editor owns. */
+    readonly formSpecs = computed<AttributeSpec[]>(() =>
+        this.isSummarize()
+            ? this.specs().filter((s) => !PipelineConfigDefinitionComponent.SUMMARIZE_KEYS.includes(s.key))
+            : this.specs(),
+    );
+
+    /** The stored `group_by`/`measures` the editor seeds from — non-string entries dropped, never coerced. */
+    readonly summarizeSeed = computed(() => ({
+        group_by: asStringList(this.node().config?.['group_by']),
+        measures: asStringList(this.node().config?.['measures']),
+    }));
+
+    /** Column names for the group-by picker, from the tab's parsed sample. Empty ⇒ the editor asks for a
+     *  typed column instead, so a summarize node is authorable before anything has been parsed. */
+    readonly upstreamColumns = computed<string[]>(() => {
+        const rows = this.sampleRows();
+        return rows && rows.length ? Object.keys(rows[0]) : [];
+    });
+
+    private readonly summarizeEditor = viewChild(SummarizeEditorComponent);
     /** Schema seed + free-form rows — the same split the dialog ran (`node-config-build.ts`). */
     readonly split = computed(() => splitNodeConfig(this.node(), this.specs(), false));
 
@@ -561,7 +622,8 @@ export class PipelineConfigDefinitionComponent {
             (this.schemaForm?.isDirty() ?? false) ||
             (this.wiringForm?.isDirty() ?? false) ||
             this.enrichName.dirty ||
-            (this.enrichEditor()?.isDirty() ?? false);
+            (this.enrichEditor()?.isDirty() ?? false) ||
+            (this.summarizeEditor()?.isDirty() ?? false);
         if (dirty === this.lastDirty) return;
         this.lastDirty = dirty;
         this.dirtyChange.emit(dirty);
@@ -631,7 +693,12 @@ export class PipelineConfigDefinitionComponent {
         return buildConfiguredNode({
             node: n,
             specs: this.specs(),
-            formValues: this.schemaForm ? this.schemaForm.value() : null,
+            // The bespoke summarize editor's two keys ride in alongside the schema form's values — the
+            // form no longer renders them, so without this merge Apply would DELETE both.
+            formValues: mergeFormValues(
+                this.schemaForm ? this.schemaForm.value() : null,
+                this.isSummarize() ? this.summarizeEditor()?.value() : undefined,
+            ),
             extras: this.extraConfig?.value() ?? {},
             name: n.name,
             description: n.description,
@@ -649,6 +716,7 @@ export class PipelineConfigDefinitionComponent {
         }
         if (this.schemaForm && !this.schemaForm.validate()) return;
         if (this.extraConfig && !this.extraConfig.validate()) return;
+        if (this.isSummarize() && !(this.summarizeEditor()?.validate() ?? true)) return;
         const node = this.buildNode();
         this.markPristine();
         this.applied.emit(node);
@@ -659,6 +727,7 @@ export class PipelineConfigDefinitionComponent {
         this.schemaForm?.form.markAsPristine();
         this.wiringForm?.form.markAsPristine();
         this.enrichName.markAsPristine();
+        this.summarizeEditor()?.markPristine();
         this.emitDirty();
     }
 

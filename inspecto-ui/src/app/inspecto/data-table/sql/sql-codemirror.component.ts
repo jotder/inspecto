@@ -56,6 +56,22 @@ export class SqlCodemirrorComponent implements AfterViewInit, OnDestroy {
         });
     }
 
+    /**
+     * Insert `text` at the cursor, replacing any selection, and focus the editor. Added 2026-09-07 for the
+     * step workbench (S4a), whose field list is clickable in the SQL view too.
+     *
+     * <p>⚠ Deliberately NOT a write to `value`: the transaction goes through the editor's own update path,
+     * so `onChange` fires and `valueChange` carries the new document. The component stays value-in /
+     * value-out — a caller that ignored `valueChange` here would silently lose the insert on the next
+     * external `value` push.
+     */
+    insertAtCursor(text: string): void {
+        const view = this.view;
+        if (!view) return;
+        view.dispatch(view.state.replaceSelection(text));
+        view.focus();
+    }
+
     ngOnDestroy(): void {
         this.view?.destroy();
     }
