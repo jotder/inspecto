@@ -144,6 +144,17 @@ if ! run_guard tools/check-vocabulary.mjs "vocabulary guard" \
   exit 1
 fi
 
+# Gate-tally guard. BACKLOG §2's summary must match its own table. Local as well as CI because the
+# section is edited by hand, in prose, and the failure it catches is a NUMBER that looks like evidence
+# and is not — "13 of 15 still gated" was written on 2026-09-07 about a 16-row table with 4 rows nobody
+# had checked. Nothing about that is visible to a reader, or to any other guard.
+if ! run_guard tools/check-gate-tally.mjs "gate-tally guard"      "CI runs it too — a stale tally there is a red master."; then
+  echo "pre-push: refusing to push — BACKLOG §2's stated arithmetic contradicts its table (above)." >&2
+  echo "          Fix the SENTENCE to match the rows, never the rows to match the sentence." >&2
+  echo "          A gate you cannot run is not a gate that holds: mark it NOT RUN and count it there." >&2
+  exit 1
+fi
+
 echo "pre-push: nothing is in production after 3.x — master is the only line worked on, so the" >&2
 echo "          merge-forward set is EMPTY (BRANCHING.md §0-A; 4.x was deleted 2026-08-17)." >&2
 echo "          When the next major is cut and has users, MERGE-FORWARD (oldest supported -> master) applies again." >&2

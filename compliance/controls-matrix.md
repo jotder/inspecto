@@ -109,6 +109,30 @@ Everything above marked GAP, in one list, so C3/C4 can be scheduled from a singl
 (plan §6 Q5 assumed self-hosted only), no 3PAO/ConMon/POA&M program. Each is a *stated posture*;
 restating it as a gap is how a matrix grows work nobody chose.
 
+### NFR-7 — the externally-gated program items, each with a landing place
+
+BACKLOG §2's **Compliance program (NFR-7)** row was the one gate on the whole board with **no repo-side
+check at all**: it named "org action + external parties" and nothing else, so a shift could never tell
+whether any of it had moved, and on 2026-09-07 it was the only §2 row that could not be run in either
+direction. These seven rows are that landing place. Each closes when **its own row here carries a dated
+line** — the same shape every other §2 gate now uses.
+
+⛔ §5 below still stands: nothing here may be **generated** from the repo. The fix is a place to record an
+answer, not a way to invent one. ⚠ Keep the literal row prefix — BACKLOG §2's stated check is
+`grep -c '^| NFR-7 ·.*⬜ open'` on this file, and renaming the prefix silently disarms it. 🔴 That check is
+**line-anchored on purpose**: unanchored, it also matches this paragraph and reports 9 for 7 rows.
+
+| # | Item | Workstream | State |
+|---|---|---|---|
+| NFR-7 · N1 | SOC 2 in-scope service list + ISO 27001 ISMS boundary (applicability statements) | C1 | ⬜ open — org input, plan §6 Q4/Q5; see §5 |
+| NFR-7 · N2 | Auditor engagement (firm named, window agreed) | C1 | ⬜ open — org action. ⚠ The SOC 2 Type II observation window has **no recorded start date**, so its 6-month end cannot be computed; recording that date is a separate BACKLOG §2 row whose first action is NOT external |
+| NFR-7 · N3 | Penetration test (scope, vendor, report) | C3 | ⬜ open — external party |
+| NFR-7 · N4 | C5 policy content (the written policies themselves, not the controls) | C5 | ⬜ open — org authorship |
+| NFR-7 · N5 | C6 FedRAMP package | C6 | ⬜ open — demand-gated; ⛔ do not start unscoped |
+| NFR-7 · N6 | C6 FIPS-mode leg (the verification half is G9 above) | C6 | ⬜ open — demand-gated |
+| NFR-7 · N7 | ISO 27001 A.8.8 advisory-watch process (who watches, how often, where recorded) | C3 | ⬜ open — org process. ⚠ Cheapest of the seven and the only one with no external dependency: it needs a named owner and a cadence, not a vendor |
+
+
 ## 5. What this file does NOT cover
 
 **C1's applicability statements are not written here and are not derivable from the repo.** The

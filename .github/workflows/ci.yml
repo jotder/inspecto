@@ -64,6 +64,16 @@ jobs:
       - name: Guard — Step Processors board is generated, not hand-edited
         run: node tools/render-processor-board.mjs --check
 
+      # Gate-tally guard (2026-09-07). BACKLOG §2 states its own arithmetic — "N of the M gates were RUN"
+      # — and this refuses a build where that sentence disagrees with the table under it. It exists
+      # because the sentence was wrong the day the section was rewritten to be checkable: it claimed
+      # "13 of 15" over a 16-row table, having silently counted 4 rows nobody could check as gates that
+      # hold. A number that looks like evidence and is not is invisible to every other guard here.
+      # Pure Node, ~instant. Falsified in both directions (wrong total, wrong not-run count, a dropped
+      # marker, a deleted sentence, and an unmatched table) before it was wired in.
+      - name: Guard — BACKLOG §2's gate tally matches its table
+        run: node tools/check-gate-tally.mjs
+
       - name: Set up JDK 25
         uses: actions/setup-java@v4
         with:

@@ -104,3 +104,40 @@ can hardcode colours freely. ✅ `check-dependencies.mjs` resolved without an ed
 under review — was the only one the lock never saw, while `compliance/controls-matrix.md` marked G7
 CLOSED. It now resolves `-Pedition-enterprise` (25 modules, not 23). Audit a guard's scope apart from its
 rules: the scope is where the silent exemptions live.
+
+## A third shape: the guard whose subject is a NUMBER a human wrote
+
+The two shapes above are about a guard that cannot fail. This one is about work that **has no guard at all
+because its subject is prose**, and the prose asserts something arithmetic.
+
+**The instance.** BACKLOG §2 was rewritten on 2026-09-07 so every externally-gated row names a command a
+shift can run — the whole point being to replace unfalsifiable gates with checkable ones. Hours later, the
+same shift summarised the pass as **"13 of 15 still gated"**. The table had **16** rows, and **4** of them
+had not been checked at all. Rows with *no evidence either way* had been summed into a count of gates that
+*hold*. Nobody could catch that by reading: the number looked like evidence.
+
+**Why no existing guard could have caught it.** The vocabulary guard reads words, the secrets guard reads
+literals, the dependency guard reads a resolved graph. None of them reads a claim about a document's own
+contents. And the claim was in the one place a reader trusts most — the section header.
+
+**The fix, and the rule it generalises.** `tools/check-gate-tally.mjs` makes the section state its own
+arithmetic in a fixed form and refuses a build where the sentence disagrees with the rows: it counts table
+rows, counts `NOT RUN` markers, and requires run + not-run to account for every row exactly once. It
+caught its own section going stale within minutes of being written.
+
+> **When a document asserts a count about itself, that count is testable — so test it.** A tally in prose
+> is a claim with no owner. Give the document a machine-readable shape for the claim, and a guard that
+> re-derives it from the rows. ⛔ Fix the SENTENCE to match the rows, never the rows to match the sentence.
+
+⚠ Two traps met while building it, both instances of the rules above:
+
+* **The emptiness floor is not optional here either.** A parser that stopped matching the table would
+  report `0 rows` and a tally over nothing would pass. `MIN_ROWS = 12`.
+* 🔴 **`node guard.mjs | tail -3` reports `tail`'s exit code.** The first falsification run printed the
+  right error message for all four probes and `exit=0` every time. The messages proved detection; they
+  proved nothing about the exit code, which is the only thing CI reads. Re-run without the pipe.
+
+⚠ And one from the same shift, in the check the guard's own subject names: `grep -c "NFR-7 ·"` over
+`compliance/controls-matrix.md` returns **9** for **7** rows, because the sentence documenting the check
+matches the check's own pattern. **Anchor a stated check (`^| NFR-7 ·`) or it counts its own
+documentation.**
