@@ -141,3 +141,13 @@ caught its own section going stale within minutes of being written.
 `compliance/controls-matrix.md` returns **9** for **7** rows, because the sentence documenting the check
 matches the check's own pattern. **Anchor a stated check (`^| NFR-7 ·`) or it counts its own
 documentation.**
+
+## Instance, 2026-09-07: a guard scoped to one directory
+
+`CapabilityManifestTest` finds `withCapability(` registration sites by regex-scanning **one directory**,
+`src/main/java/com/gamma/control`. That was the whole world while `RouteModule` was package-private — nothing
+else *could* register a route. The moment the SPI went public (EDG-01 cell 3a), the scan's scope became
+narrower than the thing it guards: a gated route in an optional module would have registered at runtime and
+been invisible to the drift check, both directions. **A guard whose scope is narrower than its subject is an
+exemption nobody wrote down.** Widened to every module's `src/main/java` in the same commit that opened the
+seam — the two must move together, or the seam opens a hole the guard used to cover by accident.

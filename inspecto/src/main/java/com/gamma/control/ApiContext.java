@@ -23,7 +23,8 @@ import java.util.regex.Matcher;
  * depending on the {@link ControlApi} host directly. ControlApi is the sole implementation; the
  * indirection lets cohesive route groups live in their own classes (lower coupling, thinner host).
  */
-interface ApiContext {
+@com.gamma.api.PublicApi(since = "4.0.0")
+public interface ApiContext {
 
     /** Returned by a handler that has already written its own (non-JSON) response. */
     Object HANDLED = new Object();

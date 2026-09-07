@@ -44,7 +44,7 @@
 |---|---|
 | **Separate Maven module** (e.g. `inspecto-security`, `inspecto-notify-channels`, `inspecto-backup`) | Standard-only code (OIDC resource-server, TLS, RBAC; the webhook + SMTP delivery transports; the backup/restore maintenance tasks). Personal simply doesn't bundle it. |
 | **Maven profiles** (`-Pedition-standard` / `-Pedition-enterprise`) | Which modules + shade includes go into the fat-JAR. `edition-enterprise` = `edition-standard` + `inspecto-policy`. 🔴 **Corrected 2026-09-07: there is no `edition-personal` profile** — the parent POM declares exactly two (`pom.xml:68,77`). **Personal is the DEFAULT**, i.e. the reactor with no profile at all, which is what `package.ps1` does (`if ($Edition -ne 'Personal')` guards every Standard+ step). ⚠ The old text named a third flag; Maven only *warns* on a profile that does not exist and then builds the default, so a shift following this table would have got the right bundle for the wrong reason and learnt nothing from the build. |
-| **`ServiceLoader`** | Runtime discovery — absent module ⇒ the no-op impl is the only one found (mirrors the optional assist agent). |
+| **`ServiceLoader`** | Runtime discovery — absent module ⇒ the no-op impl is the only one found (mirrors the optional assist agent). **Since 2026-09-07 this includes whole route groups**: `com.gamma.control.RouteModule` is a public SPI, discovered and registered *after* the built-in list (first-match order is preserved; a colliding `(method, pattern)` fails the boot). |
 | **`-D` flags** (`-Dauth.mode`, TLS on/off) | Runtime toggles within an edition. |
 | **`package.ps1 -Edition …`** | Emits the per-edition bundles from one build. |
 

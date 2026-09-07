@@ -441,6 +441,17 @@ public final class ControlApi implements AutoCloseable, ApiContext {
                 new NotificationRoutes(), new DeliveryStatusRoutes(), new SettingsRoutes(), new NavRoutes(), new AccessRoutes(),
                 new AssistRoutes(), new AgentRoutes(), new SystemRoutes(), new SchedulerRoutes()))
             module.register(this);
+
+        // Optional-module route groups (EDG-01 cell 3a, 2026-09-07): discovered through
+        // META-INF/services/com.gamma.control.RouteModule and registered AFTER the built-in list, never
+        // interleaved — matching is first-match in registration order and ServiceLoader order is
+        // unspecified, so appending is the only placement that keeps every built-in route's winner fixed.
+        // A discovered module that re-registers a built-in (method, pattern) trips the duplicate guard in
+        // register() below and fails the boot, rather than silently never matching.
+        for (RouteModule module : java.util.ServiceLoader.load(RouteModule.class)) {
+            module.register(this);
+            log.info("route module discovered: {}", module.getClass().getName());
+        }
     }
 
     // ── dispatch: a composable middleware chain (S6) ─────────────────────────────
@@ -1041,11 +1052,31 @@ public final class ControlApi implements AutoCloseable, ApiContext {
 
     // Route registration. The core (Personal edition) is auth-free — every route is open.
     // Standard/Enterprise editions re-introduce authorization out-of-band via the security module.
-    @Override public void get (String pattern, Handler h) { routes.add(new Route("GET",    Pattern.compile("^" + pattern + "$"), h)); }
-    @Override public void post(String pattern, Handler h) { routes.add(new Route("POST",   Pattern.compile("^" + pattern + "$"), h)); }
-    @Override public void put   (String pattern, Handler h) { routes.add(new Route("PUT",    Pattern.compile("^" + pattern + "$"), h)); }
-    @Override public void patch (String pattern, Handler h) { routes.add(new Route("PATCH",  Pattern.compile("^" + pattern + "$"), h)); }
-    @Override public void delete(String pattern, Handler h) { routes.add(new Route("DELETE", Pattern.compile("^" + pattern + "$"), h)); }
+    @Override public void get   (String pattern, Handler h) { register("GET",    pattern, h); }
+    @Override public void post  (String pattern, Handler h) { register("POST",   pattern, h); }
+    @Override public void put   (String pattern, Handler h) { register("PUT",    pattern, h); }
+    @Override public void patch (String pattern, Handler h) { register("PATCH",  pattern, h); }
+    @Override public void delete(String pattern, Handler h) { register("DELETE", pattern, h); }
+
+    /** Every registered {@code METHOD pattern}, for the duplicate guard. */
+    private final java.util.Set<String> registeredRoutes = new java.util.HashSet<>();
+
+    /**
+     * The one registration path. ⚠ A second registration of the same {@code (method, pattern)} is refused
+     * at boot. Matching is first-match, so a duplicate would never fail loudly — the later handler would
+     * simply never run, and the loser could be either one depending on module order. That is the exact
+     * shape that swallowed {@code DELETE /notifications/suppressions} on 2026-09-07, and with route
+     * modules now discoverable from other jars (EDG-01 cell 3a) it is the failure most worth preventing.
+     * Census before adding this: 0 duplicates among the 332 built-in registrations.
+     */
+    private void register(String method, String pattern, Handler h) {
+        if (!registeredRoutes.add(method + " " + pattern)) {
+            throw new IllegalStateException("route " + method + " " + pattern + " is registered twice - the "
+                    + "second registration would never match (first-match dispatch). If an optional module "
+                    + "added it, that module collides with a built-in route.");
+        }
+        routes.add(new Route(method, Pattern.compile("^" + pattern + "$"), h));
+    }
 
     /**
      * The always-unversioned infra probes: the <em>only</em> paths {@link #routeDispatch} will match outside

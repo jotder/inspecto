@@ -1,6 +1,6 @@
 # EDG-01 — gating the six "not for Personal" features (BUILD PLAN, in flight)
 
-> **Status 2026-09-07: mechanism DECIDED; ✅ cells 1 (`CP-15`) and 2 (`OPS-06`) SHIPPED, four cells remain.** BACKLOG `EDG-01`, ranked **P1** — the
+> **Status 2026-09-07: mechanism DECIDED; ✅ cells 1 (`CP-15`) and 2 (`OPS-06`) SHIPPED; cell 3a (the public route SPI) BUILT, verification pending; 3b + three cells remain.** BACKLOG `EDG-01`, ranked **P1** — the
 > only substantive Personal-scoped work on the board. Parent truth:
 > [`../EDITIONS.md`](../EDITIONS.md) §Feature × edition matrix + §Edition-gating debt.
 
@@ -340,3 +340,64 @@ false of the *mechanism*: **a `RouteModule` contributed from another jar cannot 
 `Handler`, `ApiException`, `WriteGates` (or an `ApiContext`-exposed subset), plus the ServiceLoader append in
 `ControlApi` and a widened `CapabilityManifestTest` scan; (b) move geo + link analysis behind it, with the
 `/bootstrap` `features` flag (§11) and the UI hiding. (a) is the pattern-setter for SEC-10 and CP-11.
+
+## 13. Cell 3a as built — the public route SPI (2026-09-07)
+
+The seam every remaining route-based cell (CP-09, SEC-10, CP-11) stands on. Five types went public with
+`@PublicApi(since = "4.0.0")` — `RouteModule`, `ApiContext`, `Handler`, `ApiException`, `WriteGates` (the
+latter two because `GeoRoutes`/`InvRoutes` call them directly: 17 `ApiException` sites, 3 `WriteGates`) — and
+`ControlApi` gained two things:
+
+1. **A `ServiceLoader.load(RouteModule.class)` pass, APPENDED after the hard-coded list** (never interleaved,
+   never replacing it — §3). Each discovered module is logged by class name so an operator can see what a
+   bundle actually registered.
+2. 🔴 **A duplicate-registration guard.** Every registration now goes through one `register(method, pattern,
+   handler)`, and a second `(method, pattern)` throws at boot naming the route. First-match dispatch means a
+   duplicate would otherwise *never fail* — the later handler simply never runs, with the loser decided by
+   module order — which is exactly what swallowed `DELETE /notifications/suppressions` earlier today. **Census
+   before adding it: 0 duplicates among the 332 built-in registrations**, so it cannot break an existing boot.
+
+🔴 **The guard-scope exemption in `CapabilityManifestTest` is closed.** It regex-scanned only
+`src/main/java/com/gamma/control`; it now walks every reactor module's `src/main/java`, so a gated route in an
+optional module cannot fall out of the manifest ↔ registration drift check. ⚠ This surfaces a tension for
+CP-11 (the gated cell): its manifest entries live in core `CapabilityManifest` while the routes would live in
+a module — the manifest is an audit surface for routes that exist only in some editions. Decide before CP-11.
+
+**Proof over real HTTP, not by reading `ControlApi`:** `TestDiscoveredRoutes` is registered ONLY via
+`src/test/resources/META-INF/services/com.gamma.control.RouteModule` and answers `GET /test-discovered/ping`
+in `RouteModuleDiscoveryTest`; the same test proves the duplicate guard fires for a repeated `GET` **and
+does not fire for a `POST` on the same pattern** — a negative test needs a probe that would otherwise succeed.
+⚠ That services file sits on every test classpath in the `inspecto` module, so every test `ControlApi` now
+carries that one extra route; the path is one nothing else could register.
+
+**Deliberately NOT done in 3a:** no `/bootstrap` `features` flag, no UI change, no 503 stub — those are
+3b's, where the first real module (geo + link analysis) gives them a concrete subject.
+
+## 14. Cell 3b — the UI half, built 2026-09-07 (⛔ not committable alone)
+
+`SessionService.geoLinkEnabled` mirrors `exchangeEnabled` exactly (a boolean signal set in `init()` from
+`/bootstrap` `features.geoLink`, absent ⇒ false); `NavigationService._build()` drops the two nav ids when it
+is false; `MenuAttachDialog` stops asking the registry for `geo-map-view`/`link-analysis-view`; both
+components' `catch` gains a 503 branch that names the edition instead of a generic failure (the belt for a
+bookmarked URL — the nav hiding is the braces). Specs: two new files + two cases, all two-directional.
+
+⛔ **This half must land in the same commit as the backend flag.** Today no backend emits `features.geoLink`,
+so on a real Standard install these edits would hide geo map and link analysis until the flag exists. The UI
+was built first only because its tree is independent of the Maven verifier running on 3a.
+
+🔴 **The first version of the nav filter filtered nothing, and only a two-directional spec caught it.**
+`studio-group` is a *child* of `platform-group`; my filter walked top-level groups' direct children and
+never reached it. The "hides" assertion would have PASSED on its own — the items were "absent" because the
+lookup found no group at all. The "shows" assertion, run against the same lookup, returned `[]` and failed,
+which is what exposed it. Two rules, both now in the spec: assert both directions, and assert the fixture
+contains the thing you are filtering (`expect(studio).toBeDefined()`) so an empty result cannot pass as a
+hit. The filter is recursive now (`dropIds`).
+
+✅ **The ordering question is settled, not assumed.** `SessionService.init()` is an `APP_INITIALIZER` that
+awaits `/bootstrap`; `NavigationService.get()` runs from `app.resolvers.ts`, a route resolver, i.e. after
+initializers. A one-shot filter reads a settled flag. (`menu-builder.component.ts` re-calls `get()` later —
+also settled.)
+
+⚠ Spec gotcha, house idiom: the dialog renders `<inspecto-data-table>`, whose theme service walks up to
+`GAMMA_APP_CONFIG` — stub `InspectoGridThemeService` with `{ theme: () => INSPECTO_GRID_DARK }`, as the
+config-pane spec does, or every case dies in DI before the assertion.

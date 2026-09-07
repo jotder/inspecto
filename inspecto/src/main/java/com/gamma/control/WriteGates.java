@@ -11,11 +11,12 @@ import java.nio.file.Path;
  * one place instead of six (docs/superpower/api-contract-design.md §8). Behaviour-preserving:
  * statuses and message shapes match the previous inline checks.
  */
-final class WriteGates {
+@com.gamma.api.PublicApi(since = "4.0.0")
+public final class WriteGates {
     private WriteGates() {}
 
     /** Gate 1 — writes disabled → 503. {@code what} names the capability (e.g. "config write"). */
-    static Path requireWriteRoot(ApiContext api, String what) {
+    public static Path requireWriteRoot(ApiContext api, String what) {
         Path root = api.writeRoot();
         if (root == null)
             throw new ApiException(503, ErrorCodes.CONTROL_PLANE_READ_ONLY,
@@ -24,7 +25,7 @@ final class WriteGates {
     }
 
     /** Gate 2 — a name/id unusable as a jailed filename → 422. Returns the trimmed name. */
-    static String safeName(String raw, String what) {
+    public static String safeName(String raw, String what) {
         if (!isSafeName(raw))
             throw new ApiException(422,
                     "unsafe " + what + " '" + raw + "' (allowed: letters, digits, '.', '_', '-')");
@@ -36,7 +37,7 @@ final class WriteGates {
      * request over — e.g. probing whether a legacy filename candidate is even usable. A caller that must
      * have the name uses {@link #safeName} so the 422 carries the reason.
      */
-    static boolean isSafeName(String raw) {
+    public static boolean isSafeName(String raw) {
         String safe = raw == null ? "" : raw.trim();
         return !safe.isEmpty() && !safe.contains("..") && safe.matches("[A-Za-z0-9][A-Za-z0-9._-]*");
     }
@@ -50,7 +51,7 @@ final class WriteGates {
      * {@link PathJail#contains}, so the gate a caller hits at the edge and the one the config
      * validator applies at authoring time cannot disagree.
      */
-    static Path jail(Path root, Path target, String what) {
+    public static Path jail(Path root, Path target, String what) {
         Path normalized = target.normalize();
         if (!PathJail.contains(root, normalized))
             throw new ApiException(403, what + " escapes the write root");
@@ -58,7 +59,7 @@ final class WriteGates {
     }
 
     /** Gate 4 — resource conflict → 409. */
-    static void conflictIf(boolean conflict, String message) {
+    public static void conflictIf(boolean conflict, String message) {
         if (conflict) throw new ApiException(409, message);
     }
 }

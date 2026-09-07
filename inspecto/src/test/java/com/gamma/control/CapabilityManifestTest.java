@@ -25,7 +25,32 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class CapabilityManifestTest {
 
+    /**
+     * The core route sources. ⚠ Since 2026-09-07 (EDG-01 cell 3a) {@link RouteModule} is public and an
+     * optional module in a SIBLING reactor module may register gated routes too — so the scan also walks
+     * every {@code ../<module>/src/main/java} tree ({@link #routeSourceRoots}). Before that widening the
+     * guard silently exempted any gated route that left this directory: a guard whose scope is narrower
+     * than the thing it guards is an exemption nobody wrote down.
+     */
     private static final Path ROUTES_DIR = Path.of("src", "main", "java", "com", "gamma", "control");
+
+    /**
+     * Every reactor module's main source tree, walked recursively — this module's included, so the historic
+     * {@link #ROUTES_DIR} is covered as a special case. Surefire's working directory is the module root,
+     * hence {@code ..} is the reactor root. There is no {@code target/} under {@code src/main/java}, so nothing
+     * needs skipping.
+     */
+    private static java.util.List<Path> routeSourceRoots() throws IOException {
+        java.util.List<Path> roots = new java.util.ArrayList<>();
+        Path reactor = Path.of("..").toAbsolutePath().normalize();
+        try (Stream<Path> siblings = Files.list(reactor)) {
+            for (Path sibling : siblings.filter(Files::isDirectory).sorted().toList()) {
+                Path src = sibling.resolve(Path.of("src", "main", "java"));
+                if (Files.isDirectory(src)) roots.add(src);
+            }
+        }
+        return roots;
+    }
 
     /** method( "pattern", ApiContext.withCapability( "capability" — whitespace/newline tolerant. */
     private static final Pattern GATE = Pattern.compile(
@@ -72,10 +97,12 @@ class CapabilityManifestTest {
 
     private static Set<String> scanSources() throws IOException {
         Set<String> found = new LinkedHashSet<>();
-        try (Stream<Path> files = Files.list(ROUTES_DIR)) {
-            for (Path f : files.filter(p -> p.toString().endsWith(".java")).toList()) {
-                Matcher m = GATE.matcher(Files.readString(f));
-                while (m.find()) found.add(key(m.group(1), m.group(2), m.group(3)));
+        for (Path root : routeSourceRoots()) {
+            try (Stream<Path> files = Files.walk(root)) {
+                for (Path f : files.filter(p -> p.toString().endsWith(".java")).toList()) {
+                    Matcher m = GATE.matcher(Files.readString(f));
+                    while (m.find()) found.add(key(m.group(1), m.group(2), m.group(3)));
+                }
             }
         }
         return found;
