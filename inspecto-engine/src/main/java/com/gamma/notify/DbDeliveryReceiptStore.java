@@ -47,6 +47,9 @@ public final class DbDeliveryReceiptStore extends com.gamma.ops.AbstractJdbcStor
         implements DeliveryReceiptStore {
 
     private static final String TABLE = "inspecto_delivery_receipts";
+    /** Operator overrides (D8-SUPPRESS-1). Separate table: an override is a DECISION about history, not
+     *  part of it, and mixing the two would make "was this address ever bad" unanswerable. */
+    private static final String OVERRIDES = "inspecto_delivery_suppression_overrides";
     private static final String COLS =
             "delivery_id, notification_id, channel_config_id, target, sent_at, status_at, provider_raw, digest";
 
@@ -76,6 +79,8 @@ public final class DbDeliveryReceiptStore extends com.gamma.ops.AbstractJdbcStor
             st.execute("CREATE INDEX IF NOT EXISTS " + TABLE + "_sent_at ON " + TABLE + " (sent_at)");
             // latestWithStatus() — the per-recipient suppression lookup, run once per external delivery.
             st.execute("CREATE INDEX IF NOT EXISTS " + TABLE + "_target ON " + TABLE + " (target)");
+            st.execute("CREATE TABLE IF NOT EXISTS " + OVERRIDES + " ("
+                    + "target VARCHAR PRIMARY KEY, cleared_at BIGINT, actor VARCHAR)");
         } catch (SQLException e) {
             throw new IllegalStateException("could not initialise " + TABLE + ": " + e.getMessage(), e);
         }
@@ -222,6 +227,70 @@ public final class DbDeliveryReceiptStore extends com.gamma.ops.AbstractJdbcStor
             }
         } catch (SQLException e) {
             throw new IllegalStateException("could not look up " + status + " for " + target + ": "
+                    + e.getMessage(), e);
+        }
+    }
+
+    /** Both tables, so the raw-table browser shows the overrides beside the receipts they qualify. */
+    @Override
+    public List<String> browseTables() {
+        return List.of(TABLE, OVERRIDES);
+    }
+
+    @Override
+    public synchronized List<String> targetsWithStatus(DeliveryStatus status) {
+        if (status == null) return List.of();
+        String sql = "SELECT DISTINCT target FROM " + TABLE
+                + " WHERE target IS NOT NULL AND target <> '' AND status_at LIKE ? ORDER BY target";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, "%\"" + status.name() + "\"%");
+            try (ResultSet rs = ps.executeQuery()) {
+                List<String> out = new ArrayList<>();
+                while (rs.next()) out.add(rs.getString(1));
+                return out;
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("could not list targets with " + status + ": "
+                    + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Last write wins on a re-forgive: the newest {@code cleared_at} is the one that matters, and an
+     * older row would only ever forgive less.
+     */
+    @Override
+    public synchronized boolean unsuppress(String target, long at, String actor) {
+        if (target == null || target.isBlank()) return false;
+        try (PreparedStatement del = conn.prepareStatement("DELETE FROM " + OVERRIDES + " WHERE target = ?");
+             PreparedStatement ins = conn.prepareStatement(
+                     "INSERT INTO " + OVERRIDES + " (target, cleared_at, actor) VALUES (?,?,?)")) {
+            del.setString(1, target);
+            del.executeUpdate();
+            ins.setString(1, target);
+            ins.setLong(2, at);
+            ins.setString(3, actor);
+            ins.executeUpdate();
+            return true;
+        } catch (SQLException e) {
+            throw new IllegalStateException("could not record suppression override for " + target + ": "
+                    + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public synchronized Optional<Long> unsuppressedAt(String target) {
+        if (target == null || target.isBlank()) return Optional.empty();
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT cleared_at FROM " + OVERRIDES + " WHERE target = ?")) {
+            ps.setString(1, target);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? Optional.of(rs.getLong(1)) : Optional.empty();
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("could not read suppression override for " + target + ": "
                     + e.getMessage(), e);
         }
     }

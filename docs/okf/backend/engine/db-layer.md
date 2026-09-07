@@ -536,6 +536,29 @@ store runs unchanged on both. It keeps `add` idempotent, matching the in-memory 
 `stamp` is read-merge-write on the store monitor, so the "first observation of a status wins" rule stays
 in `DeliveryReceipt.withStatus` rather than being re-implemented in SQL.
 
+### 3.13 `inspecto_delivery_suppression_overrides` — operator "deliver to this address again"  · **M**
+File: `inspecto-delivery-receipts.db` (the receipts' own file — one family, two tables)
+
+```sql
+CREATE TABLE IF NOT EXISTS inspecto_delivery_suppression_overrides (
+  target      VARCHAR PRIMARY KEY,
+  cleared_at  BIGINT,
+  actor       VARCHAR
+);
+```
+
+Written by `DELETE /notifications/suppressions?target=…` (operator decision 2026-09-07). 🔴 **It forgives
+history up to `cleared_at`; it deletes nothing.** The bounce and complaint receipts stay, because they are
+the evidence that the address was bad AND that someone chose to re-enable it. A suppressing event *after*
+`cleared_at` is simply not covered, so the address re-suppresses on its own — "cleared by the next
+suppressing event" is a timestamp comparison in `SuppressionList`, not state that can drift and not a job
+that must run.
+
+⚠ **A separate table, deliberately.** An override is a decision *about* history, not part of it; folding a
+"forgiven" flag into the receipt row would make *"was this address ever bad"* unanswerable. It is also why
+the rejected alternative — pruning the target's receipts to unsuppress — was refused: it destroys the audit
+trail and would permanently mask a genuinely dead destination.
+
 ## 4. File topology (per space)
 
 **One DuckDB file per capability** — not one shared DB, and not one file per space. Each file is

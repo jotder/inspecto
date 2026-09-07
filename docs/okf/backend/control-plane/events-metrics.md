@@ -238,7 +238,38 @@ there is nothing to match a bounce against — and such a destination is operato
 recipient-supplied, so it is not the kind that goes stale. (2) A suppressed send writes **no receipt**, or
 the next check would read its own non-delivery as delivery history.
 
-**Still owed from the 2026-09-06 decision: `GET/DELETE /notifications/suppressions`.** ⚠ `DELETE` carries a
-real question rather than being mechanical — the list is DERIVED from receipts, so "unsuppress" means
-either forgetting that target's bounce/complaint evidence (audit loss) or introducing an override table
-(new state). Decide before building. Tests: `SuppressionListTest`.
+**The operator surface shipped the same day**, closing the 2026-09-06 decision:
+
+* `GET /notifications/suppressions` — the suppressed destinations and why, plus `armed` and the TTL in
+  force. ⚠ It reports `armed: false` on a deployment that cannot suppress rather than an empty list:
+  "nothing is suppressed" and "suppression cannot run here" are different answers and must not look alike.
+  Capped at 500 with `?limit=`, reporting the TRUE `total` and a `truncated` flag — a diagnostic read is
+  not an export.
+* `DELETE /notifications/suppressions?target=…` — 🔴 **records an override; deletes nothing.** ⚠ `target`
+  is a QUERY parameter, not a path segment: a webhook destination is a URL and would not survive one,
+  and the value is matched against stored receipts, never resolved as a path. Gates: blank target → 422;
+  a store that cannot hold an override → 409 naming `-Ddelivery.receipts.backend`, because succeeding
+  would report a change that did not happen.
+
+**Decision 2026-09-07 (operator) — how "unsuppress" works.** An override row (`db-layer.md` §3.13)
+forgives history up to its own timestamp; a LATER bounce or complaint is not covered and re-suppresses on
+its own. Rejected: pruning the target's receipts, which would have destroyed the audit trail AND
+permanently masked a genuinely dead address. That choice is why the mechanism needs no clearing job and no
+expiry — it is one timestamp comparison.
+
+Tests: `SuppressionListTest`, `ControlApiSuppressionsTest` (one case per gate, over real HTTP, including
+the disarmed deployment and the later-bounce re-suppression).
+
+🔴 **Two registration sites a capability-gated route needs, both found by a guard rather than by review.**
+(1) `CapabilityManifest` — `CapabilityManifestTest` fails on any `withCapability` site missing from the
+manifest, and on any manifest entry with no site. (2) **Route order**: matching is FIRST-MATCH in
+`ControlApi`'s `RouteModule` registration order, and `NotificationRoutes` registers before
+`DeliveryStatusRoutes` — so its archive-by-id catch-all `DELETE /notifications/([^/]+)` swallowed
+`DELETE /notifications/suppressions` and answered *"no notification 'suppressions'"*. ⛔ A literal path
+cannot outrank a parameterised one registered earlier; the catch-all now carries `(?!suppressions$)`, and
+**any future exact `/notifications/<word>` DELETE in another module must be added to that lookahead.**
+
+⚠ A third trap, test-side: `V1Body.of(body)` **already peels the envelope's `data`** (the same unwrap the
+SPA's `v1Interceptor` does). Reaching for `.get("data")` on top of it lands on `null` and surfaces as an
+NPE that reads exactly like a handler bug. Gate tests asserting only a status code pass either way, so
+this appears in the HAPPY PATH alone.

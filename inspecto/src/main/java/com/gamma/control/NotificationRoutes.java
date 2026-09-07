@@ -61,7 +61,14 @@ final class NotificationRoutes implements RouteModule {
                 (e, m) -> updateRule(api, ApiContext.name(m), api.body(e))));
         api.delete("/notifications/rules/([^/]+)", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> deleteRule(api, ApiContext.name(m))));
-        api.delete("/notifications/([^/]+)", (e, m) -> {
+        // ⚠ The archive-by-id catch-all, and it MUST stay last in this module AND must not swallow a
+        // sibling sub-resource. Route matching is first-match in registration order across modules
+        // (ControlApi's RouteModule list), and NotificationRoutes registers before DeliveryStatusRoutes —
+        // so without the negative lookahead, `DELETE /notifications/suppressions` matched HERE and came
+        // back "no notification 'suppressions'". Found by ControlApiSuppressionsTest, 2026-09-07.
+        // ⛔ Any future exact `/notifications/<word>` DELETE in another module must be added to this
+        // lookahead; a literal path cannot otherwise outrank a parameterised one that was registered first.
+        api.delete("/notifications/(?!suppressions$)([^/]+)", (e, m) -> {
             if (!store(api).archive(ApiContext.name(m)))
                 throw new ApiException(404, "no notification '" + ApiContext.name(m) + "'");
             return Map.of("id", ApiContext.name(m), "deleted", true);

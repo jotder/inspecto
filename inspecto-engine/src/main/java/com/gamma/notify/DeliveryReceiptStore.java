@@ -79,6 +79,51 @@ public interface DeliveryReceiptStore extends AutoCloseable {
         return false;
     }
 
+    /**
+     * Distinct targets with at least one receipt carrying {@code status} — the candidate set the
+     * suppression list is built from. ⚠ Candidates, not decisions: {@link SuppressionList} still runs the
+     * authoritative per-target check, so an over-broad implementation here can only cost work, never
+     * suppress something it should not.
+     *
+     * @since 4.0.0
+     */
+    default List<String> targetsWithStatus(DeliveryStatus status) {
+        if (status == null) return List.of();
+        java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<>();
+        for (DeliveryReceipt r : recent(SUPPRESSION_SCAN)) {
+            if (r.target() != null && !r.target().isBlank() && r.statusAt().containsKey(status)) {
+                out.add(r.target());
+            }
+        }
+        return List.copyOf(out);
+    }
+
+    /**
+     * Record an operator's decision to deliver to {@code target} again despite its history
+     * (`DELETE /notifications/suppressions`, decided 2026-09-07).
+     *
+     * <p>🔴 <b>It forgives history up to {@code at} — it does not delete anything.</b> The bounce and
+     * complaint receipts stay, because they are the audit trail that says why the address was suppressed
+     * and that someone chose to re-enable it. A LATER suppressing event is therefore not forgiven and
+     * re-suppresses on its own, with no clearing job to run and nothing to expire: that is the whole
+     * mechanism behind "cleared by the next suppressing event", and it is a timestamp comparison rather
+     * than state that can drift.
+     *
+     * <p>⚠ An address forgiven forever would be worse than no feature at all — it would permanently mask
+     * a genuinely dead destination — which is exactly what deleting the receipts instead would have done.
+     *
+     * @return whether the override was recorded; {@code false} on a store that cannot hold one
+     * @since 4.0.0
+     */
+    default boolean unsuppress(String target, long at, String actor) {
+        return false;
+    }
+
+    /** When an operator last forgave {@code target}'s history, or empty. See {@link #unsuppress}. */
+    default Optional<Long> unsuppressedAt(String target) {
+        return Optional.empty();
+    }
+
     @Override
     default void close() {}
 }

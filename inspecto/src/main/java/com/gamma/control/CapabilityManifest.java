@@ -95,6 +95,8 @@ final class CapabilityManifest {
             // DeliveryStatusRoutes — the read surface only; the inbound callback authenticates itself
             // by provider signature and is deliberately outside the capability spine (D8 §4.4).
             new Entry("GET", "/notifications/deliveries", Roles.CAN_AUTHOR_WORKBENCH),
+            new Entry("GET", "/notifications/suppressions", Roles.CAN_AUTHOR_WORKBENCH),
+            new Entry("DELETE", "/notifications/suppressions", Roles.CAN_AUTHOR_WORKBENCH),
             // ObjectRoutes
             new Entry("POST", "/cases/rules", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("DELETE", "/cases/rules/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),

@@ -113,22 +113,57 @@ public final class SuppressionList {
     public Optional<String> reasonToSuppress(String target, long now) {
         if (!armed || target == null || target.isBlank()) return Optional.empty();
 
+        // An operator override forgives everything up to its timestamp — and nothing after it. That
+        // single comparison IS "cleared by the next suppressing event": a later bounce or complaint is
+        // simply not covered, so it re-suppresses with no clearing job and no state to expire.
+        long forgivenUpTo = receipts.unsuppressedAt(target).orElse(Long.MIN_VALUE);
+
         Optional<DeliveryReceipt> complaint = receipts.latestWithStatus(target, DeliveryStatus.COMPLAINED);
         if (complaint.isPresent()) {
-            Long at = complaint.get().statusAt().get(DeliveryStatus.COMPLAINED);
-            return Optional.of("the recipient marked a previous message as spam (complaint recorded at "
-                    + at + "); suppression is permanent");
+            long at = complaint.get().statusAt().get(DeliveryStatus.COMPLAINED);
+            if (at > forgivenUpTo) {
+                return Optional.of("the recipient marked a previous message as spam (complaint recorded at "
+                        + at + "); suppression is permanent");
+            }
         }
 
         Optional<DeliveryReceipt> bounce = receipts.latestWithStatus(target, DeliveryStatus.BOUNCED_HARD);
         if (bounce.isPresent()) {
             long at = bounce.get().statusAt().get(DeliveryStatus.BOUNCED_HARD);
             long expires = at + ttlMillis;
-            if (now < expires) {
+            if (at > forgivenUpTo && now < expires) {
                 return Optional.of("the address hard-bounced at " + at + "; suppressed until " + expires
                         + " (-D" + TTL_PROPERTY + "=" + hardBounceTtl() + ")");
             }
         }
         return Optional.empty();
     }
+
+    /**
+     * Every target currently suppressed, with why — the {@code GET /notifications/suppressions} body.
+     *
+     * <p>Built by asking the store for CANDIDATES (any target that ever complained or hard-bounced) and
+     * then running {@link #reasonToSuppress} over each, so the list and the delivery-time decision can
+     * never disagree: there is one authoritative check, called from both.
+     *
+     * <p>⚠ Bounded by {@code limit}. A diagnostic read must not become an unbounded export, and on a
+     * long-lived deployment the candidate set grows with every address ever mistyped.
+     *
+     * @return targets in encounter order, capped at {@code limit}
+     */
+    public java.util.List<Suppressed> suppressions(long now, int limit) {
+        java.util.List<Suppressed> out = new java.util.ArrayList<>();
+        if (!armed || limit <= 0) return out;
+        java.util.LinkedHashSet<String> candidates =
+                new java.util.LinkedHashSet<>(receipts.targetsWithStatus(DeliveryStatus.COMPLAINED));
+        candidates.addAll(receipts.targetsWithStatus(DeliveryStatus.BOUNCED_HARD));
+        for (String target : candidates) {
+            if (out.size() >= limit) break;
+            reasonToSuppress(target, now).ifPresent(why -> out.add(new Suppressed(target, why)));
+        }
+        return out;
+    }
+
+    /** One suppressed destination and the operator-facing reason. */
+    public record Suppressed(String target, String reason) {}
 }

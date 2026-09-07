@@ -60,6 +60,67 @@ final class DeliveryStatusRoutes implements RouteModule {
         // notification-rule shipped (backend + HTTP only, no UI editor).
         api.get("/notifications/deliveries", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> deliveries(api, e)));
+        // D8-SUPPRESS-1's operator surface. `target` travels as a QUERY parameter, not a path segment:
+        // a webhook destination is a URL and would not survive one. That also removes traversal from the
+        // question entirely — the value is matched against stored receipts, never resolved as a path.
+        api.get("/notifications/suppressions", ApiContext.withCapability("canAuthorWorkbench",
+                (e, m) -> suppressions(api, e)));
+        api.delete("/notifications/suppressions", ApiContext.withCapability("canAuthorWorkbench",
+                (e, m) -> unsuppress(api, e)));
+    }
+
+    /** Hard cap on the suppression listing — a diagnostic read must not become an unbounded export. */
+    private static final int MAX_SUPPRESSIONS = 500;
+
+    /**
+     * The currently-suppressed destinations and why. Reports the TRUE total alongside a {@code truncated}
+     * flag, so a capped page can never be mistaken for the whole list.
+     *
+     * <p>⚠ A DISARMED suppression list returns {@code armed: false} and an empty list — deliberately not
+     * a 404 or an error. "Nothing is suppressed" and "suppression cannot run here" are different answers
+     * to the same question, and an operator looking at an empty list is entitled to know which one they
+     * are seeing.
+     */
+    private Object suppressions(ApiContext api, HttpExchange e) {
+        var suppression = api.service().notificationService().suppression();
+        int limit = Math.min(ApiContext.parseIntOr(ApiContext.query(e, "limit"), 100), MAX_SUPPRESSIONS);
+        var all = suppression.suppressions(System.currentTimeMillis(), MAX_SUPPRESSIONS);
+        var page = all.size() > limit ? all.subList(0, limit) : all;
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("armed", suppression.armed());
+        out.put("hardBounceTtl", suppression.hardBounceTtl().toString());
+        out.put("total", all.size());
+        out.put("truncated", all.size() > page.size());
+        out.put("suppressions", page.stream()
+                .map(s -> Map.of("target", s.target(), "reason", s.reason())).toList());
+        return out;
+    }
+
+    /**
+     * Forgive a destination's delivery history so it is delivered to again.
+     *
+     * <p>Gates, fail-closed: blank {@code target} → <b>422</b>; a store that cannot hold an override →
+     * <b>409</b>, because succeeding would report a change that did not happen.
+     *
+     * <p>🔴 It records an override; it deletes nothing. The bounce and complaint receipts remain as the
+     * audit trail, and a LATER suppressing event is not covered by the override, so the address
+     * re-suppresses on its own. Operator decision 2026-09-07, over the alternative of pruning the
+     * target's receipts — that would have destroyed the evidence AND permanently masked a dead address.
+     */
+    private Object unsuppress(ApiContext api, HttpExchange e) {
+        String target = ApiContext.query(e, "target");
+        if (target == null || target.isBlank()) {
+            throw new ApiException(422, "target is required: DELETE /notifications/suppressions?target=<address>");
+        }
+        DeliveryReceiptStore receipts = api.service().deliveryReceipts();
+        long now = System.currentTimeMillis();
+        if (receipts == null || !receipts.unsuppress(target.trim(), now, ApiContext.actor(e))) {
+            throw new ApiException(409, "this deployment cannot record a suppression override — "
+                    + "delivery receipts are not stored durably (-Ddelivery.receipts.backend)");
+        }
+        return Map.of("target", target.trim(), "unsuppressedAt", now,
+                "note", "delivery history up to this moment is forgiven; a later bounce or complaint "
+                        + "suppresses this address again");
     }
 
     private Object callback(ApiContext api, HttpExchange e, String adapterId) throws Exception {
