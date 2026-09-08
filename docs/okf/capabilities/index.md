@@ -39,7 +39,7 @@ were missing). ⛔ Create a directory here only with the name that table gives i
 | `SEC` | [Security](security/security.md) | `security/` | ✅ **area #2 — 2026-09-08** |
 | `AGT` · `EOI` | [Assistant](assistant/assistant.md) | `assistant/` | ✅ **area #11 — 2026-09-08** |
 | `UI` | [Surfaces & Lenses](surfaces/surfaces.md) | `surfaces/` | ✅ **area #12 — 2026-09-08** |
-| `PKG` | Editions & packaging | `editions/` | planned — ⚠ must absorb the design in `superpower/deployment-topology-plan.md` before that plan can move (plan §5.10) |
+| `PKG` | [Editions & packaging](editions/editions.md) | `editions/` | ✅ **area #15 — 2026-09-09**; absorbs the settled design of `superpower/deployment-topology-plan.md` §3.9–§3.13 (that plan stays in `superpower/` — Phases 0–5 unbuilt) |
 | `CMP` | [Compliance](compliance/compliance.md) | `compliance/` | ✅ **area #13 — 2026-09-08**; owns the `compliance/` tree |
 | `TOOL` | [Guards & repository tooling](tooling/tooling.md) | `tooling/` | ✅ **area #14 — 2026-09-09**; new area |
 

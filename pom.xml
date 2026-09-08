@@ -160,7 +160,8 @@
              2026-07-07 — the kernel is discontinued and its reasoning layer is vendored in-tree at
              release=24), whose bytecode is Java 25 (class-file v69) — those classes cannot LOAD on
              a JDK 24 runtime (UnsupportedClassVersionError). The agent modules therefore require a
-             JDK 25+ runtime (the bundled JDK 26 qualifies); see
+             JDK 25+ runtime (the bundled GraalVM JDK 25 qualifies — this said "JDK 26" until 2026-09-09; the
+             cache holds 25.0.3 Windows / 25.1.3 Linux and CI sets up JDK 25); see
              docs/superpower/agent-kernel-replacement-plan.md. -->
         <maven.compiler.release>24</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

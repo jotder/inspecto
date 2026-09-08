@@ -1,9 +1,24 @@
 # Deployment Topology & Operations Plan — Inspecto
 
-> **Status: decisions SIGNED, build not started — 2026-07-24, §10 signed 2026-09-06.** Proposes the
+> **Status: decisions SIGNED, DESIGN DISTILLED, build not started — 2026-07-24, §10 signed 2026-09-06,
+> distilled 2026-09-09.**
+>
+> ✅ **The settled design now lives in [`okf/capabilities/editions/editions.md`](../okf/capabilities/editions/editions.md) §3.9–§3.13**
+> — the T1–T4 topologies, the security overlay as an *overlay not a tier*, the restart-safe posture and
+> the backup/verify/restore chain, the five-beat deployment shape, the §8 preflight and §9 acceptance
+> contract, and promotion/upgrade/rollback. That spec is also the only durable home for the twelve open
+> items this plan holds that have **no `BACKLOG.md` row** (`preflight`, `standby` and `disaster
+> recovery` appear nowhere in the backlog). **This plan stays here** because Phases 0–5 are unbuilt —
+> it is the BUILD plan, no longer the design of record. Proposes the
 > deployment offerings (topologies, security overlays, scaling/DR posture) and the engineering workstreams
 > (scripts, preflight checks, post-deploy verification) needed to sell and operate them. **§10's D1–D8 were
-> signed as recommended on 2026-09-06** (D3 = the shipped 2GB cap) — see §10. What remains is Phases 0–5,
+> signed as recommended on 2026-09-06** — see §10. 🔴 **Except D3, which was signed as a default
+> that does not exist** (corrected 2026-09-09: this read “D3 = the shipped 2GB cap”). See §10's
+> re-grounded GAP-4 note, which is the accurate one: `DuckDbUtil.memoryLimit(null)` returns **`null`**
+> when nothing is installed, no `scheduler.toon` ships in the bundle, and an uncapped run still sees
+> DuckDB's own ~80%-of-RAM default. D3 is therefore **undischarged work, not a settled question**, and
+> this file states three different things about it (here, the §10 clarification, and the D3 row's
+> “Needs product call”). What remains is Phases 0–5,
 > all unbuilt, plus the T2/T3/T4 reference deployments that only a real deployment can validate
 > (`BACKLOG.md` §2 · §3).
 >
@@ -177,7 +192,8 @@ browser ──HTTPS/2──► [ WSO2 API Manager ]───────HTTPS─
                                                          └─ spaces/<tenant>/… per tenant    │
 ```
 
-Enterprise edition (`-Pedition-enterprise` — packaging flavor pending, SCR-8). The gateway is **transport
+Enterprise edition (`-Pedition-enterprise` — ⚠ **the packaging flavour SHIPPED 2026-07-25 / EDG-01**;
+this said “pending, SCR-8” until 2026-09-09, contradicting this file's own GAP-2 entry in §10). The gateway is **transport
 only** (routing, throttling, CORS, edge OAuth2) — Inspecto re-validates every JWT ("never trust the gateway
 blindly"). Multi-tenancy = Spaces + seeded **space-isolation policies** (deny outside the subject's
 home-space claim; `canConfigureAccess` exempt; tailorable per space). Every policy deny and route-level
@@ -365,13 +381,13 @@ brackets; all cross-platform `ps1` + `sh` unless noted):
 | ID | Script / asset | Tier | Content [acceptance] |
 |---|---|---|---|
 | SCR-1 | `preflight` | all | §8 checks, JSON report + non-zero exit on hard-fail [runs offline; catches every §8 row] |
-| SCR-2 | Launcher `lib/` support | T2+ | `serve.*` adds `lib/*.jar` to classpath (Postgres driver et al.) [DB-backed boot with driver dropped in, no script edits] |
+| ~~SCR-2~~ | ~~Launcher `lib/` support~~ | T2+ | ⚠ **SUPERSEDED by PG-1** (struck 2026-09-09): `postgresql.jar` is **staged into every Standard/Enterprise bundle** and auto-detected by `serve.*`, inert until `-Dinspecto.db=postgres`. Nothing is dropped into a `lib/` directory, so §8's “driver jar in `lib/`” preflight row checks a step nobody performs. A generic `lib/*.jar` mechanism remains *possible* but is no longer required by D2 |
 | SCR-3 | Service wrappers | T2+ | systemd unit (`Restart=on-failure`, `WorkingDirectory=` bundle root, `EnvironmentFile=`) + Windows service (WinSW or `sc.exe` wrapper — vendor decision) [survives reboot + kill -9] |
 | SCR-4 | Proxy/TLS templates | T2a/T3 | nginx/IIS reference configs: TLS, HSTS, static-UI gzip, `/metrics`+`/health/details` network restriction [checklist-verifiable] |
 | SCR-5 | `backup-offsite` | T2+ | Post-`backup_verify` copy of verified archives off-box (share/S3-compatible) [restore succeeds from off-site copy alone] |
 | SCR-6 | `verify` | all | §9 as a script — productized smoke: probes + evidence table + exit code [green on reference deploys; red on each seeded fault] |
 | SCR-7 | `upgrade` / `rollback` | T2+ | §6 procedure automated incl. N-1 retention [drill both directions on the reference deploy] |
-| SCR-8 | `package.ps1 -Edition Enterprise` | T3+ | Add ValidateSet value + `inspecto-policy` bundling [BACKLOG §6; currently blocked by another session's uncommitted edit to the file] |
+| ~~SCR-8~~ | ~~`package.ps1 -Edition Enterprise`~~ | T3+ | ✅ **SHIPPED as EDG-01** (struck 2026-09-09; the row still named a blocker that was gone). `Enterprise` is a real flavour: ValidateSet value, profile guard, and a nine-module list. 🔴 **What replaced it as the real gap:** `release.yml` builds Personal + Enterprise and **never Standard**, while the launchers detect the edition from *jar presence* — so an “Enterprise (superset of Standard)” bundle handed to a Standard customer self-identifies as Enterprise and enables ABAC. One added packaging step closes it — see the owner spec §5.3 items 2–3 |
 | SCR-9 | Launcher hygiene | all | Remove dead `CONTROL_TOKEN`/`ASSIST_TOKEN` lines from `serve.*`/`package.ps1` (token auth was removed 2026-06-16 — no Java code reads them) [grep-clean] |
 | SCR-10 | Bundle-docs ACL fix | — | 13 files under `docs/archived-documents/plans-archive/` carry a broken deny-ACL and are silently skipped from every bundle; needs Administrator `takeown`+`icacls` [bundle diff shows them back] |
 | SCR-11 | Container image (optional) | per D1 | Dockerfile + compose reference (app + Postgres); K8s explicitly out of scope until D1 says otherwise |
@@ -394,7 +410,7 @@ Machine-readable (`preflight … --json`), each row `PASS/WARN/FAIL`; any FAIL b
 | Clock | NTP-synced (JWT `exp`/`nbf` tolerance is only 60 s — skew breaks Standard/Enterprise auth) |
 | OS limits (Linux) | open-files ulimit sane for Parquet partition fan-out |
 | Network posture | Firewall rule present given bind-all (GAP-1); CORS origin decided |
-| Postgres (if used) | Reachable; driver jar in `lib/`; credentials via `${ENV:…}` resolve |
+| Postgres (if used) | Reachable; credentials via `${ENV:…}` resolve. ⚠ *(Corrected 2026-09-09: this required a “driver jar in `lib/`” — the driver now ships in the bundle, see SCR-2.)* |
 | IAM (T2+) | Issuer + JWKS URI reachable **before** first boot (misconfig = deliberate boot failure); keystore valid + not near expiry (T2b) |
 | Gateway (T3) | Gateway JWKS reachable; `X-JWT-Assertion` header agreed |
 | Model host (optional) | Local model endpoint reachable (embedded intelligence is local-models-only, QA-only today) |
@@ -407,8 +423,12 @@ Basis: the existing smoke harness + e2e suite, productized as SCR-6. Evidence ta
 body extract) attached to the acceptance sign-off. **Basic block (every tier)**:
 
 - **VER-1 liveness/readiness**: `/health` = 200 `{"status":"UP"}`; `/ready` reports the expected pipeline count.
-- **VER-2 edition probe**: `/api/v1/bootstrap` `data.edition` matches intent (`personal` vs `standard`) —
-  catches a missing security jar or `auth.mode` immediately.
+- **VER-2 edition probe**: `/api/v1/bootstrap` `data.edition` matches intent — catches a missing security
+  jar or `auth.mode` immediately. 🔴 **This row CANNOT PASS for an Enterprise deployment** (found
+  2026-09-09): `BootstrapRoutes.edition()` derives the string from the `auth.mode` flag alone and can
+  only return `personal` or `standard`, so an Enterprise bundle reports `standard`. Probe the
+  `data.features` flags instead — those ARE derived from what registered — and note that four of the
+  nine optional modules have no flag. Owner spec §3.5.
 - **VER-3 backend assertion**: `/api/v1/health/details` shows every intended subsystem `UP` (not silently
   `NOT_CONFIGURED`/in-memory fallback) — the graceful-degradation counter-check.
 - **VER-4 telemetry**: `/metrics` scrapes and parses (Prometheus text 0.0.4).

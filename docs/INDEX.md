@@ -70,7 +70,8 @@ paid for violating them.
     [`Assistant`](okf/capabilities/assistant/assistant.md) (`AGT`+`EOI`),
     [`Surfaces & Lenses`](okf/capabilities/surfaces/surfaces.md) (`UI`),
     [`CMP`](okf/capabilities/compliance/compliance.md),
-    [`TOOL`](okf/capabilities/tooling/tooling.md); the other three slots are named in
+    [`TOOL`](okf/capabilities/tooling/tooling.md),
+    [`Editions & packaging`](okf/capabilities/editions/editions.md) (`PKG`); the other two slots are named in
     `GLOSSARY.md` §14 and sized in [`superpower/docs-consolidation-plan.md`](superpower/docs-consolidation-plan.md) §5.1.
   - [`okf/living-operational-system.md`](okf/living-operational-system.md) — the cross-cutting **north star**:
     seven cooperating networks over one metadata model, and what enforces each principle.

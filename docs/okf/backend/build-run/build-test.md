@@ -17,7 +17,7 @@ mvn -o clean package -q    # → inspecto/target/inspecto-processor-*.jar (fat J
 ```
 
 Always offline (`-o`). Tests spin up a real `CollectorService`/[`ControlApi`](../control-plane/control-api.md) on
-an ephemeral port. (Java 26 toolchain + Maven; see the `build-verify` skill for exact local paths.)
+an ephemeral port. (Java **25** toolchain + Maven — ⚠ this said 26 until 2026-09-09; the GraalVM cache holds 25.0.3 (Windows) / 25.1.3 (Linux) and CI sets up JDK 25; see the `build-verify` skill for exact local paths.)
 
 ## Mandatory DuckDB native-access flag
 
@@ -33,7 +33,7 @@ It's wired into the root `pom.xml` Surefire config as `<argLine>@{argLine} --ena
 ## Packaging — `package.ps1`
 
 `inspecto/package.ps1` emits the deployment bundle. Switches: `-NoBuild` (reuse `target/`), `-NoUi` (skip the
-Angular build), `-NoRuntime` (skip the embedded jlinked JVM), and **`-Edition personal|standard`** (selects
+Angular build), `-NoRuntime` (skip the embedded jlinked JVM), and **`-Edition Personal|Standard|Enterprise`** (⚠ this omitted `Enterprise` — the only non-Personal flavour CI actually releases — until 2026-09-09) (selects
 the Maven [edition](../editions/editions-model.md) profile + assembles the per-edition fat-JAR). Generated
 launch scripts embed the native-access flag and the key [`-D` flags](operations.md).
 
@@ -46,7 +46,14 @@ Verified by building both flavors 2026-08-27 (Personal 169.3 MB, Enterprise 170.
 | `inspecto.jar` (shaded core) | ✅ | ✅ |
 | `inspecto-security.jar` (OIDC `Authenticator` SPI) | — | ✅ Standard+ |
 | `inspecto-policy.jar` (ABAC `AccessDecider` SPI) | — | ✅ Enterprise only |
+| `inspecto-connectors.jar` (shaded sidecar — `CONNECTORS-BUNDLE-1`) | ✅ | ✅ |
+| the **seven** EDG-01 sidecars (`notify-channels` shaded, `backup`, `geo-link`, `exchange`, `metrics`, `events`, `ops`) | — | ✅ Standard+ |
+| `postgresql.jar` (inert until `-Dinspecto.db=postgres` — `PG-1`) | — | ✅ Standard+ |
 | **`inspecto-agent` / `inspecto-intelligence`** | **never** | **never** |
+
+> ⚠ **Staged-jar totals** (added 2026-09-09 — this table listed 3 of the 12): Personal stages **2**
+> jars, Standard **11**, Enterprise **12**. The complete enumerations in code are `package.ps1`'s
+> staging block and its boot-smoke classpath. Owner: [`okf/capabilities/editions/editions.md`](../../capabilities/editions/editions.md) §3.3.
 
 ⚠ **`/assist/*` is inert in every bundle `package.ps1` produces, and that is the intended default.**
 The core fat JAR carries the two SPI *interfaces* (`com.gamma.assist.spi.AssistAgent`,

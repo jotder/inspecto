@@ -15,7 +15,11 @@ timestamp: 2026-07-22T00:00:00Z
 > `inspecto-policy` and `inspecto-intelligence` **zero times** — nine modules, all created after it was
 > written (the EDG-01 edition extractions, through 2026-09-08).
 >
-> **The reactor is 23 modules today: 14 default + 9 profile-scoped.** `pom.xml` is the only current
+> **The reactor is 23 modules in the default (Personal) build, 31 with `-Pedition-standard`, 32 with
+> `-Pedition-enterprise`.** ⚠ *(Corrected 2026-09-09: this read “23 today: 14 default + 9
+> profile-scoped”, which adds up by coincidence. 14 is the count of `<modules>` ENTRIES, one of which is
+> the `asn-parser/asn-decoders` aggregator contributing itself + 8 children; with the root POM that
+> makes 23 built modules, and the 9 profile-scoped ones then take the total to 32.)* `pom.xml` is the only current
 > source — rebuild the list from it, never from this page. ⚠ `backend/architecture.md` used to call this
 > page "the authoritative map"; that deference has been corrected.
 >

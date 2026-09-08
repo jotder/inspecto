@@ -280,14 +280,20 @@ AI-driven autonomy without redesign.
 | UI-7 | **Reconciliation** + **Breaks** (auto-close on re-match; manual resolutions preserved) | Must | SHIPPED | All |
 | UI-8 | Settings drawer + consolidated admin settings pane | Should | SHIPPED (2026-07-07, `7e06463`/`12ead9c`: `SettingsDrawerComponent` + the master-detail `/settings/<section>` pane; later host for Settings ▸ Scheduler 2026-08-25 and Settings ▸ Operational database) | All |
 
-### 3.16 Packaging & editions (PKG)
+### 3.16 Editions & packaging (PKG)
+
+> ⚠ **These rows now have an owner:** [`okf/capabilities/editions/editions.md`](okf/capabilities/editions/editions.md) §2 is the
+> requirement-of-record for `PKG`, and it CORRECTS every status below. 🔴 **Three of the four
+> overstate what SHIPS:** no Standard artifact is ever built, no released bundle contains the jlink
+> runtime, and the SBOM generator declares 4 first-party jars where a Standard bundle carries 11.
+> Re-grounded 2026-09-09. Area renamed per `GLOSSARY.md` §14.
 
 | ID | Requirement | MoSCoW | Status | Edition |
 |---|---|---|---|---|
-| PKG-1 | One fat JAR + jlink runtime; per-edition bundles via `package.ps1 -Edition` | Must | SHIPPED | All |
-| PKG-2 | Lean SBOM: framework-free core, network deps isolated in `inspecto-connectors` | Must | SHIPPED | All |
-| PKG-3 | Runnable, self-contained example suite (`inspecto/examples/`) | Should | SHIPPED | All |
-| PKG-4 | Verify the Standard bundle's jlink module set against Nimbus (until then: run Standard with `-NoRuntime`) | **Must (S)** | SHIPPED (verified 2026-07-07: jdeps + Nimbus probe + boot on the exact 12-module jlink image; `package.ps1` note updated) | S |
+| PKG-1 | One fat JAR + jlink runtime; per-edition bundles via `package.ps1 -Edition` | Must | 🔴 **SHIPPED in part** (corrected 2026-09-09): the fat JAR ships; per-edition bundles are **two of three** (`release.yml` packages Personal + Enterprise, never Standard); and **no released artifact contains the jlink runtime** — every release step passes `-NoRuntime`. See owner §2/§3.7 | All |
+| PKG-2 | Lean SBOM: framework-free core, network deps isolated in `inspecto-connectors` | Must | 🔴 **SHIPPED but WRONG** (corrected 2026-09-09): `tools/sbom.mjs` declares **4** first-party jars where Standard stages **11** and Enterprise **12** — it knows none of the seven EDG-01 modules, and javax.mail (moved to `inspecto-notify-channels` by cell 1) appears in **no** shipped SBOM while the script's own comment still credits the connectors sidecar with it. No test covers the generator. Isolation is also half-superseded: the connector sidecar ships in EVERY edition (`CONNECTORS-BUNDLE-1`) | All |
+| PKG-3 | Runnable, self-contained example suite (`inspecto/examples/`) | Should | 🟡 **SHIPPED, one-thirtieth exercised** (corrected 2026-09-09): 30 examples in 7 categories are tracked and staged into every bundle, and **exactly one** runs in any pipeline (`release.yml`, on a tag only). `ci.yml` runs none | All |
+| PKG-4 | Verify the Standard bundle's jlink module set against Nimbus (until then: run Standard with `-NoRuntime`) | **Must (S)** | ⚠ **SHIPPED, evidence covers 5 of the 12 modules** (corrected 2026-09-09): the recorded verification attributes `java.base`/`java.sql`/`java.net.http`/`jdk.httpserver` + `jdk.crypto.ec`; the other seven in the image are unattributed by it. Status is also stated three ways (this row RESOLVED · `BACKLOG.md` "not re-verified" · `build-test.md` "unproven as of 2026-08-27") — all moot for shipped artifacts, which carry no runtime at all | S |
 
 ---
 
