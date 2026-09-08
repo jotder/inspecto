@@ -673,7 +673,9 @@ src/app/
    still: `@types/jasmine` no longer supplies ambient `describe`/`it`/`expect` there at all**, so the
    11 remaining specs that had leaned on it were given explicit imports and **every** spec now imports
    `{ describe, expect, it, … }` from `vitest`. A new spec MUST do the same — the fix is always the
-   import, never a tsconfig edit. A spec that runs green is not proof it typechecks. A spec that runs green is not proof it typechecks. **Check the EXIT CODE, not just the pass count**: an
+   import, never a tsconfig edit. **`@types/jasmine` was removed outright on 2026-09-08** (`89f09b6c`,
+   an orphan alongside `jasmine-core` and the five karma packages), so no ambient fallback survives in
+   the root config to lean on even by accident. A spec that runs green is not proof it typechecks. A spec that runs green is not proof it typechecks. **Check the EXIT CODE, not just the pass count**: an
    unhandled error (e.g. a G6/AntV or MapLibre canvas mounting in jsdom) makes vitest exit non-zero
    even with 0 test failures → CI red. `GraphViewComponent` only mounts a canvas when
    `data.nodes.length > 0`, so test graph-hosting components on the empty/no-graph path (`EMPTY_GRAPH`)
