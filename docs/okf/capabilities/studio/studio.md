@@ -307,7 +307,7 @@ token fails the whole page.
 `/studio/link-analysis` works on **P3 — Entity/Link graphs** (records as business entities), never on
 artifact or lineage graphs (`GLOSSARY.md` §11 keeps the four graph planes distinct).
 
-**Source.** The `entity-projection` **GraphSource** is a *mapping, not a store*: a column becomes the
+**Where the graph comes from.** The `entity-projection` **GraphSource** is a *mapping, not a store*: a column becomes the
 source Entity, another the target, optional columns carry the Link type and attributes. It is
 **backend-first only** — `POST /inv/projection` folds server-side in DuckDB
 (`GROUP BY` with `COUNT(*)`, **heaviest-first**, default cap 2,000 and maximum 20,000, returning
