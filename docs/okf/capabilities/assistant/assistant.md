@@ -86,7 +86,7 @@ and — under an explicit human gate — acts.
 
 **The version is stated four ways.** This is the `count-stated-N-ways` disease applied to a dependency:
 
-| Source | What it says |
+| Where it is stated | What it says |
 |---|---|
 | `okf/agentic/index.md`, `okf/agentic/overview.md` | `0.1.0-SNAPSHOT`, "no release tag yet" |
 | `REQUIREMENTS.md` `EOI-7` | `v0.1.0` tagged, poms pin `0.1.0`, "no SNAPSHOT anywhere" |
