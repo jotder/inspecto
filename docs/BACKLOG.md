@@ -38,8 +38,12 @@ evidence note), and four were re-ranked because the row hid a gate — a design 
 a new dependency — not a build. The rule that fell out: **a P1 must name the file it changes.** A row that
 cannot is a decision (§1) or a design (P2).
 
-Do next, in order (refreshed again 2026-09-07 — GUARD-SWEEP-1 and DAT-6-CI-1 are now done too):
-1. **Nothing is queued.** MERGE-ATTRS-1, filed hours earlier the same day, was **refuted on grounding**
+Do next, in order (refreshed 2026-09-09 — `SBOM-RESOLVE-1` is queued; GUARD-SWEEP-1 and DAT-6-CI-1 done):
+1. **`SBOM-RESOLVE-1` (§4)** — the only queued P1. The bill of materials cannot generate on a clean
+   runner, so the first tag fails at packaging; it names the file it changes (`release.yml`). Filed
+   2026-09-09 while fixing the generator's module table, and it is **not** a regression from that fix —
+   Enterprise failed identically before it. Everything else below was already drained: MERGE-ATTRS-1,
+   filed hours earlier on 2026-09-07, was **refuted on grounding**
    within one shift of being written and moved to §6 — `transform.merge` is deliberately not authorable, so
    declaring attributes for it would give a config pane to a node that refuses to save. Pick from §3/§5 by
    rank, or take the two §2 rows whose first action is **not** external (the SOC-2 window start date and
@@ -208,7 +212,26 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 
 *(Drained 2026-09-07. Three of the five rows here were standing refusals wearing a tech-debt label — a
 "LEAVE unless someone is already in the file" is not work — and moved to §6. A fourth was already closed by
-a test that post-dates it. What is left is one release-gated wire change.)*
+a test that post-dates it. What was left was one release-gated wire change; `SBOM-RESOLVE-1` joined it
+2026-09-09.)*
+
+- **P1** · **`SBOM-RESOLVE-1` — the bill of materials cannot be generated on a clean runner, so the first
+  tag fails at packaging.** `tools/sbom.mjs` resolves through `mvn dependency:list`, and Maven will **not**
+  resolve a sibling reactor module from a jar built in an *earlier* invocation — only from the local
+  repository, or from an artifact produced in the same session. `inspecto/package.ps1` runs `mvn … package`
+  and then invokes the generator as a **separate** process, so every reactor dependency must already be
+  installed. `.github/workflows/release.yml:45-46` runs its only `mvn … install` under
+  `working-directory: eoiagent-src` — it installs the **agent** dependency and never this reactor. A
+  non-zero exit throws by design, so packaging stops. ⚠ **Enterprise fails first and most visibly**:
+  `inspecto-policy` gained a *test-scoped* dependency on `inspecto-ops` in EDG-01 cell 7, and resolution
+  covers every scope regardless of the generator's `-DincludeScope=runtime`. Verified 2026-09-09 on this
+  sandbox: with `inspecto-ops` absent from `~/.m2`, Enterprise failed `Could not find artifact
+  com.gamma.inspector:inspecto-ops` **both before and after** that day's module-table fix — it is not a
+  regression from it — while Personal and Standard passed only because older reactor artifacts happened to
+  be installed here. → Either add a reactor `mvn -DskipTests install` to `release.yml` before the packaging
+  steps (simplest, and what a dev machine already does), or have the generator resolve inside a build
+  phase. ⛔ Do not "fix" it by narrowing the scope filter: the failure is in **resolution**, which precedes
+  filtering. Context: `docs/okf/capabilities/editions/editions.md` §5.3 item 1.
 
 - **P2** · **`MAP_AUTHORED` has drifted between its two homes — the FOURTH hand-mirrored map to do so.**
   `pipeline-editable.ts:197` declares `['columns', 'rules']`; `PipelineEditable.java:89` declares
