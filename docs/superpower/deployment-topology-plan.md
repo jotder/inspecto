@@ -445,11 +445,24 @@ Design/reality gaps (tracked honestly — none block T1/T2 sales today):
   it would make deployed Standard/Enterprise installs unreachable on upgrade. So the operator
   responsibility is real and now *documented* rather than contradicted: `EDITIONS.md`'s "localhost only"
   claim was the defect and has been replaced with the exposure note. Firewall guidance stands.
-- **GAP-2 Enterprise packaging** (SCR-8) · **GAP-3 no service wrappers/installers** (SCR-3) · **GAP-4
-  DuckDB cap not on-by-default** (D3; mitigated by mandatory-flag guidance) · **GAP-5 T15 surge admission**
-  (deferred hot-path work) · **GAP-6 Vault/KMS provider** (SEC-8 deferred; D4) · **GAP-7 gateway/IAM
-  blueprints unvalidated live** (Phase 3) · **GAP-8 Postgres driver not bundled** (D2) · **GAP-9 launcher
+- ✅ **GAP-2 Enterprise packaging** (SCR-8) — **SHIPPED as EDG-01.** `Enterprise` is a real
+  `package.ps1` flavour: `:61` ValidateSet, `:242` selects the `edition-enterprise` profile, `:251` lists
+  its module set. The blocker this gap named is gone.
+- ✅ **GAP-8 Postgres driver not bundled** (D2) — **SHIPPED as PG-1.** The driver rides every
+  Standard/Enterprise bundle as `postgresql.jar`, auto-detected by `serve.sh`/`serve.bat` and inert until
+  `-Dinspecto.db=postgres` (`package.ps1:17-18`, `:529-534`); the fat JAR stays driver-free.
+- **GAP-3 no service wrappers/installers** (SCR-3) · **GAP-4 DuckDB `memory_limit` not on-by-default**
+  (D3) · **GAP-5 T15 surge admission** (deferred hot-path work) · **GAP-6 Vault/KMS provider** (SEC-8
+  deferred; D4) · **GAP-7 gateway/IAM blueprints unvalidated live** (Phase 3) · **GAP-9 launcher
   token-line debris** (SCR-9) · **GAP-10 bundle silently missing 13 archived docs** (SCR-10).
+
+  ⚠ **GAP-4 re-grounded 2026-09-08 — it is subtler than "mitigated by mandatory-flag guidance", and it is
+  still OPEN.** D11 shipped as a *pair* and only half of it is on by default: `JobService`'s
+  `DEFAULT_MAX_CONCURRENT_RUNS = 4` is, but `DuckDbUtil.memoryLimit(null)` returns `null` when nothing is
+  installed, no `scheduler.toon` ships in the bundle, and the only `memory_limit` in the committed TOON
+  corpus is the empty string. So an uncapped run still sees DuckDB's own ~80 %-of-RAM default — exactly
+  what `PipelineConfig.java:392` and `okf/backend/engine/duckdb.md` say ("all opt-in"), and *not* what
+  this plan's D3 row and the archived D11 row imply. ⛔ Do not close GAP-4 off the D11 row.
 
 | # | Decision ask | Options / recommendation |
 |---|---|---|
