@@ -173,11 +173,13 @@ AI-driven autonomy without redesign.
 
 ### 3.9 Spaces & tenancy (SPC)
 
+> ⚠ **These rows now have an owner:** [`okf/capabilities/spaces/spaces.md`](okf/capabilities/spaces/spaces.md) §2 is the requirement-of-record for `SPC`, and it CORRECTS this table (`SPC-3`: the four vertical templates were mock-only seed packs deleted 2026-08-31 — one template ships; `SPC-1`: "isolated" is a layout on P/S and an enforced boundary only on E). Until the consolidation reaches step 5 this table remains, but the capability doc wins where they differ.
+
 | ID | Requirement | MoSCoW | Status | Edition |
 |---|---|---|---|---|
 | SPC-1 | Isolated **Spaces** (config/data/audit/duckdb per Space), CRUD without restart, one-time migrator | Must | SHIPPED | All |
 | SPC-2 | Whole-Space zip export/import with dry-run preview | Must | SHIPPED | All |
-| SPC-3 | **Space Templates** (vertical blueprints: Telecom RA, Fraud, Financial Audit, Link Analysis) | Should | SHIPPED (UI seed packs) | All |
+| SPC-3 | **Space Templates** (vertical blueprints: Telecom RA, Fraud, Financial Audit, Link Analysis) | Should | 🟡 **MECHANISM SHIPPED, CONTENT ABSENT** (corrected 2026-09-08) — the server catalog (`spaces/_templates/<id>/template.toon`, `GET /spaces/templates`) ships **one** template, `orders-starter`; the four verticals were mock-only seed packs deleted with the mock backend 2026-08-31 and never rebuilt — `okf/capabilities/spaces/spaces.md` §5 | All |
 | SPC-4 | **Metadata Bundle v2**: selective config-only transfer with lineage refs, provenance/contentHash, `requires`, drift fit-check | Should | SHIPPED (2026-07-07: `BundleRoutes` export/preview/import over the `ComponentStore` kinds — real content+contentHash, drift fit-check, idempotent import; connection/pipeline/job/view kinds deferred to their own stores) | All |
 | SPC-5 | Per-tenant ABAC | Could | SHIPPED (2026-07-24: `PolicyEngine.SEED` — engine-resident `space-isolation` / `space-isolation-rows` deny policies on the `AccessDecider` seam; engage once a `space` claim is mapped via `roles.toon`, exempt `canConfigureAccess` holders, tailorable in `access-policies.toon`) | E |
 

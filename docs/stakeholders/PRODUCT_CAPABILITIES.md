@@ -15,8 +15,10 @@ never a permission — server-enforced **Roles** arrive with the Standard editio
   (Datasets, Queries, Widgets, Dashboards, Link Analysis, Geo Map Analysis).
 - **Ops** — operate Runs, the Signal ledger, Alerts → Incidents → Cases.
 
-**Vertical starters:** Space Templates for Telecom Revenue Assurance, Fraud Management, Financial
-Auditing, and Link Analysis instantiate a ready-made Space per use case.
+**Starters:** a Space Template instantiates a ready-made Space from a server-side catalog; the build ships
+one (**Orders starter** — a retail-orders feed with pipeline, quality rule, dataset and dashboard). Vertical
+blueprints (Telecom Revenue Assurance, Fraud Management, Financial Auditing, Link Analysis) are a roadmap
+item, not a shipped artifact (corrected 2026-09-08).
 
 ## Capability map (status honest as of 2026-07-07)
 

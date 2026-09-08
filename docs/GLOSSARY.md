@@ -41,8 +41,11 @@ its **Component Type** decides the Config's shape. Think of a Component as a man
 
 **Space Template** — A reusable blueprint bundle of Components (Collectors, Pipelines, Schemas, Datasets, Widgets,
 Dashboards, Rules, optional seed data) that instantiates a new **Space**. Type→Instance: the Template is the
-Type; the Space created from it is the Instance. Shipped verticals: Telecom Revenue Assurance, Fraud
-Management, Financial Auditing, Link Analysis. *(Added Wave 0, 2026-07-02.)*
+Type; the Space created from it is the Instance. Templates are a **server-global catalog**
+(`spaces/_templates/<id>/template.toon`, `GET /spaces/templates`), not a Component kind. ⚠ **One template ships
+(`orders-starter`).** The four verticals this entry used to call "shipped" (Telecom Revenue Assurance, Fraud
+Management, Financial Auditing, Link Analysis) were mock-only seed packs deleted with the mock backend on
+2026-08-31 — `okf/capabilities/spaces/spaces.md` §5 (corrected 2026-09-08). *(Added Wave 0, 2026-07-02.)*
 
 **Metadata Bundle** — A selective, artifact-level export file (**configuration only, never data rows**) for
 moving definitions between Inspecto instances (staging → production): dataset metadata, Widgets, Dashboards,
@@ -50,7 +53,7 @@ saved Link-Analysis/Geo-Map views, Pipelines, and their registry pieces (grammar
 connections, secrets masked). Import previews new-vs-existing per artifact with a per-item overwrite/skip
 choice. UI: Settings → *Import & Export*, plus a reusable export/import menu on every editor, studio
 saved-view toolbar and library list. Distinct from the whole-space zip bundle and from **Space Template**.
-*(Added 2026-07-06; `docs/superpower/metadata-bundle.md`.)*
+*(Added 2026-07-06; provenance `docs/archived-documents/plans-archive/metadata-bundle.md`; as-built `okf/backend/control-plane/metadata-bundle.md`.)*
 
 **Bundle v2 / self-describing subgraph** — A Metadata Bundle that carries its own lineage and origin so the
 target can validate it without re-deriving refs: each item's outgoing **refs** (marked `included` if the
@@ -58,8 +61,8 @@ referent travels, `external` if it must already exist), its **provenance** (sour
 SHA-256 **contentHash** of the config), and the bundle's top-level **requires** (the deduped external refs —
 its contract with the target). The import **fit-check** classifies each item *new / exists / drifted*
 (contentHash ≠ target's ⇒ **drift**; identical ⇒ idempotent) and each require *satisfied / missing*. v1 files
-still import. *(Added 2026-07-06 R6; `docs/superpower/transportability-plan.md`,
-`docs/superpower/metadata-network-design.md` §4.)*
+still import. *(Added 2026-07-06 R6; provenance `docs/archived-documents/plans-archive/transportability-plan.md`,
+`docs/archived-documents/plans-archive/metadata-network-design.md` §4; as-built `okf/backend/control-plane/metadata-bundle.md`.)*
 
 ---
 

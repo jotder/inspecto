@@ -18,7 +18,9 @@ One server hosts many isolated **spaces** (projects). The ~40-method per-instanc
   serialized on `lifecycleLock` (reads are lock-free).
 * `SpaceContext` (`…/service/SpaceContext.java`) — a thin per-space holder (id + `SpaceRoot` + manifest + its
   own unchanged `CollectorService`).
-* `SpaceMigrator` (`…/service/SpaceMigrator.java`) — migrates a space's DuckDB/state stores on boot.
+* `SpaceMigrator` (`…/service/SpaceMigrator.java`) — the **one-time CLI** that turns the flat layout into a
+  `spaces/<id>/` directory (`configDir→config`, `database/→data`, `jobs_audit/→audit`, DuckDB files → `duckdb/`;
+  idempotent, `--dry-run`). ⚠ Nothing invokes it at boot — this line said "on boot" until 2026-09-08.
 
 ## Singleton isolation via the `space` MDC
 
@@ -42,6 +44,10 @@ without `?purge=true` (the files stay for re-discovery), or create another space
 current/default space. In versioned URLs the space segment sits **after** `/v1`
 (`/api/v1/spaces/<id>/…` — dispatch strips `/api/v1` first, then matches `/spaces/{id}/…`). Space CRUD
 (server-global, un-prefixed), all in `SpaceRoutes.java`: `GET /spaces` (`:45`), `POST /spaces` (`:58`), `POST /spaces/import` (`:60`, from a bundle zip), `PUT /spaces/{id}` (`:62`, rename/re-describe), `DELETE /spaces/{id}?purge=` (`:64`), `GET /spaces/templates` (`:56`, the shipped-template gallery — empty, not 409, on a single-tenant server), and
-`GET /spaces/_meta → {multiSpace}` (the UI capability probe — never infer from the space-list length). The UI
+`GET /spaces/_meta → {multiSpace}` (the UI capability probe — never infer from the space-list length). The
+**whole-space zip** lives in `DataSourceRoutes.java:38-41`, not here: `GET /spaces/{id}/export`,
+`POST /spaces/{id}/import/preview` (dry run) and `POST /spaces/{id}/import[?on_conflict=overwrite]`
+(`BundleExporter` / `BundleImporter`, zip-slip jailed) — omitted from this page until 2026-09-08. Requirement of
+record: [Spaces & tenancy capability spec](../../capabilities/spaces/spaces.md). The UI
 side is the [spaces feature](../../frontend/features/spaces.md) + the global
 [space interceptor](../../frontend/conventions/multi-space.md).

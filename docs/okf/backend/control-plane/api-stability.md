@@ -88,7 +88,7 @@ above the generated commit list.
   unchanged — renaming it is a separate, unmade decision.
 
 **Operator-visible behaviour**
-- `DELETE /spaces/{id}` answers **409** unless `?purge=true` (D4).
+- `DELETE /spaces/{id}?purge=true` answers **409** when it would remove the **last Space directory on disk** (D4); deregister-only on the last Space stays allowed. *(This line stated the rule backwards — "409 unless `?purge=true`" — until 2026-09-08; `SpaceRoutes.java:120-127`.)*
 - Full recomputes write a sibling `<pipeline>_<batchId>` table and supersede the old revision in the
   catalog; **nothing deletes the bytes** until a `retire_superseded` maintenance job is configured.
 - Run artifacts carry `event_time_min` / `event_time_max` instead of `timeRange`.

@@ -25,4 +25,5 @@ active space reloads the app.
 **"New space from template"** opens the template gallery (two-step ask-the-minimum: pick a card, then name
 — id pre-filled from the template id). Templates are a server-global catalog (`GET /spaces/templates` +
 `POST /spaces {template}`), deliberately *not* a Component kind. **Bundle export/import are
-real-backend-only by design** (blob/zip round-trips are un-mocked; they toast cleanly in mock dev).
+real-backend-only by design** (blob/zip round-trips). *(The mock backend this sentence used to mention was
+deleted 2026-08-31; the template gallery renders whatever the server publishes — today one template.)*
