@@ -1,6 +1,6 @@
 # Legacy (unversioned) API surface removal — API-5 / BACKLOG D3
 
-**Status:** in flight (started 2026-07-25) · **Decision:** BACKLOG §2 D3, authorized 2026-07-25
+**Status:** ✅ SHIPPED 2026-07-25 (`REQUIREMENTS.md` API-5) · ARCHIVED — *(this header still read "in flight" until 2026-09-08; the as-built home is the concept below)* · started 2026-07-25 · **Decision:** BACKLOG §2 D3, authorized 2026-07-25
 **Concept home on completion:** `docs/okf/backend/control-plane/api-v1.md`
 
 ## What is actually being removed

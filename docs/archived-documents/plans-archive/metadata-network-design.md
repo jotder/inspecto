@@ -1,8 +1,8 @@
 # The Metadata Network — configuration-graph design & bundle schema (v2 proposal)
 
 > Discussion draft, 2026-07-06. Companion to [`metadata-bundle.md`](metadata-bundle.md) (shipped v1).
-> Schema: [`schemas/metadata-bundle.schema.json`](schemas/metadata-bundle.schema.json) ·
-> samples: [`schemas/samples/`](schemas/samples/).
+> Schema: [`schemas/metadata-bundle.schema.json`](../../api/schemas/metadata-bundle.schema.json) ·
+> samples: [`schemas/samples/`](../../api/schemas/samples/).
 
 ## 1. The thesis: Inspecto *is* its metadata network
 

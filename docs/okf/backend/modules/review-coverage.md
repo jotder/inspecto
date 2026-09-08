@@ -2,7 +2,7 @@
 type: Reference
 title: Java Review Coverage
 description: Which Java surfaces have been read line-by-line, when, and the defect classes that keep recurring — so a later sweep starts from what is unread rather than re-reading what is clean.
-resource: docs/archived-documents/plans-archive/java-codebase-review-sweep.md
+resource: pom.xml
 tags: [review, coverage, defect-classes, control-plane, engine]
 timestamp: 2026-08-18T00:00:00Z
 ---
@@ -10,7 +10,9 @@ timestamp: 2026-08-18T00:00:00Z
 # Java Review Coverage (as-built)
 
 Distilled from `java-codebase-review-sweep.md` (completed 2026-08-18, archived in
-`../../../archived-documents/plans-archive/`) — that plan holds the full per-file evidence base.
+`../../../archived-documents/plans-archive/`) — that plan holds the full per-file evidence base, as
+*provenance*: this page is the authority for what has been read, and `resource:` points at the reactor it
+covers, not at the archive (2026-09-08).
 This page keeps only what stays useful: **what has been read, what has not, and the defect classes
 worth hunting first.**
 

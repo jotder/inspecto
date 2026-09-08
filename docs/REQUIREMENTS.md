@@ -417,12 +417,17 @@ template gallery + apply).*
 
 | Document | What it grounds |
 |---|---|
-| [`archived-documents/plans-archive/feature-matrix-editions.md`](archived-documents/plans-archive/feature-matrix-editions.md) | Original H/M/S/N ratings + edition tiers (2026-07-02 planning view) |
-| [`archived-documents/plans-archive/api-contract-design.md`](archived-documents/plans-archive/api-contract-design.md) | 33 product-owner API guidelines; W1–W7 delivery worklog |
+| [`api/README.md`](api/README.md) · [`okf/backend/control-plane/api-v1.md`](okf/backend/control-plane/api-v1.md) | The `/api/v1` contract as built — envelope, error catalog, OpenAPI, ETag concurrency, `/bootstrap` (API-1…5) |
 | [`okf/living-operational-system.md`](okf/living-operational-system.md) | Seven-network north star (the R1–R6 rework shipped 2026-07-06; plan archived 2026-09-07) |
-| [`archived-documents/plans-archive/backend-backlog.md`](archived-documents/plans-archive/backend-backlog.md) | Component-store seam history; Matrix/job-template sequencing |
-| [`archived-documents/plans-archive/embedded-intelligence-plan.md`](archived-documents/plans-archive/embedded-intelligence-plan.md) | AGT-5 phases P0–P5, autonomy ladder (COMPLETE 2026-07-21; archived) |
+| [`BACKLOG.md`](BACKLOG.md) | Every open row, ranked; §6 the standing refusals; §7 the duplicate map |
+| [`okf/backend/agent/embedded-intelligence.md`](okf/backend/agent/embedded-intelligence.md) | The Assistant's autonomy ladder and tool surface as built (AGT-5, complete 2026-07-21) |
 | [`roadmap/ROADMAP.md`](roadmap/ROADMAP.md) · [`roadmap/STAKEHOLDER_OVERVIEW.md`](roadmap/STAKEHOLDER_OVERVIEW.md) | Horizons; value proposition; maturity |
 | [`EDITIONS.md`](EDITIONS.md) | Edition capability tiers |
 | [`GLOSSARY.md`](GLOSSARY.md) | Binding vocabulary (§0 rules; §13 rename status) |
 | [`FEATURE_INVENTORY.md`](FEATURE_INVENTORY.md) | Per-feature TOON shapes + runnability constraints |
+
+*Provenance, not authority (2026-09-08):* the planning documents these rows were first derived from —
+`feature-matrix-editions.md` (the 2026-07-02 H/M/S/N ratings), `api-contract-design.md` (the 33 API
+guidelines and the W1–W7 worklog), `backend-backlog.md` and `embedded-intelligence-plan.md` — are in
+`archived-documents/plans-archive/` and are listed in [`INDEX.md`](INDEX.md) §Archived plans. ⛔ Read them for
+*why* a row was written, never for what is built; the archive is not maintained.

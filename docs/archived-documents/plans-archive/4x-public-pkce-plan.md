@@ -4,6 +4,7 @@
 `ce49a681`). **Only P2 remains — and P2 is entirely operator action** (deploy a bundle carrying them,
 then rotate at the issuer). No code work is left on this plan.
 ⚠ **Do not archive this plan until rotation is confirmed** — P2 is the whole point of the exercise.
+> *(2026-09-08: it WAS archived before that. The open P2 — operator rotation at the issuer — is tracked as `BACKLOG.md` §2 **SEC-INCIDENT-1**; this file is provenance only.)*
 · **Opened:** 2026-07-25 · **Branch of record:** ~~`4.x`~~ → **`master`**
 
 > ⚠ **`4.x` WAS DELETED 2026-08-17** (operator call), after this plan was written. Every commit it

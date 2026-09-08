@@ -124,8 +124,9 @@ status header has an **unknown** status, not an unbuilt one: this index once cal
 "NOT APPROVED, NOTHING BUILT" for two days because the status was inferred from a missing header instead of
 from the code.
 
-Full list: [`archived-documents/plans-archive/`](archived-documents/plans-archive/) (143 files). The 46 that
-this index used to narrate, newest first:
+Full list: [`archived-documents/plans-archive/`](archived-documents/plans-archive/) (143 files). The 54
+narrated here, newest first (⚠ 2026-09-08: two rows were missing — `record-transformer-replaces-map-plan`
+and `path-containment-unification` had been archived with no row — and the count read 46 over 52 rows):
 
 | Archived plan | Archived | Its truth now lives in |
 |---|---|---|
@@ -138,6 +139,7 @@ this index used to narrate, newest first:
 | [`postgres-multi-user-plan`](archived-documents/plans-archive/postgres-multi-user-plan.md) | 2026-09-06 | — PARKED, `BACKLOG.md` §6 |
 | [`geo-map-case-studies`](archived-documents/plans-archive/geo-map-case-studies.md) | 2026-09-06 | [`okf/frontend/features/geo-map.md`](okf/frontend/features/geo-map.md) |
 | [`delete-transform-map-plan`](archived-documents/plans-archive/delete-transform-map-plan.md) | 2026-09-05 | [`okf/backend/engine/catalog-vs-executors.md`](okf/backend/engine/catalog-vs-executors.md) · [`okf/frontend/features/schema-mapping-authoring.md`](okf/frontend/features/schema-mapping-authoring.md) |
+| [`record-transformer-replaces-map-plan`](archived-documents/plans-archive/record-transformer-replaces-map-plan.md) | 2026-09-05 | [`okf/frontend/features/schema-mapping-authoring.md`](okf/frontend/features/schema-mapping-authoring.md) · [`okf/backend/engine/catalog-vs-executors.md`](okf/backend/engine/catalog-vs-executors.md) · [`okf/backend/pipeline-graph/step-catalog.md`](okf/backend/pipeline-graph/step-catalog.md) |
 | [`parse-pane-redesign-plan`](archived-documents/plans-archive/parse-pane-redesign-plan.md) | 2026-09-04 | [`okf/frontend/features/grammar-config.md`](okf/frontend/features/grammar-config.md) · [`okf/backend/engine/node-types.md`](okf/backend/engine/node-types.md) · [`okf/backend/pipeline-graph/pipeline-config-keys.md`](okf/backend/pipeline-graph/pipeline-config-keys.md) |
 | [`sql-transform-v1-plan`](archived-documents/plans-archive/sql-transform-v1-plan.md) | 2026-09-04 | [`okf/frontend/features/schema-mapping-authoring.md`](okf/frontend/features/schema-mapping-authoring.md) · [`okf/backend/engine/catalog-vs-executors.md`](okf/backend/engine/catalog-vs-executors.md) |
 | [`sql-only-transform-feasibility`](archived-documents/plans-archive/sql-only-transform-feasibility.md) | 2026-09-04 | [`okf/backend/engine/catalog-vs-executors.md`](okf/backend/engine/catalog-vs-executors.md) |
@@ -164,6 +166,7 @@ this index used to narrate, newest first:
 | [`domain-timezone-behaviour-plan`](archived-documents/plans-archive/domain-timezone-behaviour-plan.md) | 2026-08-15 | [`okf/backend/control-plane/jobs.md`](okf/backend/control-plane/jobs.md) |
 | [`map-node-config-home-plan`](archived-documents/plans-archive/map-node-config-home-plan.md) | 2026-08-15 | [`okf/backend/pipeline-graph/editable-round-trip.md`](okf/backend/pipeline-graph/editable-round-trip.md) |
 | [`pipeline-build-test-run-gaps`](archived-documents/plans-archive/pipeline-build-test-run-gaps.md) | 2026-08-14 | [`okf/backend/engine/pipeline-test-run.md`](okf/backend/engine/pipeline-test-run.md) · [`okf/frontend/features/pipeline-editor.md`](okf/frontend/features/pipeline-editor.md) |
+| [`path-containment-unification`](archived-documents/plans-archive/path-containment-unification.md) | 2026-08-14 | [`okf/backend/config/config-safety.md`](okf/backend/config/config-safety.md) |
 | [`consignment-chain-plan`](archived-documents/plans-archive/consignment-chain-plan.md) | 2026-08-13 | [`okf/backend/engine/consignment-status-flow.md`](okf/backend/engine/consignment-status-flow.md) · [`okf/backend/engine/ingestion.md`](okf/backend/engine/ingestion.md) |
 | [`pipeline-multiplicity-plan`](archived-documents/plans-archive/pipeline-multiplicity-plan.md) | 2026-08-11 | [`okf/backend/engine/stage1-architecture.md`](okf/backend/engine/stage1-architecture.md) · [`okf/backend/pipeline-graph/multi-location-ingest.md`](okf/backend/pipeline-graph/multi-location-ingest.md) |
 | [`job-parameter-contract-plan`](archived-documents/plans-archive/job-parameter-contract-plan.md) | 2026-08-10 | [`okf/backend/control-plane/jobs.md`](okf/backend/control-plane/jobs.md) · [`okf/frontend/features/jobs.md`](okf/frontend/features/jobs.md) |
