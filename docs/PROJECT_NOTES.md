@@ -65,7 +65,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
 
 | Topic | Doc |
 |---|---|
-| **What a capability REQUIRED / has BUILT / has LEFT / REFUSED** (new tier 2026-09-08) | [`okf/capabilities/`](okf/capabilities/index.md) — one doc per area ID. `ACQ` is the pilot; the other 14 areas are sized in [`docs-consolidation-plan.md`](superpower/docs-consolidation-plan.md) §5.1. ⚠ The `okf/` sections answer only "what is built", and answer it by CODE LAYER |
+| **What a capability REQUIRED / has BUILT / has LEFT / REFUSED** (new tier 2026-09-08) | [`okf/capabilities/`](okf/capabilities/index.md) — one doc per area ID; **9 of 17 slots written** as of 2026-09-08 (`ACQ` pilot, then `SEC` · `INC` · `API` · `SPC` · `MET` · `DAT` · `ING` · `OPS`). Each one's §2 is the requirement-of-record and **overrides `REQUIREMENTS.md` §3 and `EDITIONS.md` where they differ**; §5 lists what is not built. The remaining 8 slots are named in [`GLOSSARY.md`](GLOSSARY.md) §14 and sized in [`docs-consolidation-plan.md`](superpower/docs-consolidation-plan.md) §5.1. ⚠ The `okf/` sections answer only "what is built", and answer it by CODE LAYER |
 | Production investigation (process/events/metrics/state/`-D` flags/Control API/troubleshooting) | [`ADVANCED_GUIDE.md`](ADVANCED_GUIDE.md) — **living doc** |
 | Pipeline-graph design (IR, lift, validator, executor, registry, T-checklist §14) | [`pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md) |
 | Live execution of authored Pipelines (`JobType.PIPELINE`, T32) | [`live-execution.md`](okf/backend/pipeline-graph/live-execution.md) |
