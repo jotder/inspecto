@@ -118,7 +118,7 @@ widens the dock to 420px (`InspectoSplitDirective.ensureAtLeast` — never persi
 (`GET /pipelines/processor-catalog`, `ProcessorCatalog` in `inspecto-engine`, pinned by
 `processor-catalog.contract.json`): eight families (Collectors & Ingestion · Extraction & Format Parsers ·
 Data Quality · Transformers & Dimensional Modeling · Analytics/Time-Series · Enrichment & AI/ML · Control &
-Governance · Sinks), 121 processors, **every one visible**. A processor whose `addable` flag is true (it maps
+Governance · Sinks), **119** processors, **every one visible** *(⚠ this said 121 until 2026-09-09; `processor-catalog.contract.json` carries 119 — 34 delivered / 18 partial / 67 planned)*. A processor whose `addable` flag is true (it maps
 onto an authorable node type) is an ordinary add/drag entry for THAT node type; a planned processor, or a
 capability that is not a Step (a Collector guarantee, a job type, a Studio surface), renders **inactive** —
 `role=button aria-disabled`, tooltip and accessible name carrying why, a `soon` / `via <capability>` chip —
@@ -144,7 +144,7 @@ for exactly this reason. `pipelines.handler.spec.ts` pins the palette to the enu
 
 - **`lowerable`** (per type, served) answers *"can a save lower this back to the flat
   `*_pipeline.toon`?"* It does NOT mean "the engine can run it". Conflating the two is how the
-  palette once presented 20 equal options, 11 failing at Save with 422 `UNSUPPORTED_NODE`. The
+  palette once presented 20 equal options, 11 failing at Save *(⚠ that count is the pre-per-format era — `BuiltinNodeType` carries **30** constants as of 2026-09-09)* with 422 `UNSUPPORTED_NODE`. The
   palette dims non-lowerable entries; a grandfathered pipeline containing them gets a **warning
   banner, not read-only** — deleting the offending Step is the only repair, and read-only would lock
   it out.
@@ -403,8 +403,8 @@ entirely with the metadata grid (D2) — (it IS an output column, stamped at wri
   its own pane — the rule that already held for map/parse/sink.
 - **The pane (bespoke — ⅋ NOT the shared fields editor):** `PipelineTransformSqlDefinitionComponent` does
   not import `<inspecto-schema-fields-editor>`. Its **Fields** view is its own grid
-  (`# · Field name · From · What to do · Comes out as · Sample · ×`) over the `SQL_FUNCTIONS` catalog — 24
-  functions in 7 categories — with a control per declared parameter; its **SQL** view is an *editable*
+  (`# · Field name · From · What to do · Comes out as · Sample · ×`) over the `SQL_FUNCTIONS` catalog — **23**
+  functions in 7 categories *(corrected 2026-09-09 from `sql-functions.ts`: 1 Keep, 8 Text, 4 Numbers, 6 Dates, 2 Logic, 1 Convert, 1 Custom)* — with a control per declared parameter; its **SQL** view is an *editable*
   `<inspecto-sql-codemirror>`, never a `<textarea>` and no longer a refusal. The old wording follows, kept
   for the record: one SQL `<textarea>`
   seeded for a new Step with an explicit column list over the upstream sample columns (else `SELECT *
@@ -532,7 +532,7 @@ database; the lift rebuilds pairing from the stamp.
   all and looks identical to any unconfigured Step.
 - 🔴 **A round-trip test that configures the artifact under test tests nothing** — the original spec
   set `database` by hand and passed the whole time.
-- **Single-slot kinds** (`processing.join` refuses a second via `MULTI_JOIN`; `recordDedup`,
+- 🔴 **Single-slot kinds** — *corrected 2026-09-09: `MULTI_JOIN` DOES NOT EXIST.* Only **two** “too many of a kind” constants are live, `MULTI_PARSER` and `MULTI_MAP_CONFIG` (`PipelineEditable.java:58,65`); the join/dedup/route/summarize codes were deleted with the ordered `steps:` chain and survive only inside a `PipelineCompileException` Javadoc paragraph explaining their own removal. §Multiplicity below already says this — this bullet contradicted it. (`processing.join` is last-one-wins; `recordDedup`,
   `routeNode`, `summarizeNode` are last-one-wins, silently): the discard behavior is PINNED per
   slot in `PipelineEditableTest`; inverting it is an operator call (BACKLOG §4). Mid-branch
   `steps:` sub-chains are refused by both authoring surfaces — design:

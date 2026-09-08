@@ -27,8 +27,8 @@ were missing). ⛔ Create a directory here only with the name that table gives i
 |---|---|---|---|
 | `ACQ` | [Acquisition & connectivity](acquisition/acquisition.md) | `acquisition/` | ✅ **pilot — the template's first instance** |
 | `ING` | [Ingestion & parsing](ingestion/ingestion.md) | `ingestion/` | ✅ **area #8 — 2026-09-08** |
-| `PIP` | Pipeline authoring | `pipeline-authoring/` | planned — the first `PIP` spec |
-| `PIP` | Pipeline execution | `pipeline-execution/` | planned — the second `PIP` spec; near-certain §3 split (440 KB of as-built truth) |
+| `PIP` | [Pipeline authoring](pipeline-authoring/pipeline-authoring.md) | `pipeline-authoring/` | ✅ **area #16 — 2026-09-09**; owns `REQUIREMENTS.md` §3.3 **`PIP-1` only** |
+| `PIP` | Pipeline execution | `pipeline-execution/` | **planned — the LAST slot**; owns `REQUIREMENTS.md` §3.3 **`PIP-2`–`PIP-7`** (medallion lanes, incremental triggers, Scheduler + Jobs, async run triggers, job templates, the maintenance library) |
 | `DAT` | [Data plane](data-plane/data-plane.md) | `data-plane/` | ✅ **area #7 — 2026-09-08** |
 | `BI` · `INV` | [Studio](studio/studio.md) | `studio/` | ✅ **area #10 — 2026-09-08** |
 | `OPS` | [Observability & maintenance](observability/observability.md) | `observability/` | ✅ **area #9 — 2026-09-08** |

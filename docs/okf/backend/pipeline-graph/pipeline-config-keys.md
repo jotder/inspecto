@@ -124,10 +124,20 @@ chain, an ACTIVE pipeline carrying one must declare top-level `output_store:`
 (`PipelineConfig.prepare()`), and mid-branch inside `route:` it compiles but does not arm
 (`RouteArming.BRANCH_STEP_KINDS` excludes it — a save-time finding, deliberate). Its node config carries **`sql`** — the one declared attribute (`NodeAttributes.TRANSFORM_SQL`,
 `multiline`, required): a single `SELECT` whose input relation is the fixed alias **`input`** (`FROM
-input`), rewritten to the real relation at execution; DDL/DML/multi-statement refused. The Angular pane
-stores **`fields[]`** beside it — the Simple-mode rows that generated the SQL. `fields[]` is an authoring
-artifact the engine never reads (its absence means the SQL was hand-written and the Simple table is
-locked); it is not a declared attribute and must not be added to the contract as one. Details:
+input`), rewritten to the real relation at execution. 🔴 **DDL/DML/multi-statement are refused at
+EXECUTION and at `/components/transform/describe` — NOT at save** (corrected 2026-09-09): `SqlGuard` has
+zero call sites on any save path, so such a statement persists cleanly and fails only when it runs.
+The Angular pane stores **`fields[]`** beside it — the grid rows that generated the SQL.
+
+🔴 **`fields[]` IS executable — this paragraph said the opposite until 2026-09-09, and that error is
+load-bearing.** `RowShaper.MAP_NODE_CONFIG_KEYS` contains it and `RowShaper.isProjection` returns true
+when a node carries record fields, so `fields[]` **is the mapping that runs**. `PipelineEditable`'s own
+comment states the stake: *"a key that becomes executable without joining this allow-list is silently
+dropped on save, which is the failure both constants exist to make impossible."* The old sentence
+(“the engine never reads it … must not be added to the contract”) is exactly the reasoning that left the
+client mirror `pipeline-editable.ts` carrying two keys where `PipelineEditable.MAP_AUTHORED` carries
+three — the drift now in `BACKLOG.md` §4. ⚠ Its absence also no longer means a locked table: the
+“hand edit LOCKS the Step” rule was superseded 2026-09-05 by the peer Fields|SQL views. Details:
 [`catalog-vs-executors.md`](../engine/catalog-vs-executors.md).
 
 ## Utility-only sections (neither authority)

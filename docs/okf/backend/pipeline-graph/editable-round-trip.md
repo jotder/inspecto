@@ -38,7 +38,7 @@ speaks the **config-file vocabulary end to end**, so nothing typed crosses the H
   [`PipelineCompileException`](../../../../inspecto-engine/src/main/java/com/gamma/pipeline/PipelineCompileException.java)
   carries stable codes — `UNSUPPORTED_NODE` (a node type the flat config has no home for),
   `UNSUPPORTED_BINDING` (a home for the *node*, but not for the `use:` component ref it carries — see
-  below), `MULTI_SINK`
+  below), ~~`MULTI_SINK`~~ 🔴 **(DELETED — not a live refusal; corrected 2026-09-09.** Its constant went with the pipeline spec's Wave 0 when `sinks:` became a plural block — see `PipelineCompileException`'s Javadoc and `pipeline-editable.ts`. A >1-destination list now SAVES and is refused at `PipelineConfig.prepare()`: an execution-time refusal, not an authoring one.)
   (>1 distinct persistent `database` dir — the flat config expresses exactly one), and the strict
   completeness set `NO_ACQUISITION`/`NO_PARSER`/`NO_PERSISTENT_SINK`/`PARSER_NO_SCHEMA`. This closes the
   old `toConfigMap` behaviour of silently picking the first sink. `strict` = an `active` save or a

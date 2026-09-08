@@ -319,7 +319,7 @@ ordering.
 
 ## 6. Step types and which may connect
 
-28 builtin types in 5 categories. Each declares what it **accepts** and **emits**.
+**30** builtin types in 5 categories *(corrected 2026-09-09 — this said 28; counted from `BuiltinNodeType`)*. Each declares what it **accepts** and **emits**.
 
 ⚠ **Read this table as the CURRENT declaration, not as the intended model.** It is phrased in terms of
 records flowing along a `data` edge; the runtime passes a Consignment token and resolves data by
@@ -353,7 +353,7 @@ refuses. The validator is the single authority.
 Two different vocabularies are served, which is why the palette and the verb list disagree:
 
 - `GET /pipelines/node-types` — **all 28 types**, grouped by category (what the canvas palette shows).
-- `GET /pipelines/step-types` — the **9-entry verb catalogue**: `collect · parse · map · dedup ·
+- `GET /pipelines/step-types` — ⚠ **16 entries over 9 verbs, and there is no `map`** (corrected 2026-09-09; this said “9-entry” and listed `map`, deleted 2026-09-05): `collect · parse`(×7)` · sql · lookup · dedup ·
   transform`(filter) `· transform`(join) `· summarize · route · sink`.
 
 🔴 **The verb catalogue authors the GENERIC `parser` type.** That contradicts the recorded decision
